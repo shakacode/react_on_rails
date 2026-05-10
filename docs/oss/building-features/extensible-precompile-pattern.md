@@ -25,20 +25,22 @@ Consider this approach if you:
 
 ### Migration Checklist
 
+If you have not already completed [Sections 1-4 below](#1-customize-bindev), do that first so `bin/dev`,
+`config/shakapacker.yml`, your Procfiles, and your build commands are in place before you start removing duplicates.
+
 When moving custom build work out of `precompile_hook`, make the ownership change in one commit so the same task cannot run twice:
 
 1. Uncomment and add custom one-time tasks to the `run_precompile_tasks` method in `bin/dev`.
 2. Ensure `build_test_command` and `build_production_command` each include every one-time build task those lifecycles
    need, such as ReScript builds, TypeScript checks or compilation, and locale generation. `bin/dev` is not invoked in
    CI or production, so these commands are the only mechanism those lifecycles have.
-3. Verify the updated commands work locally before removing duplicate invocations from Procfiles or CI/CD scripts.
-4. Remove one-time build commands from individual Procfile process entries. If those same commands appear as standalone
-   steps in CI/CD pipeline scripts, remove those duplicate invocations too. For example, remove a bare `yarn res:build`
-   GitHub Actions step only after `build_test_command` or `build_production_command` includes it. Do not delete entire
-   `.github/workflows`, `.circleci/config.yml`, or Heroku `app.json` files unless they exist solely for the migrated build
-   step.
-5. Remove `precompile_hook` from `config/shakapacker.yml` as shown in [Section 2](#2-configure-shakapackeryml).
-6. Keep long-running watchers, such as `rescript: yarn res:watch`, as separate Procfile processes.
+3. After verifying the updated commands work locally, remove one-time build commands from individual Procfile process
+   entries. If those same commands appear as standalone steps in CI/CD pipeline scripts, remove those duplicate
+   invocations too. For example, remove a bare `yarn res:build` GitHub Actions step only after `build_test_command` or
+   `build_production_command` includes it. Do not delete entire `.github/workflows`, `.circleci/config.yml`, or Heroku
+   `app.json` files unless they exist solely for the migrated build step.
+4. Remove `precompile_hook` from `config/shakapacker.yml` as shown in [Section 2](#2-configure-shakapackeryml).
+5. Keep long-running watchers, such as `rescript: yarn res:watch`, as separate Procfile processes.
 
 The goal is one owner per lifecycle: `bin/dev` owns development startup, Procfile processes own long-running watchers, and React on Rails build commands own test and production compilation.
 
@@ -213,6 +215,9 @@ executable bit for CI and other checkouts:
 chmod +x bin/build-react-on-rails
 git add bin/build-react-on-rails
 ```
+
+For a new untracked file, `git add --chmod=+x bin/build-react-on-rails` does both in one step — it stages the file
+and records the executable bit at the same time without touching the working-tree mode separately.
 
 On Windows or Docker bind mounts backed by a Windows filesystem, the filesystem may not preserve Unix modes, so `chmod`
 may not make the current checkout runnable. Record the executable bit in Git for CI and other checkouts, and invoke the

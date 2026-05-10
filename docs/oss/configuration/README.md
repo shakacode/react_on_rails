@@ -105,7 +105,7 @@ ReactOnRails.configure do |config|
   # - Minitest: ReactOnRails::TestHelper.ensure_assets_compiled
   # This controls what command is run to build assets during tests
   ################################################################################
-  config.build_test_command = "RAILS_ENV=test bin/shakapacker"
+  config.build_test_command = "RAILS_ENV=test NODE_ENV=test bin/shakapacker"
 
   #
   # React Server Components and Streaming SSR are React on Rails Pro features.
@@ -404,7 +404,7 @@ Advanced static-only workflow (optional):
 
 ```ruby
 # config/initializers/react_on_rails.rb
-config.build_test_command = "RAILS_ENV=test bin/shakapacker"
+config.build_test_command = "RAILS_ENV=test NODE_ENV=test bin/shakapacker"
 ```
 
 ```ruby
@@ -893,7 +893,7 @@ ReactOnRails.configure do |config|
   config.server_bundle_js_file = "server-bundle.js"
 
   # Test configuration
-  config.build_test_command = "RAILS_ENV=test bin/shakapacker"
+  config.build_test_command = "RAILS_ENV=test NODE_ENV=test bin/shakapacker"
 
   # File-based component registry
   config.components_subdirectory = "ror_components"
