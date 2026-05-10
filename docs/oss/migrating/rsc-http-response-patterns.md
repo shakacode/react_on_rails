@@ -37,7 +37,6 @@ class StoriesController < ApplicationController
       # Extend this hash whenever the preflight gains a new redirect branch.
       redirect_path = {
         unauthenticated: sign_in_path,
-        # moved_permanently: story_path(preflight.canonical_slug),
       }.fetch(preflight.redirect_reason) do |reason|
         raise ArgumentError, "Unknown redirect_reason: #{reason.inspect}"
       end
@@ -76,6 +75,10 @@ class StoryPagePreflight
     def redirect_status
       return unless redirect_reason
 
+      # 303 (:see_other) forces GET on the redirect target, which is correct
+      # when the original request might be POST (for example, a sign-in flow
+      # that follows a form submission). Override with :found (302) when both
+      # legs are GET, matching Rails' redirect_to default.
       self[:redirect_status] || :see_other
     end
   end
@@ -164,12 +167,29 @@ def show
 end
 ```
 
-Then keep the React component purely presentational. Set `notFound` explicitly on every branch so the discriminated union is fully exhaustive and TypeScript narrows `story` correctly. Keep `props` whole until after the guard so the narrowing flows through:
+Then keep the React component purely presentational. Set `notFound` explicitly on every branch so the discriminated union is fully exhaustive and TypeScript narrows `story` correctly. Keep `props` whole until after the guard — destructuring upfront collapses the union and loses the narrowing.
 
 ```tsx
 type StoryData = { id: number; title: string };
 type StoryPageProps = { notFound: true; story: null } | { notFound: false; story: StoryData };
+```
 
+What not to do — destructuring before the guard loses narrowing:
+
+```tsx
+export default function StoryPage(props: StoryPageProps) {
+  const { notFound, story } = props; // story widens to StoryData | null — TypeScript can't narrow it further
+  if (notFound) {
+    return <NotFoundMessage />;
+  }
+
+  return <Story story={story} />; // TS error: story is still StoryData | null here
+}
+```
+
+Keep `props` intact through the guard so the discriminated union narrows correctly:
+
+```tsx
 export default function StoryPage(props: StoryPageProps) {
   if (props.notFound) {
     return <NotFoundMessage />;
@@ -304,6 +324,10 @@ response.headers["Vary"] = "Accept-Language"
 > ```ruby
 > # Call this before streaming, e.g. in a before_action or inline in the action.
 > def merge_vary_header(*tokens)
+>   # Per RFC 7231, "*" must not appear alongside named fields, so collapse to
+>   # "*" whenever any caller passes it.
+>   return response.headers["Vary"] = "*" if tokens.map(&:strip).include?("*")
+>
 >   existing = response.headers["Vary"].presence
 >   return if existing == "*"
 >
