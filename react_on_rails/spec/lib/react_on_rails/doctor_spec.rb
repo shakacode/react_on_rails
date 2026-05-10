@@ -2585,17 +2585,47 @@ RSpec.describe ReactOnRails::Doctor do
 
       after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
 
-      it "keeps the symlink-mode suggestion while noting image-build context may differ" do
+      it "shows MODE=symlink and MODE=copy on separate lines for deploy vs image-build hooks" do
         doctor.send(:check_deprecated_renderer_cache_task)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs).not_to be_empty
+        warning_content = warning_msgs.map { |m| m[:content] }.join("\n")
+        # Match from the bullet header through any indented continuation lines.
+        bullet_section = warning_content[%r{  • \.kamal/deploy\.yml →(?:\n {6,}.*)*}]
+        expect(bullet_section).not_to be_nil
+        expect(bullet_section).to include("rake react_on_rails_pro:pre_seed_renderer_cache MODE=symlink")
+        expect(bullet_section).to include("Kamal deploy hooks")
+        expect(bullet_section).to include("Kamal image-build hooks")
+        expect(bullet_section).to include("MODE=copy")
+        # The previous trailing-comment form ("# use copy mode for image builds") was contradictory
+        # for users editing build hooks, so it must not reappear on the same line as the command.
+        expect(bullet_section).not_to match(/MODE=symlink # use copy mode for image builds/)
+      end
+    end
+
+    context "when a Capistrano staging deploy config references the deprecated task" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        FileUtils.mkdir_p(File.join(tmpdir, "config/deploy"))
+        File.write(
+          File.join(tmpdir, "config/deploy/staging.rb"),
+          "before 'deploy:assets:precompile', 'react_on_rails_pro:pre_stage_bundle_for_node_renderer'\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "flags multi-stage Capistrano deploy files for migration" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         suggestion_line = warning_msgs
                           .flat_map { |m| m[:content].split("\n") }
-                          .find { |line| line.include?(".kamal/deploy.yml →") }
+                          .find { |line| line.include?("config/deploy/staging.rb →") }
         expect(suggestion_line).not_to be_nil
+        expect(suggestion_line).to include("pre_seed_renderer_cache")
         expect(suggestion_line).to include("MODE=symlink")
-        expect(suggestion_line).to include("# use copy mode for image builds")
-        expect(suggestion_line).not_to include("(use copy mode")
       end
     end
 

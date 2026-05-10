@@ -83,6 +83,7 @@ module ReactOnRails
       "bin/docker-entrypoint",
       "config/deploy.rb",
       "config/deploy/production.rb",
+      "config/deploy/staging.rb",
       ".kamal/deploy.yml",
       "scripts/deploy.sh"
     ].freeze
@@ -2859,7 +2860,12 @@ module ReactOnRails
         "ENV RENDERER_SERVER_BUNDLE_CACHE_PATH=/app/.node-renderer-bundles\n" \
           "RUN bundle exec rake react_on_rails_pro:pre_seed_renderer_cache"
       elsif path.start_with?(".kamal/")
-        "rake react_on_rails_pro:pre_seed_renderer_cache MODE=symlink # use copy mode for image builds"
+        # Kamal hooks run in two contexts: post-deploy hooks on the live server (symlink),
+        # and image-build hooks invoked during the Docker build (copy). The trailing comments
+        # disambiguate so users pick the mode that matches the hook they're editing.
+        "rake react_on_rails_pro:pre_seed_renderer_cache MODE=symlink\n" \
+          "# For Kamal deploy hooks (post-deploy, on the live server): MODE=symlink\n" \
+          "# For Kamal image-build hooks (hook/pre-build inside the Docker build): MODE=copy"
       else
         # docker-compose.yml / compose.yaml / bin/* / config/deploy.rb / scripts/deploy.sh
         # default to symlink (correct for local dev + same-filesystem deploys); call out the

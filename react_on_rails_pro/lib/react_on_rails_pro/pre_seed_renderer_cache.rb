@@ -40,18 +40,22 @@ module ReactOnRailsPro
 
       assets, rsc_required_paths = RendererCacheHelpers.collect_assets_with_required_paths
 
+      # Block-level `rescue` (Ruby 2.5+): equivalent to wrapping the block body in
+      # begin/rescue/end. RuboCop's Style/RedundantBegin enforces this form, so
+      # callers reading the loop should treat the rescue clause below as the
+      # iteration body's exception handler — not the surrounding method's.
       RendererCacheHelpers.bundle_sources(pool, action_description(mode)).each do |src_bundle_path, bundle_hash|
         bundle_dir = File.join(cache_dir, bundle_hash.to_s)
         stage_bundle(src_bundle_path, bundle_dir, bundle_hash, mode)
         # The Node Renderer serves manifests from whichever bundle dir it loaded,
         # so both server and RSC dirs need the manifests present.
         stage_assets(assets, bundle_dir, rsc_required_paths, mode)
-      # Fail-fast: re-raise on the first bundle failure so the deploy sees a non-zero exit and
-      # aborts before downstream steps assume the cache is complete. Earlier bundles that
-      # already staged successfully (e.g. server bundle when RSC fails) remain on disk for
-      # diagnosis or for a re-run, but the renderer should not be expected to start from a
-      # partially-staged cache — operators must rebuild the cache or roll back.
       rescue StandardError => e
+        # Fail-fast: re-raise on the first bundle failure so the deploy sees a non-zero exit and
+        # aborts before downstream steps assume the cache is complete. Earlier bundles that
+        # already staged successfully (e.g. server bundle when RSC fails) remain on disk for
+        # diagnosis or for a re-run, but the renderer should not be expected to start from a
+        # partially-staged cache — operators must rebuild the cache or roll back.
         warn "[ReactOnRailsPro] Renderer cache staging failed for bundle #{bundle_hash}; " \
              "cache may be partially staged: #{e.message}"
         raise
@@ -174,8 +178,10 @@ module ReactOnRailsPro
       File.rename(tmp, destination)
       puts "[ReactOnRailsPro] #{log_prefix}: #{relative_source_path} -> #{destination}"
     ensure
-      # `tmp` is nil if assignment never ran. On success it has been renamed away, so rm_f is a no-op;
-      # on failure it removes the temp symlink.
+      # Ruby pre-initializes `tmp` to nil at parse time, so the local exists even if
+      # an exception fires before the assignment runs — the `if tmp` guard turns that
+      # case into a no-op. On success the file has been renamed away; on a failure
+      # after assignment it removes the temp symlink.
       FileUtils.rm_f(tmp) if tmp
     end
     private_class_method :make_relative_symlink

@@ -2,10 +2,19 @@
 
 require "active_support"
 
-namespace :react_on_rails_pro do
+namespace :react_on_rails_pro do # rubocop:disable Metrics/BlockLength
   desc "Stage the Node Renderer bundle cache. MODE=copy (default; Docker/image builds) " \
        "or MODE=symlink (dev/CI/same-filesystem deploys)."
   task pre_seed_renderer_cache: :environment do
+    # Mirrors the guard in `AssetsPrecompile.call`: invoking the staging path against a
+    # non-NodeRenderer setup eventually reaches `pool.server_bundle_hash` and fails with
+    # a low-level error. Abort early with actionable guidance instead.
+    unless ReactOnRailsPro.configuration.node_renderer?
+      abort "[ReactOnRailsPro] react_on_rails_pro:pre_seed_renderer_cache requires the Node Renderer. " \
+            "Set config.server_renderer = \"NodeRenderer\" in your Pro initializer, or remove this task " \
+            "from your deploy pipeline."
+    end
+
     raw_mode = ENV["MODE"].to_s.downcase
     raw_mode = "copy" if raw_mode.empty?
     valid_modes = ReactOnRailsPro::PreSeedRendererCache::VALID_MODES.map(&:to_s)
