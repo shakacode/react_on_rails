@@ -134,7 +134,15 @@ RUN bundle exec rake react_on_rails_pro:pre_seed_renderer_cache
 
 Both modes stage the server bundle, any configured `assets_to_copy`, and (when RSC is enabled) the RSC bundle and its companion manifests.
 
-The `pre_seed_renderer_cache` task is also invoked automatically at the end of `assets:precompile` with `MODE=symlink`, so the local/CI/Heroku path has zero new configuration.
+The `pre_seed_renderer_cache` task is also invoked automatically at the end of `assets:precompile`, defaulting to `MODE=symlink` so the local/CI/Heroku path has zero new configuration. To bake the cache into a Docker image when `assets:precompile` is the final asset step (rather than calling the rake task explicitly), set `ASSETS_PRECOMPILE_RENDERER_CACHE_MODE=copy` in the build environment:
+
+```dockerfile
+ENV RENDERER_SERVER_BUNDLE_CACHE_PATH=/app/.node-renderer-bundles
+ENV ASSETS_PRECOMPILE_RENDERER_CACHE_MODE=copy
+RUN bundle exec rake assets:precompile
+```
+
+Invalid values raise a clear error listing the accepted modes (`copy`, `symlink`).
 
 > [!NOTE]
 > The older `react_on_rails_pro:pre_stage_bundle_for_node_renderer` rake task and `ReactOnRailsPro::PrepareNodeRenderBundles` class are deprecated in favor of the unified API. Both remain available as thin shims that emit a deprecation warning and delegate to `MODE=symlink`. `react_on_rails:doctor` flags deploy scripts that still reference the deprecated task.
