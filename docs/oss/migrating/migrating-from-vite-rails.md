@@ -69,6 +69,50 @@ bundle exec rails generate react_on_rails:install
 
 The generator adds the React on Rails initializer, `bin/dev`, Shakapacker config, example routes, and the server bundle entrypoint.
 
+### Nested `client/` package roots
+
+Some legacy Rails apps keep `package.json`, lockfiles, `node_modules`, and the webpack config under `client/`.
+You can keep that layout during an incremental migration instead of moving every JavaScript file to the Rails root in
+the first PR.
+
+First, point React on Rails diagnostics at the real package root:
+
+```ruby
+# config/initializers/react_on_rails.rb
+config.node_modules_location = "client"
+```
+
+Then keep root-level binstubs and config files as thin wrappers so Rails, Shakapacker, and CI still have the paths they
+expect:
+
+```bash
+#!/usr/bin/env bash
+# bin/shakapacker - create this file, then make it executable:
+#   chmod +x bin/shakapacker
+# set -eu: exit immediately on any error (-e) or reference to an unset variable (-u).
+# exec then propagates shakapacker's exit code directly to the caller.
+set -eu
+cd "$(dirname "$0")/.."
+JS_PACKAGE_ROOT=client # Match config.node_modules_location; change this if you use frontend/, app/javascript/, etc.
+exec "./${JS_PACKAGE_ROOT}/node_modules/.bin/shakapacker" "$@"
+```
+
+```js
+// config/webpack/webpack.config.js
+// "../../" goes from config/webpack/ back to the Rails root, then into client/.
+module.exports = require('../../client/config/webpack/webpack.config.js');
+```
+
+```text
+# Procfile.dev
+web: bin/rails server
+js: bin/shakapacker --watch --mode development
+```
+
+Use the same pattern for any static-assets Procfile or custom `bin/dev` launcher: keep the Rails-facing command at the
+repo root, but delegate the actual JavaScript executable to the configured package root's `node_modules/.bin`. Once the
+migration is stable, you can decide separately whether moving the package root to the Rails root is worth the churn.
+
 ## 2. Replace Vite layout tags
 
 A typical Vite layout looks like this:

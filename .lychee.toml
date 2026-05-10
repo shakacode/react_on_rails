@@ -67,6 +67,7 @@ exclude = [
   '^https://angularjs\.org/?$',            # Connection failed from CI
   '^https://frigade\.com/blog/bundle-size-reduction-with-rsc-and-frigade/?$', # Connection failed from CI
   '^https://tanstack\.com/router',           # Connection failed from CI
+  '^https://tanstack\.com/query/latest/docs/framework/react/guides/ssr$', # Connection failed from CI
   '^https://lodash\.com',                    # Connection reset from CI
   '^https://vite-ruby\.netlify\.app/?$',     # Intermittent connection resets from CI
 
@@ -136,6 +137,8 @@ exclude_path = [
 # Don't check fragments/anchors (can be flaky)
 include_fragments = false
 
-# Cache results to speed up repeated runs
+# Keep CI cache entries short-lived so transient external failures do not
+# linger across otherwise valid PRs.
 cache = true
-max_cache_age = "1d"
+max_cache_age = "6h"
+cache_exclude_status = ["429", "500..=599"]

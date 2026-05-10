@@ -491,8 +491,8 @@ module ReactOnRails
     end
 
     def check_npm_package_version
-      package_json_path = resolved_package_json_path
-      return unless File.exist?(package_json_path)
+      package_json_path = package_json_path_for("react-on-rails npm package version")
+      return unless package_json_path
 
       begin
         package_json = JSON.parse(File.read(package_json_path))
@@ -607,8 +607,8 @@ module ReactOnRails
     end
 
     def check_npm_wildcards
-      package_json_path = resolved_package_json_path
-      return unless File.exist?(package_json_path)
+      package_json_path = package_json_path_for("npm package version constraints")
+      return unless package_json_path
 
       begin
         package_json = JSON.parse(File.read(package_json_path))
@@ -721,8 +721,8 @@ module ReactOnRails
     end
 
     def auto_fix_versions
-      package_json_path = resolved_package_json_path
-      return unless File.exist?(package_json_path)
+      package_json_path = package_json_path_for("package version auto-sync")
+      return unless package_json_path
 
       synchronizer = ReactOnRails::VersionSynchronizer.new(package_json_path: package_json_path, io: StringIO.new)
       result = synchronizer.sync(write: true)
@@ -766,8 +766,8 @@ module ReactOnRails
     end
 
     def check_pro_package_consistency
-      package_json_path = resolved_package_json_path
-      return unless File.exist?(package_json_path)
+      package_json_path = package_json_path_for("Pro package consistency")
+      return unless package_json_path
 
       package_json = JSON.parse(File.read(package_json_path))
       all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
@@ -2917,7 +2917,15 @@ module ReactOnRails
       # Prefer the actually installed version from node_modules over the declared
       # range in package.json. Declared ranges like "^19.0.0" would be misleading
       # (stripped to "19.0.0" even though 19.0.4+ may be installed).
-      installed = installed_react_version
+      package_root = resolved_package_root
+      if package_root_missing?(package_root)
+        # This check only needs the directory before Node chdirs into it; an
+        # installed React version can be resolved without package.json.
+        warn_missing_package_root(package_root)
+        return nil
+      end
+
+      installed = installed_react_version(package_root)
       return installed if installed
 
       declared_react_version
@@ -2925,11 +2933,12 @@ module ReactOnRails
       nil
     end
 
-    def installed_react_version
+    def installed_react_version(package_root)
       # Use Node's own module resolution to find the actually installed React,
       # which handles hoisted dependencies in monorepos and pnpm workspaces.
-      stdout, _stderr, status = Open3.capture3("node", "-e",
-                                               "console.log(require.resolve('react/package.json'))")
+      # Resolve from the configured package root so nested client/ layouts work.
+      script = "console.log(require.resolve('react/package.json'))"
+      stdout, _stderr, status = Open3.capture3("node", "-e", script, chdir: package_root)
       return nil unless status.success?
 
       resolved_path = stdout.strip
@@ -2941,10 +2950,24 @@ module ReactOnRails
       nil
     end
 
-    def declared_react_version
-      return nil unless File.exist?("package.json")
+    def add_warning(message)
+      checker.add_warning(message)
+    end
 
-      package_json = JSON.parse(File.read("package.json"))
+    # Delegates the protected registry to checker so warnings emitted from
+    # Doctor share the same de-dupe state as warnings emitted from the checker.
+    # The cross-class call is permitted because both Doctor and SystemChecker
+    # include ConfigPathResolver, which satisfies Ruby's protected-visibility
+    # rule (caller and receiver share an ancestor that defines the method).
+    def config_path_warning_registry
+      checker.config_path_warning_registry
+    end
+
+    def declared_react_version
+      package_json_path = package_json_path_for("declared React version")
+      return nil unless package_json_path
+
+      package_json = JSON.parse(File.read(package_json_path))
       all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
       version_str = all_deps["react"]
       return nil unless version_str

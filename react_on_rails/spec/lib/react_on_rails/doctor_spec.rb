@@ -1878,15 +1878,17 @@ RSpec.describe ReactOnRails::Doctor do
   describe "Pro package consistency checks" do
     let(:doctor) { described_class.new }
     let(:checker) { doctor.instance_variable_get(:@checker) }
+    let(:package_json_path) { "/tmp/myapp/package.json" }
 
     before do
       allow(File).to receive(:exist?).and_call_original
-      allow(File).to receive(:exist?).with("package.json").and_return(true)
+      allow(doctor).to receive(:resolved_package_json_path).and_return(package_json_path)
+      allow(File).to receive(:exist?).with(package_json_path).and_return(true)
     end
 
     context "when both react-on-rails and react-on-rails-pro npm packages are installed" do
       before do
-        allow(File).to receive(:read).with("package.json").and_return(
+        allow(File).to receive(:read).with(package_json_path).and_return(
           JSON.generate({ "dependencies" => { "react-on-rails" => "16.4.0", "react-on-rails-pro" => "16.4.0" } })
         )
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
@@ -1902,7 +1904,7 @@ RSpec.describe ReactOnRails::Doctor do
 
     context "when Pro gem is installed but using base npm package" do
       before do
-        allow(File).to receive(:read).with("package.json").and_return(
+        allow(File).to receive(:read).with(package_json_path).and_return(
           JSON.generate({ "dependencies" => { "react-on-rails" => "16.4.0" } })
         )
         allow(ReactOnRails::Utils).to receive_messages(
@@ -1920,7 +1922,7 @@ RSpec.describe ReactOnRails::Doctor do
 
     context "when Pro npm package is installed without Pro gem" do
       before do
-        allow(File).to receive(:read).with("package.json").and_return(
+        allow(File).to receive(:read).with(package_json_path).and_return(
           JSON.generate({ "dependencies" => { "react-on-rails-pro" => "16.4.0" } })
         )
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
@@ -1934,7 +1936,7 @@ RSpec.describe ReactOnRails::Doctor do
 
     context "when packages and gems are consistent" do
       before do
-        allow(File).to receive(:read).with("package.json").and_return(
+        allow(File).to receive(:read).with(package_json_path).and_return(
           JSON.generate({ "dependencies" => { "react-on-rails" => "16.4.0" } })
         )
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
@@ -1954,6 +1956,7 @@ RSpec.describe ReactOnRails::Doctor do
         allow(ReactOnRails).to receive(:configuration).and_return(
           instance_double(ReactOnRails::Configuration, node_modules_location: "client")
         )
+        allow(doctor).to receive(:resolved_package_json_path).and_return(package_json_path)
         allow(File).to receive(:exist?).with(package_json_path).and_return(true)
         allow(File).to receive(:read).with(package_json_path).and_return(
           JSON.generate({ "dependencies" => { "react-on-rails-pro" => "16.4.0" } })
@@ -1964,6 +1967,73 @@ RSpec.describe ReactOnRails::Doctor do
       it "uses the configured workspace package.json path" do
         expect(checker).to receive(:add_error).with(/npm package is installed but the Pro gem is not/)
         doctor.send(:check_pro_package_consistency)
+      end
+    end
+
+    context "when node_modules_location points to a missing JS workspace" do
+      let(:rails_root) { Pathname.new("/tmp/myapp") }
+      let(:package_root) { rails_root.join("client") }
+      let(:workspace_package_json_path) { package_root.join("package.json").to_s }
+
+      before do
+        allow(Rails).to receive(:root).and_return(rails_root)
+        allow(ReactOnRails).to receive(:configuration).and_return(
+          instance_double(ReactOnRails::Configuration, node_modules_location: "client")
+        )
+        allow(doctor).to receive(:resolved_package_json_path).and_call_original
+        allow(File).to receive(:exist?).with(workspace_package_json_path).and_return(false)
+        allow(Dir).to receive(:exist?).with(package_root.to_s).and_return(false)
+      end
+
+      it "warns instead of silently skipping the Pro package check" do
+        doctor.send(:check_pro_package_consistency)
+
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("node_modules_location points to #{package_root}") })
+          .to be true
+        expect(warning_msgs.any? { |m| m[:content].include?("all diagnostics that read from it are skipped") })
+          .to be true
+      end
+
+      it "warns once when checker and doctor see the same missing package root" do
+        allow(checker).to receive(:cli_exists?).with("npm").and_return(true)
+        allow(checker).to receive(:cli_exists?).with("pnpm").and_return(false)
+        allow(checker).to receive(:cli_exists?).with("yarn").and_return(false)
+        allow(checker).to receive(:cli_exists?).with("bun").and_return(false)
+
+        checker.check_package_manager
+        doctor.send(:check_pro_package_consistency)
+
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        root_warnings = warning_msgs.select do |message|
+          message[:content].include?("node_modules_location points to #{package_root}")
+        end
+        expect(root_warnings.length).to eq(1)
+      end
+    end
+
+    context "when the configured JS workspace exists without package.json" do
+      let(:rails_root) { Pathname.new("/tmp/myapp") }
+      let(:package_root) { rails_root.join("client") }
+      let(:workspace_package_json_path) { package_root.join("package.json").to_s }
+
+      before do
+        allow(Rails).to receive(:root).and_return(rails_root)
+        allow(ReactOnRails).to receive(:configuration).and_return(
+          instance_double(ReactOnRails::Configuration, node_modules_location: "client")
+        )
+        allow(doctor).to receive(:resolved_package_json_path).and_call_original
+        allow(File).to receive(:exist?).with(workspace_package_json_path).and_return(false)
+        allow(Dir).to receive(:exist?).with(package_root.to_s).and_return(true)
+      end
+
+      it "warns instead of silently skipping the Pro package check" do
+        doctor.send(:check_pro_package_consistency)
+
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("#{workspace_package_json_path} not found") })
+          .to be true
+        expect(warning_msgs.any? { |m| m[:content].include?("Pro package consistency") }).to be true
       end
     end
   end
@@ -2068,8 +2138,10 @@ RSpec.describe ReactOnRails::Doctor do
 
     it "adds explicit guidance that Gemfile constraints are not auto-fixed" do
       result = ReactOnRails::VersionSynchronizer::Result.new(
-        changes: [],
-        changed_files: [],
+        changes: [
+          { section: "dependencies", package: "react-on-rails", from: "^16.0.0", to: "16.5.0" }
+        ],
+        changed_files: ["package.json"],
         unsupported_specs: [],
         missing_source_specs: []
       )
@@ -2090,6 +2162,47 @@ RSpec.describe ReactOnRails::Doctor do
   end
 
   describe "private path resolution helpers" do
+    describe "#resolved_package_root" do
+      let(:rails_root) { Pathname.new("/tmp/myapp") }
+
+      before do
+        allow(Rails).to receive(:root).and_return(rails_root)
+      end
+
+      def stub_node_modules_location(path)
+        allow(ReactOnRails).to receive(:configuration).and_return(
+          instance_double(ReactOnRails::Configuration, node_modules_location: path)
+        )
+      end
+
+      it "resolves root package paths to Rails.root" do
+        [nil, "", ".", rails_root.to_s, "#{rails_root}/"].each do |node_modules_location|
+          doctor = described_class.new(verbose: false, fix: false)
+          stub_node_modules_location(node_modules_location)
+
+          expect(doctor.send(:resolved_package_root)).to eq(rails_root.to_s)
+          expect(doctor.send(:resolved_package_json_path)).to eq(rails_root.join("package.json").to_s)
+          expect(doctor.send(:resolved_package_path, "package.json")).to eq(rails_root.join("package.json").to_s)
+        end
+      end
+
+      it "resolves nested package paths under Rails.root" do
+        stub_node_modules_location("client")
+
+        expect(doctor.send(:resolved_package_root)).to eq(rails_root.join("client").to_s)
+        expect(doctor.send(:resolved_package_json_path)).to eq(rails_root.join("client", "package.json").to_s)
+        expect(doctor.send(:resolved_package_path, "yarn.lock")).to eq(rails_root.join("client", "yarn.lock").to_s)
+      end
+
+      it "passes through absolute package paths" do
+        stub_node_modules_location("/opt/app/client/")
+
+        expect(doctor.send(:resolved_package_root)).to eq("/opt/app/client")
+        expect(doctor.send(:resolved_package_json_path)).to eq("/opt/app/client/package.json")
+        expect(doctor.send(:resolved_package_path, "yarn.lock")).to eq("/opt/app/client/yarn.lock")
+      end
+    end
+
     describe "#resolved_webpack_config_path" do
       it "prioritizes shakapacker's exact assets_bundler_config_path" do
         allow(File).to receive(:file?).and_return(false)
@@ -2858,6 +2971,15 @@ RSpec.describe ReactOnRails::Doctor do
       File.write("node_modules/react/package.json", "{\"version\":\"#{version}\"}")
     end
 
+    def stub_package_root(path)
+      allow(doctor).to receive(:resolved_package_root).and_return(path)
+    end
+
+    before do
+      # RSpec runs before hooks inside the chdir around hooks below, so Dir.pwd is the per-example tmpdir.
+      stub_package_root(Dir.pwd)
+    end
+
     context "when React 19.0.4+" do
       around do |example|
         Dir.mktmpdir do |tmpdir|
@@ -2960,6 +3082,85 @@ RSpec.describe ReactOnRails::Doctor do
         doctor.send(:check_rsc_react_version)
         success_msgs = checker.messages.select { |m| m[:type] == :success }
         expect(success_msgs.any? { |m| m[:content].include?("19.0.4") }).to be true
+      end
+    end
+
+    context "when React is installed in a configured nested JS workspace" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) { example.run }
+        end
+      end
+
+      it "uses the configured package root for node module resolution" do
+        package_root = File.join(Dir.pwd, "client")
+        FileUtils.mkdir_p("client")
+        File.write("client/package.json", '{"dependencies":{"react":"^19.0.0"}}')
+        FileUtils.mkdir_p("client/node_modules/react")
+        File.write("client/node_modules/react/package.json", '{"version":"19.0.4"}')
+        stub_package_root(package_root)
+        allow(Open3).to receive(:capture3)
+          .with(
+            "node",
+            "-e",
+            "console.log(require.resolve('react/package.json'))",
+            chdir: package_root
+          )
+          .and_return(
+            [
+              "#{File.join(package_root, 'node_modules/react/package.json')}\n",
+              "",
+              instance_double(Process::Status, success?: true)
+            ]
+          )
+
+        doctor.send(:check_rsc_react_version)
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(success_msgs.any? { |m| m[:content].include?("19.0.4") }).to be true
+      end
+
+      it "falls back to the declared React version in the nested package.json when node is unavailable" do
+        FileUtils.mkdir_p("client")
+        File.write("client/package.json", '{"dependencies":{"react":"19.0.4"}}')
+        stub_package_root(File.join(Dir.pwd, "client"))
+        allow(Open3).to receive(:capture3).and_return(
+          ["", "", instance_double(Process::Status, success?: false)]
+        )
+
+        doctor.send(:check_rsc_react_version)
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(success_msgs.any? { |m| m[:content].include?("19.0.4") }).to be true
+      end
+
+      it "warns when the configured package root does not exist" do
+        stub_package_root(File.join(Dir.pwd, "client"))
+
+        doctor.send(:check_rsc_react_version)
+
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("node_modules_location") }).to be true
+        expect(warning_msgs.any? { |m| m[:content].include?("does not exist") }).to be true
+        expect(warning_msgs.any? { |m| m[:content].include?("config/initializers/react_on_rails.rb") }).to be true
+        expect(warning_msgs.count { |m| m[:content].include?("node_modules_location") }).to eq(1)
+        expect(warning_msgs.any? { |m| m[:content].include?("all diagnostics that read from it are skipped") })
+          .to be true
+      end
+
+      it "warns when the configured package root exists without package.json" do
+        package_root = File.join(Dir.pwd, "client")
+        package_json_path = File.join(package_root, "package.json")
+        FileUtils.mkdir_p(package_root)
+        stub_package_root(package_root)
+        allow(Open3).to receive(:capture3).and_return(
+          ["", "", instance_double(Process::Status, success?: false)]
+        )
+
+        doctor.send(:check_rsc_react_version)
+
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("#{package_json_path} not found") }).to be true
+        expect(warning_msgs.any? { |m| m[:content].include?("declared React version") }).to be true
+        expect(warning_msgs.any? { |m| m[:content].include?("config/initializers/react_on_rails.rb") }).to be true
       end
     end
 
