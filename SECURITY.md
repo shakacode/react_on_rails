@@ -40,8 +40,8 @@ and a one-line impact description, such as "potential XSS in SSR helper" or "inf
 Do not include exploit details in that first contact. Maintainers will respond with a secure alternative, such as a
 private GitHub Advisory thread or another mutually agreed private channel, before requesting reproduction details.
 
-Alternatively, if you prefer PGP-encrypted communication and a PGP key is published for this address, you may request it
-before sending any follow-up message that includes reproduction details.
+Alternatively, if you need an additional secure channel beyond the options above, mention it in your initial email and
+maintainers will arrange one before requesting reproduction details.
 
 Maintainers aim to provide an initial response within five business days. The default disclosure window is 90 days from
 the date of first report unless maintainers and the reporter agree to a shorter or longer timeline. If you do not
@@ -54,5 +54,6 @@ help exploit supported releases.
 
 Reporters will be credited in the security advisory or release notes unless they request anonymity.
 
-Maintainers will request a CVE for confirmed vulnerabilities affecting released versions of the gem or npm package and
-will include the CVE identifier in the security advisory when one is assigned.
+Maintainers will request a CVE through GitHub's Security Advisory program for confirmed vulnerabilities affecting
+released versions of the gem or npm package and will include the CVE identifier in the security advisory when one is
+assigned.

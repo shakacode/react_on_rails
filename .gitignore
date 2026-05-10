@@ -102,3 +102,12 @@ junit.xml
 .lycheecache
 .playwright-cli/
 .gstack/
+
+# Security scanner output (per internal/planning/ai-security-scanner-evaluation.md):
+# raw findings, SARIF reports, and intermediate artifacts must stay out of this
+# public repo. Commit only sanitized summaries to internal/planning/.
+/security-scans/
+*.sarif
+*.sarif.json
+scanner-output/
+scanner-findings/
