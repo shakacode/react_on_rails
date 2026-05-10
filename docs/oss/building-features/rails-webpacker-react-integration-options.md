@@ -109,7 +109,7 @@ imports from `react-on-rails/client` to the package root so Webpack resolves the
 (`lib/ReactOnRails.full.js`).
 
 The `react-on-rails/client` subpath export has been present since
-[React on Rails 14.2.0](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#1420---2025-03-03),
+[React on Rails 14.2.0](https://github.com/shakacode/react_on_rails/releases/tag/14.2.0),
 so any Webpacker 5 / Webpack 4 app on 14.2.0 or newer may need the Step 1 default-import shim. Steps 2-4 are
 only needed if Webpack 4 reports parse errors from `node_modules/react-on-rails` — check your build output first.
 
@@ -140,10 +140,21 @@ Keep each shim explicit and narrow:
    default `ReactOnRails` object. If Webpack 4 cannot resolve one of these named subpaths, use the corresponding
    built-file path as a temporary compatibility import:
 
-   > **Warning:** These `lib/` file paths bypass the `exports` map and are not covered by the public API contract.
-   > The export name (`react-on-rails/context`, etc.) is stable, but the underlying file path (`lib/context.js`,
-   > etc.) may change without notice in any patch or minor release even when the named export remains stable.
-   > Treat them as an absolute last resort, and pin `react_on_rails` tightly if you use them.
+   :::warning
+
+   These `lib/` file paths bypass the `exports` map and are not covered by the public API contract.
+   The export name (`react-on-rails/context`, etc.) is stable, but the underlying file path (`lib/context.js`,
+   etc.) may change without notice in any patch or minor release even when the named export remains stable.
+   Treat them as an absolute last resort, and pin `react_on_rails` tightly if you use them.
+
+   :::
+
+   :::caution
+
+   On React on Rails 16.0 and newer, these `lib/` path imports carry the same ESM and modern-syntax
+   requirements as the `/client` import. Put Steps 2 and 3 in place before switching to them.
+
+   :::
 
    For `react-on-rails/context`, switch only that import:
 
@@ -171,10 +182,9 @@ Keep each shim explicit and narrow:
    (for example, `react-on-rails/reactApis` → `react-on-rails/lib/reactApis.cjs`); using the wrong extension yields
    a module-not-found error.
 
-   For React on Rails 16.0 and newer, these `lib/` path imports carry the same ESM and modern-syntax
-   requirements as the `/client` import; steps 2 and 3 must also be in place before switching to them.
+2. Ensure Babel can parse modern syntax used by current packages:
 
-2. Ensure Babel can parse modern syntax used by current packages. Add these plugins to your existing Babel config without replacing existing presets or plugins:
+   Add these plugins to your existing Babel config without replacing existing presets or plugins.
 
    **When to apply:** Only add these plugins if Webpack 4 fails to parse modern syntax; first check whether your
    existing `@babel/preset-env` targets already cover optional chaining and nullish coalescing.
