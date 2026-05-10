@@ -60,6 +60,11 @@ git_diff_base_sha_ref() {
   # misclassified as a SHA here. This is accepted as an extremely unlikely
   # case; once the branch has been fetched, the local-ref checks below take
   # over and classify it correctly as a branch.
+  # Cross-repo edge case: a 40/64-char hex string from a different repository
+  # also passes this classifier without local verification. The mismatch
+  # surfaces later as "unable to find a merge base" rather than at this
+  # boundary. Callers that may pass cross-repo SHAs should validate at the
+  # call site rather than rely on this library to reject them.
   if [ "$length" -ne 40 ] && [ "$length" -ne 64 ] && ! git_diff_base_verify_ref "$ref"; then
     return 1
   fi
@@ -435,6 +440,12 @@ git_diff_base_resolve() {
         break
       fi
 
+      # Depth doubles regardless of how many branches succeeded this iteration.
+      # In the asymmetric case (one branch fails every attempt, the other
+      # succeeds), the succeeding branch may accumulate more history than
+      # strictly needed, but progress on either side can still reveal the
+      # merge base, so the bounded over-fetch is preferred over per-branch
+      # depth tracking.
       deepen_depth=$((deepen_depth * 2))
     done
 
