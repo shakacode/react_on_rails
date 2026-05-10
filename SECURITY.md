@@ -41,8 +41,10 @@ If a reporter cannot use GitHub, they may email [contact@shakacode.com](mailto:c
 line `React on Rails security` and ask to be routed to a React on Rails maintainer for coordinated disclosure. In that
 first email, include the affected package name (`react_on_rails` gem or `react-on-rails` npm package), the version range,
 and a one-line impact description, such as "potential XSS in SSR helper" or "information disclosure in generator output."
-Do not include exploit details in that first contact. Maintainers will respond with a secure alternative, such as a
-private GitHub Advisory thread or another mutually agreed private channel, before requesting reproduction details.
+These three details are safe to send in plaintext. Do not include reproduction steps, proof-of-concept payloads, code
+snippets, stack traces, or any other technical exploit details in that first contact; maintainers will respond with a
+secure alternative, such as a private GitHub Advisory thread or another mutually agreed private channel, before
+requesting reproduction details.
 
 Alternatively, if you need an additional secure channel beyond the options above, mention it in your initial email and
 maintainers will arrange one before requesting reproduction details.

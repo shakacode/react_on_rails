@@ -124,6 +124,9 @@ in the final-score row before merging the change.
 Current weight sum: 1.0 + 1.0 + 0.9 + 0.8 + 0.8 + 0.7 + 0.7 + 1.0 = **6.9**. Update this line whenever a criterion or
 weight changes.
 
+The table below has eight scored criteria followed by a `Final score` row; that last row is a computed aggregate (its
+weight is intentionally `N/A`) and must not be counted toward `sum(weights)`.
+
 | Criterion                 | Question                                                                                                                          | Score (1-5) | Weight (0-1) | Weighted score |
 | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ----------- | ------------ | -------------- |
 | Actionability             | Does the finding name the concrete file, behavior, and reachable path?                                                            |             | 1.0          |                |

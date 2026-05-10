@@ -106,6 +106,9 @@ junit.xml
 # Security scanner output (per internal/planning/ai-security-scanner-evaluation.md):
 # raw findings, SARIF reports, and intermediate artifacts must stay out of this
 # public repo. Commit only sanitized summaries to internal/planning/.
+# *.sarif and *.sarif.json are intentionally non-anchored so they match SARIF
+# files emitted into any subdirectory; the directory entries below stay anchored
+# to the repo root.
 /security-scans/
 *.sarif
 *.sarif.json
