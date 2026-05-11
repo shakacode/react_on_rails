@@ -1050,6 +1050,17 @@ describe RscGenerator, type: :generator do
       expect(partition.fetch(:unparseable)).to eq(1)
     end
 
+    it "treats a block comment between the options object and `)` as parseable" do
+      # `advance_js_block_comment_state` exits with state=nil and index pointing at the
+      # closing `/` of `*/`. Without skipping that consumed character, the scanner would
+      # falsely flag this invocation as unparseable.
+      content = "new RSCWebpackPlugin({ isServer: true } /* keep me */ );\n"
+
+      partition = generator.send(:rsc_plugin_option_sections_partition, content, is_server: true)
+      expect(partition.fetch(:safe).length).to eq(1)
+      expect(partition.fetch(:unparseable)).to eq(0)
+    end
+
     it "warns and skips the rewrite when an RSCWebpackPlugin options block is unparseable" do
       config_path = "config/webpack/serverWebpackConfig.js"
       simulate_existing_file(

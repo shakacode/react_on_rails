@@ -799,8 +799,11 @@ module ReactOnRails
         while index < content.length
           char = content[index]
           next_char = content[index + 1]
+          prev_state = state
           state, escaped, index = advance_js_scan_state(state, escaped, char, next_char, index)
-          if state
+          # Exiting a block comment leaves `char` as `*` and `index` pointing at the closing
+          # `/`; advance past it so the next iteration evaluates the first character after `*/`.
+          if state || prev_state == :block_comment
             index += 1
             next
           end
