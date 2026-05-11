@@ -172,7 +172,7 @@ module GeneratorMessages
       declared = raw_package_manager_field(content)
       return nil if declared.nil?
 
-      match = declared.match(/\A([^@\s]+)@(\S+)\z/)
+      match = declared.match(/\A([^@\s]+)@(?:\S+)\z/)
       return nil unless match
 
       name = match[1].downcase
