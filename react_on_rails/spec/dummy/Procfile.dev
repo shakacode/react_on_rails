@@ -1,5 +1,6 @@
 # Procfile for development
 # You can run these commands in separate shells
+# PORT is set automatically by bin/dev based on CONDUCTOR_PORT or REACT_ON_RAILS_BASE_PORT.
 rails: bundle exec rails s -p ${PORT:-3000}
 dev-server: bin/shakapacker-dev-server
 server-bundle: SERVER_BUNDLE_ONLY=true bin/shakapacker-watch --watch
