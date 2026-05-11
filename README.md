@@ -128,6 +128,12 @@ Bug reports and pull requests are welcome. Start with
 and the
 [help wanted issues](https://github.com/shakacode/react_on_rails/labels/contributions%3A%20up%20for%20grabs%21).
 
+## Security
+
+Suspected security vulnerabilities should be reported privately. See
+[SECURITY.md](SECURITY.md) for the disclosure process and supported version
+policy. Please do not open a public issue for security reports.
+
 ## License
 
 React on Rails is available as open source under the terms of the
