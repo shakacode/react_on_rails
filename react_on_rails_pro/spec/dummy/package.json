@@ -94,6 +94,7 @@
     "fs": false
   },
   "scripts": {
+    "//": "node-renderer scripts rely on POSIX shell parameter expansion (${RENDERER_PORT:-3800}); they require sh/bash and won't expand correctly on Windows cmd.exe. This dummy app is Linux/macOS only.",
     "test": "pnpm run build:test && pnpm run lint && rspec",
     "test:js": "jest ./tests",
     "lint": "cd ../.. && nps lint",
@@ -105,9 +106,9 @@
     "build:client": "RAILS_ENV=production NODE_ENV=production bin/shakapacker",
     "build:server": "RAILS_ENV=production NODE_ENV=production SERVER=true bin/shakapacker",
     "build:clean": "rm -rf public/webpack && rm -rf ssr-generated || true",
-    "node-renderer:debug": "RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node --inspect renderer/node-renderer.js",
-    "node-renderer": "RENDERER_PORT=3800 node renderer/node-renderer.js",
-    "node-renderer:fresh": "pnpm --filter react-on-rails-pro-node-renderer run build && RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node renderer/node-renderer.js",
+    "node-renderer:debug": "RENDERER_LOG_LEVEL=debug RENDERER_PORT=${RENDERER_PORT:-3800} node --inspect renderer/node-renderer.js",
+    "node-renderer": "RENDERER_PORT=${RENDERER_PORT:-3800} node renderer/node-renderer.js",
+    "node-renderer:fresh": "pnpm --filter react-on-rails-pro-node-renderer run build && RENDERER_LOG_LEVEL=debug RENDERER_PORT=${RENDERER_PORT:-3800} node renderer/node-renderer.js",
     "node-renderer:build-watch": "pnpm --filter react-on-rails-pro-node-renderer run build-watch"
   },
   "license": "UNLICENSED",

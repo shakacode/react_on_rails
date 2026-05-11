@@ -75,7 +75,7 @@ ReactOnRailsPro.configure do |config|
   # since it will be easy to intercept it.
   # If you provide an ENV value (maybe only for production) and there is no value, then you get the default.
   # Default for `renderer_url` is "http://localhost:3800".
-  config.renderer_url = ENV["RENDERER_URL"]
+  config.renderer_url = ENV["REACT_RENDERER_URL"]
 
   # If you don't want to worry about special characters in your password within the url, use this config value
   # Default for `renderer_password` is nil

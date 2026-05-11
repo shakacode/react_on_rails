@@ -35,6 +35,7 @@ Metrics/ClassLength:
   Exclude:
     - 'lib/generators/react_on_rails/base_generator.rb'  # Generator complexity justified
     - 'lib/react_on_rails/dev/server_manager.rb'  # Dev tool with comprehensive help system
+    - 'lib/react_on_rails/dev/port_selector.rb'  # Base-port mode plus dual-stack probing keep this above the 150-line threshold
 
 Metrics/MethodLength:
   Exclude:

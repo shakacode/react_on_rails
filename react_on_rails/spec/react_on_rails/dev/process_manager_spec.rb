@@ -188,25 +188,41 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
     end
 
     it "preserves PORT and SHAKAPACKER_DEV_SERVER_PORT in env hash" do
-      allow(ENV).to receive(:[]).and_call_original
-      allow(ENV).to receive(:[]).with("PORT").and_return("3001")
-      allow(ENV).to receive(:[]).with("SHAKAPACKER_DEV_SERVER_PORT").and_return("3036")
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with("PORT", nil).and_return("3001")
+      allow(ENV).to receive(:fetch).with("SHAKAPACKER_DEV_SERVER_PORT", nil).and_return("3036")
+      allow(ENV).to receive(:fetch).with("RENDERER_PORT", nil).and_return(nil)
+      allow(ENV).to receive(:fetch).with("REACT_RENDERER_URL", nil).and_return(nil)
+      allow(ENV).to receive(:fetch).with("SHAKAPACKER_SKIP_PRECOMPILE_HOOK", nil).and_return(nil)
 
       expect(described_class).to receive(:with_unbundled_context).and_yield
       expect(described_class).to receive(:system)
-        .with({ "PORT" => "3001", "SHAKAPACKER_DEV_SERVER_PORT" => "3036" }, "foreman", "start", "-f", "Procfile.dev")
+        .with(
+          { "PORT" => "3001", "SHAKAPACKER_DEV_SERVER_PORT" => "3036",
+            "RENDERER_PORT" => nil, "REACT_RENDERER_URL" => nil,
+            "SHAKAPACKER_SKIP_PRECOMPILE_HOOK" => nil },
+          "foreman", "start", "-f", "Procfile.dev"
+        )
 
       described_class.send(:run_process_outside_bundle, "foreman", ["start", "-f", "Procfile.dev"])
     end
 
-    it "omits unset env vars from the hash" do
-      allow(ENV).to receive(:[]).and_call_original
-      allow(ENV).to receive(:[]).with("PORT").and_return("3001")
-      allow(ENV).to receive(:[]).with("SHAKAPACKER_DEV_SERVER_PORT").and_return(nil)
+    it "passes nil for unset keys so with_unbundled_env cannot resurrect them in the child" do
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with("PORT", nil).and_return("3001")
+      allow(ENV).to receive(:fetch).with("SHAKAPACKER_DEV_SERVER_PORT", nil).and_return(nil)
+      allow(ENV).to receive(:fetch).with("RENDERER_PORT", nil).and_return(nil)
+      allow(ENV).to receive(:fetch).with("REACT_RENDERER_URL", nil).and_return(nil)
+      allow(ENV).to receive(:fetch).with("SHAKAPACKER_SKIP_PRECOMPILE_HOOK", nil).and_return(nil)
 
       expect(described_class).to receive(:with_unbundled_context).and_yield
       expect(described_class).to receive(:system)
-        .with({ "PORT" => "3001" }, "foreman", "start", "-f", "Procfile.dev")
+        .with(
+          { "PORT" => "3001", "SHAKAPACKER_DEV_SERVER_PORT" => nil,
+            "RENDERER_PORT" => nil, "REACT_RENDERER_URL" => nil,
+            "SHAKAPACKER_SKIP_PRECOMPILE_HOOK" => nil },
+          "foreman", "start", "-f", "Procfile.dev"
+        )
 
       described_class.send(:run_process_outside_bundle, "foreman", ["start", "-f", "Procfile.dev"])
     end
@@ -312,6 +328,37 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
         .to output(/DO NOT add foreman to your Gemfile/).to_stderr
       expect { described_class.send(:show_process_manager_installation_help) }
         .to output(/Don't-Bundle-Foreman/).to_stderr
+    end
+  end
+
+  describe ".preserve_runtime_env_vars" do
+    around do |example|
+      saved = described_class::ENV_KEYS_TO_PRESERVE.to_h { |k| [k, ENV.fetch(k, nil)] }
+      described_class::ENV_KEYS_TO_PRESERVE.each { |k| ENV.delete(k) }
+      example.run
+    ensure
+      saved&.each { |k, v| v.nil? ? ENV.delete(k) : ENV[k] = v }
+    end
+
+    it "returns nil for unset keys so the child shell clears them past with_unbundled_env" do
+      # This is the key invariant: a pre-Bundler invalid value (e.g.
+      # RENDERER_PORT=abc) that the parent deliberately deleted must not
+      # resurrect in the child via Bundler's env snapshot.
+      result = described_class.send(:preserve_runtime_env_vars)
+      described_class::ENV_KEYS_TO_PRESERVE.each do |key|
+        expect(result).to have_key(key)
+        expect(result[key]).to be_nil
+      end
+    end
+
+    it "forwards set keys to the child" do
+      ENV["PORT"] = "4200"
+      ENV["RENDERER_PORT"] = "3800"
+      ENV["SHAKAPACKER_SKIP_PRECOMPILE_HOOK"] = "true"
+      result = described_class.send(:preserve_runtime_env_vars)
+      expect(result["PORT"]).to eq("4200")
+      expect(result["RENDERER_PORT"]).to eq("3800")
+      expect(result["SHAKAPACKER_SKIP_PRECOMPILE_HOOK"]).to eq("true")
     end
   end
 end

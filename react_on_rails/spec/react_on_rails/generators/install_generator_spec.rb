@@ -1341,7 +1341,7 @@ describe InstallGenerator, type: :generator do
     it "adds node-renderer process to Procfile.dev" do
       assert_file "Procfile.dev" do |content|
         expect(content).to include("node-renderer:")
-        expect(content).to include("RENDERER_PORT=3800")
+        expect(content).to include("RENDERER_PORT=${RENDERER_PORT:-3800}")
         expect(content).to include("node renderer/node-renderer.js")
       end
     end
