@@ -220,18 +220,27 @@ module ReactOnRailsPro
     end
     private_class_method :valid_asset_payload?
 
+    # Split the missing payload into required-RSC and non-required buckets and
+    # warn on each populated bucket. When both are missing, logging only the
+    # required-RSC bucket (the previous behavior) hid non-required missing
+    # entries from operators debugging a skipped hash.
     def self.warn_missing_asset_payload(hash, missing_assets)
       return if missing_assets.empty?
 
-      missing_required = required_rsc_asset_basenames & missing_assets.map { |path| File.basename(path) }
+      required_basenames = required_rsc_asset_basenames
+      missing_required, missing_non_required =
+        missing_assets.partition { |path| required_basenames.include?(File.basename(path)) }
+
       if missing_required.any?
         warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) returned missing required RSC " \
-             "asset path(s): #{missing_required.inspect}. Skipping this hash."
-      else
-        warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) returned non-required asset " \
-             "path(s) that do not exist: #{missing_assets.inspect}. Adapter contract requires only " \
-             "existing file paths. Skipping this hash to avoid staging an incomplete bundle directory."
+             "asset path(s): #{missing_required.map { |p| File.basename(p) }.inspect}. Skipping this hash."
       end
+
+      return if missing_non_required.empty?
+
+      warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) returned non-required asset " \
+           "path(s) that do not exist: #{missing_non_required.inspect}. Adapter contract requires only " \
+           "existing file paths. Skipping this hash to avoid staging an incomplete bundle directory."
     end
     private_class_method :warn_missing_asset_payload
 
@@ -324,6 +333,13 @@ module ReactOnRailsPro
 
         remove_stale_temporary_directory(File.join(cache_dir, entry))
       end
+    rescue StandardError => e
+      # Dir.children uses opendir(2) — a process that can stat cache_dir but
+      # not read it (e.g. wrong group/umask from a prior deploy step) raises
+      # Errno::EACCES here. Per the module's degrade-gracefully contract, a
+      # failed sweep must not break assets:precompile.
+      warn "[ReactOnRailsPro] Could not sweep stale rolling-deploy temp directories in #{cache_dir}: " \
+           "#{e.class}: #{e.message}. Continuing."
     end
     private_class_method :sweep_stale_temporary_directories
 

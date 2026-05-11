@@ -2682,6 +2682,31 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when adapter is configured and PREVIOUS_BUNDLE_HASHES is also set" do
+      let(:adapter) do
+        Module.new do
+          def self.previous_bundle_hashes
+            raise "should not be probed when env var overrides discovery"
+          end
+
+          def self.fetch(_hash); end
+          def self.upload(_hash, **_opts); end
+        end
+      end
+
+      before { ENV["PREVIOUS_BUNDLE_HASHES"] = "abc,def" }
+
+      it "skips the previous_bundle_hashes probe and reports the env-var override" do
+        doctor.send(:check_rolling_deploy_adapter)
+        info = checker.messages.select { |m| m[:type] == :info }
+        warnings = checker.messages.select { |m| m[:type] == :warning }
+        expect(info.any? do |m|
+                 m[:content].include?("PREVIOUS_BUNDLE_HASHES") && m[:content].include?("skipping")
+               end).to be(true)
+        expect(warnings.none? { |m| m[:content].include?("should not be probed") }).to be(true)
+      end
+    end
+
     context "when renderer cache contains rolling-deploy temporary directories" do
       let(:cache_dir) { Dir.mktmpdir }
       let(:adapter) do

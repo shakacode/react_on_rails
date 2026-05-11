@@ -158,18 +158,21 @@ module ReactOnRailsPro
            "Continuing with #{existing.length} existing asset(s)."
     end
 
+    # Match by full expanded path (filter_existing_assets passes expanded paths
+    # in `unavailable_assets`) rather than basename, so an unrelated missing
+    # entry in `assets_to_copy` that happens to share a basename with a required
+    # RSC manifest can't false-positive this warning when the real required
+    # file is present elsewhere.
     def self.warn_if_unavailable_required_rsc_assets(unavailable_assets)
-      missing_required = required_rsc_asset_basenames & unavailable_assets.map { |path| File.basename(path) }
-      return if missing_required.empty?
+      required_paths = ReactOnRailsPro::RendererCacheHelpers.required_rsc_asset_paths
+      missing_required_paths = unavailable_assets.select { |path| required_paths.include?(path) }
+      return if missing_required_paths.empty?
 
+      missing_required = missing_required_paths.map { |path| File.basename(path) }
       warn "[ReactOnRailsPro] WARNING: unavailable assets include required RSC companion file(s) " \
            "#{missing_required.inspect}. The partial entry will be rejected on every subsequent rolling " \
            "deploy that tries to seed this bundle hash for RSC (falling back to 410-retry) until a " \
            "complete precompile with all required RSC companion files overwrites this hash."
-    end
-
-    def self.required_rsc_asset_basenames
-      ReactOnRailsPro::RendererCacheHelpers.required_rsc_asset_basenames
     end
 
     def self.publish_bundle(adapter, hash, bundle, assets, bundle_label)
@@ -194,7 +197,8 @@ module ReactOnRailsPro
       warn "[ReactOnRailsPro] rolling_deploy_adapter#upload for #{hash} raised #{e.class}: " \
            "#{e.message}. Next deploy's rolling-deploy seeding for this hash may degrade."
     end
-    private_class_method :publish_bundles,
+    private_class_method :publish_current_bundle_if_configured,
+                         :publish_bundles,
                          :filter_existing_assets,
                          :warn_skipped_invalid_assets,
                          :warn_if_unavailable_required_rsc_assets,

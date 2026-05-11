@@ -2901,6 +2901,20 @@ module ReactOnRails
 
       return unless report_adapter_protocol(adapter)
 
+      env_override = ENV.fetch("PREVIOUS_BUNDLE_HASHES", nil)
+      if env_override && !env_override.empty?
+        # PREVIOUS_BUNDLE_HASHES is a full discovery override at runtime, so
+        # probing adapter#previous_bundle_hashes here would surface timeout/error
+        # noise for a code path the deploy will never invoke. Skip the probe and
+        # state the override explicitly so operators see what's happening.
+        checker.add_info(
+          "ℹ️  PREVIOUS_BUNDLE_HASHES=#{truncate_for_warning(env_override).inspect} is set; " \
+          "skipping rolling_deploy_adapter#previous_bundle_hashes probe (env var overrides discovery)."
+        )
+        report_resolved_cache_dir
+        return
+      end
+
       report_previous_bundle_hashes_probe(adapter)
       report_resolved_cache_dir
     rescue StandardError => e

@@ -647,6 +647,24 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
       expect(File.exist?(File.join(cache_dir, "rsc-hash"))).to be(false)
     end
 
+    it "warns about required and non-required missing assets separately when both are absent" do
+      missing_client_manifest = File.join(cache_dir, "__sources", "react-client-manifest.json")
+      missing_extra = File.join(cache_dir, "__sources", "unrelated-chunk.js")
+      FileUtils.rm_f(missing_client_manifest)
+      FileUtils.rm_f(missing_extra)
+      allow(adapter).to receive(:fetch).with("rsc-hash").and_return(
+        bundle: src_bundle,
+        assets: [missing_client_manifest, missing_extra, server_client_manifest]
+      )
+
+      combined_warning_pattern =
+        /missing required RSC asset path.*react-client-manifest\.json.*non-required asset path.*unrelated-chunk\.js/m
+      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+        .to output(combined_warning_pattern).to_stderr
+
+      expect(File.exist?(File.join(cache_dir, "rsc-hash"))).to be(false)
+    end
+
     it "stages previous hashes when required RSC companion assets are present" do
       allow(adapter).to receive(:fetch).with("rsc-hash").and_return(
         bundle: src_bundle,

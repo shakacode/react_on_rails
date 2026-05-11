@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "securerandom"
 require_relative "spec_helper"
 require "react_on_rails_pro/renderer_cache_helpers"
 
@@ -9,7 +10,9 @@ describe ReactOnRailsPro::RendererCacheHelpers do
       instance_double(ReactOnRailsPro::Configuration, assets_to_copy: [custom_asset], enable_rsc_support: false)
     end
     let(:custom_asset) { "/app/public/webpack/production/custom.json" }
-    let(:loadable_stats_path) { File.join(Dir.tmpdir, "renderer-cache-helper-loadable-stats.json") }
+    let(:loadable_stats_path) do
+      File.join(Dir.tmpdir, "renderer-cache-helper-loadable-stats-#{Process.pid}-#{SecureRandom.hex(6)}.json")
+    end
 
     before do
       allow(ReactOnRailsPro).to receive(:configuration).and_return(config)

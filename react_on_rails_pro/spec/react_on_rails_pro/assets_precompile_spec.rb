@@ -417,21 +417,21 @@ describe ReactOnRailsPro::AssetsPrecompile do
       allow(config).to receive(:rolling_deploy_adapter).and_return(nil)
 
       expect(adapter).not_to receive(:upload)
-      expect { described_class.publish_current_bundle_if_configured }.not_to output.to_stderr
+      expect { described_class.send(:publish_current_bundle_if_configured) }.not_to output.to_stderr
     end
 
     it "is a no-op outside NodeRenderer mode" do
       allow(config).to receive(:node_renderer?).and_return(false)
 
       expect(adapter).not_to receive(:upload)
-      described_class.publish_current_bundle_if_configured
+      described_class.send(:publish_current_bundle_if_configured)
     end
 
     it "is a no-op in development and test environments" do
       expect(adapter).not_to receive(:upload)
       %w[development test].each do |env_name|
         allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new(env_name))
-        described_class.publish_current_bundle_if_configured
+        described_class.send(:publish_current_bundle_if_configured)
       end
     end
 
@@ -444,7 +444,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
       allow(adapter).to receive(:upload)
       %w[staging production qa preview anything-else].each do |env_name|
         allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new(env_name))
-        described_class.publish_current_bundle_if_configured
+        described_class.send(:publish_current_bundle_if_configured)
       end
 
       expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: []).exactly(5).times
@@ -454,7 +454,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
       stub_const("ReactOnRailsPro::AssetsPrecompile::UPLOAD_TIMEOUT_SECONDS", 0.05)
       allow(adapter).to receive(:upload) { sleep 1 }
 
-      expect { described_class.publish_current_bundle_if_configured }
+      expect { described_class.send(:publish_current_bundle_if_configured) }
         .to output(/rolling_deploy_adapter#upload for abc123 timed out after 0.05s/).to_stderr
     end
 
@@ -466,7 +466,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
     it "warns and continues precompile when adapter#upload raises" do
       allow(adapter).to receive(:upload).and_raise(RuntimeError, "S3 upload boom")
 
-      expect { described_class.publish_current_bundle_if_configured }
+      expect { described_class.send(:publish_current_bundle_if_configured) }
         .to output(/rolling_deploy_adapter#upload for abc123 raised RuntimeError: S3 upload boom/).to_stderr
 
       expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: [])
@@ -477,7 +477,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
         .to receive(:server_bundle_hash).and_return(nil)
 
       expect(adapter).not_to receive(:upload)
-      expect { described_class.publish_current_bundle_if_configured }
+      expect { described_class.send(:publish_current_bundle_if_configured) }
         .to output(/Skipping rolling_deploy_adapter publication for server bundle/).to_stderr
     end
 
@@ -503,7 +503,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
       after { FileUtils.rm_f(rsc_bundle) }
 
       it "uploads both server and RSC bundles" do
-        described_class.publish_current_bundle_if_configured
+        described_class.send(:publish_current_bundle_if_configured)
 
         expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: [])
         expect(adapter).to have_received(:upload).with("rsc999", bundle: rsc_bundle, assets: [])
@@ -525,7 +525,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
       after { FileUtils.rm_f(existing_asset) }
 
       it "filters out missing assets, warns, and still uploads the remaining ones" do
-        expect { described_class.publish_current_bundle_if_configured }
+        expect { described_class.send(:publish_current_bundle_if_configured) }
           .to output(/Skipping invalid assets.*missing:.*rolling-deploy-upload-missing-asset/m).to_stderr
 
         expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: [existing_asset])
@@ -549,7 +549,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
       end
 
       it "filters out non-file assets, warns, and still uploads the remaining files" do
-        expect { described_class.publish_current_bundle_if_configured }
+        expect { described_class.send(:publish_current_bundle_if_configured) }
           .to output(/Skipping invalid assets.*not a file:.*rolling-deploy-upload-directory-asset/m).to_stderr
 
         expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: [existing_asset])
@@ -580,7 +580,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
 
       it "uploads only the valid entries and warns about both invalid kinds in a single line" do
         warning_pattern = /Skipping invalid assets.*missing:.*rolling-deploy-upload-missing.*not a file:.*mixed-dir/m
-        expect { described_class.publish_current_bundle_if_configured }
+        expect { described_class.send(:publish_current_bundle_if_configured) }
           .to output(warning_pattern).to_stderr
 
         expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: [valid_asset])
@@ -592,13 +592,35 @@ describe ReactOnRailsPro::AssetsPrecompile do
 
       before do
         allow(config).to receive(:enable_rsc_support).and_return(true)
-        allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:required_rsc_asset_basenames)
-          .and_return([File.basename(missing_manifest)])
+        allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:required_rsc_asset_paths)
+          .and_return(Set.new([missing_manifest]))
       end
 
       it "warns that the next deploy will fall back instead of treating it as purely optional" do
         expect { described_class.send(:filter_existing_assets, [missing_manifest]) }
           .to output(/required RSC companion file/).to_stderr
+      end
+    end
+
+    context "when assets_to_copy has a missing entry sharing a basename with a required RSC manifest" do
+      # Regression: a same-basename match between an unrelated missing asset and a
+      # required RSC manifest must not trigger the required-companion warning when
+      # the real required file lives at a different expanded path.
+      let(:required_manifest) { File.join(Dir.tmpdir, "react-rolling-deploy-required-manifest.json") }
+      let(:unrelated_missing) { File.join(Dir.tmpdir, "unrelated", File.basename(required_manifest)) }
+
+      before do
+        File.write(required_manifest, "{}")
+        allow(config).to receive(:enable_rsc_support).and_return(true)
+        allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:required_rsc_asset_paths)
+          .and_return(Set.new([required_manifest]))
+      end
+
+      after { FileUtils.rm_f(required_manifest) }
+
+      it "does not flag the required RSC companion when only an unrelated same-name asset is missing" do
+        expect { described_class.send(:filter_existing_assets, [required_manifest, unrelated_missing]) }
+          .not_to output(/required RSC companion file/).to_stderr
       end
     end
 
@@ -622,7 +644,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
       after { FileUtils.rm_rf(rails_root.to_s) }
 
       it "expands relative entries against Rails.root before checking existence" do
-        described_class.publish_current_bundle_if_configured
+        described_class.send(:publish_current_bundle_if_configured)
 
         expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: [resolved_path])
       end
@@ -642,7 +664,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
       after { FileUtils.rm_f(existing_asset) }
 
       it "skips URL-backed assets without misclassifying them as missing files" do
-        described_class.publish_current_bundle_if_configured
+        described_class.send(:publish_current_bundle_if_configured)
 
         expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: [existing_asset])
       end
