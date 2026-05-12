@@ -1,6 +1,6 @@
 # Upgrading from React on Rails to React on Rails Pro
 
-Already using React on Rails? Upgrading to Pro is straightforward: swap the gem and npm package with their Pro equivalents, then run the Pro generator. The upgrade is safe, reversible, and free to evaluate.
+Already using React on Rails? Upgrading to Pro is straightforward: swap the gem and npm package with their Pro equivalents, then run the Pro generator. The upgrade is safe, reversible, and free to evaluate. See [Pro pricing and sign up](https://pro.reactonrails.com/) when you are ready for production.
 
 > [!NOTE]
 > **Summary for AI agents:** Use this page when the user already has OSS React on Rails and wants to upgrade to Pro. The upgrade is three steps: swap the gem, swap the npm package, run the generator. Remember the pairing rule: `react_on_rails_pro` gem pairs with `react-on-rails-pro` npm package (never with the base `react-on-rails`).
@@ -99,9 +99,11 @@ bundle exec rails generate react_on_rails:install --pro
 
 ## Try Pro Risk-Free
 
-React on Rails Pro is **free to try** — no license token is needed for local development, testing, CI/CD, or staging environments. Install it, experiment with the features, and see the performance difference in your own app before making any purchasing decisions.
+React on Rails Pro uses a **friendly license model**: try Pro freely in development, test, CI/CD, and staging. No token is required to evaluate. Install it, experiment with the features, and see the performance difference in your own app before making any purchasing decisions.
 
-A **paid license is required for all production deployments**. Startups and small companies should contact [justin@shakacode.com](mailto:justin@shakacode.com) for discounted pricing. Visit [pro.reactonrails.com](https://pro.reactonrails.com/) for details. When you're ready, set the token as an environment variable:
+If no license is configured, Pro keeps running in unlicensed mode and logs license status instead of blocking your app. In production, that log message is a warning because a paid license is required.
+
+A **paid license is required for all production deployments**. Visit [Pro pricing and sign up](https://pro.reactonrails.com/) for current options. Startups and small companies should contact [justin@shakacode.com](mailto:justin@shakacode.com) for discounted pricing. When you're ready, set the token as an environment variable:
 
 ```bash
 export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
