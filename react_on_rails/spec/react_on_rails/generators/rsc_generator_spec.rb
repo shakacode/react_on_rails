@@ -887,6 +887,37 @@ describe RscGenerator, type: :generator do
         .to include("a top-level `resolve` binding already exists that would conflict")
     end
 
+    it "does not inject client references setup into a commented client import anchor" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          /*
+           * const commonWebpackConfig = require('./commonWebpackConfig');
+           */
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = { plugins: [] };
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      content = File.read(File.join(destination_root, config_path))
+      generator.send(:update_existing_rsc_webpack_config, config_path, content, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).not_to include("const rscClientReferences")
+      expect(migrated_content).not_to include("clientReferences: rscClientReferences")
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("expected webpack import anchor was not found")
+    end
+
     it "does not treat a stale generated client references helper as scoped" do
       content = <<~JS
         const rscClientReferences = { directory: '.' };
@@ -899,6 +930,16 @@ describe RscGenerator, type: :generator do
       JS
 
       expect(generator.send(:rsc_plugin_uses_scoped_client_references?, content, is_server: false)).to be(false)
+    end
+
+    it "detects scoped client references when resolve has inner whitespace" do
+      content = <<~JS
+        const rscClientReferences = {
+          directory: resolve( config.source_path ),
+        };
+      JS
+
+      expect(generator.send(:scoped_rsc_client_references_defined?, content)).to be(true)
     end
 
     it "detects scoped client references when the directory key follows regex values with braces" do
@@ -1089,6 +1130,20 @@ describe RscGenerator, type: :generator do
       expect(messages).to include(config_path)
       expect(messages).to include("cannot parse safely")
       expect(messages).to include("regex literal with an unmatched")
+      expect(messages).not_to include("isServer: true")
+    end
+
+    it "flags plugin invocations whose options block cannot find a closing brace" do
+      content = <<~JS
+        new RSCWebpackPlugin({
+          isServer: true,
+          include: /\\{/,
+        });
+      JS
+
+      partition = generator.send(:rsc_plugin_option_sections_partition, content, is_server: true)
+      expect(partition.fetch(:safe).length).to eq(0)
+      expect(partition.fetch(:unparseable)).to eq(1)
     end
 
     it "does not inject duplicate imports for legacy let or var CommonJS destructuring" do
@@ -1191,6 +1246,38 @@ describe RscGenerator, type: :generator do
         .to include("a top-level `resolve` binding already exists that would conflict")
     end
 
+    it "blocks setup when a custom top-level config binding would conflict with the injected import" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const config = { source_path: 'app/javascript' };
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      content = File.read(File.join(destination_root, config_path))
+      generator.send(:update_existing_rsc_webpack_config, config_path, content, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).to include("const config = { source_path: 'app/javascript' };")
+      expect(migrated_content).not_to include("const { config } = require('shakapacker');")
+      expect(migrated_content).not_to include("clientReferences: rscClientReferences")
+      expect(migrated_content).not_to include("const rscClientReferences")
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("a top-level `config` binding already exists that would conflict")
+    end
+
     it "logs the direct file rewrite as a generator action" do
       config_path = "config/webpack/clientWebpackConfig.js"
       simulate_existing_file(
@@ -1203,6 +1290,39 @@ describe RscGenerator, type: :generator do
 
       expect(generator).to receive(:say_status).with(:rewrite, config_path, :green)
       expect(generator.send(:rewrite_rsc_plugin_client_references, config_path, is_server: false)).to be(true)
+    end
+
+    it "does not remind users to run a formatter for single-line plugin rewrites" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');\n" \
+        "clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));\n"
+      )
+
+      generator.send(:rewrite_rsc_plugin_client_references, config_path, is_server: false)
+
+      expect(GeneratorMessages.messages.join("\n")).not_to include("run `npx prettier --write")
+    end
+
+    it "reminds users to run a formatter for multi-line plugin rewrites" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          clientConfig.plugins.push(
+            new RSCWebpackPlugin({
+              chunkName: 'client',
+              isServer: false,
+            }),
+          );
+        JS
+      )
+
+      generator.send(:rewrite_rsc_plugin_client_references, config_path, is_server: false)
+
+      expect(GeneratorMessages.messages.join("\n")).to include("run `npx prettier --write #{config_path}`")
     end
 
     it "does not write plugin rewrites in pretend mode" do
@@ -1245,7 +1365,7 @@ describe RscGenerator, type: :generator do
 
       original_content = File.read(File.join(destination_root, config_path))
       expect(pretend_generator).to receive(:say_status)
-        .with(:gsub, config_path, true)
+        .with(:pretend, "Would inject rscClientReferences into #{config_path}", :yellow)
       expect(pretend_generator).to receive(:say_status)
         .with(:pretend, "Would rewrite #{config_path}", :yellow)
       pretend_generator.send(:update_existing_rsc_webpack_config, config_path, original_content, is_server: false)

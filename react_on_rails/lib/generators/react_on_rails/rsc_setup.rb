@@ -390,7 +390,7 @@ module ReactOnRails
         return unless rsc_client_references_setup_anchor_available?(config_path, content, is_server: true)
         return if rsc_setup_blocked_by_later_imports?(config_path, content, existing_imports_content, is_server: true)
 
-        inject_rsc_server_imports(config_path, existing_imports_content)
+        inject_rsc_server_imports(config_path, content, existing_imports_content)
         return unless rsc_client_references_setup_ready?(config_path)
 
         # Add rscBundle parameter to configureServer function
@@ -438,20 +438,7 @@ module ReactOnRails
           return
         end
 
-        injected_imports = [
-          "\\1",
-          ("const { config } = require('shakapacker');" unless shakapacker_config_imported?(existing_imports_content)),
-          ("const { resolve } = require('path');" unless path_resolve_imported?(existing_imports_content)),
-          "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');",
-          "",
-          rsc_client_references_js
-        ].compact.join("\n")
-
-        gsub_file(
-          config_path,
-          rsc_client_references_setup_import_pattern(is_server: false),
-          injected_imports
-        )
+        inject_rsc_client_imports(config_path, content, existing_imports_content)
         return unless rsc_client_references_setup_ready?(config_path)
 
         # Add RSCWebpackPlugin to client config before return statement
@@ -535,20 +522,29 @@ module ReactOnRails
         JS
       end
 
-      def inject_rsc_server_imports(config_path, existing_imports_content)
-        server_injected_imports = [
-          "\\1",
-          ("const { resolve } = require('path');" unless path_resolve_imported?(existing_imports_content)),
-          "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');",
-          "",
-          rsc_client_references_js
-        ].compact.join("\n")
+      def inject_rsc_client_imports(config_path, content, existing_imports_content)
+        replace_rsc_client_references_setup_anchor(config_path, content, is_server: false) do |anchor|
+          [
+            anchor,
+            shakapacker_config_import_statement(existing_imports_content),
+            path_resolve_import_statement(existing_imports_content),
+            "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');",
+            "",
+            rsc_client_references_js
+          ].compact.join("\n")
+        end
+      end
 
-        gsub_file(
-          config_path,
-          rsc_client_references_setup_import_pattern(is_server: true),
-          server_injected_imports
-        )
+      def inject_rsc_server_imports(config_path, content, existing_imports_content)
+        replace_rsc_client_references_setup_anchor(config_path, content, is_server: true) do |anchor|
+          [
+            anchor,
+            path_resolve_import_statement(existing_imports_content),
+            "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');",
+            "",
+            rsc_client_references_js
+          ].compact.join("\n")
+        end
       end
 
       def update_existing_rsc_webpack_config(config_path, content, is_server:)
@@ -569,7 +565,7 @@ module ReactOnRails
         unparseable = rsc_plugin_option_sections_partition(content, is_server: is_server).fetch(:unparseable)
         return true if unparseable.zero?
 
-        warn_unparseable_rsc_plugin_sections(config_path, unparseable, is_server: is_server)
+        warn_unparseable_rsc_plugin_sections(config_path, unparseable)
         false
       end
 
@@ -591,13 +587,13 @@ module ReactOnRails
         false
       end
 
-      def warn_unparseable_rsc_plugin_sections(config_path, count, is_server:)
+      def warn_unparseable_rsc_plugin_sections(config_path, count)
         GeneratorMessages.add_warning(
           "Skipped scoped clientReferences migration for #{config_path}: #{count} RSCWebpackPlugin " \
           "options block(s) contain characters this lightweight scanner cannot parse safely " \
           "(most often a regex literal with an unmatched `{` or `}`, e.g. `/\\{/` or `/[{]/`). " \
-          "Please add `clientReferences: rscClientReferences` manually for any plugin with " \
-          "isServer: #{is_server}."
+          "Please add `clientReferences: rscClientReferences` manually to any RSCWebpackPlugin " \
+          "that is missing it."
         )
       end
 
@@ -808,7 +804,7 @@ module ReactOnRails
             next
           end
 
-          return content[index] == ")" unless char.match?(/\s/)
+          return char == ")" unless char.match?(/\s/)
 
           index += 1
         end
@@ -822,6 +818,7 @@ module ReactOnRails
         index < content.length ? index : nil
       end
 
+      # Expects `content[open_index] == "{"`; callers pass the options-object opening brace.
       # This lightweight scanner intentionally treats template literals as opaque strings.
       # Nested template literals inside plugin options are not supported, which is acceptable
       # for the webpack option objects this migration rewrites. Regex literals are also
@@ -960,9 +957,13 @@ module ReactOnRails
           # gsub_file call, and pretend mode is already handled above.
           File.write(full_path, content)
           say_status(:rewrite, config_path, :green)
-          remind_to_run_formatter(config_path)
+          remind_to_run_formatter(config_path) if rsc_plugin_rewrites_need_formatter?(rewrites)
         end
         true
+      end
+
+      def rsc_plugin_rewrites_need_formatter?(rewrites)
+        rewrites.any? { |section, _| section.fetch(:body).include?("\n") }
       end
 
       # The rewrite splices `clientReferences: rscClientReferences` directly after `isServer:`
@@ -1000,28 +1001,49 @@ module ReactOnRails
       end
 
       def rsc_client_references_setup_anchor?(content, is_server:)
-        content.match?(rsc_client_references_setup_import_pattern(is_server: is_server))
+        !!rsc_client_references_setup_anchor_match(content, is_server: is_server)
       end
 
       def add_rsc_client_references_setup(config_path, content, is_server:)
-        # Keep these guards local too so direct helper calls cannot half-apply the migration.
         return if scoped_rsc_client_references_defined?(content)
-
-        if rsc_client_references_defined?(content)
-          warn_unscoped_rsc_client_references_helper(config_path)
-          return
-        end
+        return if rsc_client_references_defined?(content)
 
         existing_imports_content = content_before_rsc_setup_anchor(content, is_server: is_server)
-        injected_imports = [
-          "\\1",
-          ("const { config } = require('shakapacker');" unless shakapacker_config_imported?(existing_imports_content)),
-          ("const { resolve } = require('path');" unless path_resolve_imported?(existing_imports_content)),
-          "",
-          rsc_client_references_js
-        ].compact.join("\n")
+        replace_rsc_client_references_setup_anchor(config_path, content, is_server: is_server) do |anchor|
+          [
+            anchor,
+            shakapacker_config_import_statement(existing_imports_content),
+            path_resolve_import_statement(existing_imports_content),
+            "",
+            rsc_client_references_js
+          ].compact.join("\n")
+        end
+      end
 
-        gsub_file(config_path, rsc_client_references_setup_import_pattern(is_server: is_server), injected_imports)
+      def replace_rsc_client_references_setup_anchor(config_path, content, is_server:)
+        anchor_match = rsc_client_references_setup_anchor_match(content, is_server: is_server)
+        return unless anchor_match
+
+        updated_content = content.dup
+        updated_content[anchor_match.begin(0)...anchor_match.end(0)] = yield anchor_match[0]
+        if options[:pretend]
+          say_status(:pretend, "Would inject rscClientReferences into #{config_path}", :yellow)
+        else
+          File.write(File.join(destination_root, config_path), updated_content)
+          say_status(:insert, config_path, :green)
+        end
+      end
+
+      def shakapacker_config_import_statement(existing_imports_content)
+        return if shakapacker_config_imported?(existing_imports_content)
+
+        "const { config } = require('shakapacker');"
+      end
+
+      def path_resolve_import_statement(existing_imports_content)
+        return if path_resolve_imported?(existing_imports_content)
+
+        "const { resolve } = require('path');"
       end
 
       def rsc_client_references_setup_import_pattern(is_server:)
@@ -1044,14 +1066,28 @@ module ReactOnRails
 
       def scoped_rsc_client_references_defined?(content)
         rsc_client_references_defined?(content) &&
-          content.match?(/\bdirectory\s*:\s*resolve\(config\.source_path\)/)
+          content.match?(/\bdirectory\s*:\s*resolve\(\s*config\.source_path\s*\)/)
       end
 
       def content_before_rsc_setup_anchor(content, is_server:)
-        anchor = content.match(rsc_client_references_setup_import_pattern(is_server: is_server))
+        anchor = rsc_client_references_setup_anchor_match(content, is_server: is_server)
         return "" unless anchor
 
         content[0...anchor.end(0)]
+      end
+
+      def rsc_client_references_setup_anchor_match(content, is_server:)
+        pattern = rsc_client_references_setup_import_pattern(is_server: is_server)
+        anchor_match = nil
+        content.to_enum(:scan, pattern).any? do
+          current_match = Regexp.last_match
+          next false unless js_code_position?(content, current_match.begin(0))
+
+          anchor_match = current_match
+          true
+        end
+
+        anchor_match
       end
 
       def rsc_setup_blocked_by_later_imports?(config_path, content, existing_imports_content, is_server:)
@@ -1090,17 +1126,20 @@ module ReactOnRails
 
         shakapacker_anywhere = shakapacker_config_imported?(content)
 
-        if is_server
-          if shakapacker_anywhere
+        if shakapacker_anywhere
+          if is_server
             "shakapacker's `config` is imported after the bundler ternary anchor — " \
               "move the import above it"
           else
-            "shakapacker's `config` is not imported in this file — add " \
-              "`const { config } = require('shakapacker');` before the bundler ternary"
+            "shakapacker's `config` is imported after the `commonWebpackConfig` anchor — " \
+              "move the import above it"
           end
-        elsif shakapacker_anywhere
-          "shakapacker's `config` is imported after the `commonWebpackConfig` anchor — " \
-            "move the import above it"
+        elsif top_level_config_binding?(content)
+          "a top-level `config` binding already exists that would conflict with the injected " \
+            "`const { config } = require('shakapacker')`"
+        elsif is_server
+          "shakapacker's `config` is not imported in this file — add " \
+            "`const { config } = require('shakapacker');` before the bundler ternary"
         end
       end
 
@@ -1130,6 +1169,14 @@ module ReactOnRails
 
       def top_level_resolve_binding?(content)
         pattern = /^[ \t]*(?:(?:const|let|var)\s+resolve\b|function\s+resolve\s*\()/
+
+        content.to_enum(:scan, pattern).any? do
+          js_top_level_position?(content, Regexp.last_match.begin(0))
+        end
+      end
+
+      def top_level_config_binding?(content)
+        pattern = /^[ \t]*(?:(?:const|let|var)\s+config\b|function\s+config\s*\()/
 
         content.to_enum(:scan, pattern).any? do
           js_top_level_position?(content, Regexp.last_match.begin(0))
