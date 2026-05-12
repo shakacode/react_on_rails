@@ -140,11 +140,14 @@ single-container standard workload. If you follow that template and run the rend
 configure the Rails workload's probes rather than looking for a separate node-renderer container. If you split the
 renderer into its own container or workload, add renderer-specific probes there.
 
-### Same Rails Container Or Process Supervisor
+### Same Rails Container (Rails and Renderer Co-Located)
 
 Set the Rails `renderer_url` to `http://localhost:3800`. The renderer can keep the default `localhost` host binding.
 Probe the `rails` container's Rails health endpoint, such as `/up` on port `3000` in Rails 7.1+ or a custom endpoint in
 earlier Rails versions.
+
+This also applies when a process supervisor starts Rails and the renderer together in the same container: probe the
+Rails container and let the Rails health endpoint cover the co-located renderer when needed.
 
 When Rails and the renderer share one container, use one combined Rails health endpoint if you need to check both
 processes. For example, make the Rails readiness endpoint perform a short TCP connection check to `localhost:3800` and
@@ -187,7 +190,7 @@ class HealthController < ActionController::Base
     # Missing or malformed renderer_url raises and surfaces as a 500 so configuration mistakes stay visible.
     renderer_uri = URI.parse(renderer_url)
     renderer_port = renderer_url.match?(/:\d+(?:[\/?#]|$)/) ? renderer_uri.port : 3800
-    Socket.tcp("localhost", renderer_port, connect_timeout: 1) {}
+    Socket.tcp("localhost", renderer_port, connect_timeout: 1) {} # open + immediately close
     head :ok
   rescue SocketError, SystemCallError
     head :service_unavailable
