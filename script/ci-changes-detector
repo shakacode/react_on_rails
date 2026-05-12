@@ -78,7 +78,7 @@ while IFS= read -r file; do
   # shellcheck disable=SC2221,SC2222
   case "$file" in
     # Documentation files
-    *.md|*.mdx|*.markdown|*.rst|*.txt|docs/*|docs/**/*|.lychee.toml)
+    *.md|*.mdx|*.markdown|*.rst|*.txt|docs/*|.lychee.toml)
       # Don't change DOCS_ONLY flag, just continue
       ;;
 

@@ -74,12 +74,24 @@ run_test() {
   local tmpdir
   tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/git-diff-base-test.XXXXXX")"
   local before_failed="$TESTS_FAILED"
+  local had_errexit=false
+
+  case "$-" in
+    *e*)
+      had_errexit=true
+      ;;
+  esac
+
+  set +e
   (
-    set -uo pipefail
+    set -euo pipefail
     cd "$tmpdir" || exit 1
     "$test_fn"
   )
   local rc=$?
+  if [ "$had_errexit" = true ]; then
+    set -e
+  fi
   rm -rf "$tmpdir"
 
   # The subshell runs assertions that increment TESTS_FAILED in the child
@@ -209,6 +221,34 @@ test_unshallow_timeout_warns_on_invalid() {
   rm -f /tmp/timeout-warn.$$
   assert_equals "300" "$out" "fallback timeout"
   assert_contains "$warning" "invalid GIT_DIFF_BASE_UNSHALLOW_TIMEOUT_SECONDS" "warning text"
+}
+
+test_run_test_counts_non_final_assertion_failure() {
+  # shellcheck disable=SC2329
+  intentionally_fail_first_assertion_then_pass() {
+    assert_equals "expected" "actual" "intentional harness failure"
+    assert_equals "still-runs" "still-runs" "final assertion"
+  }
+
+  local before_run="$TESTS_RUN"
+  local before_failed="$TESTS_FAILED"
+  local before_failure_count="${#FAILURES[@]}"
+  local out_file="/tmp/harness-self-test-out.$$"
+  local err_file="/tmp/harness-self-test-err.$$"
+
+  run_test intentionally_fail_first_assertion_then_pass >"$out_file" 2>"$err_file"
+  rm -f "$out_file" "$err_file"
+
+  local observed_failed="$TESTS_FAILED"
+
+  TESTS_RUN="$before_run"
+  TESTS_FAILED="$before_failed"
+  FAILURES=("${FAILURES[@]:0:before_failure_count}")
+
+  if [ "$observed_failed" -le "$before_failed" ]; then
+    fail "run_test did not count a non-final assertion failure"
+    return 1
+  fi
 }
 
 # ---------------------------------------------------------------------------
@@ -422,6 +462,7 @@ ALL_TESTS=(
   test_unshallow_timeout_default
   test_unshallow_timeout_accepts_zero
   test_unshallow_timeout_warns_on_invalid
+  test_run_test_counts_non_final_assertion_failure
   test_verify_ref_recognizes_existing_refs
   test_is_shallow_repository_detects_full_clone
   test_is_shallow_repository_detects_shallow_clone
