@@ -93,7 +93,7 @@ Server components produce HTML that does not need hydration — they have no cli
 > This section covers a non-production local directional benchmark first, then a production case study. For validated,
 > at-scale results, see the [Production Case Study: Popmenu](#popmenu) below.
 
-### Non-Production Local Directional Benchmark: Gumroad-Style RSC Demo (April 2026) {#gumroad-style-rsc-demo}
+### Non-Production Local Directional Benchmark: Gumroad-Style RSC Demo (April 2026) <a id="gumroad-style-rsc-demo"></a>
 
 The [Gumroad-style RSC benchmark demo](https://github.com/shakacode/react-on-rails-demo-gumroad-rsc)
 is a public ShakaCode comparison repo modeled after a creator-dashboard surface with product listings and sales metrics,
@@ -178,7 +178,7 @@ completeness only. See
   establish statistical significance._
 - _The `action_total` -2.3% delta is likely within expected variance at n=4._
 
-#### Worst-case `responseEnd` counter-signal {#gumroad-rsc-worst-case-responseend}
+#### Worst-case `responseEnd` counter-signal <a id="gumroad-rsc-worst-case-responseend"></a>
 
 | Metric                             | Inertia demo | RSC demo | Delta % (negative = RSC faster) |
 | ---------------------------------- | -----------: | -------: | ------------------------------: |
@@ -198,7 +198,7 @@ are still required before making stronger production-performance claims.
 See [Issue 3128](https://github.com/shakacode/react_on_rails/issues/3128) and
 [Issue 3144](https://github.com/shakacode/react_on_rails/issues/3144) for the ongoing tracking discussion.
 
-### Production Case Study: Popmenu {#popmenu}
+### Production Case Study: Popmenu <a id="popmenu"></a>
 
 Popmenu, a restaurant platform serving tens of millions of SSR requests daily, adopted React on Rails Pro and reported:
 

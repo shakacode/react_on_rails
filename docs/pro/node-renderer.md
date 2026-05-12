@@ -166,7 +166,7 @@ RUN bundle exec rake react_on_rails_pro:pre_seed_renderer_cache
 
 | Scenario                      | Before                                  | After                           |
 | ----------------------------- | --------------------------------------- | ------------------------------- |
-| First request on fresh deploy | 410→retry: 200ms–1s+                    | Direct render: <50ms            |
+| First request on fresh deploy | 410→retry: 200ms–1s+                    | Direct render: `<50ms`          |
 | Thundering herd on new pod    | N requests queue behind per-bundle lock | All requests served immediately |
 
 ### Rolling deploys: seed current and previous bundle hashes
