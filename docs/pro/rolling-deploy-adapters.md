@@ -1,8 +1,5 @@
 # Rolling-Deploy Adapters
 
-> [!NOTE]
-> **Summary for AI agents:** Use this page when the user is configuring a `rolling_deploy_adapter` to eliminate 410→retry cold starts for **previous** deployed bundle hashes during rolling deploys. The [Node Renderer page](./node-renderer.md) covers the current-hash pre-seeding (PR A) and unified copy/symlink staging (PR B); this page is specific to the rolling-deploy adapter protocol introduced alongside them.
-
 ## The problem
 
 During a rolling deploy:
@@ -250,6 +247,12 @@ class ControlPlaneRollingDeployAdapter
     ENV.fetch("CPLN_RAILS_WORKLOAD")
   end
 
+  # Customize this to match your Control Plane image naming convention.
+  # Default assumes images are named "<gvc>/app-<bundle-hash>".
+  def self.image_name(hash)
+    "#{gvc}/app-#{hash}"
+  end
+
   def self.previous_bundle_hashes
     output, status = Open3.capture2e("cpln", "workload", "get", workload, "--gvc", gvc, "-o", "json")
     return [] unless status.success?
@@ -261,10 +264,9 @@ class ControlPlaneRollingDeployAdapter
   end
 
   def self.fetch(hash)
-    image = "#{gvc}/app-#{hash}"
     tmp = Rails.root.join("tmp/rolling-deploy", hash).to_s
     FileUtils.mkdir_p(tmp)
-    _out, status = Open3.capture2e("cpln", "image", "pull", image, "--output", tmp)
+    _out, status = Open3.capture2e("cpln", "image", "pull", image_name(hash), "--output", tmp)
     return nil unless status.success?
 
     # Assumes the image layer contains exactly one .js file. If your build
@@ -303,6 +305,8 @@ require "fileutils"
 require "json"
 
 class FilesystemRollingDeployAdapter
+  RETENTION = 6 # keep last ~3 deploys' worth (2 hashes per deploy when RSC is enabled)
+
   def self.root
     Pathname.new(ENV.fetch("ROLLING_DEPLOY_DIR"))
   end
@@ -332,7 +336,7 @@ class FilesystemRollingDeployAdapter
     FileUtils.mkdir_p(dir)
     FileUtils.cp(bundle, dir.join("bundle.js"))
     assets.each { |p| FileUtils.cp(p, dir.join(File.basename(p))) }
-    hashes = (previous_bundle_hashes + [hash]).uniq
+    hashes = ((previous_bundle_hashes - [hash]) + [hash]).last(RETENTION)
     root.join("_manifest.json").write(JSON.generate(hashes: hashes))
   end
 end

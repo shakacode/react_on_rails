@@ -186,11 +186,12 @@ module ReactOnRailsPro
     end
 
     def self.publish_bundle_if_present(adapter, hash, bundle, assets, bundle_label)
-      if File.exist?(bundle)
+      if File.file?(bundle)
         publish_bundle(adapter, hash, bundle, assets, bundle_label)
       else
         display_label = bundle_label == "RSC" ? "RSC" : bundle_label.capitalize
-        warn "[ReactOnRailsPro] #{display_label} bundle #{bundle.inspect} does not exist; " \
+        reason = File.exist?(bundle) ? "is not a file" : "does not exist"
+        warn "[ReactOnRailsPro] #{display_label} bundle #{bundle.inspect} #{reason}; " \
              "skipping rolling_deploy_adapter publication for #{bundle_label} bundle."
       end
     end

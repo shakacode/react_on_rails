@@ -12,7 +12,7 @@ module ReactOnRailsPro
   #
   # Supports two modes:
   #
-  # * `:copy` (default) - copies bundle and assets. Designed for Docker image
+  # * `:copy` - copies bundle and assets. Designed for Docker image
   #   builds where the cache must be baked into an immutable artifact.
   # * `:symlink` - creates relative symlinks. For same-filesystem workflows
   #   (local dev, CI, Heroku-style same-dyno deploys, bundle-caching restores).

@@ -61,6 +61,12 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     end
   end
 
+  context "when mode is omitted" do
+    it "requires callers to choose copy or symlink explicitly" do
+      expect { described_class.call }.to raise_error(ArgumentError, /missing keyword: :mode/)
+    end
+  end
+
   context "when mode is :symlink" do
     it "symlinks the bundle instead of copying it" do
       described_class.call(mode: :symlink)

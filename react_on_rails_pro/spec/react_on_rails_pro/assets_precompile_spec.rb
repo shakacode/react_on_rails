@@ -410,7 +410,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
     end
 
     after do
-      FileUtils.rm_f(server_bundle)
+      FileUtils.rm_rf(server_bundle)
     end
 
     it "is a no-op when no rolling_deploy_adapter is configured" do
@@ -487,6 +487,15 @@ describe ReactOnRailsPro::AssetsPrecompile do
       expect(adapter).not_to receive(:upload)
       expect { described_class.send(:publish_current_bundle_if_configured) }
         .to output(/Server bundle .*rolling-deploy-upload-server-bundle\.js.*does not exist/m).to_stderr
+    end
+
+    it "warns and skips publication when the server bundle path is a directory" do
+      FileUtils.rm_f(server_bundle)
+      FileUtils.mkdir_p(server_bundle)
+
+      expect(adapter).not_to receive(:upload)
+      expect { described_class.send(:publish_current_bundle_if_configured) }
+        .to output(/Server bundle .*rolling-deploy-upload-server-bundle\.js.*is not a file/m).to_stderr
     end
 
     context "when RSC support is enabled" do

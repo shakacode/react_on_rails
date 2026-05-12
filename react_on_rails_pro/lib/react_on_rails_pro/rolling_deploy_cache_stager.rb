@@ -251,11 +251,15 @@ module ReactOnRailsPro
       if non_file_required.any?
         warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) returned non-file required RSC " \
              "asset path(s): #{non_file_required.inspect}. Skipping this hash."
-      else
-        warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) returned non-required asset " \
-             "path(s) that are not files: #{non_file_assets.inspect}. Adapter contract requires only " \
-             "existing file paths. Skipping this hash to avoid staging an incomplete bundle directory."
       end
+
+      non_file_non_required =
+        non_file_assets.reject { |path| non_file_required.include?(File.basename(path)) }
+      return if non_file_non_required.empty?
+
+      warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) returned non-required asset " \
+           "path(s) that are not files: #{non_file_non_required.inspect}. Adapter contract requires only " \
+           "existing file paths. Skipping this hash to avoid staging an incomplete bundle directory."
     end
     private_class_method :warn_non_file_asset_payload
 
