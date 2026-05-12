@@ -623,6 +623,8 @@ E2E Tests (Playwright)
 └── Full page flows -- navigation, forms, etc.
 ```
 
+For Rails system tests that exercise the node renderer, see [RSC and Node Renderer System Tests](../building-features/testing-configuration.md#rsc-and-node-renderer-system-tests). That guide covers test bundle compilation, renderer process startup/shutdown, bundle-cache isolation, parallel-worker caveats, and stubbing external APIs without bypassing the RSC path.
+
 ### Testing Mutations
 
 In React on Rails, mutations go through Rails controller endpoints rather than Server Actions. Test mutation logic in your Rails controller specs (RSpec request specs) and test the Client Component's form submission behavior with component tests:
