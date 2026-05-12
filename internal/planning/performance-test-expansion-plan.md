@@ -41,13 +41,15 @@ Recommended OSS first slice for [Issue 2169](https://github.com/shakacode/react_
 3. Cached SSR route with explicit hit and miss measurements
 
 Hash SSR is deferred to a follow-on PR after the initial OSS noise profile is understood. The cached SSR slice should
-define separate cache-hit and cache-miss benchmark paths before comparing results. Use a dedicated cache adapter and
-namespace for benchmark routes, such as `ActiveSupport::Cache::FileStore.new(Rails.root.join("tmp/benchmark_cache").to_s)`, instead of the
-app's default store. The miss path should clear only that benchmark cache namespace before measurement, and the hit path
-should clear that namespace, make one warm-up request to prime the fragment, then run k6 against the primed route. For
-the dedicated `FileStore`, clear the exact store root, for example
-`FileUtils.rm_rf(Rails.root.join("tmp/benchmark_cache"))`; do not clear `tmp/cache/assets` or the app's default cache
-store. Avoid `Rails.cache.clear` on the application cache. Avoid relying on a shared Redis instance, environment-default
+define separate cache-hit and cache-miss benchmark paths before comparing results. Inside the Rails app, use a dedicated
+cache adapter and namespace for benchmark routes, such as
+`ActiveSupport::Cache::FileStore.new(Rails.root.join("tmp/benchmark_cache").to_s)`, instead of the app's default store.
+The miss path should clear only that benchmark cache namespace before measurement, and the hit path should clear that
+namespace, make one warm-up request to prime the fragment, then run k6 against the primed route. For the dedicated
+`FileStore`, clear the exact store root: use `FileUtils.rm_rf(Rails.root.join("tmp/benchmark_cache"))` from Rails-loaded
+code, or `FileUtils.rm_rf(File.join(APP_DIR, "tmp/benchmark_cache"))` from `benchmarks/bench.rb` or another plain Ruby
+wrapper where `Rails.root` is unavailable. Do not clear `tmp/cache/assets` or the app's default cache store. Avoid
+`Rails.cache.clear` on the application cache. Avoid relying on a shared Redis instance, environment-default
 `:null_store`/`:memory_store` behavior, or manual cache state. To avoid mixing cold Rails-process noise into cache-miss
 measurements, warm the Rails process with a route that does not populate the benchmark cache, then clear the dedicated
 benchmark cache immediately before the cache-miss k6 measurement. For cache-hit measurements, clear the dedicated
@@ -78,7 +80,9 @@ extended to cover full Rails streaming behavior.
 
 Run Pro routes with `PRO=true`; `benchmarks/bench.rb` switches `APP_DIR` to `react_on_rails_pro/spec/dummy`. The current
 Bencher suffix is `: Core` for OSS routes and `: Pro` for Pro routes, so cache-hit/cache-miss benchmark names should
-preserve that suffix while adding the new cache-state distinction.
+preserve that suffix while adding the exact cache-state suffix ` (cache-hit)` or ` (cache-miss)`, for example
+`/my_route: Core (cache-hit)` and `/my_route: Core (cache-miss)`. Keep the parentheses and hyphenated spelling
+consistent because Bencher treats the benchmark name as the primary key.
 
 ## Noise Controls
 
@@ -111,18 +115,21 @@ Prerequisites for the first implementation PR:
   resolves against `APP_DIR/node_modules` rather than `Dir.pwd`. Preferred form (no global side effects):
 
   ```ruby
-  react_version, _status = Open3.capture2(
+  react_version_output, status = Open3.capture2(
     "node", "-e", "console.log(require('react/package.json').version)",
     chdir: APP_DIR
   )
-  react_version = react_version.strip
+  react_version = status.success? ? react_version_output.strip : "unknown"
+  warn "WARNING: could not capture react_version" unless status.success?
   ```
 
   Equivalent block form using `Dir.chdir(APP_DIR) do ... end` is acceptable when the surrounding code already manages
   working directory state. If the `react_version` capture command fails (for example when `node_modules` is not yet
-  installed in `APP_DIR`), record `react_version: "unknown"` and emit a warning rather than aborting the benchmark run. Capture `bundle_mode` from
-  `ENV["NODE_ENV"]` (falling back to `"production"`) so the recorded mode reflects the actual build rather than silently
-  lying when CI or local runs use a non-production mode.
+  installed in `APP_DIR`), record `react_version: "unknown"` and emit a warning rather than aborting the benchmark run;
+  if `Open3.capture2` raises, use the same fallback path. Capture `bundle_mode` from `ENV["NODE_ENV"]` (falling back to
+  `"production"`) as a best-effort process environment label. Do not treat that value as proof of the Webpack build mode
+  when prebuilt assets or explicit build flags may diverge; if exact asset-build fidelity is needed later, record it from
+  the build output or a build-written metadata file.
   Define `sample_count` as the number of completed k6 measurement runs contributing to the route's reported summary. The
   first slice should start at one run per route. If a later implementation aggregates forward and reverse passes into a
   single route summary, record `sample_count: 2`; if it writes one summary per pass, keep each summary at
