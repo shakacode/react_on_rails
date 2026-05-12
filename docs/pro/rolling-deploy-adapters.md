@@ -210,6 +210,8 @@ class S3RollingDeployAdapter
   end
 
   def self.update_manifest!(hash)
+    # WARNING: This simple read-modify-write update assumes serialized deploys.
+    # Use conditional writes or external coordination if deploys can overlap.
     hashes = previous_bundle_hashes
     hashes << hash unless hashes.include?(hash)
     # Write and read both trim to RETENTION so the persisted manifest matches

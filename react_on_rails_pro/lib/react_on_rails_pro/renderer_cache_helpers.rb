@@ -83,6 +83,8 @@ module ReactOnRailsPro
     def loadable_stats_asset_path
       path = ReactOnRails::PackerUtils.asset_uri_from_packer(LOADABLE_STATS_ASSET_NAME)
       File.exist?(path.to_s) ? path : nil
+    rescue StandardError
+      nil
     end
 
     # Required assets are matched by expanded path rather than basename so a

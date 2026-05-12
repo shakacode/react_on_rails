@@ -64,8 +64,9 @@ module ReactOnRailsPro
       # bundle_directory then resolves real paths against an existing dir without
       # needing to mutate the filesystem itself.
       FileUtils.mkdir_p(cache_dir)
+      normalized_cache_dir = File.realpath(cache_dir)
       puts "[ReactOnRailsPro] Seeding previous bundle hashes for rolling deploy: #{hashes.inspect}"
-      hashes.each { |hash| seed_previous_hash(adapter, hash, cache_dir, mode) }
+      hashes.each { |hash| seed_previous_hash(adapter, hash, normalized_cache_dir, mode) }
     end
 
     def self.handle_missing_adapter
@@ -384,12 +385,7 @@ module ReactOnRailsPro
     end
     private_class_method :sanitize_hashes
 
-    def self.bundle_directory(cache_dir, hash)
-      # File.realpath requires the cache root to exist; the caller in `call` is
-      # responsible for `FileUtils.mkdir_p(cache_dir)` once at least one hash is
-      # known to need staging. Keeping the mkdir here would make every call to
-      # this pure-looking helper mutate the filesystem.
-      normalized_cache_dir = File.realpath(cache_dir)
+    def self.bundle_directory(normalized_cache_dir, hash)
       normalized_candidate = File.expand_path(File.join(normalized_cache_dir, hash))
 
       # Require the candidate to be a *subdirectory* of the cache root, not the
@@ -436,6 +432,9 @@ module ReactOnRailsPro
       # existence check above but before FileUtils.mv ran, causing mv to nest
       # staging_dir inside the racing dir instead of renaming it.
       if File.directory?(nested_staging_dir)
+        # The racing directory is now the authoritative cache entry. Remove only
+        # this attempt's nested staging copy; restore leaves the racing directory
+        # intact and the old backup is swept later.
         FileUtils.rm_rf(nested_staging_dir)
         raise ReactOnRailsPro::Error,
               "Concurrent writer recreated #{bundle_dir} before promotion completed; aborting promotion"
@@ -467,13 +466,23 @@ module ReactOnRailsPro
         return
       end
 
-      # If a concurrent writer recreates bundle_dir between the check above and the mv below,
-      # the rescue catches the resulting error and leaves that writer's directory intact.
       FileUtils.mv(backup_dir, bundle_dir)
+      remove_nested_backup_directory(backup_dir, bundle_dir)
     rescue StandardError => e
       warn "[ReactOnRailsPro] Could not restore previous rolling-deploy bundle directory #{backup_dir} " \
            "to #{bundle_dir}: #{e.class}: #{e.message}. Runtime 410-retry remains the fallback."
     end
     private_class_method :restore_previous_bundle_directory
+
+    def self.remove_nested_backup_directory(backup_dir, bundle_dir)
+      nested_backup_dir = File.join(bundle_dir, File.basename(backup_dir))
+      return unless File.directory?(nested_backup_dir)
+
+      FileUtils.rm_rf(nested_backup_dir)
+      warn "[ReactOnRailsPro] Cannot restore previous rolling-deploy bundle directory because #{bundle_dir} " \
+           "was recreated during restore. Leaving that concurrent writer's directory intact; removed nested " \
+           "backup directory #{nested_backup_dir}."
+    end
+    private_class_method :remove_nested_backup_directory
   end
 end

@@ -192,7 +192,7 @@ module ReactOnRailsPro
         display_label = bundle_label == "RSC" ? "RSC" : bundle_label.capitalize
         reason = File.exist?(bundle) ? "is not a file" : "does not exist"
         warn "[ReactOnRailsPro] #{display_label} bundle #{bundle.inspect} #{reason}; " \
-             "skipping rolling_deploy_adapter publication for #{bundle_label} bundle."
+             "skipping rolling_deploy_adapter publication for #{display_label.downcase} bundle."
       end
     end
 

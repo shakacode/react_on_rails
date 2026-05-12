@@ -462,6 +462,38 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
   end
 
+  context "when a concurrent writer recreates bundle_dir during backup restore" do
+    let(:src_bundle) { source_file("bundle-new.js", contents: "// new bundle") }
+    let(:src_asset) { source_file("loadable-stats.json", contents: "{}") }
+    let(:bundle_dir) { File.join(cache_dir, "abc123") }
+    let(:existing_bundle) { File.join(bundle_dir, "abc123.js") }
+
+    before do
+      FileUtils.mkdir_p(bundle_dir)
+      File.write(existing_bundle, "// existing bundle")
+      allow(adapter).to receive_messages(previous_bundle_hashes: ["abc123"])
+      allow(adapter).to receive(:fetch).with("abc123").and_return(bundle: src_bundle, assets: [src_asset])
+      allow(FileUtils).to receive(:mv).and_wrap_original do |original, source, destination, *args|
+        raise Errno::EIO, "promotion failed" if source.to_s.include?("abc123.staging-")
+
+        if source.to_s.include?("abc123.previous-")
+          FileUtils.mkdir_p(bundle_dir)
+          File.write(existing_bundle, "// concurrent bundle")
+        end
+
+        original.call(source, destination, *args)
+      end
+    end
+
+    it "keeps the concurrent writer's bundle and removes the nested backup" do
+      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+        .to output(/Cannot restore previous rolling-deploy bundle directory.*recreated during restore/m).to_stderr
+
+      expect(File.read(existing_bundle)).to eq("// concurrent bundle")
+      expect(Dir.glob(File.join(bundle_dir, "*.previous-*"))).to be_empty
+    end
+  end
+
   context "when a concurrent writer recreates bundle_dir between backup and promote" do
     let(:src_bundle) { source_file("bundle-new.js", contents: "// new bundle") }
     let(:src_asset) { source_file("loadable-stats.json", contents: "{}") }
