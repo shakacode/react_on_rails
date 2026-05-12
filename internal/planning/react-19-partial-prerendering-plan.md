@@ -98,13 +98,16 @@ Use a dedicated branch for the actual version verification work:
     cd react_on_rails_pro/spec/dummy
     bundle exec rspec spec/requests/rsc_payload_spec.rb spec/requests/server_render_check_spec.rb spec/system/renderer_integration_spec.rb
     ```
-  - See `.claude/docs/replicating-ci-failures.md` when mapping a failed CI job back to a narrower local command.
+  - See `.claude/docs/replicating-ci-failures.md` (Claude Code agent reference) when mapping a failed CI job back to a
+    narrower local command; human contributors can also use the failing CI job name from the GitHub Actions log to scope
+    the local repro.
 - [ ] Ensure Playwright browsers are installed, then run E2E coverage:
   - `cd react_on_rails/spec/dummy && pnpm playwright install --with-deps`
   - `cd react_on_rails/spec/dummy && pnpm test:e2e` for OSS dummy SSR and hydration paths
   - `cd react_on_rails_pro/spec/dummy && pnpm playwright install --with-deps`
   - `cd react_on_rails_pro/spec/dummy && pnpm run e2e-test` for Pro `stream_react_component` and RSC payload paths
-  - See `.claude/docs/playwright-e2e-testing.md` for the OSS dummy setup.
+  - See `.claude/docs/playwright-e2e-testing.md` (Claude Code agent reference) for additional notes; the commands above
+    are the canonical OSS dummy setup for human contributors.
 - [ ] Run the generated-app suite. Prefer a fresh clone. If a fresh clone is not practical, use a disposable worktree so
       the current checkout and gitignored files are untouched:
 
