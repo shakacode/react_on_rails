@@ -66,9 +66,11 @@ OSS first slice or in a dedicated follow-up PR:
    introduce an `RSC_BENCHMARK_COMPONENT` environment variable defaulting to a known component name so
    `benchmarks/bench.rb` can construct the URL without relying on route discovery. When `RSC_BENCHMARK_COMPONENT` is set,
    `benchmarks/bench.rb` constructs the target URL as `/rsc_payload/#{RSC_BENCHMARK_COMPONENT}` and bypasses route
-   discovery for that entry. If neither `TARGET_URL` nor `RSC_BENCHMARK_COMPONENT` is provided and no parameter-free RSC
-   route exists, fail setup with an actionable error instead of silently skipping RSC coverage. Automatic route discovery
-   currently skips required-parameter routes such as `/rsc_payload/:component_name`.
+   discovery for that entry. The implementation PR must verify that the `/rsc_payload/` prefix still matches the Pro
+   dummy app's `routes.rb` before relying on this convention. If neither `TARGET_URL` nor `RSC_BENCHMARK_COMPONENT` is
+   provided and no parameter-free RSC route exists, setup must call `abort(msg)` or otherwise exit non-zero with an
+   actionable error instead of silently skipping RSC coverage. Automatic route discovery currently skips
+   required-parameter routes such as `/rsc_payload/:component_name`.
 
 Use `benchmarks/bench.rb`/`benchmarks/k6.ts` for Rails HTTP routes such as streaming SSR and static RSC payload endpoint
 checks. Use `benchmarks/bench-node-renderer.rb` for direct Pro Node Renderer transport coverage unless that script is
@@ -126,16 +128,17 @@ Prerequisites for the first implementation PR:
   single route summary, record `sample_count: 2`; if it writes one summary per pass, keep each summary at
   `sample_count: 1`.
 
-  Use these metadata keys as the minimum schema:
+  Use these metadata keys as the minimum schema. The JSON block shows example output values; populate the real artifact
+  with the runtime capture rules above instead of copying these literals:
 
   ```json
   {
-    "ruby_version": "<output of: ruby --version>",
-    "node_version": "<output of: node --version>",
-    "react_version": "<output of: Open3.capture2(\"node\", \"-e\", \"console.log(require('react/package.json').version)\", chdir: APP_DIR)>",
-    "renderer": "<node_renderer when PRO=true, otherwise execjs>",
-    "runner_type": "<RUNNER_OS/RUNNER_ARCH when available, otherwise local platform>",
-    "bundle_mode": "<ENV[\"NODE_ENV\"] when set, otherwise production>",
+    "ruby_version": "ruby 3.3.6",
+    "node_version": "v22.13.1",
+    "react_version": "18.2.0",
+    "renderer": "execjs",
+    "runner_type": "ubuntu-latest/x64",
+    "bundle_mode": "production",
     "sample_count": 1
   }
   ```
