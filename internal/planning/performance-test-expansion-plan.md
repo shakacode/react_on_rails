@@ -70,9 +70,10 @@ OSS first slice or in a dedicated follow-up PR:
    `benchmarks/bench.rb` constructs the target URL as `/rsc_payload/#{RSC_BENCHMARK_COMPONENT}` and bypasses route
    discovery for that entry. The implementation PR must verify that the `/rsc_payload/` prefix still matches the Pro
    dummy app's `routes.rb` before relying on this convention. If neither `TARGET_URL` nor `RSC_BENCHMARK_COMPONENT` is
-   provided and no parameter-free RSC route exists, setup must call `abort(msg)` or otherwise exit non-zero with an
-   actionable error instead of silently skipping RSC coverage. Automatic route discovery currently skips
-   required-parameter routes such as `/rsc_payload/:component_name`.
+   provided and no parameter-free RSC route exists, route-list setup must call `abort(msg)` or otherwise exit non-zero
+   before benchmark measurements begin, with an actionable error instead of silently skipping RSC coverage. Do this as a
+   preflight check during route-list construction, not as a mid-run abort after partial artifacts have been written.
+   Automatic route discovery currently skips required-parameter routes such as `/rsc_payload/:component_name`.
 
 Use `benchmarks/bench.rb`/`benchmarks/k6.ts` for Rails HTTP routes such as streaming SSR and static RSC payload endpoint
 checks. Use `benchmarks/bench-node-renderer.rb` for direct Pro Node Renderer transport coverage unless that script is
@@ -110,9 +111,10 @@ Prerequisites for the first implementation PR:
 - Record sample count, runner type, Ruby version, Node version, React version, renderer, and bundle mode in a
   `metadata.json` artifact and mirror the key fields in the `summary.txt` header. Capture runtime-dependent fields when
   the benchmark runs instead of hard-coding the example schema values: use `ruby --version` for `ruby_version`,
-  `node --version` for `node_version`, and capture `react_version` by invoking Node from `APP_DIR` so OSS and Pro dummy
-  apps report their own installed React package. The implementation PR must use a chdir-aware Ruby call so `require()`
-  resolves against `APP_DIR/node_modules` rather than `Dir.pwd`. Preferred form (no global side effects):
+  `node --version` for `node_version`, populate `runner_type` from `ENV["RUNNER_OS"]` and `ENV["RUNNER_ARCH"]`, and
+  capture `react_version` by invoking Node from `APP_DIR` so OSS and Pro dummy apps report their own installed React
+  package. The implementation PR must use a chdir-aware Ruby call so `require()` resolves against `APP_DIR/node_modules`
+  rather than `Dir.pwd`. Preferred form (no global side effects):
 
   ```ruby
   react_version_output, status = Open3.capture2(
@@ -130,6 +132,15 @@ Prerequisites for the first implementation PR:
   `"production"`) as a best-effort process environment label. Do not treat that value as proof of the Webpack build mode
   when prebuilt assets or explicit build flags may diverge; if exact asset-build fidelity is needed later, record it from
   the build output or a build-written metadata file.
+  Populate `runner_type` with:
+
+  ```ruby
+  runner_type = [ENV["RUNNER_OS"], ENV["RUNNER_ARCH"]]
+                .compact
+                .join("/")
+                .then { |value| value.empty? ? "unknown" : value }
+  ```
+
   Define `sample_count` as the number of completed k6 measurement runs contributing to the route's reported summary. The
   first slice should start at one run per route. If a later implementation aggregates forward and reverse passes into a
   single route summary, record `sample_count: 2`; if it writes one summary per pass, keep each summary at
@@ -144,7 +155,7 @@ Prerequisites for the first implementation PR:
     "node_version": "v22.13.1",
     "react_version": "18.2.0",
     "renderer": "execjs",
-    "runner_type": "ubuntu-latest/x64",
+    "runner_type": "Linux/X64",
     "bundle_mode": "production",
     "sample_count": 1
   }
