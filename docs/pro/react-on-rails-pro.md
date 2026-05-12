@@ -11,6 +11,7 @@ React on Rails Pro is the advanced rendering and performance tier for React on R
 
 ## Start Here
 
+- [Pricing and sign up](https://pro.reactonrails.com/) - Current Pro plans and license purchase
 - [Installation](./installation.md) - Fresh install or manual setup
 - [Upgrade from OSS to Pro](./upgrading-to-pro.md) - Three-step upgrade path
 - [Configuration](../oss/configuration/configuration-pro.md) - Pro-specific runtime settings
@@ -34,11 +35,11 @@ React on Rails Pro is the advanced rendering and performance tier for React on R
 - [Node renderer](./node-renderer.md)
 - [Code splitting and bundle caching](../oss/building-features/code-splitting.md)
 
-## Evaluation and Licensing
+## Friendly License Model
 
-No license token is required for local development, evaluation, testing, CI/CD, or staging. Production deployments require a paid license.
+Try Pro freely in development, test, CI/CD, and staging. No token is required to evaluate the advanced rendering features before making any purchasing decision. If no license is configured, React on Rails Pro keeps running in unlicensed mode and logs license status instead of blocking the app.
 
-If your organization is budget-constrained, email [justin@shakacode.com](mailto:justin@shakacode.com). We can provide free or low-cost licenses in qualifying cases. For larger companies, paid licenses support continued React on Rails development.
+Production deployments require a paid license. See [Pro pricing and sign up](https://pro.reactonrails.com/) for current options. If your organization is budget-constrained, email [justin@shakacode.com](mailto:justin@shakacode.com). We can provide free or low-cost licenses in qualifying cases. For larger companies, paid licenses support continued React on Rails development.
 
 See [Upgrading to Pro](./upgrading-to-pro.md#try-pro-risk-free) for the current licensing and upgrade details.
 
@@ -54,6 +55,7 @@ It demonstrates the Node renderer, caching, and SSR-oriented workflows in a real
 
 - [Installation](./installation.md)
 - [Upgrade from OSS to Pro](./upgrading-to-pro.md)
+- [Pricing and sign up](https://pro.reactonrails.com/)
 - [Node Renderer](./node-renderer.md)
 - [Streaming SSR](./streaming-ssr.md)
 - [Fragment Caching](./fragment-caching.md)

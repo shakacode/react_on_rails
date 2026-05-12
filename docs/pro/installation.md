@@ -1,6 +1,8 @@
 # Installation
 
-React on Rails Pro packages are published publicly on npmjs.org and RubyGems.org. A **paid license is required for production deployments only**. No license token is needed for evaluation, local development, testing, or CI/CD. Contact [justin@shakacode.com](mailto:justin@shakacode.com) to purchase a license.
+React on Rails Pro packages are published publicly on npmjs.org and RubyGems.org. A **paid license is required for production deployments only**. No license token is needed for evaluation, local development, testing, CI/CD, or staging. If no license is configured, Pro keeps running in unlicensed mode and logs the license status instead of blocking your app.
+
+When you are ready for production, visit [Pro pricing and sign up](https://pro.reactonrails.com/) or contact [justin@shakacode.com](mailto:justin@shakacode.com) for a license.
 
 **Upgrading from GitHub Packages?** See the [Upgrading Guide](./updating.md) for migration instructions.
 
@@ -52,7 +54,7 @@ The standalone generator adds Pro-specific files and modifies your existing webp
 
 ## After Running the Generator
 
-Run a quick validation, then configure your license.
+Run a quick validation. For evaluation and non-production deployments, you can skip license setup.
 
 ```bash
 bundle exec rails react_on_rails:doctor
@@ -66,13 +68,14 @@ If port 3000 is already in use:
 PORT=3001 bin/dev
 ```
 
-Set the license environment variable:
+For production deployments, set the license environment variable:
 
 ```bash
 export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
 ```
 
-See [License Configuration](#license-configuration-production-only) below for other options.
+See [License Configuration](#license-configuration-production-only) below for other options and
+[Pro pricing and sign up](https://pro.reactonrails.com/) when you need a production license.
 
 ## Adding React Server Components
 
@@ -123,6 +126,8 @@ gem install react_on_rails_pro --version "<version>"
 ## License Configuration (Production Only)
 
 React on Rails Pro uses a license-optional model to simplify evaluation and development. A license token is optional for evaluation, local development, test environments, CI/CD pipelines, and staging/non-production deployments.
+
+If no license is configured, the app continues running in unlicensed mode and logs license status. In production, that log message is a warning because a paid license is required; in non-production environments, it is informational.
 
 **For production deployments**, set your license token as an environment variable:
 

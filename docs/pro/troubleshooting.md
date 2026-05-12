@@ -67,15 +67,15 @@ For issues related to upgrading from GitHub Packages to public distribution, see
 
 ## License
 
-### License validation fails on startup
+### License validation warnings on startup
 
-**Symptom**: `ReactOnRailsPro::LicenseError` on Rails boot.
+**Symptom**: Rails logs a React on Rails Pro license warning or informational message on boot.
 
 **Fixes**:
 
 - In production, ensure `REACT_ON_RAILS_PRO_LICENSE` environment variable is set
 - Run `bundle exec rake react_on_rails_pro:verify_license` to check license status (use `FORMAT=json` for CI/CD)
-- Check that the license key is not expired — contact [justin@shakacode.com](mailto:justin@shakacode.com) for renewal
+- Check that the license key is not expired — use [Pro pricing and sign up](https://pro.reactonrails.com/) or contact [justin@shakacode.com](mailto:justin@shakacode.com) for renewal
 - For evaluation/non-production use, no license token is required — the app runs in unlicensed mode
 
 ## React Server Components

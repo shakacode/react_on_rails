@@ -182,7 +182,7 @@ Build speed is only part of the picture. Here's how the two approaches compare a
 - **Code splitting with SSR** — route-based splitting via Loadable Components
 - **TanStack Router SSR** — type-safe routing with server rendering
 
-Available for free or with startup-friendly pricing — see the [React on Rails Pro docs](../../pro/react-on-rails-pro.md) for details and the [OSS vs Pro feature matrix](./oss-vs-pro.md) for a detailed breakdown.
+Available for free evaluation with startup-friendly pricing for production licenses. See [Pro pricing and sign up](https://pro.reactonrails.com/), the [React on Rails Pro docs](../../pro/react-on-rails-pro.md), and the [OSS vs Pro feature matrix](./oss-vs-pro.md) for a detailed breakdown.
 
 **Best for:** Production Rails apps with high-traffic pages, SEO requirements, or need for React Server Components.
 

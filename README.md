@@ -19,7 +19,8 @@
   <a href="https://reactonrails.com/docs/">Documentation</a> ·
   <a href="https://reactonrails.com/docs/getting-started/quick-start/">Quick Start</a> ·
   <a href="https://reactonrails.com/examples/">Examples</a> ·
-  <a href="https://reactonrails.com/docs/pro/">Pro</a>
+  <a href="https://reactonrails.com/docs/pro/">Pro</a> ·
+  <a href="https://pro.reactonrails.com/">Pro Pricing / Sign Up</a>
 </p>
 
 ## React on Rails
@@ -41,6 +42,7 @@ React on Rails is maintained by [ShakaCode](https://www.shakacode.com).
 - [Install into an existing Rails app](https://reactonrails.com/docs/getting-started/existing-rails-app/)
 - [Examples](https://reactonrails.com/examples/)
 - [Compare OSS and Pro](https://reactonrails.com/docs/getting-started/oss-vs-pro/)
+- [Pro pricing and sign up](https://pro.reactonrails.com/)
 - [Compare with alternatives](https://reactonrails.com/docs/getting-started/comparison-with-alternatives/)
 - [Changelog](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md)
 
@@ -94,11 +96,17 @@ React on Rails Pro adds higher-throughput SSR and advanced rendering features on
 top of the open-source gem, including Node renderer support, streaming SSR,
 React Server Components, fragment caching, and TanStack Router SSR.
 
+**Friendly license model:** Try Pro freely in development, test, CI/CD, and
+staging. No token is required to evaluate. If no license is configured, Pro
+keeps running and logs license status instead of blocking your app. Production
+deployments require a paid license; see [Pro pricing and sign up](https://pro.reactonrails.com/).
+
 Start with the docs here:
 
 - [React on Rails Pro docs](https://reactonrails.com/docs/pro/)
 - [OSS vs Pro feature comparison](https://reactonrails.com/docs/getting-started/oss-vs-pro/)
 - [Upgrade to Pro](https://reactonrails.com/docs/pro/upgrading-to-pro/)
+- [Pro pricing and sign up](https://pro.reactonrails.com/)
 
 ## Requirements
 
@@ -140,7 +148,8 @@ React on Rails is available as open source under the terms of the
 [MIT License](https://github.com/shakacode/react_on_rails/tree/main/LICENSE.md).
 
 Some advanced features require a React on Rails Pro subscription. See
-[React on Rails Pro](https://reactonrails.com/docs/pro/) for details.
+[React on Rails Pro](https://reactonrails.com/docs/pro/) and
+[Pro pricing and sign up](https://pro.reactonrails.com/) for details.
 
 ## Supporters
 
