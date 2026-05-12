@@ -167,8 +167,12 @@ module RscNodeRenderer
 
       if pid
         begin
-          # This checks the spawned command process. For `pnpm run <script>`, pnpm usually stays resident while the
-          # renderer is alive; if your launcher daemonizes Node, replace this with an app-specific health check.
+          # Heuristic early-exit check: if the launcher process has already died, raise now rather than
+          # waiting for the deadline. For `pnpm run <script>`, pnpm typically stays resident while Node
+          # is alive, but process managers that exec directly into Node (or daemonize) will exit here even
+          # though the renderer is still starting, surfacing a misleading ESRCH. The TCP probe above is
+          # the authoritative readiness signal; this check is only a fast-fail shortcut for the common
+          # pnpm/npm/yarn case. Replace it with an app-specific health check if your launcher daemonizes.
           Process.kill(0, pid)
         rescue Errno::ESRCH
           hint = log_path ? " Check #{log_path} for startup errors." : ""
@@ -212,7 +216,9 @@ RSpec.configure do |config|
     tmp_root = Rails.root.join("tmp").to_s
     unless expanded_cache_path.start_with?("#{tmp_root}#{File::SEPARATOR}")
       raise "RENDERER_SERVER_BUNDLE_CACHE_PATH must be inside Rails.root/tmp " \
-            "(got: #{expanded_cache_path})"
+            "(got: #{expanded_cache_path}). " \
+            "This path is deleted and recreated on every test run, so only paths " \
+            "inside Rails.root/tmp are permitted to prevent accidental data loss."
     end
     FileUtils.rm_rf(expanded_cache_path)
     FileUtils.mkdir_p(expanded_cache_path)
@@ -239,8 +245,12 @@ RSpec.configure do |config|
       raise "RENDERER_PORT #{renderer_env['RENDERER_PORT']} is already in use. " \
             "A previous test run may have left an orphaned node renderer. " \
             "Kill it manually or restart the CI job."
-    rescue Errno::ECONNREFUSED, Errno::ETIMEDOUT
-      # Port is free; safe to spawn.
+    rescue Errno::ECONNREFUSED
+      # Port refused immediately — nothing is listening; safe to spawn.
+    rescue Errno::ETIMEDOUT
+      # SYN was silently dropped (firewall/throttle); assume nothing is listening and proceed.
+      # Less certain than ECONNREFUSED on loopback, but treating it as fatal would block tests
+      # whenever a stray DROP rule is present.
     rescue Errno::ECONNRESET
       raise "RENDERER_PORT #{renderer_env['RENDERER_PORT']} accepted and reset a connection. " \
             "Another service may already be using it."
@@ -331,8 +341,9 @@ Require this file from `spec/rails_helper.rb` after loading `react_on_rails/test
 - The TCP probe above is a fallback for renderers that do not expose a health endpoint; if your renderer has one, replace the probe with an HTTP health check. A successful TCP connection only proves the port is accepting connections, not that route handlers or bundle manifests are fully initialized.
 - A reset during the pre-spawn probe usually means another service is already using the port and closing connections immediately.
 - The `connect_timeout` call is enough for `127.0.0.1` because an unused localhost port refuses the connection immediately. If you adapt the helper for a remote renderer, the operating system may still apply a longer TCP timeout.
-- The deadline is checked after each socket probe, so very tight timeouts can overshoot by up to the one-second connect timeout.
+- The deadline is checked after each socket probe, so very tight timeouts can overshoot by up to `connect_timeout + sleep` per iteration (roughly 1.1 s with the defaults above).
 - If CI hard-kills the Ruby process before `after(:suite)` runs, clear any orphaned renderer processes or occupied renderer ports before retrying the job.
+- `pgroup: true` and the negative-PID `Process.kill("-TERM", pid)` / `Process.kill("-KILL", pid)` calls are POSIX-only. On Windows they raise `NotImplementedError`, so adapt the spawn options and shutdown calls (for example, kill only the spawned PID and rely on the renderer to clean up its child) if you need to run this guide on a native Windows host. CI on Linux/macOS and WSL is unaffected.
 - The helper relies on the Step 2 `configure_rspec_to_compile_assets` setup so bundles are available before renderer-backed examples run. Load `support/rsc_node_renderer` after registering `configure_rspec_to_compile_assets` so modern RSpec can trigger compilation with `when_first_matching_example_defined` before suite hooks start the renderer. Older RSpec falls back to `before(:example, metatag)`, so compile assets in your CI job before running the spec process if your launcher validates bundles at boot or your suite starts renderer-backed requests outside examples tagged for compilation.
 
 In CI, set `RSC_NODE_RENDERER_TESTS=1` for jobs that need the renderer. For local development, leaving it unset lets you run non-RSC specs without starting another process.
