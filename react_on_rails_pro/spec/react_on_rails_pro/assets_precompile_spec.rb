@@ -481,6 +481,14 @@ describe ReactOnRailsPro::AssetsPrecompile do
         .to output(/Skipping rolling_deploy_adapter publication for server bundle/).to_stderr
     end
 
+    it "warns and skips publication when the server bundle file is missing after precompile" do
+      FileUtils.rm_f(server_bundle)
+
+      expect(adapter).not_to receive(:upload)
+      expect { described_class.send(:publish_current_bundle_if_configured) }
+        .to output(/Server bundle .*rolling-deploy-upload-server-bundle\.js.*does not exist/m).to_stderr
+    end
+
     context "when RSC support is enabled" do
       let(:rsc_bundle) { File.join(Dir.tmpdir, "rolling-deploy-upload-rsc-bundle.js") }
       let(:config) do
@@ -507,6 +515,16 @@ describe ReactOnRailsPro::AssetsPrecompile do
 
         expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: [])
         expect(adapter).to have_received(:upload).with("rsc999", bundle: rsc_bundle, assets: [])
+      end
+
+      it "warns and skips publication when the RSC bundle file is missing after precompile" do
+        FileUtils.rm_f(rsc_bundle)
+
+        expect { described_class.send(:publish_current_bundle_if_configured) }
+          .to output(/RSC bundle .*rolling-deploy-upload-rsc-bundle\.js.*does not exist/m).to_stderr
+
+        expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: [])
+        expect(adapter).not_to have_received(:upload).with("rsc999", bundle: rsc_bundle, assets: [])
       end
     end
 

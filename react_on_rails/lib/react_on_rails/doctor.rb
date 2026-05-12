@@ -2990,10 +2990,14 @@ module ReactOnRails
       end
     end
 
-    # Mirror of ReactOnRailsPro::RollingDeployCacheStager::TEMPORARY_DIRECTORY_PATTERN
-    # used as a fallback when the Pro gem isn't loaded so doctor still filters
-    # leftover staging/backup dirs out of the bundle-hash count. PID is `\d+`
-    # to match container deployments (Docker/Kubernetes) where seeding runs as PID 1.
+    # Fallback used when the Pro gem isn't loaded. Must match
+    # ReactOnRailsPro::RollingDeployCacheStager::TEMPORARY_DIRECTORY_PATTERN so
+    # doctor still filters staging/backup dirs out of the bundle-hash count.
+    # Drift is caught by:
+    #   react_on_rails_pro/spec/dummy/spec/rolling_deploy_cache_stager_spec.rb
+    #   describe "TEMPORARY_DIRECTORY_PATTERN"
+    # PID is `\d+` to match container deployments (Docker/Kubernetes) where
+    # seeding runs as PID 1.
     ROLLING_DEPLOY_TEMP_DIR_PATTERN = /\.(?:staging|previous)-\d+-[0-9a-f]{8,}\z/
 
     def report_resolved_cache_dir

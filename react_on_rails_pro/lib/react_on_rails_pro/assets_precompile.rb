@@ -114,12 +114,12 @@ module ReactOnRailsPro
       assets = filter_existing_assets(ReactOnRailsPro::RendererCacheHelpers.collect_assets.map(&:to_s))
 
       server_bundle = ReactOnRails::Utils.server_bundle_js_file_path
-      publish_bundle(adapter, pool.server_bundle_hash, server_bundle, assets, "server") if File.exist?(server_bundle)
+      publish_bundle_if_present(adapter, pool.server_bundle_hash, server_bundle, assets, "server")
 
       return unless ReactOnRailsPro.configuration.enable_rsc_support
 
       rsc_bundle = ReactOnRailsPro::Utils.rsc_bundle_js_file_path
-      publish_bundle(adapter, pool.rsc_bundle_hash, rsc_bundle, assets, "RSC") if File.exist?(rsc_bundle)
+      publish_bundle_if_present(adapter, pool.rsc_bundle_hash, rsc_bundle, assets, "RSC")
     end
 
     # Some collected companion assets may be absent or point at non-file paths.
@@ -185,6 +185,16 @@ module ReactOnRailsPro
       upload_bundle(adapter, hash, bundle, assets)
     end
 
+    def self.publish_bundle_if_present(adapter, hash, bundle, assets, bundle_label)
+      if File.exist?(bundle)
+        publish_bundle(adapter, hash, bundle, assets, bundle_label)
+      else
+        display_label = bundle_label == "RSC" ? "RSC" : bundle_label.capitalize
+        warn "[ReactOnRailsPro] #{display_label} bundle #{bundle.inspect} does not exist; " \
+             "skipping rolling_deploy_adapter publication for #{bundle_label} bundle."
+      end
+    end
+
     def self.upload_bundle(adapter, hash, bundle, assets)
       Timeout.timeout(UPLOAD_TIMEOUT_SECONDS) do
         adapter.upload(hash, bundle: bundle, assets: assets)
@@ -204,6 +214,7 @@ module ReactOnRailsPro
                          :warn_if_unavailable_required_rsc_assets,
                          :required_rsc_asset_basenames,
                          :publish_bundle,
+                         :publish_bundle_if_present,
                          :upload_bundle
     def self.pre_seed_renderer_cache_mode
       raw = ENV.fetch("ASSETS_PRECOMPILE_RENDERER_CACHE_MODE", "symlink").to_s.downcase

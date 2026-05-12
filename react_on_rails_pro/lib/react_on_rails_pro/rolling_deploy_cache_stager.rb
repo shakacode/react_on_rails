@@ -418,11 +418,9 @@ module ReactOnRailsPro
         FileUtils.mv(bundle_dir, backup_dir)
       end
 
-      # Guard against a concurrent writer recreating bundle_dir between the
-      # backup move and this promotion. Without this check FileUtils.mv would
-      # nest staging_dir *inside* the racing dir (yielding `<hash>/<staging-dir>/<hash>.js`),
-      # and renderer lookups would miss the cache. The rescue below restores
-      # the backup so the previous good copy remains servable.
+      # Catch the straightforward race where a concurrent writer recreates
+      # bundle_dir before promotion starts. The rescue below restores the backup
+      # so the previous good copy remains servable.
       if File.exist?(bundle_dir)
         raise ReactOnRailsPro::Error,
               "Concurrent writer recreated #{bundle_dir} between backup and promote; aborting promotion"
@@ -430,6 +428,9 @@ module ReactOnRailsPro
 
       FileUtils.mv(staging_dir, bundle_dir)
       nested_staging_dir = File.join(bundle_dir, File.basename(staging_dir))
+      # Detect the specific race where bundle_dir was recreated after the
+      # existence check above but before FileUtils.mv ran, causing mv to nest
+      # staging_dir inside the racing dir instead of renaming it.
       if File.directory?(nested_staging_dir)
         FileUtils.rm_rf(nested_staging_dir)
         raise ReactOnRailsPro::Error,
