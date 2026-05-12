@@ -135,7 +135,7 @@ This is a helper method that takes any JavaScript expression and returns the out
 
 ## Pro-Only View Helpers
 
-The following view helpers are available exclusively with [React on Rails Pro](../../pro/react-on-rails-pro.md). Install the Pro gem to use them. Pro is free to evaluate without a license token in development, test, CI/CD, and staging; production deployments require a paid license from [Pro pricing and sign up](https://pro.reactonrails.com/).
+The following view helpers are available exclusively with [React on Rails Pro](../../pro/react-on-rails-pro.md). Install the Pro gem to use them. The friendly license model lets you evaluate Pro without a token in development, test, CI/CD, and staging; production deployments require a paid license from [Pro pricing and sign up](https://pro.reactonrails.com/).
 
 ### cached_react_component and cached_react_component_hash
 

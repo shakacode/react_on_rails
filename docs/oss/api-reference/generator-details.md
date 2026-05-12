@@ -210,7 +210,7 @@ rails generate react_on_rails:install --pro
 **Prerequisites:**
 
 - Add `gem 'react_on_rails_pro'` to your Gemfile and run `bundle install` (check [the CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) for the latest version)
-- No license token is needed for evaluation, development, test, CI/CD, or staging
+- Under the friendly license model, no token is needed for evaluation, development, test, CI/CD, or staging
 - For production, get a license from [Pro pricing and sign up](https://pro.reactonrails.com/) or contact [justin@shakacode.com](mailto:justin@shakacode.com)
 
 **What gets created:**
