@@ -224,9 +224,13 @@ test_unshallow_timeout_warns_on_invalid() {
 }
 
 test_run_test_counts_non_final_assertion_failure() {
+  # This fixture is invoked indirectly by run_test. The final assertion is only
+  # reachable if run_test stops running tests under set -e.
   # shellcheck disable=SC2329
   intentionally_fail_first_assertion_then_pass() {
+    # shellcheck disable=SC2317
     assert_equals "expected" "actual" "intentional harness failure"
+    # shellcheck disable=SC2317
     assert_equals "still-runs" "still-runs" "final assertion"
   }
 
