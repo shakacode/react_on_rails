@@ -99,9 +99,9 @@ bundle exec rails generate react_on_rails:install --pro
 
 ## Try Pro Risk-Free
 
-React on Rails Pro is **free to try** — no license token is needed for local development, testing, CI/CD, or staging environments. Install it, experiment with the features, and see the performance difference in your own app before making any purchasing decisions.
+React on Rails Pro uses a **friendly license model**: try Pro freely in development, test, CI/CD, and staging. No token is required to evaluate. Install it, experiment with the features, and see the performance difference in your own app before making any purchasing decisions.
 
-If no license is configured, Pro keeps running in unlicensed mode and logs the license status instead of blocking your app. In production, that log message is a warning because a paid license is required.
+If no license is configured, Pro keeps running in unlicensed mode and logs license status instead of blocking your app. In production, that log message is a warning because a paid license is required.
 
 A **paid license is required for all production deployments**. Visit [Pro pricing and sign up](https://pro.reactonrails.com/) for current options. Startups and small companies should contact [justin@shakacode.com](mailto:justin@shakacode.com) for discounted pricing. When you're ready, set the token as an environment variable:
 
