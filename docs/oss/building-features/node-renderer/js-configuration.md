@@ -182,7 +182,7 @@ const {
 
 // undici typically relies on host Node.js globals for AbortController and AbortSignal
 // (some older releases re-exported them, but newer versions do not). Use host globals when present.
-const componentsUseAbortSignals = false; // Set to true if component code uses AbortSignal.
+const componentsUseAbortSignals = false; // Set to true if component code uses AbortSignal; requires Node.js 15+.
 
 if (!fetchImplementation || !HeadersImplementation || !RequestImplementation || !ResponseImplementation) {
   throw new Error(

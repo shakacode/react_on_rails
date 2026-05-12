@@ -753,8 +753,10 @@ Server Components run on the server (in the node renderer). When the launcher se
 
 ```jsx
 // Server Component -- this file is bundled by webpack/esbuild into the server/RSC bundle,
-// not the launcher file. node-fetch v2 is a CJS module; webpack/esbuild resolve
-// module.exports as the default import, and node-fetch v2 exports the fetch function that way.
+// not the launcher file. The launcher file (`node-renderer.js`) is separate and stays plain
+// CommonJS with `require()`. In component files, webpack/esbuild normalize CJS interop:
+// node-fetch v2 is a CJS module, module.exports is treated as the default import, and
+// node-fetch v2 exports the fetch function that way.
 import nodeFetch from 'node-fetch';
 
 async function InternalDataComponent() {
