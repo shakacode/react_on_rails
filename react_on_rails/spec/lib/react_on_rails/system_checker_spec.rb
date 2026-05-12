@@ -120,25 +120,52 @@ RSpec.describe ReactOnRails::SystemChecker do
     end
 
     context "when package managers are available" do
+      let(:rails_root) { Pathname.new("/tmp/myapp") }
+
       before do
+        allow(Rails).to receive(:root).and_return(rails_root)
+        allow(ReactOnRails).to receive(:configuration).and_return(
+          instance_double(ReactOnRails::Configuration, node_modules_location: rails_root.to_s)
+        )
+        allow(Dir).to receive(:exist?).with(rails_root.to_s).and_return(true)
         allow(checker).to receive(:cli_exists?).with("npm").and_return(true)
         allow(checker).to receive(:cli_exists?).with("yarn").and_return(true)
         allow(checker).to receive(:cli_exists?).with("pnpm").and_return(false)
         allow(checker).to receive(:cli_exists?).with("bun").and_return(false)
-        # Mock file existence checks for lock files so detect_used_package_manager returns nil
-        allow(File).to receive(:exist?).with("yarn.lock").and_return(false)
-        allow(File).to receive(:exist?).with("pnpm-lock.yaml").and_return(false)
-        allow(File).to receive(:exist?).with("bun.lock").and_return(false)
-        allow(File).to receive(:exist?).with("bun.lockb").and_return(false)
-        allow(File).to receive(:exist?).with("package-lock.json").and_return(false)
+        # Mock file existence checks so detect_package_manager_from_lockfile scans lockfiles but returns nil.
+        allow(File).to receive(:exist?).with(rails_root.join("package.json").to_s).and_return(true)
+        allow(File).to receive(:exist?).with(rails_root.join("yarn.lock").to_s).and_return(false)
+        allow(File).to receive(:exist?).with(rails_root.join("pnpm-lock.yaml").to_s).and_return(false)
+        allow(File).to receive(:exist?).with(rails_root.join("bun.lock").to_s).and_return(false)
+        allow(File).to receive(:exist?).with(rails_root.join("bun.lockb").to_s).and_return(false)
+        allow(File).to receive(:exist?).with(rails_root.join("package-lock.json").to_s).and_return(false)
       end
 
       it "adds a success message" do
         result = checker.check_package_manager
+
+        expect(File).to have_received(:exist?).with(rails_root.join("yarn.lock").to_s)
         expect(result).to be true
         expect(checker.messages.any? do |msg|
                  msg[:type] == :success && msg[:content].include?("Package managers available: npm, yarn")
                end).to be true
+      end
+
+      it "does not suggest installing lockfiles when the configured package root is missing" do
+        package_root = rails_root.join("client")
+        allow(ReactOnRails).to receive(:configuration).and_return(
+          instance_double(ReactOnRails::Configuration, node_modules_location: "client")
+        )
+        allow(File).to receive(:exist?).with(package_root.join("package.json").to_s).and_return(false)
+        allow(Dir).to receive(:exist?).with(package_root.to_s).and_return(false)
+
+        result = checker.check_package_manager
+
+        expect(result).to be true
+        expect(checker.messages.any? do |msg|
+                 msg[:type] == :warning && msg[:content].include?("node_modules_location points to #{package_root}")
+               end).to be true
+        expect(checker.messages.none? { |msg| msg[:content].include?("No lock file detected") }).to be true
       end
     end
   end
@@ -221,6 +248,12 @@ RSpec.describe ReactOnRails::SystemChecker do
   end
 
   describe "#check_react_on_rails_npm_package" do
+    before do
+      # These examples exercise package parsing, while #resolved_package_root
+      # coverage below pins the absolute path-resolution behavior.
+      allow(checker).to receive(:resolved_package_json_path).and_return("package.json")
+    end
+
     context "when package.json exists with react-on-rails" do
       let(:package_json_content) do
         { "dependencies" => { "react-on-rails" => "^16.0.0" } }.to_json
@@ -294,13 +327,74 @@ RSpec.describe ReactOnRails::SystemChecker do
 
     context "when package.json does not exist" do
       before do
+        # The outer stub keeps this example focused on package parsing; this root
+        # stub lets the missing-package warning classify the current directory as
+        # an existing JS workspace instead of exercising path resolution again.
         allow(File).to receive(:exist?).with("package.json").and_return(false)
+        allow(checker).to receive(:resolved_package_root).and_return(Dir.pwd)
       end
 
-      it "does not add any messages" do
-        messages_count_before = checker.messages.count
+      it "warns that package.json is missing" do
         checker.check_react_on_rails_npm_package
-        expect(checker.messages.count).to eq(messages_count_before)
+
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("package.json not found") }).to be true
+      end
+    end
+
+    context "when node_modules_location points to a missing JS workspace" do
+      let(:rails_root) { Pathname.new("/tmp/myapp") }
+      let(:package_root) { rails_root.join("client") }
+      let(:package_json_path) { package_root.join("package.json").to_s }
+
+      before do
+        allow(Rails).to receive(:root).and_return(rails_root)
+        allow(ReactOnRails).to receive(:configuration).and_return(
+          instance_double(ReactOnRails::Configuration, node_modules_location: "client")
+        )
+        allow(checker).to receive(:resolved_package_json_path).and_call_original
+        allow(File).to receive(:exist?).and_call_original
+        allow(File).to receive(:exist?).with(package_json_path).and_return(false)
+        allow(Dir).to receive(:exist?).with(package_root.to_s).and_return(false)
+      end
+
+      it "warns once across package.json-based checks" do
+        checker.check_react_on_rails_npm_package
+        checker.send(:check_package_version_sync)
+
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        root_warnings = warning_msgs.select { |m| m[:content].include?("node_modules_location points to") }
+        expect(root_warnings.length).to eq(1)
+        expect(root_warnings.first[:content]).to include(package_root.to_s)
+        expect(root_warnings.first[:content]).to include("config/initializers/react_on_rails.rb")
+      end
+    end
+
+    context "when the configured JS workspace exists without package.json" do
+      let(:rails_root) { Pathname.new("/tmp/myapp") }
+      let(:package_root) { rails_root.join("client") }
+      let(:package_json_path) { package_root.join("package.json").to_s }
+
+      before do
+        allow(Rails).to receive(:root).and_return(rails_root)
+        allow(ReactOnRails).to receive(:configuration).and_return(
+          instance_double(ReactOnRails::Configuration, node_modules_location: "client")
+        )
+        allow(checker).to receive(:resolved_package_json_path).and_call_original
+        allow(File).to receive(:exist?).and_call_original
+        allow(File).to receive(:exist?).with(package_json_path).and_return(false)
+        allow(Dir).to receive(:exist?).with(package_root.to_s).and_return(true)
+      end
+
+      it "warns once that package.json is missing" do
+        checker.check_react_on_rails_npm_package
+        checker.send(:check_package_version_sync)
+
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        package_json_warnings = warning_msgs.select { |m| m[:content].include?(package_json_path) }
+        expect(package_json_warnings.length).to eq(1)
+        expect(package_json_warnings.first[:content]).to include("not found")
+        expect(package_json_warnings.first[:content]).to include("config/initializers/react_on_rails.rb")
       end
     end
 
@@ -316,6 +410,7 @@ RSpec.describe ReactOnRails::SystemChecker do
         allow(ReactOnRails).to receive(:configuration).and_return(
           instance_double(ReactOnRails::Configuration, node_modules_location: "client")
         )
+        allow(checker).to receive(:resolved_package_json_path).and_return(package_json_path)
         allow(File).to receive(:exist?).with(package_json_path).and_return(true)
         allow(File).to receive(:read).with(package_json_path).and_return(package_json_content)
       end
@@ -332,17 +427,20 @@ RSpec.describe ReactOnRails::SystemChecker do
   describe "#check_package_version_sync" do
     before do
       stub_const("ReactOnRails::VERSION", "16.2.0.beta.10")
+      allow(checker).to receive(:resolved_package_json_path).and_return("package.json")
     end
 
     context "when package.json does not exist" do
       before do
         allow(File).to receive(:exist?).with("package.json").and_return(false)
+        allow(checker).to receive(:resolved_package_root).and_return(Dir.pwd)
       end
 
-      it "does not add any messages" do
-        messages_count_before = checker.messages.count
+      it "warns that package.json is missing" do
         checker.send(:check_package_version_sync)
-        expect(checker.messages.count).to eq(messages_count_before)
+
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("package.json not found") }).to be true
       end
     end
 
@@ -515,6 +613,7 @@ RSpec.describe ReactOnRails::SystemChecker do
 
     before do
       allow(File).to receive(:exist?).and_call_original
+      allow(checker).to receive(:resolved_package_json_path).and_return("package.json")
       allow(File).to receive(:exist?).with("package.json").and_return(true)
       allow(File).to receive(:read).with("package.json").and_return(base_package_json.to_json)
     end
@@ -921,22 +1020,82 @@ RSpec.describe ReactOnRails::SystemChecker do
       end
     end
 
-    describe "#detect_used_package_manager" do
-      it "returns bun when bun.lock exists" do
-        allow(File).to receive(:exist?).with("yarn.lock").and_return(false)
-        allow(File).to receive(:exist?).with("pnpm-lock.yaml").and_return(false)
-        allow(File).to receive(:exist?).with("bun.lock").and_return(true)
+    describe "#detect_package_manager_from_lockfile" do
+      let(:rails_root) { Pathname.new("/tmp/myapp") }
+      let(:node_modules_location) { rails_root.to_s }
 
-        expect(checker.send(:detect_used_package_manager)).to eq("bun")
+      before do
+        allow(Rails).to receive(:root).and_return(rails_root)
+        allow(ReactOnRails).to receive(:configuration).and_return(
+          instance_double(ReactOnRails::Configuration, node_modules_location: node_modules_location)
+        )
+        allow(Dir).to receive(:exist?).with(rails_root.to_s).and_return(true)
+        allow(Dir).to receive(:exist?).with(rails_root.join("client").to_s).and_return(true)
+        allow(File).to receive(:exist?).with(rails_root.join("package.json").to_s).and_return(true)
+        allow(File).to receive(:exist?).with(rails_root.join("client", "package.json").to_s).and_return(true)
+      end
+
+      it "returns bun when bun.lock exists" do
+        allow(File).to receive(:exist?).with(rails_root.join("yarn.lock").to_s).and_return(false)
+        allow(File).to receive(:exist?).with(rails_root.join("pnpm-lock.yaml").to_s).and_return(false)
+        allow(File).to receive(:exist?).with(rails_root.join("bun.lock").to_s).and_return(true)
+
+        expect(checker.send(:detect_package_manager_from_lockfile).manager).to eq("bun")
       end
 
       it "returns bun when bun.lockb exists" do
-        allow(File).to receive(:exist?).with("yarn.lock").and_return(false)
-        allow(File).to receive(:exist?).with("pnpm-lock.yaml").and_return(false)
-        allow(File).to receive(:exist?).with("bun.lock").and_return(false)
-        allow(File).to receive(:exist?).with("bun.lockb").and_return(true)
+        allow(File).to receive(:exist?).with(rails_root.join("yarn.lock").to_s).and_return(false)
+        allow(File).to receive(:exist?).with(rails_root.join("pnpm-lock.yaml").to_s).and_return(false)
+        allow(File).to receive(:exist?).with(rails_root.join("bun.lock").to_s).and_return(false)
+        allow(File).to receive(:exist?).with(rails_root.join("bun.lockb").to_s).and_return(true)
 
-        expect(checker.send(:detect_used_package_manager)).to eq("bun")
+        expect(checker.send(:detect_package_manager_from_lockfile).manager).to eq("bun")
+      end
+
+      context "with a configured nested package.json" do
+        let(:node_modules_location) { "client" }
+
+        it "checks lockfiles next to the configured package.json" do
+          allow(File).to receive(:exist?).with(rails_root.join("client", "yarn.lock").to_s).and_return(true)
+          allow(File).to receive(:exist?).with(rails_root.join("client", "pnpm-lock.yaml").to_s).and_return(false)
+          allow(File).to receive(:exist?).with(rails_root.join("client", "bun.lock").to_s).and_return(false)
+          allow(File).to receive(:exist?).with(rails_root.join("client", "bun.lockb").to_s).and_return(false)
+          allow(File).to receive(:exist?).with(rails_root.join("client", "package-lock.json").to_s).and_return(false)
+
+          expect(checker.send(:detect_package_manager_from_lockfile).manager).to eq("yarn")
+        end
+
+        it "warns when the configured package root does not exist" do
+          package_root = rails_root.join("client").to_s
+          allow(File).to receive(:exist?).with(rails_root.join("client", "package.json").to_s).and_return(false)
+          allow(Dir).to receive(:exist?).with(package_root).and_return(false)
+
+          detection = checker.send(:detect_package_manager_from_lockfile)
+
+          expect(detection.manager).to be_nil
+          expect(detection.lockfile_scan_blocked).to be true
+          warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+          expect(warning_msgs.any? { |m| m[:content].include?("node_modules_location points to #{package_root}") })
+            .to be true
+          expect(warning_msgs.any? { |m| m[:content].include?("config/initializers/react_on_rails.rb") }).to be true
+        end
+      end
+    end
+
+    describe "#resolved_package_root" do
+      let(:rails_root) { Pathname.new("/tmp/myapp/rails") }
+
+      before do
+        allow(Rails).to receive(:root).and_return(rails_root)
+      end
+
+      it "allows relative package paths that traverse above Rails.root" do
+        allow(ReactOnRails).to receive(:configuration).and_return(
+          instance_double(ReactOnRails::Configuration, node_modules_location: "../client")
+        )
+
+        expect(checker.send(:resolved_package_root)).to eq("/tmp/myapp/client")
+        expect(checker.send(:resolved_package_json_path)).to eq("/tmp/myapp/client/package.json")
       end
     end
   end

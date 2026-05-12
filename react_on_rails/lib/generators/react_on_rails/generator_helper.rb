@@ -2,7 +2,6 @@
 
 require "json"
 
-# rubocop:disable Metrics/ModuleLength
 module GeneratorHelper
   def package_json
     # Lazy load package_json gem only when actually needed for dependency management
@@ -370,4 +369,3 @@ module GeneratorHelper
     config.dig("default", "assets_bundler") == "rspack"
   end
 end
-# rubocop:enable Metrics/ModuleLength

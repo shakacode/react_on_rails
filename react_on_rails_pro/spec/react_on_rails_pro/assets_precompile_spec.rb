@@ -299,6 +299,58 @@ describe ReactOnRailsPro::AssetsPrecompile do
     end
   end
 
+  describe ".call" do
+    let(:instance) { described_class.instance }
+    let(:config) { instance_double(ReactOnRailsPro::Configuration, node_renderer?: true) }
+
+    before do
+      allow(instance).to receive(:build_or_fetch_bundles)
+      allow(ReactOnRailsPro).to receive(:configuration).and_return(config)
+      allow(ReactOnRailsPro::PreSeedRendererCache).to receive(:call)
+    end
+
+    after do
+      ENV.delete("ASSETS_PRECOMPILE_RENDERER_CACHE_MODE")
+    end
+
+    it "defaults to :symlink mode when ASSETS_PRECOMPILE_RENDERER_CACHE_MODE is unset" do
+      described_class.call
+
+      expect(ReactOnRailsPro::PreSeedRendererCache).to have_received(:call).with(mode: :symlink)
+    end
+
+    it "honors ASSETS_PRECOMPILE_RENDERER_CACHE_MODE=copy" do
+      ENV["ASSETS_PRECOMPILE_RENDERER_CACHE_MODE"] = "copy"
+
+      described_class.call
+
+      expect(ReactOnRailsPro::PreSeedRendererCache).to have_received(:call).with(mode: :copy)
+    end
+
+    it "is case-insensitive (COPY -> :copy)" do
+      ENV["ASSETS_PRECOMPILE_RENDERER_CACHE_MODE"] = "COPY"
+
+      described_class.call
+
+      expect(ReactOnRailsPro::PreSeedRendererCache).to have_received(:call).with(mode: :copy)
+    end
+
+    it "raises a clear error on an unknown mode" do
+      ENV["ASSETS_PRECOMPILE_RENDERER_CACHE_MODE"] = "bogus"
+
+      expect { described_class.call }
+        .to raise_error(ReactOnRailsPro::Error, /must be one of: copy, symlink.*"bogus"/)
+    end
+
+    it "skips renderer cache pre-seeding when node_renderer is disabled" do
+      allow(config).to receive(:node_renderer?).and_return(false)
+
+      described_class.call
+
+      expect(ReactOnRailsPro::PreSeedRendererCache).not_to have_received(:call)
+    end
+  end
+
   describe ".extract_extra_files_from_cache_dir" do
     after do
       FileUtils.remove_dir("extra_files_extract_destination")

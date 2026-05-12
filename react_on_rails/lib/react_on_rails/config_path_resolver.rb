@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "set"
+
 module ReactOnRails
   module ConfigPathResolver
     # Keep JS before TS to match generator defaults and to prefer the
@@ -14,13 +16,108 @@ module ReactOnRails
     ].freeze
     ALL_DEFAULT_CONFIG_CANDIDATES = (WEBPACK_DEFAULT_CONFIG_CANDIDATES + RSPACK_DEFAULT_CONFIG_CANDIDATES).freeze
 
+    protected
+
+    # Protected so including classes and overrides can share the same warning
+    # de-dupe registry across resolver callers without exposing it as API.
+    def config_path_warning_registry
+      @config_path_warning_registry ||= {
+        package_roots: Set.new,
+        package_json_paths: Set.new
+      }
+    end
+
     private
 
-    def resolved_package_json_path
-      node_modules_location = ReactOnRails.configuration.node_modules_location.to_s
-      return "package.json" if node_modules_location.empty? || node_modules_location == Rails.root.to_s
+    def resolved_package_json_path(package_root = resolved_package_root)
+      resolved_package_path("package.json", package_root)
+    end
 
-      Rails.root.join(node_modules_location, "package.json").to_s
+    # Memoized per instance: configuration is set once at boot in production.
+    # Tests must build a fresh resolver after stubbing a different
+    # node_modules_location, since reconfiguration on a reused instance is
+    # ignored after the first call.
+    def resolved_package_root
+      @resolved_package_root ||= begin
+        node_modules_location = ReactOnRails.configuration.node_modules_location.to_s
+
+        resolved_location = Pathname.new(node_modules_location).cleanpath
+        # cleanpath normalizes redundant separators and ".." without resolving symlinks;
+        # realpath is intentionally skipped to avoid filesystem I/O on every call.
+        # Relative paths like "../client" remain valid diagnostics targets and are
+        # not constrained to stay within Rails.root.
+        if resolved_location == Pathname.new(".")
+          Rails.root.to_s
+        elsif resolved_location.absolute?
+          resolved_location.to_s
+        else
+          Rails.root.join(resolved_location).to_s
+        end
+      end
+    end
+
+    def resolved_package_path(filename, package_root = resolved_package_root)
+      File.join(package_root, filename)
+    end
+
+    def package_root_missing?(package_root)
+      !Dir.exist?(package_root)
+    end
+
+    def package_json_path_for(detection_target, package_root = resolved_package_root)
+      package_json_path = resolved_package_json_path(package_root)
+      return package_json_path if File.exist?(package_json_path)
+
+      if package_root_missing?(package_root)
+        warn_missing_package_root(package_root)
+      else
+        warn_missing_package_json(package_json_path, detection_target)
+      end
+      nil
+    end
+
+    # Including classes must provide #add_warning(message). Classes that route
+    # warnings into another object's message list can override
+    # #config_path_warning_registry to share de-dupe state with that sink.
+    # Overrides must return a Hash with :package_roots and :package_json_paths
+    # keys whose values respond to #add?, such as Set instances.
+    def warn_missing_package_root(package_root)
+      return unless warned_package_roots.add?(package_root)
+
+      add_config_path_warning(missing_package_root_warning(package_root))
+    end
+
+    def missing_package_root_warning(package_root)
+      "⚠️  node_modules_location points to #{package_root}, but that directory does not exist; " \
+        "all diagnostics that read from it are skipped. Check config/initializers/react_on_rails.rb."
+    end
+
+    def warn_missing_package_json(package_json_path, detection_target)
+      return unless warned_package_json_paths.add?(package_json_path)
+
+      add_config_path_warning(missing_package_json_warning(package_json_path, detection_target))
+    end
+
+    def missing_package_json_warning(package_json_path, detection_target)
+      "⚠️  #{package_json_path} not found; cannot detect #{detection_target}. " \
+        "Check config/initializers/react_on_rails.rb."
+    end
+
+    def warned_package_roots
+      config_path_warning_registry[:package_roots]
+    end
+
+    def warned_package_json_paths
+      config_path_warning_registry[:package_json_paths]
+    end
+
+    def add_warning(_message)
+      raise NotImplementedError,
+            "#{self.class} must implement #add_warning(message) to include ReactOnRails::ConfigPathResolver"
+    end
+
+    def add_config_path_warning(message)
+      add_warning(message)
     end
 
     def resolved_webpack_config_path

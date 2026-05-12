@@ -52,6 +52,15 @@ To reduce upgrade risk, React on Rails Pro follows this policy:
 3. **Remove in a later release** with a short migration note in this guide.
 4. **Exception:** security/legal fixes may be removed immediately, but must include an explicit upgrade note.
 
+## Node Renderer Cache Layout
+
+Starting with the release that adds `react_on_rails_pro:pre_seed_renderer_cache`, both the new task and the
+deprecated `pre_stage_bundle_for_node_renderer` shim stage the renderer cache as `<cache>/<bundleHash>/<bundleHash>.js`.
+
+Older `pre_stage_bundle_for_node_renderer` versions wrote a flat `<cache>/<renderer_bundle_file_name>` file. That
+layout did not match the Node Renderer's runtime lookup, so most apps should not depend on it. Update any custom
+scripts that read the old flat file directly.
+
 ### Your Current Setup (GitHub Packages)
 
 If you're upgrading, you currently have:
@@ -187,7 +196,7 @@ yarn install
 
 #### Step 5: Configure License Token (Production Only)
 
-React on Rails Pro uses a license-optional model to simplify evaluation and development.
+React on Rails Pro uses a friendly license model to simplify evaluation and development.
 
 A license token is **optional** for non-production environments:
 
@@ -196,6 +205,8 @@ A license token is **optional** for non-production environments:
 - Staging/non-production deployments
 
 **A paid license is required only for production deployments.**
+
+If no license is configured, Pro keeps running in unlicensed mode and logs license status instead of blocking your app. In production, that log message is a warning because a paid license is required.
 
 Configure your React on Rails Pro license token as an environment variable:
 
@@ -209,7 +220,7 @@ export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
 
 ⚠️ **Security Warning**: Never commit your license token to version control. For production, use environment variables or secure secret management systems (Rails credentials, Heroku config vars, AWS Secrets Manager, etc.).
 
-**Where to get your license token:** Contact [justin@shakacode.com](mailto:justin@shakacode.com) if you don't have your license token.
+**Where to get your license token:** Visit [Pro pricing and sign up](https://pro.reactonrails.com/) or contact [justin@shakacode.com](mailto:justin@shakacode.com) if you don't have your license token.
 
 For complete licensing details, see [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/LICENSE_SETUP.md).
 

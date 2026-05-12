@@ -113,6 +113,75 @@ For local development, you can either omit the password entirely (no authenticat
 config.renderer_password = ENV.fetch("RENDERER_PASSWORD", "devPassword")
 ```
 
+## Eliminating Cold-Start Latency in Docker Deployments
+
+When a new container starts, the Node Renderer has an empty bundle cache. The first SSR request triggers a costly 410→retry round-trip where Rails sends the full bundle over HTTP, adding 200ms–1s+ of latency depending on bundle size. In rolling deploys, this affects every new pod.
+
+### Pre-seeding the bundle cache
+
+The `pre_seed_renderer_cache` rake task stages compiled server bundles directly into the renderer's cache directory, so the renderer finds them immediately on startup.
+
+It supports two modes, both producing the same on-disk cache layout (`<cache>/<bundleHash>/<bundleHash>.js`):
+
+- **`MODE=copy`** (default) — copies files. Use in Docker/image builds so the cache is baked into an immutable artifact.
+- **`MODE=symlink`** — creates relative symlinks. For same-filesystem workflows (local dev, CI, Heroku-style same-dyno deploys, bundle-caching restores).
+
+```dockerfile
+# After webpack/assets build step (Docker image build)
+ENV RENDERER_SERVER_BUNDLE_CACHE_PATH=/app/.node-renderer-bundles
+RUN bundle exec rake react_on_rails_pro:pre_seed_renderer_cache
+```
+
+Both modes stage the server bundle, any configured `assets_to_copy`, and (when RSC is enabled) the RSC bundle and its companion manifests.
+
+The `pre_seed_renderer_cache` task is also invoked automatically at the end of `assets:precompile`, defaulting to `MODE=symlink` so the local/CI/Heroku path has zero new configuration. To bake the cache into a Docker image when `assets:precompile` is the final asset step (rather than calling the rake task explicitly), set `ASSETS_PRECOMPILE_RENDERER_CACHE_MODE=copy` in the build environment:
+
+```dockerfile
+ENV RENDERER_SERVER_BUNDLE_CACHE_PATH=/app/.node-renderer-bundles
+ENV ASSETS_PRECOMPILE_RENDERER_CACHE_MODE=copy
+RUN bundle exec rake assets:precompile
+```
+
+Invalid values raise a clear error listing the accepted modes (`copy`, `symlink`).
+
+> [!NOTE]
+> The older `react_on_rails_pro:pre_stage_bundle_for_node_renderer` rake task and `ReactOnRailsPro::PrepareNodeRenderBundles` class are deprecated in favor of the unified API. Both remain available as thin shims that emit a deprecation warning and delegate to `MODE=symlink`. `react_on_rails:doctor` flags deploy scripts that still reference the deprecated task.
+
+### Configuration
+
+The task follows the same environment-variable precedence as the Node Renderer, while the default fallback can differ between Ruby and standalone Node environments:
+
+1. `RENDERER_SERVER_BUNDLE_CACHE_PATH` environment variable (preferred)
+2. `RENDERER_BUNDLE_PATH` environment variable (deprecated — emits a warning)
+3. `Rails.root.join(".node-renderer-bundles")` (Rails-side default when env vars are unset, only accepted for `MODE=symlink` and in dev/test)
+
+In **`MODE=copy`** (Docker image builds) the task requires one of the env vars above to be set in non-dev/test environments. "Non-dev/test" means any `RAILS_ENV` other than `development` or `test` — including custom environments like `staging`, `review`, or `ci` — so set `RENDERER_SERVER_BUNDLE_CACHE_PATH` wherever you run `MODE=copy` outside of local/CI-test runs. Because the Node renderer's own default can differ (e.g., falling back to `/tmp/react-on-rails-pro-node-renderer-bundles` when its `cwd` sits outside the app tree), relying on the silent fallback risks pre-seeded bundles landing in a directory the renderer never reads. The task raises a clear error if the env var is missing:
+
+```dockerfile
+ENV RENDERER_SERVER_BUNDLE_CACHE_PATH=/app/.node-renderer-bundles
+RUN bundle exec rake react_on_rails_pro:pre_seed_renderer_cache
+```
+
+### Impact
+
+| Scenario                      | Before                                  | After                           |
+| ----------------------------- | --------------------------------------- | ------------------------------- |
+| First request on fresh deploy | 410→retry: 200ms–1s+                    | Direct render: <50ms            |
+| Thundering herd on new pod    | N requests queue behind per-bundle lock | All requests served immediately |
+
+### Rolling deploys: seed current and previous bundle hashes
+
+During a rolling deploy, new renderer instances can receive requests for both the current deployed bundle hash and the previous hash while old Rails instances drain. Treat this as a two-hash cache-seeding problem, not a single-file problem.
+
+At startup, aim to have the cache contain:
+
+- the current server bundle hash
+- the previous server bundle hash
+- the current and previous RSC bundle hashes as well, if RSC support is enabled
+- any required copied assets and RSC manifests in each seeded hash directory
+
+`pre_seed_renderer_cache` seeds the current locally built bundle outputs. For the previous deployed hash, the most practical approach is to publish bundle artifacts keyed by hash after each successful deploy, then fetch the previous hash artifact during the next build and place it into the same `<cache>/<bundleHash>/...` layout before boot.
+
 ## Further Reading
 
 - [Node Renderer basics](../oss/building-features/node-renderer/basics.md) — Architecture and core concepts

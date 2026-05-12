@@ -62,9 +62,26 @@ module ReactOnRailsPro
 
     def self.call
       instance.build_or_fetch_bundles
+      return unless ReactOnRailsPro.configuration.node_renderer?
 
-      ReactOnRailsPro::PrepareNodeRenderBundles.call if ReactOnRailsPro.configuration.node_renderer?
+      # Symlink is the same-filesystem default (local dev, CI, Heroku-style same-dyno
+      # deploys, bundle-caching restores). Docker image builds that run assets:precompile
+      # should set ASSETS_PRECOMPILE_RENDERER_CACHE_MODE=copy to bake the cache into the
+      # immutable artifact, or invoke `rake react_on_rails_pro:pre_seed_renderer_cache`
+      # directly (which defaults to copy mode).
+      ReactOnRailsPro::PreSeedRendererCache.call(mode: pre_seed_renderer_cache_mode)
     end
+
+    def self.pre_seed_renderer_cache_mode
+      raw = ENV.fetch("ASSETS_PRECOMPILE_RENDERER_CACHE_MODE", "symlink").to_s.downcase
+      mode = raw.to_sym
+      return mode if ReactOnRailsPro::PreSeedRendererCache::VALID_MODES.include?(mode)
+
+      valid = ReactOnRailsPro::PreSeedRendererCache::VALID_MODES.map(&:to_s).join(", ")
+      raise ReactOnRailsPro::Error,
+            "ASSETS_PRECOMPILE_RENDERER_CACHE_MODE must be one of: #{valid} (got #{raw.inspect})"
+    end
+    private_class_method :pre_seed_renderer_cache_mode
 
     def build_or_fetch_bundles
       if disable_precompile_cache?

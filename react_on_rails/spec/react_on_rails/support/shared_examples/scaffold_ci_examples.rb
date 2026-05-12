@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "yaml"
+
 shared_examples "scaffold_ci_and_scripts" do
   it "generates a GitHub Actions CI workflow" do
     assert_file ".github/workflows/ci.yml" do |content|
@@ -7,6 +9,12 @@ shared_examples "scaffold_ci_and_scripts" do
       expect(content).to include("actions/checkout@v4")
       expect(content).to include("ruby/setup-ruby@v1")
       expect(content).to include("actions/setup-node@v4")
+    end
+  end
+
+  it "generates a CI workflow that parses as valid YAML" do
+    assert_file ".github/workflows/ci.yml" do |content|
+      expect { YAML.safe_load(content, aliases: true) }.not_to raise_error
     end
   end
 
