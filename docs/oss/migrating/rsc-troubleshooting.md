@@ -749,7 +749,7 @@ end
 
 ### Server Components
 
-Server Components run on the server (in the node renderer), so they have access to **all** environment variables available to the Node.js process:
+Server Components run on the server (in the node renderer). When the launcher sets `supportModules: true`, `process` is injected into the VM context, so Server Components can read environment variables via `process.env`:
 
 ```jsx
 // Server Component -- this file is bundled by webpack/esbuild into the server/RSC bundle,
@@ -758,6 +758,8 @@ Server Components run on the server (in the node renderer), so they have access 
 import nodeFetch from 'node-fetch';
 
 async function InternalDataComponent() {
+  // Requires `supportModules: true` in the launcher config so `process` is injected
+  // into the VM context. Without it, these reads throw `ReferenceError: process is not defined`.
   const serviceUrl = process.env.INTERNAL_SERVICE_URL; // Works
   const secret = process.env.API_SECRET; // Works
 

@@ -180,7 +180,8 @@ const {
   Response: ResponseImplementation,
 } = require('undici');
 
-// undici does not export AbortController or AbortSignal; use host Node.js globals when present.
+// undici typically relies on host Node.js globals for AbortController and AbortSignal
+// (some older releases re-exported them, but newer versions do not). Use host globals when present.
 const componentsUseAbortSignals = false; // Set to true if component code uses AbortSignal.
 
 if (!fetchImplementation || !HeadersImplementation || !RequestImplementation || !ResponseImplementation) {

@@ -55,6 +55,10 @@ export interface Config {
   // https://nodejs.org/api/globals.html) to add to the VM context in addition to our supportModules defaults.
   // Object shorthand notation may be used, but is not required.
   // Example: { URL, URLSearchParams, Crypto }
+  // NOTE: Any plain-object value (including `{}`) puts the renderer into CommonJS execution mode,
+  // wrapping the bundle and granting it access to the host's `require` (e.g. `require('fs')`,
+  // `require('child_process')`). Use only with trusted bundle sources; pass `null` to keep the
+  // VM sandboxed without `require`.
   additionalContext: Record<string, unknown> | null;
   // Number of workers that will be forked to serve rendering requests.
   workersCount: number;
