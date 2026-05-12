@@ -219,8 +219,11 @@ chmod +x bin/build-react-on-rails
 git add bin/build-react-on-rails
 ```
 
-For a new untracked file, `git add --chmod=+x bin/build-react-on-rails` does both in one step — it stages the file
-and records the executable bit at the same time without touching the working-tree mode separately.
+For a new untracked file, `git add --chmod=+x bin/build-react-on-rails` does both in one step on Git 2.9 or newer — it
+stages the file and records the executable bit at the same time without touching the working-tree mode separately.
+
+<details>
+<summary>Windows and Docker bind mounts</summary>
 
 On Windows or Docker bind mounts backed by a Windows filesystem, the filesystem may not preserve Unix modes, so `chmod`
 may not make the current checkout runnable. Record the executable bit in Git for CI and other checkouts, and invoke the
@@ -242,6 +245,8 @@ standard CI images. For hermetic environments where `PATH` may not select the pr
 base images without active version-manager shims), invoke through Bundler or substitute an absolute Ruby path — for
 example `bundle exec ruby bin/build-react-on-rails test` or `$(rbenv which ruby) bin/build-react-on-rails test`.
 Inside the script, `RbConfig.ruby` already pins shakapacker to the same interpreter that launched the wrapper.
+
+</details>
 
 ```ruby
 # config/initializers/react_on_rails.rb
