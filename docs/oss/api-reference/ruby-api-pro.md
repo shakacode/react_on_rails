@@ -102,6 +102,8 @@ Common options include `props`, `trace`, and `id`. The helper forces `prerender:
 
 Async-props variant of `rsc_payload_react_component`. Use this only when custom RSC payload rendering needs Rails-emitted async props, such as an overridden payload route or template. For standard streamed ERB views, use `stream_react_component_with_async_props`.
 
+Requires `enable_rsc_support = true` in configuration, same as `rsc_payload_react_component`.
+
 This helper accepts the same options as `rsc_payload_react_component`, plus a block that receives an emitter. Call `emit.call(prop_name, value)` for each async prop.
 
 ```ruby

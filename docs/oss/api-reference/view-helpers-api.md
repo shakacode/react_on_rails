@@ -203,6 +203,8 @@ See the [React on Rails Pro Configuration](../configuration/configuration-pro.md
 
 Async-props variant of `rsc_payload_react_component`. Use it only when custom RSC payload rendering needs Rails-emitted async props, such as an overridden payload route or template. For standard streamed ERB views, use [`stream_react_component_with_async_props`](#stream_react_component_with_async_props).
 
+Requires `enable_rsc_support = true` in configuration, same as `rsc_payload_react_component` — see [React on Rails Pro Configuration](../configuration/configuration-pro.md).
+
 It accepts the same options as `rsc_payload_react_component`, plus a block that receives an emitter:
 
 ```erb
@@ -213,7 +215,7 @@ end %>
 ```
 
 > [!IMPORTANT]
-> `rsc_payload_react_component_with_async_props` always forces `prerender: true` — passing `prerender: false` has no effect. Use this helper only for custom RSC payload rendering; standard streamed ERB views should use `stream_react_component_with_async_props`. Requires `enable_rsc_support = true` in configuration — see [React on Rails Pro Configuration](../configuration/configuration-pro.md).
+> `rsc_payload_react_component_with_async_props` always forces `prerender: true` — passing `prerender: false` has no effect. Use this helper only for custom RSC payload rendering; standard streamed ERB views should use `stream_react_component_with_async_props`.
 >
 > The emitter block runs normal Ruby code sequentially, so `emit.call` does **not** parallelize slow queries by itself. For independent slow data sources, start the work concurrently before emitting values; see [Avoiding Server-Side Waterfalls](../migrating/rsc-data-fetching.md#avoiding-server-side-waterfalls).
 
