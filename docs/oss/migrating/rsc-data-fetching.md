@@ -198,12 +198,15 @@ export default function ProductPage({ name, price, getReactOnRailsAsyncProp }: P
 }
 ```
 
+> [!IMPORTANT]
+> `<Suspense>` is the loading boundary, not the error UI. If the async-props stream closes before a requested prop is emitted, `getReactOnRailsAsyncProp` rejects and follows the same RSC/streaming error path as other Server Component render errors. Use the page-level handling described in [Error Boundary Limitations](./rsc-troubleshooting.md#error-boundary-limitations) rather than treating the Suspense fallback as failure UI.
+
 **How it works:**
 
 1. Rails loads synchronous data and passes it as props to `stream_react_component`, or as immediate `props:` to `stream_react_component_with_async_props` when slower props are emitted from the block
 2. The streaming helper uses React's `renderToPipeableStream` for streaming SSR
 3. HTML streams to the browser as React renders the component tree
-4. No client-side fetching or client-side effect-based loading state needed
+4. No client-side fetching or `useEffect`-based loading state needed
 5. The component renders with zero JavaScript cost as a Server Component
 
 With async props, `stream_react_component_with_async_props` starts rendering with the synchronous `props:` values, then the block emits slow values with `emit.call`. The Server Component uses `getReactOnRailsAsyncProp` to obtain those values as Promises and places them behind Suspense boundaries.

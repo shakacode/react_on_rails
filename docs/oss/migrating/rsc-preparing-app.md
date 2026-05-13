@@ -558,7 +558,10 @@ When the view uses React on Rails Pro async props, use the async-props helper va
 end %>
 ```
 
-The Server Component receives `getReactOnRailsAsyncProp` and reads those emitted values behind Suspense boundaries. The block still runs normal Ruby code in order, so `emit.call` does not parallelize slow queries by itself. For independent slow data sources, start the work concurrently before emitting values; see [Avoiding Server-Side Waterfalls](./rsc-data-fetching.md#avoiding-server-side-waterfalls). See [Data Fetching in React on Rails Pro](./rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) for the complete async-props pattern.
+The Server Component receives `getReactOnRailsAsyncProp` and reads those emitted values behind Suspense boundaries. See [Data Fetching in React on Rails Pro](./rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) for the complete async-props pattern.
+
+> [!IMPORTANT]
+> The block runs normal Ruby code sequentially, so `emit.call` does **not** parallelize slow queries by itself. For independent slow data sources, start the work concurrently before emitting values; see [Avoiding Server-Side Waterfalls](./rsc-data-fetching.md#avoiding-server-side-waterfalls).
 
 ### 6c. Update script loading in layouts (recommended)
 
