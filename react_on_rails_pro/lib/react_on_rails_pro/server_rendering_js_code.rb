@@ -93,10 +93,10 @@ module ReactOnRailsPro
       # @param render_options [Object] Options that control the rendering behavior
       # @return [String] JavaScript code that will render the React component on the server
       def render(props_string, rails_context, redux_stores, react_component_name, render_options)
+        Thread.current[:ror_decoupled_props] = props_string
+
         render_function_name =
           if ReactOnRailsPro.configuration.enable_rsc_support && render_options.streaming?
-            # Select appropriate function based on whether the rendering request is running on server or rsc bundle
-            # As the same rendering request is used to generate the rsc payload and SSR the component.
             "ReactOnRails.isRSCBundle ? 'serverRenderRSCReactComponent' : 'streamServerRenderedReactComponent'"
           else
             "'serverRenderReactComponent'"
@@ -113,8 +113,6 @@ module ReactOnRailsPro
                        ""
                      end
 
-        # This function is called with specific componentName and props when generateRSCPayload is invoked
-        # In that case, it replaces the empty () with ('componentName', props) in the rendering request
         <<-JS
         (function(componentName = #{react_component_name.to_json}, props = undefined) {
           var railsContext = #{rails_context};
@@ -122,7 +120,7 @@ module ReactOnRailsPro
           #{generate_rsc_payload_js_function(render_options)}
           #{ssr_pre_hook_js}
           #{redux_stores}
-          var usedProps = typeof props === 'undefined' ? #{props_string} : props;
+          var usedProps = typeof props === 'undefined' ? globalThis.__rorpProps : props;
           #{async_props_setup_js(render_options)}
           return ReactOnRails[#{render_function_name}]({
             name: componentName,
