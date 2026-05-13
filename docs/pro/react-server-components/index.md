@@ -43,8 +43,8 @@ Teams adopting RSC have reported dramatic wins — BlogHunch's 30% server-cost r
 
 The public [LocalHub marketplace demo](https://rsc.reactonrails.com/) shows the
 same marketplace-style surfaces rendered with traditional SSR, client rendering,
-and React Server Components. Use these links when you want inspectable proof
-instead of a static claim:
+and React Server Components. LocalHub is the sample marketplace app used by the
+demo. Use these links when you want inspectable proof instead of a static claim:
 
 - [RSC performance showcase](https://rsc.reactonrails.com/search-performance) —
   Lighthouse scores, transfer deltas, bootup time, and report links for each
@@ -57,6 +57,9 @@ instead of a static claim:
   walkthrough of why server-only dependencies stay off the browser
 - [Demo source](https://github.com/shakacode/react-on-rails-demo-marketplace-rsc) —
   Rails + React on Rails Pro implementation code
+
+Treat these public measurements as directional evidence, not a universal
+performance guarantee for every app.
 
 ## Current Support Status
 

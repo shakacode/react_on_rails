@@ -61,11 +61,14 @@ For detailed proof criteria and migration contribution guidance, see
 - Use it when you want a compact public demo of React on Rails Pro with React
   Server Components on a familiar read-heavy UI.
 
+<a id="marketplace-rsc-performance-demo"></a>
+
 ### Marketplace RSC Performance Demo
 
 - Repo: [shakacode/react-on-rails-demo-marketplace-rsc](https://github.com/shakacode/react-on-rails-demo-marketplace-rsc)
 - Live demo: [rsc.reactonrails.com](https://rsc.reactonrails.com/)
 - Evidence dashboard: [RSC performance showcase](https://rsc.reactonrails.com/search-performance)
+- LocalHub is the sample marketplace app used by this public demo.
 - Use it when you want a public performance-oriented RSC demo showing the shape
   of the user-visible win on a marketplace-style surface.
 - Start with the evidence dashboard when you want Lighthouse reports,

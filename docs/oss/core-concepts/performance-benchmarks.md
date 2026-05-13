@@ -17,7 +17,7 @@ The default ExecJS renderer evaluates JavaScript synchronously inside a single-t
 | RSC support       | Not supported                 | Not supported                 | Supported                  |
 | Typical speedup   | Baseline                      | Comparable                    | 3-10x over ExecJS          |
 
-The Node Renderer's persistent process supports full async rendering and multi-worker concurrency, which are the primary sources of the performance difference. Popmenu reported a [73% decrease in response times](#popmenu) after switching to Pro. ExecJS is limited to synchronous rendering within a single-threaded pool, so the gap widens for pages with many async data sources or large component trees.
+The Node Renderer's persistent process supports full async rendering and multi-worker concurrency, which are the primary sources of the performance difference. Popmenu reported a [73% decrease in response times](#production-case-study-popmenu) after switching to Pro. ExecJS is limited to synchronous rendering within a single-threaded pool, so the gap widens for pages with many async data sources or large component trees.
 
 ## Bundle Splitting Impact
 
@@ -87,11 +87,18 @@ Applications that use heavy formatting, parsing, or data-processing libraries on
 
 Server components produce HTML that does not need hydration — they have no client-side JavaScript. Only client components (those with `'use client'`) require hydration. This reduces Total Blocking Time and improves Time to Interactive.
 
+## Real-World Results
+
+> [!NOTE]
+> This section covers public, non-production directional benchmarks first, then a production case study. For validated,
+> at-scale results, see the [Production Case Study: Popmenu](#production-case-study-popmenu) below.
+
 ### Public Marketplace RSC Demo
 
 The [LocalHub marketplace demo](https://rsc.reactonrails.com/) is a public,
-inspectable React on Rails Pro + RSC demo with the same page families rendered
-as traditional SSR, client rendering, and React Server Components. Use the
+inspectable React on Rails Pro + RSC demo. LocalHub is the sample marketplace
+app used for this public benchmark. It renders the same page families as
+traditional SSR, client rendering, and React Server Components. Use the
 [performance showcase](https://rsc.reactonrails.com/search-performance) for the
 summary dashboard, [raw Lighthouse reports](https://rsc.reactonrails.com/lighthouse-reports/index.html)
 for the underlying artifacts, and [bundle-size evidence](https://rsc.reactonrails.com/lighthouse-reports/bundle-sizes.html)
@@ -102,13 +109,9 @@ artifacts. Treat it as a directional public benchmark, not a universal
 performance guarantee, because application structure, data shape, caching, and
 deployment topology still determine the final result.
 
-## Real-World Results
+<a id="gumroad-style-rsc-demo"></a>
 
-> [!NOTE]
-> This section covers a non-production local directional benchmark first, then a production case study. For validated,
-> at-scale results, see the [Production Case Study: Popmenu](#popmenu) below.
-
-### Non-Production Local Directional Benchmark: Gumroad-Style RSC Demo (April 2026) {#gumroad-style-rsc-demo}
+### Non-Production Local Directional Benchmark: Gumroad-Style RSC Demo (April 2026)
 
 The [Gumroad-style RSC benchmark demo](https://github.com/shakacode/react-on-rails-demo-gumroad-rsc)
 is a public ShakaCode comparison repo modeled after a creator-dashboard surface with product listings and sales metrics,
@@ -193,7 +196,9 @@ completeness only. See
   establish statistical significance._
 - _The `action_total` -2.3% delta is likely within expected variance at n=4._
 
-#### Worst-case `responseEnd` counter-signal {#gumroad-rsc-worst-case-responseend}
+<a id="gumroad-rsc-worst-case-responseend"></a>
+
+#### Worst-case `responseEnd` counter-signal
 
 | Metric                             | Inertia demo | RSC demo | Delta % (negative = RSC faster) |
 | ---------------------------------- | -----------: | -------: | ------------------------------: |
@@ -213,7 +218,9 @@ are still required before making stronger production-performance claims.
 See [Issue 3128](https://github.com/shakacode/react_on_rails/issues/3128) and
 [Issue 3144](https://github.com/shakacode/react_on_rails/issues/3144) for the ongoing tracking discussion.
 
-### Production Case Study: Popmenu {#popmenu}
+<a id="popmenu"></a>
+
+### Production Case Study: Popmenu
 
 Popmenu, a restaurant platform serving tens of millions of SSR requests daily, adopted React on Rails Pro and reported:
 
