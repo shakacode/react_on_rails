@@ -83,16 +83,25 @@ n,ts_ms,rss_kb,delta_kb,kb_per_req
   PRIMARY TARGET MET: kb_per_req >= 50
 ```
 
-## Baseline
+## Baseline (dev machine, 2026-05-13)
 
-> **TODO:** Fill in after first successful run on `main`. The number below
-> is what subsequent demo-experiment issues will try to beat.
+Initial runs on a Linux dev machine (Ruby 3.3.7, Puma 6.5.0, 2000 requests, concurrency 3).
 
-| Metric | Value | Notes |
-|--------|-------|-------|
-| Post-warmup `kb_per_req` | _TBD_ | Mean of 3 runs |
-| Run variance | _TBD_ | Should be within +/-10% |
-| Target met | _TBD_ | Primary (>=50) or Fallback (>=30) |
+| Metric | Run 1 | Run 2 | Run 3 | Notes |
+|--------|-------|-------|-------|-------|
+| Baseline RSS (KB) | 147,236 | 146,956 | 150,264 | Before any requests |
+| RSS after warmup (KB) | 183,920 | 187,680 | 193,484 | After 500 requests |
+| Final RSS (KB) | 193,836 | 192,888 | 211,836 | After 2000 requests |
+| Post-warmup growth (KB) | 9,916 | 5,208 | 18,352 | Final - warmup RSS |
+| Post-warmup `kb_per_req` | 6.61 | 3.47 | 12.23 | Growth / 1500 requests |
+| Overall `kb_per_req` | 23.30 | 22.97 | 30.79 | Includes warmup |
+
+**Summary:** Post-warmup mean ~7.4 kb_per_req with high variance (~90%).
+Band: **inconclusive** (variance > 10% across runs) / **refuted** (< 15 kb_per_req).
+
+Most RSS growth occurs during warmup (JIT, code loading, initial allocations).
+Post-warmup growth is relatively flat, suggesting the leak may need longer runs,
+higher concurrency, or production-like conditions to manifest.
 
 ## Verification Rubric
 

@@ -38,11 +38,29 @@ trap cleanup EXIT
 # --- Helpers ---------------------------------------------------------------
 
 sample_rss() {
-  awk '/^VmRSS:/ { print $2 }' "/proc/$1/status" 2>/dev/null || echo "0"
+  local val
+  val=$(awk '/^VmRSS:/ { print $2 }' "/proc/$1/status" 2>/dev/null) || true
+  echo "${val:-0}"
 }
 
 ts_ms() {
   date +%s%3N
+}
+
+wait_for_port() {
+  local host=$1 port=$2 label=$3 timeout=${4:-60}
+  local elapsed=0
+  echo -n "Waiting for $label at $host:$port "
+  while ! (echo -n "" > "/dev/tcp/$host/$port") 2>/dev/null; do
+    sleep 1
+    elapsed=$((elapsed + 1))
+    if [ "$elapsed" -ge "$timeout" ]; then
+      echo " TIMEOUT after ${timeout}s"
+      exit 1
+    fi
+    echo -n "."
+  done
+  echo " ready (${elapsed}s)"
 }
 
 wait_for_url() {
@@ -91,6 +109,7 @@ echo ""
 
 # --- Boot node renderer ----------------------------------------------------
 
+RENDERER_LOG="$DUMMY_DIR/tmp/renderer.log"
 echo "Starting node renderer (workers=3, restart_interval=5min)..."
 NODE_ENV=production \
 RENDERER_LOG_LEVEL=error \
@@ -98,13 +117,14 @@ RENDERER_PORT="$RENDERER_PORT" \
 RENDERER_WORKERS_COUNT=3 \
 RENDERER_ALL_WORKERS_RESTART_INTERVAL=5 \
 RENDERER_DELAY_BETWEEN_RESTARTS=1 \
-  node renderer/node-renderer.js &
+  node renderer/node-renderer.js > "$RENDERER_LOG" 2>&1 &
 RENDERER_PID=$!
 
-wait_for_url "http://localhost:${RENDERER_PORT}/" "node renderer" 60
+wait_for_port "localhost" "$RENDERER_PORT" "node renderer" 60
 
 # --- Boot puma --------------------------------------------------------------
 
+PUMA_LOG="$DUMMY_DIR/tmp/puma.log"
 echo "Starting puma (WEB_CONCURRENCY=1, RAILS_MAX_THREADS=$CONCURRENCY)..."
 RAILS_ENV=production \
 NODE_ENV=production \
@@ -114,8 +134,9 @@ RAILS_MAX_THREADS="$CONCURRENCY" \
 RAILS_MIN_THREADS="$CONCURRENCY" \
 RAILS_LOG_TO_STDOUT=1 \
 PORT="$PUMA_PORT" \
+REACT_RENDERER_URL="http://localhost:${RENDERER_PORT}" \
 SECRET_KEY_BASE=dummy-leak-repro-secret \
-  bundle exec puma -C config/puma.rb 2>&1 | sed 's/^/[puma] /' &
+  bundle exec puma -C config/puma.rb > "$PUMA_LOG" 2>&1 &
 PUMA_MASTER_PID=$!
 
 wait_for_url "$RAILS_URL" "puma" 90
@@ -156,11 +177,14 @@ request_num=0
 echo "Sending $TOTAL_REQUESTS requests at concurrency $CONCURRENCY..."
 
 while [ "$request_num" -lt "$TOTAL_REQUESTS" ]; do
-  # Launch $CONCURRENCY requests in parallel
+  # Launch $CONCURRENCY requests in parallel; collect PIDs so we only wait for
+  # curls — not the long-running renderer/puma background children.
+  curl_pids=()
   for _ in $(seq 1 "$CONCURRENCY"); do
     curl -sf "$RAILS_URL" -o /dev/null &
+    curl_pids+=($!)
   done
-  wait
+  wait "${curl_pids[@]}" 2>/dev/null || true
 
   request_num=$((request_num + CONCURRENCY))
 
@@ -191,12 +215,13 @@ FINAL_KB_PER_REQ=$(awk "BEGIN { printf \"%.2f\", $FINAL_DELTA / $TOTAL_REQUESTS 
 echo "${TOTAL_REQUESTS},${FINAL_TS},${FINAL_RSS},${FINAL_DELTA},${FINAL_KB_PER_REQ}" >> "$CSV_FILE"
 
 # Compute kb_per_req for measurement window only (after warmup)
-RSS_AT_WARMUP=$(awk -F, "\$1 == $WARMUP_REQUESTS { print \$3 }" "$CSV_FILE" | tail -1)
-if [ -z "$RSS_AT_WARMUP" ]; then
-  # If exact warmup row not found, find closest
-  RSS_AT_WARMUP=$(awk -F, "\$1 >= $WARMUP_REQUESTS { print \$3; exit }" "$CSV_FILE")
+RSS_AT_WARMUP=$(awk -F, "NR>1 && \$1 == $WARMUP_REQUESTS { print \$3 }" "$CSV_FILE" | tail -1)
+if [ -z "$RSS_AT_WARMUP" ] || ! [[ "$RSS_AT_WARMUP" =~ ^[0-9]+$ ]]; then
+  RSS_AT_WARMUP=$(awk -F, "NR>1 && \$1+0 >= $WARMUP_REQUESTS { print \$3; exit }" "$CSV_FILE")
 fi
-RSS_AT_WARMUP=${RSS_AT_WARMUP:-$BASELINE_RSS}
+if [ -z "$RSS_AT_WARMUP" ] || ! [[ "$RSS_AT_WARMUP" =~ ^[0-9]+$ ]]; then
+  RSS_AT_WARMUP=$BASELINE_RSS
+fi
 
 MEASUREMENT_REQUESTS=$((TOTAL_REQUESTS - WARMUP_REQUESTS))
 MEASUREMENT_GROWTH=$((FINAL_RSS - RSS_AT_WARMUP))
