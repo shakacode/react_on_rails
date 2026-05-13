@@ -208,9 +208,10 @@ export default function ProductPage({ name, price, getReactOnRailsAsyncProp }: P
 
 1. Rails evaluates synchronous `props:` for `stream_react_component`, or passes those synchronous `props:` to `stream_react_component_with_async_props` while the block emits slower values with `emit.call`
 2. The streaming helper uses React's `renderToPipeableStream` for streaming SSR
-3. HTML streams to the browser as React renders the component tree
-4. No client-side fetching or `useEffect`-based loading state needed
-5. The component renders with zero JavaScript cost as a Server Component
+3. `getReactOnRailsAsyncProp('reviews')` returns a Promise that resolves when Rails calls `emit.call("reviews", ...)`
+4. HTML streams to the browser as React renders the component tree
+5. No client-side fetching or `useEffect`-based loading state needed
+6. The component renders with zero JavaScript cost as a Server Component
 
 With async props, `stream_react_component_with_async_props` starts rendering with the synchronous `props:` values, then the block emits slow values with `emit.call`. The Server Component uses `getReactOnRailsAsyncProp` to obtain those values as Promises and places them behind Suspense boundaries.
 

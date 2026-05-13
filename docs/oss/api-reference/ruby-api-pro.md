@@ -65,6 +65,8 @@ Requires the controller to use `stream_view_containing_react_components`, same a
 
 This helper accepts the same options as `stream_react_component`, plus a block that receives an emitter. Call `emit.call(prop_name, value)` for each async prop as it becomes available. RSC Server Components read emitted values through the injected `getReactOnRailsAsyncProp` prop.
 
+For the complete React component pattern using `WithAsyncProps` and `getReactOnRailsAsyncProp`, see [Data Fetching in React on Rails Pro](../migrating/rsc-data-fetching.md#data-fetching-in-react-on-rails-pro).
+
 ```ruby
 <%= stream_react_component_with_async_props("ProductPage",
       props: { name: @product.name, price: @product.price }) do |emit|
