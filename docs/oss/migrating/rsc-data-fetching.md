@@ -968,7 +968,7 @@ For each component that fetches data:
 ### Step 4: Optimize
 
 10. Use `stream_react_component` for synchronous props and streaming HTML delivery via React's `renderToPipeableStream`
-11. Use `stream_react_component_with_async_props` for slow Rails props, or parallelize independent Ruby queries with threads to avoid server-side waterfalls
+11. Use `stream_react_component_with_async_props` for slow Rails props behind Suspense boundaries; parallelize independent Ruby queries inside the block when needed to avoid server-side waterfalls
 12. For client-side updates after initial render, use React Query or SWR with `initialData`/`fallbackData`
 
 ## Next Steps
