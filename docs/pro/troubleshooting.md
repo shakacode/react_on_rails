@@ -104,7 +104,7 @@ RAILS_ENV=production FORMAT=json bundle exec rake react_on_rails_pro:verify_lice
 
 The task exits with a non-zero status when the license is missing, invalid, or expired. It also reports `renewal_required: true` in JSON output when the license is expired or expiring within 30 days.
 
-You can add the task to CI so production deploys fail fast when the configured license is not valid:
+You can add the task to CI in either blocking or advisory mode. Use a blocking check for deploy gates:
 
 ```yaml
 # .github/workflows/react-on-rails-pro-license.yml
@@ -132,9 +132,55 @@ jobs:
         run: bundle exec rake react_on_rails_pro:verify_license
 ```
 
-Use this in workflows where repository secrets are available, such as trusted branch pushes, scheduled jobs, manual runs,
-or deployment gates. Pull requests from public forks usually cannot access repository secrets, so this check would fail
-there because the token is unavailable.
+Use an advisory check when you want CI visibility without failing the workflow:
+
+````yaml
+# .github/workflows/react-on-rails-pro-license-advisory.yml
+name: React on Rails Pro License Advisory
+
+on:
+  schedule:
+    - cron: '0 15 * * 1'
+  workflow_dispatch:
+
+jobs:
+  verify-license:
+    runs-on: ubuntu-latest
+    env:
+      RAILS_ENV: production
+      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Check React on Rails Pro license
+        run: |
+          set +e
+          output=$(bundle exec rake react_on_rails_pro:verify_license 2>&1)
+          status=$?
+          echo "$output"
+
+          {
+            echo "## React on Rails Pro license"
+            echo
+            echo '```text'
+            echo "$output"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$status" -ne 0 ]; then
+            echo "::warning title=React on Rails Pro license::License validation did not pass. See job summary."
+          fi
+
+          exit 0
+````
+
+Use either example in workflows where repository secrets are available, such as trusted branch pushes, scheduled jobs,
+manual runs, or deployment gates. Pull requests from public forks usually cannot access repository secrets, so these
+checks would report a missing token there.
 
 ### Monitor license expiration
 
