@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Breaking Changes
+
+- **[Pro]** **Node renderer HTTP client now uses async-http and requires Ruby 3.3+**: React on Rails Pro replaces the HTTPX-based renderer client with an `async-http` adapter for render, streaming, and asset-upload requests. Apps using React on Rails Pro must run Ruby 3.3 or newer before upgrading. [PR 3279](https://github.com/shakacode/react_on_rails/pull/3279) by [justin808](https://github.com/justin808).
+
 #### Added
 
 - **`react-on-rails/webpackHelpers` subpath export with `reactDomClientWarning`**: New webpack helper export so React 16/17 consumers can suppress the harmless `Module not found: Can't resolve 'react-dom/client'` warning with a one-liner instead of remembering a regex. The require inside `reactApis` is guarded by a runtime React-version check, so this warning never reflects a real failure, but webpack still emits it at build time because the static `require('react-dom/client')` cannot be tree-shaken without breaking React 18+. Pass `reactDomClientWarning` to `ignoreWarnings` (Webpack 5 / Shakapacker) or `stats.warningsFilter` (Webpack 4 / Webpacker 5). Fixes [Issue 3137](https://github.com/shakacode/react_on_rails/issues/3137).
