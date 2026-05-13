@@ -167,8 +167,9 @@ For CI/CD or scripting, request JSON output:
 RAILS_ENV=production FORMAT=json bundle exec rake react_on_rails_pro:verify_license
 ```
 
-The task exits with a non-zero status when the license is missing, invalid, or expired. It also reports
-`renewal_required: true` in JSON output when the license is expired or expiring within 30 days.
+The task exits with a non-zero status when the license is missing, invalid, or expired. For valid but expiring
+licenses, it exits 0 but reports `renewal_required: true` in JSON output when the license is expiring within 30 days.
+Use the app-owned rake task below if you want a non-zero exit for expiring-soon licenses or a custom warning threshold.
 
 #### Blocking CI Example
 
@@ -183,6 +184,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   verify-license:
     runs-on: ubuntu-latest
@@ -196,22 +200,29 @@ jobs:
         with:
           bundler-cache: true
 
+      # Add database, credentials, and other app-specific setup required to boot Rails in production.
       - name: Verify React on Rails Pro license
         run: bundle exec rake react_on_rails_pro:verify_license
 ```
+
+The task depends on the Rails environment. If your production boot requires credentials or services such as
+`RAILS_MASTER_KEY`, `DATABASE_URL`, or database preparation, add those to the workflow before running the task.
 
 #### Advisory CI Example
 
 Use an advisory CI check when you want visibility without failing the workflow:
 
-````yaml
+```yaml
 # .github/workflows/react-on-rails-pro-license-advisory.yml
 name: React on Rails Pro License Advisory
 
 on:
   schedule:
-    - cron: '0 15 * * 1'
+    - cron: '0 15 * * 1' # Every Monday at 15:00 UTC
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   verify-license:
@@ -226,6 +237,7 @@ jobs:
         with:
           bundler-cache: true
 
+      # Add database, credentials, and other app-specific setup required to boot Rails in production.
       - name: Check React on Rails Pro license
         run: |
           set +e
@@ -236,9 +248,9 @@ jobs:
           {
             echo "## React on Rails Pro license"
             echo
-            echo '```text'
+            echo "\`\`\`text"
             echo "$output"
-            echo '```'
+            echo "\`\`\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [ "$status" -ne 0 ]; then
@@ -246,7 +258,7 @@ jobs:
           fi
 
           exit 0
-````
+```
 
 Use either CI example in workflows where repository secrets are available, such as trusted branch pushes, scheduled jobs,
 manual runs, or deployment gates. Pull requests from public forks usually cannot access repository secrets, so these
@@ -254,7 +266,8 @@ checks would report a missing token there.
 
 ### Monitor License Expiration
 
-If your organization wants an app-owned scheduled check with a custom warning threshold, add a wrapper task like this:
+If your organization wants an app-owned scheduled check with a custom warning threshold, add a wrapper task like this.
+It uses the Pro utility API and treats the built-in 30-day renewal window as the default:
 
 ```ruby
 # lib/tasks/react_on_rails_pro_license.rake
@@ -262,12 +275,14 @@ namespace :licenses do
   desc "Fail if the React on Rails Pro license is invalid, expired, or expiring soon"
   task check_react_on_rails_pro: :environment do
     threshold_days = Integer(ENV.fetch("DAYS", "30"))
-    info = ReactOnRailsPro::LicenseValidator.license_info
-    status = info.fetch(:status)
+    info = ReactOnRailsPro::Utils.license_info
+    status = info.fetch(:status, :unknown)
     expiration = info[:expiration]
-    days_remaining = expiration && ((expiration - Time.current) / 86_400).ceil
+    days_remaining = expiration && ((expiration - Time.now) / 86_400).ceil
 
-    unless status == :valid
+    if status == :expired
+      abort "React on Rails Pro license is expired. Renew and update REACT_ON_RAILS_PRO_LICENSE."
+    elsif status != :valid
       abort "React on Rails Pro license is #{status}. Update REACT_ON_RAILS_PRO_LICENSE."
     end
 
