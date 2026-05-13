@@ -179,6 +179,7 @@ function ReviewList({ reviews }: { reviews: Review[] }) {
 }
 
 async function AsyncReviewList({ reviewsPromise }: { reviewsPromise: Promise<Review[]> }) {
+  // This awaits a Promise injected by getReactOnRailsAsyncProp, not a direct data fetch.
   return <ReviewList reviews={await reviewsPromise} />;
 }
 
@@ -948,8 +949,8 @@ For each component that fetches data:
 1. Remove the `'use client'` directive
 2. Remove `useState` for data, loading, and error
 3. Remove the `useEffect` data fetch
-4. Accept data as props from Rails (or use [`stream_react_component_with_async_props`](#data-fetching-in-react-on-rails-pro) for slow data)
-5. Use `stream_react_component` in the ERB view, or `stream_react_component_with_async_props` when step 4 moved slow data to async props, to enable streaming SSR
+4. Accept data as props from Rails. For slow data, keep immediate values in `props:` and emit the slow values with [`stream_react_component_with_async_props`](#data-fetching-in-react-on-rails-pro).
+5. Use the matching ERB helper to enable streaming SSR: `stream_react_component` for synchronous props, or `stream_react_component_with_async_props` for async props.
 6. Remove the API route if it was only used by this component
 
 ### Step 3: Add Suspense Boundaries

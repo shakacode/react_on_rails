@@ -181,7 +181,7 @@ end %>
 Components rendered this way receive `getReactOnRailsAsyncProp`, which returns a Promise for each emitted prop.
 
 > [!IMPORTANT]
-> `stream_react_component_with_async_props` always forces `prerender: true` — passing `prerender: false` has no effect. It requires the same controller setup as `stream_react_component`: the controller must call `stream_view_containing_react_components`.
+> `stream_react_component_with_async_props` always forces `prerender: true` — passing `prerender: false` has no effect. It requires the same controller setup as `stream_react_component`: the controller must call `stream_view_containing_react_components`. Like `stream_react_component`, it only supports React components and render functions that return React components; render functions returning a `{ renderedHtml }` hash are incompatible (see [compatibility matrix](../core-concepts/render-functions.md#compatibility-matrix-component-types-and-ruby-helpers)).
 
 ### rsc_payload_react_component
 
@@ -209,7 +209,7 @@ end %>
 ```
 
 > [!IMPORTANT]
-> `rsc_payload_react_component_with_async_props` always forces `prerender: true` — passing `prerender: false` has no effect. Use this helper only for custom RSC payload rendering; standard streamed ERB views should use `stream_react_component_with_async_props`.
+> `rsc_payload_react_component_with_async_props` always forces `prerender: true` — passing `prerender: false` has no effect. Use this helper only for custom RSC payload rendering; standard streamed ERB views should use `stream_react_component_with_async_props`. Requires `enable_rsc_support = true` in configuration — see [React on Rails Pro Configuration](../configuration/configuration-pro.md).
 
 ---
 

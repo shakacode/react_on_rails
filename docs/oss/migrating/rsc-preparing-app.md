@@ -551,7 +551,7 @@ When the view uses React on Rails Pro async props, use the async-props helper va
 
 ```erb
 <%= stream_react_component_with_async_props("ProductPage",
-      props: { product_id: @product.id }) do |emit|
+      props: { name: @product.name, price: @product.price }) do |emit|
   emit.call("reviews", @product.reviews.as_json(only: [:id, :text, :rating]))
   emit.call("recommendations",
             @product.recommended_products.as_json(only: [:id, :name, :price]))
