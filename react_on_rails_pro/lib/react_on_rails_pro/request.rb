@@ -24,7 +24,15 @@ module ReactOnRailsPro
       def render_code(path, js_code, send_bundle)
         Rails.logger.info { "[ReactOnRailsPro] Perform rendering request #{path}" }
         form = form_with_code(js_code, send_bundle)
-        perform_request(path, form: form)
+        # Experiment (issue #3280): use JSON for steady-state render to skip
+        # form-urlencode CPU/GC. Keep multipart when send_bundle=true because
+        # form_with_code embeds the bundle file as a Pathname which can't be
+        # JSON-serialized.
+        if send_bundle
+          perform_request(path, form: form)
+        else
+          perform_request(path, json: form)
+        end
       end
 
       def render_code_as_stream(path, js_code, is_rsc_payload:)
