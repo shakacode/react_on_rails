@@ -7,7 +7,7 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
 
   enable_async_react_rendering only: [:async_components_demo]
 
-  LEAK_REPRO_ITEM_COUNT = ENV.fetch("LEAK_REPRO_ITEM_COUNT", "200").to_i
+  LEAK_REPRO_ITEM_COUNT = ENV.fetch("LEAK_REPRO_ITEM_COUNT", "500").to_i
 
   XSS_PAYLOAD = { "<script>window.alert('xss1');</script>" => '<script>window.alert("xss2");</script>' }.freeze
   PROPS_NAME = "Mr. Server Side Rendering"
@@ -272,25 +272,79 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
 
   private
 
-  def build_leak_repro_props
+  def build_leak_repro_props # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
     rng = Random.new(42)
+    lorem = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor " \
+            "incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud " \
+            "exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure " \
+            "dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur."
+    all_tags = %w[Alpha Beta Gamma Delta Epsilon Zeta Eta Theta Iota Kappa Lambda Mu Nu Xi Omicron Pi]
+    cities = %w[NewYork London Tokyo Berlin Paris Sydney Toronto Mumbai Shanghai SaoPaulo]
+    streets = ["123 Main St", "456 Oak Ave", "789 Pine Rd", "321 Elm Blvd", "654 Cedar Ln",
+               "987 Maple Dr", "111 Birch Way", "222 Walnut Ct", "333 Spruce Pl", "444 Ash Ter"]
+    categories = %w[Technology Science Health Finance Education Sports Entertainment Travel Food Art]
+
     items = Array.new(LEAK_REPRO_ITEM_COUNT) do |i|
+      color = "##{rng.rand(0x1000000).to_s(16).rjust(6, '0')}"
       {
         id: i,
-        title: "Item #{i}: Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod",
-        body: "Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip " \
-              "ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit " \
-              "esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non " \
-              "proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Index #{i}.",
-        tags: %w[Alpha Beta Gamma Delta Epsilon Zeta].sample(3, random: rng),
-        author: "user#{rng.rand(1_000)}",
+        title: "Item #{i}: #{lorem[0..80]}",
+        body: "#{lorem} #{lorem} #{lorem} Entry number #{i} in the dataset. #{lorem}",
+        description: "#{lorem}\n\n#{lorem}\n\n#{lorem}\n\nGenerated for index #{i}.",
+        tags: all_tags.sample(8, random: rng),
+        author: { name: "user#{rng.rand(10_000)}", email: "user#{rng.rand(10_000)}@example.com",
+                  bio: lorem[0..200], avatarUrl: "https://placeholders.example.com/#{rng.rand(9999)}.png" },
         date: "2025-#{format('%02d', rng.rand(1..12))}-#{format('%02d', rng.rand(1..28))}",
-        score: rng.rand(0..1_000),
-        color: "##{rng.rand(0x1000000).to_s(16).rjust(6, '0')}",
-        bgColor: "##{rng.rand(0xE00000..0xFFFFFF).to_s(16).rjust(6, '0')}"
+        updatedAt: "2025-#{format('%02d',
+                                  rng.rand(1..12))}-#{format('%02d',
+                                                             rng.rand(1..28))}T#{format('%02d',
+                                                                                        rng.rand(0..23))}:#{format(
+                                                                                          '%02d', rng.rand(0..59)
+                                                                                        )}:00Z",
+        score: rng.rand(0..100_000),
+        color: color,
+        bgColor: "##{rng.rand(0xE00000..0xFFFFFF).to_s(16).rjust(6, '0')}",
+        address: { street: streets.sample(random: rng), city: cities.sample(random: rng),
+                   state: "ST", zip: format("%05d", rng.rand(10_000..99_999)),
+                   country: "US", lat: ((rng.rand * 180) - 90).round(6), lng: ((rng.rand * 360) - 180).round(6) },
+        metadata: { category: categories.sample(random: rng),
+                    keywords: all_tags.sample(6, random: rng).map(&:downcase),
+                    priority: rng.rand(1..5), featured: rng.rand(2).zero?,
+                    dimensions: { width: rng.rand(100..4000), height: rng.rand(100..4000) } },
+        stats: { views: rng.rand(0..1_000_000), likes: rng.rand(0..50_000),
+                 shares: rng.rand(0..10_000), bookmarks: rng.rand(0..5_000),
+                 impressions: rng.rand(0..5_000_000), clickRate: (rng.rand * 15).round(2) },
+        comments: Array.new(5) do |c|
+          { id: "#{i}-#{c}", author: "commenter#{rng.rand(5_000)}",
+            text: lorem[0..rng.rand(100..350)], score: rng.rand(-10..500),
+            createdAt: "2025-#{format('%02d', rng.rand(1..12))}-#{format('%02d', rng.rand(1..28))}",
+            replies: Array.new(3) do |r|
+              { id: "#{i}-#{c}-#{r}", author: "replier#{rng.rand(5_000)}",
+                text: lorem[0..rng.rand(50..200)], score: rng.rand(-5..200) }
+            end }
+        end,
+        thumbnail: leak_repro_svg_thumbnail(i, color)
       }
     end
-    { items: items }
+
+    { items: items, generatedAt: Time.now.iso8601, totalCount: LEAK_REPRO_ITEM_COUNT,
+      siteConfig: { name: "LeakRepro Benchmark", version: "2.0", locale: "en-US",
+                    theme: { primary: "#1a73e8", secondary: "#fbbc04", background: "#ffffff",
+                             surface: "#f8f9fa", error: "#d93025", fontFamily: "Inter, system-ui, sans-serif" } } }
+  end
+
+  def leak_repro_svg_thumbnail(index, color)
+    "<svg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'>" \
+      "<rect width='400' height='300' fill='#{color}' opacity='0.15'/>" \
+      "<circle cx='200' cy='120' r='60' fill='#{color}' opacity='0.4'/>" \
+      "<circle cx='140' cy='180' r='40' fill='#{color}' opacity='0.3'/>" \
+      "<circle cx='260' cy='180' r='40' fill='#{color}' opacity='0.3'/>" \
+      "<rect x='50' y='220' width='300' height='8' rx='4' fill='#{color}' opacity='0.25'/>" \
+      "<rect x='80' y='240' width='240' height='8' rx='4' fill='#{color}' opacity='0.2'/>" \
+      "<rect x='110' y='260' width='180' height='8' rx='4' fill='#{color}' opacity='0.15'/>" \
+      "<text x='200' y='130' text-anchor='middle' font-size='24' fill='#{color}'>Item #{index}</text>" \
+      "<text x='200' y='285' text-anchor='middle' font-size='11' fill='#999'>placeholder-#{index}</text>" \
+      "</svg>"
   end
 
   def calc_slow_app_props_server_render

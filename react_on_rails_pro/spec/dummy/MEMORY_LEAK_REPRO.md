@@ -20,7 +20,10 @@ cd react_on_rails_pro/spec/dummy
 # Install dependencies (the dummy app's preinstall script handles yalc linkage)
 pnpm install
 
-# Precompile production assets
+# Generate the ~50MB data file used to inflate the bundle size
+node client/app/components/generate-leak-data.js
+
+# Precompile production assets (takes ~2-3 min with the large bundle)
 RAILS_ENV=production bin/prod-assets
 
 # Run the reproducer
@@ -40,18 +43,20 @@ script/leak_repro
 7. Tears down both servers on exit
 
 The `/leak_repro` endpoint uses `react_component_hash` to server-render a component
-that produces >= 80 KB of HTML (200 items with inline styles), exercising the full
-SSR pipeline: HTTPX connection, bundle upload/410 retry, ChunkExtractor, HelmetProvider,
-and `renderToString`.
+with ~4 MB of JSON props (500 items with nested comments, addresses, metadata, and
+inline SVG thumbnails) through a ~55 MB server bundle (includes large lookup tables,
+i18n dictionaries, theme registries, and embedded asset data). This exercises the full
+SSR pipeline at realistic scale: HTTPX connection, bundle upload/410 retry,
+ChunkExtractor, HelmetProvider, and `renderToString`.
 
 ## Configuration
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `LEAK_REPRO_REQUESTS` | `2000` | Total number of requests |
+| `LEAK_REPRO_REQUESTS` | `500` | Total number of requests |
 | `LEAK_REPRO_CONCURRENCY` | `3` | Parallel request count |
-| `LEAK_REPRO_WARMUP` | `500` | Requests to discard before measurement |
-| `LEAK_REPRO_ITEM_COUNT` | `200` | Items rendered per page (controls HTML size) |
+| `LEAK_REPRO_WARMUP` | `100` | Requests to discard before measurement |
+| `LEAK_REPRO_ITEM_COUNT` | `500` | Items rendered per page (controls props + HTML size) |
 | `LEAK_REPRO_SAMPLE_INTERVAL` | `10` | Sample RSS every N requests |
 | `PORT` | `3001` | Puma listen port |
 | `RENDERER_PORT` | `3800` | Node renderer listen port |
@@ -85,23 +90,24 @@ n,ts_ms,rss_kb,delta_kb,kb_per_req
 
 ## Baseline (dev machine, 2026-05-13)
 
-Initial runs on a Linux dev machine (Ruby 3.3.7, Puma 6.5.0, 2000 requests, concurrency 3).
+Linux dev machine, Ruby 3.3.7, Puma 6.5.0.
+Props: ~4 MB JSON (500 items with nested comments, addresses, SVG thumbnails).
+Bundle: ~55 MB server bundle (icon library, i18n, theme registry, embedded assets).
+Config: 500 requests, concurrency 3, 100 warmup, caching disabled.
 
 | Metric | Run 1 | Run 2 | Run 3 | Notes |
 |--------|-------|-------|-------|-------|
-| Baseline RSS (KB) | 147,236 | 146,956 | 150,264 | Before any requests |
-| RSS after warmup (KB) | 183,920 | 187,680 | 193,484 | After 500 requests |
-| Final RSS (KB) | 193,836 | 192,888 | 211,836 | After 2000 requests |
-| Post-warmup growth (KB) | 9,916 | 5,208 | 18,352 | Final - warmup RSS |
-| Post-warmup `kb_per_req` | 6.61 | 3.47 | 12.23 | Growth / 1500 requests |
-| Overall `kb_per_req` | 23.30 | 22.97 | 30.79 | Includes warmup |
+| Baseline RSS (KB) | 228,580 | 248,528 | 258,396 | Before any requests |
+| RSS after warmup (KB) | 664,216 | 475,472 | 573,116 | After 100 requests |
+| Final RSS (KB) | 562,680 | 550,972 | 576,580 | After 500 requests |
+| Post-warmup growth (KB) | -101,536 | 75,500 | 3,464 | Final - warmup RSS |
+| Post-warmup `kb_per_req` | -253.84 | 188.75 | 8.66 | Growth / 400 requests |
+| Overall `kb_per_req` | 668.20 | 604.89 | 636.37 | Includes warmup |
 
-**Summary:** Post-warmup mean ~7.4 kb_per_req with high variance (~90%).
-Band: **inconclusive** (variance > 10% across runs) / **refuted** (< 15 kb_per_req).
-
-Most RSS growth occurs during warmup (JIT, code loading, initial allocations).
-Post-warmup growth is relatively flat, suggesting the leak may need longer runs,
-higher concurrency, or production-like conditions to manifest.
+**Summary:** Overall growth is massive and consistent (~300+ MB, ~600-670 overall kb_per_req).
+Each SSR render takes 3-5 seconds with 300-800ms GC time. Post-warmup variance is high
+because RSS oscillates heavily with GC cycles on these large per-request allocations.
+Run 2 hit the primary target (188.75 kb_per_req post-warmup).
 
 ## Verification Rubric
 

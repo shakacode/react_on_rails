@@ -10,3 +10,7 @@ config/react_on_rails_pro_license.key
 
 # Local node renderer bundle cache rotated during debugging
 /.node-renderer-bundles.stale-*/
+
+# Generated large data file for memory leak reproducer (~50MB)
+# Regenerate with: node client/app/components/generate-leak-data.js
+client/app/components/LeakReproLargeData.js
