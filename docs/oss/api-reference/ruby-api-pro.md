@@ -59,9 +59,11 @@ Requires the controller to use `stream_view_containing_react_components`.
 
 Async-props variant of `stream_react_component`. Use this when the view has synchronous props plus slower values that should stream to React behind Suspense boundaries.
 
+Use this helper for RSC Server Components with RSC support enabled. For non-RSC streaming SSR, use `stream_react_component`.
+
 Requires the controller to use `stream_view_containing_react_components`, same as `stream_react_component`.
 
-This helper accepts the same options as `stream_react_component`, plus a block that receives an emitter. Call `emit.call(prop_name, value)` for each async prop as it becomes available. Components read emitted values through the injected `getReactOnRailsAsyncProp` prop.
+This helper accepts the same options as `stream_react_component`, plus a block that receives an emitter. Call `emit.call(prop_name, value)` for each async prop as it becomes available. RSC Server Components read emitted values through the injected `getReactOnRailsAsyncProp` prop.
 
 ```ruby
 <%= stream_react_component_with_async_props("ProductPage",

@@ -169,6 +169,8 @@ See the [Streaming Server Rendering guide](../building-features/streaming-server
 
 Async-props variant of `stream_react_component`. Use it when Rails has synchronous props plus other props that should stream later through Suspense boundaries.
 
+Use this helper for RSC Server Components with RSC support enabled. For non-RSC streaming SSR, use `stream_react_component`.
+
 It accepts the same options as `stream_react_component`, plus a block that receives an emitter. Call `emit.call(prop_name, value)` for each async prop:
 
 ```erb
@@ -178,7 +180,7 @@ It accepts the same options as `stream_react_component`, plus a block that recei
 end %>
 ```
 
-Components rendered this way receive `getReactOnRailsAsyncProp`, which returns a Promise for each emitted prop.
+RSC Server Components rendered this way receive `getReactOnRailsAsyncProp`, which returns a Promise for each emitted prop.
 
 > [!IMPORTANT]
 > `stream_react_component_with_async_props` always forces `prerender: true` — passing `prerender: false` has no effect. It requires the same controller setup as `stream_react_component`: the controller must call `stream_view_containing_react_components`. Like `stream_react_component`, it only supports React components and render functions that return React components; render functions returning a `{ renderedHtml }` hash are incompatible (see [compatibility matrix](../core-concepts/render-functions.md#compatibility-matrix-component-types-and-ruby-helpers)).
