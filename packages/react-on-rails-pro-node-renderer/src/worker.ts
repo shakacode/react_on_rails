@@ -345,7 +345,7 @@ export default function run(config: Partial<Config>) {
       await setResponse(badRequestResponseResult('Invalid or missing request body.'), res);
       return;
     }
-    const { renderingRequest } = body;
+    const { renderingRequest, props: propsJson } = body as Record<string, unknown>;
     if (!isValidRenderingRequest(renderingRequest)) {
       await setResponse(badRequestResponseResult(invalidRenderingRequestMessage(body)), res);
       return;
@@ -360,6 +360,7 @@ export default function run(config: Partial<Config>) {
         try {
           const result = await handleRenderRequest({
             renderingRequest,
+            propsJson: typeof propsJson === 'string' ? propsJson : undefined,
             bundleTimestamp,
             dependencyBundleTimestamps,
             providedNewBundles,

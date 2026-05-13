@@ -14,6 +14,8 @@ module ReactOnRailsPro
         js_code = render_request.to_js
         ReactOnRailsPro::ServerRenderingPool::ProRendering
           .exec_server_render_js(js_code, render_request.render_options)
+      ensure
+        Thread.current[:ror_decoupled_props] = nil
       end
 
       def reset

@@ -280,6 +280,10 @@ module ReactOnRailsPro
       def form_with_code(js_code, send_bundle)
         form = common_form_data
         form["renderingRequest"] = js_code
+        if (props = Thread.current[:ror_decoupled_props])
+          form["props"] = props
+          Thread.current[:ror_decoupled_props] = nil
+        end
         populate_form_with_bundle_and_assets(form, check_bundle: false) if send_bundle
         form
       end

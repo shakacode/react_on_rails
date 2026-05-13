@@ -7,6 +7,11 @@ module ReactOnRailsPro
   # Part of the strategy pattern refactoring (see issue #2905).
   # Currently additive — not yet wired into the main rendering path.
   class JsCodeBuilder < ReactOnRails::JsCodeBuilder
+    def build(render_request)
+      Thread.current[:ror_decoupled_props] = render_request.props_string
+      super
+    end
+
     protected
 
     def build_sections(render_request)
@@ -78,8 +83,8 @@ module ReactOnRailsPro
     #   when `props` IIFE param is undefined, i.e. normal invocation)
     # - render_call_section references both `componentName` and `usedProps`
     # Overriding any one without the others will produce broken JavaScript.
-    def props_section(render_request)
-      "var usedProps = typeof props === 'undefined' ? #{render_request.props_string} : props;"
+    def props_section(_render_request)
+      "var usedProps = typeof props === 'undefined' ? globalThis.__rorpProps : props;"
     end
 
     def render_call_section(render_request)

@@ -324,6 +324,7 @@ export type ExecutionContext = {
     renderingRequest: string,
     bundleFilePath: string,
     vmCluster?: typeof cluster,
+    propsJson?: string,
   ) => Promise<RenderResult>;
   getVMContext: (bundleFilePath: string) => VMContext | undefined;
 };
@@ -360,7 +361,12 @@ export async function buildExecutionContext(
   // Example: asyncPropsManager is stored here during initial render and accessed by update chunks.
   const sharedExecutionContext = new Map();
 
-  const runInVM = async (renderingRequest: string, bundleFilePath: string, vmCluster?: typeof cluster) => {
+  const runInVM = async (
+    renderingRequest: string,
+    bundleFilePath: string,
+    vmCluster?: typeof cluster,
+    propsJson?: string,
+  ) => {
     try {
       const { serverBundleCachePath } = getConfig();
       const vmContext = mapBundleFilePathToVMContext.get(bundleFilePath);
@@ -397,6 +403,9 @@ export async function buildExecutionContext(
         };
 
         try {
+          if (propsJson) {
+            context.__rorpProps = JSON.parse(propsJson);
+          }
           return vm.runInContext(renderingRequest, context) as RenderCodeResult;
         } finally {
           // Clean up references immediately after execution.
@@ -406,6 +415,7 @@ export async function buildExecutionContext(
           context.renderingRequest = undefined;
           context.sharedExecutionContext = undefined;
           context.runOnOtherBundle = undefined;
+          context.__rorpProps = undefined;
         }
       });
 

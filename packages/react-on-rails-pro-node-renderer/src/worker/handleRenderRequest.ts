@@ -38,9 +38,15 @@ async function prepareResult(
   renderingRequest: string,
   bundleFilePathPerTimestamp: string,
   executionContext: ExecutionContext,
+  propsJson?: string,
 ): Promise<ResponseResult> {
   try {
-    const result = await executionContext.runInVM(renderingRequest, bundleFilePathPerTimestamp, cluster);
+    const result = await executionContext.runInVM(
+      renderingRequest,
+      bundleFilePathPerTimestamp,
+      cluster,
+      propsJson,
+    );
 
     let exceptionMessage = null;
     if (!result) {
@@ -202,6 +208,7 @@ export async function handleNewBundlesProvided(
  */
 export async function handleRenderRequest({
   renderingRequest,
+  propsJson,
   bundleTimestamp,
   dependencyBundleTimestamps,
   providedNewBundles,
@@ -209,6 +216,7 @@ export async function handleRenderRequest({
   tracingContext,
 }: {
   renderingRequest: string;
+  propsJson?: string;
   bundleTimestamp: string | number;
   dependencyBundleTimestamps?: string[] | number[];
   providedNewBundles?: ProvidedNewBundle[] | null;
@@ -237,7 +245,7 @@ export async function handleRenderRequest({
     try {
       const executionContext = await buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ false);
       return {
-        response: await prepareResult(renderingRequest, entryBundleFilePath, executionContext),
+        response: await prepareResult(renderingRequest, entryBundleFilePath, executionContext, propsJson),
         executionContext,
       };
     } catch (e) {
@@ -271,7 +279,7 @@ export async function handleRenderRequest({
     );
     const executionContext = await buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ true);
     return {
-      response: await prepareResult(renderingRequest, entryBundleFilePath, executionContext),
+      response: await prepareResult(renderingRequest, entryBundleFilePath, executionContext, propsJson),
       executionContext,
     };
   } catch (error) {
