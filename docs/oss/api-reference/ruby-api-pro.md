@@ -75,7 +75,7 @@ end %>
 ```
 
 > [!IMPORTANT]
-> The emitter block runs normal Ruby code sequentially, so `emit.call` does **not** parallelize slow queries by itself. For independent slow data sources, start the work concurrently before emitting values; see [Avoiding Server-Side Waterfalls](../migrating/rsc-data-fetching.md#avoiding-server-side-waterfalls).
+> `stream_react_component_with_async_props` always forces `prerender: true`; passing `prerender: false` has no effect. The emitter block runs normal Ruby code sequentially, so `emit.call` does **not** parallelize slow queries by itself. For independent slow data sources, start the work concurrently before emitting values; see [Avoiding Server-Side Waterfalls](../migrating/rsc-data-fetching.md#avoiding-server-side-waterfalls).
 
 ### `cached_stream_react_component(component_name, options = {}, &block)`
 
@@ -116,7 +116,7 @@ end %>
 ```
 
 > [!IMPORTANT]
-> The emitter block runs normal Ruby code sequentially, so `emit.call` does **not** parallelize slow queries by itself. For independent slow data sources, start the work concurrently before emitting values; see [Avoiding Server-Side Waterfalls](../migrating/rsc-data-fetching.md#avoiding-server-side-waterfalls).
+> `rsc_payload_react_component_with_async_props` always forces `prerender: true`; passing `prerender: false` has no effect. The emitter block runs normal Ruby code sequentially, so `emit.call` does **not** parallelize slow queries by itself. For independent slow data sources, start the work concurrently before emitting values; see [Avoiding Server-Side Waterfalls](../migrating/rsc-data-fetching.md#avoiding-server-side-waterfalls).
 
 ### `async_react_component(component_name, options = {})`
 
