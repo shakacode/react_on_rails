@@ -99,14 +99,12 @@ module ReactOnRailsPro
       @concurrent_component_streaming_buffer_size = value
     end
 
-    # Sets the keep-alive timeout (in seconds) for persistent HTTP connections to the node renderer.
+    # Sets the legacy keep-alive timeout configuration for node renderer HTTP connections.
     #
-    # For best results, set this value to slightly less than the node renderer's own
-    # keep-alive / idle-connection timeout. If the client-side timeout is longer than
-    # the server's, connections may be reused after the server has already closed them,
-    # resulting in stale-connection errors. If set to nil, the HTTPX default is used.
+    # This remains for configuration compatibility. The async-http adapter currently
+    # scopes clients to individual requests, so this value is validated but not applied.
     #
-    # @param value [Numeric, nil] A positive number or nil (to use the HTTPX default)
+    # @param value [Numeric, nil] A positive number or nil
     # @raise [ReactOnRailsPro::Error] if value is not a positive number or nil
     def renderer_http_keep_alive_timeout=(value)
       unless value.nil? || (value.is_a?(Numeric) && value.positive? && value.finite?)

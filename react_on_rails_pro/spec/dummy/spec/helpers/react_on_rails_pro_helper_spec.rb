@@ -342,12 +342,7 @@ describe ReactOnRailsProHelper do
 
     # mock_chunks can be an Async::Queue or an Array
     def mock_request_and_response(mock_chunks = chunks, count: 1)
-      # Reset connection instance variables to ensure clean state for tests
-      ReactOnRailsPro::Request.instance_variable_set(:@connection, nil)
-      original_httpx_plugin = HTTPX.method(:plugin)
-      allow(HTTPX).to receive(:plugin) do |*args|
-        original_httpx_plugin.call(:mock_stream).plugin(*args)
-      end
+      install_renderer_http_client_mock("http://localhost:3800")
       clear_stream_mocks
 
       chunks_read.clear
@@ -763,7 +758,7 @@ describe ReactOnRailsProHelper do
         expect(chunks_read.count).to eq(chunks.count)
         expect(first_run_chunks.first).to include("<h1>Header Rendered In View</h1>")
 
-        # Second render (HIT → served from cache, no Node call; no new HTTPX chunks)
+        # Second render (HIT -> served from cache, no Node call; no new renderer chunks)
         reset_stream_buffers
         # Reset rails context flag to simulate a fresh request lifecycle
         @rendered_rails_context = nil
@@ -940,11 +935,7 @@ describe ReactOnRailsProHelper do
       allow(mocked_response).to receive(:stream).and_return(mocked_stream)
       allow(self).to receive(:response).and_return(mocked_response)
 
-      ReactOnRailsPro::Request.instance_variable_set(:@connection, nil)
-      original_httpx_plugin = HTTPX.method(:plugin)
-      allow(HTTPX).to receive(:plugin) do |*args|
-        original_httpx_plugin.call(:mock_stream).plugin(*args)
-      end
+      install_renderer_http_client_mock("http://localhost:3800")
       clear_stream_mocks
 
       mock_streaming_response(%r{http://localhost:3800/bundles/[a-f0-9]{32}-test/render/[a-f0-9]{32}}, 200,

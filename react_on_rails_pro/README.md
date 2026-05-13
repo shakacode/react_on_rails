@@ -257,7 +257,7 @@ end
 
 ### Prerequisites
 
-- **Ruby**: >= 3.0
+- **Ruby**: >= 3.3
 - **Rails**: >= 6.0 (recommended: 7.0+)
 - **React on Rails**: >= 11.0.7 (recommended: latest)
 - **Node.js**: >= 18 (for Node Renderer)
@@ -267,7 +267,7 @@ end
 
 | React on Rails Pro | React on Rails | Rails  | Ruby   | React   |
 | ------------------ | -------------- | ------ | ------ | ------- |
-| 16.x               | >= 16.0        | >= 7.0 | >= 3.2 | >= 18   |
+| 16.x               | >= 16.0        | >= 7.0 | >= 3.3 | >= 18   |
 | 3.x                | >= 13.0        | >= 6.0 | >= 3.0 | >= 16.8 |
 
 > **Note:** Pro version numbers were aligned with the core gem starting at 16.2.0. Pro 16.x is the direct successor to Pro 3.x/4.x.

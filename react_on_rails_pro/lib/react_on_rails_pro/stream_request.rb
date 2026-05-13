@@ -1,8 +1,5 @@
 # frozen_string_literal: true
 
-require "async"
-require "async/barrier"
-
 module ReactOnRailsPro
   class StreamDecorator
     def initialize(component)
@@ -86,54 +83,54 @@ module ReactOnRailsPro
   end
 
   class StreamRequest
-    def initialize(&request_block)
+    def initialize(first_chunk_warn_callback: nil, &request_block)
       @request_executor = request_block
+      @first_chunk_warn_callback = first_chunk_warn_callback
     end
 
     private_class_method :new
 
+    # Method to start the decoration
+    def self.create(first_chunk_warn_callback: nil, &request_block)
+      StreamDecorator.new(new(first_chunk_warn_callback: first_chunk_warn_callback, &request_block))
+    end
+
     def each_chunk(&block)
       return enum_for(:each_chunk) unless block
 
-      Sync do
-        barrier = Async::Barrier.new
+      send_bundle = false
+      error_body = +""
+      loop do
+        stream_response = @request_executor.call(send_bundle)
 
-        send_bundle = false
-        error_body = +""
-        loop do
-          stream_response = @request_executor.call(send_bundle, barrier)
-
-          # The Node renderer always emits the length-prefixed wire format
-          # (`<metadata JSON>\t<content byte length hex>\n<raw content bytes>`)
-          # for every response chunk — both the one-shot streaming path and the
-          # incremental-rendering path. We check the status code inside the loop
-          # block because calling `status` outside of it blocks until the full
-          # response has been received. See the `status` spec in
-          # `spec/react_on_rails_pro/stream_spec.rb` for more details.
-          process_response_chunks(stream_response, error_body, &block)
-          break
-        rescue HTTPX::HTTPError => e
-          send_bundle = handle_http_error(e, error_body, send_bundle)
-        rescue HTTPX::ReadTimeoutError => e
-          raise ReactOnRailsPro::Error, "Time out error while server side render streaming a component.\n" \
-                                        "Original error:\n#{e}\n#{e.backtrace}"
-        end
-
-        barrier.wait
+        # The renderer emits the length-prefixed wire format documented in
+        # ReactOnRails::LengthPrefixedParser; process_response_chunks feeds chunks
+        # to that parser and yields the parsed Hash chunks downstream.
+        process_response_chunks(stream_response, error_body, &block)
+        break
+      rescue ReactOnRailsPro::RendererHttpClient::HTTPError => e
+        send_bundle = handle_http_error(e, error_body, send_bundle)
+      rescue ReactOnRailsPro::RendererHttpClient::TimeoutError => e
+        raise ReactOnRailsPro::Error, "Time out error while server side render streaming a component.\n" \
+                                      "Original error:\n#{e}\n#{e.backtrace&.join("\n")}"
+      rescue ReactOnRailsPro::RendererHttpClient::ConnectionError => e
+        raise ReactOnRailsPro::Error, "An error happened during server side render streaming " \
+                                      "of a component.\nOriginal error:\n#{e}\n#{e.backtrace&.join("\n")}"
       end
-    end
-
-    # Method to start the decoration
-    def self.create(&request_block)
-      StreamDecorator.new(new(&request_block))
     end
 
     private
 
     def process_response_chunks(stream_response, error_body, &block)
+      first_chunk_start_time = Time.now
+      first_chunk_seen = false
       parser = ReactOnRails::LengthPrefixedParser.new
+
       stream_response.each do |chunk|
-        stream_response.instance_variable_set(:@react_on_rails_received_first_chunk, true)
+        unless first_chunk_seen
+          @first_chunk_warn_callback&.call(Time.now - first_chunk_start_time)
+          first_chunk_seen = true
+        end
 
         if response_has_error_status?(stream_response)
           error_body << chunk
@@ -146,12 +143,15 @@ module ReactOnRailsPro
     end
 
     def response_has_error_status?(response)
-      return true if response.is_a?(HTTPX::ErrorResponse)
+      return response.error? if response.respond_to?(:error?)
 
-      response.status >= 400
-    rescue NoMethodError
-      # HTTPX::StreamResponse can fail to delegate #status for non-streaming errors.
-      true
+      # Future adapters without Response#error? must expose Response#status.
+      unless response.respond_to?(:status)
+        raise NotImplementedError, "#{response.class} must implement #error? or #status"
+      end
+
+      status = response.status
+      !status.nil? && status >= 400
     end
 
     def handle_http_error(error, error_body, send_bundle)
