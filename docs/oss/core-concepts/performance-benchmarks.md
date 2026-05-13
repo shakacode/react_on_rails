@@ -97,10 +97,10 @@ summary dashboard, [raw Lighthouse reports](https://rsc.reactonrails.com/lightho
 for the underlying artifacts, and [bundle-size evidence](https://rsc.reactonrails.com/lighthouse-reports/bundle-sizes.html)
 for per-route resource breakdowns.
 
-The demo is intentionally evidence-first: click any reported metric to open the
-corresponding Lighthouse artifact. Treat it as a directional public benchmark,
-not a universal performance guarantee, because application structure, data
-shape, caching, and deployment topology still determine the final result.
+The demo is intentionally evidence-first and links to the underlying Lighthouse
+artifacts. Treat it as a directional public benchmark, not a universal
+performance guarantee, because application structure, data shape, caching, and
+deployment topology still determine the final result.
 
 ## Real-World Results
 
@@ -108,7 +108,7 @@ shape, caching, and deployment topology still determine the final result.
 > This section covers a non-production local directional benchmark first, then a production case study. For validated,
 > at-scale results, see the [Production Case Study: Popmenu](#popmenu) below.
 
-### Non-Production Local Directional Benchmark: Gumroad-Style RSC Demo (April 2026) <a id="gumroad-style-rsc-demo"></a>
+### Non-Production Local Directional Benchmark: Gumroad-Style RSC Demo (April 2026) {#gumroad-style-rsc-demo}
 
 The [Gumroad-style RSC benchmark demo](https://github.com/shakacode/react-on-rails-demo-gumroad-rsc)
 is a public ShakaCode comparison repo modeled after a creator-dashboard surface with product listings and sales metrics,
@@ -193,7 +193,7 @@ completeness only. See
   establish statistical significance._
 - _The `action_total` -2.3% delta is likely within expected variance at n=4._
 
-#### Worst-case `responseEnd` counter-signal <a id="gumroad-rsc-worst-case-responseend"></a>
+#### Worst-case `responseEnd` counter-signal {#gumroad-rsc-worst-case-responseend}
 
 | Metric                             | Inertia demo | RSC demo | Delta % (negative = RSC faster) |
 | ---------------------------------- | -----------: | -------: | ------------------------------: |
