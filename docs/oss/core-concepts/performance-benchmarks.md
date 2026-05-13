@@ -87,6 +87,21 @@ Applications that use heavy formatting, parsing, or data-processing libraries on
 
 Server components produce HTML that does not need hydration — they have no client-side JavaScript. Only client components (those with `'use client'`) require hydration. This reduces Total Blocking Time and improves Time to Interactive.
 
+### Public Marketplace RSC Demo
+
+The [LocalHub marketplace demo](https://rsc.reactonrails.com/) is a public,
+inspectable React on Rails Pro + RSC demo with the same page families rendered
+as traditional SSR, client rendering, and React Server Components. Use the
+[performance showcase](https://rsc.reactonrails.com/search-performance) for the
+summary dashboard, [raw Lighthouse reports](https://rsc.reactonrails.com/lighthouse-reports/index.html)
+for the underlying artifacts, and [bundle-size evidence](https://rsc.reactonrails.com/lighthouse-reports/bundle-sizes.html)
+for per-route resource breakdowns.
+
+The demo is intentionally evidence-first: click any reported metric to open the
+corresponding Lighthouse artifact. Treat it as a directional public benchmark,
+not a universal performance guarantee, because application structure, data
+shape, caching, and deployment topology still determine the final result.
+
 ## Real-World Results
 
 > [!NOTE]
@@ -198,7 +213,7 @@ are still required before making stronger production-performance claims.
 See [Issue 3128](https://github.com/shakacode/react_on_rails/issues/3128) and
 [Issue 3144](https://github.com/shakacode/react_on_rails/issues/3144) for the ongoing tracking discussion.
 
-### Production Case Study: Popmenu <a id="popmenu"></a>
+### Production Case Study: Popmenu {#popmenu}
 
 Popmenu, a restaurant platform serving tens of millions of SSR requests daily, adopted React on Rails Pro and reported:
 

@@ -51,6 +51,15 @@ The fastest way to understand how the Pro feature set fits together is to inspec
 
 It demonstrates the Node renderer, caching, and SSR-oriented workflows in a real Rails app.
 
+## Explore the Public RSC Demo
+
+The [LocalHub marketplace demo](https://rsc.reactonrails.com/) is the best
+public click-through for React on Rails Pro with React Server Components.
+Start at the [RSC performance showcase](https://rsc.reactonrails.com/search-performance)
+for Lighthouse report links, bundle-size evidence, and side-by-side SSR,
+client, and RSC comparisons. The implementation lives in
+[shakacode/react-on-rails-demo-marketplace-rsc](https://github.com/shakacode/react-on-rails-demo-marketplace-rsc).
+
 ## References
 
 - [Installation](./installation.md)
