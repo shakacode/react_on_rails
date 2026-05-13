@@ -57,7 +57,7 @@ Requires the controller to use `stream_view_containing_react_components`.
 
 ### `stream_react_component_with_async_props(component_name, options = {}, &block)`
 
-Async-props variant of `stream_react_component`. Use this when the view has immediately available props plus slower values that should stream to React behind Suspense boundaries.
+Async-props variant of `stream_react_component`. Use this when the view has synchronous props plus slower values that should stream to React behind Suspense boundaries.
 
 Requires the controller to use `stream_view_containing_react_components`, same as `stream_react_component`.
 
@@ -69,6 +69,9 @@ This helper accepts the same options as `stream_react_component`, plus a block t
   emit.call("reviews", @product.reviews.as_json(only: [:id, :text, :rating]))
 end %>
 ```
+
+> [!IMPORTANT]
+> The emitter block runs normal Ruby code sequentially, so `emit.call` does **not** parallelize slow queries by itself. For independent slow data sources, start the work concurrently before emitting values; see [Avoiding Server-Side Waterfalls](../migrating/rsc-data-fetching.md#avoiding-server-side-waterfalls).
 
 ### `cached_stream_react_component(component_name, options = {}, &block)`
 

@@ -547,7 +547,7 @@ In each view, replace `react_component` with `stream_react_component`:
 
 `stream_react_component` automatically sets `prerender: true`. The component renders identically — the difference is that the response is now streamed, which will matter when you start adding Suspense boundaries and async Server Components. React on Rails Pro automatically hydrates components early (before `DOMContentLoaded`), so selective hydration works out of the box.
 
-When the view uses React on Rails Pro async props, use the async-props helper variant instead. Keep immediately available values in `props:` and emit slower values from the block:
+When the view uses React on Rails Pro async props, use the async-props helper variant instead. Keep synchronous values in `props:` and emit slower values from the block:
 
 ```erb
 <%= stream_react_component_with_async_props("ProductPage",

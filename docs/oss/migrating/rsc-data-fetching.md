@@ -99,6 +99,9 @@ This is the recommended data fetching pattern for React on Rails because:
 end %>
 ```
 
+> [!IMPORTANT]
+> The emitter block runs normal Ruby code sequentially, so `emit.call` does **not** parallelize slow queries by itself. For independent slow data sources, start the work concurrently before emitting values; see [Avoiding Server-Side Waterfalls](#avoiding-server-side-waterfalls).
+
 > **See also:** [React on Rails Pro streaming SSR](../../pro/streaming-ssr.md) for setup instructions and configuration options.
 
 **React component for synchronous props (Server Component):**
@@ -203,7 +206,7 @@ export default function ProductPage({ name, price, getReactOnRailsAsyncProp }: P
 
 **How it works:**
 
-1. Rails loads synchronous data and passes it as props to `stream_react_component`, or as immediate `props:` to `stream_react_component_with_async_props` when slower props are emitted from the block
+1. Rails evaluates synchronous `props:` for `stream_react_component`, or passes those synchronous `props:` to `stream_react_component_with_async_props` while the block emits slower values with `emit.call`
 2. The streaming helper uses React's `renderToPipeableStream` for streaming SSR
 3. HTML streams to the browser as React renders the component tree
 4. No client-side fetching or `useEffect`-based loading state needed
@@ -387,7 +390,7 @@ export default function DashboardStats({ fallbackData }) {
 
 ## Avoiding Server-Side Waterfalls
 
-> **React on Rails note:** In React on Rails, the primary way to handle parallel data loading is [`stream_react_component_with_async_props`](#data-fetching-in-react-on-rails-pro) -- Rails emits each prop independently, and Suspense boundaries stream them to the browser as they resolve. The patterns below apply when you have async Server Components that fetch data directly (outside the async props flow).
+> **React on Rails note:** In React on Rails, use [`stream_react_component_with_async_props`](#data-fetching-in-react-on-rails-pro) when slow Rails data should stream into Suspense boundaries independently. If independent values require slow Ruby work, start that work concurrently before emitting; the patterns below apply when you have async Server Components that fetch data directly (outside the async props flow).
 
 The most critical performance pitfall with Server Components is sequential data fetching. When one `await` blocks the next, you create a waterfall on the server:
 
@@ -952,7 +955,7 @@ For each component that fetches data:
 1. Remove the `'use client'` directive
 2. Remove `useState` for data, loading, and error
 3. Remove the `useEffect` data fetch
-4. Accept data as props from Rails. For slow data, keep immediate values in `props:` and emit the slow values with [`stream_react_component_with_async_props`](#data-fetching-in-react-on-rails-pro).
+4. Accept data as props from Rails. For slow data, keep synchronous values in `props:` and emit the slow values with [`stream_react_component_with_async_props`](#data-fetching-in-react-on-rails-pro).
 5. Use the matching ERB helper to enable streaming SSR: `stream_react_component` for synchronous props, or `stream_react_component_with_async_props` for async props.
 6. Remove the API route if it was only used by this component
 
