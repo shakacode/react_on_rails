@@ -106,6 +106,9 @@ This helper accepts the same options as `rsc_payload_react_component`, plus a bl
 end %>
 ```
 
+> [!IMPORTANT]
+> The emitter block runs normal Ruby code sequentially, so `emit.call` does **not** parallelize slow queries by itself. For independent slow data sources, start the work concurrently before emitting values; see [Avoiding Server-Side Waterfalls](../migrating/rsc-data-fetching.md#avoiding-server-side-waterfalls).
+
 ### `async_react_component(component_name, options = {})`
 
 Renders a component asynchronously, returning an `AsyncValue`. Multiple calls execute concurrently.
