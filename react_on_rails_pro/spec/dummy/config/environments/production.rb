@@ -19,6 +19,11 @@ Rails.application.configure do
   config.consider_all_requests_local       = false
   config.action_controller.perform_caching = true
 
+  if ENV["LEAK_REPRO"]
+    config.cache_store = :null_store
+    config.action_controller.perform_caching = false
+  end
+
   config.public_file_server.enabled = true
 
   # Compress JavaScripts and CSS.

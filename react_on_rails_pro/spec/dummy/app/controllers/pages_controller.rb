@@ -7,6 +7,8 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
 
   enable_async_react_rendering only: [:async_components_demo]
 
+  LEAK_REPRO_ITEM_COUNT = ENV.fetch("LEAK_REPRO_ITEM_COUNT", "200").to_i
+
   XSS_PAYLOAD = { "<script>window.alert('xss1');</script>" => '<script>window.alert("xss2");</script>' }.freeze
   PROPS_NAME = "Mr. Server Side Rendering"
   APP_PROPS_SERVER_RENDER = {
@@ -259,11 +261,37 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     render "/pages/pro/async_components_demo"
   end
 
+  def leak_repro
+    @leak_repro_props = build_leak_repro_props
+    render "/pages/leak_repro"
+  end
+
   # See files in spec/dummy/app/views/pages
 
   helper_method :calc_slow_app_props_server_render, :error_hub_config_value
 
   private
+
+  def build_leak_repro_props
+    rng = Random.new(42)
+    items = Array.new(LEAK_REPRO_ITEM_COUNT) do |i|
+      {
+        id: i,
+        title: "Item #{i}: Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod",
+        body: "Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip " \
+              "ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit " \
+              "esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non " \
+              "proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Index #{i}.",
+        tags: %w[Alpha Beta Gamma Delta Epsilon Zeta].sample(3, random: rng),
+        author: "user#{rng.rand(1_000)}",
+        date: "2025-#{format('%02d', rng.rand(1..12))}-#{format('%02d', rng.rand(1..28))}",
+        score: rng.rand(0..1_000),
+        color: "##{rng.rand(0x1000000).to_s(16).rjust(6, '0')}",
+        bgColor: "##{rng.rand(0xE00000..0xFFFFFF).to_s(16).rjust(6, '0')}"
+      }
+    end
+    { items: items }
+  end
 
   def calc_slow_app_props_server_render
     msg = <<~MSG

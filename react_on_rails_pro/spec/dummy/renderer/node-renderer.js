@@ -45,7 +45,7 @@ const config = {
   allWorkersRestartInterval: (env.CI ? 2 : env.RENDERER_ALL_WORKERS_RESTART_INTERVAL) || 10,
 
   // time in minutes between each worker restarting when restarting all workers
-  delayBetweenIndividualWorkerRestarts: env.CI ? 0.01 : 1,
+  delayBetweenIndividualWorkerRestarts: Number(env.RENDERER_DELAY_BETWEEN_RESTARTS) || (env.CI ? 0.01 : 1),
 
   // If set to true, `supportModules` enables the server-bundle code to call a default set of NodeJS modules
   // that get added to the VM context: { Buffer, process, setTimeout, setInterval, clearTimeout, clearInterval }.
@@ -68,7 +68,9 @@ const config = {
 // Renderer detects a total number of CPUs on virtual hostings like Heroky or CircleCI instead
 // of CPUs number allocated for current container. This results in spawning many workers while
 // only 1-2 of them really needed.
-if (env.CI) {
+if (env.RENDERER_WORKERS_COUNT) {
+  config.workersCount = parseInt(env.RENDERER_WORKERS_COUNT, 10);
+} else if (env.CI) {
   config.workersCount = 2;
 }
 

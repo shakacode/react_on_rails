@@ -97,6 +97,7 @@ Rails.application.routes.draw do
   get "context_function_return_jsx" => "pages#context_function_return_jsx"
   get "pure_component_wrapped_in_function" => "pages#pure_component_wrapped_in_function"
   get "posts_page" => "pages#posts_page"
+  get "leak_repro" => "pages#leak_repro", as: :leak_repro
 
   # API Routes
   namespace :api do

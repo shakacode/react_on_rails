@@ -1,0 +1,14 @@
+<% leak_app = react_component_hash("LeakReproHashApp",
+                                    props: @leak_repro_props,
+                                    prerender: true,
+                                    trace: false,
+                                    id: "leak-repro-0") %>
+<% content_for :title do %>
+  <%= leak_app["title"] %>
+<% end %>
+<% content_for :head do %>
+  <%= leak_app["linkTags"] %>
+  <%= leak_app["scriptTags"] %>
+  <%= leak_app["styleTags"] %>
+<% end %>
+<%= leak_app["componentHtml"] %>

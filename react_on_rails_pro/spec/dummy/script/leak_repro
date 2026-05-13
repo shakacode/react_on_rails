@@ -1,0 +1,230 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ============================================================================
+# Memory Leak Reproducer for react_on_rails_pro SSR pipeline
+# See MEMORY_LEAK_REPRO.md for full documentation.
+# ============================================================================
+
+DUMMY_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+TOTAL_REQUESTS="${LEAK_REPRO_REQUESTS:-2000}"
+CONCURRENCY="${LEAK_REPRO_CONCURRENCY:-3}"
+WARMUP_REQUESTS="${LEAK_REPRO_WARMUP:-500}"
+PUMA_PORT="${PORT:-3001}"
+RENDERER_PORT="${RENDERER_PORT:-3800}"
+SAMPLE_INTERVAL="${LEAK_REPRO_SAMPLE_INTERVAL:-10}"
+CSV_FILE="$DUMMY_DIR/tmp/leak_repro_metrics.csv"
+RAILS_URL="http://localhost:${PUMA_PORT}/leak_repro"
+
+PUMA_MASTER_PID=""
+RENDERER_PID=""
+
+# --- Cleanup ---------------------------------------------------------------
+
+cleanup() {
+  echo ""
+  echo "Tearing down..."
+  if [ -n "$PUMA_MASTER_PID" ]; then
+    kill "$PUMA_MASTER_PID" 2>/dev/null || true
+    wait "$PUMA_MASTER_PID" 2>/dev/null || true
+  fi
+  if [ -n "$RENDERER_PID" ]; then
+    kill "$RENDERER_PID" 2>/dev/null || true
+    wait "$RENDERER_PID" 2>/dev/null || true
+  fi
+}
+trap cleanup EXIT
+
+# --- Helpers ---------------------------------------------------------------
+
+sample_rss() {
+  awk '/^VmRSS:/ { print $2 }' "/proc/$1/status" 2>/dev/null || echo "0"
+}
+
+ts_ms() {
+  date +%s%3N
+}
+
+wait_for_url() {
+  local url=$1 label=$2 timeout=${3:-60}
+  local elapsed=0
+  echo -n "Waiting for $label at $url "
+  while ! curl -sf "$url" -o /dev/null 2>/dev/null; do
+    sleep 1
+    elapsed=$((elapsed + 1))
+    if [ "$elapsed" -ge "$timeout" ]; then
+      echo " TIMEOUT after ${timeout}s"
+      exit 1
+    fi
+    echo -n "."
+  done
+  echo " ready (${elapsed}s)"
+}
+
+# --- Pre-flight checks -----------------------------------------------------
+
+if ! command -v curl &>/dev/null; then
+  echo "ERROR: curl is required but not found" >&2
+  exit 1
+fi
+
+if [ ! -f "/proc/self/status" ]; then
+  echo "ERROR: /proc filesystem not available (Linux required)" >&2
+  exit 1
+fi
+
+cd "$DUMMY_DIR"
+
+if [ ! -d "public/webpack/production" ]; then
+  echo "ERROR: Assets not precompiled. Run:" >&2
+  echo "  cd $DUMMY_DIR && RAILS_ENV=production bin/prod-assets" >&2
+  exit 1
+fi
+
+mkdir -p tmp
+
+echo "=== Memory Leak Reproducer ==="
+echo "Requests: $TOTAL_REQUESTS (warmup: $WARMUP_REQUESTS)"
+echo "Concurrency: $CONCURRENCY"
+echo "Puma port: $PUMA_PORT | Renderer port: $RENDERER_PORT"
+echo ""
+
+# --- Boot node renderer ----------------------------------------------------
+
+echo "Starting node renderer (workers=3, restart_interval=5min)..."
+NODE_ENV=production \
+RENDERER_LOG_LEVEL=error \
+RENDERER_PORT="$RENDERER_PORT" \
+RENDERER_WORKERS_COUNT=3 \
+RENDERER_ALL_WORKERS_RESTART_INTERVAL=5 \
+RENDERER_DELAY_BETWEEN_RESTARTS=1 \
+  node renderer/node-renderer.js &
+RENDERER_PID=$!
+
+wait_for_url "http://localhost:${RENDERER_PORT}/" "node renderer" 60
+
+# --- Boot puma --------------------------------------------------------------
+
+echo "Starting puma (WEB_CONCURRENCY=1, RAILS_MAX_THREADS=$CONCURRENCY)..."
+RAILS_ENV=production \
+NODE_ENV=production \
+LEAK_REPRO=1 \
+WEB_CONCURRENCY=1 \
+RAILS_MAX_THREADS="$CONCURRENCY" \
+RAILS_MIN_THREADS="$CONCURRENCY" \
+RAILS_LOG_TO_STDOUT=1 \
+PORT="$PUMA_PORT" \
+SECRET_KEY_BASE=dummy-leak-repro-secret \
+  bundle exec puma -C config/puma.rb 2>&1 | sed 's/^/[puma] /' &
+PUMA_MASTER_PID=$!
+
+wait_for_url "$RAILS_URL" "puma" 90
+
+# --- Find puma worker PID --------------------------------------------------
+
+echo -n "Locating puma worker PID "
+PUMA_WORKER_PID=""
+for attempt in $(seq 1 20); do
+  PUMA_WORKER_PID=$(pgrep -P "$PUMA_MASTER_PID" 2>/dev/null | head -1) || true
+  if [ -n "$PUMA_WORKER_PID" ]; then
+    break
+  fi
+  sleep 0.5
+  echo -n "."
+done
+echo ""
+
+if [ -z "$PUMA_WORKER_PID" ]; then
+  echo "ERROR: Could not find puma worker PID (master=$PUMA_MASTER_PID)" >&2
+  exit 1
+fi
+echo "Puma worker PID: $PUMA_WORKER_PID"
+
+# --- Initialize CSV ---------------------------------------------------------
+
+echo "n,ts_ms,rss_kb,delta_kb,kb_per_req" > "$CSV_FILE"
+
+BASELINE_RSS=$(sample_rss "$PUMA_WORKER_PID")
+BASELINE_TS=$(ts_ms)
+echo "0,$BASELINE_TS,$BASELINE_RSS,0,0.00" >> "$CSV_FILE"
+echo "Baseline RSS: ${BASELINE_RSS} KB"
+echo ""
+
+# --- Send requests and sample RSS ------------------------------------------
+
+request_num=0
+echo "Sending $TOTAL_REQUESTS requests at concurrency $CONCURRENCY..."
+
+while [ "$request_num" -lt "$TOTAL_REQUESTS" ]; do
+  # Launch $CONCURRENCY requests in parallel
+  for _ in $(seq 1 "$CONCURRENCY"); do
+    curl -sf "$RAILS_URL" -o /dev/null &
+  done
+  wait
+
+  request_num=$((request_num + CONCURRENCY))
+
+  # Sample RSS at intervals
+  if [ $((request_num % SAMPLE_INTERVAL)) -eq 0 ]; then
+    rss=$(sample_rss "$PUMA_WORKER_PID")
+    now=$(ts_ms)
+    delta=$((rss - BASELINE_RSS))
+    if [ "$request_num" -gt 0 ]; then
+      kb_per_req=$(awk "BEGIN { printf \"%.2f\", $delta / $request_num }")
+    else
+      kb_per_req="0.00"
+    fi
+    echo "${request_num},${now},${rss},${delta},${kb_per_req}" >> "$CSV_FILE"
+
+    if [ $((request_num % 100)) -eq 0 ]; then
+      echo "  [$request_num/$TOTAL_REQUESTS] RSS=${rss} KB  delta=${delta} KB  kb_per_req=${kb_per_req}"
+    fi
+  fi
+done
+
+# --- Final measurement and report ------------------------------------------
+
+FINAL_RSS=$(sample_rss "$PUMA_WORKER_PID")
+FINAL_TS=$(ts_ms)
+FINAL_DELTA=$((FINAL_RSS - BASELINE_RSS))
+FINAL_KB_PER_REQ=$(awk "BEGIN { printf \"%.2f\", $FINAL_DELTA / $TOTAL_REQUESTS }")
+echo "${TOTAL_REQUESTS},${FINAL_TS},${FINAL_RSS},${FINAL_DELTA},${FINAL_KB_PER_REQ}" >> "$CSV_FILE"
+
+# Compute kb_per_req for measurement window only (after warmup)
+RSS_AT_WARMUP=$(awk -F, "\$1 == $WARMUP_REQUESTS { print \$3 }" "$CSV_FILE" | tail -1)
+if [ -z "$RSS_AT_WARMUP" ]; then
+  # If exact warmup row not found, find closest
+  RSS_AT_WARMUP=$(awk -F, "\$1 >= $WARMUP_REQUESTS { print \$3; exit }" "$CSV_FILE")
+fi
+RSS_AT_WARMUP=${RSS_AT_WARMUP:-$BASELINE_RSS}
+
+MEASUREMENT_REQUESTS=$((TOTAL_REQUESTS - WARMUP_REQUESTS))
+MEASUREMENT_GROWTH=$((FINAL_RSS - RSS_AT_WARMUP))
+MEASUREMENT_KB_PER_REQ=$(awk "BEGIN { printf \"%.2f\", $MEASUREMENT_GROWTH / $MEASUREMENT_REQUESTS }")
+
+echo ""
+echo "================================================================"
+echo "  Memory Leak Reproducer Results"
+echo "================================================================"
+echo "  Baseline RSS:             ${BASELINE_RSS} KB"
+echo "  RSS after warmup (${WARMUP_REQUESTS} req): ${RSS_AT_WARMUP} KB"
+echo "  Final RSS (${TOTAL_REQUESTS} req):       ${FINAL_RSS} KB"
+echo ""
+echo "  Overall growth:           ${FINAL_DELTA} KB over ${TOTAL_REQUESTS} requests"
+echo "  Overall kb_per_req:       ${FINAL_KB_PER_REQ}"
+echo ""
+echo "  Post-warmup growth:       ${MEASUREMENT_GROWTH} KB over ${MEASUREMENT_REQUESTS} requests"
+echo "  Post-warmup kb_per_req:   ${MEASUREMENT_KB_PER_REQ}"
+echo ""
+echo "  Metrics: ${CSV_FILE}"
+echo "================================================================"
+
+# Threshold check
+if awk "BEGIN { exit !($MEASUREMENT_KB_PER_REQ >= 50) }"; then
+  echo "  PRIMARY TARGET MET: kb_per_req >= 50"
+elif awk "BEGIN { exit !($MEASUREMENT_KB_PER_REQ >= 30) }"; then
+  echo "  FALLBACK TARGET MET: kb_per_req >= 30"
+else
+  echo "  BELOW THRESHOLD: kb_per_req < 30 (leak may not reproduce on this system)"
+fi
+echo ""
