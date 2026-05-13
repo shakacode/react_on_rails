@@ -139,6 +139,155 @@ export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
 
 ⚠️ **Security Warning**: Never commit your license token to version control. For production, use environment variables or secure secret management systems (Rails credentials, Heroku config vars, AWS Secrets Manager, etc.).
 
+### License Validation Lifecycle
+
+React on Rails Pro validates licenses offline with the public key embedded in the gem and node renderer package. There
+is no network call to ShakaCode during validation.
+
+License validation happens in these places:
+
+- Rails checks the license after application initialization and logs the result.
+- The standalone node renderer checks the license when the renderer master process starts and logs the result.
+- The browser receives `railsContext.rorPro` as a Pro-installed signal only; it does not validate the license.
+
+A missing, expired, or invalid license does not prevent Rails or the node renderer from starting. In production, license
+issues are logged as warnings, and Rails includes an HTML attribution comment indicating the license state.
+
+### Verify License Compliance
+
+Use the built-in task as a deploy or release gate:
+
+```bash
+RAILS_ENV=production bundle exec rake react_on_rails_pro:verify_license
+```
+
+For CI/CD or scripting, request JSON output:
+
+```bash
+RAILS_ENV=production FORMAT=json bundle exec rake react_on_rails_pro:verify_license
+```
+
+The task exits with a non-zero status when the license is missing, invalid, or expired. It also reports
+`renewal_required: true` in JSON output when the license is expired or expiring within 30 days.
+
+#### Blocking CI Example
+
+Use a blocking CI check when an invalid license should stop a production deploy:
+
+```yaml
+# .github/workflows/react-on-rails-pro-license.yml
+name: React on Rails Pro License
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  verify-license:
+    runs-on: ubuntu-latest
+    env:
+      RAILS_ENV: production
+      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Verify React on Rails Pro license
+        run: bundle exec rake react_on_rails_pro:verify_license
+```
+
+#### Advisory CI Example
+
+Use an advisory CI check when you want visibility without failing the workflow:
+
+````yaml
+# .github/workflows/react-on-rails-pro-license-advisory.yml
+name: React on Rails Pro License Advisory
+
+on:
+  schedule:
+    - cron: '0 15 * * 1'
+  workflow_dispatch:
+
+jobs:
+  verify-license:
+    runs-on: ubuntu-latest
+    env:
+      RAILS_ENV: production
+      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Check React on Rails Pro license
+        run: |
+          set +e
+          output=$(bundle exec rake react_on_rails_pro:verify_license 2>&1)
+          status=$?
+          echo "$output"
+
+          {
+            echo "## React on Rails Pro license"
+            echo
+            echo '```text'
+            echo "$output"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$status" -ne 0 ]; then
+            echo "::warning title=React on Rails Pro license::License validation did not pass. See job summary."
+          fi
+
+          exit 0
+````
+
+Use either CI example in workflows where repository secrets are available, such as trusted branch pushes, scheduled jobs,
+manual runs, or deployment gates. Pull requests from public forks usually cannot access repository secrets, so these
+checks would report a missing token there.
+
+### Monitor License Expiration
+
+If your organization wants an app-owned scheduled check with a custom warning threshold, add a wrapper task like this:
+
+```ruby
+# lib/tasks/react_on_rails_pro_license.rake
+namespace :licenses do
+  desc "Fail if the React on Rails Pro license is invalid, expired, or expiring soon"
+  task check_react_on_rails_pro: :environment do
+    threshold_days = Integer(ENV.fetch("DAYS", "30"))
+    info = ReactOnRailsPro::LicenseValidator.license_info
+    status = info.fetch(:status)
+    expiration = info[:expiration]
+    days_remaining = expiration && ((expiration - Time.current) / 86_400).ceil
+
+    unless status == :valid
+      abort "React on Rails Pro license is #{status}. Update REACT_ON_RAILS_PRO_LICENSE."
+    end
+
+    if days_remaining && days_remaining <= threshold_days
+      abort "React on Rails Pro license expires in #{days_remaining} days. Renew and rotate the key."
+    end
+
+    message = "React on Rails Pro license is valid"
+    message += " (#{days_remaining} days remaining)" if days_remaining
+    puts message
+  end
+end
+```
+
+Run it from your scheduler or CI:
+
+```bash
+RAILS_ENV=production DAYS=30 bundle exec rake licenses:check_react_on_rails_pro
+```
+
 For complete license setup instructions, see [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/LICENSE_SETUP.md).
 
 ## Rails Configuration
