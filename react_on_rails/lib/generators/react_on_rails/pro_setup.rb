@@ -229,7 +229,8 @@ module ReactOnRails
           say "ℹ️  #{legacy_node_renderer_path} detected, keeping existing renderer; " \
               "to migrate, move it to #{node_renderer_path} and update any references " \
               "(e.g. Procfile.dev, Procfile.prod, Docker CMD / command):", :yellow
-          say "      node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node #{node_renderer_path}", :yellow
+          say "      node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=${RENDERER_PORT:-3800} " \
+              "node #{node_renderer_path}", :yellow
           warn_on_stale_legacy_procfile_entry
           return true
         end
@@ -260,7 +261,7 @@ module ReactOnRails
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Procfile.dev still launches the legacy client/node-renderer.js.
           After migrating the renderer file, update that line to:
-            node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node renderer/node-renderer.js
+            node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=${RENDERER_PORT:-3800} node renderer/node-renderer.js
         MSG
       end
 
@@ -272,7 +273,7 @@ module ReactOnRails
             ⚠️  Procfile.dev not found. Skipping Node Renderer process addition.
 
             You'll need to add the Node Renderer to your process manager manually:
-              node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node renderer/node-renderer.js
+              node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=${RENDERER_PORT:-3800} node renderer/node-renderer.js
           MSG
           return
         end
@@ -287,7 +288,8 @@ module ReactOnRails
         if procfile_content.match?(/^[ \t]*node-renderer:/)
           say "⚠️  Procfile.dev has a node-renderer: entry that doesn't reference " \
               "renderer/node-renderer.js. Update it manually to:", :yellow
-          say "      node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node renderer/node-renderer.js", :yellow
+          say "      node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=${RENDERER_PORT:-3800} " \
+              "node renderer/node-renderer.js", :yellow
           return
         end
 
@@ -296,7 +298,7 @@ module ReactOnRails
         node_renderer_line = <<~PROCFILE
 
           # React on Rails Pro - Node Renderer for SSR
-          node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node renderer/node-renderer.js
+          node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=${RENDERER_PORT:-3800} node renderer/node-renderer.js
         PROCFILE
 
         append_to_file("Procfile.dev", node_renderer_line)

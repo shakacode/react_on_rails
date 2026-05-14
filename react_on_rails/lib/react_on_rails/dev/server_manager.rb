@@ -10,6 +10,7 @@ require "erb"
 require "rbconfig"
 require "socket"
 require "time"
+require "uri"
 require "yaml"
 require_relative "../packer_utils"
 require_relative "database_checker"
@@ -53,9 +54,80 @@ module ReactOnRails
           puts "🔪 Killing all development processes..."
           puts ""
 
-          killed_any = kill_running_processes || kill_port_processes([3000, 3001]) || cleanup_socket_files
+          killed_any = kill_running_processes || kill_port_processes(killable_ports) || cleanup_socket_files
 
           print_kill_summary(killed_any)
+        end
+
+        # Fallback port list for the port-scan kill path. Uses the base-port
+        # derived ports when REACT_ON_RAILS_BASE_PORT / CONDUCTOR_PORT is set,
+        # so `bin/dev kill` in a worktree on ports 5000/5001/5002 targets the
+        # right ports instead of the 3000/3001 default. Falls back to
+        # [3000, 3001] when no base port is configured, plus the renderer port
+        # when Pro renderer support is active. Uses PortSelector's pure
+        # #base_port_hash so no "Base port detected" banner prints during a kill.
+        #
+        # `pro_renderer_active?` here is evaluated against the kill-time
+        # environment, where RENDERER_PORT / REACT_RENDERER_URL set by
+        # `configure_ports` in the *previous* `bin/dev` session are not
+        # exported into the new shell. So in OSS apps the renderer port is
+        # included only when the Pro gem is actually loaded — this is the
+        # intended behavior, not a bug.
+        def killable_ports
+          base = PortSelector.base_port_hash
+          return default_killable_ports unless base
+
+          ports = [base[:rails], base[:webpack]]
+          ports << base[:renderer] if pro_renderer_active?
+          ports
+        end
+
+        def default_killable_ports
+          ports = [3000, 3001]
+          if pro_renderer_active?
+            renderer_port = configured_renderer_port_for_kill
+            ports << renderer_port if renderer_port
+          end
+          ports
+        end
+
+        def configured_renderer_port_for_kill
+          raw_port = ENV.fetch("RENDERER_PORT", nil)
+          return raw_port.strip.to_i if valid_port_string?(raw_port)
+
+          local_url_port = local_renderer_url_port_for_kill
+          return local_url_port if local_url_port
+          return nil if remote_renderer_url_configured?
+
+          # Only fall back to the default renderer port when the user has set
+          # at least one renderer env var. Without that signal (Pro gem loaded
+          # but no renderer ever started), `bin/dev kill` would otherwise
+          # target an unrelated process bound to 3800 in OSS+Pro-gem apps.
+          renderer_env_signal? ? 3800 : nil
+        end
+
+        def local_renderer_url_port_for_kill
+          %w[REACT_RENDERER_URL RENDERER_URL].each do |var|
+            url = ENV.fetch(var, nil)
+            next if url.nil? || url.strip.empty?
+
+            parsed = URI.parse(url)
+            next unless localhost_hostname?(parsed.hostname)
+            next unless url.match?(URL_WITH_EXPLICIT_PORT_RE)
+
+            return parsed.port
+          rescue URI::InvalidURIError
+            next
+          end
+
+          nil
+        end
+
+        def remote_renderer_url_configured?
+          %w[REACT_RENDERER_URL RENDERER_URL].any? do |var|
+            url = ENV.fetch(var, nil)
+            !url.nil? && !url.strip.empty? && !localhost_renderer_url?(url)
+          end
         end
 
         def development_processes
@@ -130,7 +202,11 @@ module ReactOnRails
         end
 
         def cleanup_socket_files
-          files = [".overmind.sock", "tmp/sockets/overmind.sock", "tmp/pids/server.pid"]
+          # Mirrors FileManager#cleanup_overmind_sockets so renamed/copied
+          # variants like overmind-4100.sock are removed during `bin/dev kill`,
+          # not just at startup.
+          overmind_sockets = Dir.glob("tmp/sockets/overmind*.sock")
+          files = [".overmind.sock", *overmind_sockets, "tmp/pids/server.pid"].uniq
           killed_any = false
 
           files.each do |file|
@@ -556,6 +632,12 @@ module ReactOnRails
 
         # rubocop:disable Metrics/AbcSize
         def help_mode_details
+          # Reflect base-port mode so help text advertises the port `bin/dev`
+          # will actually use. Without this, `bin/dev help` in a worktree with
+          # REACT_ON_RAILS_BASE_PORT=4000 still claims 3000/3001.
+          dev_url  = "http://localhost:#{help_display_port(:dev)}/<route>"
+          prod_url = "http://localhost:#{help_display_port(:prod)}/<route>"
+
           <<~MODES
             #{Rainbow('🔥 HMR Development mode (default)').cyan.bold} - #{Rainbow('Procfile.dev').green}:
             #{Rainbow('•').yellow} #{Rainbow('Hot Module Replacement (HMR) enabled').white}
@@ -564,7 +646,7 @@ module ReactOnRails
             #{Rainbow('•').yellow} #{Rainbow('Source maps for debugging').white}
             #{Rainbow('•').yellow} #{Rainbow('May have Flash of Unstyled Content (FOUC)').white}
             #{Rainbow('•').yellow} #{Rainbow('Fast recompilation').white}
-            #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow('http://localhost:3000/<route>').cyan.underline}
+            #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow(dev_url).cyan.underline}
 
             #{Rainbow('📦 Static development mode').cyan.bold} - #{Rainbow('Procfile.dev-static-assets').green}:
             #{Rainbow('•').yellow} #{Rainbow('No HMR (static assets with auto-recompilation)').white}
@@ -574,7 +656,7 @@ module ReactOnRails
             #{Rainbow('•').yellow} #{Rainbow('Development environment (faster builds than production)').white}
             #{Rainbow('•').yellow} #{Rainbow('Source maps for debugging').white}
             #{Rainbow('•').yellow} #{Rainbow('Optional advanced testing: share output path with tests only in this mode').white}
-            #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow('http://localhost:3000/<route>').cyan.underline}
+            #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow(dev_url).cyan.underline}
 
             #{Rainbow('🏭 Production-assets mode').cyan.bold} - #{Rainbow('Procfile.dev-prod-assets').green}:
             #{Rainbow('•').yellow} #{Rainbow('React on Rails pack generation (via precompile hook or assets:precompile)').white}
@@ -584,21 +666,80 @@ module ReactOnRails
             #{Rainbow('•').yellow} #{Rainbow('Server processes controlled by Procfile.dev-prod-assets environment').white}
             #{Rainbow('•').yellow} #{Rainbow('Optimized, minified bundles with CSS extraction').white}
             #{Rainbow('•').yellow} #{Rainbow('No HMR (static assets)').white}
-            #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow('http://localhost:3001/<route>').cyan.underline}
+            #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow(prod_url).cyan.underline}
           MODES
         end
         # rubocop:enable Metrics/AbcSize
+
+        # Returns the Rails port to advertise in `bin/dev help`. In base-port
+        # mode every mode uses `base + 0` (apply_base_port_env sets PORT
+        # uniformly across HMR/static/prod-assets); otherwise prod-assets
+        # defaults to 3001 and HMR/static default to 3000. Uses base_port_hash
+        # so help-rendering is silent (no banner) and read-only.
+        def help_display_port(mode)
+          base = PortSelector.base_port_hash
+          return base[:rails] if base
+
+          mode == :prod ? 3001 : 3000
+        end
 
         # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
         def run_production_like(_verbose: false, route: nil, rails_env: nil, skip_database_check: false,
                                 open_browser: false, open_browser_once: false)
           procfile = "Procfile.dev-prod-assets"
 
-          # Set PORT before foreman starts — foreman injects its own PORT=5000
-          # into child processes when ENV["PORT"] is unset, overriding the
-          # ${PORT:-3001} fallback in the Procfile. Scan from 3001 (not 3000)
-          # so prod-assets doesn't collide with the normal dev server.
-          ENV["PORT"] ||= PortSelector.find_available_port(procfile_port(procfile)).to_s
+          # Honor base-port mode (REACT_ON_RAILS_BASE_PORT / CONDUCTOR_PORT)
+          # before falling through to the prod-specific 3001 auto-scan, so
+          # parallel worktrees running `bin/dev prod` don't silently collide
+          # on port 3001. warn_if_legacy_renderer_url_env_used fires here too
+          # so the RENDERER_URL rename warning surfaces in prod mode.
+          #
+          # The `unless apply_base_port_if_active` branch mirrors
+          # #configure_ports (the canonical per-mode env-setup) but intentionally
+          # differs in two ways: (1) PORT auto-scan starts at 3001 (via
+          # procfile_port) rather than 3000, and (2) SHAKAPACKER_DEV_SERVER_PORT
+          # is omitted because production-like mode runs static assets, not
+          # webpack-dev-server. sync_renderer_port_and_url still runs so Pro
+          # users who set RENDERER_PORT get the same auto-derivation and
+          # mismatch warnings as `bin/dev` and `bin/dev static`.
+          warn_if_legacy_renderer_url_env_used
+          unless apply_base_port_if_active
+            # Set PORT before foreman starts — foreman injects its own PORT=5000
+            # into child processes when ENV["PORT"] is unset, overriding the
+            # ${PORT:-3001} fallback in the Procfile. Scan from 3001 (not 3000)
+            # so prod-assets doesn't collide with the normal dev server.
+            #
+            # Also normalize invalid/out-of-range values: ${PORT:-3001} only
+            # falls back on empty/unset, so `PORT=abc` or `PORT=99999` would
+            # otherwise flow straight through to `rails s -p …` and fail to
+            # start.
+            existing_port = ENV.fetch("PORT", nil)
+            if valid_port_string?(existing_port)
+              # Strip whitespace so a value like " 3001 " doesn't leak into ENV
+              # unstripped — mirrors overwrite_invalid_port_env's normalization
+              # used by configure_ports so all bin/dev modes leave ENV["PORT"]
+              # in the same shape for downstream consumers (Procfile expansion,
+              # exact ENV string comparisons).
+              stripped = existing_port.strip
+              ENV["PORT"] = stripped if stripped != existing_port
+            else
+              unless existing_port.nil? || existing_port.strip.empty?
+                warn "WARNING: PORT=#{existing_port.inspect} is not a valid port; using auto-selected port."
+              end
+              # Clear the bad value first so procfile_port falls back to its default
+              # (3001) instead of `"abc".to_i == 0`, which would scan from port 0.
+              ENV.delete("PORT")
+              # Match configure_ports' clean-exit behavior on exhaustion so
+              # `bin/dev prod` surfaces a one-line error instead of a backtrace.
+              begin
+                ENV["PORT"] = PortSelector.find_available_port(procfile_port(procfile)).to_s
+              rescue PortSelector::NoPortAvailable => e
+                warn e.message
+                exit 1
+              end
+            end
+            sync_renderer_port_and_url
+          end
 
           features = [
             "Precompiling assets with production optimizations",
@@ -833,15 +974,376 @@ module ReactOnRails
           puts ""
         end
 
+        # NOTE: `run_production_like` does NOT use this method — it calls
+        # `apply_base_port_if_active` directly because (1) its PORT auto-scan
+        # starts at 3001, not 3000, and (2) in non-base-port mode it must not
+        # set SHAKAPACKER_DEV_SERVER_PORT (no webpack-dev-server in prod-assets).
+        # Base-port mode still sets SHAKAPACKER_DEV_SERVER_PORT (= base + 1) for
+        # tooling consistency — see apply_base_port_env. Future `run_*` methods
+        # should choose between the two entry points rather than adding a third
+        # path.
         def configure_ports
-          selected = PortSelector.select_ports
-          ENV["PORT"] ||= selected[:rails].to_s
-          ENV["SHAKAPACKER_DEV_SERVER_PORT"] ||= selected[:webpack].to_s
+          warn_if_legacy_renderer_url_env_used
+          # Single call: select_ports! internally consults base_port_ports and
+          # returns the same hash when base-port mode is active, so we branch
+          # on :base_port_mode instead of calling base_port_ports twice.
+          # Pass pro_renderer so OSS apps don't get a "port base+2 (renderer)
+          # is already in use" warning for a port they don't actually use.
+          selected = PortSelector.select_ports!(pro_renderer: pro_renderer_active?)
+          if selected[:base_port_mode]
+            apply_base_port_env(selected)
+          else
+            apply_explicit_port_env(selected)
+          end
         rescue PortSelector::NoPortAvailable => e
           warn e.message
           exit 1
         end
 
+        # Returns true if REACT_ON_RAILS_BASE_PORT / CONDUCTOR_PORT is active
+        # and the derived env vars have been applied; false otherwise (env
+        # untouched). Shared across development, static, and production-like
+        # modes so all bin/dev entry points honor the same base-port contract.
+        # Does not emit the legacy-RENDERER_URL warning — callers (or
+        # configure_ports) do that so it fires in every mode regardless of
+        # whether base-port mode is active.
+        def apply_base_port_if_active
+          selected = PortSelector.base_port_ports(pro_renderer: pro_renderer_active?)
+          return false unless selected
+
+          apply_base_port_env(selected)
+          true
+        end
+
+        # The env var used to configure the Pro node renderer URL was renamed
+        # from `RENDERER_URL` to `REACT_RENDERER_URL`. Two mid-migration states
+        # are worth flagging:
+        #
+        #   1. Only `RENDERER_URL` is set — Rails falls back to the default
+        #      `http://localhost:3800` silently (which doesn't exist in most
+        #      container setups).
+        #   2. Both are set but disagree — the Pro initializer and any tooling
+        #      that reads one but not the other will silently disagree. The
+        #      gem does not read either env var directly; the user's Pro
+        #      initializer picks one (`config.renderer_url = ENV[...]`).
+        def warn_if_legacy_renderer_url_env_used
+          legacy = ENV.fetch("RENDERER_URL", nil)
+          current = ENV.fetch("REACT_RENDERER_URL", nil)
+          return if legacy.nil? || legacy.strip.empty?
+
+          if current.nil? || current.strip.empty?
+            warn "WARNING: RENDERER_URL is set but REACT_RENDERER_URL is not. " \
+                 "RENDERER_URL was renamed to REACT_RENDERER_URL; update your " \
+                 "env var to avoid silent fallback to the default renderer URL. " \
+                 "Note: RENDERER_URL alone still activates the Pro renderer code " \
+                 "path. Separately, if REACT_ON_RAILS_BASE_PORT or CONDUCTOR_PORT " \
+                 "is set, base-port mode will derive RENDERER_PORT/REACT_RENDERER_URL " \
+                 "from the base (overriding RENDERER_URL)."
+            return
+          end
+
+          return if legacy.strip == current.strip
+
+          warn "WARNING: RENDERER_URL=#{legacy.inspect} and REACT_RENDERER_URL=#{current.inspect} " \
+               "are both set but disagree. RENDERER_URL was renamed to REACT_RENDERER_URL; " \
+               "unset RENDERER_URL or align the two values so tooling and the Pro initializer " \
+               "can't silently pick different renderer URLs."
+        end
+
+        # Base port is active. Priority: base port > explicit per-service env vars.
+        # Assign unconditionally so the effective ports match the "Base port
+        # detected..." log line even when PORT/RENDERER_PORT were pre-set.
+        #
+        # Base-port mode is specifically for local, all-in-one dev setups (one
+        # machine running Rails + webpack + node renderer together — typically
+        # worktrees or coding-agent sandboxes). The derived renderer URL is
+        # therefore hard-coded to http://localhost:<port>. If you run the node
+        # renderer on a separate host/container (e.g. Docker `renderer:3800`),
+        # do not use base-port mode — set REACT_RENDERER_URL explicitly and
+        # rely on the explicit-ports path instead. warn_if_renderer_url_will_be_overridden
+        # below surfaces the override whenever a pre-set URL doesn't match.
+        #
+        # SHAKAPACKER_DEV_SERVER_PORT is set even in production-like mode (which
+        # runs static assets, not webpack-dev-server) for tooling consistency:
+        # a subsequent `bin/dev` in the same shell sees the base-port-derived
+        # value rather than a stale explicit one, and developers inspecting
+        # their env after `bin/dev prod` see the full derived block.
+        #
+        # RENDERER_PORT / REACT_RENDERER_URL are gated on `pro_renderer_active?`
+        # so OSS environments without the Pro node renderer don't get two
+        # extra env vars in every child process. Pro users (gem loaded or env
+        # vars already set) still get the derived block.
+        def apply_base_port_env(selected)
+          warn_if_port_will_be_overridden("PORT", selected[:rails])
+          warn_if_port_will_be_overridden("SHAKAPACKER_DEV_SERVER_PORT", selected[:webpack])
+          ENV["PORT"] = selected[:rails].to_s
+          ENV["SHAKAPACKER_DEV_SERVER_PORT"] = selected[:webpack].to_s
+          return unless pro_renderer_active?
+
+          derived_url = "http://localhost:#{selected[:renderer]}"
+          warn_if_renderer_url_will_be_overridden("REACT_RENDERER_URL", derived_url)
+          warn_if_port_will_be_overridden("RENDERER_PORT", selected[:renderer])
+          ENV["RENDERER_PORT"] = selected[:renderer].to_s
+          ENV["REACT_RENDERER_URL"] = derived_url
+          # Keep legacy RENDERER_URL in sync only if the user already set it.
+          # Pro initializers mid-migration may still read ENV["RENDERER_URL"];
+          # leaving it pointed at the old port while the renderer process moves
+          # to base+2 would silently route SSR calls to the wrong endpoint.
+          # Skip when unset so we don't introduce the legacy name into envs
+          # that have already migrated to REACT_RENDERER_URL.
+          legacy_url = ENV.fetch("RENDERER_URL", nil)
+          return if legacy_url.nil? || legacy_url.strip.empty?
+
+          warn_if_renderer_url_will_be_overridden("RENDERER_URL", derived_url)
+          ENV["RENDERER_URL"] = derived_url
+        end
+
+        # Heuristic for "this app has a Pro node renderer to point at": either
+        # the react_on_rails_pro gem is loaded, or the user has already set one
+        # of the renderer env vars (so they're configuring a renderer manually
+        # without the Pro gem). Keeps OSS environments clean while not
+        # silently dropping renderer env for any caller who actually wants it.
+        #
+        # The legacy `RENDERER_URL` (renamed to `REACT_RENDERER_URL`) is
+        # intentionally included so users mid-migration who still export
+        # `RENDERER_URL` keep base-port renderer-derivation behavior. The
+        # rename reminder lives in `warn_if_legacy_renderer_url_env_used`,
+        # which calls out that the legacy var still triggers this path.
+        def pro_renderer_active?
+          return true if Gem.loaded_specs.key?("react_on_rails_pro")
+
+          renderer_env_signal?
+        end
+
+        # Returns true when at least one renderer-pointing env var is set to a
+        # non-blank value. Used both by `pro_renderer_active?` (to detect
+        # Pro-renderer intent without the gem) and by
+        # `configured_renderer_port_for_kill` (to avoid widening the kill
+        # scope to 3800 when the Pro gem is loaded but no renderer was ever
+        # configured). The legacy `RENDERER_URL` is included intentionally —
+        # see `pro_renderer_active?` for the migration rationale.
+        def renderer_env_signal?
+          %w[RENDERER_PORT REACT_RENDERER_URL RENDERER_URL].any? do |var|
+            value = ENV.fetch(var, nil)
+            !value.nil? && !value.strip.empty?
+          end
+        end
+
+        # Mirrors warn_if_renderer_url_will_be_overridden so users notice when a
+        # pre-existing PORT or SHAKAPACKER_DEV_SERVER_PORT is replaced by the
+        # base-port-derived value.
+        #
+        # Asymmetry vs. `overwrite_invalid_port_env` is intentional: base-port
+        # mode replaces the user's explicit value with a derived one (so we
+        # warn on any non-matching value), while explicit mode honors valid
+        # user input and only warns when it must rewrite an invalid value.
+        def warn_if_port_will_be_overridden(var_name, derived_port)
+          existing = ENV.fetch(var_name, nil)
+          return if existing.nil? || existing.strip.empty? || existing.strip == derived_port.to_s
+
+          warn "WARNING: Overriding #{var_name}=#{existing.inspect} with #{derived_port} " \
+               "because base port mode is active."
+        end
+
+        # Base port mode overrides REACT_RENDERER_URL (and the legacy
+        # RENDERER_URL) to point at a local renderer derived from the base
+        # port. Warn whenever an explicitly-set URL doesn't exactly match the
+        # derived one so users notice — including the "localhost with a
+        # different port" case, which is a real misconfiguration (Rails would
+        # target one port, the renderer another).
+        def warn_if_renderer_url_will_be_overridden(var_name, derived_url)
+          existing = ENV.fetch(var_name, nil)
+          return if existing.nil? || existing.strip.empty? || existing.strip == derived_url
+
+          warn "WARNING: Overriding #{var_name}=#{existing.inspect} with #{derived_url} " \
+               "because base port mode is active."
+        end
+
+        def apply_explicit_port_env(selected)
+          # Overwrite whenever the current value is blank OR not a usable port
+          # string. PortSelector.read_and_sanitize_port_env! has already
+          # cleared invalid PORT / SHAKAPACKER_DEV_SERVER_PORT values upstream
+          # (and emitted the "not a valid integer" warning there), so when
+          # overwrite_invalid_port_env sees nil it silently writes the derived
+          # port — the user-facing warning isn't missed, it fired at the
+          # source. The Procfile's `${PORT:-3000}` fallback must not see a
+          # stale `PORT=99999` or `PORT=abc` that would reach `rails s -p …`.
+          overwrite_invalid_port_env("PORT", selected[:rails])
+          overwrite_invalid_port_env("SHAKAPACKER_DEV_SERVER_PORT", selected[:webpack])
+          sync_renderer_port_and_url
+        end
+
+        # Replace an invalid env value with the derived port, surfacing the
+        # override so a user who set (e.g.) PORT=abc can see why it was ignored.
+        # Silent when the env var is unset or already valid — explicit mode
+        # honors a valid user-supplied port and only rewrites bad input.
+        # Inverse of `warn_if_port_will_be_overridden`, which always rewrites
+        # under base-port mode and warns on any non-matching value.
+        def overwrite_invalid_port_env(var_name, derived_port)
+          existing = ENV.fetch(var_name, nil)
+          if valid_port_string?(existing)
+            # Strip and write back so a whitespace-padded `" 3000 "` does not
+            # leak into the Procfile's `${PORT:-3000}` expansion (which would
+            # forward the spaces verbatim to `rails s -p`). Matches the
+            # normalization already done for RENDERER_PORT in
+            # sync_renderer_port_and_url.
+            stripped = existing.strip
+            ENV[var_name] = stripped if stripped != existing
+            return
+          end
+
+          unless existing.nil? || existing.strip.empty?
+            warn "WARNING: #{var_name}=#{existing.inspect} is not a valid port; " \
+                 "using #{derived_port}."
+          end
+          ENV[var_name] = derived_port.to_s
+        end
+
+        def valid_port_string?(value)
+          PortSelector.valid_port_string?(value)
+        end
+
+        def sync_renderer_port_and_url
+          raw_port = ENV.fetch("RENDERER_PORT", nil)
+          url = ENV.fetch("REACT_RENDERER_URL", nil)
+          if raw_port.nil? || raw_port.strip.empty?
+            warn_url_without_port(url)
+            return
+          end
+
+          # Reuse the canonical port-string predicate so whitespace handling and
+          # range checks match PortSelector exactly (`" 3800 "` is accepted
+          # there; the inline regex here previously rejected it).
+          unless valid_port_string?(raw_port)
+            warn "WARNING: RENDERER_PORT=#{raw_port.inspect} is not a valid port (1..65535); ignoring."
+            # Delete so the Procfile's `${RENDERER_PORT:-3800}` fallback applies
+            # instead of passing the bad value through to the node renderer.
+            ENV.delete("RENDERER_PORT")
+            clear_local_renderer_url_after_invalid_port(url)
+            return
+          end
+
+          # Normalize for downstream URL construction and mismatch checks so
+          # `RENDERER_PORT=" 3800 "` doesn't leak whitespace into the derived
+          # URL or the warning body. Also write the stripped value back to ENV
+          # so the Procfile's `${RENDERER_PORT:-3800}` expansion propagates the
+          # clean value to the node renderer subprocess instead of forwarding
+          # the whitespace-padded original.
+          port = raw_port.strip
+          ENV["RENDERER_PORT"] = port if port != raw_port
+
+          if url.nil? || url.strip.empty?
+            # Only RENDERER_PORT set: derive the URL so Rails reaches the right port.
+            # Use warn (stderr) so `bin/dev 2>/dev/null` silences this env-mutation
+            # log together with every other "I changed your env" warning in this
+            # file — stdout would leak through the same silencing attempt.
+            derived = "http://localhost:#{port}"
+            warn "WARNING: RENDERER_PORT=#{port} set without REACT_RENDERER_URL; " \
+                 "deriving REACT_RENDERER_URL=#{derived}."
+            ENV["REACT_RENDERER_URL"] = derived
+          elsif url_port_mismatch?(url, port)
+            # Both set but inconsistent — SSR will silently break otherwise.
+            warn "WARNING: RENDERER_PORT=#{port} does not match REACT_RENDERER_URL=#{url}; " \
+                 "Rails will use REACT_RENDERER_URL to reach the renderer. " \
+                 "Unset one of them or ensure they agree."
+          end
+        end
+
+        # URL without a port is a silent misconfig: the node renderer process
+        # binds to the Procfile default (3800) while Rails targets whatever
+        # port is in the URL. Warn so the mismatch is visible, but only for
+        # local URLs where this process actually controls the renderer.
+        #
+        # Remote portless URLs (e.g. `REACT_RENDERER_URL=http://renderer.internal`)
+        # are intentionally excluded: this process doesn't launch remote
+        # renderers, so scheme-default ports (80/443) may be the correct target
+        # behind a reverse proxy. Remote-side port mismatches are a deployment
+        # concern, not something bin/dev can diagnose safely.
+        def warn_url_without_port(url)
+          return if url.nil? || url.strip.empty? || !localhost_renderer_url?(url)
+
+          warn "WARNING: REACT_RENDERER_URL=#{url} is set without RENDERER_PORT. " \
+               "The node renderer process may bind to a different port than Rails " \
+               "expects. Set RENDERER_PORT to match the URL port."
+        end
+
+        # When a local renderer URL is paired with an invalid RENDERER_PORT,
+        # keeping the URL would leave Rails targeting the stale port while the
+        # Procfile falls back to 3800. Clear the URL so the initializer's
+        # default localhost URL matches the renderer's fallback port.
+        #
+        # We clear unconditionally even when the user's URL port happens to
+        # match the current Procfile default (e.g. http://localhost:3800):
+        #   - The user expressed deliberate intent via RENDERER_PORT, which we
+        #     could not honor. Falling through to the Procfile-default-driven
+        #     URL keeps Rails and the renderer in sync regardless of which
+        #     port the Procfile chooses now or later.
+        #   - Any future change to the Procfile default would otherwise re-
+        #     introduce a Rails/renderer mismatch silently for those users.
+        def clear_local_renderer_url_after_invalid_port(url)
+          return if url.nil? || url.strip.empty? || !localhost_renderer_url?(url)
+
+          warn "WARNING: Clearing REACT_RENDERER_URL=#{url} because invalid " \
+               "RENDERER_PORT was ignored; falling back to the default " \
+               "localhost renderer port."
+          ENV.delete("REACT_RENDERER_URL")
+        end
+
+        # Matches a URL with an explicit `:port` after the authority. Used by
+        # `#url_port_mismatch?` to distinguish "URL has a port that disagrees"
+        # from "URL has no port at all" (treated as a mismatch separately).
+        #
+        # Anatomy:
+        #   - `(?:[^@/]*@)?` — optional userinfo prefix (`user:pass@`) so a URL
+        #     like `http://user:3800@localhost` does not match the password as
+        #     a host port via backtracking.
+        #   - `(?:\[[^\]]+\]|[^@/:]+)` — host alternatives:
+        #       * `\[[^\]]+\]` for bracketed IPv6 literals (`http://[::1]:3800`)
+        #       * `[^@/:]+` for a regular hostname/IPv4 whose charset excludes
+        #         `/` and `:` so the `:\d+` port anchor lands on the authority
+        #         separator without backtracking into the host.
+        URL_WITH_EXPLICIT_PORT_RE = %r{://(?:[^@/]*@)?(?:\[[^\]]+\]|[^@/:]+):\d+(?=[/?#]|$)}
+        private_constant :URL_WITH_EXPLICIT_PORT_RE
+
+        # Uses URI.parse so a short port isn't matched as a substring of a
+        # longer one (e.g. ":80" inside ":3800"). Malformed URLs fall back to
+        # "no mismatch detected" rather than crashing; the warn-path is only
+        # advisory.
+        #
+        # Treats a URL without an explicit port as a mismatch: URI.parse would
+        # otherwise return the scheme default (80 for http, 443 for https),
+        # which would silently match `RENDERER_PORT=80` / `=443` — a misconfig
+        # worth flagging rather than hiding.
+        def url_port_mismatch?(url, port)
+          return true unless url.match?(URL_WITH_EXPLICIT_PORT_RE)
+
+          URI.parse(url).port != port.to_i
+        rescue URI::InvalidURIError
+          false
+        end
+
+        def localhost_renderer_url?(url)
+          localhost_hostname?(URI.parse(url).hostname)
+        rescue URI::InvalidURIError
+          false
+        end
+
+        # Use `.hostname` not `.host`: for IPv6 URLs like `http://[::1]:3800`,
+        # `.host` returns `"[::1]"` (with brackets) while `.hostname` returns
+        # `"::1"` (bracket-stripped), matching the comparison list below.
+        # Downcase: URI preserves host case, so `http://LOCALHOST:3900` would
+        # otherwise be treated as non-local and skip the invalid-port URL
+        # remediation path, leaving Rails targeting a stale port.
+        def localhost_hostname?(hostname)
+          %w[localhost 127.0.0.1 ::1].include?(hostname&.downcase)
+        end
+
+        # Callers are expected to have normalized ENV["PORT"] beforehand:
+        # run_production_like clears non-integer / out-of-range values before
+        # calling here, and the development/static paths route through
+        # PortSelector.read_and_sanitize_port_env! which does the same. That
+        # makes the `.to_i` below safe — a stray "abc" would otherwise become
+        # 0 and scan from port 0.
         def procfile_port(procfile)
           if procfile == "Procfile.dev-prod-assets"
             ENV.fetch("PORT", 3001).to_i

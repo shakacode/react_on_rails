@@ -56,6 +56,10 @@ rake run_rspec                       # All Ruby tests
 rake all_but_examples                # All tests except generated examples
 rake run_rspec:shakapacker_examples_basic  # Single example test
 
+# Documentation checks
+script/check-docs-sidebar            # Validate docs sidebar coverage
+bin/check-links                      # Markdown link checks (requires lychee)
+
 # Full initial setup
 bundle && pnpm install && rake shakapacker_examples:gen_all && rake node_package && rake
 
@@ -178,7 +182,7 @@ For small, focused PRs (roughly 5 files changed or fewer and one clear purpose):
 - Use `bundle exec` for Ruby commands
 - Ensure all files end with a newline
 - Let Prettier and RuboCop handle formatting — never format manually
-- When adding docs under `docs/oss/` or `docs/pro/`, also add the doc ID to `docs/sidebars.ts` — CI will fail otherwise. To intentionally exclude a doc from the sidebar, add its ID to `docs/.sidebar-exclusions` with a reason comment.
+- When adding docs under `docs/oss/` or `docs/pro/`, also add the doc ID to `docs/sidebars.ts` and run `script/check-docs-sidebar` — CI will fail otherwise. To intentionally exclude a doc from the sidebar, add its ID to `docs/.sidebar-exclusions` with a reason comment.
 
 ### Ask First
 

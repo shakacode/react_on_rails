@@ -134,6 +134,17 @@ module ReactOnRails
         SH
       ].map { |template| template.gsub("\r\n", "\n").strip }.freeze
 
+      # Exact fallback used when the scaffolded CI workflow has to supply a pnpm
+      # version because `pnpm/action-setup` requires one unless package.json declares
+      # `packageManager`. Match the repo's own packageManager version so generated
+      # CI defaults to the pnpm major this codebase tests with. Track the exact release
+      # used for this fallback at https://github.com/pnpm/pnpm/releases/tag/v9.14.2;
+      # update this URL with the constant when bumping. Users who need exact
+      # reproducibility should commit `packageManager` to their package.json instead.
+      # renovate: datasource=github-releases depName=pnpm/pnpm extractVersion=^v(?<version>.+)$
+      CI_PNPM_FALLBACK_VERSION = "9.14.2"
+      private_constant :CI_PNPM_FALLBACK_VERSION
+
       # Main generator entry point
       #
       # Sets up React on Rails in a Rails application by:
@@ -258,15 +269,31 @@ module ReactOnRails
           return
         end
 
-        package_manager = GeneratorMessages.detect_package_manager(app_root: destination_root)
+        package_json = GeneratorMessages.read_package_json(destination_root)
+        package_manager = GeneratorMessages.detect_package_manager(
+          app_root: destination_root,
+          package_json: package_json
+        )
         # Scope the lockfile check to the detected manager: a generic "any lockfile exists" check
         # would emit `cache: "pnpm"` in CI when only `yarn.lock` is on disk, breaking setup-node.
         has_lockfile = GeneratorMessages.lockfile_for_manager?(package_manager, app_root: destination_root)
+        # `pnpm/action-setup@v4` requires an explicit `version:` unless package.json declares
+        # `packageManager: pnpm@...`. Only ask the question for pnpm projects — other managers
+        # never read this flag — and require a pnpm-specific declaration so an env-override to
+        # pnpm while package.json declares a different manager still gets the version pin.
+        pnpm_version_declared = package_manager == "pnpm" &&
+                                GeneratorMessages.package_manager_declared?(
+                                  app_root: destination_root,
+                                  manager: "pnpm",
+                                  package_json: package_json
+                                )
         has_active_record = File.exist?(File.join(destination_root, "config/database.yml"))
         has_rspec = File.exist?(File.join(destination_root, "spec/rails_helper.rb")) ||
                     File.exist?(File.join(destination_root, "spec/spec_helper.rb"))
         template("templates/base/base/.github/workflows/ci.yml.tt", ci_path,
                  { package_manager: package_manager, has_lockfile: has_lockfile,
+                   pnpm_version_declared: pnpm_version_declared,
+                   pnpm_fallback_version: CI_PNPM_FALLBACK_VERSION,
                    has_active_record: has_active_record, has_rspec: has_rspec })
         @ci_workflow_generated = true
       end

@@ -15,6 +15,7 @@ module ReactOnRails
     attr_reader :messages
 
     SUPPORTED_ASSETS_BUNDLERS = %w[webpack rspack].freeze
+    PackageManagerDetection = Struct.new(:manager, :lockfile_scan_blocked, keyword_init: true)
 
     def initialize
       @messages = []
@@ -115,7 +116,8 @@ module ReactOnRails
       end
 
       # Detect which package manager is actually being used
-      used_manager = detect_used_package_manager
+      package_manager_detection = detect_package_manager_from_lockfile
+      used_manager = package_manager_detection.manager
       if used_manager
         version_info = get_package_manager_version(used_manager)
         deprecation_note = get_deprecation_note(used_manager, version_info)
@@ -124,7 +126,9 @@ module ReactOnRails
         add_success(message)
       else
         add_success("✅ Package managers available: #{available_managers.join(', ')}")
-        add_info("ℹ️  No lock file detected - run npm/yarn/pnpm install to establish which manager is used")
+        unless package_manager_detection.lockfile_scan_blocked
+          add_info("ℹ️  No lock file detected - run npm/yarn/pnpm install to establish which manager is used")
+        end
       end
       true
     end
@@ -192,8 +196,8 @@ module ReactOnRails
     end
 
     def check_react_on_rails_npm_package
-      package_json_path = resolved_package_json_path
-      return unless File.exist?(package_json_path)
+      package_json_path = package_json_path_for("react-on-rails npm package")
+      return unless package_json_path
 
       package_json = JSON.parse(File.read(package_json_path))
       package_name, npm_version = react_on_rails_npm_package_details(package_json)
@@ -213,8 +217,8 @@ module ReactOnRails
     end
 
     def check_package_version_sync
-      package_json_path = resolved_package_json_path
-      return unless File.exist?(package_json_path)
+      package_json_path = package_json_path_for("React on Rails package version sync")
+      return unless package_json_path
 
       begin
         package_json = JSON.parse(File.read(package_json_path))
@@ -282,9 +286,10 @@ module ReactOnRails
 
     # React dependencies validation
     def check_react_dependencies
-      return unless File.exist?(resolved_package_json_path)
+      package_json_path = package_json_path_for("React dependencies")
+      return unless package_json_path
 
-      package_json = parse_package_json
+      package_json = parse_package_json(package_json_path)
       return unless package_json
 
       # Check core React dependencies
@@ -444,17 +449,33 @@ module ReactOnRails
       status.success?
     end
 
-    def detect_used_package_manager
-      # Check for lock files to determine which package manager is being used
-      if File.exist?("yarn.lock")
-        "yarn"
-      elsif File.exist?("pnpm-lock.yaml")
-        "pnpm"
-      elsif File.exist?("bun.lock") || File.exist?("bun.lockb")
-        "bun"
-      elsif File.exist?("package-lock.json")
-        "npm"
-      end
+    def detect_package_manager_from_lockfile
+      # Check for lock files next to the configured package.json to support
+      # legacy apps that keep their JS package tree under client/.
+      package_root = resolved_package_root
+      package_json_path = package_json_path_for(
+        "package manager",
+        package_root
+      )
+      # If package.json cannot be read, the configured package root is broken
+      # enough that detecting a stray lockfile would be misleading. Block the
+      # scan so check_package_manager does not suggest installing lockfiles.
+      # Covers both cases handled by package_json_path_for: a missing package
+      # root directory and an existing directory without a package.json.
+      return PackageManagerDetection.new(manager: nil, lockfile_scan_blocked: true) unless package_json_path
+
+      manager = if File.exist?(File.join(package_root, "yarn.lock"))
+                  "yarn"
+                elsif File.exist?(File.join(package_root, "pnpm-lock.yaml"))
+                  "pnpm"
+                elsif File.exist?(File.join(package_root, "bun.lock")) ||
+                      File.exist?(File.join(package_root, "bun.lockb"))
+                  "bun"
+                elsif File.exist?(File.join(package_root, "package-lock.json"))
+                  "npm"
+                end
+
+      PackageManagerDetection.new(manager: manager, lockfile_scan_blocked: false)
     end
 
     def get_package_manager_version(manager)
@@ -717,8 +738,8 @@ module ReactOnRails
     end
     # rubocop:enable Metrics/CyclomaticComplexity
 
-    def parse_package_json
-      JSON.parse(File.read(resolved_package_json_path))
+    def parse_package_json(package_json_path)
+      JSON.parse(File.read(package_json_path))
     rescue Errno::ENOENT, JSON::ParserError
       add_warning("⚠️  Could not parse package.json to check React dependencies")
       nil
@@ -814,8 +835,8 @@ module ReactOnRails
     end
 
     def report_webpack_version
-      package_json_path = resolved_package_json_path
-      return unless File.exist?(package_json_path)
+      package_json_path = package_json_path_for("Webpack version")
+      return unless package_json_path
 
       begin
         package_json = JSON.parse(File.read(package_json_path))

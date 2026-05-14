@@ -6,9 +6,12 @@ paths land on the right Pro docs instead of a second, competing setup guide.
 
 ## Choose the Right Pro Path
 
+- **Need pricing or a production license?** Visit [Pro pricing and sign up](https://pro.reactonrails.com/).
 - **Starting a new Pro app from scratch?** Use [Pro Installation](../../pro/installation.md#fresh-installation).
 - **Upgrading an existing React on Rails app?** Use [Upgrading from React on Rails to React on Rails Pro](../../pro/upgrading-to-pro.md).
 - **Still deciding between OSS and Pro?** Review [React on Rails: OSS vs Pro Feature Comparison](./oss-vs-pro.md).
+
+The friendly license model lets you evaluate Pro without a token in development, test, CI/CD, and staging. If no license is configured, the app keeps running in unlicensed mode and logs license status instead of blocking setup. Production deployments require a paid license.
 
 ## After Setup
 

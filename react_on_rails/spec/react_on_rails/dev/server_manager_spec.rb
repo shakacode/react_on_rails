@@ -18,15 +18,56 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     $stdout = @original_stdout
   end
 
+  shared_context "with clean port env" do
+    around do |example|
+      old = {}
+      # REACT_ON_RAILS_BASE_PORT and CONDUCTOR_PORT must be cleared too: if either
+      # is set in the developer's shell (common inside a Conductor workspace),
+      # the real PortSelector.select_ports! enters base-port mode, and any test
+      # that doesn't stub select_ports! will see unexpected port assignments.
+      # Mirrors port_selector_spec.rb's outer `around`.
+      %w[PORT SHAKAPACKER_DEV_SERVER_PORT RENDERER_PORT REACT_RENDERER_URL
+         RENDERER_URL REACT_ON_RAILS_BASE_PORT CONDUCTOR_PORT].each do |k|
+        old[k] = ENV.fetch(k, nil)
+        ENV.delete(k)
+      end
+      example.run
+    ensure
+      # `old` is assigned on the first line of the block and cannot fail, but
+      # guard with `&.` so the ensure stays correct (and CodeQL-clean) if a
+      # future change moves the assignment below something that can raise.
+      old&.each { |k, v| v.nil? ? ENV.delete(k) : ENV[k] = v }
+    end
+  end
+
   def mock_system_calls
+    mock_process_managers
+    mock_port_selector_defaults
+    # Default to "Pro renderer active" so legacy base-port tests that expect
+    # RENDERER_PORT / REACT_RENDERER_URL to be set still pass without each
+    # context having to pre-set a renderer env var. The OSS guard is exercised
+    # in a dedicated context below.
+    allow(described_class).to receive(:pro_renderer_active?).and_return(true)
+  end
+
+  def mock_process_managers
     allow(ReactOnRails::Dev::PackGenerator).to receive(:generate).with(any_args)
     allow_any_instance_of(Kernel).to receive(:system).and_return(true)
     allow_any_instance_of(Kernel).to receive(:exit)
     allow(ReactOnRails::Dev::ProcessManager).to receive(:ensure_procfile)
     allow(ReactOnRails::Dev::ProcessManager).to receive(:run_with_process_manager)
     allow(ReactOnRails::Dev::DatabaseChecker).to receive(:check_database).and_return(true)
-    allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
-      .and_return({ rails: 3000, webpack: 3035 })
+  end
+
+  def mock_port_selector_defaults
+    # Default to "no base port active" so a developer running specs inside a
+    # Conductor workspace (REACT_ON_RAILS_BASE_PORT set in their shell) doesn't
+    # silently redirect tests into the base-port branch. Individual contexts
+    # that exercise base-port mode override these stubs.
+    allow(ReactOnRails::Dev::PortSelector).to receive_messages(
+      base_port_ports: nil,
+      select_ports!: { rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false }
+    )
   end
 
   describe ".start" do
@@ -121,6 +162,24 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       ENV.delete("PORT")
     end
 
+    it "normalizes an invalid PORT to an auto-selected port in production-like mode" do
+      ENV["PORT"] = "abc"
+      env = { "NODE_ENV" => "production" }
+      argv = ["bundle", "exec", "rails", "assets:precompile"]
+      status_double = instance_double(Process::Status, success?: true)
+      allow(Open3).to receive(:capture3).with(env, *argv).and_return(["output", "", status_double])
+      allow(ReactOnRails::Dev::PortSelector).to receive(:find_available_port).with(3001).and_return(3005)
+      expect(ReactOnRails::Dev::ProcessManager)
+        .to receive(:run_with_process_manager).with("Procfile.dev-prod-assets") do
+          expect(ENV.fetch("PORT", nil)).to eq("3005")
+        end
+
+      expect { described_class.start(:production_like) }
+        .to output(/PORT=.*not a valid port/).to_stderr
+    ensure
+      ENV.delete("PORT")
+    end
+
     it "sets default PORT=3001 for production-like mode" do
       env = { "NODE_ENV" => "production" }
       argv = ["bundle", "exec", "rails", "assets:precompile"]
@@ -167,11 +226,144 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       expect { described_class.start(:unknown) }.to raise_error(ArgumentError, "Unknown mode: unknown")
     end
 
+    context "when REACT_ON_RAILS_BASE_PORT is set in production-like mode" do
+      include_context "with clean port env"
+
+      before do
+        # production-like mode does not call configure_ports directly, so stub
+        # the base-port accessor to simulate an active base port without
+        # touching PortSelector internals. The non-base-port branch still runs
+        # sync_renderer_port_and_url for RENDERER_PORT auto-derivation (see the
+        # separate context below).
+        allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_ports)
+          .and_return({ rails: 4000, webpack: 4001, renderer: 4002, base_port_mode: true })
+        status_double = instance_double(Process::Status, success?: true)
+        allow(Open3).to receive(:capture3).and_return(["output", "", status_double])
+      end
+
+      it "derives PORT from the base port instead of the 3001 default" do
+        described_class.start(:production_like)
+        expect(ENV.fetch("PORT", nil)).to eq("4000")
+      end
+
+      it "applies SHAKAPACKER_DEV_SERVER_PORT from base+1 even though prod mode doesn't use webpack-dev-server" do
+        # Intentional, not a bug: prod mode runs static assets and does not use
+        # webpack-dev-server, but applying all three env vars keeps prod mode
+        # consistent with dev/static so any tooling that reads them (shell aliases,
+        # process inspectors, a subsequent `bin/dev` in the same shell) sees the
+        # same derived values regardless of which bin/dev mode is active. See
+        # the matching comment above #apply_base_port_env in server_manager.rb.
+        described_class.start(:production_like)
+        expect(ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)).to eq("4001")
+      end
+
+      it "applies RENDERER_PORT from base+2" do
+        described_class.start(:production_like)
+        expect(ENV.fetch("RENDERER_PORT", nil)).to eq("4002")
+      end
+
+      it "applies the derived REACT_RENDERER_URL" do
+        described_class.start(:production_like)
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://localhost:4002")
+      end
+
+      it "does not fall through to find_available_port(3001) when base port is active" do
+        expect(ReactOnRails::Dev::PortSelector).not_to receive(:find_available_port)
+        described_class.start(:production_like)
+      end
+
+      it "overrides a pre-set PORT=3001 with the base-derived value" do
+        # Mirrors the dev-mode contract: base port > explicit per-service env vars.
+        ENV["PORT"] = "3001"
+        described_class.start(:production_like)
+        expect(ENV.fetch("PORT", nil)).to eq("4000")
+      end
+    end
+
+    context "when CONDUCTOR_PORT is set in production-like mode (no REACT_ON_RAILS_BASE_PORT)" do
+      include_context "with clean port env"
+
+      before do
+        allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_ports)
+          .and_return({ rails: 5000, webpack: 5001, renderer: 5002, base_port_mode: true })
+        status_double = instance_double(Process::Status, success?: true)
+        allow(Open3).to receive(:capture3).and_return(["output", "", status_double])
+      end
+
+      it "honors the base port just like REACT_ON_RAILS_BASE_PORT" do
+        described_class.start(:production_like)
+        expect(ENV.fetch("PORT", nil)).to eq("5000")
+      end
+    end
+
+    # `bin/dev prod` used to skip `sync_renderer_port_and_url` — dev and static
+    # modes auto-derived REACT_RENDERER_URL from a bare RENDERER_PORT and
+    # warned on mismatches, but prod-like mode did not. These specs lock in
+    # the new parity: without base port mode, production-like now runs the
+    # same renderer env sync that `bin/dev` and `bin/dev static` do.
+    context "when production-like mode runs without base port" do
+      include_context "with clean port env"
+
+      before do
+        allow(ReactOnRails::Dev::PortSelector).to receive_messages(base_port_ports: nil, find_available_port: 3001)
+        status_double = instance_double(Process::Status, success?: true)
+        allow(Open3).to receive(:capture3).and_return(["output", "", status_double])
+      end
+
+      it "auto-derives REACT_RENDERER_URL from a bare RENDERER_PORT" do
+        ENV["RENDERER_PORT"] = "3800"
+        described_class.start(:production_like)
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://localhost:3800")
+      end
+
+      it "warns when RENDERER_PORT and REACT_RENDERER_URL disagree" do
+        ENV["RENDERER_PORT"] = "3801"
+        ENV["REACT_RENDERER_URL"] = "http://localhost:3800"
+        expect { described_class.start(:production_like) }
+          .to output(%r{RENDERER_PORT=3801 does not match REACT_RENDERER_URL=http://localhost:3800}).to_stderr
+      end
+    end
+
+    context "when running production-like mode without a base port" do
+      include_context "with clean port env"
+
+      before do
+        allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_ports).and_return(nil)
+        status_double = instance_double(Process::Status, success?: true)
+        allow(Open3).to receive(:capture3).and_return(["output", "", status_double])
+      end
+
+      it "still uses the 3001 prod-specific default when no base port is set" do
+        described_class.start(:production_like)
+        expect(ENV.fetch("PORT", nil)).to eq("3001")
+      end
+
+      it "still respects a pre-set valid PORT when no base port is set" do
+        # Preserves the existing "PORT is sticky" behavior so users who pin a
+        # specific prod-assets port in their env aren't surprised by the
+        # base-port change.
+        ENV["PORT"] = "4242"
+        described_class.start(:production_like)
+        expect(ENV.fetch("PORT", nil)).to eq("4242")
+      end
+
+      it "exits cleanly when find_available_port raises NoPortAvailable" do
+        # Mirrors the existing rescue in `configure_ports`. Without the rescue
+        # in `run_production_like`, an exhausted port range produced an
+        # unhandled Ruby backtrace instead of a one-line warning.
+        allow(ReactOnRails::Dev::PortSelector).to receive(:find_available_port)
+          .and_raise(ReactOnRails::Dev::PortSelector::NoPortAvailable, "No port found")
+        ENV["PORT"] = "abc"
+        expect_any_instance_of(Kernel).to receive(:exit).with(1)
+        expect { described_class.start(:production_like) }.to output(/No port found/).to_stderr
+      end
+    end
+
     context "when configuring ports" do
       before do
         mock_system_calls
-        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
-          .and_return({ rails: 3000, webpack: 3035 })
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
+          .and_return({ rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false })
       end
 
       around do |example|
@@ -201,16 +393,16 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
 
       it "uses auto-detected ports when defaults are occupied" do
-        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
-          .and_return({ rails: 3001, webpack: 3036 })
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
+          .and_return({ rails: 3001, webpack: 3036, renderer: nil, base_port_mode: false })
         described_class.start(:development)
         expect(ENV.fetch("PORT", nil)).to eq("3001")
         expect(ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)).to eq("3036")
       end
 
       it "has PORT set when print_procfile_info is called in development mode" do
-        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
-          .and_return({ rails: 3001, webpack: 3036 })
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
+          .and_return({ rails: 3001, webpack: 3036, renderer: nil, base_port_mode: false })
 
         port_at_print_time = nil
         allow(described_class).to receive(:print_procfile_info).and_wrap_original do |m, *args, **kwargs|
@@ -224,8 +416,8 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
 
       it "passes the auto-detected port to print_server_info in static mode" do
-        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
-          .and_return({ rails: 3001, webpack: 3036 })
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
+          .and_return({ rails: 3001, webpack: 3036, renderer: nil, base_port_mode: false })
 
         port_at_server_info_time = nil
         allow(described_class).to receive(:print_server_info).and_wrap_original do |m, *args, **kwargs|
@@ -239,8 +431,8 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
 
       it "has PORT set when print_procfile_info is called in static mode" do
-        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
-          .and_return({ rails: 3001, webpack: 3036 })
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
+          .and_return({ rails: 3001, webpack: 3036, renderer: nil, base_port_mode: false })
 
         port_at_print_time = nil
         allow(described_class).to receive(:print_procfile_info).and_wrap_original do |m, *args, **kwargs|
@@ -254,12 +446,549 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
 
       it "exits cleanly when no port pair is available" do
-        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
           .and_raise(ReactOnRails::Dev::PortSelector::NoPortAvailable, "No available port pair found")
 
         expect_any_instance_of(Kernel).to receive(:exit).with(1)
         expect { described_class.start(:development) }.not_to raise_error
       end
+    end
+
+    context "when configuring ports with a base port active" do
+      include_context "with clean port env"
+
+      before do
+        mock_system_calls
+        # configure_ports calls select_ports! once; select_ports! internally
+        # consults base_port_ports and returns that hash when base-port mode
+        # is active. Stub both so every code path (select_ports! callers and
+        # direct base_port_ports callers like run_production_like) sees the
+        # same base-port result.
+        base_port_hash = { rails: 5000, webpack: 5001, renderer: 5002, base_port_mode: true }
+        allow(ReactOnRails::Dev::PortSelector).to receive_messages(
+          base_port_ports: base_port_hash,
+          select_ports!: base_port_hash
+        )
+      end
+
+      it "overrides a pre-existing PORT with the base-derived Rails port" do
+        ENV["PORT"] = "3000"
+        described_class.start(:development)
+        expect(ENV.fetch("PORT", nil)).to eq("5000")
+      end
+
+      it "overrides a pre-existing SHAKAPACKER_DEV_SERVER_PORT with the base-derived webpack port" do
+        ENV["SHAKAPACKER_DEV_SERVER_PORT"] = "3035"
+        described_class.start(:development)
+        expect(ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)).to eq("5001")
+      end
+
+      it "overrides pre-existing RENDERER_PORT and REACT_RENDERER_URL with base-derived values" do
+        ENV["RENDERER_PORT"] = "3800"
+        ENV["REACT_RENDERER_URL"] = "http://localhost:3800"
+        described_class.start(:development)
+        expect(ENV.fetch("RENDERER_PORT", nil)).to eq("5002")
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://localhost:5002")
+      end
+
+      it "warns before overriding a non-localhost REACT_RENDERER_URL" do
+        ENV["REACT_RENDERER_URL"] = "http://renderer.internal:3800"
+        expect { described_class.start(:development) }
+          .to output(%r{Overriding REACT_RENDERER_URL="http://renderer.internal:3800"}).to_stderr
+      end
+
+      it "warns before overriding a localhost REACT_RENDERER_URL on a different port" do
+        ENV["REACT_RENDERER_URL"] = "http://localhost:3800"
+        expect { described_class.start(:development) }
+          .to output(%r{Overriding REACT_RENDERER_URL="http://localhost:3800" with http://localhost:5002}).to_stderr
+      end
+
+      it "warns before overriding an HTTPS localhost REACT_RENDERER_URL on a different port" do
+        ENV["REACT_RENDERER_URL"] = "https://localhost:3800"
+        expect { described_class.start(:development) }
+          .to output(%r{Overriding REACT_RENDERER_URL="https://localhost:3800"}).to_stderr
+      end
+
+      it "does not warn when REACT_RENDERER_URL already equals the derived URL" do
+        ENV["REACT_RENDERER_URL"] = "http://localhost:5002"
+        expect { described_class.start(:development) }
+          .not_to output(/Overriding REACT_RENDERER_URL/).to_stderr
+      end
+
+      it "rewrites a legacy RENDERER_URL to the derived URL" do
+        ENV["RENDERER_URL"] = "http://localhost:3800"
+        described_class.start(:development)
+        expect(ENV.fetch("RENDERER_URL", nil)).to eq("http://localhost:5002")
+      end
+
+      it "warns before overriding a legacy RENDERER_URL on a different port" do
+        ENV["RENDERER_URL"] = "http://localhost:3800"
+        expect { described_class.start(:development) }
+          .to output(%r{Overriding RENDERER_URL="http://localhost:3800" with http://localhost:5002}).to_stderr
+      end
+
+      it "does not introduce RENDERER_URL when it is unset" do
+        described_class.start(:development)
+        expect(ENV).not_to have_key("RENDERER_URL")
+      end
+
+      it "does not warn when RENDERER_URL already equals the derived URL" do
+        ENV["RENDERER_URL"] = "http://localhost:5002"
+        expect { described_class.start(:development) }
+          .not_to output(/Overriding RENDERER_URL/).to_stderr
+      end
+
+      it "warns before overriding a pre-existing PORT" do
+        ENV["PORT"] = "3000"
+        expect { described_class.start(:development) }
+          .to output(/Overriding PORT="3000" with 5000/).to_stderr
+      end
+
+      it "warns before overriding a pre-existing SHAKAPACKER_DEV_SERVER_PORT" do
+        ENV["SHAKAPACKER_DEV_SERVER_PORT"] = "3035"
+        expect { described_class.start(:development) }
+          .to output(/Overriding SHAKAPACKER_DEV_SERVER_PORT="3035" with 5001/).to_stderr
+      end
+
+      it "warns before overriding a pre-existing RENDERER_PORT" do
+        ENV["RENDERER_PORT"] = "3800"
+        expect { described_class.start(:development) }
+          .to output(/Overriding RENDERER_PORT="3800" with 5002/).to_stderr
+      end
+
+      it "does not warn when PORT is unset" do
+        expect { described_class.start(:development) }
+          .not_to output(/Overriding PORT/).to_stderr
+      end
+
+      it "does not warn when PORT already matches the derived value" do
+        ENV["PORT"] = "5000"
+        expect { described_class.start(:development) }
+          .not_to output(/Overriding PORT/).to_stderr
+      end
+
+      it "does not warn when PORT matches the derived value with surrounding whitespace" do
+        ENV["PORT"] = " 5000 "
+        expect { described_class.start(:development) }
+          .not_to output(/Overriding PORT/).to_stderr
+      end
+
+      it "does not warn when RENDERER_PORT already matches the derived value" do
+        ENV["RENDERER_PORT"] = "5002"
+        expect { described_class.start(:development) }
+          .not_to output(/Overriding RENDERER_PORT/).to_stderr
+      end
+
+      it "applies the base-derived PORT in static mode" do
+        # Both run_static_development and run_development call configure_ports,
+        # so the base-port behavior should be identical across modes. This
+        # locks in :static so a future refactor that drops configure_ports
+        # from run_static_development gets caught.
+        described_class.start(:static)
+        expect(ENV.fetch("PORT", nil)).to eq("5000")
+      end
+
+      it "applies the base-derived SHAKAPACKER_DEV_SERVER_PORT in static mode" do
+        described_class.start(:static)
+        expect(ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)).to eq("5001")
+      end
+
+      it "applies the base-derived RENDERER_PORT in static mode" do
+        described_class.start(:static)
+        expect(ENV.fetch("RENDERER_PORT", nil)).to eq("5002")
+      end
+    end
+
+    context "when base port mode is active in an OSS-only environment" do
+      include_context "with clean port env"
+
+      before do
+        mock_system_calls
+        # Disable the default Pro stub so the OSS guard runs for real.
+        allow(described_class).to receive(:pro_renderer_active?).and_call_original
+        allow(Gem.loaded_specs).to receive(:key?).and_call_original
+        allow(Gem.loaded_specs).to receive(:key?).with("react_on_rails_pro").and_return(false)
+        base_port_hash = { rails: 5000, webpack: 5001, renderer: 5002, base_port_mode: true }
+        allow(ReactOnRails::Dev::PortSelector).to receive_messages(
+          base_port_ports: base_port_hash,
+          select_ports!: base_port_hash
+        )
+      end
+
+      it "still applies the base-derived PORT" do
+        described_class.start(:development)
+        expect(ENV.fetch("PORT", nil)).to eq("5000")
+      end
+
+      it "still applies the base-derived SHAKAPACKER_DEV_SERVER_PORT" do
+        described_class.start(:development)
+        expect(ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)).to eq("5001")
+      end
+
+      it "does not set RENDERER_PORT for OSS users without a renderer" do
+        described_class.start(:development)
+        expect(ENV).not_to have_key("RENDERER_PORT")
+      end
+
+      it "does not set REACT_RENDERER_URL for OSS users without a renderer" do
+        described_class.start(:development)
+        expect(ENV).not_to have_key("REACT_RENDERER_URL")
+      end
+
+      it "still applies RENDERER_PORT when the user has pre-set a renderer env var" do
+        # A user without the Pro gem who is configuring their own node renderer
+        # is signaled by any RENDERER_* env var. The guard should treat them
+        # the same as a Pro user and apply the derived block.
+        ENV["RENDERER_PORT"] = "3800"
+        described_class.start(:development)
+        expect(ENV.fetch("RENDERER_PORT", nil)).to eq("5002")
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://localhost:5002")
+      end
+    end
+
+    context "when PORT/SHAKAPACKER_DEV_SERVER_PORT are set to empty strings" do
+      include_context "with clean port env"
+
+      before do
+        mock_system_calls
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
+          .and_return({ rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false })
+      end
+
+      it "treats PORT='' as unset and applies the selected Rails port" do
+        ENV["PORT"] = ""
+        described_class.start(:development)
+        expect(ENV.fetch("PORT", nil)).to eq("3000")
+      end
+
+      it "treats SHAKAPACKER_DEV_SERVER_PORT='' as unset and applies the selected webpack port" do
+        ENV["SHAKAPACKER_DEV_SERVER_PORT"] = ""
+        described_class.start(:development)
+        expect(ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)).to eq("3035")
+      end
+    end
+
+    context "when PORT/SHAKAPACKER_DEV_SERVER_PORT hold invalid values" do
+      include_context "with clean port env"
+
+      before do
+        mock_system_calls
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
+          .and_return({ rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false })
+      end
+
+      it "overwrites an out-of-range PORT with the selected Rails port" do
+        ENV["PORT"] = "99999"
+        described_class.start(:development)
+        expect(ENV.fetch("PORT", nil)).to eq("3000")
+      end
+
+      it "overwrites a non-numeric PORT with the selected Rails port" do
+        ENV["PORT"] = "abc"
+        described_class.start(:development)
+        expect(ENV.fetch("PORT", nil)).to eq("3000")
+      end
+
+      it "overwrites an out-of-range SHAKAPACKER_DEV_SERVER_PORT" do
+        ENV["SHAKAPACKER_DEV_SERVER_PORT"] = "99999"
+        described_class.start(:development)
+        expect(ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)).to eq("3035")
+      end
+    end
+
+    context "when REACT_RENDERER_URL is set without RENDERER_PORT" do
+      include_context "with clean port env"
+
+      before do
+        mock_system_calls
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
+          .and_return({ rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false })
+      end
+
+      it "warns that the node renderer may bind to a different port" do
+        ENV["REACT_RENDERER_URL"] = "http://localhost:3801"
+        expect { described_class.start(:development) }
+          .to output(/set without RENDERER_PORT/).to_stderr
+      end
+
+      it "does not warn for a remote renderer URL when no local renderer process is being configured" do
+        ENV["REACT_RENDERER_URL"] = "http://renderer:3801"
+        expect { described_class.start(:development) }
+          .not_to output(/set without RENDERER_PORT/).to_stderr
+      end
+    end
+
+    context "when legacy RENDERER_URL is set without REACT_RENDERER_URL" do
+      include_context "with clean port env"
+
+      before do
+        mock_system_calls
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
+          .and_return({ rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false })
+      end
+
+      it "warns about the rename so silent fallback to the default URL is surfaced" do
+        ENV["RENDERER_URL"] = "http://renderer:3800"
+        expect { described_class.start(:development) }
+          .to output(/RENDERER_URL is set but REACT_RENDERER_URL is not/).to_stderr
+      end
+
+      it "does not warn when both are set to the same value" do
+        ENV["RENDERER_URL"] = "http://renderer:3800"
+        ENV["REACT_RENDERER_URL"] = "http://renderer:3800"
+        expect { described_class.start(:development) }
+          .not_to output(/RENDERER_URL/).to_stderr
+      end
+
+      it "warns when both are set but the values disagree" do
+        ENV["RENDERER_URL"] = "http://renderer:3800"
+        ENV["REACT_RENDERER_URL"] = "http://renderer:3801"
+        expect { described_class.start(:development) }
+          .to output(/both set but disagree/).to_stderr
+      end
+
+      it "tolerates whitespace-only differences as equivalent" do
+        ENV["RENDERER_URL"] = "  http://renderer:3800  "
+        ENV["REACT_RENDERER_URL"] = "http://renderer:3800"
+        expect { described_class.start(:development) }
+          .not_to output(/RENDERER_URL/).to_stderr
+      end
+    end
+
+    context "when RENDERER_PORT is set explicitly without a base port" do
+      include_context "with clean port env"
+
+      before do
+        mock_system_calls
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
+          .and_return({ rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false })
+      end
+
+      it "derives REACT_RENDERER_URL from the explicit RENDERER_PORT" do
+        ENV["RENDERER_PORT"] = "3801"
+        described_class.start(:development)
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://localhost:3801")
+      end
+
+      it "announces the derived REACT_RENDERER_URL on stderr alongside other env-mutation warnings" do
+        ENV["RENDERER_PORT"] = "3801"
+        expect { described_class.start(:development) }
+          .to output(%r{RENDERER_PORT=3801 set without REACT_RENDERER_URL; deriving REACT_RENDERER_URL=http://localhost:3801}).to_stderr
+      end
+
+      it "leaves a pre-existing REACT_RENDERER_URL untouched" do
+        ENV["RENDERER_PORT"] = "3801"
+        ENV["REACT_RENDERER_URL"] = "http://renderer.internal:3801"
+        described_class.start(:development)
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://renderer.internal:3801")
+      end
+
+      it "warns when RENDERER_PORT and REACT_RENDERER_URL disagree" do
+        ENV["RENDERER_PORT"] = "3801"
+        ENV["REACT_RENDERER_URL"] = "http://localhost:3800"
+        expect { described_class.start(:development) }
+          .to output(%r{RENDERER_PORT=3801 does not match REACT_RENDERER_URL=http://localhost:3800}).to_stderr
+      end
+
+      it "does not warn when RENDERER_PORT appears inside REACT_RENDERER_URL" do
+        ENV["RENDERER_PORT"] = "3801"
+        ENV["REACT_RENDERER_URL"] = "http://renderer.internal:3801"
+        expect { described_class.start(:development) }.not_to output(/does not match/).to_stderr
+      end
+
+      # Basic-auth password digits used to trick the pre-URI.parse guard regex:
+      # `[^/]+` would backtrack, match `user` as host, and consume `:3800` from
+      # the password. The early `return true` was skipped, URI.parse returned
+      # the scheme default (80), and the mismatch check fired spuriously.
+      it "does not warn for a basic-auth URL where the password contains digits matching RENDERER_PORT" do
+        ENV["RENDERER_PORT"] = "3800"
+        ENV["REACT_RENDERER_URL"] = "http://user:3800@renderer.internal:3800"
+        expect { described_class.start(:development) }.not_to output(/does not match/).to_stderr
+      end
+
+      it "warns when a short RENDERER_PORT is only a substring of the URL port" do
+        # :80 is a substring of :3800 — substring matching would miss this mismatch.
+        ENV["RENDERER_PORT"] = "80"
+        ENV["REACT_RENDERER_URL"] = "http://localhost:3800"
+        expect { described_class.start(:development) }
+          .to output(/RENDERER_PORT=80 does not match/).to_stderr
+      end
+
+      it "warns, deletes the bad RENDERER_PORT, and skips URL construction when RENDERER_PORT is non-numeric" do
+        ENV["RENDERER_PORT"] = "abc"
+        expect { described_class.start(:development) }
+          .to output(/RENDERER_PORT=.*not a valid port \(1\.\.65535\)/).to_stderr
+        expect(ENV.fetch("RENDERER_PORT", nil)).to be_nil
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to be_nil
+      end
+
+      it "clears a localhost REACT_RENDERER_URL when invalid RENDERER_PORT would otherwise " \
+         "leave Rails on a stale port" do
+        ENV["RENDERER_PORT"] = "abc"
+        ENV["REACT_RENDERER_URL"] = "http://localhost:3900"
+        expect { described_class.start(:development) }
+          .to output(%r{Clearing REACT_RENDERER_URL=http://localhost:3900}).to_stderr
+        expect(ENV.fetch("RENDERER_PORT", nil)).to be_nil
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to be_nil
+      end
+
+      it "keeps a remote REACT_RENDERER_URL when invalid RENDERER_PORT is ignored" do
+        ENV["RENDERER_PORT"] = "abc"
+        ENV["REACT_RENDERER_URL"] = "http://renderer.internal:3900"
+        described_class.start(:development)
+        expect(ENV.fetch("RENDERER_PORT", nil)).to be_nil
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://renderer.internal:3900")
+      end
+
+      it "deletes an out-of-range RENDERER_PORT so the Procfile fallback can apply" do
+        ENV["RENDERER_PORT"] = "99999"
+        described_class.start(:development)
+        expect(ENV.fetch("RENDERER_PORT", nil)).to be_nil
+      end
+
+      it "warns and skips URL construction when RENDERER_PORT is out of range" do
+        ENV["RENDERER_PORT"] = "0"
+        expect { described_class.start(:development) }
+          .to output(/RENDERER_PORT=.*not a valid port/).to_stderr
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to be_nil
+      end
+
+      it "accepts RENDERER_PORT with surrounding whitespace and writes the stripped value back to ENV" do
+        ENV["RENDERER_PORT"] = "  3801  "
+        described_class.start(:development)
+        # Derived URL uses the stripped value, not the raw whitespace-padded env.
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://localhost:3801")
+        # ENV is also normalized so the Procfile's ${RENDERER_PORT:-3800} expansion
+        # propagates the clean value to the node renderer subprocess.
+        expect(ENV.fetch("RENDERER_PORT", nil)).to eq("3801")
+      end
+
+      # URI preserves host case, so `URI.parse("http://LOCALHOST:3900").hostname`
+      # returns "LOCALHOST". Without downcasing in `localhost_renderer_url?`, the
+      # invalid-port remediation path would treat the URL as remote and skip
+      # clearing it, leaving Rails targeting the stale port while node falls
+      # back to 3800.
+      it "clears an uppercase localhost REACT_RENDERER_URL when RENDERER_PORT is invalid" do
+        ENV["RENDERER_PORT"] = "abc"
+        ENV["REACT_RENDERER_URL"] = "http://LOCALHOST:3900"
+        expect { described_class.start(:development) }
+          .to output(%r{Clearing REACT_RENDERER_URL=http://LOCALHOST:3900}).to_stderr
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to be_nil
+      end
+
+      # Sibling helpers in this file use `.strip.empty?` for the same env var;
+      # without that here, a whitespace-only REACT_RENDERER_URL would bypass
+      # the empty check and trigger a confusing mismatch warning instead of
+      # auto-deriving the URL from RENDERER_PORT.
+      it "treats a whitespace-only REACT_RENDERER_URL as empty and derives from RENDERER_PORT" do
+        ENV["RENDERER_PORT"] = "3801"
+        ENV["REACT_RENDERER_URL"] = "   "
+        expect { described_class.start(:development) }
+          .to output(%r{deriving REACT_RENDERER_URL=http://localhost:3801}).to_stderr
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://localhost:3801")
+      end
+    end
+
+    context "with IPv6 localhost REACT_RENDERER_URL" do
+      include_context "with clean port env"
+
+      before do
+        mock_system_calls
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
+          .and_return({ rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false })
+      end
+
+      # URI.parse("http://[::1]:3800").host returns "[::1]" (with brackets),
+      # while .hostname returns "::1" (bracket-stripped). Using .host here
+      # would make IPv6 localhost URLs silently bypass the localhost-only
+      # advisory paths.
+      it "warns for an IPv6 localhost URL set without RENDERER_PORT" do
+        ENV["REACT_RENDERER_URL"] = "http://[::1]:3801"
+        expect { described_class.start(:development) }
+          .to output(/set without RENDERER_PORT/).to_stderr
+      end
+
+      it "clears an IPv6 localhost URL when RENDERER_PORT is invalid" do
+        ENV["RENDERER_PORT"] = "abc"
+        ENV["REACT_RENDERER_URL"] = "http://[::1]:3900"
+        expect { described_class.start(:development) }
+          .to output(%r{Clearing REACT_RENDERER_URL=http://\[::1\]:3900}).to_stderr
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to be_nil
+      end
+
+      # The pre-URI.parse regex used `[^@/:]+` for the host, which stops at the
+      # `[` of `[::1]` so `:\d+` never anchors on the real port — the function
+      # returned `true` (mismatch) even when RENDERER_PORT agreed with the URL.
+      it "does not warn when RENDERER_PORT agrees with an IPv6 REACT_RENDERER_URL" do
+        ENV["RENDERER_PORT"] = "3801"
+        ENV["REACT_RENDERER_URL"] = "http://[::1]:3801"
+        expect { described_class.start(:development) }.not_to output(/does not match/).to_stderr
+      end
+
+      it "warns when RENDERER_PORT disagrees with an IPv6 REACT_RENDERER_URL" do
+        ENV["RENDERER_PORT"] = "3801"
+        ENV["REACT_RENDERER_URL"] = "http://[::1]:3800"
+        expect { described_class.start(:development) }
+          .to output(%r{RENDERER_PORT=3801 does not match REACT_RENDERER_URL=http://\[::1\]:3800}).to_stderr
+      end
+    end
+
+    context "when REACT_RENDERER_URL has no explicit port" do
+      include_context "with clean port env"
+
+      before do
+        mock_system_calls
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
+          .and_return({ rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false })
+      end
+
+      # URI.parse("http://localhost").port returns the scheme default (80),
+      # which would silently "match" RENDERER_PORT=80 without this check.
+      it "warns about the mismatch when RENDERER_PORT is set and the URL omits a port" do
+        ENV["RENDERER_PORT"] = "3801"
+        ENV["REACT_RENDERER_URL"] = "http://localhost"
+        expect { described_class.start(:development) }
+          .to output(%r{RENDERER_PORT=3801 does not match REACT_RENDERER_URL=http://localhost}).to_stderr
+      end
+
+      it "still flags the mismatch when RENDERER_PORT matches the scheme default" do
+        ENV["RENDERER_PORT"] = "80"
+        ENV["REACT_RENDERER_URL"] = "http://localhost"
+        expect { described_class.start(:development) }
+          .to output(%r{RENDERER_PORT=80 does not match REACT_RENDERER_URL=http://localhost}).to_stderr
+      end
+    end
+  end
+
+  describe "invalid PORT / SHAKAPACKER_DEV_SERVER_PORT warnings" do
+    include_context "with clean port env"
+
+    before do
+      allow(ReactOnRails::Dev::PackGenerator).to receive(:generate).with(any_args)
+      allow_any_instance_of(Kernel).to receive(:system).and_return(true)
+      allow_any_instance_of(Kernel).to receive(:exit)
+      allow(ReactOnRails::Dev::ProcessManager).to receive(:ensure_procfile)
+      allow(ReactOnRails::Dev::ProcessManager).to receive(:run_with_process_manager)
+      allow(ReactOnRails::Dev::DatabaseChecker).to receive(:check_database).and_return(true)
+      allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
+        .and_return({ rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false })
+    end
+
+    it "warns when overwriting a non-numeric PORT" do
+      ENV["PORT"] = "abc"
+      expect { described_class.start(:development) }
+        .to output(/PORT=.*"abc".*not a valid port; using 3000/).to_stderr
+    end
+
+    it "warns when overwriting a non-numeric SHAKAPACKER_DEV_SERVER_PORT" do
+      ENV["SHAKAPACKER_DEV_SERVER_PORT"] = "xyz"
+      expect { described_class.start(:development) }
+        .to output(/SHAKAPACKER_DEV_SERVER_PORT=.*"xyz".*not a valid port; using 3035/).to_stderr
+    end
+
+    it "does not warn when PORT is unset" do
+      expect { described_class.start(:development) }
+        .not_to output(/PORT=.*not a valid port/).to_stderr
     end
   end
 
@@ -390,6 +1119,8 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
   end
 
   describe ".kill_processes" do
+    include_context "with clean port env"
+
     before do
       allow_any_instance_of(Kernel).to receive(:`).and_return("")
       allow(File).to receive(:exist?).and_return(false)
@@ -441,10 +1172,164 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       # Make sure no processes are found so cleanup_socket_files gets called
       allow(Open3).to receive(:capture2).and_return(["", nil])
 
+      allow(Dir).to receive(:glob).with("tmp/sockets/overmind*.sock").and_return([])
       allow(File).to receive(:exist?).with(".overmind.sock").and_return(true)
-      allow(File).to receive(:exist?).with("tmp/sockets/overmind.sock").and_return(false)
       allow(File).to receive(:exist?).with("tmp/pids/server.pid").and_return(false)
       expect(File).to receive(:delete).with(".overmind.sock")
+
+      described_class.kill_processes
+    end
+
+    it "cleans up renamed/copied overmind sockets via the same glob FileManager uses" do
+      # Mirrors FileManager#cleanup_overmind_sockets: variants like
+      # overmind-4100.sock from copied app dirs must also be removed during
+      # `bin/dev kill`, not just at startup.
+      allow(Open3).to receive(:capture2).and_return(["", nil])
+
+      copied = "tmp/sockets/overmind-4100.sock"
+      allow(Dir).to receive(:glob).with("tmp/sockets/overmind*.sock").and_return([copied])
+      allow(File).to receive(:exist?).with(".overmind.sock").and_return(false)
+      allow(File).to receive(:exist?).with(copied).and_return(true)
+      allow(File).to receive(:exist?).with("tmp/pids/server.pid").and_return(false)
+      expect(File).to receive(:delete).with(copied)
+
+      described_class.kill_processes
+    end
+
+    it "targets base-port-derived ports when REACT_ON_RAILS_BASE_PORT is active" do
+      # Without base-port awareness, `bin/dev kill` in a worktree running on
+      # 5000/5001/5002 would fall back to killing stale processes on 3000/3001
+      # instead — the actual ports would be left untouched.
+      allow(ReactOnRails::Dev::PortSelector)
+        .to receive(:base_port_hash)
+        .and_return({ rails: 5000, webpack: 5001, renderer: 5002, base_port_mode: true })
+      # No pattern-based processes so kill_port_processes runs.
+      allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
+
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":5000", err: File::NULL).and_return(["4501", nil])
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":5001", err: File::NULL).and_return(["", nil])
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":5002", err: File::NULL).and_return(["", nil])
+
+      allow(Process).to receive(:pid).and_return(9999)
+      expect(Process).to receive(:kill).with("TERM", 4501)
+
+      described_class.kill_processes
+    end
+
+    it "skips the base-port-derived renderer port when Pro renderer support is inactive" do
+      allow(ReactOnRails::Dev::PortSelector)
+        .to receive(:base_port_hash)
+        .and_return({ rails: 5000, webpack: 5001, renderer: 5002, base_port_mode: true })
+      allow(described_class).to receive(:pro_renderer_active?).and_return(false)
+      # No pattern-based processes so kill_port_processes runs.
+      allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
+
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":5000", err: File::NULL).and_return(["", nil])
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":5001", err: File::NULL).and_return(["", nil])
+      expect(Open3).not_to receive(:capture2).with("lsof", "-ti", ":5002", err: File::NULL)
+
+      described_class.kill_processes
+    end
+
+    it "does not widen kill scope to 3800 when the Pro gem is loaded but no renderer env vars are set" do
+      # Pro gem may be present in OSS+Pro-gem apps that never run the
+      # renderer. Without an explicit RENDERER_PORT / REACT_RENDERER_URL /
+      # RENDERER_URL signal, `bin/dev kill` must not target 3800 — that
+      # port could belong to an unrelated process.
+      allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
+      allow(described_class).to receive(:pro_renderer_active?).and_return(true)
+      # No pattern-based processes so kill_port_processes runs.
+      allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
+
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3000", err: File::NULL).and_return(["", nil])
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3001", err: File::NULL).and_return(["", nil])
+      expect(Open3).not_to receive(:capture2).with("lsof", "-ti", ":3800", err: File::NULL)
+
+      allow(Process).to receive(:pid).and_return(9999)
+      expect(Process).not_to receive(:kill).with("TERM", 3801)
+
+      described_class.kill_processes
+    end
+
+    it "targets 3800 when a localhost REACT_RENDERER_URL is set without an explicit :port" do
+      ENV["REACT_RENDERER_URL"] = "http://localhost"
+      allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
+      allow(described_class).to receive(:pro_renderer_active?).and_return(true)
+      # No pattern-based processes so kill_port_processes runs.
+      allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
+
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3000", err: File::NULL).and_return(["", nil])
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3001", err: File::NULL).and_return(["", nil])
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3800", err: File::NULL).and_return(["3801", nil])
+
+      allow(Process).to receive(:pid).and_return(9999)
+      expect(Process).to receive(:kill).with("TERM", 3801)
+
+      described_class.kill_processes
+    end
+
+    it "targets the configured renderer port when Pro renderer support is active without a base port" do
+      ENV["RENDERER_PORT"] = "3900"
+      allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
+      allow(described_class).to receive(:pro_renderer_active?).and_return(true)
+      # No pattern-based processes so kill_port_processes runs.
+      allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
+
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3000", err: File::NULL).and_return(["", nil])
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3001", err: File::NULL).and_return(["", nil])
+      expect(Open3).not_to receive(:capture2).with("lsof", "-ti", ":3800", err: File::NULL)
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3900", err: File::NULL).and_return(["3901", nil])
+
+      allow(Process).to receive(:pid).and_return(9999)
+      expect(Process).to receive(:kill).with("TERM", 3901)
+
+      described_class.kill_processes
+    end
+
+    it "does not target the default renderer port for a remote renderer URL" do
+      ENV["REACT_RENDERER_URL"] = "https://renderer.internal:3800"
+      allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
+      # No pattern-based processes so kill_port_processes runs.
+      allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
+
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3000", err: File::NULL).and_return(["", nil])
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3001", err: File::NULL).and_return(["", nil])
+      expect(Open3).not_to receive(:capture2).with("lsof", "-ti", ":3800", err: File::NULL)
+
+      described_class.kill_processes
+    end
+
+    it "targets the local renderer URL port when RENDERER_PORT is not set" do
+      ENV["REACT_RENDERER_URL"] = "http://localhost:3900"
+      allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
+      # No pattern-based processes so kill_port_processes runs.
+      allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
+
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3000", err: File::NULL).and_return(["", nil])
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3001", err: File::NULL).and_return(["", nil])
+      expect(Open3).not_to receive(:capture2).with("lsof", "-ti", ":3800", err: File::NULL)
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3900", err: File::NULL).and_return(["3901", nil])
+
+      allow(Process).to receive(:pid).and_return(9999)
+      expect(Process).to receive(:kill).with("TERM", 3901)
+
+      described_class.kill_processes
+    end
+
+    it "does not treat userinfo digits as an explicit local renderer URL port" do
+      ENV["REACT_RENDERER_URL"] = "http://user:3800@localhost"
+      allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
+      allow(described_class).to receive(:pro_renderer_active?).and_return(true)
+      # No pattern-based processes so kill_port_processes runs.
+      allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
+
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3000", err: File::NULL).and_return(["", nil])
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3001", err: File::NULL).and_return(["", nil])
+      expect(Open3).not_to receive(:capture2).with("lsof", "-ti", ":80", err: File::NULL)
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3800", err: File::NULL).and_return(["3801", nil])
+
+      allow(Process).to receive(:pid).and_return(9999)
+      expect(Process).to receive(:kill).with("TERM", 3801)
 
       described_class.kill_processes
     end
@@ -600,6 +1485,33 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       expect { described_class.show_help }.to output(/TEST ASSET WORKFLOWS/).to_stdout_from_any_process
       expect { described_class.show_help }.to output(%r{bin/dev test-watch}).to_stdout_from_any_process
       expect { described_class.show_help }.to output(%r{bin/dev static}).to_stdout_from_any_process
+    end
+
+    context "when base-port mode is active" do
+      include_context "with clean port env"
+
+      before do
+        ENV["REACT_ON_RAILS_BASE_PORT"] = "5000"
+      end
+
+      it "advertises the base-derived Rails port for HMR mode" do
+        expect { described_class.show_help }
+          .to output(%r{HMR Development.*Access at.*http://localhost:5000/<route>}m).to_stdout_from_any_process
+      end
+
+      it "advertises the base-derived Rails port for production-assets mode" do
+        expect { described_class.show_help }
+          .to output(%r{Production-assets.*Access at.*http://localhost:5000/<route>}m).to_stdout_from_any_process
+      end
+    end
+
+    context "when base-port mode is not active" do
+      include_context "with clean port env"
+
+      it "advertises 3001 for production-assets mode" do
+        expect { described_class.show_help }
+          .to output(%r{Production-assets.*Access at.*http://localhost:3001/<route>}m).to_stdout_from_any_process
+      end
     end
   end
 

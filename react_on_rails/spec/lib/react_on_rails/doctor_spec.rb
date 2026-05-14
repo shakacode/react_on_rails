@@ -1878,15 +1878,17 @@ RSpec.describe ReactOnRails::Doctor do
   describe "Pro package consistency checks" do
     let(:doctor) { described_class.new }
     let(:checker) { doctor.instance_variable_get(:@checker) }
+    let(:package_json_path) { "/tmp/myapp/package.json" }
 
     before do
       allow(File).to receive(:exist?).and_call_original
-      allow(File).to receive(:exist?).with("package.json").and_return(true)
+      allow(doctor).to receive(:resolved_package_json_path).and_return(package_json_path)
+      allow(File).to receive(:exist?).with(package_json_path).and_return(true)
     end
 
     context "when both react-on-rails and react-on-rails-pro npm packages are installed" do
       before do
-        allow(File).to receive(:read).with("package.json").and_return(
+        allow(File).to receive(:read).with(package_json_path).and_return(
           JSON.generate({ "dependencies" => { "react-on-rails" => "16.4.0", "react-on-rails-pro" => "16.4.0" } })
         )
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
@@ -1902,7 +1904,7 @@ RSpec.describe ReactOnRails::Doctor do
 
     context "when Pro gem is installed but using base npm package" do
       before do
-        allow(File).to receive(:read).with("package.json").and_return(
+        allow(File).to receive(:read).with(package_json_path).and_return(
           JSON.generate({ "dependencies" => { "react-on-rails" => "16.4.0" } })
         )
         allow(ReactOnRails::Utils).to receive_messages(
@@ -1920,7 +1922,7 @@ RSpec.describe ReactOnRails::Doctor do
 
     context "when Pro npm package is installed without Pro gem" do
       before do
-        allow(File).to receive(:read).with("package.json").and_return(
+        allow(File).to receive(:read).with(package_json_path).and_return(
           JSON.generate({ "dependencies" => { "react-on-rails-pro" => "16.4.0" } })
         )
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
@@ -1934,7 +1936,7 @@ RSpec.describe ReactOnRails::Doctor do
 
     context "when packages and gems are consistent" do
       before do
-        allow(File).to receive(:read).with("package.json").and_return(
+        allow(File).to receive(:read).with(package_json_path).and_return(
           JSON.generate({ "dependencies" => { "react-on-rails" => "16.4.0" } })
         )
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
@@ -1954,6 +1956,7 @@ RSpec.describe ReactOnRails::Doctor do
         allow(ReactOnRails).to receive(:configuration).and_return(
           instance_double(ReactOnRails::Configuration, node_modules_location: "client")
         )
+        allow(doctor).to receive(:resolved_package_json_path).and_return(package_json_path)
         allow(File).to receive(:exist?).with(package_json_path).and_return(true)
         allow(File).to receive(:read).with(package_json_path).and_return(
           JSON.generate({ "dependencies" => { "react-on-rails-pro" => "16.4.0" } })
@@ -1964,6 +1967,73 @@ RSpec.describe ReactOnRails::Doctor do
       it "uses the configured workspace package.json path" do
         expect(checker).to receive(:add_error).with(/npm package is installed but the Pro gem is not/)
         doctor.send(:check_pro_package_consistency)
+      end
+    end
+
+    context "when node_modules_location points to a missing JS workspace" do
+      let(:rails_root) { Pathname.new("/tmp/myapp") }
+      let(:package_root) { rails_root.join("client") }
+      let(:workspace_package_json_path) { package_root.join("package.json").to_s }
+
+      before do
+        allow(Rails).to receive(:root).and_return(rails_root)
+        allow(ReactOnRails).to receive(:configuration).and_return(
+          instance_double(ReactOnRails::Configuration, node_modules_location: "client")
+        )
+        allow(doctor).to receive(:resolved_package_json_path).and_call_original
+        allow(File).to receive(:exist?).with(workspace_package_json_path).and_return(false)
+        allow(Dir).to receive(:exist?).with(package_root.to_s).and_return(false)
+      end
+
+      it "warns instead of silently skipping the Pro package check" do
+        doctor.send(:check_pro_package_consistency)
+
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("node_modules_location points to #{package_root}") })
+          .to be true
+        expect(warning_msgs.any? { |m| m[:content].include?("all diagnostics that read from it are skipped") })
+          .to be true
+      end
+
+      it "warns once when checker and doctor see the same missing package root" do
+        allow(checker).to receive(:cli_exists?).with("npm").and_return(true)
+        allow(checker).to receive(:cli_exists?).with("pnpm").and_return(false)
+        allow(checker).to receive(:cli_exists?).with("yarn").and_return(false)
+        allow(checker).to receive(:cli_exists?).with("bun").and_return(false)
+
+        checker.check_package_manager
+        doctor.send(:check_pro_package_consistency)
+
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        root_warnings = warning_msgs.select do |message|
+          message[:content].include?("node_modules_location points to #{package_root}")
+        end
+        expect(root_warnings.length).to eq(1)
+      end
+    end
+
+    context "when the configured JS workspace exists without package.json" do
+      let(:rails_root) { Pathname.new("/tmp/myapp") }
+      let(:package_root) { rails_root.join("client") }
+      let(:workspace_package_json_path) { package_root.join("package.json").to_s }
+
+      before do
+        allow(Rails).to receive(:root).and_return(rails_root)
+        allow(ReactOnRails).to receive(:configuration).and_return(
+          instance_double(ReactOnRails::Configuration, node_modules_location: "client")
+        )
+        allow(doctor).to receive(:resolved_package_json_path).and_call_original
+        allow(File).to receive(:exist?).with(workspace_package_json_path).and_return(false)
+        allow(Dir).to receive(:exist?).with(package_root.to_s).and_return(true)
+      end
+
+      it "warns instead of silently skipping the Pro package check" do
+        doctor.send(:check_pro_package_consistency)
+
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("#{workspace_package_json_path} not found") })
+          .to be true
+        expect(warning_msgs.any? { |m| m[:content].include?("Pro package consistency") }).to be true
       end
     end
   end
@@ -2068,8 +2138,10 @@ RSpec.describe ReactOnRails::Doctor do
 
     it "does not add Gemfile guidance when no package versions changed" do
       result = ReactOnRails::VersionSynchronizer::Result.new(
-        changes: [],
-        changed_files: [],
+        changes: [
+          { section: "dependencies", package: "react-on-rails", from: "^16.0.0", to: "16.5.0" }
+        ],
+        changed_files: ["package.json"],
         unsupported_specs: [],
         missing_source_specs: []
       )
@@ -2119,6 +2191,47 @@ RSpec.describe ReactOnRails::Doctor do
   end
 
   describe "private path resolution helpers" do
+    describe "#resolved_package_root" do
+      let(:rails_root) { Pathname.new("/tmp/myapp") }
+
+      before do
+        allow(Rails).to receive(:root).and_return(rails_root)
+      end
+
+      def stub_node_modules_location(path)
+        allow(ReactOnRails).to receive(:configuration).and_return(
+          instance_double(ReactOnRails::Configuration, node_modules_location: path)
+        )
+      end
+
+      it "resolves root package paths to Rails.root" do
+        [nil, "", ".", rails_root.to_s, "#{rails_root}/"].each do |node_modules_location|
+          doctor = described_class.new(verbose: false, fix: false)
+          stub_node_modules_location(node_modules_location)
+
+          expect(doctor.send(:resolved_package_root)).to eq(rails_root.to_s)
+          expect(doctor.send(:resolved_package_json_path)).to eq(rails_root.join("package.json").to_s)
+          expect(doctor.send(:resolved_package_path, "package.json")).to eq(rails_root.join("package.json").to_s)
+        end
+      end
+
+      it "resolves nested package paths under Rails.root" do
+        stub_node_modules_location("client")
+
+        expect(doctor.send(:resolved_package_root)).to eq(rails_root.join("client").to_s)
+        expect(doctor.send(:resolved_package_json_path)).to eq(rails_root.join("client", "package.json").to_s)
+        expect(doctor.send(:resolved_package_path, "yarn.lock")).to eq(rails_root.join("client", "yarn.lock").to_s)
+      end
+
+      it "passes through absolute package paths" do
+        stub_node_modules_location("/opt/app/client/")
+
+        expect(doctor.send(:resolved_package_root)).to eq("/opt/app/client")
+        expect(doctor.send(:resolved_package_json_path)).to eq("/opt/app/client/package.json")
+        expect(doctor.send(:resolved_package_path, "yarn.lock")).to eq("/opt/app/client/yarn.lock")
+      end
+    end
+
     describe "#resolved_webpack_config_path" do
       it "prioritizes shakapacker's exact assets_bundler_config_path" do
         allow(File).to receive(:file?).and_return(false)
@@ -2493,6 +2606,390 @@ RSpec.describe ReactOnRails::Doctor do
         doctor.send(:check_pro_initializer_existence)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? { |m| m[:content].include?("Pro initializer not found") }).to be true
+      end
+    end
+  end
+
+  describe "check_deprecated_renderer_cache_task" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    context "when a Procfile references the deprecated task" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        File.write(
+          File.join(tmpdir, "Procfile"),
+          "web: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer && bundle exec puma\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "warns with migration guidance" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("pre_stage_bundle_for_node_renderer") }).to be(true)
+        expect(warning_msgs.any? { |m| m[:content].include?("MODE=symlink") }).to be(true)
+      end
+    end
+
+    context "when a Dockerfile variant references the deprecated task" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        File.write(
+          File.join(tmpdir, "Dockerfile.production"),
+          "RUN bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "suggests the copy-mode task without MODE=symlink" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs).not_to be_empty
+        warning_content = warning_msgs.map { |m| m[:content] }.join("\n")
+        # Match from the bullet header through any indented continuation lines.
+        bullet_section = warning_content[/  • Dockerfile\.production →(?:\n {6,}.*)*/]
+        expect(bullet_section).not_to be_nil
+        expect(bullet_section).to include("ENV RENDERER_SERVER_BUNDLE_CACHE_PATH=/app/.node-renderer-bundles")
+        expect(bullet_section).to include("RUN bundle exec rake react_on_rails_pro:pre_seed_renderer_cache")
+        expect(bullet_section).not_to include(tmpdir)
+        expect(bullet_section).not_to include("MODE=symlink")
+      end
+    end
+
+    context "when a compose file references the deprecated task" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        File.write(
+          File.join(tmpdir, "docker-compose.yml"),
+          "services:\n  web:\n    command: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "warns with migration guidance and a copy-mode hint for image builds" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        suggestion_line = warning_msgs
+                          .flat_map { |m| m[:content].split("\n") }
+                          .find { |line| line.include?("docker-compose.yml →") }
+        expect(suggestion_line).not_to be_nil
+        expect(suggestion_line).to include("pre_seed_renderer_cache")
+        expect(suggestion_line).to include("MODE=symlink")
+        expect(suggestion_line).to include("MODE=copy")
+      end
+    end
+
+    context "when a Compose V2 compose.yaml references the deprecated task" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        File.write(
+          File.join(tmpdir, "compose.yaml"),
+          "services:\n  web:\n    command: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "detects .yaml variants of Compose files" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        suggestion_line = warning_msgs
+                          .flat_map { |m| m[:content].split("\n") }
+                          .find { |line| line.include?("compose.yaml →") }
+        expect(suggestion_line).not_to be_nil
+        expect(suggestion_line).to include("pre_seed_renderer_cache")
+      end
+    end
+
+    context "when a Kamal deploy config references the deprecated task" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        FileUtils.mkdir_p(File.join(tmpdir, ".kamal"))
+        File.write(
+          File.join(tmpdir, ".kamal", "deploy.yml"),
+          "hooks:\n  post-deploy: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "shows MODE=symlink and MODE=copy on separate lines for deploy vs image-build hooks" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs).not_to be_empty
+        warning_content = warning_msgs.map { |m| m[:content] }.join("\n")
+        # Match from the bullet header through any indented continuation lines.
+        bullet_section = warning_content[%r{  • \.kamal/deploy\.yml →(?:\n {6,}.*)*}]
+        expect(bullet_section).not_to be_nil
+        expect(bullet_section).to include("rake react_on_rails_pro:pre_seed_renderer_cache MODE=symlink")
+        expect(bullet_section).to include("Kamal deploy hooks")
+        expect(bullet_section).to include("Kamal image-build hooks")
+        expect(bullet_section).to include("MODE=copy")
+        # The previous trailing-comment form ("# use copy mode for image builds") was contradictory
+        # for users editing build hooks, so it must not reappear on the same line as the command.
+        expect(bullet_section).not_to match(/MODE=symlink # use copy mode for image builds/)
+      end
+    end
+
+    context "when a Capistrano staging deploy config references the deprecated task" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        FileUtils.mkdir_p(File.join(tmpdir, "config/deploy"))
+        File.write(
+          File.join(tmpdir, "config/deploy/staging.rb"),
+          "before 'deploy:assets:precompile', 'react_on_rails_pro:pre_stage_bundle_for_node_renderer'\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "flags multi-stage Capistrano deploy files for migration" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        suggestion_line = warning_msgs
+                          .flat_map { |m| m[:content].split("\n") }
+                          .find { |line| line.include?("config/deploy/staging.rb →") }
+        expect(suggestion_line).not_to be_nil
+        expect(suggestion_line).to include("pre_seed_renderer_cache")
+        expect(suggestion_line).to include("MODE=symlink")
+      end
+    end
+
+    context "when no deploy scripts reference the deprecated task" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before { allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir)) }
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "adds no warnings" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        expect(checker.messages.select { |m| m[:type] == :warning }).to be_empty
+      end
+    end
+
+    context "when a configured deploy-script path is a directory" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        FileUtils.mkdir_p(File.join(tmpdir, "bin/deploy"))
+        File.write(
+          File.join(tmpdir, "Procfile"),
+          "web: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "skips the directory and continues scanning real files" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+
+        expect(warning_msgs.any? { |m| m[:content].include?("Procfile") }).to be(true)
+        expect(warning_msgs.none? do |m|
+                 m[:content].include?("Could not scan bin/deploy for deprecated renderer-cache task")
+               end).to be(true)
+      end
+    end
+
+    context "when a deploy-script file exceeds the size gate" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        # Stub the cap so we do not have to write a real 1 MB file — the gate
+        # logic is what we are exercising, not the specific threshold.
+        stub_const("ReactOnRails::Doctor::RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES", 64)
+        padding = "x" * 128
+        File.write(
+          File.join(tmpdir, "Procfile"),
+          "web: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n#{padding}"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "silently skips the file and emits no warning" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        expect(checker.messages.select { |m| m[:type] == :warning }).to be_empty
+      end
+    end
+
+    context "when a deploy-script file is exactly the size gate" do
+      let(:tmpdir) { Dir.mktmpdir }
+      let(:script_content) do
+        "web: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+      end
+
+      before do
+        stub_const("ReactOnRails::Doctor::RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES", script_content.bytesize)
+        File.write(File.join(tmpdir, "Procfile"), script_content)
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "still scans the file" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("pre_stage_bundle_for_node_renderer") }).to be(true)
+      end
+    end
+
+    context "when reading a deploy-script file raises an unexpected error" do
+      let(:tmpdir) { Dir.mktmpdir }
+      let(:procfile_path) { File.join(tmpdir, "Procfile") }
+
+      before do
+        File.write(
+          procfile_path,
+          "web: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+        root_path = Pathname.new(tmpdir)
+        allow(Rails).to receive(:root).and_return(root_path)
+
+        # Simulate a filesystem error (e.g. transient EIO or a permissions race)
+        # on the actual Pathname receiver used by the doctor scan.
+        failing_procfile = instance_double(Pathname)
+        allow(failing_procfile).to receive_messages(file?: true, size: File.size(procfile_path))
+        allow(failing_procfile).to receive(:binread).and_raise(Errno::EIO, "simulated read failure")
+        allow(root_path).to receive(:join).and_call_original
+        allow(root_path).to receive(:join).with("Procfile").and_return(failing_procfile)
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "captures the error as a warning that names the offending file" do
+        expect { doctor.send(:check_deprecated_renderer_cache_task) }.not_to raise_error
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? do |m|
+                 m[:content].include?("Could not scan Procfile for deprecated renderer-cache task")
+               end).to be(true)
+      end
+    end
+
+    context "when probing a deploy-script file size raises an unexpected error" do
+      let(:tmpdir) { Dir.mktmpdir }
+      let(:deploy_path) { File.join(tmpdir, "bin", "deploy") }
+
+      before do
+        FileUtils.mkdir_p(File.dirname(deploy_path))
+        File.write(
+          deploy_path,
+          "bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+
+        root_path = Pathname.new(tmpdir)
+        allow(Rails).to receive(:root).and_return(root_path)
+
+        failing_procfile = instance_double(Pathname)
+        allow(failing_procfile).to receive(:file?).and_return(true)
+        allow(failing_procfile).to receive(:size).and_raise(Errno::EACCES, "simulated size failure")
+        allow(root_path).to receive(:join).and_call_original
+        allow(root_path).to receive(:join).with("Procfile").and_return(failing_procfile)
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "captures the error for that file and continues scanning the rest" do
+        expect { doctor.send(:check_deprecated_renderer_cache_task) }.not_to raise_error
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? do |m|
+                 m[:content].include?("Could not scan Procfile for deprecated renderer-cache task")
+               end).to be(true)
+        expect(warning_msgs.any? { |m| m[:content].include?("bin/deploy") }).to be(true)
+        expect(warning_msgs.none? do |m|
+                 m[:content].include?("Could not complete scan for deprecated renderer-cache task")
+               end).to be(true)
+      end
+    end
+
+    context "when the deprecated task name appears only inside a comment" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        File.write(
+          File.join(tmpdir, "Procfile"),
+          "# was: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n" \
+          "web: bundle exec puma\n"
+        )
+        File.write(
+          File.join(tmpdir, "Dockerfile"),
+          "# previously: rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n" \
+          "RUN bundle exec rake react_on_rails_pro:pre_seed_renderer_cache\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "does not warn for files where every match is in a leading-comment line" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs).to be_empty
+      end
+    end
+
+    context "when the deprecated task name appears only in a trailing inline comment" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        File.write(
+          File.join(tmpdir, "Procfile"),
+          "web: bundle exec puma  # was: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "does not warn when the task only appears after a trailing `#` annotation" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs).to be_empty
+      end
+    end
+
+    context "when a deploy-script file contains non-UTF-8 bytes" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        # Latin-1 byte (\xE9) outside ASCII; Pathname#read would raise
+        # Encoding::InvalidByteSequenceError if the default external encoding
+        # is UTF-8. The doctor scan should still match the ASCII task name.
+        File.binwrite(
+          File.join(tmpdir, "Procfile"),
+          "# d\xE9ploiement legacy\n" \
+          "web: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "still detects the deprecated task and does not surface a generic scan error" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("pre_stage_bundle_for_node_renderer") }).to be(true)
+        expect(warning_msgs.none? do |m|
+                 m[:content].include?("Could not scan Procfile for deprecated renderer-cache task")
+               end).to be(true)
       end
     end
   end
@@ -3324,6 +3821,15 @@ RSpec.describe ReactOnRails::Doctor do
       File.write("node_modules/react/package.json", "{\"version\":\"#{version}\"}")
     end
 
+    def stub_package_root(path)
+      allow(doctor).to receive(:resolved_package_root).and_return(path)
+    end
+
+    before do
+      # RSpec runs before hooks inside the chdir around hooks below, so Dir.pwd is the per-example tmpdir.
+      stub_package_root(Dir.pwd)
+    end
+
     context "when React 19.0.4+" do
       around do |example|
         Dir.mktmpdir do |tmpdir|
@@ -3426,6 +3932,85 @@ RSpec.describe ReactOnRails::Doctor do
         doctor.send(:check_rsc_react_version)
         success_msgs = checker.messages.select { |m| m[:type] == :success }
         expect(success_msgs.any? { |m| m[:content].include?("19.0.4") }).to be true
+      end
+    end
+
+    context "when React is installed in a configured nested JS workspace" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) { example.run }
+        end
+      end
+
+      it "uses the configured package root for node module resolution" do
+        package_root = File.join(Dir.pwd, "client")
+        FileUtils.mkdir_p("client")
+        File.write("client/package.json", '{"dependencies":{"react":"^19.0.0"}}')
+        FileUtils.mkdir_p("client/node_modules/react")
+        File.write("client/node_modules/react/package.json", '{"version":"19.0.4"}')
+        stub_package_root(package_root)
+        allow(Open3).to receive(:capture3)
+          .with(
+            "node",
+            "-e",
+            "console.log(require.resolve('react/package.json'))",
+            chdir: package_root
+          )
+          .and_return(
+            [
+              "#{File.join(package_root, 'node_modules/react/package.json')}\n",
+              "",
+              instance_double(Process::Status, success?: true)
+            ]
+          )
+
+        doctor.send(:check_rsc_react_version)
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(success_msgs.any? { |m| m[:content].include?("19.0.4") }).to be true
+      end
+
+      it "falls back to the declared React version in the nested package.json when node is unavailable" do
+        FileUtils.mkdir_p("client")
+        File.write("client/package.json", '{"dependencies":{"react":"19.0.4"}}')
+        stub_package_root(File.join(Dir.pwd, "client"))
+        allow(Open3).to receive(:capture3).and_return(
+          ["", "", instance_double(Process::Status, success?: false)]
+        )
+
+        doctor.send(:check_rsc_react_version)
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(success_msgs.any? { |m| m[:content].include?("19.0.4") }).to be true
+      end
+
+      it "warns when the configured package root does not exist" do
+        stub_package_root(File.join(Dir.pwd, "client"))
+
+        doctor.send(:check_rsc_react_version)
+
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("node_modules_location") }).to be true
+        expect(warning_msgs.any? { |m| m[:content].include?("does not exist") }).to be true
+        expect(warning_msgs.any? { |m| m[:content].include?("config/initializers/react_on_rails.rb") }).to be true
+        expect(warning_msgs.count { |m| m[:content].include?("node_modules_location") }).to eq(1)
+        expect(warning_msgs.any? { |m| m[:content].include?("all diagnostics that read from it are skipped") })
+          .to be true
+      end
+
+      it "warns when the configured package root exists without package.json" do
+        package_root = File.join(Dir.pwd, "client")
+        package_json_path = File.join(package_root, "package.json")
+        FileUtils.mkdir_p(package_root)
+        stub_package_root(package_root)
+        allow(Open3).to receive(:capture3).and_return(
+          ["", "", instance_double(Process::Status, success?: false)]
+        )
+
+        doctor.send(:check_rsc_react_version)
+
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("#{package_json_path} not found") }).to be true
+        expect(warning_msgs.any? { |m| m[:content].include?("declared React version") }).to be true
+        expect(warning_msgs.any? { |m| m[:content].include?("config/initializers/react_on_rails.rb") }).to be true
       end
     end
 

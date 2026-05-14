@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "tmpdir"
+
 require_relative "../support/generator_spec_helper"
 
 describe GeneratorMessages do
@@ -95,6 +97,19 @@ describe GeneratorMessages do
     expect(message).not_to include("React on Rails Pro")
   end
 
+  it "does not re-read a missing package.json when building the CI section" do
+    Dir.mktmpdir do |app_root|
+      expect(described_class).to receive(:read_package_json).with(app_root).once.and_call_original
+
+      # Calls the private build_ci_section directly to isolate the read-once invariant;
+      # going through the public `helpful_message_after_installation` path would mix in
+      # other helpers' reads and obscure which call site reopens package.json.
+      message = described_class.send(:build_ci_section, app_root: app_root, ci_workflow_generated: true)
+
+      expect(message).to include("CI / BUILD ORDERING")
+    end
+  end
+
   describe ".detect_package_manager" do
     include_context "with clean REACT_ON_RAILS_PACKAGE_MANAGER env"
 
@@ -133,6 +148,21 @@ describe GeneratorMessages do
       expect(described_class.detect_package_manager).to eq("yarn")
     end
 
+    it "detects a bare packageManager name even when it has no Corepack version" do
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package.json")).and_return(true)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "yarn.lock")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "pnpm-lock.yaml")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "bun.lock")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "bun.lockb")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package-lock.json")).and_return(false)
+      allow(File).to receive(:read).and_call_original
+      allow(File).to receive(:read).with(File.join(Dir.pwd, "package.json"))
+                                   .and_return('{"packageManager": "pnpm"}')
+
+      expect(described_class.detect_package_manager).to eq("pnpm")
+    end
+
     it "ignores an unsupported packageManager value and falls through to lockfiles" do
       allow(File).to receive(:exist?).and_call_original
       allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package.json")).and_return(true)
@@ -142,6 +172,15 @@ describe GeneratorMessages do
                                    .and_return('{"packageManager": "unknown@1.0.0"}')
 
       expect(described_class.detect_package_manager).to eq("yarn")
+    end
+
+    it "treats package_json: nil as a cached missing package.json and falls through to lockfiles" do
+      expect(described_class).not_to receive(:read_package_json)
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package.json")).and_return(true)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "yarn.lock")).and_return(true)
+
+      expect(described_class.detect_package_manager(package_json: nil)).to eq("yarn")
     end
 
     it "returns nil from detect_package_manager_from_package_json for malformed JSON" do
@@ -338,6 +377,132 @@ describe GeneratorMessages do
     it "returns false for unknown package managers" do
       expect(described_class.lockfile_for_manager?("unknown")).to be(false)
       expect(described_class.lockfile_for_manager?(nil)).to be(false)
+    end
+  end
+
+  describe ".package_manager_declared?" do
+    # Drives the "pin pnpm version in CI scaffold" fix (#3172): the template
+    # only injects `with: version:` when the field is missing and the pnpm
+    # action would otherwise fail on setup.
+    let(:app_root) { Dir.pwd }
+    let(:package_json_path) { File.join(app_root, "package.json") }
+
+    before { allow(File).to receive(:exist?).and_call_original }
+
+    it "requires callers to specify which package manager they need declared" do
+      expect { described_class.package_manager_declared? }.to raise_error(ArgumentError, /manager/)
+    end
+
+    it "returns true when package.json declares the requested packageManager" do
+      allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+      allow(File).to receive(:read).with(package_json_path)
+                                   .and_return('{"packageManager":"pnpm@9.0.0"}')
+      expect(described_class.package_manager_declared?(manager: "pnpm")).to be(true)
+    end
+
+    it "returns true when packageManager includes a Corepack hash annotation" do
+      allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+      allow(File).to receive(:read).with(package_json_path)
+                                   .and_return('{"packageManager":"pnpm@9.0.0+sha256.abc123"}')
+      expect(described_class.package_manager_declared?(manager: "pnpm")).to be(true)
+    end
+
+    it "returns true when packageManager includes a SemVer prerelease" do
+      expect(
+        described_class.package_manager_declared?(
+          manager: "pnpm",
+          package_json: { "packageManager" => "pnpm@11.0.0-alpha.1" }
+        )
+      ).to be(true)
+    end
+
+    it "returns false when packageManager is absent" do
+      allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+      allow(File).to receive(:read).with(package_json_path).and_return('{"name":"app"}')
+      expect(described_class.package_manager_declared?(manager: "pnpm")).to be(false)
+    end
+
+    it "returns false when package.json is missing" do
+      allow(File).to receive(:exist?).with(package_json_path).and_return(false)
+      expect(described_class.package_manager_declared?(manager: "pnpm")).to be(false)
+    end
+
+    it "treats package_json: nil as a cached missing package.json" do
+      expect(File).not_to receive(:read)
+
+      expect(described_class.package_manager_declared?(manager: "pnpm", package_json: nil)).to be(false)
+    end
+
+    it "returns false when packageManager declares an unsupported tool" do
+      allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+      allow(File).to receive(:read).with(package_json_path)
+                                   .and_return('{"packageManager":"deno@1.0.0"}')
+      expect(described_class.package_manager_declared?(manager: "pnpm")).to be(false)
+    end
+
+    # Corepack rejects a bare manager name with no @version, and `pnpm/action-setup`
+    # has nothing to resolve from such a field — so the CI scaffold must still pin
+    # the fallback version when packageManager is malformed this way.
+    it "returns false when packageManager omits the version (no @ separator)" do
+      allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+      allow(File).to receive(:read).with(package_json_path)
+                                   .and_return('{"packageManager":"pnpm"}')
+      expect(described_class.package_manager_declared?(manager: "pnpm")).to be(false)
+    end
+
+    it "returns false when packageManager has an empty version after the separator" do
+      allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+      allow(File).to receive(:read).with(package_json_path)
+                                   .and_return('{"packageManager":"pnpm@"}')
+      expect(described_class.package_manager_declared?(manager: "pnpm")).to be(false)
+    end
+
+    it "returns false when packageManager has text after the version" do
+      allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+      allow(File).to receive(:read).with(package_json_path)
+                                   .and_return('{"packageManager":"pnpm@9.0.0 extra text"}')
+      expect(described_class.package_manager_declared?(manager: "pnpm")).to be(false)
+    end
+
+    it "returns true when packageManager uses npm-style version specs" do
+      %w[pnpm@10 pnpm@10.x pnpm@^10.0.0 pnpm@latest pnpm@*].each do |package_manager|
+        expect(
+          described_class.package_manager_declared?(
+            manager: "pnpm",
+            package_json: { "packageManager" => package_manager }
+          )
+        ).to be(true), "expected #{package_manager.inspect} to count as an explicit packageManager declaration"
+      end
+    end
+
+    it "uses a provided package_json without reading package.json again" do
+      expect(File).not_to receive(:read)
+
+      expect(
+        described_class.package_manager_declared?(
+          manager: "pnpm",
+          package_json: { "packageManager" => "pnpm@9.0.0" }
+        )
+      ).to be(true)
+    end
+
+    # Prevents a false negative in the CI scaffold: if pnpm is selected via
+    # REACT_ON_RAILS_PACKAGE_MANAGER or pnpm-lock.yaml while package.json declares
+    # a different manager, `pnpm/action-setup` still needs the explicit version pin.
+    it "returns false when packageManager declares a different manager" do
+      allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+      allow(File).to receive(:read).with(package_json_path)
+                                   .and_return('{"packageManager":"yarn@1.22.0"}')
+      expect(described_class.package_manager_declared?(manager: "pnpm")).to be(false)
+    end
+
+    it "does not treat devEngines.packageManager as declared for pnpm/action-setup v4" do
+      expect(
+        described_class.package_manager_declared?(
+          manager: "pnpm",
+          package_json: { "devEngines" => { "packageManager" => "pnpm@9.14.2" } }
+        )
+      ).to be(false)
     end
   end
 end

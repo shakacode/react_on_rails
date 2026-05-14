@@ -24,6 +24,26 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  # Reads the repo's own package.json packageManager pin and returns the version.
+  # Anchoring on package.json (the user-visible source of truth) instead of
+  # `const_get(:CI_PNPM_FALLBACK_VERSION)` keeps the assertion on observable surface
+  # area and avoids reaching past `private_constant` from the spec.
+  def repo_pinned_pnpm_version
+    package_manager = JSON.parse(
+      File.read(File.expand_path("../../../../package.json", __dir__))
+    )["packageManager"]
+    expect(package_manager).not_to(
+      be_nil,
+      "package.json must declare packageManager so CI_PNPM_FALLBACK_VERSION stays in sync"
+    )
+    match = package_manager.match(/\Apnpm@(.+)\z/)
+    expect(match).not_to(
+      be_nil,
+      "package.json packageManager must declare a pnpm@<version> spec, got #{package_manager.inspect}"
+    )
+    match[1]
+  end
+
   context "without args" do
     before(:all) { run_generator_test_with_args(%w[], package_json: true) }
 
@@ -1341,7 +1361,7 @@ describe InstallGenerator, type: :generator do
     it "adds node-renderer process to Procfile.dev" do
       assert_file "Procfile.dev" do |content|
         expect(content).to include("node-renderer:")
-        expect(content).to include("RENDERER_PORT=3800")
+        expect(content).to include("RENDERER_PORT=${RENDERER_PORT:-3800}")
         expect(content).to include("node renderer/node-renderer.js")
       end
     end
@@ -2016,6 +2036,106 @@ describe InstallGenerator, type: :generator do
         expect(content).not_to include('cache: "pnpm"')
         # Falls back to frozen-lockfile-safe install so the workflow still runs.
         expect(content).to include("pnpm install --no-frozen-lockfile")
+      end
+    end
+
+    it "omits the pnpm fallback version when packageManager is declared" do
+      assert_file ".github/workflows/ci.yml" do |content|
+        expect(content).to include("uses: pnpm/action-setup@v4")
+        # `pnpm/action-setup` reads the version from `packageManager` when declared,
+        # so the scaffold must not inject a `with: version:` that would override it.
+        # Mirrors the regex used in the "pins a pnpm version" test, minus the value.
+        expect(content).not_to match(
+          %r{pnpm/action-setup@v4\n\s+with:\n(?:\s+\#[^\n]*\n)*\s+version:}
+        )
+        expect(content).to match(
+          %r{uses: pnpm/action-setup@v4\n\s+- name: Set up Node}
+        )
+      end
+    end
+  end
+
+  context "when pnpm is detected from lockfile only (no packageManager field)" do
+    before(:all) do
+      # Existing Shakapacker app: pre-create binaries + config so `ensure_shakapacker_installed`
+      # short-circuits and the `seed_package_manager_in_package_json_from_lockfile!` path
+      # (which would otherwise add `packageManager` to package.json) is skipped.
+      run_generator_test_with_args(%w[], package_json: true) do
+        simulate_existing_file("pnpm-lock.yaml", "")
+        simulate_existing_file("bin/shakapacker", "")
+        simulate_existing_file("bin/shakapacker-dev-server", "")
+        simulate_existing_file("config/shakapacker.yml", "default: &default\n")
+        simulate_existing_file("config/webpack/webpack.config.js", "")
+      end
+    end
+
+    # Issue #3172: pnpm/action-setup@v4 requires `version:` unless packageManager is declared.
+    # Existing Shakapacker apps skip the seeding path, so the CI scaffold has to pin the
+    # version itself or the workflow fails before dependency install.
+    it "pins a pnpm version in the setup step" do
+      fallback_version = repo_pinned_pnpm_version
+
+      assert_file ".github/workflows/ci.yml" do |content|
+        expect(content).to include("uses: pnpm/action-setup@v4")
+        expect(content).to match(
+          %r{pnpm/action-setup@v4\n\s+with:\n(?:\s+\#[^\n]*\n)*\s+version: "#{Regexp.escape(fallback_version)}"}
+        )
+        expect(content).to match(
+          /version: "#{Regexp.escape(fallback_version)}"\n\s+- name: Set up Node/
+        )
+      end
+    end
+  end
+
+  it "keeps the fallback pin tied to a version-specific pnpm release note" do
+    fallback_version = repo_pinned_pnpm_version
+    generator_source = File.read(
+      File.expand_path("../../../lib/generators/react_on_rails/install_generator.rb", __dir__)
+    )
+
+    expect(fallback_version).to match(/\A\d+\.\d+\.\d+\z/)
+    expect(generator_source).to include(%(CI_PNPM_FALLBACK_VERSION = "#{fallback_version}"))
+    expect(generator_source).to include(
+      "https://github.com/pnpm/pnpm/releases/tag/v#{fallback_version}"
+    )
+    expect(generator_source).to include(
+      "renovate: datasource=github-releases depName=pnpm/pnpm"
+    )
+  end
+
+  context "when env selects pnpm but packageManager declares yarn" do
+    around do |example|
+      previous_package_manager = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)
+      ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = "pnpm"
+      run_generator_test_with_args(%w[], package_json: true) do
+        simulate_existing_file("pnpm-lock.yaml", "")
+        simulate_existing_file("bin/shakapacker", "")
+        simulate_existing_file("bin/shakapacker-dev-server", "")
+        simulate_existing_file("config/shakapacker.yml", "default: &default\n")
+        simulate_existing_file("config/webpack/webpack.config.js", "")
+        simulate_existing_file(
+          "package.json",
+          "#{JSON.pretty_generate('name' => 'app', 'packageManager' => 'yarn@1.22.0')}\n"
+        )
+      end
+
+      example.run
+    ensure
+      if previous_package_manager.nil?
+        ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
+      else
+        ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = previous_package_manager
+      end
+    end
+
+    it "pins the pnpm fallback version in the setup step" do
+      fallback_version = repo_pinned_pnpm_version
+
+      assert_file ".github/workflows/ci.yml" do |content|
+        expect(content).to include("uses: pnpm/action-setup@v4")
+        expect(content).to match(
+          %r{pnpm/action-setup@v4\n\s+with:\n(?:\s+\#[^\n]*\n)*\s+version: "#{Regexp.escape(fallback_version)}"}
+        )
       end
     end
   end

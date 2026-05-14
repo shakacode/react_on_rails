@@ -32,6 +32,7 @@ exclude = [
   '^https://invite\.reactrails\.com/?$',  # Slack invite endpoint returns 403 for automated requests
   '^https://docs\.google\.com',  # Private docs require auth
   '^https://claude\.ai',  # Returns 403 for automated requests
+  '^https://bencher\.dev/(console/projects|perf)/react-on-rails-t8a9ncxo(/.*)?$',  # Dashboard and perf URLs require auth; return 403
   '^https://(www\.)?110grill\.com/?$',  # Returns 403 for automated requests
 
   # ============================================================================
@@ -67,6 +68,7 @@ exclude = [
   '^https://angularjs\.org/?$',            # Connection failed from CI
   '^https://frigade\.com/blog/bundle-size-reduction-with-rsc-and-frigade/?$', # Connection failed from CI
   '^https://tanstack\.com/router',           # Connection failed from CI
+  '^https://tanstack\.com/query/latest/docs/framework/react/guides/ssr$', # Connection failed from CI
   '^https://lodash\.com',                    # Connection reset from CI
   '^https://vite-ruby\.netlify\.app/?$',     # Intermittent connection resets from CI
 
@@ -88,6 +90,7 @@ exclude = [
   '^https://(www\.)?estately\.com', # Returns 403
   '^https://hiring\.careerbuilder\.com',  # Returns 403
   '^https://(www\.)?yourmechanic\.com',  # Returns 403/503
+  '^https://(www\.)?guavapass\.com',  # TLS handshake failures from CI
   '^https?://(www\.)?hvmn\.com',  # Returns 503 from CI
   '^https://(www\.)?hawaiichee\.com/?$', # Intermittent 500 from CI
 
@@ -112,15 +115,22 @@ exclude = [
   '^https://github\.com/shakacode/react_on_rails/compare/',
   '^https://github\.com/shakacode/react_on_rails/pull/[0-9]+$',  # Intermittent 5xx from GitHub PR pages in CI
   '^https://github\.com/shakacode/react_on_rails/actions/workflows/pro-test-package-and-gem\.yml$',  # Intermittent 502 from GitHub Actions workflow pages in CI
+  '^https://github\.com/shakacode/react_on_rails/issues/2766$',  # Intermittent 502 from GitHub issue pages in CI
+  '^https://github\.com/rack/rack/blob/main/SPEC\.rdoc$',  # Intermittent 502 from GitHub blob pages in CI
   '^https://github\.com/shakacode/shakapacker/blob/cdf32835d3e0949952b8b4b53063807f714f9b24/package/environments/base\.js(#.*)?$',  # Intermittent 502 from GitHub blob view in CI
   '^https://github\.com/npm/cli/issues/6253$',  # Intermittent 502 from GitHub issue pages in CI
   '^https://github\.com/search\?q=gem\+react_on_rails&ref=advsearch&type=repositories&utf8=%E2%9C%93$',  # Intermittent 502 from GitHub search in CI
 
   # ============================================================================
+  # EXTERNAL DOC PAGES WITH CI CONNECTIVITY FAILURES
+  # ============================================================================
+  '^https://tanstack\.com/query/latest/docs/framework/react/guides/ssr$',  # Connection failed from CI
+
+  # ============================================================================
   # DELETED GITHUB USER ACCOUNTS (return 502/404 from CI)
   # ============================================================================
   # Contributors whose accounts no longer exist
-  '^https://github\.com/(alleycat-at-git|Conturbo|jblasco3|nostophilia|railsme|samphilipd|wouldntsavezion)$',
+  '^https://github\.com/(alleycat-at-git|Conturbo|jblasco3|nostophilia|pulkitkkr|railsme|samphilipd|wouldntsavezion)$',
 
   # ============================================================================
   # PRIVATE REPOSITORIES
@@ -139,6 +149,8 @@ exclude_path = [
 # Don't check fragments/anchors (can be flaky)
 include_fragments = false
 
-# Cache results to speed up repeated runs
+# Keep CI cache entries short-lived so transient external failures do not
+# linger across otherwise valid PRs.
 cache = true
-max_cache_age = "1d"
+max_cache_age = "6h"
+cache_exclude_status = ["429", "500..=599"]
