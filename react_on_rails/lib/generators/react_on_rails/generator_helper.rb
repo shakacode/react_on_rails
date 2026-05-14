@@ -147,6 +147,15 @@ module GeneratorHelper
     @pro_gem_installed = Gem.loaded_specs.key?("react_on_rails_pro") || gem_in_lockfile?("react_on_rails_pro")
   end
 
+  # TODO: CQS smell — `mark_pro_gem_installed!` lets `pro_gem_installed?` return
+  # true before the gem is actually in the lockfile. Called from both
+  # `attempt_pro_gem_auto_install` (after `bundle add` succeeds but before bundle
+  # install) and `defer_pro_gem_install_to_gemfile_swap` (before the Gemfile is
+  # rewritten and bundle install runs). Callers can't distinguish "really
+  # installed" from "scheduled to be installed by this generator run". Refactor:
+  # keep `pro_gem_installed?` truthful (real lockfile/loaded check only) and add
+  # a separate `@pro_gem_install_deferred` flag that callers needing the broader
+  # meaning consult explicitly.
   def mark_pro_gem_installed!
     @pro_gem_installed = true
   end

@@ -58,6 +58,7 @@ module ReactOnRails
       def missing_pro_gem?(force: false)
         return false unless force || use_pro?
         return false if pro_gem_installed?
+        return false if defer_pro_gem_install_to_gemfile_swap
         return false if attempt_pro_gem_auto_install
 
         optional_prerelease_line = prerelease_note.empty? ? "" : "\n#{prerelease_note}"
@@ -530,6 +531,22 @@ module ReactOnRails
 
       def pro_gem_auto_install_command
         "bundle add #{PRO_GEM_NAME} --version='#{pro_gem_version_requirement}' --strict"
+      end
+
+      def defer_pro_gem_install_to_gemfile_swap
+        return false unless base_react_on_rails_gem_in_gemfile?
+
+        mark_pro_gem_installed!
+        true
+      end
+
+      def base_react_on_rails_gem_in_gemfile?
+        gemfile_path = File.join(destination_root, "Gemfile")
+        return false unless File.exist?(gemfile_path)
+
+        File.read(gemfile_path).match?(/^\s*gem(?:\s+|\(\s*)["']react_on_rails["'](?=\s*(?:,|\)|#|$))/)
+      rescue StandardError
+        false
       end
 
       def pro_gem_version_requirement

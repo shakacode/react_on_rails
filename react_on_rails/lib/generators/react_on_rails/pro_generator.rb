@@ -924,25 +924,14 @@ module ReactOnRails
       def build_pro_gem_replacement_line(indentation:, quote:, suffix:, parenthesized_gem_call: false)
         normalized_suffix = suffix || "\n"
         normalized_suffix = "#{normalized_suffix}\n" unless normalized_suffix.end_with?("\n")
-        version_arg_pattern = /\A(?<prefix>\s*,(?:\s*#.*\n|\s++)*)["'][^"']*["'](?<trailing_comma>\s*,)?/
-        loop do
-          updated_suffix = normalized_suffix.sub(version_arg_pattern) do
-            if Regexp.last_match[:trailing_comma]
-              Regexp.last_match[:prefix].sub(/\n[ \t]*\z/, "")
-            else
-              ""
-            end
-          end
-          break if updated_suffix == normalized_suffix
 
-          normalized_suffix = updated_suffix
-        end
-        normalized_suffix = normalized_suffix.sub(/\A,\s*(?:#[^\n]*)?\n\z/, "\n")
-        normalized_suffix = normalized_suffix.sub(/\A,[ \t]{2,}/, ", ")
+        has_user_version_pin = normalized_suffix.match?(/\A\s*,(?:\s*#.*\n|\s+)*["']/)
+        version_arg = has_user_version_pin ? "" : ", #{quote}#{pro_gem_version_requirement}#{quote}"
+
+        normalized_suffix = "\n" if normalized_suffix.match?(/\A,\s*\n\z/)
         normalized_suffix = normalized_suffix.sub(/\)(\s*(?:#.*)?\n)\z/, '\1') if parenthesized_gem_call
 
-        "#{indentation}gem #{quote}react_on_rails_pro#{quote}, " \
-          "#{quote}#{pro_gem_version_requirement}#{quote}#{normalized_suffix}"
+        "#{indentation}gem #{quote}react_on_rails_pro#{quote}#{version_arg}#{normalized_suffix}"
       end
 
       def print_success_message
