@@ -1,0 +1,67 @@
+module ReactOnRailsPro
+  class RendererHttpClient
+    class Error < StandardError
+    end
+
+    class TimeoutError < Error
+    end
+
+    class ConnectionError < Error
+    end
+
+    class HTTPError < Error
+      attr_reader response: Response
+
+      def initialize: (Response response) -> void
+    end
+
+    CONNECTION_ERRORS: Array[Class]
+
+    class Response
+      attr_reader status: Integer?
+
+      def initialize: (?status: Integer?, ?body: Array[String] | String?, ?error: StandardError?) ?{
+        (untyped, untyped) -> untyped
+      } -> void
+
+      def body: () -> String
+
+      def error?: () -> bool?
+
+      def each: () -> Enumerator[String, void]
+              | () { (String) -> untyped } -> untyped
+
+      def append_chunk: (String chunk) -> void
+    end
+
+    def self.get: (String url, connect_timeout: Numeric, read_timeout: Numeric) -> Response
+
+    def self.split_url: (String url) -> [String, String]
+
+    def self.build_multipart_body: (
+      Hash[untyped, untyped] form,
+      ?boundary: String
+    ) -> [Array[[String, String]], String]
+
+    def self.build_form_body: (Hash[untyped, untyped] form) -> [Array[[String, String]], String]
+
+    def initialize: (
+      origin: String,
+      pool_size: Integer,
+      connect_timeout: Numeric,
+      read_timeout: Numeric,
+      ?force_http2: bool
+    ) -> void
+
+    def post: (
+      String path,
+      ?form: Hash[untyped, untyped]?,
+      ?json: Hash[untyped, untyped]?,
+      ?stream: bool
+    ) -> Response
+
+    def get: (String path) -> Response
+
+    def close: () -> nil
+  end
+end
