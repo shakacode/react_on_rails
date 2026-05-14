@@ -115,7 +115,7 @@ module ReactOnRailsPro
       end
 
       def build_multipart_body(form, boundary: SecureRandom.hex(24))
-        body = +""
+        body = +"".b
 
         form.each do |name, value|
           append_multipart_value(body, boundary, name, value)
@@ -176,9 +176,10 @@ module ReactOnRailsPro
       def append_file_part(body, boundary, name, value)
         name = sanitize_header_param(name)
         filename = sanitize_header_param(value.fetch(:filename))
+        content_type = sanitize_header_param(value.fetch(:content_type))
         body << "--#{boundary}\r\n"
         body << %(Content-Disposition: form-data; name="#{name}"; filename="#{filename}"\r\n)
-        body << "Content-Type: #{value.fetch(:content_type)}\r\n"
+        body << "Content-Type: #{content_type}\r\n"
         body << "\r\n"
         body << multipart_file_body(value.fetch(:body))
         body << "\r\n"

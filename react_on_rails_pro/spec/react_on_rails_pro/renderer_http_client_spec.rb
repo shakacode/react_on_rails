@@ -69,7 +69,7 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
           "field\"name\r\n" => "value",
           "bundle" => {
             body: "console.log('bundle');",
-            content_type: "text/javascript",
+            content_type: "text/javascript\r\nX-Injected: true",
             filename: "server\"\r\nbundle.js"
           }
         },
@@ -79,8 +79,33 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       expect(headers).to include(["content-type", "multipart/form-data; boundary=rorp-test-boundary"])
       expect(body).to include('name="field\"name"')
       expect(body).to include('name="bundle"; filename="server\"bundle.js"')
+      expect(body).to include("Content-Type: text/javascriptX-Injected: true\r\n")
       expect(body).not_to include("field\"name\r\n")
       expect(body).not_to include("server\"\r\nbundle.js")
+      expect(body).not_to include("\r\nX-Injected")
+    end
+
+    it "supports binary uploaded file bodies" do
+      binary_payload = [0xff, 0xfe, 0x00, 0x61].pack("C*")
+      headers = nil
+      body = nil
+
+      expect do
+        headers, body = described_class.build_multipart_body(
+          {
+            "bundle" => {
+              body: binary_payload,
+              content_type: "application/octet-stream",
+              filename: "bundle.bin"
+            }
+          },
+          boundary: "rorp-test-boundary"
+        )
+      end.not_to raise_error
+
+      expect(headers).to include(["content-type", "multipart/form-data; boundary=rorp-test-boundary"])
+      expect(body.encoding).to eq(Encoding::BINARY)
+      expect(body.b).to include(binary_payload)
     end
   end
 
@@ -139,6 +164,65 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
         read_timeout: 2,
         force_http2: false
       )
+    end
+  end
+
+  describe "#post" do
+    it "defers streaming requests until response enumeration and sends encoded JSON" do
+      response_body = Class.new do
+        attr_reader :closed
+
+        def initialize(chunks)
+          @chunks = chunks
+          @closed = false
+        end
+
+        def each(&block)
+          @chunks.each(&block)
+        end
+
+        def close
+          @closed = true
+        end
+      end.new(%w[render ed])
+      stub_const(
+        "FakeAsyncPostResponse",
+        Class.new do
+          def status; end
+
+          def body; end
+        end
+      )
+      stub_const(
+        "FakeAsyncPostClient",
+        Class.new do
+          def post(_path, headers:, body:); end
+        end
+      )
+      raw_response = instance_double(FakeAsyncPostResponse, status: 200, body: response_body)
+      async_client = instance_double(FakeAsyncPostClient)
+      client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+
+      allow(async_client).to receive(:post) do |path, headers:, body:|
+        expect(path).to eq("/render")
+        expect(headers["content-type"]).to eq("application/json")
+        expect(body).to eq({ renderingRequest: "render()" }.to_json)
+        raw_response
+      end
+      allow(client).to receive(:with_client).and_yield(async_client)
+
+      response = client.post("/render", json: { renderingRequest: "render()" }, stream: true)
+
+      expect(async_client).not_to have_received(:post)
+
+      chunks = []
+      response.each { |chunk| chunks << chunk }
+
+      expect(async_client).to have_received(:post).once
+      expect(response.status).to eq(200)
+      expect(chunks).to eq(%w[render ed])
+      expect(response.body).to eq("rendered")
+      expect(response_body.closed).to be(true)
     end
   end
 
@@ -210,6 +294,43 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
 
       expect { client.get("/render") }
         .to raise_error(ReactOnRailsPro::RendererHttpClient::ConnectionError, /Connection refused/)
+    end
+
+    it "wraps body read timeouts and closes the response body" do
+      response_body = Class.new do
+        attr_reader :closed
+
+        def each
+          raise IO::TimeoutError, "read timed out"
+        end
+
+        def close
+          @closed = true
+        end
+      end.new
+      stub_const(
+        "FakeAsyncTimeoutResponse",
+        Class.new do
+          def status; end
+
+          def body; end
+        end
+      )
+      stub_const(
+        "FakeAsyncTimeoutClient",
+        Class.new do
+          def get(_path); end
+        end
+      )
+      raw_response = instance_double(FakeAsyncTimeoutResponse, status: 200, body: response_body)
+      async_client = instance_double(FakeAsyncTimeoutClient, get: raw_response)
+      client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+
+      allow(client).to receive(:with_client).and_yield(async_client)
+
+      expect { client.get("/render") }
+        .to raise_error(ReactOnRailsPro::RendererHttpClient::TimeoutError, /read timed out/)
+      expect(response_body.closed).to be(true)
     end
   end
 end
