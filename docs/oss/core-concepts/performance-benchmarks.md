@@ -93,8 +93,6 @@ Server components produce HTML that does not need hydration — they have no cli
 > This section covers public, non-production directional benchmarks first, then a production case study. For validated,
 > at-scale results, see the [Production Case Study: Popmenu](#production-case-study-popmenu) below.
 
-<a id="public-marketplace-rsc-demo"></a>
-
 ### Public Marketplace RSC Demo
 
 The [LocalHub marketplace demo](https://rsc.reactonrails.com/) is a public,
