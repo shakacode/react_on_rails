@@ -339,76 +339,70 @@ module ReactOnRails
         end.uniq
       end
 
-      def rewrite_react_on_rails_module_specifiers(content) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
-        static_import_specifier_pattern = %r{
-          (?<prefix>
-            \A\s*(?:/\*.*?\*/\s*)?(?:import|export)(?:\s+type)?\s+.*?\s+from\s+|
-            \A\s*[\w\}\],\*\$\s]+\s+from\s+
+      STATIC_IMPORT_SPECIFIER_PATTERN = %r{
+        (?<prefix>
+          \A\s*(?:/\*.*?\*/\s*)?(?:import|export)(?:\s+type)?\s+.*?\s+from\s+|
+          \A\s*[\w\}\],\*\$\s]+\s+from\s+
+        )
+        (?<quote>["'])
+        react-on-rails(?!-pro)
+        (?=(?:["']|/))
+      }x
+
+      DYNAMIC_OR_REQUIRE_SPECIFIER_PATTERN = %r{
+        (?<prefix>
+          (?<!["'`])\bimport\s*\(\s*(?:/\*[^*]*\*+(?:[^/*][^*]*\*+)*/\s*)*|
+          (?<!["'`])\brequire\s*\(\s*(?:/\*[^*]*\*+(?:[^/*][^*]*\*+)*/\s*)*
+        )
+        (?<quote>["'])
+        react-on-rails(?!-pro)
+        (?=(?:["']|/))
+      }x
+
+      SIDE_EFFECT_IMPORT_PATTERN = %r{
+        \A(?<prefix>\s*(?:/\*.*?\*/\s*)*import\s+)
+        (?<quote>["'])
+        react-on-rails(?!-pro)
+        (?=(?:["']|/))
+      }x
+
+      MOCK_CALL_PATTERN = %r{
+        (?<prefix>
+          (?<!["'`])\b(?:
+            (?:jest|vi)\.
+            (?:mock|unmock|doMock|doUnmock|dontMock|requireActual|requireMock|importActual|importMock)
+            |
+            (?:importActual|importMock)
           )
-          (?<quote>["'])
-          react-on-rails(?!-pro)
-          (?=(?:["']|/))
-        }x
+          \s*\(\s*
+        )
+        (?<quote>["'])
+        react-on-rails(?!-pro)
+        (?=(?:["']|/))
+      }x
 
-        dynamic_or_require_specifier_pattern = %r{
-          (?<prefix>
-            (?<!["'`])\bimport\s*\(\s*(?:/\*[^*]*\*+(?:[^/*][^*]*\*+)*/\s*)*|
-            (?<!["'`])\brequire\s*\(\s*(?:/\*[^*]*\*+(?:[^/*][^*]*\*+)*/\s*)*
-          )
-          (?<quote>["'])
-          react-on-rails(?!-pro)
-          (?=(?:["']|/))
-        }x
+      DECLARE_MODULE_PATTERN = %r{
+        \A(?<prefix>\s*(?:export\s+)?declare\s+module\s+)
+        (?<quote>["'])
+        react-on-rails(?!-pro)
+        (?=(?:["']|/))
+      }x
 
-        side_effect_import_pattern = %r{
-          \A(?<prefix>\s*(?:/\*.*?\*/\s*)*import\s+)
-          (?<quote>["'])
-          react-on-rails(?!-pro)
-          (?=(?:["']|/))
-        }x
+      BASE_PACKAGE_REWRITE_PATTERNS = [
+        STATIC_IMPORT_SPECIFIER_PATTERN,
+        DYNAMIC_OR_REQUIRE_SPECIFIER_PATTERN,
+        SIDE_EFFECT_IMPORT_PATTERN,
+        MOCK_CALL_PATTERN,
+        DECLARE_MODULE_PATTERN
+      ].freeze
 
-        mock_call_pattern = %r{
-          (?<prefix>
-            (?<!["'`])\b(?:
-              (?:jest|vi)\.
-              (?:mock|unmock|doMock|doUnmock|dontMock|requireActual|requireMock|importActual|importMock)
-              |
-              (?:importActual|importMock)
-            )
-            \s*\(\s*
-          )
-          (?<quote>["'])
-          react-on-rails(?!-pro)
-          (?=(?:["']|/))
-        }x
-
-        declare_module_pattern = %r{
-          \A(?<prefix>\s*(?:export\s+)?declare\s+module\s+)
-          (?<quote>["'])
-          react-on-rails(?!-pro)
-          (?=(?:["']|/))
-        }x
-
+      def rewrite_react_on_rails_module_specifiers(content)
         rewrite_non_comment_lines(content) do |line|
           rewrite_outside_inline_template_literals(line) do |line_without_templates|
-            rewritten_line = line_without_templates.gsub(static_import_specifier_pattern) do
-              "#{Regexp.last_match[:prefix]}#{Regexp.last_match[:quote]}react-on-rails-pro"
-            end
-
-            rewritten_line = rewritten_line.gsub(dynamic_or_require_specifier_pattern) do
-              "#{Regexp.last_match[:prefix]}#{Regexp.last_match[:quote]}react-on-rails-pro"
-            end
-
-            rewritten_line = rewritten_line.gsub(side_effect_import_pattern) do
-              "#{Regexp.last_match[:prefix]}#{Regexp.last_match[:quote]}react-on-rails-pro"
-            end
-
-            rewritten_line = rewritten_line.gsub(mock_call_pattern) do
-              "#{Regexp.last_match[:prefix]}#{Regexp.last_match[:quote]}react-on-rails-pro"
-            end
-
-            rewritten_line.gsub(declare_module_pattern) do
-              "#{Regexp.last_match[:prefix]}#{Regexp.last_match[:quote]}react-on-rails-pro"
+            BASE_PACKAGE_REWRITE_PATTERNS.reduce(line_without_templates) do |result, pattern|
+              result.gsub(pattern) do
+                "#{Regexp.last_match[:prefix]}#{Regexp.last_match[:quote]}react-on-rails-pro"
+              end
             end
           end
         end
