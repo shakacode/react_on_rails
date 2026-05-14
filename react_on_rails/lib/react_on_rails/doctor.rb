@@ -2881,6 +2881,7 @@ module ReactOnRails
     BASE_PACKAGE_IMPORT_PATTERN = %r{\bfrom\s+['"]react-on-rails(?:/[^'"]*)?['"]}
     BASE_PACKAGE_REQUIRE_PATTERN = %r{\brequire\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]\s*\)}
     BASE_PACKAGE_DYNAMIC_IMPORT_PATTERN = %r{\bimport\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]\s*\)}
+    BASE_PACKAGE_SIDE_EFFECT_IMPORT_PATTERN = %r{^\s*import\s+['"]react-on-rails(?:/[^'"]*)?['"]}
     # Match known Jest/Vitest helpers. Aliased or nested receivers are intentionally
     # out of scope to avoid warning on arbitrary application methods named `mock`.
     # The bare importActual/importMock forms cover Vitest's destructured-import style:
@@ -2902,6 +2903,7 @@ module ReactOnRails
       BASE_PACKAGE_IMPORT_PATTERN,
       BASE_PACKAGE_REQUIRE_PATTERN,
       BASE_PACKAGE_DYNAMIC_IMPORT_PATTERN,
+      BASE_PACKAGE_SIDE_EFFECT_IMPORT_PATTERN,
       BASE_PACKAGE_MOCK_PATTERN,
       BASE_PACKAGE_DECLARE_MODULE_PATTERN
     ].freeze
@@ -2916,7 +2918,7 @@ module ReactOnRails
           ⚠️  Found references to 'react-on-rails' instead of 'react-on-rails-pro':
           #{files_with_base_reference.map { |f| "  • #{f}" }.join("\n")}
 
-          Look for static imports, CommonJS requires, dynamic imports,
+          Look for static imports, side-effect imports, CommonJS requires, dynamic imports,
           Jest/Vitest mock helpers, or TypeScript module augmentations.
           Note: this includes commented-out references; review each file before updating.
 
@@ -2926,6 +2928,7 @@ module ReactOnRails
           Fix: Replace base-package references with their Pro equivalents:
             import ReactOnRails from 'react-on-rails-pro';         // ES import (server)
             import ReactOnRails from 'react-on-rails-pro/client';  // ES import (client)
+            import 'react-on-rails-pro';                           // Side-effect import
             const ReactOnRails = require('react-on-rails-pro');    // CommonJS require
             const ReactOnRails = await import('react-on-rails-pro'); // Dynamic import
             jest.mock('react-on-rails-pro', ...);                  // Jest mock helper

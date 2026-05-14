@@ -3076,6 +3076,44 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when JS files use a side-effect import of the base package after a Pro migration" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/side-effect.js",
+                       "import 'react-on-rails';\nimport 'react-on-rails/client';\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("side-effect.js") }).to be true
+      end
+    end
+
+    context "when JS files use a side-effect import of the Pro package" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/side-effect.js",
+                       "import 'react-on-rails-pro';\n")
+            example.run
+          end
+        end
+      end
+
+      it "does not warn" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("side-effect.js") }).to be false
+      end
+    end
+
     context "when JS tests mock the base package after a Pro migration" do
       around do |example|
         Dir.mktmpdir do |tmpdir|
