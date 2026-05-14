@@ -200,13 +200,14 @@ jobs:
         with:
           bundler-cache: true
 
-      # Add database, credentials, and other app-specific setup required to boot Rails in production.
+      # Add database, credentials, Node/pnpm, and other app-specific setup required to boot Rails in production.
       - name: Verify React on Rails Pro license
         run: bundle exec rake react_on_rails_pro:verify_license
 ```
 
 The task depends on the Rails environment. If your production boot requires credentials or services such as
-`RAILS_MASTER_KEY`, `DATABASE_URL`, or database preparation, add those to the workflow before running the task.
+`RAILS_MASTER_KEY`, `DATABASE_URL`, database preparation, or Node package setup, add those to the workflow before
+running the task.
 
 #### Advisory CI Example
 
@@ -237,7 +238,7 @@ jobs:
         with:
           bundler-cache: true
 
-      # Add database, credentials, and other app-specific setup required to boot Rails in production.
+      # Add database, credentials, Node/pnpm, and other app-specific setup required to boot Rails in production.
       - name: Check React on Rails Pro license
         run: |
           set +e
@@ -248,15 +249,17 @@ jobs:
           {
             echo "## React on Rails Pro license"
             echo
-            echo "\`\`\`text"
+            echo "~~~text"
             echo "$output"
-            echo "\`\`\`"
+            echo "~~~"
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [ "$status" -ne 0 ]; then
             echo "::warning title=React on Rails Pro license::License validation did not pass. See job summary."
           fi
 
+          # Always exit 0: this is an advisory check. The warning annotation
+          # and step summary above provide visibility without blocking the workflow.
           exit 0
 ```
 
@@ -267,7 +270,7 @@ checks would report a missing token there.
 ### Monitor License Expiration
 
 If your organization wants an app-owned scheduled check with a custom warning threshold, add a wrapper task like this.
-It uses the Pro utility API and treats the built-in 30-day renewal window as the default:
+It mirrors the built-in verification task and treats the built-in 30-day renewal window as the default:
 
 ```ruby
 # lib/tasks/react_on_rails_pro_license.rake
@@ -275,13 +278,15 @@ namespace :licenses do
   desc "Fail if the React on Rails Pro license is invalid, expired, or expiring soon"
   task check_react_on_rails_pro: :environment do
     threshold_days = Integer(ENV.fetch("DAYS", "30"))
-    info = ReactOnRailsPro::Utils.license_info
+    info = ReactOnRailsPro::LicenseValidator.license_info
     status = info.fetch(:status, :unknown)
     expiration = info[:expiration]
     days_remaining = expiration && ((expiration - Time.now) / 86_400).ceil
 
     if status == :expired
       abort "React on Rails Pro license is expired. Renew and update REACT_ON_RAILS_PRO_LICENSE."
+    elsif status == :missing
+      abort "React on Rails Pro license is missing. Set REACT_ON_RAILS_PRO_LICENSE."
     elsif status != :valid
       abort "React on Rails Pro license is #{status}. Update REACT_ON_RAILS_PRO_LICENSE."
     end
