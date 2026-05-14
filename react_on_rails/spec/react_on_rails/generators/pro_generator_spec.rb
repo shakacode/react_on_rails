@@ -1125,6 +1125,142 @@ describe ProGenerator, type: :generator do
 
       expect(generator.send(:unclosed_block_comment_starts?, source_line)).to be true
     end
+
+    it "rewrites jest.mock calls targeting the base package" do
+      source = <<~JS
+        jest.mock('react-on-rails', () => ({ authenticityHeaders: jest.fn() }));
+        jest.mock("react-on-rails/client", () => ({}));
+      JS
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten).to include("jest.mock('react-on-rails-pro',")
+      expect(rewritten).to include('jest.mock("react-on-rails-pro/client",')
+    end
+
+    it "rewrites vi.mock and vi.importActual calls targeting the base package" do
+      source = <<~JS
+        vi.mock('react-on-rails', () => ({}));
+        const mod = await vi.importActual('react-on-rails/client');
+      JS
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten).to include("vi.mock('react-on-rails-pro',")
+      expect(rewritten).to include("vi.importActual('react-on-rails-pro/client')")
+    end
+
+    it "rewrites the full set of Jest mock helpers" do
+      source = <<~JS
+        jest.unmock('react-on-rails');
+        jest.doMock('react-on-rails/client');
+        vi.doUnmock('react-on-rails');
+        jest.dontMock('react-on-rails');
+        const a = jest.requireActual('react-on-rails');
+        const b = jest.requireMock('react-on-rails/client');
+        vi.importMock('react-on-rails');
+      JS
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten.scan("react-on-rails-pro").size).to eq(7)
+      expect(rewritten).not_to match(/['"]react-on-rails['"]/)
+    end
+
+    it "rewrites bare importActual/importMock calls (Vitest destructured-import style)" do
+      source = <<~JS
+        import { importActual, importMock } from 'vitest';
+        const real = await importActual('react-on-rails');
+        const fake = importMock('react-on-rails/client');
+      JS
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten).to include("importActual('react-on-rails-pro')")
+      expect(rewritten).to include("importMock('react-on-rails-pro/client')")
+    end
+
+    it "does not rewrite mock helpers on alien receivers" do
+      source = <<~JS
+        myJest.mock('react-on-rails', factory);
+        server.mock('react-on-rails', factory);
+        vitest.mock('react-on-rails');
+        mock('react-on-rails', factory);
+      JS
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten).to eq(source)
+    end
+
+    it "does not rewrite mock helpers already targeting the Pro package" do
+      source = <<~JS
+        jest.mock('react-on-rails-pro', () => ({}));
+        vi.mock('react-on-rails-pro/client', () => ({}));
+        const m = vi.importActual('react-on-rails-pro');
+      JS
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten).to eq(source)
+    end
+
+    it "rewrites TypeScript declare module declarations targeting the base package" do
+      source = <<~TS
+        declare module 'react-on-rails' {
+          export function register(c: Record<string, unknown>): void;
+        }
+
+        declare module 'react-on-rails/client' {
+          export * from 'react-on-rails-pro';
+        }
+      TS
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten).to include("declare module 'react-on-rails-pro' {")
+      expect(rewritten).to include("declare module 'react-on-rails-pro/client' {")
+      expect(rewritten).not_to match(/declare module ['"]react-on-rails['"]/)
+    end
+
+    it "rewrites export-prefixed declare module declarations" do
+      source = <<~TS
+        export declare module 'react-on-rails' {
+          export function register(c: Record<string, unknown>): void;
+        }
+      TS
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten).to include("export declare module 'react-on-rails-pro' {")
+    end
+
+    it "rewrites indented declare module declarations and nested base-package exports together" do
+      source = <<~TS
+        declare module 'react-on-rails/client' {
+          export * from 'react-on-rails';
+          export { default as ReactOnRails } from 'react-on-rails';
+        }
+      TS
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten).to include("declare module 'react-on-rails-pro/client' {")
+      expect(rewritten).to include("export * from 'react-on-rails-pro';")
+      expect(rewritten).to include("export { default as ReactOnRails } from 'react-on-rails-pro';")
+      expect(rewritten).not_to match(/['"]react-on-rails['"]/)
+    end
+
+    it "does not rewrite declare module declarations already targeting the Pro package" do
+      source = <<~TS
+        declare module 'react-on-rails-pro' { }
+        declare module 'react-on-rails-pro/client' { }
+      TS
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten).to eq(source)
+    end
   end
 
   describe "#pro_flag_specified_for_context?" do

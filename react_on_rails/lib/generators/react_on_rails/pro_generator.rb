@@ -339,7 +339,7 @@ module ReactOnRails
         end.uniq
       end
 
-      def rewrite_react_on_rails_module_specifiers(content)
+      def rewrite_react_on_rails_module_specifiers(content) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
         static_import_specifier_pattern = %r{
           (?<prefix>
             \A\s*(?:/\*.*?\*/\s*)?(?:import|export)(?:\s+type)?\s+.*?\s+from\s+|
@@ -367,6 +367,28 @@ module ReactOnRails
           (?=(?:["']|/))
         }x
 
+        mock_call_pattern = %r{
+          (?<prefix>
+            (?<!["'`])\b(?:
+              (?:jest|vi)\.
+              (?:mock|unmock|doMock|doUnmock|dontMock|requireActual|requireMock|importActual|importMock)
+              |
+              (?:importActual|importMock)
+            )
+            \s*\(\s*
+          )
+          (?<quote>["'])
+          react-on-rails(?!-pro)
+          (?=(?:["']|/))
+        }x
+
+        declare_module_pattern = %r{
+          \A(?<prefix>\s*(?:export\s+)?declare\s+module\s+)
+          (?<quote>["'])
+          react-on-rails(?!-pro)
+          (?=(?:["']|/))
+        }x
+
         rewrite_non_comment_lines(content) do |line|
           rewrite_outside_inline_template_literals(line) do |line_without_templates|
             rewritten_line = line_without_templates.gsub(static_import_specifier_pattern) do
@@ -377,7 +399,15 @@ module ReactOnRails
               "#{Regexp.last_match[:prefix]}#{Regexp.last_match[:quote]}react-on-rails-pro"
             end
 
-            rewritten_line.gsub(side_effect_import_pattern) do
+            rewritten_line = rewritten_line.gsub(side_effect_import_pattern) do
+              "#{Regexp.last_match[:prefix]}#{Regexp.last_match[:quote]}react-on-rails-pro"
+            end
+
+            rewritten_line = rewritten_line.gsub(mock_call_pattern) do
+              "#{Regexp.last_match[:prefix]}#{Regexp.last_match[:quote]}react-on-rails-pro"
+            end
+
+            rewritten_line.gsub(declare_module_pattern) do
               "#{Regexp.last_match[:prefix]}#{Regexp.last_match[:quote]}react-on-rails-pro"
             end
           end
