@@ -219,6 +219,7 @@ module ReactOnRailsPro
     end
 
     def close
+      # Request#reset_connection still calls close for adapter compatibility.
       # async-http clients are scoped to individual requests so they never cross Async reactors.
     end
 
@@ -263,6 +264,8 @@ module ReactOnRailsPro
     end
 
     def run_with_timeout(&block)
+      # @read_timeout carries ssr_timeout and bounds the whole renderer request,
+      # including TCP connect, request write, and response body streaming.
       if (task = Async::Task.current?)
         task.with_timeout(@read_timeout, &block)
       else
@@ -287,9 +290,9 @@ module ReactOnRailsPro
     end
 
     def stream_body(raw_response, yielder)
-      raw_response.body&.each { |chunk| yielder.call(chunk) }
-    ensure
       body = raw_response&.body
+      body&.each { |chunk| yielder.call(chunk) }
+    ensure
       body&.close
     end
   end

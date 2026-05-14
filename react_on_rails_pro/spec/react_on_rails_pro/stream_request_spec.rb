@@ -42,7 +42,28 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
 
     let(:error_body) { +"" }
 
-    it "treats responses without status delegation as error responses" do
+    it "uses status as the fallback for non-Response adapters" do
+      response = Class.new do
+        def each
+          yield "Failed request body"
+        end
+
+        def status
+          500
+        end
+      end.new
+
+      yielded_chunks = []
+
+      request.send(:process_response_chunks, response, error_body) do |chunk|
+        yielded_chunks << chunk
+      end
+
+      expect(error_body).to eq("Failed request body")
+      expect(yielded_chunks).to be_empty
+    end
+
+    it "surfaces malformed fallback responses" do
       response = Class.new do
         def each
           yield "Failed request body"
@@ -58,9 +79,9 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         request.send(:process_response_chunks, response, error_body) do |chunk|
           yielded_chunks << chunk
         end
-      end.not_to raise_error
+      end.to raise_error(NoMethodError, /undefined method `status`/)
 
-      expect(error_body).to eq("Failed request body")
+      expect(error_body).to eq("")
       expect(yielded_chunks).to be_empty
     end
 

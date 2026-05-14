@@ -82,7 +82,9 @@ ReactOnRailsPro.configure do |config|
   # config.renderer_password = ENV["RENDERER_PASSWORD"]
 
   # Set the `ssr_timeout` configuration so the Rails server will not wait more than this many seconds
-  # for a SSR request to return once issued.
+  # for a SSR request to return once issued. With the async-http renderer client, this bounds the
+  # entire renderer request, including streaming responses. Increase this value for long-running
+  # streaming SSR responses.
   config.ssr_timeout = 5
 
   # If false, then crash if no backup rendering when the remote renderer is not available
@@ -92,14 +94,13 @@ ReactOnRailsPro.configure do |config|
   # Default for `renderer_use_fallback_exec_js` is true.
   config.renderer_use_fallback_exec_js = false
 
-  # The maximum size of the http connection pool,
-  # Set +pool_size+ to limit the maximum number of connections allowed.
-  # Defaults to 1/4 the number of allowed file handles.  You can have no more
-  # than this many threads with active HTTP transactions.
+  # With the async-http renderer client, clients are scoped to individual requests.
+  # For the HTTP/2 renderer connection, this limits concurrent streams on that request's client
+  # rather than the size of a persistent process-wide connection pool.
   # Default for `renderer_http_pool_size` is 10
   config.renderer_http_pool_size = 10
 
-  # Seconds to wait for an available connection before a timeout error is raised
+  # Endpoint TCP connect timeout in seconds. Request processing and streaming are bounded by `ssr_timeout`.
   # Default for `renderer_http_pool_timeout` is 5
   config.renderer_http_pool_timeout = 5
 

@@ -271,6 +271,55 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       expect(response_body.closed).to be(true)
     end
 
+    it "closes the same response body object that it streams" do
+      response_body = Class.new do
+        attr_reader :closed
+
+        def initialize(chunks)
+          @chunks = chunks
+          @closed = false
+        end
+
+        def each(&block)
+          @chunks.each(&block)
+        end
+
+        def close
+          @closed = true
+        end
+      end.new(["asset"])
+      raw_response = Class.new do
+        attr_reader :body_calls, :status
+
+        def initialize(body)
+          @body = body
+          @body_calls = 0
+          @status = 200
+        end
+
+        def body
+          @body_calls += 1
+          @body_calls == 1 ? @body : nil
+        end
+      end.new(response_body)
+      stub_const(
+        "FakeAsyncOneShotBodyClient",
+        Class.new do
+          def get(_path); end
+        end
+      )
+      async_client = instance_double(FakeAsyncOneShotBodyClient, get: raw_response)
+      client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+
+      allow(client).to receive(:with_client).and_yield(async_client)
+
+      response = client.get("/asset")
+
+      expect(response.body).to eq("asset")
+      expect(raw_response.body_calls).to eq(1)
+      expect(response_body.closed).to be(true)
+    end
+
     [
       Errno::ECONNREFUSED,
       Errno::EHOSTUNREACH,
