@@ -318,6 +318,20 @@ describe ReactOnRailsPro::Request do
     end
   end
 
+  describe "render_code" do
+    it "does not warn or raise when request warning timeout is disabled" do
+      allow(ReactOnRailsPro.configuration).to receive(:renderer_http_pool_warn_timeout).and_return(nil)
+      mock_streaming_response(render_full_url, 200) do |yielder|
+        yielder.call("rendered")
+      end
+
+      response = described_class.render_code(render_path, "console.log('Hello, world!');", false)
+
+      expect(response.body).to eq("rendered")
+      expect(logger_mock).not_to have_received(:warn)
+    end
+  end
+
   describe "get_form_body_for_file" do
     let(:url_path) { "http://localhost:3035/webpack/development/server-bundle.js" }
 

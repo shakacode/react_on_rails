@@ -62,6 +62,26 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
         expect(body).to include("console.log('bundle');")
       end
     end
+
+    it "escapes header parameters in content disposition fields" do
+      headers, body = described_class.build_multipart_body(
+        {
+          "field\"name\r\n" => "value",
+          "bundle" => {
+            body: "console.log('bundle');",
+            content_type: "text/javascript",
+            filename: "server\"\r\nbundle.js"
+          }
+        },
+        boundary: "rorp-test-boundary"
+      )
+
+      expect(headers).to include(["content-type", "multipart/form-data; boundary=rorp-test-boundary"])
+      expect(body).to include('name="field\"name"')
+      expect(body).to include('name="bundle"; filename="server\"bundle.js"')
+      expect(body).not_to include("field\"name\r\n")
+      expect(body).not_to include("server\"\r\nbundle.js")
+    end
   end
 
   describe ".build_form_body" do
@@ -123,7 +143,67 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
   end
 
   describe "#get" do
-    it "wraps TCP connection refusals in a ConnectionError" do
+    it "assigns response status internally while streaming the body" do
+      response_body = Class.new do
+        attr_reader :closed
+
+        def initialize(chunks)
+          @chunks = chunks
+          @closed = false
+        end
+
+        def each(&block)
+          @chunks.each(&block)
+        end
+
+        def close
+          @closed = true
+        end
+      end.new(["asset"])
+      stub_const(
+        "FakeAsyncResponse",
+        Class.new do
+          def status; end
+
+          def body; end
+        end
+      )
+      stub_const(
+        "FakeAsyncClient",
+        Class.new do
+          def get(_path); end
+        end
+      )
+      raw_response = instance_double(FakeAsyncResponse, status: 204, body: response_body)
+      async_client = instance_double(FakeAsyncClient, get: raw_response)
+      client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+
+      allow(client).to receive(:with_client).and_yield(async_client)
+
+      response = client.get("/asset")
+
+      expect(response.status).to eq(204)
+      expect(response.body).to eq("asset")
+      expect(response_body.closed).to be(true)
+    end
+
+    [
+      Errno::ECONNREFUSED,
+      Errno::EHOSTUNREACH,
+      Errno::ENETUNREACH,
+      Errno::ETIMEDOUT
+    ].each do |error_class|
+      it "wraps #{error_class} in a ConnectionError" do
+        client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+
+        allow(client).to receive(:with_client).and_raise(error_class)
+
+        expect { client.get("/render") }
+          .to raise_error(ReactOnRailsPro::RendererHttpClient::ConnectionError)
+      end
+    end
+
+    it "wraps TCP connection refusals in a ConnectionError with the original message" do
       client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
 
       allow(client).to receive(:with_client).and_raise(Errno::ECONNREFUSED)

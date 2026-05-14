@@ -26,6 +26,18 @@ module ReactOnRailsPro
       end
     end
 
+    CONNECTION_ERRORS = [
+      SocketError,
+      IOError,
+      Errno::ECONNRESET,
+      Errno::ECONNREFUSED,
+      Errno::EHOSTUNREACH,
+      Errno::ENETUNREACH,
+      Errno::EPIPE,
+      Errno::ETIMEDOUT,
+      Protocol::HTTP::RefusedError
+    ].freeze
+
     class Response
       attr_reader :status
 
@@ -67,20 +79,17 @@ module ReactOnRailsPro
 
       private
 
-      def assign_status(status)
-        @status = status
-      end
-
       def consume
         return if @consumed
 
         @consumed = true
+        status_assigner = ->(status) { @status = status }
         yielder = lambda do |chunk|
           append_chunk(chunk)
           yield chunk if block_given?
         end
 
-        @executor&.call(yielder)
+        @executor&.call(yielder, status_assigner)
       end
     end
 
@@ -156,6 +165,7 @@ module ReactOnRailsPro
       end
 
       def append_scalar_part(body, boundary, name, value)
+        name = sanitize_header_param(name)
         body << "--#{boundary}\r\n"
         body << %(Content-Disposition: form-data; name="#{name}"\r\n)
         body << "\r\n"
@@ -164,12 +174,18 @@ module ReactOnRailsPro
       end
 
       def append_file_part(body, boundary, name, value)
+        name = sanitize_header_param(name)
+        filename = sanitize_header_param(value.fetch(:filename))
         body << "--#{boundary}\r\n"
-        body << %(Content-Disposition: form-data; name="#{name}"; filename="#{value.fetch(:filename)}"\r\n)
+        body << %(Content-Disposition: form-data; name="#{name}"; filename="#{filename}"\r\n)
         body << "Content-Type: #{value.fetch(:content_type)}\r\n"
         body << "\r\n"
         body << multipart_file_body(value.fetch(:body))
         body << "\r\n"
+      end
+
+      def sanitize_header_param(value)
+        value.to_s.gsub(/["\\]/) { |char| "\\#{char}" }.delete("\r\n")
       end
 
       def multipart_file_body(body)
@@ -190,14 +206,14 @@ module ReactOnRailsPro
 
     def post(path, form: nil, json: nil, stream: false)
       headers, body = request_body(form: form, json: json)
-      build_response(stream: stream) do |response, yielder|
-        execute_request(:post, path, [headers, body], response, yielder)
+      build_response(stream: stream) do |yielder, status_assigner|
+        execute_request(:post, path, [headers, body], yielder, status_assigner)
       end
     end
 
     def get(path)
-      build_response(stream: false) do |response, yielder|
-        execute_request(:get, path, [[], nil], response, yielder)
+      build_response(stream: false) do |yielder, status_assigner|
+        execute_request(:get, path, [[], nil], yielder, status_assigner)
       end
     end
 
@@ -217,16 +233,14 @@ module ReactOnRailsPro
       end
     end
 
-    def build_response(stream:)
-      response = Response.new do |chunk_yielder|
-        yield response, chunk_yielder
-      end
+    def build_response(stream:, &executor)
+      response = Response.new(&executor)
 
       response.body unless stream
       response
     end
 
-    def execute_request(method, path, request_body, response, yielder)
+    def execute_request(method, path, request_body, yielder, status_assigner)
       headers, body = request_body
 
       run_with_timeout do
@@ -237,14 +251,13 @@ module ReactOnRailsPro
                            client.get(path, headers: Protocol::HTTP::Headers[headers])
                          end
 
-          response.__send__(:assign_status, raw_response.status)
+          status_assigner.call(raw_response.status)
           stream_body(raw_response, yielder)
         end
       end
     rescue Async::TimeoutError, IO::TimeoutError => e
       raise TimeoutError, e.message
-    rescue SocketError, IOError, Errno::ECONNRESET, Errno::ECONNREFUSED, Errno::EPIPE,
-           Protocol::HTTP::RefusedError => e
+    rescue *CONNECTION_ERRORS => e
       raise ConnectionError, e.message
     end
 

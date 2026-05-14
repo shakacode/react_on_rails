@@ -43,7 +43,9 @@ module ReactOnRailsPro
     DEFAULT_RENDERER_URL = "http://localhost:3800"
     DEFAULT_RENDERER_METHOD = "ExecJS"
     DEFAULT_RENDERER_FALLBACK_EXEC_JS = true
+    # async-http clients are scoped to each request, so this now limits streams on that request's client.
     DEFAULT_RENDERER_HTTP_POOL_SIZE = 10
+    # Endpoint connect timeout. Request and response processing are still bounded by ssr_timeout.
     DEFAULT_RENDERER_HTTP_POOL_TIMEOUT = 5
     DEFAULT_RENDERER_HTTP_POOL_WARN_TIMEOUT = 0.25
     DEFAULT_RENDERER_HTTP_KEEP_ALIVE_TIMEOUT = 30
