@@ -925,7 +925,7 @@ module ReactOnRails
         normalized_suffix = suffix || "\n"
         normalized_suffix = "#{normalized_suffix}\n" unless normalized_suffix.end_with?("\n")
 
-        has_user_version_pin = normalized_suffix.match?(/\A\s*,(?:\s*#.*\n|\s+)*["']/)
+        has_user_version_pin = normalized_suffix.match?(/\A\s*,\s*(?:#[^\n]*\n\s*)*["']/)
         version_arg = has_user_version_pin ? "" : ", #{quote}#{pro_gem_version_requirement}#{quote}"
 
         normalized_suffix = "\n" if normalized_suffix.match?(/\A,\s*\n\z/)
