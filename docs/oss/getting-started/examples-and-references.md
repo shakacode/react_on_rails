@@ -61,8 +61,6 @@ For detailed proof criteria and migration contribution guidance, see
 - Use it when you want a compact public demo of React on Rails Pro with React
   Server Components on a familiar read-heavy UI.
 
-<a id="marketplace-rsc-performance-demo"></a>
-
 ### Marketplace RSC Performance Demo
 
 - Repo: [shakacode/react-on-rails-demo-marketplace-rsc](https://github.com/shakacode/react-on-rails-demo-marketplace-rsc)
