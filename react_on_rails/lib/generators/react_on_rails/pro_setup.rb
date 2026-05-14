@@ -545,7 +545,7 @@ module ReactOnRails
         return false unless File.exist?(gemfile_path)
 
         File.read(gemfile_path).match?(/^\s*gem(?:\s+|\(\s*)["']react_on_rails["'](?=\s*(?:,|\)|#|$))/)
-      rescue StandardError
+      rescue SystemCallError, IOError
         false
       end
 
