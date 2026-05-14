@@ -93,7 +93,7 @@ Server components produce HTML that does not need hydration — they have no cli
 > This section covers public, non-production directional benchmarks first, then a production case study. For validated,
 > at-scale results, see the [Production Case Study: Popmenu](#production-case-study-popmenu) below.
 
-<!-- Docusaurus custom ID keeps the README link checkable without duplicating the heading's DOM id. -->
+<!-- Docusaurus custom ID keeps the docs-site README link stable if this heading text changes. -->
 
 ### Public Marketplace RSC Demo Evidence {#public-marketplace-rsc-demo}
 
