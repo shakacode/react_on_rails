@@ -11,6 +11,12 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       expect(response).not_to be_error
     end
 
+    it "does not expose a public status writer" do
+      response = described_class.new(status: 200)
+
+      expect(response).not_to respond_to(:status=)
+    end
+
     it "yields streamed chunks and raises an HTTPError after consuming an error response" do
       response = described_class.new(status: 410, body: ["Bundle ", "Required"])
       chunks = []
@@ -113,6 +119,17 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
         read_timeout: 2,
         force_http2: false
       )
+    end
+  end
+
+  describe "#get" do
+    it "wraps TCP connection refusals in a ConnectionError" do
+      client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+
+      allow(client).to receive(:with_client).and_raise(Errno::ECONNREFUSED)
+
+      expect { client.get("/render") }
+        .to raise_error(ReactOnRailsPro::RendererHttpClient::ConnectionError, /Connection refused/)
     end
   end
 end

@@ -111,6 +111,10 @@ module ReactOnRailsPro
         raise ReactOnRailsPro::Error,
               "config.renderer_http_keep_alive_timeout must be a finite positive number or nil"
       end
+      unless value.nil? || @suppress_renderer_http_keep_alive_timeout_warning
+        warn "[ReactOnRailsPro] config.renderer_http_keep_alive_timeout is deprecated and has no effect " \
+             "with the async-http adapter because clients are scoped per request."
+      end
       @renderer_http_keep_alive_timeout = value
     end
 
@@ -136,7 +140,7 @@ module ReactOnRailsPro
       self.renderer_http_pool_size = renderer_http_pool_size
       self.renderer_http_pool_timeout = renderer_http_pool_timeout
       self.renderer_http_pool_warn_timeout = renderer_http_pool_warn_timeout
-      self.renderer_http_keep_alive_timeout = renderer_http_keep_alive_timeout
+      assign_initial_renderer_http_keep_alive_timeout(renderer_http_keep_alive_timeout)
       self.tracing = tracing
       self.rendering_returns_promises = server_renderer == "NodeRenderer" ? rendering_returns_promises : false
       self.dependency_globs = dependency_globs
@@ -214,6 +218,13 @@ module ReactOnRailsPro
     end
 
     private
+
+    def assign_initial_renderer_http_keep_alive_timeout(value)
+      @suppress_renderer_http_keep_alive_timeout_warning = true
+      self.renderer_http_keep_alive_timeout = value
+    ensure
+      @suppress_renderer_http_keep_alive_timeout_warning = false
+    end
 
     def setup_assets_to_copy
       self.assets_to_copy = (Array(assets_to_copy) if assets_to_copy.present?)

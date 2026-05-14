@@ -27,7 +27,7 @@ module ReactOnRailsPro
     end
 
     class Response
-      attr_accessor :status
+      attr_reader :status
 
       def initialize(status: nil, body: nil, error: nil, &executor)
         @status = status
@@ -66,6 +66,10 @@ module ReactOnRailsPro
       end
 
       private
+
+      def assign_status(status)
+        @status = status
+      end
 
       def consume
         return if @consumed
@@ -233,13 +237,14 @@ module ReactOnRailsPro
                            client.get(path, headers: Protocol::HTTP::Headers[headers])
                          end
 
-          response.status = raw_response.status
+          response.__send__(:assign_status, raw_response.status)
           stream_body(raw_response, yielder)
         end
       end
     rescue Async::TimeoutError, IO::TimeoutError => e
       raise TimeoutError, e.message
-    rescue SocketError, IOError, Errno::ECONNRESET, Errno::EPIPE, Protocol::HTTP::RefusedError => e
+    rescue SocketError, IOError, Errno::ECONNRESET, Errno::ECONNREFUSED, Errno::EPIPE,
+           Protocol::HTTP::RefusedError => e
       raise ConnectionError, e.message
     end
 
@@ -253,7 +258,7 @@ module ReactOnRailsPro
 
     def with_client(&block)
       endpoint = endpoint_for(@origin)
-      Async::HTTP::Client.open(endpoint, protocol: endpoint.protocol, retries: 1, limit: @pool_size) do |client|
+      Async::HTTP::Client.open(endpoint, protocol: endpoint.protocol, retries: 0, limit: @pool_size) do |client|
         # rubocop:disable Performance/RedundantBlockCall
         block.call(client)
         # rubocop:enable Performance/RedundantBlockCall
@@ -270,7 +275,8 @@ module ReactOnRailsPro
     def stream_body(raw_response, yielder)
       raw_response.body&.each { |chunk| yielder.call(chunk) }
     ensure
-      raw_response.body&.close if raw_response&.body
+      body = raw_response&.body
+      body&.close
     end
   end
 end
