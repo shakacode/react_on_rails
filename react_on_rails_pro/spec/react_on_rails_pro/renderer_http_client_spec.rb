@@ -4,6 +4,25 @@ require_relative "spec_helper"
 require "react_on_rails_pro/renderer_http_client"
 
 RSpec.describe ReactOnRailsPro::RendererHttpClient do
+  describe ReactOnRailsPro::RendererHttpClient::ConnectTimeoutWrapper do
+    it "clears the socket timeout after TCP connect" do
+      wrapper = described_class.new(0.25)
+      socket = nil
+      timeout_during_connect = nil
+
+      allow(wrapper).to receive(:socket_connect) do |connecting_socket, _remote_address|
+        timeout_during_connect = connecting_socket.timeout
+      end
+
+      socket = wrapper.connect(Addrinfo.tcp("127.0.0.1", 80))
+
+      expect(timeout_during_connect).to eq(0.25)
+      expect(socket.timeout).to be_nil
+    ensure
+      socket&.close
+    end
+  end
+
   describe ReactOnRailsPro::RendererHttpClient::Response do
     it "does not treat an unknown status as an error" do
       response = described_class.new
@@ -168,6 +187,14 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
   end
 
   describe "#post" do
+    it "does not install the connect timeout as the endpoint socket operation timeout" do
+      client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 5)
+      endpoint = client.__send__(:endpoint_for, "http://localhost:3800")
+
+      expect(endpoint.endpoint.options).to include(wrapper: an_instance_of(described_class::ConnectTimeoutWrapper))
+      expect(endpoint.endpoint.options).not_to include(:timeout)
+    end
+
     it "defers streaming requests until response enumeration and sends encoded JSON" do
       response_body = Class.new do
         attr_reader :closed

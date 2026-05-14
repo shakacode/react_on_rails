@@ -100,7 +100,8 @@ ReactOnRailsPro.configure do |config|
   # Default for `renderer_http_pool_size` is 10
   config.renderer_http_pool_size = 10
 
-  # Endpoint TCP connect timeout in seconds. Request processing and streaming are bounded by `ssr_timeout`.
+  # TCP connect timeout in seconds. After the socket connects, request processing and streaming
+  # are bounded by `ssr_timeout`.
   # Default for `renderer_http_pool_timeout` is 5
   config.renderer_http_pool_timeout = 5
 

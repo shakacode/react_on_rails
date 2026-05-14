@@ -17,6 +17,14 @@ module ReactOnRailsPro
 
     CONNECTION_ERRORS: Array[Class]
 
+    class ConnectTimeoutWrapper
+      attr_reader connect_timeout: Numeric?
+
+      def initialize: (Numeric? connect_timeout) -> void
+
+      def connect: (untyped remote_address, **untyped options) ?{ (untyped) -> untyped } -> untyped
+    end
+
     class Response
       attr_reader status: Integer?
 

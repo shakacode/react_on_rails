@@ -38,6 +38,34 @@ module ReactOnRailsPro
       Protocol::HTTP::RefusedError
     ].freeze
 
+    class ConnectTimeoutWrapper < IO::Endpoint::Wrapper
+      attr_reader :connect_timeout
+
+      def initialize(connect_timeout)
+        super()
+        @connect_timeout = connect_timeout
+      end
+
+      def connect(remote_address, **options)
+        socket = super(remote_address, **options.merge(timeout: connect_timeout))
+        clear_timeout(socket)
+
+        return socket unless block_given?
+
+        begin
+          yield socket
+        ensure
+          socket.close
+        end
+      end
+
+      private
+
+      def clear_timeout(socket)
+        socket.timeout = nil if socket.respond_to?(:timeout=)
+      end
+    end
+
     class Response
       attr_reader :status
 
@@ -283,7 +311,7 @@ module ReactOnRailsPro
     end
 
     def endpoint_for(origin)
-      options = { timeout: @connect_timeout }
+      options = { wrapper: ConnectTimeoutWrapper.new(@connect_timeout) }
       options[:protocol] = Async::HTTP::Protocol::HTTP2 if @force_http2 && URI.parse(origin).scheme == "http"
 
       Async::HTTP::Endpoint.parse(origin, **options)
