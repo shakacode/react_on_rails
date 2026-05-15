@@ -318,6 +318,7 @@ module ReactOnRailsPro
     def run_with_timeout(&block)
       # @read_timeout carries ssr_timeout and bounds the whole renderer request,
       # including TCP connect, request write, and response body streaming.
+      # Async treats nil as no timeout; configuration keeps that legacy escape hatch explicit.
       if (task = Async::Task.current?)
         task.with_timeout(@read_timeout, &block)
       else
