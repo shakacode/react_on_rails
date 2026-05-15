@@ -392,6 +392,10 @@ Before upgrading:
   connect, request write, and response streaming time.
 - Treat `config.renderer_http_pool_timeout` as the TCP connect timeout. After the socket connects, renderer work is
   still bounded by `ssr_timeout`.
+- Treat `config.renderer_http_pool_size` as a per-request HTTP/2 stream limit, not as a persistent process-wide
+  connection pool size. The current async-http adapter opens a request-scoped client for each renderer request and
+  does not reuse TCP connections between Rails requests, so high-latency networks or very high request rates can see
+  extra connection and HTTP/2 handshake overhead compared with HTTPX.
 - `config.renderer_http_keep_alive_timeout` remains accepted for compatibility, but it has no effect because
   async-http clients are currently scoped to individual requests. Setting it now emits a deprecation warning.
 

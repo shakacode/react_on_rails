@@ -269,8 +269,8 @@ module ReactOnRailsPro
     end
 
     def close
+      # No-op: async-http clients are scoped to individual requests so they never cross Async reactors.
       # Request#reset_connection still calls close for adapter compatibility.
-      # async-http clients are scoped to individual requests so they never cross Async reactors.
     end
 
     private

@@ -96,7 +96,9 @@ ReactOnRailsPro.configure do |config|
 
   # With the async-http renderer client, clients are scoped to individual requests.
   # For the HTTP/2 renderer connection, this limits concurrent streams on that request's client
-  # rather than the size of a persistent process-wide connection pool.
+  # rather than the size of a persistent process-wide connection pool. The current adapter does
+  # not reuse TCP connections between Rails requests, so high-latency networks or very high
+  # request rates can see extra connection and HTTP/2 handshake overhead compared with HTTPX.
   # Default for `renderer_http_pool_size` is 10
   config.renderer_http_pool_size = 10
 
@@ -105,8 +107,8 @@ ReactOnRailsPro.configure do |config|
   # Default for `renderer_http_pool_timeout` is 5
   config.renderer_http_pool_timeout = 5
 
-  # warn_timeout  - Displays an error message if a request takes longer than the given time in seconds
-  # (used to give hints to increase the pool size). Default is 0.25
+  # warn_timeout  - Displays an error message if a request takes longer than the given time in seconds.
+  # Default is 0.25
   config.renderer_http_pool_warn_timeout = 0.25 # seconds
 
   # Snippet of JavaScript to be run right at the beginning of the server rendering process. The code

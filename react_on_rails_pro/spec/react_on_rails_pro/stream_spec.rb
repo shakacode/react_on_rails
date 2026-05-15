@@ -78,6 +78,17 @@ RSpec.describe "Streaming API" do
 
       expect(mocked_block).not_to have_received(:call)
     end
+
+    it "preserves renderer HTTP errors when final partial-line flushing raises" do
+      request = ReactOnRailsPro::StreamRequest.send(:new) { "unused" }
+      response = ReactOnRailsPro::RendererHttpClient::Response.new(status: 500, body: ["Partial error"])
+
+      expect do
+        request.send(:loop_response_lines, response) do |_chunk|
+          raise StandardError, "secondary flush failure"
+        end
+      end.to raise_error(ReactOnRailsPro::RendererHttpClient::HTTPError)
+    end
   end
 
   describe "Component streaming concurrency" do
