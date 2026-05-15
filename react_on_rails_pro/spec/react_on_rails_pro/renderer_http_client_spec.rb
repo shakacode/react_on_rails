@@ -36,6 +36,12 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       expect(response).not_to respond_to(:status=)
     end
 
+    it "does not expose a public chunk writer" do
+      response = described_class.new(status: 200)
+
+      expect(response).not_to respond_to(:append_chunk)
+    end
+
     it "yields streamed chunks and raises an HTTPError after consuming an error response" do
       response = described_class.new(status: 410, body: ["Bundle ", "Required"])
       chunks = []

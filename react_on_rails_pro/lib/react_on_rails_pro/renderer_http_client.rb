@@ -101,12 +101,12 @@ module ReactOnRailsPro
         raise HTTPError, self if error?
       end
 
+      private
+
       def append_chunk(chunk)
         @body = nil
         @body_chunks << chunk
       end
-
-      private
 
       def consume
         return if @consumed
@@ -222,7 +222,8 @@ module ReactOnRailsPro
         value.to_s.delete("\r\n")
       end
 
-      # Bundle files are buffered before upload; content-length is intentionally omitted.
+      # Bundle files are fully buffered before upload. content-length is omitted
+      # because setting it caused Fastify HTTP/2 stream resets during testing.
       def multipart_file_body(body)
         return body.binread if body.is_a?(Pathname)
         return body.read if body.respond_to?(:read)

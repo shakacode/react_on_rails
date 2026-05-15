@@ -726,7 +726,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
       end
 
       it "accepts positive numbers" do
-        expect(ReactOnRailsPro.configuration).to receive(:warn).with(
+        expect(Rails.logger).to receive(:warn).with(
           "[ReactOnRailsPro] config.renderer_http_keep_alive_timeout is deprecated and has no effect " \
           "with the async-http adapter because clients are scoped per request."
         )

@@ -111,8 +111,8 @@ module ReactOnRailsPro
     def renderer_http_keep_alive_timeout=(value)
       validate_renderer_http_keep_alive_timeout(value)
       unless value.nil?
-        warn "[ReactOnRailsPro] config.renderer_http_keep_alive_timeout is deprecated and has no effect " \
-             "with the async-http adapter because clients are scoped per request."
+        Rails.logger.warn "[ReactOnRailsPro] config.renderer_http_keep_alive_timeout is deprecated and has no effect " \
+                          "with the async-http adapter because clients are scoped per request."
       end
       @renderer_http_keep_alive_timeout = value
     end

@@ -75,7 +75,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         request.send(:process_response_chunks, response, error_body) do |chunk|
           yielded_chunks << chunk
         end
-      end.to raise_error(ReactOnRailsPro::Error, /must implement #error\? or #status/)
+      end.to raise_error(NotImplementedError, /must implement #error\? or #status/)
 
       expect(error_body).to eq("")
       expect(yielded_chunks).to be_empty
