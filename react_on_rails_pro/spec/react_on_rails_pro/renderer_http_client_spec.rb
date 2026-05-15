@@ -6,6 +6,19 @@ require "react_on_rails_pro/renderer_http_client"
 require "stringio"
 
 RSpec.describe ReactOnRailsPro::RendererHttpClient do
+  describe ".validate_io_endpoint_version!" do
+    it "accepts the bundled io-endpoint version" do
+      expect { described_class.validate_io_endpoint_version! }.not_to raise_error
+    end
+
+    it "fails fast when io-endpoint is outside the verified wrapper range" do
+      stub_const("IO::Endpoint::VERSION", "0.18.0")
+
+      expect { described_class.validate_io_endpoint_version! }
+        .to raise_error(described_class::Error, /requires ~> 0\.17\.0/)
+    end
+  end
+
   describe ReactOnRailsPro::RendererHttpClient::ConnectTimeoutWrapper do
     it "documents io-endpoint wrapper compatibility" do
       # ConnectTimeoutWrapper subclasses IO::Endpoint::Wrapper and relies on:
@@ -263,6 +276,34 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
   end
 
   describe "#post" do
+    it "uses the configured default stream limit when pool_size is nil" do
+      stub_const("FakeAsyncOpenClient", Class.new)
+      stub_const("FakeAsyncEndpoint", Class.new)
+
+      async_client = instance_double(FakeAsyncOpenClient)
+      endpoint = instance_double(FakeAsyncEndpoint, protocol: :fake_protocol)
+      client = described_class.new(
+        origin: "http://localhost:3800",
+        pool_size: nil,
+        connect_timeout: 1,
+        read_timeout: 1
+      )
+
+      allow(client).to receive(:endpoint_for).and_return(endpoint)
+      allow(Async::HTTP::Client).to receive(:open).and_yield(async_client)
+
+      yielded_client = nil
+      client.__send__(:with_client) { |opened_client| yielded_client = opened_client }
+
+      expect(Async::HTTP::Client).to have_received(:open).with(
+        endpoint,
+        protocol: :fake_protocol,
+        retries: 0,
+        limit: ReactOnRailsPro::Configuration::DEFAULT_RENDERER_HTTP_POOL_SIZE
+      )
+      expect(yielded_client).to be(async_client)
+    end
+
     it "does not install the connect timeout as the endpoint socket operation timeout" do
       client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 5)
       endpoint = client.__send__(:endpoint_for, "http://localhost:3800")

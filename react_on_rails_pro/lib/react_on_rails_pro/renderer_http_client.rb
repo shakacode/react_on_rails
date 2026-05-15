@@ -3,6 +3,7 @@
 require "async"
 require "async/http"
 require "async/http/protocol/http2"
+require "io/endpoint/version"
 require "json"
 require "pathname"
 require "protocol/http/headers"
@@ -16,6 +17,8 @@ module ReactOnRailsPro
     class TimeoutError < Error; end
 
     class ConnectionError < Error; end
+
+    IO_ENDPOINT_REQUIREMENT = Gem::Requirement.new("~> 0.17.0")
 
     class HTTPError < Error
       attr_reader :response
@@ -138,6 +141,15 @@ module ReactOnRailsPro
     end
 
     class << self
+      def validate_io_endpoint_version!
+        version = Gem::Version.new(IO::Endpoint::VERSION)
+        return if IO_ENDPOINT_REQUIREMENT.satisfied_by?(version)
+
+        raise Error, "io-endpoint #{IO::Endpoint::VERSION} is unsupported; async-http renderer client " \
+                     "requires #{IO_ENDPOINT_REQUIREMENT} because ConnectTimeoutWrapper relies on " \
+                     "IO::Endpoint::Wrapper internals."
+      end
+
       def get(url, connect_timeout:, read_timeout:)
         origin, path = split_url(url)
 
@@ -250,6 +262,8 @@ module ReactOnRailsPro
       end
     end
 
+    validate_io_endpoint_version!
+
     def initialize(origin:, pool_size:, connect_timeout:, read_timeout:, force_http2: true)
       @origin = origin
       @pool_size = pool_size
@@ -338,7 +352,7 @@ module ReactOnRailsPro
       # TODO: revisit persistent async-http clients for renderer requests once
       # https://github.com/shakacode/react_on_rails/issues/3283 settles connection-reuse direction.
       endpoint = endpoint_for(@origin)
-      Async::HTTP::Client.open(endpoint, protocol: endpoint.protocol, retries: 0, limit: @pool_size) do |client|
+      Async::HTTP::Client.open(endpoint, protocol: endpoint.protocol, retries: 0, limit: pool_limit) do |client|
         # Retries are owned by Request/StreamRequest so bundle-upload retry behavior remains centralized.
         # Each client is intentionally request-scoped to avoid sharing connections across Async reactors.
         # limit is therefore a per-request HTTP/2 stream cap, not a process-wide connection pool size.
@@ -354,6 +368,16 @@ module ReactOnRailsPro
       options[:protocol] = Async::HTTP::Protocol::HTTP2 if @force_h2c
 
       Async::HTTP::Endpoint.parse(origin, **options)
+    end
+
+    def pool_limit
+      return @pool_size unless @pool_size.nil?
+
+      if defined?(ReactOnRailsPro::Configuration::DEFAULT_RENDERER_HTTP_POOL_SIZE)
+        ReactOnRailsPro::Configuration::DEFAULT_RENDERER_HTTP_POOL_SIZE
+      else
+        10
+      end
     end
 
     def stream_body(raw_response, yielder)
