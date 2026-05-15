@@ -34,12 +34,11 @@ module ReactOnRailsPro
 
       def body: () -> String
 
-      def error?: () -> bool?
+      def error?: () -> bool
 
       def each: () -> Enumerator[String, void]
               | () { (String) -> untyped } -> untyped
 
-      def append_chunk: (String chunk) -> void
     end
 
     def self.get: (String url, connect_timeout: Numeric, read_timeout: Numeric) -> Response

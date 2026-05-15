@@ -2,6 +2,7 @@
 
 require_relative "spec_helper"
 require "react_on_rails_pro/renderer_http_client"
+require "stringio"
 
 RSpec.describe ReactOnRailsPro::RendererHttpClient do
   describe ReactOnRailsPro::RendererHttpClient::ConnectTimeoutWrapper do
@@ -27,7 +28,7 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
     it "does not treat an unknown status as an error" do
       response = described_class.new
 
-      expect(response).not_to be_error
+      expect(response.error?).to be(false)
     end
 
     it "does not expose a public status writer" do
@@ -54,6 +55,25 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       }
 
       expect(chunks).to eq(["Bundle ", "Required"])
+    end
+
+    it "replays streamed chunks and re-raises executor errors after a failed consume" do
+      response = described_class.new do |yielder, _status_assigner|
+        yielder.call("Partial")
+        raise "Renderer crashed"
+      end
+
+      first_chunks = []
+      expect do
+        response.each { |chunk| first_chunks << chunk }
+      end.to raise_error(RuntimeError, "Renderer crashed")
+      expect(first_chunks).to eq(["Partial"])
+
+      chunks = []
+      expect do
+        response.each { |chunk| chunks << chunk }
+      end.to raise_error(RuntimeError, "Renderer crashed")
+      expect(chunks).to eq(["Partial"])
     end
   end
 
@@ -147,6 +167,25 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       expect(headers).to include(["content-type", "multipart/form-data; boundary=rorp-test-boundary"])
       expect(body.encoding).to eq(Encoding::BINARY)
       expect(body.b).to include(binary_payload)
+    end
+
+    it "encodes UTF-8 scalar and IO file parts into the binary multipart body" do
+      headers, body = described_class.build_multipart_body(
+        {
+          "password" => "sëcret",
+          "bundle" => {
+            body: StringIO.new("console.log('héllo');"),
+            content_type: "text/javascript",
+            filename: "server.js"
+          }
+        },
+        boundary: "rorp-test-boundary"
+      )
+
+      expect(headers).to include(["content-type", "multipart/form-data; boundary=rorp-test-boundary"])
+      expect(body.encoding).to eq(Encoding::BINARY)
+      expect(body.b).to include("sëcret".b)
+      expect(body.b).to include("console.log('héllo');".b)
     end
   end
 

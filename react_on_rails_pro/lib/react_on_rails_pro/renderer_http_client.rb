@@ -84,7 +84,7 @@ module ReactOnRailsPro
       end
 
       def error?
-        status && status >= 400
+        !status.nil? && status >= 400
       end
 
       def each(&block)
@@ -111,14 +111,19 @@ module ReactOnRailsPro
       def consume
         return if @consumed
 
-        @consumed = true
         status_assigner = ->(status) { @status = status }
         yielder = lambda do |chunk|
           append_chunk(chunk)
           yield chunk if block_given?
         end
 
-        @executor&.call(yielder, status_assigner)
+        @consumed = true
+        begin
+          @executor&.call(yielder, status_assigner)
+        rescue StandardError => e
+          @error ||= e
+          raise
+        end
       end
     end
 
@@ -198,7 +203,7 @@ module ReactOnRailsPro
         body << "--#{boundary}\r\n"
         body << %(Content-Disposition: form-data; name="#{name}"\r\n)
         body << "\r\n"
-        body << value.to_s
+        body << value.to_s.b
         body << "\r\n"
       end
 
@@ -226,9 +231,9 @@ module ReactOnRailsPro
       # because setting it caused Fastify HTTP/2 stream resets during testing.
       def multipart_file_body(body)
         return body.binread if body.is_a?(Pathname)
-        return body.read if body.respond_to?(:read)
+        return body.read.b if body.respond_to?(:read)
 
-        body.to_s
+        body.to_s.b
       end
     end
 
