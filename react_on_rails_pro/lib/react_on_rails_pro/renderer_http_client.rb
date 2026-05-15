@@ -205,7 +205,7 @@ module ReactOnRailsPro
       def append_file_part(body, boundary, name, value)
         name = sanitize_header_param(name)
         filename = sanitize_header_param(value.fetch(:filename))
-        content_type = sanitize_header_param(value.fetch(:content_type))
+        content_type = sanitize_header_value(value.fetch(:content_type))
         body << "--#{boundary}\r\n"
         body << %(Content-Disposition: form-data; name="#{name}"; filename="#{filename}"\r\n)
         body << "Content-Type: #{content_type}\r\n"
@@ -218,6 +218,11 @@ module ReactOnRailsPro
         value.to_s.gsub(/["\\]/) { |char| "\\#{char}" }.delete("\r\n")
       end
 
+      def sanitize_header_value(value)
+        value.to_s.delete("\r\n")
+      end
+
+      # Bundle files are buffered before upload; content-length is intentionally omitted.
       def multipart_file_body(body)
         return body.binread if body.is_a?(Pathname)
         return body.read if body.respond_to?(:read)
@@ -306,6 +311,7 @@ module ReactOnRailsPro
       endpoint = endpoint_for(@origin)
       Async::HTTP::Client.open(endpoint, protocol: endpoint.protocol, retries: 0, limit: @pool_size) do |client|
         # rubocop:disable Performance/RedundantBlockCall
+        # The block is captured with &block, so yield is unavailable in this nested block.
         block.call(client)
         # rubocop:enable Performance/RedundantBlockCall
       end

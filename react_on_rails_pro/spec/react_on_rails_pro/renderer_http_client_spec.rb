@@ -104,6 +104,22 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       expect(body).not_to include("\r\nX-Injected")
     end
 
+    it "strips CRLF without quoted-string escaping content type values" do
+      headers, body = described_class.build_multipart_body(
+        {
+          "bundle" => {
+            body: "console.log('bundle');",
+            content_type: 'text/html; charset="utf-8"',
+            filename: "server.js"
+          }
+        },
+        boundary: "rorp-test-boundary"
+      )
+
+      expect(headers).to include(["content-type", "multipart/form-data; boundary=rorp-test-boundary"])
+      expect(body).to include("Content-Type: text/html; charset=\"utf-8\"\r\n")
+    end
+
     it "supports binary uploaded file bodies" do
       binary_payload = [0xff, 0xfe, 0x00, 0x61].pack("C*")
       headers = nil
@@ -353,7 +369,8 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       Errno::EHOSTUNREACH,
       Errno::ENETUNREACH,
       Errno::EPIPE,
-      Errno::ETIMEDOUT
+      Errno::ETIMEDOUT,
+      Protocol::HTTP::RefusedError
     ].each do |error_class|
       it "wraps #{error_class} in a ConnectionError" do
         client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)

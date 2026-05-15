@@ -63,14 +63,10 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       expect(yielded_chunks).to be_empty
     end
 
-    it "surfaces malformed fallback responses" do
+    it "surfaces malformed fallback responses with a clear adapter error" do
       response = Class.new do
         def each
           yield "Failed request body"
-        end
-
-        def status
-          raise NoMethodError, "undefined method `status`"
         end
       end.new
 
@@ -79,7 +75,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         request.send(:process_response_chunks, response, error_body) do |chunk|
           yielded_chunks << chunk
         end
-      end.to raise_error(NoMethodError, /undefined method `status`/)
+      end.to raise_error(ReactOnRailsPro::Error, /must implement #error\? or #status/)
 
       expect(error_body).to eq("")
       expect(yielded_chunks).to be_empty
