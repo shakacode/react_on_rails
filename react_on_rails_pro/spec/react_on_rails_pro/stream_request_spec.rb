@@ -17,7 +17,9 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
 
   describe ".create" do
     it "returns a StreamDecorator instance" do
-      result = described_class.create { mock_response }
+      # Passed block is not called until #each_chunk is invoked, so we can just pass a no-op block here.
+      # As it won't be called during this test
+      result = described_class.create { nil }
       expect(result).to be_a(ReactOnRailsPro::StreamDecorator)
     end
   end
@@ -86,6 +88,88 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       end
 
       stream.each_chunk(&:itself)
+    end
+  end
+  # rubocop:enable RSpec/VerifiedDoubles
+
+  # rubocop:disable RSpec/VerifiedDoubles
+  describe "error handling" do
+    def build_http_error(status)
+      response = double("response", status: status, headers: {}, body: "")
+      HTTPX::HTTPError.new(response)
+    end
+
+    it "raises ReactOnRailsPro::Error on HTTPX::ReadTimeoutError" do
+      mock_request = double("request")
+      mock_response = double("response")
+      timeout_error = HTTPX::ReadTimeoutError.new(mock_request, mock_response, 5)
+
+      stream = described_class.create do |_send_bundle, _barrier|
+        raise timeout_error
+      end
+
+      expect { stream.each_chunk(&:itself) }.to raise_error(
+        ReactOnRailsPro::Error,
+        /Time out error while server side render streaming a component/
+      )
+    end
+
+    it "raises ReactOnRailsPro::Error on HTTP 400 (bad request)" do
+      stream = described_class.create do |_send_bundle, _barrier|
+        raise build_http_error(400)
+      end
+
+      expect { stream.each_chunk(&:itself) }.to raise_error(
+        ReactOnRailsPro::Error,
+        /Renderer rejected malformed request or hit an unhandled VM error/
+      )
+    end
+
+    it "raises ReactOnRailsPro::Error on STATUS_INCOMPATIBLE (412)" do
+      stream = described_class.create do |_send_bundle, _barrier|
+        raise build_http_error(412)
+      end
+
+      expect { stream.each_chunk(&:itself) }.to raise_error(ReactOnRailsPro::Error)
+    end
+
+    it "raises ReactOnRailsPro::Error on unexpected status codes" do
+      stream = described_class.create do |_send_bundle, _barrier|
+        raise build_http_error(503)
+      end
+
+      expect { stream.each_chunk(&:itself) }.to raise_error(
+        ReactOnRailsPro::Error,
+        /Unexpected response code from renderer: 503/
+      )
+    end
+
+    it "retries with bundle upload on HTTP 410 (send bundle)" do
+      call_count = 0
+      mock_response = double(HTTPX::StreamResponse, status: 200)
+      allow(mock_response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(false)
+      allow(mock_response).to receive(:each).and_yield(to_length_prefixed("ok"))
+
+      stream = described_class.create do |send_bundle, _barrier|
+        call_count += 1
+        raise build_http_error(410) if call_count == 1
+
+        expect(send_bundle).to be true
+        mock_response
+      end
+
+      chunks = []
+      stream.each_chunk { |c| chunks << c }
+      expect(call_count).to eq(2)
+      expect(chunks.first).to include("html" => "ok")
+    end
+
+    it "prevents infinite loop on duplicate 410 responses" do
+      stream = described_class.create do |_send_bundle, _barrier|
+        raise build_http_error(410)
+      end
+
+      expect { stream.each_chunk(&:itself) }.to raise_error(ReactOnRailsPro::Error)
     end
   end
   # rubocop:enable RSpec/VerifiedDoubles
