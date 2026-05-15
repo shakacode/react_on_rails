@@ -45,7 +45,8 @@ module ReactOnRailsPro
       attr_reader :connect_timeout
 
       def initialize(connect_timeout)
-        # Wrapper is used only for the socket_connect hook; there is no wrapped endpoint to delegate through.
+        # Wrapper is used only for the socket_connect hook; async-http passes it via the wrapper: option and
+        # never calls delegation methods on it directly. Verified against io-endpoint 0.17.x.
         super()
         @connect_timeout = connect_timeout
       end
@@ -121,6 +122,8 @@ module ReactOnRailsPro
           yield chunk if block_given?
         end
 
+        # Mark consumed before the executor runs so a raised response still has a determinate replay state:
+        # each re-raises @error, while body can return partial chunks for error-body access.
         @consumed = true
         begin
           @executor&.call(yielder, status_assigner)
@@ -152,6 +155,7 @@ module ReactOnRailsPro
         [origin, uri.request_uri]
       end
 
+      # boundary must not contain "--"; callers should use the default SecureRandom.hex value.
       def build_multipart_body(form, boundary: SecureRandom.hex(24))
         body = +"".b
 
