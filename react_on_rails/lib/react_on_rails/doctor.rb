@@ -2983,7 +2983,7 @@ module ReactOnRails
       return false unless content.valid_encoding?
 
       base_package_reference?(content)
-    rescue SystemCallError
+    rescue SystemCallError, IOError
       false
     end
 
