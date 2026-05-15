@@ -8,19 +8,25 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
   describe ReactOnRailsPro::RendererHttpClient::ConnectTimeoutWrapper do
     it "clears the socket timeout after TCP connect" do
       wrapper = described_class.new(0.25)
-      socket = nil
       timeout_during_connect = nil
+      fake_socket = Class.new do
+        attr_accessor :timeout
 
-      allow(wrapper).to receive(:socket_connect) do |connecting_socket, _remote_address|
-        timeout_during_connect = connecting_socket.timeout
+        def setsockopt(*); end
+
+        def close; end
+      end.new
+
+      allow(Socket).to receive(:new).and_return(fake_socket)
+      allow(wrapper).to receive(:socket_connect) do |socket, _remote_address|
+        timeout_during_connect = socket.timeout
       end
 
       socket = wrapper.connect(Addrinfo.tcp("127.0.0.1", 80))
 
       expect(timeout_during_connect).to eq(0.25)
+      expect(socket).to be(fake_socket)
       expect(socket.timeout).to be_nil
-    ensure
-      socket&.close
     end
   end
 
