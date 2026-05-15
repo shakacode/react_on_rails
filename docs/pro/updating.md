@@ -379,6 +379,22 @@ If you only use ExecJS for SSR (the default), you do not need `react-on-rails-pr
 
 ### Additional Upgrade Notes
 
+#### Upgrading to a version with the async-http node renderer client
+
+React on Rails Pro now uses `async-http` instead of HTTPX for Rails-to-node-renderer requests.
+This affects render, streaming render, and asset upload requests.
+
+Before upgrading:
+
+- Run Ruby 3.3 or newer. The `async-http` dependency requires Ruby 3.3+.
+- Remove direct application assumptions about HTTPX-specific response or error classes in Pro renderer request paths.
+- Keep `config.ssr_timeout` sized for the full renderer request. With the async-http client, this timeout bounds
+  connect, request write, and response streaming time.
+- Treat `config.renderer_http_pool_timeout` as the TCP connect timeout. After the socket connects, renderer work is
+  still bounded by `ssr_timeout`.
+- `config.renderer_http_keep_alive_timeout` remains accepted for compatibility, but it has no effect because
+  async-http clients are currently scoped to individual requests. Setting it now emits a deprecation warning.
+
 #### Upgrading to 16.4.0 or later
 
 ##### JWT gem requirement
