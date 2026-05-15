@@ -15,7 +15,7 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       stub_const("IO::Endpoint::VERSION", "0.18.0")
 
       expect { described_class.validate_io_endpoint_version! }
-        .to raise_error(described_class::Error, /requires ~> 0\.17\.0/)
+        .to raise_error(described_class::Error, /Pin io-endpoint to ~> 0\.17\.0/)
     end
   end
 
@@ -465,6 +465,8 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
     end
 
     [
+      SocketError,
+      IOError,
       Errno::ECONNREFUSED,
       Errno::ECONNRESET,
       Errno::EHOSTUNREACH,

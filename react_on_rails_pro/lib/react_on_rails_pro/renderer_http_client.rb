@@ -147,7 +147,8 @@ module ReactOnRailsPro
 
         raise Error, "io-endpoint #{IO::Endpoint::VERSION} is unsupported; async-http renderer client " \
                      "requires #{IO_ENDPOINT_REQUIREMENT} because ConnectTimeoutWrapper relies on " \
-                     "IO::Endpoint::Wrapper internals."
+                     "IO::Endpoint::Wrapper internals. Pin io-endpoint to #{IO_ENDPOINT_REQUIREMENT} " \
+                     "or restore the react_on_rails_pro dependency constraints and run bundle update io-endpoint."
       end
 
       def get(url, connect_timeout:, read_timeout:)

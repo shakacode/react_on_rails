@@ -400,6 +400,10 @@ Before upgrading:
 - Expect renderer connection drops to surface immediately as `ReactOnRailsPro::Error`/connection failures. HTTPX
   previously performed one implicit transport retry for some connection drops; the async-http adapter uses
   `retries: 0` and leaves retry policy to the existing bundle-upload retry loop and caller behavior.
+- Run the node renderer client from the normal synchronous Rails request path. Async Rails servers or middleware that
+  call the renderer from inside an existing Async reactor without an `Async::Task.current?` context are not currently
+  supported because the sync fallback may create a nested reactor. Keep Falcon/async-rails deployments on the previous
+  HTTPX renderer client until this support is explicitly added.
 - `config.renderer_http_keep_alive_timeout` remains accepted for compatibility, but it has no effect because
   async-http clients are currently scoped to individual requests. Setting it now emits a deprecation warning.
 
