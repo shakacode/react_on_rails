@@ -107,6 +107,7 @@ module ReactOnRailsPro
     # This value formerly represented the HTTPX persistent connection pool size.
     # The async-http adapter opens request-scoped clients, so setting this value is
     # still valid but no longer changes process-wide connection reuse.
+    # Setting nil keeps the default stream limit at request time; it is not unlimited.
     def renderer_http_pool_size=(value)
       unless value.nil? || value == DEFAULT_RENDERER_HTTP_POOL_SIZE
         Rails.logger.warn "[ReactOnRailsPro] config.renderer_http_pool_size now limits concurrent HTTP/2 streams " \

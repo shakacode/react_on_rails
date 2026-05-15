@@ -387,6 +387,9 @@ This affects render, streaming render, and asset upload requests.
 Before upgrading:
 
 - Run Ruby 3.3 or newer. The `async-http` dependency requires Ruby 3.3+.
+- Keep the transitive `io-endpoint` gem in the 0.17.x range when updating `async-http`. Do not run
+  `bundle update async-http` without checking that `io-endpoint` remains compatible; the Pro client fails fast at boot
+  if `IO::Endpoint::Wrapper` internals change in a later `io-endpoint` release.
 - Remove direct application assumptions about HTTPX-specific response or error classes in Pro renderer request paths.
 - Keep `config.ssr_timeout` sized for the full renderer request. With the async-http client, this timeout bounds
   connect, request write, and response streaming time.
@@ -396,7 +399,9 @@ Before upgrading:
   connection pool size. The current async-http adapter opens a request-scoped client for each renderer request and
   does not reuse TCP connections between Rails requests, so high-latency networks or very high request rates can see
   extra connection and HTTP/2 handshake overhead compared with HTTPX. Setting this value now emits a warning to make
-  the changed meaning visible during upgrades.
+  the changed meaning visible during upgrades. Setting it to `nil` keeps the default stream limit; it does not make
+  the request-scoped async-http client unlimited. Persistent async-http connection reuse is tracked in
+  [Issue 3283](https://github.com/shakacode/react_on_rails/issues/3283).
 - Expect renderer connection drops to surface immediately as `ReactOnRailsPro::Error`/connection failures. HTTPX
   previously performed one implicit transport retry for some connection drops; the async-http adapter uses
   `retries: 0` and leaves retry policy to the existing bundle-upload retry loop and caller behavior.
