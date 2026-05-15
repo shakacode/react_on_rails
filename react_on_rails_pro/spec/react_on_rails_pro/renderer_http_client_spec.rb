@@ -8,6 +8,8 @@ require "stringio"
 RSpec.describe ReactOnRailsPro::RendererHttpClient do
   describe ReactOnRailsPro::RendererHttpClient::ConnectTimeoutWrapper do
     it "documents io-endpoint wrapper compatibility" do
+      # ConnectTimeoutWrapper subclasses IO::Endpoint::Wrapper and relies on its internal socket_connect
+      # callback dispatch. If this fails after an io-endpoint upgrade, verify that hook before bumping.
       expect(Gem::Version.new(IO::Endpoint::VERSION)).to be < Gem::Version.new("0.18")
     end
 

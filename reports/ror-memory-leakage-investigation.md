@@ -15,6 +15,8 @@ We built an in-repo reproducer and ran extensive experiments (up to 30,000 reque
 
 Our conclusion is that the reported RSS growth is not caused by a simple heap-level object leak in the react_on_rails framework. Instead, it is consistent with **memory fragmentation** — a well-documented phenomenon in Ruby processes under sustained traffic with large, variable-size allocations. This type of growth is notoriously difficult to reproduce in synthetic benchmarks because it depends on specific allocator behavior, traffic patterns, payload diversity, and runtime conditions that are rare and hard to simulate deterministically.
 
+**Async-http follow-up note:** PR [3279](https://github.com/shakacode/react_on_rails/pull/3279) replaces the HTTPX persistent renderer connection pool with request-scoped `async-http` clients. The benchmarks in this report are useful for memory and loopback behavior, but they do **not** estimate separate-host TCP, TLS, or HTTP/2 handshake overhead. Treat the loopback timings as optimistic for production topologies where Rails and the renderer run on different hosts; persistent async-http connection reuse is tracked in [Issue 3283](https://github.com/shakacode/react_on_rails/issues/3283).
+
 ---
 
 ## Table of Contents

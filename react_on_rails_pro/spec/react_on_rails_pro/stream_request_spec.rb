@@ -63,6 +63,27 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       expect(yielded_chunks).to be_empty
     end
 
+    it "treats nil fallback status as not-yet-an-error" do
+      response = Class.new do
+        def each
+          yield "First\n"
+        end
+
+        def status
+          nil
+        end
+      end.new
+
+      yielded_chunks = []
+
+      request.send(:process_response_chunks, response, error_body) do |chunk|
+        yielded_chunks << chunk
+      end
+
+      expect(yielded_chunks).to eq(["First"])
+      expect(error_body).to eq("")
+    end
+
     it "does not duplicate a line when a chunk starts with a newline" do
       response = Class.new do
         def each

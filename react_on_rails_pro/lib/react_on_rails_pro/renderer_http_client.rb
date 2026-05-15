@@ -327,6 +327,8 @@ module ReactOnRailsPro
       else
         # Rails calls this from a synchronous request thread; Sync blocks that thread
         # while async-http drives the renderer exchange inside a temporary reactor.
+        # Async web servers without an Async::Task.current? request context should revisit
+        # this fallback before relying on nested reactor behavior.
         Sync { |sync_task| sync_task.with_timeout(@read_timeout, &block) }
       end
     end
@@ -338,6 +340,7 @@ module ReactOnRailsPro
       Async::HTTP::Client.open(endpoint, protocol: endpoint.protocol, retries: 0, limit: @pool_size) do |client|
         # Retries are owned by Request/StreamRequest so bundle-upload retry behavior remains centralized.
         # Each client is intentionally request-scoped to avoid sharing connections across Async reactors.
+        # limit is therefore a per-request HTTP/2 stream cap, not a process-wide connection pool size.
         # rubocop:disable Performance/RedundantBlockCall
         # The block is captured with &block, so yield is unavailable in this nested block.
         block.call(client)
