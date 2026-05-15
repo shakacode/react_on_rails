@@ -20,7 +20,6 @@ module ReactOnRails
 
     PRO_GEM_PATTERN = /^\s*gem(?:\s+|\(\s*(?:#.*\n\s*)*)["']react_on_rails_pro["']/
     BASE_GEM_PATTERN = /^(\s*)gem(?:\s+|\(\s*)(["'])react_on_rails\2(?=\s*(?:,|\)|#|$))/
-    RUBY_INLINE_COMMENT_PATTERN = /(?<!\s)\s*#.*$/
     STRING_LITERAL_PATTERN = /"(?:\\.|[^"\\])*+"|'(?:\\.|[^'\\])*+'|`(?:\\.|[^`\\])*+`/
 
     module_function
@@ -75,7 +74,7 @@ module ReactOnRails
 
     def parenthesized_base_gem_name(line, fragment_offset, line_index)
       gem_name_fragment = line[fragment_offset..].to_s
-      return nil if gem_name_fragment.sub(RUBY_INLINE_COMMENT_PATTERN, "").strip.empty?
+      return nil if strip_ruby_inline_comment(gem_name_fragment).strip.empty?
 
       gem_name_match = gem_name_fragment.match(/\A\s*(["'])react_on_rails\1(?=\s*(?:,|\)|#|$))/)
       return false unless gem_name_match
@@ -141,7 +140,7 @@ module ReactOnRails
     end
 
     def line_continues_with_comma?(line)
-      line_without_comment = line.sub(RUBY_INLINE_COMMENT_PATTERN, "").rstrip
+      line_without_comment = strip_ruby_inline_comment(line).rstrip
       line_without_comment.end_with?(",")
     end
 
@@ -161,7 +160,16 @@ module ReactOnRails
       line_without_strings = line.gsub(STRING_LITERAL_PATTERN, "")
       return line_without_strings unless strip_ruby_comments
 
-      line_without_strings.sub(RUBY_INLINE_COMMENT_PATTERN, "")
+      strip_ruby_inline_comment(line_without_strings)
+    end
+
+    def strip_ruby_inline_comment(line)
+      hash_index = line.index("#")
+      return line unless hash_index
+
+      prefix = line[0, hash_index].rstrip
+      newline_index = line.index("\n", hash_index)
+      newline_index ? prefix + line[newline_index..] : prefix
     end
   end
 end
