@@ -2882,12 +2882,15 @@ module ReactOnRails
     BASE_PACKAGE_REQUIRE_PATTERN = %r{\brequire\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]\s*\)}
     BASE_PACKAGE_DYNAMIC_IMPORT_PATTERN = %r{\bimport\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]\s*\)}
     BASE_PACKAGE_SIDE_EFFECT_IMPORT_PATTERN = %r{^\s*import\s+['"]react-on-rails(?:/[^'"]*)?['"]}
-    # Match known Jest/Vitest helpers. Aliased or nested receivers are intentionally
-    # out of scope to avoid warning on arbitrary application methods named `mock`.
-    # The bare importActual/importMock forms cover Vitest's destructured-import style:
-    #   import { importActual, importMock } from 'vitest'
-    # Accepted false-positive risk: user-defined importActual/importMock helpers
-    # that take a 'react-on-rails' string also match.
+    # Match known Jest/Vitest mock helpers. Aliased or nested receivers are
+    # intentionally out of scope to avoid warning on arbitrary application
+    # methods named `mock`.
+    #
+    # importActual/importMock exist only as vi.* methods; there is no
+    # `import { importActual } from 'vitest'` form. The bare branch below is a
+    # deliberately broad detector heuristic (the rewriter omits it because
+    # rewriting is destructive while detection is advisory) and accepts that a
+    # user-defined helper of that name taking a 'react-on-rails' string matches.
     BASE_PACKAGE_MOCK_PATTERN = %r{
       \b(?:
         (?:jest|vi)\.
