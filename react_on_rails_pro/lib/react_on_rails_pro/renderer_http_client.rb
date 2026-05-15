@@ -36,6 +36,8 @@ module ReactOnRailsPro
       Errno::EPIPE,
       Errno::ETIMEDOUT,
       Protocol::HTTP::RefusedError,
+      # Treat HTTP/2 stream resets as transport failures because the renderer can
+      # abort streams without a usable HTTP response for Request/StreamRequest.
       Protocol::HTTP2::StreamError
     ].freeze
 
@@ -43,12 +45,13 @@ module ReactOnRailsPro
       attr_reader :connect_timeout
 
       def initialize(connect_timeout)
+        # Wrapper is used only for the socket_connect hook; there is no wrapped endpoint to delegate through.
         super()
         @connect_timeout = connect_timeout
       end
 
       def connect(remote_address, **options)
-        socket = super(remote_address, **options.merge(timeout: connect_timeout))
+        socket = super(remote_address, **options.merge(connect_timeout ? { timeout: connect_timeout } : {}))
         clear_timeout(socket)
 
         return socket unless block_given?
@@ -196,6 +199,8 @@ module ReactOnRailsPro
       end
 
       def file_part?(value)
+        # File parts are Hash values with the renderer upload shape:
+        # { body: Pathname/IO/String, filename: String, content_type: String }.
         value.is_a?(Hash) && value.key?(:body)
       end
 
@@ -279,6 +284,8 @@ module ReactOnRailsPro
     def build_response(stream:, &executor)
       response = Response.new(&executor)
 
+      # Non-streaming requests are consumed here so the HTTP exchange completes before returning.
+      # Streaming requests stay lazy; the caller drives the exchange via Response#each.
       response.body unless stream
       response
     end
@@ -310,6 +317,8 @@ module ReactOnRailsPro
       if (task = Async::Task.current?)
         task.with_timeout(@read_timeout, &block)
       else
+        # Rails calls this from a synchronous request thread; Sync blocks that thread
+        # while async-http drives the renderer exchange inside a temporary reactor.
         Sync { |sync_task| sync_task.with_timeout(@read_timeout, &block) }
       end
     end
@@ -317,6 +326,8 @@ module ReactOnRailsPro
     def with_client(&block)
       endpoint = endpoint_for(@origin)
       Async::HTTP::Client.open(endpoint, protocol: endpoint.protocol, retries: 0, limit: @pool_size) do |client|
+        # Retries are owned by Request/StreamRequest so bundle-upload retry behavior remains centralized.
+        # Each client is intentionally request-scoped to avoid sharing connections across Async reactors.
         # rubocop:disable Performance/RedundantBlockCall
         # The block is captured with &block, so yield is unavailable in this nested block.
         block.call(client)
