@@ -139,6 +139,7 @@ module ReactOnRailsPro
       self.renderer_http_pool_size = renderer_http_pool_size
       self.renderer_http_pool_timeout = renderer_http_pool_timeout
       self.renderer_http_pool_warn_timeout = renderer_http_pool_warn_timeout
+      # Initial assignment applies the default constructor value; warn only when users set this deprecated config.
       assign_initial_renderer_http_keep_alive_timeout(renderer_http_keep_alive_timeout)
       self.tracing = tracing
       self.rendering_returns_promises = server_renderer == "NodeRenderer" ? rendering_returns_promises : false
