@@ -52,9 +52,14 @@ module ReactOnRails
         say set_color("=" * 80, :cyan)
       end
 
-      # Check if Pro gem is missing. Attempts auto-install via bundle add.
+      # Check if the Pro gem is missing. When the base react_on_rails gem is in
+      # the Gemfile, installation is deferred to the later Gemfile swap (which
+      # preserves the user's version pin); otherwise auto-install via `bundle
+      # add` is attempted.
       # @param force [Boolean] When true, always checks (default: only if use_pro?).
-      # @return [Boolean] true if Pro gem is missing and could not be installed
+      # @return [Boolean] true only if the Pro gem is missing and could not be
+      #   installed; false if it is present, was auto-installed, or the install
+      #   is deferred to the Gemfile swap.
       def missing_pro_gem?(force: false)
         return false unless force || use_pro?
         return false if pro_gem_installed?
