@@ -2951,7 +2951,9 @@ module ReactOnRails
       js_patterns = js_extensions.map { |ext| "#{source_path}/**/*.#{ext}" }
 
       js_patterns.flat_map do |pattern|
-        Dir.glob(pattern).select { |file| base_package_reference_file?(file) }
+        Dir.glob(pattern)
+           .reject { |file| file.include?("/node_modules/") }
+           .select { |file| base_package_reference_file?(file) }
       end.sort
     end
 
