@@ -3176,6 +3176,25 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when JS tests use a typed Jest mock for the base package after a Pro migration" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/app.test.ts",
+                       "jest.mock<typeof import('react-on-rails')>('react-on-rails', () => ({}));\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("app.test.ts") }).to be true
+      end
+    end
+
     context "when JS tests mock the Pro package after a Pro migration" do
       around do |example|
         Dir.mktmpdir do |tmpdir|
@@ -3277,10 +3296,15 @@ RSpec.describe ReactOnRails::Doctor do
           Dir.chdir(tmpdir) do
             FileUtils.mkdir_p("app/javascript/packs")
             {
+              "create-mock.test.ts" => "jest.createMockFromModule('react-on-rails');\n",
               "unmock.test.ts" => "jest.unmock('react-on-rails');\n",
+              "deep-unmock.test.ts" => "jest.deepUnmock('react-on-rails');\n",
               "do-mock.test.ts" => "jest.doMock('react-on-rails/client', () => ({}));\n",
               "do-unmock.test.ts" => "vi.doUnmock('react-on-rails');\n",
               "dont-mock.test.ts" => "jest.dontMock('react-on-rails');\n",
+              "set-mock.test.ts" => "jest.setMock('react-on-rails', {});\n",
+              "unstable-mock-module.test.ts" => "jest.unstable_mockModule('react-on-rails', () => ({}));\n",
+              "unstable-unmock-module.test.ts" => "jest.unstable_unmockModule('react-on-rails');\n",
               "require-actual.test.ts" => "const mod = jest.requireActual('react-on-rails');\n",
               "require-mock.test.ts" => "const mod = jest.requireMock('react-on-rails/client');\n",
               "vitest-mock.test.ts" => "vi.mock('react-on-rails', () => ({ authenticityHeaders: vi.fn() }));\n"
@@ -3295,10 +3319,15 @@ RSpec.describe ReactOnRails::Doctor do
       it "reports warning for each stale helper reference" do
         doctor.send(:check_base_package_references)
         warning_content = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }.join("\n")
+        expect(warning_content).to include("create-mock.test.ts")
         expect(warning_content).to include("unmock.test.ts")
+        expect(warning_content).to include("deep-unmock.test.ts")
         expect(warning_content).to include("do-mock.test.ts")
         expect(warning_content).to include("do-unmock.test.ts")
         expect(warning_content).to include("dont-mock.test.ts")
+        expect(warning_content).to include("set-mock.test.ts")
+        expect(warning_content).to include("unstable-mock-module.test.ts")
+        expect(warning_content).to include("unstable-unmock-module.test.ts")
         expect(warning_content).to include("require-actual.test.ts")
         expect(warning_content).to include("require-mock.test.ts")
         expect(warning_content).to include("vitest-mock.test.ts")
@@ -3559,6 +3588,25 @@ RSpec.describe ReactOnRails::Doctor do
         doctor.send(:check_base_package_references)
         success_msgs = checker.messages.select { |m| m[:type] == :success }
         expect(success_msgs.any? { |m| m[:content].include?("Pro package used correctly") }).to be true
+      end
+    end
+
+    context "when a generator-scanned client root contains stale base package references" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("client/app/packs")
+            File.write("client/app/packs/app.test.ts",
+                       "jest.mock('react-on-rails', () => ({}));\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning for the same root the Pro generator rewrites" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("client/app/packs/app.test.ts") }).to be true
       end
     end
 

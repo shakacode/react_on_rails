@@ -366,10 +366,29 @@ module ReactOnRails
         (?=(?:["']|/))
       }x
 
+      # Explicit allowlist of documented Jest/Vitest APIs whose first argument is a module specifier.
+      # Keep destructive rewrites narrow; the doctor can warn more broadly if needed.
+      JEST_MODULE_SPECIFIER_METHOD_NAMES = %w[
+        createMockFromModule
+        mock unmock deepUnmock doMock dontMock setMock
+        requireActual requireMock unstable_mockModule unstable_unmockModule
+      ].freeze
+      VITEST_MODULE_SPECIFIER_METHOD_NAMES = %w[
+        mock unmock doMock doUnmock
+        importActual importMock
+      ].freeze
+      JEST_MODULE_SPECIFIER_METHOD_PATTERN = Regexp.union(JEST_MODULE_SPECIFIER_METHOD_NAMES)
+      VITEST_MODULE_SPECIFIER_METHOD_PATTERN = Regexp.union(VITEST_MODULE_SPECIFIER_METHOD_NAMES)
+
       MOCK_CALL_PATTERN = %r{
         (?<prefix>
-          (?<!["'`])\b(?:jest|vi)\.
-          (?:mock|unmock|doMock|doUnmock|dontMock|requireActual|requireMock|importActual|importMock)
+          (?<!["'`])\b(?:
+            jest\.(?:#{JEST_MODULE_SPECIFIER_METHOD_PATTERN})
+            |
+            vi\.(?:#{VITEST_MODULE_SPECIFIER_METHOD_PATTERN})
+          )
+          \s*
+          (?:<[^;\n]*>\s*)?
           \s*\(\s*
         )
         (?<quote>["'])
@@ -582,15 +601,43 @@ module ReactOnRails
         comment_balance.positive?
       end
 
+      MODULE_SPECIFIER_CALL_START_PATTERN = /
+        (?<![\w$])(?:import|require)\s*\(
+        |
+        (?<!["'`])\b(?:
+          jest\.(?:#{JEST_MODULE_SPECIFIER_METHOD_PATTERN})
+          |
+          vi\.(?:#{VITEST_MODULE_SPECIFIER_METHOD_PATTERN})
+        )
+          \s*
+          (?:<[^;\n]*>\s*)?
+          \s*\(
+      /x
+
+      MODULE_SPECIFIER_CALL_WITH_STRING_PATTERN = %r{
+        (?<!["'`])\b(?:import|require)\s*\(\s*(?:/\*[^*]*\*+(?:[^/*][^*]*\*+)*/\s*)*["']
+        |
+        (?<!["'`])\b(?:
+          jest\.(?:#{JEST_MODULE_SPECIFIER_METHOD_PATTERN})
+          |
+          vi\.(?:#{VITEST_MODULE_SPECIFIER_METHOD_PATTERN})
+        )
+          \s*
+          (?:<[^;\n]*>\s*)?
+          \s*\(\s*
+          (?:/\*[^*]*\*+(?:[^/*][^*]*\*+)*/\s*)*
+          ["']
+      }x
+
       def starts_pending_multiline_module_call?(line)
         line_without_literals = line_without_string_literals_and_inline_comments(line)
-        return false unless line_without_literals.match?(/(?<![\w$])(?:import|require)\s*\(/)
+        return false unless line_without_literals.match?(MODULE_SPECIFIER_CALL_START_PATTERN)
 
-        !line.match?(%r{(?<!["'`])\b(?:import|require)\s*\(\s*(?:/\*[^*]*\*+(?:[^/*][^*]*\*+)*/\s*)*["']})
+        !line.match?(MODULE_SPECIFIER_CALL_WITH_STRING_PATTERN)
       end
 
       def rewrite_pending_module_specifier(line)
-        line.gsub(%r{(?<quote>["'])react-on-rails(?!-pro)(?=(?:["']|/))}) do
+        line.sub(%r{(?<quote>["'])react-on-rails(?!-pro)(?=(?:["']|/))}) do
           "#{Regexp.last_match[:quote]}react-on-rails-pro"
         end
       end
@@ -599,6 +646,7 @@ module ReactOnRails
         if pending_depth.positive?
           rewritten_line = rewrite_pending_module_specifier(line)
           updated_depth = pending_depth + module_call_parenthesis_delta(rewritten_line)
+          updated_depth = 0 if rewritten_line != line
           updated_depth = 0 if updated_depth <= 0
           [rewritten_line, updated_depth]
         elsif starts_pending_multiline_module_call?(line)
@@ -637,7 +685,8 @@ module ReactOnRails
       def module_call_parenthesis_delta(line, from_module_call_start: false)
         line_without_literals = line_without_string_literals_and_inline_comments(line)
         line_to_measure = if from_module_call_start
-                            line_without_literals.sub(/\A.*?(?<![\w$])(?:import|require)\s*\(/, "(")
+                            match = line_without_literals.match(MODULE_SPECIFIER_CALL_START_PATTERN)
+                            match ? "(#{line_without_literals[match.end(0)..]}" : line_without_literals
                           else
                             line_without_literals
                           end

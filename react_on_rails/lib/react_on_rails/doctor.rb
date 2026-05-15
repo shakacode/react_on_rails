@@ -2882,9 +2882,25 @@ module ReactOnRails
     BASE_PACKAGE_REQUIRE_PATTERN = %r{\brequire\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]\s*\)}
     BASE_PACKAGE_DYNAMIC_IMPORT_PATTERN = %r{\bimport\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]\s*\)}
     BASE_PACKAGE_SIDE_EFFECT_IMPORT_PATTERN = %r{^\s*import\s+['"]react-on-rails(?:/[^'"]*)?['"]}
-    # Match known Jest/Vitest mock helpers. Aliased or nested receivers are
-    # intentionally out of scope to avoid warning on arbitrary application
-    # methods named `mock`.
+    BASE_PACKAGE_REFERENCE_SOURCE_ROOTS = %w[app/javascript app/frontend frontend javascript client].freeze
+    BASE_PACKAGE_REFERENCE_EXTENSIONS = %w[js jsx ts tsx mjs cjs vue svelte].freeze
+    # Explicit allowlist of documented Jest/Vitest APIs whose first argument is a module specifier.
+    # Keep in sync with the Pro generator's destructive rewrite allowlist.
+    BASE_PACKAGE_JEST_MODULE_SPECIFIER_METHOD_NAMES = %w[
+      createMockFromModule
+      mock unmock deepUnmock doMock dontMock setMock
+      requireActual requireMock unstable_mockModule unstable_unmockModule
+    ].freeze
+    BASE_PACKAGE_VITEST_MODULE_SPECIFIER_METHOD_NAMES = %w[
+      mock unmock doMock doUnmock
+      importActual importMock
+    ].freeze
+    BASE_PACKAGE_JEST_MODULE_SPECIFIER_METHOD_PATTERN =
+      Regexp.union(BASE_PACKAGE_JEST_MODULE_SPECIFIER_METHOD_NAMES)
+    BASE_PACKAGE_VITEST_MODULE_SPECIFIER_METHOD_PATTERN =
+      Regexp.union(BASE_PACKAGE_VITEST_MODULE_SPECIFIER_METHOD_NAMES)
+    # Match known Jest/Vitest module-specifier helpers. Aliased or nested receivers
+    # are intentionally out of scope to avoid warning on arbitrary application methods.
     #
     # importActual/importMock exist only as vi.* methods; there is no
     # `import { importActual } from 'vitest'` form. The bare branch below is a
@@ -2893,8 +2909,13 @@ module ReactOnRails
     # user-defined helper of that name taking a 'react-on-rails' string matches.
     BASE_PACKAGE_MOCK_PATTERN = %r{
       \b(?:
-        (?:jest|vi)\.
-        (?:mock|unmock|doMock|doUnmock|dontMock|requireActual|requireMock|importActual|importMock)
+        (?:
+          jest\.(?:#{BASE_PACKAGE_JEST_MODULE_SPECIFIER_METHOD_PATTERN})
+          |
+          vi\.(?:#{BASE_PACKAGE_VITEST_MODULE_SPECIFIER_METHOD_PATTERN})
+        )
+        \s*
+        (?:<[^;\n]*>\s*)?
         |
         (?:importActual|importMock)
       )
@@ -2946,15 +2967,25 @@ module ReactOnRails
     def files_with_base_package_references(source_path)
       # Keep in sync with js_files_for_import_update in the Pro generator: the
       # doctor must scan every file type the migration rewriter can modify.
-      js_extensions = %w[js jsx ts tsx mjs cjs vue svelte]
       # **/*.ts naturally matches *.d.ts declaration files because they end in .ts.
-      js_patterns = js_extensions.map { |ext| "#{source_path}/**/*.#{ext}" }
+      js_patterns = base_package_reference_source_paths(source_path).flat_map do |source_root|
+        BASE_PACKAGE_REFERENCE_EXTENSIONS.map { |ext| "#{source_root}/**/*.#{ext}" }
+      end
 
       js_patterns.flat_map do |pattern|
         Dir.glob(pattern)
            .reject { |file| file.include?("/node_modules/") }
            .select { |file| base_package_reference_file?(file) }
-      end.sort
+      end.uniq.sort
+    end
+
+    def base_package_reference_source_paths(source_path)
+      ([source_path] + BASE_PACKAGE_REFERENCE_SOURCE_ROOTS)
+        .compact
+        .map(&:to_s)
+        .reject(&:empty?)
+        .uniq
+        .select { |path| Dir.exist?(path) }
     end
 
     def base_package_reference_file?(file)

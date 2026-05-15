@@ -78,6 +78,22 @@ describe ProGenerator, type: :generator do
       expect(Process).not_to have_received(:spawn)
       expect(generator.send(:pro_gem_installed?)).to be true
     end
+
+    specify "missing_pro_gem? also defers for parenthesized declarations with leading comments" do
+      File.write(gemfile_path, <<~RUBY)
+        source "https://rubygems.org"
+        gem(
+          # pinned for compatibility
+          "react_on_rails",
+          "~> 16.0",
+          require: false
+        )
+      RUBY
+
+      expect(generator.send(:missing_pro_gem?, force: true)).to be false
+      expect(Process).not_to have_received(:spawn)
+      expect(generator.send(:pro_gem_installed?)).to be true
+    end
   end
 
   describe "#run_generator" do
@@ -1231,10 +1247,15 @@ describe ProGenerator, type: :generator do
 
     it "rewrites the full set of Jest mock helpers" do
       source = <<~JS
+        jest.createMockFromModule('react-on-rails');
         jest.unmock('react-on-rails');
+        jest.deepUnmock('react-on-rails');
         jest.doMock('react-on-rails/client');
         vi.doUnmock('react-on-rails');
         jest.dontMock('react-on-rails');
+        jest.setMock('react-on-rails', {});
+        jest.unstable_mockModule('react-on-rails', () => ({}));
+        jest.unstable_unmockModule('react-on-rails');
         const a = jest.requireActual('react-on-rails');
         const b = jest.requireMock('react-on-rails/client');
         vi.importMock('react-on-rails');
@@ -1242,8 +1263,50 @@ describe ProGenerator, type: :generator do
 
       rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
 
-      expect(rewritten.scan("react-on-rails-pro").size).to eq(7)
+      expect(rewritten.scan("react-on-rails-pro").size).to eq(12)
       expect(rewritten).not_to match(/['"]react-on-rails['"]/)
+    end
+
+    it "rewrites multiline Jest and Vitest mock helper calls" do
+      source = <<~JS
+        jest.mock(
+          'react-on-rails',
+          () => ({ authenticityHeaders: jest.fn() })
+        );
+        const actual = await vi.importActual(
+          'react-on-rails/client'
+        );
+      JS
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten).to include("'react-on-rails-pro',")
+      expect(rewritten).to include("'react-on-rails-pro/client'")
+      expect(rewritten).not_to match(/['"]react-on-rails['"]/)
+    end
+
+    it "does not rewrite non-specifier strings inside multiline mock factories" do
+      source = <<~JS
+        jest.mock(
+          'react-on-rails',
+          () => ({ packageName: 'react-on-rails' })
+        );
+      JS
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten).to include("'react-on-rails-pro',")
+      expect(rewritten).to include("packageName: 'react-on-rails'")
+    end
+
+    it "rewrites typed Jest mock helper module specifiers" do
+      source = "jest.mock<typeof import('react-on-rails')>('react-on-rails', () => ({}));\n"
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten).to eq(
+        "jest.mock<typeof import('react-on-rails-pro')>('react-on-rails-pro', () => ({}));\n"
+      )
     end
 
     it "does not rewrite bare or non-jest/vi importActual/importMock calls" do

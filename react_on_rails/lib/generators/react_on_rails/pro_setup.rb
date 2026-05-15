@@ -549,7 +549,9 @@ module ReactOnRails
         gemfile_path = File.join(destination_root, "Gemfile")
         return false unless File.exist?(gemfile_path)
 
-        File.read(gemfile_path).match?(/^\s*gem(?:\s+|\(\s*)["']react_on_rails["'](?=\s*(?:,|\)|#|$))/)
+        File.read(gemfile_path).match?(
+          /^\s*gem(?:\s+|\(\s*(?:#.*\n\s*)*)["']react_on_rails["'](?=\s*(?:,|\)|#|$))/
+        )
       rescue SystemCallError, IOError
         false
       end
