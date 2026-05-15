@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "English"
-
 module ReactOnRailsPro
   class StreamDecorator
     def initialize(component)

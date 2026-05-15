@@ -1,11 +1,16 @@
 # frozen_string_literal: true
 
 require_relative "spec_helper"
+require "io/endpoint/version"
 require "react_on_rails_pro/renderer_http_client"
 require "stringio"
 
 RSpec.describe ReactOnRailsPro::RendererHttpClient do
   describe ReactOnRailsPro::RendererHttpClient::ConnectTimeoutWrapper do
+    it "documents io-endpoint wrapper compatibility" do
+      expect(Gem::Version.new(IO::Endpoint::VERSION)).to be < Gem::Version.new("0.18")
+    end
+
     it "clears the socket timeout after TCP connect" do
       wrapper = described_class.new(0.25)
       timeout_during_connect = nil

@@ -71,6 +71,7 @@ module ReactOnRailsPro
       end
     end
 
+    # Not thread-safe. Each Response instance is owned and consumed by one renderer request path.
     class Response
       attr_reader :status
 
@@ -89,6 +90,7 @@ module ReactOnRailsPro
       end
 
       def error?
+        # nil status means a lazy streaming executor has not run yet, so it is not-yet-an-error.
         !status.nil? && status >= 400
       end
 
