@@ -704,6 +704,19 @@ describe ProGenerator, type: :generator do
       expect(gemfile_content).to include('gem "react_on_rails_pro", "~> 16.0", path: "../react_on_rails"')
     end
 
+    it "preserves a git: argument alongside the version pin" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails", "~> 16.0", git: "https://example.invalid/repo.git"
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      gemfile_content = File.read(gemfile_path)
+      expect(gemfile_content).to include('gem "react_on_rails_pro", "~> 16.0", git: "https://example.invalid/repo.git"')
+    end
+
     it "adds the default version when the user has no version pin" do
       simulate_existing_file("Gemfile", <<~RUBY)
         source "https://rubygems.org"
