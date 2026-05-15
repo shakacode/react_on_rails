@@ -35,7 +35,8 @@ module ReactOnRailsPro
       Errno::ENETUNREACH,
       Errno::EPIPE,
       Errno::ETIMEDOUT,
-      Protocol::HTTP::RefusedError
+      Protocol::HTTP::RefusedError,
+      Protocol::HTTP2::StreamError
     ].freeze
 
     class ConnectTimeoutWrapper < IO::Endpoint::Wrapper
@@ -242,7 +243,7 @@ module ReactOnRailsPro
       @pool_size = pool_size
       @connect_timeout = connect_timeout
       @read_timeout = read_timeout
-      @force_http2 = force_http2
+      @force_h2c = force_http2 && URI.parse(origin).scheme == "http"
     end
 
     def post(path, form: nil, json: nil, stream: false)
@@ -325,7 +326,7 @@ module ReactOnRailsPro
 
     def endpoint_for(origin)
       options = { wrapper: ConnectTimeoutWrapper.new(@connect_timeout) }
-      options[:protocol] = Async::HTTP::Protocol::HTTP2 if @force_http2 && URI.parse(origin).scheme == "http"
+      options[:protocol] = Async::HTTP::Protocol::HTTP2 if @force_h2c
 
       Async::HTTP::Endpoint.parse(origin, **options)
     end

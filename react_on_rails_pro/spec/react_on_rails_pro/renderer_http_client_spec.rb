@@ -415,12 +415,13 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       Errno::ENETUNREACH,
       Errno::EPIPE,
       Errno::ETIMEDOUT,
-      Protocol::HTTP::RefusedError
-    ].each do |error_class|
+      Protocol::HTTP::RefusedError,
+      [Protocol::HTTP2::StreamError, "stream reset"]
+    ].each do |error_class, *args|
       it "wraps #{error_class} in a ConnectionError" do
         client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
 
-        allow(client).to receive(:with_client).and_raise(error_class)
+        allow(client).to receive(:with_client).and_raise(error_class, *args)
 
         expect { client.get("/render") }
           .to raise_error(ReactOnRailsPro::RendererHttpClient::ConnectionError)

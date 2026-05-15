@@ -63,6 +63,28 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       expect(yielded_chunks).to be_empty
     end
 
+    it "does not duplicate a line when a chunk starts with a newline" do
+      response = Class.new do
+        def each
+          yield "First\n"
+          yield "\nSecond\n"
+        end
+
+        def error?
+          false
+        end
+      end.new
+
+      yielded_chunks = []
+
+      request.send(:process_response_chunks, response, error_body) do |chunk|
+        yielded_chunks << chunk
+      end
+
+      expect(yielded_chunks).to eq(%w[First Second])
+      expect(error_body).to eq("")
+    end
+
     it "surfaces malformed fallback responses with a clear adapter error" do
       response = Class.new do
         def each
