@@ -1233,17 +1233,19 @@ describe ProGenerator, type: :generator do
       expect(rewritten).not_to match(/['"]react-on-rails['"]/)
     end
 
-    it "rewrites bare importActual/importMock calls (Vitest destructured-import style)" do
+    it "does not rewrite bare or non-jest/vi importActual/importMock calls" do
+      # importActual/importMock are only `vi.importActual` / `vi.importMock` in Vitest;
+      # there is no `import { importActual } from 'vitest'`. A bare or alien-receiver
+      # call is therefore not a module specifier and must not be mutated.
       source = <<~JS
-        import { importActual, importMock } from 'vitest';
         const real = await importActual('react-on-rails');
         const fake = importMock('react-on-rails/client');
+        const srv = server.importActual('react-on-rails');
       JS
 
       rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
 
-      expect(rewritten).to include("importActual('react-on-rails-pro')")
-      expect(rewritten).to include("importMock('react-on-rails-pro/client')")
+      expect(rewritten).to eq(source)
     end
 
     it "does not rewrite mock helpers on alien receivers" do

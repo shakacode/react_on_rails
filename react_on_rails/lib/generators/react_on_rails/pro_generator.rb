@@ -368,12 +368,8 @@ module ReactOnRails
 
       MOCK_CALL_PATTERN = %r{
         (?<prefix>
-          (?<!["'`])\b(?:
-            (?:jest|vi)\.
-            (?:mock|unmock|doMock|doUnmock|dontMock|requireActual|requireMock|importActual|importMock)
-            |
-            (?:importActual|importMock)
-          )
+          (?<!["'`])\b(?:jest|vi)\.
+          (?:mock|unmock|doMock|doUnmock|dontMock|requireActual|requireMock|importActual|importMock)
           \s*\(\s*
         )
         (?<quote>["'])
