@@ -2944,7 +2944,9 @@ module ReactOnRails
     end
 
     def files_with_base_package_references(source_path)
-      js_extensions = %w[js jsx ts tsx mjs cjs]
+      # Keep in sync with js_files_for_import_update in the Pro generator: the
+      # doctor must scan every file type the migration rewriter can modify.
+      js_extensions = %w[js jsx ts tsx mjs cjs vue svelte]
       # **/*.ts naturally matches *.d.ts declaration files because they end in .ts.
       js_patterns = js_extensions.map { |ext| "#{source_path}/**/*.#{ext}" }
 

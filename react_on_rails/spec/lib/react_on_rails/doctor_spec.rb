@@ -3114,6 +3114,29 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when Vue or Svelte components reference the base package after a Pro migration" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/Widget.vue",
+                       "<template>\n  <div />\n</template>\n\n" \
+                       "<script setup>\nimport ReactOnRails from 'react-on-rails';\n</script>\n")
+            File.write("app/javascript/packs/Widget.svelte",
+                       "<script lang=\"ts\">\n  import 'react-on-rails/client';\n</script>\n\n<div />\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning for both .vue and .svelte files" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("Widget.vue") }).to be true
+        expect(warning_msgs.any? { |m| m[:content].include?("Widget.svelte") }).to be true
+      end
+    end
+
     context "when JS tests mock the base package after a Pro migration" do
       around do |example|
         Dir.mktmpdir do |tmpdir|
