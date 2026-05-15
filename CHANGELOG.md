@@ -26,7 +26,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Breaking Changes
 
-- **[Pro]** **Node renderer HTTP client now uses async-http and requires Ruby 3.3+**: React on Rails Pro replaces the HTTPX-based renderer client with an `async-http` adapter for render, streaming, and asset-upload requests. Apps using React on Rails Pro must run Ruby 3.3 or newer before upgrading. [PR 3279](https://github.com/shakacode/react_on_rails/pull/3279) by [justin808](https://github.com/justin808).
+- **[Pro]** **Node renderer HTTP client now uses async-http and requires Ruby 3.3+**: React on Rails Pro replaces the HTTPX-based renderer client with an `async-http` adapter for render, streaming, and asset-upload requests. Apps using React on Rails Pro must run Ruby 3.3 or newer before upgrading. The adapter scopes HTTP clients to individual renderer requests, so it does not reuse TCP connections between Rails requests; high-latency networks or very high request rates can see extra connection and HTTP/2 handshake overhead compared with HTTPX until persistent async-http clients are added. `config.renderer_http_pool_size` now limits concurrent streams on the request-scoped client instead of sizing a persistent process-wide connection pool, and HTTPX's implicit single transport retry is no longer present for renderer connection drops. [PR 3279](https://github.com/shakacode/react_on_rails/pull/3279) by [justin808](https://github.com/justin808).
 
 #### Added
 

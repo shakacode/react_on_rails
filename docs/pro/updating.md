@@ -395,7 +395,11 @@ Before upgrading:
 - Treat `config.renderer_http_pool_size` as a per-request HTTP/2 stream limit, not as a persistent process-wide
   connection pool size. The current async-http adapter opens a request-scoped client for each renderer request and
   does not reuse TCP connections between Rails requests, so high-latency networks or very high request rates can see
-  extra connection and HTTP/2 handshake overhead compared with HTTPX.
+  extra connection and HTTP/2 handshake overhead compared with HTTPX. Setting this value now emits a warning to make
+  the changed meaning visible during upgrades.
+- Expect renderer connection drops to surface immediately as `ReactOnRailsPro::Error`/connection failures. HTTPX
+  previously performed one implicit transport retry for some connection drops; the async-http adapter uses
+  `retries: 0` and leaves retry policy to the existing bundle-upload retry loop and caller behavior.
 - `config.renderer_http_keep_alive_timeout` remains accepted for compatibility, but it has no effect because
   async-http clients are currently scoped to individual requests. Setting it now emits a deprecation warning.
 

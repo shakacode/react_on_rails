@@ -718,6 +718,38 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
       end
     end
 
+    describe ".renderer_http_pool_size" do
+      it "defaults to 10" do
+        ReactOnRailsPro.configure {} # rubocop:disable Lint/EmptyBlock
+
+        expect(ReactOnRailsPro.configuration.renderer_http_pool_size).to eq(10)
+      end
+
+      it "warns when configured because async-http changed the setting semantics" do
+        expect(Rails.logger).to receive(:warn).with(
+          "[ReactOnRailsPro] config.renderer_http_pool_size now limits concurrent HTTP/2 streams " \
+          "on each request-scoped async-http client; it no longer configures a persistent " \
+          "process-wide renderer connection pool."
+        )
+
+        ReactOnRailsPro.configure do |config|
+          config.renderer_http_pool_size = 20
+        end
+
+        expect(ReactOnRailsPro.configuration.renderer_http_pool_size).to eq(20)
+      end
+
+      it "does not warn for the default value assigned during configuration initialization" do
+        expect(Rails.logger).not_to receive(:warn).with(
+          "[ReactOnRailsPro] config.renderer_http_pool_size now limits concurrent HTTP/2 streams " \
+          "on each request-scoped async-http client; it no longer configures a persistent " \
+          "process-wide renderer connection pool."
+        )
+
+        expect(ReactOnRailsPro.configuration.renderer_http_pool_size).to eq(10)
+      end
+    end
+
     describe ".renderer_http_keep_alive_timeout" do
       it "defaults to 30" do
         ReactOnRailsPro.configure {} # rubocop:disable Lint/EmptyBlock

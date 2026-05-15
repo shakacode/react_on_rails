@@ -46,7 +46,8 @@ module ReactOnRailsPro
 
       def initialize(connect_timeout)
         # Wrapper is used only for the socket_connect hook; async-http passes it via the wrapper: option and
-        # never calls delegation methods on it directly. Verified against io-endpoint 0.17.x.
+        # never calls delegation methods on it directly. The no-arg wrapper init and socket_connect dispatch are
+        # verified against io-endpoint 0.17.x; re-check them before bumping io-endpoint to 0.18+.
         super()
         @connect_timeout = connect_timeout
       end

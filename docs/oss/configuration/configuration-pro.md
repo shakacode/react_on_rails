@@ -99,6 +99,7 @@ ReactOnRailsPro.configure do |config|
   # rather than the size of a persistent process-wide connection pool. The current adapter does
   # not reuse TCP connections between Rails requests, so high-latency networks or very high
   # request rates can see extra connection and HTTP/2 handshake overhead compared with HTTPX.
+  # Setting this value emits a warning so upgrades notice the changed semantics.
   # Default for `renderer_http_pool_size` is 10
   config.renderer_http_pool_size = 10
 
