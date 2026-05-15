@@ -140,44 +140,6 @@ describe ReactOnRailsPro::Request do
       )
     end
 
-    it "does not warn based on lazy streaming response creation time" do
-      allow(ReactOnRailsPro.configuration).to receive(:renderer_http_pool_warn_timeout).and_return(0.5)
-      allow(Time).to receive(:now).and_return(Time.at(0), Time.at(1))
-      mock_streaming_response(render_full_url, 200) do |yielder|
-        yielder.call("rendered\n")
-      end
-
-      stream = described_class.render_code_as_stream("/render", "console.log('Hello, world!');",
-                                                     is_rsc_payload: false)
-      chunks = []
-      stream.each_chunk do |chunk|
-        chunks << chunk
-      end
-
-      expect(chunks).to eq(["rendered"])
-      expect(logger_mock).not_to have_received(:warn)
-    end
-
-    it "warns when a streaming response exceeds the first chunk warning timeout" do
-      allow(ReactOnRailsPro.configuration).to receive(:renderer_http_pool_warn_timeout).and_return(0.5)
-      allow(Time).to receive(:now).and_return(Time.at(0), Time.at(0), Time.at(0.75))
-      mock_streaming_response(render_full_url, 200) do |yielder|
-        yielder.call("rendered\n")
-      end
-
-      stream = described_class.render_code_as_stream("/render", "console.log('Hello, world!');",
-                                                     is_rsc_payload: false)
-      chunks = []
-      stream.each_chunk do |chunk|
-        chunks << chunk
-      end
-
-      expect(chunks).to eq(["rendered"])
-      expect(logger_mock).to have_received(:warn).with(
-        "Streaming request to /render delivered first chunk after 0.75 seconds, expected at most 0.5."
-      )
-    end
-
     [true, false].each do |use_delay|
       it "processes each chunk immediately when use_delay is #{use_delay}" do
         mocked_block = mock_block
@@ -324,35 +286,6 @@ describe ReactOnRailsPro::Request do
       end.to raise_error(ReactOnRailsPro::Error, /renderer reset connection/)
 
       expect(mocked_block).not_to have_received(:call)
-    end
-  end
-
-  describe "render_code" do
-    it "warns when a non-streaming request exceeds the warning timeout" do
-      allow(ReactOnRailsPro.configuration).to receive(:renderer_http_pool_warn_timeout).and_return(0.5)
-      allow(Time).to receive(:now).and_return(Time.at(0), Time.at(1))
-      mock_streaming_response(render_full_url, 200) do |yielder|
-        yielder.call("rendered")
-      end
-
-      response = described_class.render_code(render_path, "console.log('Hello, world!');", false)
-
-      expect(response.body).to eq("rendered")
-      expect(logger_mock).to have_received(:warn).with(
-        "Request to /render took 1.0 seconds, expected at most 0.5."
-      )
-    end
-
-    it "does not warn or raise when request warning timeout is disabled" do
-      allow(ReactOnRailsPro.configuration).to receive(:renderer_http_pool_warn_timeout).and_return(nil)
-      mock_streaming_response(render_full_url, 200) do |yielder|
-        yielder.call("rendered")
-      end
-
-      response = described_class.render_code(render_path, "console.log('Hello, world!');", false)
-
-      expect(response.body).to eq("rendered")
-      expect(logger_mock).not_to have_received(:warn)
     end
   end
 

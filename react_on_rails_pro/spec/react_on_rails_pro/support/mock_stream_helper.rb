@@ -68,7 +68,8 @@ module MockStreamHelper
       request_data[:request] = request
 
       if request.stream
-        return ReactOnRailsPro::RendererHttpClient::Response.new(status: status) do |yielder|
+        return ReactOnRailsPro::RendererHttpClient::Response.new(status: status) do |yielder, _status_assigner|
+          # The mock pre-sets status above; pass the request so specs can assert on the captured payload.
           block.call(->(value) { yielder.call(value) }, request)
         end
       end

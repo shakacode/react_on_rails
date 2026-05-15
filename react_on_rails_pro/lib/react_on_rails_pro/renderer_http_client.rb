@@ -327,8 +327,9 @@ module ReactOnRailsPro
       else
         # Rails calls this from a synchronous request thread; Sync blocks that thread
         # while async-http drives the renderer exchange inside a temporary reactor.
-        # Async web servers without an Async::Task.current? request context should revisit
-        # this fallback before relying on nested reactor behavior.
+        # If an async server reaches this fallback from inside an existing reactor without
+        # Async::Task.current?, Sync may create a nested reactor and deadlock; rework this
+        # path before supporting that setup.
         Sync { |sync_task| sync_task.with_timeout(@read_timeout, &block) }
       end
     end
