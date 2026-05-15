@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "generator_messages"
+require "react_on_rails/pro_migration"
 
 module ReactOnRails
   module Generators
@@ -549,9 +550,7 @@ module ReactOnRails
         gemfile_path = File.join(destination_root, "Gemfile")
         return false unless File.exist?(gemfile_path)
 
-        File.read(gemfile_path).match?(
-          /^\s*gem(?:\s+|\(\s*(?:#.*\n\s*)*)["']react_on_rails["'](?=\s*(?:,|\)|#|$))/
-        )
+        ReactOnRails::ProMigration.base_gem_entry?(File.read(gemfile_path))
       rescue SystemCallError, IOError
         false
       end

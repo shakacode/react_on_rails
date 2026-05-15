@@ -9,6 +9,7 @@ require_relative "config_path_resolver"
 require_relative "version_syntax_converter"
 require_relative "version_synchronizer"
 require_relative "system_checker"
+require_relative "pro_migration"
 
 begin
   require "rainbow"
@@ -2882,23 +2883,13 @@ module ReactOnRails
     BASE_PACKAGE_REQUIRE_PATTERN = %r{\brequire\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]\s*\)}
     BASE_PACKAGE_DYNAMIC_IMPORT_PATTERN = %r{\bimport\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]\s*\)}
     BASE_PACKAGE_SIDE_EFFECT_IMPORT_PATTERN = %r{^\s*import\s+['"]react-on-rails(?:/[^'"]*)?['"]}
-    BASE_PACKAGE_REFERENCE_SOURCE_ROOTS = %w[app/javascript app/frontend frontend javascript client].freeze
-    BASE_PACKAGE_REFERENCE_EXTENSIONS = %w[js jsx ts tsx mjs cjs vue svelte].freeze
+    BASE_PACKAGE_REFERENCE_SOURCE_ROOTS = ReactOnRails::ProMigration::JS_SOURCE_ROOTS
+    BASE_PACKAGE_REFERENCE_EXTENSIONS = ReactOnRails::ProMigration::JS_SOURCE_EXTENSIONS
     # Explicit allowlist of documented Jest/Vitest APIs whose first argument is a module specifier.
-    # Keep in sync with the Pro generator's destructive rewrite allowlist.
-    BASE_PACKAGE_JEST_MODULE_SPECIFIER_METHOD_NAMES = %w[
-      createMockFromModule
-      mock unmock deepUnmock doMock dontMock setMock
-      requireActual requireMock unstable_mockModule unstable_unmockModule
-    ].freeze
-    BASE_PACKAGE_VITEST_MODULE_SPECIFIER_METHOD_NAMES = %w[
-      mock unmock doMock doUnmock
-      importActual importMock
-    ].freeze
     BASE_PACKAGE_JEST_MODULE_SPECIFIER_METHOD_PATTERN =
-      Regexp.union(BASE_PACKAGE_JEST_MODULE_SPECIFIER_METHOD_NAMES)
+      ReactOnRails::ProMigration::JEST_MODULE_SPECIFIER_METHOD_PATTERN
     BASE_PACKAGE_VITEST_MODULE_SPECIFIER_METHOD_PATTERN =
-      Regexp.union(BASE_PACKAGE_VITEST_MODULE_SPECIFIER_METHOD_NAMES)
+      ReactOnRails::ProMigration::VITEST_MODULE_SPECIFIER_METHOD_PATTERN
     # Match known Jest/Vitest module-specifier helpers. Aliased or nested receivers
     # are intentionally out of scope to avoid warning on arbitrary application methods.
     #
@@ -2965,8 +2956,7 @@ module ReactOnRails
     end
 
     def files_with_base_package_references(source_path)
-      # Keep in sync with js_files_for_import_update in the Pro generator: the
-      # doctor must scan every file type the migration rewriter can modify.
+      # Scan every file type the Pro migration rewriter can modify.
       # **/*.ts naturally matches *.d.ts declaration files because they end in .ts.
       js_patterns = base_package_reference_source_paths(source_path).flat_map do |source_root|
         BASE_PACKAGE_REFERENCE_EXTENSIONS.map { |ext| "#{source_root}/**/*.#{ext}" }

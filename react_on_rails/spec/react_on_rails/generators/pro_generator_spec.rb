@@ -593,6 +593,21 @@ describe ProGenerator, type: :generator do
       expect(generator).not_to have_received(:bundle_install_after_gem_swap)
     end
 
+    it "does not replace other parenthesized gem declarations that reference react_on_rails in options" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem("other_gem", require: "react_on_rails")
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      original_content = File.read(gemfile_path)
+      result = generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      expect(result).to be(false)
+      expect(File.read(gemfile_path)).to eq(original_content)
+      expect(generator).not_to have_received(:bundle_install_after_gem_swap)
+    end
+
     it "warns when Gemfile is missing" do
       allow(File).to receive(:exist?).and_call_original
       allow(File).to receive(:exist?).with(gemfile_path).and_return(false)
