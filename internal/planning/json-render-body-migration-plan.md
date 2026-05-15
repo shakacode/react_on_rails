@@ -9,15 +9,15 @@ implementation still needs. It is not itself the implementation.
 
 ## Links
 
-| Artifact                               | Location                                                                                                                                                                                  |
-| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Issue                                  | https://github.com/shakacode/react_on_rails/issues/3280                                                                                                                                   |
-| Experiment PR (the "demo") — **closed** | [#3293](https://github.com/shakacode/react_on_rails/pull/3293) (closed; experiment fully captured in this doc — see note below)                                                            |
-| Experiment commit (react_on_rails)     | [`352743ef1`](https://github.com/shakacode/react_on_rails/commit/352743ef18b204bb34072b42aa8be32f05927bfa) — `[EXPERIMENT] Send render request body as JSON when no bundle attached`      |
-| Experiment branch                      | `experiment/3280-json-render-body` (base `upcoming-v16.3.0`)                                                                                                                              |
-| Demo-app harness commit (rsc-benchmar) | [`b90977ef3`](https://github.com/AbanoubGhadban/rsc-benchmar/commit/b90977ef33d72c33aacbce09b07d66db46b46155) — `demo(#3280): JSON render-body experiment harness + parallel A/B tooling` |
-| Demo-app branch                        | https://github.com/AbanoubGhadban/rsc-benchmar/tree/experiment/3280-json-render-body                                                                                                      |
-| Related/orthogonal PR                  | [#3217](https://github.com/shakacode/react_on_rails/pull/3217) — `perf(pro): enable TCP_NODELAY on httpx`                                                                                 |
+| Artifact                                | Location                                                                                                                                                                                  |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Issue                                   | https://github.com/shakacode/react_on_rails/issues/3280                                                                                                                                   |
+| Experiment PR (the "demo") — **closed** | [#3293](https://github.com/shakacode/react_on_rails/pull/3293) (closed; experiment fully captured in this doc — see note below)                                                           |
+| Experiment commit (react_on_rails)      | [`352743ef1`](https://github.com/shakacode/react_on_rails/commit/352743ef18b204bb34072b42aa8be32f05927bfa) — `[EXPERIMENT] Send render request body as JSON when no bundle attached`      |
+| Experiment branch                       | `experiment/3280-json-render-body` (base `upcoming-v16.3.0`)                                                                                                                              |
+| Demo-app harness commit (rsc-benchmar)  | [`b90977ef3`](https://github.com/AbanoubGhadban/rsc-benchmar/commit/b90977ef33d72c33aacbce09b07d66db46b46155) — `demo(#3280): JSON render-body experiment harness + parallel A/B tooling` |
+| Demo-app branch                         | https://github.com/AbanoubGhadban/rsc-benchmar/tree/experiment/3280-json-render-body                                                                                                      |
+| Related/orthogonal PR                   | [#3217](https://github.com/shakacode/react_on_rails/pull/3217) — `perf(pro): enable TCP_NODELAY on httpx`                                                                                 |
 
 > The experiment itself was run on `upcoming-v16.3.0` (to match the renderer/gem
 > version the benchmark app pins). This planning doc targets `main`; the
@@ -367,11 +367,11 @@ per the issue). Its codebase-change PR has been **closed** — everything it
 contained (the diff, the numbers, the problems, the production plan) is
 preserved in this document. Production work will be a fresh PR per §5.
 
-| PR | Branch | Status | Disposition |
-|---|---|---|---|
-| [#3293](https://github.com/shakacode/react_on_rails/pull/3293) | `experiment/3280-json-render-body` | **closed** | Experiment code (9-line `render_code` flip + instrumentation). Superseded by this plan; not for merge. Diff preserved verbatim in §1. |
-| [#3298](https://github.com/shakacode/react_on_rails/pull/3298) | `docs/3280-json-render-body-plan` (vs `upcoming-v16.3.0`) | closed | Earlier draft of this doc; relocated and re-targeted to `main`. |
-| this PR | `docs/3280-json-render-body-plan` (vs `main`) | open | This document. The only #3280 PR that stays open. |
+| PR                                                             | Branch                                                    | Status     | Disposition                                                                                                                           |
+| -------------------------------------------------------------- | --------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| [#3293](https://github.com/shakacode/react_on_rails/pull/3293) | `experiment/3280-json-render-body`                        | **closed** | Experiment code (9-line `render_code` flip + instrumentation). Superseded by this plan; not for merge. Diff preserved verbatim in §1. |
+| [#3298](https://github.com/shakacode/react_on_rails/pull/3298) | `docs/3280-json-render-body-plan` (vs `upcoming-v16.3.0`) | closed     | Earlier draft of this doc; relocated and re-targeted to `main`.                                                                       |
+| this PR                                                        | `docs/3280-json-render-body-plan` (vs `main`)             | open       | This document. The only #3280 PR that stays open.                                                                                     |
 
 [#3217](https://github.com/shakacode/react_on_rails/pull/3217) (TCP_NODELAY)
 is a separate issue's PR, orthogonal to #3280 (§2.6) — **left untouched**.

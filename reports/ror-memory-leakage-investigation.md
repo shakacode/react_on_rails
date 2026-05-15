@@ -41,6 +41,7 @@ curl → Puma (Rails, production mode) → HTTPX (HTTP/2) → Node Renderer (Fas
 ```
 
 **Key components:**
+
 - A 12-sub-component React page (`LeakRepro.jsx`) rendering complex nested data
 - Server render function with ChunkExtractor + HelmetProvider
 - Configurable props size (80 KB to 4.3 MB JSON) and bundle size (2 MB to 55 MB)
@@ -56,12 +57,12 @@ curl → Puma (Rails, production mode) → HTTPX (HTTP/2) → Node Renderer (Fas
 
 ### 1.3 Verification Rubric
 
-| Band | Condition | Meaning |
-|------|-----------|---------|
-| **confirmed** | `kb_per_req >= 50` | Leak reproduces at primary target level |
-| **reduced** | `15 <= kb_per_req < 50` | Partial improvement |
-| **refuted** | `kb_per_req < 15` | Leak effectively eliminated |
-| **inconclusive** | Variance > 10% across 3 runs | Measurement too noisy |
+| Band             | Condition                    | Meaning                                 |
+| ---------------- | ---------------------------- | --------------------------------------- |
+| **confirmed**    | `kb_per_req >= 50`           | Leak reproduces at primary target level |
+| **reduced**      | `15 <= kb_per_req < 50`      | Partial improvement                     |
+| **refuted**      | `kb_per_req < 15`            | Leak effectively eliminated             |
+| **inconclusive** | Variance > 10% across 3 runs | Measurement too noisy                   |
 
 ---
 
@@ -83,12 +84,14 @@ Understanding the memory allocation path is essential to interpreting the result
 ### 2.2 Memory-Relevant Architecture Details
 
 **Ruby side (Puma worker):**
+
 - HTTPX connection pool: persistent HTTP/2 connections with multiplexing
 - Thread-safe singleton connection with `CONNECTION_MUTEX`
 - Pool size: `renderer_http_pool_size` (default: 10)
 - Large temporary buffers: props JSON serialization, multipart encoding, response body parsing
 
 **Node side (Renderer worker):**
+
 - V8 VM contexts are created once per bundle and reused across all SSR requests
 - Module-level state persists for the lifetime of the worker process
 - LRU eviction for VM context pool (`manageVMPoolSize()`)
@@ -113,50 +116,50 @@ The HTTP/2 multiplexing means a single connection handles many concurrent stream
 
 ### 3.1 Experiment 1: Small Payload
 
-| Parameter | Value |
-|-----------|-------|
-| Items per page | 200 |
-| Props size | ~80 KB JSON |
-| Server bundle | ~2 MB |
-| HTML output | ~100 KB |
-| Requests | 500 |
+| Parameter      | Value       |
+| -------------- | ----------- |
+| Items per page | 200         |
+| Props size     | ~80 KB JSON |
+| Server bundle  | ~2 MB       |
+| HTML output    | ~100 KB     |
+| Requests       | 500         |
 
 **Result:** Post-warmup `kb_per_req`: **3–12** (across multiple runs)
 **Verdict:** **Refuted** — no leak detected with small payloads.
 
 ### 3.2 Experiment 2: Large Payload (Production Scale)
 
-| Parameter | Value |
-|-----------|-------|
-| Items per page | 500 |
-| Props size | ~4.3 MB JSON |
-| Server bundle | ~55 MB |
-| HTML output | ~2+ MB |
-| Requests | 500 |
+| Parameter      | Value        |
+| -------------- | ------------ |
+| Items per page | 500          |
+| Props size     | ~4.3 MB JSON |
+| Server bundle  | ~55 MB       |
+| HTML output    | ~2+ MB       |
+| Requests       | 500          |
 
 **Results (3 runs):**
 
-| Metric | Run 1 | Run 2 | Run 3 |
-|--------|-------|-------|-------|
-| Baseline RSS (KB) | 228,580 | 248,528 | 258,396 |
-| RSS after warmup (KB) | 664,216 | 475,472 | 573,116 |
-| Final RSS (KB) | 562,680 | 550,972 | 576,580 |
-| Post-warmup growth (KB) | -101,536 | 75,500 | 3,464 |
-| Post-warmup `kb_per_req` | -253.84 | 188.75 | 8.66 |
+| Metric                   | Run 1    | Run 2   | Run 3   |
+| ------------------------ | -------- | ------- | ------- |
+| Baseline RSS (KB)        | 228,580  | 248,528 | 258,396 |
+| RSS after warmup (KB)    | 664,216  | 475,472 | 573,116 |
+| Final RSS (KB)           | 562,680  | 550,972 | 576,580 |
+| Post-warmup growth (KB)  | -101,536 | 75,500  | 3,464   |
+| Post-warmup `kb_per_req` | -253.84  | 188.75  | 8.66    |
 
-**Verdict:** **Inconclusive** — extreme variance due to GC sawtooth on large allocations. Run 1 showed *negative* growth (GC coincided with final sample). The 500-request window was too short.
+**Verdict:** **Inconclusive** — extreme variance due to GC sawtooth on large allocations. Run 1 showed _negative_ growth (GC coincided with final sample). The 500-request window was too short.
 
 ### 3.3 Experiment 3: Long Run (30,000 Requests, 68 Minutes)
 
-| Parameter | Value |
-|-----------|-------|
-| Items per page | 60 |
-| Props size | ~510 KB JSON |
-| Server bundle | ~55 MB |
-| HTML output | ~250 KB |
-| Requests | 30,000 |
-| Warmup | 3,000 |
-| Duration | ~68 minutes |
+| Parameter      | Value        |
+| -------------- | ------------ |
+| Items per page | 60           |
+| Props size     | ~510 KB JSON |
+| Server bundle  | ~55 MB       |
+| HTML output    | ~250 KB      |
+| Requests       | 30,000       |
+| Warmup         | 3,000        |
+| Duration       | ~68 minutes  |
 
 **Results:**
 
@@ -190,6 +193,7 @@ RSS (MB)
 ```
 
 **Key observations:**
+
 - One-time warmup jump of ~77 MB (requests 0–3,000)
 - Steady-state oscillation band: 268–322 MB (no upward drift)
 - Peak RSS did not increase between request 7K and request 30K
@@ -232,6 +236,7 @@ glibc's malloc creates per-thread memory arenas (up to `cores * 8` on 64-bit Lin
 ### 4.3 HTTP/2 Multiplexing Amplifies Fragmentation
 
 HTTP/2 multiplexing means a single connection handles many concurrent streams. Each stream generates response buffers simultaneously across Puma threads. This creates:
+
 - More concurrent large allocations
 - More arenas activated simultaneously
 - More pinned pages across more memory regions
@@ -242,14 +247,14 @@ Puma's fork-based cluster mode starts workers sharing the parent's memory pages.
 
 ### 4.5 Fragmentation vs Leak — Diagnostic Distinction
 
-| Signal | Fragmentation | True Leak |
-|--------|--------------|-----------|
-| RSS over time | Plateaus at 2–4x baseline | Grows without bound |
-| `ObjectSpace.count_objects` | Stable | Increasing |
-| `GC.stat[:heap_live_slots]` | Stable | Increasing |
-| jemalloc switch | RSS drops 30–50% | No improvement |
-| Worker restart | RSS resets to baseline | RSS resets (but re-leaks) |
-| Synthetic reproducer | Cannot reproduce | Reproduces consistently |
+| Signal                      | Fragmentation             | True Leak                 |
+| --------------------------- | ------------------------- | ------------------------- |
+| RSS over time               | Plateaus at 2–4x baseline | Grows without bound       |
+| `ObjectSpace.count_objects` | Stable                    | Increasing                |
+| `GC.stat[:heap_live_slots]` | Stable                    | Increasing                |
+| jemalloc switch             | RSS drops 30–50%          | No improvement            |
+| Worker restart              | RSS resets to baseline    | RSS resets (but re-leaks) |
+| Synthetic reproducer        | Cannot reproduce          | Reproduces consistently   |
 
 Our 30K-request experiment showed the **fragmentation pattern**: a one-time warmup jump followed by a flat oscillation band with no upward drift.
 
@@ -260,6 +265,7 @@ Our 30K-request experiment showed the **fragmentation pattern**: a one-time warm
 ### 5.1 Deterministic Data Eliminates Fragmentation Triggers
 
 The reproducer uses `Random.new(42)` to generate identical props for every request. In production:
+
 - Props vary wildly per request (different pages, different data shapes, different sizes)
 - This size diversity is exactly what triggers malloc fragmentation
 - Uniform allocations pack neatly into arenas; diverse allocations create holes
@@ -267,6 +273,7 @@ The reproducer uses `Random.new(42)` to generate identical props for every reque
 ### 5.2 Uniform Concurrency Patterns
 
 The reproducer sends exactly 3 concurrent requests in lockstep. In production:
+
 - Request arrival is stochastic
 - Thread scheduling varies
 - Arena contention patterns are non-deterministic
@@ -274,11 +281,12 @@ The reproducer sends exactly 3 concurrent requests in lockstep. In production:
 
 ### 5.3 GC Timing Masks the Signal
 
-With large payloads (~4 MB props + ~2 MB HTML), Ruby's GC creates ±100 MB RSS swings per cycle. In our 500-request large-payload experiment, variance was so extreme that one run showed *negative* post-warmup growth. Fragmentation RSS growth (tens of MB over hours) is invisible under this noise.
+With large payloads (~4 MB props + ~2 MB HTML), Ruby's GC creates ±100 MB RSS swings per cycle. In our 500-request large-payload experiment, variance was so extreme that one run showed _negative_ post-warmup growth. Fragmentation RSS growth (tens of MB over hours) is invisible under this noise.
 
 ### 5.4 Runtime Conditions
 
 Production environments have:
+
 - Background jobs competing for memory
 - Database connection pools allocating buffers
 - Log rotation, health checks, and monitoring threads
@@ -297,14 +305,14 @@ While the react_on_rails framework itself does not leak, the persistent VM conte
 
 These are patterns found in application code (not in react_on_rails itself) that cause genuine Node-side leaks:
 
-| Pattern | Mechanism | Severity |
-|---------|-----------|----------|
-| Unbounded module-level caches (`new Map()`, `{}`) | Entries accumulate across requests, never evicted | High |
-| `_.memoize()` at module scope | Lodash memoize uses unbounded internal Map | Medium |
-| Redux saga middleware reuse | `sagaMiddleware.run()` called per request on shared instance; watcher sagas never finish | High |
-| Module-level `Set` / array accumulation | Tracking sets grow with every unique input | Medium |
-| Event listeners registered per render | `process.on(...)` adds duplicate listeners | Low |
-| Third-party library caches | styled-components, Apollo, MobX internal state | Varies |
+| Pattern                                           | Mechanism                                                                                | Severity |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------- | -------- |
+| Unbounded module-level caches (`new Map()`, `{}`) | Entries accumulate across requests, never evicted                                        | High     |
+| `_.memoize()` at module scope                     | Lodash memoize uses unbounded internal Map                                               | Medium   |
+| Redux saga middleware reuse                       | `sagaMiddleware.run()` called per request on shared instance; watcher sagas never finish | High     |
+| Module-level `Set` / array accumulation           | Tracking sets grow with every unique input                                               | Medium   |
+| Event listeners registered per render             | `process.on(...)` adds duplicate listeners                                               | Low      |
+| Third-party library caches                        | styled-components, Apollo, MobX internal state                                           | Varies   |
 
 ### 6.2 Framework Behavior (Not a Leak)
 
@@ -318,6 +326,7 @@ manageVMPoolSize()                     // evicts oldest context when pool exceed
 ```
 
 The framework correctly:
+
 - Clears `context.renderingRequest` in a finally block after each render
 - Implements LRU eviction for the VM context pool
 - Supports configurable worker rolling restarts
@@ -362,9 +371,9 @@ Without this flag, V8 defers GC based on the container's full memory limit, ampl
 
 ```javascript
 const config = {
-  allWorkersRestartInterval: 45,              // minutes
-  delayBetweenIndividualWorkerRestarts: 6,    // minutes
-  gracefulWorkerRestartTimeout: 30,           // seconds
+  allWorkersRestartInterval: 45, // minutes
+  delayBetweenIndividualWorkerRestarts: 6, // minutes
+  gracefulWorkerRestartTimeout: 30, // seconds
 };
 ```
 
@@ -380,7 +389,7 @@ Users experiencing RSS growth should audit their server bundle for the patterns 
 - [ ] Search for `process.on(` at module scope — listeners accumulate per render
 - [ ] Check third-party libraries for SSR cleanup functions
 
-See [Avoiding Memory Leaks in Node Renderer SSR](../../docs/pro/js-memory-leaks.md) for detailed guidance.
+See [Avoiding Memory Leaks in Node Renderer SSR](../docs/pro/js-memory-leaks.md) for detailed guidance.
 
 ### 7.3 Monitoring Recommendations
 
@@ -397,65 +406,65 @@ To distinguish fragmentation from true leaks:
 
 ### A.1 Detailed 30K Run Data Points
 
-| Requests | RSS (MB) | Delta (MB) | kb_per_req | Phase |
-|----------|----------|------------|------------|-------|
-| 0 | 167 | 0 | 0.00 | Baseline |
-| 300 | 235 | 68 | 233.37 | Warmup — heap expanding |
-| 600 | 241 | 74 | 126.53 | Warmup — stabilizing |
-| 3,000 | 244 | 77 | 26.36 | End of warmup |
-| 6,000 | 237 | 71 | 12.05 | Steady state |
-| 6,600 | 300 | 134 | 20.79 | GC spike |
-| 7,500 | 275 | 108 | 14.81 | GC reclaimed |
-| 10,500 | 271 | 104 | 10.18 | Steady state |
-| 15,000 | 285 | 118 | 8.09 | Halfway — no upward trend |
-| 18,900 | 270 | 103 | 5.59 | New low RSS |
-| 20,100 | 314 | 148 | 7.54 | Highest spike (outlier) |
-| 21,000 | 271 | 104 | 5.07 | GC reclaimed |
-| 24,600 | 271 | 104 | 4.33 | Same trough |
-| 28,200 | 275 | 108 | 3.94 | Same trough |
-| 30,000 | 287 | 120 | 4.11 | Final |
+| Requests | RSS (MB) | Delta (MB) | kb_per_req | Phase                     |
+| -------- | -------- | ---------- | ---------- | ------------------------- |
+| 0        | 167      | 0          | 0.00       | Baseline                  |
+| 300      | 235      | 68         | 233.37     | Warmup — heap expanding   |
+| 600      | 241      | 74         | 126.53     | Warmup — stabilizing      |
+| 3,000    | 244      | 77         | 26.36      | End of warmup             |
+| 6,000    | 237      | 71         | 12.05      | Steady state              |
+| 6,600    | 300      | 134        | 20.79      | GC spike                  |
+| 7,500    | 275      | 108        | 14.81      | GC reclaimed              |
+| 10,500   | 271      | 104        | 10.18      | Steady state              |
+| 15,000   | 285      | 118        | 8.09       | Halfway — no upward trend |
+| 18,900   | 270      | 103        | 5.59       | New low RSS               |
+| 20,100   | 314      | 148        | 7.54       | Highest spike (outlier)   |
+| 21,000   | 271      | 104        | 5.07       | GC reclaimed              |
+| 24,600   | 271      | 104        | 4.33       | Same trough               |
+| 28,200   | 275      | 108        | 3.94       | Same trough               |
+| 30,000   | 287      | 120        | 4.11       | Final                     |
 
 ### A.2 Oscillation Band Analysis (Post-Warmup)
 
-| Metric | Value |
-|--------|-------|
-| Trough (GC low) | 268–283 MB |
-| Peak (pre-GC high) | 308–322 MB |
-| Band width | ~40–50 MB |
-| Cycle length | ~600–900 requests (~3–5 min) |
-| Peak drift over 27K requests | None |
-| Trough drift over 27K requests | None |
+| Metric                         | Value                        |
+| ------------------------------ | ---------------------------- |
+| Trough (GC low)                | 268–283 MB                   |
+| Peak (pre-GC high)             | 308–322 MB                   |
+| Band width                     | ~40–50 MB                    |
+| Cycle length                   | ~600–900 requests (~3–5 min) |
+| Peak drift over 27K requests   | None                         |
+| Trough drift over 27K requests | None                         |
 
 ### A.3 Test Environment
 
-| Component | Version/Config |
-|-----------|---------------|
-| Linux kernel | 6.8.0-111-generic |
-| Ruby | 3.3.7 |
-| Puma | 6.5.0 |
-| Node.js | 20.x |
-| HTTPX | Latest (HTTP/2 cleartext) |
-| Puma workers | 1 (WEB_CONCURRENCY=1) |
-| Puma threads | 3 (RAILS_MAX_THREADS=3) |
-| Renderer workers | 3 |
-| Caching | All disabled |
+| Component        | Version/Config            |
+| ---------------- | ------------------------- |
+| Linux kernel     | 6.8.0-111-generic         |
+| Ruby             | 3.3.7                     |
+| Puma             | 6.5.0                     |
+| Node.js          | 20.x                      |
+| HTTPX            | Latest (HTTP/2 cleartext) |
+| Puma workers     | 1 (WEB_CONCURRENCY=1)     |
+| Puma threads     | 3 (RAILS_MAX_THREADS=3)   |
+| Renderer workers | 3                         |
+| Caching          | All disabled              |
 
 ### A.4 Files in the Reproducer
 
-| File | Purpose |
-|------|---------|
-| `client/app/components/LeakRepro.jsx` | 12-subcomponent React page |
-| `client/app/components/generate-leak-data.js` | Generates ~50 MB data file |
-| `client/app/ror-auto-load-components/LeakReproHashApp.server.jsx` | SSR render function |
-| `client/app/ror-auto-load-components/LeakReproHashApp.client.jsx` | Client hydration stub |
-| `app/controllers/pages_controller.rb` | `leak_repro` action |
-| `app/views/pages/leak_repro.html.erb` | View with `react_component_hash` |
-| `config/environments/production.rb` | Cache disabling (LEAK_REPRO=1) |
-| `config/initializers/react_on_rails_pro.rb` | Prerender caching override |
-| `renderer/node-renderer.js` | Worker count/restart env vars |
-| `script/leak_repro` | Bash driver script |
-| `MEMORY_LEAK_REPRO.md` | Setup and usage docs |
-| `MEMORY_LEAK_EXPERIMENTS.md` | Full experiment log |
+| File                                                              | Purpose                          |
+| ----------------------------------------------------------------- | -------------------------------- |
+| `client/app/components/LeakRepro.jsx`                             | 12-subcomponent React page       |
+| `client/app/components/generate-leak-data.js`                     | Generates ~50 MB data file       |
+| `client/app/ror-auto-load-components/LeakReproHashApp.server.jsx` | SSR render function              |
+| `client/app/ror-auto-load-components/LeakReproHashApp.client.jsx` | Client hydration stub            |
+| `app/controllers/pages_controller.rb`                             | `leak_repro` action              |
+| `app/views/pages/leak_repro.html.erb`                             | View with `react_component_hash` |
+| `config/environments/production.rb`                               | Cache disabling (LEAK_REPRO=1)   |
+| `config/initializers/react_on_rails_pro.rb`                       | Prerender caching override       |
+| `renderer/node-renderer.js`                                       | Worker count/restart env vars    |
+| `script/leak_repro`                                               | Bash driver script               |
+| `MEMORY_LEAK_REPRO.md`                                            | Setup and usage docs             |
+| `MEMORY_LEAK_EXPERIMENTS.md`                                      | Full experiment log              |
 
 ### A.5 References
 
