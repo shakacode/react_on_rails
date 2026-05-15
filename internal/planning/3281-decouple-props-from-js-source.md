@@ -209,6 +209,10 @@ With props decoupled, the IIFE source string becomes much smaller (~200 bytes of
 2. Since `domNodeId` still varies per request, consider extracting it too (or making it deterministic for SSR)
 3. This would eliminate V8 parse+compile entirely for repeated renders of the same component
 
+## Prior Experiment PRs
+
+- [#3294 — \[EXPERIMENT\] Decouple props from JS source: pass as separate JSON field](https://github.com/shakacode/react_on_rails/pull/3294) (closed) — Prototype implementation with code changes across Ruby and Node layers. Contains the benchmark results referenced above. Closed in favor of this plan-only document.
+
 ## Verification Checklist
 
 1. Start Rails + Node renderer, verify pages render identical HTML
