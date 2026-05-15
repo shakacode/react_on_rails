@@ -349,8 +349,10 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
 
     [
       Errno::ECONNREFUSED,
+      Errno::ECONNRESET,
       Errno::EHOSTUNREACH,
       Errno::ENETUNREACH,
+      Errno::EPIPE,
       Errno::ETIMEDOUT
     ].each do |error_class|
       it "wraps #{error_class} in a ConnectionError" do

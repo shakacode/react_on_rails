@@ -96,6 +96,7 @@ module ReactOnRailsPro
           @body_chunks.each(&block)
         end
 
+        # Replaying consumed chunks should still surface the stored response failure.
         raise @error if @error
         raise HTTPError, self if error?
       end

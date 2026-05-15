@@ -109,11 +109,8 @@ module ReactOnRailsPro
     # @param value [Numeric, nil] A positive number or nil
     # @raise [ReactOnRailsPro::Error] if value is not a positive number or nil
     def renderer_http_keep_alive_timeout=(value)
-      unless value.nil? || (value.is_a?(Numeric) && value.positive? && value.finite?)
-        raise ReactOnRailsPro::Error,
-              "config.renderer_http_keep_alive_timeout must be a finite positive number or nil"
-      end
-      unless value.nil? || @suppress_renderer_http_keep_alive_timeout_warning
+      validate_renderer_http_keep_alive_timeout(value)
+      unless value.nil?
         warn "[ReactOnRailsPro] config.renderer_http_keep_alive_timeout is deprecated and has no effect " \
              "with the async-http adapter because clients are scoped per request."
       end
@@ -222,12 +219,15 @@ module ReactOnRailsPro
     private
 
     def assign_initial_renderer_http_keep_alive_timeout(value)
-      # The constructor routes defaults through setters, so suppress the deprecation warning only
-      # during initialization. Explicit user assignments after boot still warn.
-      @suppress_renderer_http_keep_alive_timeout_warning = true
-      self.renderer_http_keep_alive_timeout = value
-    ensure
-      @suppress_renderer_http_keep_alive_timeout_warning = false
+      validate_renderer_http_keep_alive_timeout(value)
+      @renderer_http_keep_alive_timeout = value
+    end
+
+    def validate_renderer_http_keep_alive_timeout(value)
+      return if value.nil? || (value.is_a?(Numeric) && value.positive? && value.finite?)
+
+      raise ReactOnRailsPro::Error,
+            "config.renderer_http_keep_alive_timeout must be a finite positive number or nil"
     end
 
     def setup_assets_to_copy
