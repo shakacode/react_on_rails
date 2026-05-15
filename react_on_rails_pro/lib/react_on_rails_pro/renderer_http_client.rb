@@ -329,6 +329,8 @@ module ReactOnRailsPro
     end
 
     def with_client(&block)
+      # TODO: revisit persistent async-http clients for renderer requests once
+      # https://github.com/shakacode/react_on_rails/issues/3283 settles connection-reuse direction.
       endpoint = endpoint_for(@origin)
       Async::HTTP::Client.open(endpoint, protocol: endpoint.protocol, retries: 0, limit: @pool_size) do |client|
         # Retries are owned by Request/StreamRequest so bundle-upload retry behavior remains centralized.
