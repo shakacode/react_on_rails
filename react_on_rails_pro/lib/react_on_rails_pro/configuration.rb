@@ -222,6 +222,8 @@ module ReactOnRailsPro
     private
 
     def assign_initial_renderer_http_keep_alive_timeout(value)
+      # The constructor routes defaults through setters, so suppress the deprecation warning only
+      # during initialization. Explicit user assignments after boot still warn.
       @suppress_renderer_http_keep_alive_timeout_warning = true
       self.renderer_http_keep_alive_timeout = value
     ensure
