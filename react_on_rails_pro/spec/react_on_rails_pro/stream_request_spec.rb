@@ -304,6 +304,24 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
 
       expect { stream.each_chunk(&:itself) }.to raise_error(ReactOnRailsPro::Error)
     end
+
+    it "bubbles up HTTPX::ConnectionError when node renderer is unreachable" do
+      stream = described_class.create do |_send_bundle, _barrier|
+        raise HTTPX::ConnectionError, "Connection refused - connect(2) for 127.0.0.1:3500"
+      end
+
+      expect { stream.each_chunk(&:itself) }.to raise_error(HTTPX::ConnectionError, /Connection refused/)
+    end
+
+    it "does not leak barrier resources when request_executor raises" do
+      barrier_stopped = false
+      stream = described_class.create do |_send_bundle, barrier|
+        allow(barrier).to receive(:wait) { barrier_stopped = true }
+        raise HTTPX::ConnectionError, "connection reset"
+      end
+
+      expect { stream.each_chunk(&:itself) }.to raise_error(HTTPX::ConnectionError)
+    end
   end
   # rubocop:enable RSpec/VerifiedDoubles
 end

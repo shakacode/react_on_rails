@@ -326,6 +326,183 @@ describe "Incremental Rendering Integration", :integration do
       end
     end
 
+    context "when bundle is not found (410 retry)" do
+      it "re-uploads the bundle and retries successfully" do
+        # Use a unique bundle hash that the Node renderer hasn't seen yet.
+        # This triggers a 410 on the first request, then retry uploads and succeeds.
+        unique_hash = "retry_test_#{SecureRandom.hex(8)}"
+        allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool)
+          .to receive(:server_bundle_hash).and_return(unique_hash)
+        allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool)
+          .to receive(:renderer_bundle_file_name).and_return("#{unique_hash}.js")
+
+        # Update populate_form to use unique hash keys
+        # rubocop:disable Lint/UnusedBlockArgument
+        allow(ReactOnRailsPro::Request).to receive(:populate_form_with_bundle_and_assets) do |form, check_bundle:|
+          # rubocop:enable Lint/UnusedBlockArgument
+          form["bundle_#{unique_hash}"] = {
+            body: Pathname.new(fixture_bundle_path),
+            content_type: "text/javascript",
+            filename: "#{unique_hash}.js"
+          }
+          form["bundle_#{rsc_bundle_hash}"] = {
+            body: Pathname.new(fixture_rsc_bundle_path),
+            content_type: "text/javascript",
+            filename: "#{rsc_bundle_hash}.js"
+          }
+        end
+
+        # Do NOT call upload_assets — the bundle isn't on the renderer yet
+        js_code = "ReactOnRails.dummy"
+        request_digest = Digest::MD5.hexdigest(js_code)
+        render_path = "/bundles/#{unique_hash}/render/#{request_digest}"
+
+        Timeout.timeout(10) do
+          response = ReactOnRailsPro::Request.render_code(render_path, js_code, false)
+
+          expect(response.status).to eq(200)
+          expect(response.body.to_s).to include("Dummy Object")
+        end
+      end
+
+      it "re-uploads the bundle and retries incremental render successfully" do
+        unique_hash = "retry_incr_#{SecureRandom.hex(8)}"
+        allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool)
+          .to receive(:server_bundle_hash).and_return(unique_hash)
+        allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool)
+          .to receive(:renderer_bundle_file_name).and_return("#{unique_hash}.js")
+
+        # rubocop:disable Lint/UnusedBlockArgument
+        allow(ReactOnRailsPro::Request).to receive(:populate_form_with_bundle_and_assets) do |form, check_bundle:|
+          # rubocop:enable Lint/UnusedBlockArgument
+          form["bundle_#{unique_hash}"] = {
+            body: Pathname.new(fixture_bundle_path),
+            content_type: "text/javascript",
+            filename: "#{unique_hash}.js"
+          }
+          form["bundle_#{rsc_bundle_hash}"] = {
+            body: Pathname.new(fixture_rsc_bundle_path),
+            content_type: "text/javascript",
+            filename: "#{rsc_bundle_hash}.js"
+          }
+        end
+
+        js_code = "ReactOnRails.getStreamValues()"
+        request_digest = Digest::MD5.hexdigest(js_code)
+        render_path = "/bundles/#{unique_hash}/incremental-render/#{request_digest}"
+
+        Timeout.timeout(10) do
+          stream = ReactOnRailsPro::Request.render_code_with_incremental_updates(
+            render_path,
+            js_code,
+            async_props_block: proc { |emitter|
+              emitter.call("retry_prop", "retry_success")
+            }
+          )
+
+          chunks = []
+          stream.each_chunk { |chunk| chunks << chunk }
+          response_text = chunks.join
+          expect(response_text).to include("retry_success")
+        end
+      end
+    end
+
+    context "with large payloads exceeding HTTP/2 frame size" do
+      it "streams a payload larger than 16KB correctly" do
+        ReactOnRailsPro::Request.upload_assets
+
+        js_code = "ReactOnRails.getStreamValues()"
+        request_digest = Digest::MD5.hexdigest(js_code)
+        render_path = "/bundles/#{server_bundle_hash}/incremental-render/#{request_digest}"
+
+        # Generate a payload larger than default HTTP/2 frame size (16KB)
+        large_value = "X" * 20_000
+
+        Timeout.timeout(10) do
+          stream = ReactOnRailsPro::Request.render_code_with_incremental_updates(
+            render_path,
+            js_code,
+            async_props_block: proc { |emitter|
+              emitter.call("large_prop", large_value)
+            }
+          )
+
+          chunks = []
+          stream.each_chunk { |chunk| chunks << chunk }
+          response_text = chunks.join
+          expect(response_text).to include(large_value)
+        end
+      end
+
+      it "streams multiple large payloads without corruption" do
+        ReactOnRailsPro::Request.upload_assets
+
+        js_code = "ReactOnRails.getStreamValues()"
+        request_digest = Digest::MD5.hexdigest(js_code)
+        render_path = "/bundles/#{server_bundle_hash}/incremental-render/#{request_digest}"
+
+        values = 3.times.map { |i| "PAYLOAD_#{i}_#{'Y' * 18_000}" }
+
+        Timeout.timeout(15) do
+          stream = ReactOnRailsPro::Request.render_code_with_incremental_updates(
+            render_path,
+            js_code,
+            async_props_block: proc { |emitter|
+              values.each_with_index { |val, i| emitter.call("prop_#{i}", val) }
+            }
+          )
+
+          chunks = []
+          stream.each_chunk { |chunk| chunks << chunk }
+          response_text = chunks.join
+          values.each { |val| expect(response_text).to include(val) }
+        end
+      end
+    end
+
+    context "with concurrent incremental render requests" do
+      it "handles multiple parallel streams without interference" do
+        ReactOnRailsPro::Request.upload_assets
+
+        js_code = "ReactOnRails.getStreamValues()"
+        request_digest = Digest::MD5.hexdigest(js_code)
+        render_path = "/bundles/#{server_bundle_hash}/incremental-render/#{request_digest}"
+
+        results = Array.new(3)
+
+        Timeout.timeout(15) do
+          Sync do
+            3.times.map do |i|
+              Async do
+                stream = ReactOnRailsPro::Request.render_code_with_incremental_updates(
+                  render_path,
+                  js_code,
+                  async_props_block: proc { |emitter|
+                    emitter.call("stream_id", "stream_#{i}_data")
+                  }
+                )
+
+                chunks = []
+                stream.each_chunk { |chunk| chunks << chunk }
+                results[i] = chunks.join
+              end
+            end.each(&:wait)
+          end
+        end
+
+        # Each stream should have received its own data without cross-contamination
+        3.times do |i|
+          expect(results[i]).to include("stream_#{i}_data")
+          # Verify no data from other streams leaked in
+          other_indices = [0, 1, 2] - [i]
+          other_indices.each do |j|
+            expect(results[i]).not_to include("stream_#{j}_data")
+          end
+        end
+      end
+    end
+
     context "when error scenarios repeat without connection reset" do
       let(:js_code) { "ReactOnRails.getStreamValues()" }
       let(:render_path) do
