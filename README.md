@@ -132,7 +132,7 @@ Start with the docs here:
 ## Contributing
 
 Bug reports and pull requests are welcome. Start with
-[CONTRIBUTING.md](https://github.com/shakacode/react_on_rails/tree/main/CONTRIBUTING.md)
+[CONTRIBUTING.md](https://github.com/shakacode/react_on_rails/blob/main/CONTRIBUTING.md)
 and the
 [help wanted issues](https://github.com/shakacode/react_on_rails/labels/contributions%3A%20up%20for%20grabs%21).
 
@@ -145,7 +145,7 @@ policy. Please do not open a public issue for security reports.
 ## License
 
 React on Rails is available as open source under the terms of the
-[MIT License](https://github.com/shakacode/react_on_rails/tree/main/LICENSE.md).
+[MIT License](https://github.com/shakacode/react_on_rails/blob/main/LICENSE.md).
 
 Some advanced features require a React on Rails Pro subscription. See
 [React on Rails Pro](https://reactonrails.com/docs/pro/) and
