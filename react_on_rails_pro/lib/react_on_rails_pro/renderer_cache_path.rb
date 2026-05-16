@@ -6,7 +6,7 @@ module ReactOnRailsPro
   # Resolves the Node Renderer server-bundle cache directory from environment
   # variables, preserving the same precedence and warning behavior as the Node
   # renderer configuration.
-  class RendererCachePath
+  module RendererCachePath
     PREFERRED_ENV_VAR = "RENDERER_SERVER_BUNDLE_CACHE_PATH"
     LEGACY_ENV_VAR = "RENDERER_BUNDLE_PATH"
     DEFAULT_CACHE_DIR = ".node-renderer-bundles"
