@@ -41,6 +41,7 @@ exclude = [
   '^https://your-shared-addr\.c9users\.io',
   '^https://hichee\.com',
   '^https?://rubyonrails\.org/doctrine',  # DNS issues
+  '^https://www\.oppenheimerfunds\.com/?$',  # DNS no longer resolves
 
   # ============================================================================
   # SSL CERTIFICATE ISSUES
@@ -93,6 +94,7 @@ exclude = [
   '^https://(www\.)?guavapass\.com',  # TLS handshake failures from CI
   '^https?://(www\.)?hvmn\.com',  # Returns 503 from CI
   '^https://(www\.)?hawaiichee\.com/?$', # Intermittent 500 from CI
+  '^https://deliveroo\.co\.uk/?$', # Returns 403 for automated requests
 
   # ============================================================================
   # EXTERNAL SITES THAT TIMEOUT DURING CI CHECKS
