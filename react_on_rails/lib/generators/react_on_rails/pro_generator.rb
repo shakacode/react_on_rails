@@ -372,6 +372,7 @@ module ReactOnRails
         MOCK_CALL_PATTERN,
         DECLARE_MODULE_PATTERN
       ].freeze
+      GEMFILE_STRING_DELIMITERS = ["'", '"', "`"].freeze
 
       def rewrite_react_on_rails_module_specifiers(content)
         rewrite_non_comment_lines(content) do |line|
@@ -868,10 +869,68 @@ module ReactOnRails
         has_user_version_pin = normalized_suffix.match?(/\A\s*,\s*(?:#[^\n]*\n\s*)*["']/)
         version_arg = has_user_version_pin ? "" : ", #{quote}#{pro_gem_version_requirement}#{quote}"
 
+        if parenthesized_gem_call
+          normalized_suffix = remove_parenthesized_gem_call_closing_parenthesis(normalized_suffix)
+        end
         normalized_suffix = "\n" if normalized_suffix.match?(/\A,\s*\n\z/)
-        normalized_suffix = normalized_suffix.sub(/\)(\s*(?:#.*)?\n)\z/, '\1') if parenthesized_gem_call
 
         "#{indentation}gem #{quote}react_on_rails_pro#{quote}#{version_arg}#{normalized_suffix}"
+      end
+
+      def remove_parenthesized_gem_call_closing_parenthesis(suffix)
+        closing_index = parenthesized_gem_call_closing_parenthesis_index(suffix)
+        return suffix unless closing_index
+
+        prefix = suffix[0...closing_index]
+        rest = suffix[(closing_index + 1)..].to_s
+        return "#{prefix.rstrip} #{rest.lstrip}" if closing_parenthesis_line_has_postfix_code?(rest)
+
+        "#{prefix}#{rest}"
+      end
+
+      def closing_parenthesis_line_has_postfix_code?(rest)
+        stripped_rest = rest.lstrip
+        !stripped_rest.empty? && !stripped_rest.start_with?("#", "\n", "\r")
+      end
+
+      # The suffix starts after the gem name but still inside the original `gem(...)` call,
+      # so the matching call-closing parenthesis is found by starting at depth 1.
+      def parenthesized_gem_call_closing_parenthesis_index(suffix)
+        depth = 1
+        quote = nil
+        scan_index = 0
+
+        while scan_index < suffix.length
+          char = suffix[scan_index]
+
+          if quote
+            quote = nil if char == quote && !character_escaped?(suffix, scan_index)
+          else
+            scan_index, depth, quote, closing_index =
+              next_parenthesized_gem_suffix_scan_state(suffix, scan_index, depth)
+            return closing_index if closing_index
+            return nil unless scan_index
+          end
+
+          scan_index += 1
+        end
+
+        nil
+      end
+
+      def next_parenthesized_gem_suffix_scan_state(suffix, scan_index, depth)
+        char = suffix[scan_index]
+        return [scan_index, depth, char, nil] if GEMFILE_STRING_DELIMITERS.include?(char)
+        return [suffix.index("\n", scan_index), depth, nil, nil] if char == "#"
+        return [scan_index, depth + 1, nil, nil] if char == "("
+        return parenthesized_gem_suffix_closing_state(scan_index, depth) if char == ")"
+
+        [scan_index, depth, nil, nil]
+      end
+
+      def parenthesized_gem_suffix_closing_state(scan_index, depth)
+        next_depth = depth - 1
+        [scan_index, next_depth, nil, next_depth.zero? ? scan_index : nil]
       end
 
       def print_success_message

@@ -1,11 +1,16 @@
 # frozen_string_literal: true
 
+require "ripper"
 require_relative "../support/generator_spec_helper"
 
 describe ProGenerator, type: :generator do
   include GeneratorSpec::TestCase
 
   destination File.expand_path("../dummy-for-generators", __dir__)
+
+  def expect_parseable_ruby(source)
+    expect(Ripper.sexp(source)).not_to be_nil
+  end
 
   # Unit tests for prerequisite validation
 
@@ -414,6 +419,48 @@ describe ProGenerator, type: :generator do
       expect(gemfile_content).to include('gem "react_on_rails_pro", "~> 16.0", require: false')
       expect(gemfile_content).to include('if: ENV.fetch("ENABLE_ROR", false)')
       expect(gemfile_content).not_to include("false))")
+    end
+
+    it "replaces parenthesized Gemfile declarations with postfix if guards without leaving trailing parentheses" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem("react_on_rails", "~> 16.0") if ENV["ENABLE_ROR"]
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      gemfile_content = File.read(gemfile_path)
+      expect(gemfile_content).to eq(<<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails_pro", "~> 16.0" if ENV["ENABLE_ROR"]
+      RUBY
+      expect_parseable_ruby(gemfile_content)
+      expect(generator).to have_received(:bundle_install_after_gem_swap)
+    end
+
+    it "replaces multiline parenthesized Gemfile declarations with postfix unless guards" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem(
+          "react_on_rails",
+          "~> 16.0",
+          require: false
+        ) unless ENV["SKIP_ROR"]
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      gemfile_content = File.read(gemfile_path)
+      expect(gemfile_content).to eq(<<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails_pro",
+          "~> 16.0",
+          require: false unless ENV["SKIP_ROR"]
+      RUBY
+      expect_parseable_ruby(gemfile_content)
+      expect(generator).to have_received(:bundle_install_after_gem_swap)
     end
 
     it "replaces multiline parenthesized Gemfile declarations" do
