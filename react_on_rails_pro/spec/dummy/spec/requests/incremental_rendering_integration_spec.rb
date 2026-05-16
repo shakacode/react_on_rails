@@ -213,5 +213,117 @@ describe "Incremental Rendering Integration", :integration do
         # - This would deadlock if chunks weren't received concurrently
       end
     end
+
+    context "when an update chunk contains invalid JavaScript" do
+      before do
+        # rubocop:disable RSpec/AnyInstance
+        allow_any_instance_of(ReactOnRailsPro::AsyncPropsEmitter)
+          .to receive(:generate_update_chunk) do |emitter, prop_name, value|
+            bundle_timestamp = emitter.instance_variable_get(:@bundle_timestamp)
+
+            if prop_name == "bad_prop"
+              # Emit syntactically invalid JS that will throw in the VM
+              {
+                bundleTimestamp: bundle_timestamp,
+                updateChunk: "this is not valid javascript @@!#$%"
+              }
+            else
+              json_value = value.to_json
+              {
+                bundleTimestamp: bundle_timestamp,
+                updateChunk: <<~JS.chomp
+                  (function() {
+                    var content = #{json_value};
+                    var meta = JSON.stringify({consoleReplayScript:"",hasErrors:false,isShellReady:true,payloadType:"string"});
+                    var len = Buffer.byteLength(content, "utf8").toString(16).padStart(8, "0");
+                    ReactOnRails.addStreamValueToFirstBundle(meta + "\\t" + len + "\\n" + content);
+                  })()
+                JS
+              }
+            end
+          end
+        # rubocop:enable RSpec/AnyInstance
+      end
+
+      it "continues streaming valid props when one update chunk has invalid JS" do
+        ReactOnRailsPro::Request.upload_assets
+
+        js_code = "ReactOnRails.getStreamValues()"
+        request_digest = Digest::MD5.hexdigest(js_code)
+        render_path = "/bundles/#{server_bundle_hash}/incremental-render/#{request_digest}"
+
+        Timeout.timeout(10) do
+          stream = ReactOnRailsPro::Request.render_code_with_incremental_updates(
+            render_path,
+            js_code,
+            async_props_block: proc { |emitter|
+              emitter.call("good_prop1", "hello")
+              emitter.call("bad_prop", "this_wont_arrive")
+              emitter.call("good_prop2", "world")
+            }
+          )
+
+          chunks = []
+          stream.each_chunk do |chunk|
+            chunks << chunk
+          end
+
+          response_text = chunks.join
+          expect(response_text).to include("hello")
+          expect(response_text).to include("world")
+          # The bad_prop value never arrives because the JS that would have
+          # written it to the stream was invalid and threw in the VM
+          expect(response_text).not_to include("this_wont_arrive")
+        end
+      end
+    end
+
+    context "when async_props_block raises an exception" do
+      it "closes the stream and propagates the error" do
+        ReactOnRailsPro::Request.upload_assets
+
+        js_code = "ReactOnRails.getStreamValues()"
+        request_digest = Digest::MD5.hexdigest(js_code)
+        render_path = "/bundles/#{server_bundle_hash}/incremental-render/#{request_digest}"
+
+        Timeout.timeout(10) do
+          stream = ReactOnRailsPro::Request.render_code_with_incremental_updates(
+            render_path,
+            js_code,
+            async_props_block: proc { |emitter|
+              emitter.call("prop1", "before_error")
+              raise StandardError, "something went wrong in the async block"
+            }
+          )
+
+          # barrier.wait re-raises the exception from the async task
+          expect do
+            stream.each_chunk { |_chunk| }
+          end.to raise_error(StandardError, "something went wrong in the async block")
+        end
+      end
+    end
+
+    context "when rendering request JS is invalid" do
+      it "raises ReactOnRailsPro::Error with the exception details" do
+        ReactOnRailsPro::Request.upload_assets
+
+        js_code = "this is not valid javascript @@!#$%"
+        request_digest = Digest::MD5.hexdigest(js_code)
+        render_path = "/bundles/#{server_bundle_hash}/incremental-render/#{request_digest}"
+
+        Timeout.timeout(10) do
+          stream = ReactOnRailsPro::Request.render_code_with_incremental_updates(
+            render_path,
+            js_code,
+            async_props_block: proc { |_emitter| }
+          )
+
+          expect do
+            stream.each_chunk { |_chunk| }
+          end.to raise_error(ReactOnRailsPro::Error, /Unexpected identifier/)
+        end
+      end
+    end
   end
 end
