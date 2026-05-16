@@ -73,7 +73,10 @@ module ReactOnRailsPro
       end
 
       it "returns the default cache dir when neither env var is set" do
-        expect(described_class.resolve).to eq(Rails.root.join(".node-renderer-bundles").to_s)
+        rails_root = Pathname.new(Dir.pwd)
+        allow(Rails).to receive(:root).and_return(rails_root)
+
+        expect(described_class.resolve).to eq(rails_root.join(".node-renderer-bundles").to_s)
       end
     end
   end
