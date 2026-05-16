@@ -502,7 +502,10 @@ module ReactOnRailsPro
       it "delegates to RendererCachePath for compatibility" do
         allow(ReactOnRailsPro::RendererCachePath).to receive(:resolve).and_return("/tmp/renderer-cache")
 
-        expect(described_class.resolve_renderer_cache_dir).to eq("/tmp/renderer-cache")
+        result = described_class.resolve_renderer_cache_dir
+
+        expect(ReactOnRailsPro::RendererCachePath).to have_received(:resolve)
+        expect(result).to eq("/tmp/renderer-cache")
       end
     end
   end

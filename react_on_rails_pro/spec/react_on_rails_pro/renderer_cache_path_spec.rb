@@ -71,6 +71,10 @@ module ReactOnRailsPro
         expect { described_class.resolve }
           .to raise_error(ReactOnRailsPro::Error, /RENDERER_BUNDLE_PATH is whitespace-only/)
       end
+
+      it "returns the default cache dir when neither env var is set" do
+        expect(described_class.resolve).to eq(Rails.root.join(".node-renderer-bundles").to_s)
+      end
     end
   end
 end

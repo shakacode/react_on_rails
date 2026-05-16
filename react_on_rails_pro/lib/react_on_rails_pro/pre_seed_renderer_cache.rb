@@ -86,8 +86,8 @@ module ReactOnRailsPro
       # mis-staging.
       # RENDERER_BUNDLE_PATH remains accepted for compatibility, but new deploys
       # should migrate to RENDERER_SERVER_BUNDLE_CACHE_PATH. Whitespace-only
-      # values intentionally pass this guard so renderer_cache_env_value can
-      # raise the specific validation error instead of the missing-env guidance.
+      # values intentionally pass this guard so RendererCachePath can raise the
+      # specific validation error instead of the missing-env guidance.
       return if !ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH", "").empty? ||
                 !ENV.fetch("RENDERER_BUNDLE_PATH", "").empty?
 
