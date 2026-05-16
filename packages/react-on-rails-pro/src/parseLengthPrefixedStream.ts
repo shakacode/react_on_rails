@@ -43,7 +43,7 @@ export default class LengthPrefixedStreamParser {
   private metadata: Record<string, unknown> = {};
 
   feed(chunk: Uint8Array, onChunk: (content: Uint8Array, metadata: Record<string, unknown>) => void): void {
-    this.buf = concatBytes(this.buf, chunk);
+    this.buf = this.buf.length === 0 ? chunk : concatBytes(this.buf, chunk);
 
     let canExtract = true;
     while (canExtract) {
@@ -67,10 +67,10 @@ export default class LengthPrefixedStreamParser {
             );
           }
           const lenHex = decoder.decode(header.subarray(tabIdx + 1));
-          this.contentLen = parseInt(lenHex, 16);
-          if (Number.isNaN(this.contentLen)) {
+          if (!/^[0-9a-fA-F]+$/.test(lenHex)) {
             throw new Error(`Invalid content length hex: ${JSON.stringify(lenHex)}`);
           }
+          this.contentLen = parseInt(lenHex, 16);
           this.state = 'content';
         } else {
           canExtract = false;
@@ -87,5 +87,19 @@ export default class LengthPrefixedStreamParser {
         canExtract = false;
       }
     }
+
+    // Release the large backing ArrayBuffer if leftover is small relative to it.
+    // subarray() inside the loop is O(1) but pins the original buffer; this single
+    // post-loop copy (only when ratio > 4x) frees it without O(n²) in-loop overhead.
+    if (this.buf.length > 0 && this.buf.buffer.byteLength > this.buf.length * 4) {
+      this.buf = this.buf.slice(0);
+    }
+  }
+
+  flush(): void {
+    if (this.state === 'header' && this.buf.length === 0) return;
+    console.warn(
+      `[react_on_rails] Incomplete length-prefixed stream: ${this.buf.length} bytes remaining in state ${this.state}`,
+    );
   }
 }

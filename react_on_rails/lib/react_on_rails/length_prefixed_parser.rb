@@ -63,10 +63,15 @@ module ReactOnRails
       raise
     end
 
-    # Called when the stream ends. No-op — incomplete data is silently discarded.
-    # Connection errors surface through HTTPX error handling, not the parser.
+    # Called when the stream ends to detect truncated responses.
+    # Logs a warning if the buffer still has unconsumed bytes (partial header or content).
     def flush
-      nil
+      return if @state == :header && @buf.empty?
+
+      Rails.logger.warn(
+        "[react_on_rails] Incomplete length-prefixed stream: " \
+        "#{@buf.bytesize} bytes remaining in state :#{@state}"
+      )
     end
 
     # True if the parser encountered a protocol error.
