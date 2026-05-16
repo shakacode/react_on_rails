@@ -20,11 +20,12 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
 
   # Builds a mock response that yields the given raw chunks and reports the given status.
   def mock_ok_response(*raw_chunks)
-    Class.new do
-      define_method(:each) { |&blk| raw_chunks.each { |c| blk.call(c) } }
-      define_method(:status) { 200 }
-      define_method(:is_a?) { |klass| klass == HTTPX::ErrorResponse ? false : super(klass) }
-    end.new
+    response = Object.new
+    response.define_singleton_method(:each) { |&blk| raw_chunks.each { |c| blk.call(c) } }
+    response.define_singleton_method(:status) { 200 }
+    allow(response).to receive(:is_a?).and_call_original
+    allow(response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(false)
+    response
   end
 
   describe ".create" do
@@ -313,14 +314,15 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       expect { stream.each_chunk(&:itself) }.to raise_error(HTTPX::ConnectionError, /Connection refused/)
     end
 
-    it "does not leak barrier resources when request_executor raises" do
-      barrier_stopped = false
+    it "propagates connection errors without calling barrier.wait" do
+      barrier_wait_called = false
       stream = described_class.create do |_send_bundle, barrier|
-        allow(barrier).to receive(:wait) { barrier_stopped = true }
+        allow(barrier).to receive(:wait) { barrier_wait_called = true }
         raise HTTPX::ConnectionError, "connection reset"
       end
 
       expect { stream.each_chunk(&:itself) }.to raise_error(HTTPX::ConnectionError)
+      expect(barrier_wait_called).to be false
     end
   end
   # rubocop:enable RSpec/VerifiedDoubles
