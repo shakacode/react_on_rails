@@ -325,5 +325,137 @@ describe "Incremental Rendering Integration", :integration do
         end
       end
     end
+
+    context "when error scenarios repeat without connection reset" do
+      it "does not exhaust the connection pool after repeated invalid JS chunks" do
+        # Override to emit invalid JS for "bad" prop
+        # rubocop:disable RSpec/AnyInstance
+        allow_any_instance_of(ReactOnRailsPro::AsyncPropsEmitter)
+          .to receive(:generate_update_chunk) do |emitter, prop_name, value|
+            bundle_timestamp = emitter.instance_variable_get(:@bundle_timestamp)
+
+            if prop_name == "bad"
+              { bundleTimestamp: bundle_timestamp, updateChunk: "invalid js @@!!" }
+            else
+              json_value = value.to_json
+              {
+                bundleTimestamp: bundle_timestamp,
+                updateChunk: <<~JS.chomp
+                  (function() {
+                    var content = #{json_value};
+                    var meta = JSON.stringify({consoleReplayScript:"",hasErrors:false,isShellReady:true,payloadType:"string"});
+                    var len = Buffer.byteLength(content, "utf8").toString(16).padStart(8, "0");
+                    ReactOnRails.addStreamValueToFirstBundle(meta + "\\t" + len + "\\n" + content);
+                  })()
+                JS
+              }
+            end
+          end
+        # rubocop:enable RSpec/AnyInstance
+
+        ReactOnRailsPro::Request.upload_assets
+
+        js_code = "ReactOnRails.getStreamValues()"
+        request_digest = Digest::MD5.hexdigest(js_code)
+        render_path = "/bundles/#{server_bundle_hash}/incremental-render/#{request_digest}"
+
+        Timeout.timeout(30) do
+          10.times do
+            stream = ReactOnRailsPro::Request.render_code_with_incremental_updates(
+              render_path,
+              js_code,
+              async_props_block: proc { |emitter|
+                emitter.call("good", "ok")
+                emitter.call("bad", "fail")
+                emitter.call("good2", "ok2")
+              }
+            )
+            stream.each_chunk { |_chunk| }
+          end
+        end
+      end
+
+      it "does not exhaust the connection pool after repeated async_props_block exceptions" do
+        ReactOnRailsPro::Request.upload_assets
+
+        js_code = "ReactOnRails.getStreamValues()"
+        request_digest = Digest::MD5.hexdigest(js_code)
+        render_path = "/bundles/#{server_bundle_hash}/incremental-render/#{request_digest}"
+
+        Timeout.timeout(30) do
+          10.times do |i|
+            stream = ReactOnRailsPro::Request.render_code_with_incremental_updates(
+              render_path,
+              js_code,
+              async_props_block: proc { |emitter|
+                emitter.call("prop", "value_#{i}")
+                raise StandardError, "repeated failure #{i}"
+              }
+            )
+
+            expect do
+              stream.each_chunk { |_chunk| }
+            end.to raise_error(StandardError, "repeated failure #{i}")
+          end
+        end
+      end
+
+      it "does not exhaust the connection pool after repeated invalid rendering requests" do
+        ReactOnRailsPro::Request.upload_assets
+
+        Timeout.timeout(30) do
+          10.times do
+            js_code = "not valid js @@#{rand(1000)}"
+            request_digest = Digest::MD5.hexdigest(js_code)
+            render_path = "/bundles/#{server_bundle_hash}/incremental-render/#{request_digest}"
+
+            stream = ReactOnRailsPro::Request.render_code_with_incremental_updates(
+              render_path,
+              js_code,
+              async_props_block: proc { |_emitter| }
+            )
+
+            expect do
+              stream.each_chunk { |_chunk| }
+            end.to raise_error(ReactOnRailsPro::Error)
+          end
+        end
+      end
+
+      it "succeeds with normal requests after a series of errors" do
+        ReactOnRailsPro::Request.upload_assets
+
+        js_code = "ReactOnRails.getStreamValues()"
+        request_digest = Digest::MD5.hexdigest(js_code)
+        render_path = "/bundles/#{server_bundle_hash}/incremental-render/#{request_digest}"
+
+        Timeout.timeout(30) do
+          # First trigger several errors
+          5.times do |i|
+            stream = ReactOnRailsPro::Request.render_code_with_incremental_updates(
+              render_path,
+              js_code,
+              async_props_block: proc { |_emitter|
+                raise StandardError, "error #{i}"
+              }
+            )
+            expect { stream.each_chunk { |_chunk| } }.to raise_error(StandardError)
+          end
+
+          # Then verify normal streaming still works
+          stream = ReactOnRailsPro::Request.render_code_with_incremental_updates(
+            render_path,
+            js_code,
+            async_props_block: proc { |emitter|
+              emitter.call("recovery_prop", "recovered_value")
+            }
+          )
+
+          chunks = []
+          stream.each_chunk { |chunk| chunks << chunk }
+          expect(chunks.join).to include("recovered_value")
+        end
+      end
+    end
   end
 end
