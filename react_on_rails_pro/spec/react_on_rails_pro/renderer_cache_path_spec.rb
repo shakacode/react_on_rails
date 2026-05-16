@@ -78,6 +78,14 @@ module ReactOnRailsPro
 
         expect(described_class.resolve).to eq(rails_root.join(".node-renderer-bundles").to_s)
       end
+
+      it "prefers RENDERER_SERVER_BUNDLE_CACHE_PATH over RENDERER_BUNDLE_PATH when both are set" do
+        ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] = "/tmp/preferred"
+        ENV["RENDERER_BUNDLE_PATH"] = "/tmp/legacy"
+
+        expect { @result = described_class.resolve }.not_to output.to_stderr
+        expect(@result).to eq("/tmp/preferred")
+      end
     end
   end
 end
