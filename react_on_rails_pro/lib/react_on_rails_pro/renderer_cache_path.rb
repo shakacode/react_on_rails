@@ -17,6 +17,7 @@ module ReactOnRailsPro
                      :DEFAULT_CACHE_DIR,
                      :LEGACY_ENV_VAR_DEPRECATION_MUTEX
 
+    # Module-level instance var read/written by singleton methods under the mutex.
     @legacy_env_var_deprecation_warned = false
 
     class << self
