@@ -584,27 +584,30 @@ describe ProGenerator, type: :generator do
       expect(gemfile_content).not_to include("gem(")
     end
 
-    it "removes base gem without adding duplicate react_on_rails_pro entries" do
-      simulate_existing_file("Gemfile", <<~RUBY)
+    it "leaves base gem entries unchanged when react_on_rails_pro already exists" do
+      original_gemfile = <<~RUBY
         source "https://rubygems.org"
         gem "react_on_rails", "~> 16.0"
         gem "react_on_rails_pro", "~> 16.0"
       RUBY
+      simulate_existing_file("Gemfile", original_gemfile)
       allow(generator).to receive(:bundle_install_after_gem_swap)
       allow(generator).to receive(:say)
 
       generator.send(:swap_base_gem_for_pro_in_gemfile)
 
-      gemfile_content = File.read(gemfile_path)
-      expect(gemfile_content).not_to match(/gem\s+["']react_on_rails["']/)
-      expect(gemfile_content.scan(/gem\s+["']react_on_rails_pro["']/).size).to eq(1)
+      expect(File.read(gemfile_path)).to eq(original_gemfile)
       expect(generator).to have_received(:say)
-        .with("ℹ️  Existing react_on_rails_pro Gemfile entry detected; preserving current version constraint", :yellow)
-      expect(generator).to have_received(:bundle_install_after_gem_swap)
+        .with(
+          "ℹ️  Existing react_on_rails_pro Gemfile entry detected; " \
+          "leaving react_on_rails entries unchanged",
+          :yellow
+        )
+      expect(generator).not_to have_received(:bundle_install_after_gem_swap)
     end
 
-    it "does not add duplicate react_on_rails_pro entries when existing parenthesized declaration has comment lines" do
-      simulate_existing_file("Gemfile", <<~RUBY)
+    it "leaves base gem entries unchanged when existing parenthesized pro declaration has comment lines" do
+      original_gemfile = <<~RUBY
         source "https://rubygems.org"
         gem "react_on_rails", "~> 16.0"
         gem(
@@ -613,16 +616,94 @@ describe ProGenerator, type: :generator do
           "~> 16.0"
         )
       RUBY
+      simulate_existing_file("Gemfile", original_gemfile)
       allow(generator).to receive(:bundle_install_after_gem_swap)
       allow(generator).to receive(:say)
 
       generator.send(:swap_base_gem_for_pro_in_gemfile)
 
-      gemfile_content = File.read(gemfile_path)
-      expect(gemfile_content).not_to match(/gem\s+["']react_on_rails["']/)
-      expect(gemfile_content.scan(/["']react_on_rails_pro["']/).size).to eq(1)
+      expect(File.read(gemfile_path)).to eq(original_gemfile)
       expect(generator).to have_received(:say)
-        .with("ℹ️  Existing react_on_rails_pro Gemfile entry detected; preserving current version constraint", :yellow)
+        .with(
+          "ℹ️  Existing react_on_rails_pro Gemfile entry detected; " \
+          "leaving react_on_rails entries unchanged",
+          :yellow
+        )
+      expect(generator).not_to have_received(:bundle_install_after_gem_swap)
+    end
+
+    it "replaces duplicate base gem declarations without dropping grouped declarations" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails", "~> 16.0"
+        group :test do
+          gem "react_on_rails", require: false
+        end
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      gemfile_content = File.read(gemfile_path)
+      expected_version = generator.send(:pro_gem_version_requirement)
+      expect(gemfile_content).to eq(<<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails_pro", "~> 16.0"
+        group :test do
+          gem "react_on_rails_pro", "#{expected_version}", require: false
+        end
+      RUBY
+      expect_parseable_ruby(gemfile_content)
+      expect(gemfile_content).not_to match(/gem\s+["']react_on_rails["']/)
+      expect(generator).to have_received(:bundle_install_after_gem_swap)
+    end
+
+    it "replaces base gem declarations in both conditional branches" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        if ENV["ROR_EDGE"]
+          gem "react_on_rails", github: "shakacode/react_on_rails", branch: "master"
+        else
+          gem "react_on_rails", "~> 16.0"
+        end
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      gemfile_content = File.read(gemfile_path)
+      expected_version = generator.send(:pro_gem_version_requirement)
+      expect(gemfile_content).to eq(<<~RUBY)
+        source "https://rubygems.org"
+        if ENV["ROR_EDGE"]
+          gem "react_on_rails_pro", "#{expected_version}", github: "shakacode/react_on_rails", branch: "master"
+        else
+          gem "react_on_rails_pro", "~> 16.0"
+        end
+      RUBY
+      expect_parseable_ruby(gemfile_content)
+      expect(gemfile_content).not_to match(/gem\s+["']react_on_rails["']/)
+      expect(generator).to have_received(:bundle_install_after_gem_swap)
+    end
+
+    it "replaces duplicate base gem declarations with platform-specific options" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails", "~> 16.0"
+        gem "react_on_rails", "~> 16.0", platforms: :jruby
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      gemfile_content = File.read(gemfile_path)
+      expect(gemfile_content).to eq(<<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails_pro", "~> 16.0"
+        gem "react_on_rails_pro", "~> 16.0", platforms: :jruby
+      RUBY
+      expect_parseable_ruby(gemfile_content)
+      expect(gemfile_content).not_to match(/gem\s+["']react_on_rails["']/)
       expect(generator).to have_received(:bundle_install_after_gem_swap)
     end
 

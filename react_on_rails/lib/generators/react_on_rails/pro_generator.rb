@@ -110,8 +110,8 @@ module ReactOnRails
           ReactOnRails::ProMigration.pro_gem_entry?(original_gemfile_content_for_rollback)
         gemfile_lines = gemfile_content.lines
         updated_lines = []
-        pro_entry_added = has_pro_gem_entry
         base_gem_entry_found = false
+        base_gem_entries_preserved = false
         line_index = 0
 
         while line_index < gemfile_lines.length
@@ -126,14 +126,16 @@ module ReactOnRails
 
           base_gem_entry_found = true
 
-          unless pro_entry_added
+          if has_pro_gem_entry
+            updated_lines.concat(gemfile_lines[line_index...base_gem_declaration[:next_index]])
+            base_gem_entries_preserved = true
+          else
             updated_lines << build_pro_gem_replacement_line(
               indentation: base_gem_declaration[:indentation],
               quote: base_gem_declaration[:quote],
               suffix: base_gem_declaration[:trailing_suffix],
               parenthesized_gem_call: base_gem_declaration[:parenthesized_gem_call]
             )
-            pro_entry_added = true
           end
 
           line_index = base_gem_declaration[:next_index]
@@ -141,6 +143,14 @@ module ReactOnRails
 
         updated_content = updated_lines.join
         if updated_content == gemfile_content
+          if base_gem_entries_preserved
+            say(
+              "ℹ️  Existing react_on_rails_pro Gemfile entry detected; " \
+              "leaving react_on_rails entries unchanged",
+              :yellow
+            )
+          end
+
           unless base_gem_entry_found || had_pro_gem_entry_before_prerequisites
             rollback_message = rollback_gemfile_after_failed_swap_precondition(
               gemfile_path: gemfile_path,
@@ -152,10 +162,6 @@ module ReactOnRails
           end
 
           return true
-        end
-
-        if has_pro_gem_entry
-          say "ℹ️  Existing react_on_rails_pro Gemfile entry detected; preserving current version constraint", :yellow
         end
 
         if options[:pretend]
