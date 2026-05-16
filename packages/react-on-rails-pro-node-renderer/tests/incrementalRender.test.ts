@@ -706,6 +706,80 @@ describe('incremental render NDJSON endpoint', () => {
     expect(handleRequestClosed).toHaveBeenCalledTimes(1);
   });
 
+  describe('connection drop scenarios', () => {
+    test('handleRequestClosed is called when client aborts mid-stream (via timeout detection)', async () => {
+      const { sinkAdd, handleRequestClosed, handleSpy, SERVER_BUNDLE_TIMESTAMP } =
+        await createBasicTestSetup();
+
+      const req = createHttpRequest(SERVER_BUNDLE_TIMESTAMP);
+
+      setupResponseHandler(req).catch(() => {
+        // Expected: client will destroy connection
+      });
+
+      const initialObj = createInitialObject(SERVER_BUNDLE_TIMESTAMP);
+      req.write(`${JSON.stringify(initialObj)}\n`);
+
+      await waitFor(() => {
+        expect(handleSpy).toHaveBeenCalledTimes(1);
+      });
+
+      req.write(`${JSON.stringify({ a: 1 })}\n`);
+      await waitFor(() => {
+        expect(sinkAdd).toHaveBeenCalledTimes(1);
+      });
+
+      // Abort the connection — server detects this via STREAM_CHUNK_TIMEOUT_MS (20s)
+      req.destroy();
+
+      // The server's error handler calls handleRequestClosed after the timeout fires
+      await waitFor(
+        () => {
+          expect(handleRequestClosed).toHaveBeenCalledTimes(1);
+        },
+        { timeout: 25000 },
+      );
+    }, 30000);
+
+    test('server remains functional after client abort', async () => {
+      const { handleRequestClosed, handleSpy, SERVER_BUNDLE_TIMESTAMP } = await createBasicTestSetup();
+
+      const req = createHttpRequest(SERVER_BUNDLE_TIMESTAMP);
+
+      setupResponseHandler(req).catch(() => {});
+
+      req.write(`${JSON.stringify(createInitialObject(SERVER_BUNDLE_TIMESTAMP))}\n`);
+      await waitFor(() => {
+        expect(handleSpy).toHaveBeenCalledTimes(1);
+      });
+
+      req.destroy();
+
+      await waitFor(
+        () => {
+          expect(handleRequestClosed).toHaveBeenCalledTimes(1);
+        },
+        { timeout: 25000 },
+      );
+
+      handleSpy.mockRestore();
+
+      // Verify server is still functional after the abort
+      const setup = await createBasicTestSetup();
+      const req2 = createHttpRequest(setup.SERVER_BUNDLE_TIMESTAMP);
+      const responsePromise = setupResponseHandler(req2, true);
+
+      req2.write(`${JSON.stringify(createInitialObject(setup.SERVER_BUNDLE_TIMESTAMP))}\n`);
+      await waitFor(() => {
+        expect(setup.handleSpy).toHaveBeenCalledTimes(1);
+      });
+
+      req2.end();
+      const response = await responsePromise;
+      expect(response.statusCode).toBe(200);
+    }, 35000);
+  });
+
   describe('incremental render update chunk functionality', () => {
     test('basic incremental update - initial request gets value, update chunks set value', async () => {
       await createIncrementalVmBundle(TEST_NAME);

@@ -142,6 +142,7 @@ module ReactOnRailsPro
 
         parser.feed(chunk, &block)
       end
+      parser.flush
     end
 
     def response_has_error_status?(response)

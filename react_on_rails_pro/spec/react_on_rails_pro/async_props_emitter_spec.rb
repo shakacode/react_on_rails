@@ -26,6 +26,25 @@ RSpec.describe ReactOnRailsPro::AsyncPropsEmitter do
       end
     end
 
+    it "writes separate NDJSON lines for each prop" do
+      outputs = []
+      allow(request_stream).to receive(:<<) { |output| outputs << output }
+
+      emitter.call("users", [{ "name" => "Alice" }])
+      emitter.call("posts", ["Post 1"])
+
+      expect(outputs.size).to eq(2)
+      expect(outputs).to all(end_with("\n"))
+
+      first = JSON.parse(outputs[0].chomp)
+      expect(first["updateChunk"]).to include('setProp("users"')
+      expect(first["updateChunk"]).to include('"name":"Alice"')
+
+      second = JSON.parse(outputs[1].chomp)
+      expect(second["updateChunk"]).to include('setProp("posts"')
+      expect(second["updateChunk"]).to include('"Post 1"')
+    end
+
     it "logs error and continues without raising when write fails" do
       mock_logger = instance_double(Logger)
       allow(Rails).to receive(:logger).and_return(mock_logger)
@@ -39,6 +58,16 @@ RSpec.describe ReactOnRailsPro::AsyncPropsEmitter do
         expect(message).to include("Failed to send async prop 'books'")
         expect(message).to include("Connection lost")
       end
+    end
+  end
+
+  describe "#end_stream_chunk" do
+    it "returns a hash with bundleTimestamp and endStream JS" do
+      chunk = emitter.end_stream_chunk
+
+      expect(chunk[:bundleTimestamp]).to eq(bundle_timestamp)
+      expect(chunk[:updateChunk]).to include("getOrCreateAsyncPropsManager(sharedExecutionContext)")
+      expect(chunk[:updateChunk]).to include("asyncPropsManager.endStream()")
     end
   end
 end

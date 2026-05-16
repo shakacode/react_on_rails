@@ -142,11 +142,25 @@ module ReactOnRailsProHelper
   end
 
   def stream_react_component_with_async_props(component_name, options = {}, &props_block)
+    unless ReactOnRailsPro.configuration.enable_rsc_support
+      raise ReactOnRailsPro::Error,
+            "stream_react_component_with_async_props requires enable_rsc_support to be true. " \
+            "Async props depend on React Server Components. " \
+            "Set `config.enable_rsc_support = true` in your ReactOnRailsPro configuration."
+    end
+
     options[:async_props_block] = props_block
     stream_react_component(component_name, options)
   end
 
   def rsc_payload_react_component_with_async_props(component_name, options = {}, &props_block)
+    unless ReactOnRailsPro.configuration.enable_rsc_support
+      raise ReactOnRailsPro::Error,
+            "rsc_payload_react_component_with_async_props requires enable_rsc_support to be true. " \
+            "Async props depend on React Server Components. " \
+            "Set `config.enable_rsc_support = true` in your ReactOnRailsPro configuration."
+    end
+
     options[:async_props_block] = props_block
     rsc_payload_react_component(component_name, options)
   end
