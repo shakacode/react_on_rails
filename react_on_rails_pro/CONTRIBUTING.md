@@ -55,7 +55,7 @@ For links from docs pages to non-doc files, use full GitHub URLs so links resolv
   `[Installation Guide](../docs/pro/installation.md)`
 
 - When making references to source code files, use a full url path like:
-  `[spec/dummy/config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails_pro/spec/dummy/config/initializers/react_on_rails.rb)`
+  `[spec/dummy/config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/spec/dummy/config/initializers/react_on_rails.rb)`
 
 ## To run tests:
 

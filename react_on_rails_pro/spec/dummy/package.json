@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "example of server rendering",
   "main": "server.js",
+  "private": true,
   "dependencies": {
     "@apollo/client": "^3.6.9",
     "@babel/core": "7",
