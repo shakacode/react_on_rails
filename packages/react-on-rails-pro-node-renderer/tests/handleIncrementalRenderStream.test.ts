@@ -1,7 +1,7 @@
 import { handleIncrementalRenderStream } from '../src/worker/handleIncrementalRenderStream';
 import { FIELD_SIZE_LIMIT } from '../src/shared/constants';
 import * as errorReporter from '../src/shared/errorReporter';
-import { ResponseResult } from '../src/shared/utils';
+import type { ResponseResult } from '../src/shared/utils';
 
 /**
  * Creates a mock async iterable stream from an array of buffers
