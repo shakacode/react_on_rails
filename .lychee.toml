@@ -41,6 +41,7 @@ exclude = [
   '^https://your-shared-addr\.c9users\.io',
   '^https://hichee\.com',
   '^https?://rubyonrails\.org/doctrine',  # DNS issues
+  '^https://www\.oppenheimerfunds\.com/?$',  # DNS no longer resolves
 
   # ============================================================================
   # SSL CERTIFICATE ISSUES
