@@ -3,6 +3,7 @@
 require "fileutils"
 require "pathname"
 require "react_on_rails_pro/renderer_cache_helpers"
+require "react_on_rails_pro/renderer_cache_path"
 
 module ReactOnRailsPro
   # Stages the Node Renderer bundle cache in the renderer's expected directory
@@ -66,7 +67,7 @@ module ReactOnRailsPro
     # unset) before resolving. See enforce_cache_dir_env_var! for the rationale.
     def self.resolve_cache_dir(mode)
       enforce_cache_dir_env_var!(mode)
-      ReactOnRailsPro::Utils.resolve_renderer_cache_dir
+      ReactOnRailsPro::RendererCachePath.resolve
     end
     private_class_method :resolve_cache_dir
 
