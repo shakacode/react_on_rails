@@ -38,6 +38,10 @@ describe "Incremental Rendering Integration", :integration do
       rsc_renderer_bundle_file_name: "#{rsc_bundle_hash}.js"
     )
 
+    # Point bundle path methods to fixture files so upload_assets finds them
+    allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path).and_return(fixture_bundle_path)
+    allow(ReactOnRailsPro::Utils).to receive(:rsc_bundle_js_file_path).and_return(fixture_rsc_bundle_path)
+
     # Enable RSC support for these tests
     allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(true)
 
@@ -58,16 +62,26 @@ describe "Incremental Rendering Integration", :integration do
       }
     end
 
-    # Mock AsyncPropsEmitter chunk generation methods to work with fixture bundles
-    # Only mock the chunk generation, not the actual call/streaming logic
+    # Mock AsyncPropsEmitter chunk generation methods to work with fixture bundles.
+    # The fixture's addStreamValueToFirstBundle writes raw text to a PassThrough stream
+    # that is piped directly to the HTTP response. Ruby's LengthPrefixedParser expects
+    # the wire format: <metadata JSON>\t<8-char hex length>\n<content>.
+    # So we build the LPP frame in the updateChunk JS itself.
     # rubocop:disable RSpec/AnyInstance
     allow_any_instance_of(ReactOnRailsPro::AsyncPropsEmitter)
       .to receive(:generate_update_chunk) do |emitter, _prop_name, value|
         bundle_timestamp = emitter.instance_variable_get(:@bundle_timestamp)
+        json_value = value.to_json
         {
           bundleTimestamp: bundle_timestamp,
-          # Add newline to the value so the fixture bundle writes it with newline
-          updateChunk: "ReactOnRails.addStreamValueToFirstBundle(#{value.to_json} + '\\n')"
+          updateChunk: <<~JS.chomp
+            (function() {
+              var content = #{json_value};
+              var meta = JSON.stringify({consoleReplayScript:"",hasErrors:false,isShellReady:true,payloadType:"string"});
+              var len = Buffer.byteLength(content, "utf8").toString(16).padStart(8, "0");
+              ReactOnRails.addStreamValueToFirstBundle(meta + "\\t" + len + "\\n" + content);
+            })()
+          JS
         }
       end
 
@@ -112,11 +126,7 @@ describe "Incremental Rendering Integration", :integration do
   end
 
   describe "render_code_with_incremental_updates" do
-    # Broken by PR #3195 (length-prefixed protocol): fixture bundle writes raw
-    # text but Ruby parser now expects length-prefixed wire format.
-    # Not related to this PR — see #3195 for context.
-    it "sends stream values and receives them in the response",
-       skip: "Pre-existing: raw fixture incompatible with length-prefixed protocol (#3195)" do
+    it "sends stream values and receives them in the response" do
       # Upload bundles first
       ReactOnRailsPro::Request.upload_assets
 
@@ -149,8 +159,7 @@ describe "Incremental Rendering Integration", :integration do
       expect(response_text).to include("value3")
     end
 
-    it "streams bidirectionally - each_chunk receives chunks while async_props_block is still running",
-       skip: "Pre-existing: raw fixture incompatible with length-prefixed protocol (#3195)" do
+    it "streams bidirectionally - each_chunk receives chunks while async_props_block is still running" do
       # Upload bundles first
       ReactOnRailsPro::Request.upload_assets
 
