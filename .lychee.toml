@@ -93,6 +93,7 @@ exclude = [
   '^https://(www\.)?guavapass\.com',  # TLS handshake failures from CI
   '^https?://(www\.)?hvmn\.com',  # Returns 503 from CI
   '^https://(www\.)?hawaiichee\.com/?$', # Intermittent 500 from CI
+  '^https://deliveroo\.co\.uk/?$', # Returns 403 for automated requests
 
   # ============================================================================
   # EXTERNAL SITES THAT TIMEOUT DURING CI CHECKS
