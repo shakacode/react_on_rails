@@ -12,24 +12,38 @@ global.ReactOnRails = {
     return sharedExecutionContext.get('secondaryStream').stream;
   },
 
-  // Add value to stream
+  // Add value to stream in length-prefixed protocol format
   addStreamValue: function (value) {
     if (!sharedExecutionContext.has('secondaryStream')) {
-      // Create the stream first if it doesn't exist
       ReactOnRails.getStreamValues();
     }
     const { stream } = sharedExecutionContext.get('secondaryStream');
-    stream.write(value);
+    const meta = JSON.stringify({
+      consoleReplayScript: '',
+      hasErrors: false,
+      isShellReady: true,
+      payloadType: 'string',
+    });
+    const contentBytes = Buffer.byteLength(value, 'utf8');
+    const header = meta + '\t' + contentBytes.toString(16).padStart(8, '0') + '\n';
+    stream.write(header + value);
   },
 
-  // Add value to stream
+  // Add value to first bundle's stream in length-prefixed protocol format
   addStreamValueToFirstBundle: function (value) {
     if (!sharedExecutionContext.has('stream')) {
-      // Create the stream first if it doesn't exist
       ReactOnRails.getStreamValues();
     }
     const { stream } = sharedExecutionContext.get('stream');
-    stream.write(value);
+    const meta = JSON.stringify({
+      consoleReplayScript: '',
+      hasErrors: false,
+      isShellReady: true,
+      payloadType: 'string',
+    });
+    const contentBytes = Buffer.byteLength(value, 'utf8');
+    const header = meta + '\t' + contentBytes.toString(16).padStart(8, '0') + '\n';
+    stream.write(header + value);
   },
 
   endStream: function () {
