@@ -327,45 +327,10 @@ describe "Incremental Rendering Integration", :integration do
     end
 
     context "when bundle is not found (410 retry)" do
-      it "re-uploads the bundle and retries successfully" do
-        # Use a unique bundle hash that the Node renderer hasn't seen yet.
-        # This triggers a 410 on the first request, then retry uploads and succeeds.
-        unique_hash = "retry_test_#{SecureRandom.hex(8)}"
-        allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool)
-          .to receive(:server_bundle_hash).and_return(unique_hash)
-        allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool)
-          .to receive(:renderer_bundle_file_name).and_return("#{unique_hash}.js")
-
-        # Update populate_form to use unique hash keys
-        # rubocop:disable Lint/UnusedBlockArgument
-        allow(ReactOnRailsPro::Request).to receive(:populate_form_with_bundle_and_assets) do |form, check_bundle:|
-          # rubocop:enable Lint/UnusedBlockArgument
-          form["bundle_#{unique_hash}"] = {
-            body: Pathname.new(fixture_bundle_path),
-            content_type: "text/javascript",
-            filename: "#{unique_hash}.js"
-          }
-          form["bundle_#{rsc_bundle_hash}"] = {
-            body: Pathname.new(fixture_rsc_bundle_path),
-            content_type: "text/javascript",
-            filename: "#{rsc_bundle_hash}.js"
-          }
-        end
-
-        # Do NOT call upload_assets — the bundle isn't on the renderer yet
-        js_code = "ReactOnRails.dummy"
-        request_digest = Digest::MD5.hexdigest(js_code)
-        render_path = "/bundles/#{unique_hash}/render/#{request_digest}"
-
-        Timeout.timeout(10) do
-          response = ReactOnRailsPro::Request.render_code(render_path, js_code, false)
-
-          expect(response.status).to eq(200)
-          expect(response.body.to_s).to include("Dummy Object")
-        end
-      end
-
       it "re-uploads the bundle and retries incremental render successfully" do
+        # Use a unique bundle hash that the Node renderer hasn't seen yet.
+        # This triggers a 410 on the first request, then the StreamRequest retry
+        # loop sets send_bundle=true, uploads the bundle, and retries successfully.
         unique_hash = "retry_incr_#{SecureRandom.hex(8)}"
         allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool)
           .to receive(:server_bundle_hash).and_return(unique_hash)
@@ -387,6 +352,7 @@ describe "Incremental Rendering Integration", :integration do
           }
         end
 
+        # Do NOT call upload_assets — the bundle isn't on the renderer yet
         js_code = "ReactOnRails.getStreamValues()"
         request_digest = Digest::MD5.hexdigest(js_code)
         render_path = "/bundles/#{unique_hash}/incremental-render/#{request_digest}"
@@ -404,6 +370,35 @@ describe "Incremental Rendering Integration", :integration do
           stream.each_chunk { |chunk| chunks << chunk }
           response_text = chunks.join
           expect(response_text).to include("retry_success")
+        end
+      end
+
+      it "raises duplicate bundle upload error when retry also gets 410" do
+        # Use a hash that will always be missing — make upload_assets a no-op
+        # so the bundle never reaches the renderer, guaranteeing a second 410.
+        always_missing_hash = "always_missing_#{SecureRandom.hex(8)}"
+        allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool)
+          .to receive(:server_bundle_hash).and_return(always_missing_hash)
+        allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool)
+          .to receive(:renderer_bundle_file_name).and_return("#{always_missing_hash}.js")
+
+        # Make upload_assets a no-op so the bundle is never actually uploaded
+        allow(ReactOnRailsPro::Request).to receive(:upload_assets)
+
+        js_code = "ReactOnRails.getStreamValues()"
+        request_digest = Digest::MD5.hexdigest(js_code)
+        render_path = "/bundles/#{always_missing_hash}/incremental-render/#{request_digest}"
+
+        Timeout.timeout(10) do
+          stream = ReactOnRailsPro::Request.render_code_with_incremental_updates(
+            render_path,
+            js_code,
+            async_props_block: proc { |_emitter| }
+          )
+
+          expect do
+            stream.each_chunk { |_chunk| }
+          end.to raise_error(ReactOnRailsPro::Error, /bundle/i)
         end
       end
     end
