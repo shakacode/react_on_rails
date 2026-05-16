@@ -298,7 +298,7 @@ describe "Incremental Rendering Integration", :integration do
 
           # barrier.wait re-raises the exception from the async task
           expect do
-            stream.each_chunk { |_chunk| }
+            stream.each_chunk { |_chunk| nil }
           end.to raise_error(StandardError, "something went wrong in the async block")
         end
       end
@@ -320,7 +320,7 @@ describe "Incremental Rendering Integration", :integration do
           )
 
           expect do
-            stream.each_chunk { |_chunk| }
+            stream.each_chunk { |_chunk| nil }
           end.to raise_error(ReactOnRailsPro::Error, /Unexpected identifier/)
         end
       end
@@ -332,10 +332,10 @@ describe "Incremental Rendering Integration", :integration do
         # This triggers a 410 on the first request, then the StreamRequest retry
         # loop sets send_bundle=true, uploads the bundle, and retries successfully.
         unique_hash = "retry_incr_#{SecureRandom.hex(8)}"
-        allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool)
-          .to receive(:server_bundle_hash).and_return(unique_hash)
-        allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool)
-          .to receive(:renderer_bundle_file_name).and_return("#{unique_hash}.js")
+        allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool).to receive_messages(
+          server_bundle_hash: unique_hash,
+          renderer_bundle_file_name: "#{unique_hash}.js"
+        )
 
         # rubocop:disable Lint/UnusedBlockArgument
         allow(ReactOnRailsPro::Request).to receive(:populate_form_with_bundle_and_assets) do |form, check_bundle:|
@@ -377,10 +377,10 @@ describe "Incremental Rendering Integration", :integration do
         # Use a hash that will always be missing — make upload_assets a no-op
         # so the bundle never reaches the renderer, guaranteeing a second 410.
         always_missing_hash = "always_missing_#{SecureRandom.hex(8)}"
-        allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool)
-          .to receive(:server_bundle_hash).and_return(always_missing_hash)
-        allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool)
-          .to receive(:renderer_bundle_file_name).and_return("#{always_missing_hash}.js")
+        allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool).to receive_messages(
+          server_bundle_hash: always_missing_hash,
+          renderer_bundle_file_name: "#{always_missing_hash}.js"
+        )
 
         # Make upload_assets a no-op so the bundle is never actually uploaded
         allow(ReactOnRailsPro::Request).to receive(:upload_assets)
@@ -397,7 +397,7 @@ describe "Incremental Rendering Integration", :integration do
           )
 
           expect do
-            stream.each_chunk { |_chunk| }
+            stream.each_chunk { |_chunk| nil }
           end.to raise_error(ReactOnRailsPro::Error, /bundle/i)
         end
       end
@@ -437,7 +437,7 @@ describe "Incremental Rendering Integration", :integration do
         request_digest = Digest::MD5.hexdigest(js_code)
         render_path = "/bundles/#{server_bundle_hash}/incremental-render/#{request_digest}"
 
-        values = 3.times.map { |i| "PAYLOAD_#{i}_#{'Y' * 18_000}" }
+        values = Array.new(3) { |i| "PAYLOAD_#{i}_#{'Y' * 18_000}" }
 
         Timeout.timeout(15) do
           stream = ReactOnRailsPro::Request.render_code_with_incremental_updates(
@@ -468,7 +468,7 @@ describe "Incremental Rendering Integration", :integration do
 
         Timeout.timeout(15) do
           Sync do
-            3.times.map do |i|
+            Array.new(3) do |i|
               Async do
                 stream = ReactOnRailsPro::Request.render_code_with_incremental_updates(
                   render_path,
@@ -586,7 +586,7 @@ describe "Incremental Rendering Integration", :integration do
             )
 
             expect do
-              stream.each_chunk { |_chunk| }
+              stream.each_chunk { |_chunk| nil }
             end.to raise_error(StandardError, "repeated failure #{i}")
           end
 
@@ -610,7 +610,7 @@ describe "Incremental Rendering Integration", :integration do
             )
 
             expect do
-              stream.each_chunk { |_chunk| }
+              stream.each_chunk { |_chunk| nil }
             end.to raise_error(ReactOnRailsPro::Error, /Unexpected identifier|Unexpected token/)
           end
 
@@ -632,7 +632,7 @@ describe "Incremental Rendering Integration", :integration do
               }
             )
             expect do
-              stream.each_chunk { |_chunk| }
+              stream.each_chunk { |_chunk| nil }
             end.to raise_error(StandardError, "async error #{i}")
           end
 
@@ -648,7 +648,7 @@ describe "Incremental Rendering Integration", :integration do
               async_props_block: proc { |_emitter| }
             )
             expect do
-              stream.each_chunk { |_chunk| }
+              stream.each_chunk { |_chunk| nil }
             end.to raise_error(ReactOnRailsPro::Error, /Unexpected identifier|Unexpected token/)
           end
 

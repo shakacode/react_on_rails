@@ -34,7 +34,7 @@ RSpec.describe ReactOnRailsPro::AsyncPropsEmitter do
       emitter.call("posts", ["Post 1"])
 
       expect(outputs.size).to eq(2)
-      outputs.each { |o| expect(o).to end_with("\n") }
+      expect(outputs).to all(end_with("\n"))
 
       first = JSON.parse(outputs[0].chomp)
       expect(first["updateChunk"]).to include('setProp("users"')

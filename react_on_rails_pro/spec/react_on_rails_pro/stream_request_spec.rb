@@ -139,7 +139,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         response = mock_ok_response(malformed)
 
         expect do
-          request.send(:process_response_chunks, response, error_body) { |_| }
+          request.send(:process_response_chunks, response, error_body) { |_| nil }
         end.to raise_error(ReactOnRails::Error, /missing tab separator/)
       end
 
@@ -148,7 +148,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         response = mock_ok_response(malformed)
 
         expect do
-          request.send(:process_response_chunks, response, error_body) { |_| }
+          request.send(:process_response_chunks, response, error_body) { |_| nil }
         end.to raise_error(ReactOnRails::Error, /Invalid content length hex/)
       end
 
@@ -157,7 +157,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         response = mock_ok_response(malformed)
 
         expect do
-          request.send(:process_response_chunks, response, error_body) { |_| }
+          request.send(:process_response_chunks, response, error_body) { |_| nil }
         end.to raise_error(ReactOnRails::Error, /invalid metadata JSON/)
       end
 
@@ -169,7 +169,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
 
         # Parser enters error state on first chunk
         expect do
-          request.send(:process_response_chunks, response, error_body) { |_| }
+          request.send(:process_response_chunks, response, error_body) { |_| nil }
         end.to raise_error(ReactOnRails::Error)
 
         # New response through a fresh process_response_chunks call would work,
