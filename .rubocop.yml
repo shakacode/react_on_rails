@@ -29,7 +29,7 @@ AllCops:
     - 'spec/fixtures/**/*'
     - 'spec/react_on_rails/dummy-for-generators/**/*'
     # Root-wide RuboCop uses root-relative paths. Keep generated/package-specific
-    # exclusions here so the root sweep does not become stricter than package CI.
+    # exclusions here so the root sweep does not fail on files package CI exempts.
     - 'react_on_rails_pro/spec/dummy/db/schema.rb'
     - '**/vendor/**/*'
 
