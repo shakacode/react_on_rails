@@ -270,6 +270,13 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
 
   private
 
+  # Use the dummy-app-only RSC payload template so the async-props
+  # incremental-rendering path can be exercised in tests without shipping
+  # that scaffolding in the react_on_rails_pro gem's default view.
+  def custom_rsc_payload_template
+    "pages/rsc_payload"
+  end
+
   def read_async_props_from_redis(emitter)
     redis = ::Redis.new
     request_id = params[:request_id]

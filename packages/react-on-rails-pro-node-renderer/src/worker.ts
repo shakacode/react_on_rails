@@ -453,7 +453,6 @@ export default function run(config: Partial<Config>) {
           }
 
           try {
-            log.info(`Received a new update chunk ${JSON.stringify(obj)}`);
             await incrementalSink.add(obj);
           } catch (err) {
             // Log error but don't stop processing

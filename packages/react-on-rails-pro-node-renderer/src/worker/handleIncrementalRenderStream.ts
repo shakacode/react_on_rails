@@ -2,7 +2,6 @@ import { StringDecoder } from 'string_decoder';
 import type { ResponseResult } from '../shared/utils';
 import * as errorReporter from '../shared/errorReporter';
 import { BODY_SIZE_LIMIT, FIELD_SIZE_LIMIT, STREAM_CHUNK_TIMEOUT_MS } from '../shared/constants';
-import log from '../shared/log';
 
 /**
  * Error thrown when waiting for a stream chunk times out.
@@ -95,12 +94,10 @@ export async function handleIncrementalRenderStream(
   let onResponseStartPromise: Promise<void> | null = null;
 
   try {
-    log.debug('Starting to handle incremental render stream');
     for await (const chunk of withChunkTimeout(
       request.raw as AsyncIterable<Buffer>,
       STREAM_CHUNK_TIMEOUT_MS,
     )) {
-      log.debug(`Received chunk of size ${chunk.length}`);
       const chunkBuffer = chunk instanceof Buffer ? chunk : Buffer.from(chunk);
       totalBytesReceived += chunkBuffer.length;
 
@@ -202,17 +199,12 @@ export async function handleIncrementalRenderStream(
           }
         }
       }
-      log.debug('Finished processing current chunk');
     }
-
-    log.debug('Finished reading incremental render stream');
   } catch (err) {
     const error = err instanceof Error ? err : new Error(String(err));
     // Update the error message in place to retain the original stack trace, rather than creating a new error object
     error.message = `Error while handling the request stream: ${error.message}`;
     throw error;
-  } finally {
-    log.debug('Finalizing incremental render stream handling');
   }
 
   // Stream ended normally

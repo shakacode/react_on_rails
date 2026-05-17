@@ -1225,12 +1225,14 @@ describe('worker', () => {
       expect(res.payload).toBe('{"html":"Dummy Object"}');
     });
 
-    // TODO: Implement incremental updates and update this test
-    test('handles multiple NDJSON chunks but only processes first one for now', async () => {
+    test('accepts a multi-chunk NDJSON stream: first chunk renders, later chunks feed the incremental sink', async () => {
       const app = createWorkerApp();
       await uploadBundle(app);
 
-      // Send multiple NDJSON chunks (only first one should be processed for now)
+      // Send a full NDJSON stream: the first chunk is the render request; the
+      // subsequent chunks are forwarded to the incremental sink. With the
+      // `ReactOnRails.dummy` rendering request there is no async-props manager,
+      // so the update chunks are inert and the rendered response is unchanged.
       const firstChunk = createNDJSONPayload({
         gemVersion,
         protocolVersion,
@@ -1260,7 +1262,7 @@ describe('worker', () => {
         })
         .end();
 
-      // Should succeed and only process the first chunk
+      // The whole stream is consumed and the render succeeds.
       expect(res.statusCode).toBe(200);
       expect(res.headers['cache-control']).toBe('public, max-age=31536000');
       expect(res.payload).toBe('{"html":"Dummy Object"}');
