@@ -51,6 +51,7 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     FileUtils.rm_f(path_in_webpack_folder(asset_filename2))
     ENV.delete("RENDERER_SERVER_BUNDLE_CACHE_PATH")
     ENV.delete("RENDERER_BUNDLE_PATH")
+    ReactOnRailsPro::RendererCachePath.send(:reset_deprecation_warned!)
   end
 
   context "when mode is invalid" do

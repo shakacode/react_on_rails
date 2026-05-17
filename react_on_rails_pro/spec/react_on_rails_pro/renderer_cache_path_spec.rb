@@ -40,9 +40,9 @@ module ReactOnRailsPro
       it "returns RENDERER_BUNDLE_PATH verbatim when only the deprecated var is set" do
         ENV["RENDERER_BUNDLE_PATH"] = " /tmp/legacy-cache "
 
-        # Lookahead-based match so the assertion is order-independent: both the
-        # deprecation notice and the whitespace warning must appear, but either
-        # may print first since they come from different code paths.
+        # Both warnings must appear. The whitespace warning currently prints
+        # before the deprecation warning; lookaheads keep this resilient to
+        # future reordering.
         whitespace_warning = Regexp.escape(
           'RENDERER_BUNDLE_PATH has surrounding whitespace and will be used verbatim: " /tmp/legacy-cache "'
         )
