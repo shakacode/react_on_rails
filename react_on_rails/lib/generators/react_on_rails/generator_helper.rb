@@ -97,6 +97,7 @@ module GeneratorHelper
     @pro_gem_installed = Gem.loaded_specs.key?("react_on_rails_pro") || gem_in_lockfile?("react_on_rails_pro")
   end
 
+  # TODO: CQS smell: mark_pro_gem_installed! makes pro_gem_installed? return true before install. See #3303.
   def mark_pro_gem_installed!
     @pro_gem_installed = true
   end

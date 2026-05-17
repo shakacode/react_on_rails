@@ -9,6 +9,7 @@ require_relative "config_path_resolver"
 require_relative "version_syntax_converter"
 require_relative "version_synchronizer"
 require_relative "system_checker"
+require_relative "pro_migration"
 
 begin
   require "rainbow"
@@ -2748,7 +2749,7 @@ module ReactOnRails
       check_pro_initializer_existence
       ensure_rails_environment_loaded
       check_pro_renderer_mode
-      check_base_package_imports
+      check_base_package_references
       check_deprecated_renderer_cache_task
     end
 
@@ -2875,44 +2876,121 @@ module ReactOnRails
     end
 
     # The base 'react-on-rails' npm package is a transitive dependency of 'react-on-rails-pro',
-    # so `import ... from 'react-on-rails'` resolves silently — loading the base package instead
-    # of Pro. Components registered through the base package won't have Pro features (streaming,
-    # caching, RSC), and may cause "component not registered" errors at runtime.
+    # so references to 'react-on-rails' resolve silently, loading the base package instead of Pro.
+    # Components registered through the base package won't have Pro features (streaming, caching,
+    # RSC), and may cause "component not registered" errors at runtime.
     BASE_PACKAGE_IMPORT_PATTERN = %r{\bfrom\s+['"]react-on-rails(?:/[^'"]*)?['"]}
     BASE_PACKAGE_REQUIRE_PATTERN = %r{\brequire\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]\s*\)}
+    BASE_PACKAGE_DYNAMIC_IMPORT_PATTERN = %r{\bimport\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]\s*\)}
+    BASE_PACKAGE_SIDE_EFFECT_IMPORT_PATTERN = %r{^\s*import\s+['"]react-on-rails(?:/[^'"]*)?['"]}
+    BASE_PACKAGE_REFERENCE_SOURCE_ROOTS = ReactOnRails::ProMigration::JS_SOURCE_ROOTS
+    BASE_PACKAGE_REFERENCE_EXTENSIONS = ReactOnRails::ProMigration::JS_SOURCE_EXTENSIONS
+    # Explicit allowlist of documented Jest/Vitest APIs whose first argument is a module specifier.
+    BASE_PACKAGE_JEST_MODULE_SPECIFIER_METHOD_PATTERN =
+      ReactOnRails::ProMigration::JEST_MODULE_SPECIFIER_METHOD_PATTERN
+    BASE_PACKAGE_VITEST_MODULE_SPECIFIER_METHOD_PATTERN =
+      ReactOnRails::ProMigration::VITEST_MODULE_SPECIFIER_METHOD_PATTERN
+    # Match known Jest/Vitest module-specifier helpers. Aliased or nested receivers
+    # are intentionally out of scope to avoid warning on arbitrary application methods.
+    #
+    # importActual/importMock exist only as vi.* methods; there is no
+    # `import { importActual } from 'vitest'` form. The bare branch below is a
+    # deliberately broad detector heuristic (the rewriter omits it because
+    # rewriting is destructive while detection is advisory) and accepts that a
+    # user-defined helper of that name taking a 'react-on-rails' string matches.
+    BASE_PACKAGE_MOCK_PATTERN = %r{
+      \b(?:
+        (?:
+          jest\.(?:#{BASE_PACKAGE_JEST_MODULE_SPECIFIER_METHOD_PATTERN})
+          |
+          vi\.(?:#{BASE_PACKAGE_VITEST_MODULE_SPECIFIER_METHOD_PATTERN})
+        )
+        \s*
+        (?:<[^;\n]*>\s*)?
+        |
+        (?:importActual|importMock)
+      )
+      \s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]
+    }x
+    # In Ruby, ^ matches the start of any line, so this catches declarations anywhere in the file.
+    BASE_PACKAGE_DECLARE_MODULE_PATTERN = %r{^\s*(?:export\s+)?declare\s+module\s+['"]react-on-rails(?:/[^'"]*)?['"]}
+    BASE_PACKAGE_REFERENCE_PATTERNS = [
+      BASE_PACKAGE_IMPORT_PATTERN,
+      BASE_PACKAGE_REQUIRE_PATTERN,
+      BASE_PACKAGE_DYNAMIC_IMPORT_PATTERN,
+      BASE_PACKAGE_SIDE_EFFECT_IMPORT_PATTERN,
+      BASE_PACKAGE_MOCK_PATTERN,
+      BASE_PACKAGE_DECLARE_MODULE_PATTERN
+    ].freeze
 
-    def check_base_package_imports # rubocop:disable Metrics/CyclomaticComplexity
-      source_path = resolve_js_source_path
-      js_extensions = %w[js jsx ts tsx]
-      js_patterns = js_extensions.map { |ext| "#{source_path}/**/*.#{ext}" }
-      files_with_base_import = []
+    def check_base_package_references
+      files_with_base_reference = files_with_base_package_references(resolve_js_source_path)
 
-      js_patterns.each do |pattern|
-        Dir.glob(pattern).each do |file|
-          content = File.read(file)
-          next unless content.match?(BASE_PACKAGE_IMPORT_PATTERN) || content.match?(BASE_PACKAGE_REQUIRE_PATTERN)
-
-          files_with_base_import << file
-        end
-      end
-
-      if files_with_base_import.empty?
-        checker.add_success("✅ No base 'react-on-rails' imports found (Pro package used correctly)")
+      if files_with_base_reference.empty?
+        checker.add_success("✅ No base 'react-on-rails' references found (Pro package used correctly)")
       else
         checker.add_warning(<<~MSG.strip)
-          ⚠️  Found imports from 'react-on-rails' instead of 'react-on-rails-pro':
-          #{files_with_base_import.map { |f| "  • #{f}" }.join("\n")}
+          ⚠️  Found references to 'react-on-rails' instead of 'react-on-rails-pro':
+          #{files_with_base_reference.map { |f| "  • #{f}" }.join("\n")}
 
-          The base package is a transitive dependency of Pro, so these imports resolve
+          Look for static imports, side-effect imports, CommonJS requires, dynamic imports,
+          Jest/Vitest mock helpers, or TypeScript module augmentations.
+          Note: this includes commented-out references; review each file before updating.
+
+          The base package is a transitive dependency of Pro, so these references resolve
           silently but load the base version without Pro features.
 
-          Fix: Update imports to use 'react-on-rails-pro':
-            import ReactOnRails from 'react-on-rails-pro';        // server
-            import ReactOnRails from 'react-on-rails-pro/client';  // client
+          Fix: Replace base-package references with their Pro equivalents:
+            import ReactOnRails from 'react-on-rails-pro';         // ES import (server)
+            import ReactOnRails from 'react-on-rails-pro/client';  // ES import (client)
+            import 'react-on-rails-pro';                           // Side-effect import
+            const ReactOnRails = require('react-on-rails-pro');    // CommonJS require
+            const ReactOnRails = await import('react-on-rails-pro'); // Dynamic import
+            jest.mock('react-on-rails-pro', ...);                  // Jest mock helper
+            vi.mock('react-on-rails-pro', ...);                    // Vitest mock helper
+            declare module 'react-on-rails-pro' { ... }            // TypeScript augmentation
         MSG
       end
     rescue StandardError => e
-      checker.add_warning("⚠️  Could not scan for base package imports: #{e.message}")
+      checker.add_warning("⚠️  Could not scan for base package references: #{e.message}")
+    end
+
+    def files_with_base_package_references(source_path)
+      # Scan every file type the Pro migration rewriter can modify.
+      # **/*.ts naturally matches *.d.ts declaration files because they end in .ts.
+      js_patterns = base_package_reference_source_paths(source_path).flat_map do |source_root|
+        BASE_PACKAGE_REFERENCE_EXTENSIONS.map { |ext| "#{source_root}/**/*.#{ext}" }
+      end
+
+      js_patterns.flat_map do |pattern|
+        Dir.glob(pattern)
+           .reject { |file| file.include?("/node_modules/") }
+           .select { |file| base_package_reference_file?(file) }
+      end.uniq.sort
+    end
+
+    def base_package_reference_source_paths(source_path)
+      ([source_path] + BASE_PACKAGE_REFERENCE_SOURCE_ROOTS)
+        .compact
+        .map(&:to_s)
+        .reject(&:empty?)
+        .uniq
+        .select { |path| Dir.exist?(path) }
+    end
+
+    def base_package_reference_file?(file)
+      content = File.binread(file).force_encoding("UTF-8")
+      return false unless content.valid_encoding?
+
+      base_package_reference?(content)
+    rescue SystemCallError, IOError
+      false
+    end
+
+    def base_package_reference?(content)
+      # Content-based matching intentionally catches comments and string literals
+      # so stale migration references stay visible.
+      BASE_PACKAGE_REFERENCE_PATTERNS.any? { |reference_pattern| content.match?(reference_pattern) }
     end
 
     # ── React Server Components ────────────────────────────────────
