@@ -1,10 +1,6 @@
 # frozen_string_literal: true
 
-# require "English"
-# require "open3"
-# require "rainbow"
-# require "active_support"
-# require "active_support/core_ext/string"
+require "react_on_rails_pro/renderer_cache_path"
 
 module ReactOnRailsPro
   module Utils
@@ -177,55 +173,9 @@ module ReactOnRailsPro
       }
     end
 
-    RENDERER_BUNDLE_PATH_DEPRECATION_MUTEX = Mutex.new
-    private_constant :RENDERER_BUNDLE_PATH_DEPRECATION_MUTEX
-    @renderer_bundle_path_deprecation_warned = false
-
     def self.resolve_renderer_cache_dir
-      preferred = renderer_cache_env_value("RENDERER_SERVER_BUNDLE_CACHE_PATH")
-      return preferred if preferred
-
-      legacy = renderer_cache_env_value("RENDERER_BUNDLE_PATH")
-      if legacy.nil?
-        Rails.root.join(".node-renderer-bundles").to_s
-      else
-        RENDERER_BUNDLE_PATH_DEPRECATION_MUTEX.synchronize do
-          unless @renderer_bundle_path_deprecation_warned
-            warn "[ReactOnRailsPro] RENDERER_BUNDLE_PATH is deprecated. " \
-                 "Use RENDERER_SERVER_BUNDLE_CACHE_PATH instead."
-            @renderer_bundle_path_deprecation_warned = true
-          end
-        end
-        legacy
-      end
+      ReactOnRailsPro::RendererCachePath.resolve
     end
-
-    # Surrounding whitespace is preserved verbatim (Node renderer reads it raw)
-    # but is almost always a misconfigured CI secret — warn so operators notice.
-    #
-    # The two whitespace guards are intentionally asymmetric:
-    #   * Whitespace-only ("  ") raises — there is no valid interpretation, so a
-    #     misconfigured deploy should fail fast rather than silently fall back.
-    #   * Surrounding whitespace ("  /app/bundles  ") only warns — the trimmed
-    #     path could conceivably be intentional, so we let the operator decide
-    #     instead of hard-failing a deploy on a value that might still be usable.
-    def self.renderer_cache_env_value(name)
-      value = ENV.fetch(name, "")
-      raise ReactOnRailsPro::Error, "#{name} is whitespace-only; set or unset it." if value.match?(/\A\s+\z/)
-
-      if value != value.strip
-        warn "[ReactOnRailsPro] #{name} has surrounding whitespace " \
-             "and will be used verbatim: #{value.inspect}"
-      end
-      value.empty? ? nil : value
-    end
-    private_class_method :renderer_cache_env_value
-
-    # :nodoc: Test helper for resetting the one-time deprecation-warning guard.
-    def self.reset_renderer_bundle_path_deprecation_warned!
-      RENDERER_BUNDLE_PATH_DEPRECATION_MUTEX.synchronize { @renderer_bundle_path_deprecation_warned = false }
-    end
-    private_class_method :reset_renderer_bundle_path_deprecation_warned!
 
     def self.mine_type_from_file_name(filename)
       extension = File.extname(filename)
