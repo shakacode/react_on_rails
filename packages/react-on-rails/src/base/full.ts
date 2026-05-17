@@ -4,9 +4,10 @@
  */
 
 import { createBaseClientObject, type BaseClientObjectType } from './client.ts';
-import type { ReactOnRailsInternal, RenderParams, RenderResult, ErrorOptions } from '../types/index.ts';
+import type { ReactOnRailsInternal, RenderParams, ErrorOptions, RenderingError } from '../types/index.ts';
 import handleError from '../handleError.ts';
 import serverRenderReactComponent from '../serverRenderReactComponent.ts';
+import { buildLengthPrefixedResult } from '../serverRenderUtils.ts';
 
 // Warn about bundle size when included in browser bundles
 if (typeof window !== 'undefined') {
@@ -23,7 +24,7 @@ if (typeof window !== 'undefined') {
  */
 export type ReactOnRailsFullSpecificFunctions = Pick<
   ReactOnRailsInternal,
-  'handleError' | 'serverRenderReactComponent'
+  'handleError' | 'serverRenderReactComponent' | 'prepareRenderResult'
 >;
 
 /**
@@ -49,8 +50,20 @@ export function createBaseFullObject(
       return handleError(options);
     },
 
-    serverRenderReactComponent(options: RenderParams): null | string | Promise<RenderResult> {
+    serverRenderReactComponent(options: RenderParams): null | string | Promise<string> {
       return serverRenderReactComponent(options);
+    },
+
+    prepareRenderResult(
+      html: string,
+      consoleReplayScript: string,
+      hasErrors: boolean,
+      renderingError: RenderingError | null,
+    ): string {
+      return buildLengthPrefixedResult(html, consoleReplayScript, {
+        hasErrors,
+        error: renderingError ?? undefined,
+      });
     },
   };
 

@@ -13,5 +13,9 @@ export function createSSRCapability() {
     serverRenderReactComponent() {
       throw new Error('"serverRenderReactComponent" function is not supported in RSC bundle');
     },
+
+    prepareRenderResult() {
+      throw new Error('"prepareRenderResult" function is not supported in RSC bundle');
+    },
   };
 }
