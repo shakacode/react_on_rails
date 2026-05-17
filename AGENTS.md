@@ -182,10 +182,13 @@ For small, focused PRs (roughly 5 files changed or fewer and one clear purpose):
 
 ### Always
 
-- Run the CI-equivalent Ruby lint before committing:
-  `(cd react_on_rails && bundle exec rubocop)`; also run
-  `(cd react_on_rails_pro && bundle exec rubocop --ignore-parent-exclusion)` when touching Pro Ruby or
-  RuboCop config. Root `bundle exec rubocop` is a broad local sweep, not the CI contract.
+- Run the CI-equivalent Ruby lint before committing, not the root `bundle exec rubocop`:
+  ```bash
+  (cd react_on_rails && bundle exec rubocop)
+  # Also run when touching Pro Ruby or RuboCop config:
+  (cd react_on_rails_pro && bundle exec rubocop --ignore-parent-exclusion)
+  ```
+  Root `bundle exec rubocop` is a broad local sweep, not the CI contract.
 - Use `pnpm` for all JS operations — never `npm` or `yarn`
 - Use `bundle exec` for Ruby commands
 - Ensure all files end with a newline
