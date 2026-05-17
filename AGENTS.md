@@ -33,10 +33,15 @@ bundle && pnpm install
 pnpm run build
 
 # Lint (MANDATORY before every commit)
-bundle exec rubocop                  # Ruby — must pass with zero offenses
-pnpm run lint                        # JS/TS via ESLint
-pnpm start format.listDifferent      # Check Prettier formatting
-rake lint                            # All linting (Ruby + JS + formatting)
+cd react_on_rails && bundle exec rubocop                         # OSS Ruby lint — CI-equivalent
+# Pro Ruby lint — CI-equivalent when Pro files or RuboCop config change
+cd react_on_rails_pro && bundle exec rubocop --ignore-parent-exclusion
+pnpm run lint                                                    # JS/TS via ESLint
+pnpm start format.listDifferent                                  # Check Prettier formatting
+rake lint                                                        # All linting (Ruby + JS + formatting)
+
+# Optional Ruby diagnostic from the repo root (not the CI contract)
+bundle exec rubocop
 
 # Auto-fix formatting
 rake autofix                         # Preferred for all formatting
@@ -177,7 +182,10 @@ For small, focused PRs (roughly 5 files changed or fewer and one clear purpose):
 
 ### Always
 
-- Run `bundle exec rubocop` before committing — CI will reject violations
+- Run the CI-equivalent Ruby lint before committing:
+  `cd react_on_rails && bundle exec rubocop`; also run
+  `cd react_on_rails_pro && bundle exec rubocop --ignore-parent-exclusion` when touching Pro Ruby or
+  RuboCop config. Root `bundle exec rubocop` is a broad local sweep, not the CI contract.
 - Use `pnpm` for all JS operations — never `npm` or `yarn`
 - Use `bundle exec` for Ruby commands
 - Ensure all files end with a newline
