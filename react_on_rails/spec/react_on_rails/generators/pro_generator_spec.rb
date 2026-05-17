@@ -482,6 +482,30 @@ describe ProGenerator, type: :generator do
       expect(generator).to have_received(:bundle_install_after_gem_swap)
     end
 
+    it "does not introduce a blank line after a multiline parenthesized declaration" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem(
+          "react_on_rails",
+          "~> 16.0"
+        )
+        gem "rails", "~> 7.1"
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      gemfile_content = File.read(gemfile_path)
+      expect(gemfile_content).to eq(<<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails_pro",
+          "~> 16.0"
+        gem "rails", "~> 7.1"
+      RUBY
+      expect_parseable_ruby(gemfile_content)
+      expect(generator).to have_received(:bundle_install_after_gem_swap)
+    end
+
     it "replaces parenthesized declarations that start on the gem line and continue across lines" do
       simulate_existing_file("Gemfile", <<~RUBY)
         source "https://rubygems.org"
@@ -584,30 +608,34 @@ describe ProGenerator, type: :generator do
       expect(gemfile_content).not_to include("gem(")
     end
 
-    it "leaves base gem entries unchanged when react_on_rails_pro already exists" do
-      original_gemfile = <<~RUBY
+    it "removes the stale base gem entry and runs bundle install when react_on_rails_pro already exists" do
+      simulate_existing_file("Gemfile", <<~RUBY)
         source "https://rubygems.org"
         gem "react_on_rails", "~> 16.0"
         gem "react_on_rails_pro", "~> 16.0"
       RUBY
-      simulate_existing_file("Gemfile", original_gemfile)
       allow(generator).to receive(:bundle_install_after_gem_swap)
       allow(generator).to receive(:say)
 
       generator.send(:swap_base_gem_for_pro_in_gemfile)
 
-      expect(File.read(gemfile_path)).to eq(original_gemfile)
+      gemfile_content = File.read(gemfile_path)
+      expect(gemfile_content).to eq(<<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails_pro", "~> 16.0"
+      RUBY
+      expect_parseable_ruby(gemfile_content)
       expect(generator).to have_received(:say)
         .with(
           "ℹ️  Existing react_on_rails_pro Gemfile entry detected; " \
-          "leaving react_on_rails entries unchanged",
+          "removed the now-stale react_on_rails entries",
           :yellow
         )
-      expect(generator).not_to have_received(:bundle_install_after_gem_swap)
+      expect(generator).to have_received(:bundle_install_after_gem_swap)
     end
 
-    it "leaves base gem entries unchanged when existing parenthesized pro declaration has comment lines" do
-      original_gemfile = <<~RUBY
+    it "removes the stale base gem and bundles when a parenthesized pro declaration has comment lines" do
+      simulate_existing_file("Gemfile", <<~RUBY)
         source "https://rubygems.org"
         gem "react_on_rails", "~> 16.0"
         gem(
@@ -616,20 +644,28 @@ describe ProGenerator, type: :generator do
           "~> 16.0"
         )
       RUBY
-      simulate_existing_file("Gemfile", original_gemfile)
       allow(generator).to receive(:bundle_install_after_gem_swap)
       allow(generator).to receive(:say)
 
       generator.send(:swap_base_gem_for_pro_in_gemfile)
 
-      expect(File.read(gemfile_path)).to eq(original_gemfile)
+      gemfile_content = File.read(gemfile_path)
+      expect(gemfile_content).to eq(<<~RUBY)
+        source "https://rubygems.org"
+        gem(
+          # pinned for compatibility
+          "react_on_rails_pro",
+          "~> 16.0"
+        )
+      RUBY
+      expect_parseable_ruby(gemfile_content)
       expect(generator).to have_received(:say)
         .with(
           "ℹ️  Existing react_on_rails_pro Gemfile entry detected; " \
-          "leaving react_on_rails entries unchanged",
+          "removed the now-stale react_on_rails entries",
           :yellow
         )
-      expect(generator).not_to have_received(:bundle_install_after_gem_swap)
+      expect(generator).to have_received(:bundle_install_after_gem_swap)
     end
 
     it "replaces duplicate base gem declarations without dropping grouped declarations" do
@@ -637,7 +673,7 @@ describe ProGenerator, type: :generator do
         source "https://rubygems.org"
         gem "react_on_rails", "~> 16.0"
         group :test do
-          gem "react_on_rails", require: false
+          gem "react_on_rails", "~> 16.0", require: false
         end
       RUBY
       allow(generator).to receive(:bundle_install_after_gem_swap)
@@ -645,12 +681,11 @@ describe ProGenerator, type: :generator do
       generator.send(:swap_base_gem_for_pro_in_gemfile)
 
       gemfile_content = File.read(gemfile_path)
-      expected_version = generator.send(:pro_gem_version_requirement)
       expect(gemfile_content).to eq(<<~RUBY)
         source "https://rubygems.org"
         gem "react_on_rails_pro", "~> 16.0"
         group :test do
-          gem "react_on_rails_pro", "#{expected_version}", require: false
+          gem "react_on_rails_pro", "~> 16.0", require: false
         end
       RUBY
       expect_parseable_ruby(gemfile_content)
