@@ -79,6 +79,9 @@ deferred routes.
 
 ## Behavioral contract
 
+The table below describes the Phase 1 contract. Later phases preserve the same payload-skipping invariant and
+add narrower behavior on top of it.
+
 | Scenario      | Server render                    | First browser hydration render   | After mount                                | Embedded RSC payload                          |
 | ------------- | -------------------------------- | -------------------------------- | ------------------------------------------ | --------------------------------------------- |
 | `ssr` omitted | Current behavior                 | Current behavior                 | Current behavior                           | Current behavior                              |
@@ -227,9 +230,10 @@ server-side throw under `Suspense` as an intentional server bailout and retrying
 Pro currently treats server renderer errors as render errors. Supporting server-rendered fallback HTML for this
 specific opt-out requires classifying that bailout separately from real render failures.
 
-Phase 2 adds server-rendered Suspense fallback HTML for deferred routes. Keeping this in a separate phase keeps
-Phase 1 focused on the payload-skipping contract and avoids mixing stream error classification changes into the
-initial implementation.
+Phase 2 replaces the Phase 1 server-side `return null` behavior for deferred routes covered by a Suspense
+boundary. Instead of returning no HTML for that route, the server triggers a classified intentional bailout so
+React can emit the Suspense fallback without treating the render as a real SSR failure. The payload-skipping
+invariant remains the same: the deferred RSC payload is not generated during SSR.
 
 This does not block client-side loading UI in Phase 1. Users can still wrap the deferred route in `Suspense`,
 and the loading UI appears while the route resolves after mount.
@@ -258,8 +262,10 @@ Issue #3101 also calls out components rendered through `react_component` rather 
 There are two separate cases.
 
 When `react_component` is used with `prerender: false`, the root is already client-rendered. In that mode, no
-server RSC payload is generated during the initial response. `RSCRoute ssr={false}` only controls when the
-browser enters the RSC provider path.
+server RSC payload is generated during the initial response. Phase 1 keeps `ssr={false}` semantics consistent
+across render modes: the route still waits until after mount before entering the RSC provider path. This adds a
+brief blank first render in client-only roots, but avoids adding a render-mode-specific branch before the core
+feature is in place.
 
 When `react_component` is used with `prerender: true`, the current server-side RSC renderer helper validates
 streaming capabilities before the child component tree renders. That means an `RSCRoute ssr={false}` cannot by
@@ -273,9 +279,12 @@ server-rendered RSC usage. That belongs to the non-streaming helper phase, not P
 ## Implementation phases
 
 The production work is split into phases so each behavior can be built, reviewed, and tested independently. All
-phases are part of the target implementation for issue #3101.
+phases are part of the target implementation for issue #3101. The phases identify implementation modes and
+review boundaries; they do not mean every later phase is a small additive patch on the previous phase.
 
-### Phase 1: `RSCRoute` API and timing
+### Phase 1: core deferred-route behavior
+
+#### `RSCRoute` API and timing
 
 - Add `ssr?: boolean` to `RSCRouteProps`.
 - Default `ssr` to `true`.
@@ -283,21 +292,21 @@ phases are part of the target implementation for issue #3101.
 - Return no content before provider-dependent work when `ssr={false}` and the route has not mounted.
 - Move provider-dependent work into a child component so hooks remain unconditional within each component.
 
-### Phase 1: existing provider path after mount
+#### Existing provider path after mount
 
 - Keep using `useRSC().getComponent(componentName, componentProps)` after the route is allowed to render.
 - Keep using `PromiseWrapper` to consume the RSC promise.
 - Keep using `RSCRouteErrorBoundary` to preserve `ServerComponentFetchError` behavior.
 - Avoid adding custom fetch/caching logic inside `RSCRoute`.
 
-### Phase 1: tests
+#### Tests
 
 - Add focused unit coverage for the `RSCRoute` timing and provider behavior.
 - Add integration coverage for embedded payload absence and eventual client render when appropriate.
 - Assert behavior through injected provider/server-loader seams where possible instead of relying on brittle
   implementation details.
 
-### Phase 1: documentation
+#### Documentation
 
 - Update the Pro RSC documentation for the new prop, usage examples, tradeoffs, and retry behavior.
 
@@ -377,7 +386,7 @@ Phase 1 establishes the core contract: `RSCRoute ssr={false}` skips server paylo
 stable, resolves through the existing provider path after mount, preserves error/retry behavior, and documents
 the prop.
 
-Phases 2-4 build on that contract without replacing it:
+Phases 2-4 preserve the payload-skipping goal while changing or expanding specific mechanics:
 
 - Phase 2 adds server-rendered Suspense fallback HTML through classified intentional server bailout handling.
 - Phase 3 adds automatic root-level RSC provider setup for `RSCRoute ssr={false}` in trees that do not
