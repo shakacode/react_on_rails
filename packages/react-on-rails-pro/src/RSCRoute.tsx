@@ -17,7 +17,7 @@
 'use client';
 
 import * as React from 'react';
-import { Component, use, type ReactNode } from 'react';
+import { Component, use, useEffect, useState, type ReactNode } from 'react';
 import { useRSC } from './RSCProvider.tsx';
 import { ServerComponentFetchError } from './ServerComponentFetchError.ts';
 
@@ -59,6 +59,9 @@ class RSCRouteErrorBoundary extends Component<
  * 2. During hydration - Uses the embedded RSC payload already in the page
  * 3. During client navigation - Fetches the RSC payload via HTTP
  *
+ * Pass ssr={false} to skip route content during the initial server render and first hydration render.
+ * After mount, the route resolves through the same RSC provider path used by the default ssr={true} mode.
+ *
  * @example
  * ```tsx
  * <RSCRoute componentName="MyServerComponent" componentProps={{ user }} />
@@ -74,6 +77,7 @@ class RSCRouteErrorBoundary extends Component<
 export type RSCRouteProps = {
   componentName: string;
   componentProps: unknown;
+  ssr?: boolean;
 };
 
 const PromiseWrapper = ({ promise }: { promise: Promise<ReactNode> }) => {
@@ -89,7 +93,7 @@ const PromiseWrapper = ({ promise }: { promise: Promise<ReactNode> }) => {
   return promiseResult;
 };
 
-const RSCRoute = ({ componentName, componentProps }: RSCRouteProps): ReactNode => {
+const RSCRouteContent = ({ componentName, componentProps }: Omit<RSCRouteProps, 'ssr'>): ReactNode => {
   const { getComponent } = useRSC();
   const componentPromise = getComponent(componentName, componentProps);
   return (
@@ -97,6 +101,28 @@ const RSCRoute = ({ componentName, componentProps }: RSCRouteProps): ReactNode =
       <PromiseWrapper promise={componentPromise} />
     </RSCRouteErrorBoundary>
   );
+};
+
+const DeferredUntilMounted = ({ children }: { children: ReactNode }): ReactNode => {
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  return isMounted ? children : null;
+};
+
+const RSCRoute = ({ componentName, componentProps, ssr = true }: RSCRouteProps): ReactNode => {
+  if (!ssr) {
+    return (
+      <DeferredUntilMounted>
+        <RSCRouteContent componentName={componentName} componentProps={componentProps} />
+      </DeferredUntilMounted>
+    );
+  }
+
+  return <RSCRouteContent componentName={componentName} componentProps={componentProps} />;
 };
 
 export default RSCRoute;
