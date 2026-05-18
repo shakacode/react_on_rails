@@ -166,7 +166,7 @@ points both commands at the helper script.
 ```ruby
 ReactOnRails.configure do |config|
   # Build commands should include all necessary steps
-  config.build_test_command = "yarn res:build && RAILS_ENV=test NODE_ENV=test bin/shakapacker"
+  config.build_test_command = "yarn res:build && RAILS_ENV=test bin/shakapacker"
   config.build_production_command = "yarn res:build && RAILS_ENV=production NODE_ENV=production bin/shakapacker"
 end
 ```
@@ -203,7 +203,7 @@ end
 # Rails application root, so the relative path resolves correctly. Add shared steps above, not inside the case blocks.
 case mode
 when "test"
-  env = { "RAILS_ENV" => "test", "NODE_ENV" => "test" }
+  env = { "RAILS_ENV" => "test" }
   system(env, RbConfig.ruby, "bin/shakapacker") || abort("shakapacker (test) failed")
 when "production"
   env = { "RAILS_ENV" => "production", "NODE_ENV" => "production" }

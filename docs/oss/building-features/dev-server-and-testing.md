@@ -34,7 +34,7 @@ Configure TestHelper once, and Capybara tests work with any `bin/dev` mode — o
 ```ruby
 # config/initializers/react_on_rails.rb
 ReactOnRails.configure do |config|
-  config.build_test_command = "RAILS_ENV=test NODE_ENV=test bin/shakapacker"
+  config.build_test_command = "RAILS_ENV=test bin/shakapacker"
 end
 ```
 
@@ -132,7 +132,7 @@ bundle exec rspec   # TestHelper runs build_test_command if assets are stale
 Or precompile explicitly for faster parallel runs:
 
 ```bash
-RAILS_ENV=test NODE_ENV=test bin/shakapacker
+RAILS_ENV=test bin/shakapacker
 bundle exec rspec
 ```
 
@@ -175,7 +175,7 @@ end
 ```ruby
 ReactOnRails.configure do |config|
   # Command to compile test assets. Runs automatically when assets are stale.
-  config.build_test_command = "RAILS_ENV=test NODE_ENV=test bin/shakapacker"
+  config.build_test_command = "RAILS_ENV=test bin/shakapacker"
 
   # Files to check when determining if assets are stale (default: manifest.json)
   # config.webpack_generated_files = %w(manifest.json)
@@ -242,7 +242,7 @@ You are using the React on Rails test helper (configure_rspec_to_compile_assets
 or ensure_assets_compiled), but config.build_test_command is not set.
 ```
 
-**Fix:** Add `config.build_test_command = "RAILS_ENV=test NODE_ENV=test bin/shakapacker"` to `config/initializers/react_on_rails.rb`, or switch to `compile: true` in `shakapacker.yml` and remove the TestHelper calls.
+**Fix:** Add `config.build_test_command = "RAILS_ENV=test bin/shakapacker"` to `config/initializers/react_on_rails.rb`, or switch to `compile: true` in `shakapacker.yml` and remove the TestHelper calls.
 
 ### `React on Rails: Stale test assets detected`
 
@@ -250,7 +250,7 @@ or ensure_assets_compiled), but config.build_test_command is not set.
 React on Rails: Stale test assets detected:
   public/webpack/test/manifest.json
 
-Compiling with: `RAILS_ENV=test NODE_ENV=test bin/shakapacker`
+Compiling with: `RAILS_ENV=test bin/shakapacker`
 ```
 
 This is informational — compilation starts automatically. To skip the wait, run `bin/dev static` or `bin/dev test-watch` in another terminal.
@@ -272,7 +272,7 @@ React on Rails: Error building webpack assets!
 The build_test_command failed. This means test assets could not be compiled.
 ```
 
-**Fix:** Check the build output above this message for the actual webpack error. Quick workaround: `bin/dev static` or `RAILS_ENV=test NODE_ENV=test bin/shakapacker` to compile manually.
+**Fix:** Check the build output above this message for the actual webpack error. Quick workaround: `bin/dev static` or `RAILS_ENV=test bin/shakapacker` to compile manually.
 
 ### Blank pages in Capybara system tests (no Ruby error)
 
@@ -287,7 +287,7 @@ Shakapacker::Manifest::MissingEntryError: Shakapacker can't find application.js 
 /path/to/public/webpack/test/manifest.json
 ```
 
-No assets have been compiled at all. **Fix:** Wire up TestHelper (see [Test Helper Configuration](#test-helper-configuration)), or compile manually: `RAILS_ENV=test NODE_ENV=test bin/shakapacker`.
+No assets have been compiled at all. **Fix:** Wire up TestHelper (see [Test Helper Configuration](#test-helper-configuration)), or compile manually: `RAILS_ENV=test bin/shakapacker`.
 
 ## How It Works Under the Hood
 
