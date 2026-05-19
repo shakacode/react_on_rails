@@ -36,8 +36,8 @@ module ReactOnRailsPro
                 "rendering any RSC payload."
         end
 
-        first_chunk_warn_callback = ->(request_time) { warn_if_slow_streaming_first_chunk(path, request_time) }
-        ReactOnRailsPro::StreamRequest.create(first_chunk_warn_callback: first_chunk_warn_callback) do |send_bundle, _barrier|
+        warn_cb = ->(request_time) { warn_if_slow_streaming_first_chunk(path, request_time) }
+        ReactOnRailsPro::StreamRequest.create(first_chunk_warn_callback: warn_cb) do |send_bundle, _barrier|
           if send_bundle
             Rails.logger.info { "[ReactOnRailsPro] Sending bundle to the node renderer" }
             upload_assets
@@ -79,8 +79,8 @@ module ReactOnRailsPro
 
         pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
 
-        first_chunk_warn_callback = ->(request_time) { warn_if_slow_streaming_first_chunk(path, request_time) }
-        ReactOnRailsPro::StreamRequest.create(first_chunk_warn_callback: first_chunk_warn_callback) do |send_bundle, barrier|
+        warn_cb = ->(request_time) { warn_if_slow_streaming_first_chunk(path, request_time) }
+        ReactOnRailsPro::StreamRequest.create(first_chunk_warn_callback: warn_cb) do |send_bundle, barrier|
           if send_bundle
             Rails.logger.info { "[ReactOnRailsPro] Sending bundle to the node renderer" }
             upload_assets
