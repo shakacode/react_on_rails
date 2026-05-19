@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "base64"
+require "json"
 require "jwt"
 require_relative "spec_helper"
 
@@ -125,6 +127,27 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         wrong_key = OpenSSL::PKey::RSA.new(2048)
         invalid_token = JWT.encode(valid_payload, wrong_key, "RS256")
         ENV["REACT_ON_RAILS_PRO_LICENSE"] = invalid_token
+      end
+
+      it "returns :invalid" do
+        expect(described_class.license_status).to eq(:invalid)
+      end
+    end
+
+    context "with HMAC token signed using an empty key" do
+      let(:empty_key_hmac_token) do
+        header = Base64.urlsafe_encode64({ alg: "HS256", typ: "JWT" }.to_json, padding: false)
+        payload = Base64.urlsafe_encode64({ test: true }.to_json, padding: false)
+        signature = Base64.urlsafe_encode64(
+          OpenSSL::HMAC.digest("SHA256", "", "#{header}.#{payload}"),
+          padding: false
+        )
+
+        [header, payload, signature].join(".")
+      end
+
+      before do
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = empty_key_hmac_token
       end
 
       it "returns :invalid" do
