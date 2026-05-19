@@ -31,6 +31,13 @@ describe "Incremental Rendering Integration", :integration do
   let(:rsc_bundle_hash) { "test_incremental_rsc_bundle" }
 
   before do
+    # WebMock's async-http adapter intercepts every request and reads the entire
+    # request body to build a signature (build_request_signature calls request.read).
+    # For bidirectional HTTP/2 streams, the request body is a Writable that is filled
+    # concurrently — reading it eagerly deadlocks. Disable the adapter so requests
+    # go straight to the real async-http client.
+    WebMock::HttpLibAdapters::AsyncHttpClientAdapter.disable!
+
     allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool).to receive_messages(
       server_bundle_hash: server_bundle_hash,
       rsc_bundle_hash: rsc_bundle_hash,
@@ -97,6 +104,7 @@ describe "Incremental Rendering Integration", :integration do
 
   after do
     ReactOnRailsPro::Request.reset_connection
+    WebMock::HttpLibAdapters::AsyncHttpClientAdapter.enable!
   end
 
   describe "upload_assets" do
