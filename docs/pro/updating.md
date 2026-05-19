@@ -379,6 +379,39 @@ If you only use ExecJS for SSR (the default), you do not need `react-on-rails-pr
 
 ### Additional Upgrade Notes
 
+#### Upgrading to a version with the async-http node renderer client
+
+React on Rails Pro now uses `async-http` instead of HTTPX for Rails-to-node-renderer requests.
+This affects render, streaming render, and asset upload requests.
+
+Before upgrading:
+
+- Run Ruby 3.3 or newer. The `async-http` dependency requires Ruby 3.3+.
+- Keep the transitive `io-endpoint` gem in the 0.17.x range when updating `async-http`. Do not run
+  `bundle update async-http` without checking that `io-endpoint` remains compatible; the Pro client fails fast at boot
+  if `IO::Endpoint::Wrapper` internals change in a later `io-endpoint` release.
+- Remove direct application assumptions about HTTPX-specific response or error classes in Pro renderer request paths.
+- Keep `config.ssr_timeout` sized for the full renderer request. With the async-http client, this timeout bounds
+  connect, request write, and response streaming time.
+- Treat `config.renderer_http_pool_timeout` as the TCP connect timeout. After the socket connects, renderer work is
+  still bounded by `ssr_timeout`.
+- Treat `config.renderer_http_pool_size` as a per-request HTTP/2 stream limit, not as a persistent process-wide
+  connection pool size. The current async-http adapter opens a request-scoped client for each renderer request and
+  does not reuse TCP connections between Rails requests, so high-latency networks or very high request rates can see
+  extra connection and HTTP/2 handshake overhead compared with HTTPX. Setting this value now emits a warning to make
+  the changed meaning visible during upgrades. Setting it to `nil` keeps the default stream limit; it does not make
+  the request-scoped async-http client unlimited. Persistent async-http connection reuse is tracked in
+  [Issue 3283](https://github.com/shakacode/react_on_rails/issues/3283).
+- Expect renderer connection drops to surface immediately as `ReactOnRailsPro::Error`/connection failures. HTTPX
+  previously performed one implicit transport retry for some connection drops; the async-http adapter uses
+  `retries: 0` and leaves retry policy to the existing bundle-upload retry loop and caller behavior.
+- Run the node renderer client from the normal synchronous Rails request path. Async Rails servers or middleware that
+  call the renderer from inside an existing Async reactor without an `Async::Task.current?` context are not currently
+  supported because the sync fallback may create a nested reactor. Keep Falcon/async-rails deployments on the previous
+  HTTPX renderer client until this support is explicitly added.
+- `config.renderer_http_keep_alive_timeout` remains accepted for compatibility, but it has no effect because
+  async-http clients are currently scoped to individual requests. Setting it now emits a deprecation warning.
+
 #### Upgrading to 16.4.0 or later
 
 ##### JWT gem requirement
