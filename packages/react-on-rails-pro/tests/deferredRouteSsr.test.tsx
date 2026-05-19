@@ -11,7 +11,7 @@ import {
 import RSCRoute from '../src/RSCRoute.tsx';
 import { isServerComponentFetchError } from '../src/ServerComponentFetchError.ts';
 
-class CapturingErrorBoundary extends React.Component<
+class TestErrorBoundary extends React.Component<
   {
     children: React.ReactNode;
     onError?: (error: Error) => void;
@@ -218,7 +218,7 @@ describe('RSCRoute deferred SSR behavior', () => {
       await act(async () => {
         root?.render(
           <RSCProvider>
-            <CapturingErrorBoundary
+            <TestErrorBoundary
               onError={(error) => {
                 capturedError = error;
               }}
@@ -226,7 +226,7 @@ describe('RSCRoute deferred SSR behavior', () => {
               <React.Suspense fallback={<div>Loading deferred route...</div>}>
                 <RSCRoute componentName="DeferredRoute" componentProps={{ id: 1 }} ssr={false} />
               </React.Suspense>
-            </CapturingErrorBoundary>
+            </TestErrorBoundary>
           </RSCProvider>,
         );
         await Promise.resolve();
@@ -288,11 +288,11 @@ describe('RSCRoute deferred SSR behavior', () => {
       await act(async () => {
         root?.render(
           <RSCProvider>
-            <CapturingErrorBoundary fallback={(fallbackProps) => <RetryFallback {...fallbackProps} />}>
+            <TestErrorBoundary fallback={(fallbackProps) => <RetryFallback {...fallbackProps} />}>
               <React.Suspense fallback={<div>Loading deferred route...</div>}>
                 <RSCRoute componentName="DeferredRoute" componentProps={{ id: 1 }} ssr={false} />
               </React.Suspense>
-            </CapturingErrorBoundary>
+            </TestErrorBoundary>
           </RSCProvider>,
         );
         await Promise.resolve();
