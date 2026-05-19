@@ -3,7 +3,7 @@ import * as React from 'react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
-import { createRSCProvider } from '../src/RSCProvider.tsx';
+import { createRSCProvider, useRSC } from '../src/RSCProvider.tsx';
 import {
   isRSCRouteSSRFalseBailoutError,
   RSCRouteSSRFalseBailoutError,
@@ -12,29 +12,64 @@ import RSCRoute from '../src/RSCRoute.tsx';
 import { isServerComponentFetchError } from '../src/ServerComponentFetchError.ts';
 
 class CapturingErrorBoundary extends React.Component<
-  { children: React.ReactNode; onError: (error: Error) => void },
-  { hasError: boolean }
+  {
+    children: React.ReactNode;
+    onError?: (error: Error) => void;
+    fallback?: (props: { error: Error; resetErrorBoundary: () => void }) => React.ReactNode;
+  },
+  { error: Error | null }
 > {
-  constructor(props: { children: React.ReactNode; onError: (error: Error) => void }) {
+  constructor(props: {
+    children: React.ReactNode;
+    onError?: (error: Error) => void;
+    fallback?: (props: { error: Error; resetErrorBoundary: () => void }) => React.ReactNode;
+  }) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { error: null };
   }
 
-  static getDerivedStateFromError() {
-    return { hasError: true };
+  static getDerivedStateFromError(error: Error) {
+    return { error };
   }
 
   componentDidCatch(error: Error) {
-    this.props.onError(error);
+    this.props.onError?.(error);
   }
+
+  resetErrorBoundary = () => {
+    this.setState({ error: null });
+  };
 
   render() {
-    const { children } = this.props;
-    const { hasError } = this.state;
+    const { children, fallback } = this.props;
+    const { error } = this.state;
 
-    return hasError ? null : children;
+    return error ? (fallback?.({ error, resetErrorBoundary: this.resetErrorBoundary }) ?? null) : children;
   }
 }
+
+const RetryFallback = ({ error, resetErrorBoundary }: { error: Error; resetErrorBoundary: () => void }) => {
+  const { refetchComponent } = useRSC();
+
+  if (!isServerComponentFetchError(error)) {
+    throw error;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void refetchComponent(error.serverComponentName, error.serverComponentProps)
+          .catch(() => undefined)
+          .finally(() => {
+            resetErrorBoundary();
+          });
+      }}
+    >
+      Retry deferred route
+    </button>
+  );
+};
 
 const renderRouteToString = (props: Partial<React.ComponentProps<typeof RSCRoute>> = {}) =>
   renderToString(<RSCRoute componentName="DeferredRoute" componentProps={{ id: 1 }} {...props} />);
@@ -215,6 +250,84 @@ describe('RSCRoute deferred SSR behavior', () => {
       expect(capturedError.serverComponentName).toBe('DeferredRoute');
       expect(capturedError.serverComponentProps).toEqual({ id: 1 });
       expect(capturedError.originalError).toBe(payloadError);
+    } finally {
+      const mountedRoot = root;
+      try {
+        if (mountedRoot) {
+          await act(async () => {
+            mountedRoot.unmount();
+            await Promise.resolve();
+          });
+        }
+        container.remove();
+      } finally {
+        consoleErrorSpy.mockRestore();
+      }
+    }
+  });
+
+  it('allows an error boundary fallback to refetch and render recovered content', async () => {
+    let rejectPayload: ((error: Error) => void) | undefined;
+    const payloadPromise = new Promise<React.ReactNode>((_resolve, reject) => {
+      rejectPayload = reject;
+    });
+    let requestCount = 0;
+    const getServerComponent = jest.fn((): Promise<React.ReactNode> => {
+      requestCount += 1;
+      return requestCount === 1 ? payloadPromise : Promise.resolve(<div>Recovered deferred route</div>);
+    });
+    const RSCProvider = createRSCProvider({ getServerComponent });
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    let root: Root | undefined;
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    try {
+      root = createRoot(container);
+
+      await act(async () => {
+        root?.render(
+          <RSCProvider>
+            <CapturingErrorBoundary fallback={(fallbackProps) => <RetryFallback {...fallbackProps} />}>
+              <React.Suspense fallback={<div>Loading deferred route...</div>}>
+                <RSCRoute componentName="DeferredRoute" componentProps={{ id: 1 }} ssr={false} />
+              </React.Suspense>
+            </CapturingErrorBoundary>
+          </RSCProvider>,
+        );
+        await Promise.resolve();
+      });
+
+      expect(getServerComponent).toHaveBeenCalledTimes(1);
+      expect(getServerComponent).toHaveBeenNthCalledWith(1, {
+        componentName: 'DeferredRoute',
+        componentProps: { id: 1 },
+      });
+
+      await act(async () => {
+        rejectPayload?.(new Error('payload failed before retry'));
+        await payloadPromise.catch(() => undefined);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      const retryButton = container.querySelector('button');
+      expect(retryButton?.textContent).toBe('Retry deferred route');
+
+      await act(async () => {
+        retryButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(getServerComponent).toHaveBeenCalledTimes(2);
+      expect(getServerComponent).toHaveBeenNthCalledWith(2, {
+        componentName: 'DeferredRoute',
+        componentProps: { id: 1 },
+        enforceRefetch: true,
+      });
+      expect(container.textContent).toContain('Recovered deferred route');
+      expect(container.textContent).not.toContain('Retry deferred route');
     } finally {
       const mountedRoot = root;
       try {
