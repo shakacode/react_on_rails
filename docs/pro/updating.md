@@ -241,7 +241,7 @@ If you only use ExecJS for SSR (the default), you do not need `react-on-rails-pr
 
 ##### JWT gem requirement
 
-`react_on_rails_pro` 16.4.0 tightened the `jwt` gem requirement to `~> 2.7`. If your Gemfile pins `jwt` to an older version (e.g., `2.2.x` for compatibility with OAuth gems), you will need to upgrade it. Check for conflicts with:
+`react_on_rails_pro` uses `jwt` for offline license validation. Current versions require `jwt >= 3.2.0`. If your Gemfile pins `jwt` to an older version (e.g., `2.2.x` for compatibility with OAuth gems), you will need to upgrade it. Check for conflicts with:
 
 ```bash
 bundle update jwt

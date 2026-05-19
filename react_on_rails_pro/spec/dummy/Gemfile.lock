@@ -27,7 +27,7 @@ PATH
       execjs (~> 2.9)
       http-2 (>= 1.1.1)
       httpx (>= 1.7.0)
-      jwt (~> 2.7)
+      jwt (>= 3.2.0)
       rainbow
       react_on_rails (= 16.6.0)
 
@@ -211,7 +211,7 @@ GEM
       railties (>= 4.2.0)
       thor (>= 0.14, < 2.0)
     json (2.7.2)
-    jwt (2.9.3)
+    jwt (3.2.0)
       base64
     language_server-protocol (3.17.0.5)
     launchy (3.0.1)
