@@ -135,11 +135,20 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
     end
 
     # Regression coverage for https://github.com/shakacode/react_on_rails/issues/3321.
-    # Real Pro licenses are RS256, so an HS256 token signed with an empty HMAC key must be rejected.
+    # Real Pro licenses are RS256, so an otherwise valid HS256 token signed with an empty HMAC key must be
+    # rejected during JWT verification, not later during license-field validation.
     context "with HMAC token signed using an empty key" do
       let(:empty_key_hmac_token) do
+        synthetic_payload = {
+          sub: "synthetic@example.invalid",
+          iat: Time.now.to_i,
+          exp: Time.now.to_i + 3600,
+          plan: "paid",
+          org: "Synthetic Test Org"
+        }
+
         header = Base64.urlsafe_encode64({ alg: "HS256", typ: "JWT" }.to_json, padding: false)
-        payload = Base64.urlsafe_encode64({ test: true }.to_json, padding: false)
+        payload = Base64.urlsafe_encode64(synthetic_payload.to_json, padding: false)
         signature = Base64.urlsafe_encode64(
           OpenSSL::HMAC.digest("SHA256", "", "#{header}.#{payload}"),
           padding: false
