@@ -53,6 +53,11 @@ export default function App({ basePath = '/server_router', ...props }: { basePat
           <li>
             <Link to={`${basePath}/async-props-component`}>Async Props Component</Link>
           </li>
+          <li>
+            <Link to={`${basePath}/mixed-ssr-and-deferred-server-components`}>
+              Mixed SSR and Deferred Server Components
+            </Link>
+          </li>
         </ul>
       </nav>
       <Suspense fallback={<div>Loading Page...</div>}>
@@ -100,6 +105,21 @@ export default function App({ basePath = '/server_router', ...props }: { basePat
           <Route
             path={`${basePath}/async-props-component-for-testing`}
             element={<RSCRoute componentName="AsyncPropsComponentForTesting" componentProps={props} />}
+          />
+          <Route
+            path={`${basePath}/mixed-ssr-and-deferred-server-components`}
+            element={
+              <section data-testid="mixed-rsc-route-page">
+                <h1>Mixed RSC route shell before</h1>
+                <RSCRoute componentName="MyServerComponent" componentProps={{}} />
+                <Suspense
+                  fallback={<aside data-testid="deferred-rsc-route-fallback">Deferred route loading</aside>}
+                >
+                  <RSCRoute componentName="SimpleComponent" componentProps={{}} ssr={false} />
+                </Suspense>
+                <footer>Mixed RSC route shell after</footer>
+              </section>
+            }
           />
         </Routes>
       </Suspense>

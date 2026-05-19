@@ -4,6 +4,10 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import { createRSCProvider } from '../src/RSCProvider.tsx';
+import {
+  isRSCRouteSSRFalseBailoutError,
+  RSCRouteSSRFalseBailoutError,
+} from '../src/RSCRouteSSRFalseBailoutError.ts';
 import RSCRoute from '../src/RSCRoute.tsx';
 import { isServerComponentFetchError } from '../src/ServerComponentFetchError.ts';
 
@@ -35,13 +39,38 @@ class CapturingErrorBoundary extends React.Component<
 const renderRouteToString = (props: Partial<React.ComponentProps<typeof RSCRoute>> = {}) =>
   renderToString(<RSCRoute componentName="DeferredRoute" componentProps={{ id: 1 }} {...props} />);
 
+const runWithoutWindow = <T,>(callback: () => T): T => {
+  const originalWindowDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: undefined });
+
+  try {
+    return callback();
+  } finally {
+    if (originalWindowDescriptor) {
+      Object.defineProperty(globalThis, 'window', originalWindowDescriptor);
+    } else {
+      Reflect.deleteProperty(globalThis, 'window');
+    }
+  }
+};
+
 describe('RSCRoute deferred SSR behavior', () => {
-  it('returns empty server output when ssr is false', () => {
-    expect(renderRouteToString({ ssr: false })).toBe('');
+  it('throws a classified server bailout when ssr is false on the server', () => {
+    expect(() => runWithoutWindow(() => renderRouteToString({ ssr: false }))).toThrow(
+      RSCRouteSSRFalseBailoutError,
+    );
   });
 
-  it('does not require RSC context while the deferred route is skipped', () => {
-    expect(() => renderRouteToString({ ssr: false })).not.toThrow();
+  it('does not require RSC context before triggering the server bailout', () => {
+    let capturedError: unknown;
+
+    try {
+      runWithoutWindow(() => renderRouteToString({ ssr: false }));
+    } catch (error) {
+      capturedError = error;
+    }
+
+    expect(isRSCRouteSSRFalseBailoutError(capturedError)).toBe(true);
   });
 
   it.each<[string, boolean | undefined]>([
@@ -53,7 +82,7 @@ describe('RSCRoute deferred SSR behavior', () => {
     );
   });
 
-  it('does not generate provider cache keys or call the loader while skipped on the server', () => {
+  it('does not generate provider cache keys or call the loader before the server bailout', () => {
     const circularProps: Record<string, unknown> = {};
     circularProps.self = circularProps;
 
@@ -61,42 +90,15 @@ describe('RSCRoute deferred SSR behavior', () => {
     const RSCProvider = createRSCProvider({ getServerComponent });
 
     expect(() =>
-      renderToString(
-        <RSCProvider>
-          <RSCRoute componentName="CircularRoute" componentProps={circularProps} ssr={false} />
-        </RSCProvider>,
+      runWithoutWindow(() =>
+        renderToString(
+          <RSCProvider>
+            <RSCRoute componentName="CircularRoute" componentProps={circularProps} ssr={false} />
+          </RSCProvider>,
+        ),
       ),
-    ).not.toThrow();
+    ).toThrow(RSCRouteSSRFalseBailoutError);
     expect(getServerComponent).not.toHaveBeenCalled();
-  });
-
-  it('allows default routes to enter the provider path while deferred routes skip server work', () => {
-    const getServerComponent = jest.fn(() => Promise.resolve(<div>Loaded route</div>));
-    const RSCProvider = createRSCProvider({ getServerComponent });
-
-    try {
-      renderToString(
-        <RSCProvider>
-          <>
-            <RSCRoute componentName="DeferredRoute" componentProps={{ id: 2 }} ssr={false} />
-            <RSCRoute componentName="ImmediateRoute" componentProps={{ id: 1 }} />
-          </>
-        </RSCProvider>,
-      );
-    } catch {
-      // renderToString may throw once PromiseWrapper consumes the unresolved immediate route promise.
-      // The provider calls that started before that point are the behavior this test asserts.
-    }
-
-    expect(getServerComponent).toHaveBeenCalledTimes(1);
-    expect(getServerComponent).toHaveBeenCalledWith({
-      componentName: 'ImmediateRoute',
-      componentProps: { id: 1 },
-    });
-    expect(getServerComponent).not.toHaveBeenCalledWith({
-      componentName: 'DeferredRoute',
-      componentProps: { id: 2 },
-    });
   });
 
   it.each<[string, Partial<React.ComponentProps<typeof RSCRoute>>]>([
@@ -124,7 +126,7 @@ describe('RSCRoute deferred SSR behavior', () => {
     });
   });
 
-  it('uses the existing provider path after the deferred route mounts', async () => {
+  it('uses the existing provider path during the client Suspense retry', async () => {
     const getServerComponent = jest.fn(() => Promise.resolve(<div>Deferred route loaded</div>));
     const RSCProvider = createRSCProvider({ getServerComponent });
     const container = document.createElement('div');
@@ -162,7 +164,7 @@ describe('RSCRoute deferred SSR behavior', () => {
     }
   });
 
-  it('wraps rejected deferred payloads in ServerComponentFetchError after mount', async () => {
+  it('wraps rejected payloads in ServerComponentFetchError during the client Suspense retry', async () => {
     let rejectPayload: ((error: Error) => void) | undefined;
     const payloadPromise = new Promise<React.ReactNode>((_resolve, reject) => {
       rejectPayload = reject;

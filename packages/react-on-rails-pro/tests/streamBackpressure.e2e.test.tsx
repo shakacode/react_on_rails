@@ -57,7 +57,7 @@ describe('streamServerRenderedReactComponent - RSC payload exceeding default hig
   let source: PassThrough;
 
   beforeEach(() => {
-    ComponentRegistry.components().clear();
+    ComponentRegistry.clear();
     source = new PassThrough();
     (globalThis as any).generateRSCPayload = jest.fn().mockResolvedValue(source);
   });

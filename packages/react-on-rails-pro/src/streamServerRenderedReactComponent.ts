@@ -23,6 +23,7 @@ import {
   StreamableComponentResult,
 } from 'react-on-rails/types';
 import injectRSCPayload from './injectRSCPayload.ts';
+import { isRSCRouteSSRFalseBailoutError } from './RSCRouteSSRFalseBailoutError.ts';
 import {
   streamServerRenderedComponent,
   StreamingTrackers,
@@ -44,6 +45,7 @@ const streamRenderReactComponent = (
 
   const { readableStream, pipeToTransform, writeChunk, emitError, endStream } =
     transformRenderStreamChunksToResultObject(renderState);
+  let didNotifySSREnd = false;
 
   const reportError = (error: Error) => {
     renderState.hasErrors = true;
@@ -57,6 +59,13 @@ const streamRenderReactComponent = (
   const sendErrorHtml = (error: Error) => {
     const errorHtmlStream = handleError({ e: error, name: componentName, serverSide: true });
     pipeToTransform(errorHtmlStream);
+  };
+
+  const notifySSREndOnce = () => {
+    if (didNotifySSREnd) return;
+
+    didNotifySSREnd = true;
+    streamingTrackers.postSSRHookTracker.notifySSREnd();
   };
 
   assertRailsContextWithServerStreamingCapabilities(railsContext);
@@ -91,10 +100,16 @@ const streamRenderReactComponent = (
           );
         },
         onError(e) {
-          reportError(convertToError(e));
+          const error = convertToError(e);
+          if (isRSCRouteSSRFalseBailoutError(error)) {
+            return error.digest;
+          }
+
+          reportError(error);
+          return undefined;
         },
         onAllReady() {
-          streamingTrackers.postSSRHookTracker.notifySSREnd();
+          notifySSREndOnce();
         },
         identifierPrefix: domNodeId,
       });

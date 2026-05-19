@@ -29,6 +29,7 @@ import isRenderFunction from 'react-on-rails/isRenderFunction';
 import { ensureReactUseAvailable } from 'react-on-rails/reactApis';
 import { createRSCProvider } from '../RSCProvider.tsx';
 import getReactServerComponent from '../getReactServerComponent.client.ts';
+import { isRSCRouteSSRFalseBailoutError } from '../RSCRouteSSRFalseBailoutError.ts';
 
 ensureReactUseAvailable();
 
@@ -98,7 +99,23 @@ const wrapServerComponentRenderer = (
     );
 
     if (domNode.innerHTML) {
-      ReactDOMClient.hydrateRoot(domNode, root, { identifierPrefix: domNodeId });
+      ReactDOMClient.hydrateRoot(domNode, root, {
+        identifierPrefix: domNodeId,
+        onRecoverableError(error) {
+          const cause =
+            error instanceof Error && 'cause' in error ? (error as Error & { cause?: unknown }).cause : error;
+
+          if (isRSCRouteSSRFalseBailoutError(error) || isRSCRouteSSRFalseBailoutError(cause)) {
+            return;
+          }
+
+          if (typeof globalThis.reportError === 'function') {
+            globalThis.reportError(error);
+          } else {
+            console.error(error);
+          }
+        },
+      });
     } else {
       ReactDOMClient.createRoot(domNode, { identifierPrefix: domNodeId }).render(root);
     }

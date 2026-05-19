@@ -29,9 +29,9 @@ For lower-priority server component routes, pass `ssr={false}` to skip that rout
 <RSCRoute componentName="Recommendations" componentProps={{ userId }} ssr={false} />
 ```
 
-Use this for below-the-fold, collapsed, or secondary content that does not need to appear in the initial HTML. The route renders no content on the server and also renders no content on the first browser hydration pass, which keeps hydration consistent and avoids generating or embedding that route's RSC payload during SSR. After the app mounts in the browser, the route uses the same `RSCProvider` path as any other `RSCRoute`: provider cache lookup, payload fetch or embedded-payload reuse when available, `PromiseWrapper`, `ServerComponentFetchError`, and the existing retry patterns all still apply.
+Use this for below-the-fold, collapsed, or secondary content that does not need to be fully rendered in the initial HTML. During streaming SSR, the route intentionally bails out before generating or embedding that route's RSC payload. If the route is inside a scoped `Suspense` boundary, React emits that boundary's fallback HTML and retries the route on the client. On the client, the route uses the same `RSCProvider` path as any other `RSCRoute`: provider cache lookup, payload fetch or embedded-payload reuse when available, `PromiseWrapper`, `ServerComponentFetchError`, and the existing retry patterns all still apply.
 
-The tradeoff is that the deferred content appears later. The browser must resolve the RSC payload after mount, so users may see a blank area or a client-side loading state before the server component appears. `ssr={false}` does not currently server-render a `Suspense` fallback. If you wrap the route in `Suspense`, its loading UI is shown on the client after mount while the deferred payload is pending, not as server-rendered fallback HTML.
+The tradeoff is that the deferred content appears later. The browser must resolve the RSC payload during hydration or client rendering, so users will see the nearest `Suspense` fallback until the server component appears. Place `Suspense` close to the deferred route so the loading UI is scoped to that route instead of replacing a large part of the page.
 
 ```tsx
 import { Suspense } from 'react';
@@ -254,7 +254,7 @@ Understanding how RSC payloads are fetched and cached is critical to using this 
 
 When the page is server-rendered, the RSC payloads for `RSCRoute` components are generated during SSR and embedded directly in the HTML response by default. When the browser hydrates, `RSCRoute` reads the embedded payload — **no extra network round-trip**.
 
-If a route uses `ssr={false}`, that route is skipped during the initial server render and does not generate an embedded payload for that request. After mount, it resolves through the existing provider path and may reuse an equivalent cached payload from the same provider when one already exists; otherwise, it fetches the payload over HTTP.
+If a route uses `ssr={false}`, that route is skipped during the initial server render and does not generate an embedded payload for that request. A scoped `Suspense` boundary can still render fallback HTML in the streamed response. On the client retry, the route resolves through the existing provider path and may reuse an equivalent cached payload from the same provider when one already exists; otherwise, it fetches the payload over HTTP.
 
 ### Client-side navigation
 
@@ -391,7 +391,7 @@ export default function AdminLayout() {
 
 ### `Suspense` for loading states
 
-Wrap `RSCRoute` in `Suspense` to show a loading indicator while the RSC payload is being fetched. This is relevant for client-side navigation and for `ssr={false}` routes after the app mounts. With default `ssr={true}`, the payload is already embedded during SSR. With `ssr={false}`, React on Rails Pro does not currently render server fallback HTML; the `Suspense` fallback appears only on the client after mount while the deferred payload is pending.
+Wrap `RSCRoute` in `Suspense` to show a loading indicator while the RSC payload is being fetched. This is relevant for client-side navigation and for `ssr={false}` routes during the initial streaming response. With default `ssr={true}`, the payload is already embedded during SSR. With `ssr={false}`, React on Rails Pro skips the route's server payload work, streams the nearest `Suspense` fallback, and retries the route on the client.
 
 ```tsx
 'use client';
@@ -401,7 +401,7 @@ import RSCRoute from 'react-on-rails-pro/RSCRoute';
 export default function Page({ user }) {
   return (
     <Suspense fallback={<div>Loading…</div>}>
-      <RSCRoute componentName="SlowServerComponent" componentProps={{ user }} />
+      <RSCRoute componentName="SlowServerComponent" componentProps={{ user }} ssr={false} />
     </Suspense>
   );
 }
@@ -453,7 +453,7 @@ This error occurs when using `react_component` with `prerender: true` (or the de
 
 **Empty content where the server component should appear**
 
-If the route uses `ssr={false}`, empty initial HTML is expected. The route starts resolving after the app mounts in the browser, so use a client-side `Suspense` fallback if you want loading UI while the deferred payload is pending.
+If the route uses `ssr={false}` without a nearby `Suspense` boundary, the supported streaming wrapper's root `Suspense fallback={null}` may produce an empty area until the route resolves on the client. Add a scoped `Suspense` boundary around the route if you want loading UI in the streamed HTML while the deferred payload is pending.
 
 Check the browser's network tab — is the request to your RSC payload endpoint (derived from `rsc_payload_generation_url_path` config, default `/rsc_payload/:componentName`) succeeding? If not:
 
