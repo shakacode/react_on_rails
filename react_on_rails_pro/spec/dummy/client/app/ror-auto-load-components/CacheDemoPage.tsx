@@ -2,7 +2,6 @@ import React, { Suspense } from 'react';
 // eslint-disable-next-line camelcase -- matches Next.js API naming convention
 import { unstable_cache } from 'react-on-rails-pro/cache';
 
-// eslint-disable-next-line camelcase
 const getCachedTimestamp = unstable_cache(
   (label: string) => (
     <span data-testid={`cached-${label}`}>
@@ -12,15 +11,11 @@ const getCachedTimestamp = unstable_cache(
   { id: 'timestamp', tags: ['timestamps'] },
 );
 
-// eslint-disable-next-line camelcase
 const getCachedWithTTL = unstable_cache(
-  () => (
-    <span data-testid="ttl-value">TTL value: {new Date().toISOString()} (revalidates every 5s)</span>
-  ),
+  () => <span data-testid="ttl-value">TTL value: {new Date().toISOString()} (revalidates every 5s)</span>,
   { id: 'ttl-timestamp', revalidate: 5 },
 );
 
-// eslint-disable-next-line camelcase
 const getCachedProduct = unstable_cache(
   (productId: number) => (
     <span data-testid={`product-${productId}`}>
@@ -74,8 +69,8 @@ const CacheDemoPage = () => (
   <div>
     <h1>unstable_cache Demo</h1>
     <p>
-      This page demonstrates <code>unstable_cache</code> from React on Rails Pro. Cached sections retain
-      their timestamps across page refreshes. Uncached sections produce fresh timestamps on every render.
+      This page demonstrates <code>unstable_cache</code> from React on Rails Pro. Cached sections retain their
+      timestamps across page refreshes. Uncached sections produce fresh timestamps on every render.
     </p>
     <hr />
     <Suspense fallback={<div>Loading cached content...</div>}>
