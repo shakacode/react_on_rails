@@ -34,15 +34,20 @@ Here `p50` maps to k6's `med` stat and the `p50_latency` Bencher Metric Format m
 The first implementation PR should add only one or two routes per category and should reuse existing dummy app examples
 where possible. Avoid building a large benchmark suite until the noise profile is understood.
 
+### OSS First Slice
+
 Recommended OSS first slice for [Issue 2169](https://github.com/shakacode/react_on_rails/issues/2169):
 
 1. Client-only component route
 2. Traditional SSR route with the same component and props
 3. Cached SSR route with explicit hit and miss measurements
 
-Hash SSR is deferred to a follow-on PR after the initial OSS noise profile is understood. The cached SSR slice should
-define separate cache-hit and cache-miss benchmark paths before comparing results. Inside the Rails app, use a dedicated
-cache adapter and namespace for benchmark routes, such as
+Hash SSR is deferred to a follow-on PR after the initial OSS noise profile is understood.
+
+### Cache Setup
+
+The cached SSR slice should define separate cache-hit and cache-miss benchmark paths before comparing results. Use a
+dedicated cache adapter and namespace for benchmark routes, such as
 `ActiveSupport::Cache::FileStore.new(Rails.root.join("tmp/benchmark_cache").to_s)`, instead of the app's default store.
 The miss path should clear only that benchmark cache namespace before measurement, and the hit path should clear that
 namespace, make one warm-up request to prime the fragment, then run k6 against the primed route. For the dedicated
@@ -55,6 +60,8 @@ measurements, warm the Rails process with a route that does not populate the ben
 benchmark cache immediately before the cache-miss k6 measurement. For cache-hit measurements, clear the dedicated
 benchmark cache, send one explicit cache-prime request to the measured route, then run the existing per-route k6 warm-up
 and measurement against the primed route.
+
+### Pro Follow-Up Slice
 
 Recommended Pro slice for [Issue 2169](https://github.com/shakacode/react_on_rails/issues/2169), implemented after the
 OSS first slice or in a dedicated follow-up PR:
@@ -74,6 +81,8 @@ OSS first slice or in a dedicated follow-up PR:
    before benchmark measurements begin, with an actionable error instead of silently skipping RSC coverage. Do this as a
    preflight check during route-list construction, not as a mid-run abort after partial artifacts have been written.
    Automatic route discovery currently skips required-parameter routes such as `/rsc_payload/:component_name`.
+
+### Script Boundaries And Naming
 
 Use `benchmarks/bench.rb`/`benchmarks/k6.ts` for Rails HTTP routes such as streaming SSR and static RSC payload endpoint
 checks. Use `benchmarks/bench-node-renderer.rb` for direct Pro Node Renderer transport coverage unless that script is
@@ -106,8 +115,10 @@ Prerequisites for the first implementation PR:
   because it roughly doubles route runtime: each route gets two k6 runs plus two warm-up phases, or about
   `2 * (DURATION + warm-up requests * warm-up sleep)` per route. With today's defaults and the hard-coded warm-up loop in
   `benchmarks/bench.rb`, that is `2 * (30s + 10 * 0.5s)` = 70 seconds. This estimate does not include the per-job
-  `bundle exec rails routes` discovery call, server startup, or server warmdown time. Recalculate the estimate if
-  `DURATION` changes or if the `benchmarks/bench.rb` warm-up loop changes.
+  `bundle exec rails routes` discovery call, server startup, or server warmdown time. At the job level, a benchmark job
+  covering about 10 routes should be budgeted as roughly doubling from 11-12 minutes to 22-24 minutes before additional
+  startup or warmdown overhead. Recalculate the estimate if `DURATION` changes or if the `benchmarks/bench.rb` warm-up
+  loop changes.
 - Record sample count, runner type, Ruby version, Node version, React version, renderer, and bundle mode in a
   `metadata.json` artifact and mirror the key fields in the `summary.txt` header. Capture runtime-dependent fields when
   the benchmark runs instead of hard-coding the example schema values: use `ruby --version` for `ruby_version`,
@@ -123,6 +134,12 @@ Prerequisites for the first implementation PR:
   )
   react_version = status.success? ? react_version_output.strip : "unknown"
   warn "WARNING: could not capture react_version" unless status.success?
+  ```
+
+  Derive `renderer` from the same `PRO` switch that selects `APP_DIR`, rather than copying the example schema value:
+
+  ```ruby
+  renderer = ENV["PRO"] == "true" ? "node_renderer" : "execjs"
   ```
 
   Equivalent block form using `Dir.chdir(APP_DIR) do ... end` is acceptable when the surrounding code already manages
@@ -144,7 +161,8 @@ Prerequisites for the first implementation PR:
   Define `sample_count` as the number of completed k6 measurement runs contributing to the route's reported summary. The
   first slice should start at one run per route. If a later implementation aggregates forward and reverse passes into a
   single route summary, record `sample_count: 2`; if it writes one summary per pass, keep each summary at
-  `sample_count: 1`.
+  `sample_count: 1`. Do not count a run whose `rps` value is `FAILED`, `MISSING`, or otherwise non-numeric toward
+  `sample_count`; this matches the `BmfCollector#add` guard that skips non-numeric RPS entries.
 
   Use these metadata keys as the minimum schema. The JSON block shows example output values; populate the real artifact
   with the runtime capture rules above instead of copying these literals:
@@ -177,7 +195,9 @@ Prerequisites for the first implementation PR:
 Follow-on enhancements:
 
 - Add `p95` only when the k6 `--summary-trend-stats` flag, currently `med,max,p(90),p(99)` in `benchmarks/bench.rb`, the
-  summary table, artifacts, and Bencher reporting can be updated together.
+  summary table, artifacts, and Bencher reporting can be updated together. Before adding `p95`, extract the current
+  summary-trend-stats string to a named constant, such as
+  `K6_TREND_STATS = "med,max,p(90),p(99)"`, so the percentile set is changed in one place.
 - Require repeated or overlapping alerts before opening an issue or failing CI.
 
 ## Local Verification Before CI
