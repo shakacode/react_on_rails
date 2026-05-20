@@ -800,6 +800,12 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
           end
         end.to raise_error(ReactOnRailsPro::Error, /must be a positive integer or nil/)
       end
+
+      it "validates constructor values before storing them" do
+        expect do
+          described_class.new(renderer_http_pool_size: 0)
+        end.to raise_error(ReactOnRailsPro::Error, /must be a positive integer or nil/)
+      end
     end
 
     describe ".renderer_http_keep_alive_timeout" do

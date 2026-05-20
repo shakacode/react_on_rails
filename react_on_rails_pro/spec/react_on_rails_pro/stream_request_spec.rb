@@ -287,6 +287,35 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       expect(barriers[0]).not_to eq(barriers[1])
       expect(barriers[0]).to have_received(:stop).at_least(:once)
     end
+
+    it "waits for the stopped barrier before retrying on 410" do
+      call_count = 0
+      first_barrier = Async::Barrier.new
+      second_barrier = Async::Barrier.new
+      first_barrier_waited = false
+
+      allow(first_barrier).to receive(:stop).and_call_original
+      allow(first_barrier).to receive(:wait) do
+        first_barrier_waited = true
+      end
+      allow(Async::Barrier).to receive(:new).and_return(first_barrier, second_barrier)
+
+      stream = described_class.create do |send_bundle, _barrier|
+        call_count += 1
+        if call_count == 1
+          mock_error_response(410, "bundle not found")
+        else
+          expect(send_bundle).to be true
+          expect(first_barrier_waited).to be true
+          mock_ok_response(to_length_prefixed("ok"))
+        end
+      end
+
+      stream.each_chunk(&:itself)
+
+      expect(first_barrier).to have_received(:stop)
+      expect(first_barrier).to have_received(:wait)
+    end
   end
 
   describe "first_chunk_warn_callback" do

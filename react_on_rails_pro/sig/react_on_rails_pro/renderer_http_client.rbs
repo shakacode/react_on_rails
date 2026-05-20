@@ -41,7 +41,7 @@ module ReactOnRailsPro
 
     end
 
-    def self.get: (String url, connect_timeout: Numeric, read_timeout: Numeric) -> Response
+    def self.get: (String url, connect_timeout: Numeric?, read_timeout: Numeric?) -> Response
 
     def self.split_url: (String url) -> [String, String]
 

@@ -96,36 +96,7 @@ module ReactOnRailsPro
     def each_chunk(&block)
       return enum_for(:each_chunk) unless block
 
-      Sync do
-        send_bundle = false
-        barrier = nil
-
-        begin
-          loop do
-            # Create a new barrier for each attempt so that on 410 retry we stop
-            # any async fibers still writing to the previous request body.
-            barrier = Async::Barrier.new
-
-            stream_response = @request_executor.call(send_bundle, barrier)
-
-            process_response_chunks(stream_response, &block)
-            break
-          rescue ReactOnRailsPro::RendererHttpClient::HTTPError => e
-            barrier&.stop
-            send_bundle = handle_http_error(e, send_bundle)
-          rescue ReactOnRailsPro::RendererHttpClient::TimeoutError => e
-            raise ReactOnRailsPro::Error, "Time out error while server side render streaming a component.\n" \
-                                          "Original error:\n#{e}\n#{e.backtrace}"
-          rescue ReactOnRailsPro::RendererHttpClient::ConnectionError => e
-            raise ReactOnRailsPro::Error, "Connection error while server side render streaming a component.\n" \
-                                          "Original error:\n#{e}\n#{e.backtrace}"
-          end
-
-          barrier&.wait
-        ensure
-          barrier&.stop
-        end
-      end
+      Sync { consume_with_retries(&block) }
     end
 
     def self.create(first_chunk_warn_callback: nil, &request_block)
@@ -133,6 +104,37 @@ module ReactOnRailsPro
     end
 
     private
+
+    def consume_with_retries(&block)
+      send_bundle = false
+      barrier = nil
+
+      begin
+        loop do
+          # Create a new barrier for each attempt so that on 410 retry we stop
+          # any async fibers still writing to the previous request body.
+          barrier = Async::Barrier.new
+
+          stream_response = @request_executor.call(send_bundle, barrier)
+
+          process_response_chunks(stream_response, &block)
+          break
+        rescue ReactOnRailsPro::RendererHttpClient::HTTPError => e
+          barrier = stop_barrier_for_http_error(e, send_bundle, barrier)
+          send_bundle = handle_http_error(e, send_bundle)
+        rescue ReactOnRailsPro::RendererHttpClient::TimeoutError => e
+          raise ReactOnRailsPro::Error, "Time out error while server side render streaming a component.\n" \
+                                        "Original error:\n#{e}\n#{e.backtrace}"
+        rescue ReactOnRailsPro::RendererHttpClient::ConnectionError => e
+          raise ReactOnRailsPro::Error, "Connection error while server side render streaming a component.\n" \
+                                        "Original error:\n#{e}\n#{e.backtrace}"
+        end
+
+        barrier&.wait
+      ensure
+        barrier&.stop
+      end
+    end
 
     def process_response_chunks(stream_response, &block)
       parser = ReactOnRails::LengthPrefixedParser.new
@@ -150,6 +152,30 @@ module ReactOnRailsPro
         parser.feed(chunk, &block)
       end
       parser.flush
+    end
+
+    def stop_barrier_for_http_error(error, send_bundle, barrier)
+      if retrying_with_bundle_upload?(error, send_bundle)
+        stop_and_wait_for_barrier(barrier)
+        nil
+      else
+        barrier&.stop
+        barrier
+      end
+    end
+
+    def stop_and_wait_for_barrier(barrier)
+      return unless barrier
+
+      tasks = []
+      barrier.tasks.each { |waiting| tasks << waiting.task }
+      barrier.stop
+      barrier.wait
+      tasks.each(&:wait)
+    end
+
+    def retrying_with_bundle_upload?(error, send_bundle)
+      !send_bundle && error.response.status == ReactOnRailsPro::STATUS_SEND_BUNDLE
     end
 
     def handle_http_error(error, send_bundle)
