@@ -30,7 +30,8 @@ If you have not already completed [Sections 1-4 below](#1-customize-bindev), do 
 
 When moving custom build work out of `precompile_hook`, make the ownership change in one commit so the same task cannot run twice. The checklist uses letters (A–E) so the steps are easy to distinguish from the numbered Implementation sections referenced above.
 
-A. Uncomment and add custom one-time tasks to the `run_precompile_tasks` method in `bin/dev`.
+A. Add (or uncomment, if already present) custom one-time tasks to the `run_precompile_tasks` method in `bin/dev`
+(see [Section 1](#1-customize-bindev) for the generator-provided template).
 
 B. Ensure `build_test_command` and `build_production_command` each include every one-time build task those lifecycles
 need, such as ReScript builds, TypeScript checks or compilation, and locale generation. `bin/dev` is not invoked in
@@ -42,7 +43,8 @@ invocations too. For example, remove a bare `yarn res:build` GitHub Actions step
 `build_production_command` includes it. Do not delete entire `.github/workflows`, `.circleci/config.yml`, or Heroku
 `app.json` files unless they exist solely for the migrated build step.
 
-D. Remove `precompile_hook` from `config/shakapacker.yml` as shown in [Section 2](#2-configure-shakapackeryml).
+D. Confirm `precompile_hook` has been removed from `config/shakapacker.yml` (per
+[Section 2](#2-configure-shakapackeryml)) so the same task does not also run during webpack compiles.
 
 E. Keep long-running watchers, such as `rescript: yarn res:watch`, as separate Procfile processes.
 
@@ -166,6 +168,7 @@ points both commands at the helper script.
 ```ruby
 ReactOnRails.configure do |config|
   # Build commands should include all necessary steps
+  # NODE_ENV is auto-derived from RAILS_ENV by Shakapacker, so `RAILS_ENV=test` is enough here.
   config.build_test_command = "yarn res:build && RAILS_ENV=test bin/shakapacker"
   config.build_production_command = "yarn res:build && RAILS_ENV=production NODE_ENV=production bin/shakapacker"
 end
@@ -181,6 +184,13 @@ Ruby script over a very long command string. Create `bin/build-react-on-rails`:
 # frozen_string_literal: true
 
 require "rbconfig"
+
+# Pin the working directory to the Rails application root so the relative paths below resolve correctly even when
+# `config.node_modules_location` is a subdirectory. React on Rails prepends `cd "<node_modules_location>"` to
+# `build_test_command` and `build_production_command`, which would otherwise leave the script looking for
+# `bin/shakapacker` under that subdirectory. See the note under the configuration example below for invoking the
+# wrapper itself from a custom `node_modules_location`.
+Dir.chdir(File.expand_path("..", __dir__))
 
 mode = ARGV.first
 
@@ -198,9 +208,11 @@ end
 #   system("yarn", "tsc", "--noEmit") || abort("tsc type-check failed")
 #   system("yarn", "res:build")       || abort("res:build failed")
 
-# Mode-specific invocation below. RbConfig.ruby runs shakapacker with the same Ruby interpreter that launched this wrapper.
-# `bin/shakapacker` is resolved relative to the current working directory; Rails always runs build commands from the
-# Rails application root, so the relative path resolves correctly. Add shared steps above, not inside the case blocks.
+# Mode-specific invocation below. `RbConfig.ruby` runs shakapacker with the same Ruby interpreter that launched this
+# wrapper, and the `Dir.chdir` above keeps `bin/shakapacker` resolvable from the Rails application root. The
+# shakapacker binstub is a Ruby file by convention, so passing it to `RbConfig.ruby` is portable; if your project
+# replaces `bin/shakapacker` with a shell wrapper, drop `RbConfig.ruby` and invoke the binstub directly (after
+# ensuring the right Ruby is on `PATH`). Add shared steps above, not inside the case blocks.
 case mode
 when "test"
   env = { "RAILS_ENV" => "test" }
@@ -255,6 +267,20 @@ ReactOnRails.configure do |config|
   config.build_production_command = "ruby bin/build-react-on-rails production"
 end
 ```
+
+> **If you set `config.node_modules_location`:** React on Rails prepends `cd "<node_modules_location>"` to both
+> build commands, so the bare `ruby bin/build-react-on-rails …` invocation above will not find the wrapper from a
+> subdirectory. Interpolate an absolute path from `Rails.root` so the script is locatable regardless of the
+> prepended `cd`:
+>
+> ```ruby
+> wrapper = Rails.root.join("bin", "build-react-on-rails").to_s
+> config.build_test_command       = "ruby #{wrapper} test"
+> config.build_production_command = "ruby #{wrapper} production"
+> ```
+>
+> The `Dir.chdir` inside the wrapper then re-pins the working directory to the Rails root for the inner
+> `bin/shakapacker` call.
 
 This keeps the migration reviewable and avoids duplicating custom build logic across `bin/dev`, Procfiles, and deploy scripts.
 
