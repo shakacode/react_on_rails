@@ -31,6 +31,7 @@ module ReactOnRails
       RSC_GENERATED_LAYOUT_NAME_PATTERN = /\Areact_on_rails_rsc(?:_(?:[2-9]|[1-9]\d+))?\z/
       MAX_LAYOUT_NAME_ATTEMPTS = 99
       JS_STRING_DELIMITERS = ["'", '"', "`"].freeze
+      JS_COMMENT_STATES = %i[line_comment block_comment].freeze
 
       # Main entry point for RSC setup.
       # Orchestrates creation of all RSC-related files and configuration.
@@ -631,7 +632,12 @@ module ReactOnRails
 
       def rsc_plugin_client_references_configured?(content, is_server:)
         sections = rsc_plugin_option_sections(content, is_server: is_server)
-        return false if sections.empty?
+        # No parseable `isServer: <bool>` section means this file's plugin call sits outside
+        # what the generator's scanner can match (e.g. options are computed at runtime, or the
+        # plugin is invoked without an options object). Treat that as out-of-scope rather than
+        # missing — the user has nothing actionable to do with a "missing scoped clientReferences"
+        # warning in that case.
+        return true if sections.empty?
 
         sections.all? do |section|
           options = rsc_plugin_options_without_comments(section.fetch(:body))
@@ -658,75 +664,35 @@ module ReactOnRails
 
       # Strips JavaScript line and block comments while preserving string-literal contents,
       # so `clientReferences:` / `isServer:` substrings inside strings are not mis-detected.
+      # Shares the `advance_js_scan_state` family used by `js_top_level_position?` and
+      # `matching_js_closing_brace` so all JS-aware passes follow the same comment/string rules.
       # Regex literals (e.g. `/a{2}/`) are still outside this scanner's supported surface
       # because brace quantifiers can confuse `matching_js_closing_brace`'s depth counter.
       def rsc_plugin_options_without_comments(options)
         result = String.new(capacity: options.length)
-        scan_state = { mode: nil, escaped: false, index: 0 }
+        state = nil
+        escaped = false
+        index = 0
 
-        step_options_scan(options, result, scan_state) while scan_state[:index] < options.length
+        while index < options.length
+          char = options[index]
+          next_char = options[index + 1]
+          previous_state = state
+          state, escaped, index = advance_js_scan_state(state, escaped, char, next_char, index)
+
+          # Emit when (a) we're outside comments and strings and not just entering one, or
+          # (b) we're inside or exiting a string (preserves the opening/closing quote and the
+          # string contents), or (c) we're closing a line comment so the trailing `\n` survives
+          # for line-anchored regex matching downstream (e.g. `^\s*isServer`).
+          emit_char = (previous_state.nil? && !JS_COMMENT_STATES.include?(state)) ||
+                      JS_STRING_DELIMITERS.include?(previous_state) ||
+                      (previous_state == :line_comment && char == "\n")
+          result << char if emit_char
+
+          index += 1
+        end
 
         result
-      end
-
-      def step_options_scan(options, result, scan_state)
-        index = scan_state[:index]
-        char = options[index]
-        next_char = options[index + 1]
-
-        case scan_state[:mode]
-        when :line_comment
-          step_line_comment(scan_state, result, char)
-        when :block_comment
-          step_block_comment(scan_state, char, next_char)
-        when *JS_STRING_DELIMITERS
-          step_string_state(scan_state, result, char)
-        else
-          step_default_state(scan_state, result, char, next_char)
-        end
-      end
-
-      def step_line_comment(scan_state, result, char)
-        if char == "\n"
-          result << char
-          scan_state[:mode] = nil
-        end
-        scan_state[:index] += 1
-      end
-
-      def step_block_comment(scan_state, char, next_char)
-        if char == "*" && next_char == "/"
-          scan_state[:mode] = nil
-          scan_state[:index] += 2
-        else
-          scan_state[:index] += 1
-        end
-      end
-
-      def step_string_state(scan_state, result, char)
-        result << char
-        if scan_state[:escaped]
-          scan_state[:escaped] = false
-        elsif char == "\\"
-          scan_state[:escaped] = true
-        elsif char == scan_state[:mode]
-          scan_state[:mode] = nil
-        end
-        scan_state[:index] += 1
-      end
-
-      def step_default_state(scan_state, result, char, next_char)
-        if char == "/" && next_char == "/"
-          scan_state[:mode] = :line_comment
-          scan_state[:index] += 2
-        elsif char == "/" && next_char == "*"
-          scan_state[:mode] = :block_comment
-          scan_state[:index] += 2
-        else
-          result << char
-          scan_state[:mode] = char if JS_STRING_DELIMITERS.include?(char)
-          scan_state[:index] += 1
-        end
       end
 
       def rsc_plugin_option_sections(content, is_server:)
@@ -819,12 +785,12 @@ module ReactOnRails
       end
 
       # Expects `content[open_index] == "{"`; callers pass the options-object opening brace.
-      # This lightweight scanner intentionally treats template literals as opaque strings.
-      # Nested template literals inside plugin options are not supported, which is acceptable
-      # for the webpack option objects this migration rewrites. Regex literals are also
-      # outside this scanner's supported surface; callers verify the returned `}` is followed
-      # by `)` via `rsc_plugin_options_followed_by_close_paren?` so that an unmatched `{`/`}`
-      # inside a regex literal surfaces as a warning instead of a corrupt rewrite.
+      # This lightweight scanner intentionally treats template literals as opaque strings
+      # (backtick to backtick, ignoring `${...}` expressions). Any `{` or `}` inside a template
+      # expression (e.g. `` `${env}` ``) — not just nested template literals — will skew the
+      # depth counter; callers detect this via `rsc_plugin_options_followed_by_close_paren?`
+      # and mark the section unparseable rather than producing a corrupt rewrite. Regex literals
+      # are outside this scanner's supported surface for the same reason.
       def matching_js_closing_brace(content, open_index)
         depth = 0
         index = open_index
@@ -957,41 +923,21 @@ module ReactOnRails
           # gsub_file call, and pretend mode is already handled above.
           File.write(full_path, content)
           say_status(:rewrite, config_path, :green)
-          remind_to_run_formatter(config_path) if rsc_plugin_rewrites_need_formatter?(rewrites)
         end
         true
       end
 
-      def rsc_plugin_rewrites_need_formatter?(rewrites)
-        rewrites.any? { |section, _| section.fetch(:body).include?("\n") }
-      end
-
-      # The rewrite splices `clientReferences: rscClientReferences` directly after `isServer:`
-      # so single-line option objects stay readable. For multi-line option objects this leaves
-      # the new key on the same line as `isServer`, which is valid JS but easy to miss in code
-      # review unless a formatter reflows it. Surface a one-time reminder per file so users on
-      # projects without an autoformatter pipeline are not surprised.
-      def remind_to_run_formatter(config_path)
-        GeneratorMessages.add_info(
-          "Updated #{config_path} with `clientReferences: rscClientReferences`. If your project " \
-          "uses Prettier, run `npx prettier --write #{config_path}` to reflow multi-line option " \
-          "objects."
-        )
-      end
-
-      # Splices the new key directly after `isServer:` rather than at the closing brace.
-      # This keeps single-line option objects readable (`{ isServer: true, clientReferences: ... }`)
-      # at the cost of producing same-line output for multi-line objects when `isServer` is not
-      # the last key — that variant is valid JS and matched by spec coverage; users running
-      # Prettier post-migration will reflow it.
+      # Multi-line option objects get the new key on its own line just before the closing brace,
+      # with indentation matching the last existing key, so the result reads cleanly without a
+      # formatter pass. Single-line option objects keep the same-line splice immediately after
+      # `isServer:` because that's the only readable place for a one-line object literal.
       def add_client_references_to_rsc_plugin_body(body, is_server:)
         pattern = /\bisServer\s*:\s*#{Regexp.escape(is_server.to_s)}\b/
         search_from = 0
 
         while (matched_is_server = pattern.match(body, search_from))
           if js_code_position?(body, matched_is_server.begin(0))
-            return "#{body[0...matched_is_server.end(0)]}, clientReferences: rscClientReferences" \
-                   "#{body[matched_is_server.end(0)..]}"
+            return splice_client_references_into_rsc_plugin_body(body, matched_is_server)
           end
 
           search_from = matched_is_server.end(0)
@@ -1000,10 +946,35 @@ module ReactOnRails
         body
       end
 
+      def splice_client_references_into_rsc_plugin_body(body, is_server_match)
+        return splice_client_references_at_close_brace(body) if body.include?("\n")
+
+        "#{body[0...is_server_match.end(0)]}, clientReferences: rscClientReferences" \
+          "#{body[is_server_match.end(0)..]}"
+      end
+
+      def splice_client_references_at_close_brace(body)
+        trailing = body[/\s*\z/]
+        content = body[0...(body.length - trailing.length)]
+
+        last_line_start = (content.rindex("\n") || -1) + 1
+        indent = content[last_line_start..][/\A[ \t]*/] || "  "
+
+        content_without_comments = rsc_plugin_options_without_comments(content).rstrip
+        needs_comma = !content_without_comments.end_with?(",")
+        prefix = needs_comma ? "#{content}," : content
+
+        "#{prefix}\n#{indent}clientReferences: rscClientReferences,#{trailing}"
+      end
+
       def rsc_client_references_setup_anchor?(content, is_server:)
         !!rsc_client_references_setup_anchor_match(content, is_server: is_server)
       end
 
+      # Called from the existing-config migration path, which is only reached after the
+      # generator has already confirmed `RSCWebpackPlugin` is imported in the file. That's why
+      # this helper deliberately omits the `RSCWebpackPlugin` import that `inject_rsc_*_imports`
+      # adds on the from-scratch path — adding it here would produce a duplicate import.
       def add_rsc_client_references_setup(config_path, content, is_server:)
         return if scoped_rsc_client_references_defined?(content)
         return if rsc_client_references_defined?(content)
@@ -1061,7 +1032,14 @@ module ReactOnRails
       end
 
       def rsc_client_references_defined?(content)
-        content.match?(/^\s*const\s+rscClientReferences\b/)
+        # Module-scope guard mirrors the other detection helpers (e.g. `path_resolve_imported?`,
+        # `shakapacker_config_imported?`) so a function-scoped `const rscClientReferences` does
+        # not fool `ensure_rsc_client_references_setup` into skipping the helper injection — that
+        # would leave the plugin rewrite referencing an out-of-scope binding.
+        pattern = /^[ \t]*const\s+rscClientReferences\b/
+        content.to_enum(:scan, pattern).any? do
+          js_top_level_position?(content, Regexp.last_match.begin(0))
+        end
       end
 
       def scoped_rsc_client_references_defined?(content)
