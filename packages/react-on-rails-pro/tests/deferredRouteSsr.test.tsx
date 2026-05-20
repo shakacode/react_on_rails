@@ -6,7 +6,7 @@ import { renderToString } from 'react-dom/server';
 import type { RailsContext } from 'react-on-rails/types';
 import {
   clearDefaultRSCProviderFactory,
-  maybeWrapWithDefaultRSCProvider,
+  maybeWrapWithDefaultRSCProviderWithStatus,
   setDefaultRSCProviderFactory,
 } from '../src/defaultRSCProviderRegistry.ts';
 import { createRSCProvider, useRSC } from '../src/RSCProvider.tsx';
@@ -374,7 +374,7 @@ describe('RSCRoute deferred SSR behavior', () => {
 
     try {
       root = createRoot(container);
-      const defaultProviderRoot = maybeWrapWithDefaultRSCProvider(
+      const defaultProviderRoot = maybeWrapWithDefaultRSCProviderWithStatus(
         <TestErrorBoundary fallback={(fallbackProps) => <RetryFallback {...fallbackProps} />}>
           <React.Suspense fallback={<div>Loading default-provider route...</div>}>
             <RSCRoute componentName="DeferredRoute" componentProps={{ id: 1 }} ssr={false} />
@@ -382,7 +382,7 @@ describe('RSCRoute deferred SSR behavior', () => {
         </TestErrorBoundary>,
         railsContext,
         'default-provider-dom-id',
-      );
+      ).reactElement;
 
       await act(async () => {
         root?.render(defaultProviderRoot);

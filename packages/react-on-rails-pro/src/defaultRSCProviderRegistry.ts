@@ -31,6 +31,7 @@ export const setDefaultRSCProviderFactory = (factory: DefaultRSCProviderFactory)
   defaultRSCProviderFactory = factory;
 };
 
+/** @internal Exported only for tests */
 export const clearDefaultRSCProviderFactory = () => {
   defaultRSCProviderFactory = undefined;
 };
@@ -49,10 +50,3 @@ export const maybeWrapWithDefaultRSCProviderWithStatus = (
     wrappedByDefaultRSCProvider: true,
   };
 };
-
-export const maybeWrapWithDefaultRSCProvider = (
-  reactElement: ReactElement,
-  railsContext: RailsContext,
-  domNodeId: string,
-): ReactElement =>
-  maybeWrapWithDefaultRSCProviderWithStatus(reactElement, railsContext, domNodeId).reactElement;
