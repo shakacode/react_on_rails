@@ -446,6 +446,30 @@ export async function buildExecutionContext(
   };
 }
 
+/**
+ * Invokes `__rorpRevalidateTag(tag)` in every live VM context.
+ * The function is set on globalThis by the RSC bundle (ReactOnRailsRSC.ts).
+ * VM contexts that don't have the RSC bundle loaded are silently skipped.
+ */
+export async function revalidateTagInAllVMs(tag: string): Promise<void> {
+  const promises: Promise<void>[] = [];
+  for (const [, vmContext] of vmContexts) {
+    const { context } = vmContext;
+    try {
+      const fn = vm.runInContext(
+        'typeof __rorpRevalidateTag === "function" ? __rorpRevalidateTag : null',
+        context,
+      ) as ((t: string) => Promise<void>) | null;
+      if (fn) {
+        promises.push(fn(tag));
+      }
+    } catch {
+      // VM context doesn't have the revalidation function — skip
+    }
+  }
+  await Promise.all(promises);
+}
+
 /** @internal Used in tests */
 export function resetVM() {
   vmContexts.clear();

@@ -1,4 +1,16 @@
 export const WORKER_STARTUP_FAILURE = 'NODE_RENDERER_WORKER_STARTUP_FAILURE' as const;
+export const REVALIDATE_TAG = 'NODE_RENDERER_REVALIDATE_TAG' as const;
+
+export interface RevalidateTagMessage {
+  type: typeof REVALIDATE_TAG;
+  tag: string;
+}
+
+export function isRevalidateTagMessage(value: unknown): value is RevalidateTagMessage {
+  if (typeof value !== 'object' || value === null) return false;
+  const msg = value as Partial<RevalidateTagMessage>;
+  return msg.type === REVALIDATE_TAG && typeof msg.tag === 'string';
+}
 
 export interface WorkerStartupFailureMessage {
   type: typeof WORKER_STARTUP_FAILURE;

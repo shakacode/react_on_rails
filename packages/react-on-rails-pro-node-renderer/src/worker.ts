@@ -44,6 +44,12 @@ import {
 } from './shared/utils.js';
 import { startSsrRequestOptions, subSpan, trace, type TracingContext } from './shared/tracing.js';
 import { applyFastifyConfigFunctions } from './worker/fastifyConfig.js';
+import {
+  isRevalidateTagMessage,
+  REVALIDATE_TAG,
+  type RevalidateTagMessage,
+} from './shared/workerMessages.js';
+import { revalidateTagInAllVMs } from './worker/vm.js';
 
 export { configureFastify, type FastifyConfigFunction } from './worker/fastifyConfig.js';
 
@@ -207,6 +213,15 @@ export default function run(config: Partial<Config>) {
   });
 
   handleGracefulShutdown(app);
+
+  // Listen for cache tag revalidation broadcasts from the master process.
+  process.on('message', (msg) => {
+    if (isRevalidateTagMessage(msg)) {
+      void revalidateTagInAllVMs(msg.tag).catch((err: unknown) => {
+        log.error({ err, tag: msg.tag }, 'Error handling revalidate-tag IPC broadcast');
+      });
+    }
+  });
 
   // We shouldn't have unhandled errors here, but just in case
   app.addHook('onError', (req, res, err, done) => {
@@ -618,6 +633,36 @@ export default function run(config: Partial<Config>) {
     const allExist = results.every((result) => result.exists);
 
     await setResponse({ status: 200, data: { exists: allExist, results }, headers: {} }, res);
+  });
+
+  app.post<{
+    Body: { tag?: string; password?: string };
+  }>('/cache/revalidate-tag', async (req, res) => {
+    const authResult = authenticate(req.body as AuthBody);
+    if (authResult) {
+      await setResponse(authResult, res);
+      return;
+    }
+
+    const { tag } = req.body ?? {};
+    if (typeof tag !== 'string' || tag.length === 0) {
+      await setResponse(badRequestResponseResult('Missing or empty "tag" field.'), res);
+      return;
+    }
+
+    try {
+      await revalidateTagInAllVMs(tag);
+
+      if (cluster.isWorker && process.send) {
+        const msg: RevalidateTagMessage = { type: REVALIDATE_TAG, tag };
+        process.send(msg);
+      }
+
+      res.send({ ok: true });
+    } catch (err) {
+      log.error({ err, tag }, 'Error revalidating cache tag');
+      await setResponse(errorResponseResult(`Failed to revalidate tag: ${tag}`), res);
+    }
   });
 
   app.get('/info', (_req, res) => {

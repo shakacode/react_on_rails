@@ -12,61 +12,19 @@
  * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import { BundleManifest } from 'react-on-rails-rsc';
-import { buildClientRenderer } from 'react-on-rails-rsc/client.node';
 import type { RailsContextWithServerStreamingCapabilities } from 'react-on-rails/types';
 import transformRSCStream from './transformRSCNodeStream.ts';
-import loadJsonFile from './loadJsonFile.ts';
-import { mergeRSCStreamDiagnosticError } from './rscDiagnostics.ts';
+import { getClientRenderer } from './cache/manifestLoader.ts';
 
 type GetReactServerComponentOnServerProps = {
   componentName: string;
   componentProps: unknown;
 };
 
-let clientRendererPromise: Promise<ReturnType<typeof buildClientRenderer>> | undefined;
-
-const createFromReactOnRailsNodeStream = async (
-  stream: NodeJS.ReadableStream,
-  reactServerManifestFileName: string,
-  reactClientManifestFileName: string,
-  componentName: string,
-) => {
-  if (!clientRendererPromise) {
-    clientRendererPromise = Promise.all([
-      loadJsonFile<BundleManifest>(reactServerManifestFileName),
-      loadJsonFile<BundleManifest>(reactClientManifestFileName),
-    ])
-      .then(([reactServerManifest, reactClientManifest]) =>
-        buildClientRenderer(reactClientManifest, reactServerManifest),
-      )
-      .catch((err: unknown) => {
-        clientRendererPromise = undefined;
-        throw err;
-      });
-  }
-
-  const { createFromNodeStream } = await clientRendererPromise;
-  let rscDiagnosticError: Error | undefined;
-  const transformedStream = transformRSCStream(stream, {
-    componentName,
-    onDiagnosticError(error) {
-      rscDiagnosticError = error;
-    },
-  });
-
-  // Note: this try/catch enriches any error that rejects `createFromNodeStream` — stream read
-  // failures, malformed Flight data, or synchronous render errors. It does NOT catch errors
-  // React surfaces through its error-boundary / Suspense mechanism during the deferred render
-  // phase (e.g. when a Suspense boundary resolves a lazy element); those never reject this
-  // promise. In that case `rscDiagnosticError` (a local that goes out of scope when this
-  // function returns) is discarded and the caller sees only the generic React error. Enriching
-  // the deferred-render path is tracked in #3475.
-  try {
-    return await createFromNodeStream<React.ReactNode>(transformedStream);
-  } catch (error: unknown) {
-    throw mergeRSCStreamDiagnosticError(error, rscDiagnosticError);
-  }
+const createFromReactOnRailsNodeStream = async (stream: NodeJS.ReadableStream) => {
+  const { createFromNodeStream } = await getClientRenderer();
+  const transformedStream = transformRSCStream(stream);
+  return createFromNodeStream<React.ReactNode>(transformedStream);
 };
 
 /**
@@ -105,12 +63,7 @@ const getReactServerComponent =
   async ({ componentName, componentProps }: GetReactServerComponentOnServerProps) => {
     const rscPayloadStream = await railsContext.getRSCPayloadStream(componentName, componentProps);
 
-    return createFromReactOnRailsNodeStream(
-      rscPayloadStream,
-      railsContext.reactServerClientManifestFileName,
-      railsContext.reactClientManifestFileName,
-      componentName,
-    );
+    return createFromReactOnRailsNodeStream(rscPayloadStream);
   };
 
 export default getReactServerComponent;

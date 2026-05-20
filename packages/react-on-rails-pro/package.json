@@ -54,6 +54,10 @@
       "react-server": "./lib/wrapServerComponentRenderer/server.rsc.js",
       "default": "./lib/wrapServerComponentRenderer/server.js"
     },
+    "./cache": {
+      "react-server": "./lib/cache/index.js",
+      "default": "./lib/cache/index.js"
+    },
     "./RSCRoute": "./lib/RSCRoute.js",
     "./RSCProvider": "./lib/RSCProvider.js",
     "./ServerComponentFetchError": "./lib/ServerComponentFetchError.js"
