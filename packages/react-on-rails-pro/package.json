@@ -55,8 +55,7 @@
       "default": "./lib/wrapServerComponentRenderer/server.js"
     },
     "./cache": {
-      "react-server": "./lib/cache/index.js",
-      "default": "./lib/cache/index.js"
+      "react-server": "./lib/cache/index.js"
     },
     "./RSCRoute": "./lib/RSCRoute.js",
     "./RSCProvider": "./lib/RSCProvider.js",
