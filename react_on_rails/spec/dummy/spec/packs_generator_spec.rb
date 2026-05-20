@@ -261,6 +261,7 @@ module ReactOnRails
           CONTENT
 
           expect(pack_content).to eq(expected_content)
+          expect(pack_content).not_to include("registerDefaultRSCProvider")
         end
       end
 
@@ -273,9 +274,12 @@ module ReactOnRails
           component_name = "ReactClientComponentWithClientAndServer"
           component_pack = "#{generated_directory}/#{component_name}.js"
           pack_content = File.read(component_pack)
+          expect(pack_content).to include("import 'react-on-rails-pro/registerDefaultRSCProvider/client';")
           expect(pack_content).to include("import ReactOnRails from 'react-on-rails-pro/client';")
           expect(pack_content).to include("ReactOnRails.register({#{component_name}});")
           expect(pack_content).not_to include("registerServerComponent")
+          expect(pack_content.index("registerDefaultRSCProvider/client"))
+            .to be < pack_content.index("react-on-rails-pro/client")
         end
       end
 
@@ -295,6 +299,7 @@ module ReactOnRails
           CONTENT
 
           expect(pack_content).to eq(expected_content)
+          expect(pack_content).not_to include("registerDefaultRSCProvider")
         end
       end
 
@@ -307,9 +312,12 @@ module ReactOnRails
           component_name = "ReactClientComponent"
           component_pack = "#{generated_directory}/#{component_name}.js"
           pack_content = File.read(component_pack)
+          expect(pack_content).to include("import 'react-on-rails-pro/registerDefaultRSCProvider/client';")
           expect(pack_content).to include("import ReactOnRails from 'react-on-rails-pro/client';")
           expect(pack_content).to include("ReactOnRails.register({#{component_name}});")
           expect(pack_content).not_to include("registerServerComponent")
+          expect(pack_content.index("registerDefaultRSCProvider/client"))
+            .to be < pack_content.index("react-on-rails-pro/client")
         end
       end
 
@@ -326,6 +334,7 @@ module ReactOnRails
           expect(pack_content).to include("import ReactOnRails from 'react-on-rails-pro/client';")
           expect(pack_content).to include("ReactOnRails.register({#{component_name}});")
           expect(pack_content).not_to include("registerServerComponent")
+          expect(pack_content).not_to include("registerDefaultRSCProvider")
         end
       end
 
@@ -342,6 +351,7 @@ module ReactOnRails
           expect(pack_content).to include("import ReactOnRails from 'react-on-rails/client';")
           expect(pack_content).to include("ReactOnRails.register({#{component_name}});")
           expect(pack_content).not_to include("registerServerComponent")
+          expect(pack_content).not_to include("registerDefaultRSCProvider")
         end
       end
 

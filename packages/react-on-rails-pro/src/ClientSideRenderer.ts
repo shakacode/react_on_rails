@@ -23,6 +23,8 @@ import { isServerRenderHash } from 'react-on-rails/isServerRenderResult';
 import { supportsHydrate, supportsRootApi, unmountComponentAtNode } from 'react-on-rails/reactApis';
 import reactHydrateOrRender from 'react-on-rails/reactHydrateOrRender';
 import { debugTurbolinks } from 'react-on-rails/turbolinksUtils';
+import { maybeWrapWithDefaultRSCProviderWithStatus } from './defaultRSCProviderRegistry.ts';
+import handleRecoverableError from './handleRecoverableError.client.ts';
 
 import * as StoreRegistry from './StoreRegistry.ts';
 import * as ComponentRegistry from './ComponentRegistry.ts';
@@ -138,10 +140,18 @@ class ComponentRenderer {
 You returned a server side type of react-router error: ${JSON.stringify(reactElementOrRouterResult)}
 You should return a React.Component always for the client side entry point.`);
         } else {
+          const { reactElement, wrappedByDefaultRSCProvider } = maybeWrapWithDefaultRSCProviderWithStatus(
+            reactElementOrRouterResult as ReactElement,
+            railsContext,
+            domNodeId,
+          );
           const rootOrElement = reactHydrateOrRender(
             domNode,
-            reactElementOrRouterResult as ReactElement,
+            reactElement,
             shouldHydrate,
+            shouldHydrate && wrappedByDefaultRSCProvider
+              ? { identifierPrefix: domNodeId, onRecoverableError: handleRecoverableError }
+              : undefined,
           );
           this.state = 'rendered';
           if (supportsRootApi) {

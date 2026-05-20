@@ -259,9 +259,14 @@ module ReactOnRails
       end
 
       relative_component_path = relative_component_path_from_generated_pack(file_path)
+      default_rsc_provider_import = if load_server_components
+                                      "import '#{react_on_rails_npm_package}/registerDefaultRSCProvider/client';\n"
+                                    else
+                                      ""
+                                    end
 
       <<~FILE_CONTENT.strip
-        import ReactOnRails from '#{react_on_rails_npm_package}/client';
+        #{default_rsc_provider_import}import ReactOnRails from '#{react_on_rails_npm_package}/client';
         import #{registered_component_name} from '#{relative_component_path}';
 
         ReactOnRails.register({#{registered_component_name}});
