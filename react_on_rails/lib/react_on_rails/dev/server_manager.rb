@@ -54,7 +54,15 @@ module ReactOnRails
           puts "🔪 Killing all development processes..."
           puts ""
 
-          killed_any = kill_running_processes || kill_port_processes(killable_ports) || cleanup_socket_files
+          # Run every cleanup step unconditionally so a successful first step
+          # (e.g. pattern-based kill) doesn't leave stale port-bound processes
+          # or socket/pid files behind. `.any?` still gives us the
+          # "anything actually got killed?" signal for the summary message.
+          killed_any = [
+            kill_running_processes,
+            kill_port_processes(killable_ports),
+            cleanup_socket_files
+          ].any?
 
           print_kill_summary(killed_any)
         end
@@ -67,18 +75,21 @@ module ReactOnRails
         # when Pro renderer support is active. Uses PortSelector's pure
         # #base_port_hash so no "Base port detected" banner prints during a kill.
         #
-        # `pro_renderer_active?` here is evaluated against the kill-time
-        # environment, where RENDERER_PORT / REACT_RENDERER_URL set by
-        # `configure_ports` in the *previous* `bin/dev` session are not
-        # exported into the new shell. So in OSS apps the renderer port is
-        # included only when the Pro gem is actually loaded — this is the
-        # intended behavior, not a bug.
+        # We include base[:renderer] only when there is evidence the renderer
+        # was actually configured for this app — either the Pro gem is loaded
+        # and a renderer env var is set, or a renderer env var is set in OSS
+        # mode. This mirrors `configured_renderer_port_for_kill`'s conservative
+        # 3800 guard so a fresh-checkout OSS+Pro-gem app running `bin/dev kill`
+        # doesn't kill an unrelated process bound to base+2. Pattern-based
+        # killing (development_processes / node.*react[-_]on[-_]rails) still
+        # catches an active renderer node process even when the kill shell
+        # doesn't carry the renderer env vars.
         def killable_ports
           base = PortSelector.base_port_hash
           return default_killable_ports unless base
 
           ports = [base[:rails], base[:webpack]]
-          ports << base[:renderer] if pro_renderer_active?
+          ports << base[:renderer] if renderer_env_signal?
           ports
         end
 

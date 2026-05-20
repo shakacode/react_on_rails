@@ -1196,10 +1196,36 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       described_class.kill_processes
     end
 
+    # Regression: previously kill_processes used `||` which short-circuited
+    # subsequent cleanup steps as soon as one returned truthy. A successful
+    # pattern-based kill would leave stale port-bound processes and socket/pid
+    # files behind. All three cleanup helpers must always run.
+    it "runs port kills and socket cleanup even when pattern-based kill found processes" do
+      allow(Open3).to receive(:capture2).with("pgrep", "-f", "rails", err: File::NULL).and_return(["1234", nil])
+      allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
+      allow(Process).to receive(:pid).and_return(9999)
+      allow(Process).to receive(:kill)
+
+      expect(Open3).to receive(:capture2).with("lsof", "-ti", ":3000", err: File::NULL).and_return(["", nil])
+      expect(Open3).to receive(:capture2).with("lsof", "-ti", ":3001", err: File::NULL).and_return(["", nil])
+
+      socket = ".overmind.sock"
+      allow(Dir).to receive(:glob).with("tmp/sockets/overmind*.sock").and_return([])
+      allow(File).to receive(:exist?).with(socket).and_return(true)
+      allow(File).to receive(:exist?).with("tmp/pids/server.pid").and_return(false)
+      expect(File).to receive(:delete).with(socket)
+
+      described_class.kill_processes
+    end
+
     it "targets base-port-derived ports when REACT_ON_RAILS_BASE_PORT is active" do
       # Without base-port awareness, `bin/dev kill` in a worktree running on
       # 5000/5001/5002 would fall back to killing stale processes on 3000/3001
-      # instead — the actual ports would be left untouched.
+      # instead — the actual ports would be left untouched. RENDERER_PORT
+      # is set to signal that a Pro renderer was configured on base+2, so
+      # the base-port branch includes 5002 (mirrors the renderer_env_signal?
+      # guard used by `configured_renderer_port_for_kill`).
+      ENV["RENDERER_PORT"] = "5002"
       allow(ReactOnRails::Dev::PortSelector)
         .to receive(:base_port_hash)
         .and_return({ rails: 5000, webpack: 5001, renderer: 5002, base_port_mode: true })
@@ -1221,6 +1247,26 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         .to receive(:base_port_hash)
         .and_return({ rails: 5000, webpack: 5001, renderer: 5002, base_port_mode: true })
       allow(described_class).to receive(:pro_renderer_active?).and_return(false)
+      # No pattern-based processes so kill_port_processes runs.
+      allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
+
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":5000", err: File::NULL).and_return(["", nil])
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":5001", err: File::NULL).and_return(["", nil])
+      expect(Open3).not_to receive(:capture2).with("lsof", "-ti", ":5002", err: File::NULL)
+
+      described_class.kill_processes
+    end
+
+    it "skips the base-port-derived renderer port when Pro gem is loaded but no renderer env vars are set" do
+      # Mirrors the default-port branch's renderer_env_signal? guard: in a
+      # fresh-checkout OSS+Pro-gem app where no renderer was ever configured,
+      # killing base+2 by default could nuke an unrelated process bound there.
+      # Pattern-based killing (development_processes) still catches an active
+      # renderer node process if one is running.
+      allow(ReactOnRails::Dev::PortSelector)
+        .to receive(:base_port_hash)
+        .and_return({ rails: 5000, webpack: 5001, renderer: 5002, base_port_mode: true })
+      allow(described_class).to receive(:pro_renderer_active?).and_return(true)
       # No pattern-based processes so kill_port_processes runs.
       allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
 
