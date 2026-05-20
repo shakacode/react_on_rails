@@ -189,6 +189,8 @@ class HealthController < ActionController::Base
 
     # Missing or malformed renderer_url raises and surfaces as a 500 so configuration mistakes stay visible.
     renderer_uri = URI.parse(renderer_url)
+    # Assumes renderer_url is a plain http://host[:port][/path] URL with no
+    # colon-number patterns outside the authority component (e.g. embedded URLs in query strings).
     renderer_port = renderer_url.match?(/:\d+(?:[\/?#]|$)/) ? renderer_uri.port : 3800
     Socket.tcp("localhost", renderer_port, connect_timeout: 1) {} # open + immediately close
     head :ok
@@ -311,7 +313,7 @@ services:
       RENDERER_HOST: '0.0.0.0'
       NODE_OPTIONS: '--max-old-space-size=512'
     healthcheck:
-      # --max-time 2 leaves a 1 s buffer below the 3 s orchestrator timeout so curl exits
+      # --max-time 2 leaves a 1 s buffer below the 3 s healthcheck timeout so curl exits
       # cleanly with a non-zero code rather than being killed mid-request.
       test: ['CMD', 'curl', '-sf', '--max-time', '2', '--http2-prior-knowledge', 'http://localhost:3800/info']
       interval: 5s

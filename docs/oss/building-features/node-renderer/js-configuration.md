@@ -170,11 +170,26 @@ The sample `/health` route is intentionally shallow and omits handler parameters
 also passes `request` and `reply` to handlers if you need to inspect headers, set status codes, or customize the
 response. Add warm-up or readiness-gate logic inside this handler if readiness should wait for renderer-specific
 initialization. To signal not-ready while keeping Fastify's return-value style, add `reply` to the handler parameters,
-set the status with `reply.code(503)`, and return `{ status: 'warming_up' }` from that branch. Do not call `reply.send()`
-and then return another response object. The `-f` flag in `curl -sf` causes curl to exit non-zero for HTTP 4xx/5xx
-responses, so a `503` from this handler correctly fails the probe. Kubernetes exec probes treat any non-zero curl exit
-code as a failure; the response body is irrelevant to probe semantics, so you can return whatever payload is useful for
-debugging, such as `{ status: 'ok', workers: 4 }`.
+set the status with `reply.code(503)`, and return a response object from that branch. Do not call `reply.send()` and
+then return another response object.
+
+```js
+// Example: signal not-ready (e.g. while warming up workers)
+configureFastify((app) => {
+  app.get('/health', (request, reply) => {
+    if (!workersReady) {
+      reply.code(503);
+      return { status: 'warming_up' };
+    }
+    return { status: 'ok' };
+  });
+});
+```
+
+The `-f` flag in `curl -sf` causes curl to exit non-zero for HTTP 4xx/5xx responses, so a `503` from this handler
+correctly fails the probe. Kubernetes exec probes treat any non-zero curl exit code as a failure; the response body is
+irrelevant to probe semantics, so you can return whatever payload is useful for debugging, such as
+`{ status: 'ok', workers: 4 }`.
 
 Routes registered with `configureFastify` do not automatically use the renderer's render and asset authentication
 prechecks. A custom `/health` route like the one above is reachable without the renderer password unless you add your own
