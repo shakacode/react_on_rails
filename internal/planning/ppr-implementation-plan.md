@@ -51,7 +51,7 @@ reimplementation.
 
 - **Do not** attempt to invent partial RSC postpone/resume. The RSC binary
   format itself is the cache storage format; that is the right abstraction.
-- The `"use cache"` mechanism is therefore *memoization keyed by arguments*,
+- The `"use cache"` mechanism is therefore _memoization keyed by arguments_,
   whose stored value is an RSC byte stream. Both cache hit and cache miss
   return a tree reconstructed via `createFromReadableStream`, so cached and
   freshly-rendered output are bit-identical.
@@ -143,7 +143,7 @@ registerServerReference(f, "<stable id>", null)
 Details that must be reproduced:
 
 - **`<stable id>`** is a content hash derived from `(salt, filename,
-  exportName)`. It must be stable across requests and stable across deploys of
+exportName)`. It must be stable across requests and stable across deploys of
   the same source. Same recipe as the framework we studied.
 - **Closure-captured variables** are bound as a leading encrypted args array
   (the same encryption used for server-action bound args). This lets a closed-
@@ -173,7 +173,7 @@ into all of our supported build configurations.
    - On **MISS**, run `fn(...args)`, render its output via
      `renderToReadableStream` (or `prerender` during a prerender pass) to an
      RSC byte stream, `tee()` it — one branch goes to `handler.set(key,
-     pending)` for storage, the other goes to `createFromReadableStream` for
+pending)` for storage, the other goes to `createFromReadableStream` for
      immediate return.
 3. **Single exit point.** Hit and miss both return through
    `createFromReadableStream`, so the value the caller sees is always
@@ -191,20 +191,20 @@ A pluggable interface, looked up by **kind**:
 
 ```ts
 interface CacheHandler {
-  get(cacheKey: string, softTags: string[]): Promise<CacheEntry | undefined>
-  set(cacheKey: string, pendingEntry: Promise<CacheEntry>): Promise<void>
-  refreshTags(): Promise<void>
-  getExpiration(tags: string[]): Promise<number>
-  updateTags(tags: string[], durations?: { expire?: number }): Promise<void>
+  get(cacheKey: string, softTags: string[]): Promise<CacheEntry | undefined>;
+  set(cacheKey: string, pendingEntry: Promise<CacheEntry>): Promise<void>;
+  refreshTags(): Promise<void>;
+  getExpiration(tags: string[]): Promise<number>;
+  updateTags(tags: string[], durations?: { expire?: number }): Promise<void>;
 }
 
 interface CacheEntry {
-  value: ReadableStream<Uint8Array>     // the cached RSC bytes
-  tags: string[]
-  timestamp: number                     // ms since epoch
-  stale: number                         // client stale window (s)
-  revalidate: number                    // server revalidate window (s)
-  expire: number                        // hard expiry (s)
+  value: ReadableStream<Uint8Array>; // the cached RSC bytes
+  tags: string[];
+  timestamp: number; // ms since epoch
+  stale: number; // client stale window (s)
+  revalidate: number; // server revalidate window (s)
+  expire: number; // hard expiry (s)
 }
 ```
 
@@ -228,8 +228,12 @@ config.cache_store = :redis_cache_store, { url: ENV["REDIS_URL"] }
 ```ts
 // JS side adapter (runs in the renderer process or talks to Rails over IPC)
 class ActiveSupportCacheHandler implements CacheHandler {
-  async get(key, tags) { /* Rails.cache.read(key) */ }
-  async set(key, pending) { /* drain stream, Rails.cache.write(key, buf, expires_in: …) */ }
+  async get(key, tags) {
+    /* Rails.cache.read(key) */
+  }
+  async set(key, pending) {
+    /* drain stream, Rails.cache.write(key, buf, expires_in: …) */
+  }
   // tag manifest stored under reserved key prefix
 }
 ```
@@ -292,13 +296,13 @@ studied, and the reimplementation validates it end-to-end (the included
 
 ```tsx
 async function Page({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params       // dynamic in the outer wrapper
-  return <CachedBySlug slug={slug} />
+  const { slug } = await params; // dynamic in the outer wrapper
+  return <CachedBySlug slug={slug} />;
 }
 
 async function CachedBySlug({ slug }: { slug: string }) {
-  "use cache"
-  cacheTag(`product:${slug}`)
+  'use cache';
+  cacheTag(`product:${slug}`);
   // … uses slug, but cookies/headers/etc. are forbidden here
 }
 ```
@@ -324,18 +328,18 @@ Users register custom kinds in config:
 ```js
 module.exports = {
   cacheHandlers: {
-    default: require.resolve("./my-memory-handler.js"),
-    remote:  require.resolve("./my-redis-handler.js"),
-    products: require.resolve("./my-products-cache.js"),
+    default: require.resolve('./my-memory-handler.js'),
+    remote: require.resolve('./my-redis-handler.js'),
+    products: require.resolve('./my-products-cache.js'),
   },
-}
+};
 ```
 
 And opt into them per cached function:
 
 ```tsx
 async function getProducts() {
-  "use cache: products"
+  'use cache: products';
   // …
 }
 ```
@@ -348,7 +352,7 @@ The HTML stream **does** use real React postpone/resume — distinct from the
 RSC layer.
 
 - **Build / static generation.** `react-dom/static.prerender(element, {
-  signal })` returns `{ prelude, postponed }`. We persist the prelude (the
+signal })` returns `{ prelude, postponed }`. We persist the prelude (the
   static shell HTML) and the serialized `postponed` blob as **paired
   artifacts**. They must update together; serving a new shell with an old
   postponed state corrupts the resumed continuation.
@@ -404,20 +408,21 @@ Recommended:
 All mechanisms described above are validated in
 **<https://github.com/AbanoubGhadban/ppr-from-scratch>**, a ~1,000-line
 reimplementation in plain Node.js using only React + `react-server-dom-webpack`
-+ `react-dom`. It includes:
 
-- RSC tree ⇄ bytes round-trip (`renderToReadableStream` /
+- `react-dom`. It includes:
+
+* RSC tree ⇄ bytes round-trip (`renderToReadableStream` /
   `createFromReadableStream`).
-- A hand-written `cache(id, fn)` wrapper with the `(buildId, id, args)`-keyed
+* A hand-written `cache(id, fn)` wrapper with the `(buildId, id, args)`-keyed
   cache, both in-memory and on-disk handler examples.
-- A faithful port of the coordination signal (deferred settle, `beginRead`
+* A faithful port of the coordination signal (deferred settle, `beginRead`
   cancels timer) and module-load tracking.
-- The two-pass prerender (prospective + final) with abort-based shell
+* The two-pass prerender (prospective + final) with abort-based shell
   carving.
-- The HTML/Fizz layer: `react-dom/static.prerender` →
+* The HTML/Fizz layer: `react-dom/static.prerender` →
   `{ prelude, postponed }`; `react-dom/server.resume` → continuation.
-- Client component references with a hand-rolled bundler manifest.
-- A demo app that exercises every case: static, sync, cached sibling, cached
+* Client component references with a hand-rolled bundler manifest.
+* A demo app that exercises every case: static, sync, cached sibling, cached
   leaf behind plain async, client component nested in a cached server
   component.
 
@@ -433,18 +438,18 @@ refs), and identical per-request behavior under counters and timing.
 
 Each phase ends with tests + a working demo and can be merged independently.
 
-| # | Scope | Rough effort |
-|---|---|---|
-| 1 | `CacheHandler` interface + default in-memory LRU + `ActiveSupport::Cache` adapter | ~2 weeks |
-| 2 | Runtime `cache()` wrapper: key derivation, single-exit hit/miss, Resume Data Cache | ~2 weeks |
-| 3 | Build-time `"use cache"` transform (Babel/SWC): directive detection, stable id, wrapper emission, server-reference registration, bound-arg encryption | ~3 weeks |
-| 4 | Coordination signal + module-load tracking + two-pass prerender driver | ~2 weeks |
-| 5 | Hanging-promise plumbing for Rails request-time APIs (current_user, locale, session, request) | ~2 weeks |
-| 6 | HTML/Fizz prerender + resume integration; postponed-state serialization; atomic shell+state storage | ~3 weeks |
-| 7 | `cacheLife` / `cacheTag` / `revalidateTag` API + tag manifest + Ruby-side invalidation calls | ~2 weeks |
-| 8 | Client-reference threading through the cache wrapper (bundler manifest plumbing) | ~1 week |
-| 9 | CDN resume HTTP protocol + reference Cloudflare Workers adapter | ~2 weeks |
-| 10 | Documentation, examples, migration guides | ~2 weeks |
+| #   | Scope                                                                                                                                                 | Rough effort |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| 1   | `CacheHandler` interface + default in-memory LRU + `ActiveSupport::Cache` adapter                                                                     | ~2 weeks     |
+| 2   | Runtime `cache()` wrapper: key derivation, single-exit hit/miss, Resume Data Cache                                                                    | ~2 weeks     |
+| 3   | Build-time `"use cache"` transform (Babel/SWC): directive detection, stable id, wrapper emission, server-reference registration, bound-arg encryption | ~3 weeks     |
+| 4   | Coordination signal + module-load tracking + two-pass prerender driver                                                                                | ~2 weeks     |
+| 5   | Hanging-promise plumbing for Rails request-time APIs (current_user, locale, session, request)                                                         | ~2 weeks     |
+| 6   | HTML/Fizz prerender + resume integration; postponed-state serialization; atomic shell+state storage                                                   | ~3 weeks     |
+| 7   | `cacheLife` / `cacheTag` / `revalidateTag` API + tag manifest + Ruby-side invalidation calls                                                          | ~2 weeks     |
+| 8   | Client-reference threading through the cache wrapper (bundler manifest plumbing)                                                                      | ~1 week      |
+| 9   | CDN resume HTTP protocol + reference Cloudflare Workers adapter                                                                                       | ~2 weeks     |
+| 10  | Documentation, examples, migration guides                                                                                                             | ~2 weeks     |
 
 Total rough order of magnitude: **~6 months** end-to-end, parallelizable to
 **~3 months** with two engineers (one focused on build/transform, one on
@@ -463,7 +468,7 @@ runtime/cache/coordination).
 - **Out-of-band data changes.** `revalidateTag` only catches mutations that
   the app performs. Database changes from outside the app (scripts, other
   services, scheduled jobs) require relying on `cacheLife` bounds.
-- **HTML/RSC value divergence.** Non-deterministic reads inside *non-cached*
+- **HTML/RSC value divergence.** Non-deterministic reads inside _non-cached_
   server components on a PPR page cause a divergence between the built-once
   static HTML and the per-request fresh RSC — yielding a hydration mismatch
   for that subtree. We must implement a build-time guard similar to the
