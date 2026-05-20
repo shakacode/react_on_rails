@@ -55,6 +55,10 @@ module MockStreamHelper
       build_response(request)
     end
 
+    def post_bidi(_path, headers: [])
+      raise NotImplementedError, "MockClient does not support post_bidi; use a real renderer for incremental tests"
+    end
+
     def close; end
 
     private
@@ -97,6 +101,10 @@ module MockStreamHelper
       end
 
       def mock_streaming_response(url, status = 200, count: 1, &block)
+        unless count == Float::INFINITY || (count.is_a?(Integer) && count.positive?)
+          raise ArgumentError, "count must be a positive Integer or Float::INFINITY"
+        end
+
         mock_responses[url] ||= []
 
         if mock_responses[url].any? { |mock| mock[:remaining] == Float::INFINITY }

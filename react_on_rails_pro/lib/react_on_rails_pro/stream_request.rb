@@ -100,29 +100,31 @@ module ReactOnRailsPro
         send_bundle = false
         barrier = nil
 
-        loop do
-          # Create a new barrier for each attempt so that on 410 retry we stop
-          # any async fibers still writing to the previous request body.
-          barrier = Async::Barrier.new
+        begin
+          loop do
+            # Create a new barrier for each attempt so that on 410 retry we stop
+            # any async fibers still writing to the previous request body.
+            barrier = Async::Barrier.new
 
-          stream_response = @request_executor.call(send_bundle, barrier)
+            stream_response = @request_executor.call(send_bundle, barrier)
 
-          process_response_chunks(stream_response, &block)
-          break
-        rescue ReactOnRailsPro::RendererHttpClient::HTTPError => e
+            process_response_chunks(stream_response, &block)
+            break
+          rescue ReactOnRailsPro::RendererHttpClient::HTTPError => e
+            barrier&.stop
+            send_bundle = handle_http_error(e, send_bundle)
+          rescue ReactOnRailsPro::RendererHttpClient::TimeoutError => e
+            raise ReactOnRailsPro::Error, "Time out error while server side render streaming a component.\n" \
+                                          "Original error:\n#{e}\n#{e.backtrace}"
+          rescue ReactOnRailsPro::RendererHttpClient::ConnectionError => e
+            raise ReactOnRailsPro::Error, "Connection error while server side render streaming a component.\n" \
+                                          "Original error:\n#{e}\n#{e.backtrace}"
+          end
+
+          barrier&.wait
+        ensure
           barrier&.stop
-          send_bundle = handle_http_error(e, send_bundle)
-        rescue ReactOnRailsPro::RendererHttpClient::TimeoutError => e
-          barrier&.stop
-          raise ReactOnRailsPro::Error, "Time out error while server side render streaming a component.\n" \
-                                        "Original error:\n#{e}\n#{e.backtrace}"
-        rescue ReactOnRailsPro::RendererHttpClient::ConnectionError => e
-          barrier&.stop
-          raise ReactOnRailsPro::Error, "Connection error while server side render streaming a component.\n" \
-                                        "Original error:\n#{e}\n#{e.backtrace}"
         end
-
-        barrier&.wait
       end
     end
 
@@ -138,12 +140,12 @@ module ReactOnRailsPro
       received_first_chunk = false
 
       stream_response.each do |chunk|
+        next if stream_response.error?
+
         unless received_first_chunk
           received_first_chunk = true
           @first_chunk_warn_callback&.call(Time.now - request_start_time)
         end
-
-        next if stream_response.error?
 
         parser.feed(chunk, &block)
       end

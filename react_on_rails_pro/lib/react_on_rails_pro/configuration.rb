@@ -109,6 +109,11 @@ module ReactOnRailsPro
     # still valid but no longer changes process-wide connection reuse.
     # Setting nil keeps the default stream limit at request time; it is not unlimited.
     def renderer_http_pool_size=(value)
+      unless value.nil? || (value.is_a?(Integer) && value.positive?)
+        raise ReactOnRailsPro::Error,
+              "config.renderer_http_pool_size must be a positive integer or nil"
+      end
+
       unless value.nil? || value == DEFAULT_RENDERER_HTTP_POOL_SIZE
         Rails.logger.warn "[ReactOnRailsPro] config.renderer_http_pool_size now limits concurrent HTTP/2 streams " \
                           "on each request-scoped async-http client; it no longer configures a persistent " \

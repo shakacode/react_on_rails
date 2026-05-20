@@ -776,6 +776,30 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
 
         expect(ReactOnRailsPro.configuration.renderer_http_pool_size).to be_nil
       end
+
+      it "raises error for zero" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.renderer_http_pool_size = 0
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /must be a positive integer or nil/)
+      end
+
+      it "raises error for negative numbers" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.renderer_http_pool_size = -1
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /must be a positive integer or nil/)
+      end
+
+      it "raises error for non-integer values" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.renderer_http_pool_size = 5.5
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /must be a positive integer or nil/)
+      end
     end
 
     describe ".renderer_http_keep_alive_timeout" do
@@ -799,9 +823,8 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
       end
 
       it "does not warn for the default value assigned during configuration initialization" do
-        expect do
-          expect(ReactOnRailsPro.configuration.renderer_http_keep_alive_timeout).to eq(30)
-        end.not_to output.to_stderr
+        expect(Rails.logger).not_to receive(:warn).with(/renderer_http_keep_alive_timeout/)
+        expect(ReactOnRailsPro.configuration.renderer_http_keep_alive_timeout).to eq(30)
       end
 
       it "accepts nil" do

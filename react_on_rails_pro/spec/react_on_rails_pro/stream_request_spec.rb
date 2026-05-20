@@ -271,6 +271,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       barriers = []
 
       stream = described_class.create do |_send_bundle, barrier|
+        allow(barrier).to receive(:stop).and_call_original
         barriers << barrier
         call_count += 1
         if call_count == 1
@@ -284,6 +285,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
 
       expect(barriers.size).to eq(2)
       expect(barriers[0]).not_to eq(barriers[1])
+      expect(barriers[0]).to have_received(:stop).at_least(:once)
     end
   end
 

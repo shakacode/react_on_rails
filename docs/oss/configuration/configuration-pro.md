@@ -109,7 +109,7 @@ ReactOnRailsPro.configure do |config|
   # Default for `renderer_http_pool_timeout` is 5
   config.renderer_http_pool_timeout = 5
 
-  # warn_timeout  - Displays an error message if a request takes longer than the given time in seconds.
+  # warn_timeout  - Displays a warning message if a request takes longer than the given time in seconds.
   # Default is 0.25
   config.renderer_http_pool_warn_timeout = 0.25 # seconds
 
