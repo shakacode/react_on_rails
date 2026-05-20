@@ -31,7 +31,8 @@ import {
   StreamingTrackers,
   transformRenderStreamChunksToResultObject,
 } from '../streamingUtils.ts';
-import { getServerRenderer, setManifestFileNames } from '../cache/manifestLoader.ts';
+import { setManifestFileNames } from '../cache/manifestLoader.ts';
+import { getServerRenderer } from '../cache/manifestLoaderServer.ts';
 import { setBuildId } from '../cache/buildIdProvider.ts';
 
 const CLIENT_HOOK_NAMES = [

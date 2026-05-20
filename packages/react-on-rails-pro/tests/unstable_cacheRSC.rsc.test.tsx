@@ -11,7 +11,6 @@ import { InMemoryLRUCacheHandler } from '../src/cache/InMemoryLRUCacheHandler';
 
 // jest.mock is hoisted, so we build renderers inside the factory using require()
 jest.mock('../src/cache/manifestLoader', () => {
-  const { buildServerRenderer } = require('react-on-rails-rsc/server.node');
   const { buildClientRenderer } = require('react-on-rails-rsc/client.node');
 
   const emptyManifest = {
@@ -19,14 +18,29 @@ jest.mock('../src/cache/manifestLoader', () => {
     moduleLoading: { prefix: '', crossOrigin: null },
   };
 
-  const sr = buildServerRenderer(emptyManifest);
   const cr = buildClientRenderer(emptyManifest, emptyManifest);
 
   return {
     __esModule: true,
     setManifestFileNames: jest.fn(),
-    getServerRenderer: jest.fn().mockResolvedValue(sr),
+    getClientManifestFileName: jest.fn().mockReturnValue('fake-manifest.json'),
     getClientRenderer: jest.fn().mockResolvedValue(cr),
+  };
+});
+
+jest.mock('../src/cache/manifestLoaderServer', () => {
+  const { buildServerRenderer } = require('react-on-rails-rsc/server.node');
+
+  const emptyManifest = {
+    filePathToModuleMetadata: {},
+    moduleLoading: { prefix: '', crossOrigin: null },
+  };
+
+  const sr = buildServerRenderer(emptyManifest);
+
+  return {
+    __esModule: true,
+    getServerRenderer: jest.fn().mockResolvedValue(sr),
   };
 });
 

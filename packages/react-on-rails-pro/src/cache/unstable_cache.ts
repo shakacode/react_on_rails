@@ -18,7 +18,8 @@ import type { CacheEntry } from './CacheHandler.ts';
 import { getCacheHandler } from './cacheHandlerRegistry.ts';
 import { buildCacheKey } from './buildCacheKey.ts';
 import { getBuildId } from './buildIdProvider.ts';
-import { getServerRenderer, getClientRenderer } from './manifestLoader.ts';
+import { getClientRenderer } from './manifestLoader.ts';
+import { getServerRenderer } from './manifestLoaderServer.ts';
 
 export interface UnstableCacheOptions {
   /** Stable identifier for this cached function. Required. */
