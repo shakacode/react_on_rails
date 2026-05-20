@@ -12,17 +12,39 @@
  * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
+import { BundleManifest } from 'react-on-rails-rsc';
+import { buildClientRenderer } from 'react-on-rails-rsc/client.node';
 import type { RailsContextWithServerStreamingCapabilities } from 'react-on-rails/types';
 import transformRSCStream from './transformRSCNodeStream.ts';
-import { getClientRenderer } from './cache/manifestLoader.ts';
+import loadJsonFile from './loadJsonFile.ts';
 
 type GetReactServerComponentOnServerProps = {
   componentName: string;
   componentProps: unknown;
 };
 
-const createFromReactOnRailsNodeStream = async (stream: NodeJS.ReadableStream) => {
-  const { createFromNodeStream } = await getClientRenderer();
+let clientRendererPromise: Promise<ReturnType<typeof buildClientRenderer>> | undefined;
+
+const createFromReactOnRailsNodeStream = async (
+  stream: NodeJS.ReadableStream,
+  reactServerManifestFileName: string,
+  reactClientManifestFileName: string,
+) => {
+  if (!clientRendererPromise) {
+    clientRendererPromise = Promise.all([
+      loadJsonFile<BundleManifest>(reactServerManifestFileName),
+      loadJsonFile<BundleManifest>(reactClientManifestFileName),
+    ])
+      .then(([reactServerManifest, reactClientManifest]) =>
+        buildClientRenderer(reactClientManifest, reactServerManifest),
+      )
+      .catch((err: unknown) => {
+        clientRendererPromise = undefined;
+        throw err;
+      });
+  }
+
+  const { createFromNodeStream } = await clientRendererPromise;
   const transformedStream = transformRSCStream(stream);
   return createFromNodeStream<React.ReactNode>(transformedStream);
 };
@@ -63,7 +85,11 @@ const getReactServerComponent =
   async ({ componentName, componentProps }: GetReactServerComponentOnServerProps) => {
     const rscPayloadStream = await railsContext.getRSCPayloadStream(componentName, componentProps);
 
-    return createFromReactOnRailsNodeStream(rscPayloadStream);
+    return createFromReactOnRailsNodeStream(
+      rscPayloadStream,
+      railsContext.reactServerClientManifestFileName,
+      railsContext.reactClientManifestFileName,
+    );
   };
 
 export default getReactServerComponent;
