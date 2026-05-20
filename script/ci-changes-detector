@@ -74,7 +74,10 @@ UNCATEGORIZED_CHANGED=false
 
 # Analyze each changed file
 while IFS= read -r file; do
-  # Case patterns intentionally keep legacy top-level and recursive globs side by side.
+  # *.md and docs/* intentionally overlap (docs/foo.md matches both); *.md wins
+  # because it comes first. Several later branches (generators, Ruby core,
+  # specs) also pair top-level and **/* globs for clarity even though * matches
+  # any character including /.
   # shellcheck disable=SC2221,SC2222
   case "$file" in
     # Documentation files

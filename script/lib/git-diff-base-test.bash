@@ -32,24 +32,6 @@ assert_equals() {
   fi
 }
 
-assert_exit_zero() {
-  local actual="$1"
-  local label="${2:-command}"
-  if [ "$actual" -ne 0 ]; then
-    fail "$label: expected exit 0, got $actual"
-    return 1
-  fi
-}
-
-assert_exit_nonzero() {
-  local actual="$1"
-  local label="${2:-command}"
-  if [ "$actual" -eq 0 ]; then
-    fail "$label: expected non-zero exit, got 0"
-    return 1
-  fi
-}
-
 assert_contains() {
   local haystack="$1"
   local needle="$2"
@@ -161,19 +143,22 @@ test_fetch_depth_forces_base_10() {
 }
 
 test_fetch_depth_warns_and_defaults_on_zero() {
-  local out warning
-  out="$(GIT_DIFF_BASE_FETCH_DEPTH=0 git_diff_base_fetch_depth 2>/tmp/depth-warn.$$)"
-  warning="$(cat /tmp/depth-warn.$$)"
-  rm -f /tmp/depth-warn.$$
+  # mktemp into the per-test tmpdir (run_test's cwd) so files are unique and
+  # swept up by run_test's rm -rf even when an assertion fails. /tmp/...$$
+  # leaks on failure because $$ in a subshell is the parent PID.
+  local out warning warn_file
+  warn_file="$(mktemp depth-warn.XXXXXX)"
+  out="$(GIT_DIFF_BASE_FETCH_DEPTH=0 git_diff_base_fetch_depth 2>"$warn_file")"
+  warning="$(cat "$warn_file")"
   assert_equals "50" "$out" "fallback depth"
   assert_contains "$warning" "invalid fetch depth" "warning text"
 }
 
 test_fetch_depth_warns_and_defaults_on_garbage() {
-  local out warning
-  out="$(GIT_DIFF_BASE_FETCH_DEPTH=abc git_diff_base_fetch_depth 2>/tmp/depth-warn.$$)"
-  warning="$(cat /tmp/depth-warn.$$)"
-  rm -f /tmp/depth-warn.$$
+  local out warning warn_file
+  warn_file="$(mktemp depth-warn.XXXXXX)"
+  out="$(GIT_DIFF_BASE_FETCH_DEPTH=abc git_diff_base_fetch_depth 2>"$warn_file")"
+  warning="$(cat "$warn_file")"
   assert_equals "50" "$out" "fallback depth"
   assert_contains "$warning" "invalid fetch depth" "warning text"
 }
@@ -185,19 +170,19 @@ test_max_attempts_uses_default_when_unset() {
 }
 
 test_max_attempts_caps_at_30() {
-  local out warning
-  out="$(GIT_DIFF_BASE_MAX_ATTEMPTS=99 git_diff_base_max_attempts 2>/tmp/cap-warn.$$)"
-  warning="$(cat /tmp/cap-warn.$$)"
-  rm -f /tmp/cap-warn.$$
+  local out warning warn_file
+  warn_file="$(mktemp cap-warn.XXXXXX)"
+  out="$(GIT_DIFF_BASE_MAX_ATTEMPTS=99 git_diff_base_max_attempts 2>"$warn_file")"
+  warning="$(cat "$warn_file")"
   assert_equals "30" "$out" "capped attempts"
   assert_contains "$warning" "exceeds cap" "cap warning"
 }
 
 test_max_attempts_warns_on_invalid() {
-  local out warning
-  out="$(GIT_DIFF_BASE_MAX_ATTEMPTS=foo git_diff_base_max_attempts 2>/tmp/attempts-warn.$$)"
-  warning="$(cat /tmp/attempts-warn.$$)"
-  rm -f /tmp/attempts-warn.$$
+  local out warning warn_file
+  warn_file="$(mktemp attempts-warn.XXXXXX)"
+  out="$(GIT_DIFF_BASE_MAX_ATTEMPTS=foo git_diff_base_max_attempts 2>"$warn_file")"
+  warning="$(cat "$warn_file")"
   assert_equals "8" "$out" "fallback attempts"
   assert_contains "$warning" "invalid GIT_DIFF_BASE_MAX_ATTEMPTS" "warning text"
 }
@@ -215,10 +200,10 @@ test_unshallow_timeout_accepts_zero() {
 }
 
 test_unshallow_timeout_warns_on_invalid() {
-  local out warning
-  out="$(GIT_DIFF_BASE_UNSHALLOW_TIMEOUT_SECONDS=banana git_diff_base_unshallow_timeout_seconds 2>/tmp/timeout-warn.$$)"
-  warning="$(cat /tmp/timeout-warn.$$)"
-  rm -f /tmp/timeout-warn.$$
+  local out warning warn_file
+  warn_file="$(mktemp timeout-warn.XXXXXX)"
+  out="$(GIT_DIFF_BASE_UNSHALLOW_TIMEOUT_SECONDS=banana git_diff_base_unshallow_timeout_seconds 2>"$warn_file")"
+  warning="$(cat "$warn_file")"
   assert_equals "300" "$out" "fallback timeout"
   assert_contains "$warning" "invalid GIT_DIFF_BASE_UNSHALLOW_TIMEOUT_SECONDS" "warning text"
 }
@@ -237,11 +222,11 @@ test_run_test_counts_non_final_assertion_failure() {
   local before_run="$TESTS_RUN"
   local before_failed="$TESTS_FAILED"
   local before_failure_count="${#FAILURES[@]}"
-  local out_file="/tmp/harness-self-test-out.$$"
-  local err_file="/tmp/harness-self-test-err.$$"
+  local out_file err_file
+  out_file="$(mktemp harness-self-test-out.XXXXXX)"
+  err_file="$(mktemp harness-self-test-err.XXXXXX)"
 
   run_test intentionally_fail_first_assertion_then_pass >"$out_file" 2>"$err_file"
-  rm -f "$out_file" "$err_file"
 
   local observed_failed="$TESTS_FAILED"
 
@@ -369,13 +354,12 @@ test_sha_ref_rejects_non_hex_strings() {
 test_resolve_full_clone_happy_path() {
   setup_repo_fixture full
   git checkout feature >/dev/null 2>&1
-  local out
-  if ! out="$(git_diff_base_resolve "origin/main" "HEAD" strict 2>/tmp/resolve-err.$$)"; then
-    fail "resolve failed; stderr was: $(cat /tmp/resolve-err.$$)"
-    rm -f /tmp/resolve-err.$$
+  local out err_file
+  err_file="$(mktemp resolve-err.XXXXXX)"
+  if ! out="$(git_diff_base_resolve "origin/main" "HEAD" strict 2>"$err_file")"; then
+    fail "resolve failed; stderr was: $(cat "$err_file")"
     return 1
   fi
-  rm -f /tmp/resolve-err.$$
   local expected
   expected="$(git rev-parse origin/main)"
   assert_equals "$expected" "$out" "merge base SHA"
@@ -395,14 +379,13 @@ test_resolve_shallow_deepens_to_find_merge_base() {
   setup_repo_fixture shallow 1
   # Without deepening, feature only sees its own tip; main is far enough back
   # that the merge base requires history beyond the shallow boundary.
-  local out
+  local out err_file
+  err_file="$(mktemp resolve-err.XXXXXX)"
   if ! out="$(GIT_DIFF_BASE_FETCH_DEPTH=2 GIT_DIFF_BASE_MAX_ATTEMPTS=8 \
-      git_diff_base_resolve "origin/main" "HEAD" strict 2>/tmp/resolve-err.$$)"; then
-    fail "resolve failed in shallow clone; stderr was: $(cat /tmp/resolve-err.$$)"
-    rm -f /tmp/resolve-err.$$
+      git_diff_base_resolve "origin/main" "HEAD" strict 2>"$err_file")"; then
+    fail "resolve failed in shallow clone; stderr was: $(cat "$err_file")"
     return 1
   fi
-  rm -f /tmp/resolve-err.$$
   # Sanity check: the returned SHA must at least be a real commit object now.
   if ! git cat-file -e "$out^{commit}" 2>/dev/null; then
     fail "deepen path returned non-commit '$out'"
@@ -421,6 +404,27 @@ test_resolve_full_clone_missing_base_ref_errors() {
   # error from origin; either of two messages is acceptable depending on git
   # version, so look for the shared "fetch" + base ref words.
   assert_contains "$err" "does-not-exist" "error mentions missing ref"
+}
+
+test_resolve_lenient_continues_after_initial_fetch_failure() {
+  # check-docs-sidebar uses the lenient policy so a failed initial fetch (e.g.,
+  # transient network blip) does not abort when local cached history already
+  # contains the merge base. setup_repo_fixture shallow 3 keeps is_shallow=true
+  # but pulls enough history that origin/main + feat-2 share an ancestor in
+  # the cached refs. Breaking the origin URL forces the initial fetch to fail
+  # so the lenient-only continuation path is exercised.
+  setup_repo_fixture shallow 3
+  git remote set-url origin "file:///nonexistent-repo"
+  local out err_file
+  err_file="$(mktemp resolve-err.XXXXXX)"
+  if ! out="$(git_diff_base_resolve "origin/main" "HEAD" lenient 2>"$err_file")"; then
+    fail "lenient policy should succeed with cached history; stderr was: $(cat "$err_file")"
+    return 1
+  fi
+  if ! git cat-file -e "$out^{commit}" 2>/dev/null; then
+    fail "lenient path returned non-commit '$out'"
+    return 1
+  fi
 }
 
 test_resolve_cross_repo_sha_hint_appears() {
@@ -477,6 +481,7 @@ ALL_TESTS=(
   test_resolve_rejects_invalid_policy
   test_resolve_shallow_deepens_to_find_merge_base
   test_resolve_full_clone_missing_base_ref_errors
+  test_resolve_lenient_continues_after_initial_fetch_failure
   test_resolve_cross_repo_sha_hint_appears
 )
 

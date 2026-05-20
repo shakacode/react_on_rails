@@ -80,6 +80,21 @@ git_diff_base_sha_ref() {
   return 0
 }
 
+git_diff_base_validate_branch_name() {
+  # PR-author-controlled values (GITHUB_BASE_REF, GITHUB_HEAD_REF, GITHUB_REF_NAME)
+  # flow into `git fetch` refspecs. Quoting and git's own ref-name validation
+  # cover the typical case, but rejecting anything outside the standard ref
+  # character set prevents surprising interactions (e.g., a maliciously crafted
+  # name like `--upload-pack=cmd`) before the value reaches git.
+  local value="$1"
+  local label="$2"
+
+  if [[ ! "$value" =~ ^[A-Za-z0-9_./-]+$ ]]; then
+    echo "Error: $label contains unsafe characters: '$value'" >&2
+    return 1
+  fi
+}
+
 git_diff_base_base_remote_branch() {
   local base_ref="$1"
 
@@ -90,6 +105,7 @@ git_diff_base_base_remote_branch() {
   # Pull request events can provide a raw base SHA while GITHUB_BASE_REF names
   # the branch to deepen. Push-event SHAs omit GITHUB_BASE_REF and fall through.
   if git_diff_base_sha_ref "$base_ref" && [ -n "${GITHUB_BASE_REF:-}" ]; then
+    git_diff_base_validate_branch_name "$GITHUB_BASE_REF" GITHUB_BASE_REF || return 1
     printf '%s\n' "$GITHUB_BASE_REF"
     return 0
   fi
@@ -237,11 +253,13 @@ git_diff_base_current_remote_branch() {
 
   if [ "$current_ref" = "HEAD" ]; then
     if [ -n "${GITHUB_HEAD_REF:-}" ]; then
+      git_diff_base_validate_branch_name "$GITHUB_HEAD_REF" GITHUB_HEAD_REF || return 1
       printf '%s\n' "$GITHUB_HEAD_REF"
       return 0
     fi
 
     if [ "${GITHUB_REF_TYPE:-}" = "branch" ] && [ -n "${GITHUB_REF_NAME:-}" ]; then
+      git_diff_base_validate_branch_name "$GITHUB_REF_NAME" GITHUB_REF_NAME || return 1
       printf '%s\n' "$GITHUB_REF_NAME"
       return 0
     fi
@@ -483,6 +501,12 @@ git_diff_base_resolve() {
         if ! git_diff_base_fetch_remote_branch "$current_remote_branch" unshallow; then
           echo "Warning: failed to unshallow origin/$current_remote_branch; continuing." >&2
         fi
+        # Attempt merge-base unconditionally here, even on a failed unshallow
+        # above: if the earlier remote_branch fetch already pulled enough
+        # history, base_ref may now be verifiable and merge-base may resolve
+        # without current_remote_branch being fully deepened. The verify_ref
+        # guard prevents a spurious git merge-base call when base_ref is still
+        # unreachable.
         if git_diff_base_verify_ref "$base_ref" &&
           merge_base="$(git_diff_base_merge_base "$base_ref" "$current_ref")"; then
           printf '%s\n' "$merge_base"

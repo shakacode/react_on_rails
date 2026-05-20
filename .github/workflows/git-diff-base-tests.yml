@@ -25,8 +25,8 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Run git-diff-base test harness
-        run: bash script/lib/git-diff-base-test.bash
-
       - name: Shellcheck library and test harness
         run: shellcheck -x script/lib/git-diff-base script/lib/git-diff-base-test.bash
+
+      - name: Run git-diff-base test harness
+        run: bash script/lib/git-diff-base-test.bash
