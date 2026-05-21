@@ -249,7 +249,9 @@ Keep the three probe types distinct:
   h2c-aware `exec` check only when you intentionally need stricter hung-process detection.
 
 Only the custom `/health` route requires `configureFastify`; `tcpSocket` probes and `/info` checks work without custom
-Fastify setup. The health check route should return `200 OK` when the process can accept probe traffic.
+Fastify setup. The health check route should return `200 OK` when the renderer is ready to serve requests, and return a
+non-2xx status (for example `503`) only when the process should be marked unhealthy for the probe's purpose — readiness,
+startup, or stricter liveness.
 
 > **Security note:** See [Built-in Endpoints](#built-in-endpoints) for the note on `/info` exposing runtime version
 > details.
@@ -324,9 +326,10 @@ Readiness and liveness omit `initialDelaySeconds` here because Kubernetes 1.20+ 
 the startup probe succeeds. If you skip the startup probe or run an older cluster without startup probe support, add an
 appropriate `initialDelaySeconds` to each.
 
-See [Node Renderer: Container Deployment](./container-deployment.md#startup-errors-err_stream_premature_close) for full
-Kubernetes YAML examples and the shared probe command notes for curl HTTP/2 support, `--max-time` buffers, and
-`initialDelaySeconds` guidance.
+See [Kubernetes Sidecar Manifest](./container-deployment.md#kubernetes-sidecar-manifest) for a complete pod spec with
+all three probes wired in, and
+[Startup Errors: `ERR_STREAM_PREMATURE_CLOSE`](./container-deployment.md#startup-errors-err_stream_premature_close) for
+the shared probe command notes on curl HTTP/2 support, `--max-time` buffers, and `initialDelaySeconds` guidance.
 
 For Control Plane topology-specific `renderer_url`, host binding, and probe target guidance, see
 [Control Plane Deployment Shapes](./container-deployment.md#control-plane-deployment-shapes).
