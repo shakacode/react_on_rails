@@ -169,35 +169,33 @@ get "up", to: "health#show"
 `app/controllers/health_controller.rb`:
 
 ```ruby
-# Ruby stdlib; loaded explicitly for the URI/Socket readiness check.
+# Ruby stdlib; loaded explicitly for the Socket readiness check.
 require "socket"
-require "uri"
 
 # Inherits from ActionController::Base (not ApplicationController) to avoid
 # app-level authentication callbacks on unauthenticated probe requests.
 class HealthController < ActionController::Base
   def show
-    # Opens and immediately closes; raises if the renderer port is unreachable.
-    # A successful TCP connection means the h2c listener is bound, not that
-    # cluster workers are ready. Pair with the startup probe to shield liveness.
-    # In this same-container topology, Rails and the renderer share a network namespace.
-    # Probe localhost even if other deployment shapes use a service host.
-    # URI#port returns 80/443 defaults when omitted, so detect an explicit :port first.
+    # A successful TCP connect means the h2c listener is bound, not that cluster workers
+    # are ready. Pair with the startup probe to shield liveness during boot.
+    # In this same-container topology, Rails and the renderer share a network namespace,
+    # so always probe localhost even if other deployment shapes use a service host.
     # connect_timeout is supported by the Ruby versions in this guide's prerequisites.
     renderer_url = ReactOnRailsPro.configuration.renderer_url
     raise ArgumentError, "renderer_url not configured" if renderer_url.nil? || renderer_url.empty?
 
-    # Missing or malformed renderer_url raises and surfaces as a 500 so configuration mistakes stay visible.
-    renderer_uri = URI.parse(renderer_url)
-    # Assumes renderer_url is a plain http://host[:port][/path] URL with no
-    # colon-number patterns outside the authority component (e.g. embedded URLs in query strings).
-    renderer_port = renderer_url.match?(/:\d+(?:[\/?#]|$)/) ? renderer_uri.port : 3800
-    Socket.tcp("localhost", renderer_port, connect_timeout: 1) {} # open + immediately close
+    # Extract the port from the authority component only so colons in a path or query
+    # string can never match. URI#port returns 80/443 defaults when no port is given,
+    # so we read the URL string directly and fall back to 3800.
+    renderer_port = renderer_url[%r{://[^/?#]*:(\d+)}, 1]&.to_i || 3800
+    # Block form ensures the socket closes after a successful connect; the explicit
+    # |_socket| parameter signals that the empty body is intentional, not a typo.
+    Socket.tcp("localhost", renderer_port, connect_timeout: 1) { |_socket| }
     head :ok
-  # Only renderer reachability failures map to 503. ArgumentError and
-  # URI::InvalidURIError raised above intentionally escape as 500 so
-  # misconfigured `renderer_url` stays visible in logs and alerting.
   rescue SocketError, SystemCallError
+    # Only renderer reachability failures map to 503. ArgumentError raised above
+    # intentionally escapes as 500 so a misconfigured `renderer_url` stays visible
+    # in logs and alerting.
     head :service_unavailable
   end
 end
@@ -207,8 +205,8 @@ end
 > `renderer_url`. Do not reuse it as-is for sidecar or separate-workload topologies where the renderer runs behind a
 > different host.
 >
-> Configuration mistakes such as a missing or malformed `renderer_url` are allowed to surface as 500 errors so they are
-> visible in logs and alerting. Only renderer reachability failures are converted to `503`.
+> A missing `renderer_url` raises `ArgumentError` and surfaces as a 500 so the misconfiguration stays visible in logs
+> and alerting. Only renderer reachability failures are converted to `503`.
 
 ### Separate Container In The Same Workload
 

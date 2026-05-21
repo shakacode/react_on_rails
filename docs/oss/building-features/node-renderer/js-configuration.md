@@ -304,7 +304,8 @@ Recommended starting values:
 - **Liveness**: Use `tcpSocket` on the renderer port as the default. Start with `timeoutSeconds: 1`,
   `periodSeconds: 10`, and `failureThreshold: 3`, matching the Container Deployment examples. Raise
   `failureThreshold`, and optionally `periodSeconds`, if hard listener checks restart the container too aggressively in
-  your environment.
+  your environment. `timeoutSeconds: 1` assumes a co-located probe over loopback; raise it (typically to `2`-`3`) when
+  the renderer is reached over the network, such as the separate-workload topology.
 - **Optional stricter liveness**: Use
   `curl -sf --max-time 3 --http2-prior-knowledge http://localhost:3800/info` only when you need liveness to catch a
   blocked event loop and have verified curl has HTTP/2 support in the image. Keep external dependency and warm-up checks
@@ -317,10 +318,10 @@ does not apply there. See the `port` option at the top of this page for Heroku o
 > `periodSeconds` (5 s) thereafter, and the container restarts only if all six consecutive startup checks fail. Increase
 > `failureThreshold` or `periodSeconds` if startup regularly takes longer.
 > The 10-second initial delay only shifts when the first check fires. Omitting it starts checks immediately; the
-> failure window is `initialDelaySeconds + (failureThreshold - 1) * periodSeconds` (25 s with the values above when
-> `initialDelaySeconds` is omitted, since the last of six checks fires at `(6 - 1) * 5 = 25 s`). Reduce
-> `initialDelaySeconds` if your renderer reliably opens the port within 1-2 seconds, or keep it to avoid noisy
-> early-failure log entries.
+> failure window is `initialDelaySeconds + (failureThreshold - 1) * periodSeconds` (25 s with `failureThreshold: 6` and
+> `periodSeconds: 5` when `initialDelaySeconds` is omitted, since the last of six checks fires at `(6 - 1) * 5 = 25 s`).
+> Reduce `initialDelaySeconds` if your renderer reliably opens the port within 1-2 seconds, or match it to your actual
+> boot time if you want to suppress noisy early-failure log entries during the warm-up window.
 
 Readiness and liveness omit `initialDelaySeconds` here because Kubernetes 1.20+ (startup probe GA) defers them until
 the startup probe succeeds. If you skip the startup probe or run an older cluster without startup probe support, add an
