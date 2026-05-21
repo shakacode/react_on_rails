@@ -202,7 +202,9 @@ cat public/packs/manifest.json | grep "application"
 
 ### Exporting the Fully-Resolved Bundler Configuration
 
-When something is wrong with the build itself — a loader not matching, a plugin missing in production, dev/prod divergence — it helps to inspect the **fully-resolved** webpack or rspack config, including all of Shakapacker's defaults. Shakapacker ships a `--doctor` mode that dumps annotated YAML for every relevant build:
+When something is wrong with the build itself — a loader not matching, a plugin missing in production, dev/prod divergence — it helps to inspect the **fully-resolved** webpack or rspack config, including all of Shakapacker's defaults. Shakapacker ships a `--doctor` mode that dumps annotated YAML for every relevant build.
+
+> Note: this is separate from `bundle exec rake react_on_rails:doctor`, which diagnoses React on Rails configuration rather than the bundler config itself.
 
 ```bash
 # Shakapacker 9.6+ canonical binstub
@@ -212,7 +214,7 @@ bin/shakapacker-config --doctor
 bin/export-bundler-config --doctor
 ```
 
-Both commands are thin shims over the same exporter and produce the same output: annotated YAML files in `shakapacker-config-exports/` covering development (with and without HMR) and production, split into separate client and server bundle files. The YAML is annotated with inline documentation so you can see, for each loader / plugin / resolve rule, where it came from.
+Both commands are thin shims over the same exporter and produce the same output: annotated YAML files in `shakapacker-config-exports/` (created in your project root) covering development (with and without HMR) and production, split into separate client and server bundle files. The YAML is annotated with inline documentation so you can see, for each loader / plugin / resolve rule, where it came from.
 
 Two common uses:
 
