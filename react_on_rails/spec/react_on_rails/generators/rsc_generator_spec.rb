@@ -790,6 +790,35 @@ describe RscGenerator, type: :generator do
       )
     end
 
+    it "appends clientReferences at the end of a single-line options object that has options after isServer" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false, chunkName: 'client' }));
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      content = File.read(File.join(destination_root, config_path))
+      generator.send(:update_existing_rsc_webpack_config, config_path, content, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).to include(
+        "new RSCWebpackPlugin({ isServer: false, chunkName: 'client', clientReferences: rscClientReferences })"
+      )
+      expect(migrated_content).not_to match(/isServer: false, clientReferences: rscClientReferences, chunkName/)
+    end
+
     it "adds clientReferences to the real isServer option when comments mention isServer first" do
       config_path = "config/webpack/clientWebpackConfig.js"
       simulate_existing_file(
@@ -1537,6 +1566,63 @@ describe RscGenerator, type: :generator do
       expect(migrated_content).to match(
         /isServer: false,\n\s*clientReferences: rscClientReferences,\n\s*\}\),/
       )
+    end
+
+    it "does not treat a nested clientReferences: rscClientReferences as already migrated" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(
+              new RSCWebpackPlugin({
+                metadata: {
+                  clientReferences: rscClientReferences,
+                },
+                isServer: false,
+              }),
+            );
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      original_content = File.read(File.join(destination_root, config_path))
+      generator.send(:update_existing_rsc_webpack_config, config_path, original_content, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content.scan("clientReferences: rscClientReferences").length).to eq(2)
+      expect(migrated_content).to match(
+        /isServer: false,\n\s*clientReferences: rscClientReferences,\n\s*\}\),/
+      )
+    end
+
+    it "reports missing scoped clientReferences when only a nested clientReferences exists" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          clientConfig.plugins.push(
+            new RSCWebpackPlugin({
+              metadata: {
+                clientReferences: 'unused',
+              },
+              isServer: false,
+            }),
+          );
+        JS
+      )
+
+      missing = generator.send(:check_rsc_client_config)
+      expect(missing).to include("generated scoped clientReferences in clientWebpackConfig.js")
     end
   end
 

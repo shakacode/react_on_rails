@@ -625,8 +625,7 @@ module ReactOnRails
         return false unless scoped_rsc_client_references_defined?(content)
 
         sections.all? do |section|
-          options = section.fetch(:body)
-          rsc_plugin_options_without_comments(options).match?(/\bclientReferences\s*:\s*rscClientReferences\b/)
+          rsc_plugin_body_has_top_level_scoped_client_references?(section.fetch(:body))
         end
       end
 
@@ -634,31 +633,31 @@ module ReactOnRails
         sections = rsc_plugin_option_sections(content, is_server: is_server)
         # No parseable `isServer: <bool>` section means this file's plugin call sits outside
         # what the generator's scanner can match (e.g. options are computed at runtime, or the
-        # plugin is invoked without an options object). Treat that as out-of-scope rather than
-        # missing — the user has nothing actionable to do with a "missing scoped clientReferences"
-        # warning in that case.
+        # plugin is invoked without an options object). Verification callers intentionally
+        # under-report here: warning about "missing scoped clientReferences" when there's no
+        # section to inspect would only surface noise for dynamic invocations like
+        # `RSCWebpackPlugin(buildOptions())`, where the user has nothing actionable to do.
         return true if sections.empty?
 
         sections.all? do |section|
-          options = rsc_plugin_options_without_comments(section.fetch(:body))
-          if options.match?(/\bclientReferences\s*:\s*rscClientReferences\b/)
+          body = section.fetch(:body)
+          if rsc_plugin_body_has_top_level_scoped_client_references?(body)
             scoped_rsc_client_references_defined?(content)
           else
-            options.match?(/\bclientReferences\s*:/)
+            rsc_plugin_body_has_top_level_key?(body, "clientReferences")
           end
         end
       end
 
       def rsc_plugin_defines_client_references?(content, is_server:)
         rsc_plugin_option_sections(content, is_server: is_server).any? do |section|
-          options = section.fetch(:body)
-          rsc_plugin_options_without_comments(options).match?(/\bclientReferences\s*:/)
+          rsc_plugin_body_has_top_level_key?(section.fetch(:body), "clientReferences")
         end
       end
 
       def rsc_plugin_without_client_references?(content, is_server:)
         rsc_plugin_option_sections(content, is_server: is_server).any? do |section|
-          !rsc_plugin_options_without_comments(section.fetch(:body)).match?(/\bclientReferences\s*:/)
+          !rsc_plugin_body_has_top_level_key?(section.fetch(:body), "clientReferences")
         end
       end
 
@@ -712,8 +711,12 @@ module ReactOnRails
         search_from = 0
         marker = "new RSCWebpackPlugin("
 
-        # Webpack configs are tiny, so rescanning from the start in js_code_position?
-        # keeps this migration parser simple without a meaningful performance cost.
+        # `js_code_position?` rescans from index 0 on every plugin hit, so this loop is
+        # O(n × m) where m is the number of `new RSCWebpackPlugin(` occurrences. Webpack
+        # configs are tiny in practice (a few hundred lines), so the cost is negligible and
+        # the rescan keeps the migration parser simple. If this scanner is ever reused on
+        # larger inputs (shared webpack helpers, Vite configs, monorepo bundlers), carry
+        # the scanner state forward between iterations before adopting it there.
         while (call_start = content.index(marker, search_from))
           unless js_code_position?(content, call_start)
             search_from = call_start + marker.length
@@ -1000,11 +1003,46 @@ module ReactOnRails
         false
       end
 
+      # Top-level depth-aware match for the migrated `clientReferences: rscClientReferences`
+      # pair. Mirrors `rsc_plugin_body_has_top_level_key?` so verification and gating share
+      # the same comment-, string-, and brace-aware semantics as the rewrite path.
+      def rsc_plugin_body_has_top_level_scoped_client_references?(body)
+        pattern = /\bclientReferences\s*:\s*rscClientReferences\b/
+        search_from = 0
+
+        while (match = pattern.match(body, search_from))
+          return true if js_top_level_position?(body, match.begin(0))
+
+          search_from = match.end(0)
+        end
+
+        false
+      end
+
       def splice_client_references_into_rsc_plugin_body(body, is_server_match)
         return splice_client_references_at_close_brace(body) if body.include?("\n")
+        # Other options follow `isServer:` on the same line — append after the last option so
+        # `clientReferences` lands at the end of the object, matching the multi-line path's
+        # close-brace splice rather than landing mid-object.
+        return splice_client_references_at_single_line_end(body) if trailing_options_after?(body, is_server_match)
 
         "#{body[0...is_server_match.end(0)]}, clientReferences: rscClientReferences" \
           "#{body[is_server_match.end(0)..]}"
+      end
+
+      def trailing_options_after?(body, is_server_match)
+        rest = body[is_server_match.end(0)..] || ""
+        # A bare trailing comma (`isServer: false,`) is structural, not another option, so
+        # consider only non-whitespace beyond it as "trailing options".
+        rest.sub(/\A\s*,/, "").match?(/\S/)
+      end
+
+      def splice_client_references_at_single_line_end(body)
+        trailing = body[/\s*\z/]
+        content = body[0...(body.length - trailing.length)]
+        content_without_comments = rsc_plugin_options_without_comments(content).rstrip
+        separator = content_without_comments.end_with?(",") ? " " : ", "
+        "#{content}#{separator}clientReferences: rscClientReferences#{trailing}"
       end
 
       def splice_client_references_at_close_brace(body)
@@ -1050,11 +1088,16 @@ module ReactOnRails
           char = content[index]
           next_char = content[index + 1]
           prev_state = state
+          # Capture the pre-advance position so `result` always points at `char`'s index,
+          # not the post-advance value that `advance_js_scan_state` may bump for `//`/`/*`/`*/`
+          # transitions. The comment-state guard below covers those transitions, but capturing
+          # explicitly makes the invariant obvious without relying on that coupling.
+          char_index = index
           state, escaped, index = advance_js_scan_state(state, escaped, char, next_char, index)
 
           in_comment_now = JS_COMMENT_STATES.include?(state)
           was_in_comment = JS_COMMENT_STATES.include?(prev_state)
-          result = index if !in_comment_now && !was_in_comment && !char.match?(/\s/)
+          result = char_index if !in_comment_now && !was_in_comment && !char.match?(/\s/)
 
           index += 1
         end
@@ -1071,6 +1114,9 @@ module ReactOnRails
       # this helper deliberately omits the `RSCWebpackPlugin` import that `inject_rsc_*_imports`
       # adds on the from-scratch path — adding it here would produce a duplicate import.
       def add_rsc_client_references_setup(config_path, content, is_server:)
+        # Belt-and-suspenders: the only caller, `ensure_rsc_client_references_setup`, already
+        # checks both `scoped_rsc_client_references_defined?` and `rsc_client_references_defined?`
+        # before delegating here. The guards are kept so the helper is safe to call directly.
         return if scoped_rsc_client_references_defined?(content)
         return if rsc_client_references_defined?(content)
 
@@ -1323,6 +1369,10 @@ module ReactOnRails
       def commonjs_named_imported?(content, package_name, binding_name)
         # `[^}]*` is intentionally newline-permissive (Ruby character classes match `\n`),
         # so multi-line destructuring like `const {\n  config,\n} = require('shakapacker')` matches.
+        # `[^}]*` cannot match nested destructuring like
+        # `const { config: { source_path } } = require('shakapacker')` because the inner `}`
+        # terminates the character class early. That shape is outside this matcher's
+        # supported surface for the same reason aliases and split-comma defaults are.
         pattern = /^[ \t]*(?:const|let|var)\s+\{([^}]*)\}\s*=\s*require\(['"]#{Regexp.escape(package_name)}['"]\);?/
 
         content.to_enum(:scan, pattern).any? do |captures|
@@ -1338,7 +1388,10 @@ module ReactOnRails
             # The `binding = fallback` form covers JavaScript destructuring defaults whose default
             # value does not contain a comma — `{ config = fn(a, b) }` would split on the comma
             # inside `fn(a, b)` and fall outside this matcher's supported surface, same as alias
-            # renames. Both shapes are vanishingly rare in real webpack configs.
+            # renames. Inline comments inside the destructuring list
+            # (`const { config /* primary */ } = require('shakapacker')`) are also unsupported:
+            # they leave their text in the captured binding so the exact `config` match fails.
+            # All of these shapes are vanishingly rare in real webpack configs.
             binding == binding_name || binding.start_with?("#{binding_name} =")
           end
         end
