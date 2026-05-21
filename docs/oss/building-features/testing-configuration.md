@@ -9,9 +9,13 @@ For most applications, the recommended approach is React on Rails TestHelper wit
 ```ruby
 # config/initializers/react_on_rails.rb
 ReactOnRails.configure do |config|
-  config.build_test_command = "RAILS_ENV=test bin/shakapacker"
+  config.build_test_command = "RAILS_ENV=test bin/shakapacker" # NODE_ENV is derived from RAILS_ENV by Shakapacker
 end
 ```
+
+Leave `NODE_ENV` unset for Shakapacker asset builds: Shakapacker automatically sets `NODE_ENV` to match `RAILS_ENV`,
+so `RAILS_ENV=test` is sufficient. Set `NODE_ENV=test` explicitly only when running a JavaScript test runner such as
+Jest directly.
 
 Then wire TestHelper into your test framework. If your app uses both RSpec and Minitest, wire both files.
 
@@ -420,7 +424,7 @@ React on Rails supports two mutually exclusive approaches for compiling webpack 
 ```ruby
 # config/initializers/react_on_rails.rb
 ReactOnRails.configure do |config|
-  config.build_test_command = "NODE_ENV=test RAILS_ENV=test bin/shakapacker"
+  config.build_test_command = "RAILS_ENV=test bin/shakapacker" # NODE_ENV is derived from RAILS_ENV by Shakapacker
 
   # Or use your project's package manager with a custom script:
   # config.build_test_command = "pnpm run build:test"  # or: npm run build:test, yarn run build:test
