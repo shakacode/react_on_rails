@@ -64,8 +64,10 @@ module ReactOnRails
     # common deploy-script locations so users on older Procfile/Dockerfile entries
     # get a migration nudge before the task is removed.
     DEPRECATED_RENDERER_CACHE_TASK = "pre_stage_bundle_for_node_renderer"
-    # Intentionally a fixed list, not a glob (for example, config/deploy/*.rb).
-    # CI manifests and directory globs need a separate bounded scan to avoid surprising IO.
+    # Fixed allowlist of single-file deploy-script paths. Each entry is a literal
+    # path that may host a deploy hook referencing the deprecated task. Directory
+    # globs (e.g., per-stage Capistrano files or per-workflow GitHub Actions YAML)
+    # live in RENDERER_CACHE_DEPLOY_SCRIPT_GLOBS so they stay bounded.
     RENDERER_CACHE_DEPLOY_SCRIPT_PATHS = [
       "Procfile",
       "Procfile.dev",
@@ -86,10 +88,27 @@ module ReactOnRails
       "config/deploy/production.rb",
       "config/deploy/staging.rb",
       ".kamal/deploy.yml",
-      "scripts/deploy.sh"
+      "scripts/deploy.sh",
+      ".circleci/config.yml",
+      ".gitlab-ci.yml",
+      "bitbucket-pipelines.yml"
+    ].freeze
+    # Bounded glob allowlist for deploy manifests that live in a known directory
+    # but use per-environment or per-workflow filenames. Each pattern matches
+    # only one directory level (no `**`) so the scan never recurses into the
+    # project tree, and the expansion is capped by
+    # RENDERER_CACHE_DEPLOY_SCRIPT_GLOB_MAX_MATCHES.
+    RENDERER_CACHE_DEPLOY_SCRIPT_GLOBS = [
+      ".github/workflows/*.yml",
+      ".github/workflows/*.yaml",
+      "config/deploy/*.rb"
     ].freeze
     # Per-file safety gate to bound IO during the scan, not a meaningful size limit.
     RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES = 1_048_576
+    # Defense-in-depth cap on how many files a single glob may contribute.
+    # Realistic repos have a handful of workflow / deploy-stage files; far more
+    # than this is a sign of an unexpectedly broad pattern, not legitimate config.
+    RENDERER_CACHE_DEPLOY_SCRIPT_GLOB_MAX_MATCHES = 100
 
     def initialize(verbose: false, fix: false)
       @verbose = verbose
@@ -2795,22 +2814,15 @@ module ReactOnRails
       # migration nudge.
       # Per-file rescue so a transient failure on one path (e.g. Errno::EACCES)
       # does not abort the whole scan and silently skip the rest. The outer
-      # rescue catches anything that escapes the per-file guard.
-      matches = RENDERER_CACHE_DEPLOY_SCRIPT_PATHS.select do |path|
-        full_path = Rails.root.join(path)
+      # rescue catches anything that escapes the per-file guard. Globs are
+      # expanded under their own rescue so a failure expanding one pattern
+      # cannot stop other patterns or fixed paths from being scanned.
+      candidate_paths = (
+        RENDERER_CACHE_DEPLOY_SCRIPT_PATHS + expand_renderer_cache_deploy_script_globs
+      ).uniq
 
-        begin
-          next false unless full_path.file?
-          # Skip files larger than 1 MB; deploy scripts should be tiny.
-          next false if full_path.size > RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES
-
-          deploy_script_references_deprecated_task?(full_path)
-        rescue StandardError => e
-          checker.add_warning(
-            "⚠️  Could not scan #{path} for deprecated renderer-cache task references: #{e.message}"
-          )
-          false
-        end
+      matches = candidate_paths.select do |path|
+        deploy_script_path_references_deprecated_task?(path)
       end
 
       return if matches.empty?
@@ -2837,6 +2849,41 @@ module ReactOnRails
 
         without_inline_comment = stripped.sub(/ +#.*/, "")
         without_inline_comment.include?(DEPRECATED_RENDERER_CACHE_TASK)
+      end
+    end
+
+    def deploy_script_path_references_deprecated_task?(path)
+      full_path = Rails.root.join(path)
+
+      return false unless full_path.file?
+      # Skip files larger than RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES;
+      # deploy scripts and CI manifests should be tiny.
+      return false if full_path.size > RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES
+
+      deploy_script_references_deprecated_task?(full_path)
+    rescue StandardError => e
+      checker.add_warning(
+        "⚠️  Could not scan #{path} for deprecated renderer-cache task references: #{e.message}"
+      )
+      false
+    end
+
+    def expand_renderer_cache_deploy_script_globs
+      # File::FNM_PATHNAME stops `*` from crossing slashes even though none of
+      # the patterns use `**`. base: scopes the expansion to the project root
+      # and yields paths relative to it. Each pattern is rescued individually
+      # so a permission error on one glob (e.g. an unreadable .github/) does
+      # not silence the rest.
+      root = Rails.root.to_s
+      RENDERER_CACHE_DEPLOY_SCRIPT_GLOBS.flat_map do |pattern|
+        Dir.glob(pattern, File::FNM_PATHNAME, base: root)
+           .sort
+           .first(RENDERER_CACHE_DEPLOY_SCRIPT_GLOB_MAX_MATCHES)
+      rescue StandardError => e
+        checker.add_warning(
+          "⚠️  Could not expand renderer-cache deploy-script glob #{pattern}: #{e.message}"
+        )
+        []
       end
     end
 
