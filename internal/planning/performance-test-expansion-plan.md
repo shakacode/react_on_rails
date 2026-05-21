@@ -115,11 +115,11 @@ Already in place:
 - Keep hard CI gates disabled until the benchmark gate tuning in
   [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169) has a stable baseline.
 
-Prerequisites for the first implementation PR:
+Recommended prior work (desirable but not blocking for the first benchmark-routes PR):
 
 - Define forward-then-reverse route passes in `benchmarks/bench.rb` as two deterministic passes over the same route list:
   first in `rails routes` order, then in reverse order in the same job. Record the pass order with the per-route
-  artifacts before using route ordering as a noise-control signal. This is large enough to land as its own prerequisite
+  artifacts before using route ordering as a noise-control signal. This is large enough to land as its own preparatory
   PR, and the first benchmark-routes PR can defer it if the route-order work blocks progress. Budget it intentionally
   because it roughly doubles route runtime: each route gets two k6 runs plus two warm-up phases, or about
   `2 * (DURATION + warm-up requests * (request round-trip + warm-up sleep))` per route. With today's defaults and the
@@ -129,6 +129,9 @@ Prerequisites for the first implementation PR:
   discovery call, server startup, or server warmdown time. At the job level, a benchmark job covering about 10 routes
   should be budgeted as roughly doubling from 11-12 minutes to 22-24 minutes before additional startup or warmdown
   overhead. Recalculate the estimate if `DURATION` changes or if the `benchmarks/bench.rb` warm-up loop changes.
+
+Prerequisites for the first implementation PR (blocking — must land before or with the first benchmark-routes PR):
+
 - Record sample count, runner type, Ruby version, Node version, React version, renderer, and bundle mode in a
   `metadata.json` artifact and mirror the key fields in the `summary.txt` header. Capture runtime-dependent fields when
   the benchmark runs instead of hard-coding the example schema values: use `ruby --version` for `ruby_version`,
@@ -138,13 +141,22 @@ Prerequisites for the first implementation PR:
   rather than `Dir.pwd`. Preferred form (no global side effects):
 
   ```ruby
-  react_version_output, status = Open3.capture2(
-    "node", "-e", "console.log(require('react/package.json').version)",
-    chdir: APP_DIR
-  )
-  react_version = status.success? ? react_version_output.strip : "unknown"
-  warn "WARNING: could not capture react_version" unless status.success?
+  begin
+    react_version_output, status = Open3.capture2(
+      "node", "-e", "console.log(require('react/package.json').version)",
+      chdir: APP_DIR
+    )
+    react_version = status.success? ? react_version_output.strip : "unknown"
+    warn "WARNING: could not capture react_version" unless status.success?
+  rescue StandardError => e
+    react_version = "unknown"
+    warn "WARNING: could not capture react_version: #{e.message}"
+  end
   ```
+
+  The `rescue StandardError` wrapper is required so `Errno::ENOENT` (node not on `PATH`), `Errno::EACCES`, and similar
+  spawn failures fall through to the same `"unknown"` fallback as a non-zero exit. Without it, an implementer copying the
+  snippet verbatim will let those exceptions abort the benchmark run.
 
   Derive `renderer` from the same `PRO` switch that selects `APP_DIR`, rather than copying the example schema value.
   Reuse the existing `PRO = ENV.fetch("PRO", "false") == "true"` constant defined at the top of `benchmarks/bench.rb`
@@ -156,9 +168,9 @@ Prerequisites for the first implementation PR:
   ```
 
   Equivalent block form using `Dir.chdir(APP_DIR) do ... end` is acceptable when the surrounding code already manages
-  working directory state. If the `react_version` capture command fails (for example when `node_modules` is not yet
-  installed in `APP_DIR`), record `react_version: "unknown"` and emit a warning rather than aborting the benchmark run;
-  if `Open3.capture2` raises, use the same fallback path. Capture `bundle_mode` from `ENV["NODE_ENV"]` (falling back to
+  working directory state. The snippet above already records `react_version: "unknown"` and emits a warning for both
+  non-zero exit codes (for example when `node_modules` is not yet installed in `APP_DIR`) and `Open3.capture2`
+  exceptions; do not let either path abort the benchmark run. Capture `bundle_mode` from `ENV["NODE_ENV"]` (falling back to
   `"production"`) as a best-effort process environment label. Do not treat that value as proof of the Webpack build mode
   when prebuilt assets or explicit build flags may diverge; if exact asset-build fidelity is needed later, record it from
   the build output or a build-written metadata file.
@@ -200,12 +212,27 @@ Prerequisites for the first implementation PR:
   BMF reporting to include `max_latency` alongside the existing `rps`, `p50_latency`, `p90_latency`, `p99_latency`, and
   `failed_pct` measures. Today `max` appears in `summary.txt` but not in the BMF output. Add a `max:` keyword parameter
   to `BmfCollector#add` in `benchmarks/lib/bmf_helpers.rb` with a default of `nil` so existing callers stay valid, then
-  pass `max: max_latency` from the `bmf_collector.add` call in `benchmarks/bench.rb`. Updating the matching
+  pass `max: max_latency` from the `bmf_collector.add` call in `benchmarks/bench.rb`. In `BmfCollector#to_bmf`, emit the
+  new measure as `add_measure(benchmark_entry, "max_latency", r[:max])` so the BMF key matches the `_latency` suffix
+  convention already used by `p50_latency`, `p90_latency`, and `p99_latency`. Updating the matching
   `bmf_collector.add` calls in `benchmarks/bench-node-renderer.rb` (inside the `non_rsc_tests.each` and
   `rsc_tests.each` blocks) is deferred to the Pro follow-on PR so the OSS first slice can land without changing Node
   Renderer benchmark output.
 
+  `max_latency` lands as an unthresholded advisory metric in the OSS first slice: the BMF payload includes the new key,
+  but the `run_bencher` function in `.github/workflows/benchmark.yml` is not modified, so Bencher tracks the value
+  without gating CI. Adding the corresponding threshold block is a deliberate follow-on step (see "Follow-on
+  enhancements" below) so the OSS first slice can land without absorbing a new CI gate before the baseline is
+  characterized.
+
 Follow-on enhancements:
+
+- Add a `--threshold-measure max_latency` block to `run_bencher` in `.github/workflows/benchmark.yml` so `max_latency`
+  becomes a CI gate. Mirror the existing latency-block shape (`--threshold-test t_test`,
+  `--threshold-max-sample-size $MAX_SAMPLE`, `--threshold-lower-boundary _`,
+  `--threshold-upper-boundary $BOUNDARY`) used for `p50_latency`, `p90_latency`, and `p99_latency`. Gate this on
+  observing a stable `max_latency` baseline first, since `max` is more sensitive to single-iteration spikes than the
+  percentile measures.
 
 - Add `p95` only when the k6 `--summary-trend-stats` flag, currently `med,max,p(90),p(99)` in `benchmarks/bench.rb`, the
   summary table, artifacts, and Bencher reporting can be updated together. Before adding `p95`, extract the current
