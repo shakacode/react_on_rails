@@ -121,12 +121,9 @@ module ReactOnRails
         end
 
         def update_existing_rsc_webpack_config(config_path, content, is_server:)
-          return unless rsc_plugin_sections_safe_to_rewrite?(config_path, content)
+          return unless rsc_plugin_sections_safe_to_rewrite?(config_path, content, is_server: is_server)
           return if rsc_plugin_uses_scoped_client_references?(content, is_server: is_server)
-
-          # May inject the scoped helper before the rewrite step re-reads the config from disk.
-          return unless prepare_rsc_client_references_setup(config_path, content, is_server: is_server)
-          return unless rsc_plugin_needs_client_references_rewrite?(content, is_server: is_server)
+          return unless rsc_client_references_rewrite_needed?(config_path, content, is_server: is_server)
 
           return if rewrite_rsc_plugin_client_references(config_path, is_server: is_server)
 
@@ -134,28 +131,26 @@ module ReactOnRails
           warn_missing_rsc_plugin_target(config_path, is_server: is_server)
         end
 
-        def prepare_rsc_client_references_setup(config_path, content, is_server:)
+        def rsc_client_references_rewrite_needed?(config_path, content, is_server:)
+          # This predicate prepares the rewrite too: when it returns true, the scoped helper
+          # may already have been injected on disk so `rewrite_rsc_plugin_client_references`
+          # can re-read fresh content with valid offsets.
           if rsc_plugin_references_any_scoped_client_references?(content, is_server: is_server)
-            return ensure_rsc_client_references_setup(config_path, content, is_server: is_server)
+            return false unless ensure_rsc_client_references_setup(config_path, content, is_server: is_server)
+
+            return any_rsc_plugin_missing_client_references?(content, is_server: is_server)
           end
 
           rewritable_rsc_plugin?(config_path, content, is_server: is_server) &&
             ensure_rsc_client_references_setup(config_path, content, is_server: is_server)
         end
 
-        def rsc_plugin_needs_client_references_rewrite?(content, is_server:)
-          rsc_plugin_without_client_references?(content, is_server: is_server)
-        end
-
         # Detects RSCWebpackPlugin option blocks that the lightweight JS scanner could not parse
         # cleanly (most often a regex literal with an unmatched `{` / `}` that walks the depth
         # counter past the real closing brace). When found, we warn and refuse to rewrite anything
         # in the file so a sibling rewrite cannot accidentally splice into a wrong location.
-        def rsc_plugin_sections_safe_to_rewrite?(config_path, content)
-          # The unparseable count is file-wide: the partition increments it for every invocation
-          # that cannot be parsed, regardless of the `is_server` argument. The argument only
-          # filters the target-specific safe bucket, which is ignored here.
-          unparseable = rsc_plugin_option_sections_partition(content, is_server: true).fetch(:unparseable)
+        def rsc_plugin_sections_safe_to_rewrite?(config_path, content, is_server:)
+          unparseable = rsc_plugin_option_sections_partition(content, is_server: is_server).fetch(:unparseable)
           return true if unparseable.zero?
 
           warn_unparseable_rsc_plugin_sections(config_path, unparseable)
@@ -165,7 +160,7 @@ module ReactOnRails
         def rewritable_rsc_plugin?(config_path, content, is_server:)
           # Mixed same-target plugins are still rewritable: the later rewrite only updates plugins
           # missing clientReferences and leaves sibling custom clientReferences untouched.
-          return true if rsc_plugin_without_client_references?(content, is_server: is_server)
+          return true if any_rsc_plugin_missing_client_references?(content, is_server: is_server)
 
           if rsc_plugin_defines_client_references?(content, is_server: is_server)
             GeneratorMessages.add_warning(
@@ -263,7 +258,12 @@ module ReactOnRails
           end
         end
 
-        def rsc_plugin_without_client_references?(content, is_server:)
+        # Existential check: returns true when at least one matching plugin section is missing a
+        # top-level `clientReferences:` key. Pairs with `rsc_plugin_defines_client_references?`,
+        # which uses the same any-section semantics for the opposite condition. The two are not
+        # complements when multiple plugin sections exist — a file with one configured plugin and
+        # one unconfigured plugin returns true from both.
+        def any_rsc_plugin_missing_client_references?(content, is_server:)
           rsc_plugin_option_sections(content, is_server: is_server).any? do |section|
             !rsc_plugin_body_has_top_level_key?(section.fetch(:body), "clientReferences")
           end
@@ -273,8 +273,8 @@ module ReactOnRails
         # so `clientReferences:` / `isServer:` substrings inside strings are not mis-detected.
         # Shares the `advance_js_scan_state` family used by `js_top_level_position?` and
         # `matching_js_closing_brace` so all JS-aware passes follow the same comment/string rules.
-        # Regex literals (e.g. `/a{2}/`) are still outside this scanner's supported surface
-        # because brace quantifiers can confuse `matching_js_closing_brace`'s depth counter.
+        # See `advance_js_scan_state` for the scanner's supported surface (including the regex-
+        # literal and nested-template-literal limits that callers must be aware of).
         def rsc_plugin_options_without_comments(options)
           result = String.new(capacity: options.length)
           state = nil
@@ -434,15 +434,12 @@ module ReactOnRails
         end
 
         # Expects `content[open_index] == "{"`; callers pass the options-object opening brace.
-        # This lightweight scanner treats template literals as opaque strings (backtick to backtick).
-        # Simple `${...}` expressions are handled correctly: while in the backtick state every
-        # character — including `{` and `}` inside the expression — is consumed as string content
-        # and never reaches the depth counter. The real unsupported case is *nested* template
-        # literals (e.g. `` `outer ${`inner`}` ``) where the inner backtick falsely closes the outer
-        # string state, exposing later braces to the depth counter. Callers detect that via
-        # `rsc_plugin_options_followed_by_close_paren?` and mark the section unparseable rather
-        # than producing a corrupt rewrite. Regex literals are outside this scanner's supported
-        # surface for the same reason.
+        # See `advance_js_scan_state` for the scanner's supported surface — in short, simple
+        # `${...}` interpolations inside template literals stay inside the string state, while
+        # nested template literals and regex literals fall outside the scanner. When the depth
+        # counter is confused by either, the section is caught downstream via
+        # `rsc_plugin_options_followed_by_close_paren?` and marked unparseable so the migration
+        # warns the user instead of corrupting the rewrite.
         def matching_js_closing_brace(content, open_index)
           depth = 0
           index = open_index
@@ -475,8 +472,47 @@ module ReactOnRails
           nil
         end
 
-        # Return index is the last consumed character. Line comments leave the newline
-        # for the caller's normal index increment; block comments consume the closing slash.
+        # Central dispatcher for the lightweight JS scanner shared by every JS-aware pass in this
+        # generator (`matching_js_closing_brace`, `js_top_level_position?`, `js_code_position?`,
+        # `rsc_plugin_options_without_comments`, `first_significant_js_index`,
+        # `rsc_plugin_options_followed_by_close_paren?`, `last_js_code_char_index`). Return index
+        # is the last consumed character. Line comments leave the newline for the caller's normal
+        # index increment; block comments consume the closing slash.
+        #
+        # Supported lexical constructs:
+        # - Line comments (`// ...\n`) and block comments (`/* ... */`).
+        # - Single-quoted (`'...'`), double-quoted (`"..."`), and template-literal (`` `...` ``)
+        #   strings, including escape sequences and the simple `${expr}` interpolation form
+        #   (interpolation braces stay inside the string state and never reach the depth counter).
+        #
+        # Outside the supported surface — the scanner cannot distinguish these from the syntax
+        # they shadow, so `{`/`}` characters they contain can confuse the depth counter:
+        # - Regex literals (e.g. `/a{2}/`, `/\{/`, `/[{]/`): not recognized as a distinct state,
+        #   so brace-containing patterns walk the depth counter past the real options close. The
+        #   user-facing warning text in `warn_unparseable_rsc_plugin_sections` calls these out
+        #   explicitly.
+        # - Nested template literals (`` `outer ${`inner`}` ``): the inner backtick falsely closes
+        #   the outer string state, exposing later braces to the depth counter.
+        #
+        # The downstream `rsc_plugin_option_sections_partition` catches both failure modes by
+        # requiring the matched closing `}` to be followed by `)`. When it isn't, the section is
+        # marked unparseable and `warn_unparseable_rsc_plugin_sections` asks the user to add
+        # `clientReferences:` manually — the migration declines to rewrite rather than risk
+        # corrupting the config.
+        #
+        # Future expansion (only worth doing if a real-world RSC plugin options block needs it):
+        # 1. Add a `:regex_literal` state alongside the string and comment states. Track regex
+        #    contexts by detecting `/` after a token that legally precedes a regex literal
+        #    (`=`, `(`, `,`, `:`, `;`, `?`, `!`, `&&`, `||`, `return`, `typeof`, etc.) and consume
+        #    until the unescaped closing `/` plus any flags. The token-context check is necessary
+        #    because the same `/` character means division in expression position.
+        # 2. Add a stack-based template-literal state so nested `` `...${`inner`}...` `` pairs
+        #    track depth instead of toggling a single boolean state.
+        # Regex literals require expanding `advance_js_default_scan_state`; nested template
+        # literals would also require replacing `advance_js_string_state` with stack-aware
+        # handling. Both changes need a new state-machine branch; the current callers were
+        # specifically designed around the simpler scanner and would need re-validation against
+        # the expanded state set.
         #
         # IMPORTANT CALLER CONTRACT — block-comment exit:
         # When this returns from a `*/` exit, `state` is cleared, but `char` is still the `*` and
@@ -915,11 +951,18 @@ module ReactOnRails
         # this helper deliberately omits the `RSCWebpackPlugin` import that `inject_rsc_*_imports`
         # adds on the from-scratch path — adding it here would produce a duplicate import.
         def add_rsc_client_references_setup(config_path, content, existing_imports_content, is_server:)
-          # Belt-and-suspenders: the only caller, `ensure_rsc_client_references_setup`, already
-          # checks both `scoped_rsc_client_references_defined?` and `rsc_client_references_defined?`
-          # before delegating here. The guards are kept so the helper is safe to call directly.
-          return false if scoped_rsc_client_references_defined?(content)
-          return false if rsc_client_references_defined?(content)
+          # The only caller, `ensure_rsc_client_references_setup`, already runs these same checks
+          # before delegating here, so in normal flow both conditions evaluate to `false` and no
+          # early return is triggered. They are kept (rather than deleted) so a future second
+          # caller — or a refactor that bypasses `ensure_rsc_client_references_setup` — cannot
+          # accidentally splice a second `const rscClientReferences = { ... }` into a file that
+          # already declares one. JavaScript would reject that with an
+          # `Identifier 'rscClientReferences' has already been declared` SyntaxError at config
+          # load, and the cost of the duplicate check is two boolean ops on the already-loaded
+          # file body. Leaving the method defensive is cheaper than re-deriving the precondition
+          # at each new call site.
+          return if scoped_rsc_client_references_defined?(content)
+          return if rsc_client_references_defined?(content)
 
           replace_rsc_client_references_setup_anchor(config_path, content, is_server: is_server) do |anchor|
             join_rsc_client_references_setup(
