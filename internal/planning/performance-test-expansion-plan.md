@@ -53,7 +53,14 @@ The miss path should clear only that benchmark cache namespace before measuremen
 namespace, make one warm-up request to prime the fragment, then run k6 against the primed route. For the dedicated
 `FileStore`, clear the exact store root: use `FileUtils.rm_rf(Rails.root.join("tmp/benchmark_cache"))` from Rails-loaded
 code, or `FileUtils.rm_rf(File.join(APP_DIR, "tmp/benchmark_cache"))` from `benchmarks/bench.rb` or another plain Ruby
-wrapper where `Rails.root` is unavailable. Do not clear `tmp/cache/assets` or the app's default cache store. Avoid
+wrapper where `Rails.root` is unavailable. `APP_DIR` in `benchmarks/bench.rb` is the relative path
+`react_on_rails/spec/dummy` (or `react_on_rails_pro/spec/dummy` with `PRO=true`), so this `File.join` call only resolves
+correctly when bench.rb is invoked from the repo root. The benchmark workflow already runs from the repo root, but the
+implementation PR must either document that working-directory assumption near the cache-clear call or anchor the path
+explicitly, for example
+`FileUtils.rm_rf(File.expand_path(File.join(APP_DIR, "tmp/benchmark_cache"), File.join(__dir__, "..")))`, so a future
+runner configuration change cannot silently skip the cache clear. Do not clear `tmp/cache/assets` or the app's default
+cache store. Avoid
 `Rails.cache.clear` on the application cache. Avoid relying on a shared Redis instance, environment-default
 `:null_store`/`:memory_store` behavior, or manual cache state. To avoid mixing cold Rails-process noise into cache-miss
 measurements, warm the Rails process with a route that does not populate the benchmark cache, then clear the dedicated
@@ -100,8 +107,10 @@ Use these controls before treating results as regressions.
 
 Already in place:
 
-- Keep the existing per-route warm-up before k6 measurement: 10 sequential requests with 0.5 seconds between requests, or
-  about 5 seconds per route. Expand it if routes, especially streaming routes, need more stable startup behavior.
+- Keep the existing per-route warm-up before k6 measurement: 10 sequential requests with 0.5 seconds between requests.
+  Each iteration is request round-trip plus 0.5 seconds of sleep, so the warm-up takes a lower bound of 5 seconds per
+  route plus the actual request time, which is on the order of 5-6 seconds for SSR routes today. Expand it if routes,
+  especially streaming routes, need more stable startup behavior.
 - Keep the current max-rate throughput baseline from `internal/planning/library-benchmarking.md`.
 - Keep hard CI gates disabled until the benchmark gate tuning in
   [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169) has a stable baseline.
@@ -113,12 +122,13 @@ Prerequisites for the first implementation PR:
   artifacts before using route ordering as a noise-control signal. This is large enough to land as its own prerequisite
   PR, and the first benchmark-routes PR can defer it if the route-order work blocks progress. Budget it intentionally
   because it roughly doubles route runtime: each route gets two k6 runs plus two warm-up phases, or about
-  `2 * (DURATION + warm-up requests * warm-up sleep)` per route. With today's defaults and the hard-coded warm-up loop in
-  `benchmarks/bench.rb`, that is `2 * (30s + 10 * 0.5s)` = 70 seconds. This estimate does not include the per-job
-  `bundle exec rails routes` discovery call, server startup, or server warmdown time. At the job level, a benchmark job
-  covering about 10 routes should be budgeted as roughly doubling from 11-12 minutes to 22-24 minutes before additional
-  startup or warmdown overhead. Recalculate the estimate if `DURATION` changes or if the `benchmarks/bench.rb` warm-up
-  loop changes.
+  `2 * (DURATION + warm-up requests * (request round-trip + warm-up sleep))` per route. With today's defaults and the
+  hard-coded warm-up loop in `benchmarks/bench.rb`, the sleep-only lower bound is `2 * (30s + 10 * 0.5s)` = 70 seconds;
+  for SSR routes today the warm-up adds another roughly 1-2 seconds per route, putting the real per-route budget closer
+  to 72-80 seconds before any server overhead. This estimate does not include the per-job `bundle exec rails routes`
+  discovery call, server startup, or server warmdown time. At the job level, a benchmark job covering about 10 routes
+  should be budgeted as roughly doubling from 11-12 minutes to 22-24 minutes before additional startup or warmdown
+  overhead. Recalculate the estimate if `DURATION` changes or if the `benchmarks/bench.rb` warm-up loop changes.
 - Record sample count, runner type, Ruby version, Node version, React version, renderer, and bundle mode in a
   `metadata.json` artifact and mirror the key fields in the `summary.txt` header. Capture runtime-dependent fields when
   the benchmark runs instead of hard-coding the example schema values: use `ruby --version` for `ruby_version`,
@@ -136,10 +146,13 @@ Prerequisites for the first implementation PR:
   warn "WARNING: could not capture react_version" unless status.success?
   ```
 
-  Derive `renderer` from the same `PRO` switch that selects `APP_DIR`, rather than copying the example schema value:
+  Derive `renderer` from the same `PRO` switch that selects `APP_DIR`, rather than copying the example schema value.
+  Reuse the existing `PRO = ENV.fetch("PRO", "false") == "true"` constant defined at the top of `benchmarks/bench.rb`
+  rather than re-deriving the boolean inline, so a future change to the constant cannot diverge from the renderer
+  selection:
 
   ```ruby
-  renderer = ENV["PRO"] == "true" ? "node_renderer" : "execjs"
+  renderer = PRO ? "node_renderer" : "execjs"
   ```
 
   Equivalent block form using `Dir.chdir(APP_DIR) do ... end` is acceptable when the surrounding code already manages
