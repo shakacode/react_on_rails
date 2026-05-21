@@ -6,6 +6,10 @@
 # Exit codes:
 #   0 — all new docs have sidebar entries (or no new docs were added)
 #   1 — one or more new docs are missing from sidebars.ts
+#
+# Diff-base logic lives in script/lib/git-diff-base. Run its self-contained
+# tests with: bash script/lib/git-diff-base-test.bash
+# CI invokes the same harness via .github/workflows/git-diff-base-tests.yml.
 
 set -euo pipefail
 

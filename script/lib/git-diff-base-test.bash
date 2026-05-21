@@ -251,9 +251,17 @@ test_run_test_counts_non_final_assertion_failure() {
 
 # Build a minimal local "remote" + clone pair inside the current tempdir.
 # After this returns, cwd is the clone repo with the named branches and refs.
+#
+# Arguments:
+#   $1 clone_kind     "full" (default) or "shallow"
+#   $2 depth          shallow-clone depth (default 2; ignored for full clones)
+#   $3 main_extra     extra commits to add to main AFTER feature branches off
+#                     (default 0). Use a large value to force the deepen loop
+#                     to exhaust its budget and exercise the --unshallow path.
 setup_repo_fixture() {
   local clone_kind="${1:-full}"
   local depth="${2:-2}"
+  local main_extra="${3:-0}"
 
   git -c init.defaultBranch=main init --bare remote.git >/dev/null
   git -c init.defaultBranch=main init seed >/dev/null
@@ -270,6 +278,12 @@ setup_repo_fixture() {
     git commit --allow-empty -m "feat-1" >/dev/null
     git commit --allow-empty -m "feat-2" >/dev/null
     git checkout main >/dev/null 2>&1
+    if [ "$main_extra" -gt 0 ]; then
+      local i
+      for ((i = 1; i <= main_extra; i++)); do
+        git commit --allow-empty -m "main-extra-$i" >/dev/null
+      done
+    fi
     git remote add origin "$PWD/../remote.git"
     git push origin main feature >/dev/null 2>&1
   )
@@ -329,8 +343,59 @@ test_sha_ref_classifies_full_length_sha() {
   setup_repo_fixture full
   local sha
   sha="$(git rev-parse HEAD)"
+  # Sanity check: default git installs produce 40-char SHA-1 hashes. If a future
+  # default flips to SHA-256, this still tests the full-length-classifier path,
+  # but test_sha_ref_classifies_64_char_hex below exercises 64-char inputs
+  # explicitly regardless of the local repository's object format.
+  if [ "${#sha}" -ne 40 ]; then
+    fail "expected 40-char SHA from git rev-parse HEAD, got ${#sha}-char '$sha'"
+    return 1
+  fi
   if ! git_diff_base_sha_ref "$sha"; then
     fail "$sha should classify as a SHA"
+    return 1
+  fi
+}
+
+test_sha_ref_classifies_64_char_hex() {
+  # The classifier accepts 64-char SHA-256 hashes without local verification
+  # (same policy as 40-char SHA-1). No repo state is required because the
+  # full-length branch of git_diff_base_sha_ref short-circuits before any
+  # rev-parse call. Cwd is still the per-test tmpdir, which has no .git.
+  local hex="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  if [ "${#hex}" -ne 64 ]; then
+    fail "test fixture broken: expected 64-char hex, got ${#hex}"
+    return 1
+  fi
+  if ! git_diff_base_sha_ref "$hex"; then
+    fail "$hex should classify as a 64-char SHA"
+    return 1
+  fi
+}
+
+test_sha_ref_classifies_short_local_sha() {
+  # Short hex strings classify as SHAs only when they resolve locally. This
+  # exercises the verify_ref branch of the classifier, which protects against
+  # treating arbitrary short hex strings as commit refs.
+  setup_repo_fixture full
+  local short_sha
+  short_sha="$(git rev-parse --short=7 HEAD)"
+  if [ "${#short_sha}" -ne 7 ]; then
+    fail "expected 7-char short SHA, got ${#short_sha}-char '$short_sha'"
+    return 1
+  fi
+  if ! git_diff_base_sha_ref "$short_sha"; then
+    fail "$short_sha should classify as a short local SHA"
+    return 1
+  fi
+}
+
+test_sha_ref_rejects_short_unknown_hex() {
+  # A short hex string that does not resolve to any local object must NOT
+  # classify as a SHA. Using all zeros guarantees no real commit collision.
+  setup_repo_fixture full
+  if git_diff_base_sha_ref "0000000" 2>/dev/null; then
+    fail "unknown short hex string should not classify as a SHA"
     return 1
   fi
 }
@@ -435,6 +500,48 @@ test_resolve_lenient_continues_after_initial_fetch_failure() {
   fi
 }
 
+test_resolve_unshallow_fallback_finds_merge_base() {
+  # Force the deepen budget to exhaust without finding the merge base, so the
+  # --unshallow fallback runs. The fixture adds 10 extra commits on main after
+  # feature branches off (merge base = c5, main tip = main-extra-10). With
+  # initial depth=2 and one deepen attempt of depth=2, main only fetches 4
+  # commits (main-extra-7 through main-extra-10), which never reaches c5; the
+  # unshallow pull then brings in all of main and exposes the merge base.
+  setup_repo_fixture shallow 1 10
+  local out err_file
+  err_file="$(mktemp resolve-err.XXXXXX)"
+  if ! out="$(GIT_DIFF_BASE_FETCH_DEPTH=2 GIT_DIFF_BASE_MAX_ATTEMPTS=1 \
+      git_diff_base_resolve "origin/main" "HEAD" strict 2>"$err_file")"; then
+    fail "resolve should succeed after unshallow; stderr was: $(cat "$err_file")"
+    return 1
+  fi
+  if ! git cat-file -e "$out^{commit}" 2>/dev/null; then
+    fail "unshallow path returned non-commit '$out'"
+    return 1
+  fi
+  local stderr_text
+  stderr_text="$(cat "$err_file")"
+  assert_contains "$stderr_text" "falling back to --unshallow" "unshallow warning"
+}
+
+test_resolve_logs_deepen_progress() {
+  # Operators need a visible breadcrumb per deepen iteration so a slow CI run
+  # is not opaque between the initial fetch and the eventual unshallow. This
+  # checks that at least one deepen-progress line is emitted when the deepen
+  # loop runs.
+  setup_repo_fixture shallow 1
+  local err_file
+  err_file="$(mktemp resolve-err.XXXXXX)"
+  if ! GIT_DIFF_BASE_FETCH_DEPTH=2 GIT_DIFF_BASE_MAX_ATTEMPTS=8 \
+      git_diff_base_resolve "origin/main" "HEAD" strict >/dev/null 2>"$err_file"; then
+    fail "resolve failed; stderr was: $(cat "$err_file")"
+    return 1
+  fi
+  local stderr_text
+  stderr_text="$(cat "$err_file")"
+  assert_contains "$stderr_text" "Deepening" "deepen progress log line"
+}
+
 test_resolve_cross_repo_sha_hint_appears() {
   # The hint only fires from the bottom of git_diff_base_resolve after the
   # deepen+unshallow loop has run. To exercise that path, the clone must be
@@ -483,6 +590,9 @@ ALL_TESTS=(
   test_is_shallow_repository_detects_full_clone
   test_is_shallow_repository_detects_shallow_clone
   test_sha_ref_classifies_full_length_sha
+  test_sha_ref_classifies_64_char_hex
+  test_sha_ref_classifies_short_local_sha
+  test_sha_ref_rejects_short_unknown_hex
   test_sha_ref_rejects_existing_branch_name
   test_sha_ref_rejects_non_hex_strings
   test_resolve_full_clone_happy_path
@@ -490,6 +600,8 @@ ALL_TESTS=(
   test_resolve_shallow_deepens_to_find_merge_base
   test_resolve_full_clone_missing_base_ref_errors
   test_resolve_lenient_continues_after_initial_fetch_failure
+  test_resolve_unshallow_fallback_finds_merge_base
+  test_resolve_logs_deepen_progress
   test_resolve_cross_repo_sha_hint_appears
 )
 
