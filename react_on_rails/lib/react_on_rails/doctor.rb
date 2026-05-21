@@ -94,7 +94,8 @@ module ReactOnRails
       "scripts/deploy.sh",
       ".circleci/config.yml",
       ".gitlab-ci.yml",
-      "bitbucket-pipelines.yml"
+      "bitbucket-pipelines.yml",
+      "Jenkinsfile"
     ].freeze
     # Bounded glob allowlist for deploy manifests that live in a known directory
     # but use per-environment or per-workflow filenames. Each pattern matches
@@ -2899,8 +2900,10 @@ module ReactOnRails
     end
 
     def deploy_script_references_deprecated_task?(full_path)
-      # Only `#` comments matter for the scanned file types: Procfile, Dockerfile*,
-      # and bin/* scripts all use `#`. None use `//`, so we don't filter it.
+      # Filter `#` comments since Procfile, Dockerfile*, YAML, Ruby, and bin/*
+      # scripts all use `#`. Jenkinsfile (Groovy) uses `//`; we accept the rare
+      # false positive of a `//`-commented mention as the cost of keeping the
+      # filter simple — real `sh` invocations are flagged correctly.
       # The trailing-comment strip requires whitespace before `#`, so a fragment
       # like `task#name` stays intact while `cmd # was: <deprecated>` is filtered.
       full_path.binread.each_line.any? do |line|

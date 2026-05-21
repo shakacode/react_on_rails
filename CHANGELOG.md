@@ -53,6 +53,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
   See `docs/pro/updating.md` for the full upgrade guide. [PR 3320](https://github.com/shakacode/react_on_rails/pull/3320) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
+#### Changed
+
+- **`react_on_rails:doctor` renderer-cache scan covers Jenkinsfile**: The deprecated-task scan that flags `react_on_rails_pro:pre_stage_bundle_for_node_renderer` now also checks `Jenkinsfile`, alongside the existing CI/CD manifests (`.circleci/config.yml`, `.gitlab-ci.yml`, `bitbucket-pipelines.yml`, `.github/workflows/*.yml`/`.yaml`) and deploy scripts. Fixes [Issue 3269](https://github.com/shakacode/react_on_rails/issues/3269).
+
 #### Fixed
 
 - **Client-only Vite setups no longer fail Rails boot on Shakapacker's `packageManager` guard**: React on Rails now installs an engine initializer that runs before `shakapacker.manager_checker` and no-ops Shakapacker's `error_unless_package_manager_is_obvious!` when the host app has no Shakapacker config (`config/shakapacker.yml` or `SHAKAPACKER_CONFIG`). This unblocks apps that use the `react-on-rails/client` npm package from an existing Vite entrypoint and do not use the Ruby render helpers. The Ruby helpers that resolve bundle paths still require Shakapacker configuration. Apps with Shakapacker config keep Shakapacker's guard unchanged. Fixes [Issue 3145](https://github.com/shakacode/react_on_rails/issues/3145). [PR 3365](https://github.com/shakacode/react_on_rails/pull/3365) by [justin808](https://github.com/justin808).
