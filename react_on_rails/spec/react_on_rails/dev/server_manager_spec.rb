@@ -1201,8 +1201,13 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     # pattern-based kill would leave stale port-bound processes and socket/pid
     # files behind. All three cleanup helpers must always run.
     it "runs port kills and socket cleanup even when pattern-based kill found processes" do
-      allow(Open3).to receive(:capture2).with("pgrep", "-f", "rails", err: File::NULL).and_return(["1234", nil])
+      # Stub the catch-all fallback first so the specific `"pgrep", "-f", "rails"`
+      # match below wins (RSpec applies the last-defined stub when patterns
+      # overlap). Otherwise `kill_running_processes` would return false and the
+      # test wouldn't actually exercise the "pattern kill succeeded" path that
+      # the old `||` short-circuit would have skipped.
       allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
+      allow(Open3).to receive(:capture2).with("pgrep", "-f", "rails", err: File::NULL).and_return(["1234", nil])
       allow(Process).to receive(:pid).and_return(9999)
       allow(Process).to receive(:kill)
 
