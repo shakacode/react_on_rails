@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Fixed
+
+- **[Pro]** **Keep jwt 2.x compatibility in 16.7**: React on Rails Pro now requires `jwt >= 2.7`, removing the previous `~> 2.7` cap so applications can resolve patched `jwt 3.2.0+` releases without forcing a hard jwt 3.x floor in the 16.7 release line. [PR 3344](https://github.com/shakacode/react_on_rails/pull/3344) by [ihabadham](https://github.com/ihabadham).
+
 ### [16.7.0.rc.0] - 2026-05-20
 
 #### Added
