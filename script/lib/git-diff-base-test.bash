@@ -344,11 +344,11 @@ test_sha_ref_classifies_full_length_sha() {
   local sha
   sha="$(git rev-parse HEAD)"
   # Sanity check: default git installs produce 40-char SHA-1 hashes. If a future
-  # default flips to SHA-256, this still tests the full-length-classifier path,
-  # but test_sha_ref_classifies_64_char_hex below exercises 64-char inputs
-  # explicitly regardless of the local repository's object format.
+  # default flips to SHA-256, this test will fail with an explicit diagnostic —
+  # the 64-char classifier path is covered independently by
+  # test_sha_ref_classifies_64_char_hex.
   if [ "${#sha}" -ne 40 ]; then
-    fail "expected 40-char SHA from git rev-parse HEAD, got ${#sha}-char '$sha'"
+    fail "expected 40-char SHA from git rev-parse HEAD, got ${#sha}-char '$sha' -- if git now defaults to SHA-256, update this test; the 64-char classifier path is covered by test_sha_ref_classifies_64_char_hex"
     return 1
   fi
   if ! git_diff_base_sha_ref "$sha"; then
@@ -359,9 +359,11 @@ test_sha_ref_classifies_full_length_sha() {
 
 test_sha_ref_classifies_64_char_hex() {
   # The classifier accepts 64-char SHA-256 hashes without local verification
-  # (same policy as 40-char SHA-1). No repo state is required because the
-  # full-length branch of git_diff_base_sha_ref short-circuits before any
-  # rev-parse call. Cwd is still the per-test tmpdir, which has no .git.
+  # (same policy as 40-char SHA-1). No repo state is required: the
+  # verify_ref call is short-circuited for 40/64-char inputs, and the two
+  # branch-name rev-parse checks that follow fail gracefully when there is no
+  # .git in the current directory, so neither match fires and the function
+  # returns 0. Cwd is still the per-test tmpdir, which has no .git.
   local hex="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
   if [ "${#hex}" -ne 64 ]; then
     fail "test fixture broken: expected 64-char hex, got ${#hex}"
@@ -394,7 +396,7 @@ test_sha_ref_rejects_short_unknown_hex() {
   # A short hex string that does not resolve to any local object must NOT
   # classify as a SHA. Using all zeros guarantees no real commit collision.
   setup_repo_fixture full
-  if git_diff_base_sha_ref "0000000" 2>/dev/null; then
+  if git_diff_base_sha_ref "0000000"; then
     fail "unknown short hex string should not classify as a SHA"
     return 1
   fi
@@ -539,7 +541,7 @@ test_resolve_logs_deepen_progress() {
   fi
   local stderr_text
   stderr_text="$(cat "$err_file")"
-  assert_contains "$stderr_text" "Deepening" "deepen progress log line"
+  assert_contains "$stderr_text" "Deepening shallow history" "deepen progress log line"
 }
 
 test_resolve_cross_repo_sha_hint_appears() {
