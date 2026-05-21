@@ -174,7 +174,11 @@ set the status with `reply.code(503)`, and return a response object from that br
 then return another response object.
 
 ```js
-// Example: signal not-ready (e.g. while warming up workers)
+// Example: signal not-ready (e.g. while warming up workers).
+// `workersReady` is application state you maintain — flip it to true once the
+// renderer finishes its warm-up (for example in a cluster `listening` event).
+let workersReady = false;
+
 configureFastify((app) => {
   app.get('/health', (request, reply) => {
     if (!workersReady) {
@@ -311,8 +315,10 @@ does not apply there. See the `port` option at the top of this page for Heroku o
 > `periodSeconds` (5 s) thereafter, and the container restarts only if all six consecutive startup checks fail. Increase
 > `failureThreshold` or `periodSeconds` if startup regularly takes longer.
 > The 10-second initial delay only shifts when the first check fires. Omitting it starts checks immediately; the
-> failure window still comes from `failureThreshold * periodSeconds`. Reduce `initialDelaySeconds` if your renderer
-> reliably opens the port within 1-2 seconds, or keep it to avoid noisy early-failure log entries.
+> failure window is `initialDelaySeconds + (failureThreshold - 1) * periodSeconds` (25 s with the values above when
+> `initialDelaySeconds` is omitted, since the last of six checks fires at `(6 - 1) * 5 = 25 s`). Reduce
+> `initialDelaySeconds` if your renderer reliably opens the port within 1-2 seconds, or keep it to avoid noisy
+> early-failure log entries.
 
 Readiness and liveness omit `initialDelaySeconds` here because Kubernetes 1.20+ (startup probe GA) defers them until
 the startup probe succeeds. If you skip the startup probe or run an older cluster without startup probe support, add an

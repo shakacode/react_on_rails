@@ -194,6 +194,9 @@ class HealthController < ActionController::Base
     renderer_port = renderer_url.match?(/:\d+(?:[\/?#]|$)/) ? renderer_uri.port : 3800
     Socket.tcp("localhost", renderer_port, connect_timeout: 1) {} # open + immediately close
     head :ok
+  # Only renderer reachability failures map to 503. ArgumentError and
+  # URI::InvalidURIError raised above intentionally escape as 500 so
+  # misconfigured `renderer_url` stays visible in logs and alerting.
   rescue SocketError, SystemCallError
     head :service_unavailable
   end
@@ -497,6 +500,10 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
 
 **Mitigation:**
 
+> The probe values below mirror the recommended settings documented in
+> [JS Configuration: Configuring Startup, Readiness, and Liveness Probes](./js-configuration.md#configuring-startup-readiness-and-liveness-probes).
+> Treat that section as the canonical source when you tune values; update it first and reflect the change in these examples.
+
 1. **Health check endpoint** — The Node Renderer exposes a built-in `/info` endpoint that returns the node version and renderer version. Because the renderer uses cleartext HTTP/2, Kubernetes `httpGet` probes (HTTP/1.1) are incompatible with this listener. Use a TCP probe, an `exec` probe with an h2c-aware client such as `curl --http2-prior-knowledge`, or a dedicated HTTP/1.1 sidecar/port for probes. For a custom `/health` route with more granular checks, use the `configureFastify()` option (see [JS Configuration: Adding a Health Check Endpoint](./js-configuration.md#adding-a-health-check-endpoint)). Configure your container orchestrator to wait for it before routing traffic.
 2. **Startup probe** — Configure a startup probe with a generous `initialDelaySeconds`:
    ```yaml
@@ -637,7 +644,9 @@ A complete pod spec for the sidecar pattern:
 
 > [!NOTE]
 > The manifest uses an h2c-aware `exec` probe for readiness and a `tcpSocket` probe for liveness. Keep that split unless
-> you intentionally need stricter liveness detection and have verified curl HTTP/2 support in the image.
+> you intentionally need stricter liveness detection and have verified curl HTTP/2 support in the image. Probe timing
+> values mirror [JS Configuration: Configuring Startup, Readiness, and Liveness Probes](./js-configuration.md#configuring-startup-readiness-and-liveness-probes);
+> update that section first when tuning thresholds and reflect the change here.
 
 ```yaml
 apiVersion: apps/v1
