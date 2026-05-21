@@ -2992,6 +2992,190 @@ RSpec.describe ReactOnRails::Doctor do
                end).to be(true)
       end
     end
+
+    context "when a CircleCI config references the deprecated task" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        FileUtils.mkdir_p(File.join(tmpdir, ".circleci"))
+        File.write(
+          File.join(tmpdir, ".circleci/config.yml"),
+          "jobs:\n  deploy:\n    steps:\n      " \
+          "- run: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "flags CI manifests in the fixed allowlist" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        suggestion_line = warning_msgs
+                          .flat_map { |m| m[:content].split("\n") }
+                          .find { |line| line.include?(".circleci/config.yml →") }
+        expect(suggestion_line).not_to be_nil
+        expect(suggestion_line).to include("pre_seed_renderer_cache")
+      end
+    end
+
+    context "when a GitHub Actions workflow discovered via glob references the deprecated task" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        FileUtils.mkdir_p(File.join(tmpdir, ".github/workflows"))
+        File.write(
+          File.join(tmpdir, ".github/workflows/deploy.yml"),
+          "jobs:\n  release:\n    steps:\n      " \
+          "- run: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+        # A second workflow with no reference confirms the glob only flags hits.
+        File.write(
+          File.join(tmpdir, ".github/workflows/test.yml"),
+          "jobs:\n  test:\n    steps:\n      - run: bundle exec rspec\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "flags workflows expanded from the bounded glob" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        warning_content = warning_msgs.map { |m| m[:content] }.join("\n")
+        expect(warning_content).to include(".github/workflows/deploy.yml →")
+        expect(warning_content).not_to include(".github/workflows/test.yml")
+        expect(warning_content).to include("pre_seed_renderer_cache")
+      end
+    end
+
+    context "when a Capistrano stage file outside the fixed allowlist references the deprecated task" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        FileUtils.mkdir_p(File.join(tmpdir, "config/deploy"))
+        # canary.rb is not in RENDERER_CACHE_DEPLOY_SCRIPT_PATHS, so it can only be
+        # found via the config/deploy/*.rb glob expansion.
+        File.write(
+          File.join(tmpdir, "config/deploy/canary.rb"),
+          "before 'deploy:assets:precompile', 'react_on_rails_pro:pre_stage_bundle_for_node_renderer'\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "flags arbitrary Capistrano stage files via the glob" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        suggestion_line = warning_msgs
+                          .flat_map { |m| m[:content].split("\n") }
+                          .find { |line| line.include?("config/deploy/canary.rb →") }
+        expect(suggestion_line).not_to be_nil
+        expect(suggestion_line).to include("pre_seed_renderer_cache")
+        expect(suggestion_line).to include("MODE=symlink")
+      end
+    end
+
+    context "when a glob-discovered file raises during read" do
+      let(:tmpdir) { Dir.mktmpdir }
+      let(:workflow_relpath) { ".github/workflows/deploy.yml" }
+      let(:workflow_path) { File.join(tmpdir, workflow_relpath) }
+
+      before do
+        FileUtils.mkdir_p(File.dirname(workflow_path))
+        File.write(
+          workflow_path,
+          "jobs:\n  release:\n    steps:\n      " \
+          "- run: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+        # Also drop a Procfile hit so we can confirm the scan keeps going after
+        # the per-file failure on the glob-discovered workflow.
+        File.write(
+          File.join(tmpdir, "Procfile"),
+          "web: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+
+        root_path = Pathname.new(tmpdir)
+        allow(Rails).to receive(:root).and_return(root_path)
+
+        failing_workflow = instance_double(Pathname)
+        allow(failing_workflow).to receive_messages(file?: true, size: File.size(workflow_path))
+        allow(failing_workflow).to receive(:binread).and_raise(Errno::EIO, "simulated read failure")
+        allow(root_path).to receive(:join).and_call_original
+        allow(root_path).to receive(:join).with(workflow_relpath).and_return(failing_workflow)
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "captures the per-file failure and keeps scanning the remaining paths" do
+        expect { doctor.send(:check_deprecated_renderer_cache_task) }.not_to raise_error
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? do |m|
+                 m[:content].include?("Could not scan #{workflow_relpath} for deprecated renderer-cache task")
+               end).to be(true)
+        expect(warning_msgs.any? { |m| m[:content].include?("Procfile") }).to be(true)
+        expect(warning_msgs.none? do |m|
+                 m[:content].include?("Could not complete scan for deprecated renderer-cache task")
+               end).to be(true)
+      end
+    end
+
+    context "when expanding a deploy-script glob raises an unexpected error" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        File.write(
+          File.join(tmpdir, "Procfile"),
+          "web: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+
+        # Fail only the workflows glob; the others must still expand normally.
+        allow(Dir).to receive(:glob).and_call_original
+        allow(Dir).to receive(:glob)
+          .with(".github/workflows/*.yml", File::FNM_PATHNAME, base: tmpdir)
+          .and_raise(Errno::EACCES, "simulated glob failure")
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "captures the glob failure and continues scanning fixed paths" do
+        expect { doctor.send(:check_deprecated_renderer_cache_task) }.not_to raise_error
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? do |m|
+                 m[:content].include?("Could not expand renderer-cache deploy-script glob .github/workflows/*.yml")
+               end).to be(true)
+        expect(warning_msgs.any? { |m| m[:content].include?("pre_stage_bundle_for_node_renderer") }).to be(true)
+        expect(warning_msgs.none? do |m|
+                 m[:content].include?("Could not complete scan for deprecated renderer-cache task")
+               end).to be(true)
+      end
+    end
+
+    context "when a Capistrano stage file is reachable via both the fixed list and the glob" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        FileUtils.mkdir_p(File.join(tmpdir, "config/deploy"))
+        File.write(
+          File.join(tmpdir, "config/deploy/staging.rb"),
+          "before 'deploy:assets:precompile', 'react_on_rails_pro:pre_stage_bundle_for_node_renderer'\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "reports the same file only once" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        bullet_lines = warning_msgs
+                       .flat_map { |m| m[:content].split("\n") }
+                       .grep(%r{config/deploy/staging\.rb →})
+        expect(bullet_lines.length).to eq(1)
+      end
+    end
   end
 
   describe "check_base_package_references" do
