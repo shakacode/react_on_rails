@@ -68,10 +68,12 @@ The node renderer executes uploaded JavaScript bundles inside isolated VM contex
 
 `supportModules` injects a fixed set of common Node.js globals; it does **not** mirror the host global object into the VM. It does **not** inject `fetch`, `Headers`, `Request`, `Response`, `AbortController`, or `AbortSignal`. Even if the Node.js process that launches the renderer has those globals, code inside the renderer VM will not see them unless you provide them. That means Server Components should not assume that "modern Node" global `fetch` or fetch-related cancellation APIs are available in the server or RSC bundle.
 
+> **Warning:** Passing `additionalContext: {}` (an empty object) still opts the renderer into CommonJS execution mode, where bundle code can call `require()` against the renderer host's module graph. If you do not need any injected globals, use `additionalContext: null` instead. See the [Bundle Architecture Reference](../../../pro/react-server-components/rendering-flow.md#bundle-architecture-reference) for the full security and behavioral implications.
+
 Prefer passing application data from Rails controllers through props when the data belongs to your Rails app. When a Server Component really needs to call an external HTTP API from the renderer, choose one of these approaches:
 
 1. Inject host globals through `additionalContext`. Node.js 18+ exposes `globalThis.fetch`, `Headers`, `Request`, and `Response` by default (Node.js 18 and 20 mark the fetch API as experimental; fetch became stable in Node.js 21 and remains stable in Node.js 22+ LTS). Start with the guarded example below so the renderer fails fast if any required fetch global is absent. On older or unsupported Node.js versions without these globals, use a bundled HTTP client instead (see option 2).
-2. Import a server-side HTTP client in the component code, such as `node-fetch` v2 (CJS-compatible; v3+ is ESM-only) or `undici`, and let your bundler include it in the RSC/server bundle.
+2. Import a server-side HTTP client in the component code, such as `node-fetch` v2 (CJS-compatible; v3+ is ESM-only; note: `node-fetch` v2 is maintenance-only since 2022, with security fixes only) or `undici`, and let your bundler include it in the RSC/server bundle. For new projects, prefer `undici`.
 
 ```js
 const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
@@ -180,8 +182,10 @@ const {
   Response: ResponseImplementation,
 } = require('undici');
 
-// undici typically relies on host Node.js globals for AbortController and AbortSignal
-// (some older releases re-exported them, but newer versions do not). Use host globals when present.
+// `undici` v6+ exposes its own `AbortController` and `AbortSignal` as named exports;
+// older releases (v5 and earlier) did not. Newer Node.js runtimes (15+) also expose
+// these as host globals. Check the undici release notes for the version you are using
+// to decide whether to import them from undici or rely on host globals.
 const componentsUseAbortSignals = false; // Set to true if component code uses AbortSignal; requires Node.js 15+.
 
 if (!fetchImplementation || !HeadersImplementation || !RequestImplementation || !ResponseImplementation) {

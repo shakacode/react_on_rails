@@ -835,6 +835,8 @@ for the current recommendation. See also
 
 > **Important:** This VM global constraint applies to the **server bundle** (SSR) and to the **RSC bundle** when the node renderer executes it to generate an RSC payload. See the [Bundle Architecture Reference](../../pro/react-server-components/rendering-flow.md#bundle-architecture-reference) for a comparison.
 
+> **Migration note:** If you relied on earlier docs that said the RSC bundle runs in full Node.js, and your Server Components call `fetch()` directly (or use `Headers`, `Request`, `Response`, `AbortController`, `AbortSignal`), the renderer VM will not have those globals. Bundle an HTTP client into the RSC/server bundle or inject the fetch globals through `additionalContext`. See [Node Renderer Runtime Globals for SSR and RSC](../building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc) for guarded startup examples.
+
 **Fix:** Enable `supportModules` in your node renderer configuration to inject common Node.js globals:
 
 ```js
