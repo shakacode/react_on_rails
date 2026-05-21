@@ -56,7 +56,7 @@ The server bundle and RSC bundle both run in VM sandboxes that have **no global 
 When CommonJS execution mode is active:
 
 - `require()` becomes available inside the bundle and webpack `externals` callbacks resolve correctly.
-- The `require` exposed to the bundle is the renderer host's `require`, so bundle code can load any module installed on the renderer host — not only modules included in the upload.
+- The `require` exposed to the bundle is the renderer host's `require` (the same `require` the launch file uses). It is passed in directly with no sandboxing, allowlist, or custom resolver — the renderer does not expose a hook for restricting which modules the bundle can load. Bundle code can load any module installed on the renderer host, not only modules included in the upload. A filtered `additionalContext` cannot narrow this; `additionalContext` controls what globals are injected, not what `require` can resolve.
 - `additionalContext` does not inject a global `require` by itself; it just opts into the mode and injects only the globals you pass.
 
 Even with CommonJS execution mode enabled, `resolve.fallback` remains the safer default. The client bundle also uses `resolve.fallback` to omit Node builtins that don't exist in the browser.

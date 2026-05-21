@@ -63,6 +63,10 @@ export interface Config {
   // To keep the VM sandboxed without `require`, set BOTH `additionalContext: null` AND
   // `supportModules: false`. When `supportModules: true`, the renderer wraps the bundle and
   // injects the host `require` regardless of `additionalContext`.
+  // Mechanically, "wrapping" means the renderer passes the bundle source through `module.wrap()`
+  // (the standard CommonJS `(function (exports, require, module, __filename, __dirname) { ... })`
+  // wrapper) and then invokes the wrapped function with the host `require`. See the `buildVM`
+  // implementation in `worker/vm.ts` for the exact call site.
   additionalContext: Record<string, unknown> | null;
   // Number of workers that will be forked to serve rendering requests.
   workersCount: number;

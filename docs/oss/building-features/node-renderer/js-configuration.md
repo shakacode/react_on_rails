@@ -73,7 +73,7 @@ The node renderer executes uploaded JavaScript bundles inside isolated VM contex
 Prefer passing application data from Rails controllers through props when the data belongs to your Rails app. When a Server Component really needs to call an external HTTP API from the renderer, choose one of these approaches:
 
 1. Inject host globals through `additionalContext`. Node.js 18+ exposes `globalThis.fetch`, `Headers`, `Request`, and `Response` by default (Node.js 18 and 20 mark the fetch API as experimental; fetch became stable in Node.js 21 and remains stable in Node.js 22+ LTS). Start with the guarded example below so the renderer fails fast if any required fetch global is absent. On older or unsupported Node.js versions without these globals, use a bundled HTTP client instead (see option 2).
-2. Import a server-side HTTP client in the component code, such as `node-fetch` v2 (CJS-compatible; v3+ is ESM-only; note: `node-fetch` v2 is maintenance-only since 2022, with security fixes only) or `undici`, and let your bundler include it in the RSC/server bundle. For new projects, prefer `undici`.
+2. Import a server-side HTTP client in the component code, such as `undici` (recommended for new projects) or `node-fetch` v2 (CJS-compatible legacy fallback; v3+ is ESM-only; `node-fetch` v2 is maintenance-only since 2022, with security fixes only), and let your bundler include it in the RSC/server bundle.
 
 ```js
 const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
@@ -123,12 +123,61 @@ Install a fetch implementation only when your renderer runtime does not provide 
 | Situation                                                                   | Recommendation                                                                                                                                    |
 | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Supported Node.js LTS host, want to use the runtime's built-in fetch        | Use the guarded `globalThis.fetch` / `additionalContext` example above.                                                                           |
-| CommonJS launch file on an older runtime that does not expose fetch globals | Use `node-fetch` v2; `node-fetch` v3+ is ESM-only.                                                                                                |
 | Supported Node.js LTS, ESM or CommonJS, want a bundled HTTP client          | Use `undici` and choose a release compatible with your runtime; see [undici's compatibility notes](https://undici.nodejs.org/) for version pairs. |
+| CommonJS launch file on an older runtime that does not expose fetch globals | Use `node-fetch` v2; `node-fetch` v3+ is ESM-only.                                                                                                |
 
-For older or unsupported Node.js installations that cannot use the built-in fetch API, use `node-fetch` v2 (see the CommonJS example below) or an `undici` release from the compatibility notes that still supports your runtime.
+For new projects, prefer `undici`. The `undici` example below is the primary bundled-client pattern; the `node-fetch` v2 example after it is a legacy fallback for older or unsupported Node.js installations.
 
-For example, with `node-fetch` v2 in a CommonJS launch file:
+Use the same `additionalContext` shape with `undici` as with the `globalThis.fetch` example above. Unlike `node-fetch` v2, `undici` exports `fetch` as a named export; choose a version compatible with your renderer Node.js runtime. Add the same startup guard so incompatible versions fail before the renderer starts. The example below uses CommonJS; ESM launchers can import the same names from `undici` and alias them to the `*Implementation` constants used here.
+
+```js
+const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
+const {
+  fetch: fetchImplementation,
+  Headers: HeadersImplementation,
+  Request: RequestImplementation,
+  Response: ResponseImplementation,
+} = require('undici');
+
+// `undici` does not export `AbortController`/`AbortSignal` as named exports
+// (verified against v6 and v8 — they are absent from `Object.keys(require('undici'))`).
+// Bundle code that uses abort signals relies on the host globals (Node.js 15+),
+// injected via `additionalContext` below.
+// Set to true only if your Server Components use AbortSignal; requires Node.js 15+.
+const componentsUseAbortSignals = false;
+
+if (!fetchImplementation || !HeadersImplementation || !RequestImplementation || !ResponseImplementation) {
+  throw new Error(
+    'The selected undici version does not expose one or more required fetch globals (fetch, Headers, Request, Response). ' +
+      'Choose an undici release compatible with your renderer Node.js runtime.',
+  );
+}
+
+if (componentsUseAbortSignals && (!globalThis.AbortController || !globalThis.AbortSignal)) {
+  throw new Error(
+    'Your component code uses abort signals, but this Node.js runtime does not expose AbortController and AbortSignal. ' +
+      'Use Node.js 15+, or replace the globalThis.* references below with compatible abort polyfill imports.',
+  );
+}
+
+reactOnRailsProNodeRenderer({
+  supportModules: true,
+  additionalContext: {
+    fetch: fetchImplementation,
+    Headers: HeadersImplementation,
+    Request: RequestImplementation,
+    Response: ResponseImplementation,
+    ...(componentsUseAbortSignals
+      ? {
+          AbortController: globalThis.AbortController,
+          AbortSignal: globalThis.AbortSignal,
+        }
+      : {}),
+  },
+});
+```
+
+For older or unsupported Node.js installations that cannot use a current `undici` release, fall back to `node-fetch` v2 in a CommonJS launch file:
 
 ```js
 const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
@@ -169,61 +218,7 @@ reactOnRailsProNodeRenderer({
 });
 ```
 
-`node-fetch` v2 does not ship its own `AbortController` or `AbortSignal` implementation, but `node-fetch` v2.6+ accepts spec-compatible signals when you provide them. If component code uses abort signals, merge the optional abort globals shown in the first example into `additionalContext`; on Node.js 18+, the native `globalThis.AbortController` and `globalThis.AbortSignal` work with `node-fetch` v2.6+. On older EOL runtimes, use a compatible polyfill such as `node-abort-controller`.
-
-Use the same `additionalContext` shape if you import a compatible client from `undici` instead. Unlike `node-fetch` v2, `undici` exports `fetch` as a named export; choose a version compatible with your renderer Node.js runtime. Add the same startup guard so incompatible versions fail before the renderer starts. The example below uses CommonJS; ESM launchers can import the same names from `undici` and alias them to the `*Implementation` constants used here.
-
-```js
-const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
-const {
-  fetch: fetchImplementation,
-  Headers: HeadersImplementation,
-  Request: RequestImplementation,
-  Response: ResponseImplementation,
-  // `undici` v6+ exposes its own `AbortController` and `AbortSignal` as named exports;
-  // older releases (v5 and earlier) did not. Destructuring an absent named export yields
-  // `undefined`, and the `??` fallbacks below pick up the host globals (Node.js 15+).
-  AbortController: undiciAbortController,
-  AbortSignal: undiciAbortSignal,
-} = require('undici');
-
-// Set to true if component code uses AbortSignal. Requires either undici v6+ (which exports
-// AbortController/AbortSignal) or Node.js 15+ (which exposes them as host globals).
-const componentsUseAbortSignals = false;
-
-if (!fetchImplementation || !HeadersImplementation || !RequestImplementation || !ResponseImplementation) {
-  throw new Error(
-    'The selected undici version does not expose one or more required fetch globals (fetch, Headers, Request, Response). ' +
-      'Choose an undici release compatible with your renderer Node.js runtime.',
-  );
-}
-
-const abortControllerImplementation = undiciAbortController ?? globalThis.AbortController;
-const abortSignalImplementation = undiciAbortSignal ?? globalThis.AbortSignal;
-
-if (componentsUseAbortSignals && (!abortControllerImplementation || !abortSignalImplementation)) {
-  throw new Error(
-    'Your component code uses abort signals, but neither undici nor this Node.js runtime exposes AbortController and AbortSignal. ' +
-      'Upgrade to undici v6+ (which exports them as named exports), upgrade to Node.js 15+, or replace the references below with compatible abort polyfill imports.',
-  );
-}
-
-reactOnRailsProNodeRenderer({
-  supportModules: true,
-  additionalContext: {
-    fetch: fetchImplementation,
-    Headers: HeadersImplementation,
-    Request: RequestImplementation,
-    Response: ResponseImplementation,
-    ...(componentsUseAbortSignals
-      ? {
-          AbortController: abortControllerImplementation,
-          AbortSignal: abortSignalImplementation,
-        }
-      : {}),
-  },
-});
-```
+`node-fetch` v2 does not ship its own `AbortController` or `AbortSignal` implementation, but `node-fetch` v2.6+ accepts spec-compatible signals when you provide them. If component code uses abort signals, merge the optional abort globals shown in the `globalThis.fetch` example into `additionalContext`; on Node.js 18+, the native `globalThis.AbortController` and `globalThis.AbortSignal` work with `node-fetch` v2.6+. On older EOL runtimes, use a compatible polyfill such as `node-abort-controller`.
 
 ## Example Launch Files
 
