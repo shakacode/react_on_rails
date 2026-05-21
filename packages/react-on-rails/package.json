@@ -39,6 +39,7 @@
     "./createReactOutput": "./lib/createReactOutput.js",
     "./isServerRenderResult": "./lib/isServerRenderResult.js",
     "./reactApis": "./lib/reactApis.cjs",
+    "./webpackHelpers": "./lib/webpackHelpers.cjs",
     "./reactHydrateOrRender": "./lib/reactHydrateOrRender.js",
     "./turbolinksUtils": "./lib/turbolinksUtils.js",
     "./isRenderFunction": "./lib/isRenderFunction.js",
