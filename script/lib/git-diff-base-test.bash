@@ -78,10 +78,15 @@ run_test() {
 
   # The subshell runs assertions that increment TESTS_FAILED in the child
   # process only, so its non-zero exit is the signal we use to count failures
-  # in the parent process below.
+  # in the parent process. The before_failed comparison is effectively always
+  # true on subshell failure (the child's TESTS_FAILED increments cannot
+  # propagate back), but it stays defensive in case future refactors move
+  # assertions into the parent process. The summary label is intentionally
+  # generic because the specific fail() message was already emitted to stderr
+  # at the time of the failure on line 22.
   if [ "$rc" -ne 0 ] && [ "$TESTS_FAILED" -eq "$before_failed" ]; then
     TESTS_FAILED=$((TESTS_FAILED + 1))
-    FAILURES+=("$CURRENT_TEST: subshell exited $rc without explicit assertion failure")
+    FAILURES+=("$CURRENT_TEST: subshell exited $rc (see stderr above for details)")
     echo "  FAIL: subshell exited $rc" >&2
   fi
 }
@@ -281,8 +286,11 @@ setup_repo_fixture() {
   git config user.email "t@example.com"
   git config user.name "test"
   # Clones default to fetching only the checked-out branch, so make sure the
-  # base branch is also tracked locally for the deepen path tests.
-  git fetch origin main:refs/remotes/origin/main >/dev/null 2>&1 || true
+  # base branch is also tracked locally for the deepen path tests. Warn on
+  # failure so downstream test failures trace back to the setup step rather
+  # than surfacing later as opaque "merge base not found" errors.
+  git fetch origin main:refs/remotes/origin/main >/dev/null 2>&1 \
+    || echo "  Warning: setup_repo_fixture: failed to fetch origin/main; some tests may fail unexpectedly" >&2
 }
 
 test_verify_ref_recognizes_existing_refs() {

@@ -11,6 +11,13 @@
 # - GIT_DIFF_BASE_UNSHALLOW_TIMEOUT_SECONDS: maximum seconds for the --unshallow fallback when the
 #   system timeout command is available (default 300; set 0 to disable the guard).
 # - GIT_DIFF_BASE_DEBUG: set to any non-empty value to show git merge-base stderr output.
+#
+# git_diff_base_resolve accepts a third argument selecting the initial-fetch policy:
+# - strict (default): abort immediately if the first base-branch fetch fails in a shallow clone.
+#   Use this for CI gates where a silent miss would falsely skip downstream jobs.
+# - lenient: continue with cached local history after an initial fetch failure (e.g. offline runs
+#   or transient network errors). Subsequent steps still hard-fail if the merge base cannot be
+#   resolved, so the only difference is whether one fetch hiccup aborts the whole resolution.
 
 git_diff_base_remote_branch() {
   local ref="$1"
@@ -193,22 +200,26 @@ git_diff_base_fetch_remote_branch() {
   # Keep depth validation at this helper boundary because callers may pass raw
   # env-derived values directly; git_diff_base_resolve happens to pre-validate
   # its current initial/deepen depths before passing them through.
+  #
+  # --no-tags keeps deepen iterations from repeatedly downloading tag objects
+  # in tag-heavy repos; this library only needs branch refs for merge-base
+  # resolution, never the tags themselves.
   case "$mode" in
     initial)
       depth="$(git_diff_base_fetch_depth "$depth")"
-      fetch_args=(--depth="$depth" origin "$refspec")
+      fetch_args=(--no-tags --depth="$depth" origin "$refspec")
       ;;
     deepen)
       depth="$(git_diff_base_fetch_depth "$depth")"
-      fetch_args=(--deepen="$depth" origin "$refspec")
+      fetch_args=(--no-tags --deepen="$depth" origin "$refspec")
       ;;
     unshallow)
       # In full clones this becomes a plain branch fetch, used for missing refs
       # in CI checkouts that have history but not the base branch ref.
       if git_diff_base_is_shallow_repository; then
-        fetch_args=(--unshallow origin "$refspec")
+        fetch_args=(--no-tags --unshallow origin "$refspec")
       else
-        fetch_args=(origin "$refspec")
+        fetch_args=(--no-tags origin "$refspec")
       fi
       ;;
     *)
