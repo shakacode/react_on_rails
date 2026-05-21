@@ -200,7 +200,7 @@ captured by this benchmark methodology and remain a follow-up; see
   establish statistical significance._
 - _The `action_total` -2.3% delta is likely within expected variance at n=8._
 
-#### Worst-case `responseEnd` counter-signal <a id="gumroad-rsc-worst-case-responseend"></a>
+#### `responseEnd` p95 counter-signal <a id="gumroad-rsc-worst-case-responseend"></a>
 
 | Metric                  | Inertia demo | RSC demo | Delta % (negative = RSC faster) |
 | ----------------------- | -----------: | -------: | ------------------------------: |
@@ -213,7 +213,7 @@ samples it remains a coarse tail estimate rather than a stable population p95. I
 
 Use these numbers as a case-study signal, not a universal performance claim. The RSC route combines RSC, the Pro Node
 renderer, and SSR, while the Inertia control has none of those three factors. With that caveat, the RSC route showed
-faster median navigation duration and LCP on the measured routes. The worst-case `responseEnd` counter-signal favored
+faster median navigation duration and LCP on the measured routes. The `responseEnd` p95 counter-signal favored
 the Inertia control. A stable deployed repeat, renderer-internal timing, environment metadata, and distribution artifacts
 are still required before making stronger production-performance claims.
 
