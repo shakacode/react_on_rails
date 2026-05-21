@@ -169,7 +169,9 @@ get "up", to: "health#show"
 `app/controllers/health_controller.rb`:
 
 ```ruby
-# Ruby stdlib; loaded explicitly for the Socket readiness check.
+# Ruby stdlib; loaded explicitly for the Socket readiness check. Some
+# environments auto-require stdlib via Bundler — if that applies to your setup,
+# move this require to an initializer to keep the controller lean.
 require "socket"
 
 # Inherits from ActionController::Base (not ApplicationController) to avoid
@@ -184,10 +186,11 @@ class HealthController < ActionController::Base
     renderer_url = ReactOnRailsPro.configuration.renderer_url
     raise ArgumentError, "renderer_url not configured" if renderer_url.nil? || renderer_url.empty?
 
-    # Extract the port from the authority component only so colons in a path or query
-    # string can never match. URI#port returns 80/443 defaults when no port is given,
-    # so we read the URL string directly and fall back to 3800.
-    renderer_port = renderer_url[%r{://[^/?#]*:(\d+)}, 1]&.to_i || 3800
+    # Extract the explicit port from the URL authority, skipping any userinfo
+    # (`user@`, `user:pass@`) and supporting bracketed IPv6 hosts. URI#port would
+    # return 80/443 for URLs without an explicit port, so we read the string
+    # directly and fall back to 3800 when no authority port is present.
+    renderer_port = renderer_url[%r{://(?:[^/?#@]*@)?(?:\[[^\]]+\]|[^/?#:]+):(\d+)}, 1]&.to_i || 3800
     # Block form ensures the socket closes after a successful connect; the explicit
     # |_socket| parameter signals that the empty body is intentional, not a typo.
     Socket.tcp("localhost", renderer_port, connect_timeout: 1) { |_socket| }
@@ -606,9 +609,8 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
 > succeeds. If you skip the startup probe or run an older cluster without startup probe support, add an appropriate
 > `initialDelaySeconds`.
 
-> **Security:** `/info` is unauthenticated even when `password` is configured. Keep the renderer on `localhost` or
-> private networking if exposing node and renderer version details is a concern; see
-> [Built-in Endpoints](./js-configuration.md#built-in-endpoints).
+> **Security:** See the canonical [`/info` security note](./js-configuration.md#built-in-endpoints) for the
+> unauthenticated-access caveat when `password` is configured.
 
 ### OOM Tracking
 

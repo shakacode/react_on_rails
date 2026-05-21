@@ -174,12 +174,18 @@ set the status with `reply.code(503)`, and return a response object from that br
 then return another response object.
 
 ```js
-// Example: signal not-ready (e.g. while warming up workers).
-// `workersReady` is application state you maintain — flip it to true once the
-// renderer finishes its warm-up (for example in a cluster `listening` event).
+// Example: signal not-ready while application-specific warm-up runs.
+// `workersReady` stands in for any per-worker readiness gate you maintain.
 let workersReady = false;
 
 configureFastify((app) => {
+  // Fastify's `onReady` hook runs once per worker after all plugins finish
+  // loading. Put any application warm-up here — preload modules, hydrate
+  // caches, wait for an external dependency — and flip the flag when done.
+  app.addHook('onReady', async () => {
+    workersReady = true;
+  });
+
   app.get('/health', (request, reply) => {
     if (!workersReady) {
       reply.code(503);
@@ -288,17 +294,17 @@ Recommended starting values:
 
 - **Startup**: Use `tcpSocket` on the renderer port (`3800` by default; use your configured `RENDERER_PORT` value if
   different). TCP is enough here because readiness below gates traffic; startup only shields liveness during boot. Start
-  with `initialDelaySeconds: 10` (first check fires at 10 s; the sixth and final failure fires at
-  `10 + ((6 - 1) * 5) = 35 s` after container start), `periodSeconds: 5`, `failureThreshold: 6`, and the Kubernetes
-  default `timeoutSeconds: 1` for a TCP connection check.
+  with `initialDelaySeconds: 10` (first check fires at 10 s; the sixth and final check fires at
+  `10 + ((6 - 1) * 5) = 35 s` after container start, and the restart follows once that check actually fails — up to
+  `timeoutSeconds` later), `periodSeconds: 5`, `failureThreshold: 6`, and the Kubernetes default `timeoutSeconds: 1` for
+  a TCP connection check.
 - **Readiness (custom route)**: Use `exec` with
   `curl -sf --max-time 3 --http2-prior-knowledge http://localhost:3800/health` after registering the route with
   [`configureFastify`](#adding-a-health-check-endpoint). Start with `timeoutSeconds: 5`, `periodSeconds: 5`, and
   `failureThreshold: 3`.
 - **Readiness (built-in info)**: Use `exec` with
   `curl -sf --max-time 3 --http2-prior-knowledge http://localhost:3800/info`. Use the same timing settings as the
-  custom-route readiness probe. `/info` is unauthenticated and exposes runtime version details; see the
-  [security note](#built-in-endpoints) and keep the renderer on private networking.
+  custom-route readiness probe. See the canonical [`/info` security note](#built-in-endpoints) for the unauthenticated-access caveat.
 - **Readiness fallback**: Use `tcpSocket` on the renderer port only if curl with HTTP/2 support is unavailable. This
   checks port reachability, not application readiness.
 - **Liveness**: Use `tcpSocket` on the renderer port as the default. Start with `timeoutSeconds: 1`,
@@ -317,9 +323,11 @@ does not apply there. See the `port` option at the top of this page for Heroku o
 > **Note (startup window):** With these values, the first check fires at `initialDelaySeconds` (10 s), then every
 > `periodSeconds` (5 s) thereafter, and the container restarts only if all six consecutive startup checks fail. Increase
 > `failureThreshold` or `periodSeconds` if startup regularly takes longer.
-> The 10-second initial delay only shifts when the first check fires. Omitting it starts checks immediately; the
-> failure window is `initialDelaySeconds + (failureThreshold - 1) * periodSeconds` (25 s with `failureThreshold: 6` and
-> `periodSeconds: 5` when `initialDelaySeconds` is omitted, since the last of six checks fires at `(6 - 1) * 5 = 25 s`).
+> The 10-second initial delay only shifts when the first check fires. Omitting it starts checks immediately; the last
+> startup probe fires at `initialDelaySeconds + (failureThreshold - 1) * periodSeconds` (25 s with `failureThreshold: 6`
+> and `periodSeconds: 5` when `initialDelaySeconds` is omitted, since the last of six checks fires at
+> `(6 - 1) * 5 = 25 s`). The container restart follows once that check actually fails — up to `timeoutSeconds` (1 s
+> here) later.
 > Reduce `initialDelaySeconds` if your renderer reliably opens the port within 1-2 seconds, or match it to your actual
 > boot time if you want to suppress noisy early-failure log entries during the warm-up window.
 
