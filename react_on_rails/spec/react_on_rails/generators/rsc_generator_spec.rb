@@ -823,6 +823,40 @@ describe RscGenerator, type: :generator do
       expect(migrated_content).to match(/^\s*isServer: false,\n\s*clientReferences: rscClientReferences,/)
     end
 
+    it "inserts the splice comma before a trailing line comment on the last option" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(
+              new RSCWebpackPlugin({
+                isServer: false // intentional: no trailing comma
+              }),
+            );
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      content = File.read(File.join(destination_root, config_path))
+      generator.send(:update_existing_rsc_webpack_config, config_path, content, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).to include("isServer: false, // intentional: no trailing comma")
+      expect(migrated_content).not_to include("// intentional: no trailing comma,")
+      expect(migrated_content).to match(
+        %r{isServer: false, // intentional: no trailing comma\n\s+clientReferences: rscClientReferences,}
+      )
+    end
+
     it "does not treat function-scoped path module bindings as top-level setup blockers" do
       config_path = "config/webpack/clientWebpackConfig.js"
       simulate_existing_file(
@@ -966,6 +1000,41 @@ describe RscGenerator, type: :generator do
       JS
 
       expect(generator.send(:rsc_client_references_defined?, content)).to be(false)
+      expect(generator.send(:scoped_rsc_client_references_defined?, content)).to be(false)
+    end
+
+    it "detects a module-scope let rscClientReferences declaration" do
+      content = <<~JS
+        let rscClientReferences = {
+          directory: resolve(config.source_path),
+          recursive: true,
+          include: /\\.(js|ts|jsx|tsx)$/,
+        };
+      JS
+
+      expect(generator.send(:rsc_client_references_defined?, content)).to be(true)
+      expect(generator.send(:scoped_rsc_client_references_defined?, content)).to be(true)
+    end
+
+    it "detects a module-scope var rscClientReferences declaration" do
+      content = <<~JS
+        var rscClientReferences = {
+          directory: resolve(config.source_path),
+        };
+      JS
+
+      expect(generator.send(:rsc_client_references_defined?, content)).to be(true)
+    end
+
+    it "does not skip migration when only a commented-out directory key matches the scoped pattern" do
+      content = <<~JS
+        const rscClientReferences = {
+          // directory: resolve(config.source_path),
+          directory: './app/javascript',
+        };
+      JS
+
+      expect(generator.send(:rsc_client_references_defined?, content)).to be(true)
       expect(generator.send(:scoped_rsc_client_references_defined?, content)).to be(false)
     end
 

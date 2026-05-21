@@ -962,9 +962,50 @@ module ReactOnRails
 
         content_without_comments = rsc_plugin_options_without_comments(content).rstrip
         needs_comma = !content_without_comments.end_with?(",")
-        prefix = needs_comma ? "#{content}," : content
+        prefix = build_splice_prefix(content, needs_comma: needs_comma)
 
         "#{prefix}\n#{indent}clientReferences: rscClientReferences,#{trailing}"
+      end
+
+      # Inserts the trailing comma before any final line/block comment so the rewritten file reads
+      # cleanly to a human. Appending the comma to the raw `content` would tuck it inside a
+      # trailing `// note` (yielding `isServer: false  // note,`) — syntactically valid because
+      # the comment hides the comma from the parser, but visually broken in code review and
+      # likely to confuse a linter.
+      def build_splice_prefix(content, needs_comma:)
+        return content unless needs_comma
+
+        last_code_index = last_js_code_char_index(content)
+        return "#{content}," unless last_code_index
+
+        "#{content[0..last_code_index]},#{content[(last_code_index + 1)..]}"
+      end
+
+      # Returns the index of the last character in `content` that is part of executable code —
+      # i.e. neither whitespace nor inside a JS line/block comment. Strings count as code so a
+      # value ending in `"foo"` keeps the closing quote in scope. Uses the shared
+      # `advance_js_scan_state` family so comment/string handling matches every other JS-aware
+      # pass in this file.
+      def last_js_code_char_index(content)
+        state = nil
+        escaped = false
+        index = 0
+        result = nil
+
+        while index < content.length
+          char = content[index]
+          next_char = content[index + 1]
+          prev_state = state
+          state, escaped, index = advance_js_scan_state(state, escaped, char, next_char, index)
+
+          in_comment_now = JS_COMMENT_STATES.include?(state)
+          was_in_comment = JS_COMMENT_STATES.include?(prev_state)
+          result = index if !in_comment_now && !was_in_comment && !char.match?(/\s/)
+
+          index += 1
+        end
+
+        result
       end
 
       def rsc_client_references_setup_anchor?(content, is_server:)
@@ -1036,15 +1077,36 @@ module ReactOnRails
         # `shakapacker_config_imported?`) so a function-scoped `const rscClientReferences` does
         # not fool `ensure_rsc_client_references_setup` into skipping the helper injection — that
         # would leave the plugin rewrite referencing an out-of-scope binding.
-        pattern = /^[ \t]*const\s+rscClientReferences\b/
+        # `let` and `var` are matched alongside `const` because a hand-written
+        # `let rscClientReferences = {...}` at module scope would otherwise slip past this check
+        # and cause the migration to emit a second `const rscClientReferences = {...}`, producing
+        # an `Identifier 'rscClientReferences' has already been declared` SyntaxError at config load.
+        pattern = /^[ \t]*(?:const|let|var)\s+rscClientReferences\b/
         content.to_enum(:scan, pattern).any? do
           js_top_level_position?(content, Regexp.last_match.begin(0))
         end
       end
 
       def scoped_rsc_client_references_defined?(content)
-        rsc_client_references_defined?(content) &&
-          content.match?(/\bdirectory\s*:\s*resolve\(\s*config\.source_path\s*\)/)
+        # Locate the actual module-scope `const|let|var rscClientReferences = { ... }` site and
+        # check the `directory:` key against the object literal body with comments stripped.
+        # Running the regex against the raw file would treat a stale, commented-out
+        # `// directory: resolve(config.source_path)` (e.g. left over from a prior failed
+        # migration) as a real scoped declaration and silently short-circuit
+        # `ensure_rsc_client_references_setup`, leaving the plugin unscoped without any warning.
+        decl_pattern = /^[ \t]*(?:const|let|var)\s+rscClientReferences\s*=\s*\{/
+        content.to_enum(:scan, decl_pattern).any? do
+          match = Regexp.last_match
+          next false unless js_top_level_position?(content, match.begin(0))
+
+          open_brace = match.end(0) - 1
+          close_brace = matching_js_closing_brace(content, open_brace)
+          next false unless close_brace
+
+          body = content[(open_brace + 1)...close_brace]
+          rsc_plugin_options_without_comments(body)
+            .match?(/\bdirectory\s*:\s*resolve\(\s*config\.source_path\s*\)/)
+        end
       end
 
       def content_before_rsc_setup_anchor(content, is_server:)
@@ -1219,7 +1281,10 @@ module ReactOnRails
           bindings.split(",").any? do |binding|
             binding = binding.strip
             # Aliases (`config: alias`) do not provide the exact binding that rscClientReferences uses.
-            # The `binding = fallback` form covers JavaScript destructuring defaults.
+            # The `binding = fallback` form covers JavaScript destructuring defaults whose default
+            # value does not contain a comma — `{ config = fn(a, b) }` would split on the comma
+            # inside `fn(a, b)` and fall outside this matcher's supported surface, same as alias
+            # renames. Both shapes are vanishingly rare in real webpack configs.
             binding == binding_name || binding.start_with?("#{binding_name} =")
           end
         end
