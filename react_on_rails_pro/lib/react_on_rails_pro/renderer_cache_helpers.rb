@@ -49,7 +49,17 @@ module ReactOnRailsPro
     end
 
     def required_rsc_asset_basenames
-      required_rsc_asset_paths.map { |path| File.basename(path) }
+      required_rsc_asset_paths_for_current_config.map { |path| File.basename(path) }
+    end
+
+    # No-arg companion to `required_rsc_asset_paths` for callers (rolling-deploy
+    # adapter publication, payload validation) that don't already hold the
+    # resolved manifest list. Centralising the rsc_manifest_paths lookup avoids
+    # call-site drift if the manifest sources change.
+    def required_rsc_asset_paths_for_current_config
+      return Set.new unless ReactOnRailsPro.configuration.enable_rsc_support
+
+      required_rsc_asset_paths(rsc_manifest_paths)
     end
 
     def rsc_manifest_paths
@@ -83,7 +93,11 @@ module ReactOnRailsPro
     def loadable_stats_asset_path
       path = ReactOnRails::PackerUtils.asset_uri_from_packer(LOADABLE_STATS_ASSET_NAME)
       File.exist?(path.to_s) ? path : nil
-    rescue StandardError
+    rescue KeyError, TypeError, Errno::ENOENT
+      # Narrow to errors PackerUtils.asset_uri_from_packer can plausibly raise
+      # (missing manifest key, nil path, manifest file absent). Unexpected bugs
+      # like NoMethodError or NameError should surface so operators can see them
+      # rather than being silently swallowed.
       nil
     end
 

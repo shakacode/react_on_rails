@@ -164,7 +164,7 @@ module ReactOnRailsPro
     # RSC manifest can't false-positive this warning when the real required
     # file is present elsewhere.
     def self.warn_if_unavailable_required_rsc_assets(unavailable_assets)
-      required_paths = ReactOnRailsPro::RendererCacheHelpers.required_rsc_asset_paths
+      required_paths = ReactOnRailsPro::RendererCacheHelpers.required_rsc_asset_paths_for_current_config
       missing_required_paths = unavailable_assets.select { |path| required_paths.include?(path) }
       return if missing_required_paths.empty?
 
@@ -213,7 +213,6 @@ module ReactOnRailsPro
                          :filter_existing_assets,
                          :warn_skipped_invalid_assets,
                          :warn_if_unavailable_required_rsc_assets,
-                         :required_rsc_asset_basenames,
                          :publish_bundle,
                          :publish_bundle_if_present,
                          :upload_bundle

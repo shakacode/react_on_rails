@@ -302,7 +302,9 @@ describe ReactOnRailsPro::AssetsPrecompile do
 
   describe ".call" do
     let(:instance) { described_class.instance }
-    let(:config) { instance_double(ReactOnRailsPro::Configuration, node_renderer?: true) }
+    let(:config) do
+      instance_double(ReactOnRailsPro::Configuration, node_renderer?: true, rolling_deploy_adapter: nil)
+    end
 
     before do
       allow(instance).to receive(:build_or_fetch_bundles)
@@ -619,7 +621,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
 
       before do
         allow(config).to receive(:enable_rsc_support).and_return(true)
-        allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:required_rsc_asset_paths)
+        allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:required_rsc_asset_paths_for_current_config)
           .and_return(Set.new([missing_manifest]))
       end
 
@@ -639,7 +641,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
       before do
         File.write(required_manifest, "{}")
         allow(config).to receive(:enable_rsc_support).and_return(true)
-        allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:required_rsc_asset_paths)
+        allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:required_rsc_asset_paths_for_current_config)
           .and_return(Set.new([required_manifest]))
       end
 

@@ -41,6 +41,14 @@ describe ReactOnRailsPro::RendererCacheHelpers do
       expect(described_class.collect_assets.map(&:to_s)).to contain_exactly(custom_asset)
     end
 
+    it "lets unexpected errors propagate rather than silently dropping the asset" do
+      allow(ReactOnRails::PackerUtils).to receive(:asset_uri_from_packer)
+        .with("loadable-stats.json")
+        .and_raise(NoMethodError, "undefined method 'foo'")
+
+      expect { described_class.collect_assets }.to raise_error(NoMethodError)
+    end
+
     it "deduplicates collected assets" do
       allow(config).to receive(:assets_to_copy).and_return([custom_asset, loadable_stats_path])
       File.write(loadable_stats_path, "{}")
