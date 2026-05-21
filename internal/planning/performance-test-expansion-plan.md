@@ -112,7 +112,10 @@ Already in place:
 - Keep the existing per-route warm-up before k6 measurement: 10 sequential requests with 0.5 seconds between requests.
   Each iteration is request round-trip plus 0.5 seconds of sleep, so the warm-up takes a lower bound of 5 seconds per
   route plus the actual request time, which is on the order of 5-6 seconds for SSR routes today. Expand it if routes,
-  especially streaming routes, need more stable startup behavior.
+  especially streaming routes, need more stable startup behavior. Cache-miss benchmark routes are the explicit exception
+  to this per-route warm-up: see Cache Setup above, which warms the Rails process against a different route and then
+  clears the dedicated benchmark cache immediately before the cache-miss k6 measurement, so the 10 pre-requests never
+  populate the fragment cache for the route under measurement.
 - Keep the current max-rate throughput baseline from `internal/planning/library-benchmarking.md`.
 - Keep hard CI gates disabled until the benchmark gate tuning in
   [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169) has a stable baseline.
@@ -208,7 +211,15 @@ Prerequisites for the first implementation PR (blocking — must land before or 
   already used by `p50_latency`, `p90_latency`, and `p99_latency`. Updating the matching
   `bmf_collector.add` calls in `benchmarks/bench-node-renderer.rb` (inside the `non_rsc_tests.each` and
   `rsc_tests.each` blocks) is deferred to the Pro follow-on PR so the OSS first slice can land without changing Node
-  Renderer benchmark output.
+  Renderer benchmark output. That follow-on change is intentionally small: `bench-node-renderer.rb` already extracts
+  `vegeta_max` from the Vegeta JSON report and threads `max_latency` through `run_vegeta_benchmark` and
+  `add_to_summary`. The Pro PR only needs to pass `max: max_latency` to those two existing `bmf_collector.add` calls;
+  no Vegeta extraction or summary-row changes are required.
+
+  While editing `BmfCollector` to thread `max_latency`, also fix the stale comment at `benchmarks/lib/bmf_helpers.rb`
+  line 15, which currently lists `p50_latency_ms, p90_latency_ms, p99_latency_ms`. The actual measure keys emitted by
+  `to_bmf` are `p50_latency`, `p90_latency`, and `p99_latency` (no `_ms` suffix); leaving the comment as-is invites a
+  future implementer to add `max_latency_ms` by analogy and diverge from the Bencher measure keys.
 
   `max_latency` lands as an unthresholded advisory metric in the OSS first slice: the BMF payload includes the new key,
   but the `run_bencher` function in `.github/workflows/benchmark.yml` is not modified, so Bencher tracks the value
@@ -221,7 +232,9 @@ Prerequisites for the first implementation PR (blocking — must land before or 
   `benchmarks/lib/benchmark_config.rb`, and reference it from the existing `--summary-trend-stats` invocation in
   `benchmarks/bench.rb`. Landing the constant in the first implementation PR — before any follow-on PR adds `p95` or
   otherwise extends the trend-stats column set — keeps the percentile list in one place rather than scattered across
-  the bench script, summary table, artifacts, and Bencher reporting.
+  the bench script, summary table, artifacts, and Bencher reporting. The constant applies only to k6 in
+  `benchmarks/bench.rb`. `benchmarks/bench-node-renderer.rb` drives Vegeta, which has no equivalent flag and extracts
+  percentiles directly from its JSON report, so do not thread the constant through the Vegeta path.
 
 Recommended prior work (desirable but not blocking for the first benchmark-routes PR):
 
