@@ -22,10 +22,8 @@ module ReactOnRails
       # than re-deriving from the base.
       # SHAKAPACKER_SKIP_PRECOMPILE_HOOK is also runtime-only and must survive
       # Bundler's env reset so nested shakapacker commands don't rerun the hook.
-      # RENDERER_URL is the legacy name for REACT_RENDERER_URL; apply_base_port_env
-      # rewrites it to the derived URL when the user has it set (mid-migration), so
-      # it must be preserved alongside REACT_RENDERER_URL to keep foreman/overmind
-      # child processes pointed at the correct renderer port.
+      # RENDERER_URL is the legacy name for REACT_RENDERER_URL; preserved for
+      # mid-migration users (see ServerManager#warn_if_legacy_renderer_url_env_used).
       ENV_KEYS_TO_PRESERVE = %w[
         PORT
         SHAKAPACKER_DEV_SERVER_PORT

@@ -75,21 +75,24 @@ module ReactOnRails
         # when Pro renderer support is active. Uses PortSelector's pure
         # #base_port_hash so no "Base port detected" banner prints during a kill.
         #
-        # We include base[:renderer] only when there is evidence the renderer
-        # was actually configured for this app — either the Pro gem is loaded
-        # and a renderer env var is set, or a renderer env var is set in OSS
-        # mode. This mirrors `configured_renderer_port_for_kill`'s conservative
-        # 3800 guard so a fresh-checkout OSS+Pro-gem app running `bin/dev kill`
-        # doesn't kill an unrelated process bound to base+2. Pattern-based
-        # killing (development_processes / node.*react[-_]on[-_]rails) still
-        # catches an active renderer node process even when the kill shell
-        # doesn't carry the renderer env vars.
+        # In base-port mode we include base[:renderer] whenever the Pro gem is
+        # loaded, even if the current shell has no renderer env vars set. The
+        # user has explicitly claimed this port range, and `bin/dev kill` is
+        # usually invoked from a fresh shell where RENDERER_PORT / *_URL aren't
+        # carried over from the dev session — so requiring env-var presence
+        # would let a stale renderer survive. Pattern-based killing
+        # (development_processes / node.*react[-_]on[-_]rails) does NOT catch
+        # the Pro renderer because it runs as `node renderer/node-renderer.js`
+        # with no "react_on_rails" substring in the command line. Port-based
+        # killing is the only reliable path. The default-port branch keeps the
+        # tighter renderer_env_signal? guard via configured_renderer_port_for_kill
+        # because 3800 is a shared default that could belong to an unrelated process.
         def killable_ports
           base = PortSelector.base_port_hash
           return default_killable_ports unless base
 
           ports = [base[:rails], base[:webpack]]
-          ports << base[:renderer] if renderer_env_signal?
+          ports << base[:renderer] if pro_renderer_active?
           ports
         end
 

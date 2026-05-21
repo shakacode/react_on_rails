@@ -1221,10 +1221,10 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     it "targets base-port-derived ports when REACT_ON_RAILS_BASE_PORT is active" do
       # Without base-port awareness, `bin/dev kill` in a worktree running on
       # 5000/5001/5002 would fall back to killing stale processes on 3000/3001
-      # instead — the actual ports would be left untouched. RENDERER_PORT
-      # is set to signal that a Pro renderer was configured on base+2, so
-      # the base-port branch includes 5002 (mirrors the renderer_env_signal?
-      # guard used by `configured_renderer_port_for_kill`).
+      # instead — the actual ports would be left untouched. RENDERER_PORT is
+      # set so `pro_renderer_active?` returns true via `renderer_env_signal?`
+      # (the Pro gem isn't loaded in the open-source spec suite), exercising
+      # the base+2 inclusion path.
       ENV["RENDERER_PORT"] = "5002"
       allow(ReactOnRails::Dev::PortSelector)
         .to receive(:base_port_hash)
@@ -1257,12 +1257,14 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       described_class.kill_processes
     end
 
-    it "skips the base-port-derived renderer port when Pro gem is loaded but no renderer env vars are set" do
-      # Mirrors the default-port branch's renderer_env_signal? guard: in a
-      # fresh-checkout OSS+Pro-gem app where no renderer was ever configured,
-      # killing base+2 by default could nuke an unrelated process bound there.
-      # Pattern-based killing (development_processes) still catches an active
-      # renderer node process if one is running.
+    it "includes the base-port-derived renderer port when Pro gem is loaded even without renderer env vars" do
+      # bin/dev kill is usually invoked from a fresh shell where RENDERER_PORT
+      # and REACT_RENDERER_URL aren't carried over. The Pro renderer runs as
+      # `node renderer/node-renderer.js` (see react_on_rails_pro Procfile.dev),
+      # which the development_processes pattern (`node.*react[-_]on[-_]rails`)
+      # does not match — so port-based killing is the only reliable path to
+      # reap a stale renderer on base+2. In base-port mode the user owns the
+      # port range, so the conservative env-var gate isn't needed.
       allow(ReactOnRails::Dev::PortSelector)
         .to receive(:base_port_hash)
         .and_return({ rails: 5000, webpack: 5001, renderer: 5002, base_port_mode: true })
@@ -1272,7 +1274,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
       allow(Open3).to receive(:capture2).with("lsof", "-ti", ":5000", err: File::NULL).and_return(["", nil])
       allow(Open3).to receive(:capture2).with("lsof", "-ti", ":5001", err: File::NULL).and_return(["", nil])
-      expect(Open3).not_to receive(:capture2).with("lsof", "-ti", ":5002", err: File::NULL)
+      expect(Open3).to receive(:capture2).with("lsof", "-ti", ":5002", err: File::NULL).and_return(["", nil])
 
       described_class.kill_processes
     end
