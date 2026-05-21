@@ -3841,6 +3841,63 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when TypeScript module files use .mts or .cts extensions after a Pro migration" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            FileUtils.mkdir_p("app/javascript/types")
+            File.write("app/javascript/packs/esm-entry.mts",
+                       "import ReactOnRails from 'react-on-rails';\n")
+            File.write("app/javascript/packs/cjs-entry.cts",
+                       "const ReactOnRails = require('react-on-rails/client');\n")
+            File.write("app/javascript/types/react-on-rails.d.mts",
+                       "declare module 'react-on-rails' {\n  export function register(): void;\n}\n")
+            File.write("app/javascript/types/react-on-rails.d.cts",
+                       "declare module 'react-on-rails/client' {\n  export function register(): void;\n}\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning for each TypeScript module and declaration file" do
+        doctor.send(:check_base_package_references)
+        warning_content = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }.join("\n")
+        expect(warning_content).to include("esm-entry.mts")
+        expect(warning_content).to include("cjs-entry.cts")
+        expect(warning_content).to include("react-on-rails.d.mts")
+        expect(warning_content).to include("react-on-rails.d.cts")
+      end
+    end
+
+    context "when .mts or .cts files correctly reference 'react-on-rails-pro'" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            FileUtils.mkdir_p("app/javascript/types")
+            File.write("app/javascript/packs/esm-entry.mts",
+                       "import ReactOnRails from 'react-on-rails-pro';\n")
+            File.write("app/javascript/packs/cjs-entry.cts",
+                       "const ReactOnRails = require('react-on-rails-pro/client');\n")
+            File.write("app/javascript/types/react-on-rails-pro.d.mts",
+                       "declare module 'react-on-rails-pro' {\n  export function register(): void;\n}\n")
+            File.write("app/javascript/types/react-on-rails-pro.d.cts",
+                       "declare module 'react-on-rails-pro/client' {\n  export function register(): void;\n}\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports success without flagging Pro references" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(warning_msgs).to be_empty
+        expect(success_msgs.any? { |m| m[:content].include?("Pro package used correctly") }).to be true
+      end
+    end
+
     context "when one scanned file has invalid UTF-8 content" do
       around do |example|
         Dir.mktmpdir do |tmpdir|

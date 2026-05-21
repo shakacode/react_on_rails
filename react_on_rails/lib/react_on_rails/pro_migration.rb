@@ -4,7 +4,7 @@ module ReactOnRails
   # Shared Pro migration facts and Gemfile parsing used by the generator and doctor.
   module ProMigration
     JS_SOURCE_ROOTS = %w[app/javascript app/frontend frontend javascript client].freeze
-    JS_SOURCE_EXTENSIONS = %w[js jsx ts tsx mjs cjs vue svelte].freeze
+    JS_SOURCE_EXTENSIONS = %w[js jsx ts tsx mjs cjs mts cts vue svelte].freeze
 
     JEST_MODULE_SPECIFIER_METHOD_NAMES = %w[
       createMockFromModule
