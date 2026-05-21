@@ -141,14 +141,16 @@ Conditions:
 - Chrome 147 with matching ChromeDriver 147
 
 > [!WARNING]
-> The original artifact does not yet publish `RAILS_ENV`, so the absolute timing values may include
-> `RAILS_ENV=development` overhead (no eager loading, active code reloader, no asset caching). It also does not publish
-> browser cache behavior between measured runs, hardware/OS, or Ruby/Node/Rails versions. Unknown browser cache state
-> between measured runs affects repeatability. The single warmup request before each measured run may also be
-> insufficient for the Pro Node renderer worker pool to reach JIT and RSC-payload-compilation steady state, which is
-> more likely to make the RSC route look slower than its steady-state performance than to inflate its advantage.
-> [Issue 3253](https://github.com/shakacode/react_on_rails/issues/3253) tracks the missing environment metadata. Until
-> that is resolved, treat these numbers as directional signals rather than a stable baseline.
+> The original April 30, 2026 local run did not preserve `RAILS_ENV`, hardware/OS, Ruby/Node/Rails versions, or
+> browser-cache state between measured runs, and those values are not recoverable for that run. The absolute timing
+> values may therefore include `RAILS_ENV=development` overhead (no eager loading, active code reloader, no asset
+> caching), and unknown browser-cache state between measured runs affects repeatability. The single warmup request
+> before each measured run may also be insufficient for the Pro Node renderer worker pool to reach JIT and
+> RSC-payload-compilation steady state, which is more likely to make the RSC route look slower than its steady-state
+> performance than to inflate its advantage. Treat these numbers as directional signals rather than a stable baseline.
+> [Issue 3253](https://github.com/shakacode/react_on_rails/issues/3253) tracks a deployed/staging repeat that will
+> publish full environment metadata; see [Environment metadata to capture for a new
+> run](#gumroad-rsc-env-metadata-checklist) below for the required fields.
 
 The median results showed this directional signal. The source artifact's navigation-duration metric comes from its
 Playwright harness and may differ from `PerformanceNavigationTiming.duration`.
@@ -234,6 +236,25 @@ are still required before making stronger production-performance claims.
 
 See [Issue 3128](https://github.com/shakacode/react_on_rails/issues/3128) and
 [Issue 3144](https://github.com/shakacode/react_on_rails/issues/3144) for the ongoing tracking discussion.
+
+#### Environment metadata to capture for a new run {#gumroad-rsc-env-metadata-checklist}
+
+For any new local or staging Gumroad benchmark run, record the following so readers can calibrate the results. Missing
+fields should be listed explicitly rather than left implied.
+
+- **Environment:** `RAILS_ENV`, `NODE_ENV`
+- **Hardware/OS:** machine model, CPU, RAM, OS version
+- **Tool versions:** Ruby, Node.js, Rails, React on Rails, React on Rails Pro, Shakapacker, Rspack, Chrome, ChromeDriver
+- **Cache state:** Rails fragment/SQL cache mode, browser cache behavior between measured runs (cold vs warm), Pro Node
+  renderer cache state
+- **Run protocol:** warmup requests per route, measured runs per route, alternation pattern, total wall-clock duration
+- **Renderer setup:** dedicated vs shared Pro Node renderer, `RENDERER_PORT`, worker count, eager-loading status
+- **Renderer-internal timing:** whether `config.tracing = true` was enabled on the Pro initializer, or `Server-Timing`
+  was emitted for the RSC render/payload path
+- **Distribution:** raw per-run values for each metric (not just medians), enough to publish variance and tail values
+
+[Issue 3253](https://github.com/shakacode/react_on_rails/issues/3253) tracks applying this checklist to a stable
+deployed/staging repeat.
 
 ### Production Case Study: Popmenu {#popmenu}
 
