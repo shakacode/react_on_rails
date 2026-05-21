@@ -25,8 +25,9 @@ Consider this approach if you:
 
 ### Migration Checklist
 
-If you have not already completed [Sections 1-4 below](#1-customize-bindev), do that first so `bin/dev`,
-`config/shakapacker.yml`, your Procfiles, and your build commands are in place before you start removing duplicates.
+If you have not already completed Sections 1–4 below (start at [Section 1](#1-customize-bindev)), do that first so
+`bin/dev`, `config/shakapacker.yml`, your Procfiles, and your build commands are in place before you start removing
+duplicates.
 
 When moving custom build work out of `precompile_hook`, make the ownership change in one commit so the same task cannot run twice. The checklist uses letters (A–E) so the steps are easy to distinguish from the numbered Implementation sections referenced above.
 
@@ -167,8 +168,10 @@ points both commands at the helper script.
 
 ```ruby
 ReactOnRails.configure do |config|
-  # Build commands should include all necessary steps
-  # NODE_ENV is auto-derived from RAILS_ENV by Shakapacker, so `RAILS_ENV=test` is enough here.
+  # Build commands should include all necessary steps.
+  # Shakapacker auto-derives NODE_ENV from RAILS_ENV, so the test command leaves NODE_ENV implicit.
+  # The production command sets NODE_ENV=production explicitly as a belt-and-suspenders safeguard
+  # against any pre-shakapacker step (e.g. a custom yarn script) that reads NODE_ENV directly.
   config.build_test_command = "yarn res:build && RAILS_ENV=test bin/shakapacker"
   config.build_production_command = "yarn res:build && RAILS_ENV=production NODE_ENV=production bin/shakapacker"
 end
@@ -231,8 +234,11 @@ chmod +x bin/build-react-on-rails
 git add bin/build-react-on-rails
 ```
 
-For a new untracked file, `git add --chmod=+x bin/build-react-on-rails` does both in one step on Git 2.9 or newer — it
-stages the file and records the executable bit at the same time without touching the working-tree mode separately.
+`git add --chmod=+x bin/build-react-on-rails` (Git 2.9 or newer) is a useful shortcut, but it only updates the
+executable bit in Git's index — the file mode on disk is left unchanged. The script will still not be runnable from
+this checkout until `chmod +x` is also applied. Use the shortcut when CI is the only consumer that needs the
+executable bit; otherwise keep the two-step `chmod +x` then `git add` so the file is executable both locally and in
+committed history.
 
 <details>
 <summary>Windows and Docker bind mounts</summary>
@@ -271,10 +277,14 @@ end
 > **If you set `config.node_modules_location`:** React on Rails prepends `cd "<node_modules_location>"` to both
 > build commands, so the bare `ruby bin/build-react-on-rails …` invocation above will not find the wrapper from a
 > subdirectory. Interpolate an absolute path from `Rails.root` so the script is locatable regardless of the
-> prepended `cd`:
+> prepended `cd`. React on Rails passes these command strings to a shell, so escape the interpolated path with
+> `Shellwords.escape` (Ruby stdlib) — a bare `#{wrapper}` would break on any `Rails.root` containing spaces or
+> other shell metacharacters (e.g. `/Users/jane doe/my app`):
 >
 > ```ruby
-> wrapper = Rails.root.join("bin", "build-react-on-rails").to_s
+> require "shellwords"
+>
+> wrapper = Shellwords.escape(Rails.root.join("bin", "build-react-on-rails").to_s)
 > config.build_test_command       = "ruby #{wrapper} test"
 > config.build_production_command = "ruby #{wrapper} production"
 > ```
