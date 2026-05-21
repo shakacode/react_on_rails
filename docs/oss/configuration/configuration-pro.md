@@ -82,8 +82,8 @@ ReactOnRailsPro.configure do |config|
   # config.renderer_password = ENV["RENDERER_PASSWORD"]
 
   # Set the `ssr_timeout` configuration so the Rails server will not wait more than this many seconds
-  # for a SSR request to return once issued. With the async-http renderer client, this bounds the
-  # entire renderer request, including streaming responses. Increase this value for long-running
+  # for a SSR request to return once issued. With the async-http renderer client, this is applied as
+  # the per-read socket timeout on the renderer connection. Increase this value for long-running
   # streaming SSR responses.
   config.ssr_timeout = 5
 

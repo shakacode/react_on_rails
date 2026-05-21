@@ -3,7 +3,6 @@
 require "async"
 require "async/http"
 require "async/http/protocol/http2"
-require "io/endpoint/version"
 require "json"
 require "pathname"
 require "protocol/http/body/writable"
@@ -18,8 +17,6 @@ module ReactOnRailsPro
     class TimeoutError < Error; end
 
     class ConnectionError < Error; end
-
-    IO_ENDPOINT_REQUIREMENT = Gem::Requirement.new("~> 0.17.0")
 
     class HTTPError < Error
       attr_reader :response
@@ -45,20 +42,19 @@ module ReactOnRailsPro
       Protocol::HTTP2::StreamError
     ].freeze
 
+    # Uses only public, documented Wrapper APIs (connect with timeout:, set_timeout)
+    # that have been stable since io-endpoint 0.15. No version pin needed —
+    # async-http's own constraint (~> 0.14) governs the version.
     class ConnectTimeoutWrapper < IO::Endpoint::Wrapper
-      attr_reader :connect_timeout
-
-      def initialize(connect_timeout)
-        # Wrapper is used only for the socket_connect hook; async-http passes it via the wrapper: option and
-        # never calls delegation methods on it directly. The no-arg wrapper init and socket_connect dispatch are
-        # verified against io-endpoint 0.17.x; re-check them before bumping io-endpoint to 0.18+.
+      def initialize(connect_timeout:, read_timeout: nil)
         super()
         @connect_timeout = connect_timeout
+        @read_timeout = read_timeout
       end
 
       def connect(remote_address, **options)
-        socket = super(remote_address, **options.merge(connect_timeout ? { timeout: connect_timeout } : {}))
-        clear_timeout(socket)
+        socket = super(remote_address, **options.merge(@connect_timeout ? { timeout: @connect_timeout } : {}))
+        set_timeout(socket, @read_timeout)
 
         return socket unless block_given?
 
@@ -67,12 +63,6 @@ module ReactOnRailsPro
         ensure
           socket.close
         end
-      end
-
-      private
-
-      def clear_timeout(socket)
-        socket.timeout = nil if socket.respond_to?(:timeout=)
       end
     end
 
@@ -142,16 +132,6 @@ module ReactOnRailsPro
     end
 
     class << self
-      def validate_io_endpoint_version!
-        version = Gem::Version.new(IO::Endpoint::VERSION)
-        return if IO_ENDPOINT_REQUIREMENT.satisfied_by?(version)
-
-        raise Error, "io-endpoint #{IO::Endpoint::VERSION} is unsupported; async-http renderer client " \
-                     "requires #{IO_ENDPOINT_REQUIREMENT} because ConnectTimeoutWrapper relies on " \
-                     "IO::Endpoint::Wrapper internals. Pin io-endpoint to #{IO_ENDPOINT_REQUIREMENT} " \
-                     "or restore the react_on_rails_pro dependency constraints and run bundle update io-endpoint."
-      end
-
       def get(url, connect_timeout:, read_timeout:)
         origin, path = split_url(url)
 
@@ -265,8 +245,6 @@ module ReactOnRailsPro
       end
     end
 
-    validate_io_endpoint_version!
-
     def initialize(origin:, pool_size:, connect_timeout:, read_timeout:, force_http2: true)
       @origin = origin
       @pool_size = pool_size
@@ -331,7 +309,7 @@ module ReactOnRailsPro
     def execute_request(method, path, request_body, yielder, status_assigner)
       headers, body = request_body
 
-      run_with_timeout do
+      run_in_async do
         with_client do |client|
           raw_response = if method == :post
                            client.post(path, headers: Protocol::HTTP::Headers[headers], body: body)
@@ -349,19 +327,11 @@ module ReactOnRailsPro
       raise ConnectionError, e.message
     end
 
-    def run_with_timeout(&block)
-      # @read_timeout carries ssr_timeout and bounds the whole renderer request,
-      # including TCP connect, request write, and response body streaming.
-      # Async treats nil as no timeout; configuration keeps that legacy escape hatch explicit.
-      if (task = Async::Task.current?)
-        task.with_timeout(@read_timeout, &block)
+    def run_in_async(&block)
+      if Async::Task.current?
+        yield
       else
-        # Rails calls this from a synchronous request thread; Sync blocks that thread
-        # while async-http drives the renderer exchange inside a temporary reactor.
-        # If an async server reaches this fallback from inside an existing reactor without
-        # Async::Task.current?, Sync may create a nested reactor and deadlock; rework this
-        # path before supporting that setup.
-        Sync { |sync_task| sync_task.with_timeout(@read_timeout, &block) }
+        Sync(&block)
       end
     end
 
@@ -381,7 +351,10 @@ module ReactOnRailsPro
     end
 
     def endpoint_for(origin)
-      options = { wrapper: ConnectTimeoutWrapper.new(@connect_timeout) }
+      options = { wrapper: ConnectTimeoutWrapper.new(
+        connect_timeout: @connect_timeout,
+        read_timeout: @read_timeout
+      ) }
       options[:protocol] = Async::HTTP::Protocol::HTTP2 if @force_h2c
 
       Async::HTTP::Endpoint.parse(origin, **options)

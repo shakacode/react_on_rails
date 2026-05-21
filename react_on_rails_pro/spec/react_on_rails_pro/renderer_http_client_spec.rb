@@ -1,35 +1,13 @@
 # frozen_string_literal: true
 
 require_relative "spec_helper"
-require "io/endpoint/version"
 require "react_on_rails_pro/renderer_http_client"
 require "stringio"
 
 RSpec.describe ReactOnRailsPro::RendererHttpClient do
-  describe ".validate_io_endpoint_version!" do
-    it "accepts the bundled io-endpoint version" do
-      expect { described_class.validate_io_endpoint_version! }.not_to raise_error
-    end
-
-    it "fails fast when io-endpoint is outside the verified wrapper range" do
-      stub_const("IO::Endpoint::VERSION", "0.18.0")
-
-      expect { described_class.validate_io_endpoint_version! }
-        .to raise_error(described_class::Error, /Pin io-endpoint to ~> 0\.17\.0/)
-    end
-  end
-
   describe ReactOnRailsPro::RendererHttpClient::ConnectTimeoutWrapper do
-    it "documents io-endpoint wrapper compatibility" do
-      # ConnectTimeoutWrapper subclasses IO::Endpoint::Wrapper and relies on:
-      # 1. Wrapper#connect calling socket_connect internally so the wrapper can apply connect_timeout.
-      # 2. Wrapper#initialize still accepting no args so ConnectTimeoutWrapper#initialize can call super().
-      # Re-verify both contracts before bumping io-endpoint to 0.18+.
-      expect(Gem::Version.new(IO::Endpoint::VERSION)).to be < Gem::Version.new("0.18")
-    end
-
-    it "clears the socket timeout after TCP connect" do
-      wrapper = described_class.new(0.25)
+    it "sets read_timeout on the socket after TCP connect" do
+      wrapper = described_class.new(connect_timeout: 0.25, read_timeout: 5)
       timeout_during_connect = nil
       fake_socket = Class.new do
         attr_accessor :timeout
@@ -47,6 +25,25 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       socket = wrapper.connect(Addrinfo.tcp("127.0.0.1", 80))
 
       expect(timeout_during_connect).to eq(0.25)
+      expect(socket).to be(fake_socket)
+      expect(socket.timeout).to eq(5)
+    end
+
+    it "sets nil timeout when read_timeout is not provided" do
+      wrapper = described_class.new(connect_timeout: 0.25)
+      fake_socket = Class.new do
+        attr_accessor :timeout
+
+        def setsockopt(*); end
+
+        def close; end
+      end.new
+
+      allow(Socket).to receive(:new).and_return(fake_socket)
+      allow(wrapper).to receive(:socket_connect)
+
+      socket = wrapper.connect(Addrinfo.tcp("127.0.0.1", 80))
+
       expect(socket).to be(fake_socket)
       expect(socket.timeout).to be_nil
     end

@@ -387,14 +387,11 @@ This affects render, streaming render, and asset upload requests.
 Before upgrading:
 
 - Run Ruby 3.3 or newer. The `async-http` dependency requires Ruby 3.3+.
-- Keep the transitive `io-endpoint` gem in the 0.17.x range when updating `async-http`. Do not run
-  `bundle update async-http` without checking that `io-endpoint` remains compatible; the Pro client fails fast at boot
-  if `IO::Endpoint::Wrapper` internals change in a later `io-endpoint` release.
 - Remove direct application assumptions about HTTPX-specific response or error classes in Pro renderer request paths.
-- Keep `config.ssr_timeout` sized for the full renderer request. With the async-http client, this timeout bounds
-  connect, request write, and response streaming time.
-- Treat `config.renderer_http_pool_timeout` as the TCP connect timeout. After the socket connects, renderer work is
-  still bounded by `ssr_timeout`.
+- Treat `config.ssr_timeout` as a per-read socket timeout. With the async-http client, this is applied as the
+  read timeout on each renderer socket. It no longer wraps the entire request as a single task-level timeout.
+- Treat `config.renderer_http_pool_timeout` as the TCP connect timeout. After the socket connects, individual reads
+  are bounded by `ssr_timeout`.
 - Treat `config.renderer_http_pool_size` as a per-request HTTP/2 stream limit, not as a persistent process-wide
   connection pool size. The current async-http adapter opens a request-scoped client for each renderer request and
   does not reuse TCP connections between Rails requests, so high-latency networks or very high request rates can see
