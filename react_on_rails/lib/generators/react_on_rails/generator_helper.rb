@@ -84,11 +84,15 @@ module GeneratorHelper
     false
   end
 
-  # Check if React on Rails Pro gem is installed
+  # Check if React on Rails Pro gem is installed (real state — never "scheduled to be installed").
   #
   # Detection priority:
   # 1. Gem.loaded_specs - gem is loaded in current Ruby process (most reliable)
   # 2. Gemfile.lock - gem is resolved and installed
+  #
+  # Use {#pro_gem_install_deferred?} for the broader "present, or will be installed by this
+  # generator run" meaning. Use {#invalidate_pro_gem_installed_cache!} after an operation
+  # that changes real state (e.g., bundle add) so the next call re-reads the lockfile.
   #
   # @return [Boolean] true if react_on_rails_pro gem is installed
   def pro_gem_installed?
@@ -97,9 +101,22 @@ module GeneratorHelper
     @pro_gem_installed = Gem.loaded_specs.key?("react_on_rails_pro") || gem_in_lockfile?("react_on_rails_pro")
   end
 
-  # TODO: CQS smell: mark_pro_gem_installed! makes pro_gem_installed? return true before install. See #3303.
-  def mark_pro_gem_installed!
-    @pro_gem_installed = true
+  # Clear the memoized {#pro_gem_installed?} result so the next call re-checks
+  # Gem.loaded_specs / Gemfile.lock. Call after any operation that may change real state.
+  def invalidate_pro_gem_installed_cache!
+    remove_instance_variable(:@pro_gem_installed) if defined?(@pro_gem_installed)
+  end
+
+  # True when a later step in this generator run will install the Pro gem
+  # (e.g., the Gemfile swap performed by ProGenerator). Distinct from
+  # {#pro_gem_installed?}, which only reports real present state.
+  def pro_gem_install_deferred?
+    @pro_gem_install_deferred == true
+  end
+
+  # Record that a later step in this generator run will install the Pro gem.
+  def defer_pro_gem_install!
+    @pro_gem_install_deferred = true
   end
 
   # Check if Pro features should be enabled.
