@@ -424,19 +424,19 @@ Avoid letting system tests depend on live third-party APIs. RSC failures from ex
 
 ### Minitest Equivalent
 
-Steps 1, 2, and 4–6 apply to Minitest unchanged. Only the suite-level renderer lifecycle differs: Minitest has no `before(:suite)` hook, so the renderer starts when `test/test_helper.rb` requires its support file (after assets compile) and stops in [`Minitest.after_run`](https://github.com/minitest/minitest/blob/master/lib/minitest.rb). The Rails.root/tmp containment check, port probe, spawn options, `wait_until_ready!` helper, and graceful SIGTERM→SIGKILL shutdown are all reused from [Step 3](#3-start-one-test-renderer-per-worker).
+Steps 1, 2, and 4–6 apply to Minitest unchanged, with one path adjustment: Minitest-only projects (no `spec/` directory) should place the Step 1 `RscTestWorker` module at `test/support/rsc_test_worker.rb` so the `require_relative` below resolves correctly. Only the suite-level renderer lifecycle differs: Minitest has no `before(:suite)` hook, so the renderer starts when `test/test_helper.rb` requires its support file (after assets compile) and stops in [`Minitest.after_run`](https://github.com/minitest/minitest/blob/master/lib/minitest.rb). The Rails.root/tmp containment check, port probe, spawn options, `wait_until_ready!` helper, and graceful SIGTERM→SIGKILL shutdown are all reused from [Step 3](#3-start-one-test-renderer-per-worker).
 
 Wire `test/test_helper.rb` with the same ENV-before-Rails-boot preamble used in `spec/rails_helper.rb`, then require the renderer lifecycle support file before any test runs:
 
 ```ruby
 # test/test_helper.rb
 ENV["RAILS_ENV"] ||= "test"
-require_relative "support/rsc_test_worker" # same module as Step 1
+require_relative "support/rsc_test_worker" # same module as Step 1 (create test/support/rsc_test_worker.rb with the same content if your project has no spec/ directory)
 
 ENV["RENDERER_PORT"] ||= (3900 + RscTestWorker::ID.to_i).to_s
 renderer_url = "http://127.0.0.1:#{ENV["RENDERER_PORT"]}"
-ENV["REACT_RENDERER_URL"] ||= renderer_url
-ENV["RENDERER_URL"] ||= renderer_url
+ENV["REACT_RENDERER_URL"] ||= renderer_url # used by config.renderer_url = ENV["REACT_RENDERER_URL"]
+ENV["RENDERER_URL"] ||= renderer_url       # used by some older/custom initializers
 ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] ||=
   File.expand_path("../tmp/node-renderer-bundles-test-#{RscTestWorker::ID}", __dir__)
 
@@ -482,6 +482,10 @@ module RscNodeRenderer
       rescue Errno::ECONNREFUSED, Errno::ETIMEDOUT
         # Port not yet open; renderer still booting.
       rescue Errno::ECONNRESET
+        # Connection reset: renderer bound the port but closed the connection before accepting.
+        # Fall through — the PID check below will detect a dead process and raise before the deadline.
+        # If the deadline expires without a successful connect, the deadline error mentions the reset
+        # so a port already used by another service is easier to diagnose than a generic timeout.
         saw_reset = true
       rescue Errno::EADDRNOTAVAIL, Errno::EHOSTUNREACH, SocketError => e
         raise "Cannot reach node renderer at #{host}:#{port}. " \
@@ -490,12 +494,19 @@ module RscNodeRenderer
 
       if pid
         begin
+          # Heuristic early-exit check: if the launcher process has already died, raise now rather than
+          # waiting for the deadline. For `pnpm run <script>`, pnpm typically stays resident while Node
+          # is alive, but process managers that exec directly into Node (or daemonize) will exit here even
+          # though the renderer is still starting, surfacing a misleading ESRCH. The TCP probe above is
+          # the authoritative readiness signal; this check is only a fast-fail shortcut for the common
+          # pnpm/npm/yarn case. Replace it with an app-specific health check if your launcher daemonizes.
           Process.kill(0, pid)
         rescue Errno::ESRCH
           hint = log_path ? " Check #{log_path} for startup errors." : ""
           raise "Node renderer process (pid #{pid}) exited before binding to #{host}:#{port}.#{hint}"
         rescue Errno::EPERM
-          # Process exists but we lack permission to signal; TCP probe is authoritative.
+          # Process exists but we lack permission to signal it (different UID, seccomp, container boundary).
+          # Continue waiting for the TCP port — the port probe is authoritative for readiness.
         end
       end
 
