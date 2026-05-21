@@ -19,14 +19,14 @@ This spec defines a repeatable RC testing process: a known set of demo repos, a 
 
 Locked through brainstorming dialog 2026-05-21:
 
-| #   | Decision                     | Choice                                                                                                                                      |
-| --- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Q1  | Repo scope                   | **A** — Active demos only (~10 repos). Adjacent infrastructure called out as future scope.                                                  |
-| Q2  | How RCs land in demos        | **C** — PR per RC into `main` of each demo. Plus a scheduled follow-up PR to bump RC → final after the gem ships.                           |
-| Q3  | Test plan structure          | **B** — Uniform common checklist + short per-repo appendix targeting the headline feature.                                                  |
-| Q4  | Manual vs automated boundary | **B** — Use existing CI; manual fills the gap. One-time investment: add a Playwright smoke per demo for the headline feature where missing. |
-| Q5a | Gating policy                | **B** — Tiered. Critical demos hard-block the final; tutorial/examples soft-track.                                                          |
-| Q5b | Plan file location           | **C** — Canonical in `.claude/docs/rc-testing-plan.md`; stub link in `docs/contributing/rc-testing-plan.md`.                                |
+| #   | Decision                     | Choice                                                                                                                                                                                        |
+| --- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1  | Repo scope                   | **A** — Active demos only (~10 repos). Adjacent infrastructure called out as future scope.                                                                                                    |
+| Q2  | How RCs land in demos        | **C** — PR per RC into `main` of each demo. Plus a scheduled follow-up PR to bump RC → final after the gem ships.                                                                             |
+| Q3  | Test plan structure          | **B** — Uniform common checklist + short per-repo appendix targeting the headline feature.                                                                                                    |
+| Q4  | Manual vs automated boundary | **B** — Use existing CI; manual fills the gap. One-time investment: add a Playwright smoke per demo for the headline feature where missing.                                                   |
+| Q5a | Gating policy                | **B** — Tiered. Critical demos hard-block the final; tutorial/examples soft-track.                                                                                                            |
+| Q5b | Plan file location           | Canonical in `internal/contributor-info/rc-testing-plan.md` (matches the existing home for `releasing.md`, `pull-requests.md`, etc.). RC testing is contributor-only, so no public-docs stub. |
 
 ## Repo Inventory
 
@@ -75,11 +75,11 @@ For each new RC of `react_on_rails` or `shakapacker` (or both together):
 
 1. **Release manager creates a tracking issue** in `shakacode/react_on_rails`:
    - Title: `RC test tracking: react_on_rails X.Y.Z-rc.N [+ shakapacker A.B.C-rc.M]`
-   - Body generated from `.github/ISSUE_TEMPLATE/rc-release-tracking.md` — pre-populated with all Tier 1 and Tier 2 demos, grouped by tier, with checkbox per demo and a slot for the PR link.
+   - Body generated from `.github/ISSUE_TEMPLATE/rc-release-tracking.yml` — pre-populated with all Tier 1 and Tier 2 demos, grouped by tier, with checkbox per demo and a slot for the PR link.
 
 2. **For each demo**, open a PR to `main` of that demo:
    - Title: `chore: bump react_on_rails to X.Y.Z-rc.N` (or `bump shakapacker to A.B.C-rc.M`, or both)
-   - Body: paste the **RC Test Report template** from `.claude/docs/rc-testing-plan.md` and fill it out as testing progresses
+   - Body: paste the **RC Test Report template** from `internal/contributor-info/rc-testing-plan.md` and fill it out as testing progresses
    - Bumps `Gemfile` (and `Gemfile.lock`) and any `package.json` reference to the new RC
 
 3. **CI runs automatically** on the PR. The PR description tracks manual sign-off via checkboxes.
@@ -94,12 +94,13 @@ For each new RC of `react_on_rails` or `shakapacker` (or both together):
 
 When the gem ships final:
 
-1. Release manager updates each demo's RC PR by pushing a new commit that bumps from the RC to the final version (do **not** force-push; the existing RC commit stays in the PR history). If preferred, close the RC PR and open a fresh PR for the final.
-2. CI re-runs.
-3. Merge the PRs into `main` of each demo.
-4. Close the tracking issue with a summary comment.
+1. **Default approach: close the RC PR and open a fresh PR** that bumps directly to the final version. Rationale: a fresh PR keeps the title/commit history honest (no PR still labelled `rc.N` after merge), and the audit trail is two clean PRs instead of one with mixed-version commits. The closed RC PR remains in the demo's history as the testing record.
+2. Alternative (only when the RC PR has substantive review discussion worth preserving): push a follow-up commit onto the existing RC PR that bumps RC → final. Do **not** force-push; the original RC commit stays in the PR history. Rename the PR title to reflect the final version before merge.
+3. CI re-runs on the bump PR.
+4. Merge the bump PR into `main` of each demo.
+5. Close the tracking issue with a summary comment.
 
-This step is mandatory — demos must not stay pinned to an RC after the final ships. The tracking issue stays open until all Tier-1 demos are bumped to final.
+This step is mandatory — demos must not stay pinned to an RC after the final ships. The tracking issue stays open until **every** demo PR (Tier 1 _and_ Tier 2) has been bumped to the final version, regardless of whether the Tier-2 demo passed or failed during RC testing. A Tier-2 demo that passed RC.N must still be bumped to the final — leaving it pinned to an RC after the final ships defeats the purpose of the post-release follow-up.
 
 ## Common Checklist
 
@@ -115,7 +116,7 @@ The plan's canonical checklist applied to **every** demo PR.
 | JS install                         | Node deps resolve                      | `pnpm install` / `yarn install` / `npm install` (per repo) |
 | RuboCop / lint                     | Style + structural lint                | per repo's lint task                                       |
 | ESLint (where present)             | JS lint                                | per repo's npm script                                      |
-| Asset compilation                  | Build pipeline succeeds                | `bin/shakapacker` or `bin/webpacker`                       |
+| Asset compilation                  | Build pipeline succeeds                | `bin/shakapacker`                                          |
 | RSpec (where present)              | Server-side unit + integration         | `bundle exec rspec`                                        |
 | Jest (where present)               | Client-side unit                       | per repo's test script                                     |
 | Playwright/Cypress (where present) | End-to-end                             | per repo's e2e script                                      |
@@ -126,15 +127,16 @@ If a demo lacks a category (e.g., no Jest), that line is N/A and called out in t
 
 Each item must have a "how to check" line so the tester knows exactly what to look for. The plan spells these out verbatim.
 
-| Item                             | How to check                                                                                                                                           |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `bin/dev` (or equivalent) starts | Run `bin/dev`. All Procfile.dev processes show `started` and do not exit within 60 seconds.                                                            |
-| App responds                     | `curl -I http://localhost:3000` returns a 2xx or 3xx status.                                                                                           |
-| SSR view-source check            | Browse to the primary route. View page source. Grep for `data-react-class` (or `data-rsc` for RSC demos). Expect ≥1 hit.                               |
-| Console clean                    | Open browser DevTools. After page load + one interaction, the Console tab shows no red errors. (Warnings acceptable; note any new warnings in the PR.) |
-| Hot reload                       | Edit a leaf component file. Save. Verify the browser updates without manual refresh and that component state (e.g., counter, input value) persists.    |
-| Clean shutdown                   | `Ctrl+C` stops every process. Run `bin/dev` again — it starts cleanly with no port-in-use errors.                                                      |
-| Headline feature                 | See the per-repo appendix in the plan.                                                                                                                 |
+| Item                             | How to check                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `bin/dev` (or equivalent) starts | Run `bin/dev`. All Procfile.dev processes show `started` and do not exit within 60 seconds.                                                                                                                                                                                                                                                                                                                                                      |
+| App responds                     | `curl -I http://localhost:3000` returns a 2xx or 3xx status.                                                                                                                                                                                                                                                                                                                                                                                     |
+| SSR view-source check            | Browse to the primary route. View page source. Grep for `data-react-class` (or `data-rsc` for RSC demos). Expect ≥1 hit.                                                                                                                                                                                                                                                                                                                         |
+| Console clean                    | Open browser DevTools. After page load + one interaction, the Console tab shows no red errors. (Warnings acceptable; note any new warnings in the PR.)                                                                                                                                                                                                                                                                                           |
+| HMR (non-RSC demos)              | For demos without RSC (`ssr-hmr`, `v16-bundle-splitting`, `open-flights`, `migration`, `webpack-rails-tutorial`): edit a leaf component file, save, verify the browser updates without manual refresh and that component state (counter, input value) persists.                                                                                                                                                                                  |
+| Fast Refresh (RSC demos)         | For RSC demos: edit a **client** component file (one declaring `'use client'`), save, verify the browser updates without a full refresh and that client state persists. Then edit a **server** component, save, restart the dev server, and confirm the updated output is server-rendered (server-component changes require a restart — Fast Refresh does not propagate through the server boundary; treat the restart-and-verify as the check). |
+| Clean shutdown                   | `Ctrl+C` stops every process. Run `bin/dev` again — it starts cleanly with no port-in-use errors.                                                                                                                                                                                                                                                                                                                                                |
+| Headline feature                 | See the per-repo appendix in the plan.                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 The plan presents this as a copy-pasteable Markdown checklist for the PR body.
 
@@ -240,42 +242,49 @@ Tier-2 PRs are opened, tested, and tracked. A Tier-2 failure:
 
 If a Tier-2 demo fails three RC cycles in a row without being fixed, the next release manager raises it for triage (escalate to Tier 1 or formally deprecate).
 
+**Tracking surface for the 3-failures rule**: per-RC tracking issues only cover one cycle, so the rule needs a durable counter. The canonical plan instructs the release manager to:
+
+1. Apply a `rc-failing` label to the long-lived issue filed in the demo repo on the first failure.
+2. Append a one-line entry to a **failure log** kept at the top of `internal/contributor-info/rc-testing-plan.md` (under a `## Tier-2 failure log` heading), with format: `- <demo-repo> — failed RC X.Y.Z-rcN (link to tracking issue)`. Three consecutive entries for the same repo trigger the triage step.
+3. Remove the entry (and clear the `rc-failing` label) when the demo passes a subsequent RC, resetting the count.
+
 ### Recording results
 
 The tracking issue is the single source of truth for "did we test this RC?" Every checkbox links to its PR. The issue stays open until:
 
-- All Tier-1 demos are bumped to final.
-- All Tier-2 failures have either been fixed or filed as tracked issues.
+- All Tier-1 demos are bumped to the final version.
+- All Tier-2 demos are bumped to the final version (regardless of whether they passed or failed RC testing — passing Tier-2 demos must not stay pinned to an RC after the final ships).
+- All Tier-2 failures have either been fixed or filed as tracked issues in the affected demo repo and noted in the Tier-2 failure log.
 
 ## Deliverables
 
-Three files land in `shakacode/react_on_rails`:
+Two files land in `shakacode/react_on_rails`:
 
-### 1. `.claude/docs/rc-testing-plan.md` (canonical plan)
+### 1. `internal/contributor-info/rc-testing-plan.md` (canonical plan)
 
 Comprehensive plan with all sections:
 
 - Context + scope
 - Repo inventory (Tier 1, Tier 2, follow-up)
-- Workflow (per-RC PR cycle + post-release follow-up)
-- Common checklist (automated + manual, with "how to check" specifics)
+- Workflow (per-RC PR cycle + post-release follow-up, with the canonical "fresh PR" default for the post-release bump)
+- Common checklist (automated + manual, with "how to check" specifics, including the split HMR / Fast Refresh checks)
 - Per-repo appendices (10 sections)
 - Automation roadmap table
-- Gating policy
+- Gating policy, including the Tier-2 failure log and 3-consecutive-failures escalation
 - **RC Test Report template** (copy-pasteable for demo PR bodies)
-- **Tracking issue template** (mirrored in `.github/ISSUE_TEMPLATE/`)
+- **Tracking issue template reference** (mirrored in `.github/ISSUE_TEMPLATE/`)
 
-### 2. `docs/contributing/rc-testing-plan.md` (stub for the published docs site)
+This lives in `internal/contributor-info/` (next to `releasing.md`, `pull-requests.md`, etc.) rather than `docs/oss/` or `docs/pro/` because RC testing is a contributor-only workflow; no public-docs stub is needed. `AGENTS.md` restricts `docs/` to `docs/oss/` and `docs/pro/`, so `docs/contributing/` is not an option.
 
-Short page (~150 words) explaining what the plan is and linking to the canonical `.claude/docs/rc-testing-plan.md`. Surfaces the plan to humans reading the public docs.
+### 2. `.github/ISSUE_TEMPLATE/rc-release-tracking.yml`
 
-### 3. `.github/ISSUE_TEMPLATE/rc-release-tracking.md`
-
-GitHub issue template that pre-populates the tracking issue body with:
+GitHub issue form (modern YAML format, not the legacy Markdown-with-frontmatter format) that pre-populates the tracking issue body with:
 
 - Tier 1 and Tier 2 demos as checkboxes
 - Slots for PR links
 - Manual sign-off slots for the release manager
+
+The `.yml` issue-form format is preferred over `.md` with YAML frontmatter because it makes the metadata explicit in a schema, validates with a YAML linter, and renders a structured UI in the GitHub issue-creation flow rather than free-text Markdown.
 
 No changes are committed to the demo repos as part of v1 of this plan. Demo repos consume the template ad-hoc per RC by copy-pasting from the canonical plan.
 
@@ -294,6 +303,6 @@ Items marked `*` in per-repo appendices require reading each demo's README/sourc
 ## Next Steps
 
 1. User reviews this spec.
-2. On approval, invoke `superpowers:writing-plans` to produce the implementation plan (file-level work breakdown for the three deliverables in this repo).
+2. On approval, invoke `superpowers:writing-plans` to produce the implementation plan (file-level work breakdown for the two deliverables in this repo).
 3. Implement the deliverables.
 4. Open the first tracking issue against the next RC of either gem to validate the workflow end-to-end.
