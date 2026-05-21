@@ -2108,6 +2108,12 @@ describe InstallGenerator, type: :generator do
     )
     # Keep the full directive in source order so failures point at the exact Renovate comment to update.
     expect(generator_source).to include(expected_renovate_directive), renovate_directive_mismatch_message
+    expect(generator_source).to include(
+      "renovate: datasource=github-releases depName=pnpm/pnpm"
+    )
+    expect(generator_source).to include(
+      %(CONTRIBUTING.md > "Updating the pnpm Fallback Version for Scaffolded CI")
+    )
   end
 
   context "when env selects pnpm but packageManager declares yarn" do
