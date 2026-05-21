@@ -402,7 +402,7 @@ initializer agree on the port without any additional configuration.
 > derived from the base and propagated to spawned processes. If you use
 > `RENDERER_PORT` in your environment for an unrelated purpose, rename your
 > variable to avoid the side effect.
-
+>
 > **Note:** Base-port mode derives the node renderer URL as
 > `http://localhost:<port>`. If you run the renderer in a Docker container or
 > on a remote host (e.g. `REACT_RENDERER_URL=http://renderer:3800`), do not use
