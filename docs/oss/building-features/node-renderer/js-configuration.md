@@ -183,6 +183,7 @@ configureFastify((app) => {
   // loading. Put any application warm-up here — preload modules, hydrate
   // caches, wait for an external dependency — and flip the flag when done.
   app.addHook('onReady', async () => {
+    // await yourWarmUpFunction(); // put async warm-up logic here before flipping the flag
     workersReady = true;
   });
 
@@ -320,16 +321,16 @@ Recommended starting values:
 Substitute `3800` with your actual renderer port in Kubernetes YAML `exec` arrays; shell variable expansion
 does not apply there. See the `port` option at the top of this page for Heroku or Control Plane.
 
-> **Note (startup window):** With these values, the first check fires at `initialDelaySeconds` (10 s), then every
-> `periodSeconds` (5 s) thereafter, and the container restarts only if all six consecutive startup checks fail. Increase
-> `failureThreshold` or `periodSeconds` if startup regularly takes longer.
-> The 10-second initial delay only shifts when the first check fires. Omitting it starts checks immediately; the last
-> startup probe fires at `initialDelaySeconds + (failureThreshold - 1) * periodSeconds` (25 s with `failureThreshold: 6`
-> and `periodSeconds: 5` when `initialDelaySeconds` is omitted, since the last of six checks fires at
-> `(6 - 1) * 5 = 25 s`). The container restart follows once that check actually fails — up to `timeoutSeconds` (1 s
-> here) later.
-> Reduce `initialDelaySeconds` if your renderer reliably opens the port within 1-2 seconds, or match it to your actual
-> boot time if you want to suppress noisy early-failure log entries during the warm-up window.
+> **Note (startup window):** With `initialDelaySeconds: 10`, `periodSeconds: 5`, and `failureThreshold: 6`:
+>
+> - First check fires at **10 s**.
+> - Last (6th) check fires at **35 s** (`10 + (6 - 1) × 5`).
+> - Container restarts after the 6th consecutive failure, up to `timeoutSeconds` (1 s here) later.
+>
+> If you omit `initialDelaySeconds`, checks start immediately and the last check fires at **25 s** (`(6 - 1) × 5`).
+> Increase `failureThreshold` or `periodSeconds` if startup regularly takes longer. Reduce `initialDelaySeconds` if the
+> renderer reliably opens its port within 1-2 s, or match it to your actual boot time to suppress noisy early-failure
+> log entries during the warm-up window.
 
 Readiness and liveness omit `initialDelaySeconds` here because Kubernetes 1.20+ (startup probe GA) defers them until
 the startup probe succeeds. If you skip the startup probe or run an older cluster without startup probe support, add an

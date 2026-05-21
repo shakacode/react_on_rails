@@ -166,16 +166,23 @@ variable.
 get "up", to: "health#show"
 ```
 
+Loading the `Socket` stdlib from an initializer keeps the controller body lean and outside the autoload boundary, which
+matches Rails conventions for stdlib dependencies. If your environment already auto-requires stdlib (for example via
+Bundler) the require below is harmless; placing it in an initializer is still preferred.
+
+`config/initializers/socket_require.rb`:
+
+```ruby
+# Load the Ruby stdlib Socket class once at boot for the Health controller's TCP check.
+require "socket"
+```
+
 `app/controllers/health_controller.rb`:
 
 ```ruby
-# Ruby stdlib; loaded explicitly for the Socket readiness check. Some
-# environments auto-require stdlib via Bundler — if that applies to your setup,
-# move this require to an initializer to keep the controller lean.
-require "socket"
-
 # Inherits from ActionController::Base (not ApplicationController) to avoid
 # app-level authentication callbacks on unauthenticated probe requests.
+# `Socket` is loaded once at boot via config/initializers/socket_require.rb.
 class HealthController < ActionController::Base
   def show
     # A successful TCP connect means the h2c listener is bound, not that cluster workers
@@ -216,10 +223,12 @@ end
 Keep the Rails `renderer_url` as `http://localhost:3800`. Use `0.0.0.0` for the renderer `host` when you rely on
 `tcpSocket` probes; `localhost` is fine for `exec`-only probes.
 
-Add h2c-aware `exec` probes against `localhost:3800` or `tcpSocket` probes on the renderer port. For `tcpSocket`, bind the
-renderer to `0.0.0.0` because Kubernetes and platform TCP probes originate from outside the container and connect to the
-pod or workload IP, not container-local loopback. `exec` probes run a command inside the container, so `localhost` works
-there.
+Add h2c-aware `exec` probes against `localhost:3800` or `tcpSocket` probes on the renderer port. For `tcpSocket`, bind
+the renderer to `0.0.0.0` because Kubernetes and platform TCP probes are initiated by the kubelet and connect to the pod
+or workload IP, not container-local loopback. Rails→renderer HTTP traffic over `localhost` still works inside the shared
+pod network namespace (see [Host Binding for Container Environments](#host-binding-for-container-environments)); only
+externally-initiated probes need the `0.0.0.0` bind. `exec` probes run a command inside the container, so `localhost`
+works there.
 
 > **Probe YAML:** For Control Plane readiness and liveness fields, reuse the individual `exec` or `tcpSocket` probe blocks
 > from [Kubernetes Sidecar Manifest](#kubernetes-sidecar-manifest). Attach them to the node-renderer container in this
