@@ -200,6 +200,27 @@ ls ssr-generated/
 cat public/packs/manifest.json | grep "application"
 ```
 
+### Exporting the Fully-Resolved Bundler Configuration
+
+When something is wrong with the build itself — a loader not matching, a plugin missing in production, dev/prod divergence — it helps to inspect the **fully-resolved** webpack or rspack config, including all of Shakapacker's defaults. Shakapacker ships a `--doctor` mode that dumps annotated YAML for every relevant build:
+
+```bash
+# Shakapacker 9.6+ canonical binstub
+bin/shakapacker-config --doctor
+
+# Older Shakapacker versions / projects with the legacy binstub
+bin/export-bundler-config --doctor
+```
+
+Both commands are thin shims over the same exporter and produce the same output: annotated YAML files in `shakapacker-config-exports/` covering development (with and without HMR) and production, split into separate client and server bundle files. The YAML is annotated with inline documentation so you can see, for each loader / plugin / resolve rule, where it came from.
+
+Two common uses:
+
+- **Troubleshooting:** diff two exports (before/after an upgrade, or against a known-working app) to find configuration drift.
+- **AI-assisted analysis:** paste the annotated YAML into an AI tool to ask questions like "why is this plugin in server but not client?" — the output format is designed to be readable by both humans and LLMs.
+
+For the full set of flags (`--build`, `--init`, `--validate`, `--save-dir`, etc.) and the build-config-file workflow, see the [Shakapacker README](https://github.com/shakacode/shakapacker).
+
 ## Pro Node Renderer Debugging
 
 If you're using the React on Rails Pro Node Renderer, the renderer process has its own logs. The log level is controlled by the `RENDERER_LOG_LEVEL` environment variable. See the [Node Renderer Basics](./node-renderer/basics.md) for configuration details.
