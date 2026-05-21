@@ -1458,6 +1458,86 @@ describe RscGenerator, type: :generator do
       expect(File.read(File.join(destination_root, config_path))).to eq(original_content)
       expect(GeneratorMessages.messages.join("\n")).not_to include("generated scoped helper setup was not written")
     end
+
+    it "splices clientReferences at the top level when isServer also appears in a nested object" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          clientConfig.plugins.push(
+            new RSCWebpackPlugin({
+              metadata: {
+                isServer: false,
+              },
+              chunkName: 'client',
+              isServer: false,
+            }),
+          );
+        JS
+      )
+
+      generator.send(:rewrite_rsc_plugin_client_references, config_path, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content.scan("clientReferences: rscClientReferences").length).to eq(1)
+      # The new key must land in the top-level options object, not inside `metadata`.
+      expect(migrated_content).to match(
+        /chunkName: 'client',\n\s*isServer: false,\n\s*clientReferences: rscClientReferences,\n\s*\}\),/
+      )
+      expect(migrated_content).not_to match(/metadata: \{\n\s*isServer: false,\n\s*clientReferences:/)
+    end
+
+    it "rewrites the options object even when a JS comment sits between '(' and '{'" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          clientConfig.plugins.push(
+            new RSCWebpackPlugin( /* client-side opts */ {
+              isServer: false,
+            }),
+          );
+        JS
+      )
+
+      expect(generator.send(:rewrite_rsc_plugin_client_references, config_path, is_server: false)).to be(true)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).to match(
+        /isServer: false,\n\s*clientReferences: rscClientReferences,\n\s*\}\),/
+      )
+      expect(GeneratorMessages.messages.join("\n")).not_to include("no plugin options")
+    end
+
+    it "still rewrites when clientReferences appears only inside a nested sibling object" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          clientConfig.plugins.push(
+            new RSCWebpackPlugin({
+              metadata: {
+                clientReferences: 'unused',
+              },
+              isServer: false,
+            }),
+          );
+        JS
+      )
+
+      generator.send(:rewrite_rsc_plugin_client_references, config_path, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).to include("clientReferences: rscClientReferences")
+      # Nested mention is preserved verbatim, and a real top-level option is added.
+      expect(migrated_content).to include("clientReferences: 'unused'")
+      expect(migrated_content).to match(
+        /isServer: false,\n\s*clientReferences: rscClientReferences,\n\s*\}\),/
+      )
+    end
   end
 
   context "when required imports appear after the client RSC setup anchor" do

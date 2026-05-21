@@ -720,7 +720,7 @@ module ReactOnRails
             next
           end
 
-          options_start = first_non_space_index(content, call_start + marker.length)
+          options_start = first_significant_js_index(content, call_start + marker.length)
           unless options_start && content[options_start] == "{"
             search_from = call_start + marker.length
             next
@@ -753,6 +753,11 @@ module ReactOnRails
       # and JS comments, and confirms the next significant character is `)`. Used to detect
       # when `matching_js_closing_brace` was confused by a regex literal and returned an
       # earlier `}` than the real options-object close.
+      #
+      # String literals between `}` and `)` are not handled because no valid JS places one
+      # there in `new RSCWebpackPlugin({...})` — a leading string-delimiter character would
+      # simply be returned as a non-`)` and the section would be marked unparseable, which is
+      # the safe outcome.
       def rsc_plugin_options_followed_by_close_paren?(content, options_end)
         state = nil
         escaped = false
@@ -778,19 +783,45 @@ module ReactOnRails
         false
       end
 
-      def first_non_space_index(content, start_index)
+      # Skips both whitespace and JS line/block comments so callers see the first character
+      # that actually participates in the syntax. Without comment skipping, configurations
+      # like `new RSCWebpackPlugin( /* opts */ {` would land on `/` and be rejected as
+      # "no plugin options" even though the options object is present.
+      def first_significant_js_index(content, start_index)
         index = start_index
-        index += 1 while index < content.length && content[index].match?(/\s/)
-        index < content.length ? index : nil
+        state = nil
+        escaped = false
+
+        while index < content.length
+          char = content[index]
+          next_char = content[index + 1]
+          prev_state = state
+          state, escaped, index = advance_js_scan_state(state, escaped, char, next_char, index)
+          # Exiting a block comment leaves `char` as `*` and `index` pointing at the closing
+          # `/`; advance past it so the next iteration evaluates the first character after `*/`.
+          if state || prev_state == :block_comment
+            index += 1
+            next
+          end
+
+          return index unless char.match?(/\s/)
+
+          index += 1
+        end
+
+        nil
       end
 
       # Expects `content[open_index] == "{"`; callers pass the options-object opening brace.
-      # This lightweight scanner intentionally treats template literals as opaque strings
-      # (backtick to backtick, ignoring `${...}` expressions). Any `{` or `}` inside a template
-      # expression (e.g. `` `${env}` ``) — not just nested template literals — will skew the
-      # depth counter; callers detect this via `rsc_plugin_options_followed_by_close_paren?`
-      # and mark the section unparseable rather than producing a corrupt rewrite. Regex literals
-      # are outside this scanner's supported surface for the same reason.
+      # This lightweight scanner treats template literals as opaque strings (backtick to backtick).
+      # Simple `${...}` expressions are handled correctly: while in the backtick state every
+      # character — including `{` and `}` inside the expression — is consumed as string content
+      # and never reaches the depth counter. The real unsupported case is *nested* template
+      # literals (e.g. `` `outer ${`inner`}` ``) where the inner backtick falsely closes the outer
+      # string state, exposing later braces to the depth counter. Callers detect that via
+      # `rsc_plugin_options_followed_by_close_paren?` and mark the section unparseable rather
+      # than producing a corrupt rewrite. Regex literals are outside this scanner's supported
+      # surface for the same reason.
       def matching_js_closing_brace(content, open_index)
         depth = 0
         index = open_index
@@ -901,9 +932,12 @@ module ReactOnRails
         # making the caller's in-memory body_start/body_end offsets stale.
         content = File.read(full_path)
         rewrites = rsc_plugin_option_sections(content, is_server: is_server).filter_map do |candidate|
-          next if rsc_plugin_options_without_comments(candidate.fetch(:body)).match?(/\bclientReferences\s*:/)
-
           body = candidate.fetch(:body)
+          # Depth-aware check: a nested `clientReferences:` (e.g. inside a sibling object
+          # literal) must not be mistaken for a configured top-level option, or we'd skip
+          # the migration and leave the real plugin unscoped.
+          next if rsc_plugin_body_has_top_level_key?(body, "clientReferences")
+
           rewritten_body = add_client_references_to_rsc_plugin_body(body, is_server: is_server)
           next if rewritten_body == body
 
@@ -936,7 +970,10 @@ module ReactOnRails
         search_from = 0
 
         while (matched_is_server = pattern.match(body, search_from))
-          if js_code_position?(body, matched_is_server.begin(0))
+          # Require depth zero so a nested `isServer:` inside a sibling object literal
+          # doesn't cause the splice to land inside the wrong object — `body` is the
+          # content between the plugin options braces, so depth 0 == top-level options.
+          if js_top_level_position?(body, matched_is_server.begin(0))
             return splice_client_references_into_rsc_plugin_body(body, matched_is_server)
           end
 
@@ -944,6 +981,23 @@ module ReactOnRails
         end
 
         body
+      end
+
+      # Walks every `<key>:` match in the plugin options body and returns true when at
+      # least one sits at the top level of the options object (depth 0 from the body's
+      # perspective, outside strings and comments). Used to gate "already configured"
+      # checks so nested mentions don't cause false positives.
+      def rsc_plugin_body_has_top_level_key?(body, key)
+        pattern = /\b#{Regexp.escape(key)}\s*:/
+        search_from = 0
+
+        while (match = pattern.match(body, search_from))
+          return true if js_top_level_position?(body, match.begin(0))
+
+          search_from = match.end(0)
+        end
+
+        false
       end
 
       def splice_client_references_into_rsc_plugin_body(body, is_server_match)
