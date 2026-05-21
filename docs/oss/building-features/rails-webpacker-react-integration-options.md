@@ -212,6 +212,10 @@ Keep each shim explicit and narrow:
          'react-on-rails/context$': 'react-on-rails/lib/context.js',
          'react-on-rails/pageLifecycle$': 'react-on-rails/lib/pageLifecycle.js',
          'react-on-rails/turbolinksUtils$': 'react-on-rails/lib/turbolinksUtils.js',
+         // .cjs example — check the `exports` field in `packages/react-on-rails/package.json`
+         // for the correct extension before adding subpaths like these:
+         // 'react-on-rails/reactApis$': 'react-on-rails/lib/reactApis.cjs',
+         // 'react-on-rails/ReactDOMServer$': 'react-on-rails/lib/ReactDOMServer.cjs',
        },
      },
    });
@@ -222,6 +226,8 @@ Keep each shim explicit and narrow:
    The aliased files still resolve under `node_modules/react-on-rails/`, so the package-scoped `babel-loader`
    rule from Step 3 still picks them up. Put Steps 2 and 3 in place before relying on the alias — the
    redirected files use the same modern syntax and ESM packaging as the `/client` entry point.
+
+   If your `environment.js` already has other configuration, add the `environment.config.merge` block before the existing `module.exports` line.
 
 2. Ensure Babel can parse modern syntax used by current packages:
 
