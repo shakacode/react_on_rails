@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
 require "fileutils"
-require "pathname"
 require "react_on_rails_pro/renderer_cache_helpers"
 require "react_on_rails_pro/renderer_cache_path"
+require "react_on_rails_pro/rolling_deploy_cache_stager"
 
 module ReactOnRailsPro
   # Stages the Node Renderer bundle cache in the renderer's expected directory
@@ -12,7 +12,7 @@ module ReactOnRailsPro
   #
   # Supports two modes:
   #
-  # * `:copy` (default) - copies bundle and assets. Designed for Docker image
+  # * `:copy` - copies bundle and assets. Designed for Docker image
   #   builds where the cache must be baked into an immutable artifact.
   # * `:symlink` - creates relative symlinks. For same-filesystem workflows
   #   (local dev, CI, Heroku-style same-dyno deploys, bundle-caching restores).
@@ -41,6 +41,7 @@ module ReactOnRailsPro
 
       assets, rsc_required_paths = RendererCacheHelpers.collect_assets_with_required_paths
 
+      current_hashes = []
       # Block-level `rescue` (Ruby 2.5+): equivalent to wrapping the block body in
       # begin/rescue/end. RuboCop's Style/RedundantBegin enforces this form, so
       # callers reading the loop should treat the rescue clause below as the
@@ -51,6 +52,7 @@ module ReactOnRailsPro
         # The Node Renderer serves manifests from whichever bundle dir it loaded,
         # so both server and RSC dirs need the manifests present.
         stage_assets(assets, bundle_dir, rsc_required_paths, mode)
+        current_hashes << bundle_hash.to_s
       rescue StandardError => e
         # Fail-fast: re-raise on the first bundle failure so the deploy sees a non-zero exit and
         # aborts before downstream steps assume the cache is complete. Earlier bundles that
@@ -61,6 +63,10 @@ module ReactOnRailsPro
              "cache may be partially staged: #{e.message}"
         raise
       end
+
+      # Optionally seed previous deploys' bundle hashes for rolling-deploy safety.
+      # No-op when neither config.rolling_deploy_adapter nor PREVIOUS_BUNDLE_HASHES is set.
+      RollingDeployCacheStager.call(cache_dir: cache_dir, current_hashes: current_hashes, mode: mode)
     end
 
     # Validates the cache-dir env var (raises in production-like copy mode when
@@ -123,11 +129,7 @@ module ReactOnRailsPro
     private_class_method :stage_bundle
 
     def self.stage_file(src, dest, mode, log_prefix)
-      if mode == :copy
-        RendererCacheHelpers.copy_file_atomically(src, dest, log_prefix: log_prefix)
-      else
-        make_relative_symlink(src, dest, log_prefix)
-      end
+      RendererCacheHelpers.stage_file(src, dest, mode, log_prefix: log_prefix)
     end
     private_class_method :stage_file
 
@@ -142,49 +144,5 @@ module ReactOnRailsPro
       end
     end
     private_class_method :stage_assets
-
-    # Creates a temporary symlink alongside `destination` and renames it into
-    # place atomically. POSIX rename replaces an existing symlink without a
-    # delete-first gap, so concurrent renderer reads never see a missing bundle.
-    def self.make_relative_symlink(source, destination, log_prefix)
-      destination_dir = Pathname.new(destination).dirname
-
-      # Canonicalize both sides so paths like /var -> /private/var do not
-      # produce broken relative symlinks when the cache dir comes from tmpdir.
-      # Pathname#realpath raises Errno::ENOENT on a dangling symlink or a
-      # path that vanished between File.exist? and here (e.g. webpack output
-      # rotating mid-stage). Wrap each realpath call separately so the error
-      # message correctly names the side that failed.
-      source_path =
-        begin
-          Pathname.new(source).realpath
-        rescue Errno::ENOENT
-          raise ReactOnRailsPro::Error,
-                "Cannot resolve real path for symlink source #{source} - " \
-                "it does not exist or is a dangling symlink. " \
-                "Rebuild your bundles before staging the renderer cache."
-        end
-      FileUtils.mkdir_p(destination_dir)
-      destination_dir_real =
-        begin
-          destination_dir.realpath
-        rescue Errno::ENOENT
-          raise ReactOnRailsPro::Error,
-                "Cannot resolve real path for symlink destination dir #{destination_dir} - " \
-                "it may have been removed after mkdir_p (race with an external cleanup)."
-        end
-      relative_source_path = source_path.relative_path_from(destination_dir_real)
-      tmp = "#{destination}.tmp-#{Process.pid}-#{SecureRandom.hex(6)}"
-      File.symlink(relative_source_path, tmp)
-      File.rename(tmp, destination)
-      puts "[ReactOnRailsPro] #{log_prefix}: #{relative_source_path} -> #{destination}"
-    ensure
-      # Ruby pre-initializes `tmp` to nil at parse time, so the local exists even if
-      # an exception fires before the assignment runs — the `if tmp` guard turns that
-      # case into a no-op. On success the file has been renamed away; on a failure
-      # after assignment it removes the temp symlink.
-      FileUtils.rm_f(tmp) if tmp
-    end
-    private_class_method :make_relative_symlink
   end
 end

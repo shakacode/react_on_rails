@@ -2136,55 +2136,47 @@ RSpec.describe ReactOnRails::Doctor do
     let(:doctor) { described_class.new(verbose: false, fix: true) }
     let(:checker) { doctor.instance_variable_get(:@checker) }
 
-    it "does not add Gemfile guidance when no package versions changed" do
-      result = ReactOnRails::VersionSynchronizer::Result.new(
-        changes: [
-          { section: "dependencies", package: "react-on-rails", from: "^16.0.0", to: "16.5.0" }
-        ],
-        changed_files: ["package.json"],
-        unsupported_specs: [],
-        missing_source_specs: []
-      )
+    def stub_synchronizer(result)
       synchronizer = instance_double(ReactOnRails::VersionSynchronizer, sync: result)
 
-      allow(doctor).to receive(:resolved_package_json_path).and_return("package.json")
-      allow(File).to receive(:exist?).and_call_original
-      allow(File).to receive(:exist?).with("package.json").and_return(true)
+      allow(doctor).to receive(:package_json_path_for)
+        .with("package version auto-sync")
+        .and_return("package.json")
       allow(ReactOnRails::VersionSynchronizer).to receive(:new).and_return(synchronizer)
-
-      doctor.send(:auto_fix_versions)
-
-      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
-      expect(info_messages).not_to include(
-        a_string_including("FIX=true only updates package.json; update Gemfile constraints manually if needed.")
-      )
     end
 
-    it "adds explicit guidance that Gemfile constraints are not auto-fixed when package versions changed" do
+    it "adds explicit guidance that Gemfile constraints are not auto-fixed when changes are applied" do
       result = ReactOnRails::VersionSynchronizer::Result.new(
-        changes: [
-          {
-            section: "dependencies",
-            package: "react-on-rails",
-            from: "16.0.0",
-            to: "16.1.0"
-          }
-        ],
+        changes: [{ section: "dependencies", package: "react-on-rails", from: "^16.4.0", to: "16.5.0" }],
         changed_files: ["package.json"],
         unsupported_specs: [],
         missing_source_specs: []
       )
-      synchronizer = instance_double(ReactOnRails::VersionSynchronizer, sync: result)
-
-      allow(doctor).to receive(:resolved_package_json_path).and_return("package.json")
-      allow(File).to receive(:exist?).and_call_original
-      allow(File).to receive(:exist?).with("package.json").and_return(true)
-      allow(ReactOnRails::VersionSynchronizer).to receive(:new).and_return(synchronizer)
+      stub_synchronizer(result)
 
       doctor.send(:auto_fix_versions)
 
       info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
       expect(info_messages).to include(
+        a_string_including("FIX=true only updates package.json; update Gemfile constraints manually if needed.")
+      )
+    end
+
+    # Regression: previously emitted unconditionally, producing misleading noise
+    # alongside `report_sync_changes`'s "No package.json version changes needed".
+    it "skips the Gemfile-constraints info message when there are no changes" do
+      result = ReactOnRails::VersionSynchronizer::Result.new(
+        changes: [],
+        changed_files: [],
+        unsupported_specs: [],
+        missing_source_specs: []
+      )
+      stub_synchronizer(result)
+
+      doctor.send(:auto_fix_versions)
+
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(info_messages).not_to include(
         a_string_including("FIX=true only updates package.json; update Gemfile constraints manually if needed.")
       )
     end
@@ -2400,7 +2392,7 @@ RSpec.describe ReactOnRails::Doctor do
     context "when Pro gem is installed with NodeRenderer" do
       before do
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
-        pro_config = double("ProConfig", server_renderer: "NodeRenderer")
+        pro_config = double("ProConfig", server_renderer: "NodeRenderer", rolling_deploy_adapter: nil)
         stub_const("ReactOnRailsPro", double("ReactOnRailsPro", configuration: pro_config))
       end
 
@@ -2414,7 +2406,7 @@ RSpec.describe ReactOnRails::Doctor do
     context "when Pro gem is installed with ExecJS" do
       before do
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
-        pro_config = double("ProConfig", server_renderer: "ExecJS")
+        pro_config = double("ProConfig", server_renderer: "ExecJS", rolling_deploy_adapter: nil)
         stub_const("ReactOnRailsPro", double("ReactOnRailsPro", configuration: pro_config))
       end
 
@@ -2607,6 +2599,239 @@ RSpec.describe ReactOnRails::Doctor do
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? { |m| m[:content].include?("Pro initializer not found") }).to be true
       end
+    end
+  end
+
+  describe "check_rolling_deploy_adapter" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+    let(:config) { double("ProConfig", rolling_deploy_adapter: adapter) } # rubocop:disable RSpec/VerifiedDoubles
+
+    before do
+      # Capture let values into locals so closures inside define_singleton_method
+      # can see them — define_singleton_method evaluates blocks in the module's
+      # own scope where `config` is not a known identifier.
+      config_value = config
+      pro_module = Module.new
+      pro_module.define_singleton_method(:configuration) { config_value }
+      utils_module = Module.new
+      utils_module.define_singleton_method(:resolve_renderer_cache_dir) { "/tmp/nonexistent-cache-dir" }
+      pro_module.const_set(:Utils, utils_module)
+      stub_const("ReactOnRailsPro", pro_module)
+      ENV.delete("PREVIOUS_BUNDLE_HASHES")
+    end
+
+    after { ENV.delete("PREVIOUS_BUNDLE_HASHES") }
+
+    context "when rolling_deploy_adapter is nil and env override is unset" do
+      let(:adapter) { nil }
+
+      it "adds an info line" do
+        doctor.send(:check_rolling_deploy_adapter)
+        info = checker.messages.select { |m| m[:type] == :info }
+        expect(info.any? { |m| m[:content].include?("No rolling_deploy_adapter configured") }).to be(true)
+      end
+    end
+
+    context "when env override is set but adapter is nil" do
+      let(:adapter) { nil }
+
+      before { ENV["PREVIOUS_BUNDLE_HASHES"] = "abc,def" }
+
+      it "warns that both are required" do
+        doctor.send(:check_rolling_deploy_adapter)
+        warnings = checker.messages.select { |m| m[:type] == :warning }
+        expect(warnings.any? do |m|
+                 m[:content].include?("PREVIOUS_BUNDLE_HASHES") && m[:content].include?("abc,def")
+               end).to be(true)
+      end
+    end
+
+    # Regression: an accidentally-large PREVIOUS_BUNDLE_HASHES value (e.g. a
+    # full bundle dumped into the env by mistake) should not flood operator
+    # output. Echo a capped prefix and the total length instead.
+    context "when env override is large enough to flood operator output" do
+      let(:adapter) { nil }
+      let(:long_value) { "a" * 500 }
+
+      before { ENV["PREVIOUS_BUNDLE_HASHES"] = long_value }
+
+      it "truncates the echoed env value and reports the total length" do
+        doctor.send(:check_rolling_deploy_adapter)
+        warning = checker.messages.find { |m| m[:type] == :warning && m[:content].include?("PREVIOUS_BUNDLE_HASHES") }
+        expect(warning).not_to be_nil
+        expect(warning[:content]).to include("… (500 chars total)")
+        expect(warning[:content]).not_to include("a" * 200)
+      end
+    end
+
+    context "when adapter implements all required methods and returns hashes" do
+      let(:adapter) do
+        Module.new do
+          def self.previous_bundle_hashes = %w[abc def]
+          def self.fetch(_hash); end
+          def self.upload(_hash, **_opts); end
+        end
+      end
+
+      it "reports protocol success and probe success" do
+        doctor.send(:check_rolling_deploy_adapter)
+        successes = checker.messages.select { |m| m[:type] == :success }
+        expect(successes.any? { |m| m[:content].include?("responds to all required methods") }).to be(true)
+        expect(successes.any? { |m| m[:content].include?("2 hash(es)") }).to be(true)
+      end
+    end
+
+    context "when adapter is configured and PREVIOUS_BUNDLE_HASHES is also set" do
+      let(:adapter) do
+        Module.new do
+          def self.previous_bundle_hashes
+            raise "should not be probed when env var overrides discovery"
+          end
+
+          def self.fetch(_hash); end
+          def self.upload(_hash, **_opts); end
+        end
+      end
+
+      before { ENV["PREVIOUS_BUNDLE_HASHES"] = "abc,def" }
+
+      it "skips the previous_bundle_hashes probe and reports the env-var override" do
+        doctor.send(:check_rolling_deploy_adapter)
+        info = checker.messages.select { |m| m[:type] == :info }
+        warnings = checker.messages.select { |m| m[:type] == :warning }
+        expect(info.any? do |m|
+                 m[:content].include?("PREVIOUS_BUNDLE_HASHES") && m[:content].include?("skipping")
+               end).to be(true)
+        expect(warnings.none? { |m| m[:content].include?("should not be probed") }).to be(true)
+      end
+    end
+
+    context "when renderer cache contains rolling-deploy temporary directories" do
+      let(:cache_dir) { Dir.mktmpdir }
+      let(:adapter) do
+        Module.new do
+          def self.previous_bundle_hashes = %w[abc]
+          def self.fetch(_hash); end
+          def self.upload(_hash, **_opts); end
+        end
+      end
+
+      before do
+        FileUtils.mkdir_p(File.join(cache_dir, "abc"))
+        FileUtils.mkdir_p(File.join(cache_dir, "abc.staging-1234-deadbeef12"))
+        FileUtils.mkdir_p(File.join(cache_dir, "abc.previous-1234-feedface12"))
+        cache_dir_value = cache_dir
+        ReactOnRailsPro::Utils.define_singleton_method(:resolve_renderer_cache_dir) { cache_dir_value }
+      end
+
+      after { FileUtils.rm_rf(cache_dir) }
+
+      it "excludes temporary directories from the bundle-hash count" do
+        doctor.send(:check_rolling_deploy_adapter)
+        info = checker.messages.select { |m| m[:type] == :info }
+        expect(info.map { |m| m[:content] }).to include(a_string_matching(/\(1 bundle-hash subdir\(s\)\)/))
+      end
+    end
+
+    context "when adapter is missing required methods" do
+      let(:adapter) do
+        Module.new do
+          def self.previous_bundle_hashes = []
+        end
+      end
+
+      it "warns with the missing methods listed" do
+        doctor.send(:check_rolling_deploy_adapter)
+        warnings = checker.messages.select { |m| m[:type] == :warning }
+        expect(warnings.any? do |m|
+                 m[:content].include?("missing required methods") && m[:content].include?("fetch")
+               end).to be(true)
+        expect(warnings.none? { |m| m[:content].include?("previous_bundle_hashes returned []") }).to be(true)
+      end
+    end
+
+    context "when previous_bundle_hashes returns []" do
+      let(:adapter) do
+        Module.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash); end
+          def self.upload(_hash, **_opts); end
+        end
+      end
+
+      it "warns that the upload side likely has not run" do
+        doctor.send(:check_rolling_deploy_adapter)
+        warnings = checker.messages.select { |m| m[:type] == :warning }
+        expect(warnings.any? { |m| m[:content].include?("returned []") }).to be(true)
+      end
+    end
+
+    context "when previous_bundle_hashes times out" do
+      let(:adapter) do
+        Module.new do
+          def self.previous_bundle_hashes
+            sleep 1
+          end
+
+          def self.fetch(_hash); end
+          def self.upload(_hash, **_opts); end
+        end
+      end
+
+      before do
+        stager_module = Module.new
+        stager_module.const_set(:DISCOVERY_TIMEOUT_SECONDS, 0.01)
+        ReactOnRailsPro.const_set(:RollingDeployCacheStager, stager_module)
+      end
+
+      it "uses the stager timeout constant when it is loaded" do
+        doctor.send(:check_rolling_deploy_adapter)
+        warnings = checker.messages.select { |m| m[:type] == :warning }
+        expect(warnings.any? { |m| m[:content].include?("timed out after 0.01s") }).to be(true)
+      end
+    end
+  end
+
+  describe "report_resolved_cache_dir" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+    let(:cache_dir) { Dir.mktmpdir("doctor-cache") }
+
+    before do
+      cache_dir_value = cache_dir
+      pro_module = Module.new
+      utils_module = Module.new
+      utils_module.define_singleton_method(:resolve_renderer_cache_dir) { cache_dir_value }
+      pro_module.const_set(:Utils, utils_module)
+      stub_const("ReactOnRailsPro", pro_module)
+    end
+
+    after { FileUtils.rm_rf(cache_dir) }
+
+    it "excludes leftover staging/backup temp dirs from the bundle-hash count" do
+      FileUtils.mkdir_p(File.join(cache_dir, "abc123"))
+      FileUtils.mkdir_p(File.join(cache_dir, "def456"))
+      FileUtils.mkdir_p(File.join(cache_dir, "abc123.staging-1234-deadbeef"))
+      FileUtils.mkdir_p(File.join(cache_dir, "abc123.previous-1234-feedface"))
+
+      doctor.send(:report_resolved_cache_dir)
+
+      info = checker.messages.find { |m| m[:type] == :info && m[:content].include?(cache_dir) }
+      expect(info[:content]).to include("(2 bundle-hash subdir(s))")
+    end
+
+    it "uses the Pro stager constant when the Pro gem is loaded" do
+      stager_module = Module.new
+      stager_module.const_set(:TEMPORARY_DIRECTORY_PATTERN, /\.tempmarker\z/)
+      ReactOnRailsPro.const_set(:RollingDeployCacheStager, stager_module)
+      FileUtils.mkdir_p(File.join(cache_dir, "abc123"))
+      FileUtils.mkdir_p(File.join(cache_dir, "abc123.tempmarker"))
+
+      doctor.send(:report_resolved_cache_dir)
+
+      info = checker.messages.find { |m| m[:type] == :info && m[:content].include?(cache_dir) }
+      expect(info[:content]).to include("(1 bundle-hash subdir(s))")
     end
   end
 

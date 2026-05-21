@@ -3,6 +3,7 @@
 require "json"
 require "erb"
 require "stringio"
+require "timeout"
 require "yaml"
 require_relative "utils"
 require_relative "config_path_resolver"
@@ -2770,6 +2771,7 @@ module ReactOnRails
       check_pro_renderer_mode
       check_base_package_references
       check_deprecated_renderer_cache_task
+      check_rolling_deploy_adapter
     end
 
     def check_pro_initializer_existence
@@ -2919,6 +2921,150 @@ module ReactOnRails
         # default to symlink (correct for local dev + same-filesystem deploys); call out the
         # copy alternative for users driving production container builds via Compose.
         "rake react_on_rails_pro:pre_seed_renderer_cache MODE=symlink # use MODE=copy for Docker/container image builds"
+      end
+    end
+
+    # ── Rolling Deploy Adapter ────────────────────────────────────────
+
+    ROLLING_DEPLOY_REQUIRED_METHODS = %i[previous_bundle_hashes fetch upload].freeze
+
+    def check_rolling_deploy_adapter
+      adapter = ReactOnRailsPro.configuration.rolling_deploy_adapter
+
+      if adapter.nil?
+        env_override = ENV.fetch("PREVIOUS_BUNDLE_HASHES", nil)
+        if env_override && !env_override.empty?
+          checker.add_warning(
+            "⚠️  PREVIOUS_BUNDLE_HASHES=#{truncate_for_warning(env_override).inspect} is set but no " \
+            "rolling_deploy_adapter is configured. Rolling-deploy seeding needs both — the env var " \
+            "overrides *discovery* but the adapter is still required to fetch bundle files. " \
+            "Set config.rolling_deploy_adapter or unset PREVIOUS_BUNDLE_HASHES."
+          )
+        else
+          checker.add_info("ℹ️  No rolling_deploy_adapter configured (rolling-deploy seeding disabled).")
+        end
+        return
+      end
+
+      return unless report_adapter_protocol(adapter)
+
+      env_override = ENV.fetch("PREVIOUS_BUNDLE_HASHES", nil)
+      if env_override && !env_override.empty?
+        # PREVIOUS_BUNDLE_HASHES is a full discovery override at runtime, so
+        # probing adapter#previous_bundle_hashes here would surface timeout/error
+        # noise for a code path the deploy will never invoke. Skip the probe and
+        # state the override explicitly so operators see what's happening.
+        checker.add_info(
+          "ℹ️  PREVIOUS_BUNDLE_HASHES=#{truncate_for_warning(env_override).inspect} is set; " \
+          "skipping rolling_deploy_adapter#previous_bundle_hashes probe (env var overrides discovery)."
+        )
+        report_resolved_cache_dir
+        return
+      end
+
+      report_previous_bundle_hashes_probe(adapter)
+      report_resolved_cache_dir
+    rescue StandardError => e
+      checker.add_warning("⚠️  Could not evaluate rolling_deploy_adapter: #{e.message}")
+    end
+
+    # Cap echoed env-var values so a malformed (or accidentally large)
+    # PREVIOUS_BUNDLE_HASHES value doesn't dump kilobytes into operator output.
+    PREVIOUS_BUNDLE_HASHES_DISPLAY_LIMIT = 80
+    private_constant :PREVIOUS_BUNDLE_HASHES_DISPLAY_LIMIT
+
+    def truncate_for_warning(value)
+      return value if value.length <= PREVIOUS_BUNDLE_HASHES_DISPLAY_LIMIT
+
+      "#{value[0, PREVIOUS_BUNDLE_HASHES_DISPLAY_LIMIT]}… (#{value.length} chars total)"
+    end
+
+    def report_adapter_protocol(adapter)
+      missing = ROLLING_DEPLOY_REQUIRED_METHODS.reject { |m| adapter.respond_to?(m) }
+      if missing.empty?
+        checker.add_success(
+          "✅ rolling_deploy_adapter responds to all required methods " \
+          "(#{ROLLING_DEPLOY_REQUIRED_METHODS.join(', ')})"
+        )
+        true
+      else
+        checker.add_warning(
+          "⚠️  rolling_deploy_adapter is missing required methods: #{missing.join(', ')}. " \
+          "See docs/pro/rolling-deploy-adapters.md."
+        )
+        false
+      end
+    end
+
+    def report_previous_bundle_hashes_probe(adapter)
+      start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      timeout_seconds = rolling_deploy_discovery_timeout_seconds
+      hashes = Timeout.timeout(timeout_seconds) { Array(adapter.previous_bundle_hashes) }
+      latency_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - start) * 1000).round
+
+      if hashes.empty?
+        checker.add_warning(
+          "⚠️  rolling_deploy_adapter#previous_bundle_hashes returned []. " \
+          "Usually indicates the upload side has never run on a prior deploy."
+        )
+      else
+        checker.add_success(
+          "✅ rolling_deploy_adapter#previous_bundle_hashes returned #{hashes.length} hash(es) in #{latency_ms}ms"
+        )
+      end
+    rescue Timeout::Error
+      checker.add_warning(
+        "⚠️  rolling_deploy_adapter#previous_bundle_hashes timed out after " \
+        "#{timeout_seconds}s"
+      )
+    rescue StandardError => e
+      checker.add_warning("⚠️  rolling_deploy_adapter#previous_bundle_hashes raised #{e.class}: #{e.message}")
+    end
+
+    def rolling_deploy_discovery_timeout_seconds
+      if defined?(ReactOnRailsPro::RollingDeployCacheStager::DISCOVERY_TIMEOUT_SECONDS)
+        ReactOnRailsPro::RollingDeployCacheStager::DISCOVERY_TIMEOUT_SECONDS
+      else
+        # Must match the canonical Pro constant. Bidirectional pointers:
+        #   Pro file:     react_on_rails_pro/lib/react_on_rails_pro/rolling_deploy_cache_stager.rb
+        #   Pro constant: ReactOnRailsPro::RollingDeployCacheStager::DISCOVERY_TIMEOUT_SECONDS
+        #   Pro guard:    react_on_rails_pro/spec/dummy/spec/rolling_deploy_cache_stager_spec.rb
+        #                 (describe "DISCOVERY_TIMEOUT_SECONDS" → expects this fallback to equal Pro constant)
+        # The Pro spec catches drift in the Pro→OSS direction. If you change
+        # the value here without updating the Pro constant + spec, doctor will
+        # silently use a different timeout from the live stager.
+        10
+      end
+    end
+
+    # Fallback used when the Pro gem isn't loaded. Must match
+    # ReactOnRailsPro::RollingDeployCacheStager::TEMPORARY_DIRECTORY_PATTERN so
+    # doctor still filters staging/backup dirs out of the bundle-hash count.
+    # Drift is caught by:
+    #   react_on_rails_pro/spec/dummy/spec/rolling_deploy_cache_stager_spec.rb
+    #   describe "TEMPORARY_DIRECTORY_PATTERN"
+    # PID is `\d+` to match container deployments (Docker/Kubernetes) where
+    # seeding runs as PID 1.
+    ROLLING_DEPLOY_TEMP_DIR_PATTERN = /\.(?:staging|previous)-\d+-[0-9a-f]{8,}\z/
+
+    def report_resolved_cache_dir
+      cache_dir = ReactOnRailsPro::Utils.resolve_renderer_cache_dir
+      if File.directory?(cache_dir)
+        temp_dir_pattern = rolling_deploy_temp_dir_pattern
+        subdirs = Dir.children(cache_dir).select do |entry|
+          File.directory?(File.join(cache_dir, entry)) && !entry.match?(temp_dir_pattern)
+        end
+        checker.add_info("ℹ️  Resolved renderer cache dir: #{cache_dir} (#{subdirs.length} bundle-hash subdir(s))")
+      else
+        checker.add_info("ℹ️  Resolved renderer cache dir: #{cache_dir} (does not exist yet)")
+      end
+    end
+
+    def rolling_deploy_temp_dir_pattern
+      if defined?(ReactOnRailsPro::RollingDeployCacheStager::TEMPORARY_DIRECTORY_PATTERN)
+        ReactOnRailsPro::RollingDeployCacheStager::TEMPORARY_DIRECTORY_PATTERN
+      else
+        ROLLING_DEPLOY_TEMP_DIR_PATTERN
       end
     end
 
