@@ -3473,6 +3473,8 @@ RSpec.describe ReactOnRails::Doctor do
                        "const ReactOnRails = require('react-on-rails-pro/client');\n")
             File.write("app/javascript/types/react-on-rails-pro.d.mts",
                        "declare module 'react-on-rails-pro' {\n  export function register(): void;\n}\n")
+            File.write("app/javascript/types/react-on-rails-pro.d.cts",
+                       "declare module 'react-on-rails-pro/client' {\n  export function register(): void;\n}\n")
             example.run
           end
         end
