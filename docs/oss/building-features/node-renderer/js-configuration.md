@@ -103,21 +103,42 @@ And add a root-level script to the `scripts` section of your `package.json`
 
 Run the renderer with `pnpm run node-renderer` (or the equivalent `npm`/`yarn` command for your app).
 
+## Built-in Endpoints
+
+The React on Rails Pro node renderer registers `/info` as a plain `GET` route outside the authenticated render and asset
+endpoints, and it does not use the render or asset authentication prechecks, so it remains accessible without the renderer
+password even when `password` is configured. The route returns `node_version` and `renderer_version`. Treat it as a
+shallow process check and keep the renderer on `localhost` or private networking if those runtime version details should
+not be exposed.
+
+Verify it locally:
+
+```bash
+curl -s --http2-prior-knowledge http://localhost:3800/info
+```
+
+Example response:
+
+```json
+{
+  "node_version": "v20.17.0",
+  "renderer_version": "1.4.2"
+}
+```
+
 ## Custom Fastify Configuration
 
-For advanced use cases, you can customize the Fastify server instance by importing the `master` and `worker` modules directly. This is useful for:
-
-- Adding custom routes (e.g., `/health` for container health checks)
-- Registering Fastify plugins
-- Adding custom hooks for logging or monitoring
-
-### Adding a Health Check Endpoint
-
-When running the node-renderer in Docker or Kubernetes, you may need a `/health` endpoint for container health checks:
+For advanced use cases, such as adding custom routes, registering Fastify plugins, or hooking into the request lifecycle,
+you can configure the Fastify server directly by importing the `master` and `worker` modules instead of using
+`reactOnRailsProNodeRenderer`.
 
 The advanced examples below use ES modules for readability. If you want this file to keep running
 as `node renderer/node-renderer.js`, either keep using the CommonJS pattern shown in the simple
 example above or switch the file to `.mjs` or `"type": "module"`.
+
+### Adding a Health Check Endpoint
+
+A common need is a `/health` endpoint for container health checks:
 
 ```js
 import masterRun from 'react-on-rails-pro-node-renderer/master';
@@ -130,8 +151,9 @@ const config = {
 
 // Register a custom health check route
 configureFastify((app) => {
-  app.get('/health', (request, reply) => {
-    reply.send({ status: 'ok' });
+  app.get('/health', () => {
+    // Return a Promise or use async/await if warm-up checks involve async operations.
+    return { status: 'ok' };
   });
 });
 
@@ -143,6 +165,47 @@ if (cluster.isPrimary) {
   run(config);
 }
 ```
+
+The sample `/health` route is intentionally shallow and omits handler parameters because it does not need them. Fastify
+also passes `request` and `reply` to handlers if you need to inspect headers, set status codes, or customize the
+response. Add warm-up or readiness-gate logic inside this handler if readiness should wait for renderer-specific
+initialization. To signal not-ready while keeping Fastify's return-value style, add `reply` to the handler parameters,
+set the status with `reply.code(503)`, and return a response object from that branch. Do not call `reply.send()` and
+then return another response object.
+
+```js
+// Example: signal not-ready while application-specific warm-up runs.
+// `workersReady` stands in for any per-worker readiness gate you maintain.
+let workersReady = false;
+
+configureFastify((app) => {
+  // Fastify's `onReady` hook runs once per worker after all plugins finish
+  // loading. Put any application warm-up here — preload modules, hydrate
+  // caches, wait for an external dependency — and flip the flag when done.
+  app.addHook('onReady', async () => {
+    // await yourWarmUpFunction(); // put async warm-up logic here before flipping the flag
+    workersReady = true;
+  });
+
+  app.get('/health', (request, reply) => {
+    if (!workersReady) {
+      reply.code(503);
+      return { status: 'warming_up' };
+    }
+    return { status: 'ok' };
+  });
+});
+```
+
+The `-f` flag in `curl -sf` causes curl to exit non-zero for HTTP 4xx/5xx responses, so a `503` from this handler
+correctly fails the probe. Kubernetes exec probes treat any non-zero curl exit code as a failure; the response body is
+irrelevant to probe semantics, so you can return whatever payload is useful for debugging, such as
+`{ status: 'ok', workers: 4 }`.
+
+Routes registered with `configureFastify` do not automatically use the renderer's render and asset authentication
+prechecks. A custom `/health` route like the one above is reachable without the renderer password unless you add your own
+Fastify authentication. Keep probe routes shallow and non-sensitive, and keep the renderer on `localhost` or private
+networking.
 
 ### Registering Fastify Plugins
 
@@ -178,3 +241,105 @@ configureFastify((app) => {
 ### API Stability
 
 The `./master` and `./worker` exports provide direct access to the node-renderer internals. While we strive to maintain backwards compatibility, these are considered advanced APIs. If you only need basic configuration, prefer using the standard `reactOnRailsProNodeRenderer` function with the configuration options documented above.
+
+## Configuring Startup, Readiness, and Liveness Probes
+
+Keep the three probe types distinct:
+
+- **Startup** answers whether the renderer has finished booting. Separate it from readiness and liveness so slow startup
+  does not cause premature restarts or block traffic.
+- **Readiness** answers whether the renderer should receive new render requests. Use an application-level endpoint such
+  as the `/health` route in [Adding a Health Check Endpoint](#adding-a-health-check-endpoint), or the built-in `/info`
+  endpoint for a shallow process check.
+- **Liveness** answers whether the renderer is stuck badly enough that restarting the container is safer. Prefer
+  `tcpSocket` as the default so transient CPU or GC pauses do not restart an otherwise recoverable renderer; use an
+  h2c-aware `exec` check only when you intentionally need stricter hung-process detection.
+
+Only the custom `/health` route requires `configureFastify`; `tcpSocket` probes and `/info` checks work without custom
+Fastify setup. The health check route should return `200 OK` when the renderer is ready to serve requests, and return a
+non-2xx status (for example `503`) only when the process should be marked unhealthy for the probe's purpose — readiness,
+startup, or stricter liveness.
+
+> **Security note:** See [Built-in Endpoints](#built-in-endpoints) for the note on `/info` exposing runtime version
+> details.
+
+Do not put Rails, database, Redis, or other external dependency checks in the node-renderer's liveness probe. A
+temporary dependency outage should not restart every renderer replica. If SSR must be available before Rails receives
+traffic, make the Rails readiness endpoint perform a short renderer check.
+
+The renderer listens with cleartext HTTP/2 (h2c). Do not configure a Kubernetes `httpGet` probe, Control Plane HTTP
+probe, or any other HTTP/1.1-only probe directly against the renderer port; those probes are rejected by the h2c
+listener. Use one of these probe styles instead:
+
+| Probe style  | When to use it                                                                                                                      |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `tcpSocket`  | Startup checks, default liveness checks, and fallback readiness when curl with HTTP/2 support is unavailable.                       |
+| `exec` probe | Application-level readiness and optional stricter liveness checks with an h2c-aware client, such as `curl --http2-prior-knowledge`. |
+| HTTP/1.1     | Only if you probe Rails, a separate HTTP/1.1 health sidecar/port, or another endpoint that is not the renderer h2c listener.        |
+
+A passing `tcpSocket` probe means the h2c listener has bound to the port; cluster workers might still be warming up.
+Keep an application-level readiness probe if traffic should wait for worker initialization.
+
+For Kubernetes and platform `tcpSocket` probes, set the renderer `host` to `0.0.0.0` because those probes connect to the
+pod or workload IP, not container-local loopback. The default `localhost` binding is fine for `exec` probes that run
+inside the renderer container.
+
+For liveness, start with `tcpSocket`. A fully blocked Node.js event loop may still accept TCP connections and pass that
+check, so use an h2c-aware `exec` liveness probe with a short `--max-time` only if you explicitly need stricter
+hung-process detection and have verified curl HTTP/2 support in the image.
+
+> **Note:** The `exec` probe requires curl with HTTP/2 support. Verify with `curl --version | grep -i http2`. If unavailable,
+> use a `tcpSocket` probe as a fallback.
+
+Recommended starting values:
+
+- **Startup**: Use `tcpSocket` on the renderer port (`3800` by default; use your configured `RENDERER_PORT` value if
+  different). TCP is enough here because readiness below gates traffic; startup only shields liveness during boot. Start
+  with `initialDelaySeconds: 10` (first check fires at 10 s; the sixth and final check fires at
+  `10 + ((6 - 1) * 5) = 35 s` after container start, and the restart follows once that check actually fails — up to
+  `timeoutSeconds` later), `periodSeconds: 5`, `failureThreshold: 6`, and the Kubernetes default `timeoutSeconds: 1` for
+  a TCP connection check.
+- **Readiness (custom route)**: Use `exec` with
+  `curl -sf --max-time 3 --http2-prior-knowledge http://localhost:3800/health` after registering the route with
+  [`configureFastify`](#adding-a-health-check-endpoint). Start with `timeoutSeconds: 5`, `periodSeconds: 5`, and
+  `failureThreshold: 3`.
+- **Readiness (built-in info)**: Use `exec` with
+  `curl -sf --max-time 3 --http2-prior-knowledge http://localhost:3800/info`. Use the same timing settings as the
+  custom-route readiness probe. See the canonical [`/info` security note](#built-in-endpoints) for the unauthenticated-access caveat.
+- **Readiness fallback**: Use `tcpSocket` on the renderer port only if curl with HTTP/2 support is unavailable. This
+  checks port reachability, not application readiness.
+- **Liveness**: Use `tcpSocket` on the renderer port as the default. Start with `timeoutSeconds: 1`,
+  `periodSeconds: 10`, and `failureThreshold: 3`, matching the Container Deployment examples. Raise
+  `failureThreshold`, and optionally `periodSeconds`, if hard listener checks restart the container too aggressively in
+  your environment. `timeoutSeconds: 1` assumes a co-located probe over loopback; raise it (typically to `2`-`3`) when
+  the renderer is reached over the network, such as the separate-workload topology.
+- **Optional stricter liveness**: Use
+  `curl -sf --max-time 3 --http2-prior-knowledge http://localhost:3800/info` only when you need liveness to catch a
+  blocked event loop and have verified curl has HTTP/2 support in the image. Keep external dependency and warm-up checks
+  in readiness, not liveness.
+
+Substitute `3800` with your actual renderer port in Kubernetes YAML `exec` arrays; shell variable expansion
+does not apply there. See the `port` option at the top of this page for Heroku or Control Plane.
+
+> **Note (startup window):** With `initialDelaySeconds: 10`, `periodSeconds: 5`, and `failureThreshold: 6`:
+>
+> - First check fires at **10 s**.
+> - Last (6th) check fires at **35 s** (`10 + (6 - 1) × 5`).
+> - Container restarts after the 6th consecutive failure, up to `timeoutSeconds` (1 s here) later.
+>
+> If you omit `initialDelaySeconds`, checks start immediately and the last check fires at **25 s** (`(6 - 1) × 5`).
+> Increase `failureThreshold` or `periodSeconds` if startup regularly takes longer. Reduce `initialDelaySeconds` if the
+> renderer reliably opens its port within 1-2 s, or match it to your actual boot time to suppress noisy early-failure
+> log entries during the warm-up window.
+
+Readiness and liveness omit `initialDelaySeconds` here because Kubernetes 1.20+ (startup probe GA) defers them until
+the startup probe succeeds. If you skip the startup probe or run an older cluster without startup probe support, add an
+appropriate `initialDelaySeconds` to each.
+
+See [Kubernetes Sidecar Manifest](./container-deployment.md#kubernetes-sidecar-manifest) for a complete pod spec with
+all three probes wired in, and
+[Startup Errors: `ERR_STREAM_PREMATURE_CLOSE`](./container-deployment.md#startup-errors-err_stream_premature_close) for
+the shared probe command notes on curl HTTP/2 support, `--max-time` buffers, and `initialDelaySeconds` guidance.
+
+For Control Plane topology-specific `renderer_url`, host binding, and probe target guidance, see
+[Control Plane Deployment Shapes](./container-deployment.md#control-plane-deployment-shapes).
