@@ -185,6 +185,52 @@ Keep each shim explicit and narrow:
    `@internal/base/client`, `@internal/createReactOnRails`) are not public API — never import them directly,
    even via the `lib/` path fallback.
 
+   **Alternative: redirect with `resolve.alias` instead of changing imports**
+
+   If you would rather keep `react-on-rails/client` (and the named subpath imports above) in your application
+   code, alias them to the same `lib/` paths from your Webpack config instead. The alias keeps the `/client`
+   entry's smaller surface — Webpack loads `lib/ReactOnRails.client.js` directly, so the full-build browser
+   warning and the bundled SSR capability module stay out of the client bundle.
+
+   The same `lib/` path caveats apply: the file paths are not public API and may change in any patch or minor
+   release, so pin `react_on_rails` to an exact version (for example, `gem 'react_on_rails', '= 16.0.0'`) when
+   you rely on these aliases. Use the `$` suffix on each alias key for an exact match so the alias only
+   redirects the bare subpath. Match the file extension listed in the `exports` field of
+   `packages/react-on-rails/package.json` — some subpaths resolve to `.cjs` rather than `.js`. Exports prefixed
+   with `@internal/` are not public API; do not alias them.
+
+   ```js
+   // config/webpack/environment.js
+   // Webpacker 5 uses '@rails/webpacker', not 'shakapacker'.
+   const { environment } = require('@rails/webpacker');
+
+   environment.config.merge({
+     resolve: {
+       alias: {
+         'react-on-rails/client$': 'react-on-rails/lib/ReactOnRails.client.js',
+         // Add only the subpaths your app actually imports:
+         'react-on-rails/context$': 'react-on-rails/lib/context.js',
+         'react-on-rails/pageLifecycle$': 'react-on-rails/lib/pageLifecycle.js',
+         'react-on-rails/turbolinksUtils$': 'react-on-rails/lib/turbolinksUtils.js',
+         // .cjs example — check the `exports` field in `packages/react-on-rails/package.json`
+         // for the correct extension before adding subpaths like these:
+         // 'react-on-rails/reactApis$': 'react-on-rails/lib/reactApis.cjs',
+         // 'react-on-rails/ReactDOMServer$': 'react-on-rails/lib/ReactDOMServer.cjs',
+       },
+     },
+   });
+
+   module.exports = environment;
+   ```
+
+   The aliased files still resolve under `node_modules/react-on-rails/`, so the package-scoped `babel-loader`
+   rule from Step 3 still picks them up. Put Steps 2 and 3 in place before relying on the alias (Step 2 adds
+   the Babel plugins for optional chaining / nullish coalescing; Step 3 adds the `babel-loader` rule scoped to
+   `node_modules/react-on-rails`) — the redirected files use the same modern syntax and ESM packaging as the
+   `/client` entry point.
+
+   If your `environment.js` already has other configuration, add the `environment.config.merge` block before the existing `module.exports` line.
+
 2. Ensure Babel can parse modern syntax used by current packages:
 
    Add these plugins to your existing Babel config without replacing existing presets or plugins.
