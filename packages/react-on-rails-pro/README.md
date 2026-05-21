@@ -97,4 +97,4 @@ See the [full installation guide](https://reactonrails.com/docs/pro/installation
 
 ## License
 
-Commercial software. No license required for evaluation, development, testing, or CI/CD. A paid license is required for production deployments. Contact [justin@shakacode.com](mailto:justin@shakacode.com) for licensing.
+Commercial software. No license required for evaluation, development, testing, or CI/CD. A paid license is required for production deployments. Contact [ShakaCode](https://pro.reactonrails.com/contact) for licensing.
