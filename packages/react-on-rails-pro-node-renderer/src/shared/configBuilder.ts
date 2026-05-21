@@ -55,11 +55,11 @@ export interface Config {
   // https://nodejs.org/api/globals.html) to add to the VM context in addition to our supportModules defaults.
   // Object shorthand notation may be used, but is not required.
   // Example: { URL, URLSearchParams, Crypto }
-  // NOTE: Any value whose constructor is `Object` (including an empty `{}`, but not
-  // `Object.create(null)`) puts the renderer into CommonJS execution mode, wrapping the bundle
-  // and granting it access to the host's `require` (e.g. `require('fs')`, `require('child_process')`).
-  // An empty `{}` is treated the same as any other plain object -- it opts into CommonJS mode even
-  // though it adds no globals. Use only with trusted bundle sources.
+  // NOTE: Any plain object value (including an empty `{}`) puts the renderer into CommonJS
+  // execution mode, wrapping the bundle and granting it access to the host's `require`
+  // (e.g. `require('fs')`, `require('child_process')`). An empty `{}` is treated the same
+  // as any other plain object -- it opts into CommonJS mode even though it adds no globals.
+  // Use only with trusted bundle sources.
   // To keep the VM sandboxed without `require`, set BOTH `additionalContext: null` AND
   // `supportModules: false`. When `supportModules: true`, the renderer wraps the bundle and
   // injects the host `require` regardless of `additionalContext`.

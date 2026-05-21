@@ -180,13 +180,16 @@ const {
   Headers: HeadersImplementation,
   Request: RequestImplementation,
   Response: ResponseImplementation,
+  // `undici` v6+ exposes its own `AbortController` and `AbortSignal` as named exports;
+  // older releases (v5 and earlier) did not. Destructuring an absent named export yields
+  // `undefined`, and the `??` fallbacks below pick up the host globals (Node.js 15+).
+  AbortController: undiciAbortController,
+  AbortSignal: undiciAbortSignal,
 } = require('undici');
 
-// `undici` v6+ exposes its own `AbortController` and `AbortSignal` as named exports;
-// older releases (v5 and earlier) did not. Newer Node.js runtimes (15+) also expose
-// these as host globals. Check the undici release notes for the version you are using
-// to decide whether to import them from undici or rely on host globals.
-const componentsUseAbortSignals = false; // Set to true if component code uses AbortSignal; requires Node.js 15+.
+// Set to true if component code uses AbortSignal. Requires either undici v6+ (which exports
+// AbortController/AbortSignal) or Node.js 15+ (which exposes them as host globals).
+const componentsUseAbortSignals = false;
 
 if (!fetchImplementation || !HeadersImplementation || !RequestImplementation || !ResponseImplementation) {
   throw new Error(
@@ -195,10 +198,13 @@ if (!fetchImplementation || !HeadersImplementation || !RequestImplementation || 
   );
 }
 
-if (componentsUseAbortSignals && (!globalThis.AbortController || !globalThis.AbortSignal)) {
+const abortControllerImplementation = undiciAbortController ?? globalThis.AbortController;
+const abortSignalImplementation = undiciAbortSignal ?? globalThis.AbortSignal;
+
+if (componentsUseAbortSignals && (!abortControllerImplementation || !abortSignalImplementation)) {
   throw new Error(
-    'Your component code uses abort signals, but this Node.js runtime does not expose AbortController and AbortSignal. ' +
-      'Use a runtime that exposes them or replace the globalThis.* references below with compatible abort polyfill imports.',
+    'Your component code uses abort signals, but neither undici nor this Node.js runtime exposes AbortController and AbortSignal. ' +
+      'Upgrade to undici v6+ (which exports them as named exports), upgrade to Node.js 15+, or replace the references below with compatible abort polyfill imports.',
   );
 }
 
@@ -211,8 +217,8 @@ reactOnRailsProNodeRenderer({
     Response: ResponseImplementation,
     ...(componentsUseAbortSignals
       ? {
-          AbortController: globalThis.AbortController,
-          AbortSignal: globalThis.AbortSignal,
+          AbortController: abortControllerImplementation,
+          AbortSignal: abortSignalImplementation,
         }
       : {}),
   },
