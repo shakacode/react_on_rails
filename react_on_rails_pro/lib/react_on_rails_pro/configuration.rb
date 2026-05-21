@@ -283,7 +283,9 @@ module ReactOnRailsPro
 
       raise ReactOnRailsPro::Error,
             "config.rolling_deploy_adapter#upload must accept signature " \
-            "upload(bundle_hash, bundle:, assets:). See docs/pro/rolling-deploy-adapters.md."
+            "upload(bundle_hash, bundle:, assets:) or an options-hash equivalent (e.g. " \
+            "upload(bundle_hash, **opts) / upload(*args) where opts/args[1] yield :bundle and :assets). " \
+            "See docs/pro/rolling-deploy-adapters.md."
     end
 
     # Best-effort signature check — covers the common explicit, splat, and

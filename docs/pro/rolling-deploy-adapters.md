@@ -75,6 +75,13 @@ module MyRollingDeployAdapter
   # Timeout.timeout(120s), so keep adapter network work comfortably
   # inside that per-hash budget. The hard budget is
   # ReactOnRailsPro::AssetsPrecompile::UPLOAD_TIMEOUT_SECONDS.
+  #
+  # Splat-style signatures (`def self.upload(*args)`,
+  # `def self.upload(hash, **opts)`) also pass signature validation, but
+  # the runtime call passes `bundle:` / `assets:` as keyword arguments —
+  # so `args` collects keywords as `args.last` (a Hash) under Ruby 3, and
+  # `opts` is `{ bundle: ..., assets: ... }`. Prefer the explicit form
+  # below unless you have a specific reason to use a splat.
   def self.upload(bundle_hash, bundle:, assets:)
     # ...
   end
@@ -136,7 +143,7 @@ Stores each bundle + its companion assets under `s3://<bucket>/bundles/<hash>/bu
 > [!NOTE]
 > The manifest update is a read-modify-write cycle with no native concurrency guard. Concurrent deploys can lose entries (last writer wins). For strict safety, use S3 conditional writes (`If-Match` with ETag) or a small coordination layer (e.g., a deploy-level mutex, or a database row with optimistic locking). The pattern below is intentionally simple and sufficient when deploys are serialized.
 >
-> Each `upload` call performs one extra S3 round-trip to read the manifest before writing it back. With RSC enabled, `upload` is called twice per deploy (once per bundle hash), so this adds two manifest read-modify-write cycles total. Batching the manifest update once per deploy is a reasonable optimization when many bundles upload in a single precompile.
+> Each `upload` call performs one extra S3 round-trip to read the manifest before writing it back. With RSC enabled, `upload` is called twice per deploy (once for `server_bundle_hash`, once for `rsc_bundle_hash`), so a single deploy issues **2× `GetObject` + 2× `PutObject` against the manifest key alone**. Operators on high-frequency staging pipelines should account for this cost. Batching the manifest update once per deploy is a reasonable optimization when many bundles upload in a single precompile.
 
 ```ruby
 require "aws-sdk-s3"

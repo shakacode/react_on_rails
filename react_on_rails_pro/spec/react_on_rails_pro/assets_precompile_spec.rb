@@ -491,6 +491,22 @@ describe ReactOnRailsPro::AssetsPrecompile do
         .to output(/Server bundle .*rolling-deploy-upload-server-bundle\.js.*does not exist/m).to_stderr
     end
 
+    # Regression: `bundle_hash` reads the bundle file (`File.mtime` in dev/test,
+    # `Digest::MD5.file` for non-content-hashed names) and raises when the
+    # bundle is missing. Evaluating it eagerly as an argument would let that
+    # raise escape to the outer rescue in `publish_current_bundle_if_configured`,
+    # bypassing the per-bundle "does not exist" warning. Verify the per-bundle
+    # warning still fires even when the hash accessor itself raises.
+    it "still emits the per-bundle missing-file warning when server_bundle_hash raises" do
+      FileUtils.rm_f(server_bundle)
+      allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool)
+        .to receive(:server_bundle_hash).and_raise(Errno::ENOENT, "No such file")
+
+      expect(adapter).not_to receive(:upload)
+      warning_pattern = /Server bundle .*does not exist; skipping rolling_deploy_adapter publication for server bundle/m
+      expect { described_class.send(:publish_current_bundle_if_configured) }.to output(warning_pattern).to_stderr
+    end
+
     it "warns and skips publication when the server bundle path is a directory" do
       FileUtils.rm_f(server_bundle)
       FileUtils.mkdir_p(server_bundle)

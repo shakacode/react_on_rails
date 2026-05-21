@@ -250,6 +250,28 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
   end
 
+  # Regression: leading-dot hashes (e.g. `.hidden`, `.git`) are safe from path
+  # traversal (the `start_with?` check in `bundle_directory` covers that), but
+  # they would create hidden cache subdirectories invisible to a plain
+  # `ls <cache>` — a surprise for operators counting bundle-hash entries.
+  context "when adapter returns a leading-dot hash" do
+    let(:src_bundle) { source_file("bundle-ok.js") }
+
+    before do
+      allow(adapter).to receive_messages(previous_bundle_hashes: [".hidden", "safe-hash"])
+      allow(adapter).to receive(:fetch).with("safe-hash").and_return(bundle: src_bundle, assets: [])
+    end
+
+    it "rejects leading-dot hashes so they cannot create hidden cache subdirectories" do
+      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+        .to output(/invalid hash values \(rejected\): \["\.hidden"\]/).to_stderr
+
+      expect(adapter).not_to have_received(:fetch).with(".hidden")
+      expect(Dir.exist?(File.join(cache_dir, ".hidden"))).to be(false)
+      expect(File.exist?(File.join(cache_dir, "safe-hash", "safe-hash.js"))).to be(true)
+    end
+  end
+
   # Regression: a hash that passes SAFE_HASH_PATTERN's character class can also
   # match TEMPORARY_DIRECTORY_PATTERN (e.g. an OCI-style release tag like
   # `release.staging-1-deadbeefcafe`). Without sanitize_hashes also rejecting

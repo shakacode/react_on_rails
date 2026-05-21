@@ -34,11 +34,24 @@ module ReactOnRailsPro
     # fallback when the Pro gem isn't loaded. The cross-package equality is
     # asserted in spec/dummy/spec/rolling_deploy_cache_stager_spec.rb so a
     # change here fails that spec instead of silently drifting past the doctor
-    # probe.
+    # probe. Note: `Timeout.timeout` interrupts the discovery call at a quasi-
+    # random thread-execution point. The bundled reference adapters use pure-
+    # Ruby HTTP clients that release the GIL, so the interrupt is safe. Adapter
+    # authors using native-extension or FFI-backed clients should add their own
+    # SDK-level `open_timeout` / `read_timeout` rather than rely solely on this
+    # outer wrapper. Same caveat applies to `FETCH_TIMEOUT_SECONDS` below and
+    # the upload timeout in `assets_precompile.rb`.
     DISCOVERY_TIMEOUT_SECONDS = 10
     # Per-hash fetch budget during pre-seeding. Large cross-region stores may
     # need adapters to keep fetches comfortably under this limit.
     FETCH_TIMEOUT_SECONDS = 30
+    # Age threshold for sweeping leftover `.staging-*` / `.previous-*` dirs.
+    # Any temp dir older than this is assumed to be from a crashed or abandoned
+    # prior run and safe to remove. If `assets:precompile` itself routinely
+    # takes longer than one hour on a persistent-volume deploy (uncommon),
+    # raise this so a concurrent seeder's still-in-use staging dir is not
+    # swept mid-operation. The degradation is graceful regardless — the racing
+    # `replace_bundle_directory` rolls back cleanly on `ENOENT`.
     STALE_TEMP_DIR_TTL_SECONDS = 3600
     # Match temp dirs created by `temporary_bundle_directory` (and the analogous
     # `.previous-` backup suffix in `replace_bundle_directory`). The 8-hex
@@ -84,9 +97,12 @@ module ReactOnRailsPro
     private_class_method :handle_missing_adapter
 
     # Bundle hashes are used as directory names under the renderer cache path
-    # (<cache>/<hash>/<hash>.js). Reject path separators and also "." / ".."
-    # so staging and cleanup can never escape the cache root.
-    SAFE_HASH_PATTERN = /\A(?!\.{1,2}\z)[A-Za-z0-9_.-]+\z/
+    # (<cache>/<hash>/<hash>.js). Reject path separators, `.` / `..`, and any
+    # leading dot. `bundle_directory`'s `start_with?` guard already prevents
+    # path traversal, but a leading-dot hash (e.g. `.hidden`) would still
+    # create a hidden cache subdirectory invisible to `ls`, surprising
+    # operators who count bundle-hash entries during incident response.
+    SAFE_HASH_PATTERN = /\A(?!\.)[A-Za-z0-9_.-]+\z/
 
     def self.resolve_previous_hashes(adapter, current_hashes)
       explicit = ENV["PREVIOUS_BUNDLE_HASHES"].to_s.split(",").map(&:strip).reject(&:empty?)
@@ -378,8 +394,9 @@ module ReactOnRailsPro
       invalid = (hashes.grep_v(SAFE_HASH_PATTERN) + hashes.grep(TEMPORARY_DIRECTORY_PATTERN)).uniq
       if invalid.any?
         warn "[ReactOnRailsPro] #{source_label} returned invalid hash values (rejected): #{invalid.inspect}. " \
-             "Hashes must match /#{SAFE_HASH_PATTERN.source}/ and not look like renderer-cache staging " \
-             "directories to stay within the renderer cache directory."
+             "Hashes must consist of alphanumeric characters, hyphens, underscores, and dots; " \
+             "may not begin with a dot or be `.`/`..`; and must not resemble a renderer-cache " \
+             "staging-dir suffix (e.g., `.staging-1-deadbeef12`)."
       end
       hashes - invalid
     end
@@ -413,14 +430,25 @@ module ReactOnRailsPro
     # over zero-downtime swap, since the 410-retry fallback bounds the worst case.
     def self.replace_bundle_directory(staging_dir, bundle_dir)
       backup_dir = nil
-      if File.exist?(bundle_dir)
+      # `File.exist?` follows symlinks, so a dangling symlink left from an
+      # interrupted prior seed would report `false` and skip the backup. The
+      # `File.symlink?` clause backs the symlink up too, so a later
+      # `restore_previous_bundle_directory` has something to restore if the
+      # promotion below fails.
+      if File.exist?(bundle_dir) || File.symlink?(bundle_dir)
         backup_dir = "#{bundle_dir}.previous-#{Process.pid}-#{SecureRandom.hex(6)}"
         FileUtils.mv(bundle_dir, backup_dir)
       end
 
       # Catch the straightforward race where a concurrent writer recreates
       # bundle_dir before promotion starts. The rescue below restores the backup
-      # so the previous good copy remains servable.
+      # so the previous good copy remains servable. Note: this `File.exist?`
+      # check is itself a TOCTOU window — a concurrent writer could recreate
+      # `bundle_dir` between this check and `FileUtils.mv` below. On Linux that
+      # produces the nested-staging-dir case handled afterward; on macOS/BSD
+      # the kernel raises `ENOTEMPTY` instead, which is caught by the outer
+      # `rescue StandardError` and triggers `restore_previous_bundle_directory`.
+      # Both detection paths are correct.
       if File.exist?(bundle_dir)
         raise ReactOnRailsPro::Error,
               "Concurrent writer recreated #{bundle_dir} between backup and promote; aborting promotion"

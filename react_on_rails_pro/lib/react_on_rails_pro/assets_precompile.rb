@@ -113,13 +113,17 @@ module ReactOnRailsPro
       # and RSC hashes from the same build intentionally share this asset set.
       assets = filter_existing_assets(ReactOnRailsPro::RendererCacheHelpers.collect_assets.map(&:to_s))
 
+      # Defer the hash computation behind a block: `bundle_hash` reads the bundle
+      # file (`File.mtime` in dev/test, `Digest::MD5.file` for non-content-hashed
+      # names), so evaluating it eagerly as an argument would let a missing
+      # bundle raise and bypass the per-bundle warning path.
       server_bundle = ReactOnRails::Utils.server_bundle_js_file_path
-      publish_bundle_if_present(adapter, pool.server_bundle_hash, server_bundle, assets, "server")
+      publish_bundle_if_present(adapter, server_bundle, assets, "server") { pool.server_bundle_hash }
 
       return unless ReactOnRailsPro.configuration.enable_rsc_support
 
       rsc_bundle = ReactOnRailsPro::Utils.rsc_bundle_js_file_path
-      publish_bundle_if_present(adapter, pool.rsc_bundle_hash, rsc_bundle, assets, "RSC")
+      publish_bundle_if_present(adapter, rsc_bundle, assets, "RSC") { pool.rsc_bundle_hash }
     end
 
     # Some collected companion assets may be absent or point at non-file paths.
@@ -185,14 +189,17 @@ module ReactOnRailsPro
       upload_bundle(adapter, hash, bundle, assets)
     end
 
-    def self.publish_bundle_if_present(adapter, hash, bundle, assets, bundle_label)
+    def self.publish_bundle_if_present(adapter, bundle, assets, bundle_label)
       if File.file?(bundle)
-        publish_bundle(adapter, hash, bundle, assets, bundle_label)
+        publish_bundle(adapter, yield, bundle, assets, bundle_label)
       else
         display_label = bundle_label == "RSC" ? "RSC" : bundle_label.capitalize
         reason = File.exist?(bundle) ? "is not a file" : "does not exist"
+        # Use `bundle_label` (the caller's original casing) for the second
+        # reference so the warning reads consistently (e.g. "RSC bundle ...
+        # skipping ... for RSC bundle" rather than mixing "RSC" and "rsc").
         warn "[ReactOnRailsPro] #{display_label} bundle #{bundle.inspect} #{reason}; " \
-             "skipping rolling_deploy_adapter publication for #{display_label.downcase} bundle."
+             "skipping rolling_deploy_adapter publication for #{bundle_label} bundle."
       end
     end
 
@@ -216,6 +223,7 @@ module ReactOnRailsPro
                          :publish_bundle,
                          :publish_bundle_if_present,
                          :upload_bundle
+
     def self.pre_seed_renderer_cache_mode
       raw = ENV.fetch("ASSETS_PRECOMPILE_RENDERER_CACHE_MODE", "symlink").to_s.downcase
       mode = raw.to_sym
