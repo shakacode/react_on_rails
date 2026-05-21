@@ -97,12 +97,14 @@ Server components produce HTML that does not need hydration — they have no cli
 
 The [Gumroad-style RSC benchmark demo](https://github.com/shakacode/react-on-rails-demo-gumroad-rsc)
 is a public ShakaCode comparison repo modeled after a creator-dashboard surface with product listings and sales metrics,
-not an official Gumroad integration. The benchmark methodology and earlier-run artifacts are checked in as
-[`docs/performance-findings.md`](https://github.com/shakacode/react-on-rails-demo-gumroad-rsc/blob/5a2f0c29dc197184312c55bc4209492accea26e7/docs/performance-findings.md)
-on the active demo PR ([shakacode/react-on-rails-demo-gumroad-rsc#10](https://github.com/shakacode/react-on-rails-demo-gumroad-rsc/pull/10));
-the April 30, 2026 absolute timings reported below are from a more recent local run that has not yet landed in that
-artifact ([Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263) tracks the missing distribution and
-source artifacts). It measures the same reduced presenter data and outer layout across two routes. The comparison
+not an official Gumroad integration. The benchmark methodology, earlier-run artifacts, and the April 30, 2026
+production-like local run with median and p95 timings are documented in
+[`docs/performance-findings.md`](https://github.com/shakacode/react-on-rails-demo-gumroad-rsc/blob/010b3564398dbb9c8f5caafab25daed65b6f425c/docs/performance-findings.md#production-like-compiled-asset-8-cycle-repeat)
+on stacked demo PR
+[shakacode/react-on-rails-demo-gumroad-rsc#12](https://github.com/shakacode/react-on-rails-demo-gumroad-rsc/pull/12);
+the per-run JSON files remain gitignored local artifacts
+([Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263) tracks publishing per-run distribution data).
+It measures the same reduced presenter data and outer layout across two routes. The comparison
 changes three axes at once (RSC, the Pro Node renderer, and SSR), so the deltas cannot be attributed to any single
 factor. The routes are:
 
@@ -155,8 +157,8 @@ artifact does not yet publish enough logger or extraction-script context to conf
 `process_action` duration including rendering or a narrower controller-action field, so do not use it to infer the
 server-rendering split. Because the Pro Node renderer runs in a separate OS process, Rails wall time may also exclude
 RSC rendering cost that the Inertia control keeps in-process, so the two `action_total` values may not measure identical
-scopes of work. [Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263) tracks the missing distribution
-and source artifacts.
+scopes of work. The source artifact publishes median and p95 for `responseEnd` but not for `action_total`;
+[Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263) tracks publishing per-run distribution data.
 
 The navigation-duration gain (-21.7%) was larger than the `responseEnd` gain (-8.7%), which is consistent with the RSC
 route delivering fully server-rendered HTML — the browser has minimal client-side hydration work after `responseEnd`,
@@ -193,12 +195,15 @@ reduction implies. Cold-cache bundle totals (what a first-time visitor downloads
 captured by this benchmark methodology and remain a follow-up; see
 [Issue 3259](https://github.com/shakacode/react_on_rails/issues/3259).
 
-- _The linked `performance-findings.md` artifact reflects an earlier run; the April 30 timings shown above will be added
-  there in a follow-up, and distribution/variance artifacts are still pending. See
-  [Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263)._
 - _All timing values are medians from the raw benchmark artifact values (n=8 per route); sample size is too small to
   establish statistical significance._
-- _The `action_total` -2.3% delta is likely within expected variance at n=8._
+- _The published `responseEnd` p95 (731ms Inertia vs 768ms RSC, see the
+  [`responseEnd` p95 counter-signal](#gumroad-rsc-worst-case-responseend) below) is larger than the other route's
+  median in both directions (Inertia p95 731ms > RSC median 589ms; RSC p95 768ms > Inertia median 645ms), so
+  the per-run `responseEnd` ranges overlap and the median -8.7% RSC-favored delta is consistent with measurement noise
+  rather than a stable RSC win on this metric._
+- _The source artifact does not publish a p95 or per-run distribution for `action_total`, so its -2.3% median delta
+  cannot be distinguished from measurement noise at n=8._
 
 #### `responseEnd` p95 counter-signal <a id="gumroad-rsc-worst-case-responseend"></a>
 
