@@ -27,7 +27,7 @@ PATH
       execjs (~> 2.9)
       http-2 (>= 1.1.1)
       httpx (~> 1.5)
-      jwt (>= 3.2.0)
+      jwt (>= 2.7)
       rainbow
       react_on_rails (= 16.7.0.rc.0)
 
