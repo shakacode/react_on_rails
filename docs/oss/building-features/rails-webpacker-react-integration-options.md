@@ -224,8 +224,10 @@ Keep each shim explicit and narrow:
    ```
 
    The aliased files still resolve under `node_modules/react-on-rails/`, so the package-scoped `babel-loader`
-   rule from Step 3 still picks them up. Put Steps 2 and 3 in place before relying on the alias — the
-   redirected files use the same modern syntax and ESM packaging as the `/client` entry point.
+   rule from Step 3 still picks them up. Put Steps 2 and 3 in place before relying on the alias (Step 2 adds
+   the Babel plugins for optional chaining / nullish coalescing; Step 3 adds the `babel-loader` rule scoped to
+   `node_modules/react-on-rails`) — the redirected files use the same modern syntax and ESM packaging as the
+   `/client` entry point.
 
    If your `environment.js` already has other configuration, add the `environment.config.merge` block before the existing `module.exports` line.
 
