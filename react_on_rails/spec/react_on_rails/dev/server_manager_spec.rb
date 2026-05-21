@@ -1201,11 +1201,13 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     # pattern-based kill would leave stale port-bound processes and socket/pid
     # files behind. All three cleanup helpers must always run.
     it "runs port kills and socket cleanup even when pattern-based kill found processes" do
-      # Stub the catch-all fallback first so the specific `"pgrep", "-f", "rails"`
-      # match below wins (RSpec applies the last-defined stub when patterns
-      # overlap). Otherwise `kill_running_processes` would return false and the
-      # test wouldn't actually exercise the "pattern kill succeeded" path that
-      # the old `||` short-circuit would have skipped.
+      # The catch-all must be defined FIRST. RSpec uses the most-recently-defined
+      # matching stub regardless of specificity (`any_args` does not yield to a
+      # narrower matcher automatically), so the specific "rails" stub below wins
+      # because it is defined last. Reversing the order would cause
+      # `kill_running_processes` to always return false, missing the regression
+      # path this test covers (the old `||` short-circuit would have skipped the
+      # remaining cleanup steps once pattern-based kill returned truthy).
       allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
       allow(Open3).to receive(:capture2).with("pgrep", "-f", "rails", err: File::NULL).and_return(["1234", nil])
       allow(Process).to receive(:pid).and_return(9999)

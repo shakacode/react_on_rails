@@ -92,7 +92,16 @@ module ReactOnRails
           return default_killable_ports unless base
 
           ports = [base[:rails], base[:webpack]]
-          ports << base[:renderer] if pro_renderer_active?
+          if pro_renderer_active?
+            # When the Pro gem is loaded but no renderer env var is set, the
+            # user may not realize base+2 is being scanned. Surface it so an
+            # unrelated process killed on that port isn't a silent surprise.
+            unless renderer_env_signal?
+              puts "   ℹ️  Including renderer port #{base[:renderer]} (base+2): " \
+                   "react_on_rails_pro is loaded but no renderer env var is set."
+            end
+            ports << base[:renderer]
+          end
           ports
         end
 

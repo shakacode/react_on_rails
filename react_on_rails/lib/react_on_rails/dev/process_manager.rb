@@ -24,6 +24,11 @@ module ReactOnRails
       # Bundler's env reset so nested shakapacker commands don't rerun the hook.
       # RENDERER_URL is the legacy name for REACT_RENDERER_URL; preserved for
       # mid-migration users (see ServerManager#warn_if_legacy_renderer_url_env_used).
+      # Inclusion here also matters when base-port mode scrubs the legacy var:
+      # `preserve_runtime_env_vars` returns `nil` (not the string "nil") for unset
+      # keys, which `Process.spawn`/`system` use to explicitly unset the variable
+      # in the child — preventing `with_unbundled_env` from resurrecting a stale
+      # pre-Bundler value. See the comment on `preserve_runtime_env_vars` below.
       ENV_KEYS_TO_PRESERVE = %w[
         PORT
         SHAKAPACKER_DEV_SERVER_PORT
