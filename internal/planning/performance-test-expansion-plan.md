@@ -27,7 +27,9 @@ Start with a small, representative matrix before adding more routes:
 | RSC payload rendering | `rsc_payload_react_component`             | RPS, p50, p90, p99, max | Use a static/default route because route discovery skips required params                                                                          |
 | Fragment caching      | `react_component` with `cache: true`      | RPS, p50, p90, p99, max | Requires separate primed-hit and busted-miss paths or setup steps; k6 cannot infer cache state                                                    |
 
-Here `p50` maps to k6's `med` stat and the `p50_latency` Bencher Metric Format measure.
+Here `p50` maps to k6's `med` stat and the `p50_latency` Bencher Metric Format measure. `p90`, `p99`, and `max`
+keep their k6 names (`p(90)`, `p(99)`, `max`) and map to the `p90_latency`, `p99_latency`, and `max_latency` Bencher
+measures — only `med`/`p50` is renamed in the mapping.
 
 ## First PR Scope
 
@@ -115,28 +117,14 @@ Already in place:
 - Keep hard CI gates disabled until the benchmark gate tuning in
   [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169) has a stable baseline.
 
-Recommended prior work (desirable but not blocking for the first benchmark-routes PR):
-
-- Define forward-then-reverse route passes in `benchmarks/bench.rb` as two deterministic passes over the same route list:
-  first in `rails routes` order, then in reverse order in the same job. Record the pass order with the per-route
-  artifacts before using route ordering as a noise-control signal. This is large enough to land as its own preparatory
-  PR, and the first benchmark-routes PR can defer it if the route-order work blocks progress. Budget it intentionally
-  because it roughly doubles route runtime: each route gets two k6 runs plus two warm-up phases, or about
-  `2 * (DURATION + warm-up requests * (request round-trip + warm-up sleep))` per route. With today's defaults and the
-  hard-coded warm-up loop in `benchmarks/bench.rb`, the sleep-only lower bound is `2 * (30s + 10 * 0.5s)` = 70 seconds;
-  for SSR routes today the warm-up adds another roughly 1-2 seconds per route, putting the real per-route budget closer
-  to 72-80 seconds before any server overhead. This estimate does not include the per-job `bundle exec rails routes`
-  discovery call, server startup, or server warmdown time. At the job level, a benchmark job covering about 10 routes
-  should be budgeted as roughly doubling from 11-12 minutes to 22-24 minutes before additional startup or warmdown
-  overhead. Recalculate the estimate if `DURATION` changes or if the `benchmarks/bench.rb` warm-up loop changes.
-
 Prerequisites for the first implementation PR (blocking — must land before or with the first benchmark-routes PR):
 
 - Record sample count, runner type, Ruby version, Node version, React version, renderer, and bundle mode in a
   `metadata.json` artifact and mirror the key fields in the `summary.txt` header. Capture runtime-dependent fields when
   the benchmark runs instead of hard-coding the example schema values: use `ruby --version` for `ruby_version`,
-  `node --version` for `node_version`, populate `runner_type` from `ENV["RUNNER_OS"]` and `ENV["RUNNER_ARCH"]`, and
-  capture `react_version` by invoking Node from `APP_DIR` so OSS and Pro dummy apps report their own installed React
+  `node --version` for `node_version`, populate `runner_type` from `ENV["RUNNER_OS"]` and `ENV["RUNNER_ARCH"]` (both
+  set by GitHub Actions, so local runs fall back to `"unknown"` via the snippet below), and capture `react_version`
+  by invoking Node from `APP_DIR` so OSS and Pro dummy apps report their own installed React
   package. The implementation PR must use a chdir-aware Ruby call so `require()` resolves against `APP_DIR/node_modules`
   rather than `Dir.pwd`. Preferred form (no global side effects):
 
@@ -212,9 +200,12 @@ Prerequisites for the first implementation PR (blocking — must land before or 
   BMF reporting to include `max_latency` alongside the existing `rps`, `p50_latency`, `p90_latency`, `p99_latency`, and
   `failed_pct` measures. Today `max` appears in `summary.txt` but not in the BMF output. Add a `max:` keyword parameter
   to `BmfCollector#add` in `benchmarks/lib/bmf_helpers.rb` with a default of `nil` so existing callers stay valid, then
-  pass `max: max_latency` from the `bmf_collector.add` call in `benchmarks/bench.rb`. In `BmfCollector#to_bmf`, emit the
-  new measure as `add_measure(benchmark_entry, "max_latency", r[:max])` so the BMF key matches the `_latency` suffix
-  convention already used by `p50_latency`, `p90_latency`, and `p99_latency`. Updating the matching
+  pass `max: max_latency` from the `bmf_collector.add` call in `benchmarks/bench.rb`. Inside `add`, also store the
+  new keyword on the appended `@results` hash by adding `max: max` alongside the existing `name`, `rps`, `p50`,
+  `p90`, `p99`, and `failed_pct` keys; without this step `r[:max]` is always `nil` in `to_bmf` and `add_measure`
+  silently skips the measure. In `BmfCollector#to_bmf`, emit the new measure as
+  `add_measure(benchmark_entry, "max_latency", r[:max])` so the BMF key matches the `_latency` suffix convention
+  already used by `p50_latency`, `p90_latency`, and `p99_latency`. Updating the matching
   `bmf_collector.add` calls in `benchmarks/bench-node-renderer.rb` (inside the `non_rsc_tests.each` and
   `rsc_tests.each` blocks) is deferred to the Pro follow-on PR so the OSS first slice can land without changing Node
   Renderer benchmark output.
@@ -224,6 +215,29 @@ Prerequisites for the first implementation PR (blocking — must land before or 
   without gating CI. Adding the corresponding threshold block is a deliberate follow-on step (see "Follow-on
   enhancements" below) so the OSS first slice can land without absorbing a new CI gate before the baseline is
   characterized.
+
+- Extract the current k6 `--summary-trend-stats` string (`med,max,p(90),p(99)` in `benchmarks/bench.rb`) into a named
+  constant such as `K6_TREND_STATS = "med,max,p(90),p(99)"`, defined alongside `DURATION` in
+  `benchmarks/lib/benchmark_config.rb`, and reference it from the existing `--summary-trend-stats` invocation in
+  `benchmarks/bench.rb`. Landing the constant in the first implementation PR — before any follow-on PR adds `p95` or
+  otherwise extends the trend-stats column set — keeps the percentile list in one place rather than scattered across
+  the bench script, summary table, artifacts, and Bencher reporting.
+
+Recommended prior work (desirable but not blocking for the first benchmark-routes PR):
+
+- Define forward-then-reverse route passes in `benchmarks/bench.rb` as two deterministic passes over the same route list:
+  first in `rails routes` order, then in reverse order in the same job. Record the pass order with the per-route
+  artifacts before using route ordering as a noise-control signal. This is large enough to land as its own preparatory
+  PR, and the first benchmark-routes PR can defer it if the route-order work blocks progress. Budget it intentionally
+  because it roughly doubles route runtime: each route gets two k6 runs plus two warm-up phases, or about
+  `2 * (DURATION + warm-up requests * (request round-trip + warm-up sleep))` per route. With today's defaults and the
+  hard-coded warm-up loop in `benchmarks/bench.rb`, the sleep-only lower bound is
+  `2 * (DURATION + 10 * 0.5s) = 2 * (30s + 10 * 0.5s) = 70 seconds` at the current `DURATION` default of `30s`;
+  for SSR routes today the warm-up adds another roughly 1-2 seconds per route, putting the real per-route budget closer
+  to 72-80 seconds before any server overhead. This estimate does not include the per-job `bundle exec rails routes`
+  discovery call, server startup, or server warmdown time. At the job level, a benchmark job covering about 10 routes
+  should be budgeted as roughly doubling from 11-12 minutes to 22-24 minutes before additional startup or warmdown
+  overhead. Recalculate the estimate if `DURATION` changes or if the `benchmarks/bench.rb` warm-up loop changes.
 
 Follow-on enhancements:
 
@@ -235,9 +249,8 @@ Follow-on enhancements:
   percentile measures.
 
 - Add `p95` only when the k6 `--summary-trend-stats` flag, currently `med,max,p(90),p(99)` in `benchmarks/bench.rb`, the
-  summary table, artifacts, and Bencher reporting can be updated together. Before adding `p95`, extract the current
-  summary-trend-stats string to a named constant, such as
-  `K6_TREND_STATS = "med,max,p(90),p(99)"`, so the percentile set is changed in one place.
+  summary table, artifacts, and Bencher reporting can be updated together. Update the `K6_TREND_STATS` constant
+  (introduced as a prerequisite of the first implementation PR) so the percentile set is changed in one place.
 - Require repeated or overlapping alerts before opening an issue or failing CI.
 
 ## Local Verification Before CI
