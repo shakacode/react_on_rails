@@ -3,6 +3,7 @@
 require "fileutils"
 require "pathname"
 require "react_on_rails_pro/renderer_cache_helpers"
+require "react_on_rails_pro/renderer_cache_path"
 
 module ReactOnRailsPro
   # Stages the Node Renderer bundle cache in the renderer's expected directory
@@ -66,7 +67,7 @@ module ReactOnRailsPro
     # unset) before resolving. See enforce_cache_dir_env_var! for the rationale.
     def self.resolve_cache_dir(mode)
       enforce_cache_dir_env_var!(mode)
-      ReactOnRailsPro::Utils.resolve_renderer_cache_dir
+      ReactOnRailsPro::RendererCachePath.resolve
     end
     private_class_method :resolve_cache_dir
 
@@ -85,8 +86,8 @@ module ReactOnRailsPro
       # mis-staging.
       # RENDERER_BUNDLE_PATH remains accepted for compatibility, but new deploys
       # should migrate to RENDERER_SERVER_BUNDLE_CACHE_PATH. Whitespace-only
-      # values intentionally pass this guard so renderer_cache_env_value can
-      # raise the specific validation error instead of the missing-env guidance.
+      # values intentionally pass this guard so RendererCachePath can raise the
+      # specific validation error instead of the missing-env guidance.
       return if !ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH", "").empty? ||
                 !ENV.fetch("RENDERER_BUNDLE_PATH", "").empty?
 

@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require "async"
+require "async/barrier"
+
 module ReactOnRailsPro
   class StreamDecorator
     def initialize(component)
@@ -92,35 +95,54 @@ module ReactOnRailsPro
     def each_chunk(&block)
       return enum_for(:each_chunk) unless block
 
-      send_bundle = false
-      error_body = +""
-      loop do
-        stream_response = @request_executor.call(send_bundle)
+      Sync do
+        barrier = Async::Barrier.new
 
-        # Chunks can be merged during streaming, so we separate them by newlines
-        # Also, we check the status code inside the loop block because calling `status` outside the loop block
-        # is blocking, it will wait for the response to be fully received
-        # Look at the spec of `status` in `spec/react_on_rails_pro/stream_spec.rb` for more details
-        process_response_chunks(stream_response, error_body, &block)
-        break
-      rescue HTTPX::HTTPError => e
-        send_bundle = handle_http_error(e, error_body, send_bundle)
-      rescue HTTPX::ReadTimeoutError => e
-        raise ReactOnRailsPro::Error, "Time out error while server side render streaming a component.\n" \
-                                      "Original error:\n#{e}\n#{e.backtrace}"
+        send_bundle = false
+        error_body = +""
+        loop do
+          stream_response = @request_executor.call(send_bundle, barrier)
+
+          # The Node renderer always emits the length-prefixed wire format
+          # (`<metadata JSON>\t<content byte length hex>\n<raw content bytes>`)
+          # for every response chunk — both the one-shot streaming path and the
+          # incremental-rendering path. We check the status code inside the loop
+          # block because calling `status` outside of it blocks until the full
+          # response has been received. See the `status` spec in
+          # `spec/react_on_rails_pro/stream_spec.rb` for more details.
+          process_response_chunks(stream_response, error_body, &block)
+          break
+        rescue HTTPX::HTTPError => e
+          send_bundle = handle_http_error(e, error_body, send_bundle)
+        rescue HTTPX::ReadTimeoutError => e
+          raise ReactOnRailsPro::Error, "Time out error while server side render streaming a component.\n" \
+                                        "Original error:\n#{e}\n#{e.backtrace}"
+        end
+
+        barrier.wait
       end
     end
 
-    def process_response_chunks(stream_response, error_body)
-      loop_response_lines(stream_response) do |chunk|
+    # Method to start the decoration
+    def self.create(&request_block)
+      StreamDecorator.new(new(&request_block))
+    end
+
+    private
+
+    def process_response_chunks(stream_response, error_body, &block)
+      parser = ReactOnRails::LengthPrefixedParser.new
+      stream_response.each do |chunk|
+        stream_response.instance_variable_set(:@react_on_rails_received_first_chunk, true)
+
         if response_has_error_status?(stream_response)
           error_body << chunk
           next
         end
 
-        processed_chunk = chunk.strip
-        yield processed_chunk unless processed_chunk.empty?
+        parser.feed(chunk, &block)
       end
+      parser.flush
     end
 
     def response_has_error_status?(response)
@@ -149,35 +171,6 @@ module ReactOnRailsPro
       else
         raise ReactOnRailsPro::Error, "Unexpected response code from renderer: #{response.status}:\n#{error_body}"
       end
-    end
-
-    # Method to start the decoration
-    def self.create(&request_block)
-      StreamDecorator.new(new(&request_block))
-    end
-
-    private
-
-    # This method is considered as an override of response.each_line
-    # It fixes the problem of not yielding the last chunk on error
-    # You can check the spec of `each_line` in `spec/react_on_rails_pro/stream_spec.rb` for more details
-    def loop_response_lines(response)
-      return enum_for(__method__, response) unless block_given?
-
-      line = "".b
-
-      response.each do |chunk|
-        response.instance_variable_set(:@react_on_rails_received_first_chunk, true)
-        line << chunk
-
-        while (idx = line.index("\n"))
-          yield line.byteslice(0..idx - 1)
-
-          line = line.byteslice(idx + 1..-1)
-        end
-      end
-    ensure
-      yield line unless line.empty?
     end
   end
 end

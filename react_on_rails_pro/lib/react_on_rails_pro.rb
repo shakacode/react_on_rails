@@ -3,12 +3,16 @@
 require "rails"
 require "react_on_rails"
 
+# Apply HTTPX bug fix for stream_bidi plugin
+require "react_on_rails_pro/httpx_stream_bidi_patch"
+
 require "react_on_rails_pro/request"
 require "react_on_rails_pro/version"
 require "react_on_rails_pro/constants"
 require "react_on_rails_pro/compression_middleware_guard"
 require "react_on_rails_pro/engine"
 require "react_on_rails_pro/error"
+require "react_on_rails_pro/renderer_cache_path"
 require "react_on_rails_pro/utils"
 require "react_on_rails_pro/configuration"
 require "react_on_rails_pro/license_public_key"

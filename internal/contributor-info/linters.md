@@ -1,6 +1,6 @@
 # Linters
 
-These linters support the [ShakaCode Style Guidelines](../misc/style.md)
+These linters support the [ShakaCode Style Guidelines](../../docs/oss/misc/style.md)
 
 ## Autofix!
 
@@ -70,7 +70,7 @@ Rule severity is configured with `'off'`, `'warn'` or `'error'`. In older config
 
 Rules can also take a few additional options. In this case, the rule can be set to an array, the first item of which is the severity and the rest are options.
 
-See file [.eslintrc](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails/lib/generators/react_on_rails/templates/.eslintrc) for examples of configuration
+See file [.eslintrc](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/lib/generators/react_on_rails/templates/.eslintrc) for examples of configuration
 
 ### Specify/Override rules in code
 

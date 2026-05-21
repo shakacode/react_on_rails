@@ -54,9 +54,9 @@ It's critical to configure your IDE/editor to ignore certain directories. Otherw
 
 # Example apps
 
-The [`react_on_rails/spec/dummy` app](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/spec/dummy) is an example of the various setup techniques you can use with the gem.
+The [`react_on_rails/spec/dummy` app](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails/spec/dummy) is an example of the various setup techniques you can use with the gem.
 
-There are also two such apps for React on Rails Pro: [one using the Node renderer](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/spec/dummy) and [one using ExecJS](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/spec/execjs-compatible-dummy).
+There are also two such apps for React on Rails Pro: [one using the Node renderer](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails_pro/spec/dummy) and [one using ExecJS](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails_pro/spec/execjs-compatible-dummy).
 
 When you add a new feature, consider adding an example demonstrating it to the example apps.
 

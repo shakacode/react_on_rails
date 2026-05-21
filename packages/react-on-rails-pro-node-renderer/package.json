@@ -26,6 +26,11 @@
     },
     "./package.json": "./package.json"
   },
+  "files": [
+    "README.md",
+    "lib/**/*.js",
+    "lib/**/*.d.ts"
+  ],
   "dependencies": {
     "@fastify/formbody": "^7.4.0 || ^8.0.2",
     "@fastify/multipart": "^8.3.1 || ^9.0.3",

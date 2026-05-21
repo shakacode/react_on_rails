@@ -44,7 +44,7 @@ Gem::Specification.new do |s|
   #   https://github.com/HoneyryderChuck/httpx/issues/118
   s.add_runtime_dependency "http-2", ">= 1.1.1"
   s.add_runtime_dependency "httpx", "~> 1.5"
-  s.add_runtime_dependency "jwt", "~> 2.7"
+  s.add_runtime_dependency "jwt", ">= 3.2.0"
   s.add_runtime_dependency "rainbow"
   s.add_runtime_dependency "react_on_rails", ReactOnRails::VERSION
   s.add_development_dependency "bundler"

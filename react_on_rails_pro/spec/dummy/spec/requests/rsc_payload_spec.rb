@@ -8,19 +8,13 @@ RSpec.describe "RSC payload endpoint" do
   end
 
   def parsed_chunks
-    response.body.each_line.filter_map do |line|
-      stripped_line = line.strip
-      next if stripped_line.empty?
-
-      begin
-        JSON.parse(stripped_line)
-      rescue JSON::ParserError => e
-        raise "Rails view annotation leaked into RSC payload response: #{stripped_line.inspect}" \
-          if stripped_line.include?("<!--")
-
-        raise "Non-JSON line in RSC payload response: #{stripped_line.inspect} (#{e.message})"
-      end
-    end
+    parser = ReactOnRails::LengthPrefixedParser.new
+    chunks = []
+    # Strip HTML comments (e.g., Rails view annotation comments like <!-- BEGIN ... -->)
+    # and any resulting empty lines, which would break the strict length-prefixed parser.
+    body = response.body.b.gsub(/<!--.*?-->/m, "").gsub(/^\s*\n/, "")
+    parser.feed(body) { |chunk| chunks << chunk }
+    chunks
   end
 
   def expect_valid_rsc_payload_response
