@@ -781,6 +781,8 @@ async function InternalDataComponent() {
 
   return <pre>{JSON.stringify(data)}</pre>;
 }
+
+export default InternalDataComponent;
 ```
 
 ### Client Components
