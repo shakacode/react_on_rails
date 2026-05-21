@@ -51,24 +51,47 @@ Hash SSR is deferred to a follow-on PR after the initial OSS noise profile is un
 The cached SSR slice should define separate cache-hit and cache-miss benchmark paths before comparing results. Use a
 dedicated cache adapter and namespace for benchmark routes, such as
 `ActiveSupport::Cache::FileStore.new(Rails.root.join("tmp/benchmark_cache").to_s)`, instead of the app's default store.
-The miss path should clear only that benchmark cache namespace before measurement, and the hit path should clear that
-namespace, make one warm-up request to prime the fragment, then run k6 against the primed route. For the dedicated
-`FileStore`, clear the exact store root: use `FileUtils.rm_rf(Rails.root.join("tmp/benchmark_cache"))` from Rails-loaded
-code, or `FileUtils.rm_rf(File.join(APP_DIR, "tmp/benchmark_cache"))` from `benchmarks/bench.rb` or another plain Ruby
-wrapper where `Rails.root` is unavailable. `APP_DIR` in `benchmarks/bench.rb` is the relative path
-`react_on_rails/spec/dummy` (or `react_on_rails_pro/spec/dummy` with `PRO=true`), so this `File.join` call only resolves
-correctly when bench.rb is invoked from the repo root. The benchmark workflow already runs from the repo root, but the
-implementation PR must either document that working-directory assumption near the cache-clear call or anchor the path
-explicitly, for example
-`FileUtils.rm_rf(File.expand_path(File.join(APP_DIR, "tmp/benchmark_cache"), File.join(__dir__, "..")))`, so a future
-runner configuration change cannot silently skip the cache clear. Do not clear `tmp/cache/assets` or the app's default
-cache store. Avoid
-`Rails.cache.clear` on the application cache. Avoid relying on a shared Redis instance, environment-default
-`:null_store`/`:memory_store` behavior, or manual cache state. To avoid mixing cold Rails-process noise into cache-miss
-measurements, warm the Rails process with a route that does not populate the benchmark cache, then clear the dedicated
-benchmark cache immediately before the cache-miss k6 measurement. For cache-hit measurements, clear the dedicated
-benchmark cache, send one explicit cache-prime request to the measured route, then run the existing per-route k6 warm-up
-and measurement against the primed route.
+
+**Clearing the dedicated cache store.** Target the exact store root for the dedicated `FileStore`. From Rails-loaded
+code, use `FileUtils.rm_rf(Rails.root.join("tmp/benchmark_cache"))`. From `benchmarks/bench.rb` or another plain Ruby
+wrapper where `Rails.root` is unavailable, use `FileUtils.rm_rf(File.join(APP_DIR, "tmp/benchmark_cache"))`. `APP_DIR`
+in `benchmarks/bench.rb` is the relative path `react_on_rails/spec/dummy` (or `react_on_rails_pro/spec/dummy` with
+`PRO=true`), so this `File.join` call only resolves correctly when bench.rb is invoked from the repo root. The
+benchmark workflow already runs from the repo root, but the implementation PR must either document that
+working-directory assumption near the cache-clear call or anchor the path explicitly, so a future runner-configuration
+change cannot silently skip the cache clear. The anchored form below must live in `benchmarks/bench.rb` itself, where
+`__dir__` resolves to `benchmarks/` and `File.join(__dir__, "..")` resolves to the repo root:
+
+```ruby
+# In benchmarks/bench.rb (__dir__ is benchmarks/, File.join(__dir__, "..") is the repo root):
+FileUtils.rm_rf(File.expand_path(File.join(APP_DIR, "tmp/benchmark_cache"), File.join(__dir__, "..")))
+```
+
+If this logic is later extracted into a helper file (for example `benchmarks/lib/cache_helpers.rb`), `__dir__` becomes
+the helper's directory and `File.join(__dir__, "..")` resolves to `benchmarks/` — one directory level short of the repo
+root, silently skipping the cache clear. In that case, anchor the path from `__FILE__` in `bench.rb` and pass the
+resolved root into the helper as an argument rather than calling `__dir__` inside the helper.
+
+**Caches to leave alone.** Do not clear `tmp/cache/assets` or the app's default cache store. Avoid `Rails.cache.clear`
+on the application cache. Avoid relying on a shared Redis instance, environment-default `:null_store`/`:memory_store`
+behavior, or manual cache state.
+
+**Cache-miss measurement.** To avoid mixing cold Rails-process noise into the measurement:
+
+1. Warm the Rails process against a route that does not populate the benchmark cache.
+2. Clear the dedicated benchmark cache (using one of the `FileUtils.rm_rf` forms above) immediately before the k6
+   measurement.
+3. Run the k6 measurement against the route under test.
+
+Cache-miss routes are the explicit exception to the per-route k6 warm-up loop described under Noise Controls; otherwise
+the 10 pre-requests would populate the fragment cache for the route before measurement begins.
+
+**Cache-hit measurement.**
+
+1. Clear the dedicated benchmark cache (using one of the `FileUtils.rm_rf` forms above).
+2. Send one explicit cache-prime request to the measured route so the fragment is written to the dedicated cache.
+3. Run the existing per-route k6 warm-up loop. The warm-up does not clear the cache, so the fragment stays primed.
+4. Run the k6 measurement against the primed route.
 
 ### Pro Follow-Up Slice
 
@@ -216,10 +239,11 @@ Prerequisites for the first implementation PR (blocking — must land before or 
   `add_to_summary`. The Pro PR only needs to pass `max: max_latency` to those two existing `bmf_collector.add` calls;
   no Vegeta extraction or summary-row changes are required.
 
-  While editing `BmfCollector` to thread `max_latency`, also fix the stale comment at `benchmarks/lib/bmf_helpers.rb`
-  line 15, which currently lists `p50_latency_ms, p90_latency_ms, p99_latency_ms`. The actual measure keys emitted by
-  `to_bmf` are `p50_latency`, `p90_latency`, and `p99_latency` (no `_ms` suffix); leaving the comment as-is invites a
-  future implementer to add `max_latency_ms` by analogy and diverge from the Bencher measure keys.
+  While editing `BmfCollector` to thread `max_latency`, also fix the stale comment near the top of
+  `benchmarks/lib/bmf_helpers.rb` that currently reads `p50_latency_ms, p90_latency_ms, p99_latency_ms`. The actual
+  measure keys emitted by `to_bmf` are `p50_latency`, `p90_latency`, and `p99_latency` (no `_ms` suffix); leaving the
+  comment as-is invites a future implementer to add `max_latency_ms` by analogy and diverge from the Bencher measure
+  keys.
 
   `max_latency` lands as an unthresholded advisory metric in the OSS first slice: the BMF payload includes the new key,
   but the `run_bencher` function in `.github/workflows/benchmark.yml` is not modified, so Bencher tracks the value
