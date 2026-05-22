@@ -696,9 +696,11 @@ module ReactOnRails
         result
       end
 
-      # NOTE: internally rescans from index 0 for each `new RSCWebpackPlugin(` hit, so this is
-      # O(n × m) in content size × plugin count. Acceptable for small webpack configs; carry
-      # scanner state forward before adopting this pattern for larger shared inputs.
+      # NOTE: `js_code_position?` itself walks from index 0 on each call, so the partition runs
+      # in O(n² × m) (content-length² × plugin-count) — every plugin hit triggers a fresh O(n)
+      # rescan. Acceptable for small webpack configs (a few hundred lines, a handful of plugins);
+      # if this scanner is ever reused on larger inputs (shared webpack helpers, Vite configs,
+      # monorepo bundlers), carry scanner state forward between iterations before adopting it.
       def rsc_plugin_option_sections(content, is_server:)
         rsc_plugin_option_sections_partition(content, is_server: is_server).fetch(:safe)
       end

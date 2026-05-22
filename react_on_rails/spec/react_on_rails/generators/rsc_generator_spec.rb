@@ -1272,6 +1272,27 @@ describe RscGenerator, type: :generator do
       expect(partition.fetch(:unparseable)).to eq(0)
     end
 
+    it "clears state but leaves index on the closing `/` when advance_js_scan_state exits a block comment" do
+      # `block_comment_exit_guard` invariant: when `*/` is consumed, state must be nil and
+      # index must point at the closing `/` so the caller's trailing `index += 1` lands on
+      # the first character after the comment. Several callers (`matching_js_closing_brace`,
+      # `js_code_position?`, `js_top_level_position?`) rely on this without an explicit
+      # `prev_state == :block_comment` guard, so a regression here would silently misroute
+      # downstream `char == '{' / '}' / ')'` checks.
+      content = "/* x */next"
+      state = :block_comment
+      escaped = false
+      # Advance to the `*` of `*/` so `char == '*'` and `next_char == '/'`.
+      slash_index = content.index("*/") + 1
+      next_state, _next_escaped, returned_index =
+        generator.send(:advance_js_scan_state, state, escaped, "*", "/", slash_index - 1)
+
+      expect(next_state).to be_nil
+      expect(returned_index).to eq(slash_index)
+      expect(content[returned_index]).to eq("/")
+      expect(content[returned_index + 1]).to eq("n")
+    end
+
     it "warns and skips the rewrite when an RSCWebpackPlugin options block is unparseable" do
       config_path = "config/webpack/serverWebpackConfig.js"
       simulate_existing_file(
