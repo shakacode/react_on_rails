@@ -83,14 +83,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      # libyaml-dev is needed for psych v5
+      - name: Install libyaml-dev (required for psych v5 native extensions)
+        run: sudo apt-get update && sudo apt-get install -y libyaml-dev
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.4'
           bundler: 2.5.9
-      # libyaml-dev is needed for psych v5
-      - name: Fix dependency for libyaml-dev
-        run: sudo apt install libyaml-dev
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
