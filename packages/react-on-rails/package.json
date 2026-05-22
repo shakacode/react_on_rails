@@ -73,7 +73,8 @@
     "lib/**/*.js",
     "lib/**/*.cjs",
     "lib/**/*.mjs",
-    "lib/**/*.d.ts"
+    "lib/**/*.d.ts",
+    "lib/**/*.d.cts"
   ],
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails/issues"
