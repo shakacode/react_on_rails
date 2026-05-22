@@ -244,6 +244,11 @@ The `./master` and `./worker` exports provide direct access to the node-renderer
 
 ## Configuring Startup, Readiness, and Liveness Probes
 
+This section is the canonical source for probe semantics, recommended timing values, and curl command guidance. The
+copy-paste YAML lives in
+[Kubernetes Sidecar Manifest](./container-deployment.md#kubernetes-sidecar-manifest); update the values here first when
+tuning, then reflect the change in the manifest.
+
 Keep the three probe types distinct:
 
 - **Startup** answers whether the renderer has finished booting. Separate it from readiness and liveness so slow startup
@@ -339,7 +344,7 @@ appropriate `initialDelaySeconds` to each.
 See [Kubernetes Sidecar Manifest](./container-deployment.md#kubernetes-sidecar-manifest) for a complete pod spec with
 all three probes wired in, and
 [Startup Errors: `ERR_STREAM_PREMATURE_CLOSE`](./container-deployment.md#startup-errors-err_stream_premature_close) for
-the shared probe command notes on curl HTTP/2 support, `--max-time` buffers, and `initialDelaySeconds` guidance.
+the startup-error troubleshooting context.
 
 For Control Plane topology-specific `renderer_url`, host binding, and probe target guidance, see
 [Control Plane Deployment Shapes](./container-deployment.md#control-plane-deployment-shapes).
