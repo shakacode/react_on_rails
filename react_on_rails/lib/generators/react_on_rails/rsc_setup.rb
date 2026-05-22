@@ -389,7 +389,7 @@ module ReactOnRails
         # Add RSCWebpackPlugin import after bundler require
         return unless rsc_client_references_setup_anchor_available?(config_path, content, is_server: true)
 
-        existing_imports_content = content_before_rsc_setup_anchor(content, is_server: true)
+        existing_imports_content = content_through_rsc_setup_anchor(content, is_server: true)
         return if rsc_setup_blocked_by_later_imports?(config_path, content, existing_imports_content, is_server: true)
 
         inject_rsc_server_imports(config_path, content, existing_imports_content)
@@ -434,7 +434,7 @@ module ReactOnRails
         # Add RSCWebpackPlugin import after commonWebpackConfig import
         return unless rsc_client_references_setup_anchor_available?(config_path, content, is_server: false)
 
-        existing_imports_content = content_before_rsc_setup_anchor(content, is_server: false)
+        existing_imports_content = content_through_rsc_setup_anchor(content, is_server: false)
         if rsc_setup_blocked_by_later_imports?(
           config_path, content, existing_imports_content, is_server: false
         )
@@ -613,7 +613,7 @@ module ReactOnRails
           return false
         end
 
-        existing_imports_content = content_before_rsc_setup_anchor(content, is_server: is_server)
+        existing_imports_content = content_through_rsc_setup_anchor(content, is_server: is_server)
         return false if rsc_setup_blocked_by_later_imports?(config_path, content, existing_imports_content,
                                                             is_server: is_server)
 
@@ -716,12 +716,6 @@ module ReactOnRails
         search_from = 0
         marker = "new RSCWebpackPlugin("
 
-        # `js_code_position?` rescans from index 0 on every plugin hit, so this loop is
-        # O(n × m) where m is the number of `new RSCWebpackPlugin(` occurrences. Webpack
-        # configs are tiny in practice (a few hundred lines), so the cost is negligible and
-        # the rescan keeps the migration parser simple. If this scanner is ever reused on
-        # larger inputs (shared webpack helpers, Vite configs, monorepo bundlers), carry
-        # the scanner state forward between iterations before adopting it there.
         while (call_start = content.index(marker, search_from))
           unless js_code_position?(content, call_start)
             search_from = call_start + marker.length
@@ -982,6 +976,8 @@ module ReactOnRails
           [candidate, rewritten_body]
         end
 
+        # The sole caller (`update_existing_rsc_webpack_config`) translates this `false` into
+        # a `warn_missing_rsc_plugin_target` warning, so silently returning here is intentional.
         return false if rewrites.empty?
 
         # Reverse order so earlier offsets stay valid as later sections are spliced.
@@ -1247,7 +1243,11 @@ module ReactOnRails
         end
       end
 
-      def content_before_rsc_setup_anchor(content, is_server:)
+      # Inclusive slice — the anchor itself is part of the returned content because callers
+      # (`rsc_setup_blocked_by_later_imports?`, `inject_rsc_*_imports`, the import-detection
+      # helpers) check whether required imports appear up to and including the anchor line.
+      # Anything past the anchor is considered "later" and disqualifies an otherwise-valid import.
+      def content_through_rsc_setup_anchor(content, is_server:)
         anchor = rsc_client_references_setup_anchor_match(content, is_server: is_server)
         return "" unless anchor
 
@@ -1379,7 +1379,9 @@ module ReactOnRails
 
       def warn_missing_rsc_client_references_anchor(config_path)
         GeneratorMessages.add_warning(
-          "Could not inject rscClientReferences into #{config_path}: expected webpack import anchor was not found. " \
+          "Could not inject rscClientReferences into #{config_path}: expected webpack import anchor was not found " \
+          "(the generator looks for the CommonJS `require`-style anchor that the ROR templates emit). " \
+          "If your config uses ESM `import` syntax, the generator cannot migrate it automatically. " \
           "Please add clientReferences manually."
         )
       end
