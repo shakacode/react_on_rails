@@ -387,8 +387,9 @@ module ReactOnRails
         end
 
         # Add RSCWebpackPlugin import after bundler require
-        existing_imports_content = content_before_rsc_setup_anchor(content, is_server: true)
         return unless rsc_client_references_setup_anchor_available?(config_path, content, is_server: true)
+
+        existing_imports_content = content_before_rsc_setup_anchor(content, is_server: true)
         return if rsc_setup_blocked_by_later_imports?(config_path, content, existing_imports_content, is_server: true)
 
         inject_rsc_server_imports(config_path, content, existing_imports_content)
@@ -431,8 +432,9 @@ module ReactOnRails
         end
 
         # Add RSCWebpackPlugin import after commonWebpackConfig import
-        existing_imports_content = content_before_rsc_setup_anchor(content, is_server: false)
         return unless rsc_client_references_setup_anchor_available?(config_path, content, is_server: false)
+
+        existing_imports_content = content_before_rsc_setup_anchor(content, is_server: false)
         if rsc_setup_blocked_by_later_imports?(
           config_path, content, existing_imports_content, is_server: false
         )
@@ -615,7 +617,7 @@ module ReactOnRails
         return false if rsc_setup_blocked_by_later_imports?(config_path, content, existing_imports_content,
                                                             is_server: is_server)
 
-        add_rsc_client_references_setup(config_path, content, is_server: is_server)
+        add_rsc_client_references_setup(config_path, content, existing_imports_content, is_server: is_server)
         rsc_client_references_setup_ready?(config_path)
       end
 
@@ -694,6 +696,9 @@ module ReactOnRails
         result
       end
 
+      # NOTE: internally rescans from index 0 for each `new RSCWebpackPlugin(` hit, so this is
+      # O(n × m) in content size × plugin count. Acceptable for small webpack configs; carry
+      # scanner state forward before adopting this pattern for larger shared inputs.
       def rsc_plugin_option_sections(content, is_server:)
         rsc_plugin_option_sections_partition(content, is_server: is_server).fetch(:safe)
       end
@@ -872,7 +877,10 @@ module ReactOnRails
       def advance_js_string_state(state, escaped, char, index)
         return [state, false, index] if escaped
         return [state, true, index] if char == "\\"
-        return [nil, escaped, index] if char == state
+        # Explicit `false` (rather than passing `escaped` through) so a caller starting mid-parse
+        # in a string state with a stale `escaped = true` cannot silently suppress the closing
+        # quote and leave the scanner stuck in string state.
+        return [nil, false, index] if char == state
 
         [state, escaped, index]
       end
@@ -1113,17 +1121,20 @@ module ReactOnRails
       # generator has already confirmed `RSCWebpackPlugin` is imported in the file. That's why
       # this helper deliberately omits the `RSCWebpackPlugin` import that `inject_rsc_*_imports`
       # adds on the from-scratch path — adding it here would produce a duplicate import.
-      def add_rsc_client_references_setup(config_path, content, is_server:)
+      def add_rsc_client_references_setup(config_path, content, existing_imports_content, is_server:)
         # Belt-and-suspenders: the only caller, `ensure_rsc_client_references_setup`, already
         # checks both `scoped_rsc_client_references_defined?` and `rsc_client_references_defined?`
         # before delegating here. The guards are kept so the helper is safe to call directly.
         return if scoped_rsc_client_references_defined?(content)
         return if rsc_client_references_defined?(content)
 
-        existing_imports_content = content_before_rsc_setup_anchor(content, is_server: is_server)
         replace_rsc_client_references_setup_anchor(config_path, content, is_server: is_server) do |anchor|
           [
             anchor,
+            # On the server path `shakapacker_config_blocker_reason` has already blocked when
+            # `config` is missing from `existing_imports_content`, so this call returns `nil`.
+            # Kept (rather than skipped on `is_server`) so removing the upstream blocker does not
+            # silently drop the import on the client path, where its absence is permitted.
             shakapacker_config_import_statement(existing_imports_content),
             path_resolve_import_statement(existing_imports_content),
             "",
@@ -1261,6 +1272,12 @@ module ReactOnRails
         end
       end
 
+      # Intentional server/client asymmetry: when shakapacker's `config` is absent from the
+      # file entirely (not misplaced, not aliased), the client branch falls through and returns
+      # `nil` so the generator proceeds and adds the import alongside `rscClientReferences`. The
+      # server branch always blocks because the server anchor (`config.assets_bundler === 'rspack'`)
+      # itself requires `config` to be in scope, so an absent shakapacker import is always a user
+      # configuration problem there.
       def shakapacker_config_blocker_reason(content, existing_imports_content, is_server:)
         return nil if shakapacker_config_imported?(existing_imports_content)
 

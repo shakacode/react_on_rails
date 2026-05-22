@@ -819,6 +819,42 @@ describe RscGenerator, type: :generator do
       expect(migrated_content).not_to match(/isServer: false, clientReferences: rscClientReferences, chunkName/)
     end
 
+    it "rewrites plugin options that include a template-literal value with simple ${} interpolation" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          const env = process.env.RAILS_ENV;
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(
+              new RSCWebpackPlugin({
+                isServer: false,
+                chunkName: `${env}-bundle`,
+              }),
+            );
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      content = File.read(File.join(destination_root, config_path))
+      generator.send(:update_existing_rsc_webpack_config, config_path, content, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).to include("chunkName: `${env}-bundle`,")
+      expect(migrated_content).to match(
+        /chunkName: `\$\{env\}-bundle`,\n\s+clientReferences: rscClientReferences,/
+      )
+      expect(migrated_content.scan("clientReferences: rscClientReferences").length).to eq(1)
+    end
+
     it "adds clientReferences to the real isServer option when comments mention isServer first" do
       config_path = "config/webpack/clientWebpackConfig.js"
       simulate_existing_file(

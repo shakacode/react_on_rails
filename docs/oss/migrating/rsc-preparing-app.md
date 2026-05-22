@@ -267,6 +267,8 @@ module.exports = {
 
 > **`clientReferences`**: Always point this at your application source directory. If omitted, the plugin defaults to scanning the entire project root recursively (`{ directory: ".", recursive: true, include: /\.(js|ts|jsx|tsx)$/ }`). That can accidentally discover vendored gem templates under paths such as `vendor/bundle` in CI and make webpack compile files that are not part of your app. Setting `directory` to your app's source directory (e.g., `'./client/app'`) limits the scan to only the files that could contain `'use client'` directives.
 
+> **Generator note (CommonJS only):** The `rails generate react_on_rails:rsc` migration only rewrites webpack configs that use CommonJS (`require`-style) imports. If your config has been converted to ESM (`import`/`export`) syntax, the generator emits an "expected webpack import anchor was not found" warning and you must add `clientReferences` manually as shown above.
+
 ### 4c. Add RSCWebpackPlugin to the client webpack config
 
 **What this does (for custom configs):** The client bundle needs its own manifest so React on Rails Pro can map client component references (from the RSC payload) to the actual client-side chunks the browser should load. `RSCWebpackPlugin` with `isServer: false` produces a **`react-client-manifest.json`**. If your client webpack config is completely custom, add `new RSCWebpackPlugin({ isServer: false, clientReferences: [...] })` to its `plugins` array. Use the same `clientReferences` as the server config -- both must scan the same source directory.
