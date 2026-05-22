@@ -60,6 +60,9 @@ group :development, :test do
   gem "benchmark", require: false
   gem "logger", require: false
   gem "ostruct", require: false
+  # base64 is a runtime dependency of jwt 3.x but not jwt 2.x; declare it explicitly so
+  # license_validator_spec.rb's `require "base64"` works on Ruby 3.5+ when jwt 2.x resolves.
+  gem "base64", require: false
 end
 
 group :test do
