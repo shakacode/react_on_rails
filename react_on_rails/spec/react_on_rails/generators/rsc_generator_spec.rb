@@ -1261,6 +1261,17 @@ describe RscGenerator, type: :generator do
       expect(partition.fetch(:unparseable)).to eq(0)
     end
 
+    it "treats a trailing comma between the options object and `)` as parseable" do
+      # Prettier's `trailingComma: "all"` emits `new RSCWebpackPlugin({...},)`. Without
+      # tolerating the single trailing comma the scanner would mark these as unparseable
+      # and the user's migration would silently bail.
+      content = "new RSCWebpackPlugin({ isServer: true },);\n"
+
+      partition = generator.send(:rsc_plugin_option_sections_partition, content, is_server: true)
+      expect(partition.fetch(:safe).length).to eq(1)
+      expect(partition.fetch(:unparseable)).to eq(0)
+    end
+
     it "warns and skips the rewrite when an RSCWebpackPlugin options block is unparseable" do
       config_path = "config/webpack/serverWebpackConfig.js"
       simulate_existing_file(

@@ -764,6 +764,10 @@ module ReactOnRails
         state = nil
         escaped = false
         index = options_end + 1
+        # Tolerate one trailing comma between the options object and `)` so configs formatted
+        # with Prettier's `trailingComma: "all"` (`new RSCWebpackPlugin({...},)`) aren't flagged
+        # as unparseable. A second comma still bails — that would be invalid JS.
+        comma_seen = false
 
         while index < content.length
           char = content[index]
@@ -777,7 +781,12 @@ module ReactOnRails
             next
           end
 
-          return char == ")" unless char.match?(/\s/)
+          unless char.match?(/\s/)
+            return true if char == ")"
+            return false if comma_seen || char != ","
+
+            comma_seen = true
+          end
 
           index += 1
         end
@@ -1081,7 +1090,10 @@ module ReactOnRails
         content = body[0...(body.length - trailing.length)]
 
         last_line_start = (content.rindex("\n") || -1) + 1
-        indent = content[last_line_start..][/\A[ \t]*/] || "  "
+        # `[ \t]+` (one-or-more) so the regex returns nil when the last line is unindented,
+        # letting the `|| "  "` fallback actually fire. With `*` the regex would always match
+        # the empty string and the fallback was unreachable dead code.
+        indent = content[last_line_start..][/\A[ \t]+/] || "  "
 
         content_without_comments = rsc_plugin_options_without_comments(content).rstrip
         needs_comma = !content_without_comments.end_with?(",")
