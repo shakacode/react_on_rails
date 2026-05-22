@@ -344,7 +344,7 @@ appropriate `initialDelaySeconds` to each.
 See [Kubernetes Sidecar Manifest](./container-deployment.md#kubernetes-sidecar-manifest) for a complete pod spec with
 all three probes wired in, and
 [Startup Errors: `ERR_STREAM_PREMATURE_CLOSE`](./container-deployment.md#startup-errors-err_stream_premature_close) for
-the troubleshooting flow that points back here for tuning.
+the startup-error troubleshooting context.
 
 For Control Plane topology-specific `renderer_url`, host binding, and probe target guidance, see
 [Control Plane Deployment Shapes](./container-deployment.md#control-plane-deployment-shapes).
