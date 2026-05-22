@@ -87,3 +87,57 @@ export function setupTracing(options: TracingIntegrationOptions) {
 export function trace<T>(fn: UnitOfWork<T>, unitOfWorkOptions: UnitOfWorkOptions): Promise<T> {
   return executor(fn, unitOfWorkOptions);
 }
+
+/**
+ * Options passed to a sub-span wrapper.
+ *
+ * `name` is the span name (use dot.namespaced form, e.g. `ror.bundle.upload`).
+ * `attributes` are arbitrary key/value pairs attached to the span.
+ */
+export interface SubSpanOptions {
+  name: string;
+  attributes?: Record<string, string | number | boolean>;
+}
+
+/**
+ * Signature of a sub-span implementation installed via {@link setupSubSpan}.
+ * Must invoke `fn()` and return its result. May wrap `fn()` in a tracing span.
+ */
+export type SubSpanFn = <T>(opts: SubSpanOptions, fn: () => Promise<T>) => Promise<T>;
+
+const defaultSubSpan: SubSpanFn = (_opts, fn) => fn();
+let subSpanImpl: SubSpanFn = defaultSubSpan;
+
+/**
+ * Install a sub-span implementation. Integrations call this from their `init()`
+ * to start receiving sub-span events. If never called, sub-spans are no-ops.
+ */
+export function setupSubSpan(impl: SubSpanFn): void {
+  subSpanImpl = impl;
+}
+
+/**
+ * Wrap an async function in a named sub-span. Safe to call even when no
+ * integration is installed — defaults to passing through to `fn()`.
+ *
+ * If the installed implementation throws synchronously before invoking `fn()`,
+ * the caller is shielded: `fn()` is still executed and its result returned.
+ */
+export function subSpan<T>(opts: SubSpanOptions, fn: () => Promise<T>): Promise<T> {
+  try {
+    return subSpanImpl(opts, fn);
+  } catch (err) {
+    message(`subSpan implementation threw before invoking fn(): ${String(err)}`);
+    return fn();
+  }
+}
+
+/**
+ * Test-only: reset the installed sub-span implementation back to the default
+ * pass-through. Not part of the public api — do not re-export from
+ * `integrations/api.ts`.
+ */
+// eslint-disable-next-line no-underscore-dangle
+export function __resetSubSpanForTest(): void {
+  subSpanImpl = defaultSubSpan;
+}
