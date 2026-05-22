@@ -216,7 +216,8 @@ bin/export-bundler-config --doctor
 
 Both commands are thin shims over the same exporter and produce the same output: annotated YAML files in `shakapacker-config-exports/` (created in your project root) covering development (with and without HMR) and production, split into separate client and server bundle files. The YAML is annotated with inline documentation so you can see, for each loader / plugin / resolve rule, where it came from.
 
-> Tip: add `shakapacker-config-exports/` to your `.gitignore` — these files are intended for local inspection, not version control.
+> [!TIP]
+> Add `shakapacker-config-exports/` to your `.gitignore` — these files are intended for local inspection, not version control.
 
 Two common uses:
 
