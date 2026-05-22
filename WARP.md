@@ -351,14 +351,6 @@ subject(:method_result) { instance.method_name(arg) }
 - Use `rake autofix` to fix most issues automatically
 - Check `.rubocop.yml` for project-specific rules
 
-## Monorepo Merger (In Progress)
-
-The project is merging `react_on_rails` and `react_on_rails_pro` into a unified monorepo. During this transition:
-
-- Continue contributing to current structure
-- License compliance is critical (no Pro code in MIT areas)
-- See `docs/MONOREPO_MERGER_PLAN_REF.md` for details
-
 ## Additional Resources
 
 - [CONTRIBUTING.md](./CONTRIBUTING.md) - Comprehensive contributor guide
