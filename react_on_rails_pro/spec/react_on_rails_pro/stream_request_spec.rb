@@ -6,7 +6,8 @@ require "react_on_rails_pro/stream_request"
 RSpec.describe ReactOnRailsPro::StreamRequest do
   describe ".create" do
     it "returns a StreamDecorator instance" do
-      result = described_class.create { mock_response }
+      # Block is not invoked until #each_chunk runs; this example only checks the return type.
+      result = described_class.create { nil }
       expect(result).to be_a(ReactOnRailsPro::StreamDecorator)
     end
   end
