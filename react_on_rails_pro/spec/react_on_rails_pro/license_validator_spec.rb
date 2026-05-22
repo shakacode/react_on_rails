@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "base64"
+require "json"
 require "jwt"
 require_relative "spec_helper"
 
@@ -128,6 +130,38 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       end
 
       it "returns :invalid" do
+        expect(described_class.license_status).to eq(:invalid)
+      end
+    end
+
+    # Defends against the classic alg-confusion attack: an attacker forges an
+    # HS256 token using the server's public key (in PEM form) as the HMAC
+    # secret. Without an algorithm allowlist, a verifier might use the public
+    # key bytes as the HMAC key and accept the forgery. decode_license passes
+    # `algorithm: "RS256"`, which jwt 2.5+ and jwt 3.x both honour.
+    context "with HS256 token forged from the public key" do
+      before do
+        public_key_pem = test_public_key.to_pem
+        forged_token = JWT.encode(valid_payload, public_key_pem, "HS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = forged_token
+      end
+
+      it "returns :invalid (RS256 allowlist rejects HS256 tokens)" do
+        expect(described_class.license_status).to eq(:invalid)
+      end
+    end
+
+    # Defends against the classic alg:none attack: tokens with no signature
+    # must be rejected. JWT.encode does not support "none" directly, so the
+    # token is hand-crafted.
+    context "with alg:none token" do
+      before do
+        header = Base64.urlsafe_encode64('{"alg":"none","typ":"JWT"}', padding: false)
+        payload = Base64.urlsafe_encode64(JSON.dump(valid_payload), padding: false)
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = "#{header}.#{payload}."
+      end
+
+      it "returns :invalid (RS256 allowlist rejects alg:none tokens)" do
         expect(described_class.license_status).to eq(:invalid)
       end
     end
