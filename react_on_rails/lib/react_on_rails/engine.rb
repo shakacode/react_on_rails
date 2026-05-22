@@ -4,6 +4,18 @@ require "rails/railtie"
 
 module ReactOnRails
   class Engine < ::Rails::Engine
+    # Suppress Shakapacker's packageManager guard when Shakapacker is not the configured bundler.
+    #
+    # Shakapacker ships a Rails::Engine whose `shakapacker.manager_checker` initializer raises
+    # at boot if package.json lacks `packageManager` and a non-npm lockfile is present. That
+    # initializer fires whenever Shakapacker is loaded, even as a transitive dependency of
+    # React on Rails in a Vite-only / client-only setup that never adopts Shakapacker for builds.
+    # See issue #3145.
+    initializer "react_on_rails.suppress_shakapacker_package_manager_check",
+                before: "shakapacker.manager_checker" do
+      Engine.suppress_shakapacker_package_manager_check_if_not_bundler!
+    end
+
     # Validate package versions and compatibility on Rails startup
     # This ensures the application fails fast if versions don't match or packages are misconfigured
     # Skip validation during installation tasks (e.g., shakapacker:install) or generator runtime
@@ -81,6 +93,37 @@ module ReactOnRails
     # @return [Boolean] true if package.json is missing
     def self.package_json_missing?
       !File.exist?(VersionChecker::NodePackageVersion.package_json_path)
+    end
+
+    # Returns true when the host app has a Shakapacker config file, meaning Shakapacker
+    # is the configured bundler. Returns false when Shakapacker is only present as a
+    # transitive gem dependency (e.g., a Vite Rails app adopting React on Rails for
+    # client-only mounts).
+    def self.shakapacker_configured_as_bundler?
+      return false unless defined?(::Shakapacker)
+
+      ::Shakapacker.config.config_path.exist?
+    rescue StandardError
+      # If Shakapacker's config accessor is unavailable for any reason, fall back to
+      # treating Shakapacker as not configured rather than letting boot fail.
+      false
+    end
+
+    # Patch Shakapacker's package-manager guard to a no-op when Shakapacker is not the
+    # bundler. Only takes effect when no config/shakapacker.yml is present.
+    def self.suppress_shakapacker_package_manager_check_if_not_bundler!
+      return if shakapacker_configured_as_bundler?
+      return unless defined?(::Shakapacker::Utils::Manager)
+
+      Rails.logger.info(
+        "[React on Rails] No config/shakapacker.yml found; skipping Shakapacker " \
+        "packageManager check (Shakapacker is loaded as a transitive dependency but " \
+        "is not the configured bundler)."
+      )
+
+      ::Shakapacker::Utils::Manager.define_singleton_method(:error_unless_package_manager_is_obvious!) do
+        # no-op: React on Rails detected Shakapacker is not the configured bundler.
+      end
     end
 
     # Install ScoutApm instrumentation after ScoutApm is configured via "scout_apm.start" initializer.

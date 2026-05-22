@@ -166,6 +166,130 @@ module ReactOnRails
       end
     end
 
+    describe ".shakapacker_configured_as_bundler?" do
+      context "when Shakapacker.config.config_path exists" do
+        before do
+          allow(::Shakapacker.config).to receive_message_chain(:config_path, :exist?).and_return(true)
+        end
+
+        it "returns true" do
+          expect(described_class.shakapacker_configured_as_bundler?).to be true
+        end
+      end
+
+      context "when Shakapacker.config.config_path does not exist" do
+        before do
+          allow(::Shakapacker.config).to receive_message_chain(:config_path, :exist?).and_return(false)
+        end
+
+        it "returns false" do
+          expect(described_class.shakapacker_configured_as_bundler?).to be false
+        end
+      end
+
+      context "when accessing Shakapacker.config raises" do
+        before do
+          allow(::Shakapacker).to receive(:config).and_raise(StandardError, "boom")
+        end
+
+        it "returns false rather than letting boot fail" do
+          expect(described_class.shakapacker_configured_as_bundler?).to be false
+        end
+      end
+    end
+
+    describe ".suppress_shakapacker_package_manager_check_if_not_bundler!" do
+      # Skip these examples if ::Shakapacker::Utils::Manager isn't currently defined.
+      # Other specs in the suite stub_const("Shakapacker", ...) with a bare module that
+      # lacks the Utils namespace; in normal flow RSpec restores the constant after each
+      # example, so this branch is only hit when something has leaked.
+      before do
+        skip "Shakapacker::Utils::Manager is unavailable in this scope" unless defined?(::Shakapacker::Utils::Manager)
+        allow(Rails.logger).to receive(:info)
+      end
+
+      # Snapshot and restore the singleton method so the patch never leaks between examples,
+      # regardless of suite ordering or whether earlier tests already replaced it.
+      around do |example|
+        singleton = nil
+        snapshot = nil
+        if defined?(::Shakapacker::Utils::Manager)
+          singleton = ::Shakapacker::Utils::Manager.singleton_class
+          had_override = singleton.method_defined?(:error_unless_package_manager_is_obvious!) ||
+                         singleton.private_method_defined?(:error_unless_package_manager_is_obvious!)
+          snapshot = ::Shakapacker::Utils::Manager.method(:error_unless_package_manager_is_obvious!) if had_override
+        end
+        example.run
+      ensure
+        if singleton
+          if singleton.method_defined?(:error_unless_package_manager_is_obvious!) ||
+             singleton.private_method_defined?(:error_unless_package_manager_is_obvious!)
+            singleton.send(:remove_method, :error_unless_package_manager_is_obvious!)
+          end
+          if snapshot
+            ::Shakapacker::Utils::Manager.define_singleton_method(:error_unless_package_manager_is_obvious!,
+                                                                  snapshot)
+          end
+        end
+      end
+
+      context "when Shakapacker is the configured bundler" do
+        before do
+          allow(described_class).to receive(:shakapacker_configured_as_bundler?).and_return(true)
+        end
+
+        it "does not change Shakapacker::Utils::Manager.error_unless_package_manager_is_obvious!" do
+          method_name = :error_unless_package_manager_is_obvious!
+          before_location = ::Shakapacker::Utils::Manager.method(method_name).source_location
+          described_class.suppress_shakapacker_package_manager_check_if_not_bundler!
+          after_location = ::Shakapacker::Utils::Manager.method(method_name).source_location
+          expect(after_location).to eq before_location
+        end
+      end
+
+      context "when Shakapacker is not the configured bundler" do
+        before do
+          allow(described_class).to receive(:shakapacker_configured_as_bundler?).and_return(false)
+        end
+
+        it "replaces error_unless_package_manager_is_obvious! with a no-op" do
+          described_class.suppress_shakapacker_package_manager_check_if_not_bundler!
+          expect { ::Shakapacker::Utils::Manager.error_unless_package_manager_is_obvious! }.not_to raise_error
+        end
+
+        it "replaces the method with one defined in engine.rb" do
+          described_class.suppress_shakapacker_package_manager_check_if_not_bundler!
+          source_path, = ::Shakapacker::Utils::Manager.method(:error_unless_package_manager_is_obvious!).source_location
+          expect(source_path).to end_with("/lib/react_on_rails/engine.rb")
+        end
+
+        it "logs an informational message" do
+          described_class.suppress_shakapacker_package_manager_check_if_not_bundler!
+          expect(Rails.logger).to have_received(:info)
+            .with(a_string_including("skipping Shakapacker packageManager check"))
+        end
+      end
+    end
+
+    describe "Shakapacker package-manager suppression initializer" do
+      subject(:initializer) do
+        described_class.initializers.find { |i| i.name == "react_on_rails.suppress_shakapacker_package_manager_check" }
+      end
+
+      it "is registered" do
+        expect(initializer).not_to be_nil
+      end
+
+      it "runs before shakapacker.manager_checker" do
+        expect(initializer.before).to eq "shakapacker.manager_checker"
+      end
+
+      it "delegates to suppress_shakapacker_package_manager_check_if_not_bundler!" do
+        expect(described_class).to receive(:suppress_shakapacker_package_manager_check_if_not_bundler!)
+        initializer.run
+      end
+    end
+
     describe "ScoutApm instrumentation initializer" do
       subject(:initializer) { described_class.initializers.find { |i| i.name.include?("scout_apm") } }
 
