@@ -87,7 +87,19 @@ const commonWebpackConfig = () => merge({}, baseClientWebpackConfig, commonOptio
 module.exports = commonWebpackConfig;
 ```
 
-Webpack 4 / Webpacker 5 users should pass the same regex to [`stats.warningsFilter`](https://v4.webpack.js.org/configuration/stats/#statswarningsfilter) instead, since `ignoreWarnings` is a Webpack 5 option.
+Webpack 4 / Webpacker 5 users should pass the same regex to [`stats.warningsFilter`](https://v4.webpack.js.org/configuration/stats/#statswarningsfilter) instead, since `ignoreWarnings` is a Webpack 5 option:
+
+```js
+// Webpack 4 / Webpacker 5
+const { reactDomClientWarning } = require('react-on-rails/webpackHelpers');
+
+module.exports = {
+  // ...
+  stats: {
+    warningsFilter: [reactDomClientWarning],
+  },
+};
+```
 
 ---
 

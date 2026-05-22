@@ -22,4 +22,4 @@
  * Tracking issue: https://github.com/shakacode/react_on_rails/issues/3137
  */
 // eslint-disable-next-line import/prefer-default-export -- intentionally named so additional helpers can be added later without a breaking change
-export const reactDomClientWarning: RegExp = /Module not found: Error: Can't resolve 'react-dom\/client'/;
+export const reactDomClientWarning = /Module not found: Error: Can't resolve 'react-dom\/client'/;

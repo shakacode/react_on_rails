@@ -8,6 +8,12 @@ describe('webpackHelpers', () => {
       expect(reactDomClientWarning.test(message)).toBe(true);
     });
 
+    it('matches the webpack 4 "Module not found" warning for react-dom/client', () => {
+      const message =
+        "Module not found: Error: Can't resolve 'react-dom/client' in '/app/node_modules/react-on-rails/src'";
+      expect(reactDomClientWarning.test(message)).toBe(true);
+    });
+
     it('does not match unrelated module-not-found warnings', () => {
       expect(reactDomClientWarning.test("Module not found: Error: Can't resolve 'react-dom'")).toBe(false);
       expect(reactDomClientWarning.test("Module not found: Error: Can't resolve 'react-router/client'")).toBe(
