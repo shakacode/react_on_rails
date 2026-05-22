@@ -204,7 +204,8 @@ cat public/packs/manifest.json | grep "application"
 
 When something is wrong with the build itself — a loader not matching, a plugin missing in production, dev/prod divergence — it helps to inspect the **fully-resolved** webpack or rspack config, including all of Shakapacker's defaults. Shakapacker ships a `--doctor` mode that dumps annotated YAML for every relevant build.
 
-> Note: this is separate from `bundle exec rake react_on_rails:doctor`, which diagnoses React on Rails configuration rather than the bundler config itself.
+> [!NOTE]
+> This is separate from `bundle exec rake react_on_rails:doctor`, which diagnoses React on Rails configuration rather than the bundler config itself.
 
 ```bash
 # Shakapacker 9.6+ canonical binstub
