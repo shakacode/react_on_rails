@@ -144,6 +144,7 @@ jobs:
     env:
       SECRET_KEY_BASE: 'dummy-secret-key-for-ci-testing-not-used-in-production'
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+      BUNDLE_DISABLE_CHECKSUM_VALIDATION: 'true'
 
     steps:
       # ============================================
