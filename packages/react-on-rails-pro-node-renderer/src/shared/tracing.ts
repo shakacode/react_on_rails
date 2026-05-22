@@ -107,13 +107,19 @@ export type SubSpanFn = <T>(opts: SubSpanOptions, fn: () => Promise<T>) => Promi
 
 const defaultSubSpan: SubSpanFn = (_opts, fn) => fn();
 let subSpanImpl: SubSpanFn = defaultSubSpan;
+let subSpanSetupRun = false;
 
 /**
  * Install a sub-span implementation. Integrations call this from their `init()`
  * to start receiving sub-span events. If never called, sub-spans are no-ops.
  */
 export function setupSubSpan(impl: SubSpanFn): void {
+  if (subSpanSetupRun) {
+    message('setupSubSpan called more than once. Only one sub-span integration can be enabled.');
+    return;
+  }
   subSpanImpl = impl;
+  subSpanSetupRun = true;
 }
 
 /**
@@ -140,4 +146,5 @@ export function subSpan<T>(opts: SubSpanOptions, fn: () => Promise<T>): Promise<
 // eslint-disable-next-line no-underscore-dangle
 export function __resetSubSpanForTest(): void {
   subSpanImpl = defaultSubSpan;
+  subSpanSetupRun = false;
 }

@@ -38,7 +38,27 @@ describe('subSpan', () => {
     setupSubSpan(() => {
       throw new Error('impl crashed');
     });
-    const result = await subSpan({ name: 'test.span' }, async () => 'fallback-ok');
+    const fn = jest.fn(async () => 'fallback-ok');
+    const result = await subSpan({ name: 'test.span' }, fn);
     expect(result).toBe('fallback-ok');
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  test('impl async rejection propagates to caller (not swallowed by sync try/catch)', async () => {
+    setupSubSpan(async () => {
+      throw new Error('async-crash');
+    });
+    await expect(subSpan({ name: 'test.span' }, async () => 'never')).rejects.toThrow('async-crash');
+  });
+
+  test('setupSubSpan called twice logs a warning and keeps the first impl installed', async () => {
+    const firstImpl = jest.fn<SubSpanFn>(async (_opts, fn) => fn());
+    const secondImpl = jest.fn<SubSpanFn>(async (_opts, fn) => fn());
+    setupSubSpan(firstImpl);
+    setupSubSpan(secondImpl);
+
+    await subSpan({ name: 'test.span' }, async () => undefined);
+    expect(firstImpl).toHaveBeenCalledTimes(1);
+    expect(secondImpl).not.toHaveBeenCalled();
   });
 });
