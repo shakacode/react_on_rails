@@ -2,6 +2,7 @@ import type { ResponseResult } from '../shared/utils';
 import { handleRenderRequest } from './handleRenderRequest';
 import log from '../shared/log';
 import { getRequestBundleFilePath } from '../shared/utils';
+import { subSpan } from '../shared/tracing.js';
 
 export type IncrementalRenderSink = {
   /** Called for every subsequent NDJSON object after the first one */
@@ -117,15 +118,17 @@ export async function handleIncrementalRenderRequest(
       response,
       sink: {
         add: async (chunk: unknown) => {
-          try {
-            assertIsUpdateChunk(chunk);
-            const bundlePath = getRequestBundleFilePath(chunk.bundleTimestamp);
-            await executionContext.runInVM(chunk.updateChunk, bundlePath).catch((err: unknown) => {
-              log.error({ msg: 'Error running incremental render chunk', err, chunk });
-            });
-          } catch (err) {
-            log.error({ msg: 'Invalid incremental render chunk', err, chunk });
-          }
+          await subSpan({ name: 'ror.incremental.process_chunk' }, async () => {
+            try {
+              assertIsUpdateChunk(chunk);
+              const bundlePath = getRequestBundleFilePath(chunk.bundleTimestamp);
+              await executionContext.runInVM(chunk.updateChunk, bundlePath).catch((err: unknown) => {
+                log.error({ msg: 'Error running incremental render chunk', err, chunk });
+              });
+            } catch (err) {
+              log.error({ msg: 'Invalid incremental render chunk', err, chunk });
+            }
+          });
         },
         handleRequestClosed: () => {
           if (!onRequestClosedUpdateChunk) {
