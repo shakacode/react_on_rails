@@ -223,7 +223,7 @@ Two common uses:
 - **Troubleshooting:** diff two exports (before/after an upgrade, or against a known-working app) to find configuration drift.
 - **AI-assisted analysis:** paste the annotated YAML into an AI tool to ask questions like "why is this plugin in server but not client?" — the output format is designed to be readable by both humans and LLMs.
 
-For the full set of flags (`--build`, `--init`, `--validate`, `--save-dir`, etc.) and the build-config-file workflow, see the [Shakapacker Configuration Diff Tool docs](https://shakapacker.com/docs/config-diff).
+For the full set of flags (`--build`, `--init`, `--validate`, `--save-dir`, etc.) and the build-config-file workflow, see the [Shakapacker Configuration Diff Tool docs](https://shakapacker.com/docs/config-diff/).
 
 ## Pro Node Renderer Debugging
 
