@@ -2,7 +2,6 @@
 
 **Status:** Draft, pending user review
 **Date:** 2026-05-21
-**Author:** Justin Gordon (via Claude Code brainstorming)
 
 ## Context
 
@@ -25,8 +24,8 @@ Locked through brainstorming dialog 2026-05-21:
 | Q2  | How RCs land in demos        | **C** — PR per RC into `main` of each demo. Plus a scheduled follow-up PR to bump RC → final after the gem ships.                                                                             |
 | Q3  | Test plan structure          | **B** — Uniform common checklist + short per-repo appendix targeting the headline feature.                                                                                                    |
 | Q4  | Manual vs automated boundary | **B** — Use existing CI; manual fills the gap. One-time investment: add a Playwright smoke per demo for the headline feature where missing.                                                   |
-| Q5a | Gating policy                | **B** — Tiered. Critical demos hard-block the final; tutorial/examples soft-track.                                                                                                            |
-| Q5b | Plan file location           | Canonical in `internal/contributor-info/rc-testing-plan.md` (matches the existing home for `releasing.md`, `pull-requests.md`, etc.). RC testing is contributor-only, so no public-docs stub. |
+| Q5  | Gating policy                | **B** — Tiered. Critical demos hard-block the final; tutorial/examples soft-track.                                                                                                            |
+| Q6  | Plan file location           | Canonical in `internal/contributor-info/rc-testing-plan.md` (matches the existing home for `releasing.md`, `pull-requests.md`, etc.). RC testing is contributor-only, so no public-docs stub. |
 
 ## Repo Inventory
 
@@ -206,18 +205,16 @@ Each demo gets a 3–5 item appendix in the canonical plan. Items marked `*` req
 
 ## Automation Roadmap
 
-For each demo, the plan records its **current** automated coverage and lists missing Playwright smoke tests for the headline appendix item. Adding the smoke is a separate per-repo PR, not blocking on v1 of this plan.
+For each demo, the canonical plan records its **current** automated coverage and lists missing Playwright smoke tests for the headline appendix item. Adding the smoke is a separate per-repo PR, not blocking on v1 of this plan.
 
-The plan includes a table like:
+The canonical plan owns the populated coverage table; this spec only fixes its schema:
 
-| Demo                      | Current CI | Missing Playwright | Priority      |
-| ------------------------- | ---------- | ------------------ | ------------- |
-| `react-on-rails-rsc-demo` | TBD        | TBD                | High (Tier 1) |
-| ...                       | ...        | ...                | ...           |
+- **Demo** — repo short name.
+- **Current CI** — what runs today (RSpec, Jest, Playwright/Cypress, lint, build), discovered by inspecting `.github/workflows/` and the repo's test scripts.
+- **Missing Playwright** — the headline-appendix items not yet covered by an automated smoke test.
+- **Priority** — `High` for Tier 1, `Backlog` for Tier 2.
 
-The TBDs are filled in during plan authoring by inspecting each demo's `.github/workflows/` and `package.json` / `Gemfile`.
-
-Priority: Tier 1 demos first, Tier 2 demos as backlog.
+The inspection pass (one row per Tier-1 demo, then Tier 2) is an explicit prerequisite of the canonical plan PR — the table must ship populated, never with `TBD` cells. Filling the table in this design spec is deferred so the spec stays focused on schema and process; the spec is approved without doing the per-repo discovery.
 
 ## Gating Policy
 
@@ -230,7 +227,14 @@ All 7 Tier-1 PRs must satisfy both:
 
 The final release of `react_on_rails` or `shakapacker` is blocked until all 7 Tier-1 PRs pass. The release manager confirms this by reviewing the tracking issue.
 
-**Pre-existing failures**: if a Tier-1 demo fails for a reason unrelated to the RC (verified by reproducing on `main` of the demo without the RC bump), the failure does not block. The release manager documents the unrelated failure in the tracking issue with a link to the reproducing run on `main`, files an issue in the demo repo, and marks the demo as "tested, blocked by pre-existing issue." This carve-out exists so a stale demo bug cannot indefinitely block a release.
+**Pre-existing failures**: if a Tier-1 demo fails for a reason unrelated to the RC (verified by reproducing on `main` of the demo without the RC bump), the failure does not block. The release manager:
+
+1. Documents the unrelated failure in the tracking issue with a link to the reproducing run on `main`.
+2. Files an issue in the demo repo.
+3. **Requests a second contributor to confirm the carve-out** by reviewing the reproduction link and acknowledging in the tracking issue (e.g., "Confirmed pre-existing, not RC-related — @reviewer"). The release manager may not self-certify; the second sign-off avoids the conflict-of-interest case where a release manager under time pressure dismisses a real regression.
+4. Only after that confirmation, marks the demo as "tested, blocked by pre-existing issue."
+
+This is especially important for RSC demos, where "pre-existing" vs RC-regression can be ambiguous. The carve-out exists so a stale demo bug cannot indefinitely block a release, but the dual sign-off keeps the bar honest.
 
 ### Tier 2 (soft track)
 
@@ -306,3 +310,7 @@ Items marked `*` in per-repo appendices require reading each demo's README/sourc
 2. On approval, invoke `superpowers:writing-plans` to produce the implementation plan (file-level work breakdown for the two deliverables in this repo).
 3. Implement the deliverables.
 4. Open the first tracking issue against the next RC of either gem to validate the workflow end-to-end.
+
+## Lifecycle
+
+This file is a one-shot design spec, not a living document. Once `internal/contributor-info/rc-testing-plan.md` is approved and merged, **delete this spec in the same PR (or the immediate follow-up)**. The git history is the permanent record of the brainstorm; keeping the design doc alongside the canonical plan creates a drift hazard where readers can't tell which document is authoritative.
