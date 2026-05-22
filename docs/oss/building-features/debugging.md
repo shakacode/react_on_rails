@@ -216,12 +216,14 @@ bin/export-bundler-config --doctor
 
 Both commands are thin shims over the same exporter and produce the same output: annotated YAML files in `shakapacker-config-exports/` (created in your project root) covering development (with and without HMR) and production, split into separate client and server bundle files. The YAML is annotated with inline documentation so you can see, for each loader / plugin / resolve rule, where it came from.
 
+> Tip: add `shakapacker-config-exports/` to your `.gitignore` — these files are intended for local inspection, not version control.
+
 Two common uses:
 
 - **Troubleshooting:** diff two exports (before/after an upgrade, or against a known-working app) to find configuration drift.
 - **AI-assisted analysis:** paste the annotated YAML into an AI tool to ask questions like "why is this plugin in server but not client?" — the output format is designed to be readable by both humans and LLMs.
 
-For the full set of flags (`--build`, `--init`, `--validate`, `--save-dir`, etc.) and the build-config-file workflow, see the [Shakapacker README](https://github.com/shakacode/shakapacker).
+For the full set of flags (`--build`, `--init`, `--validate`, `--save-dir`, etc.) and the build-config-file workflow, see the [Shakapacker Configuration Diff Tool docs](https://shakapacker.com/docs/config-diff).
 
 ## Pro Node Renderer Debugging
 
