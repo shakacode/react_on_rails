@@ -198,6 +198,11 @@ jobs:
       # STEP 3: START APPLICATION SERVER
       # ============================================
 
+      # libyaml-dev is needed for psych v5 native extensions; install before any
+      # bundler-cache step so bundle install can compile psych if required.
+      - name: Fix dependency for libyaml-dev
+        run: sudo apt install libyaml-dev -y
+
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
@@ -216,9 +221,6 @@ jobs:
       - name: Install foreman
         if: steps.cache-foreman.outputs.cache-hit != 'true'
         run: gem install foreman
-
-      - name: Fix dependency for libyaml-dev
-        run: sudo apt install libyaml-dev -y
 
       # Follow https://github.com/pnpm/action-setup?tab=readme-ov-file#use-cache-to-reduce-installation-time
       - name: Setup pnpm
