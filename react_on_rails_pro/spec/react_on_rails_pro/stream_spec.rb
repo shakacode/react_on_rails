@@ -36,17 +36,23 @@ end
 
 RSpec.describe "Streaming API" do
   describe "Renderer response streaming" do
-    it "yields chunks as soon as complete lines arrive" do
+    def lpp(html, **metadata)
+      "#{metadata.to_json}\t#{html.bytesize.to_s(16).rjust(8, '0')}\n#{html}"
+    end
+
+    it "yields parsed length-prefixed chunks as soon as each frame arrives" do
       mocked_block = mock_block
       response = ReactOnRailsPro::RendererHttpClient::Response.new(status: 200) do |yielder|
-        yielder.call("First chunk\n")
-        expect(mocked_block).to have_received(:call).with("First chunk")
+        yielder.call(lpp("First chunk", consoleReplayScript: ""))
+        expect(mocked_block).to have_received(:call).with(
+          hash_including("html" => "First chunk", "consoleReplayScript" => "")
+        )
 
-        yielder.call("Second chunk\n")
-        expect(mocked_block).to have_received(:call).with("Second chunk")
+        yielder.call(lpp("Second chunk", consoleReplayScript: ""))
+        expect(mocked_block).to have_received(:call).with(hash_including("html" => "Second chunk"))
 
-        yielder.call("Final chunk\n")
-        expect(mocked_block).to have_received(:call).with("Final chunk")
+        yielder.call(lpp("Final chunk", consoleReplayScript: ""))
+        expect(mocked_block).to have_received(:call).with(hash_including("html" => "Final chunk"))
       end
 
       stream = ReactOnRailsPro::StreamRequest.create { response }
@@ -54,40 +60,33 @@ RSpec.describe "Streaming API" do
       stream.each_chunk(&mocked_block.block)
     end
 
-    it "yields the final partial line on successful responses" do
-      response = ReactOnRailsPro::RendererHttpClient::Response.new(status: 200, body: ["First chunk", "Second chunk"])
+    it "reassembles length-prefixed frames split across HTTP chunk boundaries" do
+      header = "{\"consoleReplayScript\":\"\"}\t0000000b\n"
+      response = ReactOnRailsPro::RendererHttpClient::Response.new(
+        status: 200,
+        body: [header, "First chunk"]
+      )
       stream = ReactOnRailsPro::StreamRequest.create { response }
       chunks = []
 
       stream.each_chunk { |chunk| chunks << chunk }
 
-      expect(chunks).to eq(["First chunkSecond chunk"])
+      expect(chunks).to eq([{ "html" => "First chunk", "consoleReplayScript" => "" }])
     end
 
-    it "includes the final partial line in renderer error bodies" do
+    it "preserves newlines when capturing renderer error bodies" do
       mocked_block = mock_block
       response = ReactOnRailsPro::RendererHttpClient::Response.new(
         status: 500,
-        body: ["First error line\n", "Second error line"]
+        body: ["First error line\n", "Second error line\n"]
       )
       stream = ReactOnRailsPro::StreamRequest.create { response }
 
       expect do
         stream.each_chunk(&mocked_block.block)
-      end.to raise_error(ReactOnRailsPro::Error, /500:\nFirst error lineSecond error line/)
+      end.to raise_error(ReactOnRailsPro::Error, /500:\nFirst error line\nSecond error line/)
 
       expect(mocked_block).not_to have_received(:call)
-    end
-
-    it "preserves renderer HTTP errors when final partial-line flushing raises" do
-      request = ReactOnRailsPro::StreamRequest.send(:new) { "unused" }
-      response = ReactOnRailsPro::RendererHttpClient::Response.new(status: 500, body: ["Partial error"])
-
-      expect do
-        request.send(:loop_response_lines, response) do |_chunk|
-          raise StandardError, "secondary flush failure"
-        end
-      end.to raise_error(ReactOnRailsPro::RendererHttpClient::HTTPError)
     end
   end
 

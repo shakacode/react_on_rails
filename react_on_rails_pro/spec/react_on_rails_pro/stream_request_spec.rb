@@ -38,10 +38,9 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
     end
 
     it "treats nil fallback status as not-yet-an-error" do
+      lpp_chunk = "{}\t00000005\nFirst"
       response = Class.new do
-        def each
-          yield "First\n"
-        end
+        define_method(:each) { |&block| block.call(lpp_chunk) }
 
         def status
           nil
@@ -54,29 +53,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         yielded_chunks << chunk
       end
 
-      expect(yielded_chunks).to eq(["First"])
-      expect(error_body).to eq("")
-    end
-
-    it "does not duplicate a line when a chunk starts with a newline" do
-      response = Class.new do
-        def each
-          yield "First\n"
-          yield "\nSecond\n"
-        end
-
-        def error?
-          false
-        end
-      end.new
-
-      yielded_chunks = []
-
-      request.send(:process_response_chunks, response, error_body) do |chunk|
-        yielded_chunks << chunk
-      end
-
-      expect(yielded_chunks).to eq(%w[First Second])
+      expect(yielded_chunks).to eq([{ "html" => "First" }])
       expect(error_body).to eq("")
     end
 
@@ -98,7 +75,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       expect(yielded_chunks).to be_empty
     end
 
-    it "preserves the original response error when final-line flushing times out" do
+    it "propagates renderer errors that arrive mid-stream" do
       response_error = ReactOnRailsPro::RendererHttpClient::ConnectionError.new("renderer reset")
       response = Class.new do
         def initialize(error)
@@ -115,11 +92,11 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         end
       end.new(response_error)
 
+      yielded_chunks = []
       expect do
-        request.send(:process_response_chunks, response, error_body) do |_chunk|
-          raise Async::TimeoutError, "flush timed out"
-        end
+        request.send(:process_response_chunks, response, error_body) { |chunk| yielded_chunks << chunk }
       end.to raise_error(ReactOnRailsPro::RendererHttpClient::ConnectionError, /renderer reset/)
+      expect(yielded_chunks).to be_empty
     end
   end
 end

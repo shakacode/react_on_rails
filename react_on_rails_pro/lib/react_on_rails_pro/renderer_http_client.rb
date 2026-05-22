@@ -372,14 +372,8 @@ module ReactOnRailsPro
     end
 
     def pool_limit
-      return @pool_size unless @pool_size.nil?
-
       # nil preserves the legacy "use the default" setting; async-http still receives a finite stream limit.
-      if defined?(ReactOnRailsPro::Configuration::DEFAULT_RENDERER_HTTP_POOL_SIZE)
-        ReactOnRailsPro::Configuration::DEFAULT_RENDERER_HTTP_POOL_SIZE
-      else
-        10
-      end
+      @pool_size || ReactOnRailsPro::Configuration::DEFAULT_RENDERER_HTTP_POOL_SIZE
     end
 
     def stream_body(raw_response, yielder)
