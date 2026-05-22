@@ -40,7 +40,7 @@ import {
   Asset,
   getAssetPath,
 } from './shared/utils.js';
-import { startSsrRequestOptions, trace } from './shared/tracing.js';
+import { startSsrRequestOptions, subSpan, trace } from './shared/tracing.js';
 
 // Uncomment the below for testing timeouts:
 // import { delay } from './shared/utils.js';
@@ -547,10 +547,20 @@ export default function run(config: Partial<Config>) {
       // endpoint so that concurrent /upload-assets and render requests
       // targeting the same bundle directory are mutually exclusive.
       // See https://github.com/shakacode/react_on_rails/issues/2463
-      const result = await handleNewBundlesProvided(
-        { label: 'Request:', content: taskDescription },
-        providedNewBundles,
-        assetsToCopy,
+      const result = await subSpan(
+        {
+          name: 'ror.bundle.upload',
+          attributes: {
+            'bundle.count': providedNewBundles.length,
+            'assets.count': assetsToCopy.length,
+          },
+        },
+        () =>
+          handleNewBundlesProvided(
+            { label: 'Request:', content: taskDescription },
+            providedNewBundles,
+            assetsToCopy,
+          ),
       );
       if (result) {
         await setResponse(result, res);
