@@ -847,6 +847,10 @@ module ReactOnRails
             next
           end
 
+          # `block_comment_exit_guard`: relies on `*` matching neither `{` nor `}`, so the
+          # `*` returned at a `*/` exit is harmless here. If any future check below adds a
+          # branch that could fire on `*` (or `)`, `/`, etc.), guard it with
+          # `prev_state == :block_comment` per the contract on `advance_js_scan_state`.
           depth += 1 if char == "{"
           if char == "}"
             depth -= 1
@@ -860,6 +864,16 @@ module ReactOnRails
 
       # Return index is the last consumed character. Line comments leave the newline
       # for the caller's normal index increment; block comments consume the closing slash.
+      #
+      # IMPORTANT CALLER CONTRACT — block-comment exit:
+      # When this returns from a `*/` exit, `state` is cleared, but `char` is still the `*` and
+      # the returned `index` points at the closing `/` (so the caller's trailing `index += 1`
+      # lands on the first char after `*/`). Any caller whose post-call branch inspects `char`
+      # as a "significant character" (e.g. `==` checks against `*`, `/`, `)`, `{`, `}`) MUST
+      # explicitly guard on `prev_state == :block_comment` before that branch — otherwise the
+      # `*` from the comment terminator is misread as code. Callers that only update accumulator
+      # state (depth counters, string/comment booleans) are inherently safe because `*` doesn't
+      # affect those. Searchable invariant name: `block_comment_exit_guard`.
       def advance_js_scan_state(state, escaped, char, next_char, index)
         return [char == "\n" ? nil : :line_comment, escaped, index] if state == :line_comment
         return advance_js_block_comment_state(escaped, char, next_char, index) if state == :block_comment
@@ -931,10 +945,23 @@ module ReactOnRails
         state.nil? && depth.zero?
       end
 
-      def rsc_plugin_is_server_match?(options, is_server:)
-        rsc_plugin_options_without_comments(options).match?(
-          /\bisServer\s*:\s*#{Regexp.escape(is_server.to_s)}\b/
-        )
+      # Depth-aware: a nested `metadata: { isServer: true }` inside another option's value
+      # must NOT route the section into the `is_server: true` partition bucket — otherwise
+      # the rewrite would correctly bail (the splice helper is also depth-aware) but
+      # `warn_missing_rsc_plugin_target` would still fire and the user sees a misleading
+      # "no plugin options with isServer: true could be rewritten" warning for a config that
+      # is actually fine. Mirrors `rsc_plugin_body_has_top_level_key?` so partitioning and
+      # splicing agree on what counts as a top-level `isServer:` pair. Comment/string skipping
+      # is handled by `js_top_level_position?` via the shared `advance_js_scan_state`.
+      def rsc_plugin_is_server_match?(body, is_server:)
+        pattern = /\bisServer\s*:\s*#{Regexp.escape(is_server.to_s)}\b/
+        search_from = 0
+        while (match = pattern.match(body, search_from))
+          return true if js_top_level_position?(body, match.begin(0))
+
+          search_from = match.end(0)
+        end
+        false
       end
 
       def rewrite_rsc_plugin_client_references(config_path, is_server:)
@@ -1229,16 +1256,11 @@ module ReactOnRails
 
       def rsc_client_references_setup_anchor_match(content, is_server:)
         pattern = rsc_client_references_setup_import_pattern(is_server: is_server)
-        anchor_match = nil
-        content.to_enum(:scan, pattern).any? do
-          current_match = Regexp.last_match
-          next false unless js_code_position?(content, current_match.begin(0))
-
-          anchor_match = current_match
-          true
+        content.to_enum(:scan, pattern).each do
+          match = Regexp.last_match
+          return match if js_code_position?(content, match.begin(0))
         end
-
-        anchor_match
+        nil
       end
 
       def rsc_setup_blocked_by_later_imports?(config_path, content, existing_imports_content, is_server:)

@@ -1305,6 +1305,27 @@ describe RscGenerator, type: :generator do
       expect(partition.fetch(:unparseable)).to eq(1)
     end
 
+    it "does not bucket a section by a nested isServer value into the wrong partition" do
+      # `metadata: { isServer: true }` must not route this section into the `is_server: true`
+      # bucket; only the top-level `isServer: false` should match the `is_server: false` bucket.
+      # Without depth-aware matching, the `is_server: true` partition would falsely include this
+      # section, the rewrite would correctly bail (the splice helper IS depth-aware), and the
+      # user would see a misleading "no plugin options with isServer: true could be rewritten"
+      # warning for a config that is actually fine.
+      content = <<~JS
+        new RSCWebpackPlugin({
+          metadata: { isServer: true },
+          isServer: false,
+        });
+      JS
+
+      true_partition = generator.send(:rsc_plugin_option_sections_partition, content, is_server: true)
+      false_partition = generator.send(:rsc_plugin_option_sections_partition, content, is_server: false)
+
+      expect(true_partition.fetch(:safe).length).to eq(0)
+      expect(false_partition.fetch(:safe).length).to eq(1)
+    end
+
     it "does not inject duplicate imports for legacy let or var CommonJS destructuring" do
       config_path = "config/webpack/clientWebpackConfig.js"
       simulate_existing_file(
