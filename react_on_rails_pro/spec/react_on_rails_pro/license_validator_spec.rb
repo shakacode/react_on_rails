@@ -138,7 +138,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
     # HS256 token using the server's public key (in PEM form) as the HMAC
     # secret. Without an algorithm allowlist, a verifier might use the public
     # key bytes as the HMAC key and accept the forgery. decode_license passes
-    # `algorithm: "RS256"`, which jwt 2.5+ and jwt 3.x both honour.
+    # `algorithms: ["RS256"]`, the documented allowlist option for jwt 2.x and 3.x.
     context "with HS256 token forged from the public key" do
       before do
         public_key_pem = test_public_key.to_pem
