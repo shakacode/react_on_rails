@@ -80,7 +80,7 @@ A phase is "done" when every task in it passes its acceptance criteria AND the p
 
 **Outputs:**
 
-- A new local branch `spike/starter-2026-stack-validation` containing a fresh app produced by `create-react-on-rails-app --rsc --rspack`.
+- A new local branch `spike/starter-tanstack-stack-validation` containing a fresh app produced by `create-react-on-rails-app --rsc --rspack`.
 - `SPIKE.md` at the app root with a "what we're testing" section.
 
 **Acceptance criteria:**
@@ -211,7 +211,7 @@ A phase is "done" when every task in it passes its acceptance criteria AND the p
 
 **Outputs:**
 
-- New repo at `shakacode/react-on-rails-starter-2026` (or whatever name the implementer picks — Justin defers).
+- New repo at `shakacode/react-on-rails-starter-tanstack` (name locked by Justin 2026-05-22).
 - Repository setting: "Template repository" = enabled.
 - `README.md` with: "Scaffolding in progress — see #3357" and a link to the strategic plan.
 - `LICENSE` (MIT, matching ShakaCode convention).
@@ -825,7 +825,7 @@ A phase is "done" when every task in it passes its acceptance criteria AND the p
 
 - [ ] Slow-throttle one query: that card shows skeleton, others show data.
 - [ ] Force one query to 500: that card shows error, others render.
-- [ ] Page is RSC-streamed (verify in network tab: chunked response).
+- [ ] `/dashboard` renders via `react_component` (classic SSR through the Pro Node renderer) — NOT `rsc: true`. RSC lives on the public landing where its TTFB / SEO / cold-load wins apply; behind auth it doesn't earn its keep. Verify the page source contains the rendered HTML and that hydration is clean (no console errors).
 
 ### T4.4: Projects list with TanStack Table
 
@@ -924,18 +924,29 @@ A phase is "done" when every task in it passes its acceptance criteria AND the p
 
 **Goal:** Each pattern ships with empty / loading / error / success states. All largely parallel.
 
-### T5.1: Hero block (landing page)
+### T5.1: Hero block (RSC-rendered landing page)
 
-**Depends on:** Phase 1 complete
+**Depends on:** Phase 1 complete, T0.4 GREEN (RSC + shadcn + Tailwind v4 validated)
 **Parallel-safe with:** all T5.\*
-**Est. CC time:** 60 min
+**Est. CC time:** 75 min
 
-**Outputs:** Public landing at `/` with hero ("Best TanStack on Rails"), 4 demo-portfolio link cards, "Use this template" + "see dashboard demo" CTAs, signed-in user sees "go to dashboard" instead.
+**Goal:** The public landing is where RSC earns its keep. This task ships the RSC-rendered landing that demonstrates the kit's "right tool for the right surface" thesis.
+
+**Outputs:**
+
+- Public landing at `/` rendered via `react_on_rails_component` with `rsc: true`.
+- Hero ("Best TanStack on Rails") + 4 demo-portfolio link cards + dark-mode toggle + CTAs ("Use this template" + "see dashboard demo"). Signed-in user sees "go to dashboard" instead.
+- Includes one interactive client-component child (e.g. the dark-mode toggle, or a "copy template URL" button) to demonstrate the RSC + client-component boundary pattern.
+- Marked `// REFERENCE PATTERN: rsc-page — see AGENTS.md §11` (the RSC vs SSR vs client decision tree section).
 
 **Acceptance criteria:**
 
+- [ ] First HTML response includes the rendered hero markup (view source, not blank).
+- [ ] Network tab shows chunked/streaming response on cold load.
+- [ ] The client-component child hydrates and responds to interaction.
+- [ ] No console errors related to `'use client'` boundaries.
 - [ ] Visually polished, responsive (mobile + desktop).
-- [ ] Dark mode renders correctly.
+- [ ] Dark mode renders correctly with no flash of wrong theme on cold load.
 
 ### T5.2–T5.6: Per-pattern 4-state components
 
@@ -1333,12 +1344,13 @@ A team of 4 AI sub-agents working in parallel could realistically land Phase 0 i
 
 ---
 
-## Open Items for Coordinator
+## Coordinator Decisions — Locked 2026-05-22
 
-These need a human (or top-level agent) call BEFORE dispatch begins:
+These were open at the time of the strategic-plan rewrite; all locked in the same session before dispatch.
 
-1. **Repo name decision** — Justin defers; pick something. Recommended: `react-on-rails-starter-2026` (matches the issue) or `react-on-rails-starter` (evergreen). The plan accepts either.
-2. **Dashboard narrative** (Required-Before-Implementation #9) — recommended: SaaS app dashboard first, rendering-tech as a drawer, pattern catalog as a `/playground` route in dev. Pick before T5.1.
-3. **Accessibility target** (Required-Before-Implementation #8) — recommended: WCAG AA, contrast ratio 4.5:1 for text. Pick before T2.8.
-4. **Demo deploy host** (T10.3) — Fly.io or Render. Pick before Phase 10.
-5. **Spike GREEN/AMBER decision authority** — if T0.5 lands AMBER, who approves the named fallbacks? Recommended: Justin reviews; coordinator dispatches once approved.
+1. **Repo name:** `react-on-rails-starter-tanstack`. Locks the identity to TanStack — sharper positioning bet than a year-suffixed name, no calendar-trap maintenance pressure.
+2. **Dashboard narrative:** SaaS app dashboard first. Rendering-tech as a drawer in the dashboard header. Pattern catalog at a dev-only `/playground` route (not the lead).
+3. **Rendering split (added 2026-05-22):** **RSC + streaming lives on the public landing `/`** (where TTFB, mobile perf, and SEO actually matter); **classic SSR + TanStack lives on the authenticated `/dashboard` + nested routes** (where TanStack's interactivity/type-safety wins apply and RSC's wins don't). The dashboard's rendering-mode drawer tells this story honestly.
+4. **Accessibility target:** WCAG AA, contrast 4.5:1 for text. Standard target; shadcn/Radix primitives get most of the way, Playwright specs verify the rest.
+5. **Demo deploy host (T10.3):** Decide at Phase 10 dispatch. Default Fly.io if no preference surfaces.
+6. **Spike approval authority:** **Full auto.** Coordinator interprets the `SPIKE.md` verdict (GREEN/AMBER/RED) and dispatches Phase 1 without waiting for human approval. Justin sees results at Phase 1 PR review. Max velocity; tradeoff is that the coordinator must accurately read the spike outcome.

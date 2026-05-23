@@ -4,7 +4,7 @@
 
 **Status:** Draft — design approved 2026-05-21; revised 2026-05-22 after `/autoplan` multi-voice review (CEO + Design + Eng + DX, each dual-voice via Claude subagent + Codex).
 **Tracking issue:** https://github.com/shakacode/react_on_rails/issues/3357
-**Public repo (to be created):** `shakacode/react-on-rails-starter-2026`
+**Public repo (to be created):** `shakacode/react-on-rails-starter-tanstack`
 
 ## Autoplan Review Outcome (2026-05-22)
 
@@ -62,18 +62,18 @@ Both audiences are served by the same core decision: an opinionated TanStack-fir
 
 ## Delivery Decision
 
-**Standalone public GitHub repo, `shakacode/react-on-rails-starter-2026`, public from commit 1, configured as a GitHub Template Repository** (so adopters get a fresh tree via "Use this template," not a stale clone).
+**Standalone public GitHub repo, `shakacode/react-on-rails-starter-tanstack`, public from commit 1, configured as a GitHub Template Repository** (so adopters get a fresh tree via "Use this template," not a stale clone).
 
 Considered alternatives:
 
-- A new flag on `create-react-on-rails-app`: deferred to Tier 2 review, not rejected. Original argument ("no Inertia kit ships as a CLI") is competitor-mimicry rather than user reasoning. The real argument is CLI-matrix bloat + Pro-heavy maintenance burden, which is legitimate but not load-bearing. After Tier 1 ships, if the maintained template proves stable, fold its defaults back into `create-react-on-rails-app --template starter-2026` (the flag clones the maintained template repo, doesn't re-generate every permutation).
+- A new flag on `create-react-on-rails-app`: deferred to Tier 2 review, not rejected. Original argument ("no Inertia kit ships as a CLI") is competitor-mimicry rather than user reasoning. The real argument is CLI-matrix bloat + Pro-heavy maintenance burden, which is legitimate but not load-bearing. After Tier 1 ships, if the maintained template proves stable, fold its defaults back into `create-react-on-rails-app --template tanstack` (the flag clones the maintained template repo, doesn't re-generate every permutation).
 - A sibling generator package (`create-react-on-rails-flagship`): rejected — duplicates the maintenance burden of both the CLI and the template repo.
 - Private-first, public when polished: rejected; the credibility cost of a messy public commit log is small enough to accept in exchange for "build in public" signal.
 - Fork the Evil Martians Inertia kit and swap Inertia for RoR Pro: rejected — TanStack-on-Rails is a _different_ product, not a recoloring of their kit.
 
 The kit is bootstrapped via `create-react-on-rails-app --rsc --rspack` and then heavily customized; downstream improvements to that CLI flow benefit both projects.
 
-**On the `-2026` naming** (dual-voice review surfaced this as a maintenance trap): the suffix telegraphs freshness in Q1 and decay by Q3 of 2027. Two acceptable resolutions, both deferred to Required-Before-Implementation #5: (a) rename to `react-on-rails-starter` (evergreen, freshening-cadence-as-policy), or (b) commit to a yearly cut-over (`-2026` → archived; `-2027` ships in January) so the suffix is a feature, not a self-defeating prophecy. Pick before public-commit-1.
+**Naming decision (2026-05-22):** the repo is `react-on-rails-starter-tanstack`. The `-tanstack` suffix locks the kit's identity to its strongest positioning rather than a calendar year — sharper claim, no maintenance trap. If TanStack momentum stalls in the future the name becomes a softer "the modern Rails+React starter" identity, which is a survivable downside. Either way the name doesn't expire on a fixed date.
 
 ## Scope: Tier 1 ("B-prime")
 
@@ -81,15 +81,15 @@ Tier 1 is what ships in the first public release. Tier 2 is deferred (listed bel
 
 ### Surfaces
 
-- **Public landing** — shadcn/ui hero, "Best TanStack on Rails" hero narrative (positioning, not feature blurbs), 4 demo-portfolio link cards (Hacker News, Marketplace, Gumroad, Octochangelog) each scoped to its proof point, dark-mode toggle, CTAs for "Use this template" and "see the dashboard demo." Signed-in users see a "go to dashboard" CTA on the landing.
+- **Public landing** — **RSC-rendered + streamed** (this is where RSC earns its keep: cold-load TTFB matters, mobile perf matters, SEO matters, the visitor hasn't downloaded the app shell yet). Pro RSC + shadcn/ui hero, "Best TanStack on Rails" hero narrative (positioning, not feature blurbs), 4 demo-portfolio link cards (Hacker News, Marketplace, Gumroad, Octochangelog) each scoped to its proof point, dark-mode toggle, CTAs for "Use this template" and "see the dashboard demo." Signed-in users see a "go to dashboard" CTA on the landing.
 - **Auth surface** — built on top of `bin/rails generate authentication` plus custom additions:
   - **From the Rails 8 generator (no changes):** login at `POST /session` (singular `resource :session`), logout at `DELETE /session`, password reset at `/passwords/new` and `/passwords/:token/edit`, `PasswordsMailer`, `User` / `Session` / `Current` models, `Authentication` concern auto-included in `ApplicationController`.
   - **Custom on top (vibe-coder pattern catalog):** signup (`RegistrationsController` + view at `/signup` — the generator does NOT provide this), email verification (token column on `User`, `EmailVerificationsController`, `EmailVerificationMailer`, `email_verified_at` gate that blocks the dashboard until verified), profile edit at `/settings/profile`, password change at `/settings/security`.
   - **Email verification UX as a designed funnel, not a backend gate.** Post-signup confirmation screen with visible target email, resend button with cooldown, "change email" affordance, expired-token recovery flow, spam-folder hint, dev-mode `letter_opener` link surfaced. (Both Design voices flagged this as the highest-friction touchpoint in the funnel; full spec lives in Required-Before-Implementation #1.)
   - `letter_opener` for dev mail.
   - Views are re-skinned with shadcn/ui blocks; the generator's raw scaffold views are replaced.
-- **Authenticated TanStack-routed surface** (the structural moat — operationalized end-to-end)
-  - `/dashboard` — single canonical dashboard, Pro RSC streaming by default. **TanStack Table** drives the Projects list (column sort, status filter, pagination, persisted view). **TanStack Query** fans out the 4 metric cards as independent fetches with per-card loading/error states, no head-of-line blocking. **TanStack Router** owns navigation to `/projects/:id` with route-level loader prefetch. A small "rendering mode" drawer surfaces _which_ Pro path is rendering (RSC) and links to the Hacker News and Gumroad demos for the classic-SSR and Inertia-head-to-head comparisons — replacing the originally-planned `/dashboard/ssr` duplicate.
+- **Authenticated TanStack-routed surface** (the structural moat — operationalized end-to-end). **Rendered via classic SSR through the Pro Node renderer**, not RSC. Rationale: RSC's headline wins (TTFB on cold load, reduced client JS, streaming SEO content) don't apply behind auth — the visitor has already loaded the app, JS is cached, search engines don't index gated pages. TanStack's wins (type-safe routing, prefetch-on-hover, URL-state interop, Query's fan-out, Table's interactivity) all show up most on the authenticated surface. RSC stays on the public landing where it pays off.
+  - `/dashboard` — single canonical dashboard. **TanStack Table** drives the Projects list (column sort, status filter, pagination, persisted view). **TanStack Query** fans out the 4 metric cards as independent fetches with per-card loading/error states, no head-of-line blocking. **TanStack Router** owns navigation to `/projects/:id` with route-level loader prefetch. A small "rendering mode" drawer in the dashboard header tells the honest surface-split story: _"This authenticated surface is TanStack-driven, classic SSR via the Pro Node renderer — chosen for type safety + interactivity. The public landing uses RSC for cold-load and SEO. The full RSC streaming story lives in the [Hacker News demo →] and [Marketplace demo →]; the Inertia head-to-head lives in the [Gumroad demo →]."_
   - `/settings` overview, `/settings/profile`, `/settings/security` — TanStack Router nested routes with SSR loaders, same primitive as the dashboard.
   - `/projects/:id`, `/projects/:id/edit`, `/projects/new` — TanStack-routed, with route-level loaders.
   - Auth + email-verification gates run server-side on the Rails shell route before any TanStack code mounts.
@@ -159,10 +159,11 @@ The auth generator's password-reset token lives on the `Session` row indirectly 
 
 ## Data Flow
 
-- Rails routes (`config/routes.rb`) handle the landing page, the auth surface, and the **single** authenticated shell route. Everything under that shell is TanStack-Router-driven.
+- Rails routes (`config/routes.rb`) handle the **public landing** (RSC-rendered), the auth surface (classic Rails views), and the **single** authenticated shell route. Everything under that shell is TanStack-Router-driven.
+- **Public landing (`/`)** renders via `react_on_rails_component` with `rsc: true` — RSC + streaming. This is the surface where RSC's headline wins (TTFB, mobile perf, SEO content streaming) actually apply. Cold visitors land on a fast, search-indexable, low-JS first paint.
 - The Rails auth + verification gates run server-side on the shell controller, _before_ any TanStack code mounts. Specifically: `Authentication` concern (`before_action :require_authentication`) + `before_action :require_verified_email` on the shell controller. Unverified users never reach the TanStack mount point.
 - TanStack Router owns `/dashboard`, `/dashboard/projects/:id`, `/projects/new`, `/settings`, `/settings/profile`, `/settings/security`. SSR loaders run server-side via the Pro Node renderer so first paint is correct; client takes over for subsequent navigations with prefetch.
-- `/dashboard` renders via `react_on_rails_component` with `rsc: true` (RSC + streaming, default rendering path). The Hacker News and Gumroad demo repos carry the classic-SSR and Inertia head-to-head comparisons respectively — the starter links to them rather than duplicating them inline.
+- **Authenticated `/dashboard` renders via `react_component` (classic SSR through the Pro Node renderer)**, not RSC. Rationale: behind auth, RSC's TTFB / SEO / cold-load wins don't apply; TanStack's interactivity / type-safety / URL-state wins do. The RSC streaming story is carried by the public landing here and by the demo portfolio (Hacker News, Marketplace) externally.
 - Per-component data fetching uses **TanStack Query** against thin Rails JSON endpoints (`/api/projects`, `/api/projects/:id/metrics`). Each metric card on `/dashboard` is an independent query — one slow query never blocks the rest of the dashboard.
 - The Projects list uses **TanStack Table** with server-side sort/filter/page params reflected in URL state via TanStack Router search params. AI agents extending the kit get a single canonical pattern for "list with server-driven sort/filter/paginate."
 - CSRF: TanStack Query and TanStack Router both honor the Rails CSRF token via a shared `getCsrfToken()` reader (meta tag on the Rails shell). Documented in `AGENTS.md` as the one cross-cutting subtlety.
@@ -245,7 +246,7 @@ Listed for tracking only. Each may become its own plan doc later.
 - i18n setup.
 - Multi-tenant example.
 - Vue and Svelte variants (only if usage of the React variant proves the model).
-- **`create-react-on-rails-app --template starter-2026` flag** — reopen the CLI question after Tier 1 ships and the maintained template proves stable; folding the starter's defaults back into the CLI flow is the natural distribution play once the maintenance burden is known.
+- **`create-react-on-rails-app --template tanstack` flag** — reopen the CLI question after Tier 1 ships and the maintained template proves stable; folding the starter's defaults back into the CLI flow is the natural distribution play once the maintenance burden is known.
 
 ## Freshening Cadence
 
@@ -287,7 +288,7 @@ All originally-listed open questions are now resolved or absorbed into the Phase
 4. ~~Tailwind v4 + Pro RSC streaming compatibility~~ — **CLOSED.** Phase 0 spike validates.
 5. ~~Signup vs `User` migration~~ — **CLOSED.** Edit the generator's emitted migration before first run; documented in `AGENTS.md`.
 6. ~~TanStack Form in Tier 2 timing~~ — **CLOSED.** Defer until Tier 1 ships and adopters ask for it.
-7. ~~`-2026` naming~~ — **CLOSED.** Implementer's call; Justin will update later if needed.
+7. ~~`-2026` naming~~ — **CLOSED.** Repo named `react-on-rails-starter-tanstack` (locks identity to positioning, sidesteps the calendar-suffix maintenance trap).
 
 Active follow-up (separate discussion, NOT in this plan's scope): **"Inertia on Pro" as a bridge product.** Inertia's hard problem is RSC streaming; Pro solves it. The natural shape if Inertia ever wants RSC is on top of Pro. Worth a separate strategy conversation — likely lives in #3144's neighborhood.
 
@@ -348,13 +349,11 @@ Tier 1 ships with:
 - RSC bundle precompilation documented in `config/initializers/assets.rb` (the Pro RSC pipeline emits a separate bundle that `assets:precompile` must include).
 - `docs/` set: `01-architecture.md`, `02-vs-inertia.md`, `03-customizing.md`, `04-deploying.md`, `05-troubleshooting.md`, `UPGRADING.md`.
 
-### 5. `-2026` naming resolution (CEO + Eng both flagged)
+### 5. ~~`-2026` naming resolution~~ — RESOLVED 2026-05-22
 
-Pick before public-commit-1:
+Repo named **`react-on-rails-starter-tanstack`**. Locks identity to the strongest positioning rather than a calendar year. Sidesteps the maintenance trap of a year-suffixed name without giving up the freshness signal entirely (the kit's `latest 2026.Q3` tag carries the calendar information).
 
-- **Option A:** Rename to `react-on-rails-starter` (no year suffix). Freshening cadence is policy. Less calendar pressure, more ambient "is this still current" risk.
-- **Option B:** Keep `-2026`, commit to yearly cut-over (`-2026` → archived banner pointing to `-2027`; new repo each January). Suffix is a feature, not a self-defeating prophecy.
-- **Option C (rejected):** Keep `-2026` with quarterly freshening. Becomes self-defeating in Q1 2027 per dual-voice review.
+If TanStack momentum stalls in some future year, the name degrades gracefully to "the modern Rails+React starter" identity — still a survivable downside.
 
 ### 6. Directory tree + canonical-reference convention (DX high)
 
