@@ -31,13 +31,11 @@ describe('wrapServerComponentRenderer/client.tsx side-effect imports', () => {
     expect(source).toMatch(/^\s*import\s+['"]react-on-rails-rsc\/client\.browser['"]\s*;?\s*$/m);
   });
 
-  it('keeps the same runtime present in the compiled lib output', () => {
-    const libPath = path.join(__dirname, '..', 'lib', 'wrapServerComponentRenderer', 'client.js');
-    if (!fs.existsSync(libPath)) {
-      // lib is only built before publish or after `pnpm run build`. Skip when
-      // running tests from a fresh checkout without a prior build.
-      return;
-    }
+  const libPath = path.join(__dirname, '..', 'lib', 'wrapServerComponentRenderer', 'client.js');
+  const libExists = fs.existsSync(libPath);
+  // lib is only built before publish or after `pnpm run build`. When absent the
+  // test is explicitly skipped (visible in the report) rather than silently green.
+  (libExists ? it : it.skip)('keeps the same runtime present in the compiled lib output', () => {
     const compiled = fs.readFileSync(libPath, 'utf8');
     expect(compiled).toMatch(/import\s+['"]react-on-rails-rsc\/client\.browser['"]\s*;?/);
   });
