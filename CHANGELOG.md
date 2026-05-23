@@ -24,6 +24,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Fixed
+
+- **[Pro]** **Preserve ruby-jwt 2.x compatibility in 16.7**: Relaxes the `16.7.0.rc.0` `jwt >= 3.2.0` floor to `jwt >= 2.7`, keeping compatibility with apps that still resolve jwt 2.x while continuing to allow patched jwt 3.2.0+ releases. [PR 3344](https://github.com/shakacode/react_on_rails/pull/3344) by [ihabadham](https://github.com/ihabadham).
+
+#### Security
+
+- **[Pro]** **Restore license-token algorithm allowlist on jwt 3.x**: `ReactOnRailsPro::LicenseValidator` now passes the plural `algorithms: ["RS256"]` option to `JWT.decode` instead of the singular `algorithm: "RS256"`. jwt 3.0 removed the singular option (deprecated in 2.x), so on 16.7.0.rc.0 with jwt 3.2.0 resolved the algorithm restriction was silently ignored — tokens signed with HS256 or bearing `alg:none` were not rejected by the algorithm check. The plural form is honored by both jwt 2.x and 3.x. Affects only the unreleased 16.7.0.rc.0; earlier releases pinned jwt `~> 2.7` and never accepted the wrong algorithm. New attack-vector specs cover both the HS256 confusion and `alg:none` cases. [PR 3344](https://github.com/shakacode/react_on_rails/pull/3344) by [ihabadham](https://github.com/ihabadham).
+
 ### [16.7.0.rc.0] - 2026-05-20
 
 #### Added
