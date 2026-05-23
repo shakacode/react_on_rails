@@ -290,7 +290,7 @@ All originally-listed open questions are now resolved or absorbed into the Phase
 6. ~~TanStack Form in Tier 2 timing~~ — **CLOSED.** Defer until Tier 1 ships and adopters ask for it.
 7. ~~`-2026` naming~~ — **CLOSED.** Repo named `react-on-rails-starter-tanstack` (locks identity to positioning, sidesteps the calendar-suffix maintenance trap).
 
-Active follow-up (separate discussion, NOT in this plan's scope): **"Inertia on Pro" as a bridge product.** Inertia's hard problem is RSC streaming; Pro solves it. The natural shape if Inertia ever wants RSC is on top of Pro. Worth a separate strategy conversation — likely lives in #3144's neighborhood.
+Active follow-up (separate discussion, NOT in this plan's scope): **"Inertia on Pro" as a bridge product** — tracked in #3371. Inertia's hard problem is RSC streaming; Pro solves it. The natural shape if Inertia ever wants RSC is on top of Pro. Discussed separately so the 2026 starter ships on TanStack-on-Rails without entangling Inertia-bridge product strategy.
 
 ## Required Before Implementation
 
@@ -393,6 +393,7 @@ Both Design voices: "is this a SaaS app dashboard, a rendering-tech demo, or a p
 - #3357 — this issue
 - #3144 — Gumroad RSC experiment: benchmark findings and positioning
 - #3128 — Gumroad public comparison repo
+- #3371 — "Inertia on Pro" bridge-product strategic discussion (surfaced during this plan's review; carved out as a separate track)
 - `internal/planning/examples-catalog-and-repo-naming-plan.md` — naming taxonomy this plan extends
 - `docs/oss/getting-started/comparison-with-alternatives.md` — Inertia vs React on Rails comparison this plan operationalizes
 

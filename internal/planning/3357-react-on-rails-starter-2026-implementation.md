@@ -8,6 +8,23 @@ This document is the executable companion to the strategic plan. Each task is sc
 
 ---
 
+## Kickoff (read this first)
+
+If you're a coordinator or sub-agent picking this up cold on a fresh machine:
+
+1. **Read both planning docs** in order:
+   - `internal/planning/3357-react-on-rails-starter-2026.md` (strategic plan — what we're building and why)
+   - This file (implementation plan — how to build it)
+2. **Confirm coordinator decisions** are locked: see the "Coordinator Decisions — Locked 2026-05-22" section at the bottom of this file. Repo name, a11y target, surface split, dashboard narrative, spike approval mode are all decided.
+3. **Start at T0.1.** Phase 0 is sequential (T0.1 → T0.2 → T0.3 → T0.4 → T0.5) and produces a `SPIKE.md` with a GREEN / AMBER / RED verdict.
+4. **Per coordinator decision #6** (spike approval = full auto): if `SPIKE.md` lands GREEN, dispatch Phase 1 immediately. If AMBER, apply the named fallback decision tree (see the strategic plan's Required-Before-Implementation #3) and dispatch Phase 1 with the fallback in place. If RED, stop and escalate to Justin.
+5. **Phase 1 onwards:** fan out parallel-safe tasks across multiple sub-agents (the "Parallel-safe with:" field on each task card identifies what can co-run).
+6. **No skill names from gstack appear in any task.** All tasks are framework-neutral and can be executed by any capable agent.
+
+Repo location for the spike: a new throwaway local branch (`spike/starter-tanstack-stack-validation`) on the existing `react_on_rails` repo. Do NOT create the public `react-on-rails-starter-tanstack` repo until T1.1 (after the spike passes).
+
+---
+
 ## How to Use This Plan
 
 ### Task IDs
