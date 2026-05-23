@@ -126,7 +126,25 @@ describe "Incremental Rendering Integration", :integration do
   end
 
   describe "render_code_with_incremental_updates" do
-    it "sends stream values and receives them in the response" do
+    it "raises a clear unsupported error for async props with the async-http renderer client" do
+      js_code = "ReactOnRails.getStreamValues()"
+      request_digest = Digest::MD5.hexdigest(js_code)
+      render_path = "/bundles/#{server_bundle_hash}/incremental-render/#{request_digest}"
+
+      expect do
+        ReactOnRailsPro::Request.render_code_with_incremental_updates(
+          render_path,
+          js_code,
+          async_props_block: proc { |_emitter| }
+        )
+      end.to raise_error(
+        ReactOnRailsPro::Error,
+        /Incremental rendering with async props is not yet supported.*3283/
+      )
+    end
+
+    it "sends stream values and receives them in the response",
+       skip: "Unsupported with async-http; see https://github.com/shakacode/react_on_rails/issues/3283." do
       # Upload bundles first
       ReactOnRailsPro::Request.upload_assets
 
@@ -159,7 +177,8 @@ describe "Incremental Rendering Integration", :integration do
       expect(response_text).to include("value3")
     end
 
-    it "streams bidirectionally - each_chunk receives chunks while async_props_block is still running" do
+    it "streams bidirectionally - each_chunk receives chunks while async_props_block is still running",
+       skip: "Unsupported with async-http; see https://github.com/shakacode/react_on_rails/issues/3283." do
       # Upload bundles first
       ReactOnRailsPro::Request.upload_assets
 
@@ -214,7 +233,8 @@ describe "Incremental Rendering Integration", :integration do
       end
     end
 
-    context "when an update chunk contains invalid JavaScript" do
+    context "when an update chunk contains invalid JavaScript",
+            skip: "Unsupported with async-http; see https://github.com/shakacode/react_on_rails/issues/3283." do
       before do
         # rubocop:disable RSpec/AnyInstance
         allow_any_instance_of(ReactOnRailsPro::AsyncPropsEmitter)
@@ -278,7 +298,8 @@ describe "Incremental Rendering Integration", :integration do
       end
     end
 
-    context "when async_props_block raises an exception" do
+    context "when async_props_block raises an exception",
+            skip: "Unsupported with async-http; see https://github.com/shakacode/react_on_rails/issues/3283." do
       it "closes the stream and propagates the error" do
         ReactOnRailsPro::Request.upload_assets
 
@@ -304,7 +325,8 @@ describe "Incremental Rendering Integration", :integration do
       end
     end
 
-    context "when rendering request JS is invalid" do
+    context "when rendering request JS is invalid",
+            skip: "Unsupported with async-http; see https://github.com/shakacode/react_on_rails/issues/3283." do
       it "raises ReactOnRailsPro::Error with the exception details" do
         ReactOnRailsPro::Request.upload_assets
 
@@ -326,7 +348,8 @@ describe "Incremental Rendering Integration", :integration do
       end
     end
 
-    context "when bundle is not found (410 retry)" do
+    context "when bundle is not found (410 retry)",
+            skip: "Unsupported with async-http; see https://github.com/shakacode/react_on_rails/issues/3283." do
       it "re-uploads the bundle and retries incremental render successfully" do
         # Use a unique bundle hash that the Node renderer hasn't seen yet.
         # This triggers a 410 on the first request, then the StreamRequest retry
@@ -403,7 +426,8 @@ describe "Incremental Rendering Integration", :integration do
       end
     end
 
-    context "with large payloads exceeding HTTP/2 frame size" do
+    context "with large payloads exceeding HTTP/2 frame size",
+            skip: "Unsupported with async-http; see https://github.com/shakacode/react_on_rails/issues/3283." do
       it "streams a payload larger than 16KB correctly" do
         ReactOnRailsPro::Request.upload_assets
 
@@ -456,7 +480,8 @@ describe "Incremental Rendering Integration", :integration do
       end
     end
 
-    context "with concurrent incremental render requests" do
+    context "with concurrent incremental render requests",
+            skip: "Unsupported with async-http; see https://github.com/shakacode/react_on_rails/issues/3283." do
       it "handles multiple parallel streams without interference" do
         ReactOnRailsPro::Request.upload_assets
 
@@ -498,7 +523,8 @@ describe "Incremental Rendering Integration", :integration do
       end
     end
 
-    context "when error scenarios repeat without connection reset" do
+    context "when error scenarios repeat without connection reset",
+            skip: "Unsupported with async-http; see https://github.com/shakacode/react_on_rails/issues/3283." do
       let(:js_code) { "ReactOnRails.getStreamValues()" }
       let(:render_path) do
         "/bundles/#{server_bundle_hash}/incremental-render/#{Digest::MD5.hexdigest(js_code)}"

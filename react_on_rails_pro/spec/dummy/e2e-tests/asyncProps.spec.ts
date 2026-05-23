@@ -1,7 +1,8 @@
 import { expect } from '@playwright/test';
 import { asyncPropsAtRouterPageTest } from './fixture';
 
-asyncPropsAtRouterPageTest(
+// Incremental async props require bidirectional streaming, which is not yet supported by the async-http client.
+asyncPropsAtRouterPageTest.skip(
   'async props are streamed on request to the page',
   async ({ page, sendRedisValue, endRedisStream }) => {
     await expect(page.getByRole('heading', { name: 'Async Props Component' })).toBeVisible();
