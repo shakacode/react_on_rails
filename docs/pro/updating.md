@@ -31,8 +31,8 @@ This checklist applies to every Pro version bump — stable releases (`16.5.0` �
 - `package.json`: `react-on-rails-pro`
 - `package.json`: `react-on-rails-pro-node-renderer` (only if you use the
   standalone Node renderer)
-- `package.json`: `react-on-rails-rsc` (when the release notes call for it; required
-  for React Server Components apps)
+- `package.json`: `react-on-rails-rsc` (required for React Server Components apps;
+  check release notes for the correct version to pair)
 - `yarn.lock`, `package-lock.json`, or `pnpm-lock.yaml`: matching npm resolutions
   and transitive npm dependencies
 
@@ -62,16 +62,19 @@ language boundary.
 Use exact version constraints on both sides — never `^`, `~`, or `*`. Semver
 wildcards in `package.json` cause boot failures starting in v16.2.x.
 
+Replace `VERSION` below with the latest version from
+[the CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md).
+
 ```ruby
 # Gemfile — pin with =
-gem "react_on_rails_pro", "= 16.7.0"
+gem "react_on_rails_pro", "= VERSION"
 ```
 
 ```bash
 # package.json — pin with --save-exact / --exact
-yarn add react-on-rails-pro@16.7.0 --exact
-npm install react-on-rails-pro@16.7.0 --save-exact
-pnpm add react-on-rails-pro@16.7.0 --save-exact
+yarn add react-on-rails-pro@VERSION --exact
+npm install react-on-rails-pro@VERSION --save-exact
+pnpm add react-on-rails-pro@VERSION --save-exact
 ```
 
 ### Suggested verification
@@ -93,7 +96,9 @@ npm install
 npm ci
 
 bundle exec rails react_on_rails:generate_packs
+# Shakapacker projects:
 NODE_ENV=development bundle exec bin/shakapacker
+# Rspack projects: use your project's Rspack build script instead (e.g. `yarn build`)
 ```
 
 The `--frozen-lockfile` (or `npm ci`) install is the same install CI runs. If your
@@ -117,9 +122,10 @@ both RSC manifests:
 - `react-client-manifest.json`
 - `react-server-client-manifest.json`
 
-Both files should appear in your webpack output directory (the location is set by
-`public_output_path` in `config/shakapacker.yml`, typically
-`public/webpack/development/` or `public/webpack/production/`). If either manifest
+Both files should appear in your bundler's output directory. For Shakapacker apps,
+the location is set by `public_output_path` in `config/shakapacker.yml`, typically
+`public/webpack/development/` or `public/webpack/production/`. For Rspack apps,
+check the `output.path` in your Rspack configuration. If either manifest
 is missing, see [Manifest Files Not Generated](./react-server-components/upgrading-existing-pro-app.md#manifest-files-not-generated).
 
 Then run your RSC and server-rendering specs to confirm SSR + RSC still work
