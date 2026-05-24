@@ -19,6 +19,14 @@ module ReactOnRails
       BACKSLASH_BYTE = "\\".ord
       DOUBLE_QUOTE_BYTE = '"'.ord
       SINGLE_QUOTE_BYTE = "'".ord
+      PERCENT_BYTE = "%".ord
+      PERCENT_LITERAL_TYPE_BYTES = "qQwWiIxrs".bytes.freeze
+      PERCENT_LITERAL_CLOSING_DELIMITERS = {
+        "(".ord => ")".ord,
+        "[".ord => "]".ord,
+        "{".ord => "}".ord,
+        "<".ord => ">".ord
+      }.freeze
       SOURCE_OPTION_KEYS = %w[git github path].freeze
 
       Result = Struct.new(
@@ -59,8 +67,7 @@ module ReactOnRails
         end
 
         has_active_pro = pro_calls.any?
-        preexisting_empty_counts =
-          has_active_pro ? empty_conditional_fingerprints(source, program).tally : {}
+        preexisting_empty_ranges = has_active_pro ? empty_conditional_ranges(program) : []
         edits = base_calls.map do |call|
           if has_active_pro
             removal_edit(source, call)
@@ -73,7 +80,7 @@ module ReactOnRails
         if has_active_pro
           new_source = collapse_dead_conditionals(
             new_source,
-            preexisting_empty_counts
+            adjust_ranges_after_edits(preexisting_empty_ranges, edits)
           )
         end
 
@@ -216,6 +223,12 @@ module ReactOnRails
             quote_byte = nil if byte == quote_byte
           elsif byte == DOUBLE_QUOTE_BYTE || byte == SINGLE_QUOTE_BYTE
             quote_byte = byte
+          elsif byte == PERCENT_BYTE
+            percent_literal_end = percent_literal_end_offset(source, scan, line_end)
+            if percent_literal_end
+              scan = percent_literal_end
+              next
+            end
           elsif byte == SEMICOLON_BYTE
             offsets << scan
           end
@@ -224,6 +237,50 @@ module ReactOnRails
         end
 
         offsets
+      end
+
+      def percent_literal_end_offset(source, start_offset, line_end)
+        delimiter_offset = start_offset + 1
+        type_or_delimiter = source.getbyte(delimiter_offset)
+        return nil unless type_or_delimiter
+
+        delimiter_offset += 1 if PERCENT_LITERAL_TYPE_BYTES.include?(type_or_delimiter)
+        delimiter = source.getbyte(delimiter_offset)
+        return nil unless percent_literal_delimiter?(delimiter)
+
+        closing_delimiter = PERCENT_LITERAL_CLOSING_DELIMITERS.fetch(delimiter, delimiter)
+        nesting = PERCENT_LITERAL_CLOSING_DELIMITERS.key?(delimiter) ? 1 : nil
+        scan = delimiter_offset + 1
+
+        while scan < line_end
+          byte = source.getbyte(scan)
+          if byte == BACKSLASH_BYTE
+            scan += 2
+            next
+          end
+
+          if nesting
+            nesting += 1 if byte == delimiter
+            nesting -= 1 if byte == closing_delimiter
+            return scan + 1 if nesting.zero?
+          elsif byte == closing_delimiter
+            return scan + 1
+          end
+
+          scan += 1
+        end
+
+        line_end
+      end
+
+      def percent_literal_delimiter?(byte)
+        byte && !horizontal_space?(byte) && byte != NEWLINE_BYTE && !ascii_alphanumeric?(byte)
+      end
+
+      def ascii_alphanumeric?(byte)
+        (byte >= "a".ord && byte <= "z".ord) ||
+          (byte >= "A".ord && byte <= "Z".ord) ||
+          (byte >= "0".ord && byte <= "9".ord)
       end
 
       def line_terminator_offset(source, line_end)
@@ -272,29 +329,27 @@ module ReactOnRails
       #   variants; after migration there is only one variant, so the conditional has
       #   no remaining purpose).
       # - Otherwise, if a branch is empty, only that branch is removed.
-      def collapse_dead_conditionals(source, preexisting_empty_counts)
+      def collapse_dead_conditionals(source, preexisting_empty_ranges)
         loop do
           parse_result = Prism.parse(source)
           break source if parse_result.failure?
 
-          seen_empty_conditional_fingerprints = Hash.new(0)
           edit = find_collapse_edit(
             source,
             parse_result.value,
-            preexisting_empty_counts,
-            seen_empty_conditional_fingerprints
+            preexisting_empty_ranges
           )
           break source unless edit
 
           source = splice_source(source, edit[:start_offset], edit[:end_offset], edit[:replacement])
+          preexisting_empty_ranges = adjust_ranges_after_edits(preexisting_empty_ranges, [edit])
         end
       end
 
       def find_collapse_edit(
         source,
         node,
-        preexisting_empty_counts,
-        seen_empty_conditional_fingerprints
+        preexisting_empty_ranges
       )
         return nil unless node
 
@@ -302,8 +357,7 @@ module ReactOnRails
           edit = collapse_edit_for_conditional(
             source,
             node,
-            preexisting_empty_counts,
-            seen_empty_conditional_fingerprints
+            preexisting_empty_ranges
           )
           return edit if edit
         end
@@ -312,8 +366,7 @@ module ReactOnRails
           edit = find_collapse_edit(
             source,
             child,
-            preexisting_empty_counts,
-            seen_empty_conditional_fingerprints
+            preexisting_empty_ranges
           )
           return edit if edit
         end
@@ -324,12 +377,12 @@ module ReactOnRails
       def collapse_edit_for_conditional(
         source,
         node,
-        preexisting_empty_counts,
-        seen_empty_conditional_fingerprints
+        preexisting_empty_ranges
       )
         # Postfix modifiers and ternary-style conditionals have node.end_keyword_loc == nil.
         # Only block-form `if/unless ... end` is considered for collapse.
         return nil unless node.respond_to?(:end_keyword_loc) && node.end_keyword_loc
+        return nil if preexisting_empty_ranges.include?([node.location.start_offset, node.location.end_offset])
 
         then_branch = node.statements
         else_node = conditional_else_node(node)
@@ -338,13 +391,6 @@ module ReactOnRails
 
         then_empty = branch_empty?(then_branch)
         else_empty = has_else_node && branch_empty?(else_statements)
-
-        fingerprint = conditional_empty_branch_fingerprint(source, node)
-        if fingerprint
-          seen_empty_conditional_fingerprints[fingerprint] += 1
-          return nil if seen_empty_conditional_fingerprints[fingerprint] <=
-                        preexisting_empty_counts[fingerprint].to_i
-        end
 
         if then_empty && has_else_node && !else_empty
           collapse_to_branch(source, node, else_statements) || remove_empty_then_branch(source, node)
@@ -360,60 +406,57 @@ module ReactOnRails
         statements_node.body.empty?
       end
 
-      def empty_conditional_fingerprints(source, node, fingerprints = [])
-        return fingerprints unless node
+      def empty_conditional_ranges(node, ranges = [])
+        return ranges unless node
 
-        if node.is_a?(Prism::IfNode) || node.is_a?(Prism::UnlessNode)
-          fingerprint = conditional_empty_branch_fingerprint(source, node)
-          fingerprints << fingerprint if fingerprint
-        end
+        ranges << [node.location.start_offset, node.location.end_offset] if empty_conditional?(node)
 
         node.compact_child_nodes.each do |child|
-          empty_conditional_fingerprints(source, child, fingerprints)
+          empty_conditional_ranges(child, ranges)
         end
 
-        fingerprints
+        ranges
       end
 
-      def conditional_empty_branch_fingerprint(source, node)
-        return nil unless node.respond_to?(:end_keyword_loc) && node.end_keyword_loc
+      def empty_conditional?(node)
+        return false unless node.is_a?(Prism::IfNode) || node.is_a?(Prism::UnlessNode)
+        return false unless node.respond_to?(:end_keyword_loc) && node.end_keyword_loc
 
         then_branch = node.statements
         else_node = conditional_else_node(node)
-        return nil unless else_node
+        return false unless else_node
 
         else_statements = else_node.statements
-        then_empty = branch_empty?(then_branch)
-        else_empty = branch_empty?(else_statements)
-        return nil unless then_empty || else_empty
-
-        [
-          node.class.name,
-          predicate_fingerprint(source, node),
-          branch_fingerprint(source, then_branch),
-          branch_fingerprint(source, else_statements),
-          then_empty,
-          else_empty
-        ]
+        branch_empty?(then_branch) || branch_empty?(else_statements)
       end
 
-      def predicate_fingerprint(source, node)
-        predicate = node.respond_to?(:predicate) ? node.predicate : nil
-        return "" unless predicate
-
-        byte_slice(source, predicate.location.start_offset, predicate.location.end_offset)
+      def adjust_ranges_after_edits(ranges, edits)
+        sorted_edits = edits.sort_by { |edit| edit[:start_offset] }
+        ranges.filter_map { |range| adjust_range_after_edits(range, sorted_edits) }
       end
 
-      def branch_fingerprint(source, statements_node)
-        return [] if statements_node.nil?
-        return [] unless statements_node.respond_to?(:body)
+      def adjust_range_after_edits(range, edits)
+        original_start, original_end = range
+        prefix_delta = 0
+        inside_delta = 0
 
-        statements_node.body.map do |child|
-          [
-            child.class.name,
-            byte_slice(source, child.location.start_offset, child.location.end_offset)
-          ]
+        edits.each do |edit|
+          edit_start = edit[:start_offset]
+          edit_end = edit[:end_offset]
+          edit_delta = edit[:replacement].bytesize - (edit_end - edit_start)
+
+          if edit_end <= original_start
+            prefix_delta += edit_delta
+          elsif edit_start >= original_end
+            next
+          elsif edit_start >= original_start && edit_end <= original_end
+            inside_delta += edit_delta
+          else
+            return nil
+          end
         end
+
+        [original_start + prefix_delta, original_end + prefix_delta + inside_delta]
       end
 
       def collapse_to_branch(source, conditional, branch_statements)

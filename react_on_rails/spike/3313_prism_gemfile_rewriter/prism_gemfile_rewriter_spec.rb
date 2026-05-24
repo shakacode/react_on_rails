@@ -334,6 +334,14 @@ RSpec.describe ReactOnRails::Spike::PrismGemfileRewriter do
         expect_parseable_ruby(result.content)
       end
 
+      it "ignores semicolons in percent-string postfix guards when removing a stale base declaration" do
+        src = 'gem "react_on_rails" if ENV[%q[ROR;ENABLED]]; gem "react_on_rails_pro", "~> 16.0"' \
+              "\n"
+        result = rewriter.rewrite(src)
+        expect(result.content).to eq("gem \"react_on_rails_pro\", \"~> 16.0\"\n")
+        expect_parseable_ruby(result.content)
+      end
+
       it "removes stale base when Pro is parenthesized with comments" do
         src = <<~RUBY
           source "https://rubygems.org"
@@ -441,6 +449,29 @@ RSpec.describe ReactOnRails::Spike::PrismGemfileRewriter do
           else
           end
           gem "react_on_rails_pro", "~> 16.0"
+        RUBY
+        expect_parseable_ruby(result.content)
+      end
+
+      it "matches pre-existing empty branches by conditional identity" do
+        src = <<~RUBY
+          if ENV["ENABLE_ROR"]
+            gem "react_on_rails_pro", "~> 16.0"
+          else
+            gem "react_on_rails", "~> 16.0"
+          end
+          if ENV["ENABLE_ROR"]
+            gem "react_on_rails_pro", "~> 16.0"
+          else
+          end
+        RUBY
+        result = rewriter.rewrite(src)
+        expect(result.content).to eq(<<~RUBY)
+          gem "react_on_rails_pro", "~> 16.0"
+          if ENV["ENABLE_ROR"]
+            gem "react_on_rails_pro", "~> 16.0"
+          else
+          end
         RUBY
         expect_parseable_ruby(result.content)
       end
