@@ -1062,6 +1062,65 @@ describe RscGenerator, type: :generator do
         .to include("expected webpack import anchor was not found")
     end
 
+    it "explains that backtick require anchors must be migrated manually" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require(`./commonWebpackConfig`);
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      content = File.read(File.join(destination_root, config_path))
+      generator.send(:update_existing_rsc_webpack_config, config_path, content, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).not_to include("const rscClientReferences")
+      expect(migrated_content).not_to include("clientReferences: rscClientReferences")
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("backtick template-literal require paths")
+    end
+
+    it "explains that rspack-only server anchors must be migrated manually" do
+      config_path = "config/webpack/serverWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { config } = require('shakapacker');
+          const bundler = require('@rspack/core');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureServer = () => {
+            const serverWebpackConfig = { plugins: [] };
+            serverWebpackConfig.plugins.push(new RSCWebpackPlugin({ isServer: true }));
+
+            return serverWebpackConfig;
+          };
+
+          module.exports = configureServer;
+        JS
+      )
+
+      content = File.read(File.join(destination_root, config_path))
+      generator.send(:update_existing_rsc_webpack_config, config_path, content, is_server: true)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).not_to include("const rscClientReferences")
+      expect(migrated_content).not_to include("clientReferences: rscClientReferences")
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("Rspack-only server configs without the webpack fallback ternary")
+    end
+
     it "does not treat a stale generated client references helper as scoped" do
       content = <<~JS
         const rscClientReferences = { directory: '.' };
