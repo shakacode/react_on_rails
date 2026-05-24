@@ -46,7 +46,7 @@ export const useLazyMutation = <TData, TVariables extends OperationVariables>(
           ...variables,
         } as TVariables,
       });
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- awaiting can change it
+
       if (!isMounted.current) return;
       setResult({ ...mutationResult, loading: false });
     },

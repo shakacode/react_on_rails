@@ -167,7 +167,7 @@ function applyDehydratedMatchData(
 function TanStackHydrationApp({
   options,
   incomingProps,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Required by TanStackHydrationAppProps interface.
+
   railsContext: _railsContext,
   RouterProvider,
   createBrowserHistory,
