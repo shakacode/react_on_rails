@@ -75,6 +75,114 @@ jobs:
           docs-only: ${{ steps.detect.outputs.docs_only }}
           previous-sha: ${{ github.event.before }}
 
+  pro-lint:
+    needs: detect-changes
+    if: |
+      !(
+        github.event_name == 'push' &&
+        github.ref == 'refs/heads/main' &&
+        needs.detect-changes.outputs.docs_only == 'true'
+      ) && (
+        github.ref == 'refs/heads/main' ||
+        github.event_name == 'workflow_dispatch' ||
+        needs.detect-changes.outputs.run_pro_lint == 'true'
+      )
+    runs-on: ubuntu-22.04
+    env:
+      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.3.7
+          bundler: 2.5.4
+
+      - name: Setup Node
+        uses: ./.github/actions/setup-node-with-retry
+        with:
+          # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
+          # https://github.com/nodejs/node/issues/56010
+          node-version: '22.11.0'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Print system information
+        run: |
+          echo "Linux release: "; cat /etc/issue
+          echo "Current user: "; whoami
+          echo "Current directory: "; pwd
+          echo "Ruby version: "; ruby -v
+          echo "Node version: "; node -v
+          echo "pnpm version: "; pnpm --version
+          echo "Bundler version: "; bundle --version
+
+      - name: Cache Pro package Ruby gems
+        uses: actions/cache@v4
+        with:
+          path: react_on_rails_pro/vendor/bundle
+          key: v4-pro-package-gem-cache-${{ hashFiles('react_on_rails_pro/react_on_rails_pro.gemspec') }}
+
+      - name: Cache Pro dummy app Ruby gems
+        uses: actions/cache@v4
+        with:
+          path: react_on_rails_pro/spec/dummy/vendor/bundle
+          key: v4-pro-dummy-app-gem-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
+
+      - name: Install Ruby Gems for Pro package
+        run: |
+          gem install bundler -v "2.5.4"
+          echo "Bundler version: "; bundle --version
+          bundle config set --local path 'vendor/bundle'
+          bundle config set --local disable_checksum_validation true
+          bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
+
+      - name: Install Node modules with pnpm
+        working-directory: .
+        run: pnpm install --frozen-lockfile
+      - name: Verify React 18 resolution for ExecJS-compatible dummy
+        working-directory: .
+        run: node script/check-react-major-version.mjs react_on_rails_pro/spec/execjs-compatible-dummy 18
+
+      - name: Install Ruby Gems for Pro dummy app
+        run: |
+          cd spec/dummy
+          bundle lock --add-platform 'x86_64-linux'
+          bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
+
+      - name: Generate file-system based entrypoints
+        run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
+
+      - name: Build react-on-rails-pro package
+        working-directory: .
+        run: pnpm --filter react-on-rails-pro build
+
+      - name: Lint Ruby
+        run: bundle exec rubocop --ignore-parent-exclusion
+
+      - name: Validate RBS type signatures
+        run: bundle exec rake rbs:validate
+
+      - name: Check TypeScript
+        working-directory: .
+        run: pnpm run nps check-typescript
+
   # Build webpack test bundles for dummy app
   build-dummy-app-webpack-test-bundles:
     needs: detect-changes
