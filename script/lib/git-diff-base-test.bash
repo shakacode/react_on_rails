@@ -282,7 +282,6 @@ setup_repo_fixture() {
     git commit --allow-empty -m "feat-2" >/dev/null
     git checkout main >/dev/null 2>&1
     if [ "$main_extra" -gt 0 ]; then
-      local i
       for ((i = 1; i <= main_extra; i++)); do
         git commit --allow-empty -m "main-extra-$i" >/dev/null
       done
@@ -376,6 +375,11 @@ test_sha_ref_classifies_64_char_hex() {
   # branch-name rev-parse checks that follow fail gracefully when there is no
   # .git in the current directory, so neither match fires and the function
   # returns 0. Cwd is still the per-test tmpdir, which has no .git.
+  if git rev-parse --git-dir >/dev/null 2>&1; then
+    fail "test must run outside a git repo (no setup_repo_fixture)"
+    return 1
+  fi
+
   local hex="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
   if [ "${#hex}" -ne 64 ]; then
     fail "test fixture broken: expected 64-char hex, got ${#hex}"
@@ -517,10 +521,13 @@ test_resolve_lenient_continues_after_initial_fetch_failure() {
 test_resolve_unshallow_fallback_finds_merge_base() {
   # Force the deepen budget to exhaust without finding the merge base, so the
   # --unshallow fallback runs. The fixture adds 10 extra commits on main after
-  # feature branches off (merge base = c5, main tip = main-extra-10). With
-  # initial depth=2 and one deepen attempt of depth=2, main only fetches 4
-  # commits (main-extra-7 through main-extra-10), which never reaches c5; the
-  # unshallow pull then brings in all of main and exposes the merge base.
+  # feature branches off (merge base = c5, main tip = main-extra-10).
+  # git_diff_base_resolve uses GIT_DIFF_BASE_FETCH_DEPTH=2:
+  #   - initial fetch (--depth=2): main-extra-9, main-extra-10
+  #   - one deepen round (--deepen=2): adds main-extra-7, main-extra-8
+  #   - total visible from main: main-extra-7..main-extra-10 (4 commits)
+  # c5 is at depth 20 from the main tip, so it is still not reachable; the
+  # --unshallow fallback then fetches all of main and exposes the merge base.
   # setup_repo_fixture intentionally leaves origin/main unfetched for this
   # main_extra shallow clone so the test does not depend on git fetch --depth
   # re-shallowing an already complete remote-tracking ref.
@@ -544,7 +551,8 @@ test_resolve_unshallow_fallback_finds_merge_base() {
 test_resolve_logs_deepen_progress() {
   # Operators need a visible breadcrumb per deepen iteration so a slow CI run
   # is not opaque between the initial fetch and the eventual unshallow. This
-  # checks each deepen depth in the 2 -> 4 -> 8 sequence.
+  # checks each deepen depth in the 2 -> 4 -> 8 sequence and verifies the
+  # fallback still fires after the deepen budget is exhausted.
   setup_repo_fixture shallow 1 20
   local err_file
   err_file="$(mktemp resolve-err.XXXXXX)"
@@ -558,6 +566,7 @@ test_resolve_logs_deepen_progress() {
   assert_contains "$stderr_text" "Deepening shallow history (attempt 1/3, depth 2)" "first deepen progress line"
   assert_contains "$stderr_text" "Deepening shallow history (attempt 2/3, depth 4)" "second deepen progress line"
   assert_contains "$stderr_text" "Deepening shallow history (attempt 3/3, depth 8)" "third deepen progress line"
+  assert_contains "$stderr_text" "falling back to --unshallow" "unshallow fallback fires after budget exhausted"
 }
 
 test_resolve_cross_repo_sha_hint_appears() {
