@@ -246,7 +246,7 @@ module ReactOnRailsPro
           public_key,
           true, # verify signature - NEVER set to false!
           # Enforce RS256 algorithm only to prevent "alg=none" and downgrade attacks
-          algorithm: "RS256",
+          algorithms: ["RS256"],
           verify_expiration: false # we handle expiration manually
         ).first
       rescue StandardError

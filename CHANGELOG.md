@@ -24,6 +24,19 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Added
+
+- **`react-on-rails/webpackHelpers` subpath export with `reactDomClientWarning`**: New webpack helper export so React 16/17 consumers can suppress the harmless `Module not found: Can't resolve 'react-dom/client'` warning with a one-liner instead of remembering a regex. The require inside `reactApis` is guarded by a runtime React-version check, so this warning never reflects a real failure, but webpack still emits it at build time because the static `require('react-dom/client')` cannot be tree-shaken without breaking React 18+. Pass `reactDomClientWarning` to `ignoreWarnings` (Webpack 5 / Shakapacker) or `stats.warningsFilter` (Webpack 4 / Webpacker 5). Fixes [Issue 3137](https://github.com/shakacode/react_on_rails/issues/3137).
+
+#### Fixed
+
+- **[Pro]** **Preserve ruby-jwt 2.x compatibility in 16.7**: Relaxes the `16.7.0.rc.0` `jwt >= 3.2.0` floor to `jwt >= 2.7`, keeping compatibility with apps that still resolve jwt 2.x while continuing to allow patched jwt 3.2.0+ releases. [PR 3344](https://github.com/shakacode/react_on_rails/pull/3344) by [ihabadham](https://github.com/ihabadham).
+- **[Pro]** **RSC client manifest restored when only `registerServerComponent/client` is in the pack graph**: `wrapServerComponentRenderer/client` now directly imports `react-on-rails-rsc/client.browser` as a side-effect import. Previously the client runtime was only reachable through a three-level transitive chain (`wrapServerComponentRenderer/client` → `getReactServerComponent.client` → `react-on-rails-rsc/client.browser`). Tooling that severed any link in that chain (tree-shaking, transpiler quirks, custom `NormalModuleReplacement`, externals) caused `RSCWebpackPlugin` to emit `Client runtime at react-on-rails-rsc/client was not found. React Server Components module map file react-client-manifest.json was not created.` and silently skip the manifest, breaking RSC hydration on the Pro Node Renderer. The direct import keeps the runtime resource in the module graph so the plugin always emits `react-client-manifest.json`. Fixes [#3366](https://github.com/shakacode/react_on_rails/issues/3366).
+
+#### Security
+
+- **[Pro]** **Restore license-token algorithm allowlist on jwt 3.x**: `ReactOnRailsPro::LicenseValidator` now passes the plural `algorithms: ["RS256"]` option to `JWT.decode` instead of the singular `algorithm: "RS256"`. jwt 3.0 removed the singular option (deprecated in 2.x), so on 16.7.0.rc.0 with jwt 3.2.0 resolved the algorithm restriction was silently ignored — tokens signed with HS256 or bearing `alg:none` were not rejected by the algorithm check. The plural form is honored by both jwt 2.x and 3.x. Affects only the unreleased 16.7.0.rc.0; earlier releases pinned jwt `~> 2.7` and never accepted the wrong algorithm. New attack-vector specs cover both the HS256 confusion and `alg:none` cases. [PR 3344](https://github.com/shakacode/react_on_rails/pull/3344) by [ihabadham](https://github.com/ihabadham).
+
 ### [16.7.0.rc.0] - 2026-05-20
 
 #### Added
@@ -46,6 +59,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Updated Fastify in the Node Renderer for CVE-2026-33806**: Raised the direct `fastify` dependency to 5.8.5 so user-provided Fastify server options, including `trustProxy`, pick up the upstream security fix. [PR 3152](https://github.com/shakacode/react_on_rails/pull/3152) by [dependabot\[bot\]](https://github.com/apps/dependabot).
 - **[Pro]** **Allow patched ruby-jwt releases**: React on Rails Pro now requires `jwt >= 3.2.0`, removing the previous `~> 2.7` cap so applications can resolve the patched ruby-jwt release for the empty-key HMAC advisory. [PR 3322](https://github.com/shakacode/react_on_rails/pull/3322) by [ihabadham](https://github.com/ihabadham).
 - **[Pro]** **Pro migration generator rewrites all base-package references and preserves Gemfile pins**: `rails generate react_on_rails:pro` now rewrites Jest/Vitest mock helpers (`jest.mock`, `vi.mock`, `requireActual`/`importActual`, and the rest) and TypeScript `declare module 'react-on-rails'` blocks alongside its existing `import`/`require`/dynamic-import handling, and the Gemfile swap now preserves the user's existing version pin (and other gem options) instead of overwriting them with the running gem's version. `react_on_rails:doctor` is widened to match: it also flags stale side-effect imports (`import 'react-on-rails';`), Jest/Vitest mock helpers, and `declare module` blocks, and the new side-effect-import pattern keeps the doctor a superset of the rewriter so anything the rewriter doesn't reach gets surfaced. Closes [Issue 3104](https://github.com/shakacode/react_on_rails/issues/3104). [PR 3232](https://github.com/shakacode/react_on_rails/pull/3232) by [justin808](https://github.com/justin808).
 - **[Pro]** **Pro migration scans TypeScript 4.7 `.mts` and `.cts` modules**: `react_on_rails:doctor` and the Pro migration rewriter now include `.mts`/`.cts` source files (and their `.d.mts`/`.d.cts` declaration counterparts) when looking for stale `react-on-rails` references, matching the existing `.mjs`/`.cjs` coverage. Fixes [Issue 3250](https://github.com/shakacode/react_on_rails/issues/3250). [PR 3334](https://github.com/shakacode/react_on_rails/pull/3334) by [justin808](https://github.com/justin808).

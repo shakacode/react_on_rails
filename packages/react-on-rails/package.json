@@ -39,6 +39,7 @@
     "./createReactOutput": "./lib/createReactOutput.js",
     "./isServerRenderResult": "./lib/isServerRenderResult.js",
     "./reactApis": "./lib/reactApis.cjs",
+    "./webpackHelpers": "./lib/webpackHelpers.cjs",
     "./reactHydrateOrRender": "./lib/reactHydrateOrRender.js",
     "./turbolinksUtils": "./lib/turbolinksUtils.js",
     "./isRenderFunction": "./lib/isRenderFunction.js",
@@ -72,7 +73,8 @@
     "lib/**/*.js",
     "lib/**/*.cjs",
     "lib/**/*.mjs",
-    "lib/**/*.d.ts"
+    "lib/**/*.d.ts",
+    "lib/**/*.d.cts"
   ],
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails/issues"

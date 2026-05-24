@@ -1,7 +1,7 @@
 # Upgrading React on Rails
 
 > [!NOTE]
-> **Summary for AI agents:** Use this page when the user is upgrading between React on Rails versions (e.g., v13 → v14). For upgrading from OSS to Pro, see [Upgrade to Pro](../../pro/upgrading-to-pro.md). For migrating from the `react-rails` gem, see [Migrating from react-rails](../migrating/migrating-from-react-rails.md). Check the [release notes](./release-notes/index.md) for version-specific breaking changes.
+> **Summary for AI agents:** Use this page when the user is upgrading between React on Rails versions (e.g., v13 → v14). For upgrading from OSS to Pro, see [Upgrade to Pro](../../pro/upgrading-to-pro.md). For upgrading between **React on Rails Pro versions**, see [Upgrading React on Rails Pro](../../pro/updating.md) — Pro upgrades are coupled Ruby + JavaScript changes and need lockfile updates on both sides. For migrating from the `react-rails` gem, see [Migrating from react-rails](../migrating/migrating-from-react-rails.md). Check the [release notes](./release-notes/index.md) for version-specific breaking changes.
 
 ## Need Help Migrating?
 
@@ -23,6 +23,20 @@ rails generate react_on_rails:install
 - webpack configurations
 - `shakapacker.yml` settings
 - other configuration files
+
+## Pro Users: Coupled Ruby + JavaScript Upgrade
+
+React on Rails Pro versions are a **coupled Ruby + JavaScript upgrade**: the gem
+(`react_on_rails_pro`), the npm packages (`react-on-rails-pro`, optionally
+`react-on-rails-pro-node-renderer` and `react-on-rails-rsc`), **and** both
+lockfiles (`Gemfile.lock` plus `yarn.lock` / `package-lock.json` / `pnpm-lock.yaml`)
+must move together. The gem and the npm package also use different prerelease
+formats (`16.7.0.rc.0` on RubyGems vs `16.7.0-rc.0` on npm).
+
+See [Upgrading React on Rails Pro → Coupled Pro Upgrade Checklist](../../pro/updating.md#coupled-pro-upgrade-checklist)
+for the full step-by-step. Following that checklist is required for Pro upgrades
+to avoid PRs that pass loose installs locally and then fail CI under frozen-lockfile
+install.
 
 ## Upgrade Preflight
 

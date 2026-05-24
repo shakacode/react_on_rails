@@ -3026,10 +3026,14 @@ describe InstallGenerator, type: :generator do
 
   context "when using --pro flag without Pro gem installed" do
     let(:install_generator) { described_class.new([], { pro: true }) }
-    let(:expected_pro_version) { Gem::Version.new(ReactOnRails::VERSION).release.to_s }
+    # Pin to a stable version so this test exercises the pessimistic (~>) branch
+    # of pro_gem_version_requirement regardless of whether the live VERSION is a
+    # prerelease (the prerelease branch is covered by a separate context below).
+    let(:expected_pro_version) { "16.5.0" }
     let(:fake_pid) { 12_345 }
 
     before do
+      stub_const("ReactOnRails::VERSION", expected_pro_version)
       allow(Gem).to receive(:loaded_specs).and_return({})
       allow(install_generator).to receive(:gem_in_lockfile?).with("react_on_rails_pro").and_return(false)
       allow(Bundler).to receive(:with_unbundled_env).and_yield

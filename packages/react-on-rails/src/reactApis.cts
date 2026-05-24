@@ -25,7 +25,9 @@ let reactDomClient: typeof import('react-dom/client');
 if (supportsRootApi) {
   // This will never throw an exception, but it's the way to tell Webpack the dependency is optional
   // https://github.com/webpack/webpack/issues/339#issuecomment-47739112
-  // Unfortunately, it only converts the error to a warning.
+  // Unfortunately, it only converts the error to a warning. React 16/17 consumers can suppress
+  // the warning by passing `reactDomClientWarning` from 'react-on-rails/webpackHelpers' to their
+  // webpack `ignoreWarnings` config. See #3137.
   try {
     reactDomClient = require('react-dom/client') as typeof import('react-dom/client');
   } catch (_e) {
