@@ -13,8 +13,9 @@ Example:
     - RSC bundle watcher to Procfile.dev
 
 Modifies:
-    - config/webpack/serverWebpackConfig.js (adds RSCWebpackPlugin, rscBundle param)
-    - config/webpack/clientWebpackConfig.js (adds RSCWebpackPlugin)
+    - config/webpack/rscManifestPlugin.js (adds RSC manifest generation helper)
+    - config/webpack/serverWebpackConfig.js (adds RSC manifest helper, rscBundle param)
+    - config/webpack/clientWebpackConfig.js (adds RSC manifest helper)
     - config/webpack/ServerClientOrBoth.js (adds rscWebpackConfig, RSC_BUNDLE_ONLY)
     - config/initializers/react_on_rails_pro.rb (adds RSC config block)
     - package.json (adds react-on-rails-rsc)

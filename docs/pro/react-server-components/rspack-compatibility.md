@@ -1,6 +1,6 @@
 # Rspack Compatibility with React Server Components
 
-> **Status**: Experimental — generator support is complete; runtime verification is in progress.
+> **Status**: Experimental — generated Rspack configs now emit the RSC manifests; full Pro Node Renderer hydration verification is still in progress.
 
 This page documents the compatibility status of [Rspack](https://rspack.dev/) with React on Rails Pro's React Server Components (RSC) implementation.
 
@@ -11,25 +11,34 @@ The generator already supports Rspack — when `assets_bundler: rspack` is detec
 
 The RSC implementation depends on the `react-on-rails-rsc` npm package, which provides:
 
-- **WebpackPlugin** — generates client/server component manifest files
+- **WebpackPlugin** — generates client/server component manifest files for webpack builds
 - **WebpackLoader** — transforms `'use client'` files into client reference proxies in the RSC bundle
+
+For Rspack builds, generated configs use `config/rspack/rscManifestPlugin.js` instead of applying
+`react-on-rails-rsc/WebpackPlugin` directly. The helper scans Shakapacker source paths for `'use client'`
+modules, adds those modules to the client and server bundle graphs, and emits the two manifest files
+expected by the Pro Node Renderer:
+
+- `react-client-manifest.json`
+- `react-server-client-manifest.json`
 
 ## Compatibility Matrix
 
-| Component                                                        | Rspack Compatible  | Notes                                                                           |
-| ---------------------------------------------------------------- | ------------------ | ------------------------------------------------------------------------------- |
-| **RSC bundle config** (`rscWebpackConfig.js`)                    | Yes                | Does not use WebpackPlugin; only uses loader + resolve settings                 |
-| **WebpackLoader** (`react-on-rails-rsc/WebpackLoader`)           | Yes                | Standard loader interface (`this.resourcePath`, source transform)               |
-| **`conditionNames: ['react-server', '...']`**                    | Yes                | Rspack supports conditional exports resolution                                  |
-| **`resolve.alias`** (`react-dom/server: false`)                  | Yes                | Rspack supports alias to `false`                                                |
-| **`LimitChunkCountPlugin`**                                      | Yes                | Generated configs use bundler-agnostic `bundler.optimize.LimitChunkCountPlugin` |
-| **Loader chain (SWC + Babel)**                                   | Yes                | Generated config handles both `function` and `Array` `rule.use` styles          |
-| **WebpackPlugin** (`react-on-rails-rsc/WebpackPlugin`)           | Needs verification | Uses webpack internal APIs (see below)                                          |
-| **Three-bundle build** (`RSC_BUNDLE_ONLY`, `SERVER_BUNDLE_ONLY`) | Yes                | Environment variable routing is bundler-agnostic                                |
+| Component                                                        | Rspack Compatible | Notes                                                                           |
+| ---------------------------------------------------------------- | ----------------- | ------------------------------------------------------------------------------- |
+| **RSC bundle config** (`rscWebpackConfig.js`)                    | Yes               | Does not use WebpackPlugin; only uses loader + resolve settings                 |
+| **WebpackLoader** (`react-on-rails-rsc/WebpackLoader`)           | Yes               | Standard loader interface (`this.resourcePath`, source transform)               |
+| **`conditionNames: ['react-server', '...']`**                    | Yes               | Rspack supports conditional exports resolution                                  |
+| **`resolve.alias`** (`react-dom/server: false`)                  | Yes               | Rspack supports alias to `false`                                                |
+| **`LimitChunkCountPlugin`**                                      | Yes               | Generated configs use bundler-agnostic `bundler.optimize.LimitChunkCountPlugin` |
+| **Loader chain (SWC + Babel)**                                   | Yes               | Generated config handles both `function` and `Array` `rule.use` styles          |
+| **WebpackPlugin** (`react-on-rails-rsc/WebpackPlugin`)           | Webpack only      | Uses webpack internal APIs (see below)                                          |
+| **Rspack manifest helper** (`rscManifestPlugin.js`)              | Yes               | Emits the Pro RSC client/server manifests without webpack-only plugin APIs      |
+| **Three-bundle build** (`RSC_BUNDLE_ONLY`, `SERVER_BUNDLE_ONLY`) | Yes               | Environment variable routing is bundler-agnostic                                |
 
 ## WebpackPlugin Compatibility Details
 
-The `RSCWebpackPlugin` is the critical compatibility question. It wraps React's
+The `RSCWebpackPlugin` remains the webpack path. It wraps React's
 `react-server-dom-webpack/plugin`, which uses these webpack internal APIs:
 
 - `webpack/lib/dependencies/ModuleDependency` — base class for dependency tracking
@@ -44,14 +53,14 @@ The `RSCWebpackPlugin` is the critical compatibility question. It wraps React's
 - `compilation.chunkGraph` — chunk/module graph traversal
 
 **Why this matters**: The plugin generates `react-client-manifest.json` and
-`react-ssr-manifest.json`, which map client component file paths to their chunk
+`react-server-client-manifest.json`, which map client component file paths to their chunk
 IDs and bundle filenames. Without these manifests, the RSC runtime cannot resolve
 `'use client'` component references during streaming.
 
-**Rspack v2 compatibility**: Rspack v2 has significantly improved webpack plugin
-compatibility. The [Rspack team has confirmed](https://github.com/shakacode/react_on_rails/issues/1828#issuecomment-3350629010)
-that Rspack supports RSC with the JavaScript API. However, runtime verification
-with the specific `react-on-rails-rsc` plugin is still needed.
+**Rspack v2 compatibility**: Applying this webpack plugin directly to Rspack is not supported.
+Rspack does not expose every webpack compiler and compilation object used by the plugin. Generated
+Rspack configs therefore route manifest generation through `rscManifestPlugin.js`, which uses Rspack's
+public compilation hooks and keeps the existing `react-on-rails-rsc` wire protocol.
 
 ## How the RSC Bundle Avoids the Plugin
 
@@ -63,7 +72,8 @@ which skips adding `RSCWebpackPlugin`. The RSC bundle only uses:
 3. **Aliases** to exclude `react-dom/server` from the RSC bundle
 
 This means the RSC bundle itself should work with Rspack today. The plugin is only
-added to the **server** and **client** bundles for manifest generation.
+added to the **server** and **client** bundles for manifest generation when using webpack. With Rspack,
+the generated manifest helper is added to those bundles instead.
 
 ## Testing with Rspack
 
@@ -74,27 +84,29 @@ To test RSC with Rspack in your project:
 3. Verify configs are in `config/rspack/`
 4. Build all three bundles and check for:
    - `rsc-bundle.js` in the output
-   - `react-client-manifest.json` and `react-ssr-manifest.json` (from the plugin)
+   - `react-client-manifest.json`
+   - `react-server-client-manifest.json`
    - No webpack/Rspack compilation errors
 
 ## Known Limitations
 
-1. **No `react-server-dom-rspack` package**: React does not ship a dedicated Rspack
-   variant of the RSC wire protocol. The `react-server-dom-webpack` package is used,
-   relying on Rspack's webpack compatibility layer.
+1. **Runtime support remains experimental**: The generated Rspack helper emits the manifests
+   expected by React on Rails Pro, but each app should still verify an interactive `'use client'`
+   boundary through the Pro Node Renderer before treating Rspack + RSC as production-ready.
 
 2. **Plugin `require('webpack')` call**: The `react-server-dom-webpack/plugin`
    internally calls `require('webpack')`, which loads webpack even in Rspack projects.
-   Rspack's compatibility layer must intercept the compiler/compilation interactions
-   for the plugin to function correctly.
+   Generated Rspack configs avoid that direct plugin path and use `rscManifestPlugin.js`.
 
-3. **No official React Rspack support**: The React team has not officially tested or
-   endorsed `react-server-dom-webpack` with Rspack. Compatibility is provided by
-   Rspack's webpack API compatibility layer.
+3. **Native Rspack RSC is a future migration path**: Rspack documents native RSC support through
+   `@rspack/core`'s `experiments.rsc` APIs and `react-server-dom-rspack`, but that path currently
+   targets React 19.1+ and a different manifest/runtime shape. React on Rails Pro's current RSC
+   integration stays on the `react-on-rails-rsc` protocol for React 19.0.x compatibility.
 
 ## Related Resources
 
 - [Issue #1828: Rspack support for RSC](https://github.com/shakacode/react_on_rails/issues/1828)
 - [Rspack RSC support PR](https://github.com/web-infra-dev/rspack/pull/5824)
+- [Rspack React Server Components guide](https://v2.rspack.rs/guide/tech/rsc)
 - [Three-bundle architecture](./how-react-server-components-work.md)
 - [Upgrading an existing Pro app to RSC](./upgrading-existing-pro-app.md)

@@ -1,0 +1,248 @@
+const fs = require('fs');
+const path = require('path');
+const url = require('url');
+const { config } = require('shakapacker');
+const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+const CLIENT_REFERENCE_EXTENSIONS = /\.(?:js|mjs|cjs|jsx|ts|tsx)$/;
+const DEFAULT_EXCLUDED_DIRECTORIES = new Set(['node_modules', 'public', 'tmp', 'log', 'storage']);
+
+const toPosixPath = (filePath) => filePath.split(path.sep).join('/');
+
+const toImportRequest = (context, filePath) => {
+  const relativePath = toPosixPath(path.relative(context, filePath));
+  if (!relativePath || relativePath.startsWith('..')) {
+    return filePath;
+  }
+
+  return relativePath.startsWith('.') ? relativePath : `./${relativePath}`;
+};
+
+const testPattern = (pattern, value) => {
+  if (!pattern) return true;
+  pattern.lastIndex = 0;
+  return pattern.test(value);
+};
+
+const isExcluded = (pattern, value) => {
+  if (!pattern) return false;
+  pattern.lastIndex = 0;
+  return pattern.test(value);
+};
+
+const hasUseClientDirective = (source) => {
+  let remaining = source.replace(/^\uFEFF/, '').trimStart();
+
+  while (remaining.length > 0) {
+    const match = remaining.match(/^(['"])(.*?)\1\s*;?/);
+    if (!match) return false;
+    if (match[2] === 'use client') return true;
+
+    remaining = remaining.slice(match[0].length).trimStart();
+  }
+
+  return false;
+};
+
+const normalizeClientReferences = () => {
+  const defaultDirectories = [config.source_path, ...(config.additional_paths || [])].filter(Boolean);
+  const directories = defaultDirectories.length > 0 ? defaultDirectories : ['.'];
+
+  return directories.map((directory) => ({
+    directory,
+    recursive: true,
+    include: CLIENT_REFERENCE_EXTENSIONS,
+  }));
+};
+
+const resolveReferenceDirectory = (context, directory) =>
+  path.isAbsolute(directory) ? directory : path.resolve(context, directory);
+
+const collectClientReferenceFiles = (context, clientReferences = normalizeClientReferences()) => {
+  const files = new Set();
+
+  const collectFile = (filePath) => {
+    if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) return;
+
+    const source = fs.readFileSync(filePath, 'utf8');
+    if (hasUseClientDirective(source)) {
+      files.add(path.resolve(filePath));
+    }
+  };
+
+  const walk = (directory, reference) => {
+    if (!fs.existsSync(directory)) return;
+
+    fs.readdirSync(directory, { withFileTypes: true }).forEach((entry) => {
+      const absolutePath = path.join(directory, entry.name);
+
+      if (entry.isDirectory()) {
+        if (reference.recursive && !DEFAULT_EXCLUDED_DIRECTORIES.has(entry.name)) {
+          walk(absolutePath, reference);
+        }
+        return;
+      }
+
+      const requestPath = `./${toPosixPath(path.relative(directory, absolutePath))}`;
+      if (
+        (testPattern(reference.include, requestPath) || testPattern(reference.include, absolutePath)) &&
+        !isExcluded(reference.exclude, requestPath) &&
+        !isExcluded(reference.exclude, absolutePath)
+      ) {
+        collectFile(absolutePath);
+      }
+    });
+  };
+
+  clientReferences.forEach((reference) => {
+    if (typeof reference === 'string') {
+      collectFile(path.isAbsolute(reference) ? reference : path.resolve(context, reference));
+      return;
+    }
+
+    walk(resolveReferenceDirectory(context, reference.directory), reference);
+  });
+
+  return Array.from(files).sort();
+};
+
+const appendImports = (entryValue, requests) => {
+  if (typeof entryValue === 'string') {
+    return [entryValue, ...requests];
+  }
+
+  if (Array.isArray(entryValue)) {
+    return [...entryValue, ...requests];
+  }
+
+  if (entryValue && typeof entryValue === 'object' && entryValue.import) {
+    return {
+      ...entryValue,
+      import: appendImports(entryValue.import, requests),
+    };
+  }
+
+  return entryValue;
+};
+
+const addClientReferencesToEntry = (bundlerConfig, clientReferenceFiles) => {
+  if (clientReferenceFiles.length === 0) return;
+
+  const context = bundlerConfig.context || process.cwd();
+  const requests = clientReferenceFiles.map((filePath) => toImportRequest(context, filePath));
+  const { entry } = bundlerConfig;
+
+  const addRequestsToEntry = (entryValue) => {
+    if (typeof entryValue === 'string' || Array.isArray(entryValue)) {
+      return appendImports(entryValue, requests);
+    }
+
+    if (entryValue && typeof entryValue === 'object') {
+      Object.keys(entryValue).forEach((entryName) => {
+        entryValue[entryName] = appendImports(entryValue[entryName], requests);
+      });
+    }
+
+    return entryValue;
+  };
+
+  if (typeof entry === 'function') {
+    bundlerConfig.entry = async (...args) => addRequestsToEntry(await entry(...args));
+    return;
+  }
+
+  bundlerConfig.entry = addRequestsToEntry(entry);
+};
+
+class RspackRSCManifestPlugin {
+  constructor(options, clientReferenceFiles) {
+    if (!options || typeof options.isServer !== 'boolean') {
+      throw new Error('RspackRSCManifestPlugin: You must specify the isServer option as a boolean.');
+    }
+
+    this.isServer = options.isServer;
+    this.clientReferenceFiles = clientReferenceFiles;
+    this.clientManifestFilename =
+      options.clientManifestFilename ||
+      (options.isServer ? 'react-server-client-manifest.json' : 'react-client-manifest.json');
+  }
+
+  apply(compiler) {
+    const clientReferenceSet = new Set(this.clientReferenceFiles.map((filePath) => path.resolve(filePath)));
+
+    compiler.hooks.thisCompilation.tap('RspackRSCManifestPlugin', (compilation) => {
+      compilation.hooks.processAssets.tap(
+        {
+          name: 'RspackRSCManifestPlugin',
+          stage: compiler.webpack.Compilation.PROCESS_ASSETS_STAGE_REPORT,
+        },
+        () => {
+          let crossOrigin = compilation.outputOptions.crossOriginLoading;
+          crossOrigin =
+            typeof crossOrigin === 'string'
+              ? crossOrigin === 'use-credentials'
+                ? crossOrigin
+                : 'anonymous'
+              : null;
+
+          const filePathToModuleMetadata = {};
+
+          const recordModule = (moduleId, module) => {
+            if (
+              !module.resource ||
+              !clientReferenceSet.has(path.resolve(module.resource)) ||
+              moduleId == null
+            )
+              return;
+
+            filePathToModuleMetadata[url.pathToFileURL(module.resource).href] = {
+              id: moduleId,
+              chunks: [],
+              name: '*',
+            };
+          };
+
+          for (const module of compilation.modules) {
+            const moduleId = compilation.chunkGraph.getModuleId(module);
+            recordModule(moduleId, module);
+
+            if (module.modules) {
+              module.modules.forEach((concatenatedModule) => recordModule(moduleId, concatenatedModule));
+            }
+          }
+
+          const manifest = {
+            moduleLoading: {
+              prefix: compilation.outputOptions.publicPath || '',
+              crossOrigin,
+            },
+            filePathToModuleMetadata,
+          };
+
+          compilation.emitAsset(
+            this.clientManifestFilename,
+            new compiler.webpack.sources.RawSource(JSON.stringify(manifest, null, 2)),
+          );
+        },
+      );
+    });
+  }
+}
+
+const addRSCManifestPlugin = (bundlerConfig, options) => {
+  if (config.assets_bundler !== 'rspack') {
+    bundlerConfig.plugins.push(new RSCWebpackPlugin(options));
+    return;
+  }
+
+  const context = bundlerConfig.context || process.cwd();
+  const clientReferenceFiles = collectClientReferenceFiles(context, options.clientReferences);
+  addClientReferencesToEntry(bundlerConfig, clientReferenceFiles);
+  bundlerConfig.plugins.push(new RspackRSCManifestPlugin(options, clientReferenceFiles));
+};
+
+module.exports = {
+  RspackRSCManifestPlugin,
+  addClientReferencesToEntry,
+  addRSCManifestPlugin,
+};

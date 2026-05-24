@@ -96,14 +96,10 @@ describe RscGenerator, type: :generator do
     end
 
     describe "webpack config transforms" do
-      it "adds RSCWebpackPlugin to serverWebpackConfig" do
+      it "adds RSC manifest helper to serverWebpackConfig" do
         assert_file "config/webpack/serverWebpackConfig.js" do |content|
-          expect(content).to include("RSCWebpackPlugin")
-          expect(content).to include("react-on-rails-rsc/WebpackPlugin")
-          expect(content).to include("clientReferences: rscClientReferences")
-          expect(content).to include("directory: resolve(config.source_path)")
-          expect(content).to include('include: /\.(js|mjs|cjs|ts|mts|cts|jsx|tsx)$/')
-          expect(content).to include("isServer: true")
+          expect(content).to include("addRSCManifestPlugin")
+          expect(content).to include("./rscManifestPlugin")
         end
       end
 
@@ -113,14 +109,11 @@ describe RscGenerator, type: :generator do
         end
       end
 
-      it "adds RSCWebpackPlugin to clientWebpackConfig" do
+      it "adds RSC manifest helper to clientWebpackConfig" do
         assert_file "config/webpack/clientWebpackConfig.js" do |content|
-          expect(content).to include("RSCWebpackPlugin")
-          expect(content).to include("react-on-rails-rsc/WebpackPlugin")
-          expect(content).to include("clientReferences: rscClientReferences")
-          expect(content).to include("directory: resolve(config.source_path)")
-          expect(content).to include('include: /\.(js|mjs|cjs|ts|mts|cts|jsx|tsx)$/')
-          expect(content).to include("isServer: false")
+          expect(content).to include("addRSCManifestPlugin")
+          expect(content).to include("./rscManifestPlugin")
+          expect(content).to include("addRSCManifestPlugin(clientConfig, { isServer: false })")
         end
       end
 
@@ -3462,13 +3455,10 @@ describe RscGenerator, type: :generator do
     end
 
     describe "RSC webpack config transforms in config/rspack/" do
-      it "adds RSCWebpackPlugin to serverWebpackConfig" do
+      it "adds RSC manifest helper to serverWebpackConfig" do
         assert_file "config/rspack/serverWebpackConfig.js" do |content|
-          expect(content).to include("RSCWebpackPlugin")
-          expect(content).to include("react-on-rails-rsc/WebpackPlugin")
-          expect(content).to include("clientReferences: rscClientReferences")
-          expect(content).to include("directory: resolve(config.source_path)")
-          expect(content).to include("isServer: true")
+          expect(content).to include("addRSCManifestPlugin")
+          expect(content).to include("./rscManifestPlugin")
         end
       end
 
@@ -3478,12 +3468,10 @@ describe RscGenerator, type: :generator do
         end
       end
 
-      it "adds RSCWebpackPlugin to clientWebpackConfig" do
+      it "adds RSC manifest helper to clientWebpackConfig" do
         assert_file "config/rspack/clientWebpackConfig.js" do |content|
-          expect(content).to include("RSCWebpackPlugin")
-          expect(content).to include("clientReferences: rscClientReferences")
-          expect(content).to include("directory: resolve(config.source_path)")
-          expect(content).to include("isServer: false")
+          expect(content).to include("addRSCManifestPlugin")
+          expect(content).to include("addRSCManifestPlugin(clientConfig, { isServer: false })")
         end
       end
 
@@ -3504,6 +3492,28 @@ describe RscGenerator, type: :generator do
     # See: https://github.com/shakacode/react_on_rails/issues/1828
 
     describe "Rspack RSC runtime compatibility" do
+      it "creates a Rspack-compatible RSC manifest plugin helper" do
+        assert_file "config/rspack/rscManifestPlugin.js" do |content|
+          expect(content).to include("class RspackRSCManifestPlugin")
+          expect(content).to include("react-client-manifest.json")
+          expect(content).to include("react-server-client-manifest.json")
+          expect(content).to include("addClientReferencesToEntry")
+          expect(content).to include("compilation.emitAsset")
+        end
+      end
+
+      it "client and server configs route manifest generation through the helper" do
+        assert_file "config/rspack/clientWebpackConfig.js" do |content|
+          expect(content).to include("addRSCManifestPlugin(clientConfig, { isServer: false })")
+          expect(content).not_to include("new RSCWebpackPlugin({ isServer: false })")
+        end
+
+        assert_file "config/rspack/serverWebpackConfig.js" do |content|
+          expect(content).to include("addRSCManifestPlugin(serverWebpackConfig, { isServer: true })")
+          expect(content).not_to include("new RSCWebpackPlugin({ isServer: true })")
+        end
+      end
+
       it "rscWebpackConfig.js uses react-server conditionNames for module resolution" do
         assert_file "config/rspack/rscWebpackConfig.js" do |content|
           expect(content).to include("conditionNames")
@@ -3553,12 +3563,10 @@ describe RscGenerator, type: :generator do
         end
       end
 
-      it "serverWebpackConfig.js conditionally skips RSCWebpackPlugin when rscBundle is true" do
+      it "serverWebpackConfig.js conditionally skips manifest generation when rscBundle is true" do
         assert_file "config/rspack/serverWebpackConfig.js" do |content|
           expect(content).to include("if (!rscBundle)")
-          expect(content).to include("clientReferences: rscClientReferences")
-          expect(content).to include("directory: resolve(config.source_path)")
-          expect(content).to include("isServer: true")
+          expect(content).to include("addRSCManifestPlugin(serverWebpackConfig, { isServer: true })")
         end
       end
 

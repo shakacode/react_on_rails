@@ -1689,12 +1689,10 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    it "serverWebpackConfig includes RSCWebpackPlugin import" do
+    it "serverWebpackConfig includes RSC manifest helper import" do
       assert_file "config/webpack/serverWebpackConfig.js" do |content|
-        expect(content).to include("RSCWebpackPlugin")
-        expect(content).to include("react-on-rails-rsc/WebpackPlugin")
-        expect(content).to include("clientReferences: rscClientReferences")
-        expect(content).to include("directory: resolve(config.source_path)")
+        expect(content).to include("addRSCManifestPlugin")
+        expect(content).to include("./rscManifestPlugin")
       end
     end
 
@@ -1907,21 +1905,17 @@ describe InstallGenerator, type: :generator do
     end
 
     describe "RSC webpack config transforms in config/rspack/" do
-      it "adds RSCWebpackPlugin to serverWebpackConfig" do
+      it "adds RSC manifest helper to serverWebpackConfig" do
         assert_file "config/rspack/serverWebpackConfig.js" do |content|
-          expect(content).to include("RSCWebpackPlugin")
-          expect(content).to include("react-on-rails-rsc/WebpackPlugin")
-          expect(content).to include("clientReferences: rscClientReferences")
-          expect(content).to include("directory: resolve(config.source_path)")
+          expect(content).to include("addRSCManifestPlugin")
+          expect(content).to include("./rscManifestPlugin")
         end
       end
 
-      it "adds RSCWebpackPlugin to clientWebpackConfig" do
+      it "adds RSC manifest helper to clientWebpackConfig" do
         assert_file "config/rspack/clientWebpackConfig.js" do |content|
-          expect(content).to include("RSCWebpackPlugin")
-          expect(content).to include("react-on-rails-rsc/WebpackPlugin")
-          expect(content).to include("clientReferences: rscClientReferences")
-          expect(content).to include("directory: resolve(config.source_path)")
+          expect(content).to include("addRSCManifestPlugin")
+          expect(content).to include("./rscManifestPlugin")
         end
       end
 
