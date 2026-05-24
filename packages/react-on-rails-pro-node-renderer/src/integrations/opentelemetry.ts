@@ -13,7 +13,7 @@ import { registerInstrumentations } from '@opentelemetry/instrumentation';
 import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
 import FastifyOtelInstrumentation from '@fastify/otel';
 import { setupTracing, setupSubSpan, type SubSpanFn } from '../shared/tracing.js';
-import { log, message } from './api.js';
+import { configureFastify, log, message } from './api.js';
 
 declare module '../shared/tracing.js' {
   interface UnitOfWorkOptions {
@@ -119,6 +119,17 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
         });
       setupSubSpan(subSpanImpl);
     }
+
+    // Flush pending spans on graceful shutdown. Fastify fires onClose during
+    // worker.destroy() / app.close(), giving the BatchSpanProcessor a chance to
+    // export queued spans before the process exits.
+    configureFastify((app) => {
+      app.addHook('onClose', async () => {
+        if (tracerProvider) {
+          await tracerProvider.shutdown();
+        }
+      });
+    });
   } catch (err) {
     message(`[OpenTelemetry] init failed: ${String(err)}`);
   }
