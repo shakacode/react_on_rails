@@ -17,6 +17,26 @@ AllCops:
     - 'spec/dummy/bin/**/*'
     - 'bin/**/*'
 
+Naming/VariableNumber:
+  AllowedIdentifiers:
+    - capture3
+    - iso8601
+    - rfc1123_date
+    - rfc822
+    - rfc2822
+    - rfc2822
+    - rfc3339
+    - x86_64
+    - p99_9
+
+RSpec/FilePath:
+  Exclude:
+    - 'spec/load/**/*_spec.rb'
+
+RSpec/SpecFilePathFormat:
+  Exclude:
+    - 'spec/load/**/*_spec.rb'
+
 RSpec/BeforeAfterAll:
   Exclude:
     - 'spec/react_on_rails/generators/dev_tests_generator_spec.rb'
