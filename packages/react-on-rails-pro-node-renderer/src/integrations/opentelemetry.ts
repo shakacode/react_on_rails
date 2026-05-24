@@ -1,17 +1,10 @@
-import { trace as otelTrace, SpanStatusCode, type Attributes } from '@opentelemetry/api';
-import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
-import {
-  BatchSpanProcessor,
-  SimpleSpanProcessor,
-  type SpanExporter,
-  type SpanProcessor,
-} from '@opentelemetry/sdk-trace-base';
-import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import { resourceFromAttributes } from '@opentelemetry/resources';
-import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions';
-import { registerInstrumentations } from '@opentelemetry/instrumentation';
-import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
-import FastifyOtelInstrumentation from '@fastify/otel';
+// Type-only imports — these are erased at runtime and do not trigger require().
+// Runtime imports of the OTel SDK happen lazily inside init() so that users who
+// haven't installed the optional OTel peer dependencies can still import this
+// module without crashing — init() will simply log an error and no-op.
+import type { Attributes } from '@opentelemetry/api';
+import type { NodeTracerProvider as NodeTracerProviderType } from '@opentelemetry/sdk-trace-node';
+import type { SpanExporter, SpanProcessor } from '@opentelemetry/sdk-trace-base';
 import { setupTracing, setupSubSpan, type SubSpanFn } from '../shared/tracing.js';
 import { configureFastify, log, message } from './api.js';
 
@@ -40,34 +33,58 @@ export interface OpenTelemetryInitOptions {
 
 const DEFAULT_SERVICE_NAME = 'react-on-rails-pro-node-renderer';
 
-let tracerProvider: NodeTracerProvider | null = null;
+let tracerProvider: NodeTracerProviderType | null = null;
 
 function isProduction(): boolean {
   return process.env.NODE_ENV === 'production' || process.env.RAILS_ENV === 'production';
 }
 
-function buildSpanProcessor(opts: OpenTelemetryInitOptions): SpanProcessor {
-  if (opts.spanProcessor) return opts.spanProcessor;
-  const exporter = opts.exporter ?? new OTLPTraceExporter();
-  return isProduction() ? new BatchSpanProcessor(exporter) : new SimpleSpanProcessor(exporter);
-}
-
 export function init(opts: OpenTelemetryInitOptions = {}): void {
   try {
+    /* eslint-disable @typescript-eslint/no-require-imports, global-require --
+     * Lazy require so init() can no-op when peer deps are missing instead of
+     * crashing at module load time. */
+    const { NodeTracerProvider } =
+      require('@opentelemetry/sdk-trace-node') as typeof import('@opentelemetry/sdk-trace-node');
+    const { BatchSpanProcessor, SimpleSpanProcessor } =
+      require('@opentelemetry/sdk-trace-base') as typeof import('@opentelemetry/sdk-trace-base');
+    const { OTLPTraceExporter } =
+      require('@opentelemetry/exporter-trace-otlp-http') as typeof import('@opentelemetry/exporter-trace-otlp-http');
+    const { resourceFromAttributes } =
+      require('@opentelemetry/resources') as typeof import('@opentelemetry/resources');
+    const { ATTR_SERVICE_NAME } =
+      require('@opentelemetry/semantic-conventions') as typeof import('@opentelemetry/semantic-conventions');
+    const otelApi = require('@opentelemetry/api') as typeof import('@opentelemetry/api');
+    /* eslint-enable @typescript-eslint/no-require-imports, global-require */
+
     const resource = resourceFromAttributes({
       [ATTR_SERVICE_NAME]: opts.serviceName ?? DEFAULT_SERVICE_NAME,
       ...(opts.resourceAttributes ?? {}),
     });
 
+    const spanProcessor =
+      opts.spanProcessor ??
+      (isProduction()
+        ? new BatchSpanProcessor(opts.exporter ?? new OTLPTraceExporter())
+        : new SimpleSpanProcessor(opts.exporter ?? new OTLPTraceExporter()));
+
     tracerProvider = new NodeTracerProvider({
       resource,
-      spanProcessors: [buildSpanProcessor(opts)],
+      spanProcessors: [spanProcessor],
     });
-
     tracerProvider.register();
     log.info('[OpenTelemetry] Tracer provider initialized');
 
     if (opts.fastify) {
+      /* eslint-disable @typescript-eslint/no-require-imports, global-require */
+      const { registerInstrumentations } =
+        require('@opentelemetry/instrumentation') as typeof import('@opentelemetry/instrumentation');
+      const { HttpInstrumentation } =
+        require('@opentelemetry/instrumentation-http') as typeof import('@opentelemetry/instrumentation-http');
+      // @fastify/otel uses `export = exported` so the require() returns the namespace
+      // object; the constructor lives on `.FastifyOtelInstrumentation` (also as `.default`).
+      const { FastifyOtelInstrumentation } = require('@fastify/otel') as typeof import('@fastify/otel');
+      /* eslint-enable @typescript-eslint/no-require-imports, global-require */
       registerInstrumentations({
         instrumentations: [
           // HTTP first — Fastify instrumentation depends on it.
@@ -79,7 +96,7 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
     }
 
     if (opts.tracing) {
-      const tracer = otelTrace.getTracer(opts.serviceName ?? DEFAULT_SERVICE_NAME);
+      const tracer = otelApi.trace.getTracer(opts.serviceName ?? DEFAULT_SERVICE_NAME);
 
       setupTracing({
         startSsrRequestOptions: () => ({
@@ -92,7 +109,7 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
               return await fn();
             } catch (err) {
               span.setStatus({
-                code: SpanStatusCode.ERROR,
+                code: otelApi.SpanStatusCode.ERROR,
                 message: err instanceof Error ? err.message : String(err),
               });
               throw err;
@@ -109,7 +126,7 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
             return await fn();
           } catch (err) {
             span.setStatus({
-              code: SpanStatusCode.ERROR,
+              code: otelApi.SpanStatusCode.ERROR,
               message: err instanceof Error ? err.message : String(err),
             });
             throw err;
@@ -145,5 +162,12 @@ export async function __resetForTest(): Promise<void> {
   // Unregister the global tracer provider so the next init() can register a fresh one.
   // Without this, otelTrace.setGlobalTracerProvider() silently skips setDelegate() because
   // registerGlobal() returns false after the first successful registration.
-  otelTrace.disable();
+  /* eslint-disable @typescript-eslint/no-require-imports, global-require */
+  try {
+    const otelApi = require('@opentelemetry/api') as typeof import('@opentelemetry/api');
+    otelApi.trace.disable();
+  } catch {
+    // OTel API not installed — nothing to disable.
+  }
+  /* eslint-enable @typescript-eslint/no-require-imports, global-require */
 }
