@@ -48,8 +48,7 @@ module ReactOnRailsPro
       # NOTE: Incremental rendering requires bidirectional streaming via HTTPX's
       # stream_bidi plugin. This is not yet implemented in the async-http renderer
       # client; tracked in https://github.com/shakacode/react_on_rails/issues/3283.
-      def render_code_with_incremental_updates(_path, _js_code, async_props_block:)
-        _ = async_props_block
+      def render_code_with_incremental_updates(_path, _js_code, **)
         raise ReactOnRailsPro::Error,
               "Incremental rendering with async props is not yet supported by the async-http " \
               "renderer client. Tracked in https://github.com/shakacode/react_on_rails/issues/3283."
@@ -148,6 +147,8 @@ module ReactOnRailsPro
             available_retries -= 1
             next
           rescue ReactOnRailsPro::RendererHttpClient::ConnectionError => e
+            # Connection errors are not retried; the renderer process or socket is unreachable,
+            # so retrying the same request immediately would not recover reliably.
             raise ReactOnRailsPro::Error,
                   "Node renderer request failed: #{path}.\nOriginal error:\n#{e}\n#{e.backtrace&.join("\n")}"
           end

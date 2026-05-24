@@ -318,6 +318,18 @@ describe ReactOnRailsPro::Request do
     end
   end
 
+  describe "render_code_with_incremental_updates" do
+    it "raises a clear error because async props incremental rendering is not yet supported" do
+      expect do
+        described_class.render_code_with_incremental_updates(
+          "/render",
+          "console.log('Hello');",
+          async_props_block: -> {}
+        )
+      end.to raise_error(ReactOnRailsPro::Error, /async-http/)
+    end
+  end
+
   describe "get_form_body_for_file" do
     let(:url_path) { "http://localhost:3035/webpack/development/server-bundle.js" }
 

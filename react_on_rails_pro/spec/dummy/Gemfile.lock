@@ -24,7 +24,6 @@ PATH
       addressable
       async (>= 2.29)
       async-http (~> 0.95)
-      connection_pool
       execjs (~> 2.9)
       io-endpoint (~> 0.17.0)
       jwt (>= 2.7)
@@ -545,6 +544,7 @@ PLATFORMS
 
 DEPENDENCIES
   amazing_print
+  base64
   benchmark
   bootsnap
   capybara (>= 3.38.0)

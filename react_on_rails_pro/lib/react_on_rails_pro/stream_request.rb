@@ -99,8 +99,8 @@ module ReactOnRailsPro
       return enum_for(:each_chunk) unless block
 
       send_bundle = false
-      error_body = +""
       loop do
+        error_body = +""
         stream_response = @request_executor.call(send_bundle)
 
         # The renderer emits the length-prefixed wire format documented in

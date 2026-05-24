@@ -54,7 +54,7 @@ module ReactOnRailsPro
 
     def initialize: (
       origin: String,
-      pool_size: Integer,
+      pool_size: Integer?,
       connect_timeout: Numeric,
       read_timeout: Numeric,
       ?force_http2: bool

@@ -39,7 +39,6 @@ Gem::Specification.new do |s|
   s.add_runtime_dependency "addressable"
   s.add_runtime_dependency "async", ">= 2.29"
   s.add_runtime_dependency "async-http", "~> 0.95"
-  s.add_runtime_dependency "connection_pool"
   s.add_runtime_dependency "execjs", "~> 2.9"
   s.add_runtime_dependency "io-endpoint", "~> 0.17.0"
   s.add_runtime_dependency "jwt", ">= 2.7"

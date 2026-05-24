@@ -100,4 +100,28 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       expect(yielded_chunks).to be_empty
     end
   end
+
+  describe "#each_chunk" do
+    it "does not carry error bodies across bundle-send retries" do
+      responses = [
+        ReactOnRailsPro::RendererHttpClient::Response.new(
+          status: ReactOnRailsPro::STATUS_SEND_BUNDLE,
+          body: ["bundle diagnostic"]
+        ),
+        ReactOnRailsPro::RendererHttpClient::Response.new(
+          status: ReactOnRailsPro::STATUS_BAD_REQUEST,
+          body: ["bad request body"]
+        )
+      ]
+      request = described_class.send(:new) { responses.shift }
+      yielded_chunks = []
+
+      expect { request.each_chunk { |chunk| yielded_chunks << chunk } }.to raise_error(
+        ReactOnRailsPro::Error,
+        "Renderer rejected malformed request or hit an unhandled VM error: " \
+        "#{ReactOnRailsPro::STATUS_BAD_REQUEST}:\nbad request body"
+      )
+      expect(yielded_chunks).to be_empty
+    end
+  end
 end
