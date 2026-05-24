@@ -39,6 +39,10 @@ function isProduction(): boolean {
   return process.env.NODE_ENV === 'production' || process.env.RAILS_ENV === 'production';
 }
 
+function resolveServiceName(opts: OpenTelemetryInitOptions): string {
+  return process.env.OTEL_SERVICE_NAME ?? opts.serviceName ?? DEFAULT_SERVICE_NAME;
+}
+
 export function init(opts: OpenTelemetryInitOptions = {}): void {
   try {
     /* eslint-disable @typescript-eslint/no-require-imports, global-require --
@@ -48,32 +52,36 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
       require('@opentelemetry/sdk-trace-node') as typeof import('@opentelemetry/sdk-trace-node');
     const { BatchSpanProcessor, SimpleSpanProcessor } =
       require('@opentelemetry/sdk-trace-base') as typeof import('@opentelemetry/sdk-trace-base');
-    const { OTLPTraceExporter } =
-      require('@opentelemetry/exporter-trace-otlp-http') as typeof import('@opentelemetry/exporter-trace-otlp-http');
     const { resourceFromAttributes } =
       require('@opentelemetry/resources') as typeof import('@opentelemetry/resources');
     const { ATTR_SERVICE_NAME } =
       require('@opentelemetry/semantic-conventions') as typeof import('@opentelemetry/semantic-conventions');
     const otelApi = require('@opentelemetry/api') as typeof import('@opentelemetry/api');
-    /* eslint-enable @typescript-eslint/no-require-imports, global-require */
 
+    const serviceName = resolveServiceName(opts);
     const resource = resourceFromAttributes({
-      [ATTR_SERVICE_NAME]: opts.serviceName ?? DEFAULT_SERVICE_NAME,
+      [ATTR_SERVICE_NAME]: serviceName,
       ...(opts.resourceAttributes ?? {}),
     });
 
+    const defaultExporter = () => {
+      const { OTLPTraceExporter } =
+        require('@opentelemetry/exporter-trace-otlp-http') as typeof import('@opentelemetry/exporter-trace-otlp-http');
+      return new OTLPTraceExporter();
+    };
+    /* eslint-enable @typescript-eslint/no-require-imports, global-require */
+
     const spanProcessor =
       opts.spanProcessor ??
-      (isProduction()
-        ? new BatchSpanProcessor(opts.exporter ?? new OTLPTraceExporter())
-        : new SimpleSpanProcessor(opts.exporter ?? new OTLPTraceExporter()));
+      (() => {
+        const exporter = opts.exporter ?? defaultExporter();
+        return isProduction() ? new BatchSpanProcessor(exporter) : new SimpleSpanProcessor(exporter);
+      })();
 
-    tracerProvider = new NodeTracerProvider({
+    const provider = new NodeTracerProvider({
       resource,
       spanProcessors: [spanProcessor],
     });
-    tracerProvider.register();
-    log.info('[OpenTelemetry] Tracer provider initialized');
 
     if (opts.fastify) {
       /* eslint-disable @typescript-eslint/no-require-imports, global-require */
@@ -89,14 +97,14 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
         instrumentations: [
           // HTTP first — Fastify instrumentation depends on it.
           new HttpInstrumentation(),
-          new FastifyOtelInstrumentation(),
+          new FastifyOtelInstrumentation({ registerOnInitialization: true }),
         ],
-        tracerProvider,
+        tracerProvider: provider,
       });
     }
 
     if (opts.tracing) {
-      const tracer = otelApi.trace.getTracer(opts.serviceName ?? DEFAULT_SERVICE_NAME);
+      const tracer = otelApi.trace.getTracer(serviceName);
 
       setupTracing({
         startSsrRequestOptions: () => ({
@@ -142,11 +150,16 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
     // export queued spans before the process exits.
     configureFastify((app) => {
       app.addHook('onClose', async () => {
-        if (tracerProvider) {
-          await tracerProvider.shutdown();
+        await provider.shutdown();
+        if (tracerProvider === provider) {
+          tracerProvider = null;
         }
       });
     });
+
+    provider.register();
+    tracerProvider = provider;
+    log.info('[OpenTelemetry] Tracer provider initialized');
   } catch (err) {
     message(`[OpenTelemetry] init failed: ${String(err)}`);
   }

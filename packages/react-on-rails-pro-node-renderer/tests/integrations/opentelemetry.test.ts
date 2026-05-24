@@ -2,6 +2,8 @@ import path from 'path';
 import { trace as otelTrace, type Tracer } from '@opentelemetry/api';
 import { InMemorySpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base';
 import { init, __resetForTest } from '../../src/integrations/opentelemetry';
+import worker, { disableHttp2 } from '../../src/worker';
+import packageJson from '../../src/shared/packageJson';
 import {
   trace,
   subSpan,
@@ -9,16 +11,22 @@ import {
   __resetSubSpanForTest,
   __resetTracingForTest,
 } from '../../src/shared/tracing';
+import { handleIncrementalRenderRequest } from '../../src/worker/handleIncrementalRenderRequest';
 import { handleRenderRequest } from '../../src/worker/handleRenderRequest';
 import {
   BUNDLE_TIMESTAMP,
+  createIncrementalVmBundle,
   createUploadedBundle,
   mkdirAsync,
   resetForTest,
+  serverBundleCachePath,
   uploadedBundlePath,
   vmBundlePath,
+  waitFor,
 } from '../helper';
 import { Asset } from '../../src/shared/utils';
+
+disableHttp2();
 
 describe('opentelemetry integration: init()', () => {
   let exporter: InMemorySpanExporter;
@@ -47,6 +55,26 @@ describe('opentelemetry integration: init()', () => {
     expect(spans).toHaveLength(1);
     expect(spans[0]!.name).toBe('manual.span');
     expect(spans[0]!.resource.attributes['service.name']).toBe('test-renderer');
+  });
+
+  test('init() uses OTEL_SERVICE_NAME before the configured serviceName option', () => {
+    process.env.OTEL_SERVICE_NAME = 'env-renderer';
+
+    try {
+      init({
+        serviceName: 'configured-renderer',
+        spanProcessor: new SimpleSpanProcessor(exporter),
+      });
+
+      const tracer = otelTrace.getTracer('test');
+      tracer.startActiveSpan('manual.span', (span) => {
+        span.end();
+      });
+
+      expect(exporter.getFinishedSpans()[0]!.resource.attributes['service.name']).toBe('env-renderer');
+    } finally {
+      delete process.env.OTEL_SERVICE_NAME;
+    }
   });
 
   test('init() defaults serviceName to "react-on-rails-pro-node-renderer"', () => {
@@ -239,6 +267,123 @@ describe('opentelemetry integration: end-to-end render request', () => {
     __resetTracingForTest();
     await __resetForTest();
     await resetForTest(testName);
+  });
+
+  test('cache-miss probe labels intent instead of reporting cache.hit=true on the error span', async () => {
+    init({
+      tracing: true,
+      spanProcessor: new SimpleSpanProcessor(exporter),
+    });
+
+    await createUploadedBundle(testName);
+
+    await trace(
+      async () => {
+        const result = await handleRenderRequest({
+          renderingRequest: 'ReactOnRails.dummy',
+          bundleTimestamp: BUNDLE_TIMESTAMP,
+          providedNewBundles: [
+            {
+              bundle: uploadedBundleForTest(),
+              timestamp: BUNDLE_TIMESTAMP,
+            },
+          ],
+        });
+        expect(result.response.status).toBe(200);
+      },
+      startSsrRequestOptions({ renderingRequest: 'ReactOnRails.dummy' }),
+    );
+
+    const cacheMissProbeSpan = exporter
+      .getFinishedSpans()
+      .find((s) => s.name === 'ror.bundle.build_execution_context' && s.status.code === 2);
+
+    expect(cacheMissProbeSpan).toBeDefined();
+    expect(cacheMissProbeSpan!.attributes['cache.strategy']).toBe('cache-first');
+    expect(cacheMissProbeSpan!.attributes).not.toHaveProperty('cache.hit');
+  });
+
+  test('incremental update chunk failures mark the process_chunk span as an error', async () => {
+    init({
+      tracing: true,
+      spanProcessor: new SimpleSpanProcessor(exporter),
+    });
+    await createIncrementalVmBundle(testName);
+
+    await trace(
+      async () => {
+        const result = await handleIncrementalRenderRequest({
+          firstRequestChunk: { renderingRequest: 'ReactOnRails.dummy' },
+          bundleTimestamp: BUNDLE_TIMESTAMP,
+        });
+        expect(result.response.status).toBe(200);
+        expect(result.sink).toBeDefined();
+
+        await result.sink!.add({ invalid: true });
+      },
+      startSsrRequestOptions({ renderingRequest: 'ReactOnRails.dummy' }),
+    );
+
+    const processChunkSpan = exporter
+      .getFinishedSpans()
+      .find((s) => s.name === 'ror.incremental.process_chunk');
+
+    expect(processChunkSpan).toBeDefined();
+    expect(processChunkSpan!.status.code).toBe(2);
+    expect(processChunkSpan!.status.message).toContain('Invalid incremental render chunk');
+  });
+
+  test('incremental render endpoint nests stream spans under ror.ssr.request', async () => {
+    init({
+      tracing: true,
+      spanProcessor: new SimpleSpanProcessor(exporter),
+    });
+    await createIncrementalVmBundle(testName);
+
+    const app = worker({
+      serverBundleCachePath: serverBundleCachePath(testName),
+      password: 'my_password',
+      supportModules: true,
+      stubTimers: false,
+      logHttpLevel: 'silent',
+    });
+
+    try {
+      const firstChunk = `${JSON.stringify({
+        gemVersion: packageJson.version,
+        protocolVersion: packageJson.protocolVersion,
+        password: 'my_password',
+        renderingRequest: 'ReactOnRails.dummy',
+        dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP)],
+      })}\n`;
+
+      const res = await app
+        .inject()
+        .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render/d41d8cd98f00b204e9800998ecf8427e`)
+        .payload(firstChunk)
+        .headers({
+          'Content-Type': 'application/x-ndjson',
+        })
+        .end();
+
+      expect(res.statusCode).toBe(200);
+
+      await waitFor(() => {
+        const spanNames = exporter.getFinishedSpans().map((s) => s.name);
+        expect(spanNames).toContain('ror.ssr.request');
+        expect(spanNames).toContain('ror.incremental.stream');
+      });
+
+      const spans = exporter.getFinishedSpans();
+      const ssrSpan = spans.find((s) => s.name === 'ror.ssr.request');
+      const incrementalStreamSpan = spans.find((s) => s.name === 'ror.incremental.stream');
+
+      expect(ssrSpan).toBeDefined();
+      expect(incrementalStreamSpan).toBeDefined();
+      expect(incrementalStreamSpan!.parentSpanContext?.spanId).toBe(ssrSpan!.spanContext().spanId);
+    } finally {
+      await app.close();
+    }
   });
 
   test('SSR render produces ror.ssr.request, ror.bundle.*, ror.vm.execute, ror.result.prepare spans', async () => {

@@ -241,15 +241,15 @@ reactOnRailsProNodeRenderer().catch((e) => {
 
 ### Span taxonomy
 
-| Span                                 | Where                                                             | Attributes                                            |
-| ------------------------------------ | ----------------------------------------------------------------- | ----------------------------------------------------- |
-| `ror.ssr.request`                    | Root span for each SSR render request                             | (none — root)                                         |
-| `ror.bundle.build_execution_context` | Loading a bundle into the VM                                      | `bundle.timestamp`, `bundle.paths.count`, `cache.hit` |
-| `ror.bundle.upload`                  | When new bundles are uploaded mid-request or via `/upload-assets` | `bundle.count`, `assets.count`                        |
-| `ror.vm.execute`                     | The actual SSR JS execution inside the VM                         | (none)                                                |
-| `ror.result.prepare`                 | Building the response payload                                     | (none)                                                |
-| `ror.incremental.stream`             | Wraps the incremental NDJSON request lifecycle                    | (none)                                                |
-| `ror.incremental.process_chunk`      | Processing each NDJSON update chunk                               | (none)                                                |
+| Span                                 | Where                                                             | Attributes                                                                |
+| ------------------------------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `ror.ssr.request`                    | Root span for each SSR render request                             | (none — root)                                                             |
+| `ror.bundle.build_execution_context` | Loading a bundle into the VM                                      | `bundle.timestamp`, `bundle.paths.count`, `cache.strategy` or `cache.hit` |
+| `ror.bundle.upload`                  | When new bundles are uploaded mid-request or via `/upload-assets` | `bundle.count`, `assets.count`                                            |
+| `ror.vm.execute`                     | The actual SSR JS execution inside the VM                         | (none)                                                                    |
+| `ror.result.prepare`                 | Building the response payload                                     | (none)                                                                    |
+| `ror.incremental.stream`             | Wraps the incremental NDJSON request lifecycle                    | (none)                                                                    |
+| `ror.incremental.process_chunk`      | Processing each NDJSON update chunk                               | (none)                                                                    |
 
 Outbound HTTP calls inside your SSR bundle are automatically captured by `HttpInstrumentation` as child spans.
 

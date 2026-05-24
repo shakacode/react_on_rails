@@ -118,17 +118,19 @@ export async function handleIncrementalRenderRequest(
       response,
       sink: {
         add: async (chunk: unknown) => {
-          await subSpan({ name: 'ror.incremental.process_chunk' }, async () => {
-            try {
+          try {
+            await subSpan({ name: 'ror.incremental.process_chunk' }, async () => {
               assertIsUpdateChunk(chunk);
               const bundlePath = getRequestBundleFilePath(chunk.bundleTimestamp);
-              await executionContext.runInVM(chunk.updateChunk, bundlePath).catch((err: unknown) => {
-                log.error({ msg: 'Error running incremental render chunk', err, chunk });
-              });
-            } catch (err) {
+              await executionContext.runInVM(chunk.updateChunk, bundlePath);
+            });
+          } catch (err) {
+            if (err instanceof Error && err.message.includes('Invalid incremental render chunk')) {
               log.error({ msg: 'Invalid incremental render chunk', err, chunk });
+            } else {
+              log.error({ msg: 'Error running incremental render chunk', err, chunk });
             }
-          });
+          }
         },
         handleRequestClosed: () => {
           if (!onRequestClosedUpdateChunk) {

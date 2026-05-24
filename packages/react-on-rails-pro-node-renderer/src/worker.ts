@@ -395,84 +395,90 @@ export default function run(config: Partial<Config>) {
     let responseStarted = false;
 
     try {
-      // Handle the incremental render stream
-      await handleIncrementalRenderStream({
-        request: req,
-        onRenderRequestReceived: async (obj: unknown) => {
-          // Build a temporary FastifyRequest shape for protocol/auth check
-          const tempReqBody = typeof obj === 'object' && obj !== null ? (obj as Record<string, unknown>) : {};
+      await trace(
+        async () => {
+          // Handle the incremental render stream
+          await handleIncrementalRenderStream({
+            request: req,
+            onRenderRequestReceived: async (obj: unknown) => {
+              // Build a temporary FastifyRequest shape for protocol/auth check
+              const tempReqBody =
+                typeof obj === 'object' && obj !== null ? (obj as Record<string, unknown>) : {};
 
-          // Perform request prechecks
-          const precheckResult = performRequestPrechecks(tempReqBody);
-          if (precheckResult) {
-            return {
-              response: precheckResult,
-              shouldContinue: false,
-            };
-          }
+              // Perform request prechecks
+              const precheckResult = performRequestPrechecks(tempReqBody);
+              if (precheckResult) {
+                return {
+                  response: precheckResult,
+                  shouldContinue: false,
+                };
+              }
 
-          // Extract data for incremental render request
-          const dependencyBundleTimestamps = extractBodyArrayField(
-            tempReqBody as WithBodyArrayField<Record<string, unknown>, 'dependencyBundleTimestamps'>,
-            'dependencyBundleTimestamps',
-          );
+              // Extract data for incremental render request
+              const dependencyBundleTimestamps = extractBodyArrayField(
+                tempReqBody as WithBodyArrayField<Record<string, unknown>, 'dependencyBundleTimestamps'>,
+                'dependencyBundleTimestamps',
+              );
 
-          const initial: IncrementalRenderInitialRequest = {
-            firstRequestChunk: obj,
-            bundleTimestamp,
-            dependencyBundleTimestamps,
-          };
+              const initial: IncrementalRenderInitialRequest = {
+                firstRequestChunk: obj,
+                bundleTimestamp,
+                dependencyBundleTimestamps,
+              };
 
-          try {
-            const { response, sink } = await handleIncrementalRenderRequest(initial);
-            incrementalSink = sink;
+              try {
+                const { response, sink } = await handleIncrementalRenderRequest(initial);
+                incrementalSink = sink;
 
-            return {
-              response,
-              shouldContinue: !!incrementalSink,
-            };
-          } catch (err) {
-            const errorResponse = errorResponseResult(
-              formatExceptionMessage(
-                { label: 'IncrementalRender', content: '' },
-                err,
-                'Error while handling incremental render request',
-              ),
-            );
-            return {
-              response: errorResponse,
-              shouldContinue: false,
-            };
-          }
+                return {
+                  response,
+                  shouldContinue: !!incrementalSink,
+                };
+              } catch (err) {
+                const errorResponse = errorResponseResult(
+                  formatExceptionMessage(
+                    { label: 'IncrementalRender', content: '' },
+                    err,
+                    'Error while handling incremental render request',
+                  ),
+                );
+                return {
+                  response: errorResponse,
+                  shouldContinue: false,
+                };
+              }
+            },
+
+            onUpdateReceived: async (obj: unknown) => {
+              if (!incrementalSink) {
+                log.error({ msg: 'Unexpected update chunk received after rendering was aborted', obj });
+                return;
+              }
+
+              try {
+                await incrementalSink.add(obj);
+              } catch (err) {
+                // Log error but don't stop processing
+                log.error({ err, msg: 'Error processing update chunk' });
+              }
+            },
+
+            onResponseStart: async (response: ResponseResult) => {
+              responseStarted = true;
+              await setResponse(response, res);
+            },
+
+            onRequestEnded: () => {
+              if (!incrementalSink) {
+                return;
+              }
+
+              incrementalSink.handleRequestClosed();
+            },
+          });
         },
-
-        onUpdateReceived: async (obj: unknown) => {
-          if (!incrementalSink) {
-            log.error({ msg: 'Unexpected update chunk received after rendering was aborted', obj });
-            return;
-          }
-
-          try {
-            await incrementalSink.add(obj);
-          } catch (err) {
-            // Log error but don't stop processing
-            log.error({ err, msg: 'Error processing update chunk' });
-          }
-        },
-
-        onResponseStart: async (response: ResponseResult) => {
-          responseStarted = true;
-          await setResponse(response, res);
-        },
-
-        onRequestEnded: () => {
-          if (!incrementalSink) {
-            return;
-          }
-
-          incrementalSink.handleRequestClosed();
-        },
-      });
+        startSsrRequestOptions({ renderingRequest: 'ReactOnRails.incrementalRender' }),
+      );
     } catch (err) {
       // If an error occurred during stream processing, send error response
       const errorMessage = formatExceptionMessage(

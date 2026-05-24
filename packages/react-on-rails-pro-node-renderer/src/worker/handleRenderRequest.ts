@@ -245,7 +245,7 @@ export async function handleRenderRequest({
           attributes: {
             'bundle.timestamp': String(bundleTimestamp),
             'bundle.paths.count': allBundleFilePaths.length,
-            'cache.hit': true,
+            'cache.strategy': 'cache-first',
           },
         },
         () => buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ false),
