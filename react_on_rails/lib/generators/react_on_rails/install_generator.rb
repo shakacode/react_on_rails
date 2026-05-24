@@ -150,7 +150,7 @@ module ReactOnRails
       # Last checked: 2026-05-20 — pnpm 10 and pnpm 11 exist upstream, but the repo's own
       # packageManager is still pnpm@9.14.2, so the fallback stays on 9.x to match what
       # this codebase actually tests with.
-      # renovate: datasource=github-releases depName=pnpm/pnpm extractVersion=^v(?<version>.+)$
+      # renovate: datasource=github-releases depName=pnpm/pnpm extractVersion=^v(?<version>.+)$ allowedVersions=<10
       CI_PNPM_FALLBACK_VERSION = "9.14.2"
       private_constant :CI_PNPM_FALLBACK_VERSION
 
