@@ -69,11 +69,6 @@ namespace :run_rspec do
     env_vars_array = []
     env_vars_array << rbs_runtime_env_vars unless rbs_runtime_env_vars.empty?
     env_vars_array << "DISABLE_TURBOLINKS=TRUE"
-    # DISABLE_TURBOLINKS makes the Gemfile diverge from Gemfile.lock (drops the
-    # turbolinks gem), so bundler refuses to load under frozen/deployment mode
-    # that ruby/setup-ruby's bundler-cache enables in CI.
-    env_vars_array << "BUNDLE_FROZEN=false"
-    env_vars_array << "BUNDLE_DEPLOYMENT=false"
     env_vars = env_vars_array.join(" ")
     run_tests_in(spec_dummy_dir,
                  env_vars: env_vars,
