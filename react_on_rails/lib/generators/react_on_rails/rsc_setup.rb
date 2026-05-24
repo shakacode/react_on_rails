@@ -553,6 +553,12 @@ module ReactOnRails
       def update_existing_rsc_webpack_config(config_path, content, is_server:)
         return unless rsc_plugin_sections_safe_to_rewrite?(config_path, content, is_server: is_server)
         return if rsc_plugin_uses_scoped_client_references?(content, is_server: is_server)
+
+        if rsc_plugin_references_scoped_client_references?(content, is_server: is_server)
+          ensure_rsc_client_references_setup(config_path, content, is_server: is_server)
+          return
+        end
+
         return unless rewritable_rsc_plugin?(config_path, content, is_server: is_server)
         return unless ensure_rsc_client_references_setup(config_path, content, is_server: is_server)
 
@@ -622,9 +628,13 @@ module ReactOnRails
       end
 
       def rsc_plugin_uses_scoped_client_references?(content, is_server:)
+        scoped_rsc_client_references_defined?(content) &&
+          rsc_plugin_references_scoped_client_references?(content, is_server: is_server)
+      end
+
+      def rsc_plugin_references_scoped_client_references?(content, is_server:)
         sections = rsc_plugin_option_sections(content, is_server: is_server)
         return false if sections.empty?
-        return false unless scoped_rsc_client_references_defined?(content)
 
         sections.all? do |section|
           rsc_plugin_body_has_top_level_scoped_client_references?(section.fetch(:body))
@@ -1281,9 +1291,16 @@ module ReactOnRails
         reason = rsc_setup_blocker_reason(content, existing_imports_content, is_server: is_server)
         return false unless reason
 
+        manual_action =
+          if content.include?("RSCWebpackPlugin")
+            "Please add clientReferences manually."
+          else
+            "RSCWebpackPlugin was not added to #{config_path}; please add the plugin and clientReferences manually."
+          end
+
         GeneratorMessages.add_warning(
           "Could not inject rscClientReferences into #{config_path}: #{reason}. " \
-          "Please add clientReferences manually."
+          "#{manual_action}"
         )
         true
       end

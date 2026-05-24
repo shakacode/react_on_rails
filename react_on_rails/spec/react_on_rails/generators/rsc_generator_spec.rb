@@ -233,6 +233,51 @@ describe RscGenerator, type: :generator do
     end
   end
 
+  context "when the client webpack config cannot inject the scoped helper before adding the plugin" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const resolve = require('custom-resolver');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            delete clientConfig.entry['server-bundle'];
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "leaves the file untouched and warns that RSCWebpackPlugin was not added" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content).not_to include("RSCWebpackPlugin")
+        expect(content).not_to include("rscClientReferences")
+      end
+
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("RSCWebpackPlugin was not added to config/webpack/clientWebpackConfig.js")
+    end
+  end
+
   context "when the server webpack config uses double-quoted bundler imports" do
     before(:all) do
       prepare_destination
@@ -1830,6 +1875,59 @@ describe RscGenerator, type: :generator do
 
       expect(GeneratorMessages.messages.join("\n"))
         .to include("shakapacker's `config` is imported after the `commonWebpackConfig` anchor")
+    end
+  end
+
+  context "when an existing client RSC webpack config already references the scoped helper" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const { config } = require('shakapacker');
+          const { resolve } = require('path');
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(
+              new RSCWebpackPlugin({
+                isServer: false,
+                clientReferences: rscClientReferences,
+              }),
+            );
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "injects the missing scoped helper instead of warning that all plugins already define clientReferences" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content).to include("const rscClientReferences = {")
+        expect(content).to include("directory: resolve(config.source_path)")
+        expect(content).to include("clientReferences: rscClientReferences")
+      end
+
+      expect(GeneratorMessages.messages.join("\n"))
+        .not_to include("all matching RSCWebpackPlugin instances already define clientReferences")
     end
   end
 
