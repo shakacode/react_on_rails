@@ -1344,7 +1344,7 @@ RSpec.describe ReactOnRails::Doctor do
         )
       end
 
-      it "notes HMR limitation for standard Capybara mode" do
+      it "notes dev-server asset limitation for standard Capybara mode" do
         write_project_file("spec/rails_helper.rb", <<~RUBY)
           require "capybara/rails"
           Capybara.default_driver = :selenium_chrome_headless
@@ -1354,7 +1354,7 @@ RSpec.describe ReactOnRails::Doctor do
 
         info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
         expect(info_messages).to include(
-          a_string_including("HMR assets won't work")
+          a_string_including("dev-server assets won't work")
         )
       end
 
@@ -1898,6 +1898,43 @@ RSpec.describe ReactOnRails::Doctor do
       warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
       expect(warning_messages).to include(a_string_including("client/node-renderer.js"))
       expect(warning_messages).not_to include(a_string_including("node renderer/node-renderer.js"))
+    end
+
+    it "labels launcher Procfile.dev as live reload when Shakapacker disables HMR" do
+      write_project_file("bin/dev", "ReactOnRails::Dev::ServerManager.run_from_command_line\n")
+      write_project_file("Procfile.dev", "web: bin/rails server\njs: bin/shakapacker-dev-server\n")
+      write_project_file("config/shakapacker.yml", <<~YAML)
+        development:
+          dev_server:
+            hmr: false
+            live_reload: true
+      YAML
+
+      doctor.send(:check_bin_dev_launcher)
+
+      success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+      expect(success_messages).to include(
+        a_string_including("Procfile.dev - Live reload development (bin/dev default)")
+      )
+      expect(success_messages).not_to include(a_string_including("Procfile.dev - HMR development"))
+    end
+
+    it "labels Procfile.dev diagnostics as live reload when Shakapacker disables HMR" do
+      write_project_file("Procfile.dev", "web: bin/rails server\njs: bin/shakapacker-dev-server\n")
+      write_project_file("config/shakapacker.yml", <<~YAML)
+        development:
+          dev_server:
+            hmr: false
+            live_reload: true
+      YAML
+
+      doctor.send(:check_procfiles)
+
+      success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+      expect(success_messages).to include(
+        a_string_including("Procfile.dev exists (Live reload development with webpack-dev-server)")
+      )
+      expect(success_messages).not_to include(a_string_including("HMR development with webpack-dev-server"))
     end
   end
 

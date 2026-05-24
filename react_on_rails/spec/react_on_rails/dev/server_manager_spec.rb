@@ -1542,6 +1542,34 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       expect { described_class.show_help }.to output(%r{bin/dev static}).to_stdout_from_any_process
     end
 
+    context "when Shakapacker config uses live reload instead of HMR" do
+      include_context "with clean port env"
+
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) { example.run }
+        end
+      end
+
+      before do
+        FileUtils.mkdir_p("config")
+        File.write("config/shakapacker.yml", <<~YAML)
+          development:
+            dev_server:
+              hmr: false
+              live_reload: true
+        YAML
+      end
+
+      it "labels the default command and mode details as live reload" do
+        expect { described_class.show_help }
+          .to output(/Start development server with live reload \(default\)/).to_stdout_from_any_process
+        expect { described_class.show_help }
+          .not_to output(/HMR Development mode \(default\)|Hot Module Replacement \(HMR\) enabled/)
+          .to_stdout_from_any_process
+      end
+    end
+
     context "when base-port mode is active" do
       include_context "with clean port env"
 

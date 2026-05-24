@@ -7,6 +7,7 @@ require "timeout"
 require "yaml"
 require_relative "utils"
 require_relative "config_path_resolver"
+require_relative "dev/server_mode"
 require_relative "version_syntax_converter"
 require_relative "version_synchronizer"
 require_relative "system_checker"
@@ -284,10 +285,11 @@ module ReactOnRails
     end
 
     def check_procfiles
+      default_mode = default_dev_server_mode
       procfiles = {
         "Procfile.dev" => {
-          description: "HMR development with webpack-dev-server",
-          required_for: "bin/dev (default/hmr mode)",
+          description: Dev::ServerMode.text(default_mode, :procfile_description),
+          required_for: "bin/dev (default mode)",
           should_contain: ["shakapacker-dev-server", "rails server"]
         },
         "Procfile.dev-static-assets" => {
@@ -324,7 +326,10 @@ module ReactOnRails
         # Only check for critical missing components, not optional suggestions
         content = File.read(filename)
         if filename == "Procfile.dev" && !content.include?("shakapacker-dev-server")
-          checker.add_warning("  ⚠️  Missing shakapacker-dev-server for HMR development")
+          procfile_description = Dev::ServerMode.text(default_dev_server_mode, :procfile_description)
+          checker.add_warning(
+            "  ⚠️  Missing shakapacker-dev-server for #{procfile_description}"
+          )
         elsif filename == "Procfile.dev-static-assets" && !content.include?("shakapacker")
           checker.add_warning("  ⚠️  Missing shakapacker for static asset compilation")
         end
@@ -341,7 +346,7 @@ module ReactOnRails
       else
         checker.add_warning(<<~MSG.strip)
           ⚠️  bin/dev script missing
-          This script provides an enhanced development workflow with HMR, static, and production modes.
+          This script provides an enhanced development workflow with development-server, static, and production modes.
           Run 'rails generate react_on_rails:install' to generate the script.
         MSG
       end
@@ -454,7 +459,7 @@ module ReactOnRails
         unless File.exist?("bin/dev") && File.read("bin/dev").include?("ReactOnRails::Dev::ServerManager")
           puts "• #{Rainbow('Upgrade to enhanced bin/dev script').yellow}:"
           puts "  - Run #{Rainbow('rails generate react_on_rails:install').cyan} for latest development tools"
-          puts "  - Provides HMR, static, and production-like asset modes"
+          puts "  - Provides development-server, static, and production-like asset modes"
           puts "  - Better error handling and debugging capabilities"
         end
 
@@ -496,7 +501,8 @@ module ReactOnRails
 
       # Enhanced contextual suggestions based on what exists
       if File.exist?("bin/dev") && File.exist?("Procfile.dev")
-        puts "• Start development with HMR: #{Rainbow('./bin/dev').cyan}"
+        puts "• Start development with #{Dev::ServerMode.text(default_dev_server_mode, :next_step_label)}: " \
+             "#{Rainbow('./bin/dev').cyan}"
         puts "• Try static mode: #{Rainbow('./bin/dev static').cyan}"
         puts "• Test production assets: #{Rainbow('./bin/dev prod').cyan}"
         puts "• See all options: #{Rainbow('./bin/dev help').cyan}"
@@ -531,7 +537,8 @@ module ReactOnRails
       when :shared
         puts "• Shared test/dev output path detected: use static workflow only"
         puts "  - Start app with: ./bin/dev static"
-        puts "  - Avoid ./bin/dev (HMR) with shared output paths"
+        puts "  - Avoid ./bin/dev (#{Dev::ServerMode.text(default_dev_server_mode, :next_step_label)}) " \
+             "with shared output paths"
         puts "  - Start test watcher with: ./bin/dev test-watch --test-watch-mode=client-only"
       when :separate
         puts "• Recommended default: keep test output path separate from development"
@@ -1517,8 +1524,9 @@ module ReactOnRails
 
     def check_launcher_procfiles
       # Keep these launcher filenames aligned with NodeRendererProcfile::DEFAULT_COMMANDS.
+      default_mode = default_dev_server_mode
       procfiles = {
-        "Procfile.dev" => "HMR development (bin/dev default)",
+        "Procfile.dev" => Dev::ServerMode.text(default_mode, :launcher_description),
         "Procfile.dev-static-assets" => "Static development (bin/dev static)",
         "Procfile.dev-prod-assets" => "Production assets (bin/dev prod)"
       }
@@ -1949,6 +1957,10 @@ module ReactOnRails
       ENV["SHAKAPACKER_CONFIG"] || DEFAULT_SHAKAPACKER_CONFIG_PATH
     end
 
+    def default_dev_server_mode
+      Dev::ServerMode.detect(shakapacker_config_path)
+    end
+
     def check_test_public_output_path_workflow(shakapacker_content, shakapacker_config = nil)
       development_output_path = extract_env_config_value(
         shakapacker_content,
@@ -1967,7 +1979,9 @@ module ReactOnRails
         @test_output_path_strategy = :shared
         checker.add_warning("  ⚠️  test and development share public_output_path '#{test_output_path}'")
         checker.add_info("  💡 Shared output is an advanced workflow meant for bin/dev static")
-        checker.add_info("  💡 Do not use shared output with bin/dev (HMR): manifests can collide")
+        checker.add_info(
+          "  💡 #{Dev::ServerMode.text(default_dev_server_mode, :shared_output_warning)}: manifests can collide"
+        )
         add_shared_output_path_procfile_guidance
       else
         @test_output_path_strategy = :separate
@@ -1981,13 +1995,15 @@ module ReactOnRails
 
       if static_procfile_available?
         checker.add_warning(
-          "  ⚠️  HMR Procfile.dev is present. Shared output path is high-risk unless you run bin/dev static."
+          "  ⚠️  Development-server Procfile.dev is present. Shared output path is high-risk " \
+          "unless you run bin/dev static."
         )
         checker.add_info("  💡 Use: ./bin/dev static")
         checker.add_info("  💡 For test watch in this setup: ./bin/dev test-watch --test-watch-mode=client-only")
       else
         checker.add_error(
-          "  🚫 Shared output path + HMR Procfile.dev detected, but Procfile.dev-static-assets is missing"
+          "  🚫 Shared output path + development-server Procfile.dev detected, " \
+          "but Procfile.dev-static-assets is missing"
         )
         checker.add_info("  💡 Fix: separate test/development public_output_path values, or add static Procfile support")
       end
@@ -2076,17 +2092,7 @@ module ReactOnRails
     end
 
     def hmr_enabled_in_shakapacker?
-      shakapacker_yml = shakapacker_config_path
-      return false unless File.exist?(shakapacker_yml)
-
-      shakapacker_config = parse_shakapacker_config(File.read(shakapacker_yml))
-      return false unless shakapacker_config.is_a?(Hash)
-
-      dev_config = (shakapacker_config["default"] || {}).merge(shakapacker_config["development"] || {})
-      dev_server = dev_config["dev_server"]
-      return false unless dev_server.is_a?(Hash)
-
-      dev_server["hmr"].to_s == "true"
+      Dev::ServerMode.hmr_enabled?(shakapacker_config_path)
     end
 
     # Returns true if Capybara is configured but NOT in external server mode.
@@ -2187,7 +2193,8 @@ module ReactOnRails
       return unless @test_output_path_strategy == :shared
 
       checker.add_info(
-        "  💡 With shared output paths, only use bin/dev static (not HMR) when running Capybara tests"
+        "  💡 With shared output paths, only use bin/dev static " \
+        "(not #{Dev::ServerMode.text(default_dev_server_mode, :next_step_label)}) when running Capybara tests"
       )
     end
 
@@ -2200,7 +2207,8 @@ module ReactOnRails
         "  💡 Tests require bin/dev (or another server) to be running at the configured app_host"
       )
       checker.add_info(
-        "  💡 Both bin/dev (HMR) and bin/dev static work in this mode"
+        "  💡 Both bin/dev (#{Dev::ServerMode.text(default_dev_server_mode, :next_step_label)}) " \
+        "and bin/dev static work in this mode"
       )
     end
 
@@ -2208,7 +2216,8 @@ module ReactOnRails
       return unless capybara_configured?
 
       checker.add_info(
-        "  💡 Capybara starts its own server — HMR assets won't work. Use bin/dev static or precompile."
+        "  💡 Capybara starts its own server — dev-server assets won't work. " \
+        "Use bin/dev static or precompile."
       )
     end
 

@@ -14,6 +14,7 @@ require "uri"
 require "yaml"
 require_relative "../packer_utils"
 require_relative "database_checker"
+require_relative "server_mode"
 require_relative "service_checker"
 
 module ReactOnRails
@@ -575,9 +576,11 @@ module ReactOnRails
 
         # rubocop:disable Metrics/AbcSize
         def help_commands
+          default_mode = default_dev_server_mode
+
           <<~COMMANDS
             #{Rainbow('🚀 COMMANDS:').cyan.bold}
-              #{Rainbow('(none) / hmr').green.bold}        #{Rainbow('Start development server with HMR (default)').white}
+              #{Rainbow('(none) / hmr').green.bold}        #{Rainbow(ServerMode.text(default_mode, :command_description)).white}
                                   #{Rainbow('→ Uses:').yellow} Procfile.dev
 
               #{Rainbow('static').green.bold}              #{Rainbow('Start development server with static assets (no HMR, no FOUC)').white}
@@ -624,11 +627,13 @@ module ReactOnRails
 
         # rubocop:disable Metrics/AbcSize
         def help_customization
+          default_mode = default_dev_server_mode
+
           <<~CUSTOMIZATION
             #{Rainbow('🔧 CUSTOMIZATION:').cyan.bold}
             Each mode uses a specific Procfile that you can customize for your application:
 
-            #{Rainbow('•').yellow} #{Rainbow('Procfile.dev').green.bold}                 - HMR development with webpack-dev-server
+            #{Rainbow('•').yellow} #{Rainbow('Procfile.dev').green.bold}                 - #{ServerMode.text(default_mode, :procfile_description)}
             #{Rainbow('•').yellow} #{Rainbow('Procfile.dev-static-assets').green.bold}   - Static development with webpack --watch
             #{Rainbow('•').yellow} #{Rainbow('Procfile.dev-prod-assets').green.bold}     - Production-optimized assets (port 3001)
 
@@ -653,13 +658,13 @@ module ReactOnRails
             #{Rainbow('🧪 TEST ASSET WORKFLOWS:').cyan.bold}
             #{Rainbow('Recommended default (separate outputs):').white}
             #{Rainbow('•').yellow} #{Rainbow('Keep test public_output_path different from development (for example, packs-test vs packs)').white}
-            #{Rainbow('•').yellow} #{Rainbow('Use').white} #{Rainbow('bin/dev').green.bold} #{Rainbow('for HMR').white}
+            #{Rainbow('•').yellow} #{Rainbow('Use').white} #{Rainbow('bin/dev').green.bold} #{Rainbow(ServerMode.text(default_mode, :workflow_suffix)).white}
             #{Rainbow('•').yellow} #{Rainbow('Use').white} #{Rainbow('bin/dev test-watch').green.bold} #{Rainbow('to watch test assets').white}
             #{Rainbow('•').yellow} #{Rainbow('Override mode when needed:').white} #{Rainbow('--test-watch-mode=full').green.bold} #{Rainbow('or').white} #{Rainbow('--test-watch-mode=client-only').green.bold}
 
             #{Rainbow('Advanced static-only workflow (shared output):').white}
             #{Rainbow('•').yellow} #{Rainbow('Only use shared test/dev output with').white} #{Rainbow('bin/dev static').green.bold}
-            #{Rainbow('•').yellow} #{Rainbow('Do not combine shared output path with').white} #{Rainbow('bin/dev').red.bold} #{Rainbow('(HMR)').white}
+            #{Rainbow('•').yellow} #{Rainbow(ServerMode.text(default_mode, :shared_output_warning)).white}
 
             #{Rainbow('Example .dev-services.yml:').white}
             #{Rainbow('  services:').cyan}
@@ -676,17 +681,14 @@ module ReactOnRails
           # Reflect base-port mode so help text advertises the port `bin/dev`
           # will actually use. Without this, `bin/dev help` in a worktree with
           # REACT_ON_RAILS_BASE_PORT=4000 still claims 3000/3001.
+          default_mode = default_dev_server_mode
+          default_mode_details = default_dev_server_detail_lines(default_mode)
           dev_url  = "http://localhost:#{help_display_port(:dev)}/<route>"
           prod_url = "http://localhost:#{help_display_port(:prod)}/<route>"
 
           <<~MODES
-            #{Rainbow('🔥 HMR Development mode (default)').cyan.bold} - #{Rainbow('Procfile.dev').green}:
-            #{Rainbow('•').yellow} #{Rainbow('Hot Module Replacement (HMR) enabled').white}
-            #{Rainbow('•').yellow} #{Rainbow('React on Rails pack generation (via precompile hook or bin/dev)').white}
-            #{Rainbow('•').yellow} #{Rainbow('Webpack dev server for fast recompilation').white}
-            #{Rainbow('•').yellow} #{Rainbow('Source maps for debugging').white}
-            #{Rainbow('•').yellow} #{Rainbow('May have Flash of Unstyled Content (FOUC)').white}
-            #{Rainbow('•').yellow} #{Rainbow('Fast recompilation').white}
+            #{Rainbow(ServerMode.text(default_mode, :mode_heading)).cyan.bold} - #{Rainbow('Procfile.dev').green}:
+            #{default_mode_details}
             #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow(dev_url).cyan.underline}
 
             #{Rainbow('📦 Static development mode').cyan.bold} - #{Rainbow('Procfile.dev-static-assets').green}:
@@ -722,6 +724,16 @@ module ReactOnRails
           return base[:rails] if base
 
           mode == :prod ? 3001 : 3000
+        end
+
+        def default_dev_server_mode
+          ServerMode.detect
+        end
+
+        def default_dev_server_detail_lines(mode)
+          ServerMode.text(mode, :details).map do |detail|
+            "#{Rainbow('•').yellow} #{Rainbow(detail).white}"
+          end.join("\n")
         end
 
         # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
@@ -1684,6 +1696,8 @@ module ReactOnRails
 
         # rubocop:disable Metrics/AbcSize
         def help_troubleshooting
+          default_mode = default_dev_server_mode
+
           <<~TROUBLESHOOTING
             #{Rainbow('🔧 TROUBLESHOOTING:').cyan.bold}
 
@@ -1692,9 +1706,9 @@ module ReactOnRails
             #{Rainbow('1.').green} #{Rainbow('Check that both babel plugin and webpack plugin are configured:').white}
                #{Rainbow('•').yellow} #{Rainbow('babel.config.js: \'react-refresh/babel\' plugin (enabled when WEBPACK_SERVE=true)').white}
                #{Rainbow('•').yellow} #{Rainbow('config/webpack/development.js: ReactRefreshWebpackPlugin (enabled when WEBPACK_SERVE=true)').white}
-            #{Rainbow('2.').green} #{Rainbow('Ensure you\'re running HMR mode:').white} #{Rainbow('bin/dev').green.bold} #{Rainbow('(not').white} #{Rainbow('bin/dev static').red}#{Rainbow(')').white}
+            #{Rainbow('2.').green} #{Rainbow(ServerMode.text(default_mode, :refresh_guidance)).white}
             #{Rainbow('3.').green} #{Rainbow('Try restarting the development server:').white} #{Rainbow('bin/dev kill && bin/dev').green.bold}
-            #{Rainbow('4.').green} #{Rainbow('Note: React Refresh only works in HMR mode, not static mode').white}
+            #{Rainbow('4.').green} #{Rainbow(ServerMode.text(default_mode, :refresh_note)).white}
 
             #{Rainbow('🚨 General Issues:').yellow.bold}
             #{Rainbow('•').red} #{Rainbow('"Port already in use"').white} #{Rainbow('→ Run:').yellow} #{Rainbow('bin/dev kill').green.bold}
