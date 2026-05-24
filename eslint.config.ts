@@ -206,6 +206,7 @@ const config = defineConfig([
     rules: {
       'import/extensions': 'off',
       'import/prefer-default-export': 'off',
+      'import/named': 'off',
       'react/prop-types': 'off',
       'no-underscore-dangle': 'off',
       // Pre-existing: a few .server.tsx files have 'use client' directives.
