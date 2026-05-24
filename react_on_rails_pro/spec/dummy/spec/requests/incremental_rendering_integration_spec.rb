@@ -306,7 +306,7 @@ describe "Incremental Rendering Integration", :integration do
             }
           )
 
-          # barrier.wait re-raises the exception from the async task
+          # task.wait re-raises the exception from the async task
           expect do
             stream.each_chunk { |_chunk| nil }
           end.to raise_error(StandardError, "something went wrong in the async block")

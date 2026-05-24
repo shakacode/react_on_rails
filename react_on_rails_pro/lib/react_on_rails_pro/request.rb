@@ -37,7 +37,7 @@ module ReactOnRailsPro
         end
 
         warn_cb = ->(request_time) { warn_if_slow_streaming_first_chunk(path, request_time) }
-        ReactOnRailsPro::StreamRequest.create(first_chunk_warn_callback: warn_cb) do |send_bundle, _barrier|
+        ReactOnRailsPro::StreamRequest.create(first_chunk_warn_callback: warn_cb) do |send_bundle, _tasks|
           if send_bundle
             Rails.logger.info { "[ReactOnRailsPro] Sending bundle to the node renderer" }
             upload_assets
@@ -53,7 +53,7 @@ module ReactOnRailsPro
       # ARCHITECTURE: This method orchestrates the async props flow:
       #
       # ┌─────────────────────────────────────────────────────────────────────────┐
-      # │  Rails Thread (main)              │  Rails Thread (barrier.async)       │
+      # │  Rails Thread (main)              │  Rails Thread (async task)          │
       # ├───────────────────────────────────┼─────────────────────────────────────┤
       # │  1. Send initial NDJSON line      │                                     │
       # │     {renderingRequest, ...}       │                                     │
@@ -68,7 +68,7 @@ module ReactOnRailsPro
       # │                                   │     output.close (sends END_STREAM) │
       # └───────────────────────────────────┴─────────────────────────────────────┘
       #
-      # WHY barrier.async?
+      # WHY async task?
       # - We need to return the response stream immediately so Rails can start sending HTML
       # - The async_props_block runs concurrently, sending props as they become available
       # - When the block finishes, we close the output (END_STREAM flag)
@@ -80,7 +80,7 @@ module ReactOnRailsPro
         pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
 
         warn_cb = ->(request_time) { warn_if_slow_streaming_first_chunk(path, request_time) }
-        ReactOnRailsPro::StreamRequest.create(first_chunk_warn_callback: warn_cb) do |send_bundle, barrier|
+        ReactOnRailsPro::StreamRequest.create(first_chunk_warn_callback: warn_cb) do |send_bundle, tasks|
           if send_bundle
             Rails.logger.info { "[ReactOnRailsPro] Sending bundle to the node renderer" }
             upload_assets
@@ -101,15 +101,15 @@ module ReactOnRailsPro
           # Send the initial render request as first NDJSON line
           output << "#{initial_data.to_json}\n"
 
-          # Execute async props block in a separate fiber via barrier.
+          # Execute async props block in a separate fiber.
           # This runs concurrently with the response streaming back to the client.
-          barrier.async do
+          tasks.push(Async::Task.current.async do
             async_props_block.call(emitter)
           ensure
             # When the block completes (or raises), close the output.
             # This sends HTTP/2 END_STREAM flag, triggering Node's handleRequestClosed.
             output.close
-          end
+          end)
 
           response
         end

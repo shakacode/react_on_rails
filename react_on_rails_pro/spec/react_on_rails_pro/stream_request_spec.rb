@@ -3,7 +3,6 @@
 require_relative "spec_helper"
 require "react_on_rails_pro/stream_request"
 require "react_on_rails_pro/renderer_http_client"
-require "async/barrier"
 
 RSpec.describe ReactOnRailsPro::StreamRequest do
   def to_length_prefixed(html, metadata_overrides = {})
@@ -152,39 +151,39 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
     end
   end
 
-  describe "#each_chunk with barrier" do
-    it "passes barrier to request_executor block" do
-      barrier_received = nil
+  describe "#each_chunk with tasks" do
+    it "passes tasks array to request_executor block" do
+      tasks_received = nil
       response = mock_ok_response(to_length_prefixed("chunk"))
 
-      stream = described_class.create do |_send_bundle, barrier|
-        barrier_received = barrier
+      stream = described_class.create do |_send_bundle, tasks|
+        tasks_received = tasks
         response
       end
 
       stream.each_chunk(&:itself)
 
-      expect(barrier_received).to be_a(Async::Barrier)
+      expect(tasks_received).to be_an(Array)
     end
 
-    it "calls barrier.wait after yielding chunks" do
-      barrier = Async::Barrier.new
-      allow(Async::Barrier).to receive(:new).and_return(barrier)
-      expect(barrier).to receive(:wait)
-
+    it "waits for tasks after yielding chunks" do
+      task_waited = false
       response = mock_ok_response(to_length_prefixed("chunk"))
 
-      stream = described_class.create do |_send_bundle, _barrier|
+      stream = described_class.create do |_send_bundle, tasks|
+        tasks.push(Async::Task.current.async { task_waited = true })
         response
       end
 
       stream.each_chunk(&:itself)
+
+      expect(task_waited).to be true
     end
   end
 
   describe "error handling" do
     it "raises ReactOnRailsPro::Error on TimeoutError" do
-      stream = described_class.create do |_send_bundle, _barrier|
+      stream = described_class.create do |_send_bundle, _tasks|
         ReactOnRailsPro::RendererHttpClient::Response.new do |_yielder, _status_assigner|
           raise ReactOnRailsPro::RendererHttpClient::TimeoutError, "read timeout"
         end
@@ -197,7 +196,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
     end
 
     it "raises ReactOnRailsPro::Error on ConnectionError" do
-      stream = described_class.create do |_send_bundle, _barrier|
+      stream = described_class.create do |_send_bundle, _tasks|
         ReactOnRailsPro::RendererHttpClient::Response.new do |_yielder, _status_assigner|
           raise ReactOnRailsPro::RendererHttpClient::ConnectionError, "Connection refused"
         end
@@ -210,7 +209,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
     end
 
     it "raises ReactOnRailsPro::Error on HTTP 400 (bad request)" do
-      stream = described_class.create do |_send_bundle, _barrier|
+      stream = described_class.create do |_send_bundle, _tasks|
         mock_error_response(400, "bad request body")
       end
 
@@ -221,7 +220,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
     end
 
     it "raises ReactOnRailsPro::Error on STATUS_INCOMPATIBLE (412)" do
-      stream = described_class.create do |_send_bundle, _barrier|
+      stream = described_class.create do |_send_bundle, _tasks|
         mock_error_response(412, "incompatible")
       end
 
@@ -229,7 +228,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
     end
 
     it "raises ReactOnRailsPro::Error on unexpected status codes" do
-      stream = described_class.create do |_send_bundle, _barrier|
+      stream = described_class.create do |_send_bundle, _tasks|
         mock_error_response(503, "service unavailable")
       end
 
@@ -242,7 +241,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
     it "retries with bundle upload on HTTP 410 (send bundle)" do
       call_count = 0
 
-      stream = described_class.create do |send_bundle, _barrier|
+      stream = described_class.create do |send_bundle, _tasks|
         call_count += 1
         if call_count == 1
           mock_error_response(410, "bundle not found")
@@ -259,62 +258,32 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
     end
 
     it "prevents infinite loop on duplicate 410 responses" do
-      stream = described_class.create do |_send_bundle, _barrier|
+      stream = described_class.create do |_send_bundle, _tasks|
         mock_error_response(410, "bundle not found")
       end
 
       expect { stream.each_chunk(&:itself) }.to raise_error(ReactOnRailsPro::Error)
     end
 
-    it "stops barrier before retrying on 410" do
+    it "stops and clears tasks before retrying on 410" do
       call_count = 0
-      barriers = []
+      task_stopped = false
 
-      stream = described_class.create do |_send_bundle, barrier|
-        allow(barrier).to receive(:stop).and_call_original
-        barriers << barrier
+      stream = described_class.create do |_send_bundle, tasks|
         call_count += 1
         if call_count == 1
+          tasks.push(Async::Task.current.async { task_stopped = true })
           mock_error_response(410, "bundle not found")
         else
+          expect(tasks).to be_empty
           mock_ok_response(to_length_prefixed("ok"))
         end
       end
 
       stream.each_chunk(&:itself)
 
-      expect(barriers.size).to eq(2)
-      expect(barriers[0]).not_to eq(barriers[1])
-      expect(barriers[0]).to have_received(:stop).at_least(:once)
-    end
-
-    it "waits for the stopped barrier before retrying on 410" do
-      call_count = 0
-      first_barrier = Async::Barrier.new
-      second_barrier = Async::Barrier.new
-      first_barrier_waited = false
-
-      allow(first_barrier).to receive(:stop).and_call_original
-      allow(first_barrier).to receive(:wait) do
-        first_barrier_waited = true
-      end
-      allow(Async::Barrier).to receive(:new).and_return(first_barrier, second_barrier)
-
-      stream = described_class.create do |send_bundle, _barrier|
-        call_count += 1
-        if call_count == 1
-          mock_error_response(410, "bundle not found")
-        else
-          expect(send_bundle).to be true
-          expect(first_barrier_waited).to be true
-          mock_ok_response(to_length_prefixed("ok"))
-        end
-      end
-
-      stream.each_chunk(&:itself)
-
-      expect(first_barrier).to have_received(:stop)
-      expect(first_barrier).to have_received(:wait)
+      expect(call_count).to eq(2)
+      expect(task_stopped).to be true
     end
   end
 
@@ -324,7 +293,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       callback = ->(time) { callback_time = time }
       response = mock_ok_response(to_length_prefixed("chunk"))
 
-      stream = described_class.create(first_chunk_warn_callback: callback) do |_send_bundle, _barrier|
+      stream = described_class.create(first_chunk_warn_callback: callback) do |_send_bundle, _tasks|
         response
       end
 
@@ -339,7 +308,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       data = to_length_prefixed("chunk1") + to_length_prefixed("chunk2")
       response = mock_ok_response(data)
 
-      stream = described_class.create(first_chunk_warn_callback: callback) do |_send_bundle, _barrier|
+      stream = described_class.create(first_chunk_warn_callback: callback) do |_send_bundle, _tasks|
         response
       end
 

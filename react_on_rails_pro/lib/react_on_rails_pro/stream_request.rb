@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "async"
-require "async/barrier"
 
 module ReactOnRailsPro
   class StreamDecorator
@@ -96,7 +95,7 @@ module ReactOnRailsPro
     def each_chunk(&block)
       return enum_for(:each_chunk) unless block
 
-      Sync { consume_with_retries(&block) }
+      Sync { consume_with_bundle_reupload(&block) }
     end
 
     def self.create(first_chunk_warn_callback: nil, &request_block)
@@ -105,22 +104,18 @@ module ReactOnRailsPro
 
     private
 
-    def consume_with_retries(&block)
+    def consume_with_bundle_reupload(&block)
       send_bundle = false
-      barrier = nil
+      tasks = []
 
       begin
         loop do
-          # Create a new barrier for each attempt so that on 410 retry we stop
-          # any async fibers still writing to the previous request body.
-          barrier = Async::Barrier.new
-
-          stream_response = @request_executor.call(send_bundle, barrier)
+          stream_response = @request_executor.call(send_bundle, tasks)
 
           process_response_chunks(stream_response, &block)
           break
         rescue ReactOnRailsPro::RendererHttpClient::HTTPError => e
-          barrier = stop_barrier_for_http_error(e, send_bundle, barrier)
+          stop_tasks(tasks) if retrying_with_bundle_upload?(e, send_bundle)
           send_bundle = handle_http_error(e, send_bundle)
         rescue ReactOnRailsPro::RendererHttpClient::TimeoutError => e
           raise ReactOnRailsPro::Error, "Time out error while server side render streaming a component.\n" \
@@ -130,9 +125,9 @@ module ReactOnRailsPro
                                         "Original error:\n#{e}\n#{e.backtrace}"
         end
 
-        barrier&.wait
+        tasks.each(&:wait)
       ensure
-        barrier&.stop
+        tasks.each(&:stop)
       end
     end
 
@@ -154,24 +149,10 @@ module ReactOnRailsPro
       parser.flush
     end
 
-    def stop_barrier_for_http_error(error, send_bundle, barrier)
-      if retrying_with_bundle_upload?(error, send_bundle)
-        stop_and_wait_for_barrier(barrier)
-        nil
-      else
-        barrier&.stop
-        barrier
-      end
-    end
-
-    def stop_and_wait_for_barrier(barrier)
-      return unless barrier
-
-      tasks = []
-      barrier.tasks.each { |waiting| tasks << waiting.task }
-      barrier.stop
-      barrier.wait
+    def stop_tasks(tasks)
+      tasks.each(&:stop)
       tasks.each(&:wait)
+      tasks.clear
     end
 
     def retrying_with_bundle_upload?(error, send_bundle)
