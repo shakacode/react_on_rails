@@ -49,7 +49,7 @@ Use this recipe for Capybara, system, and end-to-end tests that exercise `stream
 
 This recipe uses the React on Rails TestHelper with `build_test_command`: Rails checks whether generated bundles are stale, runs your test build command when needed, and fails fast if compilation fails.
 
-The Step 3 renderer-lifecycle helper is RSpec-focused because it uses `before(:suite)` and `after(:suite)` hooks; for Minitest, see [Minitest Equivalent](#minitest-equivalent) for a parallel adaptation that reuses the same safety points from a `test/test_helper.rb` harness plus `Minitest.after_run`.
+The Step 3 renderer-lifecycle helper is **RSpec-focused** because it uses `before(:suite)` and `after(:suite)` hooks; for Minitest, see [Minitest Equivalent](#minitest-equivalent) for a parallel adaptation that reuses the same safety points from a `test/test_helper.rb` harness plus `Minitest.after_run`.
 
 See [Two Approaches to Test Asset Compilation](#two-approaches-to-test-asset-compilation) for the underlying compilation tradeoffs.
 
@@ -426,12 +426,16 @@ Avoid letting system tests depend on live third-party APIs. RSC failures from ex
 
 Steps 1, 2, and 4–6 apply to Minitest unchanged, with one path adjustment: Minitest-only projects (no `spec/` directory) should place the Step 1 `RscTestWorker` module at `test/support/rsc_test_worker.rb` so the `require_relative` below resolves correctly. Only the suite-level renderer lifecycle differs: Minitest has no `before(:suite)` hook, so the renderer starts when `test/test_helper.rb` requires its support file (after assets compile) and stops in [`Minitest.after_run`](https://github.com/minitest/minitest/blob/master/lib/minitest.rb). The Rails.root/tmp containment check, port probe, spawn options, `wait_until_ready!` helper, and graceful SIGTERM→SIGKILL shutdown are all reused from [Step 3](#3-start-one-test-renderer-per-worker).
 
-Wire `test/test_helper.rb` with the same ENV-before-Rails-boot preamble used in `spec/rails_helper.rb`, then require the renderer lifecycle support file before any test runs:
+Rails-generated Minitest apps often enable `parallelize(workers: :number_of_processors)`. The file-scope startup below assumes each worker is an independent Ruby test process that loads `test/test_helper.rb` separately, such as a `parallel_tests` CI shard. If Rails-native process parallelization remains enabled for RSC system tests, move the renderer startup and cleanup into `parallelize_setup` / `parallelize_teardown` and derive the worker ID from the hook argument, or serialize the RSC system-test group.
+
+Wire `test/test_helper.rb` with the same ENV-before-Rails-boot preamble used in `spec/rails_helper.rb`, then require the renderer lifecycle support file before any test runs. Keep the compilation check at file scope: it runs once for ordinary Minitest suites and, when `RSC_NODE_RENDERER_TESTS=1`, populates the renderer bundle cache before the support file starts the node renderer.
 
 ```ruby
 # test/test_helper.rb
 ENV["RAILS_ENV"] ||= "test"
-require_relative "support/rsc_test_worker" # same module as Step 1 (create test/support/rsc_test_worker.rb with the same content if your project has no spec/ directory)
+# Same module as Step 1. For Minitest-only projects, create test/support/rsc_test_worker.rb
+# with the same content as spec/support/rsc_test_worker.rb.
+require_relative "support/rsc_test_worker"
 
 ENV["RENDERER_PORT"] ||= (3900 + RscTestWorker::ID.to_i).to_s
 renderer_url = "http://127.0.0.1:#{ENV["RENDERER_PORT"]}"
@@ -444,18 +448,10 @@ require_relative "../config/environment"
 require "rails/test_help"
 require "react_on_rails/test_helper"
 
-# Populate the renderer bundle cache before the renderer spawns. Skipped for non-RSC runs
-# so unrelated Minitest jobs don't pay the build cost.
-ReactOnRails::TestHelper.ensure_assets_compiled if ENV["RSC_NODE_RENDERER_TESTS"] == "1"
+# Run once at suite start before the optional renderer spawns.
+ReactOnRails::TestHelper.ensure_assets_compiled
 
 require_relative "support/rsc_node_renderer"
-
-class ActiveSupport::TestCase
-  setup do
-    # Keeps non-RSC test bundles fresh too; cheap when assets are already up to date.
-    ReactOnRails::TestHelper.ensure_assets_compiled
-  end
-end
 ```
 
 The renderer support file mirrors `spec/support/rsc_node_renderer.rb`. The `RscNodeRenderer` module and `wait_until_ready!` helper are framework-agnostic; if your project uses both RSpec and Minitest, extract the module to a shared file (for example, `lib/test_support/rsc_node_renderer.rb`) and require it from both helper files instead of redefining it.
@@ -469,8 +465,8 @@ require_relative "rsc_test_worker"
 module RscNodeRenderer
   module_function
 
-  # Identical to the helper defined in spec/support/rsc_node_renderer.rb (Step 3). Copy
-  # that method here, or require a shared file if your project uses both frameworks.
+  # Keep in sync with spec/support/rsc_node_renderer.rb (Step 3).
+  # Copy this method here, or require a shared file if your project uses both frameworks.
   def wait_until_ready!(host:, port:, timeout_seconds: 30, log_path: nil, pid: nil)
     deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout_seconds
     saw_reset = false
