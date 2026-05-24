@@ -11,7 +11,7 @@ const ReactHelmet = (props) => (
     Props: {JSON.stringify(props, consistentKeysReplacer)}
     <HelloWorld {...props} />
     <div>
-      result from api request during server rendering: {}
+      result from api request during server rendering:{' '}
       {JSON.stringify(props.apiRequestResponse, consistentKeysReplacer)}
     </div>
   </div>
