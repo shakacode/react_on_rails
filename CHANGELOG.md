@@ -27,6 +27,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 #### Fixed
 
 - **[Pro]** **Preserve ruby-jwt 2.x compatibility in 16.7**: Relaxes the `16.7.0.rc.0` `jwt >= 3.2.0` floor to `jwt >= 2.7`, keeping compatibility with apps that still resolve jwt 2.x while continuing to allow patched jwt 3.2.0+ releases. [PR 3344](https://github.com/shakacode/react_on_rails/pull/3344) by [ihabadham](https://github.com/ihabadham).
+- **[Pro]** **RSC client manifest restored when only `registerServerComponent/client` is in the pack graph**: `wrapServerComponentRenderer/client` now directly imports `react-on-rails-rsc/client.browser` as a side-effect import. Previously the client runtime was only reachable through a three-level transitive chain (`wrapServerComponentRenderer/client` → `getReactServerComponent.client` → `react-on-rails-rsc/client.browser`). Tooling that severed any link in that chain (tree-shaking, transpiler quirks, custom `NormalModuleReplacement`, externals) caused `RSCWebpackPlugin` to emit `Client runtime at react-on-rails-rsc/client was not found. React Server Components module map file react-client-manifest.json was not created.` and silently skip the manifest, breaking RSC hydration on the Pro Node Renderer. The direct import keeps the runtime resource in the module graph so the plugin always emits `react-client-manifest.json`. Fixes [#3366](https://github.com/shakacode/react_on_rails/issues/3366).
 
 #### Security
 
