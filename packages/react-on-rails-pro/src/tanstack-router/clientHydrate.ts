@@ -11,21 +11,6 @@ import type { RailsContext } from 'react-on-rails/types';
 /* eslint-disable import/prefer-default-export, no-underscore-dangle */
 
 const { createElement, useEffect, useRef } = React;
-type ReactElement = React.ReactElement;
-type ReactWithOptionalInsertionEffect = typeof React & {
-  useInsertionEffect?: typeof useEffect;
-};
-
-// Read from the React namespace instead of using a named import because the Pro
-// package supports React >= 16, where useInsertionEffect does not exist as an
-// export. In React 18+, useInsertionEffect is currently excluded from the
-// StrictMode passive/layout effect replay cycle relied on by CSS-in-JS
-// libraries; that makes it the narrowest hook for "real unmount only" cleanup.
-// React versions without this hook also do not have that StrictMode replay
-// behavior, so useEffect is an adequate fallback there.
-const { useInsertionEffect } = React as ReactWithOptionalInsertionEffect;
-const useSynchronousRealUnmountEffect: typeof useEffect =
-  typeof useInsertionEffect === 'function' ? useInsertionEffect : useEffect;
 
 type TanStackRouterHydrationInternals = TanStackRouter & {
   matchRoutes: (location: unknown) => unknown[];
@@ -162,7 +147,7 @@ function TanStackHydrationApp({
   railsContext: _railsContext,
   RouterProvider,
   createBrowserHistory,
-}: TanStackHydrationAppProps): ReactElement {
+}: TanStackHydrationAppProps): React.ReactElement {
   const dehydratedState = incomingProps.__tanstackRouterDehydratedState as
     | DehydratedRouterState
     | null
@@ -317,22 +302,6 @@ function TanStackHydrationApp({
 
   const router = routerRef.current;
 
-  // Clear the temporary router.ssr flag synchronously on real unmount. This is
-  // the unmount path; the async finally() below is the normal settled/cancelled
-  // path. didSetSsrFlagRef is the shared latch so exactly one path clears.
-  useSynchronousRealUnmountEffect(() => {
-    if (!router || !hasSsrPayload) {
-      return undefined;
-    }
-
-    return () => {
-      if (didSetSsrFlagRef.current) {
-        router.ssr = undefined;
-        didSetSsrFlagRef.current = false;
-      }
-    };
-  }, [hasSsrPayload, router]);
-
   // After mount, trigger router.load() to enable client-side navigation.
   // The SSR flag prevented auto-loading, so we do it manually here.
   useEffect(() => {
@@ -393,12 +362,14 @@ function TanStackHydrationApp({
       .finally(() => {
         // Invariant: temporary router.ssr is cleared by exactly one path:
         //   1. this finally block after the post-hydration load settles/cancels;
-        //   2. the synchronous real-unmount cleanup above.
+        //   2. this effect cleanup's deferred continuation when unmount happens
+        //      before that settle.
         // didSetSsrFlagRef is the shared latch, preserving user-provided
         // router.ssr from createRouter(). latestEffectRunIdRef prevents stale
-        // StrictMode passive-effect finally blocks from racing a remount; React
-        // runs passive cleanup/setup back-to-back before queued promise
-        // continuations drain.
+        // StrictMode passive-effect finally blocks from racing a remount. Today
+        // React runs passive cleanup/setup inside one synchronous
+        // flushPassiveEffects() call, so queued promise continuations cannot
+        // drain between the cleanup and the re-setup.
         if (latestEffectRunIdRef.current === effectRunId && didSetSsrFlagRef.current) {
           router.ssr = undefined;
           didSetSsrFlagRef.current = false;
@@ -408,6 +379,14 @@ function TanStackHydrationApp({
     return () => {
       cancelled = true;
       didTriggerPostHydrationLoadRef.current = false;
+      // Defer the unmount clear so React 18 StrictMode's passive cleanup/setup
+      // replay can increment latestEffectRunIdRef before this continuation runs.
+      void Promise.resolve().then(() => {
+        if (latestEffectRunIdRef.current === effectRunId && didSetSsrFlagRef.current) {
+          router.ssr = undefined;
+          didSetSsrFlagRef.current = false;
+        }
+      });
       const cancellableRouter = router as TanStackRouter & { cancelLoad?: () => void };
       if (typeof cancellableRouter.cancelLoad === 'function') {
         cancellableRouter.cancelLoad();
@@ -427,7 +406,7 @@ function TanStackHydrationApp({
   // safe because router.ssr blocks Transitioner-initiated navigation across
   // that window, and the route components themselves throw their own
   // Suspense promises if a chunk is still loading.
-  let app: ReactElement = createElement(RouterProvider, { router });
+  let app: React.ReactElement = createElement(RouterProvider, { router });
   if (options.AppWrapper) {
     const wrapperProps = { ...incomingProps } as Record<string, unknown>;
     delete wrapperProps.__tanstackRouterDehydratedState;
@@ -443,7 +422,7 @@ export function clientHydrateTanStackApp(
   railsContext: RailsContext & { serverSide: false },
   RouterProvider: React.ComponentType<{ router: TanStackRouter }>,
   createBrowserHistory: () => TanStackHistory,
-): ReactElement {
+): React.ReactElement {
   return createElement(TanStackHydrationApp, {
     options,
     incomingProps: props,

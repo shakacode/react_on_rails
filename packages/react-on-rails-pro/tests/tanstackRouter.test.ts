@@ -1099,9 +1099,9 @@ describe('tanstack-router integration (Pro)', () => {
 
     expect(router.ssr).toEqual({ manifest: undefined });
 
-    await compatAct(() => {
+    await compatAct(async () => {
       root.unmount();
-      expect(router.ssr).toBeUndefined();
+      await Promise.resolve();
     });
 
     expect(router.ssr).toBeUndefined();
@@ -1610,7 +1610,7 @@ describe('tanstack-router integration (Pro)', () => {
     }
   });
 
-  it('re-arms the chunk preload await path across StrictMode effect remounts', async () => {
+  it('does not double-call loadRouteChunk when StrictMode replays hydration effects', async () => {
     const router = buildRouter();
     const productsRoute = { id: '/products' };
     const resolveChunks: Array<() => void> = [];
