@@ -1,4 +1,4 @@
-import { trace as otelTrace } from '@opentelemetry/api';
+import { trace as otelTrace, SpanStatusCode, type Attributes } from '@opentelemetry/api';
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 import {
   BatchSpanProcessor,
@@ -12,7 +12,14 @@ import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions';
 import { registerInstrumentations } from '@opentelemetry/instrumentation';
 import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
 import FastifyOtelInstrumentation from '@fastify/otel';
+import { setupTracing, setupSubSpan, type SubSpanFn } from '../shared/tracing.js';
 import { log, message } from './api.js';
+
+declare module '../shared/tracing.js' {
+  interface UnitOfWorkOptions {
+    opentelemetry?: { name: string; attributes?: Attributes };
+  }
+}
 
 export interface OpenTelemetryInitOptions {
   /** Service name reported in traces. Defaults to "react-on-rails-pro-node-renderer".
@@ -69,6 +76,48 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
         ],
         tracerProvider,
       });
+    }
+
+    if (opts.tracing) {
+      const tracer = otelTrace.getTracer(opts.serviceName ?? DEFAULT_SERVICE_NAME);
+
+      setupTracing({
+        startSsrRequestOptions: () => ({
+          opentelemetry: { name: 'ror.ssr.request' },
+        }),
+        executor: async (fn, unitOfWorkOptions) => {
+          const otelOpts = unitOfWorkOptions.opentelemetry ?? { name: 'ror.ssr.request' };
+          return tracer.startActiveSpan(otelOpts.name, { attributes: otelOpts.attributes }, async (span) => {
+            try {
+              return await fn();
+            } catch (err) {
+              span.setStatus({
+                code: SpanStatusCode.ERROR,
+                message: err instanceof Error ? err.message : String(err),
+              });
+              throw err;
+            } finally {
+              span.end();
+            }
+          });
+        },
+      });
+
+      const subSpanImpl: SubSpanFn = (subOpts, fn) =>
+        tracer.startActiveSpan(subOpts.name, { attributes: subOpts.attributes }, async (span) => {
+          try {
+            return await fn();
+          } catch (err) {
+            span.setStatus({
+              code: SpanStatusCode.ERROR,
+              message: err instanceof Error ? err.message : String(err),
+            });
+            throw err;
+          } finally {
+            span.end();
+          }
+        });
+      setupSubSpan(subSpanImpl);
     }
   } catch (err) {
     message(`[OpenTelemetry] init failed: ${String(err)}`);

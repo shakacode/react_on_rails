@@ -1,6 +1,13 @@
 import { trace as otelTrace, type Tracer } from '@opentelemetry/api';
 import { InMemorySpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base';
 import { init, __resetForTest } from '../../src/integrations/opentelemetry';
+import {
+  trace,
+  subSpan,
+  startSsrRequestOptions,
+  __resetSubSpanForTest,
+  __resetTracingForTest,
+} from '../../src/shared/tracing';
 
 describe('opentelemetry integration: init()', () => {
   let exporter: InMemorySpanExporter;
@@ -94,5 +101,105 @@ describe('opentelemetry integration: fastify auto-instrumentation', () => {
 
     const spanNames = exporter.getFinishedSpans().map((s) => s.name);
     expect(spanNames).toContain('manual.span');
+  });
+});
+
+describe('opentelemetry integration: tracing wiring', () => {
+  let exporter: InMemorySpanExporter;
+
+  beforeEach(async () => {
+    exporter = new InMemorySpanExporter();
+    // Reset OTel state AND both tracing/subSpan registrations so each test gets a clean install.
+    __resetSubSpanForTest();
+    __resetTracingForTest();
+    await __resetForTest();
+  });
+
+  afterAll(async () => {
+    __resetSubSpanForTest();
+    __resetTracingForTest();
+    await __resetForTest();
+  });
+
+  test('init({ tracing: true }) produces a ror.ssr.request span via trace()', async () => {
+    init({
+      tracing: true,
+      spanProcessor: new SimpleSpanProcessor(exporter),
+    });
+
+    await trace(async () => 'result', startSsrRequestOptions({ renderingRequest: 'irrelevant' }));
+
+    const spanNames = exporter.getFinishedSpans().map((s) => s.name);
+    expect(spanNames).toContain('ror.ssr.request');
+  });
+
+  test('init({ tracing: true }) wires subSpan() to produce child spans of ror.ssr.request', async () => {
+    init({
+      tracing: true,
+      spanProcessor: new SimpleSpanProcessor(exporter),
+    });
+
+    await trace(
+      async () => {
+        await subSpan(
+          { name: 'ror.bundle.build_execution_context', attributes: { 'bundle.timestamp': 'abc' } },
+          async () => undefined,
+        );
+      },
+      startSsrRequestOptions({ renderingRequest: 'irrelevant' }),
+    );
+
+    const spans = exporter.getFinishedSpans();
+    const ssrSpan = spans.find((s) => s.name === 'ror.ssr.request');
+    const bundleSpan = spans.find((s) => s.name === 'ror.bundle.build_execution_context');
+    expect(ssrSpan).toBeDefined();
+    expect(bundleSpan).toBeDefined();
+    expect(bundleSpan!.attributes['bundle.timestamp']).toBe('abc');
+    // The bundle span's parent must be the ssr span.
+    expect(bundleSpan!.parentSpanContext?.spanId).toBe(ssrSpan!.spanContext().spanId);
+  });
+
+  test('subSpan does not leak renderingRequest payload into span attributes (sensitive data audit)', async () => {
+    init({
+      tracing: true,
+      spanProcessor: new SimpleSpanProcessor(exporter),
+    });
+
+    const secretPayload = 'SECRET-RENDERING-PAYLOAD-DO-NOT-LEAK';
+    await trace(
+      async () => {
+        await subSpan({ name: 'ror.vm.execute' }, async () => undefined);
+      },
+      startSsrRequestOptions({ renderingRequest: secretPayload }),
+    );
+
+    const spans = exporter.getFinishedSpans();
+    for (const span of spans) {
+      for (const value of Object.values(span.attributes)) {
+        expect(String(value)).not.toContain(secretPayload);
+      }
+    }
+  });
+
+  test('span has ERROR status when the wrapped function throws', async () => {
+    init({
+      tracing: true,
+      spanProcessor: new SimpleSpanProcessor(exporter),
+    });
+
+    await expect(
+      trace(
+        async () => {
+          throw new Error('boom');
+        },
+        startSsrRequestOptions({ renderingRequest: 'irrelevant' }),
+      ),
+    ).rejects.toThrow('boom');
+
+    const ssrSpan = exporter.getFinishedSpans().find((s) => s.name === 'ror.ssr.request');
+    expect(ssrSpan).toBeDefined();
+    // 2 = ERROR per @opentelemetry/api SpanStatusCode
+    expect(ssrSpan!.status.code).toBe(2);
+    expect(ssrSpan!.status.message).toBe('boom');
   });
 });

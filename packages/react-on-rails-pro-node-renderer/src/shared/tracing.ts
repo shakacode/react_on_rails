@@ -89,6 +89,18 @@ export function trace<T>(fn: UnitOfWork<T>, unitOfWorkOptions: UnitOfWorkOptions
 }
 
 /**
+ * Test-only: reset the installed tracing executor + startSsrRequestOptions back
+ * to defaults. Not part of the public api — do not re-export from
+ * `integrations/api.ts`.
+ */
+// eslint-disable-next-line no-underscore-dangle
+export function __resetTracingForTest(): void {
+  executor = (fn) => fn();
+  mutableStartSsrRequestOptions = () => ({});
+  setupRun = false;
+}
+
+/**
  * Options passed to a sub-span wrapper.
  *
  * `name` is the span name (use dot.namespaced form, e.g. `ror.bundle.upload`).
