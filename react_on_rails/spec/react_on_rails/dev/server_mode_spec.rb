@@ -72,6 +72,42 @@ RSpec.describe ReactOnRails::Dev::ServerMode do
       expect(described_class.detect("config/shakapacker.yml")).to eq(:hmr)
     end
 
+    it "detects HMR from the default section when development is absent" do
+      write_shakapacker_config(<<~YAML)
+        default:
+          dev_server:
+            hmr: true
+      YAML
+
+      expect(described_class.detect("config/shakapacker.yml")).to eq(:hmr)
+    end
+
+    it "lets development hmr override default hmr" do
+      write_shakapacker_config(<<~YAML)
+        default:
+          dev_server:
+            hmr: true
+        development:
+          dev_server:
+            hmr: false
+      YAML
+
+      expect(described_class.detect("config/shakapacker.yml")).to eq(:live_reload)
+    end
+
+    it "merges default and development dev_server settings" do
+      write_shakapacker_config(<<~YAML)
+        default:
+          dev_server:
+            hmr: true
+        development:
+          dev_server:
+            live_reload: false
+      YAML
+
+      expect(described_class.detect("config/shakapacker.yml")).to eq(:hmr)
+    end
+
     it "warns when Shakapacker config parsing fails" do
       write_shakapacker_config(<<~YAML)
         development:
@@ -112,6 +148,11 @@ RSpec.describe ReactOnRails::Dev::ServerMode do
   end
 
   describe ".text" do
+    it "uses mode-specific command labels" do
+      expect(described_class.text(:hmr, :command_label)).to eq("(none) / hmr")
+      expect(described_class.text(:live_reload, :command_label)).to eq("(none)")
+    end
+
     it "uses live reload wording for live reload shared output warnings" do
       expect(described_class.text(:live_reload, :shared_output_warning))
         .to eq("Do not combine shared output path with bin/dev (live reload)")
@@ -120,6 +161,20 @@ RSpec.describe ReactOnRails::Dev::ServerMode do
     it "raises a descriptive error for unknown text keys" do
       expect { described_class.text(:hmr, :missing_key) }
         .to raise_error(ArgumentError, /Unknown ServerMode text key :missing_key/)
+    end
+
+    it "raises a descriptive error for unknown modes" do
+      expect { described_class.text(:missing_mode, :command_description) }
+        .to raise_error(ArgumentError, /Unknown ServerMode :missing_mode/)
+    end
+  end
+
+  describe ".details" do
+    it "returns detail lines separately from string text" do
+      expect(described_class.details(:live_reload))
+        .to include("Full-page live reload enabled", "Browser refreshes after changes")
+      expect { described_class.text(:live_reload, :details) }
+        .to raise_error(ArgumentError, /Unknown ServerMode text key :details/)
     end
   end
 end

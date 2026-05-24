@@ -1993,16 +1993,18 @@ module ReactOnRails
     def add_shared_output_path_procfile_guidance
       return unless hmr_procfile_configured?
 
+      procfile_dev_label = Dev::ServerMode.text(default_dev_server_mode, :procfile_dev_label)
+
       if static_procfile_available?
         checker.add_warning(
-          "  ⚠️  Development-server Procfile.dev is present. Shared output path is high-risk " \
+          "  ⚠️  #{procfile_dev_label} is present. Shared output path is high-risk " \
           "unless you run bin/dev static."
         )
         checker.add_info("  💡 Use: ./bin/dev static")
         checker.add_info("  💡 For test watch in this setup: ./bin/dev test-watch --test-watch-mode=client-only")
       else
         checker.add_error(
-          "  🚫 Shared output path + development-server Procfile.dev detected, " \
+          "  🚫 Shared output path + #{procfile_dev_label} detected, " \
           "but Procfile.dev-static-assets is missing"
         )
         checker.add_info("  💡 Fix: separate test/development public_output_path values, or add static Procfile support")

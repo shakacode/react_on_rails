@@ -10,59 +10,68 @@ module ReactOnRails
 
       MODE_TEXT = {
         hmr: {
+          command_label: "(none) / hmr",
           command_description: "Start development server with HMR (default)",
           procfile_description: "HMR development with webpack-dev-server",
+          procfile_dev_label: "HMR Procfile.dev",
           launcher_description: "HMR development (bin/dev default)",
           mode_heading: "🔥 HMR Development mode (default)",
           next_step_label: "HMR",
           workflow_suffix: "for HMR",
           shared_output_warning: "Do not combine shared output path with bin/dev (HMR)",
           refresh_guidance: "Ensure you're running HMR mode: bin/dev (not bin/dev static)",
-          refresh_note: "Note: React Refresh only works in HMR mode, not static mode",
-          details: [
-            "Hot Module Replacement (HMR) enabled",
-            "React on Rails pack generation (via precompile hook or bin/dev)",
-            "Webpack dev server for fast recompilation",
-            "Source maps for debugging",
-            "May have Flash of Unstyled Content (FOUC)",
-            "Fast recompilation"
-          ]
+          refresh_note: "Note: React Refresh only works in HMR mode, not static mode"
         },
         live_reload: {
+          command_label: "(none)",
           command_description: "Start development server with live reload (default)",
           procfile_description: "Live reload development with webpack-dev-server",
+          procfile_dev_label: "Live reload Procfile.dev",
           launcher_description: "Live reload development (bin/dev default)",
           mode_heading: "🔁 Live reload development mode (default)",
           next_step_label: "live reload",
           workflow_suffix: "for live reload",
           shared_output_warning: "Do not combine shared output path with bin/dev (live reload)",
           refresh_guidance: "HMR is disabled in config/shakapacker.yml; enable dev_server.hmr for React Refresh",
-          refresh_note: "With live reload enabled, changes refresh the page instead of preserving component state",
-          details: [
-            "Full-page live reload enabled",
-            "React on Rails pack generation (via precompile hook or bin/dev)",
-            "Webpack dev server for automatic recompilation",
-            "Source maps for debugging",
-            "Browser refreshes after changes"
-          ]
+          refresh_note: "With live reload enabled, changes refresh the page instead of preserving component state"
         },
         development_server: {
+          command_label: "(none)",
           command_description: "Start development server (default)",
           procfile_description: "Development server with webpack-dev-server",
+          procfile_dev_label: "Development server Procfile.dev",
           launcher_description: "Development server (bin/dev default)",
           mode_heading: "🚀 Development server mode (default)",
           next_step_label: "the development server",
           workflow_suffix: "for the development server",
           shared_output_warning: "Do not combine shared output path with bin/dev (development server)",
           refresh_guidance: "Check config/shakapacker.yml has dev_server.hmr: true for React Refresh",
-          refresh_note: "React Refresh requires HMR; other dev-server modes may reload the page",
-          details: [
-            "Webpack dev server enabled",
-            "React on Rails pack generation (via precompile hook or bin/dev)",
-            "Source maps for debugging",
-            "Development server watches for changes"
-          ]
+          refresh_note: "React Refresh requires HMR; other dev-server modes may reload the page"
         }
+      }.freeze
+
+      MODE_DETAILS = {
+        hmr: [
+          "Hot Module Replacement (HMR) enabled",
+          "React on Rails pack generation (via precompile hook or bin/dev)",
+          "Webpack dev server for fast recompilation",
+          "Source maps for debugging",
+          "May have Flash of Unstyled Content (FOUC)",
+          "Fast recompilation"
+        ],
+        live_reload: [
+          "Full-page live reload enabled",
+          "React on Rails pack generation (via precompile hook or bin/dev)",
+          "Webpack dev server for automatic recompilation",
+          "Source maps for debugging",
+          "Browser refreshes after changes"
+        ],
+        development_server: [
+          "Webpack dev server enabled",
+          "React on Rails pack generation (via precompile hook or bin/dev)",
+          "Source maps for debugging",
+          "Development server watches for changes"
+        ]
       }.freeze
 
       class << self
@@ -70,6 +79,7 @@ module ReactOnRails
           detect_from_config(config_path) || normalize_mode(fallback)
         end
 
+        # Missing or unparseable config means HMR is not explicitly enabled, even though detect falls back to :hmr.
         def hmr_enabled?(config_path = shakapacker_config_path)
           detect_from_config(config_path) == :hmr
         end
@@ -79,6 +89,10 @@ module ReactOnRails
             valid_keys = MODE_TEXT.fetch(:hmr).keys.join(", ")
             raise ArgumentError, "Unknown ServerMode text key #{key.inspect}. Valid keys: #{valid_keys}"
           end
+        end
+
+        def details(mode)
+          MODE_DETAILS.fetch(normalize_mode(mode))
         end
 
         private
@@ -122,7 +136,8 @@ module ReactOnRails
 
           return :hmr if hmr == true
           return :live_reload if live_reload == true
-          # Shakapacker defaults live_reload to the inverse of hmr when omitted.
+          # The generated Shakapacker config documents live_reload as the inverse of hmr when omitted.
+          # See generators/react_on_rails/templates/base/base/config/shakapacker.yml.tt.
           return :live_reload if hmr == false && live_reload.nil?
           return :development_server if hmr == false || live_reload == false
 
@@ -141,7 +156,10 @@ module ReactOnRails
         end
 
         def normalize_mode(mode)
-          MODE_TEXT.key?(mode) ? mode : :development_server
+          return mode if MODE_TEXT.key?(mode)
+
+          valid_modes = MODE_TEXT.keys.join(", ")
+          raise ArgumentError, "Unknown ServerMode #{mode.inspect}. Valid modes: #{valid_modes}"
         end
       end
     end

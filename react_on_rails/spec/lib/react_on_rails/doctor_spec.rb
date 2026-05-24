@@ -964,6 +964,47 @@ RSpec.describe ReactOnRails::Doctor do
 
       error_messages = checker.messages.select { |msg| msg[:type] == :error }.map { |msg| msg[:content] }
       expect(error_messages).to include(a_string_including("Procfile.dev-static-assets is missing"))
+      expect(error_messages).to include(a_string_including("Shared output path + HMR Procfile.dev detected"))
+    end
+
+    it "uses the detected Procfile.dev mode when shared output path can use static mode" do
+      write_project_file("config/initializers/react_on_rails.rb", <<~RUBY)
+        ReactOnRails.configure do |config|
+          config.build_test_command = "RAILS_ENV=test bin/shakapacker"
+        end
+      RUBY
+      write_project_file("config/shakapacker.yml", <<~YAML)
+        development:
+          public_output_path: packs
+          dev_server:
+            hmr: false
+            live_reload: true
+
+        test:
+          public_output_path: packs
+          compile: false
+      YAML
+      write_project_file("spec/rails_helper.rb", <<~RUBY)
+        require "react_on_rails/test_helper"
+        RSpec.configure do |config|
+          ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+        end
+      RUBY
+      write_project_file("Procfile.dev", <<~PROCFILE)
+        rails: bundle exec rails s -p ${PORT:-3000}
+        dev-server: bin/shakapacker-dev-server
+      PROCFILE
+      write_project_file("Procfile.dev-static-assets", <<~PROCFILE)
+        assets: bin/shakapacker --watch
+      PROCFILE
+
+      doctor.send(:check_build_test_configuration)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(
+        a_string_including("Live reload Procfile.dev is present. Shared output path is high-risk")
+      )
+      expect(warning_messages).not_to include(a_string_including("Development-server Procfile.dev"))
     end
 
     context "with fix enabled" do

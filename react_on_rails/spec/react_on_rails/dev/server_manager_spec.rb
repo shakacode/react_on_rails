@@ -1565,7 +1565,12 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         expect { described_class.show_help }
           .to output(/Start development server with live reload \(default\)/).to_stdout_from_any_process
         expect { described_class.show_help }
+          .to output(/\(none\)\s+Start development server with live reload \(default\)/).to_stdout_from_any_process
+        expect { described_class.show_help }
           .not_to output(/HMR Development mode \(default\)|Hot Module Replacement \(HMR\) enabled/)
+          .to_stdout_from_any_process
+        expect { described_class.show_help }
+          .not_to output(%r{\(none\) / hmr\s+Start development server with live reload \(default\)})
           .to_stdout_from_any_process
       end
 

@@ -578,11 +578,12 @@ module ReactOnRails
 
         # rubocop:disable Metrics/AbcSize
         def help_commands(default_mode = default_dev_server_mode)
+          command_label = Rainbow(ServerMode.text(default_mode, :command_label)).green.bold
           command_description = Rainbow(ServerMode.text(default_mode, :command_description)).white
 
           <<~COMMANDS
             #{Rainbow('🚀 COMMANDS:').cyan.bold}
-              #{Rainbow('(none) / hmr').green.bold}        #{command_description}
+              #{command_label}        #{command_description}
                                   #{Rainbow('→ Uses:').yellow} Procfile.dev
 
               #{Rainbow('static').green.bold}              #{Rainbow('Start development server with static assets (no HMR, no FOUC)').white}
@@ -735,7 +736,7 @@ module ReactOnRails
         end
 
         def default_dev_server_detail_lines(mode)
-          ServerMode.text(mode, :details).map do |detail|
+          ServerMode.details(mode).map do |detail|
             "#{Rainbow('•').yellow} #{Rainbow(detail).white}"
           end.join("\n")
         end
