@@ -1,3 +1,4 @@
+import path from 'path';
 import { trace as otelTrace, type Tracer } from '@opentelemetry/api';
 import { InMemorySpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base';
 import { init, __resetForTest } from '../../src/integrations/opentelemetry';
@@ -8,6 +9,16 @@ import {
   __resetSubSpanForTest,
   __resetTracingForTest,
 } from '../../src/shared/tracing';
+import { handleRenderRequest } from '../../src/worker/handleRenderRequest';
+import {
+  BUNDLE_TIMESTAMP,
+  createUploadedBundle,
+  mkdirAsync,
+  resetForTest,
+  uploadedBundlePath,
+  vmBundlePath,
+} from '../helper';
+import { Asset } from '../../src/shared/utils';
 
 describe('opentelemetry integration: init()', () => {
   let exporter: InMemorySpanExporter;
@@ -201,5 +212,96 @@ describe('opentelemetry integration: tracing wiring', () => {
     // 2 = ERROR per @opentelemetry/api SpanStatusCode
     expect(ssrSpan!.status.code).toBe(2);
     expect(ssrSpan!.status.message).toBe('boom');
+  });
+});
+
+describe('opentelemetry integration: end-to-end render request', () => {
+  const testName = 'otelEndToEnd';
+  let exporter: InMemorySpanExporter;
+
+  const uploadedBundleForTest = (): Asset => ({
+    filename: '',
+    savedFilePath: uploadedBundlePath(testName),
+    type: 'asset',
+  });
+
+  beforeEach(async () => {
+    exporter = new InMemorySpanExporter();
+    __resetSubSpanForTest();
+    __resetTracingForTest();
+    await __resetForTest();
+    await resetForTest(testName);
+    await mkdirAsync(path.dirname(vmBundlePath(testName)), { recursive: true });
+  });
+
+  afterAll(async () => {
+    __resetSubSpanForTest();
+    __resetTracingForTest();
+    await __resetForTest();
+    await resetForTest(testName);
+  });
+
+  test('SSR render produces ror.ssr.request, ror.bundle.*, ror.vm.execute, ror.result.prepare spans', async () => {
+    init({
+      tracing: true,
+      spanProcessor: new SimpleSpanProcessor(exporter),
+    });
+
+    await createUploadedBundle(testName);
+
+    // Exercise the same path the worker uses: wrap handleRenderRequest in trace()
+    // with the same startSsrRequestOptions, so the SSR root span is created.
+    await trace(
+      async () => {
+        const result = await handleRenderRequest({
+          renderingRequest: 'ReactOnRails.dummy',
+          bundleTimestamp: BUNDLE_TIMESTAMP,
+          providedNewBundles: [
+            {
+              bundle: uploadedBundleForTest(),
+              timestamp: BUNDLE_TIMESTAMP,
+            },
+          ],
+        });
+        expect(result.response.status).toBe(200);
+      },
+      startSsrRequestOptions({ renderingRequest: 'ReactOnRails.dummy' }),
+    );
+
+    const spanNames = exporter.getFinishedSpans().map((s) => s.name);
+    expect(spanNames).toEqual(
+      expect.arrayContaining([
+        'ror.ssr.request',
+        'ror.bundle.upload',
+        'ror.vm.execute',
+        'ror.result.prepare',
+      ]),
+    );
+
+    // Verify hierarchy: bundle/vm/result spans must be descendants of ror.ssr.request.
+    const spans = exporter.getFinishedSpans();
+    const ssrSpan = spans.find((s) => s.name === 'ror.ssr.request');
+    expect(ssrSpan).toBeDefined();
+    const ssrSpanId = ssrSpan!.spanContext().spanId;
+
+    // Build a set of span IDs that descend from the SSR span (BFS).
+    const descendants = new Set<string>([ssrSpanId]);
+    let added = true;
+    while (added) {
+      added = false;
+      for (const s of spans) {
+        const parentId = s.parentSpanContext?.spanId;
+        if (parentId && descendants.has(parentId) && !descendants.has(s.spanContext().spanId)) {
+          descendants.add(s.spanContext().spanId);
+          added = true;
+        }
+      }
+    }
+
+    for (const targetName of ['ror.bundle.upload', 'ror.vm.execute', 'ror.result.prepare']) {
+      const span = spans.find((s) => s.name === targetName);
+      expect(span).toBeDefined();
+      expect(descendants.has(span!.spanContext().spanId)).toBe(true);
+    }
   });
 });
