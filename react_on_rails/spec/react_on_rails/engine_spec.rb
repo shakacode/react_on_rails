@@ -197,6 +197,23 @@ module ReactOnRails
         end
       end
 
+      context "when SHAKAPACKER_CONFIG points to an existing config file" do
+        around do |example|
+          original_config_path = ENV.fetch("SHAKAPACKER_CONFIG", nil)
+          ENV["SHAKAPACKER_CONFIG"] = app_root.join("custom", "shakapacker.yml").to_s
+          example.run
+        ensure
+          ENV["SHAKAPACKER_CONFIG"] = original_config_path
+        end
+
+        it "returns true without requiring config/shakapacker.yml" do
+          FileUtils.mkdir_p(app_root.join("custom"))
+          File.write(app_root.join("custom", "shakapacker.yml"), "default: {}\n")
+
+          expect(described_class.shakapacker_configured_as_bundler?).to be true
+        end
+      end
+
       it "does not call Shakapacker.config while checking for the config file" do
         expect(::Shakapacker).not_to receive(:config)
         expect(described_class.shakapacker_configured_as_bundler?).to be false

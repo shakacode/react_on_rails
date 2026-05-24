@@ -103,12 +103,19 @@ module ReactOnRails
     # transitive gem dependency (e.g., a Vite Rails app adopting React on Rails for
     # client-only mounts).
     def self.shakapacker_configured_as_bundler?
-      Rails.root.join("config", "shakapacker.yml").exist?
+      shakapacker_config_path.exist?
+    end
+
+    def self.shakapacker_config_path
+      env_config_path = ENV.fetch("SHAKAPACKER_CONFIG", nil)
+      return Pathname.new(env_config_path) unless env_config_path.to_s.empty?
+
+      Rails.root.join("config", "shakapacker.yml")
     end
 
     # Wrap Shakapacker's package-manager guard when Shakapacker is not the bundler.
-    # The wrapper checks config/shakapacker.yml at call time so the original guard still
-    # runs if another app in the same process configures Shakapacker later.
+    # The wrapper checks Shakapacker config presence at call time so the original guard
+    # still runs if another app in the same process configures Shakapacker later.
     def self.suppress_shakapacker_package_manager_check_if_not_bundler!
       return if shakapacker_configured_as_bundler?
 
@@ -120,7 +127,7 @@ module ReactOnRails
       return if original_package_manager_check.source_location&.first == __FILE__
 
       Rails.logger&.info(
-        "[React on Rails] No config/shakapacker.yml found; skipping Shakapacker " \
+        "[React on Rails] No Shakapacker config found; skipping Shakapacker " \
         "packageManager check (Shakapacker is loaded as a transitive dependency but " \
         "is not the configured bundler)."
       )
