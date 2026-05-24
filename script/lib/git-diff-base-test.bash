@@ -250,7 +250,8 @@ test_run_test_counts_non_final_assertion_failure() {
 # ---------------------------------------------------------------------------
 
 # Build a minimal local "remote" + clone pair inside the current tempdir.
-# After this returns, cwd is the clone repo with the named branches and refs.
+# After this returns, cwd is the clone repo with branch refs needed by the
+# requested fixture mode.
 #
 # Arguments:
 #   $1 clone_kind     "full" (default) or "shallow"
@@ -258,6 +259,8 @@ test_run_test_counts_non_final_assertion_failure() {
 #   $3 main_extra     extra commits to add to main AFTER feature branches off
 #                     (default 0). Use a large value to force the deepen loop
 #                     to exhaust its budget and exercise the --unshallow path.
+#                     In shallow clones with main_extra, origin/main is left for
+#                     git_diff_base_resolve to fetch depth-limited.
 setup_repo_fixture() {
   local clone_kind="${1:-full}"
   local depth="${2:-2}"
@@ -299,6 +302,15 @@ setup_repo_fixture() {
   cd clone || return 1
   git config user.email "t@example.com"
   git config user.name "test"
+
+  if [ "$clone_kind" = "shallow" ] && [ "$main_extra" -gt 0 ]; then
+    # Leave origin/main for git_diff_base_resolve's own initial depth-limited
+    # fetch. Fully prefetching it here would make fallback tests depend on
+    # whether this Git version re-shallows an already complete remote-tracking
+    # ref when a later `git fetch --depth=N` runs.
+    return 0
+  fi
+
   # Clones default to fetching only the checked-out branch, so make sure the
   # base branch is also tracked locally for the deepen path tests. Warn on
   # failure so downstream test failures trace back to the setup step rather
@@ -509,6 +521,9 @@ test_resolve_unshallow_fallback_finds_merge_base() {
   # initial depth=2 and one deepen attempt of depth=2, main only fetches 4
   # commits (main-extra-7 through main-extra-10), which never reaches c5; the
   # unshallow pull then brings in all of main and exposes the merge base.
+  # setup_repo_fixture intentionally leaves origin/main unfetched for this
+  # main_extra shallow clone so the test does not depend on git fetch --depth
+  # re-shallowing an already complete remote-tracking ref.
   setup_repo_fixture shallow 1 10
   local out err_file
   err_file="$(mktemp resolve-err.XXXXXX)"
@@ -529,19 +544,20 @@ test_resolve_unshallow_fallback_finds_merge_base() {
 test_resolve_logs_deepen_progress() {
   # Operators need a visible breadcrumb per deepen iteration so a slow CI run
   # is not opaque between the initial fetch and the eventual unshallow. This
-  # checks that at least one deepen-progress line is emitted when the deepen
-  # loop runs.
-  setup_repo_fixture shallow 1
+  # checks each deepen depth in the 2 -> 4 -> 8 sequence.
+  setup_repo_fixture shallow 1 20
   local err_file
   err_file="$(mktemp resolve-err.XXXXXX)"
-  if ! GIT_DIFF_BASE_FETCH_DEPTH=2 GIT_DIFF_BASE_MAX_ATTEMPTS=8 \
+  if ! GIT_DIFF_BASE_FETCH_DEPTH=2 GIT_DIFF_BASE_MAX_ATTEMPTS=3 \
       git_diff_base_resolve "origin/main" "HEAD" strict >/dev/null 2>"$err_file"; then
     fail "resolve failed; stderr was: $(cat "$err_file")"
     return 1
   fi
   local stderr_text
   stderr_text="$(cat "$err_file")"
-  assert_contains "$stderr_text" "Deepening shallow history" "deepen progress log line"
+  assert_contains "$stderr_text" "Deepening shallow history (attempt 1/3, depth 2)" "first deepen progress line"
+  assert_contains "$stderr_text" "Deepening shallow history (attempt 2/3, depth 4)" "second deepen progress line"
+  assert_contains "$stderr_text" "Deepening shallow history (attempt 3/3, depth 8)" "third deepen progress line"
 }
 
 test_resolve_cross_repo_sha_hint_appears() {
