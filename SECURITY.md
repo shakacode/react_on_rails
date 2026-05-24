@@ -24,12 +24,13 @@ restates the same policy with the specific version numbers in effect today.
 | Version line                                                              | Security support                                                                                                                                                                                      |
 | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Latest minor of the current major (e.g., `16.6.x` while `16.6` is latest) | Full security support. Fixes are released as a patch on this line.                                                                                                                                    |
-| Previous minor of the current major (e.g., `16.5.x`)                      | Backports for **High / Critical** severity (CVSS ≥ 7.0) for **six months** after the next minor's first release.                                                                                      |
+| Previous minor of the current major (e.g., `16.5.x`)                      | Backports for **High / Critical** severity (CVSS 7.0-10.0) for **six months** after the next minor's first release.                                                                                   |
 | Previous major (e.g., `15.x`) — only the latest minor of that major       | Backports for **Critical** severity (CVSS ≥ 9.0) for **six months** after the first stable release of the new major.                                                                                  |
 | All other releases                                                        | Not supported. Reports are still triaged; if the issue also affects a supported line, the fix lands there and the recommended remediation for unsupported releases is to upgrade to a supported line. |
 
 Pre-release builds (`.rc`, `.beta`, `.alpha`) are not separately supported — once superseded by a stable release in the
-same line, the recommended remediation is to upgrade to that stable release.
+same line, the recommended remediation is to upgrade to that stable release. Security issues found in a pre-release
+build are handled through the same private reporting process and fixed before the stable release when feasible.
 
 ### What "supported" means
 
@@ -49,14 +50,15 @@ maintainer commitment, not a ceiling on maintainer behavior.
 
 As of the **Last reviewed** date at the top of this file:
 
-| Status             | OSS gem & npm                     | Pro gem, Pro npm, Pro node renderer | Until                                                   |
-| ------------------ | --------------------------------- | ----------------------------------- | ------------------------------------------------------- |
-| Full support       | `16.6.x`                          | `16.6.x`                            | Replaced when the next minor (e.g., `16.7.0`) ships.    |
-| High/Critical only | `16.5.x`                          | `16.5.x`                            | Six months after the first release of the next minor.   |
-| Critical only      | _none — no prior major in window_ | _none — no prior major in window_   | Six months after the next major's first stable release. |
+| Status             | OSS gem & npm                             | Pro gem, Pro npm, Pro node renderer       | Until                                                |
+| ------------------ | ----------------------------------------- | ----------------------------------------- | ---------------------------------------------------- |
+| Full support       | `16.6.x`                                  | `16.6.x`                                  | Replaced when the next minor (e.g., `16.7.0`) ships. |
+| High/Critical only | `16.5.x`                                  | `16.5.x`                                  | 2026-10-09 (six months after `16.6.0` shipped).      |
+| Critical only      | _none — 15.x window closed on 2026-03-16_ | _none — 15.x window closed on 2026-03-16_ | Window closed six months after `16.0.0` shipped.     |
 
-When a new minor or major ships, the rows shift accordingly; maintainers update this section at the same time as the
-release.
+When a new minor or major ships, the rows shift accordingly; maintainers update this section as part of the release
+checklist in [internal/contributor-info/releasing.md](internal/contributor-info/releasing.md) and
+[.claude/docs/changelog-guidelines.md](.claude/docs/changelog-guidelines.md).
 
 ### Handling reports against unsupported versions
 

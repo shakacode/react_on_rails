@@ -20,7 +20,9 @@ See [Contributing](https://github.com/shakacode/react_on_rails/blob/main/CONTRIB
    - Stamp the version header (e.g., `### [16.5.0] - 2026-03-08`)
    - For `rc`/`beta`: collapse prior prerelease sections and deduplicate entries
    - **Automatically commit, push, and open a PR** with the changelog changes
-3. Review the PR, verify the computed version, and merge
+3. For minor and major releases, update the `SECURITY.md` "Current support window" table so supported version lines and
+   cutoff dates match the release being shipped.
+4. Review the PR, verify the computed version, and merge
 
 If you forget this step, the release task will print a warning and the GitHub release will need to be created manually afterward using `sync_github_release`.
 
