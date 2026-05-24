@@ -101,24 +101,6 @@ module GeneratorHelper
     @pro_gem_installed = Gem.loaded_specs.key?("react_on_rails_pro") || gem_in_lockfile?("react_on_rails_pro")
   end
 
-  # Clear the memoized {#pro_gem_installed?} result so the next call re-checks
-  # Gem.loaded_specs / Gemfile.lock. Call after any operation that may change real state.
-  def invalidate_pro_gem_installed_cache!
-    remove_instance_variable(:@pro_gem_installed) if defined?(@pro_gem_installed)
-  end
-
-  # True when a later step in this generator run will install the Pro gem
-  # (e.g., the Gemfile swap performed by ProGenerator). Distinct from
-  # {#pro_gem_installed?}, which only reports real present state.
-  def pro_gem_install_deferred?
-    @pro_gem_install_deferred == true
-  end
-
-  # Record that a later step in this generator run will install the Pro gem.
-  def defer_pro_gem_install!
-    @pro_gem_install_deferred = true
-  end
-
   # Check if Pro features should be enabled.
   # Returns true if --pro or --rsc is set (RSC implies Pro).
   #
@@ -268,6 +250,24 @@ module GeneratorHelper
   end
 
   private
+
+  # Clear the memoized {#pro_gem_installed?} result so the next call re-checks
+  # Gem.loaded_specs / Gemfile.lock. Call after any operation that may change real state.
+  def invalidate_pro_gem_installed_cache!
+    remove_instance_variable(:@pro_gem_installed) if defined?(@pro_gem_installed)
+  end
+
+  # True when a later step in this generator run will install the Pro gem
+  # (e.g., the Gemfile swap performed by ProGenerator). Distinct from
+  # {#pro_gem_installed?}, which only reports real present state.
+  def pro_gem_install_deferred?
+    @pro_gem_install_deferred == true
+  end
+
+  # Record that a later step in this generator run will install the Pro gem.
+  def defer_pro_gem_install!
+    @pro_gem_install_deferred = true
+  end
 
   # NOTE: only the `default:` section is inspected — same assumption as
   # rspack_configured_in_project?. Projects that set `javascript_transpiler`
