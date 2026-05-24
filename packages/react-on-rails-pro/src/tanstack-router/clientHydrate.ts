@@ -141,6 +141,8 @@ function applyHydrationMatches(router: TanStackRouter, matches: unknown[]): void
       router.stores.status.set('idle');
       // The freshly-created router has not rendered or awaited work yet, so
       // router.state.location matches the legacy __store updater's s.location.
+      // Invariant: router.update({ history }) does not mutate state.location synchronously;
+      // if that ever changes, this path and the legacy __store path diverge.
       router.stores.resolvedLocation.set(router.state.location);
       router.stores.setMatches(matches);
     };
@@ -151,6 +153,8 @@ function applyHydrationMatches(router: TanStackRouter, matches: unknown[]): void
       // Without router.batch, the stores API cannot make these writes atomic like
       // legacy __store.setState(); this render-phase update runs before
       // RouterProvider subscribes, so hydration still starts from the final state.
+      // NOTE: correctness here depends on RouterProvider not subscribing to stores
+      // during synchronous render. Re-validate this path on TanStack Router major upgrades.
       applyStoresUpdate();
     }
     return;

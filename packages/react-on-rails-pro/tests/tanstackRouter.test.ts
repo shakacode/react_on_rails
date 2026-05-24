@@ -1,10 +1,15 @@
 import * as React from 'react';
-import { createRoot } from 'react-dom/client';
-import { renderToString } from 'react-dom/server';
 import {
-  createTanStackRouterRenderFunction,
-  serverRenderTanStackAppAsync,
-} from '../src/tanstack-router/index.ts';
+  RouterProvider as ActualRouterProvider,
+  createMemoryHistory as createActualMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter as createActualRouter,
+} from '@tanstack/react-router';
+import { batch as tanstackStoreBatch, createAtom } from '@tanstack/store';
+import { createRoot, hydrateRoot } from 'react-dom/client';
+import { renderToString } from 'react-dom/server';
+import { createTanStackRouterRenderFunction, serverRenderTanStackAppAsync } from '../src/tanstack-router.ts';
 import type { RailsContext, ServerRenderResult } from 'react-on-rails/types';
 import type { TanStackRouter } from '../src/tanstack-router/types.ts';
 
@@ -55,6 +60,24 @@ function buildRouter(): TanStackRouter {
   };
 }
 
+function buildActualTanStackRouter(): TanStackRouter {
+  const RootLayout = () => React.createElement('div', null, React.createElement('main'));
+  const ProductsPage = () => React.createElement('h1', null, 'Products');
+  const rootRoute = createRootRoute({ component: RootLayout });
+  const productsRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/products',
+    loader: () => ({ products: ['hammer'] }),
+    component: ProductsPage,
+  });
+  const routeTree = rootRoute.addChildren([productsRoute]);
+
+  return createActualRouter({
+    routeTree,
+    history: createActualMemoryHistory({ initialEntries: ['/products'] }),
+  }) as unknown as TanStackRouter;
+}
+
 async function compatAct(callback: () => void | Promise<void>): Promise<void> {
   // React 19 exports act on the React object; React 18 exports it from react-dom/test-utils
   const actFn =
@@ -68,17 +91,27 @@ async function compatAct(callback: () => void | Promise<void>): Promise<void> {
   await actFn(callback);
 }
 
-function buildStoresHydrationHarness({ useBatch = false }: { useBatch?: boolean } = {}) {
+function buildStoresHydrationHarness({
+  useBatch = false,
+  includeLegacyStore = false,
+}: { useBatch?: boolean; includeLegacyStore?: boolean } = {}) {
   const router = buildRouter();
-  delete router.__store;
+  if (!includeLegacyStore) {
+    delete router.__store;
+  }
   router.matchRoutes = jest.fn().mockReturnValue([{ id: '/products', status: 'pending', updatedAt: 0 }]);
 
-  const stores = {
-    status: { set: jest.fn() },
-    resolvedLocation: { set: jest.fn() },
-    setMatches: jest.fn(),
+  const storeState = {
+    status: createAtom('pending'),
+    resolvedLocation: createAtom<unknown>(null),
+    matches: createAtom<unknown[]>([]),
   };
-  const batch = useBatch ? jest.fn((callback: () => void) => callback()) : undefined;
+  const stores = {
+    status: storeState.status,
+    resolvedLocation: storeState.resolvedLocation,
+    setMatches: (matches: unknown[]) => storeState.matches.set(matches),
+  };
+  const batch = useBatch ? jest.fn((callback: () => void) => tanstackStoreBatch(callback)) : undefined;
   const routerWithStores = router as TanStackRouter & { batch?: typeof batch; stores: typeof stores };
   routerWithStores.stores = stores;
   if (batch) {
@@ -108,7 +141,7 @@ function buildStoresHydrationHarness({ useBatch = false }: { useBatch?: boolean 
     },
   };
 
-  return { router, stores, batch, renderFn, props };
+  return { router, storeState, batch, renderFn, props };
 }
 
 describe('tanstack-router integration (Pro)', () => {
@@ -252,6 +285,214 @@ describe('tanstack-router integration (Pro)', () => {
     } as unknown as RailsContext);
 
     expect(typeof result).toBe('function');
+  });
+
+  it('hydrates an actual TanStack Router instance through the installed private internals', () => {
+    const router = buildActualTanStackRouter();
+    const rawMatches = router.matchRoutes?.(router.state.location) as Array<{ id: string; routeId: string }>;
+    const productsMatch = rawMatches.find((match) => match.routeId === '/products');
+    expect(productsMatch).toBeDefined();
+    const dehydratedProductsMatchId = productsMatch?.id.split('/').join('\0');
+
+    const renderFn = createTanStackRouterRenderFunction(
+      { createRouter: () => router },
+      {
+        RouterProvider: ActualRouterProvider as React.ComponentType<{ router: TanStackRouter }>,
+        createMemoryHistory: ({ initialEntries }) => createActualMemoryHistory({ initialEntries }),
+        createBrowserHistory: () => createActualMemoryHistory({ initialEntries: ['/products'] }),
+      },
+    );
+
+    const props = {
+      __tanstackRouterDehydratedState: {
+        url: '/products',
+        dehydratedRouter: null,
+        ssrRouter: {
+          manifest: undefined,
+          lastMatchId: dehydratedProductsMatchId,
+          matches: [
+            {
+              i: dehydratedProductsMatchId as string,
+              l: { products: ['hammer'] },
+              s: 'success',
+              ssr: true,
+              u: 456,
+            },
+          ],
+        },
+      },
+    };
+    const result = renderFn(props, {
+      serverSide: false,
+      pathname: '/products',
+      search: '',
+    } as unknown as RailsContext);
+
+    renderToString(React.createElement(result as React.ComponentType<Record<string, unknown>>, props));
+
+    expect(router.state.status).toBe('idle');
+    expect(router.state.resolvedLocation).toEqual(router.state.location);
+    expect(router.state.matches).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: productsMatch?.id,
+          loaderData: { products: ['hammer'] },
+          status: 'success',
+        }),
+      ]),
+    );
+  });
+
+  it('round-trips actual TanStack Router SSR match data through the public entrypoint', async () => {
+    const originalResponse = globalThis.Response;
+    if (typeof originalResponse === 'undefined') {
+      globalThis.Response = class Response {} as typeof Response;
+    }
+
+    try {
+      const serverRouter = buildActualTanStackRouter();
+      const serverResult = await serverRenderTanStackAppAsync(
+        { createRouter: () => serverRouter },
+        { initial: 'prop' },
+        {
+          serverSide: true,
+          pathname: '/products',
+          search: '',
+        } as unknown as RailsContext & { serverSide: true },
+        ActualRouterProvider as React.ComponentType<{ router: TanStackRouter }>,
+        ({ initialEntries }) => createActualMemoryHistory({ initialEntries }),
+      );
+
+      expect(serverResult.dehydratedState.ssrRouter?.matches).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            l: { products: ['hammer'] },
+            s: 'success',
+          }),
+        ]),
+      );
+
+      const clientRouter = buildActualTanStackRouter();
+      const renderFn = createTanStackRouterRenderFunction(
+        { createRouter: () => clientRouter },
+        {
+          RouterProvider: ActualRouterProvider as React.ComponentType<{ router: TanStackRouter }>,
+          createMemoryHistory: ({ initialEntries }) => createActualMemoryHistory({ initialEntries }),
+          createBrowserHistory: () => createActualMemoryHistory({ initialEntries: ['/products'] }),
+        },
+      );
+
+      const props = { __tanstackRouterDehydratedState: serverResult.dehydratedState };
+      const result = renderFn(props, {
+        serverSide: false,
+        pathname: '/products',
+        search: '',
+      } as unknown as RailsContext);
+
+      renderToString(React.createElement(result as React.ComponentType<Record<string, unknown>>, props));
+
+      expect(clientRouter.state.status).toBe('idle');
+      expect(clientRouter.state.matches).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            loaderData: { products: ['hammer'] },
+            status: 'success',
+          }),
+        ]),
+      );
+    } finally {
+      if (typeof originalResponse === 'undefined') {
+        delete (globalThis as { Response?: typeof Response }).Response;
+      } else {
+        globalThis.Response = originalResponse;
+      }
+    }
+  });
+
+  it('hydrates server-rendered HTML from actual router loader state without recoverable hydration errors', async () => {
+    const originalResponse = globalThis.Response;
+    if (typeof originalResponse === 'undefined') {
+      globalThis.Response = class Response {} as typeof Response;
+    }
+
+    try {
+      const RouterStateProvider = ({ router }: { router: TanStackRouter }) => {
+        const productsMatch = router.state.matches.find((match) => {
+          const loaderData = (match as { loaderData?: { products?: unknown } }).loaderData;
+          return Array.isArray(loaderData?.products);
+        }) as { loaderData?: { products?: string[] } } | undefined;
+        const products = productsMatch?.loaderData?.products ?? [];
+
+        return React.createElement('main', null, `Products: ${products.join(', ')}`);
+      };
+      const serverRouter = buildActualTanStackRouter();
+      const serverResult = await serverRenderTanStackAppAsync(
+        { createRouter: () => serverRouter },
+        {},
+        {
+          serverSide: true,
+          pathname: '/products',
+          search: '',
+        } as unknown as RailsContext & { serverSide: true },
+        RouterStateProvider,
+        ({ initialEntries }) => createActualMemoryHistory({ initialEntries }),
+      );
+      const serverHtml = renderToString(serverResult.appElement);
+      expect(serverHtml).toContain('Products: hammer');
+
+      const clientRouter = buildActualTanStackRouter();
+      const renderFn = createTanStackRouterRenderFunction(
+        { createRouter: () => clientRouter },
+        {
+          RouterProvider: RouterStateProvider,
+          createMemoryHistory: ({ initialEntries }) => createActualMemoryHistory({ initialEntries }),
+          createBrowserHistory: () => createActualMemoryHistory({ initialEntries: ['/products'] }),
+        },
+      );
+      const props = { __tanstackRouterDehydratedState: serverResult.dehydratedState };
+      const clientApp = renderFn(props, {
+        serverSide: false,
+        pathname: '/products',
+        search: '',
+      } as unknown as RailsContext);
+      const container = document.createElement('div');
+      container.innerHTML = serverHtml;
+      document.body.appendChild(container);
+      const recoverableErrors: unknown[] = [];
+      let root: ReturnType<typeof hydrateRoot> | undefined;
+
+      try {
+        await compatAct(async () => {
+          root = hydrateRoot(
+            container,
+            React.createElement(clientApp as React.ComponentType<Record<string, unknown>>, props),
+            {
+              onRecoverableError: (error) => {
+                recoverableErrors.push(error);
+              },
+            },
+          );
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+
+        expect(container.textContent).toContain('Products: hammer');
+        expect(recoverableErrors).toEqual([]);
+      } finally {
+        if (root) {
+          await compatAct(async () => {
+            root?.unmount();
+          });
+        }
+        container.remove();
+      }
+    } finally {
+      if (typeof originalResponse === 'undefined') {
+        delete (globalThis as { Response?: typeof Response }).Response;
+      } else {
+        globalThis.Response = originalResponse;
+      }
+    }
   });
 
   it('renders RouterProvider (not RouterClient) on client hydration with SSR match data', () => {
@@ -495,7 +736,7 @@ describe('tanstack-router integration (Pro)', () => {
   });
 
   it('injects SSR match data through router.stores when router.__store is unavailable', () => {
-    const { router, stores, renderFn, props } = buildStoresHydrationHarness();
+    const { router, storeState, renderFn, props } = buildStoresHydrationHarness();
     const result = renderFn(props, {
       serverSide: false,
       pathname: '/products',
@@ -504,9 +745,9 @@ describe('tanstack-router integration (Pro)', () => {
 
     renderToString(React.createElement(result as React.ComponentType<Record<string, unknown>>, props));
 
-    expect(stores.status.set).toHaveBeenCalledWith('idle');
-    expect(stores.resolvedLocation.set).toHaveBeenCalledWith(router.state.location);
-    expect(stores.setMatches).toHaveBeenCalledWith([
+    expect(storeState.status.get()).toBe('idle');
+    expect(storeState.resolvedLocation.get()).toBe(router.state.location);
+    expect(storeState.matches.get()).toEqual([
       expect.objectContaining({
         id: '/products',
         loaderData: { products: ['hammer'] },
@@ -516,7 +757,7 @@ describe('tanstack-router integration (Pro)', () => {
   });
 
   it('batches router.stores hydration when router.batch is available', () => {
-    const { router, stores, batch, renderFn, props } = buildStoresHydrationHarness({ useBatch: true });
+    const { router, storeState, batch, renderFn, props } = buildStoresHydrationHarness({ useBatch: true });
     const result = renderFn(props, {
       serverSide: false,
       pathname: '/products',
@@ -526,9 +767,33 @@ describe('tanstack-router integration (Pro)', () => {
     renderToString(React.createElement(result as React.ComponentType<Record<string, unknown>>, props));
 
     expect(batch).toHaveBeenCalledTimes(1);
-    expect(stores.status.set).toHaveBeenCalledWith('idle');
-    expect(stores.resolvedLocation.set).toHaveBeenCalledWith(router.state.location);
-    expect(stores.setMatches).toHaveBeenCalledWith([
+    expect(storeState.status.get()).toBe('idle');
+    expect(storeState.resolvedLocation.get()).toBe(router.state.location);
+    expect(storeState.matches.get()).toEqual([
+      expect.objectContaining({
+        id: '/products',
+        loaderData: { products: ['hammer'] },
+        status: 'success',
+      }),
+    ]);
+  });
+
+  it('uses legacy __store.setState when both legacy and stores APIs are present', () => {
+    const { router, storeState, renderFn, props } = buildStoresHydrationHarness({ includeLegacyStore: true });
+    const legacyStore = router.__store;
+    const result = renderFn(props, {
+      serverSide: false,
+      pathname: '/products',
+      search: '',
+    } as unknown as RailsContext);
+
+    renderToString(React.createElement(result as React.ComponentType<Record<string, unknown>>, props));
+
+    expect(legacyStore?.setState).toHaveBeenCalledTimes(1);
+    expect(storeState.status.get()).toBe('pending');
+    expect(storeState.resolvedLocation.get()).toBeNull();
+    expect(storeState.matches.get()).toEqual([]);
+    expect(router.state.matches).toEqual([
       expect.objectContaining({
         id: '/products',
         loaderData: { products: ['hammer'] },

@@ -1,4 +1,4 @@
-import { createElement, type ReactElement } from 'react';
+import { Suspense, createElement, type ReactElement } from 'react';
 import type {
   DehydratedRouterState,
   TanStackHistory,
@@ -19,7 +19,11 @@ function buildAppElement(
   AppWrapper: TanStackRouterOptions['AppWrapper'],
   wrapperProps: Record<string, unknown>,
 ): ReactElement {
-  let app: ReactElement = createElement(RouterProvider, { router });
+  let app: ReactElement = createElement(
+    Suspense,
+    { fallback: null },
+    createElement(RouterProvider, { router }),
+  );
   if (AppWrapper) {
     const safeWrapperProps = { ...wrapperProps };
     // eslint-disable-next-line no-underscore-dangle -- Internal hydration payload key should not reach user AppWrapper props.
