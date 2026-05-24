@@ -473,7 +473,7 @@ That fallback comes from `CI_PNPM_FALLBACK_VERSION` in [`react_on_rails/lib/gene
 
 **When to bump:**
 
-- Whenever the repo's own root `package.json` `packageManager` pin is updated to a newer pnpm version. The spec `keeps the fallback pin tied to a version-specific pnpm release note` (in `react_on_rails/spec/react_on_rails/generators/install_generator_spec.rb`) fails when the two drift.
+- Whenever the repo's own root `package.json` `packageManager` pin is updated to a newer pnpm version. The spec `keeps the fallback pin tied to a version-specific pnpm release note` (in `react_on_rails/spec/react_on_rails/generators/install_generator_spec.rb`) fails when `CI_PNPM_FALLBACK_VERSION` drifts from the `packageManager` version in `package.json`.
 - Periodically — at minimum on every pnpm **major** release, and ideally on each minor as well. A new major may change the lockfile format, in which case projects scaffolded without `packageManager` will fail with the older pinned pnpm.
 
 **What to update together (single commit):**
