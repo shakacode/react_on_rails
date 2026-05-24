@@ -143,13 +143,13 @@ module ReactOnRails
       # reproducibility should commit `packageManager` to their package.json instead.
       #
       # Bumping policy (see #3248): this constant is coupled to the repo's own
-      # `package.json#packageManager` via install_generator_spec (`repo_pinned_pnpm_version`).
-      # Bump only as part of a coordinated upgrade of the repo's pnpm major; do not raise
-      # the floor here ahead of the rest of the codebase.
+      # `package.json#packageManager` via `spec/react_on_rails/generators/install_generator_spec.rb`
+      # (`repo_pinned_pnpm_version`). Bump only as part of a coordinated upgrade of the repo's
+      # pnpm major; do not raise the floor here ahead of the rest of the codebase.
       #
-      # Last checked: 2026-05-20 — pnpm 10 (latest 10.33.4) and pnpm 11 (latest 11.2.1)
-      # are stable upstream, but the repo's own packageManager is still pnpm@9.14.2,
-      # so the fallback stays on 9.x to match what this codebase actually tests with.
+      # Last checked: 2026-05-20 — pnpm 10 and pnpm 11 exist upstream, but the repo's own
+      # packageManager is still pnpm@9.14.2, so the fallback stays on 9.x to match what
+      # this codebase actually tests with.
       # renovate: datasource=github-releases depName=pnpm/pnpm extractVersion=^v(?<version>.+)$
       CI_PNPM_FALLBACK_VERSION = "9.14.2"
       private_constant :CI_PNPM_FALLBACK_VERSION
