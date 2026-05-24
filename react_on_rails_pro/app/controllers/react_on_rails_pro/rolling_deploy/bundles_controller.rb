@@ -33,6 +33,8 @@ module ReactOnRailsPro
     #   * Responses include `Cache-Control: no-store` so a misconfigured
     #     intermediary doesn't cache the bundle behind the auth check.
     class BundlesController < ActionController::Base
+      protect_from_forgery with: :null_session
+
       before_action :authenticate_rolling_deploy_request
       before_action :set_no_store_headers
 
@@ -167,14 +169,18 @@ module ReactOnRailsPro
       end
 
       def companion_assets
+        rails_root = File.expand_path(Rails.root.to_s)
+        rails_root_realpath = File.realpath(rails_root)
+
         # `collect_assets` returns the live build's loadable-stats + RSC
         # manifests; missing assets are silently dropped to match the
         # publish-side behavior in AssetsPrecompile.
         ReactOnRailsPro::RendererCacheHelpers.collect_assets
                                              .map(&:to_s)
                                              .reject { |p| ReactOnRailsPro::RendererCacheHelpers.http_url?(p) }
-                                             .map { |p| File.expand_path(p, Rails.root) }
-                                             .select { |p| File.file?(p) }
+                                             .filter_map do |path|
+                                               safe_companion_asset_path(path, rails_root, rails_root_realpath)
+                                             end
       rescue StandardError => e
         Rails.logger.warn(
           "[ReactOnRailsPro::RollingDeploy::BundlesController] " \
@@ -182,6 +188,21 @@ module ReactOnRailsPro
           "Serving bundle without companion assets — RSC clients may fall back to runtime 410-retry."
         )
         []
+      end
+
+      def safe_companion_asset_path(path, rails_root, rails_root_realpath)
+        expanded = File.expand_path(path, rails_root)
+        return nil unless path_within_root?(expanded, rails_root)
+        return nil unless File.file?(expanded)
+
+        realpath = File.realpath(expanded)
+        return nil unless path_within_root?(realpath, rails_root_realpath)
+
+        expanded
+      end
+
+      def path_within_root?(path, root)
+        path == root || path.start_with?("#{root}#{File::SEPARATOR}")
       end
     end
   end

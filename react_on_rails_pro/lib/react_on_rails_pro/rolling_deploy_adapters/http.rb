@@ -40,6 +40,8 @@ module ReactOnRailsPro
       # at a random execution point.
       DEFAULT_OPEN_TIMEOUT_SECONDS = 5
       DEFAULT_READ_TIMEOUT_SECONDS = 25
+      # Manifest discovery is wrapped in a 10s outer budget by RollingDeployCacheStager.
+      MANIFEST_READ_TIMEOUT_SECONDS = 4
 
       # Maximum uncompressed payload accepted from /bundles/:hash. Mirrors the
       # tarball helper default so a misbehaving or malicious server cannot
@@ -55,7 +57,10 @@ module ReactOnRailsPro
           base = configured_previous_url
           return [] if base.nil?
 
-          response = http_get(URI("#{base}/manifest"))
+          response = http_get(
+            URI("#{base}/manifest"),
+            read_timeout: MANIFEST_READ_TIMEOUT_SECONDS
+          )
           return warn_and_return("manifest returned HTTP #{response.code}", []) unless response.is_a?(Net::HTTPSuccess)
 
           parsed = JSON.parse(response.body)
@@ -167,7 +172,7 @@ module ReactOnRailsPro
         # build (one /manifest plus one /bundles per previous hash), and
         # connection pooling would force us to manage lifecycle / cleanup
         # across threads.
-        def http_get(uri)
+        def http_get(uri, read_timeout: DEFAULT_READ_TIMEOUT_SECONDS)
           request = Net::HTTP::Get.new(uri.request_uri)
           token = configured_token
           request["Authorization"] = "Bearer #{token}" unless token.empty?
@@ -177,7 +182,7 @@ module ReactOnRailsPro
           http.use_ssl = (uri.scheme == "https")
           http.verify_mode = OpenSSL::SSL::VERIFY_PEER if http.use_ssl?
           http.open_timeout = DEFAULT_OPEN_TIMEOUT_SECONDS
-          http.read_timeout = DEFAULT_READ_TIMEOUT_SECONDS
+          http.read_timeout = read_timeout
           http.request(request)
         end
       end

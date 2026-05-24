@@ -37,7 +37,13 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
   end
 
   describe ".http_get" do
-    let(:config) { instance_double(ReactOnRailsPro::Configuration, rolling_deploy_token: "token") }
+    let(:config) do
+      instance_double(
+        ReactOnRailsPro::Configuration,
+        rolling_deploy_previous_url: "https://example.com",
+        rolling_deploy_token: "token"
+      )
+    end
     let(:http) { instance_double(Net::HTTP) }
     let(:response) { Net::HTTPOK.new("1.1", "200", "OK") }
 
@@ -49,12 +55,21 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
       allow(http).to receive(:open_timeout=)
       allow(http).to receive(:read_timeout=)
       allow(http).to receive_messages(use_ssl?: true, request: response)
+      allow(response).to receive(:body).and_return({ hashes: [] }.to_json)
     end
 
     it "enforces TLS peer verification for HTTPS requests" do
       described_class.send(:http_get, URI("https://example.com/manifest"))
 
       expect(http).to have_received(:verify_mode=).with(OpenSSL::SSL::VERIFY_PEER)
+    end
+
+    it "uses a discovery read timeout that fits inside the cache stager budget" do
+      described_class.previous_bundle_hashes
+
+      expect(http)
+        .to have_received(:read_timeout=)
+        .with(described_class::MANIFEST_READ_TIMEOUT_SECONDS)
     end
   end
 
