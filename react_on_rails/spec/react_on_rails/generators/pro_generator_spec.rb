@@ -1720,6 +1720,26 @@ describe ProGenerator, type: :generator do
     end
   end
 
+  context "when creating the Node Renderer migration hint for a legacy renderer" do
+    let(:generator) { described_class.new }
+
+    before do
+      prepare_destination
+      allow(generator).to receive(:destination_root).and_return(destination_root)
+      allow(generator).to receive(:say)
+      simulate_existing_file("client/node-renderer.js", "// customized legacy renderer\n")
+      allow(ReactOnRails::NodeRendererProcfile).to receive(:command_for)
+        .with("Procfile.dev")
+        .and_return("node-renderer: CUSTOM_SHARED_COMMAND")
+    end
+
+    it "uses the shared default Procfile command" do
+      generator.send(:create_node_renderer)
+
+      expect(generator).to have_received(:say).with("      node-renderer: CUSTOM_SHARED_COMMAND", :yellow)
+    end
+  end
+
   context "when renderer/node-renderer.js already exists but Procfile.dev lacks node-renderer entry" do
     let(:existing_renderer_content) { "// existing renderer\n" }
 

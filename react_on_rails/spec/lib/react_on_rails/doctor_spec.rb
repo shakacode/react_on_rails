@@ -1785,6 +1785,20 @@ RSpec.describe ReactOnRails::Doctor do
       expect(warning_messages).to include(a_string_including("Node Renderer on RENDERER_PORT"))
     end
 
+    it "warns when a common Rack server command starts without the Node Renderer" do
+      allow(doctor).to receive(:resolved_pro_server_renderer).and_return("NodeRenderer")
+      write_project_file("bin/dev", "ReactOnRails::Dev::ServerManager\n")
+      write_project_file("Procfile.dev", <<~PROCFILE)
+        web: bundle exec puma -C config/puma.rb
+      PROCFILE
+
+      doctor.send(:check_bin_dev_launcher)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("Procfile.dev"))
+      expect(warning_messages).to include(a_string_including("Node Renderer on RENDERER_PORT"))
+    end
+
     it "accepts complete NodeRenderer Procfiles for all bin/dev modes" do
       allow(doctor).to receive(:resolved_pro_server_renderer).and_return("NodeRenderer")
       write_project_file("bin/dev", "ReactOnRails::Dev::ServerManager\n")
@@ -1799,6 +1813,28 @@ RSpec.describe ReactOnRails::Doctor do
       write_project_file("Procfile.dev-prod-assets", <<~PROCFILE)
         rails: bundle exec rails s -p ${PORT:-3001}
         node-renderer: RENDERER_PORT=${RENDERER_PORT:-3800} pnpm run node-renderer
+      PROCFILE
+
+      doctor.send(:check_bin_dev_launcher)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).not_to include(a_string_including("Node Renderer on RENDERER_PORT"))
+    end
+
+    it "accepts npm and yarn NodeRenderer package scripts" do
+      allow(doctor).to receive(:resolved_pro_server_renderer).and_return("NodeRenderer")
+      write_project_file("bin/dev", "ReactOnRails::Dev::ServerManager\n")
+      write_project_file("Procfile.dev", <<~PROCFILE)
+        rails: bundle exec rails s -p ${PORT:-3000}
+        node-renderer: RENDERER_PORT=${RENDERER_PORT:-3800} npm run node-renderer
+      PROCFILE
+      write_project_file("Procfile.dev-static-assets", <<~PROCFILE)
+        web: bin/rails server -p ${PORT:-3000}
+        node-renderer: RENDERER_PORT=${RENDERER_PORT:-3800} yarn node-renderer
+      PROCFILE
+      write_project_file("Procfile.dev-prod-assets", <<~PROCFILE)
+        rails: bundle exec rails s -p ${PORT:-3001}
+        node-renderer: RENDERER_PORT=${RENDERER_PORT:-3800} yarn run node-renderer
       PROCFILE
 
       doctor.send(:check_bin_dev_launcher)

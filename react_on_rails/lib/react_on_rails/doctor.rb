@@ -61,7 +61,7 @@ module ReactOnRails
     SERVER_BUNDLE_SOURCE_EXTENSIONS = %w[.js .jsx .ts .tsx .mjs .cjs].freeze
     CUSTOM_LAUNCHER_INDICATOR_FILES = %w[dev].freeze
     RENDERER_PROCESS_WITH_PORT_REGEX = NodeRendererProcfile::PROCESS_WITH_RENDERER_PORT_REGEX
-    RAILS_SERVER_COMMAND_REGEX = %r{\b(?:bin/)?rails\s+(?:server|s)\b}
+    RAILS_SERVER_COMMAND_REGEX = %r{\b(?:(?:bin/)?rails\s+(?:server|s)|puma|unicorn|rackup|passenger\s+start)\b}
 
     # Deprecated-renderer-cache scan (used by check_deprecated_renderer_cache_task):
     # look for references to the old pre_stage_bundle_for_node_renderer task in
@@ -1516,6 +1516,7 @@ module ReactOnRails
     end
 
     def check_launcher_procfiles
+      # Keep these launcher filenames aligned with NodeRendererProcfile::DEFAULT_COMMANDS.
       procfiles = {
         "Procfile.dev" => "HMR development (bin/dev default)",
         "Procfile.dev-static-assets" => "Static development (bin/dev static)",

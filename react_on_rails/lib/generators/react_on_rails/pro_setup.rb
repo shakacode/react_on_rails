@@ -227,7 +227,7 @@ module ReactOnRails
       # client/node-renderer.js already exists.
       #
       # @return [Boolean] true when a legacy client/node-renderer.js was detected
-      #   (caller should skip add_pro_to_procfile to avoid pointing Procfile.dev
+      #   (caller should skip add_pro_to_procfiles to avoid pointing Procfile.dev
       #   at a file that wasn't created); false otherwise.
       def create_node_renderer
         node_renderer_path = "renderer/node-renderer.js"
@@ -242,8 +242,7 @@ module ReactOnRails
           say "ℹ️  #{legacy_node_renderer_path} detected, keeping existing renderer; " \
               "to migrate, move it to #{node_renderer_path} and update any references " \
               "(e.g. Procfile.dev, Procfile.prod, Docker CMD / command):", :yellow
-          say "      node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=${RENDERER_PORT:-3800} " \
-              "node #{node_renderer_path}", :yellow
+          say "      #{node_renderer_procfile_command('Procfile.dev')}", :yellow
           warn_on_stale_legacy_procfile_entry
           return true
         end
@@ -259,7 +258,7 @@ module ReactOnRails
         false
       end
 
-      # When a legacy client/node-renderer.js is detected, add_pro_to_procfile is
+      # When a legacy client/node-renderer.js is detected, add_pro_to_procfiles is
       # skipped, so surface a pointed warning if Procfile.dev still launches the
       # legacy entry. This nudges the user to update the exact line they need to
       # touch rather than leaving them to diff the generic migration hint against
@@ -274,8 +273,12 @@ module ReactOnRails
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Procfile.dev still launches the legacy client/node-renderer.js.
           After migrating the renderer file, update that line to:
-            node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=${RENDERER_PORT:-3800} node renderer/node-renderer.js
+            #{node_renderer_procfile_command('Procfile.dev')}
         MSG
+      end
+
+      def node_renderer_procfile_command(procfile)
+        ReactOnRails::NodeRendererProcfile.command_for(procfile)
       end
 
       def add_pro_to_procfile
