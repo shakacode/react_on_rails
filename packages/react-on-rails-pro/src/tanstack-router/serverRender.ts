@@ -10,13 +10,11 @@ import type {
 import type { RailsContext } from 'react-on-rails/types';
 import { normalizeSearch } from './utils.ts';
 
-function ServerSuspenseFallback(): null {
-  console.warn(
-    'react-on-rails-pro/tanstack-router: RouterProvider suspended during server render after router.load(); ' +
-      'renderToString emitted the Suspense fallback. Check route loaders and TanStack Router upgrades.',
+function ServerSuspenseFallback(): never {
+  throw new Error(
+    'react-on-rails-pro/tanstack-router: RouterProvider suspended during server render after router.load(). ' +
+      'Check route loaders and TanStack Router upgrades.',
   );
-
-  return null;
 }
 
 /**

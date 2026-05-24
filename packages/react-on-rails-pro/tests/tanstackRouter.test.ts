@@ -2191,40 +2191,31 @@ describe('tanstack-router integration (Pro)', () => {
     expect(html).toBe('<div data-testid="provider"></div>');
   });
 
-  it('warns if RouterProvider suspends during server render', async () => {
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  it('throws if RouterProvider suspends during server render', async () => {
     const router = buildRouter();
 
-    try {
-      const result = await serverRenderTanStackAppAsync(
-        { createRouter: () => router },
-        { initial: 'prop' },
-        {
-          serverSide: true,
+    const result = await serverRenderTanStackAppAsync(
+      { createRouter: () => router },
+      { initial: 'prop' },
+      {
+        serverSide: true,
+        pathname: '/products',
+        search: '',
+      } as unknown as RailsContext & { serverSide: true },
+      (_props: { router: TanStackRouter }) => {
+        throw Promise.resolve();
+      },
+      jest.fn().mockReturnValue({
+        location: {
           pathname: '/products',
           search: '',
-        } as unknown as RailsContext & { serverSide: true },
-        (_props: { router: TanStackRouter }) => {
-          throw Promise.resolve();
+          hash: '',
+          href: '/products',
+          state: null,
         },
-        jest.fn().mockReturnValue({
-          location: {
-            pathname: '/products',
-            search: '',
-            hash: '',
-            href: '/products',
-            state: null,
-          },
-        }),
-      );
+      }),
+    );
 
-      renderToString(result.appElement);
-
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('RouterProvider suspended during server render after router.load()'),
-      );
-    } finally {
-      warnSpy.mockRestore();
-    }
+    expect(() => renderToString(result.appElement)).toThrow();
   });
 });
