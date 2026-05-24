@@ -16,6 +16,7 @@ module RendererHarness
         print_requests(io, summary[:requests])
         print_latency(io, summary[:latency_ms])
         print_memory(io, summary[:memory])
+        io.puts
         io.puts "Output: #{summary[:output_dir]}" if summary[:output_dir]
       end
 
@@ -51,6 +52,8 @@ module RendererHarness
 
         "#{format('%.1f', secs)}s"
       end
+
+      private_class_method :print_requests, :print_latency, :print_memory, :fmt, :format_secs
     end
   end
 end

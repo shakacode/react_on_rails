@@ -76,6 +76,27 @@ RSpec.describe "Reporters" do
         expect(rows.length).to eq(3) # header + 2 samples
       end
     end
+
+    it "write_memory does nothing for empty rows" do
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "memory.csv")
+        described_class.write_memory(path, [])
+        expect(File.exist?(path)).to be false
+      end
+    end
+
+    it "write_memory unions keys across rows" do
+      rows = [
+        { t_seconds: 0.0, rails_rss_kb: 100 },
+        { t_seconds: 1.0, rails_rss_kb: 110, renderer_rss_kb: 200 }
+      ]
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "memory.csv")
+        described_class.write_memory(path, rows)
+        header = CSV.read(path).first
+        expect(header).to include("renderer_rss_kb")
+      end
+    end
   end
 
   describe RendererHarness::Reporters::TerminalReporter do
@@ -87,6 +108,12 @@ RSpec.describe "Reporters" do
       expect(text).to include("httpx")
       expect(text).to include("RPS")
       expect(text).to include("p99")
+    end
+
+    it "tolerates missing :memory key" do
+      out = StringIO.new
+      payload = summary_payload.dup.tap { |p| p[:memory] = nil }
+      expect { described_class.print(out, payload) }.not_to raise_error
     end
   end
 end

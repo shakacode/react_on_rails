@@ -26,7 +26,7 @@ module RendererHarness
         FileUtils.mkdir_p(File.dirname(path))
         return if rows.empty?
 
-        headers = rows.first.keys.map(&:to_s)
+        headers = rows.flat_map(&:keys).uniq.map(&:to_s)
         CSV.open(path, "w") do |csv|
           csv << headers
           rows.each { |row| csv << headers.map { |h| row[h.to_sym] } }
