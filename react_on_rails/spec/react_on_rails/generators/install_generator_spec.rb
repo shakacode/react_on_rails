@@ -2097,6 +2097,10 @@ describe InstallGenerator, type: :generator do
       "Renovate directive in install_generator.rb must match allowedVersions=<#{next_pnpm_major} " \
       "(derived from repo pnpm major). Update the # renovate: comment line when bumping " \
       "CI_PNPM_FALLBACK_VERSION."
+    fallback_guide_heading = "Updating the pnpm Fallback Version for Scaffolded CI"
+    contributing_guide = File.read(
+      File.expand_path("../../../../CONTRIBUTING.md", __dir__)
+    )
     generator_source = File.read(
       File.expand_path("../../../lib/generators/react_on_rails/install_generator.rb", __dir__)
     )
@@ -2112,8 +2116,9 @@ describe InstallGenerator, type: :generator do
       "renovate: datasource=github-releases depName=pnpm/pnpm"
     )
     expect(generator_source).to include(
-      %(CONTRIBUTING.md > "Updating the pnpm Fallback Version for Scaffolded CI")
+      %(CONTRIBUTING.md > "#{fallback_guide_heading}")
     )
+    expect(contributing_guide).to include("## #{fallback_guide_heading}")
   end
 
   context "when env selects pnpm but packageManager declares yarn" do
