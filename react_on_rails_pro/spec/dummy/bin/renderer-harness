@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+exec bundle exec bin/rails runner ../scripts/load/renderer_harness.rb "$@"
