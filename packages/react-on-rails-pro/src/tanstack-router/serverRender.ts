@@ -10,6 +10,15 @@ import type {
 import type { RailsContext } from 'react-on-rails/types';
 import { normalizeSearch } from './utils.ts';
 
+function ServerSuspenseFallback(): null {
+  console.warn(
+    'react-on-rails-pro/tanstack-router: RouterProvider suspended during server render after router.load(); ' +
+      'renderToString emitted the Suspense fallback. Check route loaders and TanStack Router upgrades.',
+  );
+
+  return null;
+}
+
 /**
  * Builds a React element tree with RouterProvider and optional AppWrapper.
  */
@@ -21,7 +30,7 @@ function buildAppElement(
 ): ReactElement {
   let app: ReactElement = createElement(
     Suspense,
-    { fallback: null },
+    { fallback: createElement(ServerSuspenseFallback) },
     createElement(RouterProvider, { router }),
   );
   if (AppWrapper) {

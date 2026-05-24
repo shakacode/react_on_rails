@@ -416,6 +416,13 @@ describe('tanstack-router integration (Pro)', () => {
     }
 
     try {
+      // This narrow provider intentionally reads the first-render router state.
+      // The stores-path tests below cover TanStack store atoms separately; this
+      // hydration test verifies that SSR-injected state is present before the
+      // first client render, which is the hydration contract this adapter owns.
+      // Using ActualRouterProvider here exercises TanStack's subscription layer
+      // instead and can fail in this package test environment due to nested React.
+      const serverRouter = buildActualTanStackRouter();
       const RouterStateProvider = ({ router }: { router: TanStackRouter }) => {
         const productsMatch = router.state.matches.find((match) => {
           const loaderData = (match as { loaderData?: { products?: unknown } }).loaderData;
@@ -425,7 +432,6 @@ describe('tanstack-router integration (Pro)', () => {
 
         return React.createElement('main', null, `Products: ${products.join(', ')}`);
       };
-      const serverRouter = buildActualTanStackRouter();
       const serverResult = await serverRenderTanStackAppAsync(
         { createRouter: () => serverRouter },
         {},
@@ -736,24 +742,30 @@ describe('tanstack-router integration (Pro)', () => {
   });
 
   it('injects SSR match data through router.stores when router.__store is unavailable', () => {
-    const { router, storeState, renderFn, props } = buildStoresHydrationHarness();
-    const result = renderFn(props, {
-      serverSide: false,
-      pathname: '/products',
-      search: '',
-    } as unknown as RailsContext);
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { router, storeState, renderFn, props } = buildStoresHydrationHarness();
+      const result = renderFn(props, {
+        serverSide: false,
+        pathname: '/products',
+        search: '',
+      } as unknown as RailsContext);
 
-    renderToString(React.createElement(result as React.ComponentType<Record<string, unknown>>, props));
+      renderToString(React.createElement(result as React.ComponentType<Record<string, unknown>>, props));
 
-    expect(storeState.status.get()).toBe('idle');
-    expect(storeState.resolvedLocation.get()).toBe(router.state.location);
-    expect(storeState.matches.get()).toEqual([
-      expect.objectContaining({
-        id: '/products',
-        loaderData: { products: ['hammer'] },
-        status: 'success',
-      }),
-    ]);
+      expect(storeState.status.get()).toBe('idle');
+      expect(storeState.resolvedLocation.get()).toBe(router.state.location);
+      expect(storeState.matches.get()).toEqual([
+        expect.objectContaining({
+          id: '/products',
+          loaderData: { products: ['hammer'] },
+          status: 'success',
+        }),
+      ]);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('router.batch is unavailable'));
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
   it('batches router.stores hydration when router.batch is available', () => {
@@ -2177,5 +2189,42 @@ describe('tanstack-router integration (Pro)', () => {
     // assertion catches any wrapping Suspense boundary.
     const html = renderToString(React.createElement(Client, props));
     expect(html).toBe('<div data-testid="provider"></div>');
+  });
+
+  it('warns if RouterProvider suspends during server render', async () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const router = buildRouter();
+
+    try {
+      const result = await serverRenderTanStackAppAsync(
+        { createRouter: () => router },
+        { initial: 'prop' },
+        {
+          serverSide: true,
+          pathname: '/products',
+          search: '',
+        } as unknown as RailsContext & { serverSide: true },
+        (_props: { router: TanStackRouter }) => {
+          throw Promise.resolve();
+        },
+        jest.fn().mockReturnValue({
+          location: {
+            pathname: '/products',
+            search: '',
+            hash: '',
+            href: '/products',
+            state: null,
+          },
+        }),
+      );
+
+      renderToString(result.appElement);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('RouterProvider suspended during server render after router.load()'),
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 });

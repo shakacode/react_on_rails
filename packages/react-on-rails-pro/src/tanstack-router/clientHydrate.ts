@@ -155,6 +155,13 @@ function applyHydrationMatches(router: TanStackRouter, matches: unknown[]): void
       // RouterProvider subscribes, so hydration still starts from the final state.
       // NOTE: correctness here depends on RouterProvider not subscribing to stores
       // during synchronous render. Re-validate this path on TanStack Router major upgrades.
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(
+          'react-on-rails-pro/tanstack-router: router.batch is unavailable; stores hydration writes ' +
+            'are not atomic. Upgrade @tanstack/react-router to a version that exposes router.batch ' +
+            'for safer hydration.',
+        );
+      }
       applyStoresUpdate();
     }
     return;
