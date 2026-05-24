@@ -122,6 +122,8 @@ module ReactOnRails
 
           return :hmr if hmr == true
           return :live_reload if live_reload == true
+          # Shakapacker defaults live_reload to the inverse of hmr when omitted.
+          return :live_reload if hmr == false && live_reload.nil?
           return :development_server if hmr == false || live_reload == false
 
           nil

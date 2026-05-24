@@ -22,14 +22,14 @@ RSpec.describe ReactOnRails::Dev::ServerMode do
       expect(described_class.detect("config/missing.yml")).to eq(:hmr)
     end
 
-    it "treats hmr false without live reload as generic development server mode" do
+    it "uses Shakapacker's live reload default when hmr is false and live_reload is omitted" do
       write_shakapacker_config(<<~YAML)
         development:
           dev_server:
             hmr: false
       YAML
 
-      expect(described_class.detect("config/shakapacker.yml")).to eq(:development_server)
+      expect(described_class.detect("config/shakapacker.yml")).to eq(:live_reload)
     end
 
     it "treats live_reload false without HMR as generic development server mode" do
