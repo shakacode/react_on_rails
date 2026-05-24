@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Added
+
+- **`react-on-rails/webpackHelpers` subpath export with `reactDomClientWarning`**: New webpack helper export so React 16/17 consumers can suppress the harmless `Module not found: Can't resolve 'react-dom/client'` warning with a one-liner instead of remembering a regex. The require inside `reactApis` is guarded by a runtime React-version check, so this warning never reflects a real failure, but webpack still emits it at build time because the static `require('react-dom/client')` cannot be tree-shaken without breaking React 18+. Pass `reactDomClientWarning` to `ignoreWarnings` (Webpack 5 / Shakapacker) or `stats.warningsFilter` (Webpack 4 / Webpacker 5). Fixes [Issue 3137](https://github.com/shakacode/react_on_rails/issues/3137).
+
 #### Fixed
 
 - **[Pro]** **Preserve ruby-jwt 2.x compatibility in 16.7**: Relaxes the `16.7.0.rc.0` `jwt >= 3.2.0` floor to `jwt >= 2.7`, keeping compatibility with apps that still resolve jwt 2.x while continuing to allow patched jwt 3.2.0+ releases. [PR 3344](https://github.com/shakacode/react_on_rails/pull/3344) by [ihabadham](https://github.com/ihabadham).
