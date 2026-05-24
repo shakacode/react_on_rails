@@ -474,14 +474,14 @@ That fallback comes from `CI_PNPM_FALLBACK_VERSION` in [`react_on_rails/lib/gene
 **When to bump:**
 
 - Whenever Renovate updates the repo's own root `package.json` `packageManager` pin to a newer pnpm version. The spec `keeps the fallback pin tied to a version-specific pnpm release note` (in `react_on_rails/spec/react_on_rails/generators/install_generator_spec.rb`) fails when `CI_PNPM_FALLBACK_VERSION` drifts from the `packageManager` version in `package.json`; treat that failure as the signal to update the fallback version and release-note URL in the same PR.
-- Periodically review pnpm release PRs from Renovate, at minimum on every pnpm **major** release and ideally on each minor as well. A new major may change the lockfile format, in which case projects scaffolded without `packageManager` will fail with the older pinned pnpm.
+- Review pnpm release PRs from Renovate, at minimum on every pnpm **major** release and ideally on each minor as well. A new major may change the lockfile format, in which case projects scaffolded without `packageManager` will fail with the older pinned pnpm. Renovate may open separate PRs for `package.json` and `CI_PNPM_FALLBACK_VERSION`; merge the constant-bump PR first or batch both updates into one PR to keep CI green.
 
 **What to update together (single commit):**
 
 1. The `CI_PNPM_FALLBACK_VERSION` constant value in `install_generator.rb`
 2. The `https://github.com/pnpm/pnpm/releases/tag/v<version>` URL in the comment above the constant
-3. The root `package.json` `packageManager` field when bumping manually; for Renovate PRs, verify the existing `packageManager` bump matches the fallback version
-4. Re-run `pnpm install` so `pnpm-lock.yaml` matches
+3. The root `package.json` `packageManager` field when bumping manually; for Renovate PRs, verify the existing `packageManager` bump matches the fallback version. The spec catches drift between these values.
+4. Re-run `pnpm install` in the repo root so the root `pnpm-lock.yaml` matches
 
 **Verification:**
 

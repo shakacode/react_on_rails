@@ -141,7 +141,7 @@ module ReactOnRails
       # used for this fallback at https://github.com/pnpm/pnpm/releases/tag/v9.14.2;
       # update this URL with the constant when bumping. Users who need exact
       # reproducibility should commit `packageManager` to their package.json instead.
-      # Bump checklist (exact text is spec-asserted; keep in sync):
+      # Bump checklist: heading text below is spec-asserted.
       # CONTRIBUTING.md > "Updating the pnpm Fallback Version for Scaffolded CI".
       # renovate: datasource=github-releases depName=pnpm/pnpm extractVersion=^v(?<version>.+)$ allowedVersions=<10
       CI_PNPM_FALLBACK_VERSION = "9.14.2"
