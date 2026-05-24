@@ -309,7 +309,7 @@ module ReactOnRailsPro
     def execute_request(method, path, request_body, yielder, status_assigner)
       headers, body = request_body
 
-      run_in_async do
+      Sync do
         with_client do |client|
           raw_response = if method == :post
                            client.post(path, headers: Protocol::HTTP::Headers[headers], body: body)
@@ -325,14 +325,6 @@ module ReactOnRailsPro
       raise TimeoutError, e.message
     rescue *CONNECTION_ERRORS => e
       raise ConnectionError, e.message
-    end
-
-    def run_in_async(&block)
-      if Async::Task.current?
-        yield
-      else
-        Sync(&block)
-      end
     end
 
     def with_client(&block)
