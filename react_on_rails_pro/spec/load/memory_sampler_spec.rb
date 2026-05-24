@@ -52,5 +52,31 @@ RSpec.describe RendererHarness::MemorySampler do
       row = sampler.sample_once
       expect(row[:renderer_rss_kb]).to eq(4000)
     end
+
+    it "skips renderer when its pid is nil" do
+      sampler = described_class.new(pids: { rails: 1234, renderer: nil })
+      allow(sampler).to receive(:run_ps).with(1234).and_return("100\n")
+      row = sampler.sample_once
+      expect(row).to have_key(:rails_rss_kb)
+      expect(row).not_to have_key(:renderer_rss_kb)
+    end
+  end
+
+  describe "background thread" do
+    it "accumulates rows and stops cleanly" do
+      sampler = described_class.new(pids: { rails: Process.pid })
+      sampler.start_background(interval_seconds: 0.01)
+      sleep(0.05)
+      sampler.stop_background
+      expect(sampler.rows.size).to be >= 1
+      expect(sampler.rows.first).to have_key(:t_seconds)
+    end
+
+    it "raises if start_background is called twice" do
+      sampler = described_class.new(pids: { rails: Process.pid })
+      sampler.start_background(interval_seconds: 0.05)
+      expect { sampler.start_background(interval_seconds: 0.05) }.to raise_error(/already running/)
+      sampler.stop_background
+    end
   end
 end

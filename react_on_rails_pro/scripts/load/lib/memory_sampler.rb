@@ -4,6 +4,9 @@ require "open3"
 
 module RendererHarness
   class MemorySampler
+    # NOTE: File-descriptor count sampling is deferred to a follow-up.
+    # The design spec lists it as "best-effort"; the foundation PR ships RSS + GC.stat only.
+
     GC_KEYS = %i[
       heap_live_slots
       total_allocated_objects
@@ -11,20 +14,32 @@ module RendererHarness
       oldmalloc_increase_bytes
     ].freeze
 
-    attr_reader :pids, :rows
+    attr_reader :pids
 
     def initialize(pids:, start_time: Time.now)
-      @pids = pids
+      @pids = pids.freeze
       @start_time = start_time
       @rows = []
+      @rows_mutex = Mutex.new
       @thread = nil
       @stop = false
     end
 
+    def rows
+      @rows_mutex.synchronize { @rows.dup }
+    end
+
     def start_background(interval_seconds:)
+      raise "MemorySampler already running" if @thread&.alive?
+
+      @stop = false
       @thread = Thread.new do
         until @stop
-          @rows << sample_once
+          begin
+            @rows_mutex.synchronize { @rows << sample_once }
+          rescue StandardError => e
+            warn "MemorySampler: sample_once raised #{e.class}: #{e.message}"
+          end
           sleep(interval_seconds)
         end
       end
