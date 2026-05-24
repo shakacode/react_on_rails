@@ -55,7 +55,8 @@ module ReactOnRails
         program = parse_result.value
         base_calls = []
         pro_calls = []
-        collect_gem_calls(program, base_calls, pro_calls)
+        parent_map = {}
+        collect_gem_calls(program, base_calls, pro_calls, parent_map)
 
         if base_calls.empty?
           return Result.new(
@@ -70,7 +71,7 @@ module ReactOnRails
         preexisting_empty_ranges = has_active_pro ? empty_conditional_ranges(program) : []
         edits = base_calls.map do |call|
           if has_active_pro
-            removal_edit(source, call)
+            removal_edit(source, call, parent_map)
           else
             replacement_edit(source, call)
           end
@@ -96,7 +97,7 @@ module ReactOnRails
 
       attr_reader :default_pro_version
 
-      def collect_gem_calls(node, base_calls, pro_calls)
+      def collect_gem_calls(node, base_calls, pro_calls, parent_map)
         return unless node
 
         if gem_call?(node)
@@ -108,7 +109,8 @@ module ReactOnRails
         end
 
         node.compact_child_nodes.each do |child|
-          collect_gem_calls(child, base_calls, pro_calls)
+          parent_map[child] = node
+          collect_gem_calls(child, base_calls, pro_calls, parent_map)
         end
       end
 
@@ -146,17 +148,23 @@ module ReactOnRails
       end
 
       def has_user_version_pin?(call)
-        positional_args = call.arguments.arguments.drop(1).reject { |a| a.is_a?(Prism::KeywordHashNode) }
+        positional_args = call.arguments.arguments.drop(1).reject { |a| option_hash?(a) }
         positional_args.any? || source_option_present?(call)
       end
 
       def source_option_present?(call)
-        keyword_hashes = call.arguments.arguments.select { |a| a.is_a?(Prism::KeywordHashNode) }
-        keyword_hashes.any? do |keyword_hash|
-          keyword_hash.elements.any? do |element|
-            element.key.is_a?(Prism::SymbolNode) && SOURCE_OPTION_KEYS.include?(element.key.unescaped)
+        option_hashes = call.arguments.arguments.select { |a| option_hash?(a) }
+        option_hashes.any? do |option_hash|
+          option_hash.elements.any? do |element|
+            element.respond_to?(:key) &&
+              element.key.is_a?(Prism::SymbolNode) &&
+              SOURCE_OPTION_KEYS.include?(element.key.unescaped)
           end
         end
+      end
+
+      def option_hash?(node)
+        node.is_a?(Prism::KeywordHashNode) || node.is_a?(Prism::HashNode)
       end
 
       def quote_char(source, string_node)
@@ -166,12 +174,36 @@ module ReactOnRails
         '"'
       end
 
-      def removal_edit(source, call)
+      def removal_edit(source, call, parent_map)
         # Remove only this gem statement. If it is the only statement on a line,
         # remove the whole line; if it shares a line via semicolons, preserve the
         # neighboring statements.
-        start_offset, end_offset = statement_byte_range(source, call)
+        node = removable_statement_node(call, parent_map)
+        start_offset, end_offset = statement_byte_range(source, node)
         { start_offset: start_offset, end_offset: end_offset, replacement: "" }
+      end
+
+      def removable_statement_node(call, parent_map)
+        statements = parent_map[call]
+        return call unless statements.is_a?(Prism::StatementsNode)
+        return call unless statements.body.one?
+
+        parent = parent_map[statements]
+        return call unless parent.is_a?(Prism::IfNode) || parent.is_a?(Prism::UnlessNode)
+        return call if parent.end_keyword_loc
+
+        keyword_loc = conditional_keyword_loc(parent)
+        return call unless keyword_loc && keyword_loc.start_offset > call.location.end_offset
+
+        parent
+      end
+
+      def conditional_keyword_loc(node)
+        if node.is_a?(Prism::IfNode)
+          node.if_keyword_loc
+        elsif node.is_a?(Prism::UnlessNode)
+          node.keyword_loc
+        end
       end
 
       def statement_byte_range(source, node)

@@ -105,6 +105,18 @@ RSpec.describe ReactOnRails::Spike::PrismGemfileRewriter do
         expect(result.content).to include('gem "react_on_rails_pro", path: "../react_on_rails"')
       end
 
+      it "inserts the default version before explicit hash options" do
+        src = "gem \"react_on_rails\", { require: false }\n"
+        result = rewriter.rewrite(src)
+        expect(result.content).to eq("gem \"react_on_rails_pro\", \"#{default_pro_version}\", { require: false }\n")
+      end
+
+      it "preserves source explicit hash options without inserting a default version" do
+        src = "gem \"react_on_rails\", { path: \"../react_on_rails\", require: false }\n"
+        result = rewriter.rewrite(src)
+        expect(result.content).to eq("gem \"react_on_rails_pro\", { path: \"../react_on_rails\", require: false }\n")
+      end
+
       it "treats a non-string positional argument as a user version requirement" do
         src = "gem \"react_on_rails\", REACT_ON_RAILS_VERSION\n"
         result = rewriter.rewrite(src)
@@ -336,6 +348,15 @@ RSpec.describe ReactOnRails::Spike::PrismGemfileRewriter do
 
       it "ignores semicolons in percent-string postfix guards when removing a stale base declaration" do
         src = 'gem "react_on_rails" if ENV[%q[ROR;ENABLED]]; gem "react_on_rails_pro", "~> 16.0"' \
+              "\n"
+        result = rewriter.rewrite(src)
+        expect(result.content).to eq("gem \"react_on_rails_pro\", \"~> 16.0\"\n")
+        expect_parseable_ruby(result.content)
+      end
+
+      it "ignores semicolons in regex postfix guards when removing a stale base declaration" do
+        src = 'gem "react_on_rails" if /ROR;ENABLED/.match?(ENV["FLAGS"]); ' \
+              'gem "react_on_rails_pro", "~> 16.0"' \
               "\n"
         result = rewriter.rewrite(src)
         expect(result.content).to eq("gem \"react_on_rails_pro\", \"~> 16.0\"\n")
