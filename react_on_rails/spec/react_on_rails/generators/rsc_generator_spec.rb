@@ -1147,6 +1147,29 @@ describe RscGenerator, type: :generator do
         .to be(true)
     end
 
+    it "detects named imports with defaults and self aliases" do
+      default_without_space = "const { config=fallbackConfig } = require('shakapacker');"
+      self_aliased_config = "const { config: config } = require('shakapacker');"
+      self_aliased_resolve = "const { resolve: resolve } = require('path');"
+
+      expect(generator.send(:commonjs_named_imported?, default_without_space, "shakapacker", "config"))
+        .to be(true)
+      expect(generator.send(:commonjs_named_imported?, self_aliased_config, "shakapacker", "config"))
+        .to be(true)
+      expect(generator.send(:commonjs_named_imported?, self_aliased_resolve, "path", "resolve"))
+        .to be(true)
+    end
+
+    it "does not treat renamed aliases as the exact binding used by rscClientReferences" do
+      aliased_config = "const { config: shakapackerConfig } = require('shakapacker');"
+      aliased_resolve = "const { resolve: pathResolve } = require('path');"
+
+      expect(generator.send(:commonjs_named_imported?, aliased_config, "shakapacker", "config"))
+        .to be(false)
+      expect(generator.send(:commonjs_named_imported?, aliased_resolve, "path", "resolve"))
+        .to be(false)
+    end
+
     it "detects legacy let or var dot-access shakapacker config imports" do
       expect(generator.send(:shakapacker_config_imported?, "let config = require('shakapacker').config;"))
         .to be(true)
@@ -1199,6 +1222,22 @@ describe RscGenerator, type: :generator do
 
       expect(generator.send(:path_resolve_imported?, function_scoped)).to be(false)
       expect(generator.send(:path_resolve_imported?, dot_access_scoped)).to be(false)
+    end
+
+    it "detects top-level destructuring that creates config or resolve bindings" do
+      config_content = "const { config } = require('custom-package');"
+      resolve_content = "const { resolve: resolve } = require('custom-paths');"
+
+      expect(generator.send(:top_level_config_binding?, config_content)).to be(true)
+      expect(generator.send(:top_level_resolve_binding?, resolve_content)).to be(true)
+    end
+
+    it "ignores top-level destructuring that renames config or resolve bindings" do
+      config_content = "const { config: customConfig } = require('custom-package');"
+      resolve_content = "const { resolve: customResolve } = require('custom-paths');"
+
+      expect(generator.send(:top_level_config_binding?, config_content)).to be(false)
+      expect(generator.send(:top_level_resolve_binding?, resolve_content)).to be(false)
     end
 
     it "preserves URL-like substrings inside string options when stripping comments" do
@@ -1483,6 +1522,38 @@ describe RscGenerator, type: :generator do
 
       migrated_content = File.read(File.join(destination_root, config_path))
       expect(migrated_content).to include("const config = { source_path: 'app/javascript' };")
+      expect(migrated_content).not_to include("const { config } = require('shakapacker');")
+      expect(migrated_content).not_to include("clientReferences: rscClientReferences")
+      expect(migrated_content).not_to include("const rscClientReferences")
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("a top-level `config` binding already exists that would conflict")
+    end
+
+    it "blocks setup when a destructured top-level config binding would conflict with the injected import" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const { config } = require('custom-webpack-config');
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      content = File.read(File.join(destination_root, config_path))
+      generator.send(:update_existing_rsc_webpack_config, config_path, content, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).to include("const { config } = require('custom-webpack-config');")
       expect(migrated_content).not_to include("const { config } = require('shakapacker');")
       expect(migrated_content).not_to include("clientReferences: rscClientReferences")
       expect(migrated_content).not_to include("const rscClientReferences")
@@ -1843,6 +1914,44 @@ describe RscGenerator, type: :generator do
         expect(content.scan("const { config } = require('shakapacker');").length).to eq(1)
         expect(content.scan("const { resolve } = require('path');").length).to eq(1)
         expect(content).to include("const { config: shakapackerConfig } = require('shakapacker');")
+        expect(content).to include("directory: resolve(config.source_path)")
+        expect(content).to include("isServer: false")
+      end
+    end
+  end
+
+  context "when the client webpack config uses self-aliased imports" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const { config: config } = require('shakapacker');
+          const { resolve: resolve } = require('path');
+          #{base_client_webpack_content}
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "reuses the self-aliased imports without adding duplicate bindings" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content).to include("const { config: config } = require('shakapacker');")
+        expect(content).to include("const { resolve: resolve } = require('path');")
+        expect(content).not_to include("const { config } = require('shakapacker');")
+        expect(content).not_to include("const { resolve } = require('path');")
         expect(content).to include("directory: resolve(config.source_path)")
         expect(content).to include("isServer: false")
       end

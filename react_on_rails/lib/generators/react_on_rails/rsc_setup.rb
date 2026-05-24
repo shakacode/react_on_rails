@@ -1361,19 +1361,11 @@ module ReactOnRails
       end
 
       def top_level_resolve_binding?(content)
-        pattern = /^[ \t]*(?:(?:const|let|var)\s+resolve\b|function\s+resolve\s*\()/
-
-        content.to_enum(:scan, pattern).any? do
-          js_top_level_position?(content, Regexp.last_match.begin(0))
-        end
+        top_level_binding?(content, "resolve")
       end
 
       def top_level_config_binding?(content)
-        pattern = /^[ \t]*(?:(?:const|let|var)\s+config\b|function\s+config\s*\()/
-
-        content.to_enum(:scan, pattern).any? do
-          js_top_level_position?(content, Regexp.last_match.begin(0))
-        end
+        top_level_binding?(content, "config")
       end
 
       def rsc_client_references_setup_anchor_available?(config_path, content, is_server:)
@@ -1435,21 +1427,49 @@ module ReactOnRails
           # appears inside a function body (which does not produce a module-scope binding).
           next false unless js_top_level_position?(content, Regexp.last_match.begin(0))
 
-          bindings = captures.first
-
-          bindings.split(",").any? do |binding|
-            binding = binding.strip
-            # Aliases (`config: alias`) do not provide the exact binding that rscClientReferences uses.
-            # The `binding = fallback` form covers JavaScript destructuring defaults whose default
-            # value does not contain a comma — `{ config = fn(a, b) }` would split on the comma
-            # inside `fn(a, b)` and fall outside this matcher's supported surface, same as alias
-            # renames. Inline comments inside the destructuring list
-            # (`const { config /* primary */ } = require('shakapacker')`) are also unsupported:
-            # they leave their text in the captured binding so the exact `config` match fails.
-            # All of these shapes are vanishingly rare in real webpack configs.
-            binding == binding_name || binding.start_with?("#{binding_name} =")
-          end
+          destructuring_declares_binding?(captures.first, binding_name)
         end
+      end
+
+      def top_level_binding?(content, binding_name)
+        direct_binding = top_level_direct_binding?(content, binding_name)
+        destructured_binding = top_level_destructured_binding?(content, binding_name)
+
+        direct_binding || destructured_binding
+      end
+
+      def top_level_direct_binding?(content, binding_name)
+        binding_pattern = Regexp.escape(binding_name)
+        pattern = /^[ \t]*(?:(?:const|let|var)\s+#{binding_pattern}\b|function\s+#{binding_pattern}\s*\()/
+
+        content.to_enum(:scan, pattern).any? do
+          js_top_level_position?(content, Regexp.last_match.begin(0))
+        end
+      end
+
+      def top_level_destructured_binding?(content, binding_name)
+        pattern = /^[ \t]*(?:const|let|var)\s+\{([^}]*)\}/
+
+        content.to_enum(:scan, pattern).any? do |captures|
+          next false unless js_top_level_position?(content, Regexp.last_match.begin(0))
+
+          destructuring_declares_binding?(captures.first, binding_name)
+        end
+      end
+
+      def destructuring_declares_binding?(bindings, binding_name)
+        bindings.split(",").any? do |binding|
+          destructuring_binding_declares_name?(binding.strip, binding_name)
+        end
+      end
+
+      def destructuring_binding_declares_name?(binding, binding_name)
+        binding_pattern = Regexp.escape(binding_name)
+
+        # Aliases (`config: alias`) do not provide the exact binding that rscClientReferences uses.
+        # Self-aliases (`config: config`) and defaults (`config = fallback`, `config=fallback`) do.
+        binding.match?(/\A#{binding_pattern}(?:\z|\s*=)/) ||
+          binding.match?(/\A#{binding_pattern}\s*:\s*#{binding_pattern}(?:\z|\s*=)/)
       end
 
       def resolve_hello_server_layout_name
