@@ -553,17 +553,21 @@ module ReactOnRails
       def update_existing_rsc_webpack_config(config_path, content, is_server:)
         return unless rsc_plugin_sections_safe_to_rewrite?(config_path, content, is_server: is_server)
         return if rsc_plugin_uses_scoped_client_references?(content, is_server: is_server)
-
-        if rsc_plugin_references_scoped_client_references?(content, is_server: is_server)
-          ensure_rsc_client_references_setup(config_path, content, is_server: is_server)
-          return
-        end
-
-        return unless rewritable_rsc_plugin?(config_path, content, is_server: is_server)
-        return unless ensure_rsc_client_references_setup(config_path, content, is_server: is_server)
+        return unless rsc_client_references_rewrite_needed?(config_path, content, is_server: is_server)
 
         rewrite_rsc_plugin_client_references(config_path, is_server: is_server) ||
           warn_missing_rsc_plugin_target(config_path, is_server: is_server)
+      end
+
+      def rsc_client_references_rewrite_needed?(config_path, content, is_server:)
+        if rsc_plugin_references_any_scoped_client_references?(content, is_server: is_server)
+          return false unless ensure_rsc_client_references_setup(config_path, content, is_server: is_server)
+
+          return rsc_plugin_without_client_references?(content, is_server: is_server)
+        end
+
+        rewritable_rsc_plugin?(config_path, content, is_server: is_server) &&
+          ensure_rsc_client_references_setup(config_path, content, is_server: is_server)
       end
 
       # Detects RSCWebpackPlugin option blocks that the lightweight JS scanner could not parse
@@ -637,6 +641,12 @@ module ReactOnRails
         return false if sections.empty?
 
         sections.all? do |section|
+          rsc_plugin_body_has_top_level_scoped_client_references?(section.fetch(:body))
+        end
+      end
+
+      def rsc_plugin_references_any_scoped_client_references?(content, is_server:)
+        rsc_plugin_option_sections(content, is_server: is_server).any? do |section|
           rsc_plugin_body_has_top_level_scoped_client_references?(section.fetch(:body))
         end
       end

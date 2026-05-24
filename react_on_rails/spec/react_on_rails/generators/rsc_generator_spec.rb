@@ -1931,6 +1931,66 @@ describe RscGenerator, type: :generator do
     end
   end
 
+  context "when an existing client RSC webpack config mixes custom and scoped client references" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const { config } = require('shakapacker');
+          const { resolve } = require('path');
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const customClientReferences = { directory: './custom' };
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(
+              new RSCWebpackPlugin({
+                isServer: false,
+                clientReferences: customClientReferences,
+              }),
+              new RSCWebpackPlugin({
+                isServer: false,
+                clientReferences: rscClientReferences,
+              }),
+            );
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "injects the missing scoped helper without touching the custom clientReferences" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content).to include("const rscClientReferences = {")
+        expect(content).to include("directory: resolve(config.source_path)")
+        expect(content.scan("clientReferences: customClientReferences").length).to eq(1)
+        expect(content.scan("clientReferences: rscClientReferences").length).to eq(1)
+      end
+
+      expect(GeneratorMessages.messages.join("\n"))
+        .not_to include("all matching RSCWebpackPlugin instances already define clientReferences")
+    end
+  end
+
   context "when path is imported into an unusable resolve binding" do
     before(:all) do
       prepare_destination
