@@ -109,7 +109,7 @@ cd react_on_rails/spec/dummy && bundle exec rspec spec/path/to/spec.rb
 | `react_on_rails/spec/dummy/`                     | Full Rails app for integration testing and E2E                                           |
 | `packages/react-on-rails/src/`                   | TypeScript source — client-side React integration                                        |
 | `packages/react-on-rails/tests/`                 | Jest tests for the npm package                                                           |
-| `react_on_rails_pro/`                            | Pro package (separate gem + npm, own lint config)                                        |
+| `react_on_rails_pro/`                            | Pro package (separate gem + npm)                                                         |
 | `rakelib/`                                       | Rake task definitions                                                                    |
 | `docs/oss/`                                      | OSS documentation — published to the [ShakaCode website](https://reactonrails.com/docs/) |
 | `docs/pro/`                                      | Pro documentation — installation, configuration, RSC, node renderer, caching             |
