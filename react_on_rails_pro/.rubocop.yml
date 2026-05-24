@@ -19,14 +19,6 @@ AllCops:
 
 Naming/VariableNumber:
   AllowedIdentifiers:
-    - capture3
-    - iso8601
-    - rfc1123_date
-    - rfc822
-    - rfc2822
-    - rfc2822
-    - rfc3339
-    - x86_64
     - p99_9
 
 RSpec/FilePath:

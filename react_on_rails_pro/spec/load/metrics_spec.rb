@@ -58,12 +58,24 @@ RSpec.describe RendererHarness::Metrics do
   end
 
   describe ".summarize_latencies" do
-    it "returns a hash with p50/p95/p99/p99_9/max/mean/count" do
+    it "returns a hash with p50/p90/p95/p99/p99_9/max/mean/count/failures/ok_count" do
       results = (1..100).map { |i| RendererHarness::RequestResult.new(latency_ms: i.to_f, ok: true) }
       summary = described_class.summarize_latencies(results)
-      expect(summary).to include(:p50, :p95, :p99, :p99_9, :max, :mean, :count)
+      expect(summary).to include(:p50, :p90, :p95, :p99, :p99_9, :max, :mean, :count, :failures, :ok_count)
       expect(summary[:count]).to eq(100)
       expect(summary[:max]).to eq(100.0)
+    end
+
+    it "excludes failed requests from latency percentiles" do
+      results = [
+        RendererHarness::RequestResult.new(latency_ms: 10.0, ok: true),
+        RendererHarness::RequestResult.new(latency_ms: 9999.0, ok: false)
+      ]
+      summary = described_class.summarize_latencies(results)
+      expect(summary[:count]).to eq(2)
+      expect(summary[:failures]).to eq(1)
+      expect(summary[:ok_count]).to eq(1)
+      expect(summary[:max]).to eq(10.0)
     end
   end
 end
