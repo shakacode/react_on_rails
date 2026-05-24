@@ -326,7 +326,7 @@ module ReactOnRails
         # Only check for critical missing components, not optional suggestions
         content = File.read(filename)
         if filename == "Procfile.dev" && !content.include?("shakapacker-dev-server")
-          procfile_description = Dev::ServerMode.text(default_dev_server_mode, :procfile_description)
+          procfile_description = config[:description]
           checker.add_warning(
             "  ⚠️  Missing shakapacker-dev-server for #{procfile_description}"
           )
@@ -1958,7 +1958,7 @@ module ReactOnRails
     end
 
     def default_dev_server_mode
-      Dev::ServerMode.detect(shakapacker_config_path)
+      @default_dev_server_mode ||= Dev::ServerMode.detect(shakapacker_config_path)
     end
 
     def check_test_public_output_path_workflow(shakapacker_content, shakapacker_config = nil)

@@ -35,7 +35,7 @@ module ReactOnRails
           mode_heading: "🔁 Live reload development mode (default)",
           next_step_label: "live reload",
           workflow_suffix: "for live reload",
-          shared_output_warning: "Do not combine shared output path with bin/dev (development server)",
+          shared_output_warning: "Do not combine shared output path with bin/dev (live reload)",
           refresh_guidance: "HMR is disabled in config/shakapacker.yml; enable dev_server.hmr for React Refresh",
           refresh_note: "With live reload enabled, changes refresh the page instead of preserving component state",
           details: [
@@ -71,11 +71,14 @@ module ReactOnRails
         end
 
         def hmr_enabled?(config_path = shakapacker_config_path)
-          detect_from_config(config_path) == :hmr
+          detect(config_path) == :hmr
         end
 
         def text(mode, key)
-          MODE_TEXT.fetch(normalize_mode(mode)).fetch(key)
+          MODE_TEXT.fetch(normalize_mode(mode)).fetch(key) do
+            valid_keys = MODE_TEXT.fetch(:hmr).keys.join(", ")
+            raise ArgumentError, "Unknown ServerMode text key #{key.inspect}. Valid keys: #{valid_keys}"
+          end
         end
 
         private
@@ -95,7 +98,10 @@ module ReactOnRails
           return nil unless File.exist?(config_path)
 
           YAML.safe_load(ERB.new(File.read(config_path)).result, permitted_classes: [Symbol], aliases: true)
-        rescue StandardError
+        rescue Psych::SyntaxError, SyntaxError, Errno::EACCES, Errno::ENOENT => e
+          warn(
+            "[ReactOnRails] Could not parse #{config_path} for dev-server mode detection: #{e.message}"
+          )
           nil
         end
 
@@ -116,7 +122,7 @@ module ReactOnRails
 
           return :hmr if hmr == true
           return :live_reload if live_reload == true
-          return :live_reload if hmr == false && live_reload.nil?
+          return :development_server if hmr == false && live_reload.nil?
           return :development_server if hmr == false
 
           nil

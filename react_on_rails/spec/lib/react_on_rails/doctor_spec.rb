@@ -1936,6 +1936,27 @@ RSpec.describe ReactOnRails::Doctor do
       )
       expect(success_messages).not_to include(a_string_including("HMR development with webpack-dev-server"))
     end
+
+    it "reuses the computed Procfile.dev description when reporting missing shakapacker-dev-server" do
+      write_project_file("Procfile.dev", "web: bin/rails server\n")
+      config = {
+        description: "Live reload development with webpack-dev-server",
+        required_for: "bin/dev (default mode)"
+      }
+
+      doctor.send(:check_individual_procfile, "Procfile.dev", config)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(
+        a_string_including("Missing shakapacker-dev-server for Live reload development with webpack-dev-server")
+      )
+    end
+
+    it "memoizes the default dev server mode for a doctor run" do
+      expect(ReactOnRails::Dev::ServerMode).to receive(:detect).once.and_return(:hmr)
+
+      2.times { doctor.send(:default_dev_server_mode) }
+    end
   end
 
   describe "server bundle path Shakapacker integration" do
