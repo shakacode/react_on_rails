@@ -1,4 +1,4 @@
-import { Suspense, createElement, useEffect, useRef, type ReactElement } from 'react';
+import * as React from 'react';
 import type {
   DehydratedRouterState,
   TanStackHistory,
@@ -9,6 +9,23 @@ import type {
 import type { RailsContext } from 'react-on-rails/types';
 
 /* eslint-disable import/prefer-default-export, no-underscore-dangle */
+
+const { createElement, useEffect, useRef } = React;
+type ReactElement = React.ReactElement;
+type ReactWithOptionalInsertionEffect = typeof React & {
+  useInsertionEffect?: typeof useEffect;
+};
+
+// Read from the React namespace instead of using a named import because the Pro
+// package supports React >= 16, where useInsertionEffect does not exist as an
+// export. In React 18+, useInsertionEffect is currently excluded from the
+// StrictMode passive/layout effect replay cycle relied on by CSS-in-JS
+// libraries; that makes it the narrowest hook for "real unmount only" cleanup.
+// React versions without this hook also do not have that StrictMode replay
+// behavior, so useEffect is an adequate fallback there.
+const { useInsertionEffect } = React as ReactWithOptionalInsertionEffect;
+const useSynchronousRealUnmountEffect: typeof useEffect =
+  typeof useInsertionEffect === 'function' ? useInsertionEffect : useEffect;
 
 type TanStackRouterHydrationInternals = TanStackRouter & {
   matchRoutes: (location: unknown) => unknown[];
@@ -21,32 +38,6 @@ type TanStackRouterChunkPreloadInternals = TanStackRouter & {
   loadRouteChunk?: (route: unknown) => Promise<unknown>;
   looseRoutesById?: Record<string, unknown>;
 };
-
-interface RouteChunkPreloadGateProps {
-  preloadPromise: Promise<void> | null;
-  preloadSettledRef: { current: boolean };
-  isHydrating?: boolean;
-  children?: ReactElement;
-}
-
-function RouteChunkPreloadGate({
-  preloadPromise,
-  preloadSettledRef,
-  isHydrating,
-  children,
-}: RouteChunkPreloadGateProps): ReactElement {
-  // During SSR hydration (first render), skip the suspension gate to avoid a
-  // hydration mismatch: the server rendered RouterProvider content directly,
-  // so throwing a promise here would cause Suspense to render the null fallback
-  // instead of matching the server HTML. After hydration completes (the
-  // post-mount effect sets didTriggerPostHydrationLoadRef), the gate activates
-  // normally for any subsequent re-renders.
-  if (!isHydrating && preloadPromise && !preloadSettledRef.current) {
-    // eslint-disable-next-line @typescript-eslint/only-throw-error -- Suspense boundaries intentionally suspend on thrown Promise.
-    throw preloadPromise;
-  }
-  return children as ReactElement;
-}
 
 function extractDehydratedData(dehydratedRouter: unknown): unknown {
   if (!dehydratedRouter || typeof dehydratedRouter !== 'object') {
@@ -183,8 +174,10 @@ function TanStackHydrationApp({
   const routerRef = useRef<TanStackRouter | null>(null);
   const didTriggerPostHydrationLoadRef = useRef(false);
   const didSetSsrFlagRef = useRef(false);
+  const latestEffectRunIdRef = useRef(0); // 0 = no post-hydration effect run yet.
+  // Set during render-phase SSR init; awaited in runPostHydrationLoad before
+  // router.load() so post-hydration navigation waits for matched lazy chunks.
   const routeChunkPreloadPromiseRef = useRef<Promise<void> | null>(null);
-  const routeChunkPreloadSettledRef = useRef(true);
   const hydrationCallbackPromiseRef = useRef<Promise<void> | null>(null);
   const didWarnPrivateInternalsRef = useRef(false);
   const warnedMissingSsrMatchIdsRef = useRef<Set<string>>(new Set());
@@ -259,14 +252,6 @@ function TanStackHydrationApp({
         router as TanStackRouterChunkPreloadInternals,
         rawMatches,
       );
-      if (routeChunkPreloadPromiseRef.current) {
-        routeChunkPreloadSettledRef.current = false;
-        void routeChunkPreloadPromiseRef.current.finally(() => {
-          routeChunkPreloadSettledRef.current = true;
-        });
-      } else {
-        routeChunkPreloadSettledRef.current = true;
-      }
       const ssrMatches = dehydratedState?.ssrRouter?.matches;
       const matches = ssrMatches?.length
         ? applyDehydratedMatchData(rawMatches, ssrMatches, warnMissingSsrMatch)
@@ -332,6 +317,22 @@ function TanStackHydrationApp({
 
   const router = routerRef.current;
 
+  // Clear the temporary router.ssr flag synchronously on real unmount. This is
+  // the unmount path; the async finally() below is the normal settled/cancelled
+  // path. didSetSsrFlagRef is the shared latch so exactly one path clears.
+  useSynchronousRealUnmountEffect(() => {
+    if (!router || !hasSsrPayload) {
+      return undefined;
+    }
+
+    return () => {
+      if (didSetSsrFlagRef.current) {
+        router.ssr = undefined;
+        didSetSsrFlagRef.current = false;
+      }
+    };
+  }, [hasSsrPayload, router]);
+
   // After mount, trigger router.load() to enable client-side navigation.
   // The SSR flag prevented auto-loading, so we do it manually here.
   useEffect(() => {
@@ -343,6 +344,24 @@ function TanStackHydrationApp({
       return undefined;
     }
     didTriggerPostHydrationLoadRef.current = true;
+    const effectRunId = latestEffectRunIdRef.current + 1;
+    latestEffectRunIdRef.current = effectRunId;
+
+    // Dev-mode sanity check: router.ssr should still hold the value we wrote
+    // during render-phase init. Our window-safety argument (parent re-renders
+    // are safe because router.ssr blocks Transitioner navigation) depends on
+    // a private TanStack Router API. If that API is renamed or removed in a
+    // future version, this warning surfaces the breakage before it manifests
+    // as a hard-to-diagnose navigation race.
+    if (process.env.NODE_ENV === 'development' && didSetSsrFlagRef.current && router.ssr == null) {
+      console.warn(
+        'react-on-rails-pro/tanstack-router: router.ssr was unexpectedly ' +
+          'cleared between render-phase init and the post-hydration effect. ' +
+          'TanStack Router\'s private "ssr" API may have changed — verify ' +
+          '@tanstack/react-router is within the supported range ' +
+          '(>=1.139.0 <2.0.0).',
+      );
+    }
 
     let cancelled = false;
     const runPostHydrationLoad = async (): Promise<void> => {
@@ -358,9 +377,10 @@ function TanStackHydrationApp({
           return;
         }
       }
-      if (cancelled) {
-        return;
-      }
+      // No final cancellation check is needed for the no-await fast path:
+      // without pending hydration or preload promises, cleanup cannot run between
+      // the checks above and this call. If unmount happens after router.load()
+      // starts, the cleanup's cancelLoad() call handles the in-flight load.
       await router.load();
     };
 
@@ -371,14 +391,15 @@ function TanStackHydrationApp({
         }
       })
       .finally(() => {
-        // Always clear temporary router.ssr set by this module, regardless of
-        // cancellation state. In React 18 StrictMode, the effect cleanup sets
-        // cancelled=true and didTriggerPostHydrationLoadRef prevents re-trigger
-        // on re-mount — if we skip cleanup here the SSR flag stays set
-        // permanently, blocking the Transitioner from ever calling router.load().
-        // The didSetSsrFlagRef guard ensures we only clear values this module
-        // created, preserving user-provided router.ssr from createRouter().
-        if (didSetSsrFlagRef.current) {
+        // Invariant: temporary router.ssr is cleared by exactly one path:
+        //   1. this finally block after the post-hydration load settles/cancels;
+        //   2. the synchronous real-unmount cleanup above.
+        // didSetSsrFlagRef is the shared latch, preserving user-provided
+        // router.ssr from createRouter(). latestEffectRunIdRef prevents stale
+        // StrictMode passive-effect finally blocks from racing a remount; React
+        // runs passive cleanup/setup back-to-back before queued promise
+        // continuations drain.
+        if (latestEffectRunIdRef.current === effectRunId && didSetSsrFlagRef.current) {
           router.ssr = undefined;
           didSetSsrFlagRef.current = false;
         }
@@ -386,10 +407,7 @@ function TanStackHydrationApp({
 
     return () => {
       cancelled = true;
-      if (didSetSsrFlagRef.current) {
-        router.ssr = undefined;
-        didSetSsrFlagRef.current = false;
-      }
+      didTriggerPostHydrationLoadRef.current = false;
       const cancellableRouter = router as TanStackRouter & { cancelLoad?: () => void };
       if (typeof cancellableRouter.cancelLoad === 'function') {
         cancellableRouter.cancelLoad();
@@ -397,29 +415,19 @@ function TanStackHydrationApp({
     };
   }, [hasSsrPayload, router]);
 
-  // Always use RouterProvider directly — matching the server-rendered tree.
-  // RouterClient is NOT used because it wraps RouterProvider in <Await> which
-  // introduces a Suspense boundary that doesn't exist in the server HTML,
-  // causing React hydration mismatch errors.
-  //
-  // RouteChunkPreloadGate blocks re-renders until matched lazy chunks finish
-  // preloading (when preload support is available). During the initial SSR
-  // hydration render, the gate is skipped to match the server-rendered tree
-  // and avoid a hydration mismatch. After the post-mount effect runs
-  // (didTriggerPostHydrationLoadRef becomes true), the gate activates normally.
-  let app: ReactElement = createElement(
-    Suspense,
-    { fallback: null },
-    createElement(
-      RouteChunkPreloadGate,
-      {
-        preloadPromise: routeChunkPreloadPromiseRef.current,
-        preloadSettledRef: routeChunkPreloadSettledRef,
-        isHydrating: hasSsrPayload && !didTriggerPostHydrationLoadRef.current,
-      },
-      createElement(RouterProvider, { router }),
-    ),
-  );
+  // Render RouterProvider directly — matching the server-rendered tree
+  // (AppWrapper > RouterProvider). Any extra Suspense boundary here produces
+  // a shape mismatch during hydration and React bails to full client-side
+  // rendering. The old RouteChunkPreloadGate also suspended re-renders during
+  // chunk preload; that behavior is intentionally not replicated here because
+  // chunk-preload sequencing is enforced by runPostHydrationLoad before
+  // router.load(). A consequence is that any parent-triggered re-render
+  // landing in the window between render-phase preload init and
+  // runPostHydrationLoad completion now reaches RouterProvider unguarded —
+  // safe because router.ssr blocks Transitioner-initiated navigation across
+  // that window, and the route components themselves throw their own
+  // Suspense promises if a chunk is still loading.
+  let app: ReactElement = createElement(RouterProvider, { router });
   if (options.AppWrapper) {
     const wrapperProps = { ...incomingProps } as Record<string, unknown>;
     delete wrapperProps.__tanstackRouterDehydratedState;
