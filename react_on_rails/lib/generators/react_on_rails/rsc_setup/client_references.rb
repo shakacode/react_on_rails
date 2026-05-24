@@ -6,6 +6,8 @@ module ReactOnRails
       module ClientReferences # rubocop:disable Metrics/ModuleLength
         JS_STRING_DELIMITERS = ["'", '"', "`"].freeze
         JS_COMMENT_STATES = %i[line_comment block_comment].freeze
+        REGEX_LITERAL_PRECEDERS = ["(", "{", "[", "=", ":", ",", ";", "!", "?", "&", "|", "+", "-", "*", "~", "^",
+                                   "<", ">"].freeze
 
         private
 
@@ -21,14 +23,17 @@ module ReactOnRails
 
         def inject_rsc_client_imports(config_path, content, existing_imports_content)
           replace_rsc_client_references_setup_anchor(config_path, content, is_server: false) do |anchor|
-            [
-              anchor,
-              shakapacker_config_import_statement(existing_imports_content),
-              path_resolve_import_statement(existing_imports_content),
-              "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');",
-              "",
-              rsc_client_references_js
-            ].compact.join("\n")
+            join_rsc_client_references_setup(
+              content,
+              [
+                anchor,
+                shakapacker_config_import_statement(existing_imports_content),
+                path_resolve_import_statement(existing_imports_content),
+                "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');",
+                "",
+                rsc_client_references_js
+              ]
+            )
           end
         end
 
@@ -37,14 +42,26 @@ module ReactOnRails
           # `shakapacker_config_blocker_reason` has confirmed `config` is already in scope.
           # Adding `shakapacker_config_import_statement` here would duplicate that binding.
           replace_rsc_client_references_setup_anchor(config_path, content, is_server: true) do |anchor|
-            [
-              anchor,
-              path_resolve_import_statement(existing_imports_content),
-              "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');",
-              "",
-              rsc_client_references_js
-            ].compact.join("\n")
+            join_rsc_client_references_setup(
+              content,
+              [
+                anchor,
+                path_resolve_import_statement(existing_imports_content),
+                "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');",
+                "",
+                rsc_client_references_js
+              ]
+            )
           end
+        end
+
+        def join_rsc_client_references_setup(content, lines)
+          line_ending = js_line_ending(content)
+          lines.compact.map { |line| line.gsub(/\r?\n/, line_ending) }.join(line_ending)
+        end
+
+        def js_line_ending(content)
+          content.include?("\r\n") ? "\r\n" : "\n"
         end
 
         def update_existing_rsc_webpack_config(config_path, content, is_server:)
@@ -437,6 +454,14 @@ module ReactOnRails
           while index < target_index
             char = content[index]
             next_char = content[index + 1]
+            if state.nil? && js_regex_literal_start?(content, index)
+              regex_end = js_regex_literal_end(content, index)
+              return false if regex_end >= target_index
+
+              index = regex_end + 1
+              next
+            end
+
             state, escaped, index = advance_js_scan_state(state, escaped, char, next_char, index)
             index += 1
           end
@@ -453,18 +478,83 @@ module ReactOnRails
           while index < target_index
             char = content[index]
             next_char = content[index + 1]
+            if state.nil? && js_regex_literal_start?(content, index)
+              regex_end = js_regex_literal_end(content, index)
+              return false if regex_end >= target_index
+
+              index = regex_end + 1
+              next
+            end
+
             state, escaped, index = advance_js_scan_state(state, escaped, char, next_char, index)
             if state
               index += 1
               next
             end
 
-            depth += 1 if char == "{"
-            depth -= 1 if char == "}" && depth.positive?
+            depth += js_depth_delta(char, depth)
             index += 1
           end
 
           state.nil? && depth.zero?
+        end
+
+        def js_depth_delta(char, depth)
+          return 1 if char == "{"
+          return -1 if char == "}" && depth.positive?
+
+          0
+        end
+
+        def js_regex_literal_start?(content, index)
+          return false unless content[index] == "/"
+          return false if ["/", "*"].include?(content[index + 1])
+
+          previous = previous_significant_js_char(content, index)
+          previous.nil? || REGEX_LITERAL_PRECEDERS.include?(previous)
+        end
+
+        def previous_significant_js_char(content, index)
+          cursor = index - 1
+          cursor -= 1 while cursor >= 0 && content[cursor].match?(/\s/)
+          cursor >= 0 ? content[cursor] : nil
+        end
+
+        def js_regex_literal_end(content, start_index)
+          index = start_index + 1
+          escaped = false
+          in_character_class = false
+
+          while index < content.length
+            char = content[index]
+            return js_regex_literal_flag_end(content, index) if js_regex_literal_closing_slash?(
+              char, escaped, in_character_class
+            )
+
+            escaped, in_character_class = next_js_regex_literal_state(char, escaped, in_character_class)
+            index += 1
+          end
+
+          start_index
+        end
+
+        def js_regex_literal_closing_slash?(char, escaped, in_character_class)
+          char == "/" && !escaped && !in_character_class
+        end
+
+        def js_regex_literal_flag_end(content, slash_index)
+          index = slash_index + 1
+          index += 1 while content[index]&.match?(/[a-z]/i)
+          index - 1
+        end
+
+        def next_js_regex_literal_state(char, escaped, in_character_class)
+          return [false, in_character_class] if escaped
+          return [true, in_character_class] if char == "\\"
+          return [false, true] if char == "["
+          return [false, false] if char == "]"
+
+          [false, in_character_class]
         end
 
         # Depth-aware: a nested `metadata: { isServer: true }` inside another option's value
@@ -607,6 +697,7 @@ module ReactOnRails
         def splice_client_references_at_close_brace(body)
           trailing = body[/\s*\z/]
           content = body[0...(body.length - trailing.length)]
+          line_ending = js_line_ending(body)
 
           last_line_start = (content.rindex("\n") || -1) + 1
           # `[ \t]+` (one-or-more) so the regex returns nil when the last line is unindented,
@@ -618,7 +709,7 @@ module ReactOnRails
           needs_comma = !content_without_comments.end_with?(",")
           prefix = build_splice_prefix(content, needs_comma: needs_comma)
 
-          "#{prefix}\n#{indent}clientReferences: rscClientReferences,#{trailing}"
+          "#{prefix}#{line_ending}#{indent}clientReferences: rscClientReferences,#{trailing}"
         end
 
         # Inserts the trailing comma before any final line/block comment so the rewritten file reads
@@ -683,17 +774,20 @@ module ReactOnRails
           return if rsc_client_references_defined?(content)
 
           replace_rsc_client_references_setup_anchor(config_path, content, is_server: is_server) do |anchor|
-            [
-              anchor,
-              # On the server path `shakapacker_config_blocker_reason` has already blocked when
-              # `config` is missing from `existing_imports_content`, so this call returns `nil`.
-              # Kept (rather than skipped on `is_server`) so removing the upstream blocker does not
-              # silently drop the import on the client path, where its absence is permitted.
-              shakapacker_config_import_statement(existing_imports_content),
-              path_resolve_import_statement(existing_imports_content),
-              "",
-              rsc_client_references_js
-            ].compact.join("\n")
+            join_rsc_client_references_setup(
+              content,
+              [
+                anchor,
+                # On the server path `shakapacker_config_blocker_reason` has already blocked when
+                # `config` is missing from `existing_imports_content`, so this call returns `nil`.
+                # Kept (rather than skipped on `is_server`) so removing the upstream blocker does not
+                # silently drop the import on the client path, where its absence is permitted.
+                shakapacker_config_import_statement(existing_imports_content),
+                path_resolve_import_statement(existing_imports_content),
+                "",
+                rsc_client_references_js
+              ]
+            )
           end
         end
 

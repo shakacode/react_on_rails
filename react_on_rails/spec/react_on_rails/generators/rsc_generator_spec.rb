@@ -1235,6 +1235,40 @@ describe RscGenerator, type: :generator do
       expect(generator.send(:rsc_client_references_setup_anchor?, content, is_server: false)).to be(true)
     end
 
+    it "preserves CRLF line endings when injecting and rewriting scoped client references" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      crlf_content = [
+        "const commonWebpackConfig = require('./commonWebpackConfig');",
+        "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');",
+        "",
+        "const configureClient = () => {",
+        "  const clientConfig = commonWebpackConfig();",
+        "  clientConfig.plugins.push(",
+        "    new RSCWebpackPlugin({",
+        "      isServer: false,",
+        "    }),",
+        "  );",
+        "",
+        "  return clientConfig;",
+        "};",
+        "",
+        "module.exports = configureClient;"
+      ].join("\r\n")
+
+      simulate_existing_file(
+        config_path,
+        "#{crlf_content}\r\n"
+      )
+
+      content = File.binread(File.join(destination_root, config_path))
+      generator.send(:update_existing_rsc_webpack_config, config_path, content, is_server: false)
+
+      migrated_content = File.binread(File.join(destination_root, config_path))
+      expect(migrated_content).to include("const rscClientReferences = {\r\n")
+      expect(migrated_content).to include("      isServer: false,\r\n      clientReferences: rscClientReferences,")
+      expect(migrated_content).not_to match(/(?<!\r)\n/)
+    end
+
     it "detects named imports with trailing commas" do
       content = "const { config, } = require('shakapacker');"
 
@@ -1326,6 +1360,17 @@ describe RscGenerator, type: :generator do
 
       expect(generator.send(:path_resolve_imported?, function_scoped)).to be(false)
       expect(generator.send(:path_resolve_imported?, dot_access_scoped)).to be(false)
+    end
+
+    it "detects top-level imports after regex literals with braces" do
+      content = <<~JS
+        const literalOpenBrace = /\\{/;
+        const { resolve } = require('path');
+        const { config } = require('shakapacker');
+      JS
+
+      expect(generator.send(:path_resolve_imported?, content)).to be(true)
+      expect(generator.send(:shakapacker_config_imported?, content)).to be(true)
     end
 
     it "detects top-level destructuring that creates config or resolve bindings" do
