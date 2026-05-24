@@ -50,6 +50,13 @@ RSpec.describe ReactOnRails::Spike::PrismGemfileRewriter do
         expect(result.content).to eq("gem 'react_on_rails_pro', '~> 16.0'\n")
       end
 
+      it "rewrites percent string literals without emitting invalid Ruby" do
+        src = "gem %q[react_on_rails], \"~> 16.0\"\n"
+        result = rewriter.rewrite(src)
+        expect(result.content).to eq("gem \"react_on_rails_pro\", \"~> 16.0\"\n")
+        expect_parseable_ruby(result.content)
+      end
+
       it "rewrites a bare gem declaration and inserts default version" do
         src = "gem \"react_on_rails\"\n"
         result = rewriter.rewrite(src)
@@ -363,6 +370,24 @@ RSpec.describe ReactOnRails::Spike::PrismGemfileRewriter do
         RUBY
         result = rewriter.rewrite(src)
         expect(result.content).to eq("gem \"react_on_rails_pro\", \"16.0.0\"\n")
+        expect_parseable_ruby(result.content)
+      end
+
+      it "does not collapse pre-existing empty branches when removing stale base elsewhere" do
+        src = <<~RUBY
+          if ENV["ENABLE_ROR"]
+            gem "react_on_rails_pro", "~> 16.0"
+          else
+          end
+          gem "react_on_rails", "~> 16.0"
+        RUBY
+        result = rewriter.rewrite(src)
+        expect(result.content).to eq(<<~RUBY)
+          if ENV["ENABLE_ROR"]
+            gem "react_on_rails_pro", "~> 16.0"
+          else
+          end
+        RUBY
         expect_parseable_ruby(result.content)
       end
 

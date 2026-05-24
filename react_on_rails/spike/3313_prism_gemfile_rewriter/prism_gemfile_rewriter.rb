@@ -55,6 +55,8 @@ module ReactOnRails
         end
 
         has_active_pro = pro_calls.any?
+        preexisting_empty_conditional_fingerprints =
+          has_active_pro ? empty_conditional_fingerprints(source, program) : []
         edits = base_calls.map do |call|
           if has_active_pro
             removal_edit(source, call)
@@ -64,7 +66,12 @@ module ReactOnRails
         end
 
         new_source = apply_edits(source, edits)
-        new_source = collapse_dead_conditionals(new_source) if has_active_pro
+        if has_active_pro
+          new_source = collapse_dead_conditionals(
+            new_source,
+            preexisting_empty_conditional_fingerprints
+          )
+        end
 
         Result.new(
           content: new_source,
@@ -142,7 +149,10 @@ module ReactOnRails
       end
 
       def quote_char(source, string_node)
-        source.byteslice(string_node.location.start_offset, 1)
+        quote = source.byteslice(string_node.location.start_offset, 1)
+        return quote if quote == '"' || quote == "'"
+
+        '"'
       end
 
       def removal_edit(source, call)
@@ -229,35 +239,35 @@ module ReactOnRails
       #   variants; after migration there is only one variant, so the conditional has
       #   no remaining purpose).
       # - Otherwise, if a branch is empty, only that branch is removed.
-      def collapse_dead_conditionals(source)
+      def collapse_dead_conditionals(source, preexisting_empty_conditional_fingerprints)
         loop do
           parse_result = Prism.parse(source)
           break source if parse_result.failure?
 
-          edit = find_collapse_edit(source, parse_result.value)
+          edit = find_collapse_edit(source, parse_result.value, preexisting_empty_conditional_fingerprints)
           break source unless edit
 
           source = splice_source(source, edit[:start_offset], edit[:end_offset], edit[:replacement])
         end
       end
 
-      def find_collapse_edit(source, node)
+      def find_collapse_edit(source, node, preexisting_empty_conditional_fingerprints)
         return nil unless node
 
         if node.is_a?(Prism::IfNode) || node.is_a?(Prism::UnlessNode)
-          edit = collapse_edit_for_conditional(source, node)
+          edit = collapse_edit_for_conditional(source, node, preexisting_empty_conditional_fingerprints)
           return edit if edit
         end
 
         node.compact_child_nodes.each do |child|
-          edit = find_collapse_edit(source, child)
+          edit = find_collapse_edit(source, child, preexisting_empty_conditional_fingerprints)
           return edit if edit
         end
 
         nil
       end
 
-      def collapse_edit_for_conditional(source, node)
+      def collapse_edit_for_conditional(source, node, preexisting_empty_conditional_fingerprints)
         # Postfix modifiers and ternary-style conditionals have node.end_keyword_loc == nil.
         # Only block-form `if/unless ... end` is considered for collapse.
         return nil unless node.respond_to?(:end_keyword_loc) && node.end_keyword_loc
@@ -269,6 +279,9 @@ module ReactOnRails
 
         then_empty = branch_empty?(then_branch)
         else_empty = has_else_node && branch_empty?(else_statements)
+
+        fingerprint = conditional_empty_branch_fingerprint(source, node)
+        return nil if preexisting_empty_conditional_fingerprints.include?(fingerprint)
 
         if then_empty && has_else_node && !else_empty
           collapse_to_branch(source, node, else_statements) || remove_empty_then_branch(source, node)
@@ -282,6 +295,62 @@ module ReactOnRails
         return true unless statements_node.respond_to?(:body)
 
         statements_node.body.empty?
+      end
+
+      def empty_conditional_fingerprints(source, node, fingerprints = [])
+        return fingerprints unless node
+
+        if node.is_a?(Prism::IfNode) || node.is_a?(Prism::UnlessNode)
+          fingerprint = conditional_empty_branch_fingerprint(source, node)
+          fingerprints << fingerprint if fingerprint
+        end
+
+        node.compact_child_nodes.each do |child|
+          empty_conditional_fingerprints(source, child, fingerprints)
+        end
+
+        fingerprints
+      end
+
+      def conditional_empty_branch_fingerprint(source, node)
+        return nil unless node.respond_to?(:end_keyword_loc) && node.end_keyword_loc
+
+        then_branch = node.statements
+        else_node = conditional_else_node(node)
+        return nil unless else_node
+
+        else_statements = else_node.statements
+        then_empty = branch_empty?(then_branch)
+        else_empty = branch_empty?(else_statements)
+        return nil unless then_empty || else_empty
+
+        [
+          node.class.name,
+          predicate_fingerprint(source, node),
+          branch_fingerprint(source, then_branch),
+          branch_fingerprint(source, else_statements),
+          then_empty,
+          else_empty
+        ]
+      end
+
+      def predicate_fingerprint(source, node)
+        predicate = node.respond_to?(:predicate) ? node.predicate : nil
+        return "" unless predicate
+
+        byte_slice(source, predicate.location.start_offset, predicate.location.end_offset)
+      end
+
+      def branch_fingerprint(source, statements_node)
+        return [] if statements_node.nil?
+        return [] unless statements_node.respond_to?(:body)
+
+        statements_node.body.map do |child|
+          [
+            child.class.name,
+            byte_slice(source, child.location.start_offset, child.location.end_offset)
+          ]
+        end
       end
 
       def collapse_to_branch(source, conditional, branch_statements)
