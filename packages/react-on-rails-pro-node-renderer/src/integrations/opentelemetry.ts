@@ -9,6 +9,9 @@ import {
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions';
+import { registerInstrumentations } from '@opentelemetry/instrumentation';
+import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
+import FastifyOtelInstrumentation from '@fastify/otel';
 import { log, message } from './api.js';
 
 export interface OpenTelemetryInitOptions {
@@ -56,6 +59,17 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
 
     tracerProvider.register();
     log.info('[OpenTelemetry] Tracer provider initialized');
+
+    if (opts.fastify) {
+      registerInstrumentations({
+        instrumentations: [
+          // HTTP first — Fastify instrumentation depends on it.
+          new HttpInstrumentation(),
+          new FastifyOtelInstrumentation(),
+        ],
+        tracerProvider,
+      });
+    }
   } catch (err) {
     message(`[OpenTelemetry] init failed: ${String(err)}`);
   }

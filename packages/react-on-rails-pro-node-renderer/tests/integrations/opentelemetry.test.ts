@@ -63,3 +63,36 @@ describe('opentelemetry integration: init()', () => {
     expect(attrs['deployment.environment']).toBe('staging');
   });
 });
+
+describe('opentelemetry integration: fastify auto-instrumentation', () => {
+  let exporter: InMemorySpanExporter;
+
+  beforeEach(async () => {
+    exporter = new InMemorySpanExporter();
+    await __resetForTest();
+  });
+
+  afterAll(async () => {
+    await __resetForTest();
+  });
+
+  test('init({ fastify: true }) initializes without throwing and tracer still works', () => {
+    // Note: asserting Fastify-instrumentation-produced spans is unreliable in unit tests
+    // because Jest's module cache and fastify's `app.inject()` codepath bypass much of
+    // the instrumentation. The end-to-end test (Task 10) exercises the real worker server
+    // and asserts the full span tree. Here we just confirm init({ fastify: true }) is
+    // safe to call and leaves the tracer fully functional.
+    expect(() =>
+      init({
+        fastify: true,
+        spanProcessor: new SimpleSpanProcessor(exporter),
+      }),
+    ).not.toThrow();
+
+    const tracer = otelTrace.getTracer('test');
+    tracer.startActiveSpan('manual.span', (span) => span.end());
+
+    const spanNames = exporter.getFinishedSpans().map((s) => s.name);
+    expect(spanNames).toContain('manual.span');
+  });
+});
