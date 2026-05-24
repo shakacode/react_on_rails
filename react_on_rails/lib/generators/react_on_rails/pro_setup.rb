@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "generator_messages"
+require "react_on_rails/node_renderer_procfile"
 require "react_on_rails/pro_migration"
 
 module ReactOnRails
@@ -220,18 +221,7 @@ module ReactOnRails
       NEW_RENDERER_COMMAND_REGEX = %r{^[ \t]*(?:node-)?renderer:[^\n]*\bnode\s+\.?/?renderer/node-renderer\.js\b}
       LEGACY_RENDERER_COMMAND_REGEX = %r{^[ \t]*(?:node-)?renderer:[^\n]*\bnode\s+\.?/?client/node-renderer\.js\b}
       RENDERER_PROCESS_REGEX = /^[ \t]*(?:node-)?renderer:/
-      NODE_RENDERER_PROCFILE_COMMANDS = {
-        "Procfile.dev" =>
-          "node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=${RENDERER_PORT:-3800} " \
-          "node renderer/node-renderer.js",
-        "Procfile.dev-static-assets" =>
-          "node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=${RENDERER_PORT:-3800} " \
-          "node renderer/node-renderer.js",
-        "Procfile.dev-prod-assets" =>
-          "node-renderer: RAILS_ENV=${RAILS_ENV:-development} " \
-          "RENDERER_LOG_LEVEL=${RENDERER_LOG_LEVEL:-info} RENDERER_PORT=${RENDERER_PORT:-3800} " \
-          "node renderer/node-renderer.js"
-      }.freeze
+      NODE_RENDERER_PROCFILE_COMMANDS = ReactOnRails::NodeRendererProcfile::DEFAULT_COMMANDS
 
       # Creates renderer/node-renderer.js unless either the new path or the legacy
       # client/node-renderer.js already exists.

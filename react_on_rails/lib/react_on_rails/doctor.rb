@@ -11,6 +11,7 @@ require_relative "version_syntax_converter"
 require_relative "version_synchronizer"
 require_relative "system_checker"
 require_relative "pro_migration"
+require_relative "node_renderer_procfile"
 
 begin
   require "rainbow"
@@ -59,7 +60,7 @@ module ReactOnRails
     DEFAULT_SHAKAPACKER_CONFIG_PATH = "config/shakapacker.yml"
     SERVER_BUNDLE_SOURCE_EXTENSIONS = %w[.js .jsx .ts .tsx .mjs .cjs].freeze
     CUSTOM_LAUNCHER_INDICATOR_FILES = %w[dev].freeze
-    RENDERER_PROCESS_WITH_PORT_REGEX = /^[ \t]*(?:node-)?renderer:[^\n]*\bRENDERER_PORT\b/
+    RENDERER_PROCESS_WITH_PORT_REGEX = NodeRendererProcfile::PROCESS_WITH_RENDERER_PORT_REGEX
     RAILS_SERVER_COMMAND_REGEX = %r{\b(?:bin/)?rails\s+(?:server|s)\b}
 
     # Deprecated-renderer-cache scan (used by check_deprecated_renderer_cache_task):
@@ -1575,16 +1576,7 @@ module ReactOnRails
     end
 
     def node_renderer_procfile_command(filename)
-      return prod_assets_node_renderer_command if filename == "Procfile.dev-prod-assets"
-
-      "node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=${RENDERER_PORT:-3800} " \
-        "node renderer/node-renderer.js"
-    end
-
-    def prod_assets_node_renderer_command
-      "node-renderer: RAILS_ENV=${RAILS_ENV:-development} " \
-        "RENDERER_LOG_LEVEL=${RENDERER_LOG_LEVEL:-info} RENDERER_PORT=${RENDERER_PORT:-3800} " \
-        "node renderer/node-renderer.js"
+      NodeRendererProcfile.command_for(filename)
     end
 
     def detected_custom_launcher_paths
