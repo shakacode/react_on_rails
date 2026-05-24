@@ -3,6 +3,7 @@
 require "fileutils"
 require "json"
 require "net/http"
+require "openssl"
 require "uri"
 
 require "react_on_rails_pro/error"
@@ -47,11 +48,7 @@ module ReactOnRailsPro
 
       LOG_PREFIX = "[ReactOnRailsPro::RollingDeployAdapters::Http]"
 
-      ASSET_BASENAMES = %w[
-        loadable-stats.json
-        react-client-manifest.json
-        react-server-client-manifest.json
-      ].freeze
+      BUNDLE_ENTRY_NAME = "bundle.js"
 
       class << self
         def previous_bundle_hashes
@@ -134,16 +131,25 @@ module ReactOnRailsPro
 
         def extract_payload(tarball_body, dir, bundle_hash)
           ReactOnRailsPro::RollingDeploy::Tarball.extract(tarball_body, dir, max_size: DEFAULT_MAX_SIZE)
-          bundle_path = File.join(dir, "bundle.js")
+          bundle_path = File.join(dir, BUNDLE_ENTRY_NAME)
           unless File.file?(bundle_path)
             return cleanup_and_return(
               dir,
-              warn_and_return("fetch(#{bundle_hash.inspect}) tarball did not contain bundle.js", nil)
+              warn_and_return("fetch(#{bundle_hash.inspect}) tarball did not contain #{BUNDLE_ENTRY_NAME}", nil)
             )
           end
 
-          assets = ASSET_BASENAMES.map { |n| File.join(dir, n) }.select { |p| File.file?(p) }
+          assets = extracted_assets(dir)
           { bundle: bundle_path, assets: assets }
+        end
+
+        def extracted_assets(dir)
+          Dir.children(dir).sort.filter_map do |entry_name|
+            next if entry_name == BUNDLE_ENTRY_NAME
+
+            path = File.join(dir, entry_name)
+            path if File.file?(path)
+          end
         end
 
         def cleanup_and_return(dir, value)
@@ -169,6 +175,7 @@ module ReactOnRailsPro
 
           http = Net::HTTP.new(uri.host, uri.port)
           http.use_ssl = (uri.scheme == "https")
+          http.verify_mode = OpenSSL::SSL::VERIFY_PEER if http.use_ssl?
           http.open_timeout = DEFAULT_OPEN_TIMEOUT_SECONDS
           http.read_timeout = DEFAULT_READ_TIMEOUT_SECONDS
           http.request(request)

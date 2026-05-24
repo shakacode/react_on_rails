@@ -33,11 +33,6 @@ module ReactOnRailsPro
     #   * Responses include `Cache-Control: no-store` so a misconfigured
     #     intermediary doesn't cache the bundle behind the auth check.
     class BundlesController < ActionController::Base
-      # No CSRF: this endpoint is GET-only and authenticated by bearer token,
-      # not by a Rails-managed session.
-      protect_from_forgery with: :null_session
-      skip_before_action :verify_authenticity_token, raise: false
-
       before_action :authenticate_rolling_deploy_request
       before_action :set_no_store_headers
 
@@ -102,11 +97,9 @@ module ReactOnRailsPro
         provided = extract_bearer_token(request.headers["Authorization"])
         return head(:unauthorized) if provided.empty?
 
-        # secure_compare requires equal-length strings to avoid leaking the
-        # configured token length through timing. Length-pad to the configured
-        # length first; if the provided token is the wrong length, the
-        # comparison still runs against the full configured bytes and then
-        # the boolean is `&`-ed with a length check to keep total work constant.
+        # secure_compare requires equal-length strings. Tokens are configured
+        # with a fixed minimum length, so this rejects malformed input before
+        # comparing same-length token bytes.
         match = provided.bytesize == configured.bytesize &&
                 ActiveSupport::SecurityUtils.secure_compare(provided, configured)
         head(:unauthorized) unless match
@@ -154,11 +147,10 @@ module ReactOnRailsPro
           # default ceiling (200 MB) fits comfortably in memory on every
           # Rails app instance we'd expect to deploy.
           send_data io.read,
-                    type: "application/x-tar",
+                    type: "application/gzip",
                     disposition: "inline",
                     filename: "#{params[:hash]}.tar.gz"
         end
-        response.headers["Content-Encoding"] = "gzip"
       end
 
       # Pairs the bundle file (renamed to `bundle.js` on the wire) with the

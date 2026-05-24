@@ -70,13 +70,13 @@ module ReactOnRailsPro
       def compose_to_io(entries, io)
         validate_compose_entries!(entries)
 
-        Zlib::GzipWriter.wrap(io) do |gz|
-          Gem::Package::TarWriter.new(gz) do |tar|
-            entries.each do |name, path|
-              add_file_to_tar(tar, name, path)
-            end
+        gz = Zlib::GzipWriter.new(io)
+        Gem::Package::TarWriter.new(gz) do |tar|
+          entries.each do |name, path|
+            add_file_to_tar(tar, name, path)
           end
         end
+        gz.finish
         io
       end
 
