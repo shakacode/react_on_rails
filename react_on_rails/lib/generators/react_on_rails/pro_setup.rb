@@ -47,7 +47,7 @@ module ReactOnRails
 
         create_pro_initializer
         legacy_renderer_detected = create_node_renderer
-        add_pro_to_procfile unless legacy_renderer_detected
+        add_pro_to_procfiles unless legacy_renderer_detected
         update_webpack_config_for_pro
 
         say set_color("=" * 80, :cyan)
@@ -217,8 +217,21 @@ module ReactOnRails
       # Matches active (uncommented) Procfile.dev node-renderer lines, tolerating
       # an optional `./` prefix that a user may have added by hand
       # (e.g. `node ./renderer/node-renderer.js`).
-      NEW_RENDERER_COMMAND_REGEX = %r{^[ \t]*node-renderer:[^\n]*\bnode\s+\.?/?renderer/node-renderer\.js\b}
-      LEGACY_RENDERER_COMMAND_REGEX = %r{^[ \t]*node-renderer:[^\n]*\bnode\s+\.?/?client/node-renderer\.js\b}
+      NEW_RENDERER_COMMAND_REGEX = %r{^[ \t]*(?:node-)?renderer:[^\n]*\bnode\s+\.?/?renderer/node-renderer\.js\b}
+      LEGACY_RENDERER_COMMAND_REGEX = %r{^[ \t]*(?:node-)?renderer:[^\n]*\bnode\s+\.?/?client/node-renderer\.js\b}
+      RENDERER_PROCESS_REGEX = /^[ \t]*(?:node-)?renderer:/
+      NODE_RENDERER_PROCFILE_COMMANDS = {
+        "Procfile.dev" =>
+          "node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=${RENDERER_PORT:-3800} " \
+          "node renderer/node-renderer.js",
+        "Procfile.dev-static-assets" =>
+          "node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=${RENDERER_PORT:-3800} " \
+          "node renderer/node-renderer.js",
+        "Procfile.dev-prod-assets" =>
+          "node-renderer: RAILS_ENV=${RAILS_ENV:-development} " \
+          "RENDERER_LOG_LEVEL=${RENDERER_LOG_LEVEL:-info} RENDERER_PORT=${RENDERER_PORT:-3800} " \
+          "node renderer/node-renderer.js"
+      }.freeze
 
       # Creates renderer/node-renderer.js unless either the new path or the legacy
       # client/node-renderer.js already exists.
@@ -276,14 +289,30 @@ module ReactOnRails
       end
 
       def add_pro_to_procfile
-        procfile_path = File.join(destination_root, "Procfile.dev")
+        add_node_renderer_to_procfile(
+          "Procfile.dev",
+          NODE_RENDERER_PROCFILE_COMMANDS.fetch("Procfile.dev"),
+          warn_if_missing: true
+        )
+      end
+
+      def add_pro_to_procfiles
+        NODE_RENDERER_PROCFILE_COMMANDS.each do |procfile, command|
+          add_node_renderer_to_procfile(procfile, command, warn_if_missing: procfile == "Procfile.dev")
+        end
+      end
+
+      def add_node_renderer_to_procfile(procfile, command, warn_if_missing:)
+        procfile_path = File.join(destination_root, procfile)
 
         unless File.exist?(procfile_path)
+          return unless warn_if_missing
+
           GeneratorMessages.add_warning(<<~MSG.strip)
-            ⚠️  Procfile.dev not found. Skipping Node Renderer process addition.
+            ⚠️  #{procfile} not found. Skipping Node Renderer process addition.
 
             You'll need to add the Node Renderer to your process manager manually:
-              node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=${RENDERER_PORT:-3800} node renderer/node-renderer.js
+              #{command}
           MSG
           return
         end
@@ -291,29 +320,28 @@ module ReactOnRails
         procfile_content = File.read(procfile_path)
 
         if procfile_content.match?(NEW_RENDERER_COMMAND_REGEX)
-          say "ℹ️  Node Renderer already in Procfile.dev, skipping", :yellow
+          say "ℹ️  Node Renderer already in #{procfile}, skipping", :yellow
           return
         end
 
-        if procfile_content.match?(/^[ \t]*node-renderer:/)
-          say "⚠️  Procfile.dev has a node-renderer: entry that doesn't reference " \
+        if procfile_content.match?(RENDERER_PROCESS_REGEX)
+          say "⚠️  #{procfile} has a renderer entry that doesn't reference " \
               "renderer/node-renderer.js. Update it manually to:", :yellow
-          say "      node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=${RENDERER_PORT:-3800} " \
-              "node renderer/node-renderer.js", :yellow
+          say "      #{command}", :yellow
           return
         end
 
-        say "📝 Adding Node Renderer to Procfile.dev...", :yellow
+        say "📝 Adding Node Renderer to #{procfile}...", :yellow
 
         node_renderer_line = <<~PROCFILE
 
           # React on Rails Pro - Node Renderer for SSR
-          node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=${RENDERER_PORT:-3800} node renderer/node-renderer.js
+          #{command}
         PROCFILE
 
-        append_to_file("Procfile.dev", node_renderer_line)
+        append_to_file(procfile, node_renderer_line)
 
-        say "✅ Added Node Renderer to Procfile.dev", :green
+        say "✅ Added Node Renderer to #{procfile}", :green
       end
 
       # Update webpack configs to enable Pro settings.

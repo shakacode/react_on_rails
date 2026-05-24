@@ -59,6 +59,8 @@ module ReactOnRails
     DEFAULT_SHAKAPACKER_CONFIG_PATH = "config/shakapacker.yml"
     SERVER_BUNDLE_SOURCE_EXTENSIONS = %w[.js .jsx .ts .tsx .mjs .cjs].freeze
     CUSTOM_LAUNCHER_INDICATOR_FILES = %w[dev].freeze
+    RENDERER_PROCESS_WITH_PORT_REGEX = /^[ \t]*(?:node-)?renderer:[^\n]*\bRENDERER_PORT\b/
+    RAILS_SERVER_COMMAND_REGEX = %r{\b(?:bin/)?rails\s+(?:server|s)\b}
 
     # Deprecated-renderer-cache scan (used by check_deprecated_renderer_cache_task):
     # look for references to the old pre_stage_bundle_for_node_renderer task in
@@ -1535,6 +1537,54 @@ module ReactOnRails
       else
         checker.add_info("  💡 Run: rails generate react_on_rails:install")
       end
+
+      check_node_renderer_launcher_procfiles(procfiles.keys)
+    end
+
+    def check_node_renderer_launcher_procfiles(procfiles)
+      return unless resolved_pro_server_renderer == "NodeRenderer"
+
+      procfiles.each do |filename|
+        next unless File.exist?(filename)
+
+        content = File.read(filename)
+        next unless procfile_serves_rails_pages?(content)
+        next if procfile_starts_node_renderer_on_renderer_port?(content)
+
+        checker.add_warning(<<~MSG.strip)
+          ⚠️  #{filename} can serve SSR pages but does not start the Node Renderer on RENDERER_PORT.
+
+          Add a process such as:
+            #{node_renderer_procfile_command(filename)}
+        MSG
+      end
+    end
+
+    def procfile_serves_rails_pages?(content)
+      active_procfile_lines(content).any? { |line| line.match?(RAILS_SERVER_COMMAND_REGEX) }
+    end
+
+    def procfile_starts_node_renderer_on_renderer_port?(content)
+      active_procfile_lines(content).any? do |line|
+        line.match?(RENDERER_PROCESS_WITH_PORT_REGEX)
+      end
+    end
+
+    def active_procfile_lines(content)
+      content.each_line.grep_v(/^\s*#/)
+    end
+
+    def node_renderer_procfile_command(filename)
+      return prod_assets_node_renderer_command if filename == "Procfile.dev-prod-assets"
+
+      "node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=${RENDERER_PORT:-3800} " \
+        "node renderer/node-renderer.js"
+    end
+
+    def prod_assets_node_renderer_command
+      "node-renderer: RAILS_ENV=${RAILS_ENV:-development} " \
+        "RENDERER_LOG_LEVEL=${RENDERER_LOG_LEVEL:-info} RENDERER_PORT=${RENDERER_PORT:-3800} " \
+        "node renderer/node-renderer.js"
     end
 
     def detected_custom_launcher_paths

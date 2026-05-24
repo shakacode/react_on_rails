@@ -1612,8 +1612,10 @@ describe ProGenerator, type: :generator do
       simulate_npm_files(package_json: true)
       # Simulate base React on Rails installed
       simulate_existing_file("config/initializers/react_on_rails.rb", "ReactOnRails.configure {}")
-      # Simulate Procfile.dev exists for appending
+      # Simulate generated bin/dev Procfiles exist for appending
       simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_existing_file("Procfile.dev-static-assets", "web: bin/rails server\njs: bin/shakapacker-watch --watch\n")
+      simulate_existing_file("Procfile.dev-prod-assets", "rails: bundle exec rails s\n")
       # Simulate base webpack configs (what base install generates without --pro)
       simulate_base_webpack_files
       # Mock Pro gem as installed
