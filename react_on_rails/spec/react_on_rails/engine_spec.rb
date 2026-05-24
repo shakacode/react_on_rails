@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "fileutils"
 require "json"
 require "open3"
 require "rbconfig"
@@ -171,32 +172,40 @@ module ReactOnRails
     end
 
     describe ".shakapacker_configured_as_bundler?" do
-      context "when Shakapacker.config.config_path exists" do
-        before do
-          allow(::Shakapacker.config).to receive_message_chain(:config_path, :exist?).and_return(true)
-        end
+      let(:app_root) { Pathname.new(Dir.mktmpdir("react-on-rails-root")) }
 
+      before do
+        allow(Rails).to receive(:root).and_return(app_root)
+      end
+
+      after do
+        FileUtils.remove_entry(app_root)
+      end
+
+      context "when config/shakapacker.yml exists" do
         it "returns true" do
+          FileUtils.mkdir_p(app_root.join("config"))
+          File.write(app_root.join("config", "shakapacker.yml"), "default: {}\n")
+
           expect(described_class.shakapacker_configured_as_bundler?).to be true
         end
       end
 
-      context "when Shakapacker.config.config_path does not exist" do
-        before do
-          allow(::Shakapacker.config).to receive_message_chain(:config_path, :exist?).and_return(false)
-        end
-
+      context "when config/shakapacker.yml does not exist" do
         it "returns false" do
           expect(described_class.shakapacker_configured_as_bundler?).to be false
         end
       end
 
-      context "when accessing Shakapacker.config raises" do
-        before do
-          allow(::Shakapacker).to receive(:config).and_raise(StandardError, "boom")
-        end
+      it "does not call Shakapacker.config while checking for the config file" do
+        expect(::Shakapacker).not_to receive(:config)
+        expect(described_class.shakapacker_configured_as_bundler?).to be false
+      end
 
-        it "returns false rather than letting boot fail" do
+      context "when Shakapacker is not defined" do
+        before { hide_const("Shakapacker") }
+
+        it "returns false when config/shakapacker.yml is absent" do
           expect(described_class.shakapacker_configured_as_bundler?).to be false
         end
       end
@@ -219,15 +228,13 @@ module ReactOnRails
         snapshot = nil
         if defined?(::Shakapacker::Utils::Manager)
           singleton = ::Shakapacker::Utils::Manager.singleton_class
-          had_override = singleton.method_defined?(:error_unless_package_manager_is_obvious!) ||
-                         singleton.private_method_defined?(:error_unless_package_manager_is_obvious!)
+          had_override = singleton_defines_package_manager_check?(singleton)
           snapshot = ::Shakapacker::Utils::Manager.method(:error_unless_package_manager_is_obvious!) if had_override
         end
         example.run
       ensure
         if singleton
-          if singleton.method_defined?(:error_unless_package_manager_is_obvious!) ||
-             singleton.private_method_defined?(:error_unless_package_manager_is_obvious!)
+          if singleton_defines_package_manager_check?(singleton)
             singleton.send(:remove_method, :error_unless_package_manager_is_obvious!)
           end
           if snapshot
@@ -235,6 +242,11 @@ module ReactOnRails
                                                                   snapshot)
           end
         end
+      end
+
+      def singleton_defines_package_manager_check?(singleton)
+        singleton.instance_methods(false).include?(:error_unless_package_manager_is_obvious!) ||
+          singleton.private_instance_methods(false).include?(:error_unless_package_manager_is_obvious!)
       end
 
       context "when Shakapacker is the configured bundler" do
@@ -256,8 +268,13 @@ module ReactOnRails
           allow(described_class).to receive(:shakapacker_configured_as_bundler?).and_return(false)
         end
 
-        it "replaces error_unless_package_manager_is_obvious! with a no-op" do
+        it "skips the original guard while Shakapacker remains unconfigured" do
+          ::Shakapacker::Utils::Manager.define_singleton_method(:error_unless_package_manager_is_obvious!) do
+            raise "original guard"
+          end
+
           described_class.suppress_shakapacker_package_manager_check_if_not_bundler!
+
           expect { ::Shakapacker::Utils::Manager.error_unless_package_manager_is_obvious! }.not_to raise_error
         end
 
@@ -272,6 +289,44 @@ module ReactOnRails
           expect(Rails.logger).to have_received(:info)
             .with(a_string_including("skipping Shakapacker packageManager check"))
         end
+
+        it "does not require a Rails logger" do
+          allow(Rails).to receive(:logger).and_return(nil)
+
+          expect { described_class.suppress_shakapacker_package_manager_check_if_not_bundler! }.not_to raise_error
+        end
+      end
+
+      context "when Shakapacker becomes configured after the patch is installed" do
+        before do
+          allow(described_class).to receive(:shakapacker_configured_as_bundler?).and_return(false, true)
+        end
+
+        it "delegates back to Shakapacker's original package-manager guard" do
+          ::Shakapacker::Utils::Manager.define_singleton_method(:error_unless_package_manager_is_obvious!) do
+            raise "original guard"
+          end
+
+          described_class.suppress_shakapacker_package_manager_check_if_not_bundler!
+
+          expect { ::Shakapacker::Utils::Manager.error_unless_package_manager_is_obvious! }
+            .to raise_error(RuntimeError, "original guard")
+        end
+      end
+    end
+
+    describe ".suppress_shakapacker_package_manager_check_if_not_bundler! with missing Shakapacker internals" do
+      before do
+        stub_const("Shakapacker", Module.new)
+        allow(described_class).to receive(:shakapacker_configured_as_bundler?).and_return(false)
+        allow(Rails.logger).to receive(:warn)
+      end
+
+      it "logs a diagnostic warning" do
+        described_class.suppress_shakapacker_package_manager_check_if_not_bundler!
+
+        expect(Rails.logger).to have_received(:warn)
+          .with(a_string_including("Shakapacker::Utils::Manager is not defined"))
       end
     end
 
