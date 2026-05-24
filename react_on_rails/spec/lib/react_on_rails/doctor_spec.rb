@@ -3379,6 +3379,7 @@ RSpec.describe ReactOnRails::Doctor do
                           .find { |line| line.include?(".circleci/config.yml →") }
         expect(suggestion_line).not_to be_nil
         expect(suggestion_line).to include("pre_seed_renderer_cache")
+        expect(suggestion_line).to include("MODE=symlink")
       end
     end
 
@@ -3405,6 +3406,21 @@ RSpec.describe ReactOnRails::Doctor do
                           .find { |line| line.include?("Jenkinsfile →") }
         expect(suggestion_line).not_to be_nil
         expect(suggestion_line).to include("pre_seed_renderer_cache")
+        expect(suggestion_line).to include("MODE=symlink")
+      end
+
+      it "still flags a //-commented reference as a known Groovy false positive" do
+        File.write(
+          File.join(tmpdir, "Jenkinsfile"),
+          "// sh 'bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer'\n"
+        )
+
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        suggestion_line = warning_msgs
+                          .flat_map { |m| m[:content].split("\n") }
+                          .find { |line| line.include?("Jenkinsfile →") }
+        expect(suggestion_line).not_to be_nil
       end
     end
 
