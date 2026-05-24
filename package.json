@@ -157,6 +157,7 @@
     },
     "// for onlyBuiltDependencies": [
       "pnpm 10 blocks lifecycle scripts by default. Allowlist packages we trust.",
+      "When adding native or compiled dependencies, run pnpm ignored-builds and add trusted packages here.",
       "@swc/core: postinstall verifies the platform-specific native binary loads.",
       "unrs-resolver: napi-postinstall check, used by eslint-import-resolver-typescript."
     ],
