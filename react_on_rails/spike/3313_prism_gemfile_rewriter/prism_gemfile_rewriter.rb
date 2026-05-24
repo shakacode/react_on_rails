@@ -15,6 +15,10 @@ module ReactOnRails
       PRO_GEM_NAME = "react_on_rails_pro"
       NEWLINE_BYTE = "\n".ord
       SEMICOLON_BYTE = ";".ord
+      COMMENT_BYTE = "#".ord
+      BACKSLASH_BYTE = "\\".ord
+      DOUBLE_QUOTE_BYTE = '"'.ord
+      SINGLE_QUOTE_BYTE = "'".ord
       SOURCE_OPTION_KEYS = %w[git github path].freeze
 
       Result = Struct.new(
@@ -55,8 +59,8 @@ module ReactOnRails
         end
 
         has_active_pro = pro_calls.any?
-        preexisting_empty_conditional_fingerprints =
-          has_active_pro ? empty_conditional_fingerprints(source, program) : []
+        preexisting_empty_counts =
+          has_active_pro ? empty_conditional_fingerprints(source, program).tally : {}
         edits = base_calls.map do |call|
           if has_active_pro
             removal_edit(source, call)
@@ -69,7 +73,7 @@ module ReactOnRails
         if has_active_pro
           new_source = collapse_dead_conditionals(
             new_source,
-            preexisting_empty_conditional_fingerprints
+            preexisting_empty_counts
           )
         end
 
@@ -166,20 +170,19 @@ module ReactOnRails
       def statement_byte_range(source, node)
         line_start = line_start_offset(source, node.location.start_offset)
         line_end = line_end_offset(source, node.location.end_offset)
-        statement_end = node.location.end_offset
-
-        while statement_end < line_end
-          byte = source.getbyte(statement_end)
-          break if byte == NEWLINE_BYTE || byte == SEMICOLON_BYTE
-
-          statement_end += 1
-        end
+        next_semicolon = next_semicolon_offset(
+          source,
+          line_start_offset(source, node.location.end_offset),
+          line_end,
+          node.location.end_offset
+        )
+        statement_end = next_semicolon || line_terminator_offset(source, line_end)
 
         previous_semicolon = previous_semicolon_offset(source, line_start, node.location.start_offset)
         if previous_semicolon
           [previous_semicolon, statement_end]
-        elsif statement_end < line_end && source.getbyte(statement_end) == SEMICOLON_BYTE
-          end_offset = statement_end + 1
+        elsif next_semicolon
+          end_offset = next_semicolon + 1
           end_offset += 1 while end_offset < line_end && horizontal_space?(source.getbyte(end_offset))
           [line_start, end_offset]
         else
@@ -188,14 +191,44 @@ module ReactOnRails
       end
 
       def previous_semicolon_offset(source, line_start, statement_start)
-        scan = statement_start - 1
-        while scan >= line_start
-          return scan if source.getbyte(scan) == SEMICOLON_BYTE
+        statement_separator_offsets(source, line_start, statement_start).last
+      end
 
-          scan -= 1
+      def next_semicolon_offset(source, line_start, line_end, statement_end)
+        statement_separator_offsets(source, line_start, line_end).find { |offset| offset >= statement_end }
+      end
+
+      def statement_separator_offsets(source, line_start, line_end)
+        offsets = []
+        quote_byte = nil
+        scan = line_start
+
+        while scan < line_end
+          byte = source.getbyte(scan)
+          break if byte == NEWLINE_BYTE || (!quote_byte && byte == COMMENT_BYTE)
+
+          if quote_byte
+            if byte == BACKSLASH_BYTE
+              scan += 2
+              next
+            end
+
+            quote_byte = nil if byte == quote_byte
+          elsif byte == DOUBLE_QUOTE_BYTE || byte == SINGLE_QUOTE_BYTE
+            quote_byte = byte
+          elsif byte == SEMICOLON_BYTE
+            offsets << scan
+          end
+
+          scan += 1
         end
 
-        nil
+        offsets
+      end
+
+      def line_terminator_offset(source, line_end)
+        newline_offset = line_end - 1
+        newline_offset >= 0 && source.getbyte(newline_offset) == NEWLINE_BYTE ? newline_offset : line_end
       end
 
       def horizontal_space?(byte)
@@ -239,35 +272,61 @@ module ReactOnRails
       #   variants; after migration there is only one variant, so the conditional has
       #   no remaining purpose).
       # - Otherwise, if a branch is empty, only that branch is removed.
-      def collapse_dead_conditionals(source, preexisting_empty_conditional_fingerprints)
+      def collapse_dead_conditionals(source, preexisting_empty_counts)
         loop do
           parse_result = Prism.parse(source)
           break source if parse_result.failure?
 
-          edit = find_collapse_edit(source, parse_result.value, preexisting_empty_conditional_fingerprints)
+          seen_empty_conditional_fingerprints = Hash.new(0)
+          edit = find_collapse_edit(
+            source,
+            parse_result.value,
+            preexisting_empty_counts,
+            seen_empty_conditional_fingerprints
+          )
           break source unless edit
 
           source = splice_source(source, edit[:start_offset], edit[:end_offset], edit[:replacement])
         end
       end
 
-      def find_collapse_edit(source, node, preexisting_empty_conditional_fingerprints)
+      def find_collapse_edit(
+        source,
+        node,
+        preexisting_empty_counts,
+        seen_empty_conditional_fingerprints
+      )
         return nil unless node
 
         if node.is_a?(Prism::IfNode) || node.is_a?(Prism::UnlessNode)
-          edit = collapse_edit_for_conditional(source, node, preexisting_empty_conditional_fingerprints)
+          edit = collapse_edit_for_conditional(
+            source,
+            node,
+            preexisting_empty_counts,
+            seen_empty_conditional_fingerprints
+          )
           return edit if edit
         end
 
         node.compact_child_nodes.each do |child|
-          edit = find_collapse_edit(source, child, preexisting_empty_conditional_fingerprints)
+          edit = find_collapse_edit(
+            source,
+            child,
+            preexisting_empty_counts,
+            seen_empty_conditional_fingerprints
+          )
           return edit if edit
         end
 
         nil
       end
 
-      def collapse_edit_for_conditional(source, node, preexisting_empty_conditional_fingerprints)
+      def collapse_edit_for_conditional(
+        source,
+        node,
+        preexisting_empty_counts,
+        seen_empty_conditional_fingerprints
+      )
         # Postfix modifiers and ternary-style conditionals have node.end_keyword_loc == nil.
         # Only block-form `if/unless ... end` is considered for collapse.
         return nil unless node.respond_to?(:end_keyword_loc) && node.end_keyword_loc
@@ -281,7 +340,11 @@ module ReactOnRails
         else_empty = has_else_node && branch_empty?(else_statements)
 
         fingerprint = conditional_empty_branch_fingerprint(source, node)
-        return nil if preexisting_empty_conditional_fingerprints.include?(fingerprint)
+        if fingerprint
+          seen_empty_conditional_fingerprints[fingerprint] += 1
+          return nil if seen_empty_conditional_fingerprints[fingerprint] <=
+                        preexisting_empty_counts[fingerprint].to_i
+        end
 
         if then_empty && has_else_node && !else_empty
           collapse_to_branch(source, node, else_statements) || remove_empty_then_branch(source, node)
@@ -360,11 +423,33 @@ module ReactOnRails
         gem_text = byte_slice(source, gem_call.location.start_offset, gem_call.location.end_offset)
         # Preserve indentation of the original conditional.
         indent = leading_indentation(source, conditional.location.start_offset)
-        {
-          start_offset: line_start_offset(source, conditional.location.start_offset),
-          end_offset: line_end_offset(source, conditional.location.end_offset),
-          replacement: "#{indent}#{gem_text}\n"
-        }
+        collapse_replacement_edit(source, conditional, "#{indent}#{gem_text}\n", gem_text)
+      end
+
+      def collapse_replacement_edit(source, conditional, full_line_replacement, inline_replacement)
+        line_start = line_start_offset(source, conditional.location.start_offset)
+        line_end = line_end_offset(source, conditional.location.end_offset)
+        next_semicolon = next_semicolon_offset(
+          source,
+          line_start_offset(source, conditional.location.end_offset),
+          line_end,
+          conditional.location.end_offset
+        )
+        previous_semicolon = previous_semicolon_offset(source, line_start, conditional.location.start_offset)
+
+        if previous_semicolon || next_semicolon
+          {
+            start_offset: conditional.location.start_offset,
+            end_offset: conditional.location.end_offset,
+            replacement: inline_replacement
+          }
+        else
+          {
+            start_offset: line_start,
+            end_offset: line_end,
+            replacement: full_line_replacement
+          }
+        end
       end
 
       def single_pro_gem_call?(statements_node)

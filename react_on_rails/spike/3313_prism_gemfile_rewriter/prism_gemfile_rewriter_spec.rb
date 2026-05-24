@@ -316,6 +316,24 @@ RSpec.describe ReactOnRails::Spike::PrismGemfileRewriter do
         expect_parseable_ruby(result.content)
       end
 
+      it "ignores semicolons in trailing comments when removing a stale base declaration" do
+        src = <<~RUBY
+          gem "react_on_rails", "~> 16.0" # old; remove
+          gem "react_on_rails_pro", "~> 16.0"
+        RUBY
+        result = rewriter.rewrite(src)
+        expect(result.content).to eq("gem \"react_on_rails_pro\", \"~> 16.0\"\n")
+        expect_parseable_ruby(result.content)
+      end
+
+      it "ignores semicolons in quoted postfix guards when removing a stale base declaration" do
+        src = 'gem "react_on_rails" if ENV["ROR;ENABLED"]; gem "react_on_rails_pro", "~> 16.0"' \
+              "\n"
+        result = rewriter.rewrite(src)
+        expect(result.content).to eq("gem \"react_on_rails_pro\", \"~> 16.0\"\n")
+        expect_parseable_ruby(result.content)
+      end
+
       it "removes stale base when Pro is parenthesized with comments" do
         src = <<~RUBY
           source "https://rubygems.org"
@@ -373,6 +391,19 @@ RSpec.describe ReactOnRails::Spike::PrismGemfileRewriter do
         expect_parseable_ruby(result.content)
       end
 
+      it "preserves same-line sibling statements when collapsing a conditional" do
+        src = <<~RUBY
+          if ENV["PRO"]
+            gem "react_on_rails_pro", "16.0.0"
+          else
+            gem "react_on_rails", "16.0.0"
+          end; gem "rails"
+        RUBY
+        result = rewriter.rewrite(src)
+        expect(result.content).to eq("gem \"react_on_rails_pro\", \"16.0.0\"; gem \"rails\"\n")
+        expect_parseable_ruby(result.content)
+      end
+
       it "does not collapse pre-existing empty branches when removing stale base elsewhere" do
         src = <<~RUBY
           if ENV["ENABLE_ROR"]
@@ -387,6 +418,29 @@ RSpec.describe ReactOnRails::Spike::PrismGemfileRewriter do
             gem "react_on_rails_pro", "~> 16.0"
           else
           end
+        RUBY
+        expect_parseable_ruby(result.content)
+      end
+
+      it "only skips as many duplicate empty conditionals as were already empty" do
+        src = <<~RUBY
+          if ENV["ENABLE_ROR"]
+            gem "react_on_rails_pro", "~> 16.0"
+          else
+          end
+          if ENV["ENABLE_ROR"]
+            gem "react_on_rails_pro", "~> 16.0"
+          else
+            gem "react_on_rails", "~> 16.0"
+          end
+        RUBY
+        result = rewriter.rewrite(src)
+        expect(result.content).to eq(<<~RUBY)
+          if ENV["ENABLE_ROR"]
+            gem "react_on_rails_pro", "~> 16.0"
+          else
+          end
+          gem "react_on_rails_pro", "~> 16.0"
         RUBY
         expect_parseable_ruby(result.content)
       end
