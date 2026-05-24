@@ -68,6 +68,49 @@ async function compatAct(callback: () => void | Promise<void>): Promise<void> {
   await actFn(callback);
 }
 
+function buildStoresHydrationHarness({ useBatch = false }: { useBatch?: boolean } = {}) {
+  const router = buildRouter();
+  delete router.__store;
+  router.matchRoutes = jest.fn().mockReturnValue([{ id: '/products', status: 'pending', updatedAt: 0 }]);
+
+  const stores = {
+    status: { set: jest.fn() },
+    resolvedLocation: { set: jest.fn() },
+    setMatches: jest.fn(),
+  };
+  const batch = useBatch ? jest.fn((callback: () => void) => callback()) : undefined;
+  const routerWithStores = router as TanStackRouter & { batch?: typeof batch; stores: typeof stores };
+  routerWithStores.stores = stores;
+  if (batch) {
+    routerWithStores.batch = batch;
+  }
+
+  const renderFn = createTanStackRouterRenderFunction(
+    { createRouter: () => router },
+    {
+      RouterProvider: (_: { router: TanStackRouter }) => React.createElement('div'),
+      createMemoryHistory: jest.fn(),
+      createBrowserHistory: jest.fn().mockReturnValue({
+        location: { pathname: '/products', search: '', hash: '', href: '/products', state: null },
+      }),
+    },
+  );
+
+  const props = {
+    __tanstackRouterDehydratedState: {
+      url: '/products',
+      dehydratedRouter: null,
+      ssrRouter: {
+        manifest: undefined,
+        lastMatchId: '\u0000products',
+        matches: [{ i: '\u0000products', l: { products: ['hammer'] }, s: 'success', u: 456 }],
+      },
+    },
+  };
+
+  return { router, stores, batch, renderFn, props };
+}
+
 describe('tanstack-router integration (Pro)', () => {
   it('returns a Promise with serverRenderHash on server-side render', async () => {
     const router = buildRouter();
@@ -452,39 +495,7 @@ describe('tanstack-router integration (Pro)', () => {
   });
 
   it('injects SSR match data through router.stores when router.__store is unavailable', () => {
-    const router = buildRouter();
-    delete router.__store;
-    router.matchRoutes = jest.fn().mockReturnValue([{ id: '/products', status: 'pending', updatedAt: 0 }]);
-
-    const stores = {
-      status: { set: jest.fn() },
-      resolvedLocation: { set: jest.fn() },
-      setMatches: jest.fn(),
-    };
-    (router as TanStackRouter & { stores: typeof stores }).stores = stores;
-
-    const renderFn = createTanStackRouterRenderFunction(
-      { createRouter: () => router },
-      {
-        RouterProvider: (_: { router: TanStackRouter }) => React.createElement('div'),
-        createMemoryHistory: jest.fn(),
-        createBrowserHistory: jest.fn().mockReturnValue({
-          location: { pathname: '/products', search: '', hash: '', href: '/products', state: null },
-        }),
-      },
-    );
-
-    const props = {
-      __tanstackRouterDehydratedState: {
-        url: '/products',
-        dehydratedRouter: null,
-        ssrRouter: {
-          manifest: undefined,
-          lastMatchId: '\u0000products',
-          matches: [{ i: '\u0000products', l: { products: ['hammer'] }, s: 'success', u: 456 }],
-        },
-      },
-    };
+    const { router, stores, renderFn, props } = buildStoresHydrationHarness();
     const result = renderFn(props, {
       serverSide: false,
       pathname: '/products',
@@ -505,42 +516,7 @@ describe('tanstack-router integration (Pro)', () => {
   });
 
   it('batches router.stores hydration when router.batch is available', () => {
-    const router = buildRouter();
-    delete router.__store;
-    router.matchRoutes = jest.fn().mockReturnValue([{ id: '/products', status: 'pending', updatedAt: 0 }]);
-
-    const stores = {
-      status: { set: jest.fn() },
-      resolvedLocation: { set: jest.fn() },
-      setMatches: jest.fn(),
-    };
-    const batch = jest.fn((callback: () => void) => callback());
-    const routerWithStores = router as TanStackRouter & { batch: typeof batch; stores: typeof stores };
-    routerWithStores.stores = stores;
-    routerWithStores.batch = batch;
-
-    const renderFn = createTanStackRouterRenderFunction(
-      { createRouter: () => router },
-      {
-        RouterProvider: (_: { router: TanStackRouter }) => React.createElement('div'),
-        createMemoryHistory: jest.fn(),
-        createBrowserHistory: jest.fn().mockReturnValue({
-          location: { pathname: '/products', search: '', hash: '', href: '/products', state: null },
-        }),
-      },
-    );
-
-    const props = {
-      __tanstackRouterDehydratedState: {
-        url: '/products',
-        dehydratedRouter: null,
-        ssrRouter: {
-          manifest: undefined,
-          lastMatchId: '\u0000products',
-          matches: [{ i: '\u0000products', l: { products: ['hammer'] }, s: 'success', u: 456 }],
-        },
-      },
-    };
+    const { router, stores, batch, renderFn, props } = buildStoresHydrationHarness({ useBatch: true });
     const result = renderFn(props, {
       serverSide: false,
       pathname: '/products',

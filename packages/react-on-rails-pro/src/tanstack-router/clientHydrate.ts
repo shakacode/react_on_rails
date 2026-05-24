@@ -27,7 +27,7 @@ type TanStackRouterStoresHydrationInternals = TanStackRouter & {
   matchRoutes: (location: unknown) => unknown[];
   stores: {
     status: TanStackRouterWritableStore<string>;
-    resolvedLocation: TanStackRouterWritableStore;
+    resolvedLocation: TanStackRouterWritableStore<TanStackRouter['state']['location']>;
     setMatches: (nextMatches: unknown[]) => void;
   };
   batch?: (callback: () => void) => void;
@@ -120,7 +120,8 @@ function raiseMissingHydrationInternals(): never {
   throw new Error(
     'react-on-rails-pro/tanstack-router: router.matchRoutes() and router.__store.setState() or ' +
       'router.stores.setMatches() are required but not available. Ensure @tanstack/react-router ' +
-      '>=1.139.0 <2.0.0 is installed.',
+      '>=1.139.0 <2.0.0 is installed; older 1.x routers expose __store.setState(), while newer ' +
+      '1.x routers expose stores.setMatches().',
   );
 }
 
@@ -138,8 +139,8 @@ function applyHydrationMatches(router: TanStackRouter, matches: unknown[]): void
   if (hasStoresHydrationApi(router)) {
     const applyStoresUpdate = (): void => {
       router.stores.status.set('idle');
-      // Equivalent to the legacy updater's s.location snapshot; this runs
-      // synchronously before the freshly-created router can be rendered.
+      // The freshly-created router has not rendered or awaited work yet, so
+      // router.state.location matches the legacy __store updater's s.location.
       router.stores.resolvedLocation.set(router.state.location);
       router.stores.setMatches(matches);
     };
@@ -147,6 +148,9 @@ function applyHydrationMatches(router: TanStackRouter, matches: unknown[]): void
     if (typeof router.batch === 'function') {
       router.batch(applyStoresUpdate);
     } else {
+      // Without router.batch, the stores API cannot make these writes atomic like
+      // legacy __store.setState(); this render-phase update runs before
+      // RouterProvider subscribes, so hydration still starts from the final state.
       applyStoresUpdate();
     }
     return;
