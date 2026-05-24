@@ -11,35 +11,13 @@ if [ -z "$files" ]; then
   exit 0
 fi
 
-# Separate files into root and Pro directories
-root_files=$(echo "$files" | grep -v '^react_on_rails_pro/' || true)
-pro_files=$(echo "$files" | grep '^react_on_rails_pro/' || true)
-
-# Format root files
-if [ -n "$root_files" ]; then
-  if [ "$CONTEXT" = "all-changed" ]; then
-    echo "💅 Prettier on root changed files:"
-  else
-    echo "💅 Prettier on root $CONTEXT files:"
-  fi
-  printf "  %s\n" $root_files
-
-  pnpm exec prettier --write $root_files
+if [ "$CONTEXT" = "all-changed" ]; then
+  echo "💅 Prettier on changed files:"
+else
+  echo "💅 Prettier on $CONTEXT files:"
 fi
+printf "  %s\n" $files
 
-# Format Pro files (using Pro's Prettier config)
-if [ -n "$pro_files" ]; then
-  if [ "$CONTEXT" = "all-changed" ]; then
-    echo "💅 Prettier on Pro changed files:"
-  else
-    echo "💅 Prettier on Pro $CONTEXT files:"
-  fi
-  printf "  %s\n" $pro_files
-
-  # Strip react_on_rails_pro/ prefix for running in Pro directory
-  pro_files_relative=$(echo "$pro_files" | sed 's|^react_on_rails_pro/||')
-
-  (cd react_on_rails_pro && pnpm exec prettier --write $pro_files_relative)
-fi
+pnpm exec prettier --write $files
 
 echo "✅ Prettier formatting complete"
