@@ -93,6 +93,8 @@ function preloadMatchedRouteChunks(
     });
 }
 
+// Each guard repeats the matchRoutes check so TypeScript narrows correctly
+// when either hydration path is used independently.
 function hasLegacyHydrationStore(router: TanStackRouter): router is TanStackRouterHydrationInternals {
   return typeof router.matchRoutes === 'function' && typeof router.__store?.setState === 'function';
 }
@@ -108,7 +110,9 @@ function hasStoresHydrationApi(router: TanStackRouter): router is TanStackRouter
   );
 }
 
-function hasHydrationInternals(router: TanStackRouter): boolean {
+function hasHydrationInternals(
+  router: TanStackRouter,
+): router is TanStackRouterHydrationInternals | TanStackRouterStoresHydrationInternals {
   return hasLegacyHydrationStore(router) || hasStoresHydrationApi(router);
 }
 
@@ -134,6 +138,8 @@ function applyHydrationMatches(router: TanStackRouter, matches: unknown[]): void
   if (hasStoresHydrationApi(router)) {
     const applyStoresUpdate = (): void => {
       router.stores.status.set('idle');
+      // Equivalent to the legacy updater's s.location snapshot; this runs
+      // synchronously before the freshly-created router can be rendered.
       router.stores.resolvedLocation.set(router.state.location);
       router.stores.setMatches(matches);
     };
@@ -316,9 +322,6 @@ function TanStackHydrationApp({
         if (!hasHydrationInternals(router)) {
           raiseMissingHydrationInternals();
         }
-        const hydrationRouter = router as
-          | TanStackRouterHydrationInternals
-          | TanStackRouterStoresHydrationInternals;
 
         // Synchronously inject route matches to match server-rendered output.
         // The server fully loads routes (via router.load()) before rendering, so
@@ -330,7 +333,7 @@ function TanStackHydrationApp({
         // so routes that render from loader results can hydrate correctly.
         // Otherwise we override 'pending' to 'success' to prevent MatchInner from
         // throwing loadPromise (which would cause Suspense suspension).
-        const rawMatches = hydrationRouter.matchRoutes(hydrationRouter.state.location);
+        const rawMatches = router.matchRoutes(router.state.location);
         routeChunkPreloadPromiseRef.current = preloadMatchedRouteChunks(
           router as TanStackRouterChunkPreloadInternals,
           rawMatches,

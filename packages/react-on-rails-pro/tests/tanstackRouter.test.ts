@@ -504,6 +504,63 @@ describe('tanstack-router integration (Pro)', () => {
     ]);
   });
 
+  it('batches router.stores hydration when router.batch is available', () => {
+    const router = buildRouter();
+    delete router.__store;
+    router.matchRoutes = jest.fn().mockReturnValue([{ id: '/products', status: 'pending', updatedAt: 0 }]);
+
+    const stores = {
+      status: { set: jest.fn() },
+      resolvedLocation: { set: jest.fn() },
+      setMatches: jest.fn(),
+    };
+    const batch = jest.fn((callback: () => void) => callback());
+    const routerWithStores = router as TanStackRouter & { batch: typeof batch; stores: typeof stores };
+    routerWithStores.stores = stores;
+    routerWithStores.batch = batch;
+
+    const renderFn = createTanStackRouterRenderFunction(
+      { createRouter: () => router },
+      {
+        RouterProvider: (_: { router: TanStackRouter }) => React.createElement('div'),
+        createMemoryHistory: jest.fn(),
+        createBrowserHistory: jest.fn().mockReturnValue({
+          location: { pathname: '/products', search: '', hash: '', href: '/products', state: null },
+        }),
+      },
+    );
+
+    const props = {
+      __tanstackRouterDehydratedState: {
+        url: '/products',
+        dehydratedRouter: null,
+        ssrRouter: {
+          manifest: undefined,
+          lastMatchId: '\u0000products',
+          matches: [{ i: '\u0000products', l: { products: ['hammer'] }, s: 'success', u: 456 }],
+        },
+      },
+    };
+    const result = renderFn(props, {
+      serverSide: false,
+      pathname: '/products',
+      search: '',
+    } as unknown as RailsContext);
+
+    renderToString(React.createElement(result as React.ComponentType<Record<string, unknown>>, props));
+
+    expect(batch).toHaveBeenCalledTimes(1);
+    expect(stores.status.set).toHaveBeenCalledWith('idle');
+    expect(stores.resolvedLocation.set).toHaveBeenCalledWith(router.state.location);
+    expect(stores.setMatches).toHaveBeenCalledWith([
+      expect.objectContaining({
+        id: '/products',
+        loaderData: { products: ['hammer'] },
+        status: 'success',
+      }),
+    ]);
+  });
+
   it('does not pass __tanstackRouterDehydratedState through AppWrapper props', () => {
     const router = buildRouter();
     const observedProps: Array<Record<string, unknown>> = [];
