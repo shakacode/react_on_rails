@@ -204,6 +204,8 @@ jobs:
       - name: Fix dependency for libyaml-dev
         run: sudo apt-get update && sudo apt-get install -y libyaml-dev
 
+      # Sets up Ruby/Bundler for unconditional steps like `gem env home`.
+      # Dummy app gems are installed in the conditional bundler-cache steps below.
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
