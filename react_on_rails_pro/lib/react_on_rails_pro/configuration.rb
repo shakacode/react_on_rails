@@ -67,10 +67,29 @@ module ReactOnRailsPro
     DEFAULT_REACT_CLIENT_MANIFEST_FILE = "react-client-manifest.json"
     DEFAULT_REACT_SERVER_CLIENT_MANIFEST_FILE = "react-server-client-manifest.json"
     DEFAULT_CONCURRENT_COMPONENT_STREAMING_BUFFER_SIZE = 64
+    RENDERER_HTTP_POOL_SIZE_WARNING = "[ReactOnRailsPro] config.renderer_http_pool_size now limits concurrent HTTP/2 " \
+                                      "streams on each request-scoped async-http client; it no longer configures a " \
+                                      "persistent process-wide renderer connection pool."
+    RENDERER_HTTP_POOL_SIZE_WARNING_MUTEX = Mutex.new
     ROLLING_DEPLOY_UPLOAD_POSITIONAL_PARAMS = %i[req opt rest].freeze
     ROLLING_DEPLOY_UPLOAD_KEYWORD_PARAMS = %i[key keyreq].freeze
     ROLLING_DEPLOY_UPLOAD_ALL_KEYWORD_PARAMS = %i[keyrest].freeze
     ROLLING_DEPLOY_UPLOAD_REQUIRED_KEYWORDS = %i[bundle assets].freeze
+
+    private_constant :RENDERER_HTTP_POOL_SIZE_WARNING,
+                     :RENDERER_HTTP_POOL_SIZE_WARNING_MUTEX
+
+    # Class-level warning guard so repeated configuration reloads in one process do not spam logs.
+    @renderer_http_pool_size_warning_emitted = false
+
+    class << self
+      private
+
+      # :nodoc: Test helper for resetting the one-time async-http pool-size warning guard.
+      def reset_renderer_http_pool_size_warning!
+        RENDERER_HTTP_POOL_SIZE_WARNING_MUTEX.synchronize { @renderer_http_pool_size_warning_emitted = false }
+      end
+    end
 
     attr_accessor :renderer_url, :renderer_password, :tracing,
                   :server_renderer, :renderer_use_fallback_exec_js, :prerender_caching,
@@ -109,11 +128,7 @@ module ReactOnRailsPro
     # still valid but no longer changes process-wide connection reuse.
     # Setting nil keeps the default stream limit at request time; it is not unlimited.
     def renderer_http_pool_size=(value)
-      unless value.nil? || value == DEFAULT_RENDERER_HTTP_POOL_SIZE
-        Rails.logger.warn "[ReactOnRailsPro] config.renderer_http_pool_size now limits concurrent HTTP/2 streams " \
-                          "on each request-scoped async-http client; it no longer configures a persistent " \
-                          "process-wide renderer connection pool."
-      end
+      warn_renderer_http_pool_size_once unless value.nil? || value == DEFAULT_RENDERER_HTTP_POOL_SIZE
       @renderer_http_pool_size = value
     end
 
@@ -234,6 +249,15 @@ module ReactOnRailsPro
     end
 
     private
+
+    def warn_renderer_http_pool_size_once
+      RENDERER_HTTP_POOL_SIZE_WARNING_MUTEX.synchronize do
+        unless self.class.instance_variable_get(:@renderer_http_pool_size_warning_emitted)
+          Rails.logger.warn RENDERER_HTTP_POOL_SIZE_WARNING
+          self.class.instance_variable_set(:@renderer_http_pool_size_warning_emitted, true)
+        end
+      end
+    end
 
     def assign_initial_renderer_http_pool_size(value)
       @renderer_http_pool_size = value

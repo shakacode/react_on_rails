@@ -50,6 +50,21 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       expect(socket).to be(fake_socket)
       expect(socket.timeout).to be_nil
     end
+
+    it "fails fast when the connected socket cannot clear its timeout" do
+      wrapper = described_class.new(0.25)
+      fake_socket = Class.new do
+        def setsockopt(*); end
+
+        def close; end
+      end.new
+
+      allow(Socket).to receive(:new).and_return(fake_socket)
+      allow(wrapper).to receive(:socket_connect)
+
+      expect { wrapper.connect(Addrinfo.tcp("127.0.0.1", 80)) }
+        .to raise_error(ReactOnRailsPro::RendererHttpClient::Error, /does not support timeout=/)
+    end
   end
 
   describe ReactOnRailsPro::RendererHttpClient::Response do

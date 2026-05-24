@@ -124,6 +124,8 @@ module ReactOnRailsPro
     def process_response_chunks(stream_response, error_body, &block)
       first_chunk_start_time = Time.now
       first_chunk_seen = false
+      error_status_checked = false
+      has_error_status = false
       parser = ReactOnRails::LengthPrefixedParser.new
 
       stream_response.each do |chunk|
@@ -132,7 +134,12 @@ module ReactOnRailsPro
           first_chunk_seen = true
         end
 
-        if response_has_error_status?(stream_response)
+        unless error_status_checked
+          has_error_status = response_has_error_status?(stream_response)
+          error_status_checked = true
+        end
+
+        if has_error_status
           error_body << chunk
           next
         end

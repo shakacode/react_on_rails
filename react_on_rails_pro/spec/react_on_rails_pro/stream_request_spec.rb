@@ -58,6 +58,39 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       expect(error_body).to eq("")
     end
 
+    it "checks error status once after a lazy stream starts" do
+      lpp_chunks = [
+        "{}\t00000005\nFirst",
+        "{}\t00000006\nSecond"
+      ]
+      response = Class.new do
+        attr_reader :error_checks
+
+        def initialize(chunks)
+          @chunks = chunks
+          @error_checks = 0
+        end
+
+        def each(&block)
+          @chunks.each(&block)
+        end
+
+        def error?
+          @error_checks += 1
+          false
+        end
+      end.new(lpp_chunks)
+
+      yielded_chunks = []
+      request.send(:process_response_chunks, response, error_body) do |chunk|
+        yielded_chunks << chunk
+      end
+
+      expect(response.error_checks).to eq(1)
+      expect(yielded_chunks).to eq([{ "html" => "First" }, { "html" => "Second" }])
+      expect(error_body).to eq("")
+    end
+
     it "surfaces malformed fallback responses with a clear adapter error" do
       response = Class.new do
         def each

@@ -719,6 +719,10 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
     end
 
     describe ".renderer_http_pool_size" do
+      before do
+        described_class.send(:reset_renderer_http_pool_size_warning!)
+      end
+
       it "defaults to 10" do
         ReactOnRailsPro.configure {} # rubocop:disable Lint/EmptyBlock
 
@@ -737,6 +741,22 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
         end
 
         expect(ReactOnRailsPro.configuration.renderer_http_pool_size).to eq(20)
+      end
+
+      it "warns only once for repeated non-default assignments" do
+        allow(Rails.logger).to receive(:warn)
+
+        ReactOnRailsPro.configure do |config|
+          config.renderer_http_pool_size = 20
+          config.renderer_http_pool_size = 30
+        end
+
+        expect(Rails.logger).to have_received(:warn).with(
+          "[ReactOnRailsPro] config.renderer_http_pool_size now limits concurrent HTTP/2 streams " \
+          "on each request-scoped async-http client; it no longer configures a persistent " \
+          "process-wide renderer connection pool."
+        ).once
+        expect(ReactOnRailsPro.configuration.renderer_http_pool_size).to eq(30)
       end
 
       it "does not warn for the default value assigned during configuration initialization" do

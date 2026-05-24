@@ -56,8 +56,8 @@ module ReactOnRailsPro
       end
 
       def connect(remote_address, **options)
-        socket = super(remote_address, **options.merge(connect_timeout ? { timeout: connect_timeout } : {}))
-        clear_timeout(socket)
+        socket = super(remote_address, **options.merge({ timeout: connect_timeout }.compact))
+        clear_timeout(socket) if connect_timeout
 
         return socket unless block_given?
 
@@ -71,7 +71,11 @@ module ReactOnRailsPro
       private
 
       def clear_timeout(socket)
-        socket.timeout = nil if socket.respond_to?(:timeout=)
+        unless socket.respond_to?(:timeout=)
+          raise Error, "#{socket.class} does not support timeout=; re-check io-endpoint socket timeout handling."
+        end
+
+        socket.timeout = nil
       end
     end
 
@@ -330,6 +334,7 @@ module ReactOnRailsPro
     rescue Async::TimeoutError, IO::TimeoutError => e
       raise TimeoutError, e.message
     rescue *CONNECTION_ERRORS => e
+      # Errno::ETIMEDOUT is an OS-level connection failure; async-http request deadlines are rescued above.
       raise ConnectionError, e.message
     end
 
