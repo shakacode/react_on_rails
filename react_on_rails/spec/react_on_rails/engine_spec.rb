@@ -1,6 +1,10 @@
 # frozen_string_literal: true
 
+require "json"
+require "open3"
+require "rbconfig"
 require_relative "spec_helper"
+require "tmpdir"
 
 module ReactOnRails
   RSpec.describe Engine do
@@ -287,6 +291,93 @@ module ReactOnRails
       it "delegates to suppress_shakapacker_package_manager_check_if_not_bundler!" do
         expect(described_class).to receive(:suppress_shakapacker_package_manager_check_if_not_bundler!)
         initializer.run
+      end
+    end
+
+    describe "booting Rails without config/shakapacker.yml" do
+      let(:lib_path) { File.expand_path("../../lib", __dir__) }
+      let(:npm_version) { ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(ReactOnRails::VERSION) }
+      let(:boot_script) do
+        <<~RUBY
+          require "logger"
+          require "pathname"
+
+          lib_path = ARGV.fetch(0)
+          app_root = Pathname.new(ARGV.fetch(1))
+          $LOAD_PATH.unshift(lib_path)
+
+          require "rails"
+          require "action_controller/railtie"
+          require "react_on_rails"
+
+          module ViteOnlyBootApp
+          end
+
+          ViteOnlyBootApp.const_set(
+            :Application,
+            Class.new(Rails::Application) do
+              config.root = app_root
+              config.eager_load = false
+              config.secret_key_base = "test-secret"
+              config.logger = Logger.new($stdout)
+              config.load_defaults Rails::VERSION::STRING.to_f
+            end
+          )
+
+          ViteOnlyBootApp::Application.initialize!
+          puts "booted"
+        RUBY
+      end
+
+      def write_vite_only_package_files(app_root, npm_version)
+        FileUtils.mkdir_p(File.join(app_root, "config"))
+        File.write(
+          File.join(app_root, "package.json"),
+          JSON.pretty_generate(
+            "private" => true,
+            "dependencies" => {
+              "react-on-rails" => npm_version
+            }
+          )
+        )
+        File.write(
+          File.join(app_root, "pnpm-lock.yaml"),
+          <<~YAML
+            lockfileVersion: '9.0'
+            packages: {}
+          YAML
+        )
+      end
+
+      it "boots a Vite/client-only style app without Shakapacker package-manager guard failure" do
+        Dir.mktmpdir("react-on-rails-vite-only") do |app_root|
+          write_vite_only_package_files(app_root, npm_version)
+
+          stdout, stderr, status = Open3.capture3(
+            {
+              "APP_ROOT" => app_root,
+              "RAILS_ENV" => "test",
+              "REACT_ON_RAILS_SKIP_VALIDATION" => nil
+            },
+            RbConfig.ruby,
+            "-e",
+            boot_script,
+            lib_path,
+            app_root
+          )
+
+          expect(status).to be_success, <<~MSG
+            Expected a Rails app with no config/shakapacker.yml, no packageManager field,
+            and a pnpm lockfile to boot after requiring react_on_rails.
+
+            stdout:
+            #{stdout}
+
+            stderr:
+            #{stderr}
+          MSG
+          expect(stdout).to include("booted")
+        end
       end
     end
 

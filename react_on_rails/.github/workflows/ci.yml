@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          # ruby-version: "3.3"  # Uncomment and set if you don't have a .ruby-version file
+          bundler-cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          # "lts/*" tracks the current Node LTS; consider pinning (e.g. "22") for reproducible builds.
+          node-version: "lts/*"
+
+      - name: Install JS dependencies
+        run: npm install
+
+      - name: Build JavaScript bundles
+        # Shakapacker default. ViteRuby users: replace with `bin/vite build --mode test`.
+        run: bin/shakapacker
+        env:
+          RAILS_ENV: test
+          NODE_ENV: test
+
+      - name: Run tests
+        run: bin/rails test
+        env:
+          RAILS_ENV: test
