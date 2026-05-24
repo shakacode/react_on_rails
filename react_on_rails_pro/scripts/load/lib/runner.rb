@@ -30,26 +30,21 @@ module RendererHarness
     end
 
     def run_by_count
-      remaining = @config.requests
-      remaining_mutex = Mutex.new
+      @remaining = @config.requests
+      @remaining_mutex = Mutex.new
       Array.new(@config.concurrency) do
         Thread.new do
           @scenario.warmup(@config.warmup) if @config.warmup.positive?
-          loop do
-            claimed = claim_request(remaining_mutex, remaining) { |n| remaining = n }
-            break unless claimed
-
-            record(@scenario.perform_request)
-          end
+          record(@scenario.perform_request) while claim_request
         end
       end
     end
 
-    def claim_request(mutex, remaining)
-      mutex.synchronize do
-        return nil if remaining <= 0
+    def claim_request
+      @remaining_mutex.synchronize do
+        return false if @remaining <= 0
 
-        yield(remaining - 1)
+        @remaining -= 1
         true
       end
     end
