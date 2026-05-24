@@ -63,10 +63,11 @@ as part of this spike" non-goal.
    `react_on_rails_pro`.
 3. Decide based on whether an active Pro gem is present:
    - **No Pro gem:** for each base call, replace the first string literal with
-     `react_on_rails_pro`. If the call has no user version pin (no second positional
-     `StringNode`), splice in the default version literal after the gem name.
+     `react_on_rails_pro`. If the call has no user version requirement and no source
+     option (`git:`, `github:`, or `path:`), splice in the default version literal
+     after the gem name.
    - **Pro gem already present:** for each base call, remove its enclosing
-     statement byte range (line start through trailing newline).
+     statement byte range without deleting unrelated semicolon-separated statements.
 4. After removals, re-parse and find any `if/unless ... end` whose branch became
    empty. If the conditional's surviving branch contains exactly the Pro gem call,
    collapse the conditional to that single declaration. Otherwise remove just the
@@ -98,6 +99,8 @@ prototype as written:
 | No final newline                                           | ✅                                  | ✅                         |
 | Duplicate declarations across groups                       | ✅                                  | ✅                         |
 | Active Pro present, base stale                             | ✅ (removes base)                   | ✅                         |
+| Active Pro present, base on shared line                    | ✅                                  | ⚠️ removes full line       |
+| Non-string version requirement (`SOME_VERSION`)            | ✅                                  | ⚠️ adds default version    |
 | Conditional with `if/else` (both branches base)            | ✅ (rewrites both)                  | ✅                         |
 | Conditional with `if pro / else base`                      | ✅ **collapses to single Pro decl** | ⚠️ **leaves empty `else`** |
 
@@ -115,6 +118,14 @@ The only **observable behavior differences**:
 
    This is the policy choice asked for in the issue's acceptance criteria. See
    "Conditional/empty-branch policy" below for the reasoning.
+
+3. **Non-literal version/source declarations.** The Prism prototype treats any
+   positional argument and `git:`, `github:`, or `path:` source option as an existing
+   user requirement, so it does not inject the default Pro version into those calls.
+   This avoids adding redundant or conflicting constraints to source-backed gems.
+4. **Semicolon-separated statements.** When removing stale base declarations, the
+   Prism prototype removes only the matched statement instead of the whole source
+   line, so neighboring gem declarations survive.
 
 ## Conditional / empty-branch policy
 

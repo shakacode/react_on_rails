@@ -17,8 +17,9 @@ RSpec.describe ReactOnRails::Spike::PrismGemfileRewriter do
 
   def expect_parseable_ruby(content)
     parse_result = Prism.parse(content)
+    error_messages = parse_result.errors.map(&:message).join(", ")
     expect(parse_result.failure?).to be(false),
-                                     "expected parseable Ruby, got errors: #{parse_result.errors.map(&:message).join(', ')}"
+                                     "expected parseable Ruby, got errors: #{error_messages}"
   end
 
   describe "#rewrite" do
@@ -54,6 +55,18 @@ RSpec.describe ReactOnRails::Spike::PrismGemfileRewriter do
         result = rewriter.rewrite(src)
         expect(result.content).to eq("gem \"react_on_rails_pro\", \"#{default_pro_version}\"\n")
       end
+
+      it "rewrites declarations after UTF-8 content using byte offsets" do
+        src = <<~RUBY
+          # D\u00e9pendances
+          gem "react_on_rails", "~> 16.0"
+        RUBY
+        result = rewriter.rewrite(src)
+        expect(result.content).to eq(<<~RUBY)
+          # D\u00e9pendances
+          gem "react_on_rails_pro", "~> 16.0"
+        RUBY
+      end
     end
 
     context "kwargs and options" do
@@ -63,20 +76,32 @@ RSpec.describe ReactOnRails::Spike::PrismGemfileRewriter do
         expect(result.content).to include('gem "react_on_rails_pro", "~> 16.0", path: "../react_on_rails"')
       end
 
-      it "preserves git: alongside the inserted default version when no user pin is present" do
+      it "preserves git: without inserting a default version when no user pin is present" do
         src = "gem \"react_on_rails\", git: \"https://example.invalid/repo.git\"\n"
         result = rewriter.rewrite(src)
         expect(result.content).to include(
-          "gem \"react_on_rails_pro\", \"#{default_pro_version}\", git: \"https://example.invalid/repo.git\""
+          "gem \"react_on_rails_pro\", git: \"https://example.invalid/repo.git\""
         )
       end
 
-      it "preserves github: alongside the inserted default version when no user pin is present" do
+      it "preserves github: without inserting a default version when no user pin is present" do
         src = "gem \"react_on_rails\", github: \"shakacode/react_on_rails\", branch: \"master\"\n"
         result = rewriter.rewrite(src)
         expect(result.content).to include(
-          "gem \"react_on_rails_pro\", \"#{default_pro_version}\", github: \"shakacode/react_on_rails\", branch: \"master\""
+          "gem \"react_on_rails_pro\", github: \"shakacode/react_on_rails\", branch: \"master\""
         )
+      end
+
+      it "preserves path: without inserting a default version when no user pin is present" do
+        src = "gem \"react_on_rails\", path: \"../react_on_rails\"\n"
+        result = rewriter.rewrite(src)
+        expect(result.content).to include('gem "react_on_rails_pro", path: "../react_on_rails"')
+      end
+
+      it "treats a non-string positional argument as a user version requirement" do
+        src = "gem \"react_on_rails\", REACT_ON_RAILS_VERSION\n"
+        result = rewriter.rewrite(src)
+        expect(result.content).to eq("gem \"react_on_rails_pro\", REACT_ON_RAILS_VERSION\n")
       end
 
       it "preserves require: false and trailing guard" do
@@ -263,6 +288,27 @@ RSpec.describe ReactOnRails::Spike::PrismGemfileRewriter do
         expect_parseable_ruby(result.content)
       end
 
+      it "removes a stale base declaration after an active Pro declaration on the same line" do
+        src = "gem \"react_on_rails_pro\", \"~> 16.0\"; gem \"react_on_rails\", \"~> 16.0\"\n"
+        result = rewriter.rewrite(src)
+        expect(result.content).to eq("gem \"react_on_rails_pro\", \"~> 16.0\"\n")
+        expect_parseable_ruby(result.content)
+      end
+
+      it "removes a stale base declaration before an active Pro declaration on the same line" do
+        src = "gem \"react_on_rails\", \"~> 16.0\"; gem \"react_on_rails_pro\", \"~> 16.0\"\n"
+        result = rewriter.rewrite(src)
+        expect(result.content).to eq("gem \"react_on_rails_pro\", \"~> 16.0\"\n")
+        expect_parseable_ruby(result.content)
+      end
+
+      it "removes a stale base declaration in the middle of a shared line" do
+        src = "gem \"rails\"; gem \"react_on_rails\", \"~> 16.0\"; gem \"react_on_rails_pro\", \"~> 16.0\"\n"
+        result = rewriter.rewrite(src)
+        expect(result.content).to eq("gem \"rails\"; gem \"react_on_rails_pro\", \"~> 16.0\"\n")
+        expect_parseable_ruby(result.content)
+      end
+
       it "removes stale base when Pro is parenthesized with comments" do
         src = <<~RUBY
           source "https://rubygems.org"
@@ -295,13 +341,15 @@ RSpec.describe ReactOnRails::Spike::PrismGemfileRewriter do
           end
         RUBY
         result = rewriter.rewrite(src)
-        expect(result.content).to eq(<<~RUBY)
-          if ENV["ROR_EDGE"]
-            gem "react_on_rails_pro", "#{default_pro_version}", github: "shakacode/react_on_rails", branch: "master"
-          else
-            gem "react_on_rails_pro", "~> 16.0"
-          end
-        RUBY
+        expected_github_line = '  gem "react_on_rails_pro", github: "shakacode/react_on_rails", ' \
+                               'branch: "master"'
+        expect(result.content.lines).to eq([
+          "if ENV[\"ROR_EDGE\"]\n",
+          "#{expected_github_line}\n",
+          "else\n",
+          "  gem \"react_on_rails_pro\", \"~> 16.0\"\n",
+          "end\n"
+        ])
         expect_parseable_ruby(result.content)
       end
 
@@ -315,6 +363,41 @@ RSpec.describe ReactOnRails::Spike::PrismGemfileRewriter do
         RUBY
         result = rewriter.rewrite(src)
         expect(result.content).to eq("gem \"react_on_rails_pro\", \"16.0.0\"\n")
+        expect_parseable_ruby(result.content)
+      end
+
+      it "does not crash on unrelated unless blocks when removing stale base" do
+        src = <<~RUBY
+          unless ENV["CI"]
+            gem "pry"
+          end
+          gem "react_on_rails", "~> 16.0"
+          gem "react_on_rails_pro", "~> 16.0"
+        RUBY
+        result = rewriter.rewrite(src)
+        expect(result.content).to eq(<<~RUBY)
+          unless ENV["CI"]
+            gem "pry"
+          end
+          gem "react_on_rails_pro", "~> 16.0"
+        RUBY
+        expect_parseable_ruby(result.content)
+      end
+
+      it "collapses stale base conditionals after UTF-8 content using byte offsets" do
+        src = <<~RUBY
+          # D\u00e9pendances
+          if ENV["PRO"]
+            gem "react_on_rails_pro", "16.0.0"
+          else
+            gem "react_on_rails", "16.0.0"
+          end
+        RUBY
+        result = rewriter.rewrite(src)
+        expect(result.content).to eq(<<~RUBY)
+          # D\u00e9pendances
+          gem "react_on_rails_pro", "16.0.0"
+        RUBY
         expect_parseable_ruby(result.content)
       end
 

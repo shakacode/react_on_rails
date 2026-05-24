@@ -17,7 +17,7 @@ shipped in PR #3232.
 
 ## How to run
 
-```
+```bash
 cd react_on_rails
 bundle exec rspec spike/3313_prism_gemfile_rewriter/prism_gemfile_rewriter_spec.rb
 bundle exec ruby spike/3313_prism_gemfile_rewriter/benchmark.rb

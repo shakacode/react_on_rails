@@ -13,6 +13,9 @@ module ReactOnRails
     class PrismGemfileRewriter
       BASE_GEM_NAME = "react_on_rails"
       PRO_GEM_NAME = "react_on_rails_pro"
+      NEWLINE_BYTE = "\n".ord
+      SEMICOLON_BYTE = ";".ord
+      SOURCE_OPTION_KEYS = %w[git github path].freeze
 
       Result = Struct.new(
         :content,
@@ -126,50 +129,84 @@ module ReactOnRails
 
       def has_user_version_pin?(call)
         positional_args = call.arguments.arguments.drop(1).reject { |a| a.is_a?(Prism::KeywordHashNode) }
-        positional_args.any? { |a| a.is_a?(Prism::StringNode) }
+        positional_args.any? || source_option_present?(call)
+      end
+
+      def source_option_present?(call)
+        keyword_hashes = call.arguments.arguments.select { |a| a.is_a?(Prism::KeywordHashNode) }
+        keyword_hashes.any? do |keyword_hash|
+          keyword_hash.elements.any? do |element|
+            element.key.is_a?(Prism::SymbolNode) && SOURCE_OPTION_KEYS.include?(element.key.unescaped)
+          end
+        end
       end
 
       def quote_char(source, string_node)
-        source[string_node.location.start_offset]
+        source.byteslice(string_node.location.start_offset, 1)
       end
 
       def removal_edit(source, call)
-        # Remove the entire statement containing the gem call, including any postfix
-        # modifier (`if`, `unless`, `while`, `until`) and the trailing newline. The
-        # statement may be wrapped in an `IfNode` / `UnlessNode` when there is a
-        # postfix modifier, so we walk outward until we find the enclosing
-        # statement-level node.
-        statement_node = enclosing_statement_node(call)
-        start_offset, end_offset = statement_byte_range(source, statement_node)
+        # Remove only this gem statement. If it is the only statement on a line,
+        # remove the whole line; if it shares a line via semicolons, preserve the
+        # neighboring statements.
+        start_offset, end_offset = statement_byte_range(source, call)
         { start_offset: start_offset, end_offset: end_offset, replacement: "" }
       end
 
-      # When Prism parses `gem "foo" if cond`, the outermost node is `IfNode`, not the
-      # `CallNode`. We treat the postfix-modifier node as the statement to remove.
-      def enclosing_statement_node(call)
-        # We do not have an explicit parent pointer; the caller passes the CallNode, so
-        # we need to detect a postfix modifier by looking at the source slice. Prism's
-        # location for the CallNode does NOT include the modifier, so we re-locate by
-        # inspecting the source after the call's end_offset.
-        call
+      def statement_byte_range(source, node)
+        line_start = line_start_offset(source, node.location.start_offset)
+        line_end = line_end_offset(source, node.location.end_offset)
+        statement_end = node.location.end_offset
+
+        while statement_end < line_end
+          byte = source.getbyte(statement_end)
+          break if byte == NEWLINE_BYTE || byte == SEMICOLON_BYTE
+
+          statement_end += 1
+        end
+
+        previous_semicolon = previous_semicolon_offset(source, line_start, node.location.start_offset)
+        if previous_semicolon
+          [previous_semicolon, statement_end]
+        elsif statement_end < line_end && source.getbyte(statement_end) == SEMICOLON_BYTE
+          end_offset = statement_end + 1
+          end_offset += 1 while end_offset < line_end && horizontal_space?(source.getbyte(end_offset))
+          [line_start, end_offset]
+        else
+          [line_start, line_end]
+        end
       end
 
-      def statement_byte_range(source, node)
-        start_offset = line_start_offset(source, node.location.start_offset)
+      def previous_semicolon_offset(source, line_start, statement_start)
+        scan = statement_start - 1
+        while scan >= line_start
+          return scan if source.getbyte(scan) == SEMICOLON_BYTE
 
-        # Walk forward from the node's end_offset to the end of the source line so that
-        # we also delete trailing modifier text (e.g. `if ENV["X"]`) and the newline.
-        scan = node.location.end_offset
-        scan += 1 while scan < source.length && source[scan] != "\n"
-        scan += 1 if scan < source.length && source[scan] == "\n"
-        [start_offset, scan]
+          scan -= 1
+        end
+
+        nil
+      end
+
+      def horizontal_space?(byte)
+        byte == " ".ord || byte == "\t".ord
       end
 
       def apply_edits(source, edits)
         sorted = edits.sort_by { |e| -e[:start_offset] }
         sorted.reduce(source) do |acc, edit|
-          acc[0...edit[:start_offset]] + edit[:replacement] + acc[edit[:end_offset]..]
+          splice_source(acc, edit[:start_offset], edit[:end_offset], edit[:replacement])
         end
+      end
+
+      def byte_slice(source, start_offset, end_offset)
+        source.byteslice(start_offset, end_offset - start_offset) || ""
+      end
+
+      def splice_source(source, start_offset, end_offset, replacement)
+        prefix = source.byteslice(0, start_offset) || ""
+        suffix = source.byteslice(end_offset, source.bytesize - end_offset) || ""
+        prefix + replacement + suffix
       end
 
       # After removing base gem statements, conditionals like
@@ -200,7 +237,7 @@ module ReactOnRails
           edit = find_collapse_edit(source, parse_result.value)
           break source unless edit
 
-          source = source[0...edit[:start_offset]] + edit[:replacement] + source[edit[:end_offset]..]
+          source = splice_source(source, edit[:start_offset], edit[:end_offset], edit[:replacement])
         end
       end
 
@@ -226,8 +263,9 @@ module ReactOnRails
         return nil unless node.respond_to?(:end_keyword_loc) && node.end_keyword_loc
 
         then_branch = node.statements
-        has_else_node = node.subsequent.is_a?(Prism::ElseNode)
-        else_statements = has_else_node ? node.subsequent.statements : nil
+        else_node = conditional_else_node(node)
+        has_else_node = !else_node.nil?
+        else_statements = has_else_node ? else_node.statements : nil
 
         then_empty = branch_empty?(then_branch)
         else_empty = has_else_node && branch_empty?(else_statements)
@@ -250,7 +288,7 @@ module ReactOnRails
         return nil unless single_pro_gem_call?(branch_statements)
 
         gem_call = branch_statements.body.first
-        gem_text = source[gem_call.location.start_offset...gem_call.location.end_offset]
+        gem_text = byte_slice(source, gem_call.location.start_offset, gem_call.location.end_offset)
         # Preserve indentation of the original conditional.
         indent = leading_indentation(source, conditional.location.start_offset)
         {
@@ -270,9 +308,10 @@ module ReactOnRails
 
       def remove_empty_else_branch(source, node)
         # Find the `else` keyword location and remove from there to just before `end`.
-        return nil unless node.subsequent.is_a?(Prism::ElseNode)
+        else_node = conditional_else_node(node)
+        return nil unless else_node
 
-        else_loc = node.subsequent.else_keyword_loc
+        else_loc = else_node.else_keyword_loc
         end_loc = node.end_keyword_loc
         return nil unless else_loc && end_loc
 
@@ -294,20 +333,28 @@ module ReactOnRails
 
       def leading_indentation(source, offset)
         line_start = line_start_offset(source, offset)
-        slice = source[line_start...offset]
+        slice = byte_slice(source, line_start, offset)
         slice[/\A\s*/].to_s
       end
 
       def line_start_offset(source, offset)
         return 0 if offset.zero?
 
-        idx = source.rindex("\n", offset - 1)
+        idx = source.b.rindex("\n".b, offset - 1)
         idx ? idx + 1 : 0
       end
 
       def line_end_offset(source, offset)
-        idx = source.index("\n", offset)
-        idx ? idx + 1 : source.length
+        idx = source.b.index("\n".b, offset)
+        idx ? idx + 1 : source.bytesize
+      end
+
+      def conditional_else_node(node)
+        if node.is_a?(Prism::IfNode)
+          node.subsequent if node.subsequent.is_a?(Prism::ElseNode)
+        elsif node.is_a?(Prism::UnlessNode)
+          node.else_clause
+        end
       end
     end
   end

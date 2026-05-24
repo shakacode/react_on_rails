@@ -92,15 +92,25 @@ GEMFILES = {
   RUBY
   "medium (80 lines, 1 ror entry, groups)" => begin
     body = +"source \"https://rubygems.org\"\n"
-    %w[rails puma sprockets-rails importmap-rails turbo-rails stimulus-rails jbuilder bcrypt bootsnap kredis].each do |g|
+    base_gems = %w[
+      rails puma sprockets-rails importmap-rails turbo-rails stimulus-rails
+      jbuilder bcrypt bootsnap kredis
+    ]
+    base_gems.each do |g|
       body << "gem \"#{g}\"\n"
     end
     body << "gem \"react_on_rails\", \"~> 16.0\"\n"
-    %w[pg redis sidekiq devise pundit kaminari rack-cors dotenv-rails].each { |g| body << "gem \"#{g}\"\n" }
+    %w[pg redis sidekiq devise pundit kaminari rack-cors dotenv-rails].each do |g|
+      body << "gem \"#{g}\"\n"
+    end
     body << "\ngroup :development, :test do\n"
-    %w[rspec-rails factory_bot_rails faker pry-rails pry-byebug debug].each { |g| body << "  gem \"#{g}\"\n" }
+    %w[rspec-rails factory_bot_rails faker pry-rails pry-byebug debug].each do |g|
+      body << "  gem \"#{g}\"\n"
+    end
     body << "end\n\ngroup :development do\n"
-    %w[web-console listen spring spring-watcher-listen rubocop rubocop-rails].each { |g| body << "  gem \"#{g}\"\n" }
+    %w[web-console listen spring spring-watcher-listen rubocop rubocop-rails].each do |g|
+      body << "  gem \"#{g}\"\n"
+    end
     body << "end\n\ngroup :test do\n"
     %w[capybara selenium-webdriver webdrivers shoulda-matchers].each { |g| body << "  gem \"#{g}\"\n" }
     body << "end\n"
@@ -116,6 +126,7 @@ GEMFILES = {
 }.freeze
 
 ITERATIONS = 200
+WARMUP_ITERATIONS = 3
 
 puts "Prism vs. scanner Gemfile rewrite benchmark (#{ITERATIONS} iterations per case)\n\n"
 puts "Ruby: #{RUBY_VERSION}, Prism: #{Prism::VERSION}\n\n"
@@ -127,7 +138,7 @@ printf("%-50s %14s %14s %14s\n", "Gemfile", "scanner total", "prism total", "rat
 
 GEMFILES.each do |label, src|
   # Warm up so we don't measure first-call overhead.
-  3.times do
+  WARMUP_ITERATIONS.times do
     scanner.rewrite(src)
     prism.rewrite(src)
   end
@@ -146,6 +157,11 @@ end
 puts
 puts "Per-rewrite cost (scanner / prism):"
 GEMFILES.each do |label, src|
+  WARMUP_ITERATIONS.times do
+    scanner.rewrite(src)
+    prism.rewrite(src)
+  end
+
   scanner_seconds = measure(ITERATIONS) { scanner.rewrite(src) }
   prism_seconds = measure(ITERATIONS) { prism.rewrite(src) }
   printf("  %-50s %8.3fms / %8.3fms\n",
