@@ -19,6 +19,20 @@ type TanStackRouterHydrationInternals = TanStackRouter & {
   };
 };
 
+type TanStackRouterWritableStore<TValue = unknown> = {
+  set: (nextOrUpdater: TValue | ((prev: TValue) => TValue)) => void;
+};
+
+type TanStackRouterStoresHydrationInternals = TanStackRouter & {
+  matchRoutes: (location: unknown) => unknown[];
+  stores: {
+    status: TanStackRouterWritableStore<string>;
+    resolvedLocation: TanStackRouterWritableStore;
+    setMatches: (nextMatches: unknown[]) => void;
+  };
+  batch?: (callback: () => void) => void;
+};
+
 type TanStackRouterChunkPreloadInternals = TanStackRouter & {
   loadRouteChunk?: (route: unknown) => Promise<unknown>;
   looseRoutesById?: Record<string, unknown>;
@@ -77,6 +91,62 @@ function preloadMatchedRouteChunks(
     .catch((error: unknown) => {
       console.error('react-on-rails-pro/tanstack-router: Error preloading matched route chunks:', error);
     });
+}
+
+function hasLegacyHydrationStore(router: TanStackRouter): router is TanStackRouterHydrationInternals {
+  return typeof router.matchRoutes === 'function' && typeof router.__store?.setState === 'function';
+}
+
+function hasStoresHydrationApi(router: TanStackRouter): router is TanStackRouterStoresHydrationInternals {
+  const { stores } = router as Partial<TanStackRouterStoresHydrationInternals>;
+
+  return (
+    typeof router.matchRoutes === 'function' &&
+    typeof stores?.status?.set === 'function' &&
+    typeof stores?.resolvedLocation?.set === 'function' &&
+    typeof stores?.setMatches === 'function'
+  );
+}
+
+function hasHydrationInternals(router: TanStackRouter): boolean {
+  return hasLegacyHydrationStore(router) || hasStoresHydrationApi(router);
+}
+
+function raiseMissingHydrationInternals(): never {
+  throw new Error(
+    'react-on-rails-pro/tanstack-router: router.matchRoutes() and router.__store.setState() or ' +
+      'router.stores.setMatches() are required but not available. Ensure @tanstack/react-router ' +
+      '>=1.139.0 <2.0.0 is installed.',
+  );
+}
+
+function applyHydrationMatches(router: TanStackRouter, matches: unknown[]): void {
+  if (hasLegacyHydrationStore(router)) {
+    router.__store.setState((s: Record<string, unknown>) => ({
+      ...s,
+      status: 'idle',
+      resolvedLocation: (s as { location: unknown }).location,
+      matches,
+    }));
+    return;
+  }
+
+  if (hasStoresHydrationApi(router)) {
+    const applyStoresUpdate = (): void => {
+      router.stores.status.set('idle');
+      router.stores.resolvedLocation.set(router.state.location);
+      router.stores.setMatches(matches);
+    };
+
+    if (typeof router.batch === 'function') {
+      router.batch(applyStoresUpdate);
+    } else {
+      applyStoresUpdate();
+    }
+    return;
+  }
+
+  raiseMissingHydrationInternals();
 }
 
 /**
@@ -237,19 +307,18 @@ function TanStackHydrationApp({
           didWarnPrivateInternalsRef.current = true;
           console.warn(
             'react-on-rails-pro/tanstack-router: Hydration uses TanStack Router private internals ' +
-              '(matchRoutes, __store, loadRouteChunk, looseRoutesById). Keep @tanstack/react-router ' +
+              '(matchRoutes, __store/stores, loadRouteChunk, looseRoutesById). Keep @tanstack/react-router ' +
               'within the supported range (>=1.139.0 <2.0.0) and run integration tests when upgrading.',
           );
         }
 
         // Validate internal APIs before using them.
-        if (typeof router.matchRoutes !== 'function' || !router.__store?.setState) {
-          throw new Error(
-            'react-on-rails-pro/tanstack-router: router.matchRoutes() and router.__store are required ' +
-              'but not available. Ensure @tanstack/react-router >=1.139.0 <2.0.0 is installed.',
-          );
+        if (!hasHydrationInternals(router)) {
+          raiseMissingHydrationInternals();
         }
-        const hydrationRouter = router as TanStackRouterHydrationInternals;
+        const hydrationRouter = router as
+          | TanStackRouterHydrationInternals
+          | TanStackRouterStoresHydrationInternals;
 
         // Synchronously inject route matches to match server-rendered output.
         // The server fully loads routes (via router.load()) before rendering, so
@@ -280,12 +349,7 @@ function TanStackHydrationApp({
 
         // Render-phase store injection is required for hydration parity: this
         // must happen before the first RouterProvider render.
-        hydrationRouter.__store.setState((s: Record<string, unknown>) => ({
-          ...s,
-          status: 'idle',
-          resolvedLocation: (s as { location: unknown }).location,
-          matches,
-        }));
+        applyHydrationMatches(router, matches);
 
         // Set SSR flag so the Transitioner skips its initial router.load() call,
         // preventing a state update during hydration that would cause a mismatch.

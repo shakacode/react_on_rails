@@ -451,6 +451,59 @@ describe('tanstack-router integration (Pro)', () => {
     expect(matches[1].status).toBe('success');
   });
 
+  it('injects SSR match data through router.stores when router.__store is unavailable', () => {
+    const router = buildRouter();
+    delete router.__store;
+    router.matchRoutes = jest.fn().mockReturnValue([{ id: '/products', status: 'pending', updatedAt: 0 }]);
+
+    const stores = {
+      status: { set: jest.fn() },
+      resolvedLocation: { set: jest.fn() },
+      setMatches: jest.fn(),
+    };
+    (router as TanStackRouter & { stores: typeof stores }).stores = stores;
+
+    const renderFn = createTanStackRouterRenderFunction(
+      { createRouter: () => router },
+      {
+        RouterProvider: (_: { router: TanStackRouter }) => React.createElement('div'),
+        createMemoryHistory: jest.fn(),
+        createBrowserHistory: jest.fn().mockReturnValue({
+          location: { pathname: '/products', search: '', hash: '', href: '/products', state: null },
+        }),
+      },
+    );
+
+    const props = {
+      __tanstackRouterDehydratedState: {
+        url: '/products',
+        dehydratedRouter: null,
+        ssrRouter: {
+          manifest: undefined,
+          lastMatchId: '\u0000products',
+          matches: [{ i: '\u0000products', l: { products: ['hammer'] }, s: 'success', u: 456 }],
+        },
+      },
+    };
+    const result = renderFn(props, {
+      serverSide: false,
+      pathname: '/products',
+      search: '',
+    } as unknown as RailsContext);
+
+    renderToString(React.createElement(result as React.ComponentType<Record<string, unknown>>, props));
+
+    expect(stores.status.set).toHaveBeenCalledWith('idle');
+    expect(stores.resolvedLocation.set).toHaveBeenCalledWith(router.state.location);
+    expect(stores.setMatches).toHaveBeenCalledWith([
+      expect.objectContaining({
+        id: '/products',
+        loaderData: { products: ['hammer'] },
+        status: 'success',
+      }),
+    ]);
+  });
+
   it('does not pass __tanstackRouterDehydratedState through AppWrapper props', () => {
     const router = buildRouter();
     const observedProps: Array<Record<string, unknown>> = [];
@@ -641,7 +694,9 @@ describe('tanstack-router integration (Pro)', () => {
 
     expect(() =>
       renderToString(React.createElement(result as React.ComponentType<Record<string, unknown>>, props)),
-    ).toThrow(/router\.matchRoutes\(\) and router\.__store are required/);
+    ).toThrow(
+      /router\.matchRoutes\(\) and router\.__store\.setState\(\) or router\.stores\.setMatches\(\) are required/,
+    );
   });
 
   it('runs router.options.hydrate callback with dehydratedData on the SSR hydration path', () => {
