@@ -1568,6 +1568,13 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           .not_to output(/HMR Development mode \(default\)|Hot Module Replacement \(HMR\) enabled/)
           .to_stdout_from_any_process
       end
+
+      it "detects the default dev-server mode once per help render" do
+        expect(ReactOnRails::Dev::ServerMode).to receive(:detect).once.and_return(:live_reload)
+
+        expect { described_class.show_help }
+          .to output(/Live reload development mode \(default\)/).to_stdout_from_any_process
+      end
     end
 
     context "when base-port mode is active" do

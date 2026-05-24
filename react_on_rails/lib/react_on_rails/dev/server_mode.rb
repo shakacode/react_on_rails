@@ -71,7 +71,7 @@ module ReactOnRails
         end
 
         def hmr_enabled?(config_path = shakapacker_config_path)
-          detect(config_path) == :hmr
+          detect_from_config(config_path) == :hmr
         end
 
         def text(mode, key)
@@ -98,7 +98,7 @@ module ReactOnRails
           return nil unless File.exist?(config_path)
 
           YAML.safe_load(ERB.new(File.read(config_path)).result, permitted_classes: [Symbol], aliases: true)
-        rescue Psych::SyntaxError, SyntaxError, Errno::EACCES, Errno::ENOENT => e
+        rescue SyntaxError, StandardError => e
           warn(
             "[ReactOnRails] Could not parse #{config_path} for dev-server mode detection: #{e.message}"
           )
@@ -122,8 +122,7 @@ module ReactOnRails
 
           return :hmr if hmr == true
           return :live_reload if live_reload == true
-          return :development_server if hmr == false && live_reload.nil?
-          return :development_server if hmr == false
+          return :development_server if hmr == false || live_reload == false
 
           nil
         end

@@ -32,11 +32,41 @@ RSpec.describe ReactOnRails::Dev::ServerMode do
       expect(described_class.detect("config/shakapacker.yml")).to eq(:development_server)
     end
 
-    it "keeps live_reload false without HMR as the fallback HMR mode" do
+    it "treats live_reload false without HMR as generic development server mode" do
       write_shakapacker_config(<<~YAML)
         development:
           dev_server:
             live_reload: false
+      YAML
+
+      expect(described_class.detect("config/shakapacker.yml")).to eq(:development_server)
+    end
+
+    it "detects live reload when live_reload is true without an HMR key" do
+      write_shakapacker_config(<<~YAML)
+        development:
+          dev_server:
+            live_reload: true
+      YAML
+
+      expect(described_class.detect("config/shakapacker.yml")).to eq(:live_reload)
+    end
+
+    it "prefers HMR when both hmr and live_reload are true" do
+      write_shakapacker_config(<<~YAML)
+        development:
+          dev_server:
+            hmr: true
+            live_reload: true
+      YAML
+
+      expect(described_class.detect("config/shakapacker.yml")).to eq(:hmr)
+    end
+
+    it "uses the fallback mode when dev_server is empty" do
+      write_shakapacker_config(<<~YAML)
+        development:
+          dev_server:
       YAML
 
       expect(described_class.detect("config/shakapacker.yml")).to eq(:hmr)
@@ -52,11 +82,32 @@ RSpec.describe ReactOnRails::Dev::ServerMode do
       expect { described_class.detect("config/shakapacker.yml") }
         .to output(%r{\[ReactOnRails\] Could not parse config/shakapacker.yml}).to_stderr
     end
+
+    it "warns when Shakapacker config ERB evaluation fails" do
+      write_shakapacker_config(<<~YAML)
+        development:
+          dev_server:
+            hmr: <%= ENV.fetch("MISSING_HMR_FLAG") %>
+      YAML
+
+      expect { described_class.detect("config/shakapacker.yml") }
+        .to output(%r{\[ReactOnRails\] Could not parse config/shakapacker.yml}).to_stderr
+    end
   end
 
   describe ".hmr_enabled?" do
-    it "uses the same fallback behavior as detect" do
-      expect(described_class.hmr_enabled?("config/missing.yml")).to be(true)
+    it "returns true when HMR is explicitly enabled" do
+      write_shakapacker_config(<<~YAML)
+        development:
+          dev_server:
+            hmr: true
+      YAML
+
+      expect(described_class.hmr_enabled?("config/shakapacker.yml")).to be(true)
+    end
+
+    it "does not treat missing config as HMR enabled" do
+      expect(described_class.hmr_enabled?("config/missing.yml")).to be(false)
     end
   end
 

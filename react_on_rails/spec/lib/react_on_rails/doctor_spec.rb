@@ -1169,6 +1169,33 @@ RSpec.describe ReactOnRails::Doctor do
         expect(warning_messages).to include(a_string_including("Shared output paths with dev_server.hmr: true"))
       end
 
+      it "does not warn when shared output paths are configured without HMR enabled" do
+        write_project_file("config/shakapacker.yml", <<~YAML)
+          development:
+            public_output_path: packs
+            dev_server:
+              port: 3035
+
+          test:
+            public_output_path: packs
+            compile: false
+        YAML
+        write_project_file("config/initializers/react_on_rails.rb", default_initializer)
+        write_project_file("spec/rails_helper.rb", <<~RUBY)
+          require "capybara/rails"
+          require "react_on_rails/test_helper"
+          RSpec.configure do |config|
+            ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+          end
+        RUBY
+
+        doctor.send(:check_build_test_configuration)
+        doctor.send(:check_shared_output_paths_with_hmr)
+
+        warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+        expect(warning_messages).not_to include(a_string_including("Shared output paths with dev_server.hmr"))
+      end
+
       it "does not warn when separate output paths AND hmr: true" do
         write_project_file("config/shakapacker.yml", <<~YAML)
           development:

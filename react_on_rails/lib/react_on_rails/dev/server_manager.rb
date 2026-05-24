@@ -257,17 +257,19 @@ module ReactOnRails
         end
 
         def show_help
+          default_mode = default_dev_server_mode
+
           puts help_usage
           puts ""
-          puts help_commands
+          puts help_commands(default_mode)
           puts ""
           puts help_options
           puts ""
-          puts help_customization
+          puts help_customization(default_mode)
           puts ""
-          puts help_mode_details
+          puts help_mode_details(default_mode)
           puts ""
-          puts help_troubleshooting
+          puts help_troubleshooting(default_mode)
         end
 
         # Flags that take a value as the next argument (not using = syntax)
@@ -575,12 +577,12 @@ module ReactOnRails
         end
 
         # rubocop:disable Metrics/AbcSize
-        def help_commands
-          default_mode = default_dev_server_mode
+        def help_commands(default_mode = default_dev_server_mode)
+          command_description = Rainbow(ServerMode.text(default_mode, :command_description)).white
 
           <<~COMMANDS
             #{Rainbow('🚀 COMMANDS:').cyan.bold}
-              #{Rainbow('(none) / hmr').green.bold}        #{Rainbow(ServerMode.text(default_mode, :command_description)).white}
+              #{Rainbow('(none) / hmr').green.bold}        #{command_description}
                                   #{Rainbow('→ Uses:').yellow} Procfile.dev
 
               #{Rainbow('static').green.bold}              #{Rainbow('Start development server with static assets (no HMR, no FOUC)').white}
@@ -626,14 +628,15 @@ module ReactOnRails
         # rubocop:enable Metrics/AbcSize
 
         # rubocop:disable Metrics/AbcSize
-        def help_customization
-          default_mode = default_dev_server_mode
+        def help_customization(default_mode = default_dev_server_mode)
+          procfile_description = ServerMode.text(default_mode, :procfile_description)
+          workflow_suffix = Rainbow(ServerMode.text(default_mode, :workflow_suffix)).white
 
           <<~CUSTOMIZATION
             #{Rainbow('🔧 CUSTOMIZATION:').cyan.bold}
             Each mode uses a specific Procfile that you can customize for your application:
 
-            #{Rainbow('•').yellow} #{Rainbow('Procfile.dev').green.bold}                 - #{ServerMode.text(default_mode, :procfile_description)}
+            #{Rainbow('•').yellow} #{Rainbow('Procfile.dev').green.bold}                 - #{procfile_description}
             #{Rainbow('•').yellow} #{Rainbow('Procfile.dev-static-assets').green.bold}   - Static development with webpack --watch
             #{Rainbow('•').yellow} #{Rainbow('Procfile.dev-prod-assets').green.bold}     - Production-optimized assets (port 3001)
 
@@ -658,7 +661,7 @@ module ReactOnRails
             #{Rainbow('🧪 TEST ASSET WORKFLOWS:').cyan.bold}
             #{Rainbow('Recommended default (separate outputs):').white}
             #{Rainbow('•').yellow} #{Rainbow('Keep test public_output_path different from development (for example, packs-test vs packs)').white}
-            #{Rainbow('•').yellow} #{Rainbow('Use').white} #{Rainbow('bin/dev').green.bold} #{Rainbow(ServerMode.text(default_mode, :workflow_suffix)).white}
+            #{Rainbow('•').yellow} #{Rainbow('Use').white} #{Rainbow('bin/dev').green.bold} #{workflow_suffix}
             #{Rainbow('•').yellow} #{Rainbow('Use').white} #{Rainbow('bin/dev test-watch').green.bold} #{Rainbow('to watch test assets').white}
             #{Rainbow('•').yellow} #{Rainbow('Override mode when needed:').white} #{Rainbow('--test-watch-mode=full').green.bold} #{Rainbow('or').white} #{Rainbow('--test-watch-mode=client-only').green.bold}
 
@@ -677,17 +680,18 @@ module ReactOnRails
         # rubocop:enable Metrics/AbcSize
 
         # rubocop:disable Metrics/AbcSize
-        def help_mode_details
+        def help_mode_details(default_mode = default_dev_server_mode)
           # Reflect base-port mode so help text advertises the port `bin/dev`
           # will actually use. Without this, `bin/dev help` in a worktree with
           # REACT_ON_RAILS_BASE_PORT=4000 still claims 3000/3001.
-          default_mode = default_dev_server_mode
           default_mode_details = default_dev_server_detail_lines(default_mode)
           dev_url  = "http://localhost:#{help_display_port(:dev)}/<route>"
           prod_url = "http://localhost:#{help_display_port(:prod)}/<route>"
+          mode_heading = Rainbow(ServerMode.text(default_mode, :mode_heading)).cyan.bold
+          procfile_dev = Rainbow("Procfile.dev").green
 
           <<~MODES
-            #{Rainbow(ServerMode.text(default_mode, :mode_heading)).cyan.bold} - #{Rainbow('Procfile.dev').green}:
+            #{mode_heading} - #{procfile_dev}:
             #{default_mode_details}
             #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow(dev_url).cyan.underline}
 
@@ -1695,9 +1699,7 @@ module ReactOnRails
         end
 
         # rubocop:disable Metrics/AbcSize
-        def help_troubleshooting
-          default_mode = default_dev_server_mode
-
+        def help_troubleshooting(default_mode = default_dev_server_mode)
           <<~TROUBLESHOOTING
             #{Rainbow('🔧 TROUBLESHOOTING:').cyan.bold}
 
