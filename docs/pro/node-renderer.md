@@ -190,6 +190,79 @@ During the next build, `pre_seed_renderer_cache` calls `previous_bundle_hashes`,
 
 See [Rolling-Deploy Adapters](./rolling-deploy-adapters.md) for the full protocol spec, reference implementations (S3, Control Plane, Filesystem), and a discussion of the loadable-stats wrinkle.
 
+## Observability with OpenTelemetry
+
+The Node Renderer ships an optional OpenTelemetry integration for distributed tracing. When enabled, every SSR request becomes a trace you can inspect in any OTLP-compatible backend (Jaeger, Honeycomb, Datadog, Grafana Tempo, New Relic, etc.).
+
+### Install the OpenTelemetry packages (peer dependencies)
+
+```bash
+npm install \
+  @opentelemetry/api \
+  @opentelemetry/sdk-trace-node \
+  @opentelemetry/sdk-trace-base \
+  @opentelemetry/resources \
+  @opentelemetry/semantic-conventions \
+  @opentelemetry/exporter-trace-otlp-http \
+  @opentelemetry/instrumentation \
+  @opentelemetry/instrumentation-http \
+  @fastify/otel
+```
+
+### Enable from your renderer entrypoint
+
+OpenTelemetry must be initialized **before** the Fastify server starts so that the auto-instrumentation can patch the modules at require-time. Call `init()` first in your entrypoint:
+
+```js
+import { init as initOpenTelemetry } from 'react-on-rails-pro-node-renderer/integrations/opentelemetry';
+
+initOpenTelemetry({
+  serviceName: 'my-app-node-renderer', // optional; defaults to "react-on-rails-pro-node-renderer"
+  fastify: true, // register HTTP + Fastify auto-instrumentation
+  tracing: true, // wrap SSR rendering in spans
+});
+
+// Now start the renderer:
+import { reactOnRailsProNodeRenderer } from 'react-on-rails-pro-node-renderer';
+reactOnRailsProNodeRenderer().catch((e) => {
+  throw e;
+});
+```
+
+### Configuration via standard OpenTelemetry environment variables
+
+| Env var                                          | Purpose                                                    | Default                            |
+| ------------------------------------------------ | ---------------------------------------------------------- | ---------------------------------- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`                    | OTLP collector endpoint                                    | `http://localhost:4318`            |
+| `OTEL_EXPORTER_OTLP_HEADERS`                     | Auth headers (e.g. `api-key=xxx`)                          | none                               |
+| `OTEL_SERVICE_NAME`                              | Service name in traces (overrides `init({ serviceName })`) | `react-on-rails-pro-node-renderer` |
+| `OTEL_RESOURCE_ATTRIBUTES`                       | Additional resource attributes (csv)                       | none                               |
+| `OTEL_TRACES_SAMPLER`, `OTEL_TRACES_SAMPLER_ARG` | Trace sampling                                             | parent-based, always-on            |
+
+### Span taxonomy
+
+| Span                                 | Where                                                             | Attributes                                            |
+| ------------------------------------ | ----------------------------------------------------------------- | ----------------------------------------------------- |
+| `ror.ssr.request`                    | Root span for each SSR render request                             | (none — root)                                         |
+| `ror.bundle.build_execution_context` | Loading a bundle into the VM                                      | `bundle.timestamp`, `bundle.paths.count`, `cache.hit` |
+| `ror.bundle.upload`                  | When new bundles are uploaded mid-request or via `/upload-assets` | `bundle.count`, `assets.count`                        |
+| `ror.vm.execute`                     | The actual SSR JS execution inside the VM                         | (none)                                                |
+| `ror.result.prepare`                 | Building the response payload                                     | (none)                                                |
+| `ror.incremental.stream`             | Wraps the incremental NDJSON request lifecycle                    | (none)                                                |
+| `ror.incremental.process_chunk`      | Processing each NDJSON update chunk                               | (none)                                                |
+
+Outbound HTTP calls inside your SSR bundle are automatically captured by `HttpInstrumentation` as child spans.
+
+### Production defaults
+
+- **Span processor**: `BatchSpanProcessor` in production (`NODE_ENV=production` or `RAILS_ENV=production`), `SimpleSpanProcessor` otherwise. Override with `init({ spanProcessor })`.
+- **Exporter**: OTLP HTTP. Override with `init({ exporter })`.
+- **Graceful shutdown**: Pending batched spans are flushed when Fastify's `onClose` hook fires (during worker shutdown), so traces are not lost on rolling restarts.
+
+### Privacy note
+
+The `renderingRequest` payload is **never** included in span attributes. Only bundle hashes, counts, and sizes are recorded. This matches the renderer's existing logging policy.
+
 ## Further Reading
 
 - [Rolling-Deploy Adapters](./rolling-deploy-adapters.md) — Protocol spec and reference implementations for `rolling_deploy_adapter`
