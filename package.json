@@ -118,7 +118,7 @@
     "url": "https://github.com/shakacode/react_on_rails/issues"
   },
   "homepage": "https://github.com/shakacode/react_on_rails#readme",
-  "packageManager": "pnpm@9.14.2",
+  "packageManager": "pnpm@10.22.0",
   "pnpm": {
     "// for overrides": [
       "Generated via pnpm audit --fix, with manual caps added to prevent major version jumps.",
@@ -154,6 +154,15 @@
       "picomatch@<2.3.2": ">=2.3.2 <3",
       "picomatch@>=4.0.0 <4.0.4": ">=4.0.4 <5",
       "yaml@>=1.0.0 <1.10.3": ">=1.10.3 <2"
-    }
+    },
+    "// for onlyBuiltDependencies": [
+      "pnpm 10 blocks lifecycle scripts by default. Allowlist packages we trust.",
+      "@swc/core: postinstall verifies the platform-specific native binary loads.",
+      "unrs-resolver: napi-postinstall check, used by eslint-import-resolver-typescript."
+    ],
+    "onlyBuiltDependencies": [
+      "@swc/core",
+      "unrs-resolver"
+    ]
   }
 }

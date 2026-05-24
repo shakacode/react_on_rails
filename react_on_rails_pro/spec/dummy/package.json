@@ -127,5 +127,5 @@
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails_pro/issues"
   },
-  "packageManager": "pnpm@9.14.2"
+  "packageManager": "pnpm@10.22.0"
 }

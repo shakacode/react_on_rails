@@ -111,9 +111,9 @@ If you rename/move directories that contain build artifacts:
 
 ## Workspace Dependencies: PNPM
 
-**CRITICAL: This project uses PNPM (v9+)**
+**CRITICAL: This project uses PNPM (v10+)**
 
-Check `package.json` for: `"packageManager": "pnpm@9.x.x"`
+Check `package.json` for: `"packageManager": "pnpm@10.x.x"`
 
 ### Correct Workspace Dependency Syntax
 
