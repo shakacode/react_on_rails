@@ -278,6 +278,51 @@ describe RscGenerator, type: :generator do
     end
   end
 
+  context "when a fresh client webpack config uses an unsupported import anchor" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const commonWebpackConfig = require(`./commonWebpackConfig`);
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            delete clientConfig.entry['server-bundle'];
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "leaves the plugin out and explicitly tells users the plugin was not added" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content).not_to include("RSCWebpackPlugin")
+        expect(content).not_to include("rscClientReferences")
+      end
+
+      messages = GeneratorMessages.messages.join("\n")
+      expect(messages).to include("backtick template-literal require paths")
+      expect(messages).to include("RSCWebpackPlugin was not added to config/webpack/clientWebpackConfig.js")
+    end
+  end
+
   context "when the server webpack config uses double-quoted bundler imports" do
     before(:all) do
       prepare_destination

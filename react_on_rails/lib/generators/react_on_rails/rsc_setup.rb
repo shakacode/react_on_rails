@@ -389,13 +389,21 @@ module ReactOnRails
         end
 
         # Add RSCWebpackPlugin import after bundler require
-        return unless rsc_client_references_setup_anchor_available?(config_path, content, is_server: true)
+        return unless rsc_client_references_setup_anchor_available?(
+          config_path,
+          content,
+          is_server: true,
+          plugin_pending: true
+        )
 
         existing_imports_content = content_through_rsc_setup_anchor(content, is_server: true)
         return if rsc_setup_blocked_by_later_imports?(config_path, content, existing_imports_content, is_server: true)
 
-        inject_rsc_server_imports(config_path, content, existing_imports_content)
-        return unless rsc_client_references_setup_ready?(config_path)
+        unless inject_rsc_server_imports(config_path, content, existing_imports_content)
+          warn_rsc_client_references_injection_failed(config_path, plugin_pending: true)
+          return
+        end
+        return unless rsc_client_references_setup_ready?(config_path, plugin_pending: true)
 
         # Add rscBundle parameter to configureServer function
         gsub_file(
@@ -434,7 +442,12 @@ module ReactOnRails
         end
 
         # Add RSCWebpackPlugin import after commonWebpackConfig import
-        return unless rsc_client_references_setup_anchor_available?(config_path, content, is_server: false)
+        return unless rsc_client_references_setup_anchor_available?(
+          config_path,
+          content,
+          is_server: false,
+          plugin_pending: true
+        )
 
         existing_imports_content = content_through_rsc_setup_anchor(content, is_server: false)
         if rsc_setup_blocked_by_later_imports?(
@@ -443,8 +456,11 @@ module ReactOnRails
           return
         end
 
-        inject_rsc_client_imports(config_path, content, existing_imports_content)
-        return unless rsc_client_references_setup_ready?(config_path)
+        unless inject_rsc_client_imports(config_path, content, existing_imports_content)
+          warn_rsc_client_references_injection_failed(config_path, plugin_pending: true)
+          return
+        end
+        return unless rsc_client_references_setup_ready?(config_path, plugin_pending: true)
 
         # Add RSCWebpackPlugin to client config before return statement
         rsc_plugin_code = "  // Add React Server Components plugin for client bundle\n  " \

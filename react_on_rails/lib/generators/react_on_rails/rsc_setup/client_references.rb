@@ -1012,38 +1012,47 @@ module ReactOnRails
           top_level_binding?(content, "config")
         end
 
-        def rsc_client_references_setup_anchor_available?(config_path, content, is_server:)
+        def rsc_client_references_setup_anchor_available?(config_path, content, is_server:, plugin_pending: false)
           return true if rsc_client_references_setup_anchor?(content, is_server: is_server)
 
-          warn_missing_rsc_client_references_anchor(config_path)
+          warn_missing_rsc_client_references_anchor(config_path, plugin_pending: plugin_pending)
           false
         end
 
-        def rsc_client_references_setup_ready?(config_path)
+        def rsc_client_references_setup_ready?(config_path, plugin_pending: false)
           return true if options[:pretend]
           return true if options[:skip]
           return true if scoped_rsc_client_references_defined?(File.read(File.join(destination_root, config_path)))
 
-          warn_rsc_client_references_injection_failed(config_path)
+          warn_rsc_client_references_injection_failed(config_path, plugin_pending: plugin_pending)
           false
         end
 
-        def warn_missing_rsc_client_references_anchor(config_path)
+        def warn_missing_rsc_client_references_anchor(config_path, plugin_pending: false)
           GeneratorMessages.add_warning(
             "Could not inject rscClientReferences into #{config_path}: expected webpack import anchor was not found " \
             "(the generator looks for the single- or double-quoted CommonJS `require` anchor that the ROR " \
             "templates emit; backtick template-literal require paths and Rspack-only server configs without " \
             "the webpack fallback ternary must be migrated manually). " \
             "If your config uses ESM `import` syntax, the generator cannot migrate it automatically. " \
-            "Please add clientReferences manually."
+            "#{manual_rsc_plugin_action(config_path, plugin_pending: plugin_pending)}"
           )
         end
 
-        def warn_rsc_client_references_injection_failed(config_path)
+        def warn_rsc_client_references_injection_failed(config_path, plugin_pending: false)
           GeneratorMessages.add_warning(
             "Could not inject rscClientReferences into #{config_path}: expected webpack import anchor was found, " \
-            "but the generated scoped helper setup was not written. Please add clientReferences manually."
+            "but the generated scoped helper setup was not written. " \
+            "#{manual_rsc_plugin_action(config_path, plugin_pending: plugin_pending)}"
           )
+        end
+
+        def manual_rsc_plugin_action(config_path, plugin_pending:)
+          if plugin_pending
+            "RSCWebpackPlugin was not added to #{config_path}; please add the plugin and clientReferences manually."
+          else
+            "Please add clientReferences manually."
+          end
         end
 
         def warn_unscoped_rsc_client_references_helper(config_path)
