@@ -11,6 +11,7 @@ import {
   setOpenTelemetryTracerProvider,
 } from '../shared/opentelemetryState.js';
 import { registerFastifyConfigFunction } from '../worker/fastifyConfig.js';
+import { registerWorkerShutdownHook } from '../worker/shutdownHooks.js';
 import { log, message } from './api.js';
 
 declare module '../shared/tracing.js' {
@@ -168,6 +169,7 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
   let otelApi: typeof import('@opentelemetry/api') | undefined;
   let registeredProvider: NodeTracerProviderType | undefined;
   let unregisterFastifyConfig: (() => void) | undefined;
+  let unregisterWorkerShutdownHook: (() => void) | undefined;
 
   try {
     /* eslint-disable @typescript-eslint/no-require-imports, global-require --
@@ -300,11 +302,9 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
       return;
     }
 
-    // Register this last so failed init paths do not leave a partial Fastify hook
-    // behind. Fastify fires onClose during app.close(), giving the span processor
-    // a chance to export queued spans before the process exits.
-    unregisterFastifyConfig = registerFastifyConfigFunction((app) => {
-      app.addHook('onClose', async () => {
+    let shutdownOpenTelemetryPromise: Promise<void> | undefined;
+    const shutdownOpenTelemetry = () => {
+      shutdownOpenTelemetryPromise ??= (async () => {
         try {
           await shutdownProviderWithTimeout(provider, shutdownTimeoutMs);
           if (getOpenTelemetryTracerProvider() === provider) {
@@ -314,13 +314,25 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
           }
         } finally {
           unregisterFastifyConfig?.();
+          unregisterWorkerShutdownHook?.();
         }
-      });
+      })();
+
+      return shutdownOpenTelemetryPromise;
+    };
+
+    // Register these last so failed init paths do not leave partial shutdown hooks
+    // behind. The worker hook runs during cluster restarts, while Fastify onClose
+    // still handles explicit app.close() calls from tests or custom integrations.
+    unregisterWorkerShutdownHook = registerWorkerShutdownHook(shutdownOpenTelemetry);
+    unregisterFastifyConfig = registerFastifyConfigFunction((app) => {
+      app.addHook('onClose', shutdownOpenTelemetry);
     });
 
     log.info('[OpenTelemetry] Tracer provider initialized');
   } catch (err) {
     unregisterFastifyConfig?.();
+    unregisterWorkerShutdownHook?.();
     if (registeredProvider && getOpenTelemetryTracerProvider() === registeredProvider) {
       setOpenTelemetryTracerProvider(null);
     }

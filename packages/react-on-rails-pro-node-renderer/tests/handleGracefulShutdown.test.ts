@@ -8,16 +8,24 @@ const flushPromises = () =>
   });
 
 describe('handleGracefulShutdown', () => {
-  const loadHandleGracefulShutdown = (worker: { id: number; destroy: jest.Mock; disconnect: jest.Mock }) => {
+  const loadHandleGracefulShutdown = (
+    worker: { id: number; destroy: jest.Mock; disconnect: jest.Mock },
+    runWorkerShutdownHooks = jest.fn(async () => undefined),
+  ) => {
     jest.resetModules();
     jest.doMock('cluster', () => ({
       __esModule: true,
       default: { worker },
     }));
+    jest.doMock('../src/worker/shutdownHooks.js', () => ({
+      runWorkerShutdownHooks,
+    }));
 
     // eslint-disable-next-line global-require, @typescript-eslint/no-require-imports
-    return require('../src/worker/handleGracefulShutdown')
+    const handleGracefulShutdown = require('../src/worker/handleGracefulShutdown')
       .default as typeof import('../src/worker/handleGracefulShutdown').default;
+
+    return { handleGracefulShutdown, runWorkerShutdownHooks };
   };
 
   const buildApp = () => {
@@ -48,26 +56,30 @@ describe('handleGracefulShutdown', () => {
   afterEach(() => {
     processOnSpy.mockRestore();
     jest.dontMock('cluster');
+    jest.dontMock('../src/worker/shutdownHooks.js');
   });
 
-  test('closes Fastify before destroying an idle worker', async () => {
+  test('runs shutdown hooks before destroying an idle worker without closing Fastify', async () => {
     const worker = { id: 1, destroy: jest.fn(), disconnect: jest.fn() };
-    const handleGracefulShutdown = loadHandleGracefulShutdown(worker);
+    const { handleGracefulShutdown, runWorkerShutdownHooks } = loadHandleGracefulShutdown(worker);
     const { app } = buildApp();
 
     handleGracefulShutdown(app as never);
     messageHandler!(SHUTDOWN_WORKER_MESSAGE);
     await flushPromises();
 
-    expect(app.close).toHaveBeenCalledTimes(1);
+    expect(runWorkerShutdownHooks).toHaveBeenCalledTimes(1);
     expect(worker.destroy).toHaveBeenCalledTimes(1);
-    expect(app.close.mock.invocationCallOrder[0]).toBeLessThan(worker.destroy.mock.invocationCallOrder[0]!);
+    expect(runWorkerShutdownHooks.mock.invocationCallOrder[0]).toBeLessThan(
+      worker.destroy.mock.invocationCallOrder[0]!,
+    );
+    expect(app.close).not.toHaveBeenCalled();
     expect(worker.disconnect).not.toHaveBeenCalled();
   });
 
-  test('disconnects while requests are active, then closes Fastify before destroy after response', async () => {
+  test('disconnects while requests are active, then runs shutdown hooks before destroy after response', async () => {
     const worker = { id: 1, destroy: jest.fn(), disconnect: jest.fn() };
-    const handleGracefulShutdown = loadHandleGracefulShutdown(worker);
+    const { handleGracefulShutdown, runWorkerShutdownHooks } = loadHandleGracefulShutdown(worker);
     const { app, hooks } = buildApp();
 
     handleGracefulShutdown(app as never);
@@ -75,29 +87,35 @@ describe('handleGracefulShutdown', () => {
     messageHandler!(SHUTDOWN_WORKER_MESSAGE);
 
     expect(worker.disconnect).toHaveBeenCalledTimes(1);
-    expect(app.close).not.toHaveBeenCalled();
+    expect(runWorkerShutdownHooks).not.toHaveBeenCalled();
     expect(worker.destroy).not.toHaveBeenCalled();
 
     hooks.onResponse!(undefined, undefined, jest.fn());
     await flushPromises();
 
-    expect(app.close).toHaveBeenCalledTimes(1);
+    expect(runWorkerShutdownHooks).toHaveBeenCalledTimes(1);
     expect(worker.destroy).toHaveBeenCalledTimes(1);
-    expect(app.close.mock.invocationCallOrder[0]).toBeLessThan(worker.destroy.mock.invocationCallOrder[0]!);
+    expect(runWorkerShutdownHooks.mock.invocationCallOrder[0]).toBeLessThan(
+      worker.destroy.mock.invocationCallOrder[0]!,
+    );
+    expect(app.close).not.toHaveBeenCalled();
   });
 
-  test('forces worker destroy when Fastify close hangs', () => {
+  test('forces worker destroy when shutdown hooks hang', () => {
     jest.useFakeTimers();
     try {
       const worker = { id: 1, destroy: jest.fn(), disconnect: jest.fn() };
-      const handleGracefulShutdown = loadHandleGracefulShutdown(worker);
+      const { handleGracefulShutdown, runWorkerShutdownHooks } = loadHandleGracefulShutdown(
+        worker,
+        jest.fn(() => new Promise(() => undefined)),
+      );
       const { app } = buildApp();
-      app.close.mockImplementation(() => new Promise(() => undefined));
 
       handleGracefulShutdown(app as never);
       messageHandler!(SHUTDOWN_WORKER_MESSAGE);
 
-      expect(app.close).toHaveBeenCalledTimes(1);
+      expect(runWorkerShutdownHooks).toHaveBeenCalledTimes(1);
+      expect(app.close).not.toHaveBeenCalled();
       expect(worker.destroy).not.toHaveBeenCalled();
 
       jest.advanceTimersByTime(10_000);

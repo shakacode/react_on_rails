@@ -4,6 +4,7 @@ import {
 } from '../shared/opentelemetryState.js';
 import { resetSubSpan, resetTracing } from '../shared/tracing.js';
 import * as fastifyConfig from '../worker/fastifyConfig.js';
+import * as shutdownHooks from '../worker/shutdownHooks.js';
 
 export async function resetOpenTelemetryForTest(): Promise<void> {
   const tracerProvider = getOpenTelemetryTracerProvider();
@@ -17,6 +18,8 @@ export async function resetOpenTelemetryForTest(): Promise<void> {
 
   // eslint-disable-next-line no-underscore-dangle
   fastifyConfig.__resetFastifyConfigFunctionsForTest();
+  // eslint-disable-next-line no-underscore-dangle
+  shutdownHooks.__resetWorkerShutdownHooksForTest();
 
   /* eslint-disable @typescript-eslint/no-require-imports, global-require */
   try {

@@ -30,6 +30,7 @@ describe('opentelemetry integration: init() failure path', () => {
     jest.dontMock('@opentelemetry/sdk-trace-node');
     jest.dontMock('../../src/integrations/api.js');
     jest.dontMock('../../src/worker/fastifyConfig.js');
+    jest.dontMock('../../src/worker/shutdownHooks.js');
     jest.dontMock('fastify');
     jest.restoreAllMocks();
     otelTrace.disable();
@@ -279,6 +280,44 @@ describe('opentelemetry integration: init() failure path', () => {
       'ror.ssr.request',
     ]);
     await installOnCloseHook();
+  });
+
+  test('worker shutdown hook disables the global tracer provider so init() can run again', async () => {
+    let workerShutdownHook: (() => Promise<void>) | undefined;
+
+    jest.doMock('../../src/worker/shutdownHooks.js', () => ({
+      __resetWorkerShutdownHooksForTest: jest.fn(),
+      registerWorkerShutdownHook: jest.fn((hook: () => Promise<void>) => {
+        workerShutdownHook = hook;
+        return jest.fn();
+      }),
+    }));
+
+    const { trace } = await import('@opentelemetry/api');
+    const { InMemorySpanExporter, SimpleSpanProcessor } = await import('@opentelemetry/sdk-trace-base');
+    const firstExporter = new InMemorySpanExporter();
+    const secondExporter = new InMemorySpanExporter();
+    const otel = await import('../../src/integrations/opentelemetry');
+
+    otel.init({
+      spanProcessor: new SimpleSpanProcessor(firstExporter),
+    });
+    trace.getTracer('test').startActiveSpan('first.manual', (span) => {
+      span.end();
+    });
+    expect(firstExporter.getFinishedSpans().map((span) => span.name)).toEqual(['first.manual']);
+
+    await workerShutdownHook!();
+
+    otel.init({
+      spanProcessor: new SimpleSpanProcessor(secondExporter),
+    });
+    trace.getTracer('test').startActiveSpan('second.manual', (span) => {
+      span.end();
+    });
+
+    expect(secondExporter.getFinishedSpans().map((span) => span.name)).toEqual(['second.manual']);
+    await resetOpenTelemetryForTest();
   });
 
   test('OpenTelemetry diagnostics preserve warn and error severity in renderer logs', async () => {

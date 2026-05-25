@@ -2,8 +2,14 @@ import cluster from 'cluster';
 import { FastifyInstance } from './types.js';
 import { SHUTDOWN_WORKER_MESSAGE } from '../shared/utils.js';
 import log from '../shared/log.js';
+import { runWorkerShutdownHooks } from './shutdownHooks.js';
 
-const APP_CLOSE_TIMEOUT_MS = 10_000;
+const WORKER_SHUTDOWN_HOOKS_TIMEOUT_MS = 10_000;
+
+function errorCode(error: unknown): string | undefined {
+  const code = (error as { code?: unknown })?.code;
+  return typeof code === 'string' ? code : undefined;
+}
 
 const handleGracefulShutdown = (app: FastifyInstance) => {
   const { worker } = cluster;
@@ -16,13 +22,13 @@ const handleGracefulShutdown = (app: FastifyInstance) => {
   let isShuttingDown = false;
   let isDestroying = false;
 
-  const closeAppAndDestroyWorker = (context: string) => {
+  const destroyWorkerAfterShutdownHooks = (context: string) => {
     if (isDestroying) {
       return;
     }
 
     isDestroying = true;
-    log.debug('Worker #%d closing Fastify app before shutdown after %s', worker.id, context);
+    log.debug('Worker #%d running shutdown hooks before shutdown after %s', worker.id, context);
     let workerDestroyed = false;
     const destroyWorker = () => {
       if (workerDestroyed) {
@@ -31,19 +37,32 @@ const handleGracefulShutdown = (app: FastifyInstance) => {
       workerDestroyed = true;
       worker.destroy();
     };
-    const closeTimeout = setTimeout(() => {
-      log.warn('Worker #%d: app.close() timed out, forcing worker.destroy()', worker.id);
+    const shutdownTimeout = setTimeout(() => {
+      log.warn('Worker #%d: shutdown hooks timed out, forcing worker.destroy()', worker.id);
       destroyWorker();
-    }, APP_CLOSE_TIMEOUT_MS);
-    void app
-      .close()
+    }, WORKER_SHUTDOWN_HOOKS_TIMEOUT_MS);
+    const shutdownHooksPromise = runWorkerShutdownHooks();
+
+    void shutdownHooksPromise
       .catch((error: unknown) => {
-        log.warn({ msg: 'Error closing Fastify app before worker shutdown', error });
+        log.warn({ msg: 'Error running worker shutdown hooks before worker shutdown', error });
       })
       .finally(() => {
-        clearTimeout(closeTimeout);
+        clearTimeout(shutdownTimeout);
         destroyWorker();
       });
+  };
+
+  const disconnectWorker = () => {
+    try {
+      worker.disconnect();
+    } catch (error: unknown) {
+      if (errorCode(error) === 'ERR_IPC_DISCONNECTED') {
+        log.debug('Worker #%d IPC channel was already disconnected during graceful shutdown', worker.id);
+      } else {
+        log.warn({ msg: 'Error disconnecting worker during graceful shutdown', error });
+      }
+    }
   };
 
   // Helper to decrement counter and potentially kill worker
@@ -51,7 +70,7 @@ const handleGracefulShutdown = (app: FastifyInstance) => {
     activeRequestsCount -= 1;
     if (isShuttingDown && activeRequestsCount === 0) {
       log.debug('Worker #%d has no active requests after %s, killing the worker', worker.id, context);
-      closeAppAndDestroyWorker(context);
+      destroyWorkerAfterShutdownHooks(context);
     }
   };
 
@@ -61,14 +80,14 @@ const handleGracefulShutdown = (app: FastifyInstance) => {
       isShuttingDown = true;
       if (activeRequestsCount === 0) {
         log.debug('Worker #%d has no active requests, killing the worker', worker.id);
-        closeAppAndDestroyWorker('shutdown message');
+        destroyWorkerAfterShutdownHooks('shutdown message');
       } else {
         log.debug(
           'Worker #%d has "%d" active requests, disconnecting the worker',
           worker.id,
           activeRequestsCount,
         );
-        worker.disconnect();
+        disconnectWorker();
       }
     }
   });
