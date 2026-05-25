@@ -126,9 +126,8 @@ jobs:
       - name: Install Ruby Gems for dummy app
         run: |
           cd react_on_rails/spec/dummy
-          bundle lock --add-platform 'x86_64-linux'
-          if ! bundle check --path=vendor/bundle; then
-            bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
+          if ! BUNDLE_FROZEN=true bundle check --path=vendor/bundle; then
+            BUNDLE_FROZEN=true bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
           fi
       - name: Build ReScript files
         run: pnpm --filter "react_on_rails" run build:rescript

@@ -113,6 +113,8 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.setup-integration-matrix.outputs.matrix) }}
     runs-on: ubuntu-22.04
+    env:
+      BUNDLE_FROZEN: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -169,7 +171,6 @@ jobs:
       - name: Install Ruby Gems for dummy app
         run: |
           cd react_on_rails/spec/dummy
-          bundle lock --add-platform 'x86_64-linux'
           if ! bundle check --path=vendor/bundle; then
             bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
           fi
@@ -206,6 +207,8 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.setup-integration-matrix.outputs.matrix) }}
     runs-on: ubuntu-22.04
+    env:
+      BUNDLE_FROZEN: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -270,14 +273,12 @@ jobs:
       - name: Install Ruby Gems for package
         run: |
           cd react_on_rails
-          bundle lock --add-platform 'x86_64-linux'
           if ! bundle check --path=vendor/bundle; then
             bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
           fi
       - name: Install Ruby Gems for dummy app
         run: |
           cd react_on_rails/spec/dummy
-          bundle lock --add-platform 'x86_64-linux'
           if ! bundle check --path=vendor/bundle; then
             bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
           fi
