@@ -17,6 +17,15 @@ RSpec.describe ReactOnRailsPro::StreamDecorator do
     end
   end
 
+  describe "#status" do
+    it "delegates status and http_status to the wrapped component" do
+      allow(mock_component).to receive(:status).and_return(204)
+
+      expect(stream_decorator.status).to eq(204)
+      expect(stream_decorator.http_status).to eq(204)
+    end
+  end
+
   describe "#each_chunk" do
     before do
       allow(mock_component).to receive(:each_chunk).and_yield("chunk1").and_yield("chunk2")

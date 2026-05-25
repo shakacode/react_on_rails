@@ -103,3 +103,4 @@ REACT_ON_RAILS_RENDERER_TRANSPORT=async_http bin/renderer-harness --scenario str
 
 - Harness unit tests run with the regular Pro gem unit test sweep (`cd react_on_rails_pro && bundle exec rspec spec/load/`).
 - Live smoke is opt-in via `RUN_RENDERER_LOAD_SMOKE=1`; it is not wired into any default workflow in this PR.
+- Live runs fail fast if bundle upload takes longer than 10 seconds, usually indicating an unresponsive node renderer.

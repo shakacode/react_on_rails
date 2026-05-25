@@ -173,6 +173,8 @@ module ReactOnRailsPro
       # Start each attempt from nil. Known missing-status cases keep that nil as
       # an unknown status; unexpected extraction errors still propagate after the
       # ensure below marks status as attempted.
+      # This extraction-level reset covers HTTP error handling; process_response_chunks
+      # also resets before streaming so retries start from a clean attempt state.
       @status = nil
       extracted_status = extract_status(response)
       @status = extracted_status
@@ -185,6 +187,7 @@ module ReactOnRailsPro
     # Missing or unreadable status is treated as an error so callers do not
     # parse an unknown response body as LPP data.
     def response_has_error_status?
+      # Guard: status must be recorded before any body chunk is parsed.
       return true unless @status_recorded
 
       @status.nil? || @status >= 400
@@ -199,7 +202,7 @@ module ReactOnRailsPro
       # request.response is available for non-streaming errors.
       # ArgumentError: HTTPX 1.7.0 can raise while materializing status from a
       # partially-consumed StreamResponse; transport-level HTTPX::Error still propagates.
-      # TODO: remove ArgumentError rescue once the minimum HTTPX version is
+      # TODO(#3383): remove ArgumentError rescue once the minimum HTTPX version is
       # greater than 1.7.0 and status reads from partially-consumed stream
       # responses are verified not to raise ArgumentError.
       warn_status_read_failure("ignoring error while reading stream response status", e)
@@ -213,8 +216,9 @@ module ReactOnRailsPro
       begin
         record_status(response)
       rescue StandardError => e
-        # record_status leaves @status nil before extraction; keep dispatching
-        # the HTTPError path so callers receive the renderer error context.
+        # record_status's ensure marks status extraction as attempted. If an
+        # unexpected error escapes, status stayed unreadable and cannot drive
+        # the 410 retry path, so fail explicitly with the renderer error body.
         warn_status_read_failure(
           "ignoring unexpected error while reading HTTP error response status",
           e

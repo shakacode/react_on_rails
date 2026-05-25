@@ -93,6 +93,8 @@ module RendererHarness
 
       out.strip.to_i
     rescue Errno::ESRCH, Errno::ENOENT
+      # run_ps returns nil for normal ps failures; keep this safety net for
+      # platform-specific process lookup errors during RSS conversion.
       nil
     end
 

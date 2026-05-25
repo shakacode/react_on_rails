@@ -157,7 +157,9 @@ module RendererHarness
         start_cv: ConditionVariable.new,
         ready_count: 0,
         started: false,
-        aborted: false
+        aborted: false,
+        deadline: nil,
+        abort_error: nil
       )
     end
 
@@ -276,6 +278,8 @@ module RendererHarness
     def join_count_thread(thread)
       @remaining_mutex.synchronize do
         loop do
+          # Non-blocking join while holding @remaining_mutex is intentional;
+          # @remaining_cv.wait releases it so workers can still claim requests.
           joined_thread = thread.join(0)
           return joined_thread if joined_thread
 
