@@ -254,21 +254,23 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
         },
       });
 
-      const subSpanImpl: SubSpanFn = (subOpts, fn) =>
-        tracer.startActiveSpan(subOpts.name, { attributes: subOpts.attributes }, async (span) => {
-          try {
-            return await fn();
-          } catch (err) {
-            span.setStatus({
-              code: otelApi.SpanStatusCode.ERROR,
-              message: err instanceof Error ? err.message : String(err),
-            });
-            throw err;
-          } finally {
-            span.end();
-          }
-        });
-      installedAdapters.subSpan = setupSubSpan(subSpanImpl);
+      if (installedAdapters.tracing) {
+        const subSpanImpl: SubSpanFn = (subOpts, fn) =>
+          tracer.startActiveSpan(subOpts.name, { attributes: subOpts.attributes }, async (span) => {
+            try {
+              return await fn();
+            } catch (err) {
+              span.setStatus({
+                code: otelApi.SpanStatusCode.ERROR,
+                message: err instanceof Error ? err.message : String(err),
+              });
+              throw err;
+            } finally {
+              span.end();
+            }
+          });
+        installedAdapters.subSpan = setupSubSpan(subSpanImpl);
+      }
     }
 
     setOpenTelemetryTracerProvider(provider);

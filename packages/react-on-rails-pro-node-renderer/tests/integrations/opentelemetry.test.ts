@@ -9,6 +9,7 @@ import packageJson from '../../src/shared/packageJson';
 import {
   trace,
   subSpan,
+  setupTracing,
   startSsrRequestOptions,
   __resetSubSpanForTest,
   __resetTracingForTest,
@@ -291,6 +292,25 @@ describe('opentelemetry integration: tracing wiring', () => {
     expect(bundleSpan!.attributes['bundle.timestamp']).toBe('abc');
     // The bundle span's parent must be the ssr span.
     expect(bundleSpan!.parentSpanContext?.spanId).toBe(ssrSpan!.spanContext().spanId);
+  });
+
+  test('init({ tracing: true }) does not install subSpan when another tracing integration is active', async () => {
+    const existingExecutor = jest.fn(async (fn) => fn());
+    expect(setupTracing({ executor: existingExecutor })).toBe(true);
+
+    init({
+      tracing: true,
+      spanProcessor: new SimpleSpanProcessor(exporter),
+    });
+
+    const result = await trace(
+      () => subSpan({ name: 'ror.vm.execute' }, async () => 'ok'),
+      startSsrRequestOptions({ renderingRequest: 'irrelevant' }),
+    );
+
+    expect(result).toBe('ok');
+    expect(existingExecutor).toHaveBeenCalledTimes(1);
+    expect(exporter.getFinishedSpans()).toHaveLength(0);
   });
 
   test('subSpan does not leak renderingRequest payload into span attributes (sensitive data audit)', async () => {
