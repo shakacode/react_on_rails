@@ -255,23 +255,191 @@ RSpec.describe "release.rake helper methods" do
 
   describe "#publish_npm_with_retry" do
     it "passes OTP as a dedicated CLI argument" do
-      expect(self).to receive(:sh_args_in_dir_for_release).with(
-        "/tmp/pkg",
-        "pnpm",
-        "publish",
-        "--tag",
-        "rc",
-        "--otp",
-        "123456"
-      )
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "package.json"), JSON.pretty_generate({ "name" => "react-on-rails",
+                                                                          "version" => "16.4.0-rc.1" }))
 
-      publish_npm_with_retry(
-        "/tmp/pkg",
-        "react-on-rails@16.4.0-rc.1",
-        base_args: ["--tag", "rc"],
-        otp: "123456",
-        max_retries: 1
+        expect(self).to receive(:sh_args_in_dir_for_release).with(
+          dir,
+          "pnpm",
+          "publish",
+          "--tag",
+          "rc",
+          "--otp",
+          "123456"
+        )
+        expect(self).to receive(:verify_npm_package_published!).with(
+          "react-on-rails",
+          "16.4.0-rc.1"
+        )
+
+        publish_npm_with_retry(
+          dir,
+          "react-on-rails@16.4.0-rc.1",
+          base_args: ["--tag", "rc"],
+          otp: "123456",
+          max_retries: 1
+        )
+      end
+    end
+
+    it "raises when pnpm publish exits but npm cannot see the package version" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "package.json"), JSON.pretty_generate({ "name" => "react-on-rails",
+                                                                          "version" => "16.7.0-rc.1" }))
+        expect(self).to receive(:sh_args_in_dir_for_release).with(dir, "pnpm", "publish")
+        allow(Open3).to receive(:capture2e)
+          .with(
+            "npm",
+            "view",
+            "react-on-rails@16.7.0-rc.1",
+            "version",
+            "dependencies",
+            "optionalDependencies",
+            "peerDependencies",
+            "--json",
+            "--registry",
+            "https://registry.npmjs.org/"
+          )
+          .and_return(["npm ERR! 404 Not Found", instance_double(Process::Status, success?: false)])
+        allow(self).to receive(:sleep)
+
+        expect do
+          publish_npm_with_retry(
+            dir,
+            "react-on-rails@16.7.0-rc.1",
+            max_retries: 1
+          )
+        end.to raise_error(SystemExit, /not visible on npm/)
+      end
+    end
+
+    it "replaces workspace protocol dependencies while publishing and restores the package manifest" do
+      Dir.mktmpdir do |dir|
+        package_json_path = File.join(dir, "package.json")
+        original_package_json = JSON.pretty_generate(
+          {
+            "name" => "react-on-rails-pro",
+            "version" => "16.7.0-rc.1",
+            "dependencies" => {
+              "react-on-rails" => "workspace:*"
+            },
+            "optionalDependencies" => {
+              "react-on-rails-optional" => "workspace:^"
+            },
+            "peerDependencies" => {
+              "react-on-rails-peer" => "workspace:~"
+            }
+          }
+        )
+        File.write(package_json_path, "#{original_package_json}\n")
+
+        expect(self).to receive(:sh_args_in_dir_for_release).with(dir, "pnpm", "publish") do
+          published_package_json = JSON.parse(File.read(package_json_path))
+          expect(published_package_json.dig("dependencies", "react-on-rails")).to eq("16.7.0-rc.1")
+          expect(published_package_json.dig("optionalDependencies", "react-on-rails-optional"))
+            .to eq("^16.7.0-rc.1")
+          expect(published_package_json.dig("peerDependencies", "react-on-rails-peer")).to eq("~16.7.0-rc.1")
+        end
+        expect(self).to receive(:verify_npm_package_published!).with(
+          "react-on-rails-pro",
+          "16.7.0-rc.1"
+        )
+
+        publish_npm_with_retry(dir, "react-on-rails-pro@16.7.0-rc.1", max_retries: 1)
+
+        expect(File.read(package_json_path)).to eq("#{original_package_json}\n")
+      end
+    end
+  end
+
+  describe "#with_publishable_package_json" do
+    it "preserves the original publish failure when package.json restore also fails" do
+      Dir.mktmpdir do |dir|
+        package_json_path = File.join(dir, "package.json")
+        File.write(
+          package_json_path,
+          "#{JSON.pretty_generate({ 'dependencies' => { 'react-on-rails' => 'workspace:*' } })}\n"
+        )
+
+        write_count = 0
+        allow(File).to receive(:write).and_wrap_original do |method, *args|
+          write_count += 1 if args.first == package_json_path
+          raise "restore failed" if args.first == package_json_path && write_count == 2
+
+          method.call(*args)
+        end
+
+        expect do
+          with_publishable_package_json(dir, "16.7.0-rc.1") do
+            raise "publish failed"
+          end
+        end.to raise_error(RuntimeError, "publish failed")
+      end
+    end
+  end
+
+  describe "#verify_npm_package_published!" do
+    it "retries transient npm metadata lookup failures before accepting the published package" do
+      failed_status = instance_double(Process::Status, success?: false)
+      successful_status = instance_double(Process::Status, success?: true)
+
+      allow(Open3).to receive(:capture2e)
+        .with(
+          "npm",
+          "view",
+          "react-on-rails@16.7.0-rc.1",
+          "version",
+          "dependencies",
+          "optionalDependencies",
+          "peerDependencies",
+          "--json",
+          "--registry",
+          "https://registry.npmjs.org/"
+        )
+        .and_return(
+          ["npm ERR! 404 Not Found", failed_status],
+          [JSON.generate({ "version" => "16.7.0-rc.1" }), successful_status]
+        )
+      expect(self).to receive(:sleep).with(0).once
+
+      verify_npm_package_published!(
+        "react-on-rails",
+        "16.7.0-rc.1",
+        attempts: 2,
+        retry_delay_seconds: 0
       )
+    end
+
+    it "raises when the published package metadata contains workspace protocol dependencies" do
+      allow(Open3).to receive(:capture2e)
+        .with(
+          "npm",
+          "view",
+          "react-on-rails-pro@16.7.0-rc.1",
+          "version",
+          "dependencies",
+          "optionalDependencies",
+          "peerDependencies",
+          "--json",
+          "--registry",
+          "https://registry.npmjs.org/"
+        )
+        .and_return([
+                      JSON.generate(
+                        {
+                          "version" => "16.7.0-rc.1",
+                          "dependencies" => {
+                            "react-on-rails" => "workspace:*"
+                          }
+                        }
+                      ),
+                      instance_double(Process::Status, success?: true)
+                    ])
+
+      expect do
+        verify_npm_package_published!("react-on-rails-pro", "16.7.0-rc.1")
+      end.to raise_error(SystemExit, /workspace:\*/)
     end
   end
 
