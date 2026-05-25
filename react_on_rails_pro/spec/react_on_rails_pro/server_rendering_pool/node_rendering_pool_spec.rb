@@ -10,7 +10,8 @@ module ReactOnRailsPro
         let(:render_path) { "/bundles/123/render/abc" }
         let(:response_body) { 'Invalid "renderingRequest" field in render request.' }
         let(:response) do
-          instance_double(HTTPX::Response, status: ReactOnRailsPro::STATUS_BAD_REQUEST, body: response_body)
+          instance_double(ReactOnRailsPro::RendererHttpClient::Response,
+                          status: ReactOnRailsPro::STATUS_BAD_REQUEST, body: response_body)
         end
 
         before do

@@ -33,6 +33,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 - **Upgrade contributor pnpm tooling to 10.33.4**: The monorepo now pins pnpm 10.33.4 with Corepack's hash-qualified `packageManager` format, keeps the install-generator CI fallback on the same pnpm version, and relies on the root workspace pin instead of duplicate workspace `packageManager` declarations. [PR 3400](https://github.com/shakacode/react_on_rails/pull/3400) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
 - **[Pro]** **Updated Pino in the Node Renderer**: Raised the `react-on-rails-pro-node-renderer` `pino` dependency range to `^9.14.0 || ^10.1.0`, aligning with the current Fastify dependency. [PR 3401](https://github.com/shakacode/react_on_rails/pull/3401) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
 
+#### Fixed
+
+- **[Pro]** **Benchmark CI starts the production dummy app on the expected port**: `react_on_rails_pro/spec/dummy/bin/prod` now sets `PORT=3001` by default before launching Foreman, preventing Foreman's default `PORT=5000` from making the Rails server miss the benchmark workflow readiness check on `localhost:3001`. Both `react_on_rails/spec/dummy/bin/prod` and `react_on_rails_pro/spec/dummy/bin/prod` respect `PORT` when it's set. [PR 3403](https://github.com/shakacode/react_on_rails/pull/3403) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
+
 ### [16.7.0.rc.2] - 2026-05-24
 
 #### Added

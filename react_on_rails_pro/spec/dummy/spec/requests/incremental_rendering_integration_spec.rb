@@ -31,6 +31,13 @@ describe "Incremental Rendering Integration", :integration do
   let(:rsc_bundle_hash) { "test_incremental_rsc_bundle" }
 
   before do
+    # WebMock's async-http adapter intercepts every request and reads the entire
+    # request body to build a signature (build_request_signature calls request.read).
+    # For bidirectional HTTP/2 streams, the request body is a Writable that is filled
+    # concurrently — reading it eagerly deadlocks. Disable the adapter so requests
+    # go straight to the real async-http client.
+    WebMock::HttpLibAdapters::AsyncHttpClientAdapter.disable!
+
     allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool).to receive_messages(
       server_bundle_hash: server_bundle_hash,
       rsc_bundle_hash: rsc_bundle_hash,
@@ -97,6 +104,7 @@ describe "Incremental Rendering Integration", :integration do
 
   after do
     ReactOnRailsPro::Request.reset_connection
+    WebMock::HttpLibAdapters::AsyncHttpClientAdapter.enable!
   end
 
   describe "upload_assets" do
@@ -168,8 +176,10 @@ describe "Incremental Rendering Integration", :integration do
       request_digest = Digest::MD5.hexdigest(js_code)
       render_path = "/bundles/#{server_bundle_hash}/incremental-render/#{request_digest}"
 
-      # Single condition to signal when each chunk is received
-      chunk_received = Async::Condition.new
+      # Use Async::Queue instead of Async::Condition — Queue buffers signals so they
+      # are never lost if the consumer hasn't called dequeue yet. Condition#signal is
+      # fire-and-forget and races with the fiber scheduler under async-http.
+      chunk_received = Async::Queue.new
 
       # Wrap the test in a timeout to prevent hanging forever on deadlock
       Timeout.timeout(10) do
@@ -180,15 +190,15 @@ describe "Incremental Rendering Integration", :integration do
           async_props_block: proc { |emitter|
             # Send first value and wait for confirmation
             emitter.call("prop1", "value1")
-            chunk_received.wait
+            chunk_received.dequeue
 
             # Send second value and wait for confirmation
             emitter.call("prop2", "value2")
-            chunk_received.wait
+            chunk_received.dequeue
 
             # Send third value and wait for confirmation
             emitter.call("prop3", "value3")
-            chunk_received.wait
+            chunk_received.dequeue
 
             # If we reach here, all chunks were received while async_block was running
           }
@@ -198,7 +208,7 @@ describe "Incremental Rendering Integration", :integration do
         chunks = []
         stream.each_chunk do |chunk|
           chunks << chunk
-          chunk_received.signal
+          chunk_received.enqueue(true)
         end
 
         # Verify all values were received
@@ -296,7 +306,7 @@ describe "Incremental Rendering Integration", :integration do
             }
           )
 
-          # barrier.wait re-raises the exception from the async task
+          # task.wait re-raises the exception from the async task
           expect do
             stream.each_chunk { |_chunk| nil }
           end.to raise_error(StandardError, "something went wrong in the async block")

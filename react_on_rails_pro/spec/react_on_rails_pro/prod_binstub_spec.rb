@@ -35,7 +35,7 @@ RSpec.describe "Pro dummy bin/prod" do
           path,
           <<~BASH
             #!/usr/bin/env bash
-            printf '%s %s\\n' "${0##*/}" "$*" > "$COMMAND_LOG_PATH"
+            printf 'PORT=%s RAILS_PORT=%s %s %s\\n' "$PORT" "$RAILS_PORT" "${0##*/}" "$*" > "$COMMAND_LOG_PATH"
           BASH
         )
         FileUtils.chmod(0o755, path)
@@ -66,7 +66,7 @@ RSpec.describe "Pro dummy bin/prod" do
 
     aggregate_failures do
       expect(result[:status]).to be_success
-      expect(result[:command_log]).to eq("overmind start -f Procfile.prod -p 3001\n")
+      expect(result[:command_log]).to eq("PORT=3001 RAILS_PORT=3001 overmind start -f Procfile.prod -p 3001\n")
       expect(result[:stderr]).to be_empty
       expect(result[:stdout]).to be_empty
     end
@@ -77,7 +77,7 @@ RSpec.describe "Pro dummy bin/prod" do
 
     aggregate_failures do
       expect(result[:status]).to be_success
-      expect(result[:command_log]).to eq("foreman start -f Procfile.prod -p 3001\n")
+      expect(result[:command_log]).to eq("PORT=3001 RAILS_PORT=3001 foreman start -f Procfile.prod -p 3001\n")
       expect(result[:stderr]).to be_empty
       expect(result[:stdout]).to be_empty
     end
@@ -88,7 +88,7 @@ RSpec.describe "Pro dummy bin/prod" do
 
     aggregate_failures do
       expect(result[:status]).to be_success
-      expect(result[:command_log]).to eq("foreman start -f Procfile.prod -p 4242\n")
+      expect(result[:command_log]).to eq("PORT=4242 RAILS_PORT=4242 foreman start -f Procfile.prod -p 4242\n")
       expect(result[:stderr]).to be_empty
       expect(result[:stdout]).to be_empty
     end

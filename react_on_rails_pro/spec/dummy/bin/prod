@@ -28,14 +28,15 @@ fi
 
 export NODE_ENV=production
 export RAILS_ENV=production
-PROD_PORT="${PORT:-3001}"
+export PORT="${PORT:-3001}"
+export RAILS_PORT="${RAILS_PORT:-$PORT}"
 
 if command -v overmind &> /dev/null; then
-  overmind start -f Procfile.prod -p "$PROD_PORT"
+  overmind start -f Procfile.prod -p "$PORT"
 elif command -v foreman &> /dev/null; then
-  foreman start -f Procfile.prod -p "$PROD_PORT"
+  foreman start -f Procfile.prod -p "$PORT"
 else
   echo "Installing foreman..."
   gem install foreman
-  foreman start -f Procfile.prod -p "$PROD_PORT"
+  foreman start -f Procfile.prod -p "$PORT"
 fi
