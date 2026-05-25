@@ -40,7 +40,7 @@ import {
   Asset,
   getAssetPath,
 } from './shared/utils.js';
-import { startSsrRequestOptions, subSpan, trace } from './shared/tracing.js';
+import { startSsrRequestOptions, subSpan, trace, type TracingContext } from './shared/tracing.js';
 import { applyFastifyConfigFunctions } from './worker/fastifyConfig.js';
 
 export { configureFastify, type FastifyConfigFunction } from './worker/fastifyConfig.js';
@@ -382,10 +382,12 @@ export default function run(config: Partial<Config>) {
     // Track whether we've already started sending a response (streaming or otherwise)
     // If true, we can't send an error response on failure - headers are already sent
     let responseStarted = false;
+    let incrementalTracingContext: TracingContext | undefined;
 
     try {
       await trace(
-        async () => {
+        async (context) => {
+          incrementalTracingContext = context;
           // Handle the incremental render stream
           await handleIncrementalRenderStream({
             request: req,
@@ -430,6 +432,7 @@ export default function run(config: Partial<Config>) {
                     err,
                     'Error while handling incremental render request',
                   ),
+                  context,
                 );
                 return {
                   response: errorResponse,
@@ -502,7 +505,7 @@ export default function run(config: Partial<Config>) {
         }
       } else {
         // Response hasn't started yet, we can send an error response
-        const errorResponse = errorResponseResult(errorMessage);
+        const errorResponse = errorResponseResult(errorMessage, incrementalTracingContext);
         await setResponse(errorResponse, res);
       }
     }
@@ -649,6 +652,8 @@ export default function run(config: Partial<Config>) {
     });
   }
 
+  // Integration hooks registered before the worker loads are applied here, immediately after
+  // listen() is scheduled and before Fastify finishes booting.
   applyFastifyConfigFunctions(app);
 
   return app;

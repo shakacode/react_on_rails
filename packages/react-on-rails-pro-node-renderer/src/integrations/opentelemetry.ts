@@ -170,6 +170,7 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
   let registeredProvider: NodeTracerProviderType | undefined;
   let unregisterFastifyConfig: (() => void) | undefined;
   let unregisterWorkerShutdownHook: (() => void) | undefined;
+  let ownsOpenTelemetryGlobals = false;
 
   try {
     /* eslint-disable @typescript-eslint/no-require-imports, global-require --
@@ -218,8 +219,6 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
       resource,
       spanProcessors: [spanProcessor],
     });
-
-    configureOpenTelemetryDiagnostics(loadedOtelApi);
 
     if (opts.fastify) {
       /* eslint-disable @typescript-eslint/no-require-imports, global-require */
@@ -285,6 +284,11 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
             }
           });
         installedAdapters.subSpan = setupSubSpan(subSpanImpl);
+      } else {
+        message(
+          '[OpenTelemetry] tracing integration was not installed because another tracing integration is ' +
+            'active; skipping OpenTelemetry sub-spans.',
+        );
       }
     }
 
@@ -292,8 +296,9 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
       provider.register();
       setOpenTelemetryTracerProvider(provider);
       registeredProvider = provider;
+      ownsOpenTelemetryGlobals = true;
+      configureOpenTelemetryDiagnostics(loadedOtelApi);
     } catch (err) {
-      disableOpenTelemetryGlobals(loadedOtelApi);
       installedAdapters = resetInstalledTracingAdapters(installedAdapters);
       // When opts.fastify is enabled, OpenTelemetry does not expose a public
       // rollback API for module patches applied by registerInstrumentations().
@@ -310,6 +315,7 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
           if (getOpenTelemetryTracerProvider() === provider) {
             setOpenTelemetryTracerProvider(null);
             disableOpenTelemetryGlobals(loadedOtelApi);
+            ownsOpenTelemetryGlobals = false;
             installedAdapters = resetInstalledTracingAdapters(installedAdapters);
           }
         } finally {
@@ -333,11 +339,15 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
   } catch (err) {
     unregisterFastifyConfig?.();
     unregisterWorkerShutdownHook?.();
-    if (registeredProvider && getOpenTelemetryTracerProvider() === registeredProvider) {
+    if (
+      ownsOpenTelemetryGlobals &&
+      registeredProvider &&
+      otelApi &&
+      getOpenTelemetryTracerProvider() === registeredProvider
+    ) {
       setOpenTelemetryTracerProvider(null);
-    }
-    if (otelApi) {
       disableOpenTelemetryGlobals(otelApi);
+      ownsOpenTelemetryGlobals = false;
     }
     installedAdapters = resetInstalledTracingAdapters(installedAdapters);
     message(`[OpenTelemetry] init failed: ${String(err)}`);

@@ -21,6 +21,11 @@ export function registerFastifyConfigFunction(configFunction: FastifyConfigFunct
   };
 }
 
+/**
+ * Public one-way registration API for custom entrypoints and integrations.
+ * Internal callers use registerFastifyConfigFunction() when they need the
+ * unregister callback during failed initialization or shutdown cleanup.
+ */
 export function configureFastify(configFunction: FastifyConfigFunction): void {
   registerFastifyConfigFunction(configFunction);
 }

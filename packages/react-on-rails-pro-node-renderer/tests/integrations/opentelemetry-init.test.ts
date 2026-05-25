@@ -1,6 +1,7 @@
 import { jest } from '@jest/globals';
 import {
   context as otelContext,
+  DiagLogLevel,
   diag as otelDiag,
   propagation as otelPropagation,
   trace as otelTrace,
@@ -394,18 +395,15 @@ describe('opentelemetry integration: init() failure path', () => {
     await resetOpenTelemetryForTest();
   });
 
-  test('init() disables OTel diagnostics when provider.register() fails', async () => {
-    const log = {
+  test('init() preserves existing OTel globals when provider.register() fails', async () => {
+    const existingDiagLogger = {
       debug: jest.fn(),
       error: jest.fn(),
       info: jest.fn(),
+      verbose: jest.fn(),
       warn: jest.fn(),
     };
 
-    jest.doMock('../../src/integrations/api.js', () => ({
-      log,
-      message: jest.fn(),
-    }));
     jest.doMock('@opentelemetry/sdk-trace-node', () => ({
       NodeTracerProvider: jest.fn(function NodeTracerProvider() {
         return {
@@ -417,19 +415,31 @@ describe('opentelemetry integration: init() failure path', () => {
       }),
     }));
 
-    const { diag } = await import('@opentelemetry/api');
-    const { InMemorySpanExporter, SimpleSpanProcessor } = await import('@opentelemetry/sdk-trace-base');
+    const { BasicTracerProvider, InMemorySpanExporter, SimpleSpanProcessor } = await import(
+      '@opentelemetry/sdk-trace-base'
+    );
+    const existingExporter = new InMemorySpanExporter();
+    const existingProvider = new BasicTracerProvider({
+      spanProcessors: [new SimpleSpanProcessor(existingExporter)],
+    });
+    expect(otelTrace.setGlobalTracerProvider(existingProvider)).toBe(true);
+    otelDiag.setLogger(existingDiagLogger, DiagLogLevel.WARN);
+    existingDiagLogger.warn.mockClear();
+
     const otel = await import('../../src/integrations/opentelemetry');
 
     otel.init({
       spanProcessor: new SimpleSpanProcessor(new InMemorySpanExporter()),
     });
-    diag.warn('should not reach renderer log');
 
-    expect(log.warn).not.toHaveBeenCalledWith(
-      { otel: true, level: 'warn', args: [] },
-      'should not reach renderer log',
-    );
+    otelTrace.getTracer('existing').startActiveSpan('span.after.failed.init', (span) => {
+      span.end();
+    });
+    otelDiag.warn('diagnostic after failed init');
+
+    expect(existingExporter.getFinishedSpans().map((span) => span.name)).toEqual(['span.after.failed.init']);
+    expect(existingDiagLogger.warn).toHaveBeenCalledWith('diagnostic after failed init');
+    await existingProvider.shutdown();
   });
 
   test('Fastify onClose suppresses late provider.shutdown() rejection after timeout', async () => {

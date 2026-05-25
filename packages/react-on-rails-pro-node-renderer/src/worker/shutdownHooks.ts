@@ -2,6 +2,26 @@ export type WorkerShutdownHook = () => void | Promise<void>;
 
 const workerShutdownHooks: WorkerShutdownHook[] = [];
 
+type AggregateErrorWithErrors = Error & { errors: readonly unknown[] };
+type AggregateErrorConstructor = new (
+  errors: readonly unknown[],
+  message?: string,
+) => AggregateErrorWithErrors;
+
+function createAggregateShutdownHookError(errors: readonly unknown[]): AggregateErrorWithErrors {
+  const { AggregateError: AggregateErrorCtor } = globalThis as typeof globalThis & {
+    AggregateError?: AggregateErrorConstructor;
+  };
+  const aggregateError = AggregateErrorCtor
+    ? new AggregateErrorCtor(errors, 'Multiple worker shutdown hooks failed')
+    : Object.assign(new Error('Multiple worker shutdown hooks failed'), {
+        errors,
+        name: 'AggregateError',
+      });
+
+  return aggregateError;
+}
+
 export function registerWorkerShutdownHook(hook: WorkerShutdownHook): () => void {
   workerShutdownHooks.push(hook);
   return () => {
@@ -18,12 +38,16 @@ export async function runWorkerShutdownHooks(): Promise<void> {
       await hook();
     }),
   );
-  const rejectedResult = results.find(
+  const rejectedResults = results.filter(
     (result): result is PromiseRejectedResult => result.status === 'rejected',
   );
 
-  if (rejectedResult) {
-    throw rejectedResult.reason;
+  const firstRejectedResult = rejectedResults[0];
+  if (rejectedResults.length === 1 && firstRejectedResult) {
+    throw firstRejectedResult.reason;
+  }
+  if (rejectedResults.length > 1) {
+    throw createAggregateShutdownHookError(rejectedResults.map((result) => result.reason));
   }
 }
 

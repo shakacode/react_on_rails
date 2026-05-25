@@ -6,6 +6,7 @@ import { resetOpenTelemetryForTest } from '../../src/testUtils/opentelemetry';
 import worker, { disableHttp2 } from '../../src/worker';
 import { applyFastifyConfigFunctions } from '../../src/worker/fastifyConfig';
 import packageJson from '../../src/shared/packageJson';
+import * as errorReporter from '../../src/shared/errorReporter';
 import {
   trace,
   subSpan,
@@ -336,22 +337,29 @@ describe('opentelemetry integration: tracing wiring', () => {
   });
 
   test('init({ tracing: true }) does not install subSpan when another tracing integration is active', async () => {
+    const messageSpy = jest.spyOn(errorReporter, 'message').mockImplementation(jest.fn());
     const existingExecutor = jest.fn(async (fn) => fn());
-    expect(setupTracing({ executor: existingExecutor })).toBe(true);
 
-    init({
-      tracing: true,
-      spanProcessor: new SimpleSpanProcessor(exporter),
-    });
+    try {
+      expect(setupTracing({ executor: existingExecutor })).toBe(true);
 
-    const result = await trace(
-      () => subSpan({ name: 'ror.vm.execute' }, async () => 'ok'),
-      startSsrRequestOptions({ renderingRequest: 'irrelevant' }),
-    );
+      init({
+        tracing: true,
+        spanProcessor: new SimpleSpanProcessor(exporter),
+      });
 
-    expect(result).toBe('ok');
-    expect(existingExecutor).toHaveBeenCalledTimes(1);
-    expect(exporter.getFinishedSpans()).toHaveLength(0);
+      const result = await trace(
+        () => subSpan({ name: 'ror.vm.execute' }, async () => 'ok'),
+        startSsrRequestOptions({ renderingRequest: 'irrelevant' }),
+      );
+
+      expect(result).toBe('ok');
+      expect(existingExecutor).toHaveBeenCalledTimes(1);
+      expect(exporter.getFinishedSpans()).toHaveLength(0);
+      expect(messageSpy).toHaveBeenCalledWith(expect.stringContaining('skipping OpenTelemetry sub-spans'));
+    } finally {
+      messageSpy.mockRestore();
+    }
   });
 
   test('subSpan does not leak renderingRequest payload into span attributes (sensitive data audit)', async () => {
