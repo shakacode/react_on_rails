@@ -22,12 +22,18 @@ module ReactOnRailsPro
 
     def http_status
       return @component.http_status if @component.respond_to?(:http_status)
+      return @component.status if @component.respond_to?(:status)
 
-      @component.status
+      nil
     end
 
     def http_status_recorded?
       return @component.http_status_recorded? if @component.respond_to?(:http_status_recorded?)
+      return @component.status_recorded? if @component.respond_to?(:status_recorded?)
+
+      # Cached/decorated stream components may expose only #each_chunk; their
+      # status is unknown until they opt into the status metadata API.
+      return false unless @component.respond_to?(:http_status) || @component.respond_to?(:status)
 
       !http_status.nil?
     end
@@ -188,6 +194,8 @@ module ReactOnRailsPro
       # Empty-body responses record status after the stream is drained; specs
       # assert that status is read only after the response has yielded no chunks.
       record_status(stream_response) unless status_read_for_attempt
+      # If status is nil, every chunk went to error_body via response_has_error_status?,
+      # so the parser has not received data and flushing it would be a no-op.
       raise_unreadable_stream_response!(error_body)
       parser.flush
     end
@@ -227,7 +235,7 @@ module ReactOnRailsPro
       # partially-consumed StreamResponse; transport-level HTTPX::Error still
       # propagates. The nil fallback buffers this attempt as error_body instead
       # of parsing LPP, so verify 200-response behavior before removing it.
-      # TODO(#3383): remove ArgumentError rescue once the minimum HTTPX version is
+      # TODO: remove ArgumentError rescue once the minimum HTTPX version is
       # greater than 1.7.0 and status reads from partially-consumed stream
       # responses are verified not to raise ArgumentError.
       warn_status_read_failure("ignoring error while reading stream response status", e)

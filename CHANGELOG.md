@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Fixed
+
+- **[Pro]** Streaming server-render responses now raise `ReactOnRailsPro::Error` when HTTPX cannot expose a stream response status after buffering a body, instead of silently returning no chunks. This is a user-visible behavior change for callers that do not already rescue `ReactOnRailsPro::Error` from `each_chunk`. [PR 3383](https://github.com/shakacode/react_on_rails/pull/3383).
+
 ### [16.7.0.rc.0] - 2026-05-20
 
 #### Added

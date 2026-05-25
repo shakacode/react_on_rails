@@ -31,6 +31,18 @@ RSpec.describe ReactOnRailsPro::StreamDecorator do
       expect(stream_decorator.status_recorded?).to be(true)
       expect(stream_decorator.http_status_recorded?).to be(true)
     end
+
+    it "treats components without status metadata as unknown status" do
+      component = Class.new do
+        def each_chunk; end
+      end.new
+      decorator = described_class.new(component)
+
+      expect(decorator.status).to be_nil
+      expect(decorator.http_status).to be_nil
+      expect(decorator.status_recorded?).to be(false)
+      expect(decorator.http_status_recorded?).to be(false)
+    end
   end
 
   describe "#each_chunk" do

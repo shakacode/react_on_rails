@@ -36,7 +36,7 @@ module RendererHarness
             # HTTPX::HTTPError; process_response_chunks buffers those bodies.
             raise ReactOnRailsPro::Error, "Renderer returned #{status}" if status && status >= 400
 
-            stream_payload(stream, bytes_in: bytes_in, bytes_out: js.bytesize)
+            stream_payload(stream, bytes_in: bytes_in, bytes_out: js.bytesize, status: status)
           rescue StandardError => e
             failure_stream_payload(stream, bytes_in: bytes_in, bytes_out: js.bytesize, error: e)
           end

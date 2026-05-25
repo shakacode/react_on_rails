@@ -280,7 +280,9 @@ module RendererHarness
       # refreshes @count_join_deadline. Poll join(0) while holding the mutex is
       # intentional because it is non-blocking; @remaining_cv.wait releases the
       # mutex while sleeping. fallback_deadline covers the window before the
-      # first request is claimed.
+      # first request is claimed. Entering the mutex may wait for a worker
+      # already in claim_request, which is expected because workers release it
+      # promptly and never wait on this join path.
       fallback_deadline = nil
       @remaining_mutex.synchronize do
         loop do

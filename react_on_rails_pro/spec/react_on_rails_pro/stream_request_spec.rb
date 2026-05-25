@@ -412,6 +412,24 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       expect(stream.http_status_recorded?).to be(true)
     end
 
+    it "allows empty HTTPX error responses with unavailable status" do
+      mock_response = double(HTTPX::ErrorResponse)
+      allow(mock_response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(true)
+      expect(mock_response).not_to receive(:status)
+      allow(mock_response).to receive(:each)
+
+      stream = described_class.create do |_send_bundle, _barrier|
+        mock_response
+      end
+
+      chunks = []
+      expect { stream.each_chunk { |chunk| chunks << chunk } }.not_to raise_error
+
+      expect(chunks).to be_empty
+      expect(stream.status).to be_nil
+      expect(stream.http_status_recorded?).to be(true)
+    end
+
     it "raises when stream response status cannot be read" do
       mock_response = double(HTTPX::StreamResponse)
       allow(mock_response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(false)
