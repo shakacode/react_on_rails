@@ -175,7 +175,9 @@ expiring-soon licenses or a custom warning threshold.
 
 #### Blocking CI Example
 
-Use a blocking CI check when an invalid license should stop a production deploy:
+Use a blocking check inside your deployment workflow when an invalid license should stop a production deploy. The
+standalone workflow below is a starting point; if you trigger it on `push` to `main`, it reports after merge, so wire the
+job as a prerequisite in the actual deploy workflow when you need a deploy gate:
 
 ```yaml
 # .github/workflows/react-on-rails-pro-license.yml
@@ -266,7 +268,8 @@ jobs:
 ```
 
 Use either CI example in workflows where repository secrets are available, such as trusted branch pushes, scheduled jobs,
-manual runs, or deployment gates. Pull requests from public forks usually cannot access repository secrets, so these
+manual runs, or deployment gates. A standalone `push` workflow is a post-merge signal; to block deployment, run the
+blocking check before the deploy job. Pull requests from public forks usually cannot access repository secrets, so these
 checks would report a missing token there.
 
 ### Monitor License Expiration
@@ -286,14 +289,15 @@ namespace :licenses do
     info = ReactOnRailsPro::Utils.license_info
     status = info[:status]
     expiration = info[:expiration]
-    days_remaining = expiration && ((expiration - Time.now) / 86_400).ceil
+    days_remaining = expiration && ((expiration - Time.current) / 86_400).ceil
+    status_label = status.to_s.tr("_", " ")
 
     if status == :expired
       abort "React on Rails Pro license is expired. Renew and update REACT_ON_RAILS_PRO_LICENSE."
     elsif status == :missing
       abort "React on Rails Pro license is missing. Set REACT_ON_RAILS_PRO_LICENSE."
     elsif status != :valid
-      abort "React on Rails Pro license is #{status}. Update REACT_ON_RAILS_PRO_LICENSE."
+      abort "React on Rails Pro license status is #{status_label}. Update REACT_ON_RAILS_PRO_LICENSE."
     end
 
     if days_remaining && days_remaining <= threshold_days
