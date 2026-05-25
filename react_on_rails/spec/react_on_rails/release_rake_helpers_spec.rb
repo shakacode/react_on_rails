@@ -475,4 +475,317 @@ RSpec.describe "release.rake helper methods" do
       end.to raise_error(SystemExit, /Version bump mismatch/)
     end
   end
+
+  describe "#ci_status_override_enabled?" do
+    it "returns true when the override flag is truthy" do
+      expect(ci_status_override_enabled?("true")).to be true
+      expect(ci_status_override_enabled?(true)).to be true
+    end
+
+    it "returns true when the env var is truthy" do
+      allow(ENV).to receive(:fetch).with("RELEASE_CI_STATUS_OVERRIDE", nil).and_return("true")
+      expect(ci_status_override_enabled?(nil)).to be true
+    end
+
+    it "returns false when both are falsy" do
+      allow(ENV).to receive(:fetch).with("RELEASE_CI_STATUS_OVERRIDE", nil).and_return(nil)
+      expect(ci_status_override_enabled?(nil)).to be false
+      expect(ci_status_override_enabled?("false")).to be false
+    end
+  end
+
+  describe "#validate_main_ci_status!" do
+    let(:monorepo_root) { "/tmp/repo" }
+    let(:sha) { "abc1234def5678abcdef" }
+    let(:short_sha) { "abc1234d" }
+
+    def passing_run(name)
+      {
+        "name" => name,
+        "status" => "completed",
+        "conclusion" => "success",
+        "html_url" => "https://github.com/shakacode/react_on_rails/runs/#{name.gsub(/\W/, '_')}"
+      }
+    end
+
+    def failing_run(name, conclusion: "failure")
+      {
+        "name" => name,
+        "status" => "completed",
+        "conclusion" => conclusion,
+        "html_url" => "https://github.com/shakacode/react_on_rails/runs/#{name.gsub(/\W/, '_')}"
+      }
+    end
+
+    def in_progress_run(name)
+      {
+        "name" => name,
+        "status" => "in_progress",
+        "conclusion" => nil,
+        "html_url" => "https://github.com/shakacode/react_on_rails/runs/#{name.gsub(/\W/, '_')}"
+      }
+    end
+
+    context "when all check runs pass" do
+      it "logs success and returns without raising" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root: monorepo_root)
+          .and_return(sha: sha, check_runs: [passing_run("Lint"), passing_run("Test")])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root: monorepo_root,
+            is_prerelease: false,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to output(/Main CI is healthy on #{short_sha} \(2 all checks\)/).to_stdout
+      end
+    end
+
+    context "when a check has failed on a stable release" do
+      it "aborts with the failing check name and link" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root: monorepo_root)
+          .and_return(sha: sha, check_runs: [passing_run("Lint"), failing_run("JS unit tests")])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root: monorepo_root,
+            is_prerelease: false,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to raise_error(SystemExit, %r{CI on origin/main is not healthy.*JS unit tests}m)
+      end
+    end
+
+    context "when a non-required check fails on a prerelease" do
+      it "passes because only required checks gate prereleases" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root: monorepo_root)
+          .and_return(sha: sha, check_runs: [passing_run("Lint"), failing_run("Benchmark Workflow")])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root: monorepo_root).and_return(["Lint"])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root: monorepo_root,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to output(/Main CI is healthy on #{short_sha} \(1 required checks\)/).to_stdout
+      end
+    end
+
+    context "when a required check fails on a prerelease" do
+      it "aborts because the required check gates prereleases" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root: monorepo_root)
+          .and_return(sha: sha, check_runs: [failing_run("Lint"), passing_run("Benchmark Workflow")])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root: monorepo_root).and_return(["Lint"])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root: monorepo_root,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to raise_error(SystemExit, %r{CI on origin/main is not healthy.*Lint}m)
+      end
+    end
+
+    context "when a check is still in progress" do
+      it "aborts with the in-progress message and link" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root: monorepo_root)
+          .and_return(sha: sha, check_runs: [passing_run("Lint"), in_progress_run("Slow test")])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root: monorepo_root,
+            is_prerelease: false,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to raise_error(SystemExit, /CI is still in progress.*Slow test/m)
+      end
+    end
+
+    context "when there are zero check runs visible" do
+      it "aborts with a 'no CI data' message" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root: monorepo_root).and_return(sha: sha, check_runs: [])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root: monorepo_root,
+            is_prerelease: false,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to raise_error(SystemExit, %r{No CI check runs visible on origin/main})
+      end
+    end
+
+    context "when override is set on a failing main" do
+      it "warns and returns instead of aborting" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root: monorepo_root)
+          .and_return(sha: sha, check_runs: [failing_run("Lint")])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root: monorepo_root,
+            is_prerelease: false,
+            allow_override: true,
+            dry_run: false
+          )
+        end.to output(/CI STATUS OVERRIDE enabled/).to_stdout
+      end
+    end
+
+    context "when running in dry-run mode on a failing main" do
+      it "warns and returns instead of aborting" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root: monorepo_root)
+          .and_return(sha: sha, check_runs: [failing_run("Lint")])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root: monorepo_root,
+            is_prerelease: false,
+            allow_override: false,
+            dry_run: true
+          )
+        end.to output(%r{DRY RUN.*CI on origin/main is not healthy}m).to_stdout
+      end
+    end
+
+    context "when branch protection is not queryable on a prerelease" do
+      it "falls back to evaluating all checks (fail-safe)" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root: monorepo_root)
+          .and_return(sha: sha, check_runs: [passing_run("Lint"), failing_run("Optional Check")])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root: monorepo_root).and_return(nil)
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root: monorepo_root,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to raise_error(SystemExit, %r{CI on origin/main is not healthy.*Optional Check}m)
+      end
+    end
+
+    context "when no check runs match the required names on a prerelease" do
+      it "aborts with a 'no required check runs' message" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root: monorepo_root)
+          .and_return(sha: sha, check_runs: [passing_run("Lint")])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root: monorepo_root).and_return(["DoesNotExist"])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root: monorepo_root,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to raise_error(SystemExit, /No required CI check runs found.*DoesNotExist/m)
+      end
+    end
+  end
+
+  describe "#fetch_main_ci_checks" do
+    let(:monorepo_root) { "/tmp/repo" }
+    let(:success_status) { instance_double(Process::Status, success?: true) }
+    let(:failure_status) { instance_double(Process::Status, success?: false) }
+
+    it "aborts if `git fetch origin main` fails" do
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "fetch", "origin", "main", "--quiet")
+        .and_return(["fetch failed: network down", failure_status])
+
+      expect do
+        fetch_main_ci_checks(monorepo_root: monorepo_root)
+      end.to raise_error(SystemExit, %r{Unable to fetch origin/main})
+    end
+
+    it "aborts if `gh api check-runs` fails (no silent override)" do
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "fetch", "origin", "main", "--quiet")
+        .and_return(["", success_status])
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "origin/main")
+        .and_return(["abc1234\n", success_status])
+      allow(self).to receive(:github_repo_slug).with(monorepo_root).and_return("shakacode/react_on_rails")
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", "--paginate", "--jq", ".check_runs[]",
+              "repos/shakacode/react_on_rails/commits/abc1234/check-runs")
+        .and_return(["HTTP 401: unauthorized", failure_status])
+
+      expect do
+        fetch_main_ci_checks(monorepo_root: monorepo_root)
+      end.to raise_error(SystemExit, /Unable to query GitHub Checks API.*HTTP 401/m)
+    end
+
+    it "parses paginated JSONL check_runs into an array of hashes" do
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "fetch", "origin", "main", "--quiet")
+        .and_return(["", success_status])
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "origin/main")
+        .and_return(["abc1234def\n", success_status])
+      allow(self).to receive(:github_repo_slug).with(monorepo_root).and_return("shakacode/react_on_rails")
+      jsonl = [
+        { "name" => "Lint", "status" => "completed", "conclusion" => "success" },
+        { "name" => "Test", "status" => "completed", "conclusion" => "failure" }
+      ].map(&:to_json).join("\n")
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", "--paginate", "--jq", ".check_runs[]",
+              "repos/shakacode/react_on_rails/commits/abc1234def/check-runs")
+        .and_return([jsonl, success_status])
+
+      result = fetch_main_ci_checks(monorepo_root: monorepo_root)
+      expect(result[:sha]).to eq("abc1234def")
+      expect(result[:check_runs].length).to eq(2)
+      expect(result[:check_runs].first["name"]).to eq("Lint")
+    end
+  end
+
+  describe "#required_check_names_for_main" do
+    let(:monorepo_root) { "/tmp/repo" }
+    let(:success_status) { instance_double(Process::Status, success?: true) }
+    let(:failure_status) { instance_double(Process::Status, success?: false) }
+
+    before do
+      allow(self).to receive(:github_repo_slug).with(monorepo_root).and_return("shakacode/react_on_rails")
+    end
+
+    it "returns the array of required context names when branch protection is configured" do
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", "--jq", ".contexts // []",
+              "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks")
+        .and_return([%w[Lint Test].to_json, success_status])
+
+      expect(required_check_names_for_main(monorepo_root: monorepo_root)).to eq(%w[Lint Test])
+    end
+
+    it "returns nil when the branch protection endpoint returns an error" do
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", "--jq", ".contexts // []",
+              "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks")
+        .and_return(["HTTP 404: Branch not protected", failure_status])
+
+      expect(required_check_names_for_main(monorepo_root: monorepo_root)).to be_nil
+    end
+  end
 end
