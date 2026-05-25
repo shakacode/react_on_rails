@@ -69,6 +69,9 @@ module RendererHarness
         ReactOnRailsPro::Request.upload_assets
       end
       unless upload_thread.join(UPLOAD_ASSETS_TIMEOUT_SECONDS)
+        # Thread#kill is acceptable here only because the CLI exits right
+        # after this timeout. Do not reuse this pattern in a long-lived server
+        # or embedded harness because HTTPX connection state may be left dirty.
         upload_thread.kill
         raise Timeout::Error
       end

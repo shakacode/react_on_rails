@@ -443,7 +443,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
 
       expect { stream.each_chunk(&:itself) }.to raise_error(
         ReactOnRailsPro::Error,
-        /Unexpected response code from renderer: unknown/
+        /Renderer returned an unreadable HTTP error response \(RuntimeError: status unavailable\)/
       )
       expect(stream.status).to be_nil
     end

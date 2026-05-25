@@ -259,6 +259,15 @@ RSpec.describe RendererHarness::Runner do
     expect { runner.run }.to raise_error(described_class::WorkerJoinTimeout, /did not finish/)
   end
 
+  it "times out request-count workers when requests remain unclaimed" do
+    stub_const("#{described_class}::WORKER_JOIN_TIMEOUT_SECONDS", 0.01)
+    scenario = build_scenario
+    allow(scenario).to receive(:perform_request) { sleep 1 }
+    runner = described_class.new(scenario: scenario, config: build_config(requests: 2))
+
+    expect { runner.run }.to raise_error(described_class::WorkerJoinTimeout, /did not finish/)
+  end
+
   def fake_stuck_thread
     Class.new do
       attr_reader :join_timeouts

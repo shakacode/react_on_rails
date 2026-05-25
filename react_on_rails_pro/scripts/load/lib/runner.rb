@@ -5,7 +5,6 @@ module RendererHarness
     StartGate = Struct.new(:mutex, :ready_cv, :start_cv, :ready_count, :started, :aborted, :deadline,
                            :abort_error, keyword_init: true)
     WORKER_JOIN_TIMEOUT_SECONDS = 30
-    COUNT_JOIN_POLL_INTERVAL_SECONDS = 0.05
     MeasurementAborted = Class.new(StandardError)
     WorkerJoinTimeout = Class.new(StandardError)
 
@@ -39,6 +38,7 @@ module RendererHarness
       @measurement_started_at = nil
       @remaining = 0
       @remaining_mutex = Mutex.new
+      @remaining_cv = ConditionVariable.new
       @count_join_deadline = nil
     end
 
@@ -67,12 +67,15 @@ module RendererHarness
     end
 
     def run_by_count(gate)
-      @remaining = @config.requests
-      @count_join_deadline = nil
+      @remaining_mutex.synchronize do
+        @remaining = @config.requests
+        @count_join_deadline = nil
+      end
       Array.new(@config.concurrency) do
         worker_thread(gate) do |worker_results|
-          # Count-based runs stop via claim_request; after the final request is
-          # claimed, join uses the same stuck-worker grace as duration runs.
+          # Count-based runs stop via claim_request; every claim refreshes the
+          # stuck-worker join grace so long runs can continue while hung
+          # requests still time out.
           prepare_worker(gate)
           worker_results << @scenario.perform_request while claim_request
         end
@@ -84,7 +87,8 @@ module RendererHarness
         return false if @remaining <= 0
 
         @remaining -= 1
-        @count_join_deadline = monotonic + WORKER_JOIN_TIMEOUT_SECONDS if @remaining.zero?
+        @count_join_deadline = monotonic + WORKER_JOIN_TIMEOUT_SECONDS
+        @remaining_cv.broadcast
         true
       end
     end
@@ -118,6 +122,7 @@ module RendererHarness
           raise
         ensure
           append_worker_results(worker_results, worker_error)
+          notify_count_join_waiters
         end
       rescue StandardError => e
         abort_measurement_start(gate, e) unless measurement_started?(gate)
@@ -269,19 +274,22 @@ module RendererHarness
     end
 
     def join_count_thread(thread)
-      loop do
-        deadline = @remaining_mutex.synchronize { @count_join_deadline }
-        unless deadline
-          joined_thread = thread.join(COUNT_JOIN_POLL_INTERVAL_SECONDS)
+      @remaining_mutex.synchronize do
+        loop do
+          joined_thread = thread.join(0)
           return joined_thread if joined_thread
 
-          next
+          deadline = @count_join_deadline
+          unless deadline
+            @remaining_cv.wait(@remaining_mutex)
+            next
+          end
+
+          remaining = deadline - monotonic
+          return nil unless remaining.positive?
+
+          @remaining_cv.wait(@remaining_mutex, remaining)
         end
-
-        remaining = deadline - monotonic
-        return nil unless remaining.positive?
-
-        return thread if thread.join(remaining)
       end
     end
 
@@ -300,6 +308,12 @@ module RendererHarness
 
     def append_results(worker_results)
       @results_mutex.synchronize { @results.concat(worker_results) }
+    end
+
+    def notify_count_join_waiters
+      return unless @config.requests
+
+      @remaining_mutex.synchronize { @remaining_cv.broadcast }
     end
 
     def monotonic

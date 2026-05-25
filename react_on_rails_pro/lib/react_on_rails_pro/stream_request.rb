@@ -199,8 +199,9 @@ module ReactOnRailsPro
       # request.response is available for non-streaming errors.
       # ArgumentError: HTTPX 1.7.0 can raise while materializing status from a
       # partially-consumed StreamResponse; transport-level HTTPX::Error still propagates.
-      # TODO: remove ArgumentError rescue after the minimum HTTPX version no longer
-      # raises while reading status from partially-consumed stream responses.
+      # TODO: remove ArgumentError rescue once the minimum HTTPX version is
+      # greater than 1.7.0 and status reads from partially-consumed stream
+      # responses are verified not to raise ArgumentError.
       warn_status_read_failure("ignoring error while reading stream response status", e)
       nil
     end
@@ -218,6 +219,8 @@ module ReactOnRailsPro
           "ignoring unexpected error while reading HTTP error response status",
           e
         )
+        raise ReactOnRailsPro::Error,
+              "Renderer returned an unreadable HTTP error response (#{e.class}: #{e.message}):\n#{error_body}"
       end
       case @status
       when ReactOnRailsPro::STATUS_SEND_BUNDLE
