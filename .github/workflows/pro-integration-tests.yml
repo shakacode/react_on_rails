@@ -310,7 +310,7 @@ jobs:
       - name: Run Rails server in background
         run: |
           cd spec/dummy
-          RAILS_ENV="test" rails server &
+          RAILS_ENV="test" bundle exec rails server &
 
       - name: Wait for Rails server to start
         run: |
@@ -511,7 +511,7 @@ jobs:
       - name: Run Rails server in background
         run: |
           cd spec/dummy
-          RAILS_ENV="test" rails server &
+          RAILS_ENV="test" bundle exec rails server &
 
       - name: Wait for Rails server to start
         run: |
