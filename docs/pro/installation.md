@@ -358,12 +358,7 @@ namespace :licenses do
     info = ReactOnRailsPro::Utils.license_info
     status = info[:status]
     expiration = info[:expiration]
-    expiration_time =
-      if expiration.instance_of?(Date)
-        expiration.in_time_zone.end_of_day
-      elsif expiration.respond_to?(:to_time)
-        expiration.to_time
-      end
+    expiration_time = expiration.respond_to?(:to_time) ? expiration.to_time : nil
     days_remaining = expiration_time && ((expiration_time - Time.current) / 1.day).ceil
     status_label = status.to_s.tr("_", " ")
 
