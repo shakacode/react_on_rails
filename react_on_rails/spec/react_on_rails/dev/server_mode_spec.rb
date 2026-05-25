@@ -32,6 +32,17 @@ RSpec.describe ReactOnRails::Dev::ServerMode do
       expect(described_class.detect("config/shakapacker.yml")).to eq(:live_reload)
     end
 
+    it "uses Shakapacker's live reload default when dev_server omits both hmr and live_reload" do
+      write_shakapacker_config(<<~YAML)
+        development:
+          dev_server:
+            host: localhost
+            port: 3035
+      YAML
+
+      expect(described_class.detect("config/shakapacker.yml")).to eq(:live_reload)
+    end
+
     it "treats live_reload false without HMR as generic development server mode" do
       write_shakapacker_config(<<~YAML)
         development:
@@ -58,6 +69,16 @@ RSpec.describe ReactOnRails::Dev::ServerMode do
           dev_server:
             hmr: true
             live_reload: true
+      YAML
+
+      expect(described_class.detect("config/shakapacker.yml")).to eq(:hmr)
+    end
+
+    it "detects HMR when hmr is webpack-dev-server only mode" do
+      write_shakapacker_config(<<~YAML)
+        development:
+          dev_server:
+            hmr: only
       YAML
 
       expect(described_class.detect("config/shakapacker.yml")).to eq(:hmr)

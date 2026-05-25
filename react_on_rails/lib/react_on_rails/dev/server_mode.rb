@@ -131,17 +131,25 @@ module ReactOnRails
         def detect_from_dev_server_config(dev_server)
           return nil if dev_server.empty?
 
-          hmr = boolean_config(dev_server["hmr"])
+          hmr = hmr_config(dev_server["hmr"])
           live_reload = boolean_config(dev_server["live_reload"])
 
           return :hmr if hmr == true
           return :live_reload if live_reload == true
-          # The generated Shakapacker config documents live_reload as the inverse of hmr when omitted.
+          return :development_server if live_reload == false
+
+          # Shakapacker maps omitted live_reload to the inverse of hmr in package/webpackDevServerConfig.ts.
+          # Once HMR is not enabled, omitted live_reload means full-page live reload.
           # See generators/react_on_rails/templates/base/base/config/shakapacker.yml.tt.
-          return :live_reload if hmr == false && live_reload.nil?
-          return :development_server if hmr == false || live_reload == false
+          return :live_reload if live_reload.nil?
 
           nil
+        end
+
+        def hmr_config(value)
+          return true if value.to_s.strip.casecmp("only").zero?
+
+          boolean_config(value)
         end
 
         def boolean_config(value)
