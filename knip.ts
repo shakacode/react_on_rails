@@ -223,6 +223,7 @@ const config: KnipConfig = {
   ignoreIssues: {
     'packages/react-on-rails-pro-node-renderer/src/shared/tracing.ts': ['exports'],
     'packages/react-on-rails-pro-node-renderer/src/worker/fastifyConfig.ts': ['exports'],
+    'packages/react-on-rails-pro-node-renderer/src/worker/shutdownHooks.ts': ['exports'],
   },
   ignoreExportsUsedInFile: true,
 };
