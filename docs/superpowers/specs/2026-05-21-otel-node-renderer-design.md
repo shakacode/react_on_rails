@@ -276,16 +276,17 @@ sub-spans for each NDJSON chunk.
    import. Caught in `init()`, logged via `errorReporter.message()`, and the
    integration silently no-ops. The renderer keeps running.
 2. **Exporter failure** — OTLP endpoint unreachable. OTel SDK already swallows
-   exporter errors. We add a `diag` hook that pipes OTel internal logs into the
-   renderer's pino logger at `debug` level so they don't pollute logs at higher
-   levels.
+   exporter errors. We add a `diag` hook at `DiagLogLevel.WARN` that pipes
+   warn/error OTel internal logs into the renderer's pino logger while
+   suppressing lower-severity SDK chatter.
 3. **Span attribute serialization failure** — Caller passes a non-serializable
    value. Wrap attribute setters in try/catch in `subSpan` so a bad attribute
    never breaks a render.
 4. **Shutdown timeout** — `tracerProvider.shutdown()` is bounded by the renderer's
    `shutdownTimeoutMs` option, and the worker graceful-shutdown path also has a
-   hard timeout around `app.close()`, so a hung exporter cannot block worker exit
-   indefinitely.
+   10s hard timeout around `app.close()`, so a hung exporter cannot block worker
+   exit indefinitely. Keep `shutdownTimeoutMs` below the worker close timeout so
+   Fastify has time to finish the rest of its close sequence.
 5. **Sensitive data** — The `renderingRequest` string can contain user input. We
    **must not** put it (or a digest derived from it) into span attributes. Only
    the bundle timestamp, sizes, and counts are recorded.

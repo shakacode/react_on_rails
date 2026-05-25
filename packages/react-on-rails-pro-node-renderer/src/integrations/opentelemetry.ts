@@ -10,7 +10,7 @@ import {
   getOpenTelemetryTracerProvider,
   setOpenTelemetryTracerProvider,
 } from '../shared/opentelemetryState.js';
-import { configureFastify } from '../worker/fastifyConfig.js';
+import { registerFastifyConfigFunction } from '../worker/fastifyConfig.js';
 import { log, message } from './api.js';
 
 declare module '../shared/tracing.js' {
@@ -84,23 +84,16 @@ function parseResourceAttributes(value: string | undefined): Record<string, stri
 }
 
 function configureOpenTelemetryDiagnostics(otelApi: typeof import('@opentelemetry/api')): void {
-  const logDiagnostic = (level: string, diagnosticMessage: string, ...args: unknown[]) => {
-    if (level === 'error') {
-      log.error({ otel: true, level, args }, diagnosticMessage);
-    } else if (level === 'warn') {
-      log.warn({ otel: true, level, args }, diagnosticMessage);
-    } else {
-      log.debug({ otel: true, level, args }, diagnosticMessage);
-    }
-  };
-
   otelApi.diag.setLogger(
     {
-      error: (diagnosticMessage, ...args) => logDiagnostic('error', diagnosticMessage, ...args),
-      warn: (diagnosticMessage, ...args) => logDiagnostic('warn', diagnosticMessage, ...args),
-      info: (diagnosticMessage, ...args) => logDiagnostic('info', diagnosticMessage, ...args),
-      debug: (diagnosticMessage, ...args) => logDiagnostic('debug', diagnosticMessage, ...args),
-      verbose: (diagnosticMessage, ...args) => logDiagnostic('verbose', diagnosticMessage, ...args),
+      error: (diagnosticMessage, ...args) =>
+        log.error({ otel: true, level: 'error', args }, diagnosticMessage),
+      warn: (diagnosticMessage, ...args) => log.warn({ otel: true, level: 'warn', args }, diagnosticMessage),
+      // DiagLogLevel.WARN below suppresses lower-severity diagnostics before
+      // these callbacks run. Keep no-op methods to satisfy the OTel logger API.
+      info: () => undefined,
+      debug: () => undefined,
+      verbose: () => undefined,
     },
     otelApi.DiagLogLevel.WARN,
   );
@@ -131,15 +124,21 @@ async function shutdownProviderWithTimeout(
   shutdownTimeoutMs: number,
 ): Promise<void> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
-  const shutdownPromise = provider.shutdown().catch((error: unknown) => {
-    log.warn({ error }, '[OpenTelemetry] provider.shutdown() failed');
+  let timedOut = false;
+  const shutdownPromise = provider.shutdown();
+  const observedShutdownPromise = shutdownPromise.catch((error: unknown) => {
+    if (!timedOut) {
+      log.warn({ error }, '[OpenTelemetry] provider.shutdown() failed');
+    }
   });
 
   try {
     await Promise.race([
-      shutdownPromise,
+      observedShutdownPromise,
       new Promise<void>((resolve) => {
         timeoutId = setTimeout(() => {
+          timedOut = true;
+          void shutdownPromise.catch(() => undefined);
           log.warn(
             '[OpenTelemetry] provider.shutdown() timed out after %dms; continuing worker shutdown',
             shutdownTimeoutMs,
@@ -162,6 +161,9 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
   }
 
   let installedAdapters: InstalledTracingAdapters = { tracing: false, subSpan: false };
+  let otelApi: typeof import('@opentelemetry/api') | undefined;
+  let registeredProvider: NodeTracerProviderType | undefined;
+  let unregisterFastifyConfig: (() => void) | undefined;
 
   try {
     /* eslint-disable @typescript-eslint/no-require-imports, global-require --
@@ -175,7 +177,8 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
       require('@opentelemetry/resources') as typeof import('@opentelemetry/resources');
     const { ATTR_SERVICE_NAME } =
       require('@opentelemetry/semantic-conventions') as typeof import('@opentelemetry/semantic-conventions');
-    const otelApi = require('@opentelemetry/api') as typeof import('@opentelemetry/api');
+    otelApi = require('@opentelemetry/api') as typeof import('@opentelemetry/api');
+    const loadedOtelApi = otelApi;
 
     const serviceName = resolveServiceName(opts);
     const shutdownTimeoutMs = resolveShutdownTimeoutMs(opts);
@@ -204,7 +207,7 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
       spanProcessors: [spanProcessor],
     });
 
-    configureOpenTelemetryDiagnostics(otelApi);
+    configureOpenTelemetryDiagnostics(loadedOtelApi);
 
     if (opts.fastify) {
       /* eslint-disable @typescript-eslint/no-require-imports, global-require */
@@ -227,7 +230,7 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
     }
 
     if (opts.tracing) {
-      const tracer = otelApi.trace.getTracer(serviceName);
+      const tracer = loadedOtelApi.trace.getTracer(serviceName);
 
       installedAdapters.tracing = setupTracing({
         startSsrRequestOptions: () => ({
@@ -243,7 +246,7 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
               return await fn();
             } catch (err) {
               span.setStatus({
-                code: otelApi.SpanStatusCode.ERROR,
+                code: loadedOtelApi.SpanStatusCode.ERROR,
                 message: err instanceof Error ? err.message : String(err),
               });
               throw err;
@@ -261,7 +264,7 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
               return await fn();
             } catch (err) {
               span.setStatus({
-                code: otelApi.SpanStatusCode.ERROR,
+                code: loadedOtelApi.SpanStatusCode.ERROR,
                 message: err instanceof Error ? err.message : String(err),
               });
               throw err;
@@ -273,13 +276,12 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
       }
     }
 
-    setOpenTelemetryTracerProvider(provider);
     try {
       provider.register();
+      setOpenTelemetryTracerProvider(provider);
+      registeredProvider = provider;
     } catch (err) {
-      if (getOpenTelemetryTracerProvider() === provider) {
-        setOpenTelemetryTracerProvider(null);
-      }
+      disableOpenTelemetryGlobals(loadedOtelApi);
       installedAdapters = resetInstalledTracingAdapters(installedAdapters);
       // When opts.fastify is enabled, OpenTelemetry does not expose a public
       // rollback API for module patches applied by registerInstrumentations().
@@ -291,23 +293,30 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
     // Register this last so failed init paths do not leave a partial Fastify hook
     // behind. Fastify fires onClose during app.close(), giving the span processor
     // a chance to export queued spans before the process exits.
-    const unregisterFastifyConfig = configureFastify((app) => {
+    unregisterFastifyConfig = registerFastifyConfigFunction((app) => {
       app.addHook('onClose', async () => {
         try {
           await shutdownProviderWithTimeout(provider, shutdownTimeoutMs);
           if (getOpenTelemetryTracerProvider() === provider) {
             setOpenTelemetryTracerProvider(null);
-            disableOpenTelemetryGlobals(otelApi);
+            disableOpenTelemetryGlobals(loadedOtelApi);
             installedAdapters = resetInstalledTracingAdapters(installedAdapters);
           }
         } finally {
-          unregisterFastifyConfig();
+          unregisterFastifyConfig?.();
         }
       });
     });
 
     log.info('[OpenTelemetry] Tracer provider initialized');
   } catch (err) {
+    unregisterFastifyConfig?.();
+    if (registeredProvider && getOpenTelemetryTracerProvider() === registeredProvider) {
+      setOpenTelemetryTracerProvider(null);
+    }
+    if (otelApi) {
+      disableOpenTelemetryGlobals(otelApi);
+    }
     installedAdapters = resetInstalledTracingAdapters(installedAdapters);
     message(`[OpenTelemetry] init failed: ${String(err)}`);
   }

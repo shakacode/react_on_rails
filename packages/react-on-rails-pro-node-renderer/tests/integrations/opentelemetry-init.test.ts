@@ -135,7 +135,8 @@ describe('opentelemetry integration: init() failure path', () => {
       const shutdown = jest.fn(() => new Promise<void>(() => undefined));
 
       jest.doMock('../../src/worker/fastifyConfig.js', () => ({
-        configureFastify: jest.fn((callback: (app: { addHook: jest.Mock }) => void) => {
+        __resetFastifyConfigFunctionsForTest: jest.fn(),
+        registerFastifyConfigFunction: jest.fn((callback: (app: { addHook: jest.Mock }) => void) => {
           configureFastifyCallback = callback;
           return jest.fn();
         }),
@@ -174,10 +175,11 @@ describe('opentelemetry integration: init() failure path', () => {
   });
 
   test('init() does not register a Fastify shutdown hook when provider.register() fails', async () => {
-    const configureFastify = jest.fn();
+    const registerFastifyConfigFunction = jest.fn();
 
     jest.doMock('../../src/worker/fastifyConfig.js', () => ({
-      configureFastify,
+      __resetFastifyConfigFunctionsForTest: jest.fn(),
+      registerFastifyConfigFunction,
     }));
     jest.doMock('@opentelemetry/sdk-trace-node', () => ({
       NodeTracerProvider: jest.fn(function NodeTracerProvider() {
@@ -201,7 +203,7 @@ describe('opentelemetry integration: init() failure path', () => {
       }),
     ).not.toThrow();
 
-    expect(configureFastify).not.toHaveBeenCalled();
+    expect(registerFastifyConfigFunction).not.toHaveBeenCalled();
     expect(
       tracing.setupTracing({
         executor: (fn) => fn(),
@@ -216,7 +218,8 @@ describe('opentelemetry integration: init() failure path', () => {
     const configureFastifyCallbacks: Array<(app: { addHook: jest.Mock }) => void> = [];
 
     jest.doMock('../../src/worker/fastifyConfig.js', () => ({
-      configureFastify: jest.fn((callback: (app: { addHook: jest.Mock }) => void) => {
+      __resetFastifyConfigFunctionsForTest: jest.fn(),
+      registerFastifyConfigFunction: jest.fn((callback: (app: { addHook: jest.Mock }) => void) => {
         configureFastifyCallbacks.push(callback);
         return jest.fn();
       }),
@@ -310,6 +313,157 @@ describe('opentelemetry integration: init() failure path', () => {
     expect(log.warn).toHaveBeenCalledWith({ otel: true, level: 'warn', args: [] }, 'collector slow');
     expect(log.debug).not.toHaveBeenCalledWith(expect.anything(), 'suppressed info');
     await resetOpenTelemetryForTest();
+  });
+
+  test('init() clears global OTel state when Fastify shutdown hook registration fails', async () => {
+    const registerFastifyConfigFunction = jest
+      .fn((_callback: (app: { addHook: jest.Mock }) => void) => jest.fn())
+      .mockImplementationOnce(() => {
+        throw new Error('fastify config registration failed');
+      })
+      .mockImplementationOnce(() => jest.fn());
+
+    jest.doMock('../../src/worker/fastifyConfig.js', () => ({
+      __resetFastifyConfigFunctionsForTest: jest.fn(),
+      registerFastifyConfigFunction,
+    }));
+
+    const { trace } = await import('@opentelemetry/api');
+    const { InMemorySpanExporter, SimpleSpanProcessor } = await import('@opentelemetry/sdk-trace-base');
+    const errorReporter = await import('../../src/shared/errorReporter');
+    const messageSpy = jest.spyOn(errorReporter, 'message');
+    const firstExporter = new InMemorySpanExporter();
+    const secondExporter = new InMemorySpanExporter();
+    const otel = await import('../../src/integrations/opentelemetry');
+
+    expect(() =>
+      otel.init({
+        spanProcessor: new SimpleSpanProcessor(firstExporter),
+      }),
+    ).not.toThrow();
+    expect(messageSpy).toHaveBeenCalledWith(expect.stringContaining('[OpenTelemetry] init failed'));
+
+    trace.getTracer('test').startActiveSpan('first.manual', (span) => span.end());
+    expect(firstExporter.getFinishedSpans()).toHaveLength(0);
+
+    otel.init({
+      spanProcessor: new SimpleSpanProcessor(secondExporter),
+    });
+    trace.getTracer('test').startActiveSpan('second.manual', (span) => span.end());
+
+    expect(secondExporter.getFinishedSpans().map((span) => span.name)).toEqual(['second.manual']);
+    await resetOpenTelemetryForTest();
+  });
+
+  test('init() disables OTel diagnostics when provider.register() fails', async () => {
+    const log = {
+      debug: jest.fn(),
+      error: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+    };
+
+    jest.doMock('../../src/integrations/api.js', () => ({
+      log,
+      message: jest.fn(),
+    }));
+    jest.doMock('@opentelemetry/sdk-trace-node', () => ({
+      NodeTracerProvider: jest.fn(function NodeTracerProvider() {
+        return {
+          register: jest.fn(() => {
+            throw new Error('register failed');
+          }),
+          shutdown: jest.fn(async () => undefined),
+        };
+      }),
+    }));
+
+    const { diag } = await import('@opentelemetry/api');
+    const { InMemorySpanExporter, SimpleSpanProcessor } = await import('@opentelemetry/sdk-trace-base');
+    const otel = await import('../../src/integrations/opentelemetry');
+
+    otel.init({
+      spanProcessor: new SimpleSpanProcessor(new InMemorySpanExporter()),
+    });
+    diag.warn('should not reach renderer log');
+
+    expect(log.warn).not.toHaveBeenCalledWith(
+      { otel: true, level: 'warn', args: [] },
+      'should not reach renderer log',
+    );
+  });
+
+  test('Fastify onClose suppresses late provider.shutdown() rejection after timeout', async () => {
+    jest.useFakeTimers();
+    try {
+      let configureFastifyCallback: ((app: { addHook: jest.Mock }) => void) | undefined;
+      let onClose: (() => Promise<void>) | undefined;
+      let rejectShutdown: ((error: Error) => void) | undefined;
+      const log = {
+        debug: jest.fn(),
+        error: jest.fn(),
+        info: jest.fn(),
+        warn: jest.fn(),
+      };
+      const shutdown = jest.fn(
+        () =>
+          new Promise<void>((_resolve, reject) => {
+            rejectShutdown = reject;
+          }),
+      );
+
+      jest.doMock('../../src/integrations/api.js', () => ({
+        log,
+        message: jest.fn(),
+      }));
+      jest.doMock('../../src/worker/fastifyConfig.js', () => ({
+        __resetFastifyConfigFunctionsForTest: jest.fn(),
+        registerFastifyConfigFunction: jest.fn((callback: (app: { addHook: jest.Mock }) => void) => {
+          configureFastifyCallback = callback;
+          return jest.fn();
+        }),
+      }));
+      jest.doMock('@opentelemetry/sdk-trace-node', () => ({
+        NodeTracerProvider: jest.fn(function NodeTracerProvider() {
+          return {
+            register: jest.fn(),
+            shutdown,
+          };
+        }),
+      }));
+
+      const { InMemorySpanExporter, SimpleSpanProcessor } = await import('@opentelemetry/sdk-trace-base');
+      const otel = await import('../../src/integrations/opentelemetry');
+
+      otel.init({
+        spanProcessor: new SimpleSpanProcessor(new InMemorySpanExporter()),
+        shutdownTimeoutMs: 25,
+      });
+
+      configureFastifyCallback!({
+        addHook: jest.fn((_name: string, handler: () => Promise<void>) => {
+          onClose = handler;
+        }),
+      });
+
+      const closePromise = onClose!();
+      jest.advanceTimersByTime(25);
+      await expect(closePromise).resolves.toBeUndefined();
+
+      rejectShutdown!(new Error('late shutdown failure'));
+      await Promise.resolve();
+
+      expect(log.warn).toHaveBeenCalledWith(
+        '[OpenTelemetry] provider.shutdown() timed out after %dms; continuing worker shutdown',
+        25,
+      );
+      expect(log.warn).not.toHaveBeenCalledWith(
+        expect.objectContaining({ error: expect.any(Error) }),
+        '[OpenTelemetry] provider.shutdown() failed',
+      );
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   test('init() ignores duplicate calls without replacing the active provider', async () => {

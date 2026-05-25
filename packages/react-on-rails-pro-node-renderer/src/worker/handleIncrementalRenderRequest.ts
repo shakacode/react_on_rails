@@ -1,7 +1,7 @@
 import type { ResponseResult } from '../shared/utils';
 import { handleRenderRequest } from './handleRenderRequest';
 import log from '../shared/log';
-import { getRequestBundleFilePath } from '../shared/utils';
+import { getRequestBundleFilePath, isErrorRenderResult } from '../shared/utils';
 import { subSpan } from '../shared/tracing.js';
 
 export type IncrementalRenderSink = {
@@ -126,10 +126,13 @@ export async function handleIncrementalRenderRequest(
       sink: {
         add: async (chunk: unknown) => {
           try {
+            assertIsUpdateChunk(chunk);
             await subSpan({ name: 'ror.incremental.process_chunk' }, async () => {
-              assertIsUpdateChunk(chunk);
               const bundlePath = getRequestBundleFilePath(chunk.bundleTimestamp);
-              await executionContext.runInVM(chunk.updateChunk, bundlePath);
+              const result = await executionContext.runInVM(chunk.updateChunk, bundlePath);
+              if (isErrorRenderResult(result)) {
+                throw new Error(result.exceptionMessage);
+              }
             });
           } catch (err) {
             if (err instanceof InvalidIncrementalRenderChunkError) {

@@ -15,7 +15,8 @@ export async function resetOpenTelemetryForTest(): Promise<void> {
   resetSubSpan();
   resetTracing();
 
-  fastifyConfig.resetFastifyConfigFunctionsForTest();
+  // eslint-disable-next-line no-underscore-dangle
+  fastifyConfig.__resetFastifyConfigFunctionsForTest();
 
   /* eslint-disable @typescript-eslint/no-require-imports, global-require */
   try {

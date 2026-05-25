@@ -11,7 +11,7 @@ const fastifyConfigFunctions: FastifyConfigFunction[] = [];
  * `fastify`, so integrations can register instrumentation before Fastify is
  * required by the worker module graph.
  */
-export function configureFastify(configFunction: FastifyConfigFunction): () => void {
+export function registerFastifyConfigFunction(configFunction: FastifyConfigFunction): () => void {
   fastifyConfigFunctions.push(configFunction);
   return () => {
     const index = fastifyConfigFunctions.indexOf(configFunction);
@@ -21,12 +21,17 @@ export function configureFastify(configFunction: FastifyConfigFunction): () => v
   };
 }
 
+export function configureFastify(configFunction: FastifyConfigFunction): void {
+  registerFastifyConfigFunction(configFunction);
+}
+
 export function applyFastifyConfigFunctions(app: FastifyInstance): void {
   fastifyConfigFunctions.forEach((configFunction) => {
     configFunction(app);
   });
 }
 
-export function resetFastifyConfigFunctionsForTest(): void {
+// eslint-disable-next-line no-underscore-dangle
+export function __resetFastifyConfigFunctionsForTest(): void {
   fastifyConfigFunctions.length = 0;
 }

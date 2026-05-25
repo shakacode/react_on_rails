@@ -425,7 +425,7 @@ describe('opentelemetry integration: end-to-end render request', () => {
     expect(cacheMissBuildSpan!.attributes).not.toHaveProperty('cache.hit');
   });
 
-  test('incremental update chunk failures mark the process_chunk span as an error', async () => {
+  test('invalid incremental update chunks do not create process_chunk error spans', async () => {
     init({
       tracing: true,
       spanProcessor: new SimpleSpanProcessor(exporter),
@@ -450,9 +450,40 @@ describe('opentelemetry integration: end-to-end render request', () => {
       .getFinishedSpans()
       .find((s) => s.name === 'ror.incremental.process_chunk');
 
+    expect(processChunkSpan).toBeUndefined();
+  });
+
+  test('incremental update chunk execution failures mark the process_chunk span as an error', async () => {
+    init({
+      tracing: true,
+      spanProcessor: new SimpleSpanProcessor(exporter),
+    });
+    await createIncrementalVmBundle(testName);
+
+    await trace(
+      async () => {
+        const result = await handleIncrementalRenderRequest({
+          firstRequestChunk: { renderingRequest: 'ReactOnRails.dummy' },
+          bundleTimestamp: BUNDLE_TIMESTAMP,
+        });
+        expect(result.response.status).toBe(200);
+        expect(result.sink).toBeDefined();
+
+        await result.sink!.add({
+          bundleTimestamp: BUNDLE_TIMESTAMP,
+          updateChunk: 'throw new Error("incremental chunk exploded");',
+        });
+      },
+      startSsrRequestOptions({ renderingRequest: 'ReactOnRails.dummy' }),
+    );
+
+    const processChunkSpan = exporter
+      .getFinishedSpans()
+      .find((s) => s.name === 'ror.incremental.process_chunk');
+
     expect(processChunkSpan).toBeDefined();
     expect(processChunkSpan!.status.code).toBe(2);
-    expect(processChunkSpan!.status.message).toContain('Invalid incremental render chunk');
+    expect(processChunkSpan!.status.message).toContain('incremental chunk exploded');
   });
 
   test('incremental render endpoint nests stream spans under ror.ssr.request', async () => {

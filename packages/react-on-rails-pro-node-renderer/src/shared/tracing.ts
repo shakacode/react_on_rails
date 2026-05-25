@@ -124,6 +124,11 @@ export interface SubSpanOptions {
 /**
  * Signature of a sub-span implementation installed via {@link setupSubSpan}.
  * Must invoke `fn()` and return its result. May wrap `fn()` in a tracing span.
+ *
+ * Implementations must either invoke `fn()` synchronously or not invoke it at
+ * all before throwing/rejecting. Deferred invocation, such as scheduling `fn()`
+ * with `setImmediate`, is unsupported because the fallback may run `fn()` to
+ * preserve renderer behavior when an implementation fails before invocation.
  */
 export type SubSpanFn = <T>(opts: SubSpanOptions, fn: () => Promise<T>) => Promise<T>;
 
@@ -151,9 +156,9 @@ export function setupSubSpan(impl: SubSpanFn): boolean {
  * integration is installed — defaults to passing through to `fn()`.
  *
  * If the installed implementation throws or rejects before invoking `fn()`, the
- * caller is shielded: `fn()` is still executed and its result returned. If the
- * implementation fails after invoking `fn()`, the error is rethrown so `fn()`
- * is never run twice.
+ * caller is shielded: `fn()` is still executed outside any sub-span and its
+ * result returned. If the implementation fails after invoking `fn()`, the error
+ * is rethrown so `fn()` is never run twice.
  */
 export function subSpan<T>(opts: SubSpanOptions, fn: () => Promise<T>): Promise<T> {
   let invoked = false;
