@@ -93,23 +93,18 @@ Server components produce HTML that does not need hydration — they have no cli
 > This section covers public, non-production directional benchmarks first, then a production case study. For validated,
 > at-scale results, see the [Production Case Study: Popmenu](#popmenu) below.
 
-<a id="public-marketplace-rsc-demo"></a>
-
 ### Public Marketplace RSC Demo Evidence
 
 The [LocalHub marketplace demo](https://rsc.reactonrails.com/) is a public,
-inspectable React on Rails Pro + RSC demo. LocalHub is the sample marketplace
-app used for this public benchmark. It renders the same page families as
-traditional SSR, client rendering, and React Server Components. Use the
-[performance showcase](https://rsc.reactonrails.com/search-performance) for the
-summary dashboard, [raw Lighthouse reports](https://rsc.reactonrails.com/lighthouse-reports/index.html)
-for the underlying artifacts, and [bundle-size evidence](https://rsc.reactonrails.com/lighthouse-reports/bundle-sizes.html)
-for per-route resource breakdowns.
+inspectable React on Rails Pro + RSC demo showing the same page families
+rendered with traditional SSR, client rendering, and React Server Components.
+See the [Live Demo and Evidence](../../pro/react-server-components/index.md#live-demo-and-evidence)
+section for the canonical link inventory: performance showcase, raw Lighthouse
+reports, bundle-size breakdowns, the `/why-rsc` walkthrough, and the demo source.
 
-The demo is intentionally evidence-first and links to the underlying Lighthouse
-artifacts. Treat it as a directional public benchmark, not a universal
-performance guarantee, because application structure, data shape, caching, and
-deployment topology still determine the final result.
+Treat these public measurements as directional evidence, not a universal
+performance guarantee for every app, because application structure, data shape,
+caching, and deployment topology still determine the final result.
 
 <a id="gumroad-style-rsc-demo"></a>
 

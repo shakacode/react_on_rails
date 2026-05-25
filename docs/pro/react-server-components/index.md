@@ -47,8 +47,8 @@ The public demo below shows how these ideas look in an inspectable React on Rail
 
 The public [LocalHub marketplace demo](https://rsc.reactonrails.com/) shows the
 same marketplace-style surfaces rendered with traditional SSR, client rendering,
-and React Server Components. Use these links when you want inspectable proof
-instead of a static claim:
+and React Server Components. Use this canonical link list when you want
+inspectable proof instead of a static claim:
 
 - [RSC performance showcase](https://rsc.reactonrails.com/search-performance) —
   Lighthouse scores, transfer deltas, bootup time, and report links for each
