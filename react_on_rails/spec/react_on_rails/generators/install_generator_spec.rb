@@ -2089,6 +2089,14 @@ describe InstallGenerator, type: :generator do
 
   it "keeps the fallback pin tied to a version-specific pnpm release note" do
     fallback_version = repo_pinned_pnpm_version
+    next_pnpm_major = fallback_version.split(".").first.to_i + 1
+    expected_renovate_directive =
+      "renovate: datasource=github-releases depName=pnpm/pnpm " \
+      "extractVersion=^v(?<version>.+)$ allowedVersions=<#{next_pnpm_major}"
+    renovate_directive_mismatch_message =
+      "Renovate directive in install_generator.rb must match allowedVersions=<#{next_pnpm_major} " \
+      "(derived from repo pnpm major). Update the # renovate: comment line when bumping " \
+      "CI_PNPM_FALLBACK_VERSION."
     generator_source = File.read(
       File.expand_path("../../../lib/generators/react_on_rails/install_generator.rb", __dir__)
     )
@@ -2098,9 +2106,8 @@ describe InstallGenerator, type: :generator do
     expect(generator_source).to include(
       "https://github.com/pnpm/pnpm/releases/tag/v#{fallback_version}"
     )
-    expect(generator_source).to include(
-      "renovate: datasource=github-releases depName=pnpm/pnpm"
-    )
+    # Keep the full directive in source order so failures point at the exact Renovate comment to update.
+    expect(generator_source).to include(expected_renovate_directive), renovate_directive_mismatch_message
   end
 
   context "when env selects pnpm but packageManager declares yarn" do

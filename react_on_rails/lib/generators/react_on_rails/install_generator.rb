@@ -141,7 +141,16 @@ module ReactOnRails
       # used for this fallback at https://github.com/pnpm/pnpm/releases/tag/v9.14.2;
       # update this URL with the constant when bumping. Users who need exact
       # reproducibility should commit `packageManager` to their package.json instead.
-      # renovate: datasource=github-releases depName=pnpm/pnpm extractVersion=^v(?<version>.+)$
+      #
+      # Bumping policy (see #3248): this constant is coupled to the repo's own
+      # `package.json#packageManager` via `spec/react_on_rails/generators/install_generator_spec.rb`
+      # (`repo_pinned_pnpm_version`). Bump only as part of a coordinated upgrade of the repo's
+      # pnpm major; do not raise the floor here ahead of the rest of the codebase.
+      #
+      # Last checked: 2026-05-20 — pnpm 10 and pnpm 11 exist upstream, but the repo's own
+      # packageManager is still pnpm@9.14.2, so the fallback stays on 9.x to match what
+      # this codebase actually tests with.
+      # renovate: datasource=github-releases depName=pnpm/pnpm extractVersion=^v(?<version>.+)$ allowedVersions=<10
       CI_PNPM_FALLBACK_VERSION = "9.14.2"
       private_constant :CI_PNPM_FALLBACK_VERSION
 
