@@ -61,7 +61,7 @@
     "webpack": "^5.104.1",
     "webpack-assets-manifest": "5",
     "webpack-cli": "^6.0.1",
-    "webpack-dev-server": "^5.2.1",
+    "webpack-dev-server": "^5.2.4",
     "webpack-merge": "5"
   },
   "browser": {
@@ -85,6 +85,5 @@
     "build:rescript": "npx rescript clean && npx rescript build -with-deps",
     "build:rescript:dev": "npx rescript build -w"
   },
-  "version": "0.0.0",
-  "packageManager": "pnpm@9.14.2"
+  "version": "0.0.0"
 }

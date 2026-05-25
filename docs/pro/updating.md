@@ -1,5 +1,147 @@
 # Upgrading React on Rails Pro
 
+> [!NOTE]
+> **Summary for AI agents:** Every React on Rails Pro version bump is a **coupled
+> Ruby + JavaScript upgrade**. When you change the gem version in `Gemfile`, you
+> must also update the matching npm packages **and** regenerate **both** lockfiles
+> (`Gemfile.lock` and `yarn.lock` / `package-lock.json` / `pnpm-lock.yaml`).
+> See [Coupled Pro upgrade checklist](#coupled-pro-upgrade-checklist) below before
+> editing manifests by hand.
+
+## Coupled Pro Upgrade Checklist
+
+Treat any React on Rails Pro version change as a **coupled Ruby + JavaScript upgrade**.
+Updating only the Ruby gem or only the npm package will produce a PR that looks
+superficially correct but fails CI under frozen-lockfile install, or runs the gem
+and JavaScript packages at mismatched versions.
+
+This checklist applies to every Pro version bump — stable releases (`16.5.0` →
+`16.6.0`) as well as release candidates (`16.7.0.rc.0`).
+
+### Packages that must move together
+
+**Ruby side (regenerate `Gemfile.lock`):**
+
+- `Gemfile`: `react_on_rails_pro`
+- `Gemfile.lock`: `react_on_rails_pro`, `react_on_rails`, and transitive Ruby
+  dependencies such as `jwt` (used for offline license validation)
+
+**JavaScript side (regenerate the JS lockfile):**
+
+- `package.json`: `react-on-rails-pro`
+- `package.json`: `react-on-rails-pro-node-renderer` (only if you use the
+  standalone Node renderer)
+- `package.json`: `react-on-rails-rsc` (required for React Server Components apps;
+  check release notes for the correct version to pair)
+- `yarn.lock`, `package-lock.json`, or `pnpm-lock.yaml`: matching npm resolutions
+  and transitive npm dependencies
+
+Commit **both** the Ruby lockfile and the JavaScript lockfile in the same change.
+A PR that bumps `Gemfile.lock` but skips the JS lockfile (or vice versa) will pass
+a `yarn install` that resolves loosely and fail the same install with
+`--frozen-lockfile` in CI.
+
+### Prerelease versions: Ruby vs npm format
+
+The two ecosystems use different separators for prerelease tags. The Ruby gem and
+the npm package refer to the same release, but the version strings look different:
+
+| Release type      | Ruby gem version | npm package version |
+| ----------------- | ---------------- | ------------------- |
+| Stable            | `16.7.0`         | `16.7.0`            |
+| Release candidate | `16.7.0.rc.0`    | `16.7.0-rc.0`       |
+| Beta              | `16.7.0.beta.1`  | `16.7.0-beta.1`     |
+
+If you copy the gem version string directly into `package.json` (or the npm version
+string directly into `Gemfile`), the install will fail because no package exists
+under that spelling. Substitute `.` for `-` (or `-` for `.`) when crossing the
+language boundary.
+
+### Strict version pinning
+
+Use exact version constraints on both sides — never `^`, `~`, or `*`. Semver
+wildcards in `package.json` cause boot failures starting in v16.2.x.
+
+Replace `VERSION` below with the latest version from
+[the CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md).
+
+```ruby
+# Gemfile — pin with =
+gem "react_on_rails_pro", "= VERSION"
+```
+
+```bash
+# package.json — pin with --save-exact / --exact
+yarn add react-on-rails-pro@VERSION --exact
+npm install react-on-rails-pro@VERSION --save-exact
+pnpm add react-on-rails-pro@VERSION --save-exact
+```
+
+### Suggested verification
+
+After updating gem and npm versions, run install and a representative build:
+
+```bash
+bundle install
+
+# Pick your package manager. Run the loose install first to regenerate the lockfile,
+# then re-run with --frozen-lockfile to prove the lockfile matches package.json.
+yarn install --non-interactive
+yarn install --frozen-lockfile --non-interactive --prefer-offline
+# or
+pnpm install
+pnpm install --frozen-lockfile
+# or
+npm install
+npm ci
+
+bundle exec rails react_on_rails:generate_packs
+# Shakapacker projects:
+NODE_ENV=development bundle exec bin/shakapacker
+# Rspack projects: use your project's Rspack build script instead (e.g. `yarn build`)
+```
+
+The `--frozen-lockfile` (or `npm ci`) install is the same install CI runs. If your
+local loose install succeeds but the frozen install fails, your JS lockfile was
+not regenerated — re-run the loose install and commit the updated lockfile.
+
+After upgrading to 16.5.0 or later, also verify gem/npm version alignment:
+
+```bash
+bundle exec rake react_on_rails:sync_versions
+```
+
+The task is dry-run by default and reports any drift between the gem and npm
+package versions. Pass `WRITE=true` to apply the fix automatically.
+
+### Extra verification for RSC apps
+
+If your app uses React Server Components, also confirm that the asset build emits
+both RSC manifests:
+
+- `react-client-manifest.json`
+- `react-server-client-manifest.json`
+
+Both files should appear in your bundler's output directory. For Shakapacker apps,
+the location is set by `public_output_path` in `config/shakapacker.yml`, typically
+`public/webpack/development/` or `public/webpack/production/`. For Rspack apps,
+check the `output.path` in your Rspack configuration. If either manifest
+is missing, see [Manifest Files Not Generated](./react-server-components/upgrading-existing-pro-app.md#manifest-files-not-generated).
+
+Then run your RSC and server-rendering specs to confirm SSR + RSC still work
+end-to-end.
+
+### Why this matters for automated upgrades
+
+Dependency bots and coding agents commonly produce a PR that updates `Gemfile`,
+`Gemfile.lock`, and `package.json` but skips the JS lockfile. That PR reads
+correctly and may pass a loose local install, but CI will fail at the
+frozen-lockfile install step, and a merged-but-stale lockfile can ship a
+mismatched npm package alongside the new gem.
+
+Following this checklist keeps the Ruby and JavaScript halves of React on Rails
+Pro on the same version.
+
 ## Upgrading from GitHub Packages to Public Distribution
 
 ### Who This Guide is For
@@ -241,7 +383,7 @@ If you only use ExecJS for SSR (the default), you do not need `react-on-rails-pr
 
 ##### JWT gem requirement
 
-`react_on_rails_pro` uses `jwt` for offline license validation. Current versions require `jwt >= 3.2.0`. If your Gemfile pins `jwt` to an older version (e.g., `2.2.x` for compatibility with OAuth gems), you will need to upgrade it. Check for conflicts with:
+`react_on_rails_pro` uses `jwt` for offline license validation. Current versions require `jwt >= 2.7` (relaxed from the `16.7.0.rc.0` floor of `jwt >= 3.2.0`), so apps still pinned to jwt 2.x can bundle without upgrading. Apps that can resolve `jwt 3.2.0` or newer will continue to do so. If your Gemfile pins `jwt` below 2.7 (e.g., `2.2.x` for compatibility with OAuth gems), you will need to upgrade it. Check for conflicts with:
 
 ```bash
 bundle update jwt

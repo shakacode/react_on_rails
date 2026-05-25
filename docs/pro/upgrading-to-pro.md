@@ -24,6 +24,8 @@ Pro includes core React on Rails as a dependency — just swap the packages and 
 > **Version note:** Replace `VERSION` below with the latest version from [the CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md). React on Rails requires exact gem/npm version parity — use `=` for the gem and `--save-exact`/`--exact` for npm. After upgrading to 16.5.0+, run `bundle exec rake react_on_rails:sync_versions` to verify versions are aligned.
 >
 > **RC versions:** RubyGems and npm use different pre-release separators — e.g., `VERSION.rc.9` on RubyGems (dots) vs `VERSION-rc.9` on npm (hyphen).
+>
+> **For later upgrades:** Once you are on Pro, follow the [Coupled Pro Upgrade Checklist](./updating.md#coupled-pro-upgrade-checklist) for every subsequent Pro version bump. It covers the Ruby + JavaScript lockfile pairing, prerelease formats, and RSC manifest verification.
 
 ### 1. Swap the gem
 

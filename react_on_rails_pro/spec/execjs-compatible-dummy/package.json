@@ -1,5 +1,4 @@
 {
-  "packageManager": "pnpm@9.14.2",
   "name": "app",
   "private": true,
   "version": "0.1.0",
@@ -43,6 +42,6 @@
   "devDependencies": {
     "@pmmmwh/react-refresh-webpack-plugin": "^0.5.15",
     "react-refresh": "^0.14.2",
-    "webpack-dev-server": "^5.2.1"
+    "webpack-dev-server": "^5.2.4"
   }
 }

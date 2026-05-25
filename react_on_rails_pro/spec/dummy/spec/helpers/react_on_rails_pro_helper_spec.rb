@@ -493,11 +493,7 @@ describe ReactOnRailsProHelper do
         mock_request_and_response(many_chunks)
 
         # Simulate client disconnect after first chunk
-        call_count = 0
-        allow(mocked_rails_stream).to receive(:closed?) do
-          call_count += 1
-          call_count > 1 # false for first call, true after
-        end
+        allow(mocked_rails_stream).to receive(:closed?).and_return(false, true)
 
         # Start streaming - first chunk returned synchronously
         initial_result = stream_react_component(component_name, props: props, **component_options)
@@ -525,11 +521,7 @@ describe ReactOnRailsProHelper do
         mock_request_and_response(many_chunks)
 
         # Simulate client disconnect after first chunk
-        closed_call_count = 0
-        allow(mocked_rails_stream).to receive(:closed?) do
-          closed_call_count += 1
-          closed_call_count > 1
-        end
+        allow(mocked_rails_stream).to receive(:closed?).and_return(false, true)
 
         on_complete_called = false
         on_complete = lambda { |_chunks|

@@ -66,10 +66,11 @@ You may see a warning like this when building a Webpack bundle using any version
 Module not found: Error: Can't resolve 'react-dom/client' in ....
 ```
 
-It can be safely [suppressed](https://webpack.js.org/configuration/other-options/#ignorewarnings) in your Webpack configuration. The following is an example of this suppression in `config/webpack/commonWebpackConfig.js`:
+It can be safely [suppressed](https://webpack.js.org/configuration/other-options/#ignorewarnings) in your Webpack configuration. React on Rails exports a ready-made regex from `react-on-rails/webpackHelpers` so you don't have to remember the message text. The following is an example of this suppression in `config/webpack/commonWebpackConfig.js`:
 
 ```js
 const { webpackConfig: baseClientWebpackConfig, merge } = require('shakapacker');
+const { reactDomClientWarning } = require('react-on-rails/webpackHelpers');
 
 const commonOptions = {
   resolve: {
@@ -78,12 +79,26 @@ const commonOptions = {
 };
 
 const ignoreWarningsConfig = {
-  ignoreWarnings: [/Module not found: Error: Can't resolve 'react-dom\/client'/],
+  ignoreWarnings: [reactDomClientWarning],
 };
 
 const commonWebpackConfig = () => merge({}, baseClientWebpackConfig, commonOptions, ignoreWarningsConfig);
 
 module.exports = commonWebpackConfig;
+```
+
+Webpack 4 / Webpacker 5 users should pass the same regex to [`stats.warningsFilter`](https://v4.webpack.js.org/configuration/stats/#statswarningsfilter) instead, since `ignoreWarnings` is a Webpack 5 option:
+
+```js
+// Webpack 4 / Webpacker 5
+const { reactDomClientWarning } = require('react-on-rails/webpackHelpers');
+
+module.exports = {
+  // ...
+  stats: {
+    warningsFilter: [reactDomClientWarning],
+  },
+};
 ```
 
 ---
