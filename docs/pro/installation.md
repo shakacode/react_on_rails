@@ -378,6 +378,8 @@ namespace :licenses do
       abort "React on Rails Pro license is expired. Renew and update REACT_ON_RAILS_PRO_LICENSE."
     elsif status == :missing
       abort "React on Rails Pro license is missing. Set REACT_ON_RAILS_PRO_LICENSE."
+    elsif status == :invalid
+      abort "React on Rails Pro license is invalid. Verify the full key was copied into REACT_ON_RAILS_PRO_LICENSE."
     elsif status != :valid
       abort "React on Rails Pro license status is #{status_label}. Update REACT_ON_RAILS_PRO_LICENSE."
     end
