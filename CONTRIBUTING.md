@@ -432,7 +432,7 @@ If you run `rspec` at the top level, you'll see this message: `require': cannot 
 
 If you run tests with `COVERAGE=true`, you can view the SimpleCov report at `coverage/index.html`.
 
-Turbolinks 5 is included in the test app, unless "DISABLE_TURBOLINKS" is set to YES in the environment.
+Turbolinks 5 is included in the test app, unless `DISABLE_TURBOLINKS=TRUE` is set in the environment.
 
 Run `rake -T` or `rake -D` to see testing options.
 
