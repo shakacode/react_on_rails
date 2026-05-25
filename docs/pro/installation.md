@@ -192,8 +192,7 @@ JSON parsers should branch on `status` before treating `renewal_required` as an 
 ```ruby
 require "json"
 
-# `output` is stdout captured from:
-# RAILS_ENV=production FORMAT=json bundle exec rake react_on_rails_pro:verify_license
+output = `RAILS_ENV=production FORMAT=json bundle exec rake react_on_rails_pro:verify_license`
 license_info = begin
   JSON.parse(output)
 rescue JSON::ParserError
@@ -306,6 +305,7 @@ jobs:
         id: license-check
         continue-on-error: true
         run: |
+          # Plain output is enough here; capture it so license metadata stays out of Actions logs.
           bundle exec rake react_on_rails_pro:verify_license \
             > "$RUNNER_TEMP/react_on_rails_pro_license.log" 2>&1
 
@@ -373,6 +373,7 @@ namespace :licenses do
     expiration_time = expiration.respond_to?(:to_time) ? expiration.to_time.utc : nil
     # The :environment task dependency loads Active Support, so 1.day is available here.
     days_remaining = expiration_time && ((expiration_time - Time.now.utc) / 1.day).ceil
+    day_label = days_remaining && "day".pluralize(days_remaining)
     status_label = status.to_s.tr("_", " ")
 
     case status
@@ -398,13 +399,13 @@ namespace :licenses do
 
     if days_remaining && days_remaining <= threshold_days
       abort(
-        "React on Rails Pro license expires in #{days_remaining} days. " \
+        "React on Rails Pro license expires in #{days_remaining} #{day_label}. " \
         "Renew and update REACT_ON_RAILS_PRO_LICENSE."
       )
     end
 
     message = "React on Rails Pro license is valid"
-    message += " (#{days_remaining} days remaining)" if days_remaining
+    message += " (#{days_remaining} #{day_label} remaining)" if days_remaining
     puts message
   end
 end
