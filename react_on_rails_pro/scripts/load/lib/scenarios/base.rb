@@ -104,9 +104,12 @@ module RendererHarness
 
       def length_prefixed_chunk_bytesize(chunk)
         html = chunk.fetch("html")
-        html_body = html.is_a?(String) ? html : JSON.generate(html)
         metadata = chunk.except("html")
+        payload_type = metadata.fetch("payloadType") { html.is_a?(String) ? "string" : "object" }
+        metadata["payloadType"] = payload_type
+        html_body = payload_type == "object" ? JSON.generate(html) : html.to_s
 
+        # Wire layout: <metadata JSON> \t <8-char hex content length> \n <html bytes>.
         JSON.generate(metadata).bytesize + 1 + 8 + 1 + html_body.bytesize
       end
 

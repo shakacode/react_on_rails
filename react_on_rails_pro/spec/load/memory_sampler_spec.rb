@@ -100,5 +100,31 @@ RSpec.describe RendererHarness::MemorySampler do
 
       expect(sampler.instance_variable_get(:@thread)).not_to be_alive
     end
+
+    it "does not hold the rows mutex while sampling" do
+      sampler = described_class.new(pids: { rails: Process.pid })
+      sampling_started = Queue.new
+      release_sample = Queue.new
+      rows_thread = nil
+
+      allow(sampler).to receive(:sample_once) do
+        sampling_started << true
+        release_sample.pop
+        { t_seconds: 0 }
+      end
+
+      begin
+        sampler.start_background(interval_seconds: 60)
+        sampling_started.pop
+        rows_thread = Thread.new { sampler.rows }
+
+        expect(rows_thread.join(0.2)).to eq(rows_thread)
+        expect(rows_thread.value).to eq([])
+      ensure
+        release_sample << true
+        sampler.stop_background(timeout_seconds: 0.2)
+        rows_thread&.kill if rows_thread&.alive?
+      end
+    end
   end
 end

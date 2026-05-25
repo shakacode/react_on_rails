@@ -156,6 +156,7 @@ module ReactOnRailsPro
 
         parser.feed(chunk, &block)
       end
+      # Empty-body responses record status after the stream is drained; blocking here is safe.
       record_status(stream_response) unless status_recorded
       parser.flush
     end

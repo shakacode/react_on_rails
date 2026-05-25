@@ -39,7 +39,8 @@ module RendererHarness
         @thread = Thread.new do
           until stop?
             begin
-              @rows_mutex.synchronize { @rows << sample_once }
+              row = sample_once
+              @rows_mutex.synchronize { @rows << row }
             rescue StandardError => e
               warn "MemorySampler: sample_once raised #{e.class}: #{e.message}"
             end
