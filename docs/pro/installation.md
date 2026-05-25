@@ -169,7 +169,9 @@ RAILS_ENV=production FORMAT=json bundle exec rake react_on_rails_pro:verify_lice
 
 The task exits with a non-zero status when the license is missing, invalid, or expired. For valid but expiring
 licenses, it exits 0 but reports `renewal_required: true` in JSON output when the license is expiring within 30 days.
-Use the app-owned rake task below if you want a non-zero exit for expiring-soon licenses or a custom warning threshold.
+When parsing JSON output, check `status` first: `renewal_required` is also `true` for already-expired licenses, which
+exit non-zero. The built-in 30-day threshold is fixed; use the app-owned rake task below if you want a non-zero exit for
+expiring-soon licenses or a custom warning threshold.
 
 #### Blocking CI Example
 
@@ -270,16 +272,19 @@ checks would report a missing token there.
 ### Monitor License Expiration
 
 If your organization wants an app-owned scheduled check with a custom warning threshold, add a wrapper task like this.
-It mirrors the built-in verification task and treats the built-in 30-day renewal window as the default:
+It reads the same license information that the built-in verification task formats and treats the built-in 30-day renewal
+window as the default:
 
 ```ruby
+# frozen_string_literal: true
+
 # lib/tasks/react_on_rails_pro_license.rake
 namespace :licenses do
   desc "Fail if the React on Rails Pro license is invalid, expired, or expiring soon"
   task check_react_on_rails_pro: :environment do
     threshold_days = Integer(ENV.fetch("DAYS", "30"))
-    info = ReactOnRailsPro::LicenseValidator.license_info
-    status = info.fetch(:status, :unknown)
+    info = ReactOnRailsPro::Utils.license_info
+    status = info[:status]
     expiration = info[:expiration]
     days_remaining = expiration && ((expiration - Time.now) / 86_400).ceil
 
