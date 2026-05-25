@@ -151,7 +151,7 @@ module ReactOnRails
 
         def hmr_config(value)
           # Shakapacker's "hmr: only" is webpack-dev-server-only HMR, not a React on Rails custom value.
-          return true if value.to_s.strip.casecmp("only").zero?
+          return true if value.to_s.strip.casecmp?("only")
 
           boolean_config(value)
         end

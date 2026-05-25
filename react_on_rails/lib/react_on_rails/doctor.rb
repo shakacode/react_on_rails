@@ -1980,7 +1980,7 @@ module ReactOnRails
         checker.add_warning("  ⚠️  test and development share public_output_path '#{test_output_path}'")
         checker.add_info("  💡 Shared output is an advanced workflow meant for bin/dev static")
         checker.add_info(
-          "  💡 #{Dev::ServerMode.text(default_dev_server_mode, :shared_output_warning)}: manifests can collide"
+          "  💡 #{Dev::ServerMode.text(default_dev_server_mode, :shared_output_warning)} because manifests can collide"
         )
         add_shared_output_path_procfile_guidance
       else
