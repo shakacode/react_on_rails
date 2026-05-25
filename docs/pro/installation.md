@@ -266,7 +266,8 @@ stdout, stderr, command_status = Open3.capture3(
 
 license_info = parse_license_json_object(stdout)
 unless license_info
-  abort "Could not parse React on Rails Pro license JSON object. Exit: #{command_status.exitstatus}. Stderr: #{stderr}"
+  exit_detail = command_status.exitstatus || "signal(#{command_status.termsig})"
+  abort "Could not parse React on Rails Pro license JSON object. Exit: #{exit_detail}. Stderr: #{stderr}"
 end
 
 status = license_info["status"]
@@ -313,8 +314,10 @@ jobs:
       RAILS_ENV: production
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE }}
     steps:
+      # Pin third-party actions to reviewed SHAs in production deployment workflows.
       - uses: actions/checkout@v4
 
+      # Pin third-party actions to reviewed SHAs in production deployment workflows.
       - uses: ruby/setup-ruby@v1
         with:
           bundler-cache: true
@@ -347,7 +350,8 @@ Call the reusable workflow before your deploy job and pass repository secrets fr
 jobs:
   check-license:
     uses: ./.github/workflows/react-on-rails-pro-license.yml
-    secrets: inherit
+    secrets:
+      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE }}
 
   deploy:
     needs: check-license
@@ -381,8 +385,10 @@ jobs:
       RAILS_ENV: production
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE }}
     steps:
+      # Pin third-party actions to reviewed SHAs in production deployment workflows.
       - uses: actions/checkout@v4
 
+      # Pin third-party actions to reviewed SHAs in production deployment workflows.
       - uses: ruby/setup-ruby@v1
         with:
           bundler-cache: true
@@ -505,7 +511,8 @@ Run it from your scheduler or CI:
 RAILS_ENV=production DAYS=30 bundle exec rake licenses:check_react_on_rails_pro
 ```
 
-Use `DAYS=0` when you only want the wrapper to fail for invalid, missing, or already expired licenses.
+Use `DAYS=0` when you want the wrapper to fail for invalid, missing, already expired, or expiring-today
+licenses.
 
 For complete license setup instructions, see [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/LICENSE_SETUP.md).
 
