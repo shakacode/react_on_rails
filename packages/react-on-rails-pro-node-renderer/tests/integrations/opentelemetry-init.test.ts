@@ -155,6 +155,81 @@ describe('opentelemetry integration: init() failure path', () => {
     }
   });
 
+  test('init() does not register a Fastify shutdown hook when provider.register() fails', async () => {
+    const configureFastify = jest.fn();
+
+    jest.doMock('../../src/worker/fastifyConfig.js', () => ({
+      configureFastify,
+    }));
+    jest.doMock('@opentelemetry/sdk-trace-node', () => ({
+      NodeTracerProvider: jest.fn(function NodeTracerProvider() {
+        return {
+          register: jest.fn(() => {
+            throw new Error('register failed');
+          }),
+          shutdown: jest.fn(async () => undefined),
+        };
+      }),
+    }));
+
+    const { InMemorySpanExporter, SimpleSpanProcessor } = await import('@opentelemetry/sdk-trace-base');
+    const otel = await import('../../src/integrations/opentelemetry');
+
+    expect(() =>
+      otel.init({
+        spanProcessor: new SimpleSpanProcessor(new InMemorySpanExporter()),
+      }),
+    ).not.toThrow();
+
+    expect(configureFastify).not.toHaveBeenCalled();
+  });
+
+  test('Fastify onClose disables the global tracer provider so init() can run again', async () => {
+    const configureFastifyCallbacks: Array<(app: { addHook: jest.Mock }) => void> = [];
+
+    jest.doMock('../../src/worker/fastifyConfig.js', () => ({
+      configureFastify: jest.fn((callback: (app: { addHook: jest.Mock }) => void) => {
+        configureFastifyCallbacks.push(callback);
+      }),
+    }));
+
+    const { trace } = await import('@opentelemetry/api');
+    const { InMemorySpanExporter, SimpleSpanProcessor } = await import('@opentelemetry/sdk-trace-base');
+    const firstExporter = new InMemorySpanExporter();
+    const secondExporter = new InMemorySpanExporter();
+    const otel = await import('../../src/integrations/opentelemetry');
+
+    const installOnCloseHook = async () => {
+      let onClose: (() => Promise<void>) | undefined;
+      configureFastifyCallbacks.at(-1)!({
+        addHook: jest.fn((_name: string, handler: () => Promise<void>) => {
+          onClose = handler;
+        }),
+      });
+      await onClose!();
+    };
+
+    otel.init({
+      spanProcessor: new SimpleSpanProcessor(firstExporter),
+    });
+    trace.getTracer('test').startActiveSpan('first.span', (span) => {
+      span.end();
+    });
+    expect(firstExporter.getFinishedSpans()).toHaveLength(1);
+
+    await installOnCloseHook();
+
+    otel.init({
+      spanProcessor: new SimpleSpanProcessor(secondExporter),
+    });
+    trace.getTracer('test').startActiveSpan('second.span', (span) => {
+      span.end();
+    });
+
+    expect(secondExporter.getFinishedSpans().map((span) => span.name)).toEqual(['second.span']);
+    await installOnCloseHook();
+  });
+
   test('init() ignores duplicate calls without replacing the active provider', async () => {
     const errorReporter = await import('../../src/shared/errorReporter');
     const messageSpy = jest.spyOn(errorReporter, 'message');

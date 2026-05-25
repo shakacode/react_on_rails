@@ -87,6 +87,11 @@ function configureOpenTelemetryDiagnostics(otelApi: typeof import('@opentelemetr
   );
 }
 
+function disableOpenTelemetryGlobals(otelApi: typeof import('@opentelemetry/api')): void {
+  otelApi.trace.disable();
+  otelApi.diag.disable();
+}
+
 async function shutdownProviderWithTimeout(
   provider: NodeTracerProviderType,
   shutdownTimeoutMs: number,
@@ -230,20 +235,29 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
       setupSubSpan(subSpanImpl);
     }
 
-    // Flush pending spans on graceful shutdown. Fastify fires onClose during
-    // worker.destroy() / app.close(), giving the BatchSpanProcessor a chance to
-    // export queued spans before the process exits.
+    tracerProvider = provider;
+    try {
+      provider.register();
+    } catch (err) {
+      if (tracerProvider === provider) {
+        tracerProvider = null;
+      }
+      throw err;
+    }
+
+    // Register this last so failed init paths do not leave a partial Fastify hook
+    // behind. Fastify fires onClose during app.close(), giving the span processor
+    // a chance to export queued spans before the process exits.
     configureFastify((app) => {
       app.addHook('onClose', async () => {
         await shutdownProviderWithTimeout(provider, shutdownTimeoutMs);
         if (tracerProvider === provider) {
           tracerProvider = null;
+          disableOpenTelemetryGlobals(otelApi);
         }
       });
     });
 
-    tracerProvider = provider;
-    provider.register();
     log.info('[OpenTelemetry] Tracer provider initialized');
   } catch (err) {
     message(`[OpenTelemetry] init failed: ${String(err)}`);
@@ -263,8 +277,7 @@ export async function __resetForTest(): Promise<void> {
   /* eslint-disable @typescript-eslint/no-require-imports, global-require */
   try {
     const otelApi = require('@opentelemetry/api') as typeof import('@opentelemetry/api');
-    otelApi.trace.disable();
-    otelApi.diag.disable();
+    disableOpenTelemetryGlobals(otelApi);
   } catch {
     // OTel API not installed — nothing to disable.
   }
