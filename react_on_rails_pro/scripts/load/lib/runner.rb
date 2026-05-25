@@ -68,9 +68,9 @@ module RendererHarness
     def run_by_count(gate)
       @remaining = @config.requests
       Array.new(@config.concurrency) do
-        worker_thread(gate) do
+        worker_thread(gate) do |worker_results|
           prepare_worker(gate)
-          record(@scenario.perform_request) while claim_request
+          worker_results << @scenario.perform_request while claim_request
         end
       end
     end
@@ -86,9 +86,9 @@ module RendererHarness
 
     def run_by_duration(gate)
       Array.new(@config.concurrency) do
-        worker_thread(gate) do
+        worker_thread(gate) do |worker_results|
           deadline = prepare_worker(gate)
-          record(@scenario.perform_request) while monotonic < deadline
+          worker_results << @scenario.perform_request while monotonic < deadline
         end
       end
     end
@@ -100,12 +100,17 @@ module RendererHarness
 
     def worker_thread(gate)
       Thread.new do
-        # join_threads reports worker failures once; keep Ruby from also dumping
-        # each thread exception to stderr.
+        # join_threads reports worker failures once; disabling thread exception
+        # reporting avoids duplicate stderr noise without hiding failures.
         Thread.current.report_on_exception = false
-        yield
-      rescue StandardError
-        abort_measurement_start(gate) unless measurement_started?(gate)
+        worker_results = []
+        begin
+          yield worker_results
+        ensure
+          append_results(worker_results) if worker_results.any?
+        end
+      rescue StandardError => e
+        abort_measurement_start(gate, e) unless measurement_started?(gate)
         raise
       end
     end
@@ -224,8 +229,8 @@ module RendererHarness
       raise WorkerErrors, actionable_errors
     end
 
-    def record(result)
-      @results_mutex.synchronize { @results << result }
+    def append_results(worker_results)
+      @results_mutex.synchronize { @results.concat(worker_results) }
     end
 
     def monotonic

@@ -98,6 +98,8 @@ RSpec.describe RendererHarness::MemorySampler do
     end
 
     it "kills and resets a sampler thread that does not stop in time" do
+      sampler = nil
+      release_sample = nil
       sampler = described_class.new(pids: { rails: Process.pid })
       sampling_started = Queue.new
       release_sample = Queue.new
@@ -118,8 +120,8 @@ RSpec.describe RendererHarness::MemorySampler do
       allow(sampler).to receive(:sample_once).and_return({ t_seconds: 0 })
       expect { sampler.start_background(interval_seconds: 0.01) }.not_to raise_error
     ensure
-      release_sample << true
-      sampler.stop_background(timeout_seconds: 0.01)
+      release_sample&.push(true)
+      sampler&.stop_background(timeout_seconds: 0.01)
     end
 
     it "does not hold the rows mutex while sampling" do

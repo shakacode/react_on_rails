@@ -141,12 +141,13 @@ module ReactOnRailsPro
 
     def process_response_chunks(stream_response, error_body, &block)
       parser = ReactOnRails::LengthPrefixedParser.new
-      status_recorded = false
+      @status_recorded = false
+      status_recorded_for_response = false
       stream_response.each do |chunk|
         stream_response.instance_variable_set(:@react_on_rails_received_first_chunk, true)
-        unless status_recorded
+        unless status_recorded_for_response
           record_status(stream_response)
-          status_recorded = true
+          status_recorded_for_response = true
         end
 
         if response_has_error_status?
@@ -158,14 +159,16 @@ module ReactOnRailsPro
       end
       # Empty-body responses record status after the stream is drained; specs
       # assert that status is read only after the response has yielded no chunks.
-      record_status(stream_response) unless status_recorded
+      record_status(stream_response) unless status_recorded_for_response
       parser.flush
     end
 
     # StreamRequest is consumed sequentially. Status intentionally reflects the
     # latest response attempt, so a 410 retry replaces the pre-retry status.
     def record_status(response)
+      @status = nil
       @status = extract_status(response)
+    ensure
       @status_recorded = true
     end
 

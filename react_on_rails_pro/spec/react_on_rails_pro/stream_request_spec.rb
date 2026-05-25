@@ -96,6 +96,23 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       end.to raise_error(ReactOnRailsPro::Error, /status was not recorded/)
     end
 
+    it "marks status as attempted when status extraction raises" do
+      response = Class.new do
+        def each
+          yield "body"
+        end
+
+        def status
+          raise "status unavailable"
+        end
+      end.new
+
+      expect do
+        request.send(:process_response_chunks, response, error_body) { |_| nil }
+      end.to raise_error(RuntimeError, /status unavailable/)
+      expect(request.send(:response_has_error_status?)).to be(true)
+    end
+
     context "with length-prefixed protocol parsing" do
       it "parses multiple LPP chunks from a single response" do
         data = to_length_prefixed("<div>First</div>") + to_length_prefixed("<div>Second</div>")

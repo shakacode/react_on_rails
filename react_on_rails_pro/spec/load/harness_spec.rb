@@ -48,6 +48,20 @@ RSpec.describe RendererHarness::Harness do
     expect(summary[:memory][:rails_slope_mb_per_min]).to eq(0.0)
   end
 
+  it "defaults output under the Rails root" do
+    rails = Class.new do
+      def self.root
+        "/app"
+      end
+    end
+    stub_const("Rails", rails)
+    allow(Time).to receive(:now).and_return(Time.utc(2026, 1, 2, 3, 4, 5))
+
+    harness = described_class.new(build_config(output_dir: nil))
+
+    expect(harness.send(:default_output_dir)).to eq("/app/tmp/load-tests/2026-01-02T03-04-05Z")
+  end
+
   it "warns when an RSS sample is zero" do
     harness = described_class.new(build_config)
     rows = [{ t_seconds: 0.0, rails_rss_kb: 0 }]

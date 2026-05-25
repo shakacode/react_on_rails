@@ -151,7 +151,16 @@ module RendererHarness
 
     def default_output_dir
       ts = Time.now.utc.strftime("%Y-%m-%dT%H-%M-%SZ")
-      File.join("tmp", "load-tests", ts)
+      File.join(default_output_root, ts)
+    end
+
+    def default_output_root
+      app_root = if defined?(Rails) && Rails.respond_to?(:root)
+                   Rails.root
+                 else
+                   Dir.pwd
+                 end
+      File.join(app_root.to_s, "tmp", "load-tests")
     end
   end
 end
