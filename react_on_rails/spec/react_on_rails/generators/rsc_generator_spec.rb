@@ -326,6 +326,51 @@ describe RscGenerator, type: :generator do
     end
   end
 
+  context "when a fresh client webpack config misses the plugin insertion point" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            delete clientConfig.entry['server-bundle'];
+
+            finalizeClientConfig(clientConfig);
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "rolls back the prepared imports and scoped helper" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content).not_to include("RSCWebpackPlugin")
+        expect(content).not_to include("rscClientReferences")
+        expect(content).to include("finalizeClientConfig(clientConfig);")
+      end
+
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("Reverted partial RSC setup; please add RSCWebpackPlugin and clientReferences manually")
+    end
+  end
+
   context "when the server webpack config uses double-quoted bundler imports" do
     before(:all) do
       prepare_destination
@@ -357,6 +402,44 @@ describe RscGenerator, type: :generator do
         expect(content).to include("directory: resolve(config.source_path)")
         expect(content).to include("isServer: true")
       end
+    end
+  end
+
+  context "when a fresh server webpack config misses the plugin insertion point" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/serverWebpackConfig.js",
+        pro_server_webpack_content.sub(
+          "  serverWebpackConfig.plugins.unshift(new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));\n\n",
+          ""
+        )
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "rolls back the prepared imports, scoped helper, and rscBundle parameter" do
+      assert_file "config/webpack/serverWebpackConfig.js" do |content|
+        expect(content).not_to include("RSCWebpackPlugin")
+        expect(content).not_to include("rscClientReferences")
+        expect(content).not_to include("rscBundle")
+        expect(content).to include("const configureServer = () => {")
+      end
+
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("Reverted partial RSC setup; please add RSCWebpackPlugin and clientReferences manually")
     end
   end
 
@@ -620,7 +703,9 @@ describe RscGenerator, type: :generator do
         expect(content).not_to include("const rscClientReferences")
       end
 
-      expect(GeneratorMessages.messages.join("\n")).to include("no plugin options with isServer: false")
+      messages = GeneratorMessages.messages.join("\n")
+      expect(messages).to include("no plugin options with isServer: false")
+      expect(messages).to include("Dynamic or computed plugin options cannot be verified automatically")
     end
   end
 
@@ -1720,6 +1805,13 @@ describe RscGenerator, type: :generator do
       expect(partition.fetch(:unparseable)).to eq(0)
     end
 
+    it "skips leading string literals when looking for the first significant token" do
+      content = %(  "client-bundle", { isServer: false })
+
+      index = generator.send(:first_significant_js_index, content, 0)
+      expect(content[index]).to eq(",")
+    end
+
     it "clears state but leaves index on the closing `/` when advance_js_scan_state exits a block comment" do
       # `block_comment_exit_guard` invariant: when `*/` is consumed, state must be nil and
       # index must point at the closing `/` so the caller's trailing `index += 1` lands on
@@ -2006,6 +2098,31 @@ describe RscGenerator, type: :generator do
         /chunkName: 'client',\n\s*isServer: false,\n\s*clientReferences: rscClientReferences,/
       )
       expect(GeneratorMessages.messages.join("\n")).not_to include("npx prettier")
+    end
+
+    it "matches indentation from the last code line when a template-literal value contains a newline" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          clientConfig.plugins.push(
+            new RSCWebpackPlugin({
+              isServer: false,
+              message: `hello
+          world`,
+            }),
+          );
+        JS
+      )
+
+      generator.send(:rewrite_rsc_plugin_client_references, config_path, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).to include(
+        "    message: `hello\nworld`,\n    clientReferences: rscClientReferences,"
+      )
+      expect(migrated_content).not_to include("world`,\n  clientReferences")
     end
 
     it "does not write plugin rewrites in pretend mode" do

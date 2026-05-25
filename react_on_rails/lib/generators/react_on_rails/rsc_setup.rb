@@ -422,6 +422,7 @@ module ReactOnRails
           /(serverWebpackConfig\.plugins\.unshift\(new bundler\.optimize\.LimitChunkCountPlugin.*\);)/,
           "#{rsc_plugin_code}\n  \\1"
         )
+        rollback_incomplete_new_rsc_plugin_setup(config_path, content, is_server: true)
       end
 
       def update_client_webpack_config_for_rsc
@@ -459,6 +460,35 @@ module ReactOnRails
           config_path,
           /^( *return clientConfig;)$/,
           "#{rsc_plugin_code}\n\n\\1"
+        )
+        rollback_incomplete_new_rsc_plugin_setup(config_path, content, is_server: false)
+      end
+
+      def rollback_incomplete_new_rsc_plugin_setup(config_path, original_content, is_server:)
+        return if options[:pretend] || options[:skip]
+
+        full_path = File.join(destination_root, config_path)
+        current_content = File.read(full_path)
+        return if new_rsc_plugin_setup_complete?(current_content, is_server: is_server)
+        return if current_content == original_content
+
+        say_status(:revert, config_path, :yellow)
+        File.write(full_path, original_content)
+        warn_incomplete_new_rsc_plugin_setup(config_path, is_server: is_server)
+      end
+
+      def new_rsc_plugin_setup_complete?(content, is_server:)
+        plugin_added = content.include?("new RSCWebpackPlugin(")
+        return plugin_added unless is_server
+
+        plugin_added && content.match?(/configureServer\s*=\s*\(\s*rscBundle\s*=\s*false\s*\)/)
+      end
+
+      def warn_incomplete_new_rsc_plugin_setup(config_path, is_server:)
+        insertion_point = is_server ? "server webpack insertion points" : "client webpack return statement"
+        GeneratorMessages.add_warning(
+          "Could not finish adding RSCWebpackPlugin to #{config_path}: expected #{insertion_point} was not found. " \
+          "Reverted partial RSC setup; please add RSCWebpackPlugin and clientReferences manually."
         )
       end
 

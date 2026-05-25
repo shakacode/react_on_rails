@@ -372,10 +372,10 @@ module ReactOnRails
           false
         end
 
-        # Skips both whitespace and JS line/block comments so callers see the first character
-        # that actually participates in the syntax. Without comment skipping, configurations
-        # like `new RSCWebpackPlugin( /* opts */ {` would land on `/` and be rejected as
-        # "no plugin options" even though the options object is present.
+        # Skips whitespace, JS line/block comments, and leading string literals so callers see the
+        # next structural character. Without comment skipping, configurations like
+        # `new RSCWebpackPlugin( /* opts */ {` would land on `/` and be rejected as "no plugin
+        # options" even though the options object is present.
         def first_significant_js_index(content, start_index)
           index = start_index
           state = nil
@@ -393,7 +393,7 @@ module ReactOnRails
               next
             end
 
-            return index unless char.match?(/\s/)
+            return index unless char.match?(/\s/) || JS_STRING_DELIMITERS.include?(prev_state)
 
             index += 1
           end
@@ -795,7 +795,8 @@ module ReactOnRails
           content = body[0...(body.length - trailing.length)]
           line_ending = js_line_ending(body)
 
-          last_line_start = (content.rindex("\n") || -1) + 1
+          last_code_index = last_js_code_char_index(content)
+          last_line_start = last_code_index ? last_js_code_line_start(content, last_code_index) : 0
           # `[ \t]+` (one-or-more) so the regex returns nil when the last line is unindented,
           # letting the `|| "  "` fallback actually fire. With `*` the regex would always match
           # the empty string and the fallback was unreachable dead code.
@@ -806,6 +807,25 @@ module ReactOnRails
           prefix = build_splice_prefix(content, needs_comma: needs_comma)
 
           "#{prefix}#{line_ending}#{indent}clientReferences: rscClientReferences,#{trailing}"
+        end
+
+        def last_js_code_line_start(content, last_code_index)
+          state = nil
+          escaped = false
+          index = 0
+          line_start = 0
+
+          while index <= last_code_index
+            char = content[index]
+            next_char = content[index + 1]
+            prev_state = state
+            state, escaped, index = advance_js_scan_state(state, escaped, char, next_char, index)
+            line_start = index + 1 if char == "\n" && !JS_STRING_DELIMITERS.include?(prev_state)
+
+            index += 1
+          end
+
+          line_start
         end
 
         # Inserts the trailing comma before any final line/block comment so the rewritten file reads
@@ -1172,7 +1192,8 @@ module ReactOnRails
         def warn_missing_rsc_plugin_target(config_path, is_server:)
           GeneratorMessages.add_warning(
             "Could not update RSCWebpackPlugin in #{config_path}: no plugin options with isServer: #{is_server} " \
-            "could be rewritten. Please add clientReferences manually."
+            "could be rewritten. Please add clientReferences manually. Dynamic or computed plugin options cannot be " \
+            "verified automatically, so verify this file manually after adding clientReferences."
           )
         end
 
