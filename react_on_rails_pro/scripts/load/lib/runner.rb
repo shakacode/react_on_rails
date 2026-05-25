@@ -104,15 +104,32 @@ module RendererHarness
         # reporting avoids duplicate stderr noise without hiding failures.
         Thread.current.report_on_exception = false
         worker_results = []
+        worker_error = nil
         begin
           yield worker_results
+        rescue StandardError => e
+          worker_error = e
+          raise
         ensure
-          append_results(worker_results) if worker_results.any?
+          append_worker_results(worker_results, worker_error)
         end
       rescue StandardError => e
         abort_measurement_start(gate, e) unless measurement_started?(gate)
         raise
       end
+    end
+
+    def append_worker_results(worker_results, worker_error)
+      return unless worker_results.any?
+
+      append_results(worker_results)
+    rescue StandardError => e
+      raise unless worker_error
+
+      warn(
+        "RendererHarness::Runner: failed to append partial worker results after worker failure: " \
+        "#{e.class}: #{e.message}"
+      )
     end
 
     def start_gate

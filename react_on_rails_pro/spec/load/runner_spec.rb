@@ -151,6 +151,26 @@ RSpec.describe RendererHarness::Runner do
     end
   end
 
+  it "does not mask a worker failure when appending partial results fails" do
+    scenario = build_scenario
+    calls = 0
+    allow(scenario).to receive(:perform_request) do
+      calls += 1
+      raise "worker failure" if calls == 2
+
+      RendererHarness::RequestResult.new(latency_ms: 1.0, ok: true)
+    end
+    runner = described_class.new(
+      scenario: scenario,
+      config: build_config(requests: 2, concurrency: 1)
+    )
+    allow(runner).to receive(:append_results).and_raise("append failed")
+    allow(runner).to receive(:warn)
+
+    expect { runner.run }.to raise_error(/worker failure/)
+    expect(runner).to have_received(:warn).with(/failed to append partial worker results/)
+  end
+
   it "times out worker threads that never finish" do
     stub_const("#{described_class}::WORKER_JOIN_TIMEOUT_SECONDS", 0.01)
     scenario = build_scenario

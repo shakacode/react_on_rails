@@ -170,8 +170,9 @@ module ReactOnRailsPro
     # StreamRequest is consumed sequentially. Status intentionally reflects the
     # latest response attempt, so a 410 retry replaces the pre-retry status.
     def record_status(response)
-      # Keep status nil if extraction raises so the caller treats the unknown
-      # status as an error response.
+      # Start each attempt from nil. Known missing-status cases keep that nil as
+      # an unknown status; unexpected extraction errors still propagate after the
+      # ensure below marks status as attempted.
       @status = nil
       @status = extract_status(response)
     ensure
