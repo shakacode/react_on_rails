@@ -10,6 +10,8 @@ RSpec.describe RendererHarness::Scenarios::StreamingRender do
 
   def build_stream(status:, chunks:)
     Struct.new(:status, :chunks) do
+      alias_method :http_status, :status
+
       def each_chunk(&block)
         chunks.each(&block)
       end
@@ -43,6 +45,18 @@ RSpec.describe RendererHarness::Scenarios::StreamingRender do
 
     expect(result.ok).to be(false)
     expect(result.http_status).to eq(503)
+    expect(result.error).to eq("Renderer returned 503")
+  end
+
+  it "marks streaming HTTP error status without yielded chunks as a failure" do
+    stream = build_stream(status: 503, chunks: [])
+    allow(ReactOnRailsPro::Request).to receive(:render_code_as_stream).and_return(stream)
+
+    result = described_class.new(build_config).perform_request
+
+    expect(result.ok).to be(false)
+    expect(result.http_status).to eq(503)
+    expect(result.bytes_in).to eq(0)
     expect(result.error).to eq("Renderer returned 503")
   end
 

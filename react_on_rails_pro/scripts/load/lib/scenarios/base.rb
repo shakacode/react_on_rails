@@ -59,12 +59,14 @@ module RendererHarness
       end
 
       def stream_payload(stream, bytes_in:, bytes_out:)
-        status = stream.status
+        status = stream.http_status
+        ok = !status.nil? && !http_error_status?(status)
         {
           http_status: status,
+          ok: ok,
+          error: ok ? nil : stream_error_message(status),
           bytes_in: bytes_in,
-          bytes_out: bytes_out,
-          require_http_status: true
+          bytes_out: bytes_out
         }
       end
 
@@ -147,15 +149,19 @@ module RendererHarness
       end
 
       def payload_ok?(payload, http_status)
-        return false if payload[:require_http_status] && http_status.nil?
+        return payload[:ok] if payload.key?(:ok)
 
         !http_error_status?(http_status)
       end
 
-      def payload_error_message(payload, http_status)
-        return "Renderer stream status unavailable" if payload[:require_http_status] && http_status.nil?
-
+      def payload_error_message(_payload, http_status)
         http_error_message(http_status)
+      end
+
+      def stream_error_message(status)
+        return "Renderer stream status unavailable" if status.nil?
+
+        http_error_message(status)
       end
     end
   end

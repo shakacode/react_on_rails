@@ -18,8 +18,8 @@ RSpec.describe ReactOnRailsPro::StreamDecorator do
   end
 
   describe "#status" do
-    it "delegates status and http_status to the wrapped component" do
-      allow(mock_component).to receive(:status).and_return(204)
+    it "uses http_status as the canonical status accessor" do
+      allow(mock_component).to receive(:http_status).and_return(204)
 
       expect(stream_decorator.status).to eq(204)
       expect(stream_decorator.http_status).to eq(204)

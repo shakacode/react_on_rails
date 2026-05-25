@@ -276,11 +276,14 @@ module RendererHarness
     end
 
     def join_count_thread(thread)
+      # Count-mode join cannot use one fixed deadline: each claimed request
+      # refreshes @count_join_deadline. Poll join(0) while holding the mutex is
+      # intentional because it is non-blocking; @remaining_cv.wait releases the
+      # mutex while sleeping. fallback_deadline covers the window before the
+      # first request is claimed.
       fallback_deadline = nil
       @remaining_mutex.synchronize do
         loop do
-          # Non-blocking join while holding @remaining_mutex is intentional;
-          # @remaining_cv.wait releases it so workers can still claim requests.
           joined_thread = thread.join(0)
           return joined_thread if joined_thread
 

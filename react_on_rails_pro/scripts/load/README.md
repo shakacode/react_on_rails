@@ -98,6 +98,9 @@ REACT_ON_RAILS_RENDERER_TRANSPORT=async_http bin/renderer-harness --scenario str
 - The harness uses the renderer URL and password from the dummy app initializer (`config/initializers/react_on_rails_pro.rb`).
 - Count-based runs refresh the stuck-worker shutdown grace on every claimed
   request; use duration mode when a bounded wall-clock run matters.
+- Timeout fallback paths use `Thread#kill` only because `renderer-harness` is a
+  short-lived CLI. Replace those paths with cooperative cancellation before
+  embedding the harness in a long-lived process.
 
 ## CI
 

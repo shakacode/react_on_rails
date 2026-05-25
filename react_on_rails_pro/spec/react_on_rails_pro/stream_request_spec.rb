@@ -142,9 +142,6 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
 
     it "treats HTTPX stream status argument errors as unknown response status" do
       error = ArgumentError.new("wrong number of arguments (given 1, expected 0)")
-      error.set_backtrace(
-        ["/ruby/gems/3.4.0/gems/httpx-1.7.0/lib/httpx/plugins/stream.rb:113:in `method_missing'"]
-      )
       response = httpx_stream_response_with_status_error(error, "body")
       expect(Rails.logger).to receive(:warn).with(/ignoring error while reading stream response status: ArgumentError/)
 
@@ -153,6 +150,18 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       end.not_to raise_error
       expect(error_body).to eq("body")
       expect(request.status).to be_nil
+    end
+
+    it "raises HTTPX stream status argument errors after the workaround version" do
+      error = ArgumentError.new("wrong number of arguments (given 1, expected 0)")
+      response = httpx_stream_response_with_status_error(error, "body")
+      allow(Gem).to receive(:loaded_specs).and_return(
+        "httpx" => Struct.new(:version).new(Gem::Version.new("1.7.1"))
+      )
+
+      expect do
+        request.send(:process_response_chunks, response, error_body) { |_| nil }
+      end.to raise_error(ArgumentError, /wrong number of arguments/)
     end
 
     it "raises non-HTTPX ArgumentError status read failures" do

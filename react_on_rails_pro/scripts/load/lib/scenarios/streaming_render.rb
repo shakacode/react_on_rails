@@ -31,6 +31,9 @@ module RendererHarness
             stream.each_chunk do |chunk|
               bytes_in += chunk_bytesize(chunk)
             end
+            status = stream.http_status
+            raise ReactOnRailsPro::Error, "Renderer returned #{status}" if status && status >= 400
+
             stream_payload(stream, bytes_in: bytes_in, bytes_out: js.bytesize)
           rescue StandardError => e
             failure_stream_payload(stream, bytes_in: bytes_in, bytes_out: js.bytesize, error: e)

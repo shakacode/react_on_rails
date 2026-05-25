@@ -17,10 +17,14 @@ module ReactOnRailsPro
     end
 
     def status
-      @component.status
+      http_status
     end
 
-    alias http_status status
+    def http_status
+      return @component.http_status if @component.respond_to?(:http_status)
+
+      @component.status
+    end
 
     # Add a prepend action
     def prepend
@@ -92,10 +96,13 @@ module ReactOnRailsPro
   end
 
   class StreamRequest
-    HTTPX_STREAM_STATUS_ARGUMENT_ERROR_BACKTRACE =
-      %r{/httpx-[^/]+/lib/httpx/plugins/stream\.rb:}
+    HTTPX_STATUS_ARGUMENT_ERROR_MAX_VERSION = Gem::Version.new("1.7.0")
 
-    attr_reader :status
+    def http_status
+      @status
+    end
+
+    alias status http_status
 
     def initialize(&request_block)
       @request_executor = request_block
@@ -220,9 +227,9 @@ module ReactOnRailsPro
       begin
         record_status(response)
       rescue StandardError => e
-        # record_status's ensure marks status extraction as attempted. If an
-        # unexpected error escapes, status stayed unreadable and cannot drive
-        # the 410 retry path, so fail explicitly with the renderer error body.
+        # response#status adapters can still raise unexpected StandardError
+        # subclasses; specs cover RuntimeError. Keep the renderer body attached
+        # to that failure instead of continuing with stale or unreadable status.
         warn_status_read_failure(
           "ignoring unexpected error while reading HTTP error response status",
           e
@@ -258,10 +265,11 @@ module ReactOnRailsPro
       end
     end
 
-    def httpx_stream_status_argument_error?(response, error)
-      defined?(HTTPX::StreamResponse) &&
-        response.is_a?(HTTPX::StreamResponse) &&
-        Array(error.backtrace).any? { |line| line.match?(HTTPX_STREAM_STATUS_ARGUMENT_ERROR_BACKTRACE) }
+    def httpx_stream_status_argument_error?(response, _error)
+      return false unless defined?(HTTPX::StreamResponse) && response.is_a?(HTTPX::StreamResponse)
+
+      httpx_spec = Gem.loaded_specs["httpx"]
+      httpx_spec.nil? || httpx_spec.version <= HTTPX_STATUS_ARGUMENT_ERROR_MAX_VERSION
     end
   end
 end
