@@ -242,7 +242,6 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
     it "exposes nil status when the response status cannot be read" do
       mock_response = double(HTTPX::StreamResponse)
       allow(mock_response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(false)
-      allow(mock_response).to receive(:respond_to?).with(:status).and_return(true)
       allow(mock_response).to receive(:status).and_raise(NoMethodError)
       allow(mock_response).to receive(:each).and_yield("renderer error")
 

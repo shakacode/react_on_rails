@@ -28,5 +28,10 @@ RSpec.describe RendererHarness::Config do
         described_class.parse(["--scenario", "missing", "--requests", "1"])
       end.to raise_error(ArgumentError, /unknown scenario: missing/)
     end
+
+    it "keeps parser helper methods private" do
+      expect(described_class.private_methods).to include(:build_parser, :validate!)
+      expect(described_class).not_to respond_to(:build_parser)
+    end
   end
 end

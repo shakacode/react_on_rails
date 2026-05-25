@@ -14,6 +14,8 @@ require_relative "reporters/terminal_reporter"
 require_relative "scenario_registry"
 
 module RendererHarness
+  UserError = Class.new(StandardError)
+
   class Harness
     def initialize(config)
       @config = config
@@ -27,7 +29,7 @@ module RendererHarness
 
       # Upload the server bundle to the renderer before running so that the
       # first real request does not get a 410 Send-Bundle handshake response.
-      ReactOnRailsPro::Request.upload_assets
+      upload_assets!
 
       sampler = MemorySampler.new(pids: { rails: Process.pid, renderer: @config.renderer_pid })
       runner = Runner.new(scenario: scenario, config: @config)
@@ -53,6 +55,12 @@ module RendererHarness
     end
 
     private
+
+    def upload_assets!
+      ReactOnRailsPro::Request.upload_assets
+    rescue StandardError => e
+      raise UserError, "bundle upload failed - is the node renderer running? (#{e.class}: #{e.message})"
+    end
 
     def build_summary(results, mem_rows, elapsed, memory_offset_seconds = 0.0)
       lat = Metrics.summarize_latencies(results)

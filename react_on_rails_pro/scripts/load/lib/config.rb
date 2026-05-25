@@ -103,6 +103,8 @@ module RendererHarness
       raise ArgumentError, "--mem-interval must be > 0" if opts[:mem_interval] <= 0
     end
 
-    private_class_method :validate_scenario!, :validate_run_mode!, :validate_numeric_options!
+    private_class_method :build_parser, :add_primary_flags, :add_secondary_flags,
+                         :apply_smoke_preset!, :validate!,
+                         :validate_scenario!, :validate_run_mode!, :validate_numeric_options!
   end
 end

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "request_result"
+require_relative "../request_result"
 
 module RendererHarness
   module Scenarios
@@ -26,6 +26,7 @@ module RendererHarness
       def initialize(config)
         @config = config
         @server_bundle_hash = nil
+        @server_bundle_hash_mutex = Mutex.new
       end
 
       def name
@@ -55,13 +56,17 @@ module RendererHarness
 
       def stream_status(stream)
         return stream.status if stream.respond_to?(:status)
+        # Keep this fallback for stream-like test doubles or alternate transports
+        # that expose an explicit http_status without using StreamDecorator.
         return stream.http_status if stream.respond_to?(:http_status)
 
         nil
       end
 
       def server_bundle_hash
-        @server_bundle_hash ||= ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool.server_bundle_hash
+        @server_bundle_hash_mutex.synchronize do
+          @server_bundle_hash ||= ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool.server_bundle_hash
+        end
       end
 
       def stream_payload(stream, bytes_in:, bytes_out:)

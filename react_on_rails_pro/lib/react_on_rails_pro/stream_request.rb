@@ -155,9 +155,9 @@ module ReactOnRailsPro
     end
 
     def response_has_error_status?(response)
-      @status = response_status(response)
       return true if response.is_a?(HTTPX::ErrorResponse)
 
+      @status = response_status(response)
       @status.nil? || @status >= 400
     end
 

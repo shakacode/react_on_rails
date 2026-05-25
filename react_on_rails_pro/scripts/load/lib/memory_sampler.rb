@@ -55,8 +55,11 @@ module RendererHarness
       end
       return unless thread
 
+      thread.wakeup if thread.alive?
       thread.join(timeout_seconds)
       warn "MemorySampler: background thread did not stop within #{timeout_seconds}s" if thread.alive?
+    rescue ThreadError
+      thread&.join(timeout_seconds)
     end
 
     def sample_once

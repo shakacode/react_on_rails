@@ -20,12 +20,14 @@ module RendererHarness
           response = ReactOnRailsPro::Request.render_code(path, js, false)
           body = response.respond_to?(:body) ? response.body.to_s : response.to_s
           status = response.respond_to?(:status) ? response.status : nil
-          raise "Renderer returned #{status}: #{body.slice(0, 200)}" if status && status >= 400
+          error = "Renderer returned #{status}: #{body.slice(0, 200)}" if status && status >= 400
 
           {
             http_status: status,
             bytes_in: body.bytesize,
-            bytes_out: js.bytesize
+            bytes_out: js.bytesize,
+            ok: error.nil?,
+            error: error
           }
         end
       end

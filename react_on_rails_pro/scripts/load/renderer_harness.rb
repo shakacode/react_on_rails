@@ -10,6 +10,11 @@ $LOAD_PATH.unshift(File.expand_path("lib", __dir__))
 require "config"
 require "harness"
 
-config = RendererHarness::Config.parse(ARGV)
-summary = RendererHarness::Harness.new(config).run
-exit(summary[:requests][:failures].zero? ? 0 : 1)
+begin
+  config = RendererHarness::Config.parse(ARGV)
+  summary = RendererHarness::Harness.new(config).run
+  exit(summary[:requests][:failures].zero? ? 0 : 1)
+rescue RendererHarness::UserError => e
+  warn "renderer-harness: #{e.message}"
+  exit 1
+end
