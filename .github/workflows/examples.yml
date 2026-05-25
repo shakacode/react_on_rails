@@ -116,6 +116,7 @@ jobs:
       matrix: ${{ fromJson(needs.setup-matrix.outputs.matrix) }}
     env:
       BUNDLE_FROZEN: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
+      BUNDLE_PATH: vendor/bundle
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -170,8 +171,8 @@ jobs:
       - name: Install Ruby Gems for package
         run: |
           cd react_on_rails
-          if ! bundle check --path=vendor/bundle; then
-            bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
+          if ! bundle check; then
+            bundle _2.5.9_ install --jobs=4 --retry=3
           fi
       - name: Ensure minimum required Chrome version
         run: |

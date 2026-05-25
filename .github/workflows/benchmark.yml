@@ -70,6 +70,8 @@ concurrency:
 env:
   RUBY_VERSION: '3.3.7'
   BUNDLER_VERSION: '2.5.4'
+  BUNDLE_FROZEN: true
+  BUNDLE_PATH: vendor/bundle
   K6_VERSION: '2.0.0'
   VEGETA_VERSION: '12.13.0'
   # Determine which apps/benchmarks to run (default is 'both' for all triggers)
@@ -288,8 +290,6 @@ jobs:
         if: env.RUN_CORE
         run: |
           cd react_on_rails/spec/dummy
-          bundle config set path vendor/bundle
-          bundle config set frozen true
           bundle _${BUNDLER_VERSION}_ install --jobs=4 --retry=3
 
       - name: Prepare Core production assets
@@ -414,8 +414,6 @@ jobs:
         if: env.RUN_PRO
         run: |
           cd react_on_rails_pro/spec/dummy
-          bundle config set path vendor/bundle
-          bundle config set frozen true
           bundle _${BUNDLER_VERSION}_ install --jobs=4 --retry=3
 
       - name: Generate file-system based entrypoints for Pro

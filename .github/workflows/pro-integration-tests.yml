@@ -91,6 +91,7 @@ jobs:
     runs-on: ubuntu-22.04
     env:
       BUNDLE_FROZEN: true
+      BUNDLE_PATH: vendor/bundle
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
     steps:
       - uses: actions/checkout@v4
@@ -198,6 +199,7 @@ jobs:
     runs-on: ubuntu-22.04
     env:
       BUNDLE_FROZEN: true
+      BUNDLE_PATH: vendor/bundle
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
     steps:
       - uses: actions/checkout@v4
@@ -387,6 +389,7 @@ jobs:
     runs-on: ubuntu-22.04
     env:
       BUNDLE_FROZEN: true
+      BUNDLE_PATH: vendor/bundle
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
     # Redis service container
     services:
