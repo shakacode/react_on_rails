@@ -31,7 +31,6 @@ else
 end
 
 require "webmock"
-require "httpx/adapters/webmock"
 require "webmock/rspec"
 
 RSpec.configure do |config|
