@@ -176,16 +176,15 @@ expiring-soon licenses or a custom warning threshold.
 #### Blocking CI Example
 
 Use a blocking check inside your deployment workflow when an invalid license should stop a production deploy. The
-standalone workflow below is a starting point; if you trigger it on `push` to `main`, it reports after merge, so wire the
-job as a prerequisite in the actual deploy workflow when you need a deploy gate:
+reusable workflow below can be called before the deploy job and run manually when you need to verify a key outside a
+deployment:
 
 ```yaml
 # .github/workflows/react-on-rails-pro-license.yml
 name: React on Rails Pro License
 
 on:
-  push:
-    branches: [main]
+  workflow_call:
   workflow_dispatch:
 
 permissions:
@@ -268,9 +267,9 @@ jobs:
 ```
 
 Use either CI example in workflows where repository secrets are available, such as trusted branch pushes, scheduled jobs,
-manual runs, or deployment gates. A standalone `push` workflow is a post-merge signal; to block deployment, run the
-blocking check before the deploy job. Pull requests from public forks usually cannot access repository secrets, so these
-checks would report a missing token there.
+manual runs, or deployment gates. To block deployment, call the blocking check from the deploy pipeline before the deploy
+job. A standalone `push` workflow is only a post-merge signal. Pull requests from public forks usually cannot access
+repository secrets, so these checks would report a missing token there.
 
 ### Monitor License Expiration
 
