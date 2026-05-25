@@ -142,6 +142,9 @@ module ReactOnRailsPro
         send_bundle = false
         error_body = +""
         loop do
+          # Reset before request_executor.call as well as before parsing, since
+          # transport failures can happen before a response object exists.
+          reset_response_attempt!(error_body)
           stream_response = @request_executor.call(send_bundle, barrier)
 
           # The Node renderer always emits the length-prefixed wire format
@@ -172,13 +175,7 @@ module ReactOnRailsPro
 
     def process_response_chunks(stream_response, error_body, &block)
       parser = ReactOnRails::LengthPrefixedParser.new
-      # Each streaming response attempt owns its status; a 410 retry must not
-      # reuse the previous attempt's recorded state.
-      # Error bodies are attempt-local too, so unreadable-status diagnostics do
-      # not report bytes buffered by an earlier failed attempt.
-      @status = nil
-      @status_recorded = false
-      error_body.clear
+      reset_response_attempt!(error_body)
       status_read_for_attempt = false
       stream_response.each do |chunk|
         stream_response.instance_variable_set(:@react_on_rails_received_first_chunk, true)
@@ -201,6 +198,16 @@ module ReactOnRailsPro
       # so the parser has not received data and flushing it would be a no-op.
       raise_unreadable_stream_response!(error_body)
       parser.flush
+    end
+
+    def reset_response_attempt!(error_body)
+      # Each streaming response attempt owns its status; a 410 retry must not
+      # reuse the previous attempt's recorded state.
+      # Error bodies are attempt-local too, so unreadable-status diagnostics do
+      # not report bytes buffered by an earlier failed attempt.
+      @status = nil
+      @status_recorded = false
+      error_body.clear
     end
 
     # StreamRequest is consumed sequentially. Status intentionally reflects the

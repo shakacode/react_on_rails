@@ -615,6 +615,22 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       expect(stream.status).to eq(503)
     end
 
+    it "clears retry status before request execution failures" do
+      call_count = 0
+      stream = described_class.create do |send_bundle, _barrier|
+        call_count += 1
+        raise build_http_error(410) if call_count == 1
+
+        expect(send_bundle).to be true
+        raise HTTPX::ConnectionError, "connection reset"
+      end
+
+      expect { stream.each_chunk(&:itself) }.to raise_error(HTTPX::ConnectionError, /connection reset/)
+      expect(call_count).to eq(2)
+      expect(stream.status).to be_nil
+      expect(stream.http_status_recorded?).to be(false)
+    end
+
     it "bubbles up HTTPX::ConnectionError when node renderer is unreachable" do
       stream = described_class.create do |_send_bundle, _barrier|
         raise HTTPX::ConnectionError, "Connection refused - connect(2) for 127.0.0.1:3500"
