@@ -99,12 +99,9 @@ The [LocalHub marketplace demo](https://rsc.reactonrails.com/) is a public,
 inspectable React on Rails Pro + RSC demo showing the same page families
 rendered with traditional SSR, client rendering, and React Server Components.
 See the [Live Demo and Evidence](../../pro/react-server-components/index.md#live-demo-and-evidence)
-section for the canonical link inventory: performance showcase, raw Lighthouse
-reports, bundle-size breakdowns, the `/why-rsc` walkthrough, and the demo source.
-
-Treat these public measurements as directional evidence, not a universal
-performance guarantee for every app, because application structure, data shape,
-caching, and deployment topology still determine the final result.
+section for the canonical link inventory and caveats: performance showcase, raw
+Lighthouse reports, bundle-size breakdowns, the `/why-rsc` walkthrough, and the
+demo source.
 
 <a id="gumroad-style-rsc-demo"></a>
 
