@@ -29,9 +29,14 @@ For lower-priority server component routes, pass `ssr={false}` to skip that rout
 <RSCRoute componentName="Recommendations" componentProps={{ userId }} ssr={false} />
 ```
 
-Use this for below-the-fold, collapsed, or secondary content that does not need to be fully rendered in the initial HTML. During streaming SSR, the route intentionally bails out before generating or embedding that route's RSC payload. If the route is inside a scoped `Suspense` boundary, React emits that boundary's fallback HTML and retries the route on the client. In auto-bundled client-rendered roots, the initial Rails response contains only the root mount point and the browser fetches the RSC payload after the root renders. In auto-bundled streaming roots where every `RSCRoute` payload is deferred with `ssr={false}`, the server can stream scoped `Suspense` fallbacks without a manual RSC renderer wrapper. In all cases, the route uses the same `RSCProvider` path as any other `RSCRoute`: provider cache lookup, payload fetch or embedded-payload reuse when available, `PromiseWrapper`, `ServerComponentFetchError`, and the existing retry patterns all still apply.
+Use this for below-the-fold, collapsed, or secondary content that does not need to be fully rendered in the initial HTML. Deferring a route has two main performance benefits:
 
-The tradeoff is that the deferred content appears later. The browser must resolve the RSC payload during hydration or client rendering, so users will see the nearest `Suspense` fallback until the server component appears. Place `Suspense` close to the deferred route so the loading UI is scoped to that route instead of replacing a large part of the page.
+- **Less SSR work:** the server does not generate that route's RSC payload during the initial render.
+- **Smaller initial HTML:** the skipped payload is not embedded in `window.REACT_ON_RAILS_RSC_PAYLOADS` script tags.
+
+During streaming SSR, the route intentionally bails out before generating or embedding that route's RSC payload. Place it inside a scoped `Suspense` boundary so React emits that boundary's fallback HTML and retries the route on the client. In auto-bundled client-rendered roots, the initial Rails response contains only the root mount point and the browser fetches the RSC payload after the root renders. In auto-bundled streaming roots where every `RSCRoute` payload is deferred with `ssr={false}`, the server can stream scoped `Suspense` fallbacks without a manual RSC renderer wrapper. In all cases, the route uses the same `RSCProvider` path as any other `RSCRoute`: provider cache lookup, payload fetch or embedded-payload reuse when available, `PromiseWrapper`, `ServerComponentFetchError`, and the existing retry patterns all still apply.
+
+The tradeoff is that the deferred content appears later. The browser must resolve the RSC payload during hydration or client rendering, so users will see the nearest `Suspense` fallback until the server component appears. Without a nearby `Suspense` boundary, the nearest parent boundary handles the bailout; in wrapped streaming roots, that may be the root `fallback={null}`, leaving an empty area until the client retry resolves. Place `Suspense` close to the deferred route so the loading UI is scoped to that route instead of replacing a large part of the page.
 
 ```tsx
 import { Suspense } from 'react';
