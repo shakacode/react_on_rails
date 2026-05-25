@@ -15,25 +15,17 @@ module ReactOnRailsPro
       @rescue_blocks = []
     end
 
-    def status
-      http_status
-    end
-
     def http_status
       return @component.http_status if @component.respond_to?(:http_status)
-      return @component.status if @component.respond_to?(:status)
 
       nil
     end
 
     def http_status_recorded?
       return @component.http_status_recorded? if @component.respond_to?(:http_status_recorded?)
-      return @component.status_recorded? if @component.respond_to?(:status_recorded?)
 
       false
     end
-
-    alias status_recorded? http_status_recorded?
 
     # Add a prepend action
     def prepend
@@ -112,9 +104,6 @@ module ReactOnRailsPro
     def http_status_recorded?
       @status_recorded
     end
-
-    alias status http_status
-    alias status_recorded? http_status_recorded?
 
     def initialize(first_chunk_warn_callback: nil, &request_block)
       @request_executor = request_block
@@ -248,6 +237,8 @@ module ReactOnRailsPro
       return if @status_recorded || !response.respond_to?(:status)
 
       status = response.status
+      # Leave nil status unrecorded so a later call can retry after a lazy
+      # transport response has populated its metadata.
       return if status.nil?
 
       @status = status

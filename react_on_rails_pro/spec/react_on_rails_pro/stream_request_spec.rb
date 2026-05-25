@@ -55,7 +55,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       expect(yielded.first["html"]).to eq("<div>Hello</div>")
       expect(yielded.first["hasErrors"]).to be false
       expect(yielded.first["consoleReplayScript"]).to eq("")
-      expect(request.status).to eq(200)
+      expect(request.http_status).to eq(200)
       expect(request.http_status_recorded?).to be(true)
     end
 
@@ -68,7 +68,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       end.to raise_error(ReactOnRailsPro::RendererHttpClient::HTTPError)
 
       expect(yielded).to be_empty
-      expect(request.status).to eq(500)
+      expect(request.http_status).to eq(500)
       expect(request.http_status_recorded?).to be(true)
     end
 
@@ -79,7 +79,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
 
       request.send(:process_response_chunks, response) { |_| nil }
 
-      expect(request.status).to eq(204)
+      expect(request.http_status).to eq(204)
       expect(request.http_status_recorded?).to be(true)
     end
 
@@ -175,7 +175,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
     it "ignores responses without status metadata" do
       request.send(:record_status, Object.new)
 
-      expect(request.status).to be_nil
+      expect(request.http_status).to be_nil
       expect(request.http_status_recorded?).to be(false)
     end
 
@@ -191,7 +191,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       request.send(:record_status, response)
 
       expect(status_calls).to eq(1)
-      expect(request.status).to eq(200)
+      expect(request.http_status).to eq(200)
     end
   end
 
@@ -311,7 +311,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       stream.each_chunk { |c| chunks << c }
       expect(call_count).to eq(2)
       expect(chunks.first).to include("html" => "ok")
-      expect(stream.status).to eq(200)
+      expect(stream.http_status).to eq(200)
       expect(stream.http_status_recorded?).to be(true)
     end
 
@@ -365,7 +365,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         ReactOnRailsPro::Error,
         /Unexpected response code from renderer: 503/
       )
-      expect(stream.status).to eq(503)
+      expect(stream.http_status).to eq(503)
       expect(stream.http_status_recorded?).to be(true)
     end
 
@@ -440,7 +440,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         /Connection error while server side render streaming a component/
       )
       expect(call_count).to eq(2)
-      expect(stream.status).to be_nil
+      expect(stream.http_status).to be_nil
       expect(stream.http_status_recorded?).to be(false)
     end
   end
