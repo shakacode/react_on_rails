@@ -99,7 +99,8 @@ module RendererHarness
 
     def worker_thread(gate)
       Thread.new do
-        # Worker failures are collected by join_threads and reported once.
+        # join_threads reports worker failures once; keep Ruby from also dumping
+        # each thread exception to stderr.
         Thread.current.report_on_exception = false
         yield
       rescue StandardError

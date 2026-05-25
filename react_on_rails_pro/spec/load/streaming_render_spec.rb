@@ -67,4 +67,16 @@ RSpec.describe RendererHarness::Scenarios::StreamingRender do
     expect(result.http_status).to be_nil
     expect(result.error).to eq("Renderer stream status unavailable")
   end
+
+  it "preserves stream status when chunk iteration raises" do
+    stream = build_stream(status: 503, chunks: [])
+    allow(stream).to receive(:each_chunk).and_raise(StandardError, "renderer unavailable")
+    allow(ReactOnRailsPro::Request).to receive(:render_code_as_stream).and_return(stream)
+
+    result = described_class.new(build_config).perform_request
+
+    expect(result.ok).to be(false)
+    expect(result.http_status).to eq(503)
+    expect(result.error).to eq("renderer unavailable")
+  end
 end

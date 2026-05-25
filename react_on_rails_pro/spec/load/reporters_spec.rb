@@ -97,6 +97,22 @@ RSpec.describe "Reporters" do
         expect(header).to include("renderer_rss_kb")
       end
     end
+
+    it "write_memory keeps known columns in stable order" do
+      rows = [
+        { t_seconds: 0.0, rails_rss_kb: 100, gc_heap_live_slots: 10 },
+        { t_seconds: 1.0, rails_rss_kb: 110, renderer_rss_kb: 200, custom_metric: 1 }
+      ]
+
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "memory.csv")
+        described_class.write_memory(path, rows)
+        header = CSV.read(path).first
+        expect(header).to eq(
+          %w[t_seconds rails_rss_kb renderer_rss_kb gc_heap_live_slots custom_metric]
+        )
+      end
+    end
   end
 
   describe RendererHarness::Reporters::TerminalReporter do

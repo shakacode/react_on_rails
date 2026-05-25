@@ -27,10 +27,14 @@ module RendererHarness
         measure do
           bytes_in = 0
           stream = ReactOnRailsPro::Request.render_code_as_stream(path, js, is_rsc_payload: false)
-          stream.each_chunk do |chunk|
-            bytes_in += chunk_bytesize(chunk)
+          begin
+            stream.each_chunk do |chunk|
+              bytes_in += chunk_bytesize(chunk)
+            end
+            stream_payload(stream, bytes_in: bytes_in, bytes_out: js.bytesize)
+          rescue StandardError => e
+            stream_payload(stream, bytes_in: bytes_in, bytes_out: js.bytesize).merge(ok: false, error: e.message)
           end
-          stream_payload(stream, bytes_in: bytes_in, bytes_out: js.bytesize)
         end
       end
     end

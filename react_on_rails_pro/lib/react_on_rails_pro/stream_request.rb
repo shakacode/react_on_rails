@@ -97,6 +97,7 @@ module ReactOnRailsPro
     def initialize(&request_block)
       @request_executor = request_block
       @status = nil
+      @status_recorded = false
     end
 
     private_class_method :new
@@ -164,16 +165,20 @@ module ReactOnRailsPro
     # StreamRequest is consumed sequentially. Status intentionally reflects the
     # latest response attempt, so a 410 retry replaces the pre-retry status.
     def record_status(response)
-      @status = response.is_a?(HTTPX::ErrorResponse) ? nil : response_status(response)
+      @status = extract_status(response)
+      @status_recorded = true
     end
 
-    # A nil status means the response could not expose an HTTP status. Treat it
-    # as an error so callers do not parse an unknown response body as LPP data.
+    # Once status has been read, a nil value means the response could not expose
+    # an HTTP status. Treat it as an error so callers do not parse an unknown
+    # response body as LPP data.
     def response_has_error_status?
-      @status.nil? || @status >= 400
+      @status_recorded && (@status.nil? || @status >= 400)
     end
 
-    def response_status(response)
+    def extract_status(response)
+      return nil if response.is_a?(HTTPX::ErrorResponse)
+
       response.status
     rescue NoMethodError
       # HTTPX::StreamResponse can fail to delegate #status for non-streaming errors.
@@ -182,8 +187,8 @@ module ReactOnRailsPro
 
     def handle_http_error(error, error_body, send_bundle)
       response = error.response
-      status = record_status(response)
-      case status
+      record_status(response)
+      case @status
       when ReactOnRailsPro::STATUS_SEND_BUNDLE
         # To prevent infinite loop
         ReactOnRailsPro::Error.raise_duplicate_bundle_upload_error if send_bundle
@@ -196,7 +201,7 @@ module ReactOnRailsPro
       when ReactOnRailsPro::STATUS_INCOMPATIBLE
         raise ReactOnRailsPro::Error, error_body
       else
-        status_label = status || "unknown"
+        status_label = @status || "unknown"
         raise ReactOnRailsPro::Error, "Unexpected response code from renderer: #{status_label}:\n#{error_body}"
       end
     end
