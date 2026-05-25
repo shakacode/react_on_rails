@@ -156,12 +156,9 @@ module ReactOnRails
         end
 
         def boolean_config(value)
+          # Match Shakapacker's YAML config semantics: booleans must be booleans, not quoted strings.
           return true if value == true
           return false if value == false
-
-          normalized = value.to_s.strip.downcase
-          return true if normalized == "true"
-          return false if normalized == "false"
 
           nil
         end

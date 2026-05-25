@@ -88,6 +88,26 @@ RSpec.describe ReactOnRails::Dev::ServerMode do
       expect(described_class.detect("config/shakapacker.yml")).to eq(:hmr)
     end
 
+    it "ignores quoted HMR boolean strings" do
+      write_shakapacker_config(<<~YAML)
+        development:
+          dev_server:
+            hmr: "true"
+      YAML
+
+      expect(described_class.detect("config/shakapacker.yml")).to eq(:live_reload)
+    end
+
+    it "ignores quoted live_reload boolean strings" do
+      write_shakapacker_config(<<~YAML)
+        development:
+          dev_server:
+            live_reload: "false"
+      YAML
+
+      expect(described_class.detect("config/shakapacker.yml")).to eq(:live_reload)
+    end
+
     it "ignores invalid HMR values when live reload uses the Shakapacker default" do
       write_shakapacker_config(<<~YAML)
         development:
