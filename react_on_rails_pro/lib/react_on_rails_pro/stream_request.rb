@@ -175,6 +175,8 @@ module ReactOnRailsPro
 
     def process_response_chunks(stream_response, error_body, &block)
       parser = ReactOnRails::LengthPrefixedParser.new
+      # This repeats the pre-call reset in each_chunk intentionally: once a
+      # response object exists, parsing state belongs to this response attempt.
       reset_response_attempt!(error_body)
       status_read_for_attempt = false
       stream_response.each do |chunk|
@@ -196,7 +198,7 @@ module ReactOnRailsPro
       record_status(stream_response) unless status_read_for_attempt
       # If status is nil, every chunk went to error_body via response_has_error_status?,
       # so the parser has not received data and flushing it would be a no-op.
-      raise_unreadable_stream_response!(error_body)
+      raise_stream_response_error!(error_body)
       parser.flush
     end
 
@@ -251,7 +253,8 @@ module ReactOnRailsPro
       # of parsing LPP, so verify 200-response behavior before removing it.
       # TODO: remove ArgumentError rescue once the minimum HTTPX version is
       # greater than 1.7.0 and status reads from partially-consumed stream
-      # responses are verified not to raise ArgumentError.
+      # responses are verified not to raise ArgumentError. Related HTTPX 1.7.1
+      # release note: https://gitlab.com/os85/httpx/-/blob/master/doc/release_notes/1_7_1.md
       warn_status_read_failure(warning_context, e)
       nil
     end
@@ -303,11 +306,20 @@ module ReactOnRailsPro
       end
     end
 
-    def raise_unreadable_stream_response!(error_body)
-      return unless @status_recorded && @status.nil? && !error_body.empty?
+    def raise_stream_response_error!(error_body)
+      return unless @status_recorded
 
-      raise ReactOnRailsPro::Error,
-            "Renderer returned an unreadable stream response status after buffering #{error_body.bytesize} bytes"
+      if @status.nil?
+        return if error_body.empty?
+
+        raise ReactOnRailsPro::Error,
+              "Renderer returned an unreadable stream response status after buffering #{error_body.bytesize} bytes"
+      end
+
+      return unless @status >= 400
+
+      status_label = @status
+      raise ReactOnRailsPro::Error, "Unexpected response code from renderer: #{status_label}:\n#{error_body}"
     end
 
     def httpx_stream_status_argument_error_context(response)

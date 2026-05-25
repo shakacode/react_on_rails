@@ -89,7 +89,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       expect(yielded.first["consoleReplayScript"]).to eq("")
     end
 
-    it "collects body into error_body when response has error status" do
+    it "raises with buffered body when response has error status" do
       response = Class.new do
         define_method(:each) { |&blk| blk.call("error details") }
         define_method(:status) { 500 }
@@ -97,10 +97,32 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       end.new
 
       yielded = []
-      request.send(:process_response_chunks, response, error_body) { |chunk| yielded << chunk }
+      expect do
+        request.send(:process_response_chunks, response, error_body) { |chunk| yielded << chunk }
+      end.to raise_error(
+        ReactOnRailsPro::Error,
+        /Unexpected response code from renderer: 500:\nerror details/
+      )
 
       expect(yielded).to be_empty
       expect(error_body).to eq("error details")
+    end
+
+    it "raises when response has error status without yielded chunks" do
+      response = Class.new do
+        define_method(:each) { nil }
+        define_method(:status) { 503 }
+        define_method(:is_a?) { |klass| klass == HTTPX::ErrorResponse ? false : super(klass) }
+      end.new
+
+      expect do
+        request.send(:process_response_chunks, response, error_body) { |_| nil }
+      end.to raise_error(
+        ReactOnRailsPro::Error,
+        /Unexpected response code from renderer: 503:/
+      )
+
+      expect(error_body).to be_empty
     end
 
     it "treats unrecorded status as an error status" do
@@ -123,7 +145,9 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         end
       end.new
 
-      request.send(:process_response_chunks, response, error_body) { |_| nil }
+      expect do
+        request.send(:process_response_chunks, response, error_body) { |_| nil }
+      end.to raise_error(ReactOnRailsPro::Error, /Unexpected response code from renderer: 500:\nbody/)
 
       expect(request.status).to eq(500)
     end
@@ -144,7 +168,12 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         end
       end.new
 
-      request.send(:process_response_chunks, response, error_body) { |_| nil }
+      expect do
+        request.send(:process_response_chunks, response, error_body) { |_| nil }
+      end.to raise_error(
+        ReactOnRailsPro::Error,
+        /Unexpected response code from renderer: 500:\ncurrent attempt/
+      )
 
       expect(error_body).to eq("current attempt")
     end

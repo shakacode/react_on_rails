@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "active_support/inflector"
 require_relative "../request_result"
 
 module RendererHarness
@@ -30,11 +31,7 @@ module RendererHarness
       end
 
       def name
-        @name ||= self.class.name.split("::").last
-                      .gsub(/([A-Z]+)([A-Z][a-z])/, "\\1_\\2")
-                      .gsub(/([a-z\d])([A-Z])/, "\\1_\\2")
-                      .downcase
-                      .freeze
+        @name ||= ActiveSupport::Inflector.underscore(self.class.name.split("::").last).freeze
       end
 
       def warmup(count)

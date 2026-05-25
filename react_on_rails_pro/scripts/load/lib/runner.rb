@@ -285,6 +285,8 @@ module RendererHarness
       # first request is claimed. Entering the mutex may wait for a worker
       # already in claim_request, which is expected because workers release it
       # promptly and never wait on this join path.
+      # A broadcast between join(0) and wait can be missed, but only causes a
+      # bounded extra sleep before this CLI rechecks the refreshed deadline.
       fallback_deadline = nil
       @remaining_mutex.synchronize do
         loop do
