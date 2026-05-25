@@ -390,7 +390,8 @@ module ReactOnRailsPro
 
         response.body
       rescue ReactOnRailsPro::RendererHttpClient::Error => e
-        raise ReactOnRailsPro::Error, "Failed to fetch dev-server asset from #{path}: #{e}"
+        detail = e.is_a?(ReactOnRailsPro::RendererHttpClient::HTTPError) ? e.response.body : e
+        raise ReactOnRailsPro::Error, "Failed to fetch dev-server asset from #{path}: #{detail}"
       end
 
       def http_url?(path)
