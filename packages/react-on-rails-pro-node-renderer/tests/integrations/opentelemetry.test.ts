@@ -1,8 +1,10 @@
 import path from 'path';
 import { trace as otelTrace, type Tracer } from '@opentelemetry/api';
 import { InMemorySpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base';
-import { init, __resetForTest } from '../../src/integrations/opentelemetry';
+import { init } from '../../src/integrations/opentelemetry';
+import { resetOpenTelemetryForTest } from '../../src/testUtils/opentelemetry';
 import worker, { disableHttp2 } from '../../src/worker';
+import { applyFastifyConfigFunctions } from '../../src/worker/fastifyConfig';
 import packageJson from '../../src/shared/packageJson';
 import {
   trace,
@@ -33,11 +35,11 @@ describe('opentelemetry integration: init()', () => {
 
   beforeEach(async () => {
     exporter = new InMemorySpanExporter();
-    await __resetForTest();
+    await resetOpenTelemetryForTest();
   });
 
   afterAll(async () => {
-    await __resetForTest();
+    await resetOpenTelemetryForTest();
   });
 
   test('init() registers a tracer provider with the configured service name', () => {
@@ -136,6 +138,19 @@ describe('opentelemetry integration: init()', () => {
       delete process.env.OTEL_RESOURCE_ATTRIBUTES;
     }
   });
+
+  test('test reset clears Fastify shutdown hooks registered by init()', async () => {
+    init({
+      spanProcessor: new SimpleSpanProcessor(exporter),
+    });
+
+    await resetOpenTelemetryForTest();
+
+    const addHook = jest.fn();
+    applyFastifyConfigFunctions({ addHook } as never);
+
+    expect(addHook).not.toHaveBeenCalled();
+  });
 });
 
 describe('opentelemetry integration: fastify auto-instrumentation', () => {
@@ -143,11 +158,11 @@ describe('opentelemetry integration: fastify auto-instrumentation', () => {
 
   beforeEach(async () => {
     exporter = new InMemorySpanExporter();
-    await __resetForTest();
+    await resetOpenTelemetryForTest();
   });
 
   afterAll(async () => {
-    await __resetForTest();
+    await resetOpenTelemetryForTest();
   });
 
   test('init({ fastify: true }) enables Fastify auto-registration', () => {
@@ -206,13 +221,13 @@ describe('opentelemetry integration: tracing wiring', () => {
     // Reset OTel state AND both tracing/subSpan registrations so each test gets a clean install.
     __resetSubSpanForTest();
     __resetTracingForTest();
-    await __resetForTest();
+    await resetOpenTelemetryForTest();
   });
 
   afterAll(async () => {
     __resetSubSpanForTest();
     __resetTracingForTest();
-    await __resetForTest();
+    await resetOpenTelemetryForTest();
   });
 
   test('init({ tracing: true }) produces a ror.ssr.request span via trace()', async () => {
@@ -312,7 +327,7 @@ describe('opentelemetry integration: end-to-end render request', () => {
     exporter = new InMemorySpanExporter();
     __resetSubSpanForTest();
     __resetTracingForTest();
-    await __resetForTest();
+    await resetOpenTelemetryForTest();
     await resetForTest(testName);
     await mkdirAsync(path.dirname(vmBundlePath(testName)), { recursive: true });
   });
@@ -320,7 +335,7 @@ describe('opentelemetry integration: end-to-end render request', () => {
   afterAll(async () => {
     __resetSubSpanForTest();
     __resetTracingForTest();
-    await __resetForTest();
+    await resetOpenTelemetryForTest();
     await resetForTest(testName);
   });
 

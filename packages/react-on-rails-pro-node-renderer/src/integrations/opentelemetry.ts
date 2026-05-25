@@ -6,6 +6,10 @@ import type { Attributes } from '@opentelemetry/api';
 import type { NodeTracerProvider as NodeTracerProviderType } from '@opentelemetry/sdk-trace-node';
 import type { SpanExporter, SpanProcessor } from '@opentelemetry/sdk-trace-base';
 import { resetSubSpan, resetTracing, setupTracing, setupSubSpan, type SubSpanFn } from '../shared/tracing.js';
+import {
+  getOpenTelemetryTracerProvider,
+  setOpenTelemetryTracerProvider,
+} from '../shared/opentelemetryState.js';
 import { configureFastify } from '../worker/fastifyConfig.js';
 import { log, message } from './api.js';
 
@@ -36,8 +40,6 @@ export interface OpenTelemetryInitOptions {
 
 const DEFAULT_SERVICE_NAME = 'react-on-rails-pro-node-renderer';
 const DEFAULT_SHUTDOWN_TIMEOUT_MS = 5_000;
-
-let tracerProvider: NodeTracerProviderType | null = null;
 
 interface InstalledTracingAdapters {
   tracing: boolean;
@@ -154,7 +156,7 @@ async function shutdownProviderWithTimeout(
 }
 
 export function init(opts: OpenTelemetryInitOptions = {}): void {
-  if (tracerProvider) {
+  if (getOpenTelemetryTracerProvider()) {
     message('[OpenTelemetry] init() called more than once; ignoring duplicate call.');
     return;
   }
@@ -269,12 +271,12 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
       installedAdapters.subSpan = setupSubSpan(subSpanImpl);
     }
 
-    tracerProvider = provider;
+    setOpenTelemetryTracerProvider(provider);
     try {
       provider.register();
     } catch (err) {
-      if (tracerProvider === provider) {
-        tracerProvider = null;
+      if (getOpenTelemetryTracerProvider() === provider) {
+        setOpenTelemetryTracerProvider(null);
       }
       installedAdapters = resetInstalledTracingAdapters(installedAdapters);
       throw err;
@@ -286,8 +288,8 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
     configureFastify((app) => {
       app.addHook('onClose', async () => {
         await shutdownProviderWithTimeout(provider, shutdownTimeoutMs);
-        if (tracerProvider === provider) {
-          tracerProvider = null;
+        if (getOpenTelemetryTracerProvider() === provider) {
+          setOpenTelemetryTracerProvider(null);
           disableOpenTelemetryGlobals(otelApi);
           installedAdapters = resetInstalledTracingAdapters(installedAdapters);
         }
@@ -299,24 +301,4 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
     installedAdapters = resetInstalledTracingAdapters(installedAdapters);
     message(`[OpenTelemetry] init failed: ${String(err)}`);
   }
-}
-
-/** Test-only: shut down the tracer provider and reset module state. */
-// eslint-disable-next-line no-underscore-dangle -- test hook, intentionally hidden by name
-export async function __resetForTest(): Promise<void> {
-  if (tracerProvider) {
-    await tracerProvider.shutdown();
-    tracerProvider = null;
-  }
-  // Unregister the global tracer provider so the next init() can register a fresh one.
-  // Without this, otelTrace.setGlobalTracerProvider() silently skips setDelegate() because
-  // registerGlobal() returns false after the first successful registration.
-  /* eslint-disable @typescript-eslint/no-require-imports, global-require */
-  try {
-    const otelApi = require('@opentelemetry/api') as typeof import('@opentelemetry/api');
-    disableOpenTelemetryGlobals(otelApi);
-  } catch {
-    // OTel API not installed — nothing to disable.
-  }
-  /* eslint-enable @typescript-eslint/no-require-imports, global-require */
 }

@@ -20,3 +20,7 @@ export function applyFastifyConfigFunctions(app: FastifyInstance): void {
     configFunction(app);
   });
 }
+
+export function resetFastifyConfigFunctionsForTest(): void {
+  fastifyConfigFunctions.length = 0;
+}

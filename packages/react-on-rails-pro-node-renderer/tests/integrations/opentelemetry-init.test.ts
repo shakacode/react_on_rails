@@ -6,6 +6,11 @@ import {
   trace as otelTrace,
 } from '@opentelemetry/api';
 
+const resetOpenTelemetryForTest = async () => {
+  const testUtils = await import('../../src/testUtils/opentelemetry');
+  await testUtils.resetOpenTelemetryForTest();
+};
+
 describe('opentelemetry integration: init() failure path', () => {
   beforeEach(() => {
     jest.resetModules();
@@ -64,7 +69,9 @@ describe('opentelemetry integration: init() failure path', () => {
     });
 
     // This import should succeed without triggering any of the mocked throws.
-    await expect(import('../../src/integrations/opentelemetry')).resolves.toBeDefined();
+    const otel = await import('../../src/integrations/opentelemetry');
+    expect(otel).toBeDefined();
+    expect(otel).not.toHaveProperty('__resetForTest');
   });
 
   test('the integration module can be imported without loading Fastify or the worker graph', async () => {
@@ -90,7 +97,7 @@ describe('opentelemetry integration: init() failure path', () => {
     });
 
     expect(messageSpy).not.toHaveBeenCalledWith(expect.stringContaining('[OpenTelemetry] init failed'));
-    await otel.__resetForTest();
+    await resetOpenTelemetryForTest();
   });
 
   test('init({ fastify: true }) auto-registers the Fastify OTel plugin on initialization', async () => {
@@ -117,7 +124,7 @@ describe('opentelemetry integration: init() failure path', () => {
     });
 
     expect(fastifyConfigs).toEqual([expect.objectContaining({ registerOnInitialization: true })]);
-    await otel.__resetForTest();
+    await resetOpenTelemetryForTest();
   });
 
   test('Fastify onClose does not wait forever for provider.shutdown()', async () => {
@@ -184,14 +191,24 @@ describe('opentelemetry integration: init() failure path', () => {
 
     const { InMemorySpanExporter, SimpleSpanProcessor } = await import('@opentelemetry/sdk-trace-base');
     const otel = await import('../../src/integrations/opentelemetry');
+    const tracing = await import('../../src/shared/tracing');
 
     expect(() =>
       otel.init({
+        tracing: true,
         spanProcessor: new SimpleSpanProcessor(new InMemorySpanExporter()),
       }),
     ).not.toThrow();
 
     expect(configureFastify).not.toHaveBeenCalled();
+    expect(
+      tracing.setupTracing({
+        executor: (fn) => fn(),
+      }),
+    ).toBe(true);
+    expect(tracing.setupSubSpan((_opts, fn) => fn())).toBe(true);
+    tracing.__resetTracingForTest();
+    tracing.__resetSubSpanForTest();
   });
 
   test('Fastify onClose disables the global tracer provider so init() can run again', async () => {
@@ -290,7 +307,7 @@ describe('opentelemetry integration: init() failure path', () => {
     );
     expect(log.warn).toHaveBeenCalledWith({ otel: true, level: 'warn', args: [] }, 'collector slow');
     expect(log.debug).not.toHaveBeenCalledWith(expect.anything(), 'suppressed info');
-    await otel.__resetForTest();
+    await resetOpenTelemetryForTest();
   });
 
   test('init() ignores duplicate calls without replacing the active provider', async () => {
@@ -318,7 +335,7 @@ describe('opentelemetry integration: init() failure path', () => {
     expect(messageSpy).toHaveBeenCalledWith(
       '[OpenTelemetry] init() called more than once; ignoring duplicate call.',
     );
-    await otel.__resetForTest();
+    await resetOpenTelemetryForTest();
   });
 
   test('init() does not register a global provider when a later Fastify lazy import fails', async () => {
@@ -341,6 +358,6 @@ describe('opentelemetry integration: init() failure path', () => {
     });
 
     expect(exporter.getFinishedSpans()).toHaveLength(0);
-    await otel.__resetForTest();
+    await resetOpenTelemetryForTest();
   });
 });

@@ -103,8 +103,8 @@ initOpenTelemetry({
 });
 
 // After init, start the renderer:
-import { reactOnRailsProNodeRenderer } from 'react-on-rails-pro-node-renderer';
-reactOnRailsProNodeRenderer().catch(/* … */);
+const { reactOnRailsProNodeRenderer } = await import('react-on-rails-pro-node-renderer');
+await reactOnRailsProNodeRenderer().catch(/* … */);
 ```
 
 ### Configuring
