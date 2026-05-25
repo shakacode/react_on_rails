@@ -56,8 +56,7 @@ RSpec.describe RendererHarness::Scenarios::StreamingRender do
 
     expect(result.ok).to be(true)
     expect(result.http_status).to eq(200)
-    expected_lpp_frame_bytes = JSON.generate("payloadType" => "string").bytesize + 1 + 8 + 1 + "ok".bytesize
-    expect(result.bytes_in).to eq(expected_lpp_frame_bytes)
+    expect(result.bytes_in).to eq(scenario.send(:chunk_bytesize, html_chunk))
   end
 
   it "marks streams with unavailable status as failures" do
@@ -80,6 +79,19 @@ RSpec.describe RendererHarness::Scenarios::StreamingRender do
 
     expect(result.ok).to be(false)
     expect(result.http_status).to eq(503)
+    expect(result.error).to eq("renderer unavailable")
+  end
+
+  it "preserves the original streaming error when status reading also fails" do
+    stream = build_stream(status: 503, chunks: [])
+    allow(stream).to receive(:each_chunk).and_raise(StandardError, "renderer unavailable")
+    allow(stream).to receive(:status).and_raise(StandardError, "status unavailable")
+    allow(ReactOnRailsPro::Request).to receive(:render_code_as_stream).and_return(stream)
+
+    result = described_class.new(build_config).perform_request
+
+    expect(result.ok).to be(false)
+    expect(result.http_status).to be_nil
     expect(result.error).to eq("renderer unavailable")
   end
 end

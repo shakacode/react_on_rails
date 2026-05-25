@@ -11,7 +11,6 @@ module RendererHarness
     :concurrency,
     :warmup,
     :mix,
-    :increments,
     :mem_interval,
     :start_gate_timeout,
     :renderer_pid,
@@ -27,7 +26,6 @@ module RendererHarness
         concurrency: 1,
         warmup: 5,
         mix: "small",
-        increments: 5,
         mem_interval: 1.0,
         start_gate_timeout: default_start_gate_timeout_seconds,
         renderer_pid: nil,
@@ -65,7 +63,6 @@ module RendererHarness
     end
 
     def self.add_secondary_flags(opt_parser, opts)
-      opt_parser.on("--increments N", Integer) { |v| opts[:increments] = v }
       opt_parser.on("--mem-interval SECONDS", Float) { |v| opts[:mem_interval] = v }
       opt_parser.on(
         "--start-gate-timeout SECONDS",

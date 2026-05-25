@@ -113,6 +113,24 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       expect(request.send(:response_has_error_status?)).to be(true)
     end
 
+    it "treats known status read errors as unknown response status" do
+      response = Class.new do
+        def each
+          yield "body"
+        end
+
+        def status
+          raise ArgumentError, "status unavailable"
+        end
+      end.new
+
+      expect do
+        request.send(:process_response_chunks, response, error_body) { |_| nil }
+      end.not_to raise_error
+      expect(error_body).to eq("body")
+      expect(request.status).to be_nil
+    end
+
     context "with length-prefixed protocol parsing" do
       it "parses multiple LPP chunks from a single response" do
         data = to_length_prefixed("<div>First</div>") + to_length_prefixed("<div>Second</div>")

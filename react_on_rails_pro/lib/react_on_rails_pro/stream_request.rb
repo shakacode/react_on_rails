@@ -144,14 +144,12 @@ module ReactOnRailsPro
       # Each response attempt must record status independently; a 410 retry must
       # not reuse the previous attempt's status when parsing retry chunks.
       @status_recorded = false
-      # @status_recorded guards error handling for the attempt; this loop-local
-      # flag only avoids re-reading the same response status on every chunk.
-      status_recorded_for_response = false
+      status_read_for_attempt = false
       stream_response.each do |chunk|
         stream_response.instance_variable_set(:@react_on_rails_received_first_chunk, true)
-        unless status_recorded_for_response
+        unless status_read_for_attempt
           record_status(stream_response)
-          status_recorded_for_response = true
+          status_read_for_attempt = true
         end
 
         if response_has_error_status?
@@ -163,7 +161,7 @@ module ReactOnRailsPro
       end
       # Empty-body responses record status after the stream is drained; specs
       # assert that status is read only after the response has yielded no chunks.
-      record_status(stream_response) unless status_recorded_for_response
+      record_status(stream_response) unless status_read_for_attempt
       parser.flush
     end
 
@@ -194,8 +192,8 @@ module ReactOnRailsPro
       return nil if response.is_a?(HTTPX::ErrorResponse)
 
       response.status
-    rescue NoMethodError
-      # HTTPX::StreamResponse can fail to delegate #status for non-streaming errors.
+    rescue NoMethodError, HTTPX::Error, ArgumentError
+      # Known HTTPX/delegation failures mean the response status is unavailable.
       nil
     end
 

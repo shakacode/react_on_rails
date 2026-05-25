@@ -33,9 +33,23 @@ module RendererHarness
             end
             stream_payload(stream, bytes_in: bytes_in, bytes_out: js.bytesize)
           rescue StandardError => e
-            stream_payload(stream, bytes_in: bytes_in, bytes_out: js.bytesize).merge(ok: false, error: e.message)
+            failure_stream_payload(stream, bytes_in: bytes_in, bytes_out: js.bytesize, error: e)
           end
         end
+      end
+
+      private
+
+      def failure_stream_payload(stream, bytes_in:, bytes_out:, error:)
+        stream_payload(stream, bytes_in: bytes_in, bytes_out: bytes_out).merge(ok: false, error: error.message)
+      rescue StandardError
+        {
+          http_status: nil,
+          bytes_in: bytes_in,
+          bytes_out: bytes_out,
+          ok: false,
+          error: error.message
+        }
       end
     end
   end
