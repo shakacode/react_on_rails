@@ -315,8 +315,7 @@ namespace :licenses do
     info = ReactOnRailsPro::Utils.license_info
     status = info[:status]
     expiration = info[:expiration]
-    expiration_time = expiration
-    expiration_time = expiration.to_time if expiration.respond_to?(:to_time)
+    expiration_time = expiration.respond_to?(:to_time) ? expiration.to_time : expiration
     days_remaining = expiration_time && ((expiration_time - Time.current) / 86_400).ceil
     status_label = status.to_s.tr("_", " ")
 
@@ -328,11 +327,7 @@ namespace :licenses do
       abort "React on Rails Pro license status is #{status_label}. Update REACT_ON_RAILS_PRO_LICENSE."
     end
 
-    if days_remaining&.negative?
-      abort "React on Rails Pro license expiration date is in the past. Renew and rotate the key."
-    elsif days_remaining&.zero?
-      abort "React on Rails Pro license expires today. Renew and rotate the key."
-    elsif days_remaining && days_remaining <= threshold_days
+    if days_remaining && days_remaining <= threshold_days
       abort "React on Rails Pro license expires in #{days_remaining} days. Renew and rotate the key."
     end
 
