@@ -192,9 +192,14 @@ require "json"
 
 # `output` is stdout captured from:
 # RAILS_ENV=production FORMAT=json bundle exec rake react_on_rails_pro:verify_license
-license_info = JSON.parse(output)
+license_info = begin
+  JSON.parse(output)
+rescue JSON::ParserError
+  abort "Could not parse React on Rails Pro license JSON output."
+end
+
 status = license_info["status"]
-abort "Unexpected license info response: #{license_info.inspect}" unless status
+abort "React on Rails Pro license JSON output did not include a status." unless status
 
 case status
 when "expired", "invalid", "missing"
