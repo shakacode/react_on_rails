@@ -146,6 +146,7 @@ jobs:
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
       # Pro gem server does not publish checksums; needed for Pro benchmark gem installs.
       BUNDLE_DISABLE_CHECKSUM_VALIDATION: 'true'
+      BENCHMARK_PORT: '3001'
 
     steps:
       # ============================================
@@ -169,7 +170,7 @@ jobs:
       - name: Add tools directory to PATH
         run: |
           mkdir -p ~/bin
-          echo "$HOME/bin" >> $GITHUB_PATH
+          echo "$HOME/bin" >> "$GITHUB_PATH"
 
       - name: Cache Vegeta binary
         id: cache-vegeta
@@ -185,11 +186,11 @@ jobs:
           echo "📦 Installing Vegeta v${VEGETA_VERSION}"
 
           # Download and extract vegeta binary
-          wget -q https://github.com/tsenart/vegeta/releases/download/v${VEGETA_VERSION}/vegeta_${VEGETA_VERSION}_linux_amd64.tar.gz
-          tar -xzf vegeta_${VEGETA_VERSION}_linux_amd64.tar.gz
+          wget -q "https://github.com/tsenart/vegeta/releases/download/v${VEGETA_VERSION}/vegeta_${VEGETA_VERSION}_linux_amd64.tar.gz"
+          tar -xzf "vegeta_${VEGETA_VERSION}_linux_amd64.tar.gz"
 
           # Store in cache directory
-          mv vegeta ~/bin/
+          mv vegeta "$HOME/bin/"
 
       - name: Setup k6
         uses: grafana/setup-k6-action@v1
@@ -213,7 +214,7 @@ jobs:
           ruby-version: ${{ env.RUBY_VERSION }}
 
       - name: Get gem home directory
-        run: echo "GEM_HOME_PATH=$(gem env home)" >> $GITHUB_ENV
+        run: echo "GEM_HOME_PATH=$(gem env home)" >> "$GITHUB_ENV"
 
       - name: Cache foreman gem
         id: cache-foreman
@@ -261,13 +262,13 @@ jobs:
           SERVER_CMD="nice -n -20 taskset -c 1-$((NPROC-1)) bin/prod"
           BENCH_CMD="nice -n -10 taskset -c 0 ruby"
 
-          echo "SERVER_CMD=$SERVER_CMD" >> $GITHUB_ENV
-          echo "BENCH_CMD=$BENCH_CMD" >> $GITHUB_ENV
+          echo "SERVER_CMD=$SERVER_CMD" >> "$GITHUB_ENV"
+          echo "BENCH_CMD=$BENCH_CMD" >> "$GITHUB_ENV"
 
           # Set Puma workers to match available server CPUs (only if not explicitly set)
           if [ -z "$WEB_CONCURRENCY" ]; then
             WEB_CONCURRENCY=$((NPROC-1))
-            echo "WEB_CONCURRENCY=$WEB_CONCURRENCY" >> $GITHUB_ENV
+            echo "WEB_CONCURRENCY=$WEB_CONCURRENCY" >> "$GITHUB_ENV"
             echo "WEB_CONCURRENCY (auto): $WEB_CONCURRENCY"
           else
             echo "WEB_CONCURRENCY (from input): $WEB_CONCURRENCY"
@@ -310,13 +311,13 @@ jobs:
           echo "🚀 Starting production server..."
           cd react_on_rails/spec/dummy
 
-          $SERVER_CMD &
+          PORT="$BENCHMARK_PORT" $SERVER_CMD &
           echo "Server started in background"
 
           # Wait for server to be ready (max 30 seconds)
           echo "⏳ Waiting for server to be ready..."
           for i in {1..30}; do
-            if curl -fsS http://localhost:3001 > /dev/null; then
+            if curl -fsS "http://localhost:${BENCHMARK_PORT}" > /dev/null; then
               echo "✅ Server is ready and responding"
               exit 0
             fi
@@ -381,19 +382,19 @@ jobs:
           # Kill all server-related processes (safe in isolated CI environment)
           pkill -9 -f "ruby|node|foreman|overmind|puma" || true
 
-          # Wait for port 3001 to be free
-          echo "⏳ Waiting for port 3001 to be free..."
+          # Wait for benchmark port to be free
+          echo "⏳ Waiting for port ${BENCHMARK_PORT} to be free..."
           for _ in {1..10}; do
-            if ! lsof -ti:3001 > /dev/null 2>&1; then
-              echo "✅ Port 3001 is now free"
+            if ! lsof -ti:"${BENCHMARK_PORT}" > /dev/null 2>&1; then
+              echo "✅ Port ${BENCHMARK_PORT} is now free"
               exit 0
             fi
             sleep 1
           done
 
-          echo "❌ ERROR: Port 3001 is still in use after 10 seconds"
-          echo "Processes using port 3001:"
-          lsof -i:3001 || true
+          echo "❌ ERROR: Port ${BENCHMARK_PORT} is still in use after 10 seconds"
+          echo "Processes using port ${BENCHMARK_PORT}:"
+          lsof -i:"${BENCHMARK_PORT}" || true
           exit 1
 
       # ============================================
@@ -432,13 +433,15 @@ jobs:
           echo "🚀 Starting Pro production server..."
           cd react_on_rails_pro/spec/dummy
 
-          $SERVER_CMD &
+          # Foreman assigns PORT=5000 by default; pin it to the benchmark port
+          # so readiness checks and benchmarks hit the Rails process we started.
+          PORT="$BENCHMARK_PORT" $SERVER_CMD &
           echo "Server started in background"
 
           # Wait for server to be ready (max 30 seconds)
           echo "⏳ Waiting for server to be ready..."
           for i in {1..30}; do
-            if curl -fsS http://localhost:3001 > /dev/null; then
+            if curl -fsS "http://localhost:${BENCHMARK_PORT}" > /dev/null; then
               echo "✅ Server is ready and responding"
               exit 0
             fi
@@ -552,12 +555,14 @@ jobs:
           # branch — new reports compare against main's own history.
           # Feature branches (PRs, dispatch) use --start-point to inherit
           # historical data and thresholds from main.
+          START_POINT_HASH_ARG=""
           if [ "${{ github.event_name }}" = "push" ]; then
             BRANCH="main"
             START_POINT_ARGS=""
           elif [ "${{ github.event_name }}" = "pull_request" ]; then
             BRANCH="$GITHUB_HEAD_REF"
-            START_POINT_ARGS="--start-point $GITHUB_BASE_REF --start-point-hash ${{ github.event.pull_request.base.sha }} --start-point-clone-thresholds --start-point-reset"
+            START_POINT_HASH_ARG="--start-point-hash ${{ github.event.pull_request.base.sha }}"
+            START_POINT_ARGS="--start-point $GITHUB_BASE_REF $START_POINT_HASH_ARG --start-point-clone-thresholds --start-point-reset"
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             BRANCH="${{ github.ref_name }}"
             if [ "$BRANCH" = "main" ]; then
@@ -568,7 +573,8 @@ jobs:
               START_POINT_HASH=$(gh api "repos/${{ github.repository }}/compare/main...$BRANCH" --jq '.merge_base_commit.sha' || true)
               if [ -n "$START_POINT_HASH" ]; then
                 echo "Found merge-base via API: $START_POINT_HASH"
-                START_POINT_ARGS="--start-point main --start-point-hash $START_POINT_HASH --start-point-clone-thresholds --start-point-reset"
+                START_POINT_HASH_ARG="--start-point-hash $START_POINT_HASH"
+                START_POINT_ARGS="--start-point main $START_POINT_HASH_ARG --start-point-clone-thresholds --start-point-reset"
               else
                 echo "⚠️ Could not find merge-base with main via GitHub API, continuing without hash"
                 START_POINT_ARGS="--start-point main --start-point-clone-thresholds --start-point-reset"
@@ -646,7 +652,7 @@ jobs:
           # when the pinned hash isn't in its DB. A single combined pattern
           # avoids false-positive matches across unrelated lines.
           if [ $BENCHER_EXIT_CODE -ne 0 ] && grep -q "Head Version.*not found" "$BENCHER_STDERR" && ! grep -qiE "alert|threshold violation|boundary violation" "$BENCHER_STDERR"; then
-            RETRY_ARGS=$(echo "$START_POINT_ARGS" | sed 's/--start-point-hash [^ ]*//')
+            RETRY_ARGS="${START_POINT_ARGS/$START_POINT_HASH_ARG/}"
             if [ "$RETRY_ARGS" != "$START_POINT_ARGS" ]; then
               echo ""
               echo "⚠️ Start-point hash not found in Bencher — retrying without --start-point-hash (will use latest baseline)"
@@ -751,13 +757,13 @@ jobs:
             --state open \
             --limit 1 \
             --json number \
-            --jq '.[0].number // empty')
+            --jq ".[0].number // empty")
 
           # Build the benchmark summary snippet (defensive: don't let column failure block alerting)
           SUMMARY=""
           if [ -f bench_results/summary.txt ]; then
             FORMATTED=$(column -t -s $'\t' "bench_results/summary.txt" 2>/dev/null) || FORMATTED=$(cat "bench_results/summary.txt")
-            SUMMARY=$(printf '\n### Benchmark Summary\n\n```\n%s\n```' "$FORMATTED")
+            SUMMARY=$(printf "\n### Benchmark Summary\n\n\`\`\`\n%s\n\`\`\`" "$FORMATTED")
           fi
 
           if [ -n "$EXISTING_ISSUE" ]; then
