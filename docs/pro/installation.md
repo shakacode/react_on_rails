@@ -141,8 +141,8 @@ export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
 
 ### License Validation Lifecycle
 
-React on Rails Pro validates licenses offline with the public key embedded in the gem and node renderer package. There
-is no network call to ShakaCode during validation.
+React on Rails Pro currently validates licenses offline with the public key embedded in the gem and node renderer
+package. There is no network call to ShakaCode during validation.
 
 License validation happens in these places:
 
@@ -202,11 +202,13 @@ def parse_license_json_object(output)
 
   while (start_index = output.index("{", search_index))
     parsed_object, end_index = parse_json_object_at(output, start_index)
+    break unless end_index
+
     if parsed_object.is_a?(Hash) && LICENSE_STATUSES.include?(parsed_object["status"])
       return parsed_object
     end
 
-    search_index = end_index ? end_index + 1 : start_index + 1
+    search_index = end_index + 1
   end
 
   nil
