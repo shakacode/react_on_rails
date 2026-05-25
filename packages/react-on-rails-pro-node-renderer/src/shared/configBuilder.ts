@@ -45,6 +45,9 @@ export interface Config {
   // If set to true, `supportModules` enables the server-bundle code to call a default set of NodeJS
   // global objects and functions that get added to the VM context:
   // `{ Buffer, TextDecoder, TextEncoder, URLSearchParams, ReadableStream, process, performance, setTimeout, setInterval, setImmediate, clearTimeout, clearInterval, clearImmediate, queueMicrotask }`.
+  // NOTE: `fetch`, `Headers`, `Request`, `Response`, `AbortController`, and `AbortSignal` are NOT injected.
+  // Provide them via `additionalContext` if your bundle needs them.
+  // See docs/oss/building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc.
   // This option is required to equal `true` if you want to use loadable components.
   // Setting this value to false causes the NodeRenderer to behave like ExecJS.
   supportModules: boolean;
@@ -52,6 +55,18 @@ export interface Config {
   // https://nodejs.org/api/globals.html) to add to the VM context in addition to our supportModules defaults.
   // Object shorthand notation may be used, but is not required.
   // Example: { URL, URLSearchParams, Crypto }
+  // NOTE: Any plain object value (including an empty `{}`) puts the renderer into CommonJS
+  // execution mode, wrapping the bundle and granting it access to the host's `require`
+  // (e.g. `require('fs')`, `require('child_process')`). An empty `{}` is treated the same
+  // as any other plain object -- it opts into CommonJS mode even though it adds no globals.
+  // Use only with trusted bundle sources.
+  // To keep the VM sandboxed without `require`, set BOTH `additionalContext: null` AND
+  // `supportModules: false`. When `supportModules: true`, the renderer wraps the bundle and
+  // injects the host `require` regardless of `additionalContext`.
+  // Mechanically, "wrapping" means the renderer passes the bundle source through `module.wrap()`
+  // (the standard CommonJS `(function (exports, require, module, __filename, __dirname) { ... })`
+  // wrapper) and then invokes the wrapped function with the host `require`. See the `buildVM`
+  // implementation in `worker/vm.ts` for the exact call site.
   additionalContext: Record<string, unknown> | null;
   // Number of workers that will be forked to serve rendering requests.
   workersCount: number;

@@ -13,7 +13,7 @@ module GeneratorMessages
     private_constant :PACKAGE_JSON_UNSET
 
     # Hash insertion order is the detection priority used by
-    # detect_package_manager_from_lockfiles (yarn -> pnpm -> bun -> npm).
+    # detect_package_manager_from_lockfiles (yarn → pnpm → bun → npm).
     LOCKFILE_CANDIDATES_BY_MANAGER = {
       "yarn" => ["yarn.lock"],
       "pnpm" => ["pnpm-lock.yaml"],

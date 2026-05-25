@@ -101,7 +101,7 @@ jobs:
           bundler: 2.5.4
 
       - name: Setup Node
-        uses: ./.github/actions/setup-node-with-retry
+        uses: actions/setup-node@v4
         with:
           # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
           # https://github.com/nodejs/node/issues/56010

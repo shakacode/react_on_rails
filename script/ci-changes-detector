@@ -5,6 +5,10 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=script/lib/git-diff-base
+source "$SCRIPT_DIR/lib/git-diff-base"
+
 BASE_REF="${1:-origin/main}"
 CURRENT_REF="${2:-HEAD}"
 
@@ -19,28 +23,28 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Fetch the base ref if it's a remote ref
-if [[ "$BASE_REF" == origin/* ]]; then
-  BASE_BRANCH="${BASE_REF#origin/}"
-  if ! git fetch origin "$BASE_BRANCH" --depth=50 2>/dev/null; then
-    echo "${RED}Error: Failed to fetch $BASE_REF${NC}"
-    echo "Please check your network connection and try again."
-    exit 1
-  fi
-fi
-
-# Validate that the base ref exists
-if ! git rev-parse --verify "$BASE_REF" >/dev/null 2>&1; then
-  echo "${RED}Error: Base ref '$BASE_REF' does not exist${NC}"
-  echo "Available branches:"
-  git branch -a | head -10
+# Resolve the merge base before diffing. Three-dot diffs fail in shallow clones
+# when the common ancestor is outside the fixed fetch depth.
+if ! MERGE_BASE=$(git_diff_base_resolve "$BASE_REF" "$CURRENT_REF" strict); then
   exit 1
 fi
 
-# Get list of changed files (committed + uncommitted)
-CHANGED_FILES=$(git diff --name-only "$BASE_REF"..."$CURRENT_REF" 2>/dev/null || echo "")
+# Get list of changed files (committed + uncommitted). A failed git diff is now
+# fatal so CI does not silently skip every job when diff detection breaks.
+# Note: bash 'set -e' does NOT trigger on a failed command substitution in an
+# assignment, so the explicit '|| { exit 1 }' is required to catch errors here.
+# Do not "simplify" this away — removing it reintroduces the silent-failure bug.
+CHANGED_FILES=$(git diff --name-only "$MERGE_BASE" "$CURRENT_REF") || {
+  echo -e "${RED}Error: git diff failed for $MERGE_BASE..$CURRENT_REF${NC}" >&2
+  exit 1
+}
 
-# For local development, also include uncommitted changes
+# For local development, also include uncommitted changes.
+# Local-dev only: git failures here are intentionally non-fatal and degrade
+# to "no extra changes" via `|| echo ""`. The CI diff above hard-fails on
+# the same kind of error; do not propagate that swallow-and-continue
+# pattern back into CI, where a silent empty diff would skip every job
+# (the original bug this script was rewritten to prevent).
 if [ -z "${CI:-}" ] && [ "$CURRENT_REF" = "HEAD" ]; then
   UNCOMMITTED=$(git diff --name-only HEAD 2>/dev/null || echo "")
   UNTRACKED=$(git ls-files --others --exclude-standard 2>/dev/null || echo "")
@@ -70,9 +74,14 @@ UNCATEGORIZED_CHANGED=false
 
 # Analyze each changed file
 while IFS= read -r file; do
+  # *.md and docs/* intentionally overlap (docs/foo.md matches both); *.md wins
+  # because it comes first. Several later branches (generators, Ruby core,
+  # specs) also pair top-level and **/* globs for clarity even though * matches
+  # any character including /.
+  # shellcheck disable=SC2221,SC2222
   case "$file" in
     # Documentation files
-    *.md|*.mdx|*.markdown|*.rst|*.txt|docs/*|docs/**/*|.lychee.toml)
+    *.md|*.mdx|*.markdown|*.rst|*.txt|docs/*|.lychee.toml)
       # Don't change DOCS_ONLY flag, just continue
       ;;
 
@@ -174,7 +183,7 @@ done <<< "$CHANGED_FILES"
 
 # Output results
 echo "=== CI Changes Analysis ==="
-echo "Base: $BASE_REF | Current: $CURRENT_REF"
+echo "Base: $BASE_REF | Current: $CURRENT_REF | Merge base: $MERGE_BASE"
 echo ""
 
 if [ "$DOCS_ONLY" = true ]; then

@@ -9,9 +9,13 @@ For most applications, the recommended approach is React on Rails TestHelper wit
 ```ruby
 # config/initializers/react_on_rails.rb
 ReactOnRails.configure do |config|
-  config.build_test_command = "RAILS_ENV=test bin/shakapacker"
+  config.build_test_command = "RAILS_ENV=test bin/shakapacker" # NODE_ENV is derived from RAILS_ENV by Shakapacker
 end
 ```
+
+Leave `NODE_ENV` unset for Shakapacker asset builds: Shakapacker automatically sets `NODE_ENV` to match `RAILS_ENV`,
+so `RAILS_ENV=test` is sufficient. Set `NODE_ENV=test` explicitly only when running a JavaScript test runner such as
+Jest directly.
 
 Then wire TestHelper into your test framework. If your app uses both RSpec and Minitest, wire both files.
 
@@ -43,7 +47,11 @@ React Server Components add one more moving part to the standard test setup: sys
 
 Use this recipe for Capybara, system, and end-to-end tests that exercise `stream_react_component`, `RSCRoute`, or the `rsc_payload_route`.
 
-This recipe uses the React on Rails TestHelper with `build_test_command`: Rails checks whether generated bundles are stale, runs your test build command when needed, and fails fast if compilation fails. The full lifecycle example is RSpec-focused because it uses `before(:suite)` and `after(:suite)` hooks; Minitest suites can reuse the ENV setup and `ReactOnRails::TestHelper.ensure_assets_compiled` call, but must start and stop the renderer from their own suite-level harness such as `Minitest.after_run { ... }` plus a suite-level startup helper. See [Two Approaches to Test Asset Compilation](#two-approaches-to-test-asset-compilation) for the underlying compilation tradeoffs.
+This recipe uses the React on Rails TestHelper with `build_test_command`: Rails checks whether generated bundles are stale, runs your test build command when needed, and fails fast if compilation fails.
+
+The Step 3 renderer-lifecycle helper is **RSpec-only** because it relies on `before(:suite)` and `after(:suite)` hooks. Minitest suites can still reuse the Step 1 ENV setup and `ReactOnRails::TestHelper.ensure_assets_compiled`; a turnkey Minitest renderer-lifecycle recipe is future work. Until then, adapt the Step 3 harness into a `Minitest.after_run { ... }` block plus a suite-level startup hook (for example, a Minitest plugin that boots the renderer before the first test) if you need Minitest coverage.
+
+See [Two Approaches to Test Asset Compilation](#two-approaches-to-test-asset-compilation) for the underlying compilation tradeoffs.
 
 ### 1. Set Renderer ENV Before Rails Boots
 
@@ -73,7 +81,7 @@ ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] ||=
 require_relative "../config/environment"
 ```
 
-`TEST_ENV_NUMBER` is set by the `parallel_tests` gem. It uses `""` for the first worker, then `"2"`, `"3"`, and so on (skipping `"1"`), so the example uses ports 3900, 3902, 3903, and leaves a harmless gap at 3901. That unused 3901 port is expected; keeping the normalized worker ID stable matters more than filling every port number. If another service already uses ports in the 3900 range, set `RENDERER_PORT` before this snippet or change the base port in the example. If you use a different parallelization tool, update `spec/support/rsc_test_worker.rb` to normalize that tool's worker ID to a stable, path-safe `RscTestWorker::ID` so every worker gets a unique port, cache path, and renderer log.
+`TEST_ENV_NUMBER` is set by the `parallel_tests` gem. It uses `""` for the first worker, then `"2"`, `"3"`, and so on (skipping `"1"`), so the example uses ports 3900, 3902, 3903, and leaves a harmless gap at 3901. That unused 3901 port is expected; keeping the normalized worker ID stable matters more than filling every port number. Before adopting the 3900 range, check for existing listeners with `lsof -i :3900-3910`; if another service already uses these ports, set `RENDERER_PORT` before this snippet or change the base port in the example. If you use a different parallelization tool, update `spec/support/rsc_test_worker.rb` to normalize that tool's worker ID to a stable, path-safe `RscTestWorker::ID` so every worker gets a unique port, cache path, and renderer log.
 
 If you run tests in parallel, each worker needs its own `RENDERER_PORT` and `RENDERER_SERVER_BUNDLE_CACHE_PATH`. Sharing a renderer cache across parallel workers can produce stale-bundle and missing-bundle failures that look like flaky RSC timeouts.
 
@@ -89,6 +97,12 @@ end
 ```
 
 The Quick Start command only sets `RAILS_ENV` for the minimal browser-bundle case. The RSC recipe also sets `NODE_ENV=test` so JavaScript build scripts, webpack/shakapacker config, and the node-renderer all see the test environment consistently. If your app's build does not branch on `NODE_ENV`, the simpler Quick Start command is still enough for non-RSC tests.
+
+> **Warning:** Three copy-paste hazards in the snippet below — read these before adapting it.
+>
+> - **The metatag list replaces TestHelper defaults.** Passing any metatags to `configure_rspec_to_compile_assets` replaces the defaults, so include `:js`, `:server_rendering`, and `:controller` alongside `:rsc` if your suite mixes RSC and non-RSC specs, or those tag groups will no longer trigger compilation.
+> - **`define_derived_metadata` tags every `spec/system` and `spec/features` example.** That is intentional so the first browser request cannot race ahead of RSC bundle compilation, but it compiles for unrelated system tests too. If only some directories exercise RSC, narrow the regex to something like `%r{spec/(system/rsc|features/rsc)}` or tag those examples manually.
+> - **Load `support/rsc_node_renderer` _after_ registering `configure_rspec_to_compile_assets`.** The Step 3 helper installs a `before(:suite)` hook that validates bundles when the renderer boots, so the compile hook must register first. On older RSpec, also compile assets in CI before running the spec process — see the Caveats note at the end of Step 3.
 
 ```ruby
 # spec/rails_helper.rb
@@ -110,10 +124,6 @@ end
 
 require_relative "support/rsc_node_renderer"
 ```
-
-> **Warning:** Passing any metatags replaces the TestHelper defaults. Include `:js`, `:server_rendering`, and `:controller` alongside `:rsc` if your suite mixes RSC and non-RSC specs, or those tag groups will no longer trigger compilation.
-
-The derived metadata block intentionally tags every system and feature spec so the first browser request cannot race ahead of RSC bundle compilation. If only some directories exercise RSC, narrow the regex (for example, `spec/(system/rsc|features/rsc)`) or tag those examples manually to avoid compiling for unrelated system tests.
 
 Tag request specs that hit the RSC payload endpoint explicitly with `:rsc`. If your suite uses a different tag scheme, pass the complete list of tags that should trigger compilation. The important part is that the build runs before the first request that can upload bundles to the node renderer.
 
@@ -248,9 +258,11 @@ RSpec.configure do |config|
     rescue Errno::ECONNREFUSED
       # Port refused immediately — nothing is listening; safe to spawn.
     rescue Errno::ETIMEDOUT
-      # SYN was silently dropped (firewall/throttle); assume nothing is listening and proceed.
-      # Less certain than ECONNREFUSED on loopback, but treating it as fatal would block tests
-      # whenever a stray DROP rule is present.
+      # SYN silently dropped (firewall/throttle). Unusual on 127.0.0.1, so surface it in
+      # CI logs but proceed — treating it as fatal would block tests whenever a stray DROP
+      # rule is present on loopback.
+      warn "RENDERER_PORT #{renderer_env['RENDERER_PORT']} pre-spawn probe timed out on 127.0.0.1; " \
+           "this is unusual on loopback. Continuing under the assumption that the port is free."
     rescue Errno::ECONNRESET
       raise "RENDERER_PORT #{renderer_env['RENDERER_PORT']} accepted and reset a connection. " \
             "Another service may already be using it."
@@ -336,9 +348,12 @@ end
 
 Require this file from `spec/rails_helper.rb` after loading `react_on_rails/test_helper`, unless your suite already loads `spec/support/**/*.rb`. On slow CI workers, increase `RSC_NODE_RENDERER_BOOT_TIMEOUT` instead of adding sleeps.
 
+> **Note:** The setup writes per-worker artifacts to `tmp/node-renderer-bundles-test-*` and `log/node-renderer-test-*.log`. The default Rails `.gitignore` rules (`/tmp/*` and `/log/*`) cover both, but if you maintain a custom `.gitignore` confirm both paths are excluded so they do not show up as untracked changes on every test run.
+
 **Caveats:**
 
 - The TCP probe above is a fallback for renderers that do not expose a health endpoint; if your renderer has one, replace the probe with an HTTP health check. A successful TCP connection only proves the port is accepting connections, not that route handlers or bundle manifests are fully initialized.
+- The `start_with?` safety check on `Rails.root/tmp` compares raw paths; it does **not** resolve symlinks. If your project's `tmp/` directory is a symlink (for example, mounted to a tmpfs path), an absolute `RENDERER_SERVER_BUNDLE_CACHE_PATH` pointing inside the resolved target will fail the check. Resolve both paths with `Pathname#realpath` before comparing if you need to support a symlinked `tmp/`.
 - A reset during the pre-spawn probe usually means another service is already using the port and closing connections immediately.
 - The `connect_timeout` call is enough for `127.0.0.1` because an unused localhost port refuses the connection immediately. If you adapt the helper for a remote renderer, the operating system may still apply a longer TCP timeout.
 - The deadline is checked after each socket probe, so very tight timeouts can overshoot by up to `connect_timeout + sleep` per iteration (roughly 1.1 s with the defaults above).
@@ -420,7 +435,7 @@ React on Rails supports two mutually exclusive approaches for compiling webpack 
 ```ruby
 # config/initializers/react_on_rails.rb
 ReactOnRails.configure do |config|
-  config.build_test_command = "NODE_ENV=test RAILS_ENV=test bin/shakapacker"
+  config.build_test_command = "RAILS_ENV=test bin/shakapacker" # NODE_ENV is derived from RAILS_ENV by Shakapacker
 
   # Or use your project's package manager with a custom script:
   # config.build_test_command = "pnpm run build:test"  # or: npm run build:test, yarn run build:test

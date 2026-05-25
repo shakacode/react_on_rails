@@ -33,7 +33,7 @@ end
 - You need to **programmatically generate** tasks
 - You need to **pass context** to the tasks
 
-**Historical Context**: PR #1770 added explicit rake task loading, causing webpack builds and pack generation to run twice during `rake assets:precompile`. This was fixed in PR #2052. See `analysis/rake-task-duplicate-analysis.md` for full details.
+**Historical Context**: PR #1770 added explicit rake task loading, causing webpack builds and pack generation to run twice during `rake assets:precompile`. This was fixed in PR #2052.
 
 ## Engine Initializers and Hooks
 

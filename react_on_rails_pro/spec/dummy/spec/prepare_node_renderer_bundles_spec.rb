@@ -21,6 +21,7 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
                                         renderer_url: "http://localhost:3800",
                                         renderer_request_retry_limit: 5,
                                         enable_rsc_support: false,
+                                        rolling_deploy_adapter: nil,
                                         assets_to_copy: [
                                           path_in_webpack_folder(asset_filename),
                                           path_in_webpack_folder(asset_filename2)
@@ -38,7 +39,7 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
 
     ENV.delete("RENDERER_SERVER_BUNDLE_CACHE_PATH")
     ENV.delete("RENDERER_BUNDLE_PATH")
-    ReactOnRailsPro::Utils.send(:reset_renderer_bundle_path_deprecation_warned!)
+    ReactOnRailsPro::RendererCachePath.send(:reset_deprecation_warned!)
     described_class.send(:reset_deprecation_warned!)
   end
 
@@ -49,6 +50,7 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
     FileUtils.rm_f(path_in_webpack_folder(asset_filename2))
     ENV.delete("RENDERER_SERVER_BUNDLE_CACHE_PATH")
     ENV.delete("RENDERER_BUNDLE_PATH")
+    ReactOnRailsPro::RendererCachePath.send(:reset_deprecation_warned!)
     described_class.send(:reset_deprecation_warned!)
   end
 
@@ -171,6 +173,7 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
                                           renderer_url: "http://localhost:3800",
                                           renderer_request_retry_limit: 5,
                                           enable_rsc_support: true,
+                                          rolling_deploy_adapter: nil,
                                           assets_to_copy: nil)
       allow(ReactOnRailsPro).to receive(:configuration).and_return(dbl_configuration)
       allow(ReactOnRailsPro::Utils).to receive_messages(

@@ -3,12 +3,14 @@
 require "json"
 require "erb"
 require "stringio"
+require "timeout"
 require "yaml"
 require_relative "utils"
 require_relative "config_path_resolver"
 require_relative "version_syntax_converter"
 require_relative "version_synchronizer"
 require_relative "system_checker"
+require_relative "pro_migration"
 
 begin
   require "rainbow"
@@ -63,8 +65,10 @@ module ReactOnRails
     # common deploy-script locations so users on older Procfile/Dockerfile entries
     # get a migration nudge before the task is removed.
     DEPRECATED_RENDERER_CACHE_TASK = "pre_stage_bundle_for_node_renderer"
-    # Intentionally a fixed list, not a glob (for example, config/deploy/*.rb).
-    # CI manifests and directory globs need a separate bounded scan to avoid surprising IO.
+    # Fixed allowlist of single-file deploy-script paths. Each entry is a literal
+    # path that may host a deploy hook referencing the deprecated task. Directory
+    # globs (e.g., per-stage Capistrano files or per-workflow GitHub Actions YAML)
+    # live in RENDERER_CACHE_DEPLOY_SCRIPT_GLOBS so they stay bounded.
     RENDERER_CACHE_DEPLOY_SCRIPT_PATHS = [
       "Procfile",
       "Procfile.dev",
@@ -85,10 +89,27 @@ module ReactOnRails
       "config/deploy/production.rb",
       "config/deploy/staging.rb",
       ".kamal/deploy.yml",
-      "scripts/deploy.sh"
+      "scripts/deploy.sh",
+      ".circleci/config.yml",
+      ".gitlab-ci.yml",
+      "bitbucket-pipelines.yml"
+    ].freeze
+    # Bounded glob allowlist for deploy manifests that live in a known directory
+    # but use per-environment or per-workflow filenames. Each pattern matches
+    # only one directory level (no `**`) so the scan never recurses into the
+    # project tree, and the expansion is capped by
+    # RENDERER_CACHE_DEPLOY_SCRIPT_GLOB_MAX_MATCHES.
+    RENDERER_CACHE_DEPLOY_SCRIPT_GLOBS = [
+      ".github/workflows/*.yml",
+      ".github/workflows/*.yaml",
+      "config/deploy/*.rb"
     ].freeze
     # Per-file safety gate to bound IO during the scan, not a meaningful size limit.
     RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES = 1_048_576
+    # Defense-in-depth cap on how many files a single glob may contribute.
+    # Realistic repos have a handful of workflow / deploy-stage files; far more
+    # than this is a sign of an unexpectedly broad pattern, not legitimate config.
+    RENDERER_CACHE_DEPLOY_SCRIPT_GLOB_MAX_MATCHES = 100
 
     def initialize(verbose: false, fix: false)
       @verbose = verbose
@@ -2748,8 +2769,9 @@ module ReactOnRails
       check_pro_initializer_existence
       ensure_rails_environment_loaded
       check_pro_renderer_mode
-      check_base_package_imports
+      check_base_package_references
       check_deprecated_renderer_cache_task
+      check_rolling_deploy_adapter
     end
 
     def check_pro_initializer_existence
@@ -2794,22 +2816,15 @@ module ReactOnRails
       # migration nudge.
       # Per-file rescue so a transient failure on one path (e.g. Errno::EACCES)
       # does not abort the whole scan and silently skip the rest. The outer
-      # rescue catches anything that escapes the per-file guard.
-      matches = RENDERER_CACHE_DEPLOY_SCRIPT_PATHS.select do |path|
-        full_path = Rails.root.join(path)
+      # rescue catches anything that escapes the per-file guard. Globs are
+      # expanded under their own rescue so a failure expanding one pattern
+      # cannot stop other patterns or fixed paths from being scanned.
+      candidate_paths = (
+        RENDERER_CACHE_DEPLOY_SCRIPT_PATHS + expand_renderer_cache_deploy_script_globs
+      ).uniq
 
-        begin
-          next false unless full_path.file?
-          # Skip files larger than 1 MB; deploy scripts should be tiny.
-          next false if full_path.size > RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES
-
-          deploy_script_references_deprecated_task?(full_path)
-        rescue StandardError => e
-          checker.add_warning(
-            "⚠️  Could not scan #{path} for deprecated renderer-cache task references: #{e.message}"
-          )
-          false
-        end
+      matches = candidate_paths.select do |path|
+        deploy_script_path_references_deprecated_task?(path)
       end
 
       return if matches.empty?
@@ -2836,6 +2851,41 @@ module ReactOnRails
 
         without_inline_comment = stripped.sub(/ +#.*/, "")
         without_inline_comment.include?(DEPRECATED_RENDERER_CACHE_TASK)
+      end
+    end
+
+    def deploy_script_path_references_deprecated_task?(path)
+      full_path = Rails.root.join(path)
+
+      return false unless full_path.file?
+      # Skip files larger than RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES;
+      # deploy scripts and CI manifests should be tiny.
+      return false if full_path.size > RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES
+
+      deploy_script_references_deprecated_task?(full_path)
+    rescue StandardError => e
+      checker.add_warning(
+        "⚠️  Could not scan #{path} for deprecated renderer-cache task references: #{e.message}"
+      )
+      false
+    end
+
+    def expand_renderer_cache_deploy_script_globs
+      # File::FNM_PATHNAME stops `*` from crossing slashes even though none of
+      # the patterns use `**`. base: scopes the expansion to the project root
+      # and yields paths relative to it. Each pattern is rescued individually
+      # so a permission error on one glob (e.g. an unreadable .github/) does
+      # not silence the rest.
+      root = Rails.root.to_s
+      RENDERER_CACHE_DEPLOY_SCRIPT_GLOBS.flat_map do |pattern|
+        Dir.glob(pattern, File::FNM_PATHNAME, base: root)
+           .sort
+           .first(RENDERER_CACHE_DEPLOY_SCRIPT_GLOB_MAX_MATCHES)
+      rescue StandardError => e
+        checker.add_warning(
+          "⚠️  Could not expand renderer-cache deploy-script glob #{pattern}: #{e.message}"
+        )
+        []
       end
     end
 
@@ -2874,45 +2924,266 @@ module ReactOnRails
       end
     end
 
-    # The base 'react-on-rails' npm package is a transitive dependency of 'react-on-rails-pro',
-    # so `import ... from 'react-on-rails'` resolves silently — loading the base package instead
-    # of Pro. Components registered through the base package won't have Pro features (streaming,
-    # caching, RSC), and may cause "component not registered" errors at runtime.
-    BASE_PACKAGE_IMPORT_PATTERN = %r{\bfrom\s+['"]react-on-rails(?:/[^'"]*)?['"]}
-    BASE_PACKAGE_REQUIRE_PATTERN = %r{\brequire\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]\s*\)}
+    # ── Rolling Deploy Adapter ────────────────────────────────────────
 
-    def check_base_package_imports # rubocop:disable Metrics/CyclomaticComplexity
-      source_path = resolve_js_source_path
-      js_extensions = %w[js jsx ts tsx]
-      js_patterns = js_extensions.map { |ext| "#{source_path}/**/*.#{ext}" }
-      files_with_base_import = []
+    ROLLING_DEPLOY_REQUIRED_METHODS = %i[previous_bundle_hashes fetch upload].freeze
 
-      js_patterns.each do |pattern|
-        Dir.glob(pattern).each do |file|
-          content = File.read(file)
-          next unless content.match?(BASE_PACKAGE_IMPORT_PATTERN) || content.match?(BASE_PACKAGE_REQUIRE_PATTERN)
+    def check_rolling_deploy_adapter
+      adapter = ReactOnRailsPro.configuration.rolling_deploy_adapter
 
-          files_with_base_import << file
+      if adapter.nil?
+        env_override = ENV.fetch("PREVIOUS_BUNDLE_HASHES", nil)
+        if env_override && !env_override.empty?
+          checker.add_warning(
+            "⚠️  PREVIOUS_BUNDLE_HASHES=#{truncate_for_warning(env_override).inspect} is set but no " \
+            "rolling_deploy_adapter is configured. Rolling-deploy seeding needs both — the env var " \
+            "overrides *discovery* but the adapter is still required to fetch bundle files. " \
+            "Set config.rolling_deploy_adapter or unset PREVIOUS_BUNDLE_HASHES."
+          )
+        else
+          checker.add_info("ℹ️  No rolling_deploy_adapter configured (rolling-deploy seeding disabled).")
         end
+        return
       end
 
-      if files_with_base_import.empty?
-        checker.add_success("✅ No base 'react-on-rails' imports found (Pro package used correctly)")
+      return unless report_adapter_protocol(adapter)
+
+      env_override = ENV.fetch("PREVIOUS_BUNDLE_HASHES", nil)
+      if env_override && !env_override.empty?
+        # PREVIOUS_BUNDLE_HASHES is a full discovery override at runtime, so
+        # probing adapter#previous_bundle_hashes here would surface timeout/error
+        # noise for a code path the deploy will never invoke. Skip the probe and
+        # state the override explicitly so operators see what's happening.
+        checker.add_info(
+          "ℹ️  PREVIOUS_BUNDLE_HASHES=#{truncate_for_warning(env_override).inspect} is set; " \
+          "skipping rolling_deploy_adapter#previous_bundle_hashes probe (env var overrides discovery)."
+        )
+        report_resolved_cache_dir
+        return
+      end
+
+      report_previous_bundle_hashes_probe(adapter)
+      report_resolved_cache_dir
+    rescue StandardError => e
+      checker.add_warning("⚠️  Could not evaluate rolling_deploy_adapter: #{e.message}")
+    end
+
+    # Cap echoed env-var values so a malformed (or accidentally large)
+    # PREVIOUS_BUNDLE_HASHES value doesn't dump kilobytes into operator output.
+    PREVIOUS_BUNDLE_HASHES_DISPLAY_LIMIT = 80
+    private_constant :PREVIOUS_BUNDLE_HASHES_DISPLAY_LIMIT
+
+    def truncate_for_warning(value)
+      return value if value.length <= PREVIOUS_BUNDLE_HASHES_DISPLAY_LIMIT
+
+      "#{value[0, PREVIOUS_BUNDLE_HASHES_DISPLAY_LIMIT]}… (#{value.length} chars total)"
+    end
+
+    def report_adapter_protocol(adapter)
+      missing = ROLLING_DEPLOY_REQUIRED_METHODS.reject { |m| adapter.respond_to?(m) }
+      if missing.empty?
+        checker.add_success(
+          "✅ rolling_deploy_adapter responds to all required methods " \
+          "(#{ROLLING_DEPLOY_REQUIRED_METHODS.join(', ')})"
+        )
+        true
+      else
+        checker.add_warning(
+          "⚠️  rolling_deploy_adapter is missing required methods: #{missing.join(', ')}. " \
+          "See docs/pro/rolling-deploy-adapters.md."
+        )
+        false
+      end
+    end
+
+    def report_previous_bundle_hashes_probe(adapter)
+      start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      timeout_seconds = rolling_deploy_discovery_timeout_seconds
+      hashes = Timeout.timeout(timeout_seconds) { Array(adapter.previous_bundle_hashes) }
+      latency_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - start) * 1000).round
+
+      if hashes.empty?
+        checker.add_warning(
+          "⚠️  rolling_deploy_adapter#previous_bundle_hashes returned []. " \
+          "Usually indicates the upload side has never run on a prior deploy."
+        )
+      else
+        checker.add_success(
+          "✅ rolling_deploy_adapter#previous_bundle_hashes returned #{hashes.length} hash(es) in #{latency_ms}ms"
+        )
+      end
+    rescue Timeout::Error
+      checker.add_warning(
+        "⚠️  rolling_deploy_adapter#previous_bundle_hashes timed out after " \
+        "#{timeout_seconds}s"
+      )
+    rescue StandardError => e
+      checker.add_warning("⚠️  rolling_deploy_adapter#previous_bundle_hashes raised #{e.class}: #{e.message}")
+    end
+
+    def rolling_deploy_discovery_timeout_seconds
+      if defined?(ReactOnRailsPro::RollingDeployCacheStager::DISCOVERY_TIMEOUT_SECONDS)
+        ReactOnRailsPro::RollingDeployCacheStager::DISCOVERY_TIMEOUT_SECONDS
+      else
+        # Must match the canonical Pro constant. Bidirectional pointers:
+        #   Pro file:     react_on_rails_pro/lib/react_on_rails_pro/rolling_deploy_cache_stager.rb
+        #   Pro constant: ReactOnRailsPro::RollingDeployCacheStager::DISCOVERY_TIMEOUT_SECONDS
+        #   Pro guard:    react_on_rails_pro/spec/dummy/spec/rolling_deploy_cache_stager_spec.rb
+        #                 (describe "DISCOVERY_TIMEOUT_SECONDS" → expects this fallback to equal Pro constant)
+        # The Pro spec catches drift in the Pro→OSS direction. If you change
+        # the value here without updating the Pro constant + spec, doctor will
+        # silently use a different timeout from the live stager.
+        10
+      end
+    end
+
+    # Fallback used when the Pro gem isn't loaded. Must match
+    # ReactOnRailsPro::RollingDeployCacheStager::TEMPORARY_DIRECTORY_PATTERN so
+    # doctor still filters staging/backup dirs out of the bundle-hash count.
+    # Drift is caught by:
+    #   react_on_rails_pro/spec/dummy/spec/rolling_deploy_cache_stager_spec.rb
+    #   describe "TEMPORARY_DIRECTORY_PATTERN"
+    # PID is `\d+` to match container deployments (Docker/Kubernetes) where
+    # seeding runs as PID 1.
+    ROLLING_DEPLOY_TEMP_DIR_PATTERN = /\.(?:staging|previous)-\d+-[0-9a-f]{8,}\z/
+
+    def report_resolved_cache_dir
+      cache_dir = ReactOnRailsPro::Utils.resolve_renderer_cache_dir
+      if File.directory?(cache_dir)
+        temp_dir_pattern = rolling_deploy_temp_dir_pattern
+        subdirs = Dir.children(cache_dir).select do |entry|
+          File.directory?(File.join(cache_dir, entry)) && !entry.match?(temp_dir_pattern)
+        end
+        checker.add_info("ℹ️  Resolved renderer cache dir: #{cache_dir} (#{subdirs.length} bundle-hash subdir(s))")
+      else
+        checker.add_info("ℹ️  Resolved renderer cache dir: #{cache_dir} (does not exist yet)")
+      end
+    end
+
+    def rolling_deploy_temp_dir_pattern
+      if defined?(ReactOnRailsPro::RollingDeployCacheStager::TEMPORARY_DIRECTORY_PATTERN)
+        ReactOnRailsPro::RollingDeployCacheStager::TEMPORARY_DIRECTORY_PATTERN
+      else
+        ROLLING_DEPLOY_TEMP_DIR_PATTERN
+      end
+    end
+
+    # The base 'react-on-rails' npm package is a transitive dependency of 'react-on-rails-pro',
+    # so references to 'react-on-rails' resolve silently, loading the base package instead of Pro.
+    # Components registered through the base package won't have Pro features (streaming, caching,
+    # RSC), and may cause "component not registered" errors at runtime.
+    BASE_PACKAGE_IMPORT_PATTERN = %r{\bfrom\s+['"]react-on-rails(?:/[^'"]*)?['"]}
+    BASE_PACKAGE_REQUIRE_PATTERN = %r{\brequire\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]\s*\)}
+    BASE_PACKAGE_DYNAMIC_IMPORT_PATTERN = %r{\bimport\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]\s*\)}
+    BASE_PACKAGE_SIDE_EFFECT_IMPORT_PATTERN = %r{^\s*import\s+['"]react-on-rails(?:/[^'"]*)?['"]}
+    BASE_PACKAGE_REFERENCE_SOURCE_ROOTS = ReactOnRails::ProMigration::JS_SOURCE_ROOTS
+    BASE_PACKAGE_REFERENCE_EXTENSIONS = ReactOnRails::ProMigration::JS_SOURCE_EXTENSIONS
+    # Explicit allowlist of documented Jest/Vitest APIs whose first argument is a module specifier.
+    BASE_PACKAGE_JEST_MODULE_SPECIFIER_METHOD_PATTERN =
+      ReactOnRails::ProMigration::JEST_MODULE_SPECIFIER_METHOD_PATTERN
+    BASE_PACKAGE_VITEST_MODULE_SPECIFIER_METHOD_PATTERN =
+      ReactOnRails::ProMigration::VITEST_MODULE_SPECIFIER_METHOD_PATTERN
+    # Match known Jest/Vitest module-specifier helpers. Aliased or nested receivers
+    # are intentionally out of scope to avoid warning on arbitrary application methods.
+    #
+    # importActual/importMock exist only as vi.* methods; there is no
+    # `import { importActual } from 'vitest'` form. The bare branch below is a
+    # deliberately broad detector heuristic (the rewriter omits it because
+    # rewriting is destructive while detection is advisory) and accepts that a
+    # user-defined helper of that name taking a 'react-on-rails' string matches.
+    BASE_PACKAGE_MOCK_PATTERN = %r{
+      \b(?:
+        (?:
+          jest\.(?:#{BASE_PACKAGE_JEST_MODULE_SPECIFIER_METHOD_PATTERN})
+          |
+          vi\.(?:#{BASE_PACKAGE_VITEST_MODULE_SPECIFIER_METHOD_PATTERN})
+        )
+        \s*
+        (?:<[^;\n]*>\s*)?
+        |
+        (?:importActual|importMock)
+      )
+      \s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]
+    }x
+    # In Ruby, ^ matches the start of any line, so this catches declarations anywhere in the file.
+    BASE_PACKAGE_DECLARE_MODULE_PATTERN = %r{^\s*(?:export\s+)?declare\s+module\s+['"]react-on-rails(?:/[^'"]*)?['"]}
+    BASE_PACKAGE_REFERENCE_PATTERNS = [
+      BASE_PACKAGE_IMPORT_PATTERN,
+      BASE_PACKAGE_REQUIRE_PATTERN,
+      BASE_PACKAGE_DYNAMIC_IMPORT_PATTERN,
+      BASE_PACKAGE_SIDE_EFFECT_IMPORT_PATTERN,
+      BASE_PACKAGE_MOCK_PATTERN,
+      BASE_PACKAGE_DECLARE_MODULE_PATTERN
+    ].freeze
+
+    def check_base_package_references
+      files_with_base_reference = files_with_base_package_references(resolve_js_source_path)
+
+      if files_with_base_reference.empty?
+        checker.add_success("✅ No base 'react-on-rails' references found (Pro package used correctly)")
       else
         checker.add_warning(<<~MSG.strip)
-          ⚠️  Found imports from 'react-on-rails' instead of 'react-on-rails-pro':
-          #{files_with_base_import.map { |f| "  • #{f}" }.join("\n")}
+          ⚠️  Found references to 'react-on-rails' instead of 'react-on-rails-pro':
+          #{files_with_base_reference.map { |f| "  • #{f}" }.join("\n")}
 
-          The base package is a transitive dependency of Pro, so these imports resolve
+          Look for static imports, side-effect imports, CommonJS requires, dynamic imports,
+          Jest/Vitest mock helpers, or TypeScript module augmentations.
+          Note: this includes commented-out references; review each file before updating.
+
+          The base package is a transitive dependency of Pro, so these references resolve
           silently but load the base version without Pro features.
 
-          Fix: Update imports to use 'react-on-rails-pro':
-            import ReactOnRails from 'react-on-rails-pro';        // server
-            import ReactOnRails from 'react-on-rails-pro/client';  // client
+          Fix: Replace base-package references with their Pro equivalents:
+            import ReactOnRails from 'react-on-rails-pro';         // ES import (server)
+            import ReactOnRails from 'react-on-rails-pro/client';  // ES import (client)
+            import 'react-on-rails-pro';                           // Side-effect import
+            const ReactOnRails = require('react-on-rails-pro');    // CommonJS require
+            const ReactOnRails = await import('react-on-rails-pro'); // Dynamic import
+            jest.mock('react-on-rails-pro', ...);                  // Jest mock helper
+            vi.mock('react-on-rails-pro', ...);                    // Vitest mock helper
+            declare module 'react-on-rails-pro' { ... }            // TypeScript augmentation
         MSG
       end
     rescue StandardError => e
-      checker.add_warning("⚠️  Could not scan for base package imports: #{e.message}")
+      checker.add_warning("⚠️  Could not scan for base package references: #{e.message}")
+    end
+
+    def files_with_base_package_references(source_path)
+      # Scan every file type the Pro migration rewriter can modify.
+      # **/*.ts naturally matches *.d.ts declaration files because they end in .ts.
+      js_patterns = base_package_reference_source_paths(source_path).flat_map do |source_root|
+        BASE_PACKAGE_REFERENCE_EXTENSIONS.map { |ext| "#{source_root}/**/*.#{ext}" }
+      end
+
+      js_patterns.flat_map do |pattern|
+        Dir.glob(pattern)
+           .reject { |file| file.include?("/node_modules/") }
+           .select { |file| base_package_reference_file?(file) }
+      end.uniq.sort
+    end
+
+    def base_package_reference_source_paths(source_path)
+      ([source_path] + BASE_PACKAGE_REFERENCE_SOURCE_ROOTS)
+        .compact
+        .map(&:to_s)
+        .reject(&:empty?)
+        .uniq
+        .select { |path| Dir.exist?(path) }
+    end
+
+    def base_package_reference_file?(file)
+      content = File.binread(file).force_encoding("UTF-8")
+      return false unless content.valid_encoding?
+
+      base_package_reference?(content)
+    rescue SystemCallError, IOError
+      false
+    end
+
+    def base_package_reference?(content)
+      # Content-based matching intentionally catches comments and string literals
+      # so stale migration references stay visible.
+      BASE_PACKAGE_REFERENCE_PATTERNS.any? { |reference_pattern| content.match?(reference_pattern) }
     end
 
     # ── React Server Components ────────────────────────────────────

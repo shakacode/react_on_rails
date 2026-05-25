@@ -129,6 +129,124 @@ end
 
 > **Recommendation:** Start with a single container. Move to sidecar containers if you need per-process memory/CPU visibility (e.g., to diagnose OOM restarts). Separate workloads are rarely justified unless you have a specific need for independent scaling at high replica counts.
 
+## Control Plane Deployment Shapes
+
+For Control Plane deployments, choose the probe target based on where the node renderer runs. Control Plane configures
+probes per container. Renderer probe targets below mean `tcpSocket` or h2c-aware `exec` probes, not HTTP/1.1 `httpGet`
+probes directly against the renderer.
+
+[Control Plane Flow](https://github.com/shakacode/control-plane-flow)'s default `rails` template models Rails as a
+single-container standard workload. If you follow that template and run the renderer inside the Rails container,
+configure the Rails workload's probes rather than looking for a separate node-renderer container. If you split the
+renderer into its own container or workload, add renderer-specific probes there.
+
+### Same Rails Container (Rails and Renderer Co-Located)
+
+Set the Rails `renderer_url` to `http://localhost:3800`. The renderer can keep the default `localhost` host binding.
+Probe the `rails` container's Rails health endpoint, such as `/up` on port `3000` in Rails 7.1+ or a custom endpoint in
+earlier Rails versions.
+
+This also applies when a process supervisor starts Rails and the renderer together in the same container: probe the
+Rails container and let the Rails health endpoint cover the co-located renderer when needed.
+
+When Rails and the renderer share one container, use one combined Rails health endpoint if you need to check both
+processes. For example, make the Rails readiness endpoint perform a short TCP connection check to `localhost:3800` and
+return `503` if the renderer is unreachable.
+
+Because this guide covers React on Rails Pro's Node Renderer, the Rails endpoint below reads the same
+`ReactOnRailsPro.configuration.renderer_url` value used for SSR requests rather than requiring a second port environment
+variable.
+
+`config/routes.rb`:
+
+```ruby
+# Override Rails 7.1+'s built-in /up route to add the renderer TCP check.
+# If you already have custom /up logic, use a distinct path such as /healthz
+# to avoid silently replacing existing health behavior.
+get "up", to: "health#show"
+```
+
+Loading the `Socket` stdlib from an initializer keeps the controller body lean and outside the autoload boundary, which
+matches Rails conventions for stdlib dependencies. If your environment already auto-requires stdlib (for example via
+Bundler) the require below is harmless; placing it in an initializer is still preferred.
+
+`config/initializers/socket_require.rb`:
+
+```ruby
+# Load the Ruby stdlib Socket class once at boot for the Health controller's TCP check.
+require "socket"
+```
+
+`app/controllers/health_controller.rb`:
+
+```ruby
+# Inherits from ActionController::Base (not ApplicationController) to avoid
+# app-level authentication callbacks on unauthenticated probe requests.
+# `Socket` is loaded once at boot via config/initializers/socket_require.rb.
+class HealthController < ActionController::Base
+  def show
+    # A successful TCP connect means the h2c listener is bound, not that cluster workers
+    # are ready. Pair with the startup probe to shield liveness during boot.
+    # In this same-container topology, Rails and the renderer share a network namespace,
+    # so always probe localhost even if other deployment shapes use a service host.
+    # connect_timeout is supported by the Ruby versions in this guide's prerequisites.
+    renderer_url = ReactOnRailsPro.configuration.renderer_url
+    raise ArgumentError, "renderer_url not configured" if renderer_url.nil? || renderer_url.empty?
+
+    # Extract the explicit port from the URL authority, skipping any userinfo
+    # (`user@`, `user:pass@`) and supporting bracketed IPv6 hosts. URI#port would
+    # return 80/443 for URLs without an explicit port, so we read the string
+    # directly and fall back to 3800 when no authority port is present.
+    renderer_port = renderer_url[%r{://(?:[^/?#@]*@)?(?:\[[^\]]+\]|[^/?#:]+):(\d+)}, 1]&.to_i || 3800
+    # Block form ensures the socket closes after a successful connect; the explicit
+    # |_socket| parameter signals that the empty body is intentional, not a typo.
+    Socket.tcp("localhost", renderer_port, connect_timeout: 1) { |_socket| }
+    head :ok
+  rescue SocketError, SystemCallError
+    # Only renderer reachability failures map to 503. ArgumentError raised above
+    # intentionally escapes as 500 so a misconfigured `renderer_url` stays visible
+    # in logs and alerting.
+    head :service_unavailable
+  end
+end
+```
+
+> **Topology-specific:** This same-container example always probes `localhost` and only borrows the port from
+> `renderer_url`. Do not reuse it as-is for sidecar or separate-workload topologies where the renderer runs behind a
+> different host.
+>
+> A missing `renderer_url` raises `ArgumentError` and surfaces as a 500 so the misconfiguration stays visible in logs
+> and alerting. Only renderer reachability failures are converted to `503`.
+
+### Separate Container In The Same Workload
+
+Keep the Rails `renderer_url` as `http://localhost:3800`. Use `0.0.0.0` for the renderer `host` when you rely on
+`tcpSocket` probes; `localhost` is fine for `exec`-only probes.
+
+Add h2c-aware `exec` probes against `localhost:3800` or `tcpSocket` probes on the renderer port. For `tcpSocket`, bind
+the renderer to `0.0.0.0` because Kubernetes and platform TCP probes are initiated by the kubelet and connect to the pod
+or workload IP, not container-local loopback. Rails→renderer HTTP traffic over `localhost` still works inside the shared
+pod network namespace (see [Host Binding for Container Environments](#host-binding-for-container-environments)); only
+externally-initiated probes need the `0.0.0.0` bind. `exec` probes run a command inside the container, so `localhost`
+works there.
+
+> **Probe YAML:** For Control Plane readiness and liveness fields, reuse the individual `exec` or `tcpSocket` probe blocks
+> from [Kubernetes Sidecar Manifest](#kubernetes-sidecar-manifest). Attach them to the node-renderer container in this
+> workload instead of to a separate Kubernetes pod spec.
+
+### Separate Node-Renderer Workload
+
+Set the Rails `renderer_url` to `http://<WORKLOAD_NAME>.<GVC_NAME>.cpln.local:3800`, use `0.0.0.0` for the renderer
+`host`, and add `tcpSocket` or h2c-aware `exec` probes to the node-renderer workload container. Expose the renderer port
+internally, not publicly, unless required.
+
+Use the same Control Plane probe fields as the same-workload case, but attach them to the separate node-renderer workload
+container.
+
+Replace `<WORKLOAD_NAME>` with the renderer workload name and `<GVC_NAME>` with your Control Plane Global Virtual Cloud
+name. Use your actual renderer port if it is not `3800`; see Control Plane's
+[service-to-service endpoint format](https://docs.controlplane.com/guides/service-to-service).
+
 ## Dockerfile Example
 
 > **Why the renderer entry point lives in a dedicated `renderer/` directory:** Production Docker builds commonly strip JavaScript sources after the client bundles are built, since the Rails app no longer needs them at runtime. Keeping the renderer entry point in its own top-level directory (separate from `client/`) makes it trivial to exclude from that cleanup — the Node Renderer process still needs its entry file and dependencies at runtime.
@@ -208,7 +326,9 @@ services:
       RENDERER_HOST: '0.0.0.0'
       NODE_OPTIONS: '--max-old-space-size=512'
     healthcheck:
-      test: ['CMD', 'curl', '-sf', '--http2-prior-knowledge', 'http://localhost:3800/info']
+      # --max-time 2 leaves a 1 s buffer below the 3 s healthcheck timeout so curl exits
+      # cleanly with a non-zero code rather than being killed mid-request.
+      test: ['CMD', 'curl', '-sf', '--max-time', '2', '--http2-prior-knowledge', 'http://localhost:3800/info']
       interval: 5s
       timeout: 3s
       retries: 5
@@ -216,6 +336,8 @@ services:
 ```
 
 > **Note:** In Docker Compose, the containers do not share a network namespace (unlike Kubernetes sidecars), so the renderer must bind to `0.0.0.0` and Rails must connect via the service name (`renderer`).
+> The Compose example uses `--max-time 2` with `timeout: 3s` for fast local feedback; the Kubernetes examples use
+> `--max-time 3` with `timeoutSeconds: 5` to allow more scheduler and node-load jitter.
 
 ## Host Binding for Container Environments
 
@@ -388,8 +510,19 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
 
 **Mitigation:**
 
-1. **Health check endpoint** — The Node Renderer exposes a built-in `/info` endpoint that returns the node version and renderer version. Because the renderer uses cleartext HTTP/2, Kubernetes `httpGet` probes (HTTP/1.1) are incompatible with this listener. Use a TCP probe, an `exec` probe (for example with `curl --http2-prior-knowledge`, which requires curl with HTTP/2 support in your container image), or a dedicated HTTP/1.1 sidecar/port for probes. For a custom `/health` route with more granular checks, use the `configureFastify()` option (see [JS Configuration: Custom Fastify Configuration](./js-configuration.md#custom-fastify-configuration)). Configure your container orchestrator to wait for it before routing traffic.
-2. **Startup probe** — Configure a startup probe with a generous `initialDelaySeconds`:
+> Probe semantics, timing values, and curl command flags are documented canonically in
+> [JS Configuration: Configuring Startup, Readiness, and Liveness Probes](./js-configuration.md#configuring-startup-readiness-and-liveness-probes).
+> The full copy-paste YAML lives in [Kubernetes Sidecar Manifest](#kubernetes-sidecar-manifest) below. Update the JS
+> Configuration section first when tuning thresholds, then reflect the change in the manifest.
+
+1. **Health check endpoint** — The Node Renderer exposes a built-in `/info` endpoint that returns the node version and
+   renderer version. The renderer uses cleartext HTTP/2, so Kubernetes `httpGet` probes (HTTP/1.1) are incompatible —
+   use a `tcpSocket` probe, an `exec` probe with an h2c-aware client such as `curl --http2-prior-knowledge`, or a
+   dedicated HTTP/1.1 sidecar/port for probes. For a custom `/health` route with more granular checks, see
+   [JS Configuration: Adding a Health Check Endpoint](./js-configuration.md#adding-a-health-check-endpoint).
+2. **Startup probe** — A startup probe is the primary mitigation for this error. It defers readiness and liveness until
+   the renderer has bound its port, so Rails only sends render requests after workers are ready:
+
    ```yaml
    startupProbe:
      tcpSocket:
@@ -397,29 +530,17 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
      initialDelaySeconds: 10
      periodSeconds: 5
      failureThreshold: 6
+     timeoutSeconds: 1
    ```
-3. **Readiness probe** — Ensure traffic is only routed to the renderer when it's ready to accept requests. Prefer an `exec` probe with an h2c-aware client for application-level readiness. Use `tcpSocket` only as a minimal fallback that confirms the port is accepting connections:
-   ```yaml
-   readinessProbe:
-     exec:
-       command:
-         - curl
-         - -sf
-         - --http2-prior-knowledge
-         - http://localhost:3800/info
-     timeoutSeconds: 5
-     periodSeconds: 5
-     failureThreshold: 3
-   ```
-   > **Note:** The `exec` probe requires curl with HTTP/2 support in your image. Verify with `curl --version | grep HTTP2`. If curl is unavailable, use `tcpSocket` as a fallback.
-4. **Liveness probe** — Ensure the renderer is restarted if it becomes unresponsive:
-   ```yaml
-   livenessProbe:
-     tcpSocket:
-       port: 3800
-     periodSeconds: 10
-     failureThreshold: 3
-   ```
+
+3. **Readiness and liveness probes** — Configure these alongside the startup probe so Rails only routes requests to a
+   healthy renderer and stuck containers get restarted. See
+   [Configuring Startup, Readiness, and Liveness Probes](./js-configuration.md#configuring-startup-readiness-and-liveness-probes)
+   for probe-style choices, timing values, and curl command guidance, and
+   [Kubernetes Sidecar Manifest](#kubernetes-sidecar-manifest) for the full copy-paste YAML.
+
+> **Security:** See the canonical [`/info` security note](./js-configuration.md#built-in-endpoints) for the
+> unauthenticated-access caveat when `password` is configured.
 
 ### OOM Tracking
 
@@ -449,7 +570,15 @@ In production, `logLevel: 'warn'` is sufficient unless actively debugging.
 
 ## Kubernetes Sidecar Manifest
 
-A complete pod spec for the sidecar pattern:
+A complete pod spec for the sidecar pattern. This is the canonical copy-paste YAML for renderer probes — other sections
+reference it instead of repeating the full block.
+
+> [!NOTE]
+> The manifest uses an h2c-aware `exec` probe for readiness and a `tcpSocket` probe for liveness. Keep that split unless
+> you intentionally need stricter liveness detection and have verified curl HTTP/2 support in the image. Probe timing
+> values and curl command guidance are canonical in
+> [JS Configuration: Configuring Startup, Readiness, and Liveness Probes](./js-configuration.md#configuring-startup-readiness-and-liveness-probes);
+> update that section first when tuning thresholds and reflect the change here.
 
 ```yaml
 apiVersion: apps/v1
@@ -513,22 +642,35 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 5
             failureThreshold: 6
+            timeoutSeconds: 1
           readinessProbe:
+            # Add initialDelaySeconds here if no startupProbe is configured.
+            # Kubernetes 1.20+ defers readiness/liveness until the startupProbe succeeds.
             exec:
               command:
                 - curl
                 - -sf
+                - --max-time
+                - '3'
                 - --http2-prior-knowledge
                 - http://localhost:3800/info
             timeoutSeconds: 5
             periodSeconds: 5
             failureThreshold: 3
           livenessProbe:
+            # Add initialDelaySeconds here if no startupProbe is configured.
+            # Kubernetes 1.20+ defers readiness/liveness until the startupProbe succeeds.
             tcpSocket:
               port: 3800
+            # TCP handshakes should complete quickly; exec/H2 uses timeoutSeconds: 5.
+            timeoutSeconds: 1
             periodSeconds: 10
             failureThreshold: 3
 ```
+
+> **Readiness endpoint:** The manifest uses `/info` for copy-paste safety because that endpoint is built in. Replace
+> `/info` with `/health` in the readiness probe after registering that route via `configureFastify` if readiness should
+> wait for renderer-specific warm-up checks.
 
 > **Note:** Both containers use the same Docker image, ensuring the React on Rails gem and Node Renderer package versions are always aligned.
 

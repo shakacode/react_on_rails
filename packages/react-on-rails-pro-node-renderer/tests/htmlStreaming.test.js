@@ -3,6 +3,7 @@ import buildApp from '../src/worker';
 import { createTestConfig } from './testingNodeRendererConfigs';
 import * as errorReporter from '../src/shared/errorReporter';
 import { createForm, SERVER_BUNDLE_TIMESTAMP } from './httpRequestUtils';
+import { LengthPrefixedStreamParser } from './parseLengthPrefixedStream';
 
 const { config } = createTestConfig('htmlStreaming');
 const app = buildApp(config);
@@ -30,34 +31,16 @@ const makeRequest = async (options = {}) => {
   });
   request.setEncoding('utf8');
 
-  const chunks = [];
-  const jsonChunks = [];
+  const parser = new LengthPrefixedStreamParser();
   let firstByteTime;
   let status;
-  const decoder = new TextDecoder();
 
   request.on('response', (headers) => {
     status = headers[':status'];
   });
 
   request.on('data', (data) => {
-    // Sometimes, multiple chunks are merged into one.
-    // So, the server uses \n as a delimiter between chunks.
-    const decodedData = typeof data === 'string' ? data : decoder.decode(data, { stream: false });
-    const decodedChunksFromData = decodedData
-      .split('\n')
-      .map((chunk) => chunk.trim())
-      .filter((chunk) => chunk.length > 0);
-    chunks.push(...decodedChunksFromData);
-    jsonChunks.push(
-      ...decodedChunksFromData.map((chunk) => {
-        try {
-          return JSON.parse(chunk);
-        } catch (e) {
-          return { hasErrors: true, error: `JSON parsing failed: ${e.message}` };
-        }
-      }),
-    );
+    parser.feed(data);
     if (!firstByteTime) {
       firstByteTime = Date.now();
     }
@@ -80,6 +63,7 @@ const makeRequest = async (options = {}) => {
   });
 
   const endTime = Date.now();
+  const { htmlChunks: chunks, parsedChunks: jsonChunks } = parser;
   const fullBody = chunks.join('');
   const timeToFirstByte = firstByteTime - startTime;
   const streamingTime = endTime - firstByteTime;
@@ -114,12 +98,26 @@ describe('html streaming', () => {
     const { status, chunks } = await makeRequest();
     expect(status).toBe(200);
 
-    const secondChunk = chunks[1];
-    expect(secondChunk).not.toContain('<p>Header for AsyncComponentsTreeForTesting</p>');
-    expect(secondChunk).not.toContain('<p>Footer for AsyncComponentsTreeForTesting</p>');
-    expect(secondChunk).not.toContain('Loading branch1...');
-    expect(secondChunk).not.toContain('Loading branch2...');
-    expect(secondChunk).not.toContain('branch1 (level 0)');
+    // Strip <script> tags from the chunk before checking for rendered HTML.
+    // RSC Flight payload <script> tags contain the serialized React tree which
+    // includes fallback text as data (e.g., "Loading branch1..." inside a JSON
+    // string). We only want to assert that the fallback is not rendered as HTML.
+    // Note: the `i` flag and per-tag matching keep CodeQL's bad-tag-filter and
+    // incomplete-multi-character-sanitization rules happy; this is test-only
+    // string scrubbing for assertions, not security sanitization.
+    // lgtm[js/incomplete-multi-character-sanitization]
+    // lgtm[js/bad-tag-filter]
+    let secondChunkHtml = chunks[1];
+    let prev;
+    do {
+      prev = secondChunkHtml;
+      secondChunkHtml = secondChunkHtml.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, '');
+    } while (prev !== secondChunkHtml);
+    expect(secondChunkHtml).not.toContain('<p>Header for AsyncComponentsTreeForTesting</p>');
+    expect(secondChunkHtml).not.toContain('<p>Footer for AsyncComponentsTreeForTesting</p>');
+    expect(secondChunkHtml).not.toContain('Loading branch1...');
+    expect(secondChunkHtml).not.toContain('Loading branch2...');
+    expect(secondChunkHtml).not.toContain('branch1 (level 0)');
   }, 10000);
 
   it('should contains all components', async () => {

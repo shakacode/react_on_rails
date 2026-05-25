@@ -62,7 +62,7 @@ module ReactOnRailsPro
         # is when ActionController::Live commits headers. render_to_string itself
         # never writes to response.stream, so this assignment is always safe.
         response.content_type = content_type if content_type
-        response.stream.write(template_string)
+        response.stream.write(template_string.lstrip)
 
         drain_streams_concurrently(parent_task)
         # Do not close the response stream in an ensure block.

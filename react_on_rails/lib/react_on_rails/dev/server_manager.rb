@@ -54,7 +54,15 @@ module ReactOnRails
           puts "🔪 Killing all development processes..."
           puts ""
 
-          killed_any = kill_running_processes || kill_port_processes(killable_ports) || cleanup_socket_files
+          # Run every cleanup step unconditionally so a successful first step
+          # (e.g. pattern-based kill) doesn't leave stale port-bound processes
+          # or socket/pid files behind. `.any?` still gives us the
+          # "anything actually got killed?" signal for the summary message.
+          killed_any = [
+            kill_running_processes,
+            kill_port_processes(killable_ports),
+            cleanup_socket_files
+          ].any?
 
           print_kill_summary(killed_any)
         end
@@ -67,18 +75,33 @@ module ReactOnRails
         # when Pro renderer support is active. Uses PortSelector's pure
         # #base_port_hash so no "Base port detected" banner prints during a kill.
         #
-        # `pro_renderer_active?` here is evaluated against the kill-time
-        # environment, where RENDERER_PORT / REACT_RENDERER_URL set by
-        # `configure_ports` in the *previous* `bin/dev` session are not
-        # exported into the new shell. So in OSS apps the renderer port is
-        # included only when the Pro gem is actually loaded — this is the
-        # intended behavior, not a bug.
+        # In base-port mode we include base[:renderer] whenever the Pro gem is
+        # loaded, even if the current shell has no renderer env vars set. The
+        # user has explicitly claimed this port range, and `bin/dev kill` is
+        # usually invoked from a fresh shell where RENDERER_PORT / *_URL aren't
+        # carried over from the dev session — so requiring env-var presence
+        # would let a stale renderer survive. Pattern-based killing
+        # (development_processes / node.*react[-_]on[-_]rails) does NOT catch
+        # the Pro renderer because it runs as `node renderer/node-renderer.js`
+        # with no "react_on_rails" substring in the command line. Port-based
+        # killing is the only reliable path. The default-port branch keeps the
+        # tighter renderer_env_signal? guard via configured_renderer_port_for_kill
+        # because 3800 is a shared default that could belong to an unrelated process.
         def killable_ports
           base = PortSelector.base_port_hash
           return default_killable_ports unless base
 
           ports = [base[:rails], base[:webpack]]
-          ports << base[:renderer] if pro_renderer_active?
+          if pro_renderer_active?
+            # When the Pro gem is loaded but no renderer env var is set, the
+            # user may not realize base+2 is being scanned. Surface it so an
+            # unrelated process killed on that port isn't a silent surprise.
+            unless renderer_env_signal?
+              puts "   ℹ️  Including renderer port #{base[:renderer]} (base+2): " \
+                   "react_on_rails_pro is loaded but no renderer env var is set."
+            end
+            ports << base[:renderer]
+          end
           ports
         end
 

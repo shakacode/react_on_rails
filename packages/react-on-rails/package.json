@@ -1,6 +1,6 @@
 {
   "name": "react-on-rails",
-  "version": "16.6.0",
+  "version": "16.7.0-rc.1",
   "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
   "main": "lib/ReactOnRails.full.js",
   "type": "module",
@@ -39,6 +39,7 @@
     "./createReactOutput": "./lib/createReactOutput.js",
     "./isServerRenderResult": "./lib/isServerRenderResult.js",
     "./reactApis": "./lib/reactApis.cjs",
+    "./webpackHelpers": "./lib/webpackHelpers.cjs",
     "./reactHydrateOrRender": "./lib/reactHydrateOrRender.js",
     "./turbolinksUtils": "./lib/turbolinksUtils.js",
     "./isRenderFunction": "./lib/isRenderFunction.js",
@@ -72,7 +73,8 @@
     "lib/**/*.js",
     "lib/**/*.cjs",
     "lib/**/*.mjs",
-    "lib/**/*.d.ts"
+    "lib/**/*.d.ts",
+    "lib/**/*.d.cts"
   ],
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails/issues"

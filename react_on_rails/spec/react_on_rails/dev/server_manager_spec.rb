@@ -1196,10 +1196,43 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       described_class.kill_processes
     end
 
+    # Regression: previously kill_processes used `||` which short-circuited
+    # subsequent cleanup steps as soon as one returned truthy. A successful
+    # pattern-based kill would leave stale port-bound processes and socket/pid
+    # files behind. All three cleanup helpers must always run.
+    it "runs port kills and socket cleanup even when pattern-based kill found processes" do
+      # The catch-all must be defined FIRST. RSpec uses the most-recently-defined
+      # matching stub regardless of specificity (`any_args` does not yield to a
+      # narrower matcher automatically), so the specific "rails" stub below wins
+      # because it is defined last. Reversing the order would cause
+      # `kill_running_processes` to always return false, missing the regression
+      # path this test covers (the old `||` short-circuit would have skipped the
+      # remaining cleanup steps once pattern-based kill returned truthy).
+      allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
+      allow(Open3).to receive(:capture2).with("pgrep", "-f", "rails", err: File::NULL).and_return(["1234", nil])
+      allow(Process).to receive(:pid).and_return(9999)
+      allow(Process).to receive(:kill)
+
+      expect(Open3).to receive(:capture2).with("lsof", "-ti", ":3000", err: File::NULL).and_return(["", nil])
+      expect(Open3).to receive(:capture2).with("lsof", "-ti", ":3001", err: File::NULL).and_return(["", nil])
+
+      socket = ".overmind.sock"
+      allow(Dir).to receive(:glob).with("tmp/sockets/overmind*.sock").and_return([])
+      allow(File).to receive(:exist?).with(socket).and_return(true)
+      allow(File).to receive(:exist?).with("tmp/pids/server.pid").and_return(false)
+      expect(File).to receive(:delete).with(socket)
+
+      described_class.kill_processes
+    end
+
     it "targets base-port-derived ports when REACT_ON_RAILS_BASE_PORT is active" do
       # Without base-port awareness, `bin/dev kill` in a worktree running on
       # 5000/5001/5002 would fall back to killing stale processes on 3000/3001
-      # instead — the actual ports would be left untouched.
+      # instead — the actual ports would be left untouched. RENDERER_PORT is
+      # set so `pro_renderer_active?` returns true via `renderer_env_signal?`
+      # (the Pro gem isn't loaded in the open-source spec suite), exercising
+      # the base+2 inclusion path.
+      ENV["RENDERER_PORT"] = "5002"
       allow(ReactOnRails::Dev::PortSelector)
         .to receive(:base_port_hash)
         .and_return({ rails: 5000, webpack: 5001, renderer: 5002, base_port_mode: true })
@@ -1227,6 +1260,28 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       allow(Open3).to receive(:capture2).with("lsof", "-ti", ":5000", err: File::NULL).and_return(["", nil])
       allow(Open3).to receive(:capture2).with("lsof", "-ti", ":5001", err: File::NULL).and_return(["", nil])
       expect(Open3).not_to receive(:capture2).with("lsof", "-ti", ":5002", err: File::NULL)
+
+      described_class.kill_processes
+    end
+
+    it "includes the base-port-derived renderer port when Pro gem is loaded even without renderer env vars" do
+      # bin/dev kill is usually invoked from a fresh shell where RENDERER_PORT
+      # and REACT_RENDERER_URL aren't carried over. The Pro renderer runs as
+      # `node renderer/node-renderer.js` (see react_on_rails_pro Procfile.dev),
+      # which the development_processes pattern (`node.*react[-_]on[-_]rails`)
+      # does not match — so port-based killing is the only reliable path to
+      # reap a stale renderer on base+2. In base-port mode the user owns the
+      # port range, so the conservative env-var gate isn't needed.
+      allow(ReactOnRails::Dev::PortSelector)
+        .to receive(:base_port_hash)
+        .and_return({ rails: 5000, webpack: 5001, renderer: 5002, base_port_mode: true })
+      allow(described_class).to receive(:pro_renderer_active?).and_return(true)
+      # No pattern-based processes so kill_port_processes runs.
+      allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
+
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":5000", err: File::NULL).and_return(["", nil])
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":5001", err: File::NULL).and_return(["", nil])
+      expect(Open3).to receive(:capture2).with("lsof", "-ti", ":5002", err: File::NULL).and_return(["", nil])
 
       described_class.kill_processes
     end
