@@ -1565,7 +1565,9 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         expected_output = satisfy do |output|
           output.match?(/\(none\)\s+Start development server with live reload \(default\)/) &&
             !output.match?(/HMR Development mode \(default\)|Hot Module Replacement \(HMR\) enabled/) &&
-            !output.match?(%r{\(none\) / hmr\s+Start development server with live reload \(default\)})
+            !output.match?(%r{\(none\) / hmr\s+Start development server with live reload \(default\)}) &&
+            !output.include?("ReactRefreshWebpackPlugin") &&
+            output.include?("React Refresh requires HMR; current default mode is not HMR.")
         end
 
         expect { described_class.show_help }.to output(expected_output).to_stdout_from_any_process
@@ -1601,7 +1603,9 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         expected_output = satisfy do |output|
           output.match?(/\(none\)\s+Start development server \(default\)/) &&
             output.include?("Development server mode (default)") &&
-            !output.match?(/HMR Development mode \(default\)|Hot Module Replacement \(HMR\) enabled/)
+            !output.match?(/HMR Development mode \(default\)|Hot Module Replacement \(HMR\) enabled/) &&
+            !output.include?("ReactRefreshWebpackPlugin") &&
+            output.include?("React Refresh requires HMR; current default mode is not HMR.")
         end
 
         expect { described_class.show_help }.to output(expected_output).to_stdout_from_any_process

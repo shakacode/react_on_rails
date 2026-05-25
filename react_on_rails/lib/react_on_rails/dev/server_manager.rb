@@ -743,6 +743,32 @@ module ReactOnRails
           end.join("\n")
         end
 
+        def help_react_refresh_troubleshooting(default_mode)
+          return help_hmr_react_refresh_troubleshooting if default_mode == :hmr
+
+          <<~REFRESH
+            #{Rainbow('⚛️  React Refresh:').yellow.bold}
+            #{Rainbow('React Refresh requires HMR; current default mode is not HMR.').white}
+            #{Rainbow('•').yellow} #{Rainbow(ServerMode.text(default_mode, :refresh_guidance)).white}
+            #{Rainbow('•').yellow} #{Rainbow(ServerMode.text(default_mode, :refresh_note)).white}
+          REFRESH
+        end
+
+        # rubocop:disable Metrics/AbcSize
+        def help_hmr_react_refresh_troubleshooting
+          <<~REFRESH
+            #{Rainbow('⚛️  React Refresh Issues:').yellow.bold}
+            #{Rainbow('If you see "$RefreshSig$ is not defined" errors:').white}
+            #{Rainbow('1.').green} #{Rainbow('Check that both babel plugin and webpack plugin are configured:').white}
+               #{Rainbow('•').yellow} #{Rainbow('babel.config.js: \'react-refresh/babel\' plugin (enabled when WEBPACK_SERVE=true)').white}
+               #{Rainbow('•').yellow} #{Rainbow('config/webpack/development.js: ReactRefreshWebpackPlugin (enabled when WEBPACK_SERVE=true)').white}
+            #{Rainbow('2.').green} #{Rainbow(ServerMode.text(:hmr, :refresh_guidance)).white}
+            #{Rainbow('3.').green} #{Rainbow('Try restarting the development server:').white} #{Rainbow('bin/dev kill && bin/dev').green.bold}
+            #{Rainbow('4.').green} #{Rainbow(ServerMode.text(:hmr, :refresh_note)).white}
+          REFRESH
+        end
+        # rubocop:enable Metrics/AbcSize
+
         # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
         def run_production_like(_verbose: false, route: nil, rails_env: nil, skip_database_check: false,
                                 open_browser: false, open_browser_once: false)
@@ -1706,14 +1732,7 @@ module ReactOnRails
           <<~TROUBLESHOOTING
             #{Rainbow('🔧 TROUBLESHOOTING:').cyan.bold}
 
-            #{Rainbow('⚛️  React Refresh Issues:').yellow.bold}
-            #{Rainbow('If you see "$RefreshSig$ is not defined" errors:').white}
-            #{Rainbow('1.').green} #{Rainbow('Check that both babel plugin and webpack plugin are configured:').white}
-               #{Rainbow('•').yellow} #{Rainbow('babel.config.js: \'react-refresh/babel\' plugin (enabled when WEBPACK_SERVE=true)').white}
-               #{Rainbow('•').yellow} #{Rainbow('config/webpack/development.js: ReactRefreshWebpackPlugin (enabled when WEBPACK_SERVE=true)').white}
-            #{Rainbow('2.').green} #{Rainbow(ServerMode.text(default_mode, :refresh_guidance)).white}
-            #{Rainbow('3.').green} #{Rainbow('Try restarting the development server:').white} #{Rainbow('bin/dev kill && bin/dev').green.bold}
-            #{Rainbow('4.').green} #{Rainbow(ServerMode.text(default_mode, :refresh_note)).white}
+            #{help_react_refresh_troubleshooting(default_mode)}
 
             #{Rainbow('🚨 General Issues:').yellow.bold}
             #{Rainbow('•').red} #{Rainbow('"Port already in use"').white} #{Rainbow('→ Run:').yellow} #{Rainbow('bin/dev kill').green.bold}

@@ -140,7 +140,7 @@ module ReactOnRails
           return :live_reload if live_reload == true
           return :development_server if live_reload == false
 
-          # When neither explicit HMR nor explicit live_reload: false is configured, default to live reload.
+          # For a non-empty dev_server config without explicit HMR or live_reload: false, default to live reload.
           # Shakapacker enables live reload by default unless explicitly disabled:
           # https://github.com/shakacode/shakapacker/blob/main/package/webpackDevServerConfig.ts
           # See generators/react_on_rails/templates/base/base/config/shakapacker.yml.tt.
