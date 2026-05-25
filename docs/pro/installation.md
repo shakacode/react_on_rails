@@ -185,7 +185,7 @@ fields among the full response:
 }
 ```
 
-For example, JSON parsers should branch on `status` before treating `renewal_required` as an expiring-soon signal:
+JSON parsers should branch on `status` before treating `renewal_required` as an expiring-soon signal:
 
 ```ruby
 require "json"
@@ -231,7 +231,7 @@ permissions:
   contents: read
 
 jobs:
-  verify-license:
+  advisory-license-check:
     runs-on: ubuntu-latest
     env:
       RAILS_ENV: production
@@ -303,18 +303,20 @@ jobs:
           "$RUNNER_TEMP/react_on_rails_pro_license.log" 2>&1
 
       - name: Summarize React on Rails Pro license
+        env:
+          LICENSE_CHECK_OUTCOME: ${{ steps.license-check.outcome }}
         run: |
           {
             echo "## React on Rails Pro license"
             echo
-            if [ "${{ steps.license-check.outcome }}" = "success" ]; then
+            if [ "$LICENSE_CHECK_OUTCOME" = "success" ]; then
               echo "License validation passed."
             else
               echo "License validation did not pass. Run the check locally or inspect a redacted log for details."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-          if [ "${{ steps.license-check.outcome }}" != "success" ]; then
+          if [ "$LICENSE_CHECK_OUTCOME" != "success" ]; then
             echo "::warning title=React on Rails Pro license::License validation did not pass. See job summary."
           fi
 ```
