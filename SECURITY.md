@@ -1,23 +1,76 @@
 # Security Policy
 
-- **Last reviewed:** 2026-05-09
+- **Last reviewed:** 2026-05-20
 - **Review owner:** React on Rails maintainers
 - **Initial triage owner:** ShakaCode; [@justin808](https://github.com/justin808) is the current primary maintainer and initial triage contact for both the OSS packages and `react_on_rails_pro`.
-- **Next review due:** 2027-05-09
+- **Next review due:** 2027-05-20
 
 ## Supported Versions
 
-React on Rails does not yet publish fixed version numbers for security support. Report suspected vulnerabilities even
-when you find them in an older released React on Rails gem or npm package version; do not self-filter reports by
-version. Maintainers triage all reports, but fixes are normally prepared for the latest released minor line and supported
-upgrade paths first.
+Report suspected vulnerabilities even when you find them in an older released React on Rails gem or npm package
+version; do not self-filter reports by version. Maintainers triage all reports regardless of the affected version. What
+the policy below governs is which versions normally receive a **fix**, not which versions you may **report** against.
 
-| Version line                                                      | Security support                                                      |
-| ----------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Latest released `react_on_rails` gem and `react-on-rails` package | Report and triage                                                     |
-| Older released versions                                           | Report; maintainers evaluate case-by-case and may recommend upgrading |
+The `react_on_rails` Ruby gem and the `react-on-rails` npm package are released as a matched version pair and share a
+single security support window. The same window applies to the `react_on_rails_pro` gem, the `react-on-rails-pro` npm
+package, and the `react-on-rails-pro-node-renderer` npm package — they ship at the same version as the open-source
+release and are patched together. Pro customers on active commercial support agreements may have additional support
+windows negotiated privately; this public policy describes the floor, not the ceiling.
 
-Fixes are generally delivered for the most recent minor line; older releases may receive backports if severity warrants.
+The current released major line is **16.x**. The table below describes the policy in terms of "current major / current
+minor" so it remains accurate as new releases ship; the [Current support window](#current-support-window) section
+restates the same policy with the specific version numbers in effect today.
+
+| Version line                                                              | Security support                                                                                                                                                                                      |
+| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Latest minor of the current major (e.g., `16.6.x` while `16.6` is latest) | Full security support. Fixes are released as a patch on this line.                                                                                                                                    |
+| Previous minor of the current major (e.g., `16.5.x`)                      | Backports for **High / Critical** severity (CVSS ≥ 7.0) for **six months** after the next minor's first release.                                                                                      |
+| Previous major (e.g., `15.x`) — only the latest minor of that major       | Backports for **Critical** severity (CVSS ≥ 9.0) for **six months** after the first stable release of the new major.                                                                                  |
+| All other releases                                                        | Not supported. Reports are still triaged; if the issue also affects a supported line, the fix lands there and the recommended remediation for unsupported releases is to upgrade to a supported line. |
+
+Pre-release builds (`.rc`, `.beta`, `.alpha`) are not separately supported — once superseded by a stable release in the
+same line, the recommended remediation is to upgrade to that stable release. Security issues found in a pre-release
+build are handled through the same private reporting process and fixed before the stable release when feasible.
+
+### What "supported" means
+
+- **Full support:** Maintainers prepare a patch release for confirmed in-scope vulnerabilities of any severity.
+- **Backports (High/Critical):** A patch release is prepared if the vulnerability is rated High or Critical (CVSS ≥
+  7.0) under the GitHub Security Advisory rubric, or, in maintainer judgment, would be rated High or Critical if scored
+  formally.
+- **Backports (Critical only):** A patch release is prepared only for Critical (CVSS ≥ 9.0) vulnerabilities.
+- **Not supported:** No patch will be issued on that line. The fix lands on supported lines; users on unsupported lines
+  upgrade.
+
+When the severity rubric and maintainer judgment disagree, maintainers may choose to backport more aggressively than
+the table promises (for example, backporting a Medium-severity fix that is trivial to apply). The table is a floor on
+maintainer commitment, not a ceiling on maintainer behavior.
+
+### Current support window
+
+As of the **Last reviewed** date at the top of this file:
+
+| Status             | OSS gem & npm                             | Pro gem, Pro npm, Pro node renderer       | Until                                                |
+| ------------------ | ----------------------------------------- | ----------------------------------------- | ---------------------------------------------------- |
+| Full support       | `16.6.x`                                  | `16.6.x`                                  | Replaced when the next minor (e.g., `16.7.0`) ships. |
+| High/Critical only | `16.5.x`                                  | `16.5.x`                                  | 2026-10-09 (six months after `16.6.0` shipped).      |
+| Critical only      | _none — 15.x window closed on 2026-03-16_ | _none — 15.x window closed on 2026-03-16_ | Window closed six months after `16.0.0` shipped.     |
+
+When a new minor or major ships, the rows shift accordingly; maintainers update this section as part of the release
+checklist in [internal/contributor-info/releasing.md](internal/contributor-info/releasing.md).
+
+### Handling reports against unsupported versions
+
+If a reporter discloses a vulnerability that affects only an unsupported version:
+
+1. Maintainers confirm whether any supported line is also affected.
+2. If a supported line is affected, a fix is prepared there and the advisory documents the impact range, including the
+   unsupported lines, with the recommended remediation being "upgrade to a supported line."
+3. If no supported line is affected, the issue is documented privately and the reporter is credited; no patch release
+   is issued for the unsupported line.
+
+This policy is reviewed annually (see **Next review due** above) and may be revised at any time if release cadence,
+dependency landscape, or contributor capacity changes materially.
 
 ## Scope
 
