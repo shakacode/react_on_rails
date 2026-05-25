@@ -226,6 +226,14 @@ export function createCoreCapability(registries: Registries) {
       );
     },
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    prepareRenderResult(...args: any[]): any {
+      void args;
+      throw new Error(
+        'prepareRenderResult is not available in the client bundle. Import "react-on-rails" server-side.',
+      );
+    },
+
     // ===================================================================
     // PRO STUBS — overridden by Pro capabilities in react-on-rails-pro
     // ===================================================================
@@ -256,6 +264,18 @@ export function createCoreCapability(registries: Registries) {
     serverRenderRSCReactComponent(...args: any[]): any {
       void args;
       throw new Error('serverRenderRSCReactComponent requires the react-on-rails-pro package.');
+    },
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    addAsyncPropsCapabilityToComponentProps(...args: any[]): any {
+      void args;
+      throw new Error('addAsyncPropsCapabilityToComponentProps requires the react-on-rails-pro package.');
+    },
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    getOrCreateAsyncPropsManager(...args: any[]): any {
+      void args;
+      throw new Error('getOrCreateAsyncPropsManager requires the react-on-rails-pro package.');
     },
   };
 }

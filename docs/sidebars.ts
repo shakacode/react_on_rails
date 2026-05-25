@@ -196,6 +196,7 @@ const sidebars: SidebarsConfig = {
         'pro/upgrading-to-pro',
         'pro/streaming-ssr',
         'pro/node-renderer',
+        'pro/rolling-deploy-adapters',
         'pro/fragment-caching',
         'pro/js-memory-leaks',
         'pro/profiling-server-side-rendering-code',

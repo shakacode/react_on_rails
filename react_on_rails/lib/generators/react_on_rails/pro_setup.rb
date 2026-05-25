@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "generator_messages"
+require "react_on_rails/pro_migration"
 
 module ReactOnRails
   module Generators
@@ -52,12 +53,18 @@ module ReactOnRails
         say set_color("=" * 80, :cyan)
       end
 
-      # Check if Pro gem is missing. Attempts auto-install via bundle add.
+      # Check if the Pro gem is missing. When the base react_on_rails gem is in
+      # the Gemfile, installation is deferred to the later Gemfile swap (which
+      # preserves the user's version pin); otherwise auto-install via `bundle
+      # add` is attempted.
       # @param force [Boolean] When true, always checks (default: only if use_pro?).
-      # @return [Boolean] true if Pro gem is missing and could not be installed
+      # @return [Boolean] true only if the Pro gem is missing and could not be
+      #   installed; false if it is present, was auto-installed, or the install
+      #   is deferred to the Gemfile swap.
       def missing_pro_gem?(force: false)
         return false unless force || use_pro?
         return false if pro_gem_installed?
+        return false if defer_pro_gem_install_to_gemfile_swap
         return false if attempt_pro_gem_auto_install
 
         optional_prerelease_line = prerelease_note.empty? ? "" : "\n#{prerelease_note}"
@@ -530,6 +537,22 @@ module ReactOnRails
 
       def pro_gem_auto_install_command
         "bundle add #{PRO_GEM_NAME} --version='#{pro_gem_version_requirement}' --strict"
+      end
+
+      def defer_pro_gem_install_to_gemfile_swap
+        return false unless base_react_on_rails_gem_in_gemfile?
+
+        mark_pro_gem_installed!
+        true
+      end
+
+      def base_react_on_rails_gem_in_gemfile?
+        gemfile_path = File.join(destination_root, "Gemfile")
+        return false unless File.exist?(gemfile_path)
+
+        ReactOnRails::ProMigration.base_gem_entry?(File.read(gemfile_path))
+      rescue SystemCallError, IOError
+        false
       end
 
       def pro_gem_version_requirement

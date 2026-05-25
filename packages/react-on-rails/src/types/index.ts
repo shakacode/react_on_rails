@@ -149,6 +149,12 @@ type RenderFunctionResult = RenderFunctionSyncResult | RenderFunctionAsyncResult
 
 type StreamableComponentResult = ReactElement | Promise<ReactElement | string>;
 
+type AsyncPropsManager = {
+  getProp: (propName: string) => Promise<unknown>;
+  setProp: (propName: string, propValue: unknown) => void;
+  endStream: () => void;
+};
+
 /**
  * Render-functions are used to create dynamic React components or server-rendered HTML with side effects.
  * They receive two arguments: props and railsContext.
@@ -220,11 +226,18 @@ export interface RegisteredComponent {
 
 export type ItemRegistrationCallback<T> = (component: T) => void;
 
+export type GenerateRSCPayloadFunction = (
+  componentName: string,
+  props: unknown,
+  railsContext: RailsContextWithServerComponentMetadata,
+) => Promise<NodeJS.ReadableStream>;
+
 interface Params {
   props?: Record<string, unknown>;
   railsContext?: RailsContext;
   domNodeId?: string;
   trace?: boolean;
+  generateRSCPayload?: GenerateRSCPayloadFunction;
 }
 
 export interface RenderParams extends Params {
@@ -366,6 +379,15 @@ export type RSCPayloadStreamInfo = {
 
 export type RSCPayloadCallback = (streamInfo: RSCPayloadStreamInfo) => void;
 
+export type WithAsyncProps<
+  AsyncPropsType extends Record<string, unknown>,
+  PropsType extends Record<string, unknown>,
+> = PropsType & {
+  getReactOnRailsAsyncProp: <PropName extends keyof AsyncPropsType>(
+    propName: PropName,
+  ) => Promise<AsyncPropsType[PropName]>;
+};
+
 /** Contains the parts of the `ReactOnRails` API intended for internal use only. */
 export interface ReactOnRailsInternal extends ReactOnRails {
   /**
@@ -433,7 +455,7 @@ export interface ReactOnRailsInternal extends ReactOnRails {
   /**
    * Used by server rendering by Rails
    */
-  serverRenderReactComponent(options: RenderParams): null | string | Promise<RenderResult>;
+  serverRenderReactComponent(options: RenderParams): null | string | Promise<string>;
   /**
    * Used by server rendering by Rails
    */
@@ -446,6 +468,16 @@ export interface ReactOnRailsInternal extends ReactOnRails {
    * Used by Rails to catch errors in rendering
    */
   handleError(options: ErrorOptions): string | undefined;
+  /**
+   * Prepares a rendering result in the length-prefixed wire format for transport to Ruby.
+   * Used by the server_render_js Rails helper to format arbitrary JS evaluation results.
+   */
+  prepareRenderResult(
+    html: string,
+    consoleReplayScript: string,
+    hasErrors: boolean,
+    renderingError: RenderingError | null,
+  ): string;
   /**
    * Used by Rails server rendering to replay console messages.
    * Returns the console replay script wrapped in script tags.
@@ -480,6 +512,33 @@ export interface ReactOnRailsInternal extends ReactOnRails {
    * Indicates if the RSC bundle is being used.
    */
   isRSCBundle: boolean;
+  /**
+   * Adds the getAsyncProp function to the component props object.
+   * Uses getOrCreateAsyncPropsManager internally to handle race conditions
+   * between initial render and update chunks.
+   *
+   * @param props - The component props to enhance
+   * @param sharedExecutionContext - Map scoped to the current HTTP request
+   * @returns An object containing the component props with getReactOnRailsAsyncProp added
+   */
+  addAsyncPropsCapabilityToComponentProps: <
+    AsyncPropsType extends Record<string, unknown>,
+    PropsType extends Record<string, unknown>,
+  >(
+    props: PropsType,
+    sharedExecutionContext: Map<string, unknown>,
+  ) => {
+    props: WithAsyncProps<AsyncPropsType, PropsType>;
+  };
+  /**
+   * Gets or creates an AsyncPropsManager from the shared execution context.
+   * Implements lazy initialization to handle race conditions between
+   * the initial render request and update chunks.
+   *
+   * @param sharedExecutionContext - Map scoped to the current HTTP request
+   * @returns The AsyncPropsManager instance (existing or newly created)
+   */
+  getOrCreateAsyncPropsManager: (sharedExecutionContext: Map<string, unknown>) => AsyncPropsManager;
 }
 
 export type RenderStateHtml = FinalHtmlResult | Promise<FinalHtmlResult | ServerRenderResult>;

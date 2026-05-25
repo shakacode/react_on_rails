@@ -171,19 +171,28 @@ RUN bundle exec rake react_on_rails_pro:pre_seed_renderer_cache
 
 ### Rolling deploys: seed current and previous bundle hashes
 
-During a rolling deploy, new renderer instances can receive requests for both the current deployed bundle hash and the previous hash while old Rails instances drain. Treat this as a two-hash cache-seeding problem, not a single-file problem.
+During a rolling deploy, new renderer instances can receive requests for both the current deployed bundle hash and the previous hash while old Rails instances drain. Treat this as a two-hash cache-seeding problem, not a single-file problem — and each seeded hash must carry its own companion `loadable-stats.json` / RSC manifests built in lockstep with that bundle.
 
-At startup, aim to have the cache contain:
+`pre_seed_renderer_cache` handles the current bundle. For previous hashes, configure a **`rolling_deploy_adapter`** that:
 
-- the current server bundle hash
-- the previous server bundle hash
-- the current and previous RSC bundle hashes as well, if RSC support is enabled
-- any required copied assets and RSC manifests in each seeded hash directory
+- Publishes each successful deploy's bundle + companion assets to an artifact store (S3, Control Plane image registry, etc.) via its `upload` method — called automatically after `assets:precompile` in production-like environments.
+- Advertises recent deploys' bundle hashes via `previous_bundle_hashes`.
+- Retrieves the bundle + assets for a given historical hash via `fetch`.
 
-`pre_seed_renderer_cache` seeds the current locally built bundle outputs. For the previous deployed hash, the most practical approach is to publish bundle artifacts keyed by hash after each successful deploy, then fetch the previous hash artifact during the next build and place it into the same `<cache>/<bundleHash>/...` layout before boot.
+```ruby
+# config/initializers/react_on_rails_pro.rb
+ReactOnRailsPro.configure do |config|
+  config.rolling_deploy_adapter = MyApp::S3RollingDeployAdapter
+end
+```
+
+During the next build, `pre_seed_renderer_cache` calls `previous_bundle_hashes`, deduplicates against the current hash, then fetches and stages each into `<cache>/<bundleHash>/...` — preventing 410→retry for draining-version requests.
+
+See [Rolling-Deploy Adapters](./rolling-deploy-adapters.md) for the full protocol spec, reference implementations (S3, Control Plane, Filesystem), and a discussion of the loadable-stats wrinkle.
 
 ## Further Reading
 
+- [Rolling-Deploy Adapters](./rolling-deploy-adapters.md) — Protocol spec and reference implementations for `rolling_deploy_adapter`
 - [Node Renderer basics](../oss/building-features/node-renderer/basics.md) — Architecture and core concepts
 - [JavaScript configuration](../oss/building-features/node-renderer/js-configuration.md) — Node-side config options
 - [Error reporting and tracing](../oss/building-features/node-renderer/error-reporting-and-tracing.md) — Monitoring in production

@@ -12,6 +12,7 @@ on:
       - 'docs/sidebars.ts'
       - 'docs/.sidebar-exclusions'
       - 'script/check-docs-sidebar'
+      - 'script/lib/git-diff-base'
       - '.github/workflows/check-docs-sidebar.yml'
   pull_request:
     paths:
@@ -20,6 +21,7 @@ on:
       - 'docs/sidebars.ts'
       - 'docs/.sidebar-exclusions'
       - 'script/check-docs-sidebar'
+      - 'script/lib/git-diff-base'
       - '.github/workflows/check-docs-sidebar.yml'
   workflow_dispatch:
 

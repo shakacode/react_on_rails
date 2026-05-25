@@ -22,6 +22,7 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
                                         renderer_url: "http://localhost:3800",
                                         renderer_request_retry_limit: 5,
                                         enable_rsc_support: false,
+                                        rolling_deploy_adapter: nil,
                                         assets_to_copy: [
                                           path_in_webpack_folder(asset_filename),
                                           path_in_webpack_folder(asset_filename2)
@@ -41,7 +42,7 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     # Clear env vars and deprecation warning guard
     ENV.delete("RENDERER_SERVER_BUNDLE_CACHE_PATH")
     ENV.delete("RENDERER_BUNDLE_PATH")
-    ReactOnRailsPro::Utils.send(:reset_renderer_bundle_path_deprecation_warned!)
+    ReactOnRailsPro::RendererCachePath.send(:reset_deprecation_warned!)
   end
 
   after do
@@ -51,11 +52,18 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     FileUtils.rm_f(path_in_webpack_folder(asset_filename2))
     ENV.delete("RENDERER_SERVER_BUNDLE_CACHE_PATH")
     ENV.delete("RENDERER_BUNDLE_PATH")
+    ReactOnRailsPro::RendererCachePath.send(:reset_deprecation_warned!)
   end
 
   context "when mode is invalid" do
     it "raises ArgumentError" do
       expect { described_class.call(mode: :hardlink) }.to raise_error(ArgumentError, /mode must be one of/)
+    end
+  end
+
+  context "when mode is omitted" do
+    it "requires callers to choose copy or symlink explicitly" do
+      expect { described_class.call }.to raise_error(ArgumentError, /missing keyword: :mode/)
     end
   end
 
@@ -529,6 +537,7 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
                                           renderer_url: "http://localhost:3800",
                                           renderer_request_retry_limit: 5,
                                           enable_rsc_support: true,
+                                          rolling_deploy_adapter: nil,
                                           assets_to_copy: nil)
       allow(ReactOnRailsPro).to receive(:configuration).and_return(dbl_configuration)
       allow(ReactOnRailsPro::Utils).to receive_messages(

@@ -2,6 +2,7 @@
 
 - **Last reviewed:** 2026-05-09
 - **Review owner:** React on Rails maintainers
+- **Initial triage owner:** ShakaCode; [@justin808](https://github.com/justin808) is the current primary maintainer and initial triage contact for both the OSS packages and `react_on_rails_pro`.
 - **Next review due:** 2027-05-09
 
 ## Supported Versions

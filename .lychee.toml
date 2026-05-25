@@ -41,12 +41,14 @@ exclude = [
   '^https://your-shared-addr\.c9users\.io',
   '^https://hichee\.com',
   '^https?://rubyonrails\.org/doctrine',  # DNS issues
+  '^https://www\.oppenheimerfunds\.com/?$',  # DNS no longer resolves
 
   # ============================================================================
   # SSL CERTIFICATE ISSUES
   # ============================================================================
   # Expired, hostname mismatch, or verification failed
   '^https://(www\.)?blinkinc\.com',     # SSL certificate expired
+  '^https://(www\.)?flyhomes\.com',     # SSL certificate intermittently expired (#3268)
   '^https://(www\.)?localwise\.com',    # SSL verification failed
   '^https://(www\.)?mycfsapp\.com',     # SSL hostname mismatch
   '^https://(www\.)?scoutapp\.com',     # SSL hostname mismatch
@@ -93,6 +95,7 @@ exclude = [
   '^https://(www\.)?guavapass\.com',  # TLS handshake failures from CI
   '^https?://(www\.)?hvmn\.com',  # Returns 503 from CI
   '^https://(www\.)?hawaiichee\.com/?$', # Intermittent 500 from CI
+  '^https://deliveroo\.co\.uk/?$', # Returns 403 for automated requests
 
   # ============================================================================
   # EXTERNAL SITES THAT TIMEOUT DURING CI CHECKS
@@ -114,9 +117,13 @@ exclude = [
   # return 5xx responses to lychee in CI, even when the pages are live.
   '^https://github\.com/shakacode/react_on_rails/compare/',
   '^https://github\.com/shakacode/react_on_rails/pull/[0-9]+$',  # Intermittent 5xx from GitHub PR pages in CI
+  '^https://github\.com/shakacode/react_on_rails/actions/workflows/pro-test-package-and-gem\.yml$',  # Intermittent 502 from GitHub Actions workflow pages in CI
   '^https://github\.com/shakacode/react_on_rails/issues/2766$',  # Intermittent 502 from GitHub issue pages in CI
   '^https://github\.com/rack/rack/blob/main/SPEC\.rdoc$',  # Intermittent 502 from GitHub blob pages in CI
   '^https://github\.com/shakacode/shakapacker/blob/cdf32835d3e0949952b8b4b53063807f714f9b24/package/environments/base\.js(#.*)?$',  # Intermittent 502 from GitHub blob view in CI
+  '^https://github\.com/K4sku$',  # Intermittent 502 from GitHub user page in CI
+  '^https://github\.com/npm/cli/issues/6253$',  # Intermittent 502 from GitHub issue pages in CI
+  '^https://github\.com/search\?q=gem\+react_on_rails&ref=advsearch&type=repositories&utf8=%E2%9C%93$',  # Intermittent 502 from GitHub search in CI
 
   # ============================================================================
   # EXTERNAL DOC PAGES WITH CI CONNECTIVITY FAILURES

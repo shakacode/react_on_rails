@@ -84,6 +84,228 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
       end
     end
 
+    describe ".rolling_deploy_adapter" do
+      it "throws if upload does not accept bundle and assets keyword arguments" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash); end
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /upload\(bundle_hash, bundle:, assets:\)/)
+      end
+
+      it "accepts the documented upload signature" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, bundle:, assets:) = [bundle, assets]
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.not_to raise_error
+      end
+
+      it "accepts optional extra upload keyword arguments" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, bundle:, assets:, region: nil) = [bundle, assets, region]
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.not_to raise_error
+      end
+
+      it "rejects adapters that require extra upload keyword arguments" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, bundle:, assets:, region:) = [bundle, assets, region]
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /upload\(bundle_hash, bundle:, assets:\)/)
+      end
+
+      it "accepts adapters that capture upload keywords in an options hash" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, _options = {}); end
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.not_to raise_error
+      end
+
+      it "accepts adapters that capture upload keywords with a positional splat" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, *_args); end
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.not_to raise_error
+      end
+
+      it "accepts adapters that capture upload keywords with a keyword splat" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, **_kwargs); end
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.not_to raise_error
+      end
+
+      it "rejects options-hash adapters that require extra keyword arguments" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, _options = {}, region:) = region
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /upload\(bundle_hash, bundle:, assets:\)/)
+      end
+
+      it "rejects options-hash adapters with explicit keywords that do not capture upload keywords" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, _options = {}, region: nil) = region
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /upload\(bundle_hash, bundle:, assets:\)/)
+      end
+
+      it "rejects positional splat adapters with explicit keywords that do not capture upload keywords" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, *_args, region: nil) = region
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /upload\(bundle_hash, bundle:, assets:\)/)
+      end
+
+      it "rejects adapters that require the options hash positional argument" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, _options); end
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /upload\(bundle_hash, bundle:, assets:\)/)
+      end
+
+      # Regression: `accepts_bundle_hash_argument?` rejects signatures that have
+      # zero positional parameters even when the required upload keywords are
+      # present. A plausible mistake is to swap the positional `bundle_hash` for
+      # a `bundle_hash:` keyword; the adapter would still raise at upload time
+      # because the stager passes `bundle_hash` positionally.
+      it "rejects kwarg-only upload signatures with no positional bundle_hash" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(bundle:, assets:) = [bundle, assets]
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /upload\(bundle_hash, bundle:, assets:\)/)
+      end
+
+      it "rejects adapters that require extra positional upload arguments" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, _options, _extra); end
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /upload\(bundle_hash, bundle:, assets:\)/)
+      end
+
+      it "rejects extra required positional upload arguments even when required keywords are present" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, _region, bundle:, assets:) = [bundle, assets]
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /upload\(bundle_hash, bundle:, assets:\)/)
+      end
+
+      # Regression: `**nil` (the `:nokey` parameter kind) explicitly forbids
+      # keyword arguments. Without an explicit guard the options-hash branch
+      # would treat `(hash, opts = {}, **nil)` as compatible because it has one
+      # required and one optional positional, but the runtime call shape
+      # `upload(hash, bundle: ..., assets: ...)` raises ArgumentError.
+      it "rejects upload signatures that explicitly forbid keywords with **nil" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, _options = {}, **nil); end
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /upload\(bundle_hash, bundle:, assets:\)/)
+      end
+    end
+
     describe ".renderer_url" do
       it "is the renderer_url if provided" do
         url = "http://something.com:1234"

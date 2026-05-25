@@ -1,7 +1,7 @@
 PATH
   remote: ../../..
   specs:
-    react_on_rails (16.6.0)
+    react_on_rails (16.7.0.rc.1)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -12,16 +12,16 @@ PATH
 PATH
   remote: ../..
   specs:
-    react_on_rails_pro (16.6.0)
+    react_on_rails_pro (16.7.0.rc.1)
       addressable
       async (>= 2.29)
       connection_pool
       execjs (~> 2.9)
       http-2 (>= 1.1.1)
       httpx (~> 1.5)
-      jwt (~> 2.7)
+      jwt (>= 2.7)
       rainbow
-      react_on_rails (= 16.6.0)
+      react_on_rails (= 16.7.0.rc.1)
 
 GEM
   remote: https://rubygems.org/
@@ -162,7 +162,7 @@ GEM
       actionview (>= 5.0.0)
       activesupport (>= 5.0.0)
     json (2.16.0)
-    jwt (2.10.2)
+    jwt (3.2.0)
       base64
     logger (1.7.0)
     loofah (2.25.1)

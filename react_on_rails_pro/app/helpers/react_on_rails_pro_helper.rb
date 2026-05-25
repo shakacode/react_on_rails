@@ -141,6 +141,30 @@ module ReactOnRailsProHelper
     end
   end
 
+  def stream_react_component_with_async_props(component_name, options = {}, &props_block)
+    unless ReactOnRailsPro.configuration.enable_rsc_support
+      raise ReactOnRailsPro::Error,
+            "stream_react_component_with_async_props requires enable_rsc_support to be true. " \
+            "Async props depend on React Server Components. " \
+            "Set `config.enable_rsc_support = true` in your ReactOnRailsPro configuration."
+    end
+
+    options[:async_props_block] = props_block
+    stream_react_component(component_name, options)
+  end
+
+  def rsc_payload_react_component_with_async_props(component_name, options = {}, &props_block)
+    unless ReactOnRailsPro.configuration.enable_rsc_support
+      raise ReactOnRailsPro::Error,
+            "rsc_payload_react_component_with_async_props requires enable_rsc_support to be true. " \
+            "Async props depend on React Server Components. " \
+            "Set `config.enable_rsc_support = true` in your ReactOnRailsPro configuration."
+    end
+
+    options[:async_props_block] = props_block
+    rsc_payload_react_component(component_name, options)
+  end
+
   # Renders the React Server Component (RSC) payload for a given component. This helper generates
   # a special format designed by React for serializing server components and transmitting them
   # to the client.
@@ -516,7 +540,10 @@ module ReactOnRailsProHelper
     render_options = create_render_options(react_component_name, options)
     json_stream = server_rendered_react_component(render_options)
     json_stream.transform do |chunk|
-      "#{chunk.to_json}\n".html_safe
+      html = chunk.delete("html") || ""
+      metadata = chunk.to_json
+      content_bytes = html.bytesize.to_s(16).rjust(8, "0")
+      "#{metadata}\t#{content_bytes}\n#{html}".html_safe
     end
   end
 

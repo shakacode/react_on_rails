@@ -7,6 +7,7 @@ require_relative "generator_helper"
 require_relative "generator_messages"
 require_relative "js_dependency_manager"
 require_relative "pro_setup"
+require "react_on_rails/pro_migration"
 
 module ReactOnRails
   module Generators
@@ -103,43 +104,21 @@ module ReactOnRails
         end
 
         gemfile_content = File.read(gemfile_path)
-        pro_gem_pattern = /^\s*gem(?:\s+|\(\s*(?:#.*\n\s*)*)["']react_on_rails_pro["']/
-        base_gem_pattern = /^(\s*)gem(?:\s+|\(\s*)(["'])react_on_rails\2(?=\s*(?:,|\)|#|$))/
-
-        has_pro_gem_entry = gemfile_content.match?(pro_gem_pattern)
+        has_pro_gem_entry = ReactOnRails::ProMigration.pro_gem_entry?(gemfile_content)
         had_pro_gem_entry_before_prerequisites =
-          original_gemfile_content_for_rollback&.match?(pro_gem_pattern)
+          original_gemfile_content_for_rollback &&
+          ReactOnRails::ProMigration.pro_gem_entry?(original_gemfile_content_for_rollback)
         gemfile_lines = gemfile_content.lines
         updated_lines = []
-        pro_entry_added = has_pro_gem_entry
         base_gem_entry_found = false
+        base_gem_entries_removed = false
         line_index = 0
 
         while line_index < gemfile_lines.length
           line = gemfile_lines[line_index]
-          multiline_parenthesized_match = match_multiline_parenthesized_base_gem(gemfile_lines, line_index)
+          base_gem_declaration = ReactOnRails::ProMigration.base_gem_declaration_at(gemfile_lines, line_index)
 
-          if multiline_parenthesized_match
-            base_gem_entry_found = true
-            unless pro_entry_added
-              indentation = multiline_parenthesized_match[:indentation]
-              quote = multiline_parenthesized_match[:quote]
-              updated_lines << build_pro_gem_replacement_line(
-                indentation: indentation,
-                quote: quote,
-                suffix: multiline_parenthesized_match[:trailing_suffix],
-                parenthesized_gem_call: true
-              )
-              pro_entry_added = true
-            end
-
-            line_index = multiline_parenthesized_match[:next_index]
-            next
-          end
-
-          match = line.match(base_gem_pattern)
-
-          unless match
+          unless base_gem_declaration
             updated_lines << line
             line_index += 1
             next
@@ -147,25 +126,18 @@ module ReactOnRails
 
           base_gem_entry_found = true
 
-          declaration = consume_non_parenthesized_base_gem_declaration(
-            gemfile_lines,
-            line_index,
-            match.end(0)
-          )
-
-          unless pro_entry_added
-            indentation = match[1]
-            quote = match[2]
+          if has_pro_gem_entry
+            base_gem_entries_removed = true
+          else
             updated_lines << build_pro_gem_replacement_line(
-              indentation: indentation,
-              quote: quote,
-              suffix: declaration[:trailing_suffix],
-              parenthesized_gem_call: match[0].include?("(")
+              indentation: base_gem_declaration[:indentation],
+              quote: base_gem_declaration[:quote],
+              suffix: base_gem_declaration[:trailing_suffix],
+              parenthesized_gem_call: base_gem_declaration[:parenthesized_gem_call]
             )
-            pro_entry_added = true
           end
 
-          line_index = declaration[:next_index]
+          line_index = base_gem_declaration[:next_index]
         end
 
         updated_content = updated_lines.join
@@ -183,10 +155,6 @@ module ReactOnRails
           return true
         end
 
-        if has_pro_gem_entry
-          say "ℹ️  Existing react_on_rails_pro Gemfile entry detected; preserving current version constraint", :yellow
-        end
-
         if options[:pretend]
           say_status :pretend, "Would replace react_on_rails with react_on_rails_pro in Gemfile", :yellow
           return true
@@ -194,7 +162,15 @@ module ReactOnRails
 
         original_gemfile_content = original_gemfile_content_for_rollback || gemfile_content
         atomic_write_file(gemfile_path, updated_content)
-        say "✅ Replaced react_on_rails with react_on_rails_pro in Gemfile", :green
+        if base_gem_entries_removed
+          say(
+            "ℹ️  Existing react_on_rails_pro Gemfile entry detected; " \
+            "removed the now-stale react_on_rails entries",
+            :yellow
+          )
+        else
+          say "✅ Replaced react_on_rails with react_on_rails_pro in Gemfile", :green
+        end
         bundle_install_after_gem_swap(
           gemfile_path: gemfile_path,
           original_gemfile_content: original_gemfile_content
@@ -329,8 +305,8 @@ module ReactOnRails
       end
 
       def js_files_for_import_update
-        js_extensions = %w[js jsx ts tsx mjs cjs vue svelte].join(",")
-        %w[app/javascript app/frontend frontend javascript client].flat_map do |root|
+        js_extensions = ReactOnRails::ProMigration::JS_SOURCE_EXTENSIONS.join(",")
+        ReactOnRails::ProMigration::JS_SOURCE_ROOTS.flat_map do |root|
           root_path = File.join(destination_root, root)
           next [] unless Dir.exist?(root_path)
 
@@ -339,66 +315,84 @@ module ReactOnRails
         end.uniq
       end
 
+      STATIC_IMPORT_SPECIFIER_PATTERN = %r{
+        (?<prefix>
+          \A\s*(?:/\*.*?\*/\s*)?(?:import|export)(?:\s+type)?\s+.*?\s+from\s+|
+          \A\s*[\w\}\],\*\$\s]+\s+from\s+
+        )
+        (?<quote>["'])
+        react-on-rails(?!-pro)
+        (?=(?:["']|/))
+      }x
+
+      DYNAMIC_OR_REQUIRE_SPECIFIER_PATTERN = %r{
+        (?<prefix>
+          (?<!["'`])\bimport\s*\(\s*(?:/\*[^*]*\*+(?:[^/*][^*]*\*+)*/\s*)*|
+          (?<!["'`])\brequire\s*\(\s*(?:/\*[^*]*\*+(?:[^/*][^*]*\*+)*/\s*)*
+        )
+        (?<quote>["'])
+        react-on-rails(?!-pro)
+        (?=(?:["']|/))
+      }x
+
+      SIDE_EFFECT_IMPORT_PATTERN = %r{
+        \A(?<prefix>\s*(?:/\*.*?\*/\s*)*import\s+)
+        (?<quote>["'])
+        react-on-rails(?!-pro)
+        (?=(?:["']|/))
+      }x
+
+      # Explicit allowlist of documented Jest/Vitest APIs whose first argument is a module specifier.
+      # Keep destructive rewrites narrow; the doctor can warn more broadly if needed.
+      JEST_MODULE_SPECIFIER_METHOD_PATTERN = ReactOnRails::ProMigration::JEST_MODULE_SPECIFIER_METHOD_PATTERN
+      VITEST_MODULE_SPECIFIER_METHOD_PATTERN = ReactOnRails::ProMigration::VITEST_MODULE_SPECIFIER_METHOD_PATTERN
+
+      MOCK_CALL_PATTERN = %r{
+        (?<prefix>
+          (?<!["'`])\b(?:
+            jest\.(?:#{JEST_MODULE_SPECIFIER_METHOD_PATTERN})
+            |
+            vi\.(?:#{VITEST_MODULE_SPECIFIER_METHOD_PATTERN})
+          )
+          \s*
+          (?:<[^;\n]*>\s*)?
+          \s*\(\s*
+        )
+        (?<quote>["'])
+        react-on-rails(?!-pro)
+        (?=(?:["']|/))
+      }x
+
+      DECLARE_MODULE_PATTERN = %r{
+        \A(?<prefix>\s*(?:export\s+)?declare\s+module\s+)
+        (?<quote>["'])
+        react-on-rails(?!-pro)
+        (?=(?:["']|/))
+      }x
+
+      BASE_PACKAGE_REWRITE_PATTERNS = [
+        STATIC_IMPORT_SPECIFIER_PATTERN,
+        DYNAMIC_OR_REQUIRE_SPECIFIER_PATTERN,
+        SIDE_EFFECT_IMPORT_PATTERN,
+        MOCK_CALL_PATTERN,
+        DECLARE_MODULE_PATTERN
+      ].freeze
+      GEMFILE_STRING_DELIMITERS = ["'", '"', "`"].freeze
+
       def rewrite_react_on_rails_module_specifiers(content)
-        static_import_specifier_pattern = %r{
-          (?<prefix>
-            \A\s*(?:/\*.*?\*/\s*)?(?:import|export)(?:\s+type)?\s+.*?\s+from\s+|
-            \A\s*[\w\}\],\*\$\s]+\s+from\s+
-          )
-          (?<quote>["'])
-          react-on-rails(?!-pro)
-          (?=(?:["']|/))
-        }x
-
-        dynamic_or_require_specifier_pattern = %r{
-          (?<prefix>
-            (?<!["'`])\bimport\s*\(\s*(?:/\*[^*]*\*+(?:[^/*][^*]*\*+)*/\s*)*|
-            (?<!["'`])\brequire\s*\(\s*(?:/\*[^*]*\*+(?:[^/*][^*]*\*+)*/\s*)*
-          )
-          (?<quote>["'])
-          react-on-rails(?!-pro)
-          (?=(?:["']|/))
-        }x
-
-        side_effect_import_pattern = %r{
-          \A(?<prefix>\s*(?:/\*.*?\*/\s*)*import\s+)
-          (?<quote>["'])
-          react-on-rails(?!-pro)
-          (?=(?:["']|/))
-        }x
-
         rewrite_non_comment_lines(content) do |line|
           rewrite_outside_inline_template_literals(line) do |line_without_templates|
-            rewritten_line = line_without_templates.gsub(static_import_specifier_pattern) do
-              "#{Regexp.last_match[:prefix]}#{Regexp.last_match[:quote]}react-on-rails-pro"
-            end
-
-            rewritten_line = rewritten_line.gsub(dynamic_or_require_specifier_pattern) do
-              "#{Regexp.last_match[:prefix]}#{Regexp.last_match[:quote]}react-on-rails-pro"
-            end
-
-            rewritten_line.gsub(side_effect_import_pattern) do
-              "#{Regexp.last_match[:prefix]}#{Regexp.last_match[:quote]}react-on-rails-pro"
-            end
+            rewrite_base_package_patterns(line_without_templates)
           end
         end
       end
 
-      def line_continues_with_comma?(line)
-        line_without_comment = line.sub(/\s*#.*$/, "").rstrip
-        line_without_comment.end_with?(",")
-      end
-
-      def gem_declaration_continues_on_next_line?(line)
-        stripped = line.lstrip
-        return true if stripped.empty?
-
-        !stripped.match?(/\Agem(?:\s|\()/)
-      end
-
-      def comment_or_blank_line?(line)
-        stripped = line.lstrip
-        stripped.empty? || stripped.start_with?("#")
+      def rewrite_base_package_patterns(line)
+        BASE_PACKAGE_REWRITE_PATTERNS.reduce(line) do |result, pattern|
+          result.gsub(pattern) do
+            "#{Regexp.last_match[:prefix]}#{Regexp.last_match[:quote]}react-on-rails-pro"
+          end
+        end
       end
 
       def add_missing_gemfile_warning(gemfile_path)
@@ -562,23 +556,72 @@ module ReactOnRails
         comment_balance.positive?
       end
 
+      MODULE_SPECIFIER_CALL_START_PATTERN = /
+        (?<![\w$])(?:import|require)\s*\(
+        |
+        (?<!["'`])\b(?:
+          jest\.(?:#{JEST_MODULE_SPECIFIER_METHOD_PATTERN})
+          |
+          vi\.(?:#{VITEST_MODULE_SPECIFIER_METHOD_PATTERN})
+        )
+          \s*
+          (?:<[^;\n]*>\s*)?
+          \s*\(
+      /x
+
+      MODULE_SPECIFIER_CALL_WITH_STRING_PATTERN = %r{
+        (?<!["'`])\b(?:import|require)\s*\(\s*(?:/\*[^*]*\*+(?:[^/*][^*]*\*+)*/\s*)*["']
+        |
+        (?<!["'`])\b(?:
+          jest\.(?:#{JEST_MODULE_SPECIFIER_METHOD_PATTERN})
+          |
+          vi\.(?:#{VITEST_MODULE_SPECIFIER_METHOD_PATTERN})
+        )
+          \s*
+          (?:<[^;\n]*>\s*)?
+          \s*\(\s*
+          (?:/\*[^*]*\*+(?:[^/*][^*]*\*+)*/\s*)*
+          ["']
+      }x
+
       def starts_pending_multiline_module_call?(line)
         line_without_literals = line_without_string_literals_and_inline_comments(line)
-        return false unless line_without_literals.match?(/(?<![\w$])(?:import|require)\s*\(/)
+        return false unless line_without_literals.match?(MODULE_SPECIFIER_CALL_START_PATTERN)
 
-        !line.match?(%r{(?<!["'`])\b(?:import|require)\s*\(\s*(?:/\*[^*]*\*+(?:[^/*][^*]*\*+)*/\s*)*["']})
+        !line.match?(MODULE_SPECIFIER_CALL_WITH_STRING_PATTERN)
       end
 
+      PENDING_MODULE_SPECIFIER_PATTERN = %r{(?<quote>["'])react-on-rails(?!-pro)(?=(?:["']|/))}
+
       def rewrite_pending_module_specifier(line)
-        line.gsub(%r{(?<quote>["'])react-on-rails(?!-pro)(?=(?:["']|/))}) do
+        match = line.match(PENDING_MODULE_SPECIFIER_PATTERN)
+        return line unless match
+
+        rewritten_line = line.sub(PENDING_MODULE_SPECIFIER_PATTERN) do
           "#{Regexp.last_match[:quote]}react-on-rails-pro"
         end
+
+        rewrite_statement_suffix_after_pending_module_specifier(rewritten_line, match)
+      end
+
+      def rewrite_statement_suffix_after_pending_module_specifier(line, pending_match)
+        closing_quote_index = line.index(pending_match[:quote], pending_match.end(0))
+        return line unless closing_quote_index
+
+        suffix = line[(closing_quote_index + 1)..].to_s
+        separator_match = suffix.match(/\A(?<separator>\s*;\s*)/)
+        return line unless separator_match
+
+        suffix_code = suffix[separator_match.end(0)..].to_s
+        rewritten_suffix_code = rewrite_base_package_patterns(suffix_code)
+        "#{line[0..closing_quote_index]}#{separator_match[:separator]}#{rewritten_suffix_code}"
       end
 
       def update_pending_multiline_module_call_tracking(line, pending_depth)
         if pending_depth.positive?
           rewritten_line = rewrite_pending_module_specifier(line)
           updated_depth = pending_depth + module_call_parenthesis_delta(rewritten_line)
+          updated_depth = 0 if rewritten_line != line
           updated_depth = 0 if updated_depth <= 0
           [rewritten_line, updated_depth]
         elsif starts_pending_multiline_module_call?(line)
@@ -617,7 +660,8 @@ module ReactOnRails
       def module_call_parenthesis_delta(line, from_module_call_start: false)
         line_without_literals = line_without_string_literals_and_inline_comments(line)
         line_to_measure = if from_module_call_start
-                            line_without_literals.sub(/\A.*?(?<![\w$])(?:import|require)\s*\(/, "(")
+                            match = line_without_literals.match(MODULE_SPECIFIER_CALL_START_PATTERN)
+                            match ? "(#{line_without_literals[match.end(0)..]}" : line_without_literals
                           else
                             line_without_literals
                           end
@@ -823,96 +867,75 @@ module ReactOnRails
         nil
       end
 
-      # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
-      def match_multiline_parenthesized_base_gem(lines, start_index)
-        start_line = lines[start_index]
-        start_match = start_line.match(/^(\s*)gem\s*\(/)
-        return nil unless start_match
+      def build_pro_gem_replacement_line(indentation:, quote:, suffix:, parenthesized_gem_call: false)
+        normalized_suffix = suffix || "\n"
+        normalized_suffix = "#{normalized_suffix}\n" unless normalized_suffix.end_with?("\n")
 
-        line_index = start_index
-        found_base_gem_name = false
-        base_gem_quote = nil
-        gem_name_line_index = nil
-        gem_name_match_end = nil
-        paren_depth = 0
+        has_user_version_pin = normalized_suffix.match?(/\A\s*,\s*(?:#[^\n]*\n\s*)*["']/)
+        version_arg = has_user_version_pin ? "" : ", #{quote}#{pro_gem_version_requirement}#{quote}"
 
-        while line_index < lines.length
-          line = lines[line_index]
-          line_without_comment = line.sub(/\s*#.*$/, "")
-          line_without_literals = line_without_string_literals_and_inline_comments(line, strip_ruby_comments: true)
+        if parenthesized_gem_call
+          normalized_suffix = remove_parenthesized_gem_call_closing_parenthesis(normalized_suffix)
+        end
+        normalized_suffix = "\n" if normalized_suffix.match?(/\A,\s*\n\z/)
 
-          if !found_base_gem_name &&
-             (gem_name_match = line_without_comment.match(/(["'])react_on_rails\1(?=\s*(?:,|\)|#|$))/))
-            found_base_gem_name = true
-            base_gem_quote = gem_name_match[1]
-            gem_name_line_index = line_index
-            gem_name_match_end = gem_name_match.end(0)
+        "#{indentation}gem #{quote}react_on_rails_pro#{quote}#{version_arg}#{normalized_suffix}"
+      end
+
+      def remove_parenthesized_gem_call_closing_parenthesis(suffix)
+        closing_index = parenthesized_gem_call_closing_parenthesis_index(suffix)
+        return suffix unless closing_index
+
+        prefix = suffix[0...closing_index]
+        rest = suffix[(closing_index + 1)..].to_s
+        return "#{prefix.rstrip} #{rest.lstrip}" if closing_parenthesis_line_has_postfix_code?(rest)
+
+        "#{prefix.chomp}#{rest}"
+      end
+
+      def closing_parenthesis_line_has_postfix_code?(rest)
+        stripped_rest = rest.lstrip
+        !stripped_rest.empty? && !stripped_rest.start_with?("#", "\n", "\r")
+      end
+
+      # The suffix starts after the gem name but still inside the original `gem(...)` call,
+      # so the matching call-closing parenthesis is found by starting at depth 1.
+      def parenthesized_gem_call_closing_parenthesis_index(suffix)
+        depth = 1
+        quote = nil
+        scan_index = 0
+
+        while scan_index < suffix.length
+          char = suffix[scan_index]
+
+          if quote
+            quote = nil if char == quote && !character_escaped?(suffix, scan_index)
+          else
+            scan_index, depth, quote, closing_index =
+              next_parenthesized_gem_suffix_scan_state(suffix, scan_index, depth)
+            return closing_index if closing_index
+            return nil unless scan_index
           end
 
-          paren_depth += line_without_literals.count("(") - line_without_literals.count(")")
-
-          if paren_depth <= 0
-            return nil unless found_base_gem_name
-
-            declaration_fragment = lines[gem_name_line_index..line_index].join
-            suffix = declaration_fragment[gem_name_match_end..]
-            suffix = "\n" if suffix.nil? || suffix.empty?
-            return {
-              indentation: start_match[1],
-              quote: base_gem_quote,
-              next_index: line_index + 1,
-              trailing_suffix: suffix
-            }
-          end
-
-          line_index += 1
+          scan_index += 1
         end
 
         nil
       end
-      # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
 
-      def consume_non_parenthesized_base_gem_declaration(lines, start_index, match_end)
-        line_index = start_index
-        current_line = lines[line_index]
-        declaration_lines = [current_line]
-        line_index += 1
+      def next_parenthesized_gem_suffix_scan_state(suffix, scan_index, depth)
+        char = suffix[scan_index]
+        return [scan_index, depth, char, nil] if GEMFILE_STRING_DELIMITERS.include?(char)
+        return [suffix.index("\n", scan_index), depth, nil, nil] if char == "#"
+        return [scan_index, depth + 1, nil, nil] if char == "("
+        return parenthesized_gem_suffix_closing_state(scan_index, depth) if char == ")"
 
-        while line_index < lines.length &&
-              line_continues_with_comma?(current_line) &&
-              gem_declaration_continues_on_next_line?(lines[line_index])
-          next_line = lines[line_index]
-          declaration_lines << next_line
-          current_line = next_line unless comment_or_blank_line?(next_line)
-          line_index += 1
-        end
-
-        trailing_suffix = lines[start_index][match_end..].to_s + declaration_lines.drop(1).join
-        { trailing_suffix: trailing_suffix, next_index: line_index }
+        [scan_index, depth, nil, nil]
       end
 
-      def build_pro_gem_replacement_line(indentation:, quote:, suffix:, parenthesized_gem_call: false)
-        normalized_suffix = suffix || "\n"
-        normalized_suffix = "#{normalized_suffix}\n" unless normalized_suffix.end_with?("\n")
-        version_arg_pattern = /\A(?<prefix>\s*,(?:\s*#.*\n|\s++)*)["'][^"']*["'](?<trailing_comma>\s*,)?/
-        loop do
-          updated_suffix = normalized_suffix.sub(version_arg_pattern) do
-            if Regexp.last_match[:trailing_comma]
-              Regexp.last_match[:prefix].sub(/\n[ \t]*\z/, "")
-            else
-              ""
-            end
-          end
-          break if updated_suffix == normalized_suffix
-
-          normalized_suffix = updated_suffix
-        end
-        normalized_suffix = normalized_suffix.sub(/\A,\s*(?:#[^\n]*)?\n\z/, "\n")
-        normalized_suffix = normalized_suffix.sub(/\A,[ \t]{2,}/, ", ")
-        normalized_suffix = normalized_suffix.sub(/\)(\s*(?:#.*)?\n)\z/, '\1') if parenthesized_gem_call
-
-        "#{indentation}gem #{quote}react_on_rails_pro#{quote}, " \
-          "#{quote}#{pro_gem_version_requirement}#{quote}#{normalized_suffix}"
+      def parenthesized_gem_suffix_closing_state(scan_index, depth)
+        next_depth = depth - 1
+        [scan_index, next_depth, nil, next_depth.zero? ? scan_index : nil]
       end
 
       def print_success_message

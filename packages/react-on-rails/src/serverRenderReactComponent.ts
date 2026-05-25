@@ -6,12 +6,11 @@ import { isPromise, isServerRenderHash } from './isServerRenderResult.ts';
 import { consoleReplay } from './buildConsoleReplay.ts';
 import handleError from './handleError.ts';
 import { renderToString } from './ReactDOMServer.cts';
-import { createResultObject, convertToError, validateComponent } from './serverRenderUtils.ts';
+import { buildLengthPrefixedResult, convertToError, validateComponent } from './serverRenderUtils.ts';
 import type {
   CreateReactOutputResult,
   FinalHtmlResult,
   RenderParams,
-  RenderResult,
   RenderState,
   RenderOptions,
   ServerRenderResult,
@@ -110,7 +109,7 @@ async function createPromiseResult(
   renderState: RenderState,
   options: RenderOptions,
   throwJsErrors: boolean,
-): Promise<RenderResult> {
+): Promise<string> {
   // Capture console history before awaiting the promise
   // Node renderer will reset the global console.history after executing the synchronous part of the request.
   // It resets it only if replayServerAsyncOperationLogs renderer config is set to false.
@@ -122,11 +121,11 @@ async function createPromiseResult(
       ? processServerRenderHash(asyncResult, options)
       : ({ ...renderState, result: asyncResult } satisfies ProcessedRenderState);
     const consoleReplayScript = consoleReplay(consoleHistory);
-    return createResultObject(finalRenderState.result, consoleReplayScript, finalRenderState);
+    return buildLengthPrefixedResult(finalRenderState.result, consoleReplayScript, finalRenderState);
   } catch (e: unknown) {
     const errorRenderState = handleRenderingError(e, { componentName: options.componentName, throwJsErrors });
     const consoleReplayScript = consoleReplay(consoleHistory);
-    return createResultObject(errorRenderState.result, consoleReplayScript, errorRenderState);
+    return buildLengthPrefixedResult(errorRenderState.result, consoleReplayScript, errorRenderState);
   }
 }
 
@@ -134,17 +133,17 @@ function createFinalResult(
   renderState: RenderState,
   options: RenderOptions,
   throwJsErrors: boolean,
-): null | string | Promise<RenderResult> {
+): null | string | Promise<string> {
   const { result } = renderState;
   if (isPromise(result)) {
     return createPromiseResult({ ...renderState, result }, options, throwJsErrors);
   }
 
   const consoleReplayScript = consoleReplay();
-  return JSON.stringify(createResultObject(result, consoleReplayScript, renderState));
+  return buildLengthPrefixedResult(result, consoleReplayScript, renderState);
 }
 
-function serverRenderReactComponentInternal(options: RenderParams): null | string | Promise<RenderResult> {
+function serverRenderReactComponentInternal(options: RenderParams): null | string | Promise<string> {
   const {
     name: componentName,
     domNodeId,

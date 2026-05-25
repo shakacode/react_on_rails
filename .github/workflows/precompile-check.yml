@@ -90,7 +90,7 @@ jobs:
       - name: Fix dependency for libyaml-dev
         run: sudo apt install libyaml-dev
       - name: Setup Node
-        uses: ./.github/actions/setup-node-with-retry
+        uses: actions/setup-node@v4
         with:
           node-version: '22'
       - name: Setup pnpm

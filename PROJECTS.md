@@ -37,7 +37,7 @@ _Please support the project by [emailing Justin Gordon](mailto:justin@shakacode.
 
 ## Open Source Projects Live
 
-- [github.com/empirical-org/Empirical-Core](https://github.com/empirical-org/Empirical-Core): [Quill.org](https://quill.org/) Provides free tools to make your students better writers.
+- **[Quill.org](https://quill.org/)**: Provides free tools to make your students better writers.
 - **[Coderwall](https://coderwall.com/)**: The latest development and design tips, tools, and projects from our developer community. Source at [github.com/coderwall/coderwall-next](https://github.com/coderwall/coderwall-next)
 
 ## Demos and Tutorials

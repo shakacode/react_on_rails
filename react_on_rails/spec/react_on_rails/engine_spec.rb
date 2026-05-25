@@ -260,7 +260,6 @@ module ReactOnRails
       #
       # Historical context: PR #1770 added explicit loading via rake_tasks block,
       # causing tasks to run twice. Fixed in PR #2052 by relying on automatic loading.
-      # See analysis/rake-task-duplicate-analysis.md for full details.
 
       it "verifies engine.rb does not have a rake_tasks block" do
         # Read the engine.rb file

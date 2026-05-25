@@ -93,9 +93,9 @@ Server components produce HTML that does not need hydration — they have no cli
 > This section covers public, non-production directional benchmarks first, then a production case study. For validated,
 > at-scale results, see the [Production Case Study: Popmenu](#production-case-study-popmenu) below.
 
-<!-- Docusaurus custom ID keeps the docs-site README link stable if this heading text changes. -->
+<a id="public-marketplace-rsc-demo"></a>
 
-### Public Marketplace RSC Demo Evidence {#public-marketplace-rsc-demo}
+### Public Marketplace RSC Demo Evidence
 
 The [LocalHub marketplace demo](https://rsc.reactonrails.com/) is a public,
 inspectable React on Rails Pro + RSC demo. LocalHub is the sample marketplace
@@ -117,12 +117,14 @@ deployment topology still determine the final result.
 
 The [Gumroad-style RSC benchmark demo](https://github.com/shakacode/react-on-rails-demo-gumroad-rsc)
 is a public ShakaCode comparison repo modeled after a creator-dashboard surface with product listings and sales metrics,
-not an official Gumroad integration. The benchmark methodology and earlier-run artifacts are checked in as
-[`docs/performance-findings.md`](https://github.com/shakacode/react-on-rails-demo-gumroad-rsc/blob/5a2f0c29dc197184312c55bc4209492accea26e7/docs/performance-findings.md)
-on the active demo PR ([shakacode/react-on-rails-demo-gumroad-rsc#10](https://github.com/shakacode/react-on-rails-demo-gumroad-rsc/pull/10));
-the April 30, 2026 absolute timings reported below are from a more recent local run that has not yet landed in that
-artifact ([Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263) tracks the missing distribution and
-source artifacts). It measures the same reduced presenter data and outer layout across two routes. The comparison
+not an official Gumroad integration. The benchmark methodology, earlier-run artifacts, and the April 30, 2026
+production-like local run with median and p95 timings are documented in
+[`docs/performance-findings.md`](https://github.com/shakacode/react-on-rails-demo-gumroad-rsc/blob/010b3564398dbb9c8f5caafab25daed65b6f425c/docs/performance-findings.md#production-like-compiled-asset-8-cycle-repeat)
+on stacked demo PR
+[shakacode/react-on-rails-demo-gumroad-rsc#12](https://github.com/shakacode/react-on-rails-demo-gumroad-rsc/pull/12);
+the per-run JSON files remain gitignored local artifacts
+([Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263) tracks publishing per-run distribution data).
+It measures the same reduced presenter data and outer layout across two routes. The comparison
 changes three axes at once (RSC, the Pro Node renderer, and SSR), so the deltas cannot be attributed to any single
 factor. The routes are:
 
@@ -135,9 +137,10 @@ factor. The routes are:
 > renderer or SSR, while the RSC route uses the Pro Node renderer. Treat the deltas as the combined route-level effect;
 > see the [SSR Performance table](#ssr-performance-execjs-vs-node-renderer) for the renderer baseline.
 
-The April 30, 2026 local benchmark used eight strictly alternating measured runs between the Inertia and RSC routes
-(Inertia, RSC, Inertia, RSC, and so on), four per route. Before each of the eight measured runs, the harness sent one
-warmup request to the route being measured.
+The April 30, 2026 local benchmark used eight cycles, each measuring both routes in alternating cycle order
+(cycle 1: Inertia then RSC; cycle 2: RSC then Inertia; cycle 3: Inertia then RSC; and so on), producing sixteen
+measured runs total — eight per route. Before each measured run, the harness sent one warmup request to the route
+being measured.
 
 Conditions:
 
@@ -174,8 +177,8 @@ artifact does not yet publish enough logger or extraction-script context to conf
 `process_action` duration including rendering or a narrower controller-action field, so do not use it to infer the
 server-rendering split. Because the Pro Node renderer runs in a separate OS process, Rails wall time may also exclude
 RSC rendering cost that the Inertia control keeps in-process, so the two `action_total` values may not measure identical
-scopes of work. [Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263) tracks the missing distribution
-and source artifacts.
+scopes of work. The source artifact publishes median and p95 for `responseEnd` but not for `action_total`;
+[Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263) tracks publishing per-run distribution data.
 
 The navigation-duration gain (-21.7%) was larger than the `responseEnd` gain (-8.7%), which is consistent with the RSC
 route delivering fully server-rendered HTML — the browser has minimal client-side hydration work after `responseEnd`,
@@ -183,37 +186,61 @@ while the Inertia control must hydrate the React component tree on the client. B
 comes from the source artifact's Playwright harness rather than `PerformanceNavigationTiming.duration`, the two metrics
 are not from the same timing source and a direct `navigation duration - responseEnd` subtraction is not reported here.
 
-The page-specific script request count was 6 for the Inertia demo and 1 for the RSC demo, recorded as Chrome DevTools
-Network panel `Script`-type requests after loading each route. This is a fixed post-load observation, not a per-run
-timing median or statistical sample. Fewer requests do not necessarily imply a smaller browser payload: the RSC route
-carries runtime, Flight payload, and RSC-specific bundle costs that the Inertia control does not, so total transfer size
-is the meaningful network-cost metric and is not reported here. The raw request-count difference is noted for
-completeness only. See
+The same April 30, 2026 benchmark also captured per-navigation resource bytes via the `PerformanceResourceTiming` API
+for resources whose URL contains `/packs/` and ends in `.js`, plus the HTML response via
+`PerformanceNavigationTiming`. Medians across n=8 measured runs per route:
+
+| Metric                                                              | Inertia demo | RSC demo |
+| ------------------------------------------------------------------- | -----------: | -------: |
+| Page-specific JS requests (`/packs/*.js`)                           |            6 |        1 |
+| Page-specific JS transfer (wire bytes)                              |      3,587 B |      0 B |
+| Page-specific JS encoded body                                       |      3,287 B |      0 B |
+| Page-specific JS decoded body                                       |     10,947 B |      0 B |
+| HTML response transfer (`PerformanceNavigationTiming.transferSize`) |     14,523 B | 12,673 B |
+
+These transfer-size values are warmed-cache wire bytes, not cold-cache bundle totals. The harness sends one warmup
+request to the measured route before each measured run, which primes Chrome's HTTP disk cache so the Resource Timing
+API reports `transferSize: 0` for assets already cached by the warmup. For the Inertia demo, 5 of the 6 `/packs/` JS
+files (webpack-runtime, webpack-commons, two vendor chunks, and the inertia bundle) are served from disk cache on the
+measured run; the freshly-fetched bytes (~3.3 KB compressed, ~10.9 KB decompressed) come from a route-specific page
+chunk. For the RSC demo, the single page-specific JS file (the React on Rails Pro client bootstrap) is served from
+cache on the measured run, so its measured `transferSize` is `0`.
+
+The RSC route's Flight payload is not delivered as a separate `/rsc_payload/*` request in this benchmark; it is inlined
+in the HTML response, so the HTML transfer column (12,673 B vs 14,523 B for the Inertia control) captures most of the
+route-specific data delivered per navigation. The combined route-specific new bytes per warmed-cache navigation are
+roughly ~18.1 KB for the Inertia control (~3.6 KB JS + ~14.5 KB HTML) and ~12.7 KB for the RSC demo (~0 KB JS + ~12.7 KB
+HTML) — a ~30% warmed-cache wire-byte reduction, materially smaller than the -83% page-specific JS request-count
+reduction implies. Cold-cache bundle totals (what a first-time visitor downloads before any caching kicks in) are not
+captured by this benchmark methodology and remain a follow-up; see
 [Issue 3259](https://github.com/shakacode/react_on_rails/issues/3259).
 
-- _The linked `performance-findings.md` artifact reflects an earlier run; the April 30 timings shown above will be added
-  there in a follow-up, and distribution/variance artifacts are still pending. See
-  [Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263)._
-- _All timing values are medians from the raw benchmark artifact values (n=4 per route); sample size is too small to
+- _All timing values are medians from the raw benchmark artifact values (n=8 per route); sample size is too small to
   establish statistical significance._
-- _The `action_total` -2.3% delta is likely within expected variance at n=4._
+- _The published `responseEnd` p95 (731ms Inertia vs 768ms RSC, see the
+  [`responseEnd` p95 counter-signal](#gumroad-rsc-worst-case-responseend) below) is larger than the other route's
+  median in both directions (Inertia p95 731ms > RSC median 589ms; RSC p95 768ms > Inertia median 645ms), so
+  the per-run `responseEnd` ranges overlap and the median -8.7% RSC-favored delta is consistent with measurement noise
+  rather than a stable RSC win on this metric._
+- _The source artifact does not publish a p95 or per-run distribution for `action_total`, so its -2.3% median delta
+  cannot be distinguished from measurement noise at n=8._
 
 <a id="gumroad-rsc-worst-case-responseend"></a>
 
-#### Worst-case `responseEnd` counter-signal
+#### `responseEnd` p95 counter-signal
 
-| Metric                             | Inertia demo | RSC demo | Delta % (negative = RSC faster) |
-| ---------------------------------- | -----------: | -------: | ------------------------------: |
-| Worst-case `responseEnd` (max n=4) |        731ms |    768ms |                           +5.1% |
+| Metric                  | Inertia demo | RSC demo | Delta % (negative = RSC faster) |
+| ----------------------- | -----------: | -------: | ------------------------------: |
+| `responseEnd` p95 (n=8) |        731ms |    768ms |                           +5.1% |
 
-With only four samples, p95 is the maximum observed value by definition, not an independently estimated tail
-percentile; this metric is therefore reported as "worst-case (max n=4)" here. It shows a +5.1% RSC regression on
-worst-case `responseEnd` (high variance is expected at n=4), indicating the Inertia control had a faster worst-case
-`responseEnd` than the RSC route.
+At n=8 the p95 is interpolated near the second-worst observed value rather than the maximum, but with only eight
+samples it remains a coarse tail estimate rather than a stable population p95. It shows a +5.1% RSC regression on tail
+`responseEnd` (high variance is expected at n=8), indicating the Inertia control had a faster tail
+`responseEnd` than the RSC route on this run.
 
 Use these numbers as a case-study signal, not a universal performance claim. The RSC route combines RSC, the Pro Node
 renderer, and SSR, while the Inertia control has none of those three factors. With that caveat, the RSC route showed
-faster median navigation duration and LCP on the measured routes. The worst-case `responseEnd` counter-signal favored
+faster median navigation duration and LCP on the measured routes. The `responseEnd` p95 counter-signal favored
 the Inertia control. A stable deployed repeat, renderer-internal timing, environment metadata, and distribution artifacts
 are still required before making stronger production-performance claims.
 

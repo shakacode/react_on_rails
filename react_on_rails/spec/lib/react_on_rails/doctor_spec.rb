@@ -2136,26 +2136,47 @@ RSpec.describe ReactOnRails::Doctor do
     let(:doctor) { described_class.new(verbose: false, fix: true) }
     let(:checker) { doctor.instance_variable_get(:@checker) }
 
-    it "adds explicit guidance that Gemfile constraints are not auto-fixed" do
+    def stub_synchronizer(result)
+      synchronizer = instance_double(ReactOnRails::VersionSynchronizer, sync: result)
+
+      allow(doctor).to receive(:package_json_path_for)
+        .with("package version auto-sync")
+        .and_return("package.json")
+      allow(ReactOnRails::VersionSynchronizer).to receive(:new).and_return(synchronizer)
+    end
+
+    it "adds explicit guidance that Gemfile constraints are not auto-fixed when changes are applied" do
       result = ReactOnRails::VersionSynchronizer::Result.new(
-        changes: [
-          { section: "dependencies", package: "react-on-rails", from: "^16.0.0", to: "16.5.0" }
-        ],
+        changes: [{ section: "dependencies", package: "react-on-rails", from: "^16.4.0", to: "16.5.0" }],
         changed_files: ["package.json"],
         unsupported_specs: [],
         missing_source_specs: []
       )
-      synchronizer = instance_double(ReactOnRails::VersionSynchronizer, sync: result)
-
-      allow(doctor).to receive(:resolved_package_json_path).and_return("package.json")
-      allow(File).to receive(:exist?).and_call_original
-      allow(File).to receive(:exist?).with("package.json").and_return(true)
-      allow(ReactOnRails::VersionSynchronizer).to receive(:new).and_return(synchronizer)
+      stub_synchronizer(result)
 
       doctor.send(:auto_fix_versions)
 
       info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
       expect(info_messages).to include(
+        a_string_including("FIX=true only updates package.json; update Gemfile constraints manually if needed.")
+      )
+    end
+
+    # Regression: previously emitted unconditionally, producing misleading noise
+    # alongside `report_sync_changes`'s "No package.json version changes needed".
+    it "skips the Gemfile-constraints info message when there are no changes" do
+      result = ReactOnRails::VersionSynchronizer::Result.new(
+        changes: [],
+        changed_files: [],
+        unsupported_specs: [],
+        missing_source_specs: []
+      )
+      stub_synchronizer(result)
+
+      doctor.send(:auto_fix_versions)
+
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(info_messages).not_to include(
         a_string_including("FIX=true only updates package.json; update Gemfile constraints manually if needed.")
       )
     end
@@ -2371,7 +2392,7 @@ RSpec.describe ReactOnRails::Doctor do
     context "when Pro gem is installed with NodeRenderer" do
       before do
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
-        pro_config = double("ProConfig", server_renderer: "NodeRenderer")
+        pro_config = double("ProConfig", server_renderer: "NodeRenderer", rolling_deploy_adapter: nil)
         stub_const("ReactOnRailsPro", double("ReactOnRailsPro", configuration: pro_config))
       end
 
@@ -2385,7 +2406,7 @@ RSpec.describe ReactOnRails::Doctor do
     context "when Pro gem is installed with ExecJS" do
       before do
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
-        pro_config = double("ProConfig", server_renderer: "ExecJS")
+        pro_config = double("ProConfig", server_renderer: "ExecJS", rolling_deploy_adapter: nil)
         stub_const("ReactOnRailsPro", double("ReactOnRailsPro", configuration: pro_config))
       end
 
@@ -2578,6 +2599,239 @@ RSpec.describe ReactOnRails::Doctor do
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? { |m| m[:content].include?("Pro initializer not found") }).to be true
       end
+    end
+  end
+
+  describe "check_rolling_deploy_adapter" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+    let(:config) { double("ProConfig", rolling_deploy_adapter: adapter) } # rubocop:disable RSpec/VerifiedDoubles
+
+    before do
+      # Capture let values into locals so closures inside define_singleton_method
+      # can see them — define_singleton_method evaluates blocks in the module's
+      # own scope where `config` is not a known identifier.
+      config_value = config
+      pro_module = Module.new
+      pro_module.define_singleton_method(:configuration) { config_value }
+      utils_module = Module.new
+      utils_module.define_singleton_method(:resolve_renderer_cache_dir) { "/tmp/nonexistent-cache-dir" }
+      pro_module.const_set(:Utils, utils_module)
+      stub_const("ReactOnRailsPro", pro_module)
+      ENV.delete("PREVIOUS_BUNDLE_HASHES")
+    end
+
+    after { ENV.delete("PREVIOUS_BUNDLE_HASHES") }
+
+    context "when rolling_deploy_adapter is nil and env override is unset" do
+      let(:adapter) { nil }
+
+      it "adds an info line" do
+        doctor.send(:check_rolling_deploy_adapter)
+        info = checker.messages.select { |m| m[:type] == :info }
+        expect(info.any? { |m| m[:content].include?("No rolling_deploy_adapter configured") }).to be(true)
+      end
+    end
+
+    context "when env override is set but adapter is nil" do
+      let(:adapter) { nil }
+
+      before { ENV["PREVIOUS_BUNDLE_HASHES"] = "abc,def" }
+
+      it "warns that both are required" do
+        doctor.send(:check_rolling_deploy_adapter)
+        warnings = checker.messages.select { |m| m[:type] == :warning }
+        expect(warnings.any? do |m|
+                 m[:content].include?("PREVIOUS_BUNDLE_HASHES") && m[:content].include?("abc,def")
+               end).to be(true)
+      end
+    end
+
+    # Regression: an accidentally-large PREVIOUS_BUNDLE_HASHES value (e.g. a
+    # full bundle dumped into the env by mistake) should not flood operator
+    # output. Echo a capped prefix and the total length instead.
+    context "when env override is large enough to flood operator output" do
+      let(:adapter) { nil }
+      let(:long_value) { "a" * 500 }
+
+      before { ENV["PREVIOUS_BUNDLE_HASHES"] = long_value }
+
+      it "truncates the echoed env value and reports the total length" do
+        doctor.send(:check_rolling_deploy_adapter)
+        warning = checker.messages.find { |m| m[:type] == :warning && m[:content].include?("PREVIOUS_BUNDLE_HASHES") }
+        expect(warning).not_to be_nil
+        expect(warning[:content]).to include("… (500 chars total)")
+        expect(warning[:content]).not_to include("a" * 200)
+      end
+    end
+
+    context "when adapter implements all required methods and returns hashes" do
+      let(:adapter) do
+        Module.new do
+          def self.previous_bundle_hashes = %w[abc def]
+          def self.fetch(_hash); end
+          def self.upload(_hash, **_opts); end
+        end
+      end
+
+      it "reports protocol success and probe success" do
+        doctor.send(:check_rolling_deploy_adapter)
+        successes = checker.messages.select { |m| m[:type] == :success }
+        expect(successes.any? { |m| m[:content].include?("responds to all required methods") }).to be(true)
+        expect(successes.any? { |m| m[:content].include?("2 hash(es)") }).to be(true)
+      end
+    end
+
+    context "when adapter is configured and PREVIOUS_BUNDLE_HASHES is also set" do
+      let(:adapter) do
+        Module.new do
+          def self.previous_bundle_hashes
+            raise "should not be probed when env var overrides discovery"
+          end
+
+          def self.fetch(_hash); end
+          def self.upload(_hash, **_opts); end
+        end
+      end
+
+      before { ENV["PREVIOUS_BUNDLE_HASHES"] = "abc,def" }
+
+      it "skips the previous_bundle_hashes probe and reports the env-var override" do
+        doctor.send(:check_rolling_deploy_adapter)
+        info = checker.messages.select { |m| m[:type] == :info }
+        warnings = checker.messages.select { |m| m[:type] == :warning }
+        expect(info.any? do |m|
+                 m[:content].include?("PREVIOUS_BUNDLE_HASHES") && m[:content].include?("skipping")
+               end).to be(true)
+        expect(warnings.none? { |m| m[:content].include?("should not be probed") }).to be(true)
+      end
+    end
+
+    context "when renderer cache contains rolling-deploy temporary directories" do
+      let(:cache_dir) { Dir.mktmpdir }
+      let(:adapter) do
+        Module.new do
+          def self.previous_bundle_hashes = %w[abc]
+          def self.fetch(_hash); end
+          def self.upload(_hash, **_opts); end
+        end
+      end
+
+      before do
+        FileUtils.mkdir_p(File.join(cache_dir, "abc"))
+        FileUtils.mkdir_p(File.join(cache_dir, "abc.staging-1234-deadbeef12"))
+        FileUtils.mkdir_p(File.join(cache_dir, "abc.previous-1234-feedface12"))
+        cache_dir_value = cache_dir
+        ReactOnRailsPro::Utils.define_singleton_method(:resolve_renderer_cache_dir) { cache_dir_value }
+      end
+
+      after { FileUtils.rm_rf(cache_dir) }
+
+      it "excludes temporary directories from the bundle-hash count" do
+        doctor.send(:check_rolling_deploy_adapter)
+        info = checker.messages.select { |m| m[:type] == :info }
+        expect(info.map { |m| m[:content] }).to include(a_string_matching(/\(1 bundle-hash subdir\(s\)\)/))
+      end
+    end
+
+    context "when adapter is missing required methods" do
+      let(:adapter) do
+        Module.new do
+          def self.previous_bundle_hashes = []
+        end
+      end
+
+      it "warns with the missing methods listed" do
+        doctor.send(:check_rolling_deploy_adapter)
+        warnings = checker.messages.select { |m| m[:type] == :warning }
+        expect(warnings.any? do |m|
+                 m[:content].include?("missing required methods") && m[:content].include?("fetch")
+               end).to be(true)
+        expect(warnings.none? { |m| m[:content].include?("previous_bundle_hashes returned []") }).to be(true)
+      end
+    end
+
+    context "when previous_bundle_hashes returns []" do
+      let(:adapter) do
+        Module.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash); end
+          def self.upload(_hash, **_opts); end
+        end
+      end
+
+      it "warns that the upload side likely has not run" do
+        doctor.send(:check_rolling_deploy_adapter)
+        warnings = checker.messages.select { |m| m[:type] == :warning }
+        expect(warnings.any? { |m| m[:content].include?("returned []") }).to be(true)
+      end
+    end
+
+    context "when previous_bundle_hashes times out" do
+      let(:adapter) do
+        Module.new do
+          def self.previous_bundle_hashes
+            sleep 1
+          end
+
+          def self.fetch(_hash); end
+          def self.upload(_hash, **_opts); end
+        end
+      end
+
+      before do
+        stager_module = Module.new
+        stager_module.const_set(:DISCOVERY_TIMEOUT_SECONDS, 0.01)
+        ReactOnRailsPro.const_set(:RollingDeployCacheStager, stager_module)
+      end
+
+      it "uses the stager timeout constant when it is loaded" do
+        doctor.send(:check_rolling_deploy_adapter)
+        warnings = checker.messages.select { |m| m[:type] == :warning }
+        expect(warnings.any? { |m| m[:content].include?("timed out after 0.01s") }).to be(true)
+      end
+    end
+  end
+
+  describe "report_resolved_cache_dir" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+    let(:cache_dir) { Dir.mktmpdir("doctor-cache") }
+
+    before do
+      cache_dir_value = cache_dir
+      pro_module = Module.new
+      utils_module = Module.new
+      utils_module.define_singleton_method(:resolve_renderer_cache_dir) { cache_dir_value }
+      pro_module.const_set(:Utils, utils_module)
+      stub_const("ReactOnRailsPro", pro_module)
+    end
+
+    after { FileUtils.rm_rf(cache_dir) }
+
+    it "excludes leftover staging/backup temp dirs from the bundle-hash count" do
+      FileUtils.mkdir_p(File.join(cache_dir, "abc123"))
+      FileUtils.mkdir_p(File.join(cache_dir, "def456"))
+      FileUtils.mkdir_p(File.join(cache_dir, "abc123.staging-1234-deadbeef"))
+      FileUtils.mkdir_p(File.join(cache_dir, "abc123.previous-1234-feedface"))
+
+      doctor.send(:report_resolved_cache_dir)
+
+      info = checker.messages.find { |m| m[:type] == :info && m[:content].include?(cache_dir) }
+      expect(info[:content]).to include("(2 bundle-hash subdir(s))")
+    end
+
+    it "uses the Pro stager constant when the Pro gem is loaded" do
+      stager_module = Module.new
+      stager_module.const_set(:TEMPORARY_DIRECTORY_PATTERN, /\.tempmarker\z/)
+      ReactOnRailsPro.const_set(:RollingDeployCacheStager, stager_module)
+      FileUtils.mkdir_p(File.join(cache_dir, "abc123"))
+      FileUtils.mkdir_p(File.join(cache_dir, "abc123.tempmarker"))
+
+      doctor.send(:report_resolved_cache_dir)
+
+      info = checker.messages.find { |m| m[:type] == :info && m[:content].include?(cache_dir) }
+      expect(info[:content]).to include("(1 bundle-hash subdir(s))")
     end
   end
 
@@ -2963,9 +3217,193 @@ RSpec.describe ReactOnRails::Doctor do
                end).to be(true)
       end
     end
+
+    context "when a CircleCI config references the deprecated task" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        FileUtils.mkdir_p(File.join(tmpdir, ".circleci"))
+        File.write(
+          File.join(tmpdir, ".circleci/config.yml"),
+          "jobs:\n  deploy:\n    steps:\n      " \
+          "- run: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "flags CI manifests in the fixed allowlist" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        suggestion_line = warning_msgs
+                          .flat_map { |m| m[:content].split("\n") }
+                          .find { |line| line.include?(".circleci/config.yml →") }
+        expect(suggestion_line).not_to be_nil
+        expect(suggestion_line).to include("pre_seed_renderer_cache")
+      end
+    end
+
+    context "when a GitHub Actions workflow discovered via glob references the deprecated task" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        FileUtils.mkdir_p(File.join(tmpdir, ".github/workflows"))
+        File.write(
+          File.join(tmpdir, ".github/workflows/deploy.yml"),
+          "jobs:\n  release:\n    steps:\n      " \
+          "- run: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+        # A second workflow with no reference confirms the glob only flags hits.
+        File.write(
+          File.join(tmpdir, ".github/workflows/test.yml"),
+          "jobs:\n  test:\n    steps:\n      - run: bundle exec rspec\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "flags workflows expanded from the bounded glob" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        warning_content = warning_msgs.map { |m| m[:content] }.join("\n")
+        expect(warning_content).to include(".github/workflows/deploy.yml →")
+        expect(warning_content).not_to include(".github/workflows/test.yml")
+        expect(warning_content).to include("pre_seed_renderer_cache")
+      end
+    end
+
+    context "when a Capistrano stage file outside the fixed allowlist references the deprecated task" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        FileUtils.mkdir_p(File.join(tmpdir, "config/deploy"))
+        # canary.rb is not in RENDERER_CACHE_DEPLOY_SCRIPT_PATHS, so it can only be
+        # found via the config/deploy/*.rb glob expansion.
+        File.write(
+          File.join(tmpdir, "config/deploy/canary.rb"),
+          "before 'deploy:assets:precompile', 'react_on_rails_pro:pre_stage_bundle_for_node_renderer'\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "flags arbitrary Capistrano stage files via the glob" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        suggestion_line = warning_msgs
+                          .flat_map { |m| m[:content].split("\n") }
+                          .find { |line| line.include?("config/deploy/canary.rb →") }
+        expect(suggestion_line).not_to be_nil
+        expect(suggestion_line).to include("pre_seed_renderer_cache")
+        expect(suggestion_line).to include("MODE=symlink")
+      end
+    end
+
+    context "when a glob-discovered file raises during read" do
+      let(:tmpdir) { Dir.mktmpdir }
+      let(:workflow_relpath) { ".github/workflows/deploy.yml" }
+      let(:workflow_path) { File.join(tmpdir, workflow_relpath) }
+
+      before do
+        FileUtils.mkdir_p(File.dirname(workflow_path))
+        File.write(
+          workflow_path,
+          "jobs:\n  release:\n    steps:\n      " \
+          "- run: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+        # Also drop a Procfile hit so we can confirm the scan keeps going after
+        # the per-file failure on the glob-discovered workflow.
+        File.write(
+          File.join(tmpdir, "Procfile"),
+          "web: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+
+        root_path = Pathname.new(tmpdir)
+        allow(Rails).to receive(:root).and_return(root_path)
+
+        failing_workflow = instance_double(Pathname)
+        allow(failing_workflow).to receive_messages(file?: true, size: File.size(workflow_path))
+        allow(failing_workflow).to receive(:binread).and_raise(Errno::EIO, "simulated read failure")
+        allow(root_path).to receive(:join).and_call_original
+        allow(root_path).to receive(:join).with(workflow_relpath).and_return(failing_workflow)
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "captures the per-file failure and keeps scanning the remaining paths" do
+        expect { doctor.send(:check_deprecated_renderer_cache_task) }.not_to raise_error
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? do |m|
+                 m[:content].include?("Could not scan #{workflow_relpath} for deprecated renderer-cache task")
+               end).to be(true)
+        expect(warning_msgs.any? { |m| m[:content].include?("Procfile") }).to be(true)
+        expect(warning_msgs.none? do |m|
+                 m[:content].include?("Could not complete scan for deprecated renderer-cache task")
+               end).to be(true)
+      end
+    end
+
+    context "when expanding a deploy-script glob raises an unexpected error" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        File.write(
+          File.join(tmpdir, "Procfile"),
+          "web: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+
+        # Fail only the workflows glob; the others must still expand normally.
+        allow(Dir).to receive(:glob).and_call_original
+        allow(Dir).to receive(:glob)
+          .with(".github/workflows/*.yml", File::FNM_PATHNAME, base: tmpdir)
+          .and_raise(Errno::EACCES, "simulated glob failure")
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "captures the glob failure and continues scanning fixed paths" do
+        expect { doctor.send(:check_deprecated_renderer_cache_task) }.not_to raise_error
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? do |m|
+                 m[:content].include?("Could not expand renderer-cache deploy-script glob .github/workflows/*.yml")
+               end).to be(true)
+        expect(warning_msgs.any? { |m| m[:content].include?("pre_stage_bundle_for_node_renderer") }).to be(true)
+        expect(warning_msgs.none? do |m|
+                 m[:content].include?("Could not complete scan for deprecated renderer-cache task")
+               end).to be(true)
+      end
+    end
+
+    context "when a Capistrano stage file is reachable via both the fixed list and the glob" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        FileUtils.mkdir_p(File.join(tmpdir, "config/deploy"))
+        File.write(
+          File.join(tmpdir, "config/deploy/staging.rb"),
+          "before 'deploy:assets:precompile', 'react_on_rails_pro:pre_stage_bundle_for_node_renderer'\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "reports the same file only once" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        bullet_lines = warning_msgs
+                       .flat_map { |m| m[:content].split("\n") }
+                       .grep(%r{config/deploy/staging\.rb →})
+        expect(bullet_lines.length).to eq(1)
+      end
+    end
   end
 
-  describe "check_base_package_imports" do
+  describe "check_base_package_references" do
     let(:doctor) { described_class.new(verbose: false, fix: false) }
     let(:checker) { doctor.instance_variable_get(:@checker) }
 
@@ -2982,10 +3420,11 @@ RSpec.describe ReactOnRails::Doctor do
       end
 
       it "reports warning with file paths" do
-        doctor.send(:check_base_package_imports)
+        doctor.send(:check_base_package_references)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? { |m| m[:content].include?("react-on-rails") }).to be true
         expect(warning_msgs.any? { |m| m[:content].include?("custom-bundle.js") }).to be true
+        expect(warning_msgs.any? { |m| m[:content].include?("dynamic imports") }).to be true
       end
     end
 
@@ -3002,7 +3441,7 @@ RSpec.describe ReactOnRails::Doctor do
       end
 
       it "reports warning" do
-        doctor.send(:check_base_package_imports)
+        doctor.send(:check_base_package_references)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? { |m| m[:content].include?("react-on-rails") }).to be true
       end
@@ -3021,9 +3460,462 @@ RSpec.describe ReactOnRails::Doctor do
       end
 
       it "reports warning" do
-        doctor.send(:check_base_package_imports)
+        doctor.send(:check_base_package_references)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? { |m| m[:content].include?("react-on-rails") }).to be true
+      end
+    end
+
+    context "when JS files dynamically import the base package after a Pro migration" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/lazy.js",
+                       "const ReactOnRails = await import('react-on-rails/client');\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("lazy.js") }).to be true
+      end
+    end
+
+    context "when JS files use a side-effect import of the base package after a Pro migration" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/side-effect.js",
+                       "import 'react-on-rails';\nimport 'react-on-rails/client';\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("side-effect.js") }).to be true
+      end
+    end
+
+    context "when JS files use a side-effect import of the Pro package" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/side-effect.js",
+                       "import 'react-on-rails-pro';\n")
+            example.run
+          end
+        end
+      end
+
+      it "does not warn" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("side-effect.js") }).to be false
+      end
+    end
+
+    context "when Vue or Svelte components reference the base package after a Pro migration" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/Widget.vue",
+                       "<template>\n  <div />\n</template>\n\n" \
+                       "<script setup>\nimport ReactOnRails from 'react-on-rails';\n</script>\n")
+            File.write("app/javascript/packs/Widget.svelte",
+                       "<script lang=\"ts\">\n  import 'react-on-rails/client';\n</script>\n\n<div />\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning for both .vue and .svelte files" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("Widget.vue") }).to be true
+        expect(warning_msgs.any? { |m| m[:content].include?("Widget.svelte") }).to be true
+      end
+    end
+
+    context "when JS tests mock the base package after a Pro migration" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/app.test.ts",
+                       "jest.mock('react-on-rails', () => ({ authenticityHeaders: jest.fn() }));\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("app.test.ts") }).to be true
+        expect(warning_msgs.any? { |m| m[:content].include?("Found references to 'react-on-rails'") }).to be true
+      end
+    end
+
+    context "when JS tests mock a base package subpath after a Pro migration" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/app.test.ts",
+                       "jest.mock('react-on-rails/client', () => ({ authenticityHeaders: jest.fn() }));\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("app.test.ts") }).to be true
+      end
+    end
+
+    context "when JS tests use a typed Jest mock for the base package after a Pro migration" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/app.test.ts",
+                       "jest.mock<typeof import('react-on-rails')>('react-on-rails', () => ({}));\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("app.test.ts") }).to be true
+      end
+    end
+
+    context "when JS tests mock the Pro package after a Pro migration" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/app.test.ts",
+                       "jest.mock('react-on-rails-pro', () => ({ authenticityHeaders: jest.fn() }));\n")
+            example.run
+          end
+        end
+      end
+
+      it "does not warn" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("app.test.ts") }).to be false
+      end
+    end
+
+    context "when Vitest tests import the actual base package after a Pro migration" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/app.test.ts",
+                       "const mod = await vi.importActual('react-on-rails/client');\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("app.test.ts") }).to be true
+      end
+    end
+
+    context "when Vitest tests import the base package mock without a receiver" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/app.test.ts",
+                       "const mod = await importMock('react-on-rails');\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("app.test.ts") }).to be true
+      end
+    end
+
+    context "when non-test code has a bare mock helper that references the base package string" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/factory.ts",
+                       "mock('react-on-rails', factory);\n")
+            example.run
+          end
+        end
+      end
+
+      it "does not warn" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("factory.ts") }).to be false
+      end
+    end
+
+    context "when non-test code has a mock-like receiver that references the base package string" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/factory.ts",
+                       "server.mock('react-on-rails', factory);\n")
+            example.run
+          end
+        end
+      end
+
+      it "does not warn" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("factory.ts") }).to be false
+      end
+    end
+
+    context "when JS tests use additional mock helpers after a Pro migration" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            {
+              "create-mock.test.ts" => "jest.createMockFromModule('react-on-rails');\n",
+              "unmock.test.ts" => "jest.unmock('react-on-rails');\n",
+              "deep-unmock.test.ts" => "jest.deepUnmock('react-on-rails');\n",
+              "do-mock.test.ts" => "jest.doMock('react-on-rails/client', () => ({}));\n",
+              "do-unmock.test.ts" => "vi.doUnmock('react-on-rails');\n",
+              "dont-mock.test.ts" => "jest.dontMock('react-on-rails');\n",
+              "set-mock.test.ts" => "jest.setMock('react-on-rails', {});\n",
+              "unstable-mock-module.test.ts" => "jest.unstable_mockModule('react-on-rails', () => ({}));\n",
+              "unstable-unmock-module.test.ts" => "jest.unstable_unmockModule('react-on-rails');\n",
+              "require-actual.test.ts" => "const mod = jest.requireActual('react-on-rails');\n",
+              "require-mock.test.ts" => "const mod = jest.requireMock('react-on-rails/client');\n",
+              "vitest-mock.test.ts" => "vi.mock('react-on-rails', () => ({ authenticityHeaders: vi.fn() }));\n"
+            }.each do |filename, content|
+              File.write("app/javascript/packs/#{filename}", content)
+            end
+            example.run
+          end
+        end
+      end
+
+      it "reports warning for each stale helper reference" do
+        doctor.send(:check_base_package_references)
+        warning_content = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }.join("\n")
+        expect(warning_content).to include("create-mock.test.ts")
+        expect(warning_content).to include("unmock.test.ts")
+        expect(warning_content).to include("deep-unmock.test.ts")
+        expect(warning_content).to include("do-mock.test.ts")
+        expect(warning_content).to include("do-unmock.test.ts")
+        expect(warning_content).to include("dont-mock.test.ts")
+        expect(warning_content).to include("set-mock.test.ts")
+        expect(warning_content).to include("unstable-mock-module.test.ts")
+        expect(warning_content).to include("unstable-unmock-module.test.ts")
+        expect(warning_content).to include("require-actual.test.ts")
+        expect(warning_content).to include("require-mock.test.ts")
+        expect(warning_content).to include("vitest-mock.test.ts")
+      end
+    end
+
+    context "when JS tests use a nonstandard vitest namespace object" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/vitest-namespace.test.ts",
+                       "vitest.mock('react-on-rails', () => ({}));\n")
+            example.run
+          end
+        end
+      end
+
+      it "does not report a warning for the nonstandard helper form" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("vitest-namespace.test.ts") }).to be false
+      end
+    end
+
+    context "when TypeScript declaration files augment the base package after a Pro migration" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/types")
+            File.write("app/javascript/types/react-on-rails.d.ts",
+                       "declare module 'react-on-rails' {\n  export function register(): void;\n}\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("react-on-rails.d.ts") }).to be true
+      end
+    end
+
+    context "when TypeScript declaration files augment a base package subpath after a Pro migration" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/types")
+            File.write("app/javascript/types/react-on-rails-client.d.ts",
+                       "declare module 'react-on-rails/client' {\n  export function register(): void;\n}\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("react-on-rails-client.d.ts") }).to be true
+      end
+    end
+
+    context "when TypeScript declarations export augmentations for the base package after a Pro migration" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/types")
+            File.write("app/javascript/types/react-on-rails-export.d.ts",
+                       "export declare module 'react-on-rails' {\n  export function register(): void;\n}\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("react-on-rails-export.d.ts") }).to be true
+      end
+    end
+
+    context "when module files use ESM or CommonJS extensions after a Pro migration" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/esm-entry.mjs",
+                       "import ReactOnRails from 'react-on-rails';\n")
+            File.write("app/javascript/packs/cjs-entry.cjs",
+                       "const ReactOnRails = require('react-on-rails/client');\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning for each module file" do
+        doctor.send(:check_base_package_references)
+        warning_content = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }.join("\n")
+        expect(warning_content).to include("esm-entry.mjs")
+        expect(warning_content).to include("cjs-entry.cjs")
+      end
+    end
+
+    context "when TypeScript module files use .mts or .cts extensions after a Pro migration" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            FileUtils.mkdir_p("app/javascript/types")
+            File.write("app/javascript/packs/esm-entry.mts",
+                       "import ReactOnRails from 'react-on-rails';\n")
+            File.write("app/javascript/packs/cjs-entry.cts",
+                       "const ReactOnRails = require('react-on-rails/client');\n")
+            File.write("app/javascript/types/react-on-rails.d.mts",
+                       "declare module 'react-on-rails' {\n  export function register(): void;\n}\n")
+            File.write("app/javascript/types/react-on-rails.d.cts",
+                       "declare module 'react-on-rails/client' {\n  export function register(): void;\n}\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning for each TypeScript module and declaration file" do
+        doctor.send(:check_base_package_references)
+        warning_content = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }.join("\n")
+        expect(warning_content).to include("esm-entry.mts")
+        expect(warning_content).to include("cjs-entry.cts")
+        expect(warning_content).to include("react-on-rails.d.mts")
+        expect(warning_content).to include("react-on-rails.d.cts")
+      end
+    end
+
+    context "when .mts or .cts files correctly reference 'react-on-rails-pro'" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            FileUtils.mkdir_p("app/javascript/types")
+            File.write("app/javascript/packs/esm-entry.mts",
+                       "import ReactOnRails from 'react-on-rails-pro';\n")
+            File.write("app/javascript/packs/cjs-entry.cts",
+                       "const ReactOnRails = require('react-on-rails-pro/client');\n")
+            File.write("app/javascript/types/react-on-rails-pro.d.mts",
+                       "declare module 'react-on-rails-pro' {\n  export function register(): void;\n}\n")
+            File.write("app/javascript/types/react-on-rails-pro.d.cts",
+                       "declare module 'react-on-rails-pro/client' {\n  export function register(): void;\n}\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports success without flagging Pro references" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(warning_msgs).to be_empty
+        expect(success_msgs.any? { |m| m[:content].include?("Pro package used correctly") }).to be true
+      end
+    end
+
+    context "when one scanned file has invalid UTF-8 content" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/app.js",
+                       "import ReactOnRails from 'react-on-rails';\n")
+            File.binwrite("app/javascript/packs/binary.js", "\xFF")
+            example.run
+          end
+        end
+      end
+
+      it "skips the unreadable file and keeps scanning the rest" do
+        doctor.send(:check_base_package_references)
+        warning_content = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }.join("\n")
+        expect(warning_content).to include("app.js")
+        expect(warning_content).not_to include("Could not scan")
       end
     end
 
@@ -3040,8 +3932,113 @@ RSpec.describe ReactOnRails::Doctor do
       end
 
       it "reports success" do
-        doctor.send(:check_base_package_imports)
+        doctor.send(:check_base_package_references)
         success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(success_msgs.any? { |m| m[:content].include?("Pro package used correctly") }).to be true
+      end
+    end
+
+    context "when JS files correctly dynamically import from 'react-on-rails-pro'" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/lazy.js",
+                       "const ReactOnRails = await import('react-on-rails-pro/client');\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports success" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(warning_msgs).to be_empty
+        expect(success_msgs.any? { |m| m[:content].include?("Pro package used correctly") }).to be true
+      end
+    end
+
+    context "when JS tests correctly mock 'react-on-rails-pro'" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/app.test.ts",
+                       "jest.mock('react-on-rails-pro', () => ({ authenticityHeaders: jest.fn() }));\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports success" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(warning_msgs).to be_empty
+        expect(success_msgs.any? { |m| m[:content].include?("Pro package used correctly") }).to be true
+      end
+    end
+
+    context "when Vitest tests correctly import actual 'react-on-rails-pro'" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/app.test.ts",
+                       "const mod = await vi.importActual('react-on-rails-pro');\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports success" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(warning_msgs).to be_empty
+        expect(success_msgs.any? { |m| m[:content].include?("Pro package used correctly") }).to be true
+      end
+    end
+
+    context "when TypeScript declarations correctly augment 'react-on-rails-pro'" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/types")
+            File.write("app/javascript/types/react-on-rails-pro.d.ts",
+                       "declare module 'react-on-rails-pro' {\n  export function register(): void;\n}\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports success" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(warning_msgs).to be_empty
+        expect(success_msgs.any? { |m| m[:content].include?("Pro package used correctly") }).to be true
+      end
+    end
+
+    context "when TypeScript declarations correctly augment a Pro package subpath" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/types")
+            File.write("app/javascript/types/react-on-rails-pro-client.d.ts",
+                       "declare module 'react-on-rails-pro/client' {\n  export function register(): void;\n}\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports success" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(warning_msgs).to be_empty
         expect(success_msgs.any? { |m| m[:content].include?("Pro package used correctly") }).to be true
       end
     end
@@ -3054,9 +4051,28 @@ RSpec.describe ReactOnRails::Doctor do
       end
 
       it "reports success (no files to scan)" do
-        doctor.send(:check_base_package_imports)
+        doctor.send(:check_base_package_references)
         success_msgs = checker.messages.select { |m| m[:type] == :success }
         expect(success_msgs.any? { |m| m[:content].include?("Pro package used correctly") }).to be true
+      end
+    end
+
+    context "when a generator-scanned client root contains stale base package references" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("client/app/packs")
+            File.write("client/app/packs/app.test.ts",
+                       "jest.mock('react-on-rails', () => ({}));\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning for the same root the Pro generator rewrites" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("client/app/packs/app.test.ts") }).to be true
       end
     end
 
@@ -3079,10 +4095,35 @@ RSpec.describe ReactOnRails::Doctor do
       end
 
       it "scans the custom source_path and reports warning" do
-        doctor.send(:check_base_package_imports)
+        doctor.send(:check_base_package_references)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? { |m| m[:content].include?("react-on-rails") }).to be true
         expect(warning_msgs.any? { |m| m[:content].include?("client/app/packs/app.js") }).to be true
+      end
+    end
+
+    context "when a file disappears during the base package scan" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            example.run
+          end
+        end
+      end
+
+      it "skips the unreadable file and keeps scanning the rest" do
+        missing_file = "app/javascript/packs/deleted.js"
+        stale_file = "app/javascript/packs/stale.js"
+        File.write(stale_file, "import ReactOnRails from 'react-on-rails';\n")
+
+        allow(Dir).to receive(:glob).and_call_original
+        allow(Dir).to receive(:glob).with("app/javascript/**/*.js").and_return([missing_file, stale_file])
+
+        doctor.send(:check_base_package_references)
+        warning_content = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }.join("\n")
+        expect(warning_content).to include(stale_file)
+        expect(warning_content).not_to include("Could not scan for base package references")
       end
     end
   end

@@ -21,6 +21,7 @@ module ReactOnRailsPro
       dependency_globs: Configuration::DEFAULT_DEPENDENCY_GLOBS,
       excluded_dependency_globs: Configuration::DEFAULT_EXCLUDED_DEPENDENCY_GLOBS,
       remote_bundle_cache_adapter: Configuration::DEFAULT_REMOTE_BUNDLE_CACHE_ADAPTER,
+      rolling_deploy_adapter: Configuration::DEFAULT_ROLLING_DEPLOY_ADAPTER,
       ssr_timeout: Configuration::DEFAULT_SSR_TIMEOUT,
       ssr_pre_hook_js: nil,
       assets_to_copy: nil,
@@ -52,6 +53,7 @@ module ReactOnRailsPro
     DEFAULT_DEPENDENCY_GLOBS = [].freeze
     DEFAULT_EXCLUDED_DEPENDENCY_GLOBS = [].freeze
     DEFAULT_REMOTE_BUNDLE_CACHE_ADAPTER = nil
+    DEFAULT_ROLLING_DEPLOY_ADAPTER = nil
     DEFAULT_RENDERER_REQUEST_RETRY_LIMIT = 5
     DEFAULT_THROW_JS_ERRORS = true
     DEFAULT_RENDERING_RETURNS_PROMISES = false
@@ -63,12 +65,16 @@ module ReactOnRailsPro
     DEFAULT_REACT_CLIENT_MANIFEST_FILE = "react-client-manifest.json"
     DEFAULT_REACT_SERVER_CLIENT_MANIFEST_FILE = "react-server-client-manifest.json"
     DEFAULT_CONCURRENT_COMPONENT_STREAMING_BUFFER_SIZE = 64
+    ROLLING_DEPLOY_UPLOAD_POSITIONAL_PARAMS = %i[req opt rest].freeze
+    ROLLING_DEPLOY_UPLOAD_KEYWORD_PARAMS = %i[key keyreq].freeze
+    ROLLING_DEPLOY_UPLOAD_ALL_KEYWORD_PARAMS = %i[keyrest].freeze
+    ROLLING_DEPLOY_UPLOAD_REQUIRED_KEYWORDS = %i[bundle assets].freeze
 
     attr_accessor :renderer_url, :renderer_password, :tracing,
                   :server_renderer, :renderer_use_fallback_exec_js, :prerender_caching,
                   :renderer_http_pool_size, :renderer_http_pool_timeout, :renderer_http_pool_warn_timeout,
                   :dependency_globs, :excluded_dependency_globs, :rendering_returns_promises,
-                  :remote_bundle_cache_adapter, :ssr_pre_hook_js, :assets_to_copy,
+                  :remote_bundle_cache_adapter, :rolling_deploy_adapter, :ssr_pre_hook_js, :assets_to_copy,
                   :renderer_request_retry_limit, :throw_js_errors, :ssr_timeout,
                   :profile_server_rendering_js_code, :raise_non_shell_server_rendering_errors, :enable_rsc_support,
                   :rsc_payload_generation_url_path, :rsc_bundle_js_file, :react_client_manifest_file,
@@ -116,7 +122,8 @@ module ReactOnRailsPro
                    renderer_http_pool_warn_timeout: nil, renderer_http_keep_alive_timeout: nil,
                    tracing: nil,
                    dependency_globs: nil, excluded_dependency_globs: nil, rendering_returns_promises: nil,
-                   remote_bundle_cache_adapter: nil, ssr_pre_hook_js: nil, assets_to_copy: nil,
+                   remote_bundle_cache_adapter: nil, rolling_deploy_adapter: nil,
+                   ssr_pre_hook_js: nil, assets_to_copy: nil,
                    renderer_request_retry_limit: nil, throw_js_errors: nil, ssr_timeout: nil,
                    profile_server_rendering_js_code: nil, raise_non_shell_server_rendering_errors: nil,
                    enable_rsc_support: nil, rsc_payload_generation_url_path: nil,
@@ -137,6 +144,7 @@ module ReactOnRailsPro
       self.dependency_globs = dependency_globs
       self.excluded_dependency_globs = excluded_dependency_globs
       self.remote_bundle_cache_adapter = remote_bundle_cache_adapter
+      self.rolling_deploy_adapter = rolling_deploy_adapter
       self.ssr_pre_hook_js = ssr_pre_hook_js
       self.assets_to_copy = assets_to_copy
       self.renderer_request_retry_limit = renderer_request_retry_limit
@@ -156,6 +164,7 @@ module ReactOnRailsPro
       configure_default_url_if_not_provided
       validate_url
       validate_remote_bundle_cache_adapter
+      validate_rolling_deploy_adapter
       setup_renderer_password
       validate_renderer_password_for_production
       setup_assets_to_copy
@@ -247,6 +256,94 @@ module ReactOnRailsPro
         raise ReactOnRailsPro::Error,
               "config.remote_bundle_cache_adapter must have a class method named 'upload'" \
               "which takes a single named Pathname parameter 'zipped_bundles_filepath' & returns nil"
+      end
+    end
+
+    def validate_rolling_deploy_adapter
+      return if rolling_deploy_adapter.nil?
+
+      unless rolling_deploy_adapter.is_a?(Module)
+        raise ReactOnRailsPro::Error, "config.rolling_deploy_adapter must be a module or class"
+      end
+
+      %i[previous_bundle_hashes fetch upload].each do |method_name|
+        next if rolling_deploy_adapter.respond_to?(method_name)
+
+        raise ReactOnRailsPro::Error,
+              "config.rolling_deploy_adapter must define class method ##{method_name}. " \
+              "See docs/pro/rolling-deploy-adapters.md for the full protocol and reference implementations."
+      end
+
+      validate_rolling_deploy_upload_signature
+    end
+
+    def validate_rolling_deploy_upload_signature
+      params = rolling_deploy_adapter.method(:upload).parameters
+      return if rolling_deploy_upload_signature_valid?(params)
+
+      raise ReactOnRailsPro::Error,
+            "config.rolling_deploy_adapter#upload must accept signature " \
+            "upload(bundle_hash, bundle:, assets:) or an options-hash equivalent (e.g. " \
+            "upload(bundle_hash, **opts) / upload(*args) where opts/args[1] yield :bundle and :assets). " \
+            "See docs/pro/rolling-deploy-adapters.md."
+    end
+
+    # Best-effort signature check — covers the common explicit, splat, and
+    # options-hash shapes adapter authors actually write. Edge cases (e.g.
+    # `upload(hash, *args, bundle:)` mixing splat with explicit keywords) may
+    # pass this check and still fail at call time; the runtime ArgumentError
+    # in that case is clear enough that we accept the gap rather than encode
+    # every Ruby parameter combination here.
+    def rolling_deploy_upload_signature_valid?(params)
+      accepts_bundle_hash_argument?(params) &&
+        (accepts_upload_keyword_arguments?(params) || accepts_upload_options_hash?(params))
+    end
+
+    def accepts_bundle_hash_argument?(params)
+      required_positionals = params.count { |type, _name| type == :req }
+      return false if required_positionals > 1
+
+      params.any? { |type, _name| ROLLING_DEPLOY_UPLOAD_POSITIONAL_PARAMS.include?(type) }
+    end
+
+    def accepts_upload_keyword_arguments?(params)
+      return false if extra_required_upload_keywords(params).any?
+
+      accepts_all_upload_keywords?(params) || accepts_required_upload_keywords?(params)
+    end
+
+    def extra_required_upload_keywords(params)
+      required_keywords = params.select { |type, _name| type == :keyreq }.map(&:last)
+      required_keywords - ROLLING_DEPLOY_UPLOAD_REQUIRED_KEYWORDS
+    end
+
+    def accepts_all_upload_keywords?(params)
+      params.any? { |type, _name| ROLLING_DEPLOY_UPLOAD_ALL_KEYWORD_PARAMS.include?(type) }
+    end
+
+    def accepts_required_upload_keywords?(params)
+      ROLLING_DEPLOY_UPLOAD_REQUIRED_KEYWORDS.all? do |keyword|
+        params.any? { |type, name| ROLLING_DEPLOY_UPLOAD_KEYWORD_PARAMS.include?(type) && name == keyword }
+      end
+    end
+
+    def accepts_upload_options_hash?(params)
+      # Ruby 3 only converts keywords to an options hash when the callee has no
+      # explicit keyword parameters. `upload(hash, options = {}, region:)` still
+      # rejects the `bundle:` / `assets:` call shape used by assets precompile.
+      # `**nil` (the `:nokey` parameter kind) explicitly forbids keywords too,
+      # so reject it for the same reason.
+      return false if uses_explicit_upload_keywords?(params)
+      return true if params.any? { |type, _name| type == :rest }
+
+      required_positionals = params.count { |type, _name| type == :req }
+      optional_positionals = params.count { |type, _name| type == :opt }
+      required_positionals == 1 && optional_positionals.positive?
+    end
+
+    def uses_explicit_upload_keywords?(params)
+      params.any? do |type, _name|
+        type == :nokey || ROLLING_DEPLOY_UPLOAD_KEYWORD_PARAMS.include?(type)
       end
     end
 

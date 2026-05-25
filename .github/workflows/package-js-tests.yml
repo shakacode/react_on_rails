@@ -102,7 +102,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup Node
-        uses: ./.github/actions/setup-node-with-retry
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
       - name: Setup pnpm
