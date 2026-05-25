@@ -19,7 +19,7 @@ module RendererHarness
     # The stream is iterated via StreamDecorator#each_chunk (not #each).
     class StreamingRender < Base
       def perform_request
-        js = format(RENDER_COMPONENT_JS_TEMPLATE, props: filler_props.to_json)
+        js = render_component_js
         bundle_hash = server_bundle_hash
         digest = Digest::MD5.hexdigest(js)
         path = "/bundles/#{bundle_hash}/render/#{digest}"

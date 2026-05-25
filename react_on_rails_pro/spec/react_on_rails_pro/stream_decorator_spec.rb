@@ -24,6 +24,13 @@ RSpec.describe ReactOnRailsPro::StreamDecorator do
       expect(stream_decorator.status).to eq(204)
       expect(stream_decorator.http_status).to eq(204)
     end
+
+    it "delegates status recording state to the component" do
+      allow(mock_component).to receive(:http_status_recorded?).and_return(true)
+
+      expect(stream_decorator.status_recorded?).to be(true)
+      expect(stream_decorator.http_status_recorded?).to be(true)
+    end
   end
 
   describe "#each_chunk" do

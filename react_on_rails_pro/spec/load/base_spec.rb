@@ -49,4 +49,18 @@ RSpec.describe RendererHarness::Scenarios::Base do
       JSON.generate(metadata).bytesize + 1 + described_class::LENGTH_PREFIX_HEX_WIDTH + 1 + 2
     )
   end
+
+  it "renders component JavaScript without interpreting percent characters in props" do
+    scenario_class = Class.new(described_class) do
+      def filler_props
+        { "url" => "https://example.test/a%20b", "ratio" => "50%" }
+      end
+    end
+    scenario = scenario_class.new(build_config)
+
+    js = scenario.send(:render_component_js)
+
+    expect(js).to include('"url":"https://example.test/a%20b"')
+    expect(js).to include('"ratio":"50%"')
+  end
 end

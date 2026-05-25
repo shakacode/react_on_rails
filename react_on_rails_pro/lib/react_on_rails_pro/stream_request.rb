@@ -26,6 +26,14 @@ module ReactOnRailsPro
       @component.status
     end
 
+    def http_status_recorded?
+      return @component.http_status_recorded? if @component.respond_to?(:http_status_recorded?)
+
+      !http_status.nil?
+    end
+
+    alias status_recorded? http_status_recorded?
+
     # Add a prepend action
     def prepend
       @actions << ->(chunk, position) { position == :first ? "#{yield}#{chunk}" : chunk }
@@ -98,11 +106,18 @@ module ReactOnRailsPro
   class StreamRequest
     HTTPX_STATUS_ARGUMENT_ERROR_MAX_VERSION = Gem::Version.new("1.7.0")
 
+    # nil means either no response has been read yet or HTTPX could not expose
+    # the status; use http_status_recorded? to distinguish those states.
     def http_status
       @status
     end
 
+    def http_status_recorded?
+      @status_recorded
+    end
+
     alias status http_status
+    alias status_recorded? http_status_recorded?
 
     def initialize(&request_block)
       @request_executor = request_block
@@ -173,6 +188,7 @@ module ReactOnRailsPro
       # Empty-body responses record status after the stream is drained; specs
       # assert that status is read only after the response has yielded no chunks.
       record_status(stream_response) unless status_read_for_attempt
+      raise_unreadable_stream_response!(error_body)
       parser.flush
     end
 
@@ -236,8 +252,7 @@ module ReactOnRailsPro
         )
         body_context = error_body.empty? ? "" : ":\n#{error_body}"
         raise ReactOnRailsPro::Error,
-              "Renderer returned an unreadable HTTP error response (#{e.class}: #{e.message})#{body_context}",
-              e.backtrace
+              "Renderer returned an unreadable HTTP error response (#{e.class}: #{e.message})#{body_context}"
       end
       case @status
       when ReactOnRailsPro::STATUS_SEND_BUNDLE
@@ -264,6 +279,13 @@ module ReactOnRailsPro
       else
         warn(message)
       end
+    end
+
+    def raise_unreadable_stream_response!(error_body)
+      return unless @status_recorded && @status.nil? && !error_body.empty?
+
+      raise ReactOnRailsPro::Error,
+            "Renderer returned an unreadable stream response status after buffering #{error_body.bytesize} bytes"
     end
 
     def httpx_stream_status_argument_error?(response, error)

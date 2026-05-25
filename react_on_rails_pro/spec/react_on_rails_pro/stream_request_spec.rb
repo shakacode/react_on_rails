@@ -66,10 +66,15 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         request.send(:process_response_chunks, response, error_body) do |chunk|
           yielded_chunks << chunk
         end
-      end.not_to raise_error
+      end.to raise_error(
+        ReactOnRailsPro::Error,
+        /unreadable stream response status after buffering 19 bytes/
+      )
 
       expect(error_body).to eq("Failed request body")
       expect(yielded_chunks).to be_empty
+      expect(request.status).to be_nil
+      expect(request.http_status_recorded?).to be(true)
     end
 
     it "parses length-prefixed chunks and yields result hashes" do
@@ -147,9 +152,13 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
 
       expect do
         request.send(:process_response_chunks, response, error_body) { |_| nil }
-      end.not_to raise_error
+      end.to raise_error(
+        ReactOnRailsPro::Error,
+        /unreadable stream response status after buffering 4 bytes/
+      )
       expect(error_body).to eq("body")
       expect(request.status).to be_nil
+      expect(request.http_status_recorded?).to be(true)
     end
 
     it "raises HTTPX stream status argument errors after the workaround version" do
@@ -171,7 +180,12 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       expect(Rails.logger).to receive(:warn).with(/loaded httpx version is unavailable: ArgumentError/)
       expect(Rails.logger).to receive(:warn).with(/ignoring error while reading stream response status: ArgumentError/)
 
-      request.send(:process_response_chunks, response, error_body) { |_| nil }
+      expect do
+        request.send(:process_response_chunks, response, error_body) { |_| nil }
+      end.to raise_error(
+        ReactOnRailsPro::Error,
+        /unreadable stream response status after buffering 4 bytes/
+      )
 
       expect(error_body).to eq("body")
     end
@@ -336,10 +350,12 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         mock_response
       end
 
+      expect(stream.http_status_recorded?).to be(false)
       stream.each_chunk(&:itself)
 
       expect(stream.status).to eq(204)
       expect(stream.http_status).to eq(204)
+      expect(stream.http_status_recorded?).to be(true)
     end
 
     it "exposes the response status for empty streaming responses" do
@@ -377,7 +393,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       expect(chunks.size).to eq(2)
     end
 
-    it "does not read status from HTTPX error responses" do
+    it "raises after buffering HTTPX error response bodies without reading status" do
       mock_response = double(HTTPX::ErrorResponse)
       allow(mock_response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(true)
       expect(mock_response).not_to receive(:status)
@@ -387,12 +403,16 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         mock_response
       end
 
-      stream.each_chunk(&:itself)
+      expect { stream.each_chunk(&:itself) }.to raise_error(
+        ReactOnRailsPro::Error,
+        /unreadable stream response status after buffering 14 bytes/
+      )
 
       expect(stream.status).to be_nil
+      expect(stream.http_status_recorded?).to be(true)
     end
 
-    it "exposes nil status when the response status cannot be read" do
+    it "raises when stream response status cannot be read" do
       mock_response = double(HTTPX::StreamResponse)
       allow(mock_response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(false)
       allow(mock_response).to receive(:status).and_raise(NoMethodError)
@@ -404,10 +424,14 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       end
 
       chunks = []
-      stream.each_chunk { |chunk| chunks << chunk }
+      expect { stream.each_chunk { |chunk| chunks << chunk } }.to raise_error(
+        ReactOnRailsPro::Error,
+        /unreadable stream response status after buffering 14 bytes/
+      )
 
       expect(chunks).to be_empty
       expect(stream.status).to be_nil
+      expect(stream.http_status_recorded?).to be(true)
     end
   end
   # rubocop:enable RSpec/VerifiedDoubles
@@ -488,7 +512,6 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
           "Renderer returned an unreadable HTTP error response (RuntimeError: status unavailable)"
         )
         expect(error.cause).to eq(status_error)
-        expect(error.backtrace).to eq(status_error.backtrace)
       end
       expect(stream.status).to be_nil
     end

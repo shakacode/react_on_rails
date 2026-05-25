@@ -12,7 +12,7 @@ module RendererHarness
       MIX_PROPS_SIZES = { "small" => 200, "medium" => 10_000, "large" => 100_000 }.freeze
       RENDER_COMPONENT_JS_TEMPLATE = <<~JS
         (function(){
-          var props = %<props>s;
+          var props = __PROPS__;
           return ReactOnRails.serverRenderReactComponent({
             name: 'HelloWorld',
             domNodeId: 'HelloWorld-react-component',
@@ -56,6 +56,11 @@ module RendererHarness
 
       def server_bundle_hash
         ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool.server_bundle_hash
+      end
+
+      def render_component_js
+        props_json = filler_props.to_json
+        RENDER_COMPONENT_JS_TEMPLATE.sub("__PROPS__") { props_json }
       end
 
       def stream_payload(stream, bytes_in:, bytes_out:)
