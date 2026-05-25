@@ -174,8 +174,11 @@ module ReactOnRailsPro
       parser = ReactOnRails::LengthPrefixedParser.new
       # Each streaming response attempt owns its status; a 410 retry must not
       # reuse the previous attempt's recorded state.
+      # Error bodies are attempt-local too, so unreadable-status diagnostics do
+      # not report bytes buffered by an earlier failed attempt.
       @status = nil
       @status_recorded = false
+      error_body.clear
       status_read_for_attempt = false
       stream_response.each do |chunk|
         stream_response.instance_variable_set(:@react_on_rails_received_first_chunk, true)
@@ -229,7 +232,8 @@ module ReactOnRailsPro
       warn_status_read_failure("ignoring error while reading stream response status", e)
       nil
     rescue ArgumentError => e
-      raise unless httpx_stream_status_argument_error?(response, e)
+      warning_context = httpx_stream_status_argument_error_context(response)
+      raise unless warning_context
 
       # ArgumentError: HTTPX 1.7.0 can raise while materializing status from a
       # partially-consumed StreamResponse; transport-level HTTPX::Error still
@@ -238,7 +242,7 @@ module ReactOnRailsPro
       # TODO: remove ArgumentError rescue once the minimum HTTPX version is
       # greater than 1.7.0 and status reads from partially-consumed stream
       # responses are verified not to raise ArgumentError.
-      warn_status_read_failure("ignoring error while reading stream response status", e)
+      warn_status_read_failure(warning_context, e)
       nil
     end
 
@@ -296,19 +300,17 @@ module ReactOnRailsPro
             "Renderer returned an unreadable stream response status after buffering #{error_body.bytesize} bytes"
     end
 
-    def httpx_stream_status_argument_error?(response, error)
-      return false unless defined?(HTTPX::StreamResponse) && response.is_a?(HTTPX::StreamResponse)
+    def httpx_stream_status_argument_error_context(response)
+      return unless defined?(HTTPX::StreamResponse) && response.is_a?(HTTPX::StreamResponse)
 
       httpx_spec = Gem.loaded_specs["httpx"]
-      if httpx_spec.nil?
-        warn_status_read_failure(
-          "assuming HTTPX stream status workaround because loaded httpx version is unavailable",
-          error
-        )
-        return true
+      unless httpx_spec
+        return "ignoring error while reading stream response status because loaded httpx version is unavailable"
       end
 
-      httpx_spec.version <= HTTPX_STATUS_ARGUMENT_ERROR_MAX_VERSION
+      return unless httpx_spec.version <= HTTPX_STATUS_ARGUMENT_ERROR_MAX_VERSION
+
+      "ignoring error while reading stream response status"
     end
   end
 end

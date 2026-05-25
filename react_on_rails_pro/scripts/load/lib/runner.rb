@@ -5,6 +5,8 @@ module RendererHarness
     StartGate = Struct.new(:mutex, :ready_cv, :start_cv, :ready_count, :started, :aborted, :deadline,
                            :abort_error, keyword_init: true)
     WORKER_JOIN_TIMEOUT_SECONDS = 30
+    # Sentinel passed through join_thread for request-count runs; not a timestamp.
+    COUNT_JOIN_DEADLINE = :after_requests_claimed
     MeasurementAborted = Class.new(StandardError)
     WorkerJoinTimeout = Class.new(StandardError)
 
@@ -240,7 +242,7 @@ module RendererHarness
     end
 
     def count_join_deadline
-      :after_requests_claimed
+      COUNT_JOIN_DEADLINE
     end
 
     def join_threads(threads, deadline:, ignore_measurement_aborted: false)

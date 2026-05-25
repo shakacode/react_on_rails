@@ -128,6 +128,27 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       expect(request.status).to eq(500)
     end
 
+    it "clears previous error body before parsing a response attempt" do
+      error_body << "previous attempt"
+      response = Class.new do
+        def each
+          yield "current attempt"
+        end
+
+        def status
+          500
+        end
+
+        def is_a?(klass)
+          klass == HTTPX::ErrorResponse ? false : super
+        end
+      end.new
+
+      request.send(:process_response_chunks, response, error_body) { |_| nil }
+
+      expect(error_body).to eq("current attempt")
+    end
+
     it "marks status as attempted when status extraction raises" do
       response = Class.new do
         def each
@@ -177,8 +198,8 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       error = ArgumentError.new("wrong number of arguments (given 1, expected 0)")
       response = httpx_stream_response_with_status_error(error, "body")
       allow(Gem).to receive(:loaded_specs).and_return({})
-      expect(Rails.logger).to receive(:warn).with(/loaded httpx version is unavailable: ArgumentError/)
-      expect(Rails.logger).to receive(:warn).with(/ignoring error while reading stream response status: ArgumentError/)
+      expect(Rails.logger).to receive(:warn)
+        .with(/loaded httpx version is unavailable: ArgumentError/)
 
       expect do
         request.send(:process_response_chunks, response, error_body) { |_| nil }
