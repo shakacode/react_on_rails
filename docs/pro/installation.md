@@ -193,16 +193,58 @@ JSON parsers should branch on `status` before treating `renewal_required` as an 
 require "json"
 require "open3"
 
+def parse_first_json_object(output)
+  output.each_char.with_index do |char, start_index|
+    next unless char == "{"
+
+    depth = 0
+    in_string = false
+    escaped = false
+
+    output[start_index..].each_char.with_index do |current_char, offset|
+      if in_string
+        if escaped
+          escaped = false
+        elsif current_char == "\\"
+          escaped = true
+        elsif current_char == '"'
+          in_string = false
+        end
+
+        next
+      end
+
+      case current_char
+      when '"'
+        in_string = true
+      when "{"
+        depth += 1
+      when "}"
+        depth -= 1
+
+        if depth.zero?
+          candidate = output[start_index, offset + 1]
+
+          begin
+            return JSON.parse(candidate)
+          rescue JSON::ParserError
+            break
+          end
+        end
+      end
+    end
+  end
+
+  nil
+end
+
 stdout, stderr, command_status = Open3.capture3(
   { "RAILS_ENV" => "production", "FORMAT" => "json" },
   "bundle", "exec", "rake", "react_on_rails_pro:verify_license"
 )
-json_output = stdout[/{.*}/m]
-abort "React on Rails Pro license command produced no JSON. Stderr: #{stderr}" unless json_output
 
-license_info = begin
-  JSON.parse(json_output)
-rescue JSON::ParserError
+license_info = parse_first_json_object(stdout)
+unless license_info
   abort "Could not parse React on Rails Pro license JSON output. Exit: #{command_status.exitstatus}. Stderr: #{stderr}"
 end
 
@@ -211,7 +253,7 @@ abort "React on Rails Pro license JSON output did not include a status." unless 
 
 case status
 when "expired", "invalid", "missing"
-  abort "React on Rails Pro license is #{status}."
+  abort "React on Rails Pro license is #{status}. Verify REACT_ON_RAILS_PRO_LICENSE is present and current."
 when "valid"
   if license_info["renewal_required"]
     warn "React on Rails Pro license renewal is required soon."
@@ -260,6 +302,9 @@ jobs:
       - name: Verify React on Rails Pro license
         run: bundle exec rake react_on_rails_pro:verify_license
 ```
+
+If the repository does not pin Ruby with `.ruby-version` or a `ruby` directive in the Gemfile, add `ruby-version:` to
+`ruby/setup-ruby` so the workflow uses the same Ruby version as production.
 
 Call the reusable workflow before your deploy job and pass repository secrets from the caller:
 
@@ -326,7 +371,8 @@ jobs:
             if [ "$LICENSE_CHECK_OUTCOME" = "success" ]; then
               echo "License validation passed."
             else
-              echo "License validation did not pass. Run the check locally or inspect a redacted log for details."
+              echo "License validation did not pass; the license may be invalid, expired, or unavailable to this workflow."
+              echo "Run the check locally or inspect a redacted log for details."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -364,14 +410,14 @@ value should fail closed in the catch-all branch:
 
 # lib/tasks/react_on_rails_pro_license.rake
 namespace :licenses do
-  desc "Fail if the React on Rails Pro license is invalid, expired, or expiring soon"
+  desc "Fail if the React on Rails Pro license is invalid, expired, or expiring within DAYS"
   task check_react_on_rails_pro: :environment do
     threshold_days = begin
       Integer(ENV.fetch("DAYS", "30"))
     rescue ArgumentError
       abort "DAYS must be an integer number of days."
     end
-    abort "DAYS must be a positive integer number of days." unless threshold_days.positive?
+    abort "DAYS must be a non-negative integer number of days." if threshold_days.negative?
 
     info = ReactOnRailsPro::Utils.license_info
     status = info[:status]
@@ -423,6 +469,8 @@ Run it from your scheduler or CI:
 ```bash
 RAILS_ENV=production DAYS=30 bundle exec rake licenses:check_react_on_rails_pro
 ```
+
+Use `DAYS=0` when you only want the wrapper to fail for invalid, missing, or already expired licenses.
 
 For complete license setup instructions, see [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/LICENSE_SETUP.md).
 
