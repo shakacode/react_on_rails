@@ -66,7 +66,7 @@ module RendererHarness
       unless thread.join(timeout_seconds)
         warn "MemorySampler: background thread did not stop within #{timeout_seconds}s"
         thread.kill
-        thread.join
+        thread.join(timeout_seconds)
       end
     ensure
       @thread_mutex.synchronize { @thread = nil if thread && @thread.equal?(thread) }

@@ -141,8 +141,8 @@ module ReactOnRailsPro
 
     def process_response_chunks(stream_response, error_body, &block)
       parser = ReactOnRails::LengthPrefixedParser.new
-      # Each response attempt must record status independently; a 410 retry must
-      # not reuse the previous attempt's status when parsing retry chunks.
+      # Each response attempt, especially the post-410 retry, must not reuse the
+      # previous attempt's status while parsing its own chunks.
       @status_recorded = false
       status_read_for_attempt = false
       stream_response.each do |chunk|
@@ -192,7 +192,7 @@ module ReactOnRailsPro
       return nil if response.is_a?(HTTPX::ErrorResponse)
 
       response.status
-    rescue NoMethodError, HTTPX::Error, ArgumentError
+    rescue NoMethodError, ArgumentError
       # Known HTTPX/delegation failures mean the response status is unavailable.
       nil
     end
