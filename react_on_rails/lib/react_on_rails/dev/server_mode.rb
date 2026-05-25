@@ -79,7 +79,8 @@ module ReactOnRails
           detect_from_config(config_path) || normalize_mode(fallback)
         end
 
-        # Missing or unparseable config means HMR is not explicitly enabled, even though detect falls back to :hmr.
+        # This is intentionally narrower than detect: missing, empty, or unparseable config falls back to :hmr for
+        # legacy bin/dev help text, but only an explicit HMR config should trigger HMR-specific doctor warnings.
         def hmr_enabled?(config_path = shakapacker_config_path)
           detect_from_config(config_path) == :hmr
         end
@@ -141,9 +142,7 @@ module ReactOnRails
           # Shakapacker maps omitted live_reload to the inverse of hmr in package/webpackDevServerConfig.ts.
           # Once HMR is not enabled, omitted live_reload means full-page live reload.
           # See generators/react_on_rails/templates/base/base/config/shakapacker.yml.tt.
-          return :live_reload if live_reload.nil?
-
-          nil
+          :live_reload
         end
 
         def hmr_config(value)
