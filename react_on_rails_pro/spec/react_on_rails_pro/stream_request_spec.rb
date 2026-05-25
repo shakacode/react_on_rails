@@ -2,13 +2,16 @@
 
 require_relative "spec_helper"
 require "react_on_rails_pro/stream_request"
-require "async/barrier"
-require "httpx"
-
-HTTPX::Plugins.load_plugin(:stream)
+require "react_on_rails_pro/renderer_http_client"
 
 RSpec.describe ReactOnRailsPro::StreamRequest do
-  # Wraps a string in the length-prefixed wire format for mock streaming responses.
+  let(:retry_limit) { 2 }
+
+  before do
+    config = instance_double(ReactOnRailsPro::Configuration, renderer_request_retry_limit: retry_limit)
+    allow(ReactOnRailsPro).to receive(:configuration).and_return(config)
+  end
+
   def to_length_prefixed(html, metadata_overrides = {})
     metadata = {
       "consoleReplayScript" => "", "hasErrors" => false,
@@ -18,27 +21,22 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
     "#{metadata.to_json}\t#{content_bytes}\n#{html}"
   end
 
-  # Builds a mock response that yields the given raw chunks and reports the given status.
-  def mock_ok_response(*raw_chunks)
-    response = Object.new
-    response.define_singleton_method(:each) { |&blk| raw_chunks.each { |c| blk.call(c) } }
-    response.define_singleton_method(:status) { 200 }
-    allow(response).to receive(:is_a?).and_call_original
-    allow(response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(false)
-    response
+  def mock_ok_response(*chunks)
+    ReactOnRailsPro::RendererHttpClient::Response.new do |yielder, status_assigner|
+      status_assigner.call(200)
+      chunks.each { |c| yielder.call(c) }
+    end
   end
 
-  def httpx_stream_response_with_status_error(error, *raw_chunks)
-    response = HTTPX::StreamResponse.allocate
-    response.define_singleton_method(:each) { |&blk| raw_chunks.each { |c| blk.call(c) } }
-    response.define_singleton_method(:status) { raise error }
-    response
+  def mock_error_response(status, *chunks)
+    ReactOnRailsPro::RendererHttpClient::Response.new do |yielder, status_assigner|
+      status_assigner.call(status)
+      chunks.each { |c| yielder.call(c) }
+    end
   end
 
   describe ".create" do
     it "returns a StreamDecorator instance" do
-      # Passed block is not called until #each_chunk is invoked, so we can just pass a no-op block here.
-      # As it won't be called during this test
       result = described_class.create { nil }
       expect(result).to be_a(ReactOnRailsPro::StreamDecorator)
     end
@@ -47,214 +45,42 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
   describe "#process_response_chunks" do
     subject(:request) { described_class.send(:new) { nil } }
 
-    let(:error_body) { +"" }
-
-    it "treats responses without status delegation as error responses" do
-      response = Class.new do
-        def each
-          yield "Failed request body"
-        end
-
-        def status
-          raise NoMethodError, "undefined method `status`"
-        end
-      end.new
-      expect(Rails.logger).to receive(:warn).with(/ignoring error while reading stream response status: NoMethodError/)
-
-      yielded_chunks = []
-      expect do
-        request.send(:process_response_chunks, response, error_body) do |chunk|
-          yielded_chunks << chunk
-        end
-      end.to raise_error(
-        ReactOnRailsPro::Error,
-        /unreadable stream response status after buffering 19 bytes/
-      )
-
-      expect(error_body).to eq("Failed request body")
-      expect(yielded_chunks).to be_empty
-      expect(request.status).to be_nil
-      expect(request.http_status_recorded?).to be(true)
-    end
-
     it "parses length-prefixed chunks and yields result hashes" do
       response = mock_ok_response(to_length_prefixed("<div>Hello</div>"))
 
       yielded = []
-      request.send(:process_response_chunks, response, error_body) { |chunk| yielded << chunk }
+      request.send(:process_response_chunks, response) { |chunk| yielded << chunk }
 
       expect(yielded.size).to eq(1)
       expect(yielded.first["html"]).to eq("<div>Hello</div>")
       expect(yielded.first["hasErrors"]).to be false
       expect(yielded.first["consoleReplayScript"]).to eq("")
-    end
-
-    it "raises with buffered body when response has error status" do
-      response = Class.new do
-        define_method(:each) { |&blk| blk.call("error details") }
-        define_method(:status) { 500 }
-        define_method(:is_a?) { |klass| klass == HTTPX::ErrorResponse ? false : super(klass) }
-      end.new
-
-      yielded = []
-      expect do
-        request.send(:process_response_chunks, response, error_body) { |chunk| yielded << chunk }
-      end.to raise_error(
-        ReactOnRailsPro::Error,
-        /Unexpected response code from renderer: 500:\nerror details/
-      )
-
-      expect(yielded).to be_empty
-      expect(error_body).to eq("error details")
-    end
-
-    it "raises when response has error status without yielded chunks" do
-      response = Class.new do
-        define_method(:each) { nil }
-        define_method(:status) { 503 }
-        define_method(:is_a?) { |klass| klass == HTTPX::ErrorResponse ? false : super(klass) }
-      end.new
-
-      expect do
-        request.send(:process_response_chunks, response, error_body) { |_| nil }
-      end.to raise_error(
-        ReactOnRailsPro::Error,
-        /Unexpected response code from renderer: 503:/
-      )
-
-      expect(error_body).to be_empty
-    end
-
-    it "treats unrecorded status as an error status" do
-      expect(request.send(:response_has_error_status?)).to be(true)
-    end
-
-    it "clears previous status before parsing a response attempt" do
-      request.instance_variable_set(:@status, ReactOnRailsPro::STATUS_SEND_BUNDLE)
-      response = Class.new do
-        def each
-          yield "body"
-        end
-
-        def status
-          500
-        end
-
-        def is_a?(klass)
-          klass == HTTPX::ErrorResponse ? false : super
-        end
-      end.new
-
-      expect do
-        request.send(:process_response_chunks, response, error_body) { |_| nil }
-      end.to raise_error(ReactOnRailsPro::Error, /Unexpected response code from renderer: 500:\nbody/)
-
-      expect(request.status).to eq(500)
-    end
-
-    it "clears previous error body before parsing a response attempt" do
-      error_body << "previous attempt"
-      response = Class.new do
-        def each
-          yield "current attempt"
-        end
-
-        def status
-          500
-        end
-
-        def is_a?(klass)
-          klass == HTTPX::ErrorResponse ? false : super
-        end
-      end.new
-
-      expect do
-        request.send(:process_response_chunks, response, error_body) { |_| nil }
-      end.to raise_error(
-        ReactOnRailsPro::Error,
-        /Unexpected response code from renderer: 500:\ncurrent attempt/
-      )
-
-      expect(error_body).to eq("current attempt")
-    end
-
-    it "marks status as attempted when status extraction raises" do
-      response = Class.new do
-        def each
-          yield "body"
-        end
-
-        def status
-          raise "status unavailable"
-        end
-      end.new
-
-      expect do
-        request.send(:process_response_chunks, response, error_body) { |_| nil }
-      end.to raise_error(RuntimeError, /status unavailable/)
-      expect(request.send(:response_has_error_status?)).to be(true)
-    end
-
-    it "treats HTTPX stream status argument errors as unknown response status" do
-      error = ArgumentError.new("wrong number of arguments (given 1, expected 0)")
-      response = httpx_stream_response_with_status_error(error, "body")
-      expect(Rails.logger).to receive(:warn).with(/ignoring error while reading stream response status: ArgumentError/)
-
-      expect do
-        request.send(:process_response_chunks, response, error_body) { |_| nil }
-      end.to raise_error(
-        ReactOnRailsPro::Error,
-        /unreadable stream response status after buffering 4 bytes/
-      )
-      expect(error_body).to eq("body")
-      expect(request.status).to be_nil
+      expect(request.status).to eq(200)
       expect(request.http_status_recorded?).to be(true)
     end
 
-    it "raises HTTPX stream status argument errors after the workaround version" do
-      error = ArgumentError.new("wrong number of arguments (given 1, expected 0)")
-      response = httpx_stream_response_with_status_error(error, "body")
-      allow(Gem).to receive(:loaded_specs).and_return(
-        "httpx" => Struct.new(:version).new(Gem::Version.new("1.7.1"))
-      )
+    it "skips LPP parsing when response has error status" do
+      response = mock_error_response(500, "error details")
 
+      yielded = []
       expect do
-        request.send(:process_response_chunks, response, error_body) { |_| nil }
-      end.to raise_error(ArgumentError, /wrong number of arguments/)
+        request.send(:process_response_chunks, response) { |chunk| yielded << chunk }
+      end.to raise_error(ReactOnRailsPro::RendererHttpClient::HTTPError)
+
+      expect(yielded).to be_empty
+      expect(request.status).to eq(500)
+      expect(request.http_status_recorded?).to be(true)
     end
 
-    it "warns when applying the HTTPX stream status workaround without a loaded gem version" do
-      error = ArgumentError.new("wrong number of arguments (given 1, expected 0)")
-      response = httpx_stream_response_with_status_error(error, "body")
-      allow(Gem).to receive(:loaded_specs).and_return({})
-      expect(Rails.logger).to receive(:warn)
-        .with(/loaded httpx version is unavailable: ArgumentError/)
+    it "records status for empty responses" do
+      response = ReactOnRailsPro::RendererHttpClient::Response.new do |_yielder, status_assigner|
+        status_assigner.call(204)
+      end
 
-      expect do
-        request.send(:process_response_chunks, response, error_body) { |_| nil }
-      end.to raise_error(
-        ReactOnRailsPro::Error,
-        /unreadable stream response status after buffering 4 bytes/
-      )
+      request.send(:process_response_chunks, response) { |_| nil }
 
-      expect(error_body).to eq("body")
-    end
-
-    it "raises non-HTTPX ArgumentError status read failures" do
-      response = Class.new do
-        def each
-          yield "body"
-        end
-
-        def status
-          raise ArgumentError, "status unavailable"
-        end
-      end.new
-
-      expect do
-        request.send(:process_response_chunks, response, error_body) { |_| nil }
-      end.to raise_error(ArgumentError, /status unavailable/)
-      expect(request.send(:response_has_error_status?)).to be(true)
+      expect(request.status).to eq(204)
+      expect(request.http_status_recorded?).to be(true)
     end
 
     context "with length-prefixed protocol parsing" do
@@ -263,7 +89,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         response = mock_ok_response(data)
 
         yielded = []
-        request.send(:process_response_chunks, response, error_body) { |chunk| yielded << chunk }
+        request.send(:process_response_chunks, response) { |chunk| yielded << chunk }
 
         expect(yielded.size).to eq(2)
         expect(yielded[0]["html"]).to eq("<div>First</div>")
@@ -278,7 +104,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         response = mock_ok_response(chunk1, chunk2)
 
         yielded = []
-        request.send(:process_response_chunks, response, error_body) { |chunk| yielded << chunk }
+        request.send(:process_response_chunks, response) { |chunk| yielded << chunk }
 
         expect(yielded.size).to eq(1)
         expect(yielded.first["html"]).to eq("<div>Split</div>")
@@ -295,7 +121,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         response = mock_ok_response(lpp_data)
 
         yielded = []
-        request.send(:process_response_chunks, response, error_body) { |chunk| yielded << chunk }
+        request.send(:process_response_chunks, response) { |chunk| yielded << chunk }
 
         expect(yielded.size).to eq(1)
         expect(yielded.first["html"]).to be_a(Hash)
@@ -307,7 +133,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         response = mock_ok_response(malformed)
 
         expect do
-          request.send(:process_response_chunks, response, error_body) { |_| nil }
+          request.send(:process_response_chunks, response) { |_| nil }
         end.to raise_error(ReactOnRails::Error, /missing tab separator/)
       end
 
@@ -316,7 +142,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         response = mock_ok_response(malformed)
 
         expect do
-          request.send(:process_response_chunks, response, error_body) { |_| nil }
+          request.send(:process_response_chunks, response) { |_| nil }
         end.to raise_error(ReactOnRails::Error, /Invalid content length hex/)
       end
 
@@ -325,210 +151,173 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         response = mock_ok_response(malformed)
 
         expect do
-          request.send(:process_response_chunks, response, error_body) { |_| nil }
+          request.send(:process_response_chunks, response) { |_| nil }
         end.to raise_error(ReactOnRails::Error, /invalid metadata JSON/)
       end
 
-      it "becomes no-op after a protocol error" do
-        # First chunk is malformed, second is valid
+      it "recovers across separate process_response_chunks calls" do
         malformed = "no-tab-here\n"
         valid = to_length_prefixed("<div>Valid</div>")
-        response = mock_ok_response(malformed)
 
-        # Parser enters error state on first chunk
+        response1 = mock_ok_response(malformed)
         expect do
-          request.send(:process_response_chunks, response, error_body) { |_| nil }
+          request.send(:process_response_chunks, response1) { |_| nil }
         end.to raise_error(ReactOnRails::Error)
 
-        # New response through a fresh process_response_chunks call would work,
-        # but the SAME parser instance (if reused) would be in error state.
-        # Since process_response_chunks creates a new parser each time,
-        # we verify a second call still works independently.
         response2 = mock_ok_response(valid)
         yielded = []
-        request.send(:process_response_chunks, response2, error_body) { |chunk| yielded << chunk }
+        request.send(:process_response_chunks, response2) { |chunk| yielded << chunk }
         expect(yielded.size).to eq(1)
         expect(yielded.first["html"]).to eq("<div>Valid</div>")
       end
     end
   end
 
-  # Unverified doubles are required for streaming responses because:
-  # 1. HTTP streaming responses don't have a dedicated class type in HTTPX
-  # 2. The #each method for streaming is added dynamically at runtime
-  # 3. The interface varies based on the streaming mode (HTTP/2, chunked, etc.)
-  # rubocop:disable RSpec/VerifiedDoubles
-  describe "#each_chunk with barrier" do
-    it "passes barrier to request_executor block" do
-      barrier_received = nil
-      mock_response = double(HTTPX::StreamResponse, status: 200)
-      allow(mock_response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(false)
-      allow(mock_response).to receive(:each).and_yield(to_length_prefixed("chunk"))
+  describe "#each_chunk with tasks" do
+    it "passes tasks array to request_executor block" do
+      tasks_received = nil
+      response = mock_ok_response(to_length_prefixed("chunk"))
 
-      stream = described_class.create do |_send_bundle, barrier|
-        barrier_received = barrier
-        mock_response
+      stream = described_class.create do |_send_bundle, tasks|
+        tasks_received = tasks
+        response
       end
 
       stream.each_chunk(&:itself)
 
-      expect(barrier_received).to be_a(Async::Barrier)
+      expect(tasks_received).to be_an(Array)
     end
 
-    it "calls barrier.wait after yielding chunks" do
-      barrier = Async::Barrier.new
-      allow(Async::Barrier).to receive(:new).and_return(barrier)
-      expect(barrier).to receive(:wait)
+    it "waits for tasks after yielding chunks" do
+      task_waited = false
+      response = mock_ok_response(to_length_prefixed("chunk"))
 
-      mock_response = double(HTTPX::StreamResponse, status: 200)
-      allow(mock_response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(false)
-      allow(mock_response).to receive(:each).and_yield(to_length_prefixed("chunk"))
-
-      stream = described_class.create do |_send_bundle, _barrier|
-        mock_response
-      end
-
-      stream.each_chunk(&:itself)
-    end
-
-    it "exposes the response status after streaming" do
-      mock_response = double(HTTPX::StreamResponse, status: 204)
-      allow(mock_response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(false)
-      allow(mock_response).to receive(:each).and_yield(to_length_prefixed("chunk"))
-
-      stream = described_class.create do |_send_bundle, _barrier|
-        mock_response
-      end
-
-      expect(stream.http_status_recorded?).to be(false)
-      stream.each_chunk(&:itself)
-
-      expect(stream.status).to eq(204)
-      expect(stream.http_status).to eq(204)
-      expect(stream.http_status_recorded?).to be(true)
-    end
-
-    it "exposes the response status for empty streaming responses" do
-      drained = false
-      mock_response = double(HTTPX::StreamResponse)
-      allow(mock_response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(false)
-      allow(mock_response).to receive(:each) { drained = true }
-      allow(mock_response).to receive(:status) do
-        expect(drained).to be(true)
-        204
-      end
-
-      stream = described_class.create do |_send_bundle, _barrier|
-        mock_response
+      stream = described_class.create do |_send_bundle, tasks|
+        tasks.push(Async::Task.current.async { task_waited = true })
+        response
       end
 
       stream.each_chunk(&:itself)
 
-      expect(stream.status).to eq(204)
-    end
-
-    it "reads the response status once per streaming response" do
-      mock_response = double(HTTPX::StreamResponse)
-      allow(mock_response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(false)
-      expect(mock_response).to receive(:status).once.and_return(200)
-      allow(mock_response).to receive(:each).and_yield(to_length_prefixed("one")).and_yield(to_length_prefixed("two"))
-
-      stream = described_class.create do |_send_bundle, _barrier|
-        mock_response
-      end
-
-      chunks = []
-      stream.each_chunk { |chunk| chunks << chunk }
-
-      expect(chunks.size).to eq(2)
-    end
-
-    it "raises after buffering HTTPX error response bodies without reading status" do
-      mock_response = double(HTTPX::ErrorResponse)
-      allow(mock_response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(true)
-      expect(mock_response).not_to receive(:status)
-      allow(mock_response).to receive(:each).and_yield("renderer error")
-
-      stream = described_class.create do |_send_bundle, _barrier|
-        mock_response
-      end
-
-      expect { stream.each_chunk(&:itself) }.to raise_error(
-        ReactOnRailsPro::Error,
-        /unreadable stream response status after buffering 14 bytes/
-      )
-
-      expect(stream.status).to be_nil
-      expect(stream.http_status_recorded?).to be(true)
-    end
-
-    it "allows empty HTTPX error responses with unavailable status" do
-      mock_response = double(HTTPX::ErrorResponse)
-      allow(mock_response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(true)
-      expect(mock_response).not_to receive(:status)
-      allow(mock_response).to receive(:each)
-
-      stream = described_class.create do |_send_bundle, _barrier|
-        mock_response
-      end
-
-      chunks = []
-      expect { stream.each_chunk { |chunk| chunks << chunk } }.not_to raise_error
-
-      expect(chunks).to be_empty
-      expect(stream.status).to be_nil
-      expect(stream.http_status_recorded?).to be(true)
-    end
-
-    it "raises when stream response status cannot be read" do
-      mock_response = double(HTTPX::StreamResponse)
-      allow(mock_response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(false)
-      allow(mock_response).to receive(:status).and_raise(NoMethodError)
-      allow(mock_response).to receive(:each).and_yield("renderer error")
-      expect(Rails.logger).to receive(:warn).with(/ignoring error while reading stream response status: NoMethodError/)
-
-      stream = described_class.create do |_send_bundle, _barrier|
-        mock_response
-      end
-
-      chunks = []
-      expect { stream.each_chunk { |chunk| chunks << chunk } }.to raise_error(
-        ReactOnRailsPro::Error,
-        /unreadable stream response status after buffering 14 bytes/
-      )
-
-      expect(chunks).to be_empty
-      expect(stream.status).to be_nil
-      expect(stream.http_status_recorded?).to be(true)
+      expect(task_waited).to be true
     end
   end
-  # rubocop:enable RSpec/VerifiedDoubles
 
-  # rubocop:disable RSpec/VerifiedDoubles
   describe "error handling" do
-    def build_http_error(status)
-      response = double("response", status: status, headers: {}, body: "")
-      HTTPX::HTTPError.new(response)
-    end
-
-    it "raises ReactOnRailsPro::Error on HTTPX::ReadTimeoutError" do
-      mock_request = double("request")
-      mock_response = double("response")
-      timeout_error = HTTPX::ReadTimeoutError.new(mock_request, mock_response, 5)
-
-      stream = described_class.create do |_send_bundle, _barrier|
-        raise timeout_error
+    it "retries TimeoutError before first chunk, then raises after exhausting retries" do
+      call_count = 0
+      stream = described_class.create do |_send_bundle, _tasks|
+        call_count += 1
+        ReactOnRailsPro::RendererHttpClient::Response.new do |_yielder, _status_assigner|
+          raise ReactOnRailsPro::RendererHttpClient::TimeoutError, "read timeout"
+        end
       end
 
       expect { stream.each_chunk(&:itself) }.to raise_error(
         ReactOnRailsPro::Error,
         /Time out error while server side render streaming a component/
       )
+      expect(call_count).to eq(retry_limit + 1)
+    end
+
+    it "retries ConnectionError before first chunk, then raises after exhausting retries" do
+      call_count = 0
+      stream = described_class.create do |_send_bundle, _tasks|
+        call_count += 1
+        ReactOnRailsPro::RendererHttpClient::Response.new do |_yielder, _status_assigner|
+          raise ReactOnRailsPro::RendererHttpClient::ConnectionError, "Connection refused"
+        end
+      end
+
+      expect { stream.each_chunk(&:itself) }.to raise_error(
+        ReactOnRailsPro::Error,
+        /Connection error while server side render streaming a component/
+      )
+      expect(call_count).to eq(retry_limit + 1)
+    end
+
+    it "raises immediately on TimeoutError after first chunk is received" do
+      call_count = 0
+      stream = described_class.create do |_send_bundle, _tasks|
+        call_count += 1
+        ReactOnRailsPro::RendererHttpClient::Response.new do |yielder, status_assigner|
+          status_assigner.call(200)
+          yielder.call(to_length_prefixed("chunk1"))
+          raise ReactOnRailsPro::RendererHttpClient::TimeoutError, "read timeout"
+        end
+      end
+
+      expect { stream.each_chunk(&:itself) }.to raise_error(
+        ReactOnRailsPro::Error,
+        /Time out error while server side render streaming a component/
+      )
+      expect(call_count).to eq(1)
+    end
+
+    it "raises immediately on ConnectionError after first chunk is received" do
+      call_count = 0
+      stream = described_class.create do |_send_bundle, _tasks|
+        call_count += 1
+        ReactOnRailsPro::RendererHttpClient::Response.new do |yielder, status_assigner|
+          status_assigner.call(200)
+          yielder.call(to_length_prefixed("chunk1"))
+          raise ReactOnRailsPro::RendererHttpClient::ConnectionError, "Connection reset"
+        end
+      end
+
+      expect { stream.each_chunk(&:itself) }.to raise_error(
+        ReactOnRailsPro::Error,
+        /Connection error while server side render streaming a component/
+      )
+      expect(call_count).to eq(1)
+    end
+
+    it "retries transport error then succeeds" do
+      call_count = 0
+      stream = described_class.create do |_send_bundle, _tasks|
+        call_count += 1
+        if call_count == 1
+          ReactOnRailsPro::RendererHttpClient::Response.new do |_yielder, _status_assigner|
+            raise ReactOnRailsPro::RendererHttpClient::ConnectionError, "Connection refused"
+          end
+        else
+          mock_ok_response(to_length_prefixed("ok"))
+        end
+      end
+
+      chunks = []
+      stream.each_chunk { |c| chunks << c }
+      expect(call_count).to eq(2)
+      expect(chunks.first).to include("html" => "ok")
+      expect(stream.status).to eq(200)
+      expect(stream.http_status_recorded?).to be(true)
+    end
+
+    it "stops and clears tasks before retrying on transport error" do
+      call_count = 0
+      task_stopped = false
+
+      stream = described_class.create do |_send_bundle, tasks|
+        call_count += 1
+        if call_count == 1
+          tasks.push(Async::Task.current.async { task_stopped = true })
+          ReactOnRailsPro::RendererHttpClient::Response.new do |_yielder, _status_assigner|
+            raise ReactOnRailsPro::RendererHttpClient::ConnectionError, "Connection refused"
+          end
+        else
+          expect(tasks).to be_empty
+          mock_ok_response(to_length_prefixed("ok"))
+        end
+      end
+
+      stream.each_chunk(&:itself)
+      expect(call_count).to eq(2)
+      expect(task_stopped).to be true
     end
 
     it "raises ReactOnRailsPro::Error on HTTP 400 (bad request)" do
-      stream = described_class.create do |_send_bundle, _barrier|
-        raise build_http_error(400)
+      stream = described_class.create do |_send_bundle, _tasks|
+        mock_error_response(400, "bad request body")
       end
 
       expect { stream.each_chunk(&:itself) }.to raise_error(
@@ -537,104 +326,17 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       )
     end
 
-    it "uses the recorded status in HTTP 400 error messages" do
-      status_calls = 0
-      response = double("response", headers: {}, body: "")
-      allow(response).to receive(:status) do
-        status_calls += 1
-        raise NoMethodError, "status unavailable" if status_calls > 2
-
-        400
-      end
-      http_error = HTTPX::HTTPError.new(response)
-      stream = described_class.create do |_send_bundle, _barrier|
-        raise http_error
-      end
-
-      expect { stream.each_chunk(&:itself) }.to raise_error(
-        ReactOnRailsPro::Error,
-        /Renderer rejected malformed request or hit an unhandled VM error: 400:/
-      )
-    end
-
-    it "preserves HTTP error handling when status extraction unexpectedly fails" do
-      status_calls = 0
-      status_error = RuntimeError.new("status unavailable")
-      response = double("response", headers: {}, body: "")
-      allow(response).to receive(:status) do
-        status_calls += 1
-        raise status_error if status_calls > 1
-
-        503
-      end
-      http_error = HTTPX::HTTPError.new(response)
-      stream = described_class.create do |_send_bundle, _barrier|
-        raise http_error
-      end
-      expect(Rails.logger).to receive(:warn).with(
-        /ignoring unexpected error while reading HTTP error response status: RuntimeError/
-      )
-
-      expect { stream.each_chunk(&:itself) }.to raise_error(ReactOnRailsPro::Error) do |error|
-        expect(error.message).to eq(
-          "Renderer returned an unreadable HTTP error response (RuntimeError: status unavailable)"
-        )
-        expect(error.cause).to eq(status_error)
-      end
-      expect(stream.status).to be_nil
-    end
-
     it "raises ReactOnRailsPro::Error on STATUS_INCOMPATIBLE (412)" do
-      stream = described_class.create do |_send_bundle, _barrier|
-        raise build_http_error(412)
+      stream = described_class.create do |_send_bundle, _tasks|
+        mock_error_response(412, "incompatible")
       end
 
       expect { stream.each_chunk(&:itself) }.to raise_error(ReactOnRailsPro::Error)
     end
 
     it "raises ReactOnRailsPro::Error on unexpected status codes" do
-      stream = described_class.create do |_send_bundle, _barrier|
-        raise build_http_error(503)
-      end
-
-      expect { stream.each_chunk(&:itself) }.to raise_error(
-        ReactOnRailsPro::Error,
-        /Unexpected response code from renderer: 503/
-      )
-    end
-
-    it "retries with bundle upload on HTTP 410 (send bundle)" do
-      call_count = 0
-      mock_response = double(HTTPX::StreamResponse, status: 200)
-      allow(mock_response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(false)
-      allow(mock_response).to receive(:each).and_yield(to_length_prefixed("ok"))
-
-      stream = described_class.create do |send_bundle, _barrier|
-        call_count += 1
-        raise build_http_error(410) if call_count == 1
-
-        expect(send_bundle).to be true
-        mock_response
-      end
-
-      chunks = []
-      stream.each_chunk { |c| chunks << c }
-      expect(call_count).to eq(2)
-      expect(chunks.first).to include("html" => "ok")
-      expect(stream.status).to eq(200)
-    end
-
-    it "prevents infinite loop on duplicate 410 responses" do
-      stream = described_class.create do |_send_bundle, _barrier|
-        raise build_http_error(410)
-      end
-
-      expect { stream.each_chunk(&:itself) }.to raise_error(ReactOnRailsPro::Error)
-    end
-
-    it "records status when HTTPX raises before yielding chunks" do
-      stream = described_class.create do |_send_bundle, _barrier|
-        raise build_http_error(503)
+      stream = described_class.create do |_send_bundle, _tasks|
+        mock_error_response(503, "service unavailable")
       end
 
       expect { stream.each_chunk(&:itself) }.to raise_error(
@@ -642,42 +344,112 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         /Unexpected response code from renderer: 503/
       )
       expect(stream.status).to eq(503)
+      expect(stream.http_status_recorded?).to be(true)
     end
 
-    it "clears retry status before request execution failures" do
+    it "retries with bundle upload on HTTP 410 (send bundle)" do
       call_count = 0
-      stream = described_class.create do |send_bundle, _barrier|
-        call_count += 1
-        raise build_http_error(410) if call_count == 1
 
-        expect(send_bundle).to be true
-        raise HTTPX::ConnectionError, "connection reset"
+      stream = described_class.create do |send_bundle, _tasks|
+        call_count += 1
+        if call_count == 1
+          mock_error_response(410, "bundle not found")
+        else
+          expect(send_bundle).to be true
+          mock_ok_response(to_length_prefixed("ok"))
+        end
       end
 
-      expect { stream.each_chunk(&:itself) }.to raise_error(HTTPX::ConnectionError, /connection reset/)
+      chunks = []
+      stream.each_chunk { |c| chunks << c }
+      expect(call_count).to eq(2)
+      expect(chunks.first).to include("html" => "ok")
+    end
+
+    it "prevents infinite loop on duplicate 410 responses" do
+      stream = described_class.create do |_send_bundle, _tasks|
+        mock_error_response(410, "bundle not found")
+      end
+
+      expect { stream.each_chunk(&:itself) }.to raise_error(ReactOnRailsPro::Error)
+    end
+
+    it "stops and clears tasks before retrying on 410" do
+      call_count = 0
+      task_stopped = false
+
+      stream = described_class.create do |_send_bundle, tasks|
+        call_count += 1
+        if call_count == 1
+          tasks.push(Async::Task.current.async { task_stopped = true })
+          mock_error_response(410, "bundle not found")
+        else
+          expect(tasks).to be_empty
+          mock_ok_response(to_length_prefixed("ok"))
+        end
+      end
+
+      stream.each_chunk(&:itself)
+
+      expect(call_count).to eq(2)
+      expect(task_stopped).to be true
+    end
+
+    it "clears retry status before transport failures" do
+      allow(ReactOnRailsPro).to receive(:configuration).and_return(
+        instance_double(ReactOnRailsPro::Configuration, renderer_request_retry_limit: 0)
+      )
+      call_count = 0
+
+      stream = described_class.create do |send_bundle, _tasks|
+        call_count += 1
+        if call_count == 1
+          mock_error_response(410, "bundle not found")
+        else
+          expect(send_bundle).to be true
+          ReactOnRailsPro::RendererHttpClient::Response.new do |_yielder, _status_assigner|
+            raise ReactOnRailsPro::RendererHttpClient::ConnectionError, "connection reset"
+          end
+        end
+      end
+
+      expect { stream.each_chunk(&:itself) }.to raise_error(
+        ReactOnRailsPro::Error,
+        /Connection error while server side render streaming a component/
+      )
       expect(call_count).to eq(2)
       expect(stream.status).to be_nil
       expect(stream.http_status_recorded?).to be(false)
     end
+  end
 
-    it "bubbles up HTTPX::ConnectionError when node renderer is unreachable" do
-      stream = described_class.create do |_send_bundle, _barrier|
-        raise HTTPX::ConnectionError, "Connection refused - connect(2) for 127.0.0.1:3500"
+  describe "first_chunk_warn_callback" do
+    it "invokes callback with time to first chunk" do
+      callback_time = nil
+      callback = ->(time) { callback_time = time }
+      response = mock_ok_response(to_length_prefixed("chunk"))
+
+      stream = described_class.create(first_chunk_warn_callback: callback) do |_send_bundle, _tasks|
+        response
       end
 
-      expect { stream.each_chunk(&:itself) }.to raise_error(HTTPX::ConnectionError, /Connection refused/)
+      stream.each_chunk(&:itself)
+      expect(callback_time).to be_a(Float)
+      expect(callback_time).to be >= 0
     end
 
-    it "propagates connection errors without calling barrier.wait" do
-      barrier_wait_called = false
-      stream = described_class.create do |_send_bundle, barrier|
-        allow(barrier).to receive(:wait) { barrier_wait_called = true }
-        raise HTTPX::ConnectionError, "connection reset"
+    it "invokes callback only once for multiple chunks" do
+      callback_count = 0
+      callback = ->(_time) { callback_count += 1 }
+      data = to_length_prefixed("chunk1") + to_length_prefixed("chunk2")
+      response = mock_ok_response(data)
+
+      stream = described_class.create(first_chunk_warn_callback: callback) do |_send_bundle, _tasks|
+        response
       end
 
-      expect { stream.each_chunk(&:itself) }.to raise_error(HTTPX::ConnectionError)
-      expect(barrier_wait_called).to be false
+      stream.each_chunk(&:itself)
+      expect(callback_count).to eq(1)
     end
   end
-  # rubocop:enable RSpec/VerifiedDoubles
 end
