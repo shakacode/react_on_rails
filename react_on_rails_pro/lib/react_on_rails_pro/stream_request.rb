@@ -141,6 +141,8 @@ module ReactOnRailsPro
 
     def process_response_chunks(stream_response, error_body, &block)
       parser = ReactOnRails::LengthPrefixedParser.new
+      # Each response attempt must record status independently; a 410 retry must
+      # not reuse the previous attempt's status when parsing retry chunks.
       @status_recorded = false
       status_recorded_for_response = false
       stream_response.each do |chunk|
@@ -169,6 +171,8 @@ module ReactOnRailsPro
       @status = nil
       @status = extract_status(response)
     ensure
+      # If status extraction itself fails, callers should treat the unknown
+      # status as an error response rather than as "status was never read."
       @status_recorded = true
     end
 
