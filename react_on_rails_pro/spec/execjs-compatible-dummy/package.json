@@ -1,5 +1,4 @@
 {
-  "packageManager": "pnpm@9.14.2",
   "name": "app",
   "private": true,
   "version": "0.1.0",

@@ -130,6 +130,5 @@
     "transform": {
       "^.+\\.[jt]sx?$": "babel-jest"
     }
-  },
-  "packageManager": "pnpm@9.14.2"
+  }
 }

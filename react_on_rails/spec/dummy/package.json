@@ -85,6 +85,5 @@
     "build:rescript": "npx rescript clean && npx rescript build -with-deps",
     "build:rescript:dev": "npx rescript build -w"
   },
-  "version": "0.0.0",
-  "packageManager": "pnpm@9.14.2"
+  "version": "0.0.0"
 }

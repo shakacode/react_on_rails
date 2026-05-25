@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Changed
+
+- **Upgrade contributor pnpm tooling to 10.33.4**: The monorepo now pins pnpm 10.33.4 with Corepack's hash-qualified `packageManager` format, keeps the install-generator CI fallback on the same pnpm version, and relies on the root workspace pin instead of duplicate workspace `packageManager` declarations. [PR 3400](https://github.com/shakacode/react_on_rails/pull/3400) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
+
 ### [16.7.0.rc.2] - 2026-05-24
 
 #### Added
