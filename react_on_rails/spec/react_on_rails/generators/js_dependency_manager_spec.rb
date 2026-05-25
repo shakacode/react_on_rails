@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require_relative "../support/generator_spec_helper"
-require "tmpdir"
 
 # rubocop:disable Style/NumericPredicate
 # Using `be > 0` instead of `be_positive` because `be_positive` is not available
@@ -97,6 +96,12 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
   let(:mock_manager) { double("PackageManager", install: true, add: true) }
   let(:mock_package_json) { double("PackageJson", manager: mock_manager) }
   # rubocop:enable RSpec/VerifiedDoubles
+
+  around do |example|
+    Dir.mktmpdir do |dir|
+      Dir.chdir(dir) { example.run }
+    end
+  end
 
   # Helper methods to filter GeneratorMessages output
   def warnings
@@ -211,25 +216,28 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect(result).to be(false)
     end
 
-    it "keeps requested dependencies in package.json when installation fails" do
-      Dir.mktmpdir do |destination_root|
-        allow(instance).to receive(:destination_root).and_return(destination_root)
-        package_json_path = File.join(destination_root, "package.json")
-        package_json = { "dependencies" => { "existing" => "^1.0.0" } }
-        File.write(package_json_path, "#{JSON.pretty_generate(package_json)}\n")
+    it "keeps version-pinned dependencies in package.json when package-manager install fails" do
+      File.write("package.json", "#{JSON.pretty_generate({ 'dependencies' => {} })}\n")
+      instance.add_npm_dependencies_result = false
+      instance.system_result = false
 
-        instance.add_npm_dependencies_result = false
-        instance.system_result = false
+      result = instance.send(:add_packages, ["react-on-rails-pro@16.7.0-rc.1"])
 
-        Dir.chdir(destination_root) do
-          result = instance.send(:add_packages, ["react-on-rails-pro@16.7.0-rc.1"])
-          expect(result).to be(false)
-        end
+      package_json = JSON.parse(File.read("package.json"))
+      expect(result).to be(false)
+      expect(package_json.dig("dependencies", "react-on-rails-pro")).to eq("16.7.0-rc.1")
+    end
 
-        dependencies = JSON.parse(File.read(package_json_path)).fetch("dependencies")
-        expect(dependencies).to include("existing" => "^1.0.0")
-        expect(dependencies).to include("react-on-rails-pro" => "16.7.0-rc.1")
-      end
+    it "does not write unversioned dependencies to package.json when package-manager install fails" do
+      File.write("package.json", "#{JSON.pretty_generate({ 'dependencies' => {} })}\n")
+      instance.add_npm_dependencies_result = false
+      instance.system_result = false
+
+      result = instance.send(:add_packages, ["react-on-rails-pro"])
+
+      package_json = JSON.parse(File.read("package.json"))
+      expect(result).to be(false)
+      expect(package_json.fetch("dependencies")).to eq({})
     end
 
     it "skips fallback install for packages already present in package.json" do

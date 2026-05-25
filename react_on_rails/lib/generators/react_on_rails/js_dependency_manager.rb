@@ -510,10 +510,9 @@ module ReactOnRails
       # @return [Boolean] true if successful, false otherwise
       def add_packages(packages, dev: false)
         return true if add_npm_dependencies(packages, dev: dev)
-
         return true if install_packages_with_fallback(packages, dev: dev)
 
-        declare_package_json_dependencies(packages, dev: dev)
+        write_versioned_package_specs_to_package_json(packages, dev: dev)
         false
       end
 
@@ -562,25 +561,26 @@ module ReactOnRails
         false
       end
 
-      def declare_package_json_dependencies(packages, dev:)
-        package_json_path = File.join(destination_root, "package.json")
-        return false unless File.exist?(package_json_path)
+      # Last-resort fallback for install failures. This rewrites package.json with
+      # JSON.pretty_generate so users can rerun their package manager manually.
+      def write_versioned_package_specs_to_package_json(packages, dev:)
+        return false unless File.exist?("package.json")
 
-        content = JSON.parse(File.read(package_json_path))
-        dependency_type = dev ? "devDependencies" : "dependencies"
-        dependencies = content[dependency_type] ||= {}
+        versioned_packages = packages.filter_map { |package_spec| package_name_and_version_from_spec(package_spec) }
+        return false if versioned_packages.empty?
 
-        packages.each do |package_spec|
-          package_name = package_name_from_spec(package_spec)
-          next unless package_name
+        content = JSON.parse(File.read("package.json"))
+        dependency_field = dev ? "devDependencies" : "dependencies"
+        content[dependency_field] ||= {}
 
-          dependencies[package_name] = package_version_from_spec(package_spec, package_name)
+        versioned_packages.each do |package_name, package_version|
+          content[dependency_field][package_name] = package_version
         end
 
-        File.write(package_json_path, "#{JSON.pretty_generate(content)}\n")
+        File.write("package.json", "#{JSON.pretty_generate(content)}\n")
         true
       rescue StandardError => e
-        GeneratorMessages.add_warning("⚠️  Could not update package.json dependencies: #{e.message}")
+        GeneratorMessages.add_warning("⚠️  Could not write dependency pins to package.json: #{e.message}")
         false
       end
 
@@ -648,10 +648,11 @@ module ReactOnRails
         package_spec != package_name
       end
 
-      def package_version_from_spec(package_spec, package_name)
-        return "latest" unless version_specified?(package_spec, package_name)
+      def package_name_and_version_from_spec(package_spec)
+        package_name = package_name_from_spec(package_spec)
+        return nil unless package_name && version_specified?(package_spec, package_name)
 
-        package_spec.delete_prefix("#{package_name}@")
+        [package_name, package_spec.delete_prefix("#{package_name}@")]
       end
     end
   end
