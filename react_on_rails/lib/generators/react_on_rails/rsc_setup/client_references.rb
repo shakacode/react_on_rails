@@ -234,10 +234,11 @@ module ReactOnRails
         end
 
         # NOTE: `js_code_position?` itself walks from index 0 on each call, so the partition runs
-        # in O(n² × m) (content-length² × plugin-count) — every plugin hit triggers a fresh O(n)
-        # rescan. Acceptable for small webpack configs (a few hundred lines, a handful of plugins);
-        # if this scanner is ever reused on larger inputs (shared webpack helpers, Vite configs,
-        # monorepo bundlers), carry scanner state forward between iterations before adopting it.
+        # in O(n³ × m) (content-length³ × plugin-count) — `js_regex_literal_start?` calls
+        # `last_js_code_char_index` on each character, making `js_code_position?` itself O(n²),
+        # and every plugin hit triggers a fresh rescan. Acceptable for small webpack configs
+        # (a few hundred lines, a handful of plugins); if this scanner is ever reused on larger
+        # inputs, carry scanner state forward between iterations before adopting it.
         def rsc_plugin_option_sections(content, is_server:)
           rsc_plugin_option_sections_partition(content, is_server: is_server).fetch(:safe)
         end
@@ -1020,6 +1021,7 @@ module ReactOnRails
 
         def rsc_client_references_setup_ready?(config_path)
           return true if options[:pretend]
+          return true if options[:skip]
           return true if scoped_rsc_client_references_defined?(File.read(File.join(destination_root, config_path)))
 
           warn_rsc_client_references_injection_failed(config_path)

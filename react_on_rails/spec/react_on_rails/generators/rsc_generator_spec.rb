@@ -1891,6 +1891,15 @@ describe RscGenerator, type: :generator do
       expect(GeneratorMessages.messages.join("\n")).not_to include("generated scoped helper setup was not written")
     end
 
+    it "treats skipped from-scratch scoped helper setup as ready" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      skip_generator = described_class.new([], { skip: true }, { destination_root: destination_root })
+      simulate_existing_file(config_path, base_client_webpack_content)
+
+      expect(skip_generator.send(:rsc_client_references_setup_ready?, config_path)).to be(true)
+      expect(GeneratorMessages.messages.join("\n")).not_to include("generated scoped helper setup was not written")
+    end
+
     it "splices clientReferences at the top level when isServer also appears in a nested object" do
       config_path = "config/webpack/clientWebpackConfig.js"
       simulate_existing_file(
