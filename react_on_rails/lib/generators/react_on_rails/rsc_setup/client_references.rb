@@ -118,7 +118,8 @@ module ReactOnRails
           GeneratorMessages.add_warning(
             "Skipped scoped clientReferences migration for #{config_path}: #{count} RSCWebpackPlugin " \
             "options block(s) contain characters this lightweight scanner cannot parse safely " \
-            "(most often a regex literal with an unmatched `{` or `}`, e.g. `/\\{/` or `/[{]/`). " \
+            "(most often a regex literal with an unmatched `{` or `}`, e.g. `/\\{/` or `/[{]/`, " \
+            "or a regex literal after a keyword context such as `return` or `typeof`). " \
             "Please add `clientReferences: rscClientReferences` manually to any RSCWebpackPlugin " \
             "that is missing it."
           )
@@ -515,9 +516,9 @@ module ReactOnRails
         end
 
         def previous_significant_js_char(content, index)
-          cursor = index - 1
-          cursor -= 1 while cursor >= 0 && content[cursor].match?(/\s/)
-          cursor >= 0 ? content[cursor] : nil
+          prefix = content[0...index]
+          previous_index = last_js_code_char_index(prefix)
+          previous_index ? prefix[previous_index] : nil
         end
 
         def js_regex_literal_end(content, start_index)

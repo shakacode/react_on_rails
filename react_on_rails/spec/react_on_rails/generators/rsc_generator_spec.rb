@@ -1373,6 +1373,17 @@ describe RscGenerator, type: :generator do
       expect(generator.send(:shakapacker_config_imported?, content)).to be(true)
     end
 
+    it "detects top-level imports after regex literals preceded by block comments" do
+      content = <<~JS
+        const literalOpenBrace = /* comment */ /\\{/;
+        const { resolve } = require('path');
+        const { config } = require('shakapacker');
+      JS
+
+      expect(generator.send(:path_resolve_imported?, content)).to be(true)
+      expect(generator.send(:shakapacker_config_imported?, content)).to be(true)
+    end
+
     it "detects top-level destructuring that creates config or resolve bindings" do
       config_content = "const { config } = require('custom-package');"
       resolve_content = "const { resolve: resolve } = require('custom-paths');"
