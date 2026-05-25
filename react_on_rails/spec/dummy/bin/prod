@@ -26,4 +26,4 @@ if [ -f "pnpm-lock.yaml" ] && [ "pnpm-lock.yaml" -nt "$MANIFEST" ]; then
   echo "Consider running ./bin/prod-assets to rebuild"
 fi
 
-NODE_ENV=production RAILS_ENV=production bundle exec rails server -p 3001
+NODE_ENV=production RAILS_ENV=production bundle exec rails server -p "${PORT:-3001}"
