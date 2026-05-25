@@ -255,6 +255,16 @@ pnpm install
 
 You can also run `bin/console` for an interactive prompt that will allow you to experiment.
 
+### Lockfile Platforms
+
+When committing any `Gemfile.lock`, ensure it includes the Linux platform used by CI.
+If you generated or refreshed a lockfile on macOS or another non-Linux platform and `x86_64-linux` is missing from the
+`PLATFORMS` section, the lint workflow will fail. Run this in the directory that owns that lockfile before committing:
+
+```sh
+bundle lock --add-platform x86_64-linux
+```
+
 ### Local Node Package
 
 Note, the example and dummy apps will use your local `packages/react-on-rails` folder as the `react-on-rails` node package. This will also be done automatically for you via the `rake examples:gen_all` rake task.

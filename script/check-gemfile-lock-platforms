@@ -1,0 +1,57 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# GitHub-hosted Ubuntu runners currently use x86_64-linux.
+REQUIRED_PLATFORM = "x86_64-linux"
+
+lockfiles = `git ls-files`.lines.map(&:chomp).select do |path|
+  path == "Gemfile.lock" || path.end_with?("/Gemfile.lock")
+end.sort
+
+missing_platforms_section = []
+missing_required_platform = []
+
+lockfiles.each do |lockfile|
+  platforms = []
+  found_platforms_section = false
+  reading_platforms_section = false
+
+  File.foreach(lockfile) do |line|
+    stripped_line = line.chomp
+
+    if stripped_line == "PLATFORMS"
+      found_platforms_section = true
+      reading_platforms_section = true
+      next
+    end
+
+    next unless reading_platforms_section
+
+    break if stripped_line.empty? || !stripped_line.start_with?("  ")
+
+    platforms << stripped_line.strip
+  end
+
+  if !found_platforms_section
+    missing_platforms_section << lockfile
+  elsif !platforms.include?(REQUIRED_PLATFORM)
+    missing_required_platform << lockfile
+  end
+end
+
+if missing_platforms_section.any? || missing_required_platform.any?
+  if missing_platforms_section.any?
+    warn "Missing PLATFORMS section in #{missing_platforms_section.length} Gemfile.lock file(s):"
+    missing_platforms_section.each { |lockfile| warn "  - #{lockfile}" }
+  end
+
+  if missing_required_platform.any?
+    warn "Missing #{REQUIRED_PLATFORM} in #{missing_required_platform.length} Gemfile.lock file(s):"
+    missing_required_platform.each { |lockfile| warn "  - #{lockfile}" }
+  end
+
+  warn "Run bundle lock --add-platform #{REQUIRED_PLATFORM} in each affected lockfile directory."
+  exit 1
+end
+
+puts "All #{lockfiles.length} Gemfile.lock file(s) include #{REQUIRED_PLATFORM}."

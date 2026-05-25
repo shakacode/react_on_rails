@@ -126,6 +126,8 @@ jobs:
           echo "Node version: "; node -v
           echo "pnpm version: "; pnpm --version
           echo "Bundler version: "; bundle --version
+      - name: Check Gemfile.lock platforms
+        run: ruby script/check-gemfile-lock-platforms
       - name: Save root ruby gems to cache
         uses: actions/cache@v4
         with:
