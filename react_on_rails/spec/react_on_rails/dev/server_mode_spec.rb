@@ -84,6 +84,27 @@ RSpec.describe ReactOnRails::Dev::ServerMode do
       expect(described_class.detect("config/shakapacker.yml")).to eq(:hmr)
     end
 
+    it "ignores invalid HMR values when live reload uses the Shakapacker default" do
+      write_shakapacker_config(<<~YAML)
+        development:
+          dev_server:
+            hmr: sometimes
+      YAML
+
+      expect(described_class.detect("config/shakapacker.yml")).to eq(:live_reload)
+    end
+
+    it "lets live_reload false win over invalid HMR values" do
+      write_shakapacker_config(<<~YAML)
+        development:
+          dev_server:
+            hmr: sometimes
+            live_reload: false
+      YAML
+
+      expect(described_class.detect("config/shakapacker.yml")).to eq(:development_server)
+    end
+
     it "uses the fallback mode when dev_server is empty" do
       write_shakapacker_config(<<~YAML)
         development:
