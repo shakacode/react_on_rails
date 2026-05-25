@@ -68,7 +68,10 @@ module RendererHarness
         Thread.current.report_on_exception = false
         ReactOnRailsPro::Request.upload_assets
       end
-      raise Timeout::Error unless upload_thread.join(UPLOAD_ASSETS_TIMEOUT_SECONDS)
+      unless upload_thread.join(UPLOAD_ASSETS_TIMEOUT_SECONDS)
+        upload_thread.kill
+        raise Timeout::Error
+      end
 
       upload_thread.value
     rescue Timeout::Error

@@ -206,7 +206,13 @@ module ReactOnRailsPro
       response = error.response
       # Public status intentionally reflects the HTTP error response that ended
       # this attempt, not any intermediate streaming status from a prior attempt.
-      record_status(response)
+      begin
+        record_status(response)
+      rescue StandardError
+        # record_status leaves @status nil before extraction; keep dispatching
+        # the HTTPError path so callers receive the renderer error context.
+        nil
+      end
       case @status
       when ReactOnRailsPro::STATUS_SEND_BUNDLE
         # To prevent infinite loop
