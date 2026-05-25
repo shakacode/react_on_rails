@@ -92,6 +92,9 @@ module ReactOnRailsPro
   end
 
   class StreamRequest
+    HTTPX_STREAM_STATUS_ARGUMENT_ERROR_BACKTRACE =
+      %r{/httpx-[^/]+/lib/httpx/plugins/stream\.rb:}
+
     attr_reader :status
 
     def initialize(&request_block)
@@ -141,9 +144,8 @@ module ReactOnRailsPro
 
     def process_response_chunks(stream_response, error_body, &block)
       parser = ReactOnRails::LengthPrefixedParser.new
-      # @status_recorded = false is essential for 410 retry correctness: each
-      # response attempt must not reuse the previous attempt's recorded state.
-      # The @status = nil reset mirrors record_status's nil-before-extract pattern.
+      # Each streaming response attempt owns its status; a 410 retry must not
+      # reuse the previous attempt's recorded state.
       @status = nil
       @status_recorded = false
       status_read_for_attempt = false
@@ -170,14 +172,7 @@ module ReactOnRailsPro
     # StreamRequest is consumed sequentially. Status intentionally reflects the
     # latest response attempt, so a 410 retry replaces the pre-retry status.
     def record_status(response)
-      # Start each attempt from nil. Known missing-status cases keep that nil as
-      # an unknown status; unexpected extraction errors still propagate after the
-      # ensure below marks status as attempted.
-      # This extraction-level reset covers HTTP error handling; process_response_chunks
-      # also resets before streaming so retries start from a clean attempt state.
-      @status = nil
-      extracted_status = extract_status(response)
-      @status = extracted_status
+      @status = extract_status(response)
     ensure
       # If status extraction itself fails, callers should treat the unknown
       # status as an error response rather than as "status was never read."
@@ -197,11 +192,18 @@ module ReactOnRailsPro
       return nil if response.is_a?(HTTPX::ErrorResponse)
 
       response.status
-    rescue NoMethodError, ArgumentError => e
+    rescue NoMethodError => e
       # NoMethodError: HTTPX::StreamResponse can fail to delegate #status before
       # request.response is available for non-streaming errors.
+      warn_status_read_failure("ignoring error while reading stream response status", e)
+      nil
+    rescue ArgumentError => e
+      raise unless httpx_stream_status_argument_error?(response, e)
+
       # ArgumentError: HTTPX 1.7.0 can raise while materializing status from a
-      # partially-consumed StreamResponse; transport-level HTTPX::Error still propagates.
+      # partially-consumed StreamResponse; transport-level HTTPX::Error still
+      # propagates. The nil fallback buffers this attempt as error_body instead
+      # of parsing LPP, so verify 200-response behavior before removing it.
       # TODO(#3383): remove ArgumentError rescue once the minimum HTTPX version is
       # greater than 1.7.0 and status reads from partially-consumed stream
       # responses are verified not to raise ArgumentError.
@@ -213,6 +215,8 @@ module ReactOnRailsPro
       response = error.response
       # Public status intentionally reflects the HTTP error response that ended
       # this attempt, not any intermediate streaming status from a prior attempt.
+      @status = nil
+      @status_recorded = false
       begin
         record_status(response)
       rescue StandardError => e
@@ -223,8 +227,9 @@ module ReactOnRailsPro
           "ignoring unexpected error while reading HTTP error response status",
           e
         )
+        body_context = error_body.empty? ? "" : ":\n#{error_body}"
         raise ReactOnRailsPro::Error,
-              "Renderer returned an unreadable HTTP error response (#{e.class}: #{e.message}):\n#{error_body}"
+              "Renderer returned an unreadable HTTP error response (#{e.class}: #{e.message})#{body_context}"
       end
       case @status
       when ReactOnRailsPro::STATUS_SEND_BUNDLE
@@ -251,6 +256,12 @@ module ReactOnRailsPro
       else
         warn(message)
       end
+    end
+
+    def httpx_stream_status_argument_error?(response, error)
+      defined?(HTTPX::StreamResponse) &&
+        response.is_a?(HTTPX::StreamResponse) &&
+        Array(error.backtrace).any? { |line| line.match?(HTTPX_STREAM_STATUS_ARGUMENT_ERROR_BACKTRACE) }
     end
   end
 end

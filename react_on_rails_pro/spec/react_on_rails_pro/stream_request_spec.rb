@@ -28,6 +28,13 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
     response
   end
 
+  def httpx_stream_response_with_status_error(error, *raw_chunks)
+    response = HTTPX::StreamResponse.allocate
+    response.define_singleton_method(:each) { |&blk| raw_chunks.each { |c| blk.call(c) } }
+    response.define_singleton_method(:status) { raise error }
+    response
+  end
+
   describe ".create" do
     it "returns a StreamDecorator instance" do
       # Passed block is not called until #each_chunk is invoked, so we can just pass a no-op block here.
@@ -133,7 +140,22 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       expect(request.send(:response_has_error_status?)).to be(true)
     end
 
-    it "treats known status read errors as unknown response status" do
+    it "treats HTTPX stream status argument errors as unknown response status" do
+      error = ArgumentError.new("wrong number of arguments (given 1, expected 0)")
+      error.set_backtrace(
+        ["/ruby/gems/3.4.0/gems/httpx-1.7.0/lib/httpx/plugins/stream.rb:113:in `method_missing'"]
+      )
+      response = httpx_stream_response_with_status_error(error, "body")
+      expect(Rails.logger).to receive(:warn).with(/ignoring error while reading stream response status: ArgumentError/)
+
+      expect do
+        request.send(:process_response_chunks, response, error_body) { |_| nil }
+      end.not_to raise_error
+      expect(error_body).to eq("body")
+      expect(request.status).to be_nil
+    end
+
+    it "raises non-HTTPX ArgumentError status read failures" do
       response = Class.new do
         def each
           yield "body"
@@ -143,13 +165,11 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
           raise ArgumentError, "status unavailable"
         end
       end.new
-      expect(Rails.logger).to receive(:warn).with(/ignoring error while reading stream response status: ArgumentError/)
 
       expect do
         request.send(:process_response_chunks, response, error_body) { |_| nil }
-      end.not_to raise_error
-      expect(error_body).to eq("body")
-      expect(request.status).to be_nil
+      end.to raise_error(ArgumentError, /status unavailable/)
+      expect(request.send(:response_has_error_status?)).to be(true)
     end
 
     context "with length-prefixed protocol parsing" do
@@ -441,10 +461,11 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         /ignoring unexpected error while reading HTTP error response status: RuntimeError/
       )
 
-      expect { stream.each_chunk(&:itself) }.to raise_error(
-        ReactOnRailsPro::Error,
-        /Renderer returned an unreadable HTTP error response \(RuntimeError: status unavailable\)/
-      )
+      expect { stream.each_chunk(&:itself) }.to raise_error(ReactOnRailsPro::Error) do |error|
+        expect(error.message).to eq(
+          "Renderer returned an unreadable HTTP error response (RuntimeError: status unavailable)"
+        )
+      end
       expect(stream.status).to be_nil
     end
 

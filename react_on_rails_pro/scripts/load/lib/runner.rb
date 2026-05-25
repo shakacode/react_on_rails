@@ -276,6 +276,7 @@ module RendererHarness
     end
 
     def join_count_thread(thread)
+      fallback_deadline = nil
       @remaining_mutex.synchronize do
         loop do
           # Non-blocking join while holding @remaining_mutex is intentional;
@@ -285,7 +286,11 @@ module RendererHarness
 
           deadline = @count_join_deadline
           unless deadline
-            @remaining_cv.wait(@remaining_mutex)
+            fallback_deadline ||= monotonic + WORKER_JOIN_TIMEOUT_SECONDS
+            remaining = fallback_deadline - monotonic
+            return nil unless remaining.positive?
+
+            @remaining_cv.wait(@remaining_mutex, remaining)
             next
           end
 

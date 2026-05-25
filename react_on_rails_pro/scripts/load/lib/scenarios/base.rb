@@ -8,6 +8,7 @@ module RendererHarness
     # Abstract base class for all load-test scenarios.
     # Subclasses must implement +perform_request+, which must return a +RequestResult+.
     class Base
+      LENGTH_PREFIX_HEX_WIDTH = 8
       MIX_PROPS_SIZES = { "small" => 200, "medium" => 10_000, "large" => 100_000 }.freeze
       RENDER_COMPONENT_JS_TEMPLATE = <<~JS
         (function(){
@@ -102,7 +103,7 @@ module RendererHarness
         html_body = payload_type == "object" ? JSON.generate(html) : html.to_s
 
         # Wire layout: <metadata JSON> \t <8-char hex content length> \n <html bytes>.
-        JSON.generate(metadata).bytesize + 1 + 8 + 1 + html_body.bytesize
+        JSON.generate(metadata).bytesize + 1 + LENGTH_PREFIX_HEX_WIDTH + 1 + html_body.bytesize
       end
 
       def success_result(start_ms, t_started_ms, payload)

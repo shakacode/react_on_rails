@@ -268,6 +268,13 @@ RSpec.describe RendererHarness::Runner do
     expect { runner.run }.to raise_error(described_class::WorkerJoinTimeout, /did not finish/)
   end
 
+  it "uses a fallback timeout before a request-count worker claims a request" do
+    stub_const("#{described_class}::WORKER_JOIN_TIMEOUT_SECONDS", 0.01)
+    runner = described_class.new(scenario: build_scenario, config: build_config(requests: 1))
+
+    expect(runner.send(:join_count_thread, fake_stuck_thread)).to be_nil
+  end
+
   def fake_stuck_thread
     Class.new do
       attr_reader :join_timeouts

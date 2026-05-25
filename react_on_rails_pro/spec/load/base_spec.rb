@@ -35,7 +35,9 @@ RSpec.describe RendererHarness::Scenarios::Base do
 
     metadata_bytes = JSON.generate(chunk.except("html")).bytesize
 
-    expect(scenario.send(:chunk_bytesize, chunk)).to eq(metadata_bytes + 1 + 8 + 1 + "ok".bytesize)
+    expect(scenario.send(:chunk_bytesize, chunk)).to eq(
+      metadata_bytes + 1 + described_class::LENGTH_PREFIX_HEX_WIDTH + 1 + "ok".bytesize
+    )
   end
 
   it "restores string payloadType when estimating parsed streamed frame bytes" do
@@ -43,6 +45,8 @@ RSpec.describe RendererHarness::Scenarios::Base do
     chunk = { "html" => "ok", "hasErrors" => false }
     metadata = { "hasErrors" => false, "payloadType" => "string" }
 
-    expect(scenario.send(:chunk_bytesize, chunk)).to eq(JSON.generate(metadata).bytesize + 1 + 8 + 1 + 2)
+    expect(scenario.send(:chunk_bytesize, chunk)).to eq(
+      JSON.generate(metadata).bytesize + 1 + described_class::LENGTH_PREFIX_HEX_WIDTH + 1 + 2
+    )
   end
 end
