@@ -36,6 +36,8 @@ module RendererHarness
         raise "MemorySampler already running" if @thread&.alive?
 
         @stop = false
+        # The new thread's first stop? call blocks on @thread_mutex until this
+        # assignment completes, so @thread is visible before sampling begins.
         @thread = Thread.new do
           until stop?
             begin

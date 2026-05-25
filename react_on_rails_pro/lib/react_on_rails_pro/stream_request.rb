@@ -198,11 +198,14 @@ module ReactOnRailsPro
       # request.response is available for non-streaming errors.
       # ArgumentError: HTTPX 1.7.0 can raise while materializing status from a
       # partially-consumed StreamResponse; transport-level HTTPX::Error still propagates.
+      # TODO: remove ArgumentError rescue once the minimum HTTPX version fixes this.
       nil
     end
 
     def handle_http_error(error, error_body, send_bundle)
       response = error.response
+      # Public status intentionally reflects the HTTP error response that ended
+      # this attempt, not any intermediate streaming status from a prior attempt.
       record_status(response)
       case @status
       when ReactOnRailsPro::STATUS_SEND_BUNDLE

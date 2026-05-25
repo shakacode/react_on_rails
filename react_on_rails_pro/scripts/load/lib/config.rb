@@ -19,6 +19,7 @@ module RendererHarness
     keyword_init: true
   ) do
     def self.parse(argv)
+      scenario_explicit = false
       opts = {
         scenario: "standard_render",
         requests: nil,
@@ -30,28 +31,26 @@ module RendererHarness
         start_gate_timeout: default_start_gate_timeout_seconds,
         renderer_pid: nil,
         output_dir: nil,
-        smoke: false,
-        scenario_explicit: false
+        smoke: false
       }
-      build_parser(opts).parse!(argv)
-      apply_smoke_preset!(opts) if opts[:smoke]
-      opts.delete(:scenario_explicit)
+      build_parser(opts, -> { scenario_explicit = true }).parse!(argv)
+      apply_smoke_preset!(opts, scenario_explicit: scenario_explicit) if opts[:smoke]
       validate!(opts)
       new(**opts).freeze
     end
 
-    def self.build_parser(opts)
+    def self.build_parser(opts, scenario_marker)
       OptionParser.new do |o|
         o.banner = "Usage: renderer_harness [options]"
-        add_primary_flags(o, opts)
+        add_primary_flags(o, opts, scenario_marker)
         add_secondary_flags(o, opts)
       end
     end
 
-    def self.add_primary_flags(opt_parser, opts)
+    def self.add_primary_flags(opt_parser, opts, scenario_marker)
       opt_parser.on("--scenario NAME", String) do |v|
         opts[:scenario] = v
-        opts[:scenario_explicit] = true
+        scenario_marker.call
       end
       opt_parser.on("--requests N", Integer) { |v| opts[:requests] = v }
       opt_parser.on("--duration SECONDS", Float) { |v| opts[:duration] = v }
@@ -78,8 +77,8 @@ module RendererHarness
       end
     end
 
-    def self.apply_smoke_preset!(opts)
-      if opts[:scenario_explicit] && opts[:scenario] != "standard_render"
+    def self.apply_smoke_preset!(opts, scenario_explicit:)
+      if scenario_explicit && opts[:scenario] != "standard_render"
         warn "renderer-harness: --smoke overrides --scenario #{opts[:scenario]} with standard_render"
       end
       opts[:scenario] = "standard_render"

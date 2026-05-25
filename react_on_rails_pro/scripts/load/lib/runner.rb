@@ -231,8 +231,9 @@ module RendererHarness
       errors = []
       threads.each do |thread|
         unless join_thread(thread, deadline)
-          # This CLI exits after reporting worker timeouts, so force-killing a
-          # stuck request is preferable to hanging the benchmark indefinitely.
+          # Thread#kill is acceptable here only because the CLI exits right
+          # after reporting worker timeouts. Do not reuse this pattern in a
+          # long-lived server or embedded harness.
           thread.kill
           errors << WorkerJoinTimeout.new(
             "worker thread did not finish before the global join deadline"

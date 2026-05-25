@@ -64,9 +64,13 @@ module RendererHarness
     private
 
     def upload_assets!
-      Timeout.timeout(UPLOAD_ASSETS_TIMEOUT_SECONDS) do
+      upload_thread = Thread.new do
+        Thread.current.report_on_exception = false
         ReactOnRailsPro::Request.upload_assets
       end
+      raise Timeout::Error unless upload_thread.join(UPLOAD_ASSETS_TIMEOUT_SECONDS)
+
+      upload_thread.value
     rescue Timeout::Error
       raise UserError,
             "bundle upload timed out after #{UPLOAD_ASSETS_TIMEOUT_SECONDS}s - is the node renderer responsive?"
