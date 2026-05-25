@@ -18,6 +18,7 @@ All entries live in a single chronological flow within each release. Pro entries
 - **Use `/update-changelog` command** for guided changelog updates with automatic formatting
 - **Before a release**: Run `/update-changelog release` (or `rc`/`beta`) to stamp a version header; then `rake release` reads it automatically and creates the GitHub release
 - **Version management**: `bundle exec rake "update_changelog[release]"` (or `rc`/`beta`/explicit version) for header-only updates
+- **Security support window**: For minor and major releases, update `SECURITY.md` "Current support window" rows and cutoff dates to match the new release line
 - **After releasing without changelog**: Run `bundle exec rake "sync_github_release[VERSION]"` to create the GitHub release from CHANGELOG.md
 - **Examples**: Run `grep -A 3 "^#### " CHANGELOG.md | head -30` to see real formatting examples
 - **Prerelease curation**: See `.claude/commands/update-changelog.md` for prerelease-to-stable consolidation process
