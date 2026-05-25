@@ -24,7 +24,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
-### [16.7.0.rc.1] - 2026-05-23
+### [16.7.0.rc.2] - 2026-05-24
 
 #### Added
 
@@ -47,6 +47,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **Release pipeline verifies published npm packages and blocks `workspace:` dependency leaks**: `rake release:npm` now polls `npm view` after each `pnpm publish` and aborts when the published version is missing, mismatched, or when any install-time `dependencies`/`optionalDependencies`/`peerDependencies` still contains a `workspace:` protocol entry. Before publishing, package manifests are temporarily rewritten to replace `workspace:` ranges with publishable semver and restored afterward. The broken `16.7.0-rc.1` npm publish shipped `react-on-rails-pro@16.7.0-rc.1` with `react-on-rails: "workspace:*"` in its dependency metadata, which Yarn v1 cannot install from the registry; this safeguard prevents future releases from leaking the same protocol. [PR 3387](https://github.com/shakacode/react_on_rails/pull/3387) by [justin808](https://github.com/justin808).
+- **Install generator preserves explicit version pins when package-manager install fails**: The install generator's `add_packages` path now writes versioned `name@version` specs directly into `package.json` (under `dependencies` or `devDependencies`) as a last-resort fallback when neither the primary nor fallback package manager install succeeds, so users can rerun their package manager manually without losing the pins. Specs without an explicit version are not written. [PR 3387](https://github.com/shakacode/react_on_rails/pull/3387) by [justin808](https://github.com/justin808).
 - **[Pro]** **Preserve ruby-jwt 2.x compatibility in 16.7**: Relaxes the `16.7.0.rc.0` `jwt >= 3.2.0` floor to `jwt >= 2.7`, keeping compatibility with apps that still resolve jwt 2.x while continuing to allow patched jwt 3.2.0+ releases. [PR 3344](https://github.com/shakacode/react_on_rails/pull/3344) by [ihabadham](https://github.com/ihabadham).
 - **[Pro]** **RSC client manifest restored when only `registerServerComponent/client` is in the pack graph**: `wrapServerComponentRenderer/client` now directly imports `react-on-rails-rsc/client.browser` as a side-effect import. Previously the client runtime was only reachable through a three-level transitive chain (`wrapServerComponentRenderer/client` → `getReactServerComponent.client` → `react-on-rails-rsc/client.browser`). Tooling that severed any link in that chain (tree-shaking, transpiler quirks, custom `NormalModuleReplacement`, externals) caused `RSCWebpackPlugin` to emit `Client runtime at react-on-rails-rsc/client was not found. React Server Components module map file react-client-manifest.json was not created.` and silently skip the manifest, breaking RSC hydration on the Pro Node Renderer. The direct import keeps the runtime resource in the module graph so the plugin always emits `react-client-manifest.json`. Fixes [#3366](https://github.com/shakacode/react_on_rails/issues/3366). [PR 3368](https://github.com/shakacode/react_on_rails/pull/3368) by [justin808](https://github.com/justin808).
 - **[Pro]** **Updated Fastify in the Node Renderer for CVE-2026-33806**: Raised the direct `fastify` dependency to 5.8.5 so user-provided Fastify server options, including `trustProxy`, pick up the upstream security fix. [PR 3152](https://github.com/shakacode/react_on_rails/pull/3152) by [dependabot\[bot\]](https://github.com/apps/dependabot).
@@ -2156,8 +2158,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.7.0.rc.1...main
-[16.7.0.rc.1]: https://github.com/shakacode/react_on_rails/compare/v16.6.0...v16.7.0.rc.1
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.7.0.rc.2...main
+[16.7.0.rc.2]: https://github.com/shakacode/react_on_rails/compare/v16.6.0...v16.7.0.rc.2
 [16.6.0]: https://github.com/shakacode/react_on_rails/compare/v16.5.1...v16.6.0
 [16.5.1]: https://github.com/shakacode/react_on_rails/compare/v16.5.0...v16.5.1
 [16.5.0]: https://github.com/shakacode/react_on_rails/compare/v16.4.0...v16.5.0
