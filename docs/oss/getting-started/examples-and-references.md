@@ -68,9 +68,6 @@ For detailed proof criteria and migration contribution guidance, see
   section for Lighthouse reports, bundle-size breakdowns, and the demo itself.
 - Use it when you want a public performance-oriented RSC demo showing the shape
   of the user-visible win on a marketplace-style surface.
-- Start with the hub section when you want Lighthouse reports, bundle-size
-  breakdowns, and side-by-side SSR/client/RSC comparisons without cloning the
-  repo.
 
 ### Gumroad-Style RSC Benchmark Demo
 
