@@ -517,19 +517,13 @@ module ReactOnRailsPro
       end
 
       if KNOWN_WEAK_RENDERER_PASSWORDS.include?(renderer_password.downcase)
-        if is_production_like
-          raise ReactOnRailsPro::Error,
-                "renderer_password is set to a known-default value (\"#{renderer_password}\"). " \
-                "Set RENDERER_PASSWORD to a random value of at least #{MIN_RENDERER_PASSWORD_LENGTH} characters."
-        else
-          Rails.logger.warn "[react_on_rails_pro] renderer_password is set to a known-default value " \
-                            "(\"#{renderer_password}\"). This is acceptable for development but MUST be " \
-                            "changed before deploying to staging/production."
-        end
-      elsif renderer_password.length < MIN_RENDERER_PASSWORD_LENGTH && is_production_like
-        raise ReactOnRailsPro::Error,
-              "renderer_password must be at least #{MIN_RENDERER_PASSWORD_LENGTH} characters " \
-              "in production-like environments. Current length: #{renderer_password.length}."
+        Rails.logger.warn "[react_on_rails_pro] renderer_password is set to a known-default value " \
+                          "(\"#{renderer_password}\"). " \
+                          "Set RENDERER_PASSWORD to a random value of at least #{MIN_RENDERER_PASSWORD_LENGTH} characters."
+      elsif renderer_password.length < MIN_RENDERER_PASSWORD_LENGTH
+        Rails.logger.warn "[react_on_rails_pro] renderer_password is shorter than #{MIN_RENDERER_PASSWORD_LENGTH} " \
+                          "characters (current length: #{renderer_password.length}). " \
+                          "Consider using a stronger password."
       end
     end
   end

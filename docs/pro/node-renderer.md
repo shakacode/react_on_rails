@@ -87,10 +87,10 @@ The renderer password secures communication between Rails and the Node Renderer.
 | `production`          | **Yes**            | Raises error on boot if `RENDERER_PASSWORD` is missing   |
 | `qa`, `preview`, etc. | **Yes**            | Raises error on boot if `RENDERER_PASSWORD` is missing   |
 
-In production-like environments (anything other than `development` or `test`), both the Rails app and the Node Renderer will refuse to start without a password that meets these requirements:
+In production-like environments (anything other than `development` or `test`), both the Rails app and the Node Renderer will refuse to start without a non-empty password. Additionally, a warning is logged if the password:
 
-- **Not a known-weak default** (e.g. `devPassword`, `password`, `changeme`, `admin`, `secret`, `test`, `renderer`)
-- **At least 16 characters long**
+- Matches a known-weak default (e.g. `devPassword`, `password`, `changeme`, `admin`, `secret`, `test`, `renderer`)
+- Is shorter than 16 characters
 
 Set the same `RENDERER_PASSWORD` for both sides:
 

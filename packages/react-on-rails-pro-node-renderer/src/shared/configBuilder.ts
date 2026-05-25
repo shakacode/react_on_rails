@@ -346,20 +346,14 @@ function validatePasswordForProduction(aConfig: Config): string | null {
   }
 
   if (KNOWN_WEAK_PASSWORDS.has(aConfig.password.toLowerCase())) {
-    if (isProductionLike) {
-      return (
-        `RENDERER_PASSWORD is set to a known-default value ("${aConfig.password}"). ` +
-        `Set RENDERER_PASSWORD to a random value of at least ${MIN_PASSWORD_LENGTH} characters.`
-      );
-    }
     log.warn(
       `RENDERER_PASSWORD is set to a known-default value ("${aConfig.password}"). ` +
-        'This is acceptable for development but MUST be changed before deploying to staging/production.',
+        `Set RENDERER_PASSWORD to a random value of at least ${MIN_PASSWORD_LENGTH} characters.`,
     );
-  } else if (aConfig.password.length < MIN_PASSWORD_LENGTH && isProductionLike) {
-    return (
-      `RENDERER_PASSWORD must be at least ${MIN_PASSWORD_LENGTH} characters in production-like environments. ` +
-      `Current length: ${aConfig.password.length}.`
+  } else if (aConfig.password.length < MIN_PASSWORD_LENGTH) {
+    log.warn(
+      `RENDERER_PASSWORD is shorter than ${MIN_PASSWORD_LENGTH} characters (current length: ${aConfig.password.length}). ` +
+        'Consider using a stronger password.',
     );
   }
 
