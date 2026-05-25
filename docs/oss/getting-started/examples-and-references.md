@@ -64,9 +64,9 @@ For detailed proof criteria and migration contribution guidance, see
 ### Marketplace RSC Performance Demo
 
 - Repo: [shakacode/react-on-rails-demo-marketplace-rsc](https://github.com/shakacode/react-on-rails-demo-marketplace-rsc)
-- Live demo: [LocalHub marketplace demo](https://rsc.reactonrails.com/)
+- Live demo: [LocalHub marketplace demo](https://rsc.reactonrails.com/) - a sample marketplace app used as the RSC
+  comparison surface
 - Evidence dashboard: [RSC performance showcase](https://rsc.reactonrails.com/search-performance)
-- LocalHub is the sample marketplace app used by this public demo.
 - Use it when you want a public performance-oriented RSC demo showing the shape
   of the user-visible win on a marketplace-style surface.
 - Start with the evidence dashboard when you want Lighthouse reports,
