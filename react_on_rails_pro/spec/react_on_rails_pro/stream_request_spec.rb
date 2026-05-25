@@ -8,7 +8,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
   let(:retry_limit) { 2 }
 
   before do
-    config = double("configuration", renderer_request_retry_limit: retry_limit)
+    config = instance_double(ReactOnRailsPro::Configuration, renderer_request_retry_limit: retry_limit)
     allow(ReactOnRailsPro).to receive(:configuration).and_return(config)
   end
 

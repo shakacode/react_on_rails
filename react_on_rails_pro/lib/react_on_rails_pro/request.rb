@@ -184,50 +184,41 @@ module ReactOnRailsPro
 
       def perform_request(path, **post_options)
         available_retries = ReactOnRailsPro.configuration.renderer_request_retry_limit
-        retry_request = true
         response = nil
-        while retry_request
-          begin
-            start_time = Time.now
-            response = connection.post(path, **post_options)
-
-            warn_if_slow_request(path, start_time, stream: post_options[:stream])
-            retry_request = false
-          rescue ReactOnRailsPro::RendererHttpClient::TimeoutError => e
-            if available_retries.zero?
-              raise ReactOnRailsPro::Error, "Time out error when getting the response on: #{path}.\n" \
-                                            "Original error:\n#{e}\n#{e.backtrace}"
-            end
-            Rails.logger.info do
-              "[ReactOnRailsPro] Timed out trying to make a request to the Node Renderer. " \
-                "Retrying #{available_retries} more times..."
-            end
-            available_retries -= 1
-            next
-          rescue ReactOnRailsPro::RendererHttpClient::ConnectionError => e
-            if available_retries.zero?
-              raise ReactOnRailsPro::Error,
-                    "Node renderer request failed: #{path}.\nOriginal error:\n#{e}\n#{e.backtrace}"
-            end
-            Rails.logger.info do
-              "[ReactOnRailsPro] Connection error when making a request to the Node Renderer. " \
-                "Retrying #{available_retries} more times..."
-            end
-            available_retries -= 1
-            next
-          end
+        loop do
+          start_time = Time.now
+          response = connection.post(path, **post_options)
+          warn_if_slow_request(path, start_time, stream: post_options[:stream])
+          break
+        rescue ReactOnRailsPro::RendererHttpClient::TimeoutError => e
+          available_retries = retry_or_raise_transport_error(e, available_retries, path, "Time out")
+        rescue ReactOnRailsPro::RendererHttpClient::ConnectionError => e
+          available_retries = retry_or_raise_transport_error(e, available_retries, path, "Connection")
         end
 
+        validate_response(response)
+      end
+
+      def retry_or_raise_transport_error(error, available_retries, path, error_type)
+        if available_retries.zero?
+          raise ReactOnRailsPro::Error,
+                "#{error_type} error on renderer request: #{path}.\nOriginal error:\n#{error}\n#{error.backtrace}"
+        end
+        Rails.logger.info do
+          "[ReactOnRailsPro] #{error_type} error when making a request to the Node Renderer. " \
+            "Retrying #{available_retries} more times..."
+        end
+        available_retries - 1
+      end
+
+      # Only checks for fatal protocol mismatch (412). Other non-success statuses
+      # (410 = send bundle, 400 = bad request) are handled by callers like eval_js
+      # and StreamRequest, which need the response object to decide on retry/reupload.
+      def validate_response(response)
         Rails.logger.info { "[ReactOnRailsPro] Node Renderer responded" }
 
         if response.status && response.status == ReactOnRailsPro::STATUS_INCOMPATIBLE
           raise ReactOnRailsPro::Error, response.body
-        end
-
-        # For streaming responses, status is nil here (lazy execution), so error? returns false.
-        if response.error?
-          raise ReactOnRailsPro::Error,
-                "Unexpected response code from renderer: #{response.status} on #{path}:\n#{response.body}"
         end
 
         response
