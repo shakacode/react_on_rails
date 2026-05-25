@@ -90,10 +90,29 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       expect(error_body).to eq("error details")
     end
 
-    it "raises if error-status detection runs before status is recorded" do
-      expect do
-        request.send(:response_has_error_status?)
-      end.to raise_error(ReactOnRailsPro::Error, /status was not recorded/)
+    it "treats unrecorded status as an error status" do
+      expect(request.send(:response_has_error_status?)).to be(true)
+    end
+
+    it "clears previous status before parsing a response attempt" do
+      request.instance_variable_set(:@status, ReactOnRailsPro::STATUS_SEND_BUNDLE)
+      response = Class.new do
+        def each
+          yield "body"
+        end
+
+        def status
+          500
+        end
+
+        def is_a?(klass)
+          klass == HTTPX::ErrorResponse ? false : super
+        end
+      end.new
+
+      request.send(:process_response_chunks, response, error_body) { |_| nil }
+
+      expect(request.status).to eq(500)
     end
 
     it "marks status as attempted when status extraction raises" do

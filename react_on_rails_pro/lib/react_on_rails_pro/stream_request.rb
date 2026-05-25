@@ -143,6 +143,7 @@ module ReactOnRailsPro
       parser = ReactOnRails::LengthPrefixedParser.new
       # Each response attempt, especially the post-410 retry, must not reuse the
       # previous attempt's status while parsing its own chunks.
+      @status = nil
       @status_recorded = false
       status_read_for_attempt = false
       stream_response.each do |chunk|
@@ -179,11 +180,10 @@ module ReactOnRailsPro
       @status_recorded = true
     end
 
-    # Once status has been read, a nil value means the response could not expose
-    # an HTTP status. Treat it as an error so callers do not parse an unknown
-    # response body as LPP data.
+    # Missing or unreadable status is treated as an error so callers do not
+    # parse an unknown response body as LPP data.
     def response_has_error_status?
-      raise ReactOnRailsPro::Error, "Renderer response status was not recorded" unless @status_recorded
+      return true unless @status_recorded
 
       @status.nil? || @status >= 400
     end

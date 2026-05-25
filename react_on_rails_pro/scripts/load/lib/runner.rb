@@ -89,6 +89,7 @@ module RendererHarness
         worker_thread(gate) do |worker_results|
           deadline = prepare_worker(gate)
           worker_results << @scenario.perform_request while monotonic < deadline
+          warn_zero_duration_results(deadline) if worker_results.empty?
         end
       end
     end
@@ -129,6 +130,13 @@ module RendererHarness
       warn(
         "RendererHarness::Runner: failed to append partial worker results after worker failure: " \
         "#{e.class}: #{e.message}"
+      )
+    end
+
+    def warn_zero_duration_results(deadline)
+      warn(
+        "RendererHarness::Runner: duration worker #{Thread.current.object_id} recorded 0 measured requests " \
+        "because the measurement deadline (#{format('%.3f', deadline)}) had already passed"
       )
     end
 

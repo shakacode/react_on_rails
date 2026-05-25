@@ -20,7 +20,7 @@ module RendererHarness
           response = ReactOnRailsPro::Request.render_code(path, js, false)
           body = response.respond_to?(:body) ? response.body.to_s : response.to_s
           status = response.respond_to?(:status) ? response.status : nil
-          error = "Renderer returned #{status}: #{body.slice(0, 200)}" if status && status >= 400
+          error = "Renderer returned #{status}: #{safe_body_preview(body)}" if status && status >= 400
 
           {
             http_status: status,
@@ -30,6 +30,15 @@ module RendererHarness
             error: error
           }
         end
+      end
+
+      private
+
+      def safe_body_preview(body)
+        body
+          .encode(Encoding::UTF_8, invalid: :replace, undef: :replace, replace: "?")
+          .scrub("?")
+          .slice(0, 200)
       end
     end
   end

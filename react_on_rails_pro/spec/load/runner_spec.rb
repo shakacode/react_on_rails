@@ -99,6 +99,19 @@ RSpec.describe RendererHarness::Runner do
     expect(runner.results.size).to eq(1)
   end
 
+  it "warns when a duration worker records zero measured requests" do
+    runner = described_class.new(
+      scenario: build_scenario,
+      config: build_config(requests: nil, duration: 0.0, concurrency: 1)
+    )
+    allow(runner).to receive(:warn)
+
+    runner.run
+
+    expect(runner.results).to be_empty
+    expect(runner).to have_received(:warn).with(/recorded 0 measured requests/)
+  end
+
   it "aborts before measurement if a worker fails during warmup" do
     scenario = build_scenario
     allow(scenario).to receive(:warmup).and_raise("warmup failed")

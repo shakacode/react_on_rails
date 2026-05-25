@@ -37,4 +37,16 @@ RSpec.describe RendererHarness::Scenarios::StandardRender do
     expect(result.http_status).to eq(503)
     expect(result.error).to eq("Renderer returned 503: renderer unavailable")
   end
+
+  it "scrubs invalid response body bytes before writing error text" do
+    body = +"renderer unavailable\xFF"
+    body.force_encoding(Encoding::UTF_8)
+    response = Struct.new(:status, :body).new(503, body)
+    allow(ReactOnRailsPro::Request).to receive(:render_code).and_return(response)
+
+    result = described_class.new(build_config).perform_request
+
+    expect(result.error).to eq("Renderer returned 503: renderer unavailable?")
+    expect(result.error).to be_valid_encoding
+  end
 end
