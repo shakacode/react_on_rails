@@ -311,19 +311,20 @@ jobs:
   verify-license:
     runs-on: ubuntu-latest
     env:
-      RAILS_ENV: production
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE }}
     steps:
-      # Pin third-party actions to reviewed SHAs in production deployment workflows.
+      # Examples use version tags for readability. In production deployment workflows,
+      # replace third-party action refs with reviewed commit SHAs or pinned versions.
       - uses: actions/checkout@v4
 
-      # Pin third-party actions to reviewed SHAs in production deployment workflows.
       - uses: ruby/setup-ruby@v1
         with:
           bundler-cache: true
 
       # Add database, credentials, Node/pnpm, and other app-specific setup required to boot Rails in production.
       - name: Verify React on Rails Pro license
+        env:
+          RAILS_ENV: production
         run: |
           set +e
           bundle exec rake react_on_rails_pro:verify_license \
@@ -382,13 +383,12 @@ jobs:
   advisory-license-check:
     runs-on: ubuntu-latest
     env:
-      RAILS_ENV: production
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE }}
     steps:
-      # Pin third-party actions to reviewed SHAs in production deployment workflows.
+      # Examples use version tags for readability. In production deployment workflows,
+      # replace third-party action refs with reviewed commit SHAs or pinned versions.
       - uses: actions/checkout@v4
 
-      # Pin third-party actions to reviewed SHAs in production deployment workflows.
       - uses: ruby/setup-ruby@v1
         with:
           bundler-cache: true
@@ -397,6 +397,8 @@ jobs:
       - name: Check React on Rails Pro license
         id: license-check
         continue-on-error: true
+        env:
+          RAILS_ENV: production
         run: |
           # Plain output is enough here; capture it so license metadata stays out of Actions logs.
           bundle exec rake react_on_rails_pro:verify_license \
@@ -511,8 +513,8 @@ Run it from your scheduler or CI:
 RAILS_ENV=production DAYS=30 bundle exec rake licenses:check_react_on_rails_pro
 ```
 
-Use `DAYS=0` when you want the wrapper to fail for invalid, missing, already expired, or expiring-today
-licenses.
+Partial days are rounded up, so a license with any time remaining today counts as 1 day remaining. Use `DAYS=0` when
+you only want the wrapper to fail for invalid, missing, already expired, or past-dated valid license metadata.
 
 For complete license setup instructions, see [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/LICENSE_SETUP.md).
 
