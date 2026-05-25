@@ -5,7 +5,7 @@ module RendererHarness
     module TerminalReporter
       module_function
 
-      def print(io, summary)
+      def print_summary(io, summary)
         io.puts "=== Renderer Load Harness Results ==="
         scenario_line = "Scenario: #{summary[:scenario]} | " \
                         "Concurrency: #{summary[:concurrency]} | " \

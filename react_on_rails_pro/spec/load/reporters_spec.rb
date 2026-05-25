@@ -118,7 +118,7 @@ RSpec.describe "Reporters" do
   describe RendererHarness::Reporters::TerminalReporter do
     it "prints a summary block including scenario, transport, RPS, p99" do
       out = StringIO.new
-      described_class.print(out, summary_payload)
+      described_class.print_summary(out, summary_payload)
       text = out.string
       expect(text).to include("standard_render")
       expect(text).to include("httpx")
@@ -129,7 +129,7 @@ RSpec.describe "Reporters" do
     it "tolerates missing :memory key" do
       out = StringIO.new
       payload = summary_payload.dup.tap { |p| p[:memory] = nil }
-      expect { described_class.print(out, payload) }.not_to raise_error
+      expect { described_class.print_summary(out, payload) }.not_to raise_error
     end
   end
 end

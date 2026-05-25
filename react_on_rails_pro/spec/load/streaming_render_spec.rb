@@ -96,4 +96,17 @@ RSpec.describe RendererHarness::Scenarios::StreamingRender do
     expect(result.http_status).to eq(503)
     expect(result.error).to eq("renderer unavailable")
   end
+
+  it "preserves stream creation errors without masking them" do
+    allow(ReactOnRailsPro::Request)
+      .to receive(:render_code_as_stream)
+      .and_raise(StandardError, "connection refused")
+
+    result = described_class.new(build_config).perform_request
+
+    expect(result.ok).to be(false)
+    expect(result.http_status).to be_nil
+    expect(result.bytes_in).to eq(0)
+    expect(result.error).to eq("connection refused")
+  end
 end

@@ -26,8 +26,9 @@ module RendererHarness
 
         measure do
           bytes_in = 0
-          stream = ReactOnRailsPro::Request.render_code_as_stream(path, js, is_rsc_payload: false)
+          stream = nil
           begin
+            stream = ReactOnRailsPro::Request.render_code_as_stream(path, js, is_rsc_payload: false)
             stream.each_chunk do |chunk|
               bytes_in += chunk_bytesize(chunk)
             end
@@ -46,7 +47,7 @@ module RendererHarness
       private
 
       def failure_stream_payload(stream, bytes_in:, bytes_out:, error:)
-        stream_payload(stream, bytes_in: bytes_in, bytes_out: bytes_out).merge(
+        stream_payload(stream, bytes_in: bytes_in, bytes_out: bytes_out, status: stream&.http_status).merge(
           ok: false,
           error: error.message
         )

@@ -58,7 +58,7 @@ module RendererHarness
         measurement_start_offset(sampler, runner)
       )
       write_outputs(summary, runner.results, memory_rows)
-      Reporters::TerminalReporter.print($stdout, summary)
+      Reporters::TerminalReporter.print_summary($stdout, summary)
       summary
     end
 
