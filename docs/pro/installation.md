@@ -202,7 +202,11 @@ def parse_license_json_object(output)
 
   while (start_index = output.index("{", search_index))
     parsed_object, end_index = parse_json_object_at(output, start_index)
-    break unless end_index
+
+    unless end_index
+      search_index = start_index + 1
+      next
+    end
 
     if parsed_object.is_a?(Hash) && LICENSE_STATUSES.include?(parsed_object["status"])
       return parsed_object
