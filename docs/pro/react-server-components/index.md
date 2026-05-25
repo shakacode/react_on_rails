@@ -39,6 +39,8 @@ Server components can access databases, file systems, and internal APIs directly
 
 Teams adopting RSC have reported dramatic wins — BlogHunch's 30% server-cost reduction, Frigade's 62% client-bundle reduction, and Mux's 50,000-line incremental migration — all documented in [Migration Success Stories](./success-stories.md). DoorDash's 65% LCP improvement from an earlier Next.js SSR migration is included as a useful server-rendering baseline.
 
+<a id="live-demo-and-evidence"></a>
+
 ### Live Demo and Evidence
 
 The public [LocalHub marketplace demo](https://rsc.reactonrails.com/) shows the

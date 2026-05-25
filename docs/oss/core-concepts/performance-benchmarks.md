@@ -91,7 +91,7 @@ Server components produce HTML that does not need hydration — they have no cli
 
 > [!NOTE]
 > This section covers public, non-production directional benchmarks first, then a production case study. For validated,
-> at-scale results, see the [Production Case Study: Popmenu](#production-case-study-popmenu) below.
+> at-scale results, see the [Production Case Study: Popmenu](#popmenu) below.
 
 <a id="public-marketplace-rsc-demo"></a>
 
