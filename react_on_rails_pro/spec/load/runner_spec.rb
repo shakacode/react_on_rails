@@ -112,6 +112,22 @@ RSpec.describe RendererHarness::Runner do
     expect(runner).to have_received(:warn).with(/recorded 0 measured requests/)
   end
 
+  it "allows duration runs to exceed the stuck-worker shutdown grace" do
+    stub_const("#{described_class}::WORKER_JOIN_TIMEOUT_SECONDS", 0.05)
+    scenario = build_scenario
+    allow(scenario).to receive(:perform_request) do
+      sleep 0.02
+      RendererHarness::RequestResult.new(latency_ms: 20.0, ok: true)
+    end
+    runner = described_class.new(
+      scenario: scenario,
+      config: build_config(requests: nil, duration: 0.08, concurrency: 1)
+    )
+
+    expect { runner.run }.not_to raise_error
+    expect(runner.results).not_to be_empty
+  end
+
   it "aborts before measurement if a worker fails during warmup" do
     scenario = build_scenario
     allow(scenario).to receive(:warmup).and_raise("warmup failed")

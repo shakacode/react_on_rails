@@ -48,7 +48,8 @@ module RendererHarness
       gate = start_gate
       threads = build_threads(gate)
       start = release_workers_when_ready(gate)
-      join_threads(threads, ignore_measurement_aborted: start.nil?)
+      join_threads(threads, timeout_seconds: worker_join_timeout_seconds(start),
+                            ignore_measurement_aborted: start.nil?)
       raise(gate.abort_error || MeasurementAborted.new("Measurement aborted before workers started")) unless start
 
       monotonic - start
@@ -220,15 +221,21 @@ module RendererHarness
       raise ArgumentError, "--requests and --duration are mutually exclusive" if @config.requests && @config.duration
     end
 
-    def join_threads(threads, ignore_measurement_aborted: false)
+    def worker_join_timeout_seconds(measurement_start)
+      return WORKER_JOIN_TIMEOUT_SECONDS unless measurement_start && @config.duration
+
+      @config.duration + WORKER_JOIN_TIMEOUT_SECONDS
+    end
+
+    def join_threads(threads, timeout_seconds:, ignore_measurement_aborted: false)
       errors = []
       threads.each do |thread|
-        unless thread.join(WORKER_JOIN_TIMEOUT_SECONDS)
+        unless thread.join(timeout_seconds)
           # This CLI exits after reporting worker timeouts, so force-killing a
           # stuck request is preferable to hanging the benchmark indefinitely.
           thread.kill
           errors << WorkerJoinTimeout.new(
-            "worker thread did not finish within #{WORKER_JOIN_TIMEOUT_SECONDS}s"
+            "worker thread did not finish within #{timeout_seconds}s"
           )
           next
         end
