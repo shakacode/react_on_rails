@@ -176,7 +176,7 @@ expiring-soon licenses or a custom warning threshold.
 For example, JSON parsers should branch on `status` before treating `renewal_required` as an expiring-soon signal:
 
 ```ruby
-status = license_info.fetch("status")
+status = license_info["status"] || abort("Unexpected license info response: #{license_info.inspect}")
 
 case status
 when "expired", "invalid", "missing"
@@ -329,8 +329,13 @@ namespace :licenses do
     info = ReactOnRailsPro::Utils.license_info
     status = info[:status]
     expiration = info[:expiration]
-    expiration_time = expiration.to_time if expiration.respond_to?(:to_time)
-    days_remaining = expiration_time && ((expiration_time - Time.current) / 86_400).ceil
+    expiration_time =
+      if expiration.is_a?(Date) && !expiration.is_a?(DateTime)
+        expiration.in_time_zone.end_of_day
+      elsif expiration.respond_to?(:to_time)
+        expiration.to_time
+      end
+    days_remaining = expiration_time && ((expiration_time - Time.current) / 1.day).ceil
     status_label = status.to_s.tr("_", " ")
 
     if status == :expired
@@ -341,6 +346,7 @@ namespace :licenses do
       abort "React on Rails Pro license status is #{status_label}. Update REACT_ON_RAILS_PRO_LICENSE."
     end
 
+    # Defensive guard for future metadata changes; normal expired licenses abort above.
     if days_remaining&.negative?
       abort "React on Rails Pro license expiration date is in the past. Renew and rotate the key."
     end
