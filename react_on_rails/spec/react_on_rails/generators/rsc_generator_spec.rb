@@ -2097,12 +2097,14 @@ describe RscGenerator, type: :generator do
       allow(generator).to receive(:rewrite_rsc_plugin_client_references)
         .with(config_path, is_server: false)
         .and_return(false)
+      allow(generator).to receive(:say_status).and_call_original
 
       generator.send(:update_existing_rsc_webpack_config, config_path, original_content, is_server: false)
 
       migrated_content = File.read(File.join(destination_root, config_path))
       expect(generator).to have_received(:rewrite_rsc_plugin_client_references)
         .with(config_path, is_server: false)
+      expect(generator).to have_received(:say_status).with(:revert, config_path, :yellow)
       expect(migrated_content).to eq(original_content)
       expect(migrated_content).not_to include("const rscClientReferences")
       expect(GeneratorMessages.messages.join("\n"))

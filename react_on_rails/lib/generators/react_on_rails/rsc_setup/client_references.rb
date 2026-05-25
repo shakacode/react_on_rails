@@ -106,6 +106,9 @@ module ReactOnRails
         end
 
         def rsc_client_references_rewrite_needed?(config_path, content, is_server:)
+          # This predicate prepares the rewrite too: when it returns true, the scoped helper
+          # may already have been injected on disk so `rewrite_rsc_plugin_client_references`
+          # can re-read fresh content with valid offsets.
           if rsc_plugin_references_any_scoped_client_references?(content, is_server: is_server)
             return false unless ensure_rsc_client_references_setup(config_path, content, is_server: is_server)
 
@@ -152,6 +155,8 @@ module ReactOnRails
             "options block(s) contain characters this lightweight scanner cannot parse safely " \
             "(most often a regex literal with an unmatched `{` or `}`, e.g. `/\\{/` or `/[{]/`, " \
             "or a regex literal after a keyword context such as `return` or `typeof`). " \
+            "All RSCWebpackPlugin calls in the file must be parseable for auto-migration to proceed, " \
+            "including calls targeting the other bundle. " \
             "Please add `clientReferences: rscClientReferences` manually to any RSCWebpackPlugin " \
             "that is missing it."
           )
@@ -652,6 +657,7 @@ module ReactOnRails
           full_path = File.join(destination_root, config_path)
           return unless scoped_rsc_client_references_defined?(File.read(full_path))
 
+          say_status(:revert, config_path, :yellow)
           File.write(full_path, original_content)
         end
 
@@ -888,6 +894,8 @@ module ReactOnRails
           updated_content = content.dup
           updated_content[anchor_match.begin(0)...anchor_match.end(0)] = yield anchor_match[0]
           if options[:pretend]
+            # Pretend is handled here because this helper reports injection-specific wording;
+            # `write_existing_rsc_config` still handles pretend for direct rewrite calls.
             say_status(:pretend, "Would inject rscClientReferences into #{config_path}", :yellow)
           else
             write_existing_rsc_config(config_path, updated_content, action: :insert)
