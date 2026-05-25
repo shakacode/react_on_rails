@@ -391,7 +391,7 @@ When releasing from prerelease to a stable version (e.g., `v16.5.0.rc.1` -> `v16
 
 #### Step 4: Investigation process for each entry
 
-For each entry from a prerelease section, ask:
+For each entry that doesn't obviously fall into a REMOVE or KEEP category above, ask:
 
 - Was this bug present in the last stable release? If no, drop.
 - Was this feature introduced in an earlier prerelease and then superseded? If yes, keep only the final state.
