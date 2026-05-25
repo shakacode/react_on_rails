@@ -1297,6 +1297,18 @@ describe RscGenerator, type: :generator do
         .to be(true)
     end
 
+    it "detects named imports when destructuring comments contain braces" do
+      content = <<~JS
+        const {
+          /* kept for docs: } */
+          config,
+        } = require('shakapacker');
+      JS
+
+      expect(generator.send(:commonjs_named_imported?, content, "shakapacker", "config"))
+        .to be(true)
+    end
+
     it "detects named imports with defaults and self aliases" do
       default_without_space = "const { config=fallbackConfig } = require('shakapacker');"
       self_aliased_config = "const { config: config } = require('shakapacker');"
@@ -1411,6 +1423,11 @@ describe RscGenerator, type: :generator do
 
       expect(generator.send(:top_level_config_binding?, config_content)).to be(true)
       expect(generator.send(:top_level_resolve_binding?, resolve_content)).to be(true)
+    end
+
+    it "detects top-level class declarations that create config or resolve bindings" do
+      expect(generator.send(:top_level_config_binding?, "class config {}")).to be(true)
+      expect(generator.send(:top_level_resolve_binding?, "  class resolve extends BaseResolve {}")).to be(true)
     end
 
     it "ignores top-level destructuring that renames config or resolve bindings" do
@@ -1798,6 +1815,23 @@ describe RscGenerator, type: :generator do
       expect(File.read(File.join(destination_root, config_path))).to eq(original_content)
     end
 
+    it "does not write plugin rewrites in skip mode" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      skip_generator = described_class.new([], { skip: true }, { destination_root: destination_root })
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+        JS
+      )
+
+      original_content = File.read(File.join(destination_root, config_path))
+      expect(skip_generator).to receive(:say_status).with(:skip, config_path, :yellow)
+      expect(skip_generator.send(:rewrite_rsc_plugin_client_references, config_path, is_server: false)).to be(true)
+      expect(File.read(File.join(destination_root, config_path))).to eq(original_content)
+    end
+
     it "continues planning later setup steps after scoped helper setup in pretend mode" do
       config_path = "config/webpack/clientWebpackConfig.js"
       pretend_generator = described_class.new([], { pretend: true }, { destination_root: destination_root })
@@ -1824,6 +1858,34 @@ describe RscGenerator, type: :generator do
       expect(pretend_generator).to receive(:say_status)
         .with(:pretend, "Would rewrite #{config_path}", :yellow)
       pretend_generator.send(:update_existing_rsc_webpack_config, config_path, original_content, is_server: false)
+
+      expect(File.read(File.join(destination_root, config_path))).to eq(original_content)
+      expect(GeneratorMessages.messages.join("\n")).not_to include("generated scoped helper setup was not written")
+    end
+
+    it "does not inject scoped helper setup in skip mode" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      skip_generator = described_class.new([], { skip: true }, { destination_root: destination_root })
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      original_content = File.read(File.join(destination_root, config_path))
+      expect(skip_generator).to receive(:say_status).with(:skip, config_path, :yellow).twice
+      skip_generator.send(:update_existing_rsc_webpack_config, config_path, original_content, is_server: false)
 
       expect(File.read(File.join(destination_root, config_path))).to eq(original_content)
       expect(GeneratorMessages.messages.join("\n")).not_to include("generated scoped helper setup was not written")

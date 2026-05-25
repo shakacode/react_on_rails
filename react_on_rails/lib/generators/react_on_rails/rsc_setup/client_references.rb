@@ -143,6 +143,8 @@ module ReactOnRails
                                                               is_server: is_server)
 
           add_rsc_client_references_setup(config_path, content, existing_imports_content, is_server: is_server)
+          return true if options[:skip]
+
           rsc_client_references_setup_ready?(config_path)
         end
 
@@ -605,14 +607,7 @@ module ReactOnRails
           rewrites.reverse_each do |section, rewritten_body|
             content[section.fetch(:body_start)...section.fetch(:body_end)] = rewritten_body
           end
-          if options[:pretend]
-            say_status(:pretend, "Would rewrite #{config_path}", :yellow)
-          else
-            # Direct write is intentional: multi-point rewrites cannot be expressed as one
-            # gsub_file call, and pretend mode is already handled above.
-            File.write(full_path, content)
-            say_status(:rewrite, config_path, :green)
-          end
+          write_existing_rsc_config(config_path, content, action: :rewrite)
           true
         end
 
@@ -803,9 +798,33 @@ module ReactOnRails
           if options[:pretend]
             say_status(:pretend, "Would inject rscClientReferences into #{config_path}", :yellow)
           else
-            File.write(File.join(destination_root, config_path), updated_content)
-            say_status(:insert, config_path, :green)
+            write_existing_rsc_config(config_path, updated_content, action: :insert)
           end
+          true
+        end
+
+        def write_existing_rsc_config(config_path, content, action:)
+          if options[:pretend]
+            message =
+              if action == :insert
+                "Would inject rscClientReferences into #{config_path}"
+              else
+                "Would rewrite #{config_path}"
+              end
+            say_status(:pretend, message, :yellow)
+            return true
+          end
+
+          if options[:skip]
+            say_status(:skip, config_path, :yellow)
+            return true
+          end
+
+          # Direct write is intentional: multi-point rewrites cannot be expressed as one
+          # gsub_file call, so the raw write explicitly mirrors Thor's --skip behavior above.
+          File.write(File.join(destination_root, config_path), content)
+          say_status(action, config_path, :green)
+          true
         end
 
         def shakapacker_config_import_statement(existing_imports_content)
@@ -1040,18 +1059,13 @@ module ReactOnRails
         end
 
         def commonjs_named_imported?(content, package_name, binding_name)
-          # `[^}]*` is intentionally newline-permissive (Ruby character classes match `\n`),
-          # so multi-line destructuring like `const {\n  config,\n} = require('shakapacker')` matches.
-          # `[^}]*` cannot match nested destructuring like
-          # `const { config: { source_path } } = require('shakapacker')` because the inner `}`
-          # terminates the character class early. That shape is outside this matcher's
-          # supported surface for the same reason aliases and split-comma defaults are.
+          content_without_comments = rsc_plugin_options_without_comments(content)
           pattern = /^[ \t]*(?:const|let|var)\s+\{([^}]*)\}\s*=\s*require\(['"]#{Regexp.escape(package_name)}['"]\);?/
 
-          content.to_enum(:scan, pattern).any? do |captures|
+          content_without_comments.to_enum(:scan, pattern).any? do |captures|
             # Module-scope check guards against false positives when the same destructuring
             # appears inside a function body (which does not produce a module-scope binding).
-            next false unless js_top_level_position?(content, Regexp.last_match.begin(0))
+            next false unless js_top_level_position?(content_without_comments, Regexp.last_match.begin(0))
 
             destructuring_declares_binding?(captures.first, binding_name)
           end
@@ -1066,7 +1080,14 @@ module ReactOnRails
 
         def top_level_direct_binding?(content, binding_name)
           binding_pattern = Regexp.escape(binding_name)
-          pattern = /^[ \t]*(?:(?:const|let|var)\s+#{binding_pattern}\b|function\s+#{binding_pattern}\s*\()/
+          pattern = /
+            ^[ \t]*
+            (?:
+              (?:const|let|var)\s+#{binding_pattern}\b |
+              function\s+#{binding_pattern}\s*\( |
+              class\s+#{binding_pattern}\b
+            )
+          /x
 
           content.to_enum(:scan, pattern).any? do
             js_top_level_position?(content, Regexp.last_match.begin(0))
@@ -1074,17 +1095,18 @@ module ReactOnRails
         end
 
         def top_level_destructured_binding?(content, binding_name)
+          content_without_comments = rsc_plugin_options_without_comments(content)
           pattern = /^[ \t]*(?:const|let|var)\s+\{([^}]*)\}/
 
-          content.to_enum(:scan, pattern).any? do |captures|
-            next false unless js_top_level_position?(content, Regexp.last_match.begin(0))
+          content_without_comments.to_enum(:scan, pattern).any? do |captures|
+            next false unless js_top_level_position?(content_without_comments, Regexp.last_match.begin(0))
 
             destructuring_declares_binding?(captures.first, binding_name)
           end
         end
 
         def destructuring_declares_binding?(bindings, binding_name)
-          bindings.split(",").any? do |binding|
+          rsc_plugin_options_without_comments(bindings).split(",").any? do |binding|
             destructuring_binding_declares_name?(binding.strip, binding_name)
           end
         end
