@@ -36,12 +36,12 @@ describe InstallGenerator, type: :generator do
       be_nil,
       "package.json must declare packageManager so CI_PNPM_FALLBACK_VERSION stays in sync"
     )
-    match = package_manager.match(/\Apnpm@(.+)\z/)
+    match = package_manager.match(/\Apnpm@(?<version>\d+\.\d+\.\d+)(?:\+sha\d+\.[0-9a-f]+)?\z/)
     expect(match).not_to(
       be_nil,
       "package.json packageManager must declare a pnpm@<version> spec, got #{package_manager.inspect}"
     )
-    match[1]
+    match[:version]
   end
 
   context "without args" do

@@ -126,6 +126,5 @@
   "author": "justin808",
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails_pro/issues"
-  },
-  "packageManager": "pnpm@9.14.2"
+  }
 }
