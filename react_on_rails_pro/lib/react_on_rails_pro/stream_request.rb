@@ -141,8 +141,9 @@ module ReactOnRailsPro
 
     def process_response_chunks(stream_response, error_body, &block)
       parser = ReactOnRails::LengthPrefixedParser.new
-      # Each response attempt, especially the post-410 retry, must not reuse the
-      # previous attempt's status while parsing its own chunks.
+      # @status_recorded = false is essential for 410 retry correctness: each
+      # response attempt must not reuse the previous attempt's recorded state.
+      # The @status = nil reset mirrors record_status's nil-before-extract pattern.
       @status = nil
       @status_recorded = false
       status_read_for_attempt = false

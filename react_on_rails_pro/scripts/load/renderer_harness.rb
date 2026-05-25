@@ -20,6 +20,6 @@ rescue RendererHarness::UserError, RendererHarness::Runner::MeasurementAborted,
   exit 1
 rescue StandardError => e
   warn "renderer-harness: unexpected error - #{e.class}: #{e.message}"
-  warn e.backtrace.first(5).join("\n")
+  warn e.backtrace&.first(5)&.join("\n")
   exit 2
 end

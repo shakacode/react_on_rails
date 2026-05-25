@@ -85,11 +85,19 @@ RSpec.describe RendererHarness::Runner do
       scenario: scenario,
       config: build_config(requests: nil, duration: 1.0, concurrency: 1, warmup: 1)
     )
-    clock_values_after_warmup = [100.0, 100.25, 101.25, 101.5]
+    main_thread = Thread.current
+    main_clock_values_after_warmup = [100.0, 100.5, 101.5]
+    worker_clock_values_after_warmup = [100.25, 101.25]
     warmup_counts_at_clock_reads = []
     allow(runner).to receive(:monotonic) do
       warmup_counts_at_clock_reads << scenario.warmup_calls
-      scenario.warmup_calls.zero? ? 0.0 : clock_values_after_warmup.shift
+      if scenario.warmup_calls.zero?
+        0.0
+      elsif Thread.current == main_thread
+        main_clock_values_after_warmup.shift
+      else
+        worker_clock_values_after_warmup.shift
+      end
     end
 
     runner.run
@@ -126,6 +134,37 @@ RSpec.describe RendererHarness::Runner do
 
     expect { runner.run }.not_to raise_error
     expect(runner.results).not_to be_empty
+  end
+
+  it "allows request-count runs to exceed the stuck-worker shutdown grace" do
+    stub_const("#{described_class}::WORKER_JOIN_TIMEOUT_SECONDS", 0.01)
+    scenario = build_scenario
+    allow(scenario).to receive(:perform_request) do
+      sleep 0.02
+      RendererHarness::RequestResult.new(latency_ms: 20.0, ok: true)
+    end
+    runner = described_class.new(scenario: scenario, config: build_config(requests: 1))
+
+    expect { runner.run }.not_to raise_error
+    expect(runner.results.size).to eq(1)
+  end
+
+  it "applies the worker join timeout as one global deadline" do
+    runner = described_class.new(scenario: build_scenario, config: build_config)
+    threads = Array.new(2) { fake_stuck_thread }
+    allow(runner).to receive(:monotonic).and_return(10.0, 11.0)
+    raised_error = nil
+
+    begin
+      runner.send(:join_threads, threads, deadline: 10.5)
+    rescue described_class::WorkerErrors => e
+      raised_error = e
+    end
+
+    expect(raised_error).to be_a(described_class::WorkerErrors)
+    expect(raised_error.errors).to all(be_a(described_class::WorkerJoinTimeout))
+    expect(threads[0].join_timeouts).to eq([0.5])
+    expect(threads[1].join_timeouts).to be_empty
   end
 
   it "aborts before measurement if a worker fails during warmup" do
@@ -205,9 +244,26 @@ RSpec.describe RendererHarness::Runner do
     allow(scenario).to receive(:perform_request) { sleep 1 }
     runner = described_class.new(
       scenario: scenario,
-      config: build_config(requests: 1)
+      config: build_config(requests: nil, duration: 0.01)
     )
 
     expect { runner.run }.to raise_error(described_class::WorkerJoinTimeout, /did not finish/)
+  end
+
+  def fake_stuck_thread
+    Class.new do
+      attr_reader :join_timeouts
+
+      def initialize
+        @join_timeouts = []
+      end
+
+      def join(timeout = :none)
+        @join_timeouts << timeout
+        nil
+      end
+
+      def kill; end
+    end.new
   end
 end
