@@ -46,15 +46,6 @@ module RendererHarness
           { http_status: stream_status(stream), bytes_in: bytes_in, bytes_out: js.bytesize }
         end
       end
-
-      private
-
-      def stream_status(stream)
-        return stream.status if stream.respond_to?(:status)
-        return stream.http_status if stream.respond_to?(:http_status)
-
-        nil
-      end
     end
   end
 end

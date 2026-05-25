@@ -40,6 +40,13 @@ module RendererHarness
         { "filler" => "x" * size }
       end
 
+      def stream_status(stream)
+        return stream.status if stream.respond_to?(:status)
+        return stream.http_status if stream.respond_to?(:http_status)
+
+        nil
+      end
+
       def measure
         start_ms = monotonic_ms
         t_started_ms = (Time.now.to_f * 1000)
@@ -58,13 +65,17 @@ module RendererHarness
       private
 
       def success_result(start_ms, t_started_ms, payload)
+        http_status = payload[:http_status]
+        ok = payload.key?(:ok) ? payload[:ok] : !http_error_status?(http_status)
+        error = payload[:error]
+        error ||= http_error_message(http_status) unless ok
         RequestResult.new(
           latency_ms: monotonic_ms - start_ms,
           bytes_in: payload[:bytes_in] || 0,
           bytes_out: payload[:bytes_out] || 0,
-          ok: true,
-          error: nil,
-          http_status: payload[:http_status],
+          ok: ok,
+          error: error,
+          http_status: http_status,
           scenario: name,
           thread_id: Thread.current.object_id,
           t_started_ms: t_started_ms
@@ -83,6 +94,14 @@ module RendererHarness
           thread_id: Thread.current.object_id,
           t_started_ms: t_started_ms
         )
+      end
+
+      def http_error_status?(status)
+        status && status.to_i >= 400
+      end
+
+      def http_error_message(status)
+        "Renderer returned #{status}" if http_error_status?(status)
       end
     end
   end

@@ -26,6 +26,9 @@ RSpec.describe RendererHarness::Runner do
         mutex.synchronize { state[:perform_calls] += 1 }
         RendererHarness::RequestResult.new(latency_ms: 1.0, ok: true)
       end
+      scenario.define_singleton_method(:perform_calls) do
+        mutex.synchronize { state[:perform_calls] }
+      end
     end
   end
 
@@ -73,5 +76,42 @@ RSpec.describe RendererHarness::Runner do
 
     expect(warmup_counts_at_clock_reads.first).to eq(1)
     expect(runner.results.size).to eq(1)
+  end
+
+  it "aborts before measurement if a worker fails during warmup" do
+    scenario = build_scenario
+    allow(scenario).to receive(:warmup).and_raise("warmup failed")
+    runner = described_class.new(
+      scenario: scenario,
+      config: build_config(requests: 2, concurrency: 2, warmup: 1)
+    )
+
+    expect { runner.run }.to raise_error(/warmup failed/)
+    expect(runner.results).to be_empty
+    expect(scenario.perform_calls).to eq(0)
+  end
+
+  it "reports multiple worker errors" do
+    mutex = Mutex.new
+    ready = ConditionVariable.new
+    entered = 0
+    scenario = build_scenario
+    allow(scenario).to receive(:perform_request) do
+      mutex.synchronize do
+        entered += 1
+        ready.broadcast
+        ready.wait(mutex) until entered == 2
+      end
+      raise "worker failure #{Thread.current.object_id}"
+    end
+    runner = described_class.new(
+      scenario: scenario,
+      config: build_config(requests: 2, concurrency: 2)
+    )
+
+    expect { runner.run }.to raise_error(described_class::WorkerErrors) do |error|
+      expect(error.errors.size).to eq(2)
+      expect(error.message).to include("2 worker threads failed", "worker failure")
+    end
   end
 end

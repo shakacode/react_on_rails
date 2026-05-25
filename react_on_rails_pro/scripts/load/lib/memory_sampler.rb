@@ -14,7 +14,7 @@ module RendererHarness
       oldmalloc_increase_bytes
     ].freeze
 
-    attr_reader :pids
+    attr_reader :pids, :start_time
 
     def initialize(pids:, start_time: Process.clock_gettime(Process::CLOCK_MONOTONIC))
       @pids = pids.freeze

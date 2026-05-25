@@ -62,7 +62,7 @@ module RendererHarness
           stream.each_chunk do |chunk|
             bytes_in += chunk.bytesize if chunk.respond_to?(:bytesize)
           end
-          { http_status: nil, bytes_in: bytes_in, bytes_out: js.bytesize }
+          { http_status: stream_status(stream), bytes_in: bytes_in, bytes_out: js.bytesize }
         end
       end
 

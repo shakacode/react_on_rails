@@ -223,6 +223,21 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
 
       stream.each_chunk(&:itself)
     end
+
+    it "exposes the response status after streaming" do
+      mock_response = double(HTTPX::StreamResponse, status: 204)
+      allow(mock_response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(false)
+      allow(mock_response).to receive(:each).and_yield(to_length_prefixed("chunk"))
+
+      stream = described_class.create do |_send_bundle, _barrier|
+        mock_response
+      end
+
+      stream.each_chunk(&:itself)
+
+      expect(stream.status).to eq(204)
+      expect(stream.http_status).to eq(204)
+    end
   end
   # rubocop:enable RSpec/VerifiedDoubles
 

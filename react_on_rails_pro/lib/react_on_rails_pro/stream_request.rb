@@ -16,6 +16,12 @@ module ReactOnRailsPro
       @rescue_blocks = []
     end
 
+    def status
+      @component.status if @component.respond_to?(:status)
+    end
+
+    alias http_status status
+
     # Add a prepend action
     def prepend
       @actions << ->(chunk, position) { position == :first ? "#{yield}#{chunk}" : chunk }
@@ -86,8 +92,11 @@ module ReactOnRailsPro
   end
 
   class StreamRequest
+    attr_reader :status
+
     def initialize(&request_block)
       @request_executor = request_block
+      @status = nil
     end
 
     private_class_method :new
@@ -148,7 +157,8 @@ module ReactOnRailsPro
     def response_has_error_status?(response)
       return true if response.is_a?(HTTPX::ErrorResponse)
 
-      response.status >= 400
+      @status = response.status
+      @status >= 400
     rescue NoMethodError
       # HTTPX::StreamResponse can fail to delegate #status for non-streaming errors.
       true

@@ -42,18 +42,25 @@ module RendererHarness
         scenario.cleanup
       end
 
-      summary = build_summary(runner.results, sampler.rows, elapsed)
-      write_outputs(summary, runner.results, sampler.rows)
+      memory_rows = sampler.rows
+      summary = build_summary(
+        runner.results,
+        memory_rows,
+        elapsed,
+        measurement_start_offset(sampler, runner)
+      )
+      write_outputs(summary, runner.results, memory_rows)
       Reporters::TerminalReporter.print($stdout, summary)
       summary
     end
 
     private
 
-    def build_summary(results, mem_rows, elapsed)
+    def build_summary(results, mem_rows, elapsed, memory_offset_seconds = 0.0)
       lat = Metrics.summarize_latencies(results)
-      rails_series = build_rails_series(mem_rows)
-      renderer_series = build_renderer_series(mem_rows)
+      measured_mem_rows = measured_memory_rows(mem_rows, memory_offset_seconds)
+      rails_series = build_rails_series(measured_mem_rows)
+      renderer_series = build_renderer_series(measured_mem_rows)
 
       {
         scenario: @config.scenario,
@@ -69,6 +76,21 @@ module RendererHarness
         memory: build_memory_block(rails_series, renderer_series),
         output_dir: @output_dir
       }
+    end
+
+    def measurement_start_offset(sampler, runner)
+      return 0.0 unless runner.measurement_started_at
+
+      [runner.measurement_started_at - sampler.start_time, 0.0].max
+    end
+
+    def measured_memory_rows(mem_rows, offset_seconds)
+      mem_rows.filter_map do |row|
+        t_seconds = row[:t_seconds].to_f
+        next if t_seconds < offset_seconds
+
+        row.merge(t_seconds: t_seconds - offset_seconds)
+      end
     end
 
     def build_rails_series(mem_rows)
