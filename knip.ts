@@ -86,6 +86,7 @@ const config: KnipConfig = {
         // Test helper utilities
         'tests/helper.ts',
         'tests/httpRequestUtils.ts',
+        'src/testUtils/opentelemetry.ts',
       ],
       ignoreDependencies: [
         // Optional dependencies used in integrations
@@ -199,6 +200,11 @@ const config: KnipConfig = {
         'mini-css-extract-plugin',
         // Webpack config merge helper is used in the dummy app config, but not detected reliably by Knip.
         'webpack-merge',
+        // Used by dynamically registered dummy app components, which are intentionally ignored above.
+        '@dr.pogodin/react-helmet',
+        'create-react-class',
+        'react-redux',
+        'react-router-dom',
         // This one is weird. It's long-deprecated and shouldn't be necessary.
         // Probably need to update the Webpack config.
         'node-libs-browser',
@@ -216,6 +222,7 @@ const config: KnipConfig = {
   },
   ignoreIssues: {
     'packages/react-on-rails-pro-node-renderer/src/shared/tracing.ts': ['exports'],
+    'packages/react-on-rails-pro-node-renderer/src/worker/fastifyConfig.ts': ['exports'],
   },
   ignoreExportsUsedInFile: true,
 };
