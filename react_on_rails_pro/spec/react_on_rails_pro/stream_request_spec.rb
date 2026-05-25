@@ -5,6 +5,13 @@ require "react_on_rails_pro/stream_request"
 require "react_on_rails_pro/renderer_http_client"
 
 RSpec.describe ReactOnRailsPro::StreamRequest do
+  let(:retry_limit) { 2 }
+
+  before do
+    config = double("configuration", renderer_request_retry_limit: retry_limit)
+    allow(ReactOnRailsPro).to receive(:configuration).and_return(config)
+  end
+
   def to_length_prefixed(html, metadata_overrides = {})
     metadata = {
       "consoleReplayScript" => "", "hasErrors" => false,
@@ -182,8 +189,10 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
   end
 
   describe "error handling" do
-    it "raises ReactOnRailsPro::Error on TimeoutError" do
+    it "retries TimeoutError before first chunk, then raises after exhausting retries" do
+      call_count = 0
       stream = described_class.create do |_send_bundle, _tasks|
+        call_count += 1
         ReactOnRailsPro::RendererHttpClient::Response.new do |_yielder, _status_assigner|
           raise ReactOnRailsPro::RendererHttpClient::TimeoutError, "read timeout"
         end
@@ -193,10 +202,13 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         ReactOnRailsPro::Error,
         /Time out error while server side render streaming a component/
       )
+      expect(call_count).to eq(retry_limit + 1)
     end
 
-    it "raises ReactOnRailsPro::Error on ConnectionError" do
+    it "retries ConnectionError before first chunk, then raises after exhausting retries" do
+      call_count = 0
       stream = described_class.create do |_send_bundle, _tasks|
+        call_count += 1
         ReactOnRailsPro::RendererHttpClient::Response.new do |_yielder, _status_assigner|
           raise ReactOnRailsPro::RendererHttpClient::ConnectionError, "Connection refused"
         end
@@ -206,6 +218,84 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         ReactOnRailsPro::Error,
         /Connection error while server side render streaming a component/
       )
+      expect(call_count).to eq(retry_limit + 1)
+    end
+
+    it "raises immediately on TimeoutError after first chunk is received" do
+      call_count = 0
+      stream = described_class.create do |_send_bundle, _tasks|
+        call_count += 1
+        ReactOnRailsPro::RendererHttpClient::Response.new do |yielder, status_assigner|
+          status_assigner.call(200)
+          yielder.call(to_length_prefixed("chunk1"))
+          raise ReactOnRailsPro::RendererHttpClient::TimeoutError, "read timeout"
+        end
+      end
+
+      expect { stream.each_chunk(&:itself) }.to raise_error(
+        ReactOnRailsPro::Error,
+        /Time out error while server side render streaming a component/
+      )
+      expect(call_count).to eq(1)
+    end
+
+    it "raises immediately on ConnectionError after first chunk is received" do
+      call_count = 0
+      stream = described_class.create do |_send_bundle, _tasks|
+        call_count += 1
+        ReactOnRailsPro::RendererHttpClient::Response.new do |yielder, status_assigner|
+          status_assigner.call(200)
+          yielder.call(to_length_prefixed("chunk1"))
+          raise ReactOnRailsPro::RendererHttpClient::ConnectionError, "Connection reset"
+        end
+      end
+
+      expect { stream.each_chunk(&:itself) }.to raise_error(
+        ReactOnRailsPro::Error,
+        /Connection error while server side render streaming a component/
+      )
+      expect(call_count).to eq(1)
+    end
+
+    it "retries transport error then succeeds" do
+      call_count = 0
+      stream = described_class.create do |_send_bundle, _tasks|
+        call_count += 1
+        if call_count == 1
+          ReactOnRailsPro::RendererHttpClient::Response.new do |_yielder, _status_assigner|
+            raise ReactOnRailsPro::RendererHttpClient::ConnectionError, "Connection refused"
+          end
+        else
+          mock_ok_response(to_length_prefixed("ok"))
+        end
+      end
+
+      chunks = []
+      stream.each_chunk { |c| chunks << c }
+      expect(call_count).to eq(2)
+      expect(chunks.first).to include("html" => "ok")
+    end
+
+    it "stops and clears tasks before retrying on transport error" do
+      call_count = 0
+      task_stopped = false
+
+      stream = described_class.create do |_send_bundle, tasks|
+        call_count += 1
+        if call_count == 1
+          tasks.push(Async::Task.current.async { task_stopped = true })
+          ReactOnRailsPro::RendererHttpClient::Response.new do |_yielder, _status_assigner|
+            raise ReactOnRailsPro::RendererHttpClient::ConnectionError, "Connection refused"
+          end
+        else
+          expect(tasks).to be_empty
+          mock_ok_response(to_length_prefixed("ok"))
+        end
+      end
+
+      stream.each_chunk(&:itself)
+      expect(call_count).to eq(2)
+      expect(task_stopped).to be true
     end
 
     it "raises ReactOnRailsPro::Error on HTTP 400 (bad request)" do

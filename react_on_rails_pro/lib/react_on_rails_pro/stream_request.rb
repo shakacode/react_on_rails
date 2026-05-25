@@ -107,9 +107,11 @@ module ReactOnRailsPro
     def consume_with_bundle_reupload(&block)
       send_bundle = false
       tasks = []
+      available_retries = ReactOnRailsPro.configuration.renderer_request_retry_limit
 
       begin
         loop do
+          @received_first_chunk = false
           stream_response = @request_executor.call(send_bundle, tasks)
 
           process_response_chunks(stream_response, &block)
@@ -117,12 +119,11 @@ module ReactOnRailsPro
         rescue ReactOnRailsPro::RendererHttpClient::HTTPError => e
           stop_tasks(tasks) if retrying_with_bundle_upload?(e, send_bundle)
           send_bundle = handle_http_error(e, send_bundle)
-        rescue ReactOnRailsPro::RendererHttpClient::TimeoutError => e
-          raise ReactOnRailsPro::Error, "Time out error while server side render streaming a component.\n" \
-                                        "Original error:\n#{e}\n#{e.backtrace}"
-        rescue ReactOnRailsPro::RendererHttpClient::ConnectionError => e
-          raise ReactOnRailsPro::Error, "Connection error while server side render streaming a component.\n" \
-                                        "Original error:\n#{e}\n#{e.backtrace}"
+        rescue ReactOnRailsPro::RendererHttpClient::TimeoutError,
+               ReactOnRailsPro::RendererHttpClient::ConnectionError => e
+          raise_or_retry_streaming_transport_error(e, available_retries)
+          available_retries -= 1
+          stop_tasks(tasks)
         end
 
         tasks.each(&:wait)
@@ -134,19 +135,31 @@ module ReactOnRailsPro
     def process_response_chunks(stream_response, &block)
       parser = ReactOnRails::LengthPrefixedParser.new
       request_start_time = Time.now
-      received_first_chunk = false
 
       stream_response.each do |chunk|
         next if stream_response.error?
 
-        unless received_first_chunk
-          received_first_chunk = true
+        unless @received_first_chunk
+          @received_first_chunk = true
           @first_chunk_warn_callback&.call(Time.now - request_start_time)
         end
 
         parser.feed(chunk, &block)
       end
       parser.flush
+    end
+
+    # Retrying after first chunk would duplicate content in the page.
+    def raise_or_retry_streaming_transport_error(error, available_retries)
+      error_type = error.is_a?(ReactOnRailsPro::RendererHttpClient::TimeoutError) ? "Time out" : "Connection"
+      if @received_first_chunk || available_retries.zero?
+        raise ReactOnRailsPro::Error, "#{error_type} error while server side render streaming a component.\n" \
+                                      "Original error:\n#{error}\n#{error.backtrace}"
+      end
+      Rails.logger.info do
+        "[ReactOnRailsPro] Streaming #{error_type.downcase} error before receiving first chunk. " \
+          "Retrying #{available_retries} more times..."
+      end
     end
 
     def stop_tasks(tasks)
