@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../support/generator_spec_helper"
+require "tmpdir"
 
 # rubocop:disable Style/NumericPredicate
 # Using `be > 0` instead of `be_positive` because `be_positive` is not available
@@ -208,6 +209,27 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       instance.system_result = false
       result = instance.send(:add_packages, %w[package1])
       expect(result).to be(false)
+    end
+
+    it "keeps requested dependencies in package.json when installation fails" do
+      Dir.mktmpdir do |destination_root|
+        allow(instance).to receive(:destination_root).and_return(destination_root)
+        package_json_path = File.join(destination_root, "package.json")
+        package_json = { "dependencies" => { "existing" => "^1.0.0" } }
+        File.write(package_json_path, "#{JSON.pretty_generate(package_json)}\n")
+
+        instance.add_npm_dependencies_result = false
+        instance.system_result = false
+
+        Dir.chdir(destination_root) do
+          result = instance.send(:add_packages, ["react-on-rails-pro@16.7.0-rc.1"])
+          expect(result).to be(false)
+        end
+
+        dependencies = JSON.parse(File.read(package_json_path)).fetch("dependencies")
+        expect(dependencies).to include("existing" => "^1.0.0")
+        expect(dependencies).to include("react-on-rails-pro" => "16.7.0-rc.1")
+      end
     end
 
     it "skips fallback install for packages already present in package.json" do

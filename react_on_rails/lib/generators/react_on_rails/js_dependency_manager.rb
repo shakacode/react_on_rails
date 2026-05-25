@@ -511,7 +511,10 @@ module ReactOnRails
       def add_packages(packages, dev: false)
         return true if add_npm_dependencies(packages, dev: dev)
 
-        install_packages_with_fallback(packages, dev: dev)
+        return true if install_packages_with_fallback(packages, dev: dev)
+
+        declare_package_json_dependencies(packages, dev: dev)
+        false
       end
 
       def install_js_dependencies
@@ -556,6 +559,28 @@ module ReactOnRails
         system(*install_args)
       rescue StandardError => e
         GeneratorMessages.add_warning("⚠️  Fallback package install failed: #{e.message}")
+        false
+      end
+
+      def declare_package_json_dependencies(packages, dev:)
+        package_json_path = File.join(destination_root, "package.json")
+        return false unless File.exist?(package_json_path)
+
+        content = JSON.parse(File.read(package_json_path))
+        dependency_type = dev ? "devDependencies" : "dependencies"
+        dependencies = content[dependency_type] ||= {}
+
+        packages.each do |package_spec|
+          package_name = package_name_from_spec(package_spec)
+          next unless package_name
+
+          dependencies[package_name] = package_version_from_spec(package_spec, package_name)
+        end
+
+        File.write(package_json_path, "#{JSON.pretty_generate(content)}\n")
+        true
+      rescue StandardError => e
+        GeneratorMessages.add_warning("⚠️  Could not update package.json dependencies: #{e.message}")
         false
       end
 
@@ -621,6 +646,12 @@ module ReactOnRails
 
       def version_specified?(package_spec, package_name)
         package_spec != package_name
+      end
+
+      def package_version_from_spec(package_spec, package_name)
+        return "latest" unless version_specified?(package_spec, package_name)
+
+        package_spec.delete_prefix("#{package_name}@")
       end
     end
   end
