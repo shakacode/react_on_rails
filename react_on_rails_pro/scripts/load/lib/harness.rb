@@ -25,6 +25,7 @@ module RendererHarness
     def initialize(config)
       @config = config
       @output_dir = config.output_dir || default_output_dir
+      @transport = ENV.fetch(TRANSPORT_ENV, DEFAULT_TRANSPORT)
     end
 
     def run
@@ -92,7 +93,7 @@ module RendererHarness
 
       {
         scenario: @config.scenario,
-        transport: ENV.fetch(TRANSPORT_ENV, DEFAULT_TRANSPORT),
+        transport: @transport,
         concurrency: @config.concurrency,
         mix: @config.mix,
         warmup: @config.warmup,

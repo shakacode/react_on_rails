@@ -236,7 +236,8 @@ module ReactOnRailsPro
         )
         body_context = error_body.empty? ? "" : ":\n#{error_body}"
         raise ReactOnRailsPro::Error,
-              "Renderer returned an unreadable HTTP error response (#{e.class}: #{e.message})#{body_context}"
+              "Renderer returned an unreadable HTTP error response (#{e.class}: #{e.message})#{body_context}",
+              e.backtrace
       end
       case @status
       when ReactOnRailsPro::STATUS_SEND_BUNDLE
@@ -265,11 +266,19 @@ module ReactOnRailsPro
       end
     end
 
-    def httpx_stream_status_argument_error?(response, _error)
+    def httpx_stream_status_argument_error?(response, error)
       return false unless defined?(HTTPX::StreamResponse) && response.is_a?(HTTPX::StreamResponse)
 
       httpx_spec = Gem.loaded_specs["httpx"]
-      httpx_spec.nil? || httpx_spec.version <= HTTPX_STATUS_ARGUMENT_ERROR_MAX_VERSION
+      if httpx_spec.nil?
+        warn_status_read_failure(
+          "assuming HTTPX stream status workaround because loaded httpx version is unavailable",
+          error
+        )
+        return true
+      end
+
+      httpx_spec.version <= HTTPX_STATUS_ARGUMENT_ERROR_MAX_VERSION
     end
   end
 end

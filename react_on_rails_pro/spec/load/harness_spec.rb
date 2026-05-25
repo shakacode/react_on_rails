@@ -50,6 +50,19 @@ RSpec.describe RendererHarness::Harness do
     expect(summary[:memory][:rails_slope_mb_per_min]).to eq(0.0)
   end
 
+  it "records the renderer transport from harness construction time" do
+    original_transport = ENV.fetch(RendererHarness::TRANSPORT_ENV, nil)
+    ENV[RendererHarness::TRANSPORT_ENV] = "httpx"
+    harness = described_class.new(build_config)
+    ENV[RendererHarness::TRANSPORT_ENV] = "mutated"
+
+    summary = harness.send(:build_summary, [], [], 1.0)
+
+    expect(summary[:transport]).to eq("httpx")
+  ensure
+    ENV[RendererHarness::TRANSPORT_ENV] = original_transport
+  end
+
   it "defaults output under the Rails root" do
     rails = Class.new do
       def self.root

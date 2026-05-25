@@ -164,6 +164,18 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       end.to raise_error(ArgumentError, /wrong number of arguments/)
     end
 
+    it "warns when applying the HTTPX stream status workaround without a loaded gem version" do
+      error = ArgumentError.new("wrong number of arguments (given 1, expected 0)")
+      response = httpx_stream_response_with_status_error(error, "body")
+      allow(Gem).to receive(:loaded_specs).and_return({})
+      expect(Rails.logger).to receive(:warn).with(/loaded httpx version is unavailable: ArgumentError/)
+      expect(Rails.logger).to receive(:warn).with(/ignoring error while reading stream response status: ArgumentError/)
+
+      request.send(:process_response_chunks, response, error_body) { |_| nil }
+
+      expect(error_body).to eq("body")
+    end
+
     it "raises non-HTTPX ArgumentError status read failures" do
       response = Class.new do
         def each
@@ -455,10 +467,11 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
 
     it "preserves HTTP error handling when status extraction unexpectedly fails" do
       status_calls = 0
+      status_error = RuntimeError.new("status unavailable")
       response = double("response", headers: {}, body: "")
       allow(response).to receive(:status) do
         status_calls += 1
-        raise "status unavailable" if status_calls > 1
+        raise status_error if status_calls > 1
 
         503
       end
@@ -474,6 +487,8 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         expect(error.message).to eq(
           "Renderer returned an unreadable HTTP error response (RuntimeError: status unavailable)"
         )
+        expect(error.cause).to eq(status_error)
+        expect(error.backtrace).to eq(status_error.backtrace)
       end
       expect(stream.status).to be_nil
     end
