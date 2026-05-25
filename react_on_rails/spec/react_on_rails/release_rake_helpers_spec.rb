@@ -313,6 +313,45 @@ RSpec.describe "release.rake helper methods" do
         end.to raise_error(SystemExit, /not visible on npm/)
       end
     end
+
+    it "replaces workspace protocol dependencies while publishing and restores the package manifest" do
+      Dir.mktmpdir do |dir|
+        package_json_path = File.join(dir, "package.json")
+        original_package_json = JSON.pretty_generate(
+          {
+            "name" => "react-on-rails-pro",
+            "version" => "16.7.0-rc.1",
+            "dependencies" => {
+              "react-on-rails" => "workspace:*"
+            },
+            "optionalDependencies" => {
+              "react-on-rails-optional" => "workspace:^"
+            },
+            "peerDependencies" => {
+              "react-on-rails-peer" => "workspace:~"
+            }
+          }
+        )
+        File.write(package_json_path, "#{original_package_json}\n")
+
+        expect(self).to receive(:sh_args_in_dir_for_release).with(dir, "pnpm", "publish") do
+          published_package_json = JSON.parse(File.read(package_json_path))
+          expect(published_package_json.dig("dependencies", "react-on-rails")).to eq("16.7.0-rc.1")
+          expect(published_package_json.dig("optionalDependencies", "react-on-rails-optional"))
+            .to eq("^16.7.0-rc.1")
+          expect(published_package_json.dig("peerDependencies", "react-on-rails-peer")).to eq("~16.7.0-rc.1")
+        end
+        expect(self).to receive(:verify_npm_package_published!).with(
+          "react-on-rails-pro",
+          "16.7.0-rc.1",
+          registry_url: "https://registry.npmjs.org/"
+        )
+
+        publish_npm_with_retry(dir, "react-on-rails-pro@16.7.0-rc.1", max_retries: 1)
+
+        expect(File.read(package_json_path)).to eq("#{original_package_json}\n")
+      end
+    end
   end
 
   describe "#verify_npm_package_published!" do

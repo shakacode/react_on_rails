@@ -635,6 +635,51 @@ def workspace_protocol_dependencies(metadata)
   end
 end
 
+def publish_dependency_version_for_workspace_protocol(dependency_version, package_version)
+  workspace_range = dependency_version.to_s.delete_prefix("workspace:")
+
+  case workspace_range
+  when "*", ""
+    package_version
+  when "^", "~"
+    "#{workspace_range}#{package_version}"
+  else
+    workspace_range
+  end
+end
+
+def replace_workspace_protocol_dependencies_for_publish!(package_json, package_version)
+  changed = false
+
+  NPM_INSTALL_DEPENDENCY_FIELDS.each do |field|
+    dependencies = package_json[field]
+    next unless dependencies.is_a?(Hash)
+
+    dependencies.each do |dependency_name, dependency_version|
+      next unless dependency_version.to_s.start_with?("workspace:")
+
+      dependencies[dependency_name] =
+        publish_dependency_version_for_workspace_protocol(dependency_version, package_version)
+      changed = true
+    end
+  end
+
+  changed
+end
+
+def with_publishable_package_json(dir, package_version)
+  package_json_path = File.join(dir, "package.json")
+  original_content = File.read(package_json_path)
+  package_json = JSON.parse(original_content)
+
+  changed = replace_workspace_protocol_dependencies_for_publish!(package_json, package_version)
+  File.write(package_json_path, "#{JSON.pretty_generate(package_json)}\n") if changed
+
+  yield
+ensure
+  File.write(package_json_path, original_content) if changed
+end
+
 def fetch_npm_package_metadata(package_ref, registry_url:)
   output, status = Open3.capture2e(
     "npm",
@@ -716,7 +761,9 @@ def publish_npm_with_retry(dir, package_name, base_args: [], otp: nil, max_retri
     begin
       command_args = ["pnpm", "publish", *publish_args]
       command_args += ["--otp", current_otp] if current_otp
-      sh_args_in_dir_for_release(dir, *command_args)
+      with_publishable_package_json(dir, npm_package_version) do
+        sh_args_in_dir_for_release(dir, *command_args)
+      end
       verify_npm_package_published!(npm_package_name, npm_package_version, registry_url: NPM_REGISTRY_URL)
       success = true
     rescue RuntimeError => e
