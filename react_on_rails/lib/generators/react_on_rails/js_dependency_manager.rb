@@ -561,6 +561,8 @@ module ReactOnRails
         false
       end
 
+      # Last-resort fallback for install failures. This rewrites package.json with
+      # JSON.pretty_generate so users can rerun their package manager manually.
       def write_versioned_package_specs_to_package_json(packages, dev:)
         return false unless File.exist?("package.json")
 

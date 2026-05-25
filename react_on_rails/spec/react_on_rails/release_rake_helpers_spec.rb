@@ -270,8 +270,7 @@ RSpec.describe "release.rake helper methods" do
         )
         expect(self).to receive(:verify_npm_package_published!).with(
           "react-on-rails",
-          "16.4.0-rc.1",
-          registry_url: "https://registry.npmjs.org/"
+          "16.4.0-rc.1"
         )
 
         publish_npm_with_retry(
@@ -303,6 +302,7 @@ RSpec.describe "release.rake helper methods" do
             "https://registry.npmjs.org/"
           )
           .and_return(["npm ERR! 404 Not Found", instance_double(Process::Status, success?: false)])
+        allow(self).to receive(:sleep)
 
         expect do
           publish_npm_with_retry(
@@ -343,8 +343,7 @@ RSpec.describe "release.rake helper methods" do
         end
         expect(self).to receive(:verify_npm_package_published!).with(
           "react-on-rails-pro",
-          "16.7.0-rc.1",
-          registry_url: "https://registry.npmjs.org/"
+          "16.7.0-rc.1"
         )
 
         publish_npm_with_retry(dir, "react-on-rails-pro@16.7.0-rc.1", max_retries: 1)
@@ -354,7 +353,64 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#with_publishable_package_json" do
+    it "preserves the original publish failure when package.json restore also fails" do
+      Dir.mktmpdir do |dir|
+        package_json_path = File.join(dir, "package.json")
+        File.write(
+          package_json_path,
+          "#{JSON.pretty_generate({ 'dependencies' => { 'react-on-rails' => 'workspace:*' } })}\n"
+        )
+
+        write_count = 0
+        allow(File).to receive(:write).and_wrap_original do |method, *args|
+          write_count += 1 if args.first == package_json_path
+          raise "restore failed" if args.first == package_json_path && write_count == 2
+
+          method.call(*args)
+        end
+
+        expect do
+          with_publishable_package_json(dir, "16.7.0-rc.1") do
+            raise "publish failed"
+          end
+        end.to raise_error(RuntimeError, "publish failed")
+      end
+    end
+  end
+
   describe "#verify_npm_package_published!" do
+    it "retries transient npm metadata lookup failures before accepting the published package" do
+      failed_status = instance_double(Process::Status, success?: false)
+      successful_status = instance_double(Process::Status, success?: true)
+
+      allow(Open3).to receive(:capture2e)
+        .with(
+          "npm",
+          "view",
+          "react-on-rails@16.7.0-rc.1",
+          "version",
+          "dependencies",
+          "optionalDependencies",
+          "peerDependencies",
+          "--json",
+          "--registry",
+          "https://registry.npmjs.org/"
+        )
+        .and_return(
+          ["npm ERR! 404 Not Found", failed_status],
+          [JSON.generate({ "version" => "16.7.0-rc.1" }), successful_status]
+        )
+      expect(self).to receive(:sleep).with(0).once
+
+      verify_npm_package_published!(
+        "react-on-rails",
+        "16.7.0-rc.1",
+        attempts: 2,
+        retry_delay_seconds: 0
+      )
+    end
+
     it "raises when the published package metadata contains workspace protocol dependencies" do
       allow(Open3).to receive(:capture2e)
         .with(

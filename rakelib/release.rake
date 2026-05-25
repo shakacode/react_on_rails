@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "bundler"
+require "English"
 require "json"
 require "open3"
 require "rubygems/version"
@@ -19,6 +20,8 @@ class RaisingMessageHandler
 end
 
 NPM_REGISTRY_URL = "https://registry.npmjs.org/"
+NPM_PUBLISH_VERIFY_ATTEMPTS = 6
+NPM_PUBLISH_VERIFY_RETRY_DELAY_SECONDS = 5
 NPM_INSTALL_DEPENDENCY_FIELDS = %w[dependencies optionalDependencies peerDependencies].freeze
 
 # Helper methods for release-specific tasks
@@ -669,6 +672,7 @@ end
 
 def with_publishable_package_json(dir, package_version)
   package_json_path = File.join(dir, "package.json")
+  changed = false
   original_content = File.read(package_json_path)
   package_json = JSON.parse(original_content)
 
@@ -677,7 +681,14 @@ def with_publishable_package_json(dir, package_version)
 
   yield
 ensure
-  File.write(package_json_path, original_content) if changed
+  original_error = $ERROR_INFO
+
+  begin
+    File.write(package_json_path, original_content) if changed
+  rescue StandardError => e
+    warn "⚠️  Failed to restore #{package_json_path}: #{e.message}"
+    raise e unless original_error
+  end
 end
 
 def fetch_npm_package_metadata(package_ref, registry_url:)
@@ -696,6 +707,25 @@ def fetch_npm_package_metadata(package_ref, registry_url:)
   [output, status]
 end
 
+def fetch_npm_package_metadata_with_retries(package_ref, registry_url:, attempts:, retry_delay_seconds:)
+  last_output = nil
+  last_status = nil
+
+  attempts.times do |attempt|
+    output, status = fetch_npm_package_metadata(package_ref, registry_url: registry_url)
+    return [output, status] if status.success?
+
+    last_output = output
+    last_status = status
+    next if attempt == attempts - 1
+
+    puts "npm did not return #{package_ref} yet; retrying in #{retry_delay_seconds} seconds..."
+    sleep retry_delay_seconds
+  end
+
+  [last_output, last_status]
+end
+
 def parse_npm_package_metadata(package_ref, output)
   JSON.parse(output)
 rescue JSON::ParserError => e
@@ -708,9 +738,20 @@ rescue JSON::ParserError => e
   ERROR
 end
 
-def verify_npm_package_published!(package_name, expected_version, registry_url: NPM_REGISTRY_URL)
+def verify_npm_package_published!(
+  package_name,
+  expected_version,
+  registry_url: NPM_REGISTRY_URL,
+  attempts: NPM_PUBLISH_VERIFY_ATTEMPTS,
+  retry_delay_seconds: NPM_PUBLISH_VERIFY_RETRY_DELAY_SECONDS
+)
   package_ref = "#{package_name}@#{expected_version}"
-  output, status = fetch_npm_package_metadata(package_ref, registry_url: registry_url)
+  output, status = fetch_npm_package_metadata_with_retries(
+    package_ref,
+    registry_url: registry_url,
+    attempts: attempts,
+    retry_delay_seconds: retry_delay_seconds
+  )
   unless status.success?
     abort <<~ERROR
       ❌ #{package_ref} is not visible on npm after publish.
@@ -764,7 +805,7 @@ def publish_npm_with_retry(dir, package_name, base_args: [], otp: nil, max_retri
       with_publishable_package_json(dir, npm_package_version) do
         sh_args_in_dir_for_release(dir, *command_args)
       end
-      verify_npm_package_published!(npm_package_name, npm_package_version, registry_url: NPM_REGISTRY_URL)
+      verify_npm_package_published!(npm_package_name, npm_package_version)
       success = true
     rescue RuntimeError => e
       retry_count += 1
