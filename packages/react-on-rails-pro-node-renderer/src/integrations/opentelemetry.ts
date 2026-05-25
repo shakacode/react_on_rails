@@ -281,6 +281,9 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
         setOpenTelemetryTracerProvider(null);
       }
       installedAdapters = resetInstalledTracingAdapters(installedAdapters);
+      // When opts.fastify is enabled, OpenTelemetry does not expose a public
+      // rollback API for module patches applied by registerInstrumentations().
+      // With no registered provider, those shims use the no-op tracer.
       message(`[OpenTelemetry] init failed: ${String(err)}`);
       return;
     }
