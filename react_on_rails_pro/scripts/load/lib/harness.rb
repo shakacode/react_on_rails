@@ -11,17 +11,11 @@ require_relative "runner"
 require_relative "reporters/json_reporter"
 require_relative "reporters/csv_reporter"
 require_relative "reporters/terminal_reporter"
-require_relative "scenarios/standard_render"
-require_relative "scenarios/streaming_render"
-require_relative "scenarios/incremental_async"
+require_relative "scenario_registry"
 
 module RendererHarness
   class Harness
-    SCENARIO_REGISTRY = {
-      "standard_render" => Scenarios::StandardRender,
-      "streaming_render" => Scenarios::StreamingRender,
-      "incremental_async" => Scenarios::IncrementalAsync
-    }.freeze
+    SCENARIO_REGISTRY = RendererHarness::SCENARIO_REGISTRY
 
     def initialize(config)
       @config = config
@@ -38,13 +32,15 @@ module RendererHarness
       ReactOnRailsPro::Request.upload_assets
 
       sampler = MemorySampler.new(pids: { rails: Process.pid, renderer: @config.renderer_pid })
-      sampler.start_background(interval_seconds: @config.mem_interval)
-
       runner = Runner.new(scenario: scenario, config: @config)
-      elapsed = runner.run
 
-      sampler.stop_background
-      scenario.cleanup
+      begin
+        sampler.start_background(interval_seconds: @config.mem_interval)
+        elapsed = runner.run
+      ensure
+        sampler.stop_background
+        scenario.cleanup
+      end
 
       summary = build_summary(runner.results, sampler.rows, elapsed)
       write_outputs(summary, runner.results, sampler.rows)
@@ -76,11 +72,17 @@ module RendererHarness
     end
 
     def build_rails_series(mem_rows)
-      mem_rows.map { |r| [r[:t_seconds].to_f, r[:rails_rss_kb].to_f] }.reject { |_, v| v.zero? }
+      build_rss_series(mem_rows, :rails_rss_kb, "Rails")
     end
 
     def build_renderer_series(mem_rows)
-      mem_rows.map { |r| [r[:t_seconds].to_f, (r[:renderer_rss_kb] || 0).to_f] }.reject { |_, v| v.zero? }
+      build_rss_series(mem_rows.select { |r| r.key?(:renderer_rss_kb) }, :renderer_rss_kb, "Renderer")
+    end
+
+    def build_rss_series(rows, rss_key, label)
+      valid, dropped = rows.partition { |r| r[rss_key] }
+      warn "MemorySampler: #{dropped.size} #{label} RSS samples missing (ps failed?)" if dropped.any?
+      valid.map { |r| [r[:t_seconds].to_f, r[rss_key].to_f] }.reject { |_, v| v.zero? }
     end
 
     def build_requests_block(lat, elapsed)

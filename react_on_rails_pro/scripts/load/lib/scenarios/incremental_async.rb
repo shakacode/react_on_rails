@@ -38,6 +38,12 @@ module RendererHarness
       # real RSC component or fixture when this scenario is properly wired up.
       JS_TEMPLATE = "ReactOnRails.getStreamValues()"
 
+      def initialize(config)
+        super
+        warn "[incremental_async] WARNING: This scenario is not yet functional against the dummy app " \
+             "and will report 100% failures. See the class-level FIXME for details."
+      end
+
       def perform_request
         js = JS_TEMPLATE
         bundle_hash = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool.server_bundle_hash

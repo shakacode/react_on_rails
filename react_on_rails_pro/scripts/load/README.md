@@ -52,6 +52,9 @@ bin/renderer-harness --scenario streaming_render --duration 60 --concurrency 4
 bin/renderer-harness --scenario incremental_async --requests 200 --concurrency 4 --increments 10
 ```
 
+`--warmup` is per worker thread. For example, `--warmup 5 --concurrency 4` issues 20 warmup
+requests before measured requests begin.
+
 ### Tracking the node-renderer process
 
 To include the node-renderer RSS in `memory.csv`, pass its PID:

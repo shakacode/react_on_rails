@@ -16,7 +16,7 @@ module RendererHarness
 
     attr_reader :pids
 
-    def initialize(pids:, start_time: Time.now)
+    def initialize(pids:, start_time: Process.clock_gettime(Process::CLOCK_MONOTONIC))
       @pids = pids.freeze
       @start_time = start_time
       @rows = []
@@ -45,13 +45,16 @@ module RendererHarness
       end
     end
 
-    def stop_background
+    def stop_background(timeout_seconds: 5)
       @stop = true
-      @thread&.join
+      return unless @thread
+
+      @thread.join(timeout_seconds)
+      warn "MemorySampler: background thread did not stop within #{timeout_seconds}s" if @thread.alive?
     end
 
     def sample_once
-      row = { t_seconds: Time.now - @start_time }
+      row = { t_seconds: Process.clock_gettime(Process::CLOCK_MONOTONIC) - @start_time }
       pids.each do |label, pid|
         next if pid.nil?
 

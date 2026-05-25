@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "optparse"
+require_relative "scenario_registry"
 
 module RendererHarness
   Config = Struct.new(
@@ -48,9 +49,11 @@ module RendererHarness
     def self.add_primary_flags(opt_parser, opts)
       opt_parser.on("--scenario NAME", String) { |v| opts[:scenario] = v }
       opt_parser.on("--requests N", Integer) { |v| opts[:requests] = v }
-      opt_parser.on("--duration SECONDS", Integer) { |v| opts[:duration] = v }
+      opt_parser.on("--duration SECONDS", Float) { |v| opts[:duration] = v }
       opt_parser.on("--concurrency N", Integer) { |v| opts[:concurrency] = v }
-      opt_parser.on("--warmup N", Integer) { |v| opts[:warmup] = v }
+      opt_parser.on("--warmup N", Integer, "Warmup requests per thread (default: 5)") do |v|
+        opts[:warmup] = v
+      end
       opt_parser.on("--mix MIX", %w[small medium large]) { |v| opts[:mix] = v }
     end
 
@@ -74,14 +77,32 @@ module RendererHarness
     end
 
     def self.validate!(opts)
-      unless %w[standard_render streaming_render incremental_async].include?(opts[:scenario])
-        raise ArgumentError, "unknown scenario: #{opts[:scenario]}"
-      end
-      if opts[:requests].nil? && opts[:duration].nil?
+      validate_scenario!(opts[:scenario])
+      validate_run_mode!(opts)
+      validate_numeric_options!(opts)
+    end
+
+    def self.validate_scenario!(scenario)
+      return if RendererHarness::SCENARIO_REGISTRY.key?(scenario)
+
+      raise ArgumentError, "unknown scenario: #{scenario}"
+    end
+
+    def self.validate_run_mode!(opts)
+      if opts.values_at(:requests, :duration).all?(&:nil?)
         raise ArgumentError, "must provide --requests or --duration (or --smoke)"
       end
       raise ArgumentError, "--requests and --duration are mutually exclusive" if opts[:requests] && opts[:duration]
-      raise ArgumentError, "--concurrency must be >= 1" if opts[:concurrency] < 1
     end
+
+    def self.validate_numeric_options!(opts)
+      raise ArgumentError, "--requests must be >= 1" if opts[:requests] && opts[:requests] < 1
+      raise ArgumentError, "--duration must be > 0" if opts[:duration] && opts[:duration] <= 0
+      raise ArgumentError, "--concurrency must be >= 1" if opts[:concurrency] < 1
+      raise ArgumentError, "--warmup must be >= 0" if opts[:warmup].negative?
+      raise ArgumentError, "--mem-interval must be > 0" if opts[:mem_interval] <= 0
+    end
+
+    private_class_method :validate_scenario!, :validate_run_mode!, :validate_numeric_options!
   end
 end

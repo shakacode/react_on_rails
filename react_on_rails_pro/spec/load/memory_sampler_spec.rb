@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "spec_helper"
+require_relative "spec_helper"
 require "memory_sampler"
 
 RSpec.describe RendererHarness::MemorySampler do
@@ -37,7 +37,10 @@ RSpec.describe RendererHarness::MemorySampler do
 
   describe "#sample_once" do
     it "returns a row including t_seconds, rails_rss_kb, and gc.* fields" do
-      sampler = described_class.new(pids: { rails: 1234 }, start_time: Time.now - 5)
+      sampler = described_class.new(
+        pids: { rails: 1234 },
+        start_time: Process.clock_gettime(Process::CLOCK_MONOTONIC) - 5
+      )
       allow(sampler).to receive(:run_ps).with(1234).and_return("100\n")
       row = sampler.sample_once
       expect(row[:t_seconds]).to be_within(0.5).of(5.0)
@@ -74,9 +77,12 @@ RSpec.describe RendererHarness::MemorySampler do
 
     it "raises if start_background is called twice" do
       sampler = described_class.new(pids: { rails: Process.pid })
-      sampler.start_background(interval_seconds: 0.05)
-      expect { sampler.start_background(interval_seconds: 0.05) }.to raise_error(/already running/)
-      sampler.stop_background
+      begin
+        sampler.start_background(interval_seconds: 0.05)
+        expect { sampler.start_background(interval_seconds: 0.05) }.to raise_error(/already running/)
+      ensure
+        sampler.stop_background
+      end
     end
   end
 end
