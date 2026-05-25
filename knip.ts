@@ -90,6 +90,15 @@ const config: KnipConfig = {
       ignoreDependencies: [
         // Optional dependencies used in integrations
         '@honeybadger-io/js',
+        '@fastify/otel',
+        '@opentelemetry/api',
+        '@opentelemetry/exporter-trace-otlp-http',
+        '@opentelemetry/instrumentation',
+        '@opentelemetry/instrumentation-http',
+        '@opentelemetry/resources',
+        '@opentelemetry/sdk-trace-base',
+        '@opentelemetry/sdk-trace-node',
+        '@opentelemetry/semantic-conventions',
         '@sentry/*',
         // Jest reporter used in CI
         'jest-junit',

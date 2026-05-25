@@ -24,11 +24,56 @@ type TanStackRouterChunkPreloadInternals = TanStackRouter & {
   looseRoutesById?: Record<string, unknown>;
 };
 
+// Render-phase initialization can be replayed before commit in StrictMode. Reuse
+// in-flight route chunk preloads so replay does not request the same chunk twice.
+const routeChunkPreloadPromisesByRouter = new WeakMap<
+  TanStackRouterChunkPreloadInternals,
+  WeakMap<object, Promise<unknown>>
+>();
+
 function extractDehydratedData(dehydratedRouter: unknown): unknown {
   if (!dehydratedRouter || typeof dehydratedRouter !== 'object') {
     return undefined;
   }
   return (dehydratedRouter as { dehydratedData?: unknown }).dehydratedData;
+}
+
+function preloadRouteChunk(router: TanStackRouterChunkPreloadInternals, route: unknown): Promise<unknown> {
+  const { loadRouteChunk } = router;
+  if (typeof loadRouteChunk !== 'function') {
+    return Promise.resolve();
+  }
+
+  if (!route || typeof route !== 'object') {
+    return loadRouteChunk(route);
+  }
+
+  let routeChunkPreloadPromises = routeChunkPreloadPromisesByRouter.get(router);
+  if (!routeChunkPreloadPromises) {
+    routeChunkPreloadPromises = new WeakMap<object, Promise<unknown>>();
+    routeChunkPreloadPromisesByRouter.set(router, routeChunkPreloadPromises);
+  }
+
+  const existingPromise = routeChunkPreloadPromises.get(route);
+  if (existingPromise) {
+    return existingPromise;
+  }
+
+  let loadPromise: Promise<unknown>;
+  try {
+    loadPromise = Promise.resolve(loadRouteChunk(route));
+  } catch (error) {
+    return Promise.reject(error instanceof Error ? error : new Error(String(error)));
+  }
+
+  const cachedPromise = loadPromise.finally(() => {
+    if (routeChunkPreloadPromises.get(route) === cachedPromise) {
+      routeChunkPreloadPromises.delete(route);
+    }
+  });
+  routeChunkPreloadPromises.set(route, cachedPromise);
+
+  return cachedPromise;
 }
 
 function preloadMatchedRouteChunks(
@@ -52,7 +97,7 @@ function preloadMatchedRouteChunks(
       return;
     }
 
-    routeChunkPromises.push(loadRouteChunk(route));
+    routeChunkPromises.push(preloadRouteChunk(router, route));
   });
 
   if (!routeChunkPromises.length) {
