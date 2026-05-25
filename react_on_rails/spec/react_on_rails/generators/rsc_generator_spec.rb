@@ -770,6 +770,60 @@ describe RscGenerator, type: :generator do
     end
   end
 
+  context "when an existing RSC webpack config uses shorthand clientReferences" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          const clientReferences = { directory: './custom' };
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(
+              new RSCWebpackPlugin({
+                isServer: false,
+                clientReferences,
+              }),
+            );
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "treats shorthand clientReferences as configured without overriding the local variable" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content.scan(/\bclientReferences\b/).length).to eq(2)
+        expect(content).to include("const clientReferences = { directory: './custom' };")
+        expect(content).not_to include("clientReferences: rscClientReferences")
+        expect(content).not_to include("const rscClientReferences")
+      end
+
+      messages = GeneratorMessages.messages.join("\n")
+      expect(messages).to include("already define clientReferences")
+      expect(messages).not_to include("generated scoped clientReferences in clientWebpackConfig.js")
+    end
+  end
+
   describe "existing RSC webpack config migration helpers" do
     let(:generator) { described_class.new([], {}, { destination_root: destination_root }) }
 
@@ -1279,6 +1333,24 @@ describe RscGenerator, type: :generator do
       JS
 
       expect(generator.send(:rsc_plugin_client_references_configured?, content, is_server: false)).to be(true)
+    end
+
+    it "treats shorthand clientReferences as a top-level configured option" do
+      body = <<~JS
+        isServer: false,
+        clientReferences,
+      JS
+
+      expect(generator.send(:rsc_plugin_body_has_top_level_key?, body, "clientReferences")).to be(true)
+    end
+
+    it "does not treat a top-level value reference as a configured clientReferences option" do
+      body = <<~JS
+        isServer: false,
+        metadata: clientReferences,
+      JS
+
+      expect(generator.send(:rsc_plugin_body_has_top_level_key?, body, "clientReferences")).to be(false)
     end
 
     it "matches the server setup anchor with CRLF line endings" do

@@ -635,21 +635,31 @@ module ReactOnRails
           body
         end
 
-        # Walks every `<key>:` match in the plugin options body and returns true when at
-        # least one sits at the top level of the options object (depth 0 from the body's
-        # perspective, outside strings and comments). Used to gate "already configured"
-        # checks so nested mentions don't cause false positives.
+        # Walks every `<key>:` or shorthand `<key>` match in the plugin options body and returns
+        # true when at least one sits at the top level of the options object (depth 0 from the
+        # body's perspective, outside strings and comments). Used to gate "already configured"
+        # checks so nested mentions and value references don't cause false positives.
         def rsc_plugin_body_has_top_level_key?(body, key)
-          pattern = /\b#{Regexp.escape(key)}\s*:/
+          pattern = /\b#{Regexp.escape(key)}\b/
           search_from = 0
 
           while (match = pattern.match(body, search_from))
-            return true if js_top_level_position?(body, match.begin(0))
+            return true if js_top_level_position?(body, match.begin(0)) &&
+                           rsc_plugin_body_key_position?(body, match.begin(0), match.end(0))
 
             search_from = match.end(0)
           end
 
           false
+        end
+
+        def rsc_plugin_body_key_position?(body, key_start, key_end)
+          previous_char = previous_significant_js_char(body, key_start)
+          return false unless previous_char.nil? || previous_char == ","
+
+          next_index = first_significant_js_index(body, key_end)
+          next_char = next_index ? body[next_index] : nil
+          next_char.nil? || next_char == ":" || next_char == ","
         end
 
         # Top-level depth-aware match for the migrated `clientReferences: rscClientReferences`
@@ -770,8 +780,8 @@ module ReactOnRails
           # Belt-and-suspenders: the only caller, `ensure_rsc_client_references_setup`, already
           # checks both `scoped_rsc_client_references_defined?` and `rsc_client_references_defined?`
           # before delegating here. The guards are kept so the helper is safe to call directly.
-          return if scoped_rsc_client_references_defined?(content)
-          return if rsc_client_references_defined?(content)
+          return false if scoped_rsc_client_references_defined?(content)
+          return false if rsc_client_references_defined?(content)
 
           replace_rsc_client_references_setup_anchor(config_path, content, is_server: is_server) do |anchor|
             join_rsc_client_references_setup(
