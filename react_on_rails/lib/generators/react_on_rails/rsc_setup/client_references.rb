@@ -536,7 +536,9 @@ module ReactOnRails
             index += 1
           end
 
-          start_index
+          # Unterminated regex literals leave the rest of the file in invalid JS, so treat the
+          # remaining content as non-code instead of resuming the normal brace/import scanner.
+          content.length - 1
         end
 
         def js_regex_literal_closing_slash?(char, escaped, in_character_class)
@@ -820,12 +822,15 @@ module ReactOnRails
 
         def rsc_client_references_setup_import_pattern(is_server:)
           if is_server
-            # Matches the standard 3-line bundler ternary from the serverWebpackConfig template.
+            # Matches the standard bundler ternary from the serverWebpackConfig template, including
+            # harmless comments or extra whitespace around the ternary operators.
             # Rspack-only configs without the webpack fallback receive the manual-migration warning.
+            js_gap = "(?:\\s|//[^\\n]*(?:\\n|\\r\\n?)|/\\*[\\s\\S]*?\\*/)*"
             Regexp.new(
-              "(const bundler = config\\.assets_bundler.*\\r?\\n" \
-              ".*require\\(['\"]@rspack/core['\"]\\).*\\r?\\n" \
-              ".*: require\\(['\"]webpack['\"]\\);)"
+              "(const\\s+bundler\\s*=\\s*config\\.assets_bundler#{js_gap}" \
+              "===#{js_gap}['\"]rspack['\"]#{js_gap}" \
+              "\\?#{js_gap}require\\(['\"]@rspack/core['\"]\\)#{js_gap}" \
+              ":#{js_gap}require\\(['\"]webpack['\"]\\)#{js_gap};)"
             )
           else
             %r{(const commonWebpackConfig = require\(['"]\./commonWebpackConfig['"]\);)}
