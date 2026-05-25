@@ -53,13 +53,8 @@ It demonstrates the Node renderer, caching, and SSR-oriented workflows in a real
 
 ## Explore the Public RSC Demo
 
-The [LocalHub marketplace demo](https://rsc.reactonrails.com/) is a public,
-inspectable React on Rails Pro + RSC demo.
-It uses a sample marketplace app to make the RSC comparison concrete.
-Start at the [RSC performance showcase](https://rsc.reactonrails.com/search-performance)
-for Lighthouse report links, bundle-size evidence, and side-by-side SSR,
-client, and RSC comparisons. The implementation lives in
-[shakacode/react-on-rails-demo-marketplace-rsc](https://github.com/shakacode/react-on-rails-demo-marketplace-rsc).
+The [React Server Components guide](./react-server-components/index.md#live-demo-and-evidence) keeps the public
+LocalHub demo, evidence dashboard, Lighthouse artifacts, and source repository links in one place.
 
 ## References
 
