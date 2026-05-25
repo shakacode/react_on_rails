@@ -123,7 +123,9 @@ module RendererHarness
     def build_rss_series(rows, rss_key, label)
       valid, dropped = rows.partition { |r| !r[rss_key].nil? }
       warn "MemorySampler: #{dropped.size} #{label} RSS samples missing (ps failed?)" if dropped.any?
-      valid.map { |r| [r[:t_seconds].to_f, r[rss_key].to_f] }.reject { |_, v| v.zero? }
+      nonzero, zero = valid.partition { |r| !r[rss_key].to_f.zero? }
+      warn "MemorySampler: #{zero.size} #{label} RSS samples were zero (ps parse anomaly?)" if zero.any?
+      nonzero.map { |r| [r[:t_seconds].to_f, r[rss_key].to_f] }
     end
 
     def build_requests_block(lat, elapsed)

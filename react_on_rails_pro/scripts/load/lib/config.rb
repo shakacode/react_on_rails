@@ -80,6 +80,7 @@ module RendererHarness
       end
       opts[:scenario] = "standard_render"
       opts[:requests] = 10
+      opts[:duration] = nil
       opts[:concurrency] = 1
       opts[:warmup] = 0
     end

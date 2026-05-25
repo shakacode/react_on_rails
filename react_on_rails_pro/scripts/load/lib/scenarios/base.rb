@@ -52,21 +52,12 @@ module RendererHarness
         { "filler" => "x" * size }
       end
 
-      def stream_status(stream)
-        return stream.status if stream.respond_to?(:status)
-        # Keep this fallback for stream-like test doubles or alternate transports
-        # that expose an explicit http_status without using StreamDecorator.
-        return stream.http_status if stream.respond_to?(:http_status)
-
-        nil
-      end
-
       def server_bundle_hash
         ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool.server_bundle_hash
       end
 
       def stream_payload(stream, bytes_in:, bytes_out:)
-        status = stream_status(stream)
+        status = stream.status
         {
           http_status: status,
           bytes_in: bytes_in,

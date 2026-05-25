@@ -378,6 +378,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       stream.each_chunk { |c| chunks << c }
       expect(call_count).to eq(2)
       expect(chunks.first).to include("html" => "ok")
+      expect(stream.status).to eq(200)
     end
 
     it "prevents infinite loop on duplicate 410 responses" do
@@ -386,6 +387,18 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       end
 
       expect { stream.each_chunk(&:itself) }.to raise_error(ReactOnRailsPro::Error)
+    end
+
+    it "records status when HTTPX raises before yielding chunks" do
+      stream = described_class.create do |_send_bundle, _barrier|
+        raise build_http_error(503)
+      end
+
+      expect { stream.each_chunk(&:itself) }.to raise_error(
+        ReactOnRailsPro::Error,
+        /Unexpected response code from renderer: 503/
+      )
+      expect(stream.status).to eq(503)
     end
 
     it "bubbles up HTTPX::ConnectionError when node renderer is unreachable" do

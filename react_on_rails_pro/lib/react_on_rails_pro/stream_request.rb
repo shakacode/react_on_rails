@@ -140,16 +140,15 @@ module ReactOnRailsPro
 
     def process_response_chunks(stream_response, error_body, &block)
       parser = ReactOnRails::LengthPrefixedParser.new
-      status = nil
       status_recorded = false
       stream_response.each do |chunk|
         stream_response.instance_variable_set(:@react_on_rails_received_first_chunk, true)
         unless status_recorded
-          status = record_status(stream_response)
+          record_status(stream_response)
           status_recorded = true
         end
 
-        if response_has_error_status?(status)
+        if response_has_error_status?
           error_body << chunk
           next
         end
@@ -170,8 +169,8 @@ module ReactOnRailsPro
 
     # A nil status means the response could not expose an HTTP status. Treat it
     # as an error so callers do not parse an unknown response body as LPP data.
-    def response_has_error_status?(status)
-      status.nil? || status >= 400
+    def response_has_error_status?
+      @status.nil? || @status >= 400
     end
 
     def response_status(response)
@@ -183,7 +182,8 @@ module ReactOnRailsPro
 
     def handle_http_error(error, error_body, send_bundle)
       response = error.response
-      case response.status
+      status = record_status(response)
+      case status
       when ReactOnRailsPro::STATUS_SEND_BUNDLE
         # To prevent infinite loop
         ReactOnRailsPro::Error.raise_duplicate_bundle_upload_error if send_bundle
@@ -196,7 +196,8 @@ module ReactOnRailsPro
       when ReactOnRailsPro::STATUS_INCOMPATIBLE
         raise ReactOnRailsPro::Error, error_body
       else
-        raise ReactOnRailsPro::Error, "Unexpected response code from renderer: #{response.status}:\n#{error_body}"
+        status_label = status || "unknown"
+        raise ReactOnRailsPro::Error, "Unexpected response code from renderer: #{status_label}:\n#{error_body}"
       end
     end
   end

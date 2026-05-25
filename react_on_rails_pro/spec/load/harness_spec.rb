@@ -48,11 +48,11 @@ RSpec.describe RendererHarness::Harness do
     expect(summary[:memory][:rails_slope_mb_per_min]).to eq(0.0)
   end
 
-  it "does not warn when an RSS sample is zero" do
+  it "warns when an RSS sample is zero" do
     harness = described_class.new(build_config)
     rows = [{ t_seconds: 0.0, rails_rss_kb: 0 }]
 
-    expect(harness).not_to receive(:warn)
+    expect(harness).to receive(:warn).with(/1 Rails RSS samples were zero/)
 
     expect(harness.send(:build_rss_series, rows, :rails_rss_kb, "Rails")).to be_empty
   end

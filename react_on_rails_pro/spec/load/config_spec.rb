@@ -27,6 +27,12 @@ RSpec.describe RendererHarness::Config do
       expect(config.scenario).to eq("standard_render")
     end
 
+    it "clears duration when applying the smoke preset" do
+      config = described_class.parse(["--duration", "1", "--smoke"])
+
+      expect(config).to have_attributes(requests: 10, duration: nil)
+    end
+
     it "rejects mutually exclusive run modes" do
       expect do
         described_class.parse(["--requests", "10", "--duration", "1"])
