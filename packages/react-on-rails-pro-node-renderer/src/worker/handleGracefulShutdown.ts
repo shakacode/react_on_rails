@@ -3,6 +3,8 @@ import { FastifyInstance } from './types.js';
 import { SHUTDOWN_WORKER_MESSAGE } from '../shared/utils.js';
 import log from '../shared/log.js';
 
+const APP_CLOSE_TIMEOUT_MS = 10_000;
+
 const handleGracefulShutdown = (app: FastifyInstance) => {
   const { worker } = cluster;
   if (!worker) {
@@ -21,13 +23,26 @@ const handleGracefulShutdown = (app: FastifyInstance) => {
 
     isDestroying = true;
     log.debug('Worker #%d closing Fastify app before shutdown after %s', worker.id, context);
+    let workerDestroyed = false;
+    const destroyWorker = () => {
+      if (workerDestroyed) {
+        return;
+      }
+      workerDestroyed = true;
+      worker.destroy();
+    };
+    const closeTimeout = setTimeout(() => {
+      log.warn('Worker #%d: app.close() timed out, forcing worker.destroy()', worker.id);
+      destroyWorker();
+    }, APP_CLOSE_TIMEOUT_MS);
     void app
       .close()
       .catch((error: unknown) => {
         log.warn({ msg: 'Error closing Fastify app before worker shutdown', error });
       })
       .finally(() => {
-        worker.destroy();
+        clearTimeout(closeTimeout);
+        destroyWorker();
       });
   };
 

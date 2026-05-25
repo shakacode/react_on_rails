@@ -347,13 +347,20 @@ describe('opentelemetry integration: end-to-end render request', () => {
       startSsrRequestOptions({ renderingRequest: 'ReactOnRails.dummy' }),
     );
 
-    const cacheMissProbeSpan = exporter
-      .getFinishedSpans()
-      .find((s) => s.name === 'ror.bundle.build_execution_context' && s.status.code === 2);
+    const spans = exporter.getFinishedSpans();
+    const cacheMissProbeSpan = spans.find(
+      (s) => s.name === 'ror.bundle.build_execution_context' && s.status.code === 2,
+    );
+    const cacheMissBuildSpan = spans.find(
+      (s) =>
+        s.name === 'ror.bundle.build_execution_context' && s.attributes['cache.strategy'] === 'cache-miss',
+    );
 
     expect(cacheMissProbeSpan).toBeDefined();
     expect(cacheMissProbeSpan!.attributes['cache.strategy']).toBe('cache-first');
     expect(cacheMissProbeSpan!.attributes).not.toHaveProperty('cache.hit');
+    expect(cacheMissBuildSpan).toBeDefined();
+    expect(cacheMissBuildSpan!.attributes).not.toHaveProperty('cache.hit');
   });
 
   test('incremental update chunk failures mark the process_chunk span as an error', async () => {

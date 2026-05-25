@@ -2,7 +2,7 @@
 
 - **Issue:** [#2156](https://github.com/shakacode/react_on_rails/issues/2156)
 - **Date:** 2026-05-21
-- **Status:** Design — awaiting user review
+- **Status:** Implemented (PR #3382)
 
 ## Summary
 
@@ -129,6 +129,7 @@ init({
   exporter?: SpanExporter;    // default: OTLPTraceExporter from env
   spanProcessor?: SpanProcessor; // default: see below
   resourceAttributes?: Record<string, string>; // merged with defaults
+  shutdownTimeoutMs?: number; // default: 5000
 })
 ```
 
@@ -188,12 +189,12 @@ This keeps `handleRenderRequest.ts` free of any direct OTel imports — it just 
 
 Wrap the critical calls with `subSpan`:
 
-| Span name                            | Wraps                                              | Attributes                                                                |
-| ------------------------------------ | -------------------------------------------------- | ------------------------------------------------------------------------- |
-| `ror.bundle.build_execution_context` | `buildExecutionContext(...)`                       | `bundle.timestamp`, `bundle.paths.count`, `cache.strategy` or `cache.hit` |
-| `ror.bundle.upload`                  | `handleNewBundlesProvided(...)`                    | `bundle.count`, `assets.count`                                            |
-| `ror.vm.execute`                     | The actual SSR JS execution inside `prepareResult` | (none)                                                                    |
-| `ror.result.prepare`                 | The rest of `prepareResult`                        | (none)                                                                    |
+| Span name                            | Wraps                                              | Attributes                                                 |
+| ------------------------------------ | -------------------------------------------------- | ---------------------------------------------------------- |
+| `ror.bundle.build_execution_context` | `buildExecutionContext(...)`                       | `bundle.timestamp`, `bundle.paths.count`, `cache.strategy` |
+| `ror.bundle.upload`                  | `handleNewBundlesProvided(...)`                    | `bundle.count`, `assets.count`                             |
+| `ror.vm.execute`                     | The actual SSR JS execution inside `prepareResult` | (none)                                                     |
+| `ror.result.prepare`                 | The rest of `prepareResult`                        | (none)                                                     |
 
 No semantic logic changes — only sub-span wrapping.
 
@@ -254,10 +255,9 @@ integration.
 2. HttpInstrumentation → root span "POST /bundles/.../render/..."
 3. FastifyInstrumentation → child "request handler" span
 4. Worker calls `trace(fn, startSsrRequestOptions(…))`
-5. OTel executor → child span "ror.ssr.request" (with attributes:
-   bundle.timestamp, dependency_count, request.bytes)
+5. OTel executor → child span "ror.ssr.request" (no request-payload attributes)
 6. handleRenderRequest runs:
-   - subSpan "ror.bundle.build_execution_context"  (with cache.strategy or cache.hit)
+   - subSpan "ror.bundle.build_execution_context"  (with cache.strategy)
    - (if bundles posted) subSpan "ror.bundle.upload"
    - subSpan "ror.vm.execute"
    - subSpan "ror.result.prepare"
@@ -282,9 +282,10 @@ sub-spans for each NDJSON chunk.
 3. **Span attribute serialization failure** — Caller passes a non-serializable
    value. Wrap attribute setters in try/catch in `subSpan` so a bad attribute
    never breaks a render.
-4. **Shutdown timeout** — `tracerProvider.shutdown()` has its own internal timeout.
-   The renderer's graceful shutdown also has a hard kill timer (existing behavior),
-   so a hung exporter cannot block worker exit indefinitely.
+4. **Shutdown timeout** — `tracerProvider.shutdown()` is bounded by the renderer's
+   `shutdownTimeoutMs` option, and the worker graceful-shutdown path also has a
+   hard timeout around `app.close()`, so a hung exporter cannot block worker exit
+   indefinitely.
 5. **Sensitive data** — The `renderingRequest` string can contain user input. We
    **must not** put it (or a digest derived from it) into span attributes. Only
    the bundle timestamp, sizes, and counts are recorded.

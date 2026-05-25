@@ -15,6 +15,13 @@ export type UpdateChunk = {
   updateChunk: string;
 };
 
+class InvalidIncrementalRenderChunkError extends Error {
+  constructor() {
+    super('Invalid incremental render chunk received, missing properties');
+    this.name = 'InvalidIncrementalRenderChunkError';
+  }
+}
+
 function assertIsUpdateChunk(value: unknown): asserts value is UpdateChunk {
   if (
     typeof value !== 'object' ||
@@ -24,7 +31,7 @@ function assertIsUpdateChunk(value: unknown): asserts value is UpdateChunk {
     (typeof value.bundleTimestamp !== 'string' && typeof value.bundleTimestamp !== 'number') ||
     typeof value.updateChunk !== 'string'
   ) {
-    throw new Error('Invalid incremental render chunk received, missing properties');
+    throw new InvalidIncrementalRenderChunkError();
   }
 }
 
@@ -125,7 +132,7 @@ export async function handleIncrementalRenderRequest(
               await executionContext.runInVM(chunk.updateChunk, bundlePath);
             });
           } catch (err) {
-            if (err instanceof Error && err.message.includes('Invalid incremental render chunk')) {
+            if (err instanceof InvalidIncrementalRenderChunkError) {
               log.error({ msg: 'Invalid incremental render chunk', err, chunk });
             } else {
               log.error({ msg: 'Error running incremental render chunk', err, chunk });

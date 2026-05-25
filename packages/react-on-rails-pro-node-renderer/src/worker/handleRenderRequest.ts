@@ -298,7 +298,7 @@ export async function handleRenderRequest({
         attributes: {
           'bundle.timestamp': String(bundleTimestamp),
           'bundle.paths.count': allBundleFilePaths.length,
-          'cache.hit': false,
+          'cache.strategy': 'cache-miss',
         },
       },
       () => buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ true),

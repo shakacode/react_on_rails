@@ -85,4 +85,26 @@ describe('handleGracefulShutdown', () => {
     expect(worker.destroy).toHaveBeenCalledTimes(1);
     expect(app.close.mock.invocationCallOrder[0]).toBeLessThan(worker.destroy.mock.invocationCallOrder[0]!);
   });
+
+  test('forces worker destroy when Fastify close hangs', () => {
+    jest.useFakeTimers();
+    try {
+      const worker = { id: 1, destroy: jest.fn(), disconnect: jest.fn() };
+      const handleGracefulShutdown = loadHandleGracefulShutdown(worker);
+      const { app } = buildApp();
+      app.close.mockImplementation(() => new Promise(() => undefined));
+
+      handleGracefulShutdown(app as never);
+      messageHandler!(SHUTDOWN_WORKER_MESSAGE);
+
+      expect(app.close).toHaveBeenCalledTimes(1);
+      expect(worker.destroy).not.toHaveBeenCalled();
+
+      jest.advanceTimersByTime(10_000);
+
+      expect(worker.destroy).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });

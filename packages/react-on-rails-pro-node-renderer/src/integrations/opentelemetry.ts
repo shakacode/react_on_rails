@@ -6,7 +6,8 @@ import type { Attributes } from '@opentelemetry/api';
 import type { NodeTracerProvider as NodeTracerProviderType } from '@opentelemetry/sdk-trace-node';
 import type { SpanExporter, SpanProcessor } from '@opentelemetry/sdk-trace-base';
 import { setupTracing, setupSubSpan, type SubSpanFn } from '../shared/tracing.js';
-import { configureFastify, log, message } from './api.js';
+import { configureFastify } from '../worker/fastifyConfig.js';
+import { log, message } from './api.js';
 
 declare module '../shared/tracing.js' {
   interface UnitOfWorkOptions {
@@ -29,9 +30,12 @@ export interface OpenTelemetryInitOptions {
   spanProcessor?: SpanProcessor;
   /** Additional resource attributes merged into the default resource. */
   resourceAttributes?: Record<string, string>;
+  /** Maximum time to wait for provider.shutdown() during Fastify onClose. Default: 5000ms. */
+  shutdownTimeoutMs?: number;
 }
 
 const DEFAULT_SERVICE_NAME = 'react-on-rails-pro-node-renderer';
+const DEFAULT_SHUTDOWN_TIMEOUT_MS = 5_000;
 
 let tracerProvider: NodeTracerProviderType | null = null;
 
@@ -43,9 +47,16 @@ function resolveServiceName(opts: OpenTelemetryInitOptions): string {
   return process.env.OTEL_SERVICE_NAME ?? opts.serviceName ?? DEFAULT_SERVICE_NAME;
 }
 
+function resolveShutdownTimeoutMs(opts: OpenTelemetryInitOptions): number {
+  const timeoutMs = opts.shutdownTimeoutMs ?? DEFAULT_SHUTDOWN_TIMEOUT_MS;
+  return Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : DEFAULT_SHUTDOWN_TIMEOUT_MS;
+}
+
 function parseResourceAttributes(value: string | undefined): Record<string, string> {
   if (!value) return {};
 
+  // OTel resource attributes are comma-separated. Literal commas in values must
+  // be percent-encoded by callers; unencoded commas split the value.
   const attributes: Record<string, string> = {};
   for (const pair of value.split(',')) {
     const [rawKey, ...rawValueParts] = pair.split('=');
@@ -57,6 +68,52 @@ function parseResourceAttributes(value: string | undefined): Record<string, stri
   }
 
   return attributes;
+}
+
+function configureOpenTelemetryDiagnostics(otelApi: typeof import('@opentelemetry/api')): void {
+  const logDiagnostic = (level: string, diagnosticMessage: string, ...args: unknown[]) => {
+    log.debug({ otel: true, level, args }, diagnosticMessage);
+  };
+
+  otelApi.diag.setLogger(
+    {
+      error: (diagnosticMessage, ...args) => logDiagnostic('error', diagnosticMessage, ...args),
+      warn: (diagnosticMessage, ...args) => logDiagnostic('warn', diagnosticMessage, ...args),
+      info: (diagnosticMessage, ...args) => logDiagnostic('info', diagnosticMessage, ...args),
+      debug: (diagnosticMessage, ...args) => logDiagnostic('debug', diagnosticMessage, ...args),
+      verbose: (diagnosticMessage, ...args) => logDiagnostic('verbose', diagnosticMessage, ...args),
+    },
+    otelApi.DiagLogLevel.WARN,
+  );
+}
+
+async function shutdownProviderWithTimeout(
+  provider: NodeTracerProviderType,
+  shutdownTimeoutMs: number,
+): Promise<void> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const shutdownPromise = provider.shutdown().catch((error: unknown) => {
+    log.warn({ msg: '[OpenTelemetry] provider.shutdown() failed', error });
+  });
+
+  try {
+    await Promise.race([
+      shutdownPromise,
+      new Promise<void>((resolve) => {
+        timeoutId = setTimeout(() => {
+          log.warn(
+            '[OpenTelemetry] provider.shutdown() timed out after %dms; continuing worker shutdown',
+            shutdownTimeoutMs,
+          );
+          resolve();
+        }, shutdownTimeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
 }
 
 export function init(opts: OpenTelemetryInitOptions = {}): void {
@@ -80,6 +137,7 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
     const otelApi = require('@opentelemetry/api') as typeof import('@opentelemetry/api');
 
     const serviceName = resolveServiceName(opts);
+    const shutdownTimeoutMs = resolveShutdownTimeoutMs(opts);
     const resource = resourceFromAttributes({
       ...parseResourceAttributes(process.env.OTEL_RESOURCE_ATTRIBUTES),
       ...(opts.resourceAttributes ?? {}),
@@ -104,6 +162,8 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
       resource,
       spanProcessors: [spanProcessor],
     });
+
+    configureOpenTelemetryDiagnostics(otelApi);
 
     if (opts.fastify) {
       /* eslint-disable @typescript-eslint/no-require-imports, global-require */
@@ -130,6 +190,9 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
 
       setupTracing({
         startSsrRequestOptions: () => ({
+          // Keep the root span free of request payload data. Future safe
+          // attributes should be derived from structured metadata supplied by
+          // Ruby, not parsed out of the executable renderingRequest string.
           opentelemetry: { name: 'ror.ssr.request' },
         }),
         executor: async (fn, unitOfWorkOptions) => {
@@ -172,15 +235,15 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
     // export queued spans before the process exits.
     configureFastify((app) => {
       app.addHook('onClose', async () => {
-        await provider.shutdown();
+        await shutdownProviderWithTimeout(provider, shutdownTimeoutMs);
         if (tracerProvider === provider) {
           tracerProvider = null;
         }
       });
     });
 
-    provider.register();
     tracerProvider = provider;
+    provider.register();
     log.info('[OpenTelemetry] Tracer provider initialized');
   } catch (err) {
     message(`[OpenTelemetry] init failed: ${String(err)}`);
@@ -201,6 +264,7 @@ export async function __resetForTest(): Promise<void> {
   try {
     const otelApi = require('@opentelemetry/api') as typeof import('@opentelemetry/api');
     otelApi.trace.disable();
+    otelApi.diag.disable();
   } catch {
     // OTel API not installed — nothing to disable.
   }

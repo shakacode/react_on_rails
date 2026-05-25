@@ -138,10 +138,10 @@ export function setupSubSpan(impl: SubSpanFn): void {
  * Wrap an async function in a named sub-span. Safe to call even when no
  * integration is installed — defaults to passing through to `fn()`.
  *
- * If the installed implementation throws synchronously before invoking `fn()`,
- * the caller is shielded: `fn()` is still executed and its result returned.
- * If the implementation throws after invoking `fn()`, the error is rethrown so
- * `fn()` is never run twice.
+ * If the installed implementation throws or rejects before invoking `fn()`, the
+ * caller is shielded: `fn()` is still executed and its result returned. If the
+ * implementation fails after invoking `fn()`, the error is rethrown so `fn()`
+ * is never run twice.
  */
 export function subSpan<T>(opts: SubSpanOptions, fn: () => Promise<T>): Promise<T> {
   let invoked = false;
@@ -151,7 +151,14 @@ export function subSpan<T>(opts: SubSpanOptions, fn: () => Promise<T>): Promise<
   };
 
   try {
-    return subSpanImpl(opts, wrappedFn);
+    return Promise.resolve(subSpanImpl(opts, wrappedFn)).catch((err: unknown) => {
+      if (invoked) {
+        return Promise.reject(err instanceof Error ? err : new Error(String(err)));
+      }
+
+      message(`subSpan implementation rejected before invoking fn(): ${String(err)}`);
+      return wrappedFn();
+    });
   } catch (err) {
     if (invoked) {
       return Promise.reject(err instanceof Error ? err : new Error(String(err)));

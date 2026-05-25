@@ -273,23 +273,25 @@ reactOnRailsProNodeRenderer().catch((e) => {
 
 ### Span taxonomy
 
-| Span                                 | Where                                                             | Attributes                                                                |
-| ------------------------------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `ror.ssr.request`                    | Root span for each SSR render request                             | (none — root)                                                             |
-| `ror.bundle.build_execution_context` | Loading a bundle into the VM                                      | `bundle.timestamp`, `bundle.paths.count`, `cache.strategy` or `cache.hit` |
-| `ror.bundle.upload`                  | When new bundles are uploaded mid-request or via `/upload-assets` | `bundle.count`, `assets.count`                                            |
-| `ror.vm.execute`                     | The actual SSR JS execution inside the VM                         | (none)                                                                    |
-| `ror.result.prepare`                 | Building the response payload                                     | (none)                                                                    |
-| `ror.incremental.stream`             | Wraps the incremental NDJSON request lifecycle                    | (none)                                                                    |
-| `ror.incremental.process_chunk`      | Processing each NDJSON update chunk                               | (none)                                                                    |
+| Span                                 | Where                                                             | Attributes                                                 |
+| ------------------------------------ | ----------------------------------------------------------------- | ---------------------------------------------------------- |
+| `ror.ssr.request`                    | Root span for each SSR render request                             | (none — root)                                              |
+| `ror.bundle.build_execution_context` | Loading a bundle into the VM                                      | `bundle.timestamp`, `bundle.paths.count`, `cache.strategy` |
+| `ror.bundle.upload`                  | When new bundles are uploaded mid-request or via `/upload-assets` | `bundle.count`, `assets.count`                             |
+| `ror.vm.execute`                     | The actual SSR JS execution inside the VM                         | (none)                                                     |
+| `ror.result.prepare`                 | Building the response payload                                     | (none)                                                     |
+| `ror.incremental.stream`             | Wraps the incremental NDJSON request lifecycle                    | (none)                                                     |
+| `ror.incremental.process_chunk`      | Processing each NDJSON update chunk                               | (none)                                                     |
 
 Outbound HTTP calls inside your SSR bundle are automatically captured by `HttpInstrumentation` as child spans.
+
+**Cache-miss note:** On a cache-miss path `ror.bundle.build_execution_context` appears twice. The first span has `cache.strategy=cache-first` and can end with ERROR status when the VM cache probe misses. The second span has `cache.strategy=cache-miss` for the real VM build after bundle upload or bundle discovery. Scope error alerts to exclude `cache.strategy=cache-first` when that miss is expected.
 
 ### Production defaults
 
 - **Span processor**: `BatchSpanProcessor` in production (`NODE_ENV=production` or `RAILS_ENV=production`), `SimpleSpanProcessor` otherwise. Override with `init({ spanProcessor })`.
 - **Exporter**: OTLP HTTP. Override with `init({ exporter })`.
-- **Graceful shutdown**: Pending batched spans are flushed when Fastify's `onClose` hook fires (during worker shutdown), so traces are not lost on rolling restarts.
+- **Graceful shutdown**: Pending batched spans are flushed when Fastify's `onClose` hook fires (during worker shutdown), so traces are not lost on rolling restarts. The renderer waits up to 5000ms by default before continuing worker shutdown; override with `init({ shutdownTimeoutMs })`.
 
 ### Privacy note
 

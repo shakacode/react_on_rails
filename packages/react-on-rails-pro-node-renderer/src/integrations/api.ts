@@ -44,4 +44,4 @@ export {
   SubSpanOptions,
   SubSpanFn,
 } from '../shared/tracing.js';
-export { configureFastify, FastifyConfigFunction } from '../worker.js';
+export { configureFastify, FastifyConfigFunction } from '../worker/fastifyConfig.js';

@@ -1,10 +1,11 @@
 import { jest } from '@jest/globals';
-import { trace as otelTrace } from '@opentelemetry/api';
+import { diag as otelDiag, trace as otelTrace } from '@opentelemetry/api';
 
 describe('opentelemetry integration: init() failure path', () => {
   beforeEach(() => {
     jest.resetModules();
     otelTrace.disable();
+    otelDiag.disable();
   });
 
   afterEach(() => {
@@ -15,8 +16,11 @@ describe('opentelemetry integration: init() failure path', () => {
     jest.dontMock('@opentelemetry/instrumentation-http');
     jest.dontMock('@opentelemetry/sdk-trace-base');
     jest.dontMock('@opentelemetry/sdk-trace-node');
+    jest.dontMock('../../src/worker/fastifyConfig.js');
+    jest.dontMock('fastify');
     jest.restoreAllMocks();
     otelTrace.disable();
+    otelDiag.disable();
   });
 
   test('init() catches missing-peer-dep import error and returns without throwing', async () => {
@@ -50,6 +54,14 @@ describe('opentelemetry integration: init() failure path', () => {
     });
 
     // This import should succeed without triggering any of the mocked throws.
+    await expect(import('../../src/integrations/opentelemetry')).resolves.toBeDefined();
+  });
+
+  test('the integration module can be imported without loading Fastify or the worker graph', async () => {
+    jest.doMock('fastify', () => {
+      throw new Error('fastify should not be loaded by opentelemetry import');
+    });
+
     await expect(import('../../src/integrations/opentelemetry')).resolves.toBeDefined();
   });
 
@@ -96,6 +108,51 @@ describe('opentelemetry integration: init() failure path', () => {
 
     expect(fastifyConfigs).toEqual([expect.objectContaining({ registerOnInitialization: true })]);
     await otel.__resetForTest();
+  });
+
+  test('Fastify onClose does not wait forever for provider.shutdown()', async () => {
+    jest.useFakeTimers();
+    try {
+      let configureFastifyCallback: ((app: { addHook: jest.Mock }) => void) | undefined;
+      let onClose: (() => Promise<void>) | undefined;
+      const shutdown = jest.fn(() => new Promise<void>(() => undefined));
+
+      jest.doMock('../../src/worker/fastifyConfig.js', () => ({
+        configureFastify: jest.fn((callback: (app: { addHook: jest.Mock }) => void) => {
+          configureFastifyCallback = callback;
+        }),
+      }));
+      jest.doMock('@opentelemetry/sdk-trace-node', () => ({
+        NodeTracerProvider: jest.fn(function NodeTracerProvider() {
+          return {
+            register: jest.fn(),
+            shutdown,
+          };
+        }),
+      }));
+
+      const { InMemorySpanExporter, SimpleSpanProcessor } = await import('@opentelemetry/sdk-trace-base');
+      const otel = await import('../../src/integrations/opentelemetry');
+
+      otel.init({
+        spanProcessor: new SimpleSpanProcessor(new InMemorySpanExporter()),
+        shutdownTimeoutMs: 25,
+      });
+
+      configureFastifyCallback!({
+        addHook: jest.fn((_name: string, handler: () => Promise<void>) => {
+          onClose = handler;
+        }),
+      });
+
+      const closePromise = onClose!();
+      jest.advanceTimersByTime(25);
+
+      await expect(closePromise).resolves.toBeUndefined();
+      expect(shutdown).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   test('init() ignores duplicate calls without replacing the active provider', async () => {

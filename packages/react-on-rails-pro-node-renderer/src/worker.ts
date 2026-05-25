@@ -14,7 +14,7 @@ import log, { sharedLoggerOptions } from './shared/log.js';
 import packageJson from './shared/packageJson.js';
 import { buildConfig, Config, getConfig } from './shared/configBuilder.js';
 import fileExistsAsync from './shared/fileExistsAsync.js';
-import type { FastifyInstance, FastifyReply } from './worker/types.js';
+import type { FastifyReply } from './worker/types.js';
 import { performRequestPrechecks } from './worker/requestPrechecks.js';
 import { type AuthBody, authenticate } from './worker/authHandler.js';
 import {
@@ -41,6 +41,7 @@ import {
   getAssetPath,
 } from './shared/utils.js';
 import { startSsrRequestOptions, subSpan, trace } from './shared/tracing.js';
+import { applyFastifyConfigFunctions } from './worker/fastifyConfig.js';
 
 // Uncomment the below for testing timeouts:
 // import { delay } from './shared/utils.js';
@@ -60,20 +61,6 @@ declare module 'fastify' {
   interface FastifyRequest {
     uploadDir: string;
   }
-}
-
-export type FastifyConfigFunction = (app: FastifyInstance) => void;
-
-const fastifyConfigFunctions: FastifyConfigFunction[] = [];
-
-/**
- * Configures Fastify instance before starting the server.
- * @param configFunction The configuring function. Normally it will be something like `(app) => { app.register(...); }`
- *  or `(app) => { app.addHook(...); }` to report data from Fastify to an external service.
- *  Note that we call `await app.ready()` in our code, so you don't need to `await` the results.
- */
-export function configureFastify(configFunction: FastifyConfigFunction) {
-  fastifyConfigFunctions.push(configFunction);
 }
 
 function setHeaders(headers: ResponseResult['headers'], res: FastifyReply) {
@@ -660,9 +647,7 @@ export default function run(config: Partial<Config>) {
     });
   }
 
-  fastifyConfigFunctions.forEach((configFunction) => {
-    configFunction(app);
-  });
+  applyFastifyConfigFunctions(app);
 
   return app;
 }
