@@ -41,6 +41,24 @@ RSpec.describe RendererHarness::Runner do
     expect(runner.results.size).to eq(1)
   end
 
+  it "rejects direct construction without a run mode" do
+    runner = described_class.new(
+      scenario: build_scenario,
+      config: build_config(requests: nil, duration: nil)
+    )
+
+    expect { runner.run }.to raise_error(ArgumentError, /must provide --requests or --duration/)
+  end
+
+  it "rejects direct construction with conflicting run modes" do
+    runner = described_class.new(
+      scenario: build_scenario,
+      config: build_config(requests: 1, duration: 1.0)
+    )
+
+    expect { runner.run }.to raise_error(ArgumentError, /mutually exclusive/)
+  end
+
   it "starts elapsed timing after all workers finish warmup" do
     scenario = build_scenario
     runner = described_class.new(

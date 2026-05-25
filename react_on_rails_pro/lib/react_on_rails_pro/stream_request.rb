@@ -149,7 +149,7 @@ module ReactOnRailsPro
           status_recorded = true
         end
 
-        if response_has_error_status?(stream_response, status)
+        if response_has_error_status?(status)
           error_body << chunk
           next
         end
@@ -164,8 +164,8 @@ module ReactOnRailsPro
       @status = response.is_a?(HTTPX::ErrorResponse) ? nil : response_status(response)
     end
 
-    def response_has_error_status?(response, status)
-      response.is_a?(HTTPX::ErrorResponse) || status.nil? || status >= 400
+    def response_has_error_status?(status)
+      status.nil? || status >= 400
     end
 
     def response_status(response)

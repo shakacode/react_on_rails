@@ -25,10 +25,9 @@ module RendererHarness
     #
     # See: https://github.com/shakacode/react_on_rails/issues (file a follow-up issue)
     #
-    # For now, this scenario is included to exercise the Ruby-side code path and measure
-    # the overhead of the incremental-render HTTP/2 handshake. The renderer will return
-    # a 400 on JS execution, which the scenario records as a failure. This is expected
-    # until a suitable test component or fixture is wired up.
+    # This class is retained as the Ruby-side scaffold for a follow-up, but it is
+    # intentionally not registered as a runnable CLI scenario until a suitable test
+    # component or fixture is wired up.
     #
     # Path format: /bundles/:bundleTimestamp/incremental-render/:renderRequestDigest
     # The stream is iterated via StreamDecorator#each_chunk (not #each).
@@ -37,12 +36,6 @@ module RendererHarness
       # test fixture bundles, not in the production server bundle. Replace with a
       # real RSC component or fixture when this scenario is properly wired up.
       JS_TEMPLATE = "ReactOnRails.getStreamValues()"
-
-      def initialize(config)
-        super
-        warn "[incremental_async] WARNING: This scenario is not yet functional against the dummy app " \
-             "and will report 100% failures. See the class-level FIXME for details."
-      end
 
       def perform_request
         js = JS_TEMPLATE

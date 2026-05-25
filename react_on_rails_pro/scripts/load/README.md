@@ -6,14 +6,14 @@ A reproducible Ruby-based load and memory harness for the React on Rails Pro Rai
 
 This is the **foundation** PR. It ships:
 
-- Three scenarios: `standard_render`, `streaming_render`, `incremental_async`
+- Two runnable scenarios: `standard_render`, `streaming_render`
 - Metrics (latency percentiles, RPS, memory slope), output as JSON + CSV + terminal summary
 - Smoke mode for quick local + CI validation
 - Harness unit tests (no live HTTP)
 
 Deferred to follow-up issues:
 
-- `incremental_async` scenario — requires a JS handler that accepts NDJSON async-prop chunks AND renders via `ReactOnRails.addAsyncPropsCapabilityToComponentProps`. That method is only available in the RSC bundle; the plain server bundle lacks it. The integration tests use special fixture bundles (`react-on-rails-pro-node-renderer/tests/fixtures/bundle-incremental.js`) with a `ReactOnRails.getStreamValues()` helper not present in production bundles. Until an RSC-capable test component or fixture is wired up, `incremental_async` will report 100% failures when run against the dummy app. The Ruby-side concurrency/stream plumbing still runs and is exercised — only the renderer-side JS execution fails.
+- `incremental_async` scenario — requires a JS handler that accepts NDJSON async-prop chunks AND renders via `ReactOnRails.addAsyncPropsCapabilityToComponentProps`. That method is only available in the RSC bundle; the plain server bundle lacks it. The integration tests use special fixture bundles (`react-on-rails-pro-node-renderer/tests/fixtures/bundle-incremental.js`) with a `ReactOnRails.getStreamValues()` helper not present in production bundles. Until an RSC-capable test component or fixture is wired up, this scenario is intentionally not registered as a runnable CLI scenario.
 - 410 missing-bundle retry scenario
 - Stale-connection scenario (renderer restart)
 - Early-disconnect / cancel scenario
@@ -47,9 +47,6 @@ bin/renderer-harness --scenario standard_render --requests 1000 --concurrency 4 
 
 # Streaming render, 60s with 4 threads
 bin/renderer-harness --scenario streaming_render --duration 60 --concurrency 4
-
-# Incremental async props
-bin/renderer-harness --scenario incremental_async --requests 200 --concurrency 4 --increments 10
 ```
 
 `--warmup` is per worker thread. For example, `--warmup 5 --concurrency 4` issues 20 warmup

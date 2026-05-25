@@ -40,6 +40,7 @@ module RendererHarness
 
     # Returns elapsed seconds with per-thread warmup excluded.
     def run
+      validate_run_mode!
       @results_mutex.synchronize { @results.clear }
       @measurement_started_at = nil
       gate = start_gate
@@ -96,6 +97,7 @@ module RendererHarness
 
     def worker_thread(gate)
       Thread.new do
+        # Worker failures are collected by join_threads and reported once.
         Thread.current.report_on_exception = false
         yield
       rescue StandardError
@@ -152,6 +154,12 @@ module RendererHarness
 
     def measurement_started?(gate)
       gate.mutex.synchronize { gate.started }
+    end
+
+    def validate_run_mode!
+      raise ArgumentError, "must provide --requests or --duration" if @config.requests.nil? && @config.duration.nil?
+
+      raise ArgumentError, "--requests and --duration are mutually exclusive" if @config.requests && @config.duration
     end
 
     def join_threads(threads)
