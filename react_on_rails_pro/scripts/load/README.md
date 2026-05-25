@@ -50,7 +50,8 @@ bin/renderer-harness --scenario streaming_render --duration 60 --concurrency 4
 ```
 
 `--warmup` is per worker thread. For example, `--warmup 5 --concurrency 4` issues 20 warmup
-requests before measured requests begin.
+requests before measured requests begin. All workers must finish warmup before measurement starts;
+`--start-gate-timeout` controls how long to wait for them (default: 30 seconds).
 
 ### Tracking the node-renderer process
 

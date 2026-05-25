@@ -364,6 +364,26 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       )
     end
 
+    it "uses the recorded status in HTTP 400 error messages" do
+      status_calls = 0
+      response = double("response", headers: {}, body: "")
+      allow(response).to receive(:status) do
+        status_calls += 1
+        raise NoMethodError, "status unavailable" if status_calls > 2
+
+        400
+      end
+      http_error = HTTPX::HTTPError.new(response)
+      stream = described_class.create do |_send_bundle, _barrier|
+        raise http_error
+      end
+
+      expect { stream.each_chunk(&:itself) }.to raise_error(
+        ReactOnRailsPro::Error,
+        /Renderer rejected malformed request or hit an unhandled VM error: 400:/
+      )
+    end
+
     it "raises ReactOnRailsPro::Error on STATUS_INCOMPATIBLE (412)" do
       stream = described_class.create do |_send_bundle, _barrier|
         raise build_http_error(412)

@@ -13,6 +13,7 @@ RSpec.describe RendererHarness::Config do
         requests: 10,
         concurrency: 1,
         warmup: 0,
+        start_gate_timeout: 30.0,
         smoke: true
       )
     end
@@ -33,6 +34,12 @@ RSpec.describe RendererHarness::Config do
       expect(config).to have_attributes(requests: 10, duration: nil)
     end
 
+    it "parses the worker start-gate timeout" do
+      config = described_class.parse(["--requests", "1", "--start-gate-timeout", "0.5"])
+
+      expect(config.start_gate_timeout).to eq(0.5)
+    end
+
     it "rejects mutually exclusive run modes" do
       expect do
         described_class.parse(["--requests", "10", "--duration", "1"])
@@ -49,6 +56,12 @@ RSpec.describe RendererHarness::Config do
       expect do
         described_class.parse(["--scenario", "incremental_async", "--requests", "1"])
       end.to raise_error(ArgumentError, /unknown scenario: incremental_async/)
+    end
+
+    it "rejects non-positive worker start-gate timeouts" do
+      expect do
+        described_class.parse(["--requests", "1", "--start-gate-timeout", "0"])
+      end.to raise_error(ArgumentError, /--start-gate-timeout must be > 0/)
     end
 
     it "keeps parser helper methods private" do

@@ -11,6 +11,7 @@ RSpec.describe RendererHarness::Harness do
       :concurrency,
       :mix,
       :warmup,
+      :start_gate_timeout,
       :renderer_pid,
       :mem_interval,
       keyword_init: true
@@ -21,6 +22,7 @@ RSpec.describe RendererHarness::Harness do
         concurrency: 1,
         mix: "small",
         warmup: 1,
+        start_gate_timeout: 30.0,
         renderer_pid: nil,
         mem_interval: 1.0
       }

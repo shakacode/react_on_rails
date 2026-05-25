@@ -15,6 +15,14 @@ RSpec.describe RendererHarness::Scenarios::Base do
     expect(scenario_class.new(build_config).name).to eq("rsc_render")
   end
 
+  it "memoizes the generated scenario name" do
+    scenario_class = Class.new(described_class)
+    stub_const("RendererHarness::Scenarios::RSCRender", scenario_class)
+    scenario = scenario_class.new(build_config)
+
+    expect(scenario.name).to equal(scenario.name)
+  end
+
   it "counts the full length-prefixed streamed frame" do
     scenario = described_class.new(build_config)
     chunk = {

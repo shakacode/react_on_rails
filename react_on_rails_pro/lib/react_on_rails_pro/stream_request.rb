@@ -211,7 +211,7 @@ module ReactOnRailsPro
       when ReactOnRailsPro::STATUS_BAD_REQUEST
         raise ReactOnRailsPro::Error,
               "Renderer rejected malformed request or hit an unhandled VM error: " \
-              "#{response.status}:\n#{error_body}"
+              "#{@status || 'unknown'}:\n#{error_body}"
       when ReactOnRailsPro::STATUS_INCOMPATIBLE
         raise ReactOnRailsPro::Error, error_body
       else

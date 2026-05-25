@@ -6,8 +6,8 @@ require "runner"
 
 RSpec.describe RendererHarness::Runner do
   def build_config(**overrides)
-    Struct.new(:requests, :duration, :concurrency, :warmup, keyword_init: true).new(
-      { requests: 1, duration: nil, concurrency: 1, warmup: 0 }.merge(overrides)
+    Struct.new(:requests, :duration, :concurrency, :warmup, :start_gate_timeout, keyword_init: true).new(
+      { requests: 1, duration: nil, concurrency: 1, warmup: 0, start_gate_timeout: 30.0 }.merge(overrides)
     )
   end
 
@@ -113,12 +113,11 @@ RSpec.describe RendererHarness::Runner do
   end
 
   it "times out while waiting for workers to finish warmup" do
-    stub_const("#{described_class}::START_GATE_TIMEOUT_SECONDS", 0.01)
     scenario = build_scenario
     allow(scenario).to receive(:warmup) { sleep 0.05 }
     runner = described_class.new(
       scenario: scenario,
-      config: build_config(requests: 1, warmup: 1)
+      config: build_config(requests: 1, warmup: 1, start_gate_timeout: 0.01)
     )
 
     expect { runner.run }.to raise_error(

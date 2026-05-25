@@ -13,6 +13,7 @@ module RendererHarness
     :mix,
     :increments,
     :mem_interval,
+    :start_gate_timeout,
     :renderer_pid,
     :output_dir,
     :smoke,
@@ -28,6 +29,7 @@ module RendererHarness
         mix: "small",
         increments: 5,
         mem_interval: 1.0,
+        start_gate_timeout: default_start_gate_timeout_seconds,
         renderer_pid: nil,
         output_dir: nil,
         smoke: false,
@@ -65,6 +67,11 @@ module RendererHarness
     def self.add_secondary_flags(opt_parser, opts)
       opt_parser.on("--increments N", Integer) { |v| opts[:increments] = v }
       opt_parser.on("--mem-interval SECONDS", Float) { |v| opts[:mem_interval] = v }
+      opt_parser.on(
+        "--start-gate-timeout SECONDS",
+        Float,
+        "Seconds to wait for worker warmup before aborting (default: #{default_start_gate_timeout_seconds.to_i})"
+      ) { |v| opts[:start_gate_timeout] = v }
       opt_parser.on("--renderer-pid PID", Integer) { |v| opts[:renderer_pid] = v }
       opt_parser.on("--output-dir PATH", String) { |v| opts[:output_dir] = v }
       opt_parser.on("--smoke") { opts[:smoke] = true }
@@ -106,14 +113,28 @@ module RendererHarness
 
     def self.validate_numeric_options!(opts)
       raise ArgumentError, "--requests must be >= 1" if opts[:requests] && opts[:requests] < 1
-      raise ArgumentError, "--duration must be > 0" if opts[:duration] && opts[:duration] <= 0
+
+      validate_positive_option!("--duration", opts[:duration])
       raise ArgumentError, "--concurrency must be >= 1" if opts[:concurrency] < 1
       raise ArgumentError, "--warmup must be >= 0" if opts[:warmup].negative?
-      raise ArgumentError, "--mem-interval must be > 0" if opts[:mem_interval] <= 0
+
+      validate_positive_option!("--mem-interval", opts[:mem_interval])
+      validate_positive_option!("--start-gate-timeout", opts[:start_gate_timeout])
+    end
+
+    def self.validate_positive_option!(flag, value)
+      return if value.nil? || value.positive?
+
+      raise ArgumentError, "#{flag} must be > 0"
+    end
+
+    def self.default_start_gate_timeout_seconds
+      30.0
     end
 
     private_class_method :build_parser, :add_primary_flags, :add_secondary_flags,
                          :apply_smoke_preset!, :validate!,
-                         :validate_scenario!, :validate_run_mode!, :validate_numeric_options!
+                         :validate_scenario!, :validate_run_mode!, :validate_numeric_options!,
+                         :validate_positive_option!, :default_start_gate_timeout_seconds
   end
 end

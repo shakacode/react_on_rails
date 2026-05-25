@@ -29,10 +29,11 @@ module RendererHarness
       end
 
       def name
-        self.class.name.split("::").last
-            .gsub(/([A-Z]+)([A-Z][a-z])/, "\\1_\\2")
-            .gsub(/([a-z\d])([A-Z])/, "\\1_\\2")
-            .downcase
+        @name ||= self.class.name.split("::").last
+                      .gsub(/([A-Z]+)([A-Z][a-z])/, "\\1_\\2")
+                      .gsub(/([a-z\d])([A-Z])/, "\\1_\\2")
+                      .downcase
+                      .freeze
       end
 
       def warmup(count)

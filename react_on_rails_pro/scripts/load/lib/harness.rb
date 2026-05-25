@@ -86,6 +86,7 @@ module RendererHarness
         concurrency: @config.concurrency,
         mix: @config.mix,
         warmup: @config.warmup,
+        start_gate_timeout: @config.start_gate_timeout,
         elapsed_seconds: elapsed,
         ruby_version: RUBY_VERSION,
         hostname: Socket.gethostname,

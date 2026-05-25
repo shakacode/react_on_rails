@@ -4,7 +4,6 @@ module RendererHarness
   class Runner # rubocop:disable Metrics/ClassLength
     StartGate = Struct.new(:mutex, :ready_cv, :start_cv, :ready_count, :started, :aborted, :deadline,
                            :abort_error, keyword_init: true)
-    START_GATE_TIMEOUT_SECONDS = 30
     WORKER_JOIN_TIMEOUT_SECONDS = 30
     MeasurementAborted = Class.new(StandardError)
     WorkerJoinTimeout = Class.new(StandardError)
@@ -153,7 +152,7 @@ module RendererHarness
     end
 
     def wait_for_ready_workers(gate)
-      deadline = monotonic + START_GATE_TIMEOUT_SECONDS
+      deadline = monotonic + @config.start_gate_timeout
       until gate.ready_count == @config.concurrency || gate.aborted
         remaining = deadline - monotonic
         return abort_start_gate_timeout(gate) if remaining <= 0
