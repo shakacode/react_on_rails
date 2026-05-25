@@ -41,15 +41,20 @@ module RendererHarness
       private
 
       def failure_stream_payload(stream, bytes_in:, bytes_out:, error:)
-        stream_payload(stream, bytes_in: bytes_in, bytes_out: bytes_out).merge(ok: false, error: error.message)
-      rescue StandardError
         {
-          http_status: nil,
+          http_status: stream_status(stream),
           bytes_in: bytes_in,
           bytes_out: bytes_out,
           ok: false,
-          error: error.message
+          error: error.message,
+          require_http_status: true
         }
+      end
+
+      def stream_status(stream)
+        stream.status
+      rescue NoMethodError, ArgumentError
+        nil
       end
     end
   end

@@ -85,7 +85,7 @@ RSpec.describe RendererHarness::Scenarios::StreamingRender do
   it "preserves the original streaming error when status reading also fails" do
     stream = build_stream(status: 503, chunks: [])
     allow(stream).to receive(:each_chunk).and_raise(StandardError, "renderer unavailable")
-    allow(stream).to receive(:status).and_raise(StandardError, "status unavailable")
+    allow(stream).to receive(:status).and_raise(ArgumentError, "status unavailable")
     allow(ReactOnRailsPro::Request).to receive(:render_code_as_stream).and_return(stream)
 
     result = described_class.new(build_config).perform_request

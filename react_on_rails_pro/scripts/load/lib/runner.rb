@@ -68,6 +68,7 @@ module RendererHarness
       @remaining = @config.requests
       Array.new(@config.concurrency) do
         worker_thread(gate) do |worker_results|
+          # Count-based runs stop via claim_request, so any duration deadline is intentionally unused here.
           prepare_worker(gate)
           worker_results << @scenario.perform_request while claim_request
         end

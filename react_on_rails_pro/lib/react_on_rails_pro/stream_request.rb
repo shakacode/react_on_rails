@@ -171,7 +171,7 @@ module ReactOnRailsPro
       # Start each attempt from nil. Known missing-status cases keep that nil as
       # an unknown status; unexpected extraction errors still propagate after the
       # ensure below marks status as attempted.
-      @status = nil
+      @status = nil # Preserve nil if extract_status raises before returning.
       @status = extract_status(response)
     ensure
       # If status extraction itself fails, callers should treat the unknown
@@ -209,7 +209,7 @@ module ReactOnRailsPro
       when ReactOnRailsPro::STATUS_BAD_REQUEST
         raise ReactOnRailsPro::Error,
               "Renderer rejected malformed request or hit an unhandled VM error: " \
-              "#{@status || 'unknown'}:\n#{error_body}"
+              "#{@status}:\n#{error_body}"
       when ReactOnRailsPro::STATUS_INCOMPATIBLE
         raise ReactOnRailsPro::Error, error_body
       else
