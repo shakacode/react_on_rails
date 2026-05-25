@@ -30,6 +30,7 @@ const routeChunkPreloadPromisesByRouter = new WeakMap<
   TanStackRouterChunkPreloadInternals,
   WeakMap<object, Promise<unknown>>
 >();
+const temporarySsrFlagRouters = new WeakSet<TanStackRouter>();
 
 function extractDehydratedData(dehydratedRouter: unknown): unknown {
   if (!dehydratedRouter || typeof dehydratedRouter !== 'object') {
@@ -311,6 +312,9 @@ function TanStackHydrationApp({
       if (!router.ssr) {
         router.ssr = { manifest: undefined };
         didSetSsrFlagRef.current = true;
+        temporarySsrFlagRouters.add(router);
+      } else if (temporarySsrFlagRouters.has(router)) {
+        didSetSsrFlagRef.current = true;
       }
 
       try {
@@ -337,6 +341,7 @@ function TanStackHydrationApp({
         if (didSetSsrFlagRef.current) {
           router.ssr = undefined;
           didSetSsrFlagRef.current = false;
+          temporarySsrFlagRouters.delete(router);
         }
         throw error;
       }
@@ -382,6 +387,7 @@ function TanStackHydrationApp({
       if (latestEffectRunIdRef.current === effectRunId && didSetSsrFlagRef.current) {
         router.ssr = undefined;
         didSetSsrFlagRef.current = false;
+        temporarySsrFlagRouters.delete(router);
       }
     };
 

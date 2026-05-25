@@ -214,6 +214,9 @@ const config: KnipConfig = {
       ],
     },
   },
+  ignoreIssues: {
+    'packages/react-on-rails-pro-node-renderer/src/shared/tracing.ts': ['exports'],
+  },
   ignoreExportsUsedInFile: true,
 };
 
