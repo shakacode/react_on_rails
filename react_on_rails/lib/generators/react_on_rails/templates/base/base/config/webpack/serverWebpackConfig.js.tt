@@ -13,7 +13,7 @@ const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
 const rscClientReferences = {
   directory: resolve(config.source_path),
   recursive: true,
-  include: /\.(js|ts|jsx|tsx)$/,
+  include: /\.(js|mjs|cjs|ts|mts|cts|jsx|tsx)$/,
 };
 <% end -%>
 

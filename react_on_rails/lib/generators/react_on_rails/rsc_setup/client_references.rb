@@ -99,8 +99,10 @@ module ReactOnRails
           return if rsc_plugin_uses_scoped_client_references?(content, is_server: is_server)
           return unless rsc_client_references_rewrite_needed?(config_path, content, is_server: is_server)
 
-          rewrite_rsc_plugin_client_references(config_path, is_server: is_server) ||
-            warn_missing_rsc_plugin_target(config_path, is_server: is_server)
+          return if rewrite_rsc_plugin_client_references(config_path, is_server: is_server)
+
+          rollback_incomplete_rsc_client_references_setup(config_path, content)
+          warn_missing_rsc_plugin_target(config_path, is_server: is_server)
         end
 
         def rsc_client_references_rewrite_needed?(config_path, content, is_server:)
@@ -641,6 +643,16 @@ module ReactOnRails
           end
           write_existing_rsc_config(config_path, content, action: :rewrite)
           true
+        end
+
+        def rollback_incomplete_rsc_client_references_setup(config_path, original_content)
+          return if options[:pretend] || options[:skip]
+          return if scoped_rsc_client_references_defined?(original_content)
+
+          full_path = File.join(destination_root, config_path)
+          return unless scoped_rsc_client_references_defined?(File.read(full_path))
+
+          File.write(full_path, original_content)
         end
 
         # Multi-line option objects get the new key on its own line just before the closing brace,

@@ -102,6 +102,7 @@ describe RscGenerator, type: :generator do
           expect(content).to include("react-on-rails-rsc/WebpackPlugin")
           expect(content).to include("clientReferences: rscClientReferences")
           expect(content).to include("directory: resolve(config.source_path)")
+          expect(content).to include('include: /\.(js|mjs|cjs|ts|mts|cts|jsx|tsx)$/')
           expect(content).to include("isServer: true")
         end
       end
@@ -2071,6 +2072,41 @@ describe RscGenerator, type: :generator do
 
       expect(File.read(File.join(destination_root, config_path))).to eq(original_content)
       expect(GeneratorMessages.messages.join("\n")).not_to include("generated scoped helper setup was not written")
+    end
+
+    it "rolls back helper setup when the follow-up plugin rewrite cannot be applied" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      original_content = File.read(File.join(destination_root, config_path))
+      allow(generator).to receive(:rewrite_rsc_plugin_client_references)
+        .with(config_path, is_server: false)
+        .and_return(false)
+
+      generator.send(:update_existing_rsc_webpack_config, config_path, original_content, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(generator).to have_received(:rewrite_rsc_plugin_client_references)
+        .with(config_path, is_server: false)
+      expect(migrated_content).to eq(original_content)
+      expect(migrated_content).not_to include("const rscClientReferences")
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("no plugin options with isServer: false could be rewritten")
     end
 
     it "does not inject scoped helper setup in skip mode" do
