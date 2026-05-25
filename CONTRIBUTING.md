@@ -465,6 +465,33 @@ After updating the source files above, regenerate lock files by running `bundle 
 
 The CI-generated example apps (under `gen-examples/`) automatically resolve the shakapacker version via the gem dependency. The `pin_shakapacker_npm_version` helper in `react_on_rails/rakelib/shakapacker_examples.rake` ensures the npm version matches the gem.
 
+## Updating the pnpm Fallback Version for Scaffolded CI
+
+The `react_on_rails:install` generator scaffolds a GitHub Actions workflow that uses `pnpm/action-setup@v4`. When the target app declares `packageManager: pnpm@…` in its `package.json`, the scaffold reads the pin from there. When it does not (e.g., existing Shakapacker apps that only have `pnpm-lock.yaml`), the scaffold has to supply an explicit `version:` to the action — otherwise the workflow fails before installing dependencies.
+
+That fallback comes from `CI_PNPM_FALLBACK_VERSION` in [`react_on_rails/lib/generators/react_on_rails/install_generator.rb`](./react_on_rails/lib/generators/react_on_rails/install_generator.rb).
+
+**When to bump:**
+
+- Whenever Renovate updates the repo's own root `package.json` `packageManager` pin to a newer pnpm version. The spec `keeps the fallback pin tied to a version-specific pnpm release note` (in `react_on_rails/spec/react_on_rails/generators/install_generator_spec.rb`) fails when `CI_PNPM_FALLBACK_VERSION` drifts from the `packageManager` version in `package.json`; treat that failure as the signal to update the fallback version and release-note URL in the same PR.
+- Review pnpm release PRs from Renovate, at minimum on every pnpm **major** release and ideally on each minor as well. A new major may change the lockfile format, in which case projects scaffolded without `packageManager` will fail with the older pinned pnpm. Renovate may open separate PRs for `package.json` and `CI_PNPM_FALLBACK_VERSION`; merge the constant-bump PR first or batch both updates into one PR to keep CI green.
+
+**What to update together (single commit):**
+
+1. The `CI_PNPM_FALLBACK_VERSION` constant value in `install_generator.rb`
+2. The `https://github.com/pnpm/pnpm/releases/tag/v<version>` URL in the comment above the constant
+3. The root `package.json` `packageManager` field when bumping manually; for Renovate PRs, verify the existing `packageManager` bump matches the fallback version. The spec catches drift between these values.
+4. Re-run `pnpm install` in the repo root so the root `pnpm-lock.yaml` matches
+
+**Verification:**
+
+```sh
+bundle exec rspec react_on_rails/spec/react_on_rails/generators/install_generator_spec.rb \
+  -e "keeps the fallback pin tied to a version-specific pnpm release note"
+```
+
+Users who want exact reproducibility in their generated CI can commit a `packageManager: pnpm@<version>` field to their own `package.json`; the generator then omits the fallback `version:` entirely.
+
 ## CI Testing and Optimization
 
 React on Rails uses an optimized CI pipeline that runs faster on branches while maintaining full coverage on `main`. Contributors have access to local CI tools to validate changes before pushing.
