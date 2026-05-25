@@ -485,10 +485,10 @@ namespace :licenses do
       abort "React on Rails Pro license status is #{status_label}. Update REACT_ON_RAILS_PRO_LICENSE."
     end
 
-    # Guard against a future gem version returning :valid with a past expiration.
-    if days_remaining && days_remaining < 0
+    # Guard against a future gem version returning :valid with an expiration that is not in the future.
+    if days_remaining && days_remaining <= 0
       abort(
-        "React on Rails Pro license is expired (expiration date is in the past). " \
+        "React on Rails Pro license is expired (expiration time is not in the future). " \
         "Renew and update REACT_ON_RAILS_PRO_LICENSE."
       )
     end
