@@ -188,12 +188,12 @@ This keeps `handleRenderRequest.ts` free of any direct OTel imports — it just 
 
 Wrap the critical calls with `subSpan`:
 
-| Span name                            | Wraps                                              | Attributes                                                                         |
-| ------------------------------------ | -------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `ror.bundle.build_execution_context` | `buildExecutionContext(...)`                       | `bundle.timestamp`, `bundle.paths.count`, `cache.hit` (true if no VM build needed) |
-| `ror.bundle.upload`                  | `handleNewBundlesProvided(...)`                    | `bundle.count`, `assets.count`, `bytes.total`                                      |
-| `ror.vm.execute`                     | The actual SSR JS execution inside `prepareResult` | `bundle.timestamp`                                                                 |
-| `ror.result.prepare`                 | The rest of `prepareResult`                        | `response.bytes`                                                                   |
+| Span name                            | Wraps                                              | Attributes                                                                |
+| ------------------------------------ | -------------------------------------------------- | ------------------------------------------------------------------------- |
+| `ror.bundle.build_execution_context` | `buildExecutionContext(...)`                       | `bundle.timestamp`, `bundle.paths.count`, `cache.strategy` or `cache.hit` |
+| `ror.bundle.upload`                  | `handleNewBundlesProvided(...)`                    | `bundle.count`, `assets.count`                                            |
+| `ror.vm.execute`                     | The actual SSR JS execution inside `prepareResult` | (none)                                                                    |
+| `ror.result.prepare`                 | The rest of `prepareResult`                        | (none)                                                                    |
 
 No semantic logic changes — only sub-span wrapping.
 
@@ -257,7 +257,7 @@ integration.
 5. OTel executor → child span "ror.ssr.request" (with attributes:
    bundle.timestamp, dependency_count, request.bytes)
 6. handleRenderRequest runs:
-   - subSpan "ror.bundle.build_execution_context"  (with cache.hit)
+   - subSpan "ror.bundle.build_execution_context"  (with cache.strategy or cache.hit)
    - (if bundles posted) subSpan "ror.bundle.upload"
    - subSpan "ror.vm.execute"
    - subSpan "ror.result.prepare"

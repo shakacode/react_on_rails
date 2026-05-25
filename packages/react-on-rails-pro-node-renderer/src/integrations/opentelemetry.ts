@@ -60,6 +60,11 @@ function parseResourceAttributes(value: string | undefined): Record<string, stri
 }
 
 export function init(opts: OpenTelemetryInitOptions = {}): void {
+  if (tracerProvider) {
+    message('[OpenTelemetry] init() called more than once; ignoring duplicate call.');
+    return;
+  }
+
   try {
     /* eslint-disable @typescript-eslint/no-require-imports, global-require --
      * Lazy require so init() can no-op when peer deps are missing instead of

@@ -98,6 +98,34 @@ describe('opentelemetry integration: init() failure path', () => {
     await otel.__resetForTest();
   });
 
+  test('init() ignores duplicate calls without replacing the active provider', async () => {
+    const errorReporter = await import('../../src/shared/errorReporter');
+    const messageSpy = jest.spyOn(errorReporter, 'message');
+    const { InMemorySpanExporter, SimpleSpanProcessor } = await import('@opentelemetry/sdk-trace-base');
+    const firstExporter = new InMemorySpanExporter();
+    const secondExporter = new InMemorySpanExporter();
+    const { trace } = await import('@opentelemetry/api');
+    const otel = await import('../../src/integrations/opentelemetry');
+
+    otel.init({
+      spanProcessor: new SimpleSpanProcessor(firstExporter),
+    });
+    otel.init({
+      spanProcessor: new SimpleSpanProcessor(secondExporter),
+    });
+
+    trace.getTracer('test').startActiveSpan('manual.span', (span) => {
+      span.end();
+    });
+
+    expect(firstExporter.getFinishedSpans()).toHaveLength(1);
+    expect(secondExporter.getFinishedSpans()).toHaveLength(0);
+    expect(messageSpy).toHaveBeenCalledWith(
+      '[OpenTelemetry] init() called more than once; ignoring duplicate call.',
+    );
+    await otel.__resetForTest();
+  });
+
   test('init() does not register a global provider when a later Fastify lazy import fails', async () => {
     jest.doMock('@fastify/otel', () => {
       throw new Error('Cannot find module @fastify/otel');
