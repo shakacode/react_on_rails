@@ -43,6 +43,8 @@ import {
 import { startSsrRequestOptions, subSpan, trace } from './shared/tracing.js';
 import { applyFastifyConfigFunctions } from './worker/fastifyConfig.js';
 
+export { configureFastify, type FastifyConfigFunction } from './worker/fastifyConfig.js';
+
 // Uncomment the below for testing timeouts:
 // import { delay } from './shared/utils.js';
 //

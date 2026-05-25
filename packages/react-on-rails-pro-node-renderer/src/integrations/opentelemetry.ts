@@ -5,7 +5,7 @@
 import type { Attributes } from '@opentelemetry/api';
 import type { NodeTracerProvider as NodeTracerProviderType } from '@opentelemetry/sdk-trace-node';
 import type { SpanExporter, SpanProcessor } from '@opentelemetry/sdk-trace-base';
-import { setupTracing, setupSubSpan, type SubSpanFn } from '../shared/tracing.js';
+import { resetSubSpan, resetTracing, setupTracing, setupSubSpan, type SubSpanFn } from '../shared/tracing.js';
 import { configureFastify } from '../worker/fastifyConfig.js';
 import { log, message } from './api.js';
 
@@ -39,6 +39,11 @@ const DEFAULT_SHUTDOWN_TIMEOUT_MS = 5_000;
 
 let tracerProvider: NodeTracerProviderType | null = null;
 
+interface InstalledTracingAdapters {
+  tracing: boolean;
+  subSpan: boolean;
+}
+
 function isProduction(): boolean {
   return process.env.NODE_ENV === 'production' || process.env.RAILS_ENV === 'production';
 }
@@ -63,7 +68,13 @@ function parseResourceAttributes(value: string | undefined): Record<string, stri
     const key = rawKey?.trim();
 
     if (key && rawValueParts.length > 0) {
-      attributes[key] = rawValueParts.join('=').trim();
+      const rawValue = rawValueParts.join('=').trim().replace(/^"|"$/g, '');
+      try {
+        attributes[key] = decodeURIComponent(rawValue);
+      } catch {
+        // Keep init resilient when callers provide malformed percent-encoding.
+        attributes[key] = rawValue;
+      }
     }
   }
 
@@ -72,7 +83,13 @@ function parseResourceAttributes(value: string | undefined): Record<string, stri
 
 function configureOpenTelemetryDiagnostics(otelApi: typeof import('@opentelemetry/api')): void {
   const logDiagnostic = (level: string, diagnosticMessage: string, ...args: unknown[]) => {
-    log.debug({ otel: true, level, args }, diagnosticMessage);
+    if (level === 'error') {
+      log.error({ otel: true, level, args }, diagnosticMessage);
+    } else if (level === 'warn') {
+      log.warn({ otel: true, level, args }, diagnosticMessage);
+    } else {
+      log.debug({ otel: true, level, args }, diagnosticMessage);
+    }
   };
 
   otelApi.diag.setLogger(
@@ -89,7 +106,22 @@ function configureOpenTelemetryDiagnostics(otelApi: typeof import('@opentelemetr
 
 function disableOpenTelemetryGlobals(otelApi: typeof import('@opentelemetry/api')): void {
   otelApi.trace.disable();
+  otelApi.context.disable();
+  otelApi.propagation.disable();
   otelApi.diag.disable();
+}
+
+function resetInstalledTracingAdapters(
+  installedAdapters: InstalledTracingAdapters,
+): InstalledTracingAdapters {
+  if (installedAdapters.subSpan) {
+    resetSubSpan();
+  }
+  if (installedAdapters.tracing) {
+    resetTracing();
+  }
+
+  return { tracing: false, subSpan: false };
 }
 
 async function shutdownProviderWithTimeout(
@@ -126,6 +158,8 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
     message('[OpenTelemetry] init() called more than once; ignoring duplicate call.');
     return;
   }
+
+  let installedAdapters: InstalledTracingAdapters = { tracing: false, subSpan: false };
 
   try {
     /* eslint-disable @typescript-eslint/no-require-imports, global-require --
@@ -193,7 +227,7 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
     if (opts.tracing) {
       const tracer = otelApi.trace.getTracer(serviceName);
 
-      setupTracing({
+      installedAdapters.tracing = setupTracing({
         startSsrRequestOptions: () => ({
           // Keep the root span free of request payload data. Future safe
           // attributes should be derived from structured metadata supplied by
@@ -232,7 +266,7 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
             span.end();
           }
         });
-      setupSubSpan(subSpanImpl);
+      installedAdapters.subSpan = setupSubSpan(subSpanImpl);
     }
 
     tracerProvider = provider;
@@ -242,6 +276,7 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
       if (tracerProvider === provider) {
         tracerProvider = null;
       }
+      installedAdapters = resetInstalledTracingAdapters(installedAdapters);
       throw err;
     }
 
@@ -254,12 +289,14 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
         if (tracerProvider === provider) {
           tracerProvider = null;
           disableOpenTelemetryGlobals(otelApi);
+          installedAdapters = resetInstalledTracingAdapters(installedAdapters);
         }
       });
     });
 
     log.info('[OpenTelemetry] Tracer provider initialized');
   } catch (err) {
+    installedAdapters = resetInstalledTracingAdapters(installedAdapters);
     message(`[OpenTelemetry] init failed: ${String(err)}`);
   }
 }

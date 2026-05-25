@@ -5,7 +5,7 @@ import querystring from 'querystring';
 import { createReadStream } from 'fs-extra';
 // eslint-disable-next-line import/no-relative-packages
 import packageJson from '../package.json';
-import worker, { disableHttp2 } from '../src/worker';
+import worker, { configureFastify, disableHttp2 } from '../src/worker';
 import * as vm from '../src/worker/vm';
 import * as errorReporter from '../src/shared/errorReporter';
 import {
@@ -50,6 +50,10 @@ describe('worker', () => {
 
   afterAll(async () => {
     await resetForTest(testName);
+  });
+
+  test('worker subpath keeps configureFastify available for custom entrypoints', () => {
+    expect(configureFastify).toEqual(expect.any(Function));
   });
 
   test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest when bundle is provided and did not yet exist', async () => {

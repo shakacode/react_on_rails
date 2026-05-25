@@ -111,7 +111,7 @@ describe('opentelemetry integration: init()', () => {
 
   test('init() includes OTEL_RESOURCE_ATTRIBUTES and lets explicit resourceAttributes override them', () => {
     process.env.OTEL_RESOURCE_ATTRIBUTES =
-      'deployment.environment=staging, service.version=1.2.3, custom.equals=value=with=equals';
+      'deployment.environment=staging, service.version=1.2.3, custom.equals=value=with=equals, custom.comma=a%2Cb, custom.quoted=" padded "';
 
     try {
       init({
@@ -130,6 +130,8 @@ describe('opentelemetry integration: init()', () => {
       expect(attrs['deployment.environment']).toBe('test');
       expect(attrs['service.version']).toBe('1.2.3');
       expect(attrs['custom.equals']).toBe('value=with=equals');
+      expect(attrs['custom.comma']).toBe('a,b');
+      expect(attrs['custom.quoted']).toBe(' padded ');
     } finally {
       delete process.env.OTEL_RESOURCE_ATTRIBUTES;
     }

@@ -1,10 +1,17 @@
 import { jest } from '@jest/globals';
-import { diag as otelDiag, trace as otelTrace } from '@opentelemetry/api';
+import {
+  context as otelContext,
+  diag as otelDiag,
+  propagation as otelPropagation,
+  trace as otelTrace,
+} from '@opentelemetry/api';
 
 describe('opentelemetry integration: init() failure path', () => {
   beforeEach(() => {
     jest.resetModules();
     otelTrace.disable();
+    otelContext.disable();
+    otelPropagation.disable();
     otelDiag.disable();
   });
 
@@ -16,10 +23,13 @@ describe('opentelemetry integration: init() failure path', () => {
     jest.dontMock('@opentelemetry/instrumentation-http');
     jest.dontMock('@opentelemetry/sdk-trace-base');
     jest.dontMock('@opentelemetry/sdk-trace-node');
+    jest.dontMock('../../src/integrations/api.js');
     jest.dontMock('../../src/worker/fastifyConfig.js');
     jest.dontMock('fastify');
     jest.restoreAllMocks();
     otelTrace.disable();
+    otelContext.disable();
+    otelPropagation.disable();
     otelDiag.disable();
   });
 
@@ -198,6 +208,7 @@ describe('opentelemetry integration: init() failure path', () => {
     const firstExporter = new InMemorySpanExporter();
     const secondExporter = new InMemorySpanExporter();
     const otel = await import('../../src/integrations/opentelemetry');
+    const tracing = await import('../../src/shared/tracing');
 
     const installOnCloseHook = async () => {
       let onClose: (() => Promise<void>) | undefined;
@@ -209,25 +220,77 @@ describe('opentelemetry integration: init() failure path', () => {
       await onClose!();
     };
 
+    const renderWithTracing = (renderingRequest: string, childName: string) =>
+      tracing.trace(
+        () => tracing.subSpan({ name: childName }, async () => 'ok'),
+        tracing.startSsrRequestOptions({ renderingRequest }),
+      );
+
     otel.init({
+      tracing: true,
       spanProcessor: new SimpleSpanProcessor(firstExporter),
     });
-    trace.getTracer('test').startActiveSpan('first.span', (span) => {
+    trace.getTracer('test').startActiveSpan('first.manual', (span) => {
       span.end();
     });
-    expect(firstExporter.getFinishedSpans()).toHaveLength(1);
+    await renderWithTracing('ReactOnRails.first', 'first.child');
+    expect(firstExporter.getFinishedSpans().map((span) => span.name)).toEqual([
+      'first.manual',
+      'first.child',
+      'ror.ssr.request',
+    ]);
 
     await installOnCloseHook();
 
     otel.init({
+      tracing: true,
       spanProcessor: new SimpleSpanProcessor(secondExporter),
     });
-    trace.getTracer('test').startActiveSpan('second.span', (span) => {
+    trace.getTracer('test').startActiveSpan('second.manual', (span) => {
       span.end();
     });
+    await renderWithTracing('ReactOnRails.second', 'second.child');
 
-    expect(secondExporter.getFinishedSpans().map((span) => span.name)).toEqual(['second.span']);
+    expect(secondExporter.getFinishedSpans().map((span) => span.name)).toEqual([
+      'second.manual',
+      'second.child',
+      'ror.ssr.request',
+    ]);
     await installOnCloseHook();
+  });
+
+  test('OpenTelemetry diagnostics preserve warn and error severity in renderer logs', async () => {
+    const log = {
+      debug: jest.fn(),
+      error: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+    };
+
+    jest.doMock('../../src/integrations/api.js', () => ({
+      log,
+      message: jest.fn(),
+    }));
+
+    const { diag } = await import('@opentelemetry/api');
+    const { InMemorySpanExporter, SimpleSpanProcessor } = await import('@opentelemetry/sdk-trace-base');
+    const otel = await import('../../src/integrations/opentelemetry');
+
+    otel.init({
+      spanProcessor: new SimpleSpanProcessor(new InMemorySpanExporter()),
+    });
+
+    diag.error('collector rejected spans', { statusCode: 401 });
+    diag.warn('collector slow');
+    diag.info('suppressed info');
+
+    expect(log.error).toHaveBeenCalledWith(
+      { otel: true, level: 'error', args: [{ statusCode: 401 }] },
+      'collector rejected spans',
+    );
+    expect(log.warn).toHaveBeenCalledWith({ otel: true, level: 'warn', args: [] }, 'collector slow');
+    expect(log.debug).not.toHaveBeenCalledWith(expect.anything(), 'suppressed info');
+    await otel.__resetForTest();
   });
 
   test('init() ignores duplicate calls without replacing the active provider', async () => {

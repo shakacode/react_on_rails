@@ -67,11 +67,12 @@ export interface TracingIntegrationOptions {
  * @param options.startSsrRequestOptions - Options used to start a new unit of work for an SSR request.
  *   Should be an object with your integration name as the only property.
  *   It will be passed to the executor.
+ * @returns true when this call installed the tracing integration.
  */
-export function setupTracing(options: TracingIntegrationOptions) {
+export function setupTracing(options: TracingIntegrationOptions): boolean {
   if (setupRun) {
     message('setupTracing called more than once. Currently only one tracing integration can be enabled.');
-    return;
+    return false;
   }
 
   executor = options.executor;
@@ -79,6 +80,7 @@ export function setupTracing(options: TracingIntegrationOptions) {
     mutableStartSsrRequestOptions = options.startSsrRequestOptions;
   }
   setupRun = true;
+  return true;
 }
 
 /**
@@ -89,15 +91,23 @@ export function trace<T>(fn: UnitOfWork<T>, unitOfWorkOptions: UnitOfWorkOptions
 }
 
 /**
+ * Resets the installed tracing executor + startSsrRequestOptions back to
+ * defaults. Internal integrations use this during lifecycle teardown.
+ */
+export function resetTracing(): void {
+  executor = (fn) => fn();
+  mutableStartSsrRequestOptions = () => ({});
+  setupRun = false;
+}
+
+/**
  * Test-only: reset the installed tracing executor + startSsrRequestOptions back
  * to defaults. Not part of the public api — do not re-export from
  * `integrations/api.ts`.
  */
 // eslint-disable-next-line no-underscore-dangle
 export function __resetTracingForTest(): void {
-  executor = (fn) => fn();
-  mutableStartSsrRequestOptions = () => ({});
-  setupRun = false;
+  resetTracing();
 }
 
 /**
@@ -124,14 +134,16 @@ let subSpanSetupRun = false;
 /**
  * Install a sub-span implementation. Integrations call this from their `init()`
  * to start receiving sub-span events. If never called, sub-spans are no-ops.
+ * @returns true when this call installed the sub-span integration.
  */
-export function setupSubSpan(impl: SubSpanFn): void {
+export function setupSubSpan(impl: SubSpanFn): boolean {
   if (subSpanSetupRun) {
     message('setupSubSpan called more than once. Only one sub-span integration can be enabled.');
-    return;
+    return false;
   }
   subSpanImpl = impl;
   subSpanSetupRun = true;
+  return true;
 }
 
 /**
@@ -170,12 +182,20 @@ export function subSpan<T>(opts: SubSpanOptions, fn: () => Promise<T>): Promise<
 }
 
 /**
+ * Resets the installed sub-span implementation back to the default pass-through.
+ * Internal integrations use this during lifecycle teardown.
+ */
+export function resetSubSpan(): void {
+  subSpanImpl = defaultSubSpan;
+  subSpanSetupRun = false;
+}
+
+/**
  * Test-only: reset the installed sub-span implementation back to the default
  * pass-through. Not part of the public api — do not re-export from
  * `integrations/api.ts`.
  */
 // eslint-disable-next-line no-underscore-dangle
 export function __resetSubSpanForTest(): void {
-  subSpanImpl = defaultSubSpan;
-  subSpanSetupRun = false;
+  resetSubSpan();
 }
