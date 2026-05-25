@@ -3,6 +3,7 @@
 require "fileutils"
 require "time"
 require "socket"
+require "timeout"
 require_relative "config"
 require_relative "request_result"
 require_relative "metrics"
@@ -17,6 +18,8 @@ module RendererHarness
   UserError = Class.new(StandardError)
 
   class Harness
+    UPLOAD_ASSETS_TIMEOUT_SECONDS = 10
+
     def initialize(config)
       @config = config
       @output_dir = config.output_dir || default_output_dir
@@ -57,7 +60,12 @@ module RendererHarness
     private
 
     def upload_assets!
-      ReactOnRailsPro::Request.upload_assets
+      Timeout.timeout(UPLOAD_ASSETS_TIMEOUT_SECONDS) do
+        ReactOnRailsPro::Request.upload_assets
+      end
+    rescue Timeout::Error
+      raise UserError,
+            "bundle upload timed out after #{UPLOAD_ASSETS_TIMEOUT_SECONDS}s - is the node renderer responsive?"
     rescue StandardError => e
       raise UserError, "bundle upload failed - is the node renderer running? (#{e.class}: #{e.message})"
     end
@@ -108,7 +116,7 @@ module RendererHarness
     end
 
     def build_rss_series(rows, rss_key, label)
-      valid, dropped = rows.partition { |r| r[rss_key] }
+      valid, dropped = rows.partition { |r| !r[rss_key].nil? }
       warn "MemorySampler: #{dropped.size} #{label} RSS samples missing (ps failed?)" if dropped.any?
       valid.map { |r| [r[:t_seconds].to_f, r[rss_key].to_f] }.reject { |_, v| v.zero? }
     end

@@ -239,6 +239,51 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       expect(stream.http_status).to eq(204)
     end
 
+    it "exposes the response status for empty streaming responses" do
+      mock_response = double(HTTPX::StreamResponse, status: 204)
+      allow(mock_response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(false)
+      allow(mock_response).to receive(:each)
+
+      stream = described_class.create do |_send_bundle, _barrier|
+        mock_response
+      end
+
+      stream.each_chunk(&:itself)
+
+      expect(stream.status).to eq(204)
+    end
+
+    it "reads the response status once per streaming response" do
+      mock_response = double(HTTPX::StreamResponse)
+      allow(mock_response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(false)
+      expect(mock_response).to receive(:status).once.and_return(200)
+      allow(mock_response).to receive(:each).and_yield(to_length_prefixed("one")).and_yield(to_length_prefixed("two"))
+
+      stream = described_class.create do |_send_bundle, _barrier|
+        mock_response
+      end
+
+      chunks = []
+      stream.each_chunk { |chunk| chunks << chunk }
+
+      expect(chunks.size).to eq(2)
+    end
+
+    it "does not read status from HTTPX error responses" do
+      mock_response = double(HTTPX::ErrorResponse)
+      allow(mock_response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(true)
+      expect(mock_response).not_to receive(:status)
+      allow(mock_response).to receive(:each).and_yield("renderer error")
+
+      stream = described_class.create do |_send_bundle, _barrier|
+        mock_response
+      end
+
+      stream.each_chunk(&:itself)
+
+      expect(stream.status).to be_nil
+    end
+
     it "exposes nil status when the response status cannot be read" do
       mock_response = double(HTTPX::StreamResponse)
       allow(mock_response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(false)

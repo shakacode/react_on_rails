@@ -115,10 +115,9 @@ module ReactOnRailsPro
           # The Node renderer always emits the length-prefixed wire format
           # (`<metadata JSON>\t<content byte length hex>\n<raw content bytes>`)
           # for every response chunk — both the one-shot streaming path and the
-          # incremental-rendering path. We check the status code inside the loop
-          # block because calling `status` outside of it blocks until the full
-          # response has been received. See the `status` spec in
-          # `spec/react_on_rails_pro/stream_spec.rb` for more details.
+          # incremental-rendering path. We read the status once after the first
+          # chunk to avoid blocking before streaming starts. Empty-body responses
+          # are handled after iteration so callers can still inspect the status.
           process_response_chunks(stream_response, error_body, &block)
           break
         rescue HTTPX::HTTPError => e
@@ -141,9 +140,14 @@ module ReactOnRailsPro
 
     def process_response_chunks(stream_response, error_body, &block)
       parser = ReactOnRails::LengthPrefixedParser.new
+      status = nil
+      status_recorded = false
       stream_response.each do |chunk|
         stream_response.instance_variable_set(:@react_on_rails_received_first_chunk, true)
-        status = record_status(stream_response)
+        unless status_recorded
+          status = record_status(stream_response)
+          status_recorded = true
+        end
 
         if response_has_error_status?(stream_response, status)
           error_body << chunk
@@ -152,11 +156,12 @@ module ReactOnRailsPro
 
         parser.feed(chunk, &block)
       end
+      record_status(stream_response) unless status_recorded
       parser.flush
     end
 
     def record_status(response)
-      @status = response_status(response)
+      @status = response.is_a?(HTTPX::ErrorResponse) ? nil : response_status(response)
     end
 
     def response_has_error_status?(response, status)
@@ -165,7 +170,7 @@ module ReactOnRailsPro
 
     def response_status(response)
       response.status
-    rescue StandardError
+    rescue NoMethodError
       # HTTPX::StreamResponse can fail to delegate #status for non-streaming errors.
       nil
     end
