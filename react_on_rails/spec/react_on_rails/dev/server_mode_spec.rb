@@ -22,6 +22,10 @@ RSpec.describe ReactOnRails::Dev::ServerMode do
       expect(described_class.detect("config/missing.yml")).to eq(:hmr)
     end
 
+    it "uses the supplied fallback when config is missing" do
+      expect(described_class.detect("config/missing.yml", fallback: :live_reload)).to eq(:live_reload)
+    end
+
     it "uses Shakapacker's live reload default when hmr is false and live_reload is omitted" do
       write_shakapacker_config(<<~YAML)
         development:
@@ -189,6 +193,16 @@ RSpec.describe ReactOnRails::Dev::ServerMode do
         development:
           dev_server:
             hmr: true
+      YAML
+
+      expect(described_class.hmr_enabled?("config/shakapacker.yml")).to be(true)
+    end
+
+    it "returns true when HMR is set to webpack-dev-server only mode" do
+      write_shakapacker_config(<<~YAML)
+        development:
+          dev_server:
+            hmr: only
       YAML
 
       expect(described_class.hmr_enabled?("config/shakapacker.yml")).to be(true)

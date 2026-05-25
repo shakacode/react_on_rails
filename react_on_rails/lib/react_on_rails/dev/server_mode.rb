@@ -75,6 +75,7 @@ module ReactOnRails
       }.freeze
 
       class << self
+        # The fallback preserves legacy HMR wording when no Shakapacker config can be read.
         def detect(config_path = shakapacker_config_path, fallback: :hmr)
           detect_from_config(config_path) || normalize_mode(fallback)
         end
