@@ -54,7 +54,7 @@ RSpec.describe RendererHarness::Scenarios::StreamingRender do
 
     expect(result.ok).to be(true)
     expect(result.http_status).to eq(200)
-    expect(result.bytes_in).to eq(2)
+    expect(result.bytes_in).to eq(14)
   end
 
   it "marks streams with unavailable status as failures" do

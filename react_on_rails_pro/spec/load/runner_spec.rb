@@ -132,4 +132,16 @@ RSpec.describe RendererHarness::Runner do
       expect(error.message).to include("2 worker threads failed", "worker failure")
     end
   end
+
+  it "times out worker threads that never finish" do
+    stub_const("#{described_class}::WORKER_JOIN_TIMEOUT_SECONDS", 0.01)
+    scenario = build_scenario
+    allow(scenario).to receive(:perform_request) { sleep 1 }
+    runner = described_class.new(
+      scenario: scenario,
+      config: build_config(requests: 1)
+    )
+
+    expect { runner.run }.to raise_error(described_class::WorkerJoinTimeout, /did not finish/)
+  end
 end

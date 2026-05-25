@@ -5,16 +5,31 @@ require "harness"
 
 RSpec.describe RendererHarness::Harness do
   def build_config(**overrides)
-    Struct.new(:output_dir, :scenario, :concurrency, :mix, :warmup, keyword_init: true).new(
-      { output_dir: "tmp/load-tests/spec", scenario: "standard_render", concurrency: 1, mix: "small", warmup: 1 }
+    Struct.new(
+      :output_dir,
+      :scenario,
+      :concurrency,
+      :mix,
+      :warmup,
+      :renderer_pid,
+      :mem_interval,
+      keyword_init: true
+    ).new(
+      {
+        output_dir: "tmp/load-tests/spec",
+        scenario: "standard_render",
+        concurrency: 1,
+        mix: "small",
+        warmup: 1,
+        renderer_pid: nil,
+        mem_interval: 1.0
+      }
         .merge(overrides)
     )
   end
 
   before do
     stub_const("ReactOnRailsPro", Module.new) unless defined?(ReactOnRailsPro)
-    stub_const("ReactOnRailsPro::RENDERER_TRANSPORT_ENV", "RENDERER_TRANSPORT")
-    stub_const("ReactOnRailsPro::DEFAULT_RENDERER_TRANSPORT", "http")
     stub_const("ReactOnRailsPro::Request", Class.new do
       def self.upload_assets; end
     end)
@@ -48,5 +63,20 @@ RSpec.describe RendererHarness::Harness do
 
     expect { described_class.new(build_config).send(:upload_assets!) }
       .to raise_error(RendererHarness::UserError, /bundle upload timed out/)
+  end
+
+  it "cleans up the scenario when stopping the sampler fails" do
+    scenario = instance_double(RendererHarness::Scenarios::StandardRender, cleanup: nil)
+    runner = instance_double(RendererHarness::Runner, run: 0.1, results: [], measurement_started_at: nil)
+    sampler = instance_double(RendererHarness::MemorySampler, rows: [])
+
+    allow(RendererHarness::SCENARIO_REGISTRY.fetch("standard_render")).to receive(:new).and_return(scenario)
+    allow(RendererHarness::MemorySampler).to receive(:new).and_return(sampler)
+    allow(RendererHarness::Runner).to receive(:new).and_return(runner)
+    allow(sampler).to receive(:start_background)
+    allow(sampler).to receive(:stop_background).and_raise("sampler stuck")
+
+    expect { described_class.new(build_config).run }.to raise_error(/sampler stuck/)
+    expect(scenario).to have_received(:cleanup)
   end
 end

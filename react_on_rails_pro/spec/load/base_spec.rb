@@ -4,11 +4,29 @@ require_relative "spec_helper"
 require "scenarios/base"
 
 RSpec.describe RendererHarness::Scenarios::Base do
+  def build_config(**overrides)
+    Struct.new(:mix, keyword_init: true).new({ mix: "small" }.merge(overrides))
+  end
+
   it "converts acronym scenario class names to snake case" do
     scenario_class = Class.new(described_class)
     stub_const("RendererHarness::Scenarios::RSCRender", scenario_class)
-    config = Struct.new(:mix, keyword_init: true).new(mix: "small")
 
-    expect(scenario_class.new(config).name).to eq("rsc_render")
+    expect(scenario_class.new(build_config).name).to eq("rsc_render")
+  end
+
+  it "counts the full length-prefixed streamed frame" do
+    scenario = described_class.new(build_config)
+    chunk = {
+      "html" => "ok",
+      "consoleReplayScript" => "",
+      "hasErrors" => false,
+      "isShellReady" => true,
+      "payloadType" => "string"
+    }
+
+    metadata_bytes = JSON.generate(chunk.except("html")).bytesize
+
+    expect(scenario.send(:chunk_bytesize, chunk)).to eq(metadata_bytes + 1 + 8 + 1 + "ok".bytesize)
   end
 end

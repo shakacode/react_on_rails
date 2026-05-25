@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "json"
 require_relative "../request_result"
 
 module RendererHarness
@@ -25,8 +26,6 @@ module RendererHarness
 
       def initialize(config)
         @config = config
-        @server_bundle_hash = nil
-        @server_bundle_hash_mutex = Mutex.new
       end
 
       def name
@@ -63,9 +62,7 @@ module RendererHarness
       end
 
       def server_bundle_hash
-        @server_bundle_hash_mutex.synchronize do
-          @server_bundle_hash ||= ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool.server_bundle_hash
-        end
+        ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool.server_bundle_hash
       end
 
       def stream_payload(stream, bytes_in:, bytes_out:)
@@ -80,10 +77,8 @@ module RendererHarness
 
       def chunk_bytesize(chunk)
         return chunk.bytesize if chunk.respond_to?(:bytesize)
-        return chunk["html"].to_s.bytesize if chunk.is_a?(Hash) && chunk.key?("html")
-        if chunk.is_a?(Hash)
-          return chunk.values.sum { |value| value.respond_to?(:bytesize) ? value.bytesize : value.to_s.bytesize }
-        end
+        return length_prefixed_chunk_bytesize(chunk) if chunk.is_a?(Hash) && chunk.key?("html")
+        return JSON.generate(chunk).bytesize if chunk.is_a?(Hash)
 
         chunk.to_s.bytesize
       end
@@ -106,6 +101,14 @@ module RendererHarness
       end
 
       private
+
+      def length_prefixed_chunk_bytesize(chunk)
+        html = chunk.fetch("html")
+        html_body = html.is_a?(String) ? html : JSON.generate(html)
+        metadata = chunk.except("html")
+
+        JSON.generate(metadata).bytesize + 1 + 8 + 1 + html_body.bytesize
+      end
 
       def success_result(start_ms, t_started_ms, payload)
         http_status = payload[:http_status]

@@ -16,6 +16,8 @@ require_relative "scenario_registry"
 
 module RendererHarness
   UserError = Class.new(StandardError)
+  TRANSPORT_ENV = "REACT_ON_RAILS_RENDERER_TRANSPORT"
+  DEFAULT_TRANSPORT = "httpx"
 
   class Harness
     UPLOAD_ASSETS_TIMEOUT_SECONDS = 10
@@ -41,8 +43,11 @@ module RendererHarness
         sampler.start_background(interval_seconds: @config.mem_interval)
         elapsed = runner.run
       ensure
-        sampler.stop_background
-        scenario.cleanup
+        begin
+          sampler.stop_background
+        ensure
+          scenario.cleanup
+        end
       end
 
       memory_rows = sampler.rows
@@ -78,7 +83,7 @@ module RendererHarness
 
       {
         scenario: @config.scenario,
-        transport: ENV.fetch(ReactOnRailsPro::RENDERER_TRANSPORT_ENV, ReactOnRailsPro::DEFAULT_RENDERER_TRANSPORT),
+        transport: ENV.fetch(TRANSPORT_ENV, DEFAULT_TRANSPORT),
         concurrency: @config.concurrency,
         mix: @config.mix,
         warmup: @config.warmup,

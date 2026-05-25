@@ -164,6 +164,8 @@ module ReactOnRailsPro
       @status = response.is_a?(HTTPX::ErrorResponse) ? nil : response_status(response)
     end
 
+    # A nil status means the response could not expose an HTTP status. Treat it
+    # as an error so callers do not parse an unknown response body as LPP data.
     def response_has_error_status?(status)
       status.nil? || status >= 400
     end

@@ -4,7 +4,9 @@ module RendererHarness
   class Runner
     StartGate = Struct.new(:mutex, :ready_cv, :start_cv, :ready_count, :started, :aborted, :deadline,
                            keyword_init: true)
+    WORKER_JOIN_TIMEOUT_SECONDS = 30
     MeasurementAborted = Class.new(StandardError)
+    WorkerJoinTimeout = Class.new(StandardError)
 
     class WorkerErrors < StandardError
       attr_reader :errors
@@ -165,6 +167,14 @@ module RendererHarness
     def join_threads(threads)
       errors = []
       threads.each do |thread|
+        unless thread.join(WORKER_JOIN_TIMEOUT_SECONDS)
+          thread.kill
+          errors << WorkerJoinTimeout.new(
+            "worker thread did not finish within #{WORKER_JOIN_TIMEOUT_SECONDS}s"
+          )
+          next
+        end
+
         thread.value
       rescue StandardError => e
         errors << e
