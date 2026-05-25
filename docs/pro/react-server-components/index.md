@@ -41,7 +41,7 @@ Teams adopting RSC have reported dramatic wins — BlogHunch's 30% server-cost r
 
 <a id="live-demo-and-evidence"></a>
 
-### Live Demo and Evidence
+## Live Demo and Evidence
 
 The public [LocalHub marketplace demo](https://rsc.reactonrails.com/) shows the
 same marketplace-style surfaces rendered with traditional SSR, client rendering,

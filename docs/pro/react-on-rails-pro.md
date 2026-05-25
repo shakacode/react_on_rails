@@ -54,7 +54,7 @@ It demonstrates the Node renderer, caching, and SSR-oriented workflows in a real
 ## Explore the Public RSC Demo
 
 Use the public LocalHub demo when you want an inspectable React on Rails Pro + RSC marketplace surface. The
-[React Server Components guide](./react-server-components/index.md#live-demo-and-evidence) keeps the demo, evidence
+[React Server Components index](./react-server-components/index.md#live-demo-and-evidence) keeps the demo, evidence
 dashboard, Lighthouse artifacts, and source repository links in one place.
 
 ## References
