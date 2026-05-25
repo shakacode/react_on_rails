@@ -187,55 +187,66 @@ fields among the full response:
 }
 ```
 
-JSON parsers should branch on `status` before treating `renewal_required` as an expiring-soon signal:
+JSON parsers should branch on `status` before treating `renewal_required` as an expiring-soon signal. If your app
+guarantees JSON-only stdout, `JSON.parse(stdout.strip)` is enough. The example below also tolerates Rails boot output
+or structured logs written to stdout before the task prints its own JSON object:
 
 ```ruby
 require "json"
 require "open3"
 
-def parse_first_json_object(output)
-  output.each_char.with_index do |char, start_index|
-    next unless char == "{"
+def parse_license_json_object(output)
+  search_index = 0
 
-    depth = 0
-    in_string = false
-    escaped = false
+  while (start_index = output.index("{", search_index))
+    parsed_object, end_index = parse_json_object_at(output, start_index)
+    return parsed_object if parsed_object.is_a?(Hash) && parsed_object.key?("status")
 
-    output[start_index..].each_char.with_index do |current_char, offset|
-      if in_string
-        if escaped
-          escaped = false
-        elsif current_char == "\\"
-          escaped = true
-        elsif current_char == '"'
-          in_string = false
-        end
+    search_index = end_index ? end_index + 1 : start_index + 1
+  end
 
-        next
+  nil
+end
+
+def parse_json_object_at(output, start_index)
+  depth = 0
+  in_string = false
+  escaped = false
+
+  output[start_index..].each_char.with_index do |current_char, offset|
+    if in_string
+      if escaped
+        escaped = false
+      elsif current_char == "\\"
+        escaped = true
+      elsif current_char == '"'
+        in_string = false
       end
 
-      case current_char
-      when '"'
-        in_string = true
-      when "{"
-        depth += 1
-      when "}"
-        depth -= 1
+      next
+    end
 
-        if depth.zero?
-          candidate = output[start_index, offset + 1]
+    case current_char
+    when '"'
+      in_string = true
+    when "{"
+      depth += 1
+    when "}"
+      depth -= 1
 
-          begin
-            return JSON.parse(candidate)
-          rescue JSON::ParserError
-            break
-          end
+      if depth.zero?
+        candidate = output[start_index, offset + 1]
+
+        begin
+          return [JSON.parse(candidate), start_index + offset]
+        rescue JSON::ParserError
+          return [nil, nil]
         end
       end
     end
   end
 
-  nil
+  [nil, nil]
 end
 
 stdout, stderr, command_status = Open3.capture3(
@@ -243,9 +254,9 @@ stdout, stderr, command_status = Open3.capture3(
   "bundle", "exec", "rake", "react_on_rails_pro:verify_license"
 )
 
-license_info = parse_first_json_object(stdout)
+license_info = parse_license_json_object(stdout)
 unless license_info
-  abort "Could not parse React on Rails Pro license JSON output. Exit: #{command_status.exitstatus}. Stderr: #{stderr}"
+  abort "Could not parse React on Rails Pro license JSON object. Exit: #{command_status.exitstatus}. Stderr: #{stderr}"
 end
 
 status = license_info["status"]
@@ -427,7 +438,6 @@ namespace :licenses do
     # The :environment task dependency loads Active Support, so 1.day is available here.
     days_remaining = expiration_time && ((expiration_time - Time.now.utc) / 1.day).ceil
     day_label = days_remaining && "day".pluralize(days_remaining)
-    status_label = status.to_s.tr("_", " ")
 
     case status
     when :valid
@@ -439,6 +449,7 @@ namespace :licenses do
     when :invalid
       abort "React on Rails Pro license is invalid. Verify the full key was copied into REACT_ON_RAILS_PRO_LICENSE."
     else
+      status_label = status.to_s.tr("_", " ")
       abort "React on Rails Pro license status is #{status_label}. Update REACT_ON_RAILS_PRO_LICENSE."
     end
 
