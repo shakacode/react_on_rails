@@ -24,10 +24,9 @@ PATH
       addressable
       async (>= 2.29)
       async-http (~> 0.95)
-      connection_pool
       execjs (~> 2.9)
       io-endpoint (~> 0.17.0)
-      jwt (>= 3.2.0)
+      jwt (>= 2.5, < 4)
       rainbow
       react_on_rails (= 16.7.0.rc.2)
 
