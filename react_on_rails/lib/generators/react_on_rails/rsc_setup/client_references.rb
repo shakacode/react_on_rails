@@ -16,7 +16,7 @@ module ReactOnRails
             const rscClientReferences = {
               directory: resolve(config.source_path),
               recursive: true,
-              include: /\.(js|ts|jsx|tsx)$/,
+              include: /\.(js|mjs|cjs|ts|mts|cts|jsx|tsx)$/,
             };
           JS
         end
@@ -53,6 +53,36 @@ module ReactOnRails
               ]
             )
           end
+        end
+
+        def prepare_rsc_plugin_imports(config_path, content, existing_imports_content, is_server:)
+          if rsc_setup_blocked_by_later_imports?(
+            config_path,
+            content,
+            existing_imports_content,
+            is_server: is_server,
+            plugin_pending: true
+          )
+            return inject_rsc_webpack_plugin_import(config_path, content, is_server: is_server) ? :unscoped : :failed
+          end
+
+          return :failed unless inject_rsc_imports(config_path, content, existing_imports_content, is_server: is_server)
+          return :scoped if rsc_client_references_setup_ready?(config_path, plugin_pending: true)
+
+          :failed
+        end
+
+        def inject_rsc_imports(config_path, content, existing_imports_content, is_server:)
+          inserted =
+            if is_server
+              inject_rsc_server_imports(config_path, content, existing_imports_content)
+            else
+              inject_rsc_client_imports(config_path, content, existing_imports_content)
+            end
+          return true if inserted
+
+          warn_rsc_client_references_injection_failed(config_path, plugin_pending: true)
+          false
         end
 
         def join_rsc_client_references_setup(content, lines)
@@ -635,11 +665,29 @@ module ReactOnRails
           body
         end
 
-        # Walks every `<key>:` or shorthand `<key>` match in the plugin options body and returns
-        # true when at least one sits at the top level of the options object (depth 0 from the
-        # body's perspective, outside strings and comments). Used to gate "already configured"
-        # checks so nested mentions and value references don't cause false positives.
+        def inject_rsc_webpack_plugin_import(config_path, content, is_server:)
+          replace_rsc_client_references_setup_anchor(config_path, content, is_server: is_server) do |anchor|
+            join_rsc_client_references_setup(
+              content,
+              [
+                anchor,
+                "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');"
+              ]
+            )
+          end
+        end
+
+        # Walks every `<key>:` / shorthand `<key>` / quoted `"<key>":` match in the plugin options
+        # body and returns true when at least one sits at the top level of the options object
+        # (depth 0 from the body's perspective, outside strings and comments). Used to gate
+        # "already configured" checks so nested mentions and value references don't cause false
+        # positives.
         def rsc_plugin_body_has_top_level_key?(body, key)
+          rsc_plugin_body_has_top_level_bare_key?(body, key) ||
+            rsc_plugin_body_has_top_level_quoted_key?(body, key)
+        end
+
+        def rsc_plugin_body_has_top_level_bare_key?(body, key)
           pattern = /\b#{Regexp.escape(key)}\b/
           search_from = 0
 
@@ -653,12 +701,28 @@ module ReactOnRails
           false
         end
 
-        def rsc_plugin_body_key_position?(body, key_start, key_end)
+        def rsc_plugin_body_has_top_level_quoted_key?(body, key)
+          pattern = /(['"`])#{Regexp.escape(key)}\1/
+          search_from = 0
+
+          while (match = pattern.match(body, search_from))
+            return true if js_top_level_position?(body, match.begin(0)) &&
+                           rsc_plugin_body_key_position?(body, match.begin(0), match.end(0), quoted: true)
+
+            search_from = match.end(0)
+          end
+
+          false
+        end
+
+        def rsc_plugin_body_key_position?(body, key_start, key_end, quoted: false)
           previous_char = previous_significant_js_char(body, key_start)
           return false unless previous_char.nil? || previous_char == ","
 
           next_index = first_significant_js_index(body, key_end)
           next_char = next_index ? body[next_index] : nil
+          return next_char == ":" if quoted
+
           next_char.nil? || next_char == ":" || next_char == ","
         end
 
@@ -666,13 +730,17 @@ module ReactOnRails
         # pair. Mirrors `rsc_plugin_body_has_top_level_key?` so verification and gating share
         # the same comment-, string-, and brace-aware semantics as the rewrite path.
         def rsc_plugin_body_has_top_level_scoped_client_references?(body)
-          pattern = /\bclientReferences\s*:\s*rscClientReferences\b/
-          search_from = 0
+          [
+            /\bclientReferences\s*:\s*rscClientReferences\b/,
+            /(['"`])clientReferences\1\s*:\s*rscClientReferences\b/
+          ].any? do |pattern|
+            search_from = 0
 
-          while (match = pattern.match(body, search_from))
-            return true if js_top_level_position?(body, match.begin(0))
+            while (match = pattern.match(body, search_from))
+              return true if js_top_level_position?(body, match.begin(0))
 
-            search_from = match.end(0)
+              search_from = match.end(0)
+            end
           end
 
           false
@@ -925,12 +993,20 @@ module ReactOnRails
           nil
         end
 
-        def rsc_setup_blocked_by_later_imports?(config_path, content, existing_imports_content, is_server:)
+        def rsc_setup_blocked_by_later_imports?(
+          config_path,
+          content,
+          existing_imports_content,
+          is_server:,
+          plugin_pending: false
+        )
           reason = rsc_setup_blocker_reason(content, existing_imports_content, is_server: is_server)
           return false unless reason
 
           manual_action =
-            if content.include?("RSCWebpackPlugin")
+            if plugin_pending
+              "RSCWebpackPlugin will be added without scoped clientReferences; please add clientReferences manually."
+            elsif content.include?("RSCWebpackPlugin")
               "Please add clientReferences manually."
             else
               "RSCWebpackPlugin was not added to #{config_path}; please add the plugin and clientReferences manually."
