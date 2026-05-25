@@ -394,7 +394,7 @@ When releasing from prerelease to a stable version (e.g., `v16.5.0.rc.1` -> `v16
 For each entry that doesn't obviously fall into a REMOVE or KEEP category above, ask:
 
 - Was this bug present in the last stable release? If no, drop.
-- Was this feature introduced in an earlier prerelease and then superseded? If yes, keep only the final state.
+- Was this feature introduced in an earlier prerelease and then iterated/refined across later RCs? If yes, keep only the final description and drop the intermediate history.
 - Does this matter to someone upgrading from the last stable to this stable? If no, drop.
 
 #### Step 5: Final read-through
