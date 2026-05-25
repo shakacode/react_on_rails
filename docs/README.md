@@ -42,7 +42,7 @@ React on Rails is one product with two tiers: open source for Rails + React inte
 Start at [React on Rails Pro](./pro/react-on-rails-pro.md) for the canonical Pro route map, then choose the feature family you need:
 
 - [React Server Components](./pro/react-server-components/tutorial.md) - RSC tutorial and deep dive
-- [Public RSC demo and evidence](./pro/react-server-components/index.md#live-demo-and-evidence) - Docs overview linking to the LocalHub benchmark dashboard, Lighthouse reports, and bundle-size breakdowns
+- [Public RSC demo and evidence](./pro/react-server-components/index.md#live-demo-and-evidence) - Docs overview linking to the LocalHub live demo, Lighthouse reports, and bundle-size breakdowns
 - [Streaming SSR](./pro/streaming-ssr.md) - Progressive server rendering
 - [Node Renderer](./pro/node-renderer.md) - Dedicated Node.js rendering server
 - [Fragment Caching](./pro/fragment-caching.md) - Cache rendered components
