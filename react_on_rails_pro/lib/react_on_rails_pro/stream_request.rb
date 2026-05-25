@@ -172,7 +172,7 @@ module ReactOnRailsPro
       # Start each attempt from nil. Known missing-status cases keep that nil as
       # an unknown status; unexpected extraction errors still propagate after the
       # ensure below marks status as attempted.
-      @status = nil # Preserve nil if extract_status raises before returning.
+      @status = nil # Reset before extraction so a raise leaves @status nil, not stale.
       @status = extract_status(response)
     ensure
       # If status extraction itself fails, callers should treat the unknown
@@ -193,7 +193,10 @@ module ReactOnRailsPro
 
       response.status
     rescue NoMethodError, ArgumentError
-      # Known HTTPX/delegation failures mean the response status is unavailable.
+      # NoMethodError: HTTPX::StreamResponse can fail to delegate #status before
+      # request.response is available for non-streaming errors.
+      # ArgumentError: HTTPX 1.7.0 can raise while materializing status from a
+      # partially-consumed StreamResponse; transport-level HTTPX::Error still propagates.
       nil
     end
 
