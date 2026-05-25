@@ -350,6 +350,60 @@ describe('RSCRoute deferred SSR behavior', () => {
     }
   });
 
+  it('dedupes identical deferred routes under the same default provider', async () => {
+    const sharedPayloadPromise = new Promise<React.ReactNode>(() => undefined);
+    const getServerComponent = jest.fn(() => sharedPayloadPromise);
+    setDefaultRSCProviderFactory(({ reactElement }) => {
+      const RSCProvider = createRSCProvider({ getServerComponent });
+      return <RSCProvider>{reactElement}</RSCProvider>;
+    });
+    const railsContext = { rscPayloadGenerationUrlPath: '/rsc_payload' } as RailsContext;
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    let root: Root | undefined;
+
+    try {
+      root = createRoot(container);
+      const defaultProviderRoot = maybeWrapWithDefaultRSCProviderWithStatus(
+        <>
+          <React.Suspense fallback={<div data-testid="first-deferred-fallback">Loading first route...</div>}>
+            <RSCRoute componentName="DeferredRoute" componentProps={{ id: 1 }} ssr={false} />
+          </React.Suspense>
+          <React.Suspense
+            fallback={<div data-testid="second-deferred-fallback">Loading second route...</div>}
+          >
+            <RSCRoute componentName="DeferredRoute" componentProps={{ id: 1 }} ssr={false} />
+          </React.Suspense>
+        </>,
+        railsContext,
+        'default-provider-dedupe-dom-id',
+      ).reactElement;
+
+      await act(async () => {
+        root?.render(defaultProviderRoot);
+        await Promise.resolve();
+      });
+
+      expect(container.querySelector('[data-testid="first-deferred-fallback"]')).not.toBeNull();
+      expect(container.querySelector('[data-testid="second-deferred-fallback"]')).not.toBeNull();
+      expect(getServerComponent).toHaveBeenCalledTimes(1);
+      expect(getServerComponent).toHaveBeenCalledWith({
+        componentName: 'DeferredRoute',
+        componentProps: { id: 1 },
+      });
+    } finally {
+      clearDefaultRSCProviderFactory();
+      const mountedRoot = root;
+      if (mountedRoot) {
+        await act(async () => {
+          mountedRoot.unmount();
+          await Promise.resolve();
+        });
+      }
+      container.remove();
+    }
+  });
+
   it('keeps default-provider roots above error boundary retry fallbacks', async () => {
     let rejectPayload: ((error: Error) => void) | undefined;
     const payloadPromise = new Promise<React.ReactNode>((_resolve, reject) => {
