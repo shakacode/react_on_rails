@@ -47,7 +47,7 @@ RSpec.describe RendererHarness::Scenarios::StreamingRender do
   end
 
   it "records successful streaming responses as successes" do
-    stream = build_stream(status: 200, chunks: ["ok"])
+    stream = build_stream(status: 200, chunks: [{ "html" => "ok" }])
     allow(ReactOnRailsPro::Request).to receive(:render_code_as_stream).and_return(stream)
 
     result = described_class.new(build_config).perform_request
@@ -55,5 +55,16 @@ RSpec.describe RendererHarness::Scenarios::StreamingRender do
     expect(result.ok).to be(true)
     expect(result.http_status).to eq(200)
     expect(result.bytes_in).to eq(2)
+  end
+
+  it "marks streams with unavailable status as failures" do
+    stream = build_stream(status: nil, chunks: [])
+    allow(ReactOnRailsPro::Request).to receive(:render_code_as_stream).and_return(stream)
+
+    result = described_class.new(build_config).perform_request
+
+    expect(result.ok).to be(false)
+    expect(result.http_status).to be_nil
+    expect(result.error).to eq("Renderer stream status unavailable")
   end
 end

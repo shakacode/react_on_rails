@@ -18,22 +18,9 @@ module RendererHarness
     #
     # The stream is iterated via StreamDecorator#each_chunk (not #each).
     class StreamingRender < Base
-      JS_TEMPLATE = <<~JS
-        (function(){
-          var props = %<props>s;
-          return ReactOnRails.serverRenderReactComponent({
-            name: 'HelloWorld',
-            domNodeId: 'HelloWorld-react-component',
-            props: props,
-            trace: false,
-            renderingReturnsPromises: false
-          });
-        })()
-      JS
-
       def perform_request
-        js = format(JS_TEMPLATE, props: filler_props.to_json)
-        bundle_hash = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool.server_bundle_hash
+        js = format(RENDER_COMPONENT_JS_TEMPLATE, props: filler_props.to_json)
+        bundle_hash = server_bundle_hash
         digest = Digest::MD5.hexdigest(js)
         path = "/bundles/#{bundle_hash}/render/#{digest}"
 
@@ -41,9 +28,9 @@ module RendererHarness
           bytes_in = 0
           stream = ReactOnRailsPro::Request.render_code_as_stream(path, js, is_rsc_payload: false)
           stream.each_chunk do |chunk|
-            bytes_in += chunk.bytesize if chunk.respond_to?(:bytesize)
+            bytes_in += chunk_bytesize(chunk)
           end
-          { http_status: stream_status(stream), bytes_in: bytes_in, bytes_out: js.bytesize }
+          stream_payload(stream, bytes_in: bytes_in, bytes_out: js.bytesize)
         end
       end
     end

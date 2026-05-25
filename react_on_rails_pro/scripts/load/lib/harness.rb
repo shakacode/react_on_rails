@@ -15,8 +15,6 @@ require_relative "scenario_registry"
 
 module RendererHarness
   class Harness
-    SCENARIO_REGISTRY = RendererHarness::SCENARIO_REGISTRY
-
     def initialize(config)
       @config = config
       @output_dir = config.output_dir || default_output_dir
@@ -24,7 +22,7 @@ module RendererHarness
 
     def run
       FileUtils.mkdir_p(@output_dir)
-      scenario_class = SCENARIO_REGISTRY.fetch(@config.scenario)
+      scenario_class = RendererHarness::SCENARIO_REGISTRY.fetch(@config.scenario)
       scenario = scenario_class.new(@config)
 
       # Upload the server bundle to the renderer before running so that the

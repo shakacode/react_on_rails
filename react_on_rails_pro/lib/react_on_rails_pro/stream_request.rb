@@ -155,13 +155,17 @@ module ReactOnRailsPro
     end
 
     def response_has_error_status?(response)
+      @status = response_status(response)
       return true if response.is_a?(HTTPX::ErrorResponse)
 
-      @status = response.status
-      @status >= 400
+      @status.nil? || @status >= 400
+    end
+
+    def response_status(response)
+      response.status
     rescue NoMethodError
       # HTTPX::StreamResponse can fail to delegate #status for non-streaming errors.
-      true
+      nil
     end
 
     def handle_http_error(error, error_body, send_bundle)

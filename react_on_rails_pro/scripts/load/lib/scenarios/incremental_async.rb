@@ -46,7 +46,7 @@ module RendererHarness
 
       def perform_request
         js = JS_TEMPLATE
-        bundle_hash = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool.server_bundle_hash
+        bundle_hash = server_bundle_hash
         digest = Digest::MD5.hexdigest(js)
         path = "/bundles/#{bundle_hash}/incremental-render/#{digest}"
 
@@ -60,9 +60,9 @@ module RendererHarness
           )
 
           stream.each_chunk do |chunk|
-            bytes_in += chunk.bytesize if chunk.respond_to?(:bytesize)
+            bytes_in += chunk_bytesize(chunk)
           end
-          { http_status: stream_status(stream), bytes_in: bytes_in, bytes_out: js.bytesize }
+          stream_payload(stream, bytes_in: bytes_in, bytes_out: js.bytesize)
         end
       end
 

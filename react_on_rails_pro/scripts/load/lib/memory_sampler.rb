@@ -21,6 +21,7 @@ module RendererHarness
       @start_time = start_time
       @rows = []
       @rows_mutex = Mutex.new
+      @thread_mutex = Mutex.new
       @thread = nil
       @stop = false
     end
@@ -30,27 +31,32 @@ module RendererHarness
     end
 
     def start_background(interval_seconds:)
-      raise "MemorySampler already running" if @thread&.alive?
+      @thread_mutex.synchronize do
+        raise "MemorySampler already running" if @thread&.alive?
 
-      @stop = false
-      @thread = Thread.new do
-        until @stop
-          begin
-            @rows_mutex.synchronize { @rows << sample_once }
-          rescue StandardError => e
-            warn "MemorySampler: sample_once raised #{e.class}: #{e.message}"
+        @stop = false
+        @thread = Thread.new do
+          until @stop
+            begin
+              @rows_mutex.synchronize { @rows << sample_once }
+            rescue StandardError => e
+              warn "MemorySampler: sample_once raised #{e.class}: #{e.message}"
+            end
+            sleep(interval_seconds)
           end
-          sleep(interval_seconds)
         end
       end
     end
 
     def stop_background(timeout_seconds: 5)
-      @stop = true
-      return unless @thread
+      thread = @thread_mutex.synchronize do
+        @stop = true
+        @thread
+      end
+      return unless thread
 
-      @thread.join(timeout_seconds)
-      warn "MemorySampler: background thread did not stop within #{timeout_seconds}s" if @thread.alive?
+      thread.join(timeout_seconds)
+      warn "MemorySampler: background thread did not stop within #{timeout_seconds}s" if thread.alive?
     end
 
     def sample_once

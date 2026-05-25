@@ -238,6 +238,24 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       expect(stream.status).to eq(204)
       expect(stream.http_status).to eq(204)
     end
+
+    it "exposes nil status when the response status cannot be read" do
+      mock_response = double(HTTPX::StreamResponse)
+      allow(mock_response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(false)
+      allow(mock_response).to receive(:respond_to?).with(:status).and_return(true)
+      allow(mock_response).to receive(:status).and_raise(NoMethodError)
+      allow(mock_response).to receive(:each).and_yield("renderer error")
+
+      stream = described_class.create do |_send_bundle, _barrier|
+        mock_response
+      end
+
+      chunks = []
+      stream.each_chunk { |chunk| chunks << chunk }
+
+      expect(chunks).to be_empty
+      expect(stream.status).to be_nil
+    end
   end
   # rubocop:enable RSpec/VerifiedDoubles
 
