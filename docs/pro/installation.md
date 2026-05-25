@@ -191,12 +191,19 @@ JSON parsers should branch on `status` before treating `renewal_required` as an 
 
 ```ruby
 require "json"
+require "open3"
 
-output = `RAILS_ENV=production FORMAT=json bundle exec rake react_on_rails_pro:verify_license`
+stdout, stderr, command_status = Open3.capture3(
+  { "RAILS_ENV" => "production", "FORMAT" => "json" },
+  "bundle", "exec", "rake", "react_on_rails_pro:verify_license"
+)
+json_output = stdout[/{.*}/m]
+abort "React on Rails Pro license command produced no JSON. Stderr: #{stderr}" unless json_output
+
 license_info = begin
-  JSON.parse(output)
+  JSON.parse(json_output)
 rescue JSON::ParserError
-  abort "Could not parse React on Rails Pro license JSON output."
+  abort "Could not parse React on Rails Pro license JSON output. Exit: #{command_status.exitstatus}. Stderr: #{stderr}"
 end
 
 status = license_info["status"]
