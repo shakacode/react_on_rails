@@ -1004,7 +1004,7 @@ RSpec.describe ReactOnRails::Doctor do
       expect(warning_messages).to include(
         a_string_including("Live reload Procfile.dev is present. Shared output path is high-risk")
       )
-      expect(warning_messages).not_to include(a_string_including("Development-server Procfile.dev"))
+      expect(warning_messages).not_to include(a_string_including("Development server Procfile.dev"))
     end
 
     context "with fix enabled" do
