@@ -103,9 +103,7 @@ section for the canonical link inventory and caveats: performance showcase, raw
 Lighthouse reports, bundle-size breakdowns, the `/why-rsc` walkthrough, and the
 demo source.
 
-<a id="gumroad-style-rsc-demo"></a>
-
-### Non-Production Local Directional Benchmark: Gumroad-Style RSC Demo (April 2026)
+### <span id="gumroad-style-rsc-demo"></span>Non-Production Local Directional Benchmark: Gumroad-Style RSC Demo (April 2026)
 
 The [Gumroad-style RSC benchmark demo](https://github.com/shakacode/react-on-rails-demo-gumroad-rsc)
 is a public ShakaCode comparison repo modeled after a creator-dashboard surface with product listings and sales metrics,
@@ -217,9 +215,7 @@ captured by this benchmark methodology and remain a follow-up; see
 - _The source artifact does not publish a p95 or per-run distribution for `action_total`, so its -2.3% median delta
   cannot be distinguished from measurement noise at n=8._
 
-<a id="gumroad-rsc-worst-case-responseend"></a>
-
-#### `responseEnd` p95 counter-signal
+#### <span id="gumroad-rsc-worst-case-responseend"></span>`responseEnd` p95 counter-signal
 
 | Metric                  | Inertia demo | RSC demo | Delta % (negative = RSC faster) |
 | ----------------------- | -----------: | -------: | ------------------------------: |
@@ -239,9 +235,7 @@ are still required before making stronger production-performance claims.
 See [Issue 3128](https://github.com/shakacode/react_on_rails/issues/3128) and
 [Issue 3144](https://github.com/shakacode/react_on_rails/issues/3144) for the ongoing tracking discussion.
 
-<a id="popmenu"></a>
-
-### Production Case Study: Popmenu
+### <span id="popmenu"></span>Production Case Study: Popmenu
 
 Popmenu, a restaurant platform serving tens of millions of SSR requests daily, adopted React on Rails Pro and reported:
 
