@@ -185,6 +185,9 @@ name: React on Rails Pro License
 
 on:
   workflow_call:
+    secrets:
+      REACT_ON_RAILS_PRO_LICENSE:
+        required: true
   workflow_dispatch:
 
 permissions:
@@ -206,6 +209,19 @@ jobs:
       # Add database, credentials, Node/pnpm, and other app-specific setup required to boot Rails in production.
       - name: Verify React on Rails Pro license
         run: bundle exec rake react_on_rails_pro:verify_license
+```
+
+Call the reusable workflow before your deploy job and pass repository secrets from the caller:
+
+```yaml
+jobs:
+  check-license:
+    uses: ./.github/workflows/react-on-rails-pro-license.yml
+    secrets: inherit
+
+  deploy:
+    needs: check-license
+    # ...
 ```
 
 The task depends on the Rails environment. If your production boot requires credentials or services such as
@@ -252,9 +268,11 @@ jobs:
           {
             echo "## React on Rails Pro license"
             echo
-            echo "~~~text"
-            echo "$output"
-            echo "~~~"
+            if [ "$status" -eq 0 ]; then
+              echo "License validation passed."
+            else
+              echo "License validation did not pass. Check the job logs for details."
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [ "$status" -ne 0 ]; then
@@ -276,6 +294,10 @@ repository secrets, so these checks would report a missing token there.
 If your organization wants an app-owned scheduled check with a custom warning threshold, add a wrapper task like this.
 It reads the same license information that the built-in verification task formats and treats the built-in 30-day renewal
 window as the default:
+
+The built-in `react_on_rails_pro:verify_license` task is the stable scripting interface. This wrapper calls
+`ReactOnRailsPro::Utils.license_info` so it can apply a custom threshold in Ruby; review this app-owned task when
+upgrading `react_on_rails_pro` because the helper's returned metadata shape can evolve.
 
 ```ruby
 # frozen_string_literal: true
@@ -299,7 +321,9 @@ namespace :licenses do
       abort "React on Rails Pro license status is #{status_label}. Update REACT_ON_RAILS_PRO_LICENSE."
     end
 
-    if days_remaining && days_remaining <= threshold_days
+    if days_remaining&.zero?
+      abort "React on Rails Pro license expires today. Renew and rotate the key."
+    elsif days_remaining && days_remaining <= threshold_days
       abort "React on Rails Pro license expires in #{days_remaining} days. Renew and rotate the key."
     end
 
