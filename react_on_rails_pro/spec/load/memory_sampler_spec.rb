@@ -88,7 +88,13 @@ RSpec.describe RendererHarness::MemorySampler do
     it "wakes a sleeping sampler thread during stop" do
       sampler = described_class.new(pids: { rails: Process.pid })
       sampler.start_background(interval_seconds: 60)
-      sleep(0.01) until sampler.rows.any?
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 1.0
+      until sampler.rows.any?
+        break if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+
+        sleep(0.01)
+      end
+      expect(sampler.rows).not_to be_empty
 
       sampler.stop_background(timeout_seconds: 0.2)
 

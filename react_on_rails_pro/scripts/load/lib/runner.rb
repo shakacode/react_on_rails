@@ -34,6 +34,8 @@ module RendererHarness
       @results = []
       @results_mutex = Mutex.new
       @measurement_started_at = nil
+      @remaining = 0
+      @remaining_mutex = Mutex.new
     end
 
     # Returns elapsed seconds with per-thread warmup excluded.
@@ -61,7 +63,6 @@ module RendererHarness
 
     def run_by_count(gate)
       @remaining = @config.requests
-      @remaining_mutex = Mutex.new
       Array.new(@config.concurrency) do
         worker_thread(gate) do
           prepare_worker(gate)

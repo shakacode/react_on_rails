@@ -22,6 +22,7 @@ module RendererHarness
       @rows = []
       @rows_mutex = Mutex.new
       @thread_mutex = Mutex.new
+      @stop_cv = ConditionVariable.new
       @thread = nil
       @stop = false
     end
@@ -36,13 +37,17 @@ module RendererHarness
 
         @stop = false
         @thread = Thread.new do
-          until @stop
+          until stop?
             begin
               @rows_mutex.synchronize { @rows << sample_once }
             rescue StandardError => e
               warn "MemorySampler: sample_once raised #{e.class}: #{e.message}"
             end
-            sleep(interval_seconds)
+            @thread_mutex.synchronize do
+              break if @stop
+
+              @stop_cv.wait(@thread_mutex, interval_seconds)
+            end
           end
         end
       end
@@ -51,15 +56,13 @@ module RendererHarness
     def stop_background(timeout_seconds: 5)
       thread = @thread_mutex.synchronize do
         @stop = true
+        @stop_cv.broadcast
         @thread
       end
       return unless thread
 
-      thread.wakeup if thread.alive?
       thread.join(timeout_seconds)
       warn "MemorySampler: background thread did not stop within #{timeout_seconds}s" if thread.alive?
-    rescue ThreadError
-      thread&.join(timeout_seconds)
     end
 
     def sample_once
@@ -88,6 +91,10 @@ module RendererHarness
     end
 
     private
+
+    def stop?
+      @thread_mutex.synchronize { @stop }
+    end
 
     def run_ps(pid)
       out, _err, status = Open3.capture3("ps", "-o", "rss=", "-p", pid.to_s)

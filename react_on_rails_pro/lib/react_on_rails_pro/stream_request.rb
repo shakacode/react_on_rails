@@ -143,8 +143,9 @@ module ReactOnRailsPro
       parser = ReactOnRails::LengthPrefixedParser.new
       stream_response.each do |chunk|
         stream_response.instance_variable_set(:@react_on_rails_received_first_chunk, true)
+        status = record_status(stream_response)
 
-        if response_has_error_status?(stream_response)
+        if response_has_error_status?(stream_response, status)
           error_body << chunk
           next
         end
@@ -154,16 +155,17 @@ module ReactOnRailsPro
       parser.flush
     end
 
-    def response_has_error_status?(response)
-      return true if response.is_a?(HTTPX::ErrorResponse)
-
+    def record_status(response)
       @status = response_status(response)
-      @status.nil? || @status >= 400
+    end
+
+    def response_has_error_status?(response, status)
+      response.is_a?(HTTPX::ErrorResponse) || status.nil? || status >= 400
     end
 
     def response_status(response)
       response.status
-    rescue NoMethodError
+    rescue StandardError
       # HTTPX::StreamResponse can fail to delegate #status for non-streaming errors.
       nil
     end

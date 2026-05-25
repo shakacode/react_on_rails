@@ -14,7 +14,11 @@ begin
   config = RendererHarness::Config.parse(ARGV)
   summary = RendererHarness::Harness.new(config).run
   exit(summary[:requests][:failures].zero? ? 0 : 1)
-rescue RendererHarness::UserError => e
+rescue RendererHarness::UserError, ArgumentError, OptionParser::ParseError => e
   warn "renderer-harness: #{e.message}"
   exit 1
+rescue StandardError => e
+  warn "renderer-harness: unexpected error - #{e.class}: #{e.message}"
+  warn e.backtrace.first(5).join("\n")
+  exit 2
 end
