@@ -378,6 +378,13 @@ function TanStackHydrationApp({
     }
 
     let cancelled = false;
+    const clearTemporarySsrFlag = (): void => {
+      if (latestEffectRunIdRef.current === effectRunId && didSetSsrFlagRef.current) {
+        router.ssr = undefined;
+        didSetSsrFlagRef.current = false;
+      }
+    };
+
     const runPostHydrationLoad = async (): Promise<void> => {
       if (hydrationCallbackPromiseRef.current) {
         await hydrationCallbackPromiseRef.current;
@@ -396,6 +403,7 @@ function TanStackHydrationApp({
       // the checks above and this call. If unmount happens after router.load()
       // starts, the cleanup's cancelLoad() call handles the in-flight load.
       await router.load();
+      clearTemporarySsrFlag();
     };
 
     void runPostHydrationLoad()
@@ -415,10 +423,7 @@ function TanStackHydrationApp({
         // React runs passive cleanup/setup inside one synchronous
         // flushPassiveEffects() call, so queued promise continuations cannot
         // drain between the cleanup and the re-setup.
-        if (latestEffectRunIdRef.current === effectRunId && didSetSsrFlagRef.current) {
-          router.ssr = undefined;
-          didSetSsrFlagRef.current = false;
-        }
+        clearTemporarySsrFlag();
       });
 
     return () => {
@@ -427,10 +432,7 @@ function TanStackHydrationApp({
       // Defer the unmount clear so React 18 StrictMode's passive cleanup/setup
       // replay can increment latestEffectRunIdRef before this continuation runs.
       void Promise.resolve().then(() => {
-        if (latestEffectRunIdRef.current === effectRunId && didSetSsrFlagRef.current) {
-          router.ssr = undefined;
-          didSetSsrFlagRef.current = false;
-        }
+        clearTemporarySsrFlag();
       });
       const cancellableRouter = router as TanStackRouter & { cancelLoad?: () => void };
       if (typeof cancellableRouter.cancelLoad === 'function') {
