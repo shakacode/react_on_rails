@@ -169,6 +169,8 @@ RAILS_ENV=production FORMAT=json bundle exec rake react_on_rails_pro:verify_lice
 
 The task exits with a non-zero status when the license is missing, invalid, or expired. For valid but expiring
 licenses, it exits 0 but reports `renewal_required: true` in JSON output when the license is expiring within 30 days.
+The `FORMAT=json` response is part of the task's documented scripting interface; scripts should branch on `status`,
+`renewal_required`, and the process exit code, and treat additional fields as metadata that may grow over time.
 When parsing JSON output, check `status` first: `renewal_required` is also `true` for already-expired licenses, which
 exit non-zero. The built-in 30-day threshold is fixed; use the app-owned rake task below if you want a non-zero exit for
 expiring-soon licenses or a custom warning threshold.
@@ -334,7 +336,9 @@ repository secrets, so these checks would report a missing token there.
 The advisory workflow redirects raw task output to `$RUNNER_TEMP` and writes only pass/fail status to the step summary so
 organization, plan, and expiration metadata are not copied into the summary. Remove the redirect or upload a redacted
 artifact only after verifying that the task output is acceptable for everyone who can read your repository's Actions
-logs. If the license secret is absent, the advisory workflow emits the warning but still exits successfully by design.
+logs. The `$RUNNER_TEMP` log file is intentionally ephemeral; if you need diagnostics after the job ends, run the task
+locally or upload a redacted artifact with restricted retention. If the license secret is absent, the advisory workflow
+emits the warning but still exits successfully by design.
 
 ### Monitor License Expiration
 
@@ -365,8 +369,9 @@ namespace :licenses do
     info = ReactOnRailsPro::Utils.license_info
     status = info[:status]
     expiration = info[:expiration]
-    expiration_time = expiration.respond_to?(:to_time) ? expiration.to_time : nil
-    days_remaining = expiration_time && ((expiration_time - Time.current) / 1.day).ceil
+    # :expiration is expected to be a Time or nil; keep the guard for compatibility with future gem versions.
+    expiration_time = expiration.respond_to?(:to_time) ? expiration.to_time.utc : nil
+    days_remaining = expiration_time && ((expiration_time - Time.now.utc) / 1.day).ceil
     status_label = status.to_s.tr("_", " ")
 
     if status == :expired
