@@ -754,6 +754,7 @@ module ReactOnRails
           REFRESH
         end
 
+        # Only called when the default dev-server mode is HMR.
         # rubocop:disable Metrics/AbcSize
         def help_hmr_react_refresh_troubleshooting
           <<~REFRESH

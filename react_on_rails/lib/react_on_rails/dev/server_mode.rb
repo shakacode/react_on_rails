@@ -87,8 +87,9 @@ module ReactOnRails
         end
 
         def text(mode, key)
-          MODE_TEXT.fetch(normalize_mode(mode)).fetch(key) do
-            valid_keys = MODE_TEXT.fetch(:hmr).keys.join(", ")
+          mode_text = MODE_TEXT.fetch(normalize_mode(mode))
+          mode_text.fetch(key) do
+            valid_keys = mode_text.keys.join(", ")
             raise ArgumentError, "Unknown ServerMode text key #{key.inspect}. Valid keys: #{valid_keys}"
           end
         end
