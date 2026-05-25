@@ -173,6 +173,19 @@ When parsing JSON output, check `status` first: `renewal_required` is also `true
 exit non-zero. The built-in 30-day threshold is fixed; use the app-owned rake task below if you want a non-zero exit for
 expiring-soon licenses or a custom warning threshold.
 
+For example, JSON parsers should branch on `status` before treating `renewal_required` as an expiring-soon signal:
+
+```ruby
+status = license_info.fetch("status")
+
+case status
+when "expired", "invalid", "missing"
+  abort "React on Rails Pro license is #{status}."
+else
+  warn "React on Rails Pro license renewal is required soon." if license_info["renewal_required"]
+end
+```
+
 #### Blocking CI Example
 
 Use a blocking check inside your deployment workflow when an invalid license should stop a production deploy. The
@@ -292,9 +305,10 @@ repository secrets, so these checks would report a missing token there.
 ### Monitor License Expiration
 
 If your organization wants an app-owned scheduled check with a custom warning threshold, add a wrapper task. The built-in
-`react_on_rails_pro:verify_license` task is the stable scripting interface. This wrapper calls
-`ReactOnRailsPro::Utils.license_info` so it can apply a custom threshold in Ruby; review this app-owned task when
-upgrading `react_on_rails_pro` because the helper's returned metadata shape can evolve.
+`react_on_rails_pro:verify_license` task is the stable scripting interface. This wrapper deliberately calls
+`ReactOnRailsPro::Utils.license_info`, an internal helper, so it can apply a custom threshold in Ruby. Keep this task
+app-owned, cover it with a smoke test, and review it when upgrading `react_on_rails_pro` because the helper name and
+returned metadata shape can evolve.
 
 The wrapper reads the same license information that the built-in verification task formats and treats the built-in
 30-day renewal window as the default:
@@ -315,7 +329,7 @@ namespace :licenses do
     info = ReactOnRailsPro::Utils.license_info
     status = info[:status]
     expiration = info[:expiration]
-    expiration_time = expiration.respond_to?(:to_time) ? expiration.to_time : expiration
+    expiration_time = expiration.to_time if expiration.respond_to?(:to_time)
     days_remaining = expiration_time && ((expiration_time - Time.current) / 86_400).ceil
     status_label = status.to_s.tr("_", " ")
 
@@ -325,6 +339,10 @@ namespace :licenses do
       abort "React on Rails Pro license is missing. Set REACT_ON_RAILS_PRO_LICENSE."
     elsif status != :valid
       abort "React on Rails Pro license status is #{status_label}. Update REACT_ON_RAILS_PRO_LICENSE."
+    end
+
+    if days_remaining&.negative?
+      abort "React on Rails Pro license expiration date is in the past. Renew and rotate the key."
     end
 
     if days_remaining && days_remaining <= threshold_days
