@@ -205,8 +205,16 @@ module ReactOnRailsPro
             available_retries -= 1
             next
           rescue ReactOnRailsPro::RendererHttpClient::ConnectionError => e
-            raise ReactOnRailsPro::Error,
-                  "Node renderer request failed: #{path}.\nOriginal error:\n#{e}\n#{e.backtrace}"
+            if available_retries.zero?
+              raise ReactOnRailsPro::Error,
+                    "Node renderer request failed: #{path}.\nOriginal error:\n#{e}\n#{e.backtrace}"
+            end
+            Rails.logger.info do
+              "[ReactOnRailsPro] Connection error when making a request to the Node Renderer. " \
+                "Retrying #{available_retries} more times..."
+            end
+            available_retries -= 1
+            next
           end
         end
 
@@ -214,6 +222,12 @@ module ReactOnRailsPro
 
         if response.status && response.status == ReactOnRailsPro::STATUS_INCOMPATIBLE
           raise ReactOnRailsPro::Error, response.body
+        end
+
+        # For streaming responses, status is nil here (lazy execution), so error? returns false.
+        if response.error?
+          raise ReactOnRailsPro::Error,
+                "Unexpected response code from renderer: #{response.status} on #{path}:\n#{response.body}"
         end
 
         response
