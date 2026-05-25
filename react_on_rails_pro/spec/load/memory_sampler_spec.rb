@@ -2,6 +2,7 @@
 
 require_relative "spec_helper"
 require "memory_sampler"
+require "timeout"
 
 RSpec.describe RendererHarness::MemorySampler do
   describe "#sample_rss_kb" do
@@ -88,17 +89,37 @@ RSpec.describe RendererHarness::MemorySampler do
     it "wakes a sleeping sampler thread during stop" do
       sampler = described_class.new(pids: { rails: Process.pid })
       sampler.start_background(interval_seconds: 60)
-      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 1.0
-      until sampler.rows.any?
-        break if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
-
-        sleep(0.01)
-      end
+      Timeout.timeout(1.0) { sleep(0.01) until sampler.rows.any? }
       expect(sampler.rows).not_to be_empty
 
       sampler.stop_background(timeout_seconds: 0.2)
 
-      expect(sampler.instance_variable_get(:@thread)).not_to be_alive
+      expect(sampler.instance_variable_get(:@thread)).to be_nil
+    end
+
+    it "kills and resets a sampler thread that does not stop in time" do
+      sampler = described_class.new(pids: { rails: Process.pid })
+      sampling_started = Queue.new
+      release_sample = Queue.new
+      allow(sampler).to receive(:sample_once) do
+        sampling_started << true
+        release_sample.pop
+        { t_seconds: 0 }
+      end
+
+      sampler.start_background(interval_seconds: 60)
+      sampling_started.pop
+
+      expect do
+        sampler.stop_background(timeout_seconds: 0.01)
+      end.to output(/MemorySampler: background thread did not stop/).to_stderr
+      expect(sampler.instance_variable_get(:@thread)).to be_nil
+
+      allow(sampler).to receive(:sample_once).and_return({ t_seconds: 0 })
+      expect { sampler.start_background(interval_seconds: 0.01) }.not_to raise_error
+    ensure
+      release_sample << true
+      sampler.stop_background(timeout_seconds: 0.01)
     end
 
     it "does not hold the rows mutex while sampling" do

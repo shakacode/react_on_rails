@@ -1,9 +1,10 @@
 # frozen_string_literal: true
 
 module RendererHarness
-  class Runner
+  class Runner # rubocop:disable Metrics/ClassLength
     StartGate = Struct.new(:mutex, :ready_cv, :start_cv, :ready_count, :started, :aborted, :deadline,
-                           keyword_init: true)
+                           :abort_error, keyword_init: true)
+    START_GATE_TIMEOUT_SECONDS = 30
     WORKER_JOIN_TIMEOUT_SECONDS = 30
     MeasurementAborted = Class.new(StandardError)
     WorkerJoinTimeout = Class.new(StandardError)
@@ -48,8 +49,8 @@ module RendererHarness
       gate = start_gate
       threads = build_threads(gate)
       start = release_workers_when_ready(gate)
-      join_threads(threads)
-      raise MeasurementAborted, "Measurement aborted before workers started" unless start
+      join_threads(threads, ignore_measurement_aborted: start.nil?)
+      raise(gate.abort_error || MeasurementAborted.new("Measurement aborted before workers started")) unless start
 
       monotonic - start
     end
@@ -122,16 +123,39 @@ module RendererHarness
 
     def release_workers_when_ready(gate)
       gate.mutex.synchronize do
-        gate.ready_cv.wait(gate.mutex) until gate.ready_count == @config.concurrency || gate.aborted
+        wait_for_ready_workers(gate)
         return nil if gate.aborted
 
-        start = monotonic
-        @measurement_started_at = start
-        gate.deadline = start + @config.duration if @config.duration
-        gate.started = true
-        gate.start_cv.broadcast
-        start
+        release_measurement_start(gate)
       end
+    end
+
+    def wait_for_ready_workers(gate)
+      deadline = monotonic + START_GATE_TIMEOUT_SECONDS
+      until gate.ready_count == @config.concurrency || gate.aborted
+        remaining = deadline - monotonic
+        return abort_start_gate_timeout(gate) if remaining <= 0
+
+        gate.ready_cv.wait(gate.mutex, remaining)
+      end
+    end
+
+    def abort_start_gate_timeout(gate)
+      gate.aborted = true
+      gate.abort_error ||= MeasurementAborted.new(
+        "Timed out waiting for #{@config.concurrency - gate.ready_count} worker thread(s) to finish warmup"
+      )
+      gate.ready_cv.broadcast
+      gate.start_cv.broadcast
+    end
+
+    def release_measurement_start(gate)
+      start = monotonic
+      @measurement_started_at = start
+      gate.deadline = start + @config.duration if @config.duration
+      gate.started = true
+      gate.start_cv.broadcast
+      start
     end
 
     def wait_for_measurement_start(gate)
@@ -147,9 +171,10 @@ module RendererHarness
       end
     end
 
-    def abort_measurement_start(gate)
+    def abort_measurement_start(gate, error = nil)
       gate.mutex.synchronize do
         gate.aborted = true
+        gate.abort_error ||= error
         gate.ready_cv.broadcast
         gate.start_cv.broadcast
       end
@@ -165,7 +190,7 @@ module RendererHarness
       raise ArgumentError, "--requests and --duration are mutually exclusive" if @config.requests && @config.duration
     end
 
-    def join_threads(threads)
+    def join_threads(threads, ignore_measurement_aborted: false)
       errors = []
       threads.each do |thread|
         unless thread.join(WORKER_JOIN_TIMEOUT_SECONDS)
@@ -183,12 +208,17 @@ module RendererHarness
         errors << e
       end
 
-      raise_worker_errors(errors) if errors.any?
+      raise_worker_errors(errors, ignore_measurement_aborted: ignore_measurement_aborted) if errors.any?
     end
 
-    def raise_worker_errors(errors)
-      actionable_errors = errors.reject { |error| error.is_a?(MeasurementAborted) }
-      actionable_errors = errors if actionable_errors.empty?
+    def raise_worker_errors(errors, ignore_measurement_aborted:)
+      actionable_errors = if ignore_measurement_aborted
+                            errors.reject { |error| error.is_a?(MeasurementAborted) }
+                          else
+                            errors
+                          end
+      return if actionable_errors.empty?
+
       raise actionable_errors.first if actionable_errors.one?
 
       raise WorkerErrors, actionable_errors

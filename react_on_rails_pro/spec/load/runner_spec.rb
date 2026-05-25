@@ -66,14 +66,16 @@ RSpec.describe RendererHarness::Runner do
       config: build_config(requests: 2, concurrency: 2, warmup: 1)
     )
     warmup_counts_at_clock_reads = []
+    clock_values_after_warmup = [10.0, 10.5]
     allow(runner).to receive(:monotonic) do
       warmup_counts_at_clock_reads << scenario.warmup_calls
-      warmup_counts_at_clock_reads.length == 1 ? 10.0 : 10.5
+      scenario.warmup_calls < 2 ? 0.0 : clock_values_after_warmup.shift
     end
 
     runner.run
 
-    expect(warmup_counts_at_clock_reads.first).to eq(2)
+    expect(warmup_counts_at_clock_reads).to include(2)
+    expect(warmup_counts_at_clock_reads.last).to eq(2)
     expect(runner.results.size).to eq(2)
   end
 
@@ -83,16 +85,17 @@ RSpec.describe RendererHarness::Runner do
       scenario: scenario,
       config: build_config(requests: nil, duration: 1.0, concurrency: 1, warmup: 1)
     )
-    clock_values = [100.0, 100.25, 101.25, 101.5]
+    clock_values_after_warmup = [100.0, 100.25, 101.25, 101.5]
     warmup_counts_at_clock_reads = []
     allow(runner).to receive(:monotonic) do
       warmup_counts_at_clock_reads << scenario.warmup_calls
-      clock_values.shift
+      scenario.warmup_calls.zero? ? 0.0 : clock_values_after_warmup.shift
     end
 
     runner.run
 
-    expect(warmup_counts_at_clock_reads.first).to eq(1)
+    expect(warmup_counts_at_clock_reads).to include(1)
+    expect(warmup_counts_at_clock_reads.last).to eq(1)
     expect(runner.results.size).to eq(1)
   end
 
@@ -107,6 +110,21 @@ RSpec.describe RendererHarness::Runner do
     expect { runner.run }.to raise_error(/warmup failed/)
     expect(runner.results).to be_empty
     expect(scenario.perform_calls).to eq(0)
+  end
+
+  it "times out while waiting for workers to finish warmup" do
+    stub_const("#{described_class}::START_GATE_TIMEOUT_SECONDS", 0.01)
+    scenario = build_scenario
+    allow(scenario).to receive(:warmup) { sleep 0.05 }
+    runner = described_class.new(
+      scenario: scenario,
+      config: build_config(requests: 1, warmup: 1)
+    )
+
+    expect { runner.run }.to raise_error(
+      described_class::MeasurementAborted,
+      /Timed out waiting for 1 worker thread/
+    )
   end
 
   it "reports multiple worker errors" do

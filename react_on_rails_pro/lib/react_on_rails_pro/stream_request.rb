@@ -173,7 +173,9 @@ module ReactOnRailsPro
     # an HTTP status. Treat it as an error so callers do not parse an unknown
     # response body as LPP data.
     def response_has_error_status?
-      @status_recorded && (@status.nil? || @status >= 400)
+      raise ReactOnRailsPro::Error, "Renderer response status was not recorded" unless @status_recorded
+
+      @status.nil? || @status >= 400
     end
 
     def extract_status(response)

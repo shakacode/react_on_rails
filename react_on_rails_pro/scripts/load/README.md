@@ -13,7 +13,7 @@ This is the **foundation** PR. It ships:
 
 Deferred to follow-up issues:
 
-- `incremental_async` scenario — requires a JS handler that accepts NDJSON async-prop chunks AND renders via `ReactOnRails.addAsyncPropsCapabilityToComponentProps`. That method is only available in the RSC bundle; the plain server bundle lacks it. The integration tests use special fixture bundles (`react-on-rails-pro-node-renderer/tests/fixtures/bundle-incremental.js`) with a `ReactOnRails.getStreamValues()` helper not present in production bundles. Until an RSC-capable test component or fixture is wired up, this scenario is intentionally not registered as a runnable CLI scenario.
+- Incremental async scenario — requires a JS handler that accepts NDJSON async-prop chunks AND renders via `ReactOnRails.addAsyncPropsCapabilityToComponentProps`. That method is only available in the RSC bundle; the plain server bundle lacks it. The integration tests use special fixture bundles (`react-on-rails-pro-node-renderer/tests/fixtures/bundle-incremental.js`) with a `ReactOnRails.getStreamValues()` helper not present in production bundles. No runnable Ruby scenario ships until an RSC-capable test component or fixture is wired up.
 - 410 missing-bundle retry scenario
 - Stale-connection scenario (renderer restart)
 - Early-disconnect / cancel scenario

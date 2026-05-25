@@ -90,6 +90,12 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       expect(error_body).to eq("error details")
     end
 
+    it "raises if error-status detection runs before status is recorded" do
+      expect do
+        request.send(:response_has_error_status?)
+      end.to raise_error(ReactOnRailsPro::Error, /status was not recorded/)
+    end
+
     context "with length-prefixed protocol parsing" do
       it "parses multiple LPP chunks from a single response" do
         data = to_length_prefixed("<div>First</div>") + to_length_prefixed("<div>Second</div>")

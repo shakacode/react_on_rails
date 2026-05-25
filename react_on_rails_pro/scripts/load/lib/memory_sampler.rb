@@ -55,6 +55,7 @@ module RendererHarness
     end
 
     def stop_background(timeout_seconds: 5)
+      thread = nil
       thread = @thread_mutex.synchronize do
         @stop = true
         @stop_cv.broadcast
@@ -62,8 +63,13 @@ module RendererHarness
       end
       return unless thread
 
-      thread.join(timeout_seconds)
-      warn "MemorySampler: background thread did not stop within #{timeout_seconds}s" if thread.alive?
+      unless thread.join(timeout_seconds)
+        warn "MemorySampler: background thread did not stop within #{timeout_seconds}s"
+        thread.kill
+        thread.join
+      end
+    ensure
+      @thread_mutex.synchronize { @thread = nil if thread && @thread.equal?(thread) }
     end
 
     def sample_once
