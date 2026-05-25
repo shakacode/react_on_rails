@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require "uri"
-require "httpx"
+require_relative "renderer_http_client"
 require_relative "stream_request"
 require_relative "async_props_emitter"
 
@@ -36,7 +36,8 @@ module ReactOnRailsPro
                 "rendering any RSC payload."
         end
 
-        ReactOnRailsPro::StreamRequest.create do |send_bundle, _barrier|
+        warn_cb = ->(request_time) { warn_if_slow_streaming_first_chunk(path, request_time) }
+        ReactOnRailsPro::StreamRequest.create(first_chunk_warn_callback: warn_cb) do |send_bundle, _tasks|
           if send_bundle
             Rails.logger.info { "[ReactOnRailsPro] Sending bundle to the node renderer" }
             upload_assets
@@ -52,7 +53,7 @@ module ReactOnRailsPro
       # ARCHITECTURE: This method orchestrates the async props flow:
       #
       # ┌─────────────────────────────────────────────────────────────────────────┐
-      # │  Rails Thread (main)              │  Rails Thread (barrier.async)       │
+      # │  Rails Thread (main)              │  Rails Thread (async task)          │
       # ├───────────────────────────────────┼─────────────────────────────────────┤
       # │  1. Send initial NDJSON line      │                                     │
       # │     {renderingRequest, ...}       │                                     │
@@ -64,59 +65,51 @@ module ReactOnRailsPro
       # │                                   │     └── Sends NDJSON: {updateChunk} │
       # │                                   │                                     │
       # │  ... streaming HTML chunks ...    │  4. Block completes                 │
-      # │                                   │     request.close (sends END_STREAM)│
+      # │                                   │     output.close (sends END_STREAM) │
       # └───────────────────────────────────┴─────────────────────────────────────┘
       #
-      # WHY barrier.async?
+      # WHY async task?
       # - We need to return the response stream immediately so Rails can start sending HTML
       # - The async_props_block runs concurrently, sending props as they become available
-      # - When the block finishes, we close the request (END_STREAM flag)
+      # - When the block finishes, we close the output (END_STREAM flag)
       # - Node's handleRequestClosed then calls asyncPropsManager.endStream()
       #
       def render_code_with_incremental_updates(path, js_code, async_props_block:)
         Rails.logger.info { "[ReactOnRailsPro] Perform incremental rendering request #{path}" }
 
-        # Determine bundle timestamp based on RSC support
         pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
 
-        # Incremental rendering goes through the same `streamServerRenderedReactComponent`
-        # transform as one-shot streaming, so each response chunk arrives in the
-        # length-prefixed wire format. `StreamRequest` always parses length-prefixed.
-        ReactOnRailsPro::StreamRequest.create do |send_bundle, barrier|
+        warn_cb = ->(request_time) { warn_if_slow_streaming_first_chunk(path, request_time) }
+        ReactOnRailsPro::StreamRequest.create(first_chunk_warn_callback: warn_cb) do |send_bundle, tasks|
           if send_bundle
             Rails.logger.info { "[ReactOnRailsPro] Sending bundle to the node renderer" }
             upload_assets
           end
 
-          # Build bidirectional streaming request using HTTPX's stream_bidi plugin.
-          # This creates an HTTP/2 stream where we can send data while receiving.
-          request = connection.build_request(
-            "POST",
+          # Open a bidirectional HTTP/2 stream using async-http's Writable body.
+          # output supports << (alias for write) and close (sends END_STREAM).
+          output, response = connection.post_bidi(
             path,
-            headers: { "content-type" => "application/x-ndjson" },
-            body: [],
-            stream: true
+            headers: [["content-type", "application/x-ndjson"]]
           )
 
-          # Create emitter - it will write NDJSON lines to the request stream
-          emitter = ReactOnRailsPro::AsyncPropsEmitter.new(pool.rsc_bundle_hash, request)
+          # Create emitter — output has the same interface as the old HTTPX request
+          # object (<< for writing, close for END_STREAM), so AsyncPropsEmitter works unchanged.
+          emitter = ReactOnRailsPro::AsyncPropsEmitter.new(pool.rsc_bundle_hash, output)
           initial_data = build_initial_incremental_request(js_code, emitter)
 
-          # Start the request - response begins streaming immediately
-          response = connection.request(request, stream: true)
-
           # Send the initial render request as first NDJSON line
-          request << "#{initial_data.to_json}\n"
+          output << "#{initial_data.to_json}\n"
 
-          # Execute async props block in a separate fiber via barrier.
+          # Execute async props block in a separate fiber.
           # This runs concurrently with the response streaming back to the client.
-          barrier.async do
+          tasks.push(Async::Task.current.async do
             async_props_block.call(emitter)
           ensure
-            # When the block completes (or raises), close the request.
+            # When the block completes (or raises), close the output.
             # This sends HTTP/2 END_STREAM flag, triggering Node's handleRequestClosed.
-            request.close
-          end
+            output.close
+          end)
 
           response
         end
@@ -189,92 +182,67 @@ module ReactOnRailsPro
         end
       end
 
-      # Performs HTTP POST requests using the build_request pattern.
-      # This approach is required because when stream_bidi plugin is loaded,
-      # using connection.post with stream: true causes timeouts (the plugin's
-      # empty? method returns false, preventing END_STREAM from being sent).
-      #
-      # For consistency and to share error handling logic, both streaming and
-      # non-streaming requests use build_request with manually encoded bodies.
-      def perform_request(path, form: nil, json: nil, stream: false) # rubocop:disable Metrics/AbcSize,Metrics/CyclomaticComplexity
+      def perform_request(path, **post_options)
         available_retries = ReactOnRailsPro.configuration.renderer_request_retry_limit
-        retry_request = true
-        while retry_request
-          begin
-            start_time = Time.now
-            response = execute_http_request(path, form: form, json: json, stream: stream)
-            raise response.error if response.is_a?(HTTPX::ErrorResponse)
-
-            request_time = Time.now - start_time
-            warn_timeout = ReactOnRailsPro.configuration.renderer_http_pool_warn_timeout
-            if request_time > warn_timeout
-              Rails.logger.warn "Request to #{path} took #{request_time} seconds, expected at most #{warn_timeout}."
-            end
-            retry_request = false
-          rescue HTTPX::TimeoutError => e
-            # Testing timeout catching:
-            # https://github.com/shakacode/react_on_rails_pro/pull/136#issue-463421204
-            if available_retries.zero?
-              raise ReactOnRailsPro::Error, "Time out error when getting the response on: #{path}.\n" \
-                                            "Original error:\n#{e}\n#{e.backtrace}"
-            end
-            Rails.logger.info do
-              "[ReactOnRailsPro] Timed out trying to make a request to the Node Renderer. " \
-                "Retrying #{available_retries} more times..."
-            end
-            available_retries -= 1
-            next
-          rescue HTTPX::Error => e # Connection errors or other unexpected errors
-            # Such errors are handled by ReactOnRailsPro::StreamRequest instead
-            raise if e.is_a?(HTTPX::HTTPError) && stream
-
-            raise ReactOnRailsPro::Error,
-                  "Node renderer request failed: #{path}.\nOriginal error:\n#{e}\n#{e.backtrace}"
-          end
+        response = nil
+        loop do
+          start_time = Time.now
+          response = connection.post(path, **post_options)
+          warn_if_slow_request(path, start_time, stream: post_options[:stream])
+          break
+        rescue ReactOnRailsPro::RendererHttpClient::TimeoutError => e
+          available_retries = retry_or_raise_transport_error(e, available_retries, path, "Time out")
+        rescue ReactOnRailsPro::RendererHttpClient::ConnectionError => e
+          available_retries = retry_or_raise_transport_error(e, available_retries, path, "Connection")
         end
 
+        validate_response(response)
+      end
+
+      def retry_or_raise_transport_error(error, available_retries, path, error_type)
+        if available_retries.zero?
+          raise ReactOnRailsPro::Error,
+                "#{error_type} error on renderer request: #{path}.\nOriginal error:\n#{error}\n#{error.backtrace}"
+        end
+        Rails.logger.info do
+          "[ReactOnRailsPro] #{error_type} error when making a request to the Node Renderer. " \
+            "Retrying #{available_retries} more times..."
+        end
+        available_retries - 1
+      end
+
+      # Only checks for fatal protocol mismatch (412). Other non-success statuses
+      # (410 = send bundle, 400 = bad request) are handled by callers like eval_js
+      # and StreamRequest, which need the response object to decide on retry/reupload.
+      def validate_response(response)
         Rails.logger.info { "[ReactOnRailsPro] Node Renderer responded" }
 
-        # +response+ can also be an +HTTPX::ErrorResponse+ or an +HTTPX::StreamResponse+, which don't have +#status+.
-        if response.is_a?(HTTPX::Response) && response.status == ReactOnRailsPro::STATUS_INCOMPATIBLE
+        if response.status && response.status == ReactOnRailsPro::STATUS_INCOMPATIBLE
           raise ReactOnRailsPro::Error, response.body
         end
 
         response
       end
 
-      # Executes an HTTP POST request using build_request pattern.
-      # For streaming requests, calls request.close to send END_STREAM flag.
-      def execute_http_request(path, form: nil, json: nil, stream: false)
-        body, content_type = encode_request_body(form: form, json: json)
+      def warn_if_slow_request(path, start_time, stream:)
+        return if stream
 
-        request_options = {
-          headers: { "content-type" => content_type },
-          body: body
-        }
-        request_options[:stream] = true if stream
+        warn_timeout = ReactOnRailsPro.configuration.renderer_http_pool_warn_timeout
+        return unless warn_timeout
 
-        request = connection.build_request("POST", path, **request_options)
-        request.close if stream # Signal end of request body to send END_STREAM flag
+        request_time = Time.now - start_time
+        return unless request_time > warn_timeout
 
-        connection.request(request)
+        Rails.logger.warn "Request to #{path} took #{request_time} seconds, expected at most #{warn_timeout}."
       end
 
-      # Encodes request body for use with build_request.
-      # Supports both form data (with automatic multipart detection) and JSON data.
-      def encode_request_body(form: nil, json: nil)
-        if form
-          encoder = if HTTPX::Transcoder::Multipart.multipart?(form)
-                      HTTPX::Transcoder::Multipart.encode(form)
-                    else
-                      HTTPX::Transcoder::Form.encode(form)
-                    end
-          [encoder.to_s, encoder.content_type]
-        elsif json
-          [JSON.generate(json), "application/json"]
-        else
-          raise ArgumentError, "Either form: or json: must be provided"
-        end
+      def warn_if_slow_streaming_first_chunk(path, request_time)
+        warn_timeout = ReactOnRailsPro.configuration.renderer_http_pool_warn_timeout
+        return unless warn_timeout
+        return unless request_time > warn_timeout
+
+        Rails.logger.warn "Streaming request to #{path} delivered first chunk after #{request_time} seconds, " \
+                          "expected at most #{warn_timeout}."
       end
 
       def form_with_code(js_code, send_bundle)
@@ -368,71 +336,21 @@ module ReactOnRailsPro
         )
       end
 
-      def create_connection # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
+      def create_connection
         url = ReactOnRailsPro.configuration.renderer_url
         Rails.logger.info do
           "[ReactOnRailsPro] Setting up Node Renderer connection to #{url}"
         end
-        HTTPX
-          # For persistent connections we want retries,
-          # so the requests don't just fail if the other side closes the connection
-          # https://honeyryderchuck.gitlab.io/httpx/wiki/Persistent
-          .plugin(
-            :retries, max_retries: 1,
-                      retry_change_requests: true,
-                      # Official HTTPx docs says that we should use the retry_on option to decide if the
-                      # request should be retried or not
-                      # However, HTTPx assumes that connection errors such as timeout error should be retried
-                      # by default and it doesn't consider retry_on block at all at that case
-                      # So, we have to do the following trick to avoid retries when a Timeout error happens
-                      # while streaming a component
-                      # If the streamed component returned any chunks, it shouldn't retry on errors, as it
-                      # would cause page duplication
-                      # The SSR-generated html will be written to the page two times in this case
-                      retry_after: lambda do |request, response|
-                                     if request.stream.instance_variable_get(:@react_on_rails_received_first_chunk)
-                                       e = response.error
-                                       raise(
-                                         ReactOnRailsPro::Error,
-                                         "An error happened during server side render streaming " \
-                                         "of a component.\nOriginal error:\n#{e}\n#{e.backtrace}"
-                                       )
-                                     end
-                                     Rails.logger.info do
-                                       "[ReactOnRailsPro] An error occurred while making " \
-                                         "a request to the Node Renderer.\n" \
-                                         "Error: #{response.error}.\n" \
-                                         "Retrying by HTTPX \"retries\" plugin..."
-                                     end
-                                     # The retry_after block expects to return a delay to wait before
-                                     # retrying the request
-                                     # nil means no waiting delay
-                                     nil
-                                   end
-          )
-          .plugin(:stream_bidi)
-          # See https://www.rubydoc.info/gems/httpx/1.3.3/HTTPX%2FOptions:initialize for the available options
-          .with(
-            origin: url,
-            # Version of HTTP protocol to use by default in the absence of protocol negotiation
-            fallback_protocol: "h2",
-            persistent: true,
-            pool_options: {
-              max_connections_per_origin: ReactOnRailsPro.configuration.renderer_http_pool_size
-            },
-            # Other timeouts supported https://honeyryderchuck.gitlab.io/httpx/wiki/Timeouts:
-            # :write_timeout
-            # :request_timeout
-            # :operation_timeout
-            timeout: {
-              connect_timeout: ReactOnRailsPro.configuration.renderer_http_pool_timeout,
-              read_timeout: ReactOnRailsPro.configuration.ssr_timeout,
-              keep_alive_timeout: ReactOnRailsPro.configuration.renderer_http_keep_alive_timeout
-            }.compact
-          )
+
+        ReactOnRailsPro::RendererHttpClient.new(
+          origin: url,
+          pool_size: ReactOnRailsPro.configuration.renderer_http_pool_size,
+          connect_timeout: ReactOnRailsPro.configuration.renderer_http_pool_timeout,
+          read_timeout: ReactOnRailsPro.configuration.ssr_timeout
+        )
       rescue StandardError => e
         message = <<~MSG
-          [ReactOnRailsPro] Error creating HTTPX connection.
+          [ReactOnRailsPro] Error creating async-http connection.
           renderer_http_pool_size = #{ReactOnRailsPro.configuration.renderer_http_pool_size}
           renderer_http_pool_timeout = #{ReactOnRailsPro.configuration.renderer_http_pool_timeout}
           renderer_http_pool_warn_timeout = #{ReactOnRailsPro.configuration.renderer_http_pool_warn_timeout}
@@ -446,28 +364,25 @@ module ReactOnRailsPro
       end
 
       def get_form_body_for_file(path)
-        # Handles the case when the file is served from the dev server
-        if http_url?(path)
-          unless Rails.env.development?
-            raise ReactOnRailsPro::Error,
-                  "Not expected to get HTTP url for bundle or assets in production mode"
-          end
+        return Pathname.new(path) unless http_url?(path)
 
-          response = HTTPX.get(path)
-          error = response.error
-          if error
-            # Re-raise via rescue so Ruby sets error.cause for exception chaining.
-            begin
-              raise error
-            rescue StandardError
-              raise ReactOnRailsPro::Error, "Failed to fetch dev-server asset from #{path}: #{error}"
-            end
-          end
-
-          response.body
-        else
-          Pathname.new(path)
+        unless Rails.env.development?
+          raise ReactOnRailsPro::Error,
+                "Not expected to get HTTP url for bundle or assets in production mode"
         end
+
+        response = ReactOnRailsPro::RendererHttpClient.get(
+          path,
+          connect_timeout: ReactOnRailsPro.configuration.renderer_http_pool_timeout,
+          read_timeout: ReactOnRailsPro.configuration.ssr_timeout
+        )
+
+        raise ReactOnRailsPro::RendererHttpClient::HTTPError, response if response.error?
+
+        response.body
+      rescue ReactOnRailsPro::RendererHttpClient::Error => e
+        detail = e.is_a?(ReactOnRailsPro::RendererHttpClient::HTTPError) ? e.response.body : e
+        raise ReactOnRailsPro::Error, "Failed to fetch dev-server asset from #{path}: #{detail}"
       end
 
       def http_url?(path)

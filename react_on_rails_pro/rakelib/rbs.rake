@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "open3"
+require "rbconfig"
 require "timeout"
 
 # NOTE: Pro package does not include Steep tasks (:steep, :all) as it does not
@@ -14,13 +15,11 @@ namespace :rbs do
 
     puts "Validating RBS type signatures..."
 
-    # Use Open3 for better error handling - captures stdout, stderr, and exit status separately
-    # This allows us to distinguish between actual validation errors and warnings
-    # Note: Must use bundle exec even though rake runs in bundle context because
-    # spawned shell commands via Open3.capture3() do NOT inherit bundle context
+    # Use Open3 for better error handling - captures stdout, stderr, and exit status separately.
+    # Invoke RBS through the current Ruby to avoid nested `bundle exec` issues under newer RubyGems.
     # Wrap in Timeout to prevent hung processes in CI environments (60 second timeout)
     stdout, stderr, status = Timeout.timeout(60) do
-      Open3.capture3("bundle exec rbs -I sig validate")
+      Open3.capture3(RbConfig.ruby, Gem.bin_path("rbs", "rbs"), "-I", "sig", "validate")
     end
 
     if status.success?
