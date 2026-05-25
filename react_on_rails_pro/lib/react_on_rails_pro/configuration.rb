@@ -71,9 +71,10 @@ module ReactOnRailsPro
     ROLLING_DEPLOY_UPLOAD_KEYWORD_PARAMS = %i[key keyreq].freeze
     ROLLING_DEPLOY_UPLOAD_ALL_KEYWORD_PARAMS = %i[keyrest].freeze
     ROLLING_DEPLOY_UPLOAD_REQUIRED_KEYWORDS = %i[bundle assets].freeze
-    RENDERER_HTTP_POOL_SIZE_WARNING = "[ReactOnRailsPro] config.renderer_http_pool_size now limits concurrent HTTP/2 " \
-                                      "streams on each request-scoped async-http client; it no longer configures a " \
-                                      "persistent process-wide renderer connection pool."
+    RENDERER_HTTP_POOL_SIZE_WARNING = "[ReactOnRailsPro] config.renderer_http_pool_size currently has no effect. " \
+                                      "The async-http adapter creates a new client per request, so the pool limit " \
+                                      "is never reached. This setting is kept for forward-compatibility with " \
+                                      "planned persistent connection support (see issue #3283)."
     RENDERER_HTTP_POOL_SIZE_WARNING_MUTEX = Mutex.new
 
     private_constant :RENDERER_HTTP_POOL_SIZE_WARNING,
@@ -119,12 +120,9 @@ module ReactOnRailsPro
       @concurrent_component_streaming_buffer_size = value
     end
 
-    # Sets the per-request HTTP/2 stream limit for node renderer HTTP requests.
-    #
-    # This value formerly represented the HTTPX persistent connection pool size.
-    # The async-http adapter opens request-scoped clients, so setting this value is
-    # still valid but no longer changes process-wide connection reuse.
-    # Setting nil keeps the default stream limit at request time; it is not unlimited.
+    # Currently has no effect. The async-http adapter creates a new client per request,
+    # so this pool limit is never reached. Kept for forward-compatibility with planned
+    # persistent connection support (issue #3283).
     def renderer_http_pool_size=(value)
       validate_renderer_http_pool_size(value)
       warn_renderer_http_pool_size_once unless value.nil? || value == DEFAULT_RENDERER_HTTP_POOL_SIZE

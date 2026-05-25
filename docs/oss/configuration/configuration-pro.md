@@ -94,13 +94,10 @@ ReactOnRailsPro.configure do |config|
   # Default for `renderer_use_fallback_exec_js` is true.
   config.renderer_use_fallback_exec_js = false
 
-  # With the async-http renderer client, clients are scoped to individual requests.
-  # For the HTTP/2 renderer connection, this limits concurrent streams on that request's client
-  # rather than the size of a persistent process-wide connection pool. The current adapter does
-  # not reuse TCP connections between Rails requests, so high-latency networks or very high
-  # request rates can see extra connection and HTTP/2 handshake overhead compared with HTTPX.
-  # Setting this value emits a warning so upgrades notice the changed semantics.
-  # Setting this to nil keeps the default limit; it does not make the async-http client unlimited.
+  # Currently has no effect. The async-http adapter creates a new client per request,
+  # so this pool limit is never reached. The setting is kept for forward-compatibility
+  # with planned persistent connection support (see issue #3283).
+  # Setting a non-default value emits a warning explaining this.
   # Default for `renderer_http_pool_size` is 10
   config.renderer_http_pool_size = 10
 

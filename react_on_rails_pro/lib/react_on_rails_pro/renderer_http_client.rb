@@ -333,8 +333,8 @@ module ReactOnRailsPro
       endpoint = endpoint_for(@origin)
       Async::HTTP::Client.open(endpoint, protocol: endpoint.protocol, retries: 0, limit: pool_limit) do |client|
         # Retries are owned by Request/StreamRequest so bundle-upload retry behavior remains centralized.
-        # Each client is intentionally request-scoped to avoid sharing connections across Async reactors.
-        # limit is therefore a per-request HTTP/2 stream cap, not a process-wide connection pool size.
+        # Each client is request-scoped (one connection, one request), so limit has no practical effect.
+        # It is passed through for forward-compatibility with planned persistent connections (#3283).
         # rubocop:disable Performance/RedundantBlockCall
         # The block is captured with &block, so yield is unavailable in this nested block.
         block.call(client)
