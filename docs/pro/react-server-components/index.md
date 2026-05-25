@@ -60,8 +60,9 @@ inspectable proof instead of a static claim:
 - [Demo source](https://github.com/shakacode/react-on-rails-demo-marketplace-rsc) —
   Rails + React on Rails Pro implementation code
 
-Treat these public measurements as directional evidence, not a universal
-performance guarantee for every app.
+> [!NOTE]
+> Treat these public measurements as directional evidence, not a universal
+> performance guarantee for every app.
 
 ## Current Support Status
 
