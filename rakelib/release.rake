@@ -18,6 +18,9 @@ class RaisingMessageHandler
   end
 end
 
+NPM_REGISTRY_URL = "https://registry.npmjs.org/"
+NPM_INSTALL_DEPENDENCY_FIELDS = %w[dependencies optionalDependencies peerDependencies].freeze
+
 # Helper methods for release-specific tasks
 # These are defined at the top level so they have access to Rake's sh method
 
@@ -610,10 +613,101 @@ def publish_gem_with_retry(dir, gem_name, otp: nil, max_retries: ENV.fetch("GEM_
   current_otp
 end
 
+def parse_npm_package_ref(package_ref)
+  match = package_ref.to_s.match(%r{\A(?<name>@[^/]+/[^@]+|[^@]+)@(?<version>.+)\z})
+  abort "❌ Invalid npm package ref for release verification: #{package_ref.inspect}" unless match
+
+  [match[:name], match[:version]]
+end
+
+def workspace_protocol_dependencies(metadata)
+  return [] unless metadata.is_a?(Hash)
+
+  NPM_INSTALL_DEPENDENCY_FIELDS.flat_map do |field|
+    dependencies = metadata[field]
+    next [] unless dependencies.is_a?(Hash)
+
+    dependencies.filter_map do |dependency_name, dependency_version|
+      next unless dependency_version.to_s.start_with?("workspace:")
+
+      "#{field}.#{dependency_name}=#{dependency_version}"
+    end
+  end
+end
+
+def fetch_npm_package_metadata(package_ref, registry_url:)
+  output, status = Open3.capture2e(
+    "npm",
+    "view",
+    package_ref,
+    "version",
+    "dependencies",
+    "optionalDependencies",
+    "peerDependencies",
+    "--json",
+    "--registry",
+    registry_url
+  )
+  [output, status]
+end
+
+def parse_npm_package_metadata(package_ref, output)
+  JSON.parse(output)
+rescue JSON::ParserError => e
+  abort <<~ERROR
+    ❌ Unable to parse npm metadata for #{package_ref}.
+
+    Error: #{e.message}
+    Output:
+    #{output}
+  ERROR
+end
+
+def verify_npm_package_published!(package_name, expected_version, registry_url: NPM_REGISTRY_URL)
+  package_ref = "#{package_name}@#{expected_version}"
+  output, status = fetch_npm_package_metadata(package_ref, registry_url: registry_url)
+  unless status.success?
+    abort <<~ERROR
+      ❌ #{package_ref} is not visible on npm after publish.
+
+      The release cannot continue because npm did not confirm the published package.
+
+      Technical details:
+      #{output.strip}
+    ERROR
+  end
+
+  metadata = parse_npm_package_metadata(package_ref, output)
+  actual_version = metadata.is_a?(Hash) ? metadata["version"] : metadata.to_s
+  unless actual_version == expected_version
+    abort <<~ERROR
+      ❌ npm returned #{actual_version.inspect} for #{package_ref}; expected #{expected_version.inspect}.
+
+      The release cannot continue because npm did not confirm the exact published version.
+    ERROR
+  end
+
+  workspace_dependencies = workspace_protocol_dependencies(metadata)
+  unless workspace_dependencies.empty?
+    abort <<~ERROR
+      ❌ #{package_ref} was published with workspace protocol dependencies.
+
+      Published packages must not contain workspace:* install-time dependencies because external package managers
+      cannot resolve them from npm.
+
+      Offending dependencies:
+      #{workspace_dependencies.map { |dependency| "  - #{dependency}" }.join("\n")}
+    ERROR
+  end
+
+  puts "✓ Verified npm package #{package_ref}"
+end
+
 def publish_npm_with_retry(dir, package_name, base_args: [], otp: nil, max_retries: 3)
   puts "\nPublishing #{package_name}..."
   current_otp = normalize_otp_code(otp, service_name: "NPM")
   publish_args = Array(base_args)
+  npm_package_name, npm_package_version = parse_npm_package_ref(package_name)
 
   retry_count = 0
   success = false
@@ -623,6 +717,7 @@ def publish_npm_with_retry(dir, package_name, base_args: [], otp: nil, max_retri
       command_args = ["pnpm", "publish", *publish_args]
       command_args += ["--otp", current_otp] if current_otp
       sh_args_in_dir_for_release(dir, *command_args)
+      verify_npm_package_published!(npm_package_name, npm_package_version, registry_url: NPM_REGISTRY_URL)
       success = true
     rescue RuntimeError => e
       retry_count += 1
