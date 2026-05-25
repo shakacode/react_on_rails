@@ -138,13 +138,13 @@ module ReactOnRails
       # version because `pnpm/action-setup` requires one unless package.json declares
       # `packageManager`. Match the repo's own packageManager version so generated
       # CI defaults to the pnpm major this codebase tests with. Track the exact release
-      # used for this fallback at https://github.com/pnpm/pnpm/releases/tag/v9.14.2;
+      # used for this fallback at https://github.com/pnpm/pnpm/releases/tag/v10.33.4;
       # update this URL with the constant when bumping. Users who need exact
       # reproducibility should commit `packageManager` to their package.json instead.
       # Bump checklist: heading text below is spec-asserted.
       # CONTRIBUTING.md > "Updating the pnpm Fallback Version for Scaffolded CI".
-      # renovate: datasource=github-releases depName=pnpm/pnpm extractVersion=^v(?<version>.+)$ allowedVersions=<10
-      CI_PNPM_FALLBACK_VERSION = "9.14.2"
+      # renovate: datasource=github-releases depName=pnpm/pnpm extractVersion=^v(?<version>.+)$ allowedVersions=<11
+      CI_PNPM_FALLBACK_VERSION = "10.33.4"
       private_constant :CI_PNPM_FALLBACK_VERSION
 
       # Main generator entry point
