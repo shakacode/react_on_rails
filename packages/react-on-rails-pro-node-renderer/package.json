@@ -38,7 +38,7 @@
     "fs-extra": "^11.2.0",
     "jsonwebtoken": "^9.0.3",
     "lockfile": "^1.0.4",
-    "pino": "^9.0.0"
+    "pino": "^9.14.0 || ^10.1.0"
   },
   "devDependencies": {
     "@babel/core": "^7.26.10",
