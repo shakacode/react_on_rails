@@ -308,7 +308,7 @@ importers:
         specifier: ^6.10.1
         version: 6.12.3
       '@opentelemetry/api':
-        specifier: ^1.9.0
+        specifier: '>=1.9.0 <1.10.0'
         version: 1.9.1
       '@opentelemetry/exporter-trace-otlp-http':
         specifier: ^0.214.0

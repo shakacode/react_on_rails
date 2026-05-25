@@ -228,7 +228,7 @@ Add as **optional peer dependencies** (matching the existing pattern):
 ```jsonc
 "peerDependencies": {
   // … existing …
-  "@opentelemetry/api": ">=1.9.0",
+  "@opentelemetry/api": ">=1.9.0 <1.10.0",
   "@opentelemetry/sdk-trace-node": ">=2.0.0",
   "@opentelemetry/sdk-trace-base": ">=2.0.0",
   "@opentelemetry/resources": ">=2.0.0",
