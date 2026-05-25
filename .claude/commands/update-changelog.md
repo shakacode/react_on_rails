@@ -370,7 +370,7 @@ When releasing from prerelease to a stable version (e.g., `v16.5.0.rc.1` -> `v16
 #### Step 2: Curate the entries — REMOVE these
 
 1. **Prerelease-only fixes** — bugs introduced during the prerelease cycle and fixed in a later RC. If the bug never shipped in a stable release, the fix is noise to stable users.
-   - Investigate when a bug was introduced: `git log --oneline v<last_stable>..v<rc_that_fixed_the_bug>` — if this commit range doesn't contain the bug's introduction (i.e., the introducing commit predates the RC cycle), the bug was already in the last stable release and the fix belongs in the stable section. If the introduction _is_ in this range, the bug never shipped in stable, so drop the fix.
+   - Investigate when a bug was introduced: `git log --oneline v<last_stable>..v<rc_that_fixed_the_bug>` — search this range for the commit that introduced the bug. If you **find it** in this range, the bug was introduced during the RC cycle and never shipped in stable — drop the fix. If you **don't find it**, the bug predates the RC cycle and existed in `<last_stable>` — keep the fix.
    - Check the PR description for what was broken and when
 
 2. **Refinements to prerelease-only features** — if a new feature was introduced in `rc.0` and then iterated in `rc.1`/`rc.2`, keep only the final description and drop the iteration history
