@@ -41,8 +41,6 @@ Teams adopting RSC have reported dramatic wins — BlogHunch's 30% server-cost r
 
 The public demo below shows how these ideas look in an inspectable React on Rails Pro application.
 
-<a id="live-demo-and-evidence"></a>
-
 ## Live Demo and Evidence
 
 The public [LocalHub marketplace demo](https://rsc.reactonrails.com/) shows the
