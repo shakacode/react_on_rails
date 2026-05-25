@@ -727,9 +727,10 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
 
       it "warns when configured because async-http changed the setting semantics" do
         expect(Rails.logger).to receive(:warn).with(
-          "[ReactOnRailsPro] config.renderer_http_pool_size now limits concurrent HTTP/2 streams " \
-          "on each request-scoped async-http client; it no longer configures a persistent " \
-          "process-wide renderer connection pool."
+          "[ReactOnRailsPro] config.renderer_http_pool_size currently has no effect. " \
+          "The async-http adapter creates a new client per request, so the pool limit " \
+          "is never reached. This setting is kept for forward-compatibility with " \
+          "planned persistent connection support (see issue #3283)."
         )
 
         ReactOnRailsPro.configure do |config|
@@ -741,9 +742,10 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
 
       it "does not warn for the default value assigned during configuration initialization" do
         expect(Rails.logger).not_to receive(:warn).with(
-          "[ReactOnRailsPro] config.renderer_http_pool_size now limits concurrent HTTP/2 streams " \
-          "on each request-scoped async-http client; it no longer configures a persistent " \
-          "process-wide renderer connection pool."
+          "[ReactOnRailsPro] config.renderer_http_pool_size currently has no effect. " \
+          "The async-http adapter creates a new client per request, so the pool limit " \
+          "is never reached. This setting is kept for forward-compatibility with " \
+          "planned persistent connection support (see issue #3283)."
         )
 
         expect(ReactOnRailsPro.configuration.renderer_http_pool_size).to eq(10)
@@ -751,9 +753,10 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
 
       it "does not warn when explicitly configured with the default value" do
         expect(Rails.logger).not_to receive(:warn).with(
-          "[ReactOnRailsPro] config.renderer_http_pool_size now limits concurrent HTTP/2 streams " \
-          "on each request-scoped async-http client; it no longer configures a persistent " \
-          "process-wide renderer connection pool."
+          "[ReactOnRailsPro] config.renderer_http_pool_size currently has no effect. " \
+          "The async-http adapter creates a new client per request, so the pool limit " \
+          "is never reached. This setting is kept for forward-compatibility with " \
+          "planned persistent connection support (see issue #3283)."
         )
 
         ReactOnRailsPro.configure do |config|
@@ -765,9 +768,10 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
 
       it "does not warn when explicitly cleared" do
         expect(Rails.logger).not_to receive(:warn).with(
-          "[ReactOnRailsPro] config.renderer_http_pool_size now limits concurrent HTTP/2 streams " \
-          "on each request-scoped async-http client; it no longer configures a persistent " \
-          "process-wide renderer connection pool."
+          "[ReactOnRailsPro] config.renderer_http_pool_size currently has no effect. " \
+          "The async-http adapter creates a new client per request, so the pool limit " \
+          "is never reached. This setting is kept for forward-compatibility with " \
+          "planned persistent connection support (see issue #3283)."
         )
 
         ReactOnRailsPro.configure do |config|

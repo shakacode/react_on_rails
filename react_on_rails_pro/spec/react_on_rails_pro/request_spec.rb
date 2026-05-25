@@ -241,7 +241,7 @@ describe ReactOnRailsPro::Request do
 
     it "raises ReactOnRailsPro::Error when response has error status" do
       error_response = instance_double(ReactOnRailsPro::RendererHttpClient::Response,
-                                       error?: true, status: 404)
+                                       error?: true, status: 404, body: "Not Found")
       allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("development"))
       allow(ReactOnRailsPro::RendererHttpClient).to receive(:get).and_return(error_response)
 
