@@ -142,7 +142,8 @@ module ReactOnRails
           return false if rsc_setup_blocked_by_later_imports?(config_path, content, existing_imports_content,
                                                               is_server: is_server)
 
-          add_rsc_client_references_setup(config_path, content, existing_imports_content, is_server: is_server)
+          return false unless add_rsc_client_references_setup(config_path, content, existing_imports_content,
+                                                              is_server: is_server)
           return true if options[:skip]
 
           rsc_client_references_setup_ready?(config_path)

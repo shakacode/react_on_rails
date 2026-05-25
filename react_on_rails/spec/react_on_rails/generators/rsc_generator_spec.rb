@@ -1180,6 +1180,26 @@ describe RscGenerator, type: :generator do
       expect(generator.send(:rsc_plugin_uses_scoped_client_references?, content, is_server: false)).to be(false)
     end
 
+    it "treats a server plugin with scoped client references as already migrated" do
+      content = <<~JS
+        const { config } = require('shakapacker');
+        const { resolve } = require('path');
+        const rscClientReferences = {
+          directory: resolve(config.source_path),
+          recursive: true,
+          include: /\\.(js|ts|jsx|tsx)$/,
+        };
+        serverWebpackConfig.plugins.push(
+          new RSCWebpackPlugin({
+            isServer: true,
+            clientReferences: rscClientReferences,
+          }),
+        );
+      JS
+
+      expect(generator.send(:rsc_plugin_uses_scoped_client_references?, content, is_server: true)).to be(true)
+    end
+
     it "detects scoped client references when resolve has inner whitespace" do
       content = <<~JS
         const rscClientReferences = {
