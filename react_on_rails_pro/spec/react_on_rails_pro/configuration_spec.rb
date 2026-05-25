@@ -718,6 +718,100 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
       end
     end
 
+    describe ".renderer_http_pool_size" do
+      it "defaults to 10" do
+        ReactOnRailsPro.configure {} # rubocop:disable Lint/EmptyBlock
+
+        expect(ReactOnRailsPro.configuration.renderer_http_pool_size).to eq(10)
+      end
+
+      it "warns when configured because async-http changed the setting semantics" do
+        expect(Rails.logger).to receive(:warn).with(
+          "[ReactOnRailsPro] config.renderer_http_pool_size currently has no effect. " \
+          "The async-http adapter creates a new client per request, so the pool limit " \
+          "is never reached. This setting is kept for forward-compatibility with " \
+          "planned persistent connection support (see issue #3283)."
+        )
+
+        ReactOnRailsPro.configure do |config|
+          config.renderer_http_pool_size = 20
+        end
+
+        expect(ReactOnRailsPro.configuration.renderer_http_pool_size).to eq(20)
+      end
+
+      it "does not warn for the default value assigned during configuration initialization" do
+        expect(Rails.logger).not_to receive(:warn).with(
+          "[ReactOnRailsPro] config.renderer_http_pool_size currently has no effect. " \
+          "The async-http adapter creates a new client per request, so the pool limit " \
+          "is never reached. This setting is kept for forward-compatibility with " \
+          "planned persistent connection support (see issue #3283)."
+        )
+
+        expect(ReactOnRailsPro.configuration.renderer_http_pool_size).to eq(10)
+      end
+
+      it "does not warn when explicitly configured with the default value" do
+        expect(Rails.logger).not_to receive(:warn).with(
+          "[ReactOnRailsPro] config.renderer_http_pool_size currently has no effect. " \
+          "The async-http adapter creates a new client per request, so the pool limit " \
+          "is never reached. This setting is kept for forward-compatibility with " \
+          "planned persistent connection support (see issue #3283)."
+        )
+
+        ReactOnRailsPro.configure do |config|
+          config.renderer_http_pool_size = 10
+        end
+
+        expect(ReactOnRailsPro.configuration.renderer_http_pool_size).to eq(10)
+      end
+
+      it "does not warn when explicitly cleared" do
+        expect(Rails.logger).not_to receive(:warn).with(
+          "[ReactOnRailsPro] config.renderer_http_pool_size currently has no effect. " \
+          "The async-http adapter creates a new client per request, so the pool limit " \
+          "is never reached. This setting is kept for forward-compatibility with " \
+          "planned persistent connection support (see issue #3283)."
+        )
+
+        ReactOnRailsPro.configure do |config|
+          config.renderer_http_pool_size = nil
+        end
+
+        expect(ReactOnRailsPro.configuration.renderer_http_pool_size).to be_nil
+      end
+
+      it "raises error for zero" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.renderer_http_pool_size = 0
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /must be a positive integer or nil/)
+      end
+
+      it "raises error for negative numbers" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.renderer_http_pool_size = -1
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /must be a positive integer or nil/)
+      end
+
+      it "raises error for non-integer values" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.renderer_http_pool_size = 5.5
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /must be a positive integer or nil/)
+      end
+
+      it "validates constructor values before storing them" do
+        expect do
+          described_class.new(renderer_http_pool_size: 0)
+        end.to raise_error(ReactOnRailsPro::Error, /must be a positive integer or nil/)
+      end
+    end
+
     describe ".renderer_http_keep_alive_timeout" do
       it "defaults to 30" do
         ReactOnRailsPro.configure {} # rubocop:disable Lint/EmptyBlock
@@ -726,11 +820,21 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
       end
 
       it "accepts positive numbers" do
+        expect(Rails.logger).to receive(:warn).with(
+          "[ReactOnRailsPro] config.renderer_http_keep_alive_timeout is deprecated and has no effect " \
+          "with the async-http adapter because clients are scoped per request."
+        )
+
         ReactOnRailsPro.configure do |config|
           config.renderer_http_keep_alive_timeout = 60
         end
 
         expect(ReactOnRailsPro.configuration.renderer_http_keep_alive_timeout).to eq(60)
+      end
+
+      it "does not warn for the default value assigned during configuration initialization" do
+        expect(Rails.logger).not_to receive(:warn).with(/renderer_http_keep_alive_timeout/)
+        expect(ReactOnRailsPro.configuration.renderer_http_keep_alive_timeout).to eq(30)
       end
 
       it "accepts nil" do

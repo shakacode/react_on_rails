@@ -1,6 +1,7 @@
 # Procfile for production mode (precompiled assets)
 
-rails: RAILS_ENV=production NODE_ENV=production bin/rails s -p ${PORT:-3001}
+# Foreman assigns PORT=5000 by default, but the benchmark scripts target 3001.
+rails: RAILS_ENV=production NODE_ENV=production bin/rails s -p ${RAILS_PORT:-3001}
 
 # Start Node server for server rendering.
 node-renderer: NODE_ENV=production RENDERER_LOG_LEVEL=error RENDERER_PORT=${RENDERER_PORT:-3800} node renderer/node-renderer.js
