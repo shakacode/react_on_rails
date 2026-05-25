@@ -409,6 +409,14 @@ function TanStackHydrationApp({
         if (latestEffectRunIdRef.current === effectRunId && didSetSsrFlagRef.current) {
           router.ssr = undefined;
           didSetSsrFlagRef.current = false;
+          // Keep sharedHydrationInitStates in sync so a later mount of the
+          // same cached router doesn't restore a stale didSetSsrFlag=true and
+          // trigger the dev sanity-check warning below on a router whose ssr
+          // flag was already cleared correctly.
+          const cached = sharedHydrationInitStates.get(router);
+          if (cached) {
+            cached.didSetSsrFlag = false;
+          }
         }
       });
 
@@ -421,6 +429,10 @@ function TanStackHydrationApp({
         if (latestEffectRunIdRef.current === effectRunId && didSetSsrFlagRef.current) {
           router.ssr = undefined;
           didSetSsrFlagRef.current = false;
+          const cached = sharedHydrationInitStates.get(router);
+          if (cached) {
+            cached.didSetSsrFlag = false;
+          }
         }
       });
       const cancellableRouter = router as TanStackRouter & { cancelLoad?: () => void };
