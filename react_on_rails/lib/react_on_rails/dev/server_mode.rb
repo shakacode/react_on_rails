@@ -124,12 +124,17 @@ module ReactOnRails
         end
 
         def dev_server_config(config)
-          default_config = config["default"] || {}
-          development_config = config["development"] || {}
-          default_dev_server = default_config["dev_server"].is_a?(Hash) ? default_config["dev_server"] : {}
-          development_dev_server = development_config["dev_server"].is_a?(Hash) ? development_config["dev_server"] : {}
+          default_dev_server = dev_server_section(config["default"])
+          development_dev_server = dev_server_section(config["development"])
 
           default_dev_server.merge(development_dev_server)
+        end
+
+        def dev_server_section(environment_config)
+          return {} unless environment_config.is_a?(Hash)
+
+          dev_server = environment_config["dev_server"]
+          dev_server.is_a?(Hash) ? dev_server : {}
         end
 
         def detect_from_dev_server_config(dev_server)

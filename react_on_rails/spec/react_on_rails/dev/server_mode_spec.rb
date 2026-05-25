@@ -138,6 +138,22 @@ RSpec.describe ReactOnRails::Dev::ServerMode do
       expect(described_class.detect("config/shakapacker.yml")).to eq(:hmr)
     end
 
+    it "uses the fallback mode when the default section is not a mapping" do
+      write_shakapacker_config(<<~YAML)
+        default: false
+      YAML
+
+      expect(described_class.detect("config/shakapacker.yml")).to eq(:hmr)
+    end
+
+    it "uses the fallback mode when the development section is not a mapping" do
+      write_shakapacker_config(<<~YAML)
+        development: false
+      YAML
+
+      expect(described_class.detect("config/shakapacker.yml")).to eq(:hmr)
+    end
+
     it "detects HMR from the default section when development is absent" do
       write_shakapacker_config(<<~YAML)
         default:
