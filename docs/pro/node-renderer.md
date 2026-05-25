@@ -261,15 +261,18 @@ await reactOnRailsProNodeRenderer().catch((e) => {
 });
 ```
 
+> [!NOTE]
+> With `fastify: true`, OpenTelemetry patches the HTTP and Fastify modules process-wide. If a later init step fails after those patches are installed, OpenTelemetry does not provide a rollback API; the patched modules remain installed and use a no-op tracer until the process restarts.
+
 ### Configuration via standard OpenTelemetry environment variables
 
-| Env var                                          | Purpose                                                    | Default                            |
-| ------------------------------------------------ | ---------------------------------------------------------- | ---------------------------------- |
-| `OTEL_EXPORTER_OTLP_ENDPOINT`                    | OTLP collector endpoint                                    | `http://localhost:4318`            |
-| `OTEL_EXPORTER_OTLP_HEADERS`                     | Auth headers (e.g. `api-key=xxx`)                          | none                               |
-| `OTEL_SERVICE_NAME`                              | Service name in traces (overrides `init({ serviceName })`) | `react-on-rails-pro-node-renderer` |
-| `OTEL_RESOURCE_ATTRIBUTES`                       | Additional resource attributes (csv)                       | none                               |
-| `OTEL_TRACES_SAMPLER`, `OTEL_TRACES_SAMPLER_ARG` | Trace sampling                                             | parent-based, always-on            |
+| Env var                                          | Purpose                                                                                                                     | Default                            |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`                    | OTLP collector endpoint                                                                                                     | `http://localhost:4318`            |
+| `OTEL_EXPORTER_OTLP_HEADERS`                     | Auth headers (e.g. `api-key=xxx`)                                                                                           | none                               |
+| `OTEL_SERVICE_NAME`                              | Service name in traces (overrides `init({ serviceName })`)                                                                  | `react-on-rails-pro-node-renderer` |
+| `OTEL_RESOURCE_ATTRIBUTES`                       | Additional resource attributes (csv); `service.name` applies when `OTEL_SERVICE_NAME` and `init({ serviceName })` are unset | none                               |
+| `OTEL_TRACES_SAMPLER`, `OTEL_TRACES_SAMPLER_ARG` | Trace sampling                                                                                                              | parent-based, always-on            |
 
 ### Span taxonomy
 

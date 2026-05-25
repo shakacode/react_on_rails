@@ -106,6 +106,8 @@ export async function handleIncrementalRenderRequest(
 
   try {
     // Call handleRenderRequest internally to handle all validation and VM execution
+    // Incremental requests do not enter through worker.ts's trace() wrapper, so
+    // there is no tracingContext to forward for handleRenderRequest's error path.
     const { response, executionContext } = await handleRenderRequest({
       renderingRequest,
       bundleTimestamp,

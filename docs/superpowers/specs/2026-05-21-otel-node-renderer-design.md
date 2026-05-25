@@ -111,19 +111,19 @@ await reactOnRailsProNodeRenderer().catch(/* … */);
 
 All configuration goes through standard OTel env vars:
 
-| Env var                                          | Purpose                                    | Default                               |
-| ------------------------------------------------ | ------------------------------------------ | ------------------------------------- |
-| `OTEL_EXPORTER_OTLP_ENDPOINT`                    | OTLP collector endpoint                    | `http://localhost:4318`               |
-| `OTEL_EXPORTER_OTLP_HEADERS`                     | Optional auth headers (e.g. `api-key=xxx`) | none                                  |
-| `OTEL_SERVICE_NAME`                              | Service name in traces                     | falls back to `init({ serviceName })` |
-| `OTEL_RESOURCE_ATTRIBUTES`                       | Additional resource attrs (csv)            | none                                  |
-| `OTEL_TRACES_SAMPLER`, `OTEL_TRACES_SAMPLER_ARG` | Sampling                                   | parent-based, always-on               |
+| Env var                                          | Purpose                                                                               | Default                               |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------- | ------------------------------------- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`                    | OTLP collector endpoint                                                               | `http://localhost:4318`               |
+| `OTEL_EXPORTER_OTLP_HEADERS`                     | Optional auth headers (e.g. `api-key=xxx`)                                            | none                                  |
+| `OTEL_SERVICE_NAME`                              | Service name in traces                                                                | falls back to `init({ serviceName })` |
+| `OTEL_RESOURCE_ATTRIBUTES`                       | Additional resource attrs (csv); `service.name` can override the default service name | none                                  |
+| `OTEL_TRACES_SAMPLER`, `OTEL_TRACES_SAMPLER_ARG` | Sampling                                                                              | parent-based, always-on               |
 
 `init()` options for non-env cases:
 
 ```ts
 init({
-  serviceName?: string;       // default: 'react-on-rails-pro-node-renderer'
+  serviceName?: string;       // default unless service.name resource attr is set
   fastify?: boolean;          // default: false — register Fastify instr
   tracing?: boolean;          // default: false — wrap SSR in spans
   exporter?: SpanExporter;    // default: OTLPTraceExporter from env
@@ -275,19 +275,24 @@ sub-spans for each NDJSON chunk.
 1. **Init failure** — Required `@opentelemetry/*` packages missing or fail to
    import. Caught in `init()`, logged via `errorReporter.message()`, and the
    integration silently no-ops. The renderer keeps running.
-2. **Exporter failure** — OTLP endpoint unreachable. OTel SDK already swallows
+2. **Auto-instrumentation rollback** — if `fastify: true` reaches
+   `registerInstrumentations()` and a later init step fails, OpenTelemetry does
+   not expose a rollback API for the process-wide HTTP/Fastify patches. The
+   patched modules remain installed and use the no-op tracer until process
+   restart.
+3. **Exporter failure** — OTLP endpoint unreachable. OTel SDK already swallows
    exporter errors. We add a `diag` hook at `DiagLogLevel.WARN` that pipes
    warn/error OTel internal logs into the renderer's pino logger while
    suppressing lower-severity SDK chatter.
-3. **Span attribute serialization failure** — Caller passes a non-serializable
+4. **Span attribute serialization failure** — Caller passes a non-serializable
    value. Wrap attribute setters in try/catch in `subSpan` so a bad attribute
    never breaks a render.
-4. **Shutdown timeout** — `tracerProvider.shutdown()` is bounded by the renderer's
+5. **Shutdown timeout** — `tracerProvider.shutdown()` is bounded by the renderer's
    `shutdownTimeoutMs` option, and the worker graceful-shutdown path also has a
    10s hard timeout around `app.close()`, so a hung exporter cannot block worker
    exit indefinitely. Keep `shutdownTimeoutMs` below the worker close timeout so
    Fastify has time to finish the rest of its close sequence.
-5. **Sensitive data** — The `renderingRequest` string can contain user input. We
+6. **Sensitive data** — The `renderingRequest` string can contain user input. We
    **must not** put it (or a digest derived from it) into span attributes. Only
    the bundle timestamp, sizes, and counts are recorded.
 

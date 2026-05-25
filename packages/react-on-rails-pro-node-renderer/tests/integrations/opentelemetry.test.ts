@@ -95,6 +95,25 @@ describe('opentelemetry integration: init()', () => {
     );
   });
 
+  test('init() lets OTEL_RESOURCE_ATTRIBUTES service.name override the default serviceName', () => {
+    process.env.OTEL_RESOURCE_ATTRIBUTES = 'service.name=resource-renderer';
+
+    try {
+      init({
+        spanProcessor: new SimpleSpanProcessor(exporter),
+      });
+
+      const tracer = otelTrace.getTracer('test');
+      tracer.startActiveSpan('manual.span', (span) => {
+        span.end();
+      });
+
+      expect(exporter.getFinishedSpans()[0]!.resource.attributes['service.name']).toBe('resource-renderer');
+    } finally {
+      delete process.env.OTEL_RESOURCE_ATTRIBUTES;
+    }
+  });
+
   test('init() merges resourceAttributes with defaults', () => {
     init({
       serviceName: 'test-renderer',
@@ -110,6 +129,28 @@ describe('opentelemetry integration: init()', () => {
     const attrs = exporter.getFinishedSpans()[0]!.resource.attributes;
     expect(attrs['service.name']).toBe('test-renderer');
     expect(attrs['deployment.environment']).toBe('staging');
+  });
+
+  test('init() lets explicit resourceAttributes service.name override OTEL_RESOURCE_ATTRIBUTES', () => {
+    process.env.OTEL_RESOURCE_ATTRIBUTES = 'service.name=env-resource-renderer';
+
+    try {
+      init({
+        resourceAttributes: { 'service.name': 'configured-resource-renderer' },
+        spanProcessor: new SimpleSpanProcessor(exporter),
+      });
+
+      const tracer = otelTrace.getTracer('test');
+      tracer.startActiveSpan('manual.span', (span) => {
+        span.end();
+      });
+
+      expect(exporter.getFinishedSpans()[0]!.resource.attributes['service.name']).toBe(
+        'configured-resource-renderer',
+      );
+    } finally {
+      delete process.env.OTEL_RESOURCE_ATTRIBUTES;
+    }
   });
 
   test('init() includes OTEL_RESOURCE_ATTRIBUTES and lets explicit resourceAttributes override them', () => {

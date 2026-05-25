@@ -21,9 +21,13 @@ declare module '../shared/tracing.js' {
 
 export interface OpenTelemetryInitOptions {
   /** Service name reported in traces. Defaults to "react-on-rails-pro-node-renderer".
-   *  `OTEL_SERVICE_NAME` env var takes precedence over this value. */
+   *  `OTEL_SERVICE_NAME` env var takes precedence over this value. If neither is
+   *  set, `resourceAttributes["service.name"]` or `OTEL_RESOURCE_ATTRIBUTES`
+   *  can override the default service name. */
   serviceName?: string;
-  /** Register HTTP + Fastify auto-instrumentation. Default: false. */
+  /** Register HTTP + Fastify auto-instrumentation. Default: false.
+   *  OpenTelemetry module patches are process-global and cannot be rolled back;
+   *  if later init steps fail, patched modules remain installed with a no-op tracer. */
   fastify?: boolean;
   /** Wrap SSR work in spans via setupTracing + setupSubSpan. Default: false. */
   tracing?: boolean;
@@ -50,8 +54,8 @@ function isProduction(): boolean {
   return process.env.NODE_ENV === 'production' || process.env.RAILS_ENV === 'production';
 }
 
-function resolveServiceName(opts: OpenTelemetryInitOptions): string {
-  return process.env.OTEL_SERVICE_NAME ?? opts.serviceName ?? DEFAULT_SERVICE_NAME;
+function resolveConfiguredServiceName(opts: OpenTelemetryInitOptions): string | undefined {
+  return process.env.OTEL_SERVICE_NAME ?? opts.serviceName;
 }
 
 function resolveShutdownTimeoutMs(opts: OpenTelemetryInitOptions): number {
@@ -180,12 +184,18 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
     otelApi = require('@opentelemetry/api') as typeof import('@opentelemetry/api');
     const loadedOtelApi = otelApi;
 
-    const serviceName = resolveServiceName(opts);
-    const shutdownTimeoutMs = resolveShutdownTimeoutMs(opts);
-    const resource = resourceFromAttributes({
+    const resourceAttributes = {
       ...parseResourceAttributes(process.env.OTEL_RESOURCE_ATTRIBUTES),
       ...(opts.resourceAttributes ?? {}),
+    };
+    const configuredServiceName = resolveConfiguredServiceName(opts);
+    const serviceName =
+      configuredServiceName ?? resourceAttributes[ATTR_SERVICE_NAME] ?? DEFAULT_SERVICE_NAME;
+    const shutdownTimeoutMs = resolveShutdownTimeoutMs(opts);
+    const resource = resourceFromAttributes({
       [ATTR_SERVICE_NAME]: serviceName,
+      ...resourceAttributes,
+      ...(configuredServiceName ? { [ATTR_SERVICE_NAME]: configuredServiceName } : {}),
     });
 
     const defaultExporter = () => {
