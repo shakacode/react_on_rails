@@ -17,6 +17,16 @@ RSpec.describe RendererHarness::Config do
       )
     end
 
+    it "warns when smoke mode overrides an explicit scenario" do
+      config = nil
+
+      expect do
+        config = described_class.parse(["--scenario", "streaming_render", "--smoke"])
+      end.to output(/--smoke overrides --scenario streaming_render with standard_render/).to_stderr
+
+      expect(config.scenario).to eq("standard_render")
+    end
+
     it "rejects mutually exclusive run modes" do
       expect do
         described_class.parse(["--requests", "10", "--duration", "1"])

@@ -30,10 +30,12 @@ module RendererHarness
         mem_interval: 1.0,
         renderer_pid: nil,
         output_dir: nil,
-        smoke: false
+        smoke: false,
+        scenario_explicit: false
       }
       build_parser(opts).parse!(argv)
       apply_smoke_preset!(opts) if opts[:smoke]
+      opts.delete(:scenario_explicit)
       validate!(opts)
       new(**opts).freeze
     end
@@ -47,7 +49,10 @@ module RendererHarness
     end
 
     def self.add_primary_flags(opt_parser, opts)
-      opt_parser.on("--scenario NAME", String) { |v| opts[:scenario] = v }
+      opt_parser.on("--scenario NAME", String) do |v|
+        opts[:scenario] = v
+        opts[:scenario_explicit] = true
+      end
       opt_parser.on("--requests N", Integer) { |v| opts[:requests] = v }
       opt_parser.on("--duration SECONDS", Float) { |v| opts[:duration] = v }
       opt_parser.on("--concurrency N", Integer) { |v| opts[:concurrency] = v }
@@ -70,6 +75,9 @@ module RendererHarness
     end
 
     def self.apply_smoke_preset!(opts)
+      if opts[:scenario_explicit] && opts[:scenario] != "standard_render"
+        warn "renderer-harness: --smoke overrides --scenario #{opts[:scenario]} with standard_render"
+      end
       opts[:scenario] = "standard_render"
       opts[:requests] = 10
       opts[:concurrency] = 1

@@ -168,6 +168,8 @@ module RendererHarness
       errors = []
       threads.each do |thread|
         unless thread.join(WORKER_JOIN_TIMEOUT_SECONDS)
+          # This CLI exits after reporting worker timeouts, so force-killing a
+          # stuck request is preferable to hanging the benchmark indefinitely.
           thread.kill
           errors << WorkerJoinTimeout.new(
             "worker thread did not finish within #{WORKER_JOIN_TIMEOUT_SECONDS}s"

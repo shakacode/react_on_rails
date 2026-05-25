@@ -17,7 +17,7 @@ module ReactOnRailsPro
     end
 
     def status
-      @component.status if @component.respond_to?(:status)
+      @component.status
     end
 
     alias http_status status
@@ -156,11 +156,14 @@ module ReactOnRailsPro
 
         parser.feed(chunk, &block)
       end
-      # Empty-body responses record status after the stream is drained; blocking here is safe.
+      # Empty-body responses record status after the stream is drained; specs
+      # assert that status is read only after the response has yielded no chunks.
       record_status(stream_response) unless status_recorded
       parser.flush
     end
 
+    # StreamRequest is consumed sequentially. Status intentionally reflects the
+    # latest response attempt, so a 410 retry replaces the pre-retry status.
     def record_status(response)
       @status = response.is_a?(HTTPX::ErrorResponse) ? nil : response_status(response)
     end

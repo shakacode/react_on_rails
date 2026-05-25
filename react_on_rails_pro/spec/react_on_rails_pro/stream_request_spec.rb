@@ -240,9 +240,14 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
     end
 
     it "exposes the response status for empty streaming responses" do
-      mock_response = double(HTTPX::StreamResponse, status: 204)
+      drained = false
+      mock_response = double(HTTPX::StreamResponse)
       allow(mock_response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(false)
-      allow(mock_response).to receive(:each)
+      allow(mock_response).to receive(:each) { drained = true }
+      allow(mock_response).to receive(:status) do
+        expect(drained).to be(true)
+        204
+      end
 
       stream = described_class.create do |_send_bundle, _barrier|
         mock_response
