@@ -165,6 +165,7 @@ GEM
       bigdecimal
       rexml
     crass (1.0.6)
+    csv (3.3.5)
     date (3.5.1)
     diff-lcs (1.5.1)
     docile (1.4.0)
@@ -502,6 +503,7 @@ DEPENDENCIES
   capybara (>= 3.38.0)
   capybara-screenshot
   commonmarker
+  csv
   equivalent-xml
   fakefs
   faker

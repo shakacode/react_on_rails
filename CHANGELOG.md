@@ -31,6 +31,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** Streaming server-render responses now raise `ReactOnRailsPro::Error` when the stream response status is unavailable or the renderer delivers a readable HTTP error status as a streaming body, instead of silently returning no chunks. This is a user-visible behavior change for callers that do not already rescue `ReactOnRailsPro::Error` from `each_chunk`. [PR 3383](https://github.com/shakacode/react_on_rails/pull/3383).
 - **[Pro]** **Benchmark CI starts the production dummy app on the expected port**: `react_on_rails_pro/spec/dummy/bin/prod` now sets `PORT=3001` by default before launching Foreman, preventing Foreman's default `PORT=5000` from making the Rails server miss the benchmark workflow readiness check on `localhost:3001`. Both `react_on_rails/spec/dummy/bin/prod` and `react_on_rails_pro/spec/dummy/bin/prod` respect `PORT` when it's set. [PR 3403](https://github.com/shakacode/react_on_rails/pull/3403) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
 
 ### [16.7.0.rc.2] - 2026-05-24

@@ -24,10 +24,9 @@ PATH
       addressable
       async (>= 2.29)
       async-http (~> 0.95)
-      connection_pool
       execjs (~> 2.9)
       io-endpoint (~> 0.17.0)
-      jwt (>= 3.2.0)
+      jwt (>= 2.5, < 4)
       rainbow
       react_on_rails (= 16.7.0.rc.2)
 
@@ -165,6 +164,7 @@ GEM
     crass (1.0.6)
     csso-rails (1.0.0)
       execjs (>= 1)
+    csv (3.3.5)
     date (3.5.1)
     diff-lcs (1.5.1)
     docile (1.4.0)
@@ -551,6 +551,7 @@ DEPENDENCIES
   capybara (>= 3.38.0)
   capybara-screenshot
   csso-rails (~> 1.0)
+  csv
   equivalent-xml
   fakefs
   faker
