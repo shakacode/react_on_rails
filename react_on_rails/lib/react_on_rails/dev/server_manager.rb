@@ -577,7 +577,7 @@ module ReactOnRails
         end
 
         # rubocop:disable Metrics/AbcSize
-        def help_commands(default_mode = default_dev_server_mode)
+        def help_commands(default_mode)
           command_label_text = ServerMode.text(default_mode, :command_label)
           command_label = Rainbow(command_label_text).green.bold
           command_padding = " " * [20 - command_label_text.length, 1].max
@@ -631,7 +631,7 @@ module ReactOnRails
         # rubocop:enable Metrics/AbcSize
 
         # rubocop:disable Metrics/AbcSize
-        def help_customization(default_mode = default_dev_server_mode)
+        def help_customization(default_mode)
           procfile_description = ServerMode.text(default_mode, :procfile_description)
           workflow_suffix = Rainbow(ServerMode.text(default_mode, :workflow_suffix)).white
 
@@ -683,7 +683,7 @@ module ReactOnRails
         # rubocop:enable Metrics/AbcSize
 
         # rubocop:disable Metrics/AbcSize
-        def help_mode_details(default_mode = default_dev_server_mode)
+        def help_mode_details(default_mode)
           # Reflect base-port mode so help text advertises the port `bin/dev`
           # will actually use. Without this, `bin/dev help` in a worktree with
           # REACT_ON_RAILS_BASE_PORT=4000 still claims 3000/3001.
@@ -1702,7 +1702,7 @@ module ReactOnRails
         end
 
         # rubocop:disable Metrics/AbcSize
-        def help_troubleshooting(default_mode = default_dev_server_mode)
+        def help_troubleshooting(default_mode)
           <<~TROUBLESHOOTING
             #{Rainbow('🔧 TROUBLESHOOTING:').cyan.bold}
 

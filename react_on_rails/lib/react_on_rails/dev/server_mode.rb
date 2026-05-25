@@ -112,6 +112,7 @@ module ReactOnRails
         def parse_config(config_path)
           return nil unless File.exist?(config_path)
 
+          # ERB uses TOPLEVEL_BINDING here, matching Shakapacker's config loading behavior.
           YAML.safe_load(ERB.new(File.read(config_path)).result, permitted_classes: [Symbol], aliases: true)
         rescue SyntaxError, StandardError => e
           warn(
@@ -139,13 +140,15 @@ module ReactOnRails
           return :live_reload if live_reload == true
           return :development_server if live_reload == false
 
-          # Shakapacker maps omitted live_reload to the inverse of hmr in package/webpackDevServerConfig.ts.
-          # Once HMR is not enabled, omitted live_reload means full-page live reload.
+          # When neither explicit HMR nor explicit live_reload: false is configured, default to live reload.
+          # Shakapacker enables live reload by default unless explicitly disabled:
+          # https://github.com/shakacode/shakapacker/blob/main/package/webpackDevServerConfig.ts
           # See generators/react_on_rails/templates/base/base/config/shakapacker.yml.tt.
           :live_reload
         end
 
         def hmr_config(value)
+          # Shakapacker's "hmr: only" is webpack-dev-server-only HMR, not a React on Rails custom value.
           return true if value.to_s.strip.casecmp("only").zero?
 
           boolean_config(value)

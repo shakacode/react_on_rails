@@ -328,7 +328,7 @@ module ReactOnRails
         if filename == "Procfile.dev" && !content.include?("shakapacker-dev-server")
           procfile_description = config[:description]
           checker.add_warning(
-            "  ⚠️  Missing shakapacker-dev-server for #{procfile_description}"
+            "  ⚠️  #{procfile_description} (Procfile.dev) requires shakapacker-dev-server"
           )
         elsif filename == "Procfile.dev-static-assets" && !content.include?("shakapacker")
           checker.add_warning("  ⚠️  Missing shakapacker for static asset compilation")
@@ -1991,7 +1991,7 @@ module ReactOnRails
     end
 
     def add_shared_output_path_procfile_guidance
-      return unless hmr_procfile_configured?
+      return unless procfile_dev_uses_dev_server?
 
       procfile_dev_label = Dev::ServerMode.text(default_dev_server_mode, :procfile_dev_label)
 
@@ -2011,7 +2011,7 @@ module ReactOnRails
       end
     end
 
-    def hmr_procfile_configured?
+    def procfile_dev_uses_dev_server?
       return false unless File.exist?("Procfile.dev")
 
       File.read("Procfile.dev").include?("shakapacker-dev-server")

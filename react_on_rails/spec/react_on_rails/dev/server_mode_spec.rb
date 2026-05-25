@@ -32,7 +32,7 @@ RSpec.describe ReactOnRails::Dev::ServerMode do
       expect(described_class.detect("config/shakapacker.yml")).to eq(:live_reload)
     end
 
-    it "uses Shakapacker's live reload default when dev_server omits both hmr and live_reload" do
+    it "uses live reload default when dev_server has only host/port settings" do
       write_shakapacker_config(<<~YAML)
         development:
           dev_server:
@@ -170,6 +170,16 @@ RSpec.describe ReactOnRails::Dev::ServerMode do
 
       expect { described_class.detect("config/shakapacker.yml") }
         .to output(%r{\[ReactOnRails\] Could not parse config/shakapacker.yml}).to_stderr
+    end
+
+    it "evaluates ERB in the config file" do
+      write_shakapacker_config(<<~YAML)
+        development:
+          dev_server:
+            hmr: <%= true %>
+      YAML
+
+      expect(described_class.detect("config/shakapacker.yml")).to eq(:hmr)
     end
   end
 

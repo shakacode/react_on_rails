@@ -2016,7 +2016,9 @@ RSpec.describe ReactOnRails::Doctor do
 
       warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
       expect(warning_messages).to include(
-        a_string_including("Missing shakapacker-dev-server for Live reload development with webpack-dev-server")
+        a_string_including(
+          "Live reload development with webpack-dev-server (Procfile.dev) requires shakapacker-dev-server"
+        )
       )
     end
 
