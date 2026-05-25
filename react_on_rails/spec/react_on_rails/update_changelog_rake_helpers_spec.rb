@@ -507,5 +507,69 @@ RSpec.describe "update_changelog.rake helper methods" do
         expect(version).to eq("16.4.0.rc.0")
       end
     end
+
+    it "increments rc index from existing rc tag of the same base version" do
+      Dir.mktmpdir do |repo_dir|
+        init_git_repo!(repo_dir)
+        run_git!("tag", "v16.3.0", chdir: repo_dir)
+        run_git!("tag", "v16.4.0.rc.0", chdir: repo_dir)
+
+        changelog = <<~CHANGELOG
+          ### [Unreleased]
+
+          ### [16.4.0.rc.0] - 2026-03-01
+          #### Added
+          - Feature from rc.0
+        CHANGELOG
+
+        version = compute_auto_version(changelog, "rc", repo_dir)
+
+        expect(version).to eq("16.4.0.rc.1")
+      end
+    end
+
+    it "reuses the active prerelease base even when Unreleased entries would suggest a different bump" do
+      # When rc.0 is tagged based on a minor bump (16.3.0 -> 16.4.0), a subsequent
+      # rc.1 must stay on the same 16.4.0 base even if Unreleased only contains a
+      # bug fix (which would naively suggest a patch bump to 16.3.1.rc.0).
+      Dir.mktmpdir do |repo_dir|
+        init_git_repo!(repo_dir)
+        run_git!("tag", "v16.3.0", chdir: repo_dir)
+        run_git!("tag", "v16.4.0.rc.0", chdir: repo_dir)
+
+        changelog = <<~CHANGELOG
+          ### [Unreleased]
+
+          #### Fixed
+          - A patch-level fix added since rc.0
+
+          ### [16.4.0.rc.0] - 2026-03-01
+          #### Added
+          - Feature from rc.0
+        CHANGELOG
+
+        version = compute_auto_version(changelog, "rc", repo_dir)
+
+        expect(version).to eq("16.4.0.rc.1")
+      end
+    end
+
+    it "falls through to stable-bump inference for rc mode when no active prerelease base exists" do
+      Dir.mktmpdir do |repo_dir|
+        init_git_repo!(repo_dir)
+        run_git!("tag", "v16.3.0", chdir: repo_dir)
+
+        changelog = <<~CHANGELOG
+          ### [Unreleased]
+
+          #### Added
+          - A new feature for the next minor release
+        CHANGELOG
+
+        version = compute_auto_version(changelog, "rc", repo_dir)
+
+        expect(version).to eq("16.4.0.rc.0")
+      end
+    end
   end
 end

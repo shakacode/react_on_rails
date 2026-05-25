@@ -400,6 +400,21 @@ def compute_auto_version(changelog, mode, monorepo_root, changelog_for_bump: nil
   # Keep backward compatibility with older callers that pass changelog_for_bump
   # as a keyword while allowing the new 3-argument call shape.
   changelog_for_bump ||= changelog
+
+  # For rc/beta modes, if an active prerelease base already exists (from a
+  # tag or a draft changelog header above the latest stable), reuse it
+  # directly. The bump decision was made when the first RC of the series
+  # was stamped; once rc.0 ships, rc.1 must stay on the same base version
+  # even if Unreleased is empty or its headings suggest a different bump.
+  if %w[rc beta].include?(mode)
+    active_base = active_prerelease_base_version(monorepo_root, changelog)
+    if active_base
+      indices = prerelease_indices_from_tags(monorepo_root, active_base, mode)
+      next_index = indices.empty? ? 0 : indices.max + 1
+      return "#{active_base}.#{mode}.#{next_index}"
+    end
+  end
+
   bump_type = inferred_bump_type_from_unreleased(changelog_for_bump)
   latest_stable = latest_stable_tag_version(monorepo_root)
   base_version = bump_stable_version(latest_stable, bump_type)
@@ -450,9 +465,13 @@ desc "Updates CHANGELOG.md by inserting a version header and compare links.
 Argument: Mode (`release`, `rc`, `beta`) or explicit git tag/version.
 
 Modes:
-  - release: auto-compute next stable version from Unreleased section headings
-  - rc: auto-compute next RC version and collapse prior RC sections of same base version
-  - beta: auto-compute next beta version and collapse prior beta sections of same base version
+  - release: auto-compute next stable version and collapse prior RC/beta
+             sections of the same base version into the new stable section
+  - rc: auto-compute next RC version; prior RC/beta sections of the same
+        base version are left in place so users can see what changed
+        between RCs
+  - beta: auto-compute next beta version; prior beta/RC sections of the
+          same base version are left in place
 
 Explicit argument examples:
   - v16.4.0.rc.6
@@ -473,7 +492,14 @@ task :update_changelog, %i[mode_or_tag] do |_, args|
 
   if auto_mode
     fetch_git_tags!(monorepo_root)
-    prepared_changelog = prepare_changelog_for_auto_version(changelog, monorepo_root)
+    # Collapse prior prerelease sections only when stamping the stable
+    # release. For rc/beta modes, each prerelease keeps its own section
+    # so users on an earlier RC can see what changed between RCs.
+    prepared_changelog = if auto_mode == "release"
+                           prepare_changelog_for_auto_version(changelog, monorepo_root)
+                         else
+                           changelog
+                         end
     changelog_version = compute_auto_version(prepared_changelog, auto_mode, monorepo_root)
     changelog = prepared_changelog
     tag_date = Date.today.strftime("%Y-%m-%d")
