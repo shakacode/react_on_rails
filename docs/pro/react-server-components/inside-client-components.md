@@ -210,7 +210,7 @@ Use `stream_react_component` to render the wrapped component:
 ```
 
 > [!IMPORTANT]
-> Use `stream_react_component`, not `react_component`, whenever the initial response should server-render `RSCRoute` content or stream `Suspense` fallback HTML for `ssr={false}` routes. If you intentionally want a client-rendered root, use `react_component(..., prerender: false)` with auto-bundling and `ssr={false}` routes. The unsupported case is `react_component(..., prerender: true)` for server-rendered RSC usage; the server variant of `wrapServerComponentRenderer` will throw a descriptive error there.
+> Use `stream_react_component`, not `react_component`, whenever the initial response should server-render `RSCRoute` content or stream `Suspense` fallback HTML for `ssr={false}` routes. If you intentionally want a client-rendered root, use `react_component(..., prerender: false)` with auto-bundling and `ssr={false}` routes. The unsupported case is `react_component(..., prerender: true)` for server-rendered `RSCRoute` payloads; use `stream_react_component` for that path.
 
 That's the complete setup. The rest of this guide covers how to simplify registration with auto-bundling, understand performance and caching, handle errors, and apply common patterns.
 
@@ -243,7 +243,7 @@ Auto-bundling takes care of the **registration** layer: it generates the per-com
 
 For streaming SSR that server-renders any `RSCRoute` payload, auto-bundling does **not** replace the explicit wrappers. You must still author `AppRouter.client.tsx` and `AppRouter.server.tsx` yourself with `wrapServerComponentRenderer` as shown in [Step 3 of the walkthrough](#3-wrap-the-client-component-for-both-bundles). The generator uses whatever you export from those files as the "AppRouter" component in each bundle.
 
-For roots that only use deferred `RSCRoute ssr={false}` payloads, auto-bundling can set up the client RSC provider automatically when RSC support is enabled. Generated client component packs import `react-on-rails-pro/registerDefaultRSCProvider/client` before registering the root. This supports `RSCRoute ssr={false}` in the browser without manually wrapping the root. Fully manual client entrypoints that bypass generated packs can import the same registration module before calling `ReactOnRails.register`.
+For roots that only use deferred `RSCRoute ssr={false}` payloads, auto-bundling can set up the client RSC provider automatically when RSC support is enabled. Generated client component packs import `react-on-rails-pro/registerDefaultRSCProvider/client` before registering the root. This supports `RSCRoute ssr={false}` in the browser without manually wrapping the root. Fully manual client entrypoints that bypass generated packs can mirror that generated-pack setup import before calling `ReactOnRails.register`; it is not a replacement for `wrapServerComponentRenderer` when the initial response server-renders RSC payloads.
 
 > [!IMPORTANT]
 > The `.server.tsx` / `.client.tsx` variants here are legitimate because both wrappers are **client components** (both start with `'use client'`) that happen to use different imports for client-side vs server-side rendering. **Do not** apply the `.client` / `.server` suffixes to the actual server components referenced by `RSCRoute` (`Dashboard.jsx`, `Profile.jsx`). Server components have no client-side variant — their code never runs in the browser. See [the RSC variant rules](../../oss/core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md#when-to-use-client--server-variants-with-rsc) for details.
@@ -453,7 +453,7 @@ Unless noted otherwise, each API below is a default export — use default-impor
 
 **Error: "Component 'X' is registered as a server component but is being rendered with the react_component helper"**
 
-This error occurs when using `react_component` with `prerender: true` (or the default prerender setting). The server-side `wrapServerComponentRenderer` requires streaming capabilities that only `stream_react_component` provides. Either switch to `stream_react_component`, or if you don't need SSR for the RSC route, use `react_component` with `prerender: false`, auto-bundling, and `ssr={false}` — `RSCRoute` will fetch the RSC payload over HTTP on the client side.
+This error occurs when a component that needs the RSC server-rendering context is rendered through `react_component` with `prerender: true` (or the default prerender setting). `react_component` supports normal SSR, but it does not provide the RSC streaming context required by `wrapServerComponentRenderer/server`. Either switch to `stream_react_component`, or if you don't need SSR for the RSC route, use `react_component` with `prerender: false`, auto-bundling, and `ssr={false}` — `RSCRoute` will fetch the RSC payload over HTTP on the client side.
 
 **Empty content where the server component should appear**
 
@@ -467,7 +467,7 @@ Check the browser's network tab — is the request to your RSC payload endpoint 
 
 **`useRSC` returns `undefined` or throws**
 
-The component calling `useRSC` is not inside a tree set up by `wrapServerComponentRenderer`, `registerServerComponent`, or the default provider registration for an auto-bundled root that only defers `RSCRoute` payloads with `ssr={false}`. Make sure you registered the `.client.tsx` / `.server.tsx` variants for streaming SSR that server-renders RSC payloads, or that auto-bundling is generating the client pack for your deferred-only root. If you use a fully manual client entrypoint, import `react-on-rails-pro/registerDefaultRSCProvider/client` before registering the root.
+The component calling `useRSC` is not inside a tree set up by `wrapServerComponentRenderer`, `registerServerComponent`, or the default provider registration for an auto-bundled root that only defers `RSCRoute` payloads with `ssr={false}`. Make sure you registered the `.client.tsx` / `.server.tsx` variants for streaming SSR that server-renders RSC payloads, or that auto-bundling is generating the client pack for your deferred-only root. If you use a fully manual client entrypoint, mirror the generated client pack setup by importing `react-on-rails-pro/registerDefaultRSCProvider/client` before registering the root.
 
 **The bundler complains about importing a server component from a client component**
 

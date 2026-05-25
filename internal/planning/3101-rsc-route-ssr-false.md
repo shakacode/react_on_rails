@@ -306,9 +306,57 @@ streaming capabilities before the child component tree renders. That means an `R
 itself make this path work, because the outer renderer fails before `RSCRoute` gets a chance to return no
 content.
 
-Supporting that mode requires a contained change that delays the streaming-capability check until server RSC
-payload generation is actually requested, while preserving the existing descriptive error for true
-server-rendered RSC usage. That belongs to the non-streaming helper phase, not Phase 1.
+### Phase 4 investigation: `react_component(..., prerender: true)`
+
+Question: can deferred `RSCRoute ssr={false}` work cleanly inside the non-streaming
+`react_component(..., prerender: true)` helper, not only inside `stream_react_component` or client-rendered
+`react_component(..., prerender: false)` roots?
+
+Phase 4 investigated this mode and is deferred.
+
+The important distinction is functional support versus clean support. An unwrapped
+`react_component(..., prerender: true)` root with only `RSCRoute ssr={false}` can already render the surrounding
+HTML, show the nearest Suspense fallback, hydrate, fetch the RSC payload in the browser, and eventually show the
+server component. A wrapped root can also reach that behavior if the early streaming-capability assertion is
+delayed. The unresolved problem is not basic rendering; it is safely identifying the intentional `ssr={false}`
+server bailout during hydration so React's expected recoverable error can be suppressed without hiding real server
+render errors.
+
+Key findings:
+
+- `react_component(..., prerender: true)` uses React's `renderToString` path.
+- React documents `renderToString` as having limited Suspense support. When a component suspends, the output
+  contains fallback HTML immediately rather than waiting for the content.
+- `renderToString` has no public `onError` option and internally uses a no-op error handler.
+- Development output may include a Suspense error message, but not the bailout digest.
+- Production output uses a generic Suspense fallback marker with no message or digest.
+- React static prerender APIs can serialize an `onError` digest. For example, a renderer using static prerender
+  could return the `RSCRoute ssr={false}` bailout digest from `onError`, React would write that digest into the
+  Suspense boundary marker, and the browser could suppress only that known bailout. That is the clean signal
+  `renderToString` does not provide.
+
+A naive fix that only delays the `wrapServerComponentRenderer/server` streaming-capability check is not safe. It
+lets deferred-only `ssr={false}` render fallback HTML, but if an `ssr={true}` route attempts real server RSC
+payload generation under Suspense, React can catch the thrown unsupported-helper error and emit fallback/client
+retry markers instead of preserving the existing descriptive failure. That would weaken the current clear error
+for unsupported server RSC rendering through `react_component(..., prerender: true)`.
+
+Decision: do not implement non-streaming `react_component(..., prerender: true)` support in this PR stack. Clean
+support requires one of:
+
+1. a wrapper-only special case: inside `wrapServerComponentRenderer/server`, use React static prerender only when
+   the normal streaming capabilities are missing and the tree is deferred-only. That would clean up wrapped
+   `react_component(..., prerender: true)` roots, but unwrapped roots would still render with `renderToString` and
+   keep the noisy recoverable error; or
+2. a broader Pro render-pipeline change: teach the non-streaming Pro server-render path to use React static
+   prerender for eligible RSC/Suspense roots, so both wrapped and unwrapped `react_component(..., prerender: true)`
+   cases can get the same classified bailout signal.
+
+Both are larger than the contained `ssr={false}` route behavior and default-provider work here. The supported
+paths remain:
+
+- `stream_react_component` for server-rendered RSC payloads and streamed Suspense fallback HTML;
+- `react_component(..., prerender: false)` for client-deferred RSC roots that fetch after the browser renders.
 
 ## Implementation phases
 
@@ -373,9 +421,14 @@ review boundaries; they do not mean every later phase is a small additive patch 
 
 ### Phase 4: non-streaming Rails helper support
 
-- Support the `react_component(..., prerender: true)` path for deferred-only RSC usage by delaying
-  server-capability checks until server RSC payload generation is requested.
-- Preserve the existing descriptive error when true server-rendered RSC usage requires streaming capabilities.
+- Deferred after investigation. Clean support for `react_component(..., prerender: true)` and deferred-only RSC
+  usage requires more than delaying server-capability checks.
+- Preserve the existing descriptive error when true server-rendered RSC usage requires streaming capabilities; do
+  not let Suspense hide that unsupported-helper error behind a client retry marker.
+- Avoid broad recoverable-error suppression for `renderToString`, because production output does not carry the
+  classified bailout digest.
+- Consider a follow-up design around React static prerender or a broader Pro render-pipeline change for eligible
+  non-streaming RSC/Suspense roots.
 - Keep `react_component(..., prerender: false)` on the client-rendered path, where no server RSC payload is
   generated during the initial response.
 
@@ -467,8 +520,8 @@ Phases 2-4 preserve the payload-skipping goal while changing or expanding specif
   with loading UI controlled by the nearest scoped Suspense boundary.
 - Phase 3 adds automatic root-level RSC provider setup for auto-bundled deferred-only roots that contain
   `RSCRoute ssr={false}` and do not explicitly call `wrapServerComponentRenderer`.
-- Phase 4 adds non-streaming Rails helper support for server-rendered `react_component(..., prerender: true)`
-  paths by delaying server-capability checks until server RSC payload generation is requested.
+- Phase 4 was investigated and deferred. Clean `react_component(..., prerender: true)` support for RSC/Suspense
+  roots needs a separate render-pipeline design, not just delayed server-capability checks.
 
-All phases are part of the target implementation for issue #3101. They are separated to keep the review and test
-surface understandable while preserving a single end-to-end design.
+The implemented phases are separated to keep the review and test surface understandable while preserving a single
+end-to-end design.
