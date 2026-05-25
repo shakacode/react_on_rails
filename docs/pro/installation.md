@@ -317,7 +317,19 @@ jobs:
 
       # Add database, credentials, Node/pnpm, and other app-specific setup required to boot Rails in production.
       - name: Verify React on Rails Pro license
-        run: bundle exec rake react_on_rails_pro:verify_license
+        run: |
+          set +e
+          bundle exec rake react_on_rails_pro:verify_license \
+            > "$RUNNER_TEMP/react_on_rails_pro_license.log" 2>&1
+          exit_code=$?
+          set -e
+
+          if [ "$exit_code" -ne 0 ]; then
+            echo "::error title=React on Rails Pro license::License validation failed. Run the task locally or inspect a redacted log for details."
+            exit "$exit_code"
+          fi
+
+          echo "React on Rails Pro license validation passed."
 ```
 
 If the repository does not pin Ruby with `.ruby-version` or a `ruby` directive in the Gemfile, add `ruby-version:` to
@@ -403,8 +415,8 @@ manual runs, or deployment gates. To block deployment, call the blocking check f
 job. A standalone `push` workflow is only a post-merge signal. Pull requests from public forks usually cannot access
 repository secrets, so these checks would report a missing token there.
 
-The advisory workflow redirects raw task output to `$RUNNER_TEMP` and writes only pass/fail status to the step summary so
-organization, plan, and expiration metadata are not copied into the summary. Remove the redirect or upload a redacted
+Both workflow examples redirect raw task output to `$RUNNER_TEMP` and write only pass/fail status to logs or summaries so
+organization, plan, and expiration metadata are not copied into Actions output. Remove the redirect or upload a redacted
 artifact only after verifying that the task output is acceptable for everyone who can read your repository's Actions
 logs. The `$RUNNER_TEMP` log file is intentionally ephemeral; if you need diagnostics after the job ends, run the task
 locally or upload a redacted artifact with restricted retention. If the license secret is absent, the advisory workflow
