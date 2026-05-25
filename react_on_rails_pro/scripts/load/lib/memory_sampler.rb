@@ -67,6 +67,8 @@ module RendererHarness
 
       unless thread.join(timeout_seconds)
         warn "MemorySampler: background thread did not stop within #{timeout_seconds}s"
+        # The CLI reads sampled rows only after stop_background returns. Killing
+        # the sampler is a shutdown fallback, not a long-lived embedding contract.
         thread.kill
         thread.join(timeout_seconds)
       end

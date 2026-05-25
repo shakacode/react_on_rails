@@ -66,7 +66,7 @@ RSpec.describe RendererHarness::Runner do
       config: build_config(requests: 2, concurrency: 2, warmup: 1)
     )
     warmup_counts_at_clock_reads = []
-    clock_values_after_warmup = [10.0, 10.5]
+    clock_values_after_warmup = [10.0, 10.5, 10.75, 11.0, 11.25, 11.5]
     allow(runner).to receive(:monotonic) do
       warmup_counts_at_clock_reads << scenario.warmup_calls
       scenario.warmup_calls < 2 ? 0.0 : clock_values_after_warmup.shift
@@ -137,16 +137,16 @@ RSpec.describe RendererHarness::Runner do
   end
 
   it "allows request-count runs to exceed the stuck-worker shutdown grace" do
-    stub_const("#{described_class}::WORKER_JOIN_TIMEOUT_SECONDS", 0.01)
+    stub_const("#{described_class}::WORKER_JOIN_TIMEOUT_SECONDS", 0.05)
     scenario = build_scenario
     allow(scenario).to receive(:perform_request) do
-      sleep 0.02
+      sleep 0.03
       RendererHarness::RequestResult.new(latency_ms: 20.0, ok: true)
     end
-    runner = described_class.new(scenario: scenario, config: build_config(requests: 1))
+    runner = described_class.new(scenario: scenario, config: build_config(requests: 3))
 
     expect { runner.run }.not_to raise_error
-    expect(runner.results.size).to eq(1)
+    expect(runner.results.size).to eq(3)
   end
 
   it "applies the worker join timeout as one global deadline" do
@@ -246,6 +246,15 @@ RSpec.describe RendererHarness::Runner do
       scenario: scenario,
       config: build_config(requests: nil, duration: 0.01)
     )
+
+    expect { runner.run }.to raise_error(described_class::WorkerJoinTimeout, /did not finish/)
+  end
+
+  it "times out request-count workers after all requests are claimed" do
+    stub_const("#{described_class}::WORKER_JOIN_TIMEOUT_SECONDS", 0.01)
+    scenario = build_scenario
+    allow(scenario).to receive(:perform_request) { sleep 1 }
+    runner = described_class.new(scenario: scenario, config: build_config(requests: 1))
 
     expect { runner.run }.to raise_error(described_class::WorkerJoinTimeout, /did not finish/)
   end

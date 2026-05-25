@@ -52,6 +52,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
           raise NoMethodError, "undefined method `status`"
         end
       end.new
+      expect(Rails.logger).to receive(:warn).with(/ignoring error while reading stream response status: NoMethodError/)
 
       yielded_chunks = []
       expect do
@@ -142,6 +143,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
           raise ArgumentError, "status unavailable"
         end
       end.new
+      expect(Rails.logger).to receive(:warn).with(/ignoring error while reading stream response status: ArgumentError/)
 
       expect do
         request.send(:process_response_chunks, response, error_body) { |_| nil }
@@ -354,6 +356,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       allow(mock_response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(false)
       allow(mock_response).to receive(:status).and_raise(NoMethodError)
       allow(mock_response).to receive(:each).and_yield("renderer error")
+      expect(Rails.logger).to receive(:warn).with(/ignoring error while reading stream response status: NoMethodError/)
 
       stream = described_class.create do |_send_bundle, _barrier|
         mock_response
@@ -434,6 +437,9 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       stream = described_class.create do |_send_bundle, _barrier|
         raise http_error
       end
+      expect(Rails.logger).to receive(:warn).with(
+        /ignoring unexpected error while reading HTTP error response status: RuntimeError/
+      )
 
       expect { stream.each_chunk(&:itself) }.to raise_error(
         ReactOnRailsPro::Error,

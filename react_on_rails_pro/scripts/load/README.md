@@ -96,7 +96,8 @@ REACT_ON_RAILS_RENDERER_TRANSPORT=async_http bin/renderer-harness --scenario str
 - `ps -o rss=` units are kB on both macOS and Linux but reporting is best-effort; if the process is gone mid-sample, the row is omitted (not zero-filled).
 - FD count is not yet collected — planned for follow-up.
 - The harness uses the renderer URL and password from the dummy app initializer (`config/initializers/react_on_rails_pro.rb`).
-- Count-based runs do not impose a post-start join deadline because there is no configured run length; use duration mode when a bounded wall-clock run matters.
+- Count-based runs apply the stuck-worker shutdown grace after the final requested
+  request is claimed; use duration mode when a bounded wall-clock run matters.
 
 ## CI
 

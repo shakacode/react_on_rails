@@ -98,7 +98,7 @@ module RendererHarness
         html = chunk.fetch("html")
         metadata = chunk.except("html")
         payload_type = metadata.fetch("payloadType") { html.is_a?(String) ? "string" : "object" }
-        metadata["payloadType"] = payload_type
+        metadata = metadata.merge("payloadType" => payload_type)
         html_body = payload_type == "object" ? JSON.generate(html) : html.to_s
 
         # Wire layout: <metadata JSON> \t <8-char hex content length> \n <html bytes>.

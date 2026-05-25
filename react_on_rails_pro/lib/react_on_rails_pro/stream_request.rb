@@ -173,8 +173,9 @@ module ReactOnRailsPro
       # Start each attempt from nil. Known missing-status cases keep that nil as
       # an unknown status; unexpected extraction errors still propagate after the
       # ensure below marks status as attempted.
-      @status = nil # Reset before extraction so a raise leaves @status nil, not stale.
-      @status = extract_status(response)
+      @status = nil
+      extracted_status = extract_status(response)
+      @status = extracted_status
     ensure
       # If status extraction itself fails, callers should treat the unknown
       # status as an error response rather than as "status was never read."
@@ -193,12 +194,14 @@ module ReactOnRailsPro
       return nil if response.is_a?(HTTPX::ErrorResponse)
 
       response.status
-    rescue NoMethodError, ArgumentError
+    rescue NoMethodError, ArgumentError => e
       # NoMethodError: HTTPX::StreamResponse can fail to delegate #status before
       # request.response is available for non-streaming errors.
       # ArgumentError: HTTPX 1.7.0 can raise while materializing status from a
       # partially-consumed StreamResponse; transport-level HTTPX::Error still propagates.
-      # TODO: remove ArgumentError rescue once the minimum HTTPX version fixes this.
+      # TODO: remove ArgumentError rescue after the minimum HTTPX version no longer
+      # raises while reading status from partially-consumed stream responses.
+      warn_status_read_failure("ignoring error while reading stream response status", e)
       nil
     end
 
@@ -208,10 +211,13 @@ module ReactOnRailsPro
       # this attempt, not any intermediate streaming status from a prior attempt.
       begin
         record_status(response)
-      rescue StandardError
+      rescue StandardError => e
         # record_status leaves @status nil before extraction; keep dispatching
         # the HTTPError path so callers receive the renderer error context.
-        nil
+        warn_status_read_failure(
+          "ignoring unexpected error while reading HTTP error response status",
+          e
+        )
       end
       case @status
       when ReactOnRailsPro::STATUS_SEND_BUNDLE
@@ -228,6 +234,15 @@ module ReactOnRailsPro
       else
         status_label = @status || "unknown"
         raise ReactOnRailsPro::Error, "Unexpected response code from renderer: #{status_label}:\n#{error_body}"
+      end
+    end
+
+    def warn_status_read_failure(context, error)
+      message = "[ReactOnRailsPro] #{context}: #{error.class}: #{error.message}"
+      if defined?(Rails) && Rails.respond_to?(:logger) && Rails.logger
+        Rails.logger.warn(message)
+      else
+        warn(message)
       end
     end
   end

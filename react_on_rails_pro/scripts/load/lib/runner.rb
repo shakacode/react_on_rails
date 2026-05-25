@@ -5,6 +5,7 @@ module RendererHarness
     StartGate = Struct.new(:mutex, :ready_cv, :start_cv, :ready_count, :started, :aborted, :deadline,
                            :abort_error, keyword_init: true)
     WORKER_JOIN_TIMEOUT_SECONDS = 30
+    COUNT_JOIN_POLL_INTERVAL_SECONDS = 0.05
     MeasurementAborted = Class.new(StandardError)
     WorkerJoinTimeout = Class.new(StandardError)
 
@@ -38,6 +39,7 @@ module RendererHarness
       @measurement_started_at = nil
       @remaining = 0
       @remaining_mutex = Mutex.new
+      @count_join_deadline = nil
     end
 
     # Returns elapsed seconds with per-thread warmup excluded.
@@ -66,9 +68,11 @@ module RendererHarness
 
     def run_by_count(gate)
       @remaining = @config.requests
+      @count_join_deadline = nil
       Array.new(@config.concurrency) do
         worker_thread(gate) do |worker_results|
-          # Count-based runs stop via claim_request, so any duration deadline is intentionally unused here.
+          # Count-based runs stop via claim_request; after the final request is
+          # claimed, join uses the same stuck-worker grace as duration runs.
           prepare_worker(gate)
           worker_results << @scenario.perform_request while claim_request
         end
@@ -80,6 +84,7 @@ module RendererHarness
         return false if @remaining <= 0
 
         @remaining -= 1
+        @count_join_deadline = monotonic + WORKER_JOIN_TIMEOUT_SECONDS if @remaining.zero?
         true
       end
     end
@@ -222,9 +227,13 @@ module RendererHarness
 
     def worker_join_deadline(measurement_start)
       return monotonic + WORKER_JOIN_TIMEOUT_SECONDS unless measurement_start
-      return nil unless @config.duration
+      return count_join_deadline if @config.requests
 
       measurement_start + @config.duration + WORKER_JOIN_TIMEOUT_SECONDS
+    end
+
+    def count_join_deadline
+      :after_requests_claimed
     end
 
     def join_threads(threads, deadline:, ignore_measurement_aborted: false)
@@ -250,12 +259,30 @@ module RendererHarness
     end
 
     def join_thread(thread, deadline)
+      return join_count_thread(thread) if deadline == count_join_deadline
       return thread.join unless deadline
 
       remaining = deadline - monotonic
       return nil unless remaining.positive?
 
       thread.join(remaining)
+    end
+
+    def join_count_thread(thread)
+      loop do
+        deadline = @remaining_mutex.synchronize { @count_join_deadline }
+        unless deadline
+          joined_thread = thread.join(COUNT_JOIN_POLL_INTERVAL_SECONDS)
+          return joined_thread if joined_thread
+
+          next
+        end
+
+        remaining = deadline - monotonic
+        return nil unless remaining.positive?
+
+        return thread if thread.join(remaining)
+      end
     end
 
     def raise_worker_errors(errors, ignore_measurement_aborted:)
