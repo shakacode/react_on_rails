@@ -151,6 +151,31 @@ describe('opentelemetry integration: init()', () => {
 
     expect(addHook).not.toHaveBeenCalled();
   });
+
+  test('Fastify shutdown hook unregisters itself after onClose', async () => {
+    init({
+      spanProcessor: new SimpleSpanProcessor(exporter),
+    });
+
+    const firstHooks: Array<() => Promise<void>> = [];
+    applyFastifyConfigFunctions({
+      addHook: jest.fn((_name: string, handler: () => Promise<void>) => firstHooks.push(handler)),
+    } as never);
+    expect(firstHooks).toHaveLength(1);
+    await firstHooks[0]!();
+
+    init({
+      spanProcessor: new SimpleSpanProcessor(new InMemorySpanExporter()),
+    });
+
+    const secondHooks: Array<() => Promise<void>> = [];
+    applyFastifyConfigFunctions({
+      addHook: jest.fn((_name: string, handler: () => Promise<void>) => secondHooks.push(handler)),
+    } as never);
+
+    expect(secondHooks).toHaveLength(1);
+    await secondHooks[0]!();
+  });
 });
 
 describe('opentelemetry integration: fastify auto-instrumentation', () => {

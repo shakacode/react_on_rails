@@ -132,7 +132,7 @@ async function shutdownProviderWithTimeout(
 ): Promise<void> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   const shutdownPromise = provider.shutdown().catch((error: unknown) => {
-    log.warn({ msg: '[OpenTelemetry] provider.shutdown() failed', error });
+    log.warn({ error }, '[OpenTelemetry] provider.shutdown() failed');
   });
 
   try {
@@ -279,19 +279,24 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
         setOpenTelemetryTracerProvider(null);
       }
       installedAdapters = resetInstalledTracingAdapters(installedAdapters);
-      throw err;
+      message(`[OpenTelemetry] init failed: ${String(err)}`);
+      return;
     }
 
     // Register this last so failed init paths do not leave a partial Fastify hook
     // behind. Fastify fires onClose during app.close(), giving the span processor
     // a chance to export queued spans before the process exits.
-    configureFastify((app) => {
+    const unregisterFastifyConfig = configureFastify((app) => {
       app.addHook('onClose', async () => {
-        await shutdownProviderWithTimeout(provider, shutdownTimeoutMs);
-        if (getOpenTelemetryTracerProvider() === provider) {
-          setOpenTelemetryTracerProvider(null);
-          disableOpenTelemetryGlobals(otelApi);
-          installedAdapters = resetInstalledTracingAdapters(installedAdapters);
+        try {
+          await shutdownProviderWithTimeout(provider, shutdownTimeoutMs);
+          if (getOpenTelemetryTracerProvider() === provider) {
+            setOpenTelemetryTracerProvider(null);
+            disableOpenTelemetryGlobals(otelApi);
+            installedAdapters = resetInstalledTracingAdapters(installedAdapters);
+          }
+        } finally {
+          unregisterFastifyConfig();
         }
       });
     });

@@ -137,6 +137,7 @@ describe('opentelemetry integration: init() failure path', () => {
       jest.doMock('../../src/worker/fastifyConfig.js', () => ({
         configureFastify: jest.fn((callback: (app: { addHook: jest.Mock }) => void) => {
           configureFastifyCallback = callback;
+          return jest.fn();
         }),
       }));
       jest.doMock('@opentelemetry/sdk-trace-node', () => ({
@@ -217,6 +218,7 @@ describe('opentelemetry integration: init() failure path', () => {
     jest.doMock('../../src/worker/fastifyConfig.js', () => ({
       configureFastify: jest.fn((callback: (app: { addHook: jest.Mock }) => void) => {
         configureFastifyCallbacks.push(callback);
+        return jest.fn();
       }),
     }));
 

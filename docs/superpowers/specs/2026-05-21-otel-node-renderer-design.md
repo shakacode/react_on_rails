@@ -202,10 +202,10 @@ No semantic logic changes — only sub-span wrapping.
 
 Wrap the incremental stream lifecycle:
 
-| Span name                       | Wraps                                | Attributes                                  |
-| ------------------------------- | ------------------------------------ | ------------------------------------------- |
-| `ror.incremental.stream`        | Full stream lifecycle                | `chunks.count`, `duration_to_first_byte_ms` |
-| `ror.incremental.process_chunk` | `incrementalSink.add(obj)` per chunk | `chunk.bytes`, `chunk.index`                |
+| Span name                       | Wraps                                | Attributes |
+| ------------------------------- | ------------------------------------ | ---------- |
+| `ror.incremental.stream`        | Full stream lifecycle                | (none)     |
+| `ror.incremental.process_chunk` | `incrementalSink.add(obj)` per chunk | (none)     |
 
 ### 6. `src/worker.ts` _(no change for SSR root span)_
 
