@@ -1732,7 +1732,7 @@ module ReactOnRails
           <<~TROUBLESHOOTING
             #{Rainbow('🔧 TROUBLESHOOTING:').cyan.bold}
 
-            #{help_react_refresh_troubleshooting(default_mode)}
+            #{help_react_refresh_troubleshooting(default_mode).chomp}
 
             #{Rainbow('🚨 General Issues:').yellow.bold}
             #{Rainbow('•').red} #{Rainbow('"Port already in use"').white} #{Rainbow('→ Run:').yellow} #{Rainbow('bin/dev kill').green.bold}

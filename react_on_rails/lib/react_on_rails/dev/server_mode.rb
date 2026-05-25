@@ -112,7 +112,7 @@ module ReactOnRails
         def parse_config(config_path)
           return nil unless File.exist?(config_path)
 
-          # ERB uses TOPLEVEL_BINDING here, matching Shakapacker's config loading behavior.
+          # ERB uses TOPLEVEL_BINDING here so config files can reference ENV and top-level constants.
           YAML.safe_load(ERB.new(File.read(config_path)).result, permitted_classes: [Symbol], aliases: true)
         rescue SyntaxError, StandardError => e
           warn(
