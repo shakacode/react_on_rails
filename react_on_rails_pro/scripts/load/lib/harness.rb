@@ -20,8 +20,6 @@ module RendererHarness
   DEFAULT_TRANSPORT = "httpx"
 
   class Harness
-    UPLOAD_ASSETS_TIMEOUT_SECONDS = 10
-
     def initialize(config)
       @config = config
       @output_dir = config.output_dir || default_output_dir
@@ -69,7 +67,8 @@ module RendererHarness
         Thread.current.report_on_exception = false
         ReactOnRailsPro::Request.upload_assets
       end
-      unless upload_thread.join(UPLOAD_ASSETS_TIMEOUT_SECONDS)
+      upload_timeout = @config.upload_timeout
+      unless upload_thread.join(upload_timeout)
         # Thread#kill is acceptable here only because the CLI exits right
         # after this timeout. Do not reuse this pattern in a long-lived server
         # or embedded harness because HTTPX connection state may be left dirty.
@@ -80,7 +79,7 @@ module RendererHarness
       upload_thread.value
     rescue Timeout::Error
       raise UserError,
-            "bundle upload timed out after #{UPLOAD_ASSETS_TIMEOUT_SECONDS}s - is the node renderer responsive?"
+            "bundle upload timed out after #{upload_timeout}s - is the node renderer responsive?"
     rescue StandardError => e
       raise UserError, "bundle upload failed - is the node renderer running? (#{e.class}: #{e.message})"
     end
@@ -98,6 +97,7 @@ module RendererHarness
         mix: @config.mix,
         warmup: @config.warmup,
         start_gate_timeout: @config.start_gate_timeout,
+        upload_timeout: @config.upload_timeout,
         elapsed_seconds: elapsed,
         ruby_version: RUBY_VERSION,
         hostname: Socket.gethostname,

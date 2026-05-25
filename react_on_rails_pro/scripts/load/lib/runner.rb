@@ -4,6 +4,9 @@ module RendererHarness
   class Runner # rubocop:disable Metrics/ClassLength
     StartGate = Struct.new(:mutex, :ready_cv, :start_cv, :ready_count, :started, :aborted, :deadline,
                            :abort_error, keyword_init: true)
+    # Count-mode uses this as an idle-since-last-claim grace, not as a total
+    # elapsed cap. A worker that keeps claiming just inside this window can keep
+    # this short-lived CLI waiting indefinitely.
     WORKER_JOIN_TIMEOUT_SECONDS = 30
     # Sentinel passed through join_thread for request-count runs; not a timestamp.
     COUNT_JOIN_DEADLINE = :after_requests_claimed
@@ -286,7 +289,8 @@ module RendererHarness
       # already in claim_request, which is expected because workers release it
       # promptly and never wait on this join path.
       # A broadcast between join(0) and wait can be missed, but only causes a
-      # bounded extra sleep before this CLI rechecks the refreshed deadline.
+      # bounded extra sleep, up to the current deadline, before this CLI
+      # rechecks the refreshed deadline.
       fallback_deadline = nil
       @remaining_mutex.synchronize do
         loop do

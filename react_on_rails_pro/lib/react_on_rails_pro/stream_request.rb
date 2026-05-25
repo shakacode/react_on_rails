@@ -133,8 +133,9 @@ module ReactOnRailsPro
 
       begin
         loop do
-          # Reset before request_executor.call as well as before parsing, since
-          # transport failures can happen before a response object exists.
+          # Pre-call reset guards transport failures that happen before a response object
+          # exists; process_response_chunks resets again so parsing state belongs to that
+          # response attempt.
           reset_response_status
           @received_first_chunk = false
           stream_response = @request_executor.call(send_bundle, tasks)

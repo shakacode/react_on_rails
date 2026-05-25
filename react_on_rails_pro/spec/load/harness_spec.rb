@@ -12,6 +12,7 @@ RSpec.describe RendererHarness::Harness do
       :mix,
       :warmup,
       :start_gate_timeout,
+      :upload_timeout,
       :renderer_pid,
       :mem_interval,
       keyword_init: true
@@ -23,6 +24,7 @@ RSpec.describe RendererHarness::Harness do
         mix: "small",
         warmup: 1,
         start_gate_timeout: 30.0,
+        upload_timeout: 10.0,
         renderer_pid: nil,
         mem_interval: 1.0
       }
@@ -87,11 +89,10 @@ RSpec.describe RendererHarness::Harness do
   end
 
   it "raises a user error when bundle upload times out" do
-    stub_const("RendererHarness::Harness::UPLOAD_ASSETS_TIMEOUT_SECONDS", 0.01)
     allow(ReactOnRailsPro::Request).to receive(:upload_assets) { sleep 1 }
 
-    expect { described_class.new(build_config).send(:upload_assets!) }
-      .to raise_error(RendererHarness::UserError, /bundle upload timed out/)
+    expect { described_class.new(build_config(upload_timeout: 0.01)).send(:upload_assets!) }
+      .to raise_error(RendererHarness::UserError, /bundle upload timed out after 0.01s/)
   end
 
   it "cleans up the scenario when bundle upload fails" do

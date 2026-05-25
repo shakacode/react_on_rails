@@ -60,7 +60,8 @@ module RendererHarness
         RENDER_COMPONENT_JS_TEMPLATE.sub("__PROPS__") { props_json }
       end
 
-      def stream_payload(stream, bytes_in:, bytes_out:, status: stream.http_status)
+      def stream_payload(stream, bytes_in:, bytes_out:, status: nil)
+        status = stream.http_status if status.nil? && stream
         ok = !status.nil? && !http_error_status?(status)
         {
           http_status: status,

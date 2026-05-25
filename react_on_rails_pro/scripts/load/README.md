@@ -51,7 +51,8 @@ bin/renderer-harness --scenario streaming_render --duration 60 --concurrency 4
 
 `--warmup` is per worker thread. For example, `--warmup 5 --concurrency 4` issues 20 warmup
 requests before measured requests begin. All workers must finish warmup before measurement starts;
-`--start-gate-timeout` controls how long to wait for them (default: 30 seconds).
+`--start-gate-timeout` controls how long to wait for them (default: 30 seconds). If bundle upload is
+slow on a cold renderer, adjust `--upload-timeout` (default: 10 seconds).
 
 ### Tracking the node-renderer process
 
@@ -106,4 +107,4 @@ REACT_ON_RAILS_RENDERER_TRANSPORT=async_http bin/renderer-harness --scenario str
 
 - Harness unit tests run with the regular Pro gem unit test sweep (`cd react_on_rails_pro && bundle exec rspec spec/load/`).
 - Live smoke is opt-in via `RUN_RENDERER_LOAD_SMOKE=1`; it is not wired into any default workflow in this PR.
-- Live runs fail fast if bundle upload takes longer than 10 seconds, usually indicating an unresponsive node renderer.
+- Live runs fail fast if bundle upload takes longer than `--upload-timeout`, usually indicating an unresponsive node renderer.

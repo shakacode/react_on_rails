@@ -14,6 +14,7 @@ RSpec.describe RendererHarness::Config do
         concurrency: 1,
         warmup: 0,
         start_gate_timeout: 30.0,
+        upload_timeout: 10.0,
         smoke: true
       )
     end
@@ -44,6 +45,12 @@ RSpec.describe RendererHarness::Config do
       expect(config.start_gate_timeout).to eq(0.5)
     end
 
+    it "parses the bundle upload timeout" do
+      config = described_class.parse(["--requests", "1", "--upload-timeout", "0.5"])
+
+      expect(config.upload_timeout).to eq(0.5)
+    end
+
     it "rejects mutually exclusive run modes" do
       expect do
         described_class.parse(["--requests", "10", "--duration", "1"])
@@ -66,6 +73,12 @@ RSpec.describe RendererHarness::Config do
       expect do
         described_class.parse(["--requests", "1", "--start-gate-timeout", "0"])
       end.to raise_error(ArgumentError, /--start-gate-timeout must be > 0/)
+    end
+
+    it "rejects non-positive bundle upload timeouts" do
+      expect do
+        described_class.parse(["--requests", "1", "--upload-timeout", "0"])
+      end.to raise_error(ArgumentError, /--upload-timeout must be > 0/)
     end
 
     it "keeps parser helper methods private" do

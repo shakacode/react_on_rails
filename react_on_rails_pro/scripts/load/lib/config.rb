@@ -13,6 +13,7 @@ module RendererHarness
     :mix,
     :mem_interval,
     :start_gate_timeout,
+    :upload_timeout,
     :renderer_pid,
     :output_dir,
     :smoke,
@@ -30,6 +31,7 @@ module RendererHarness
         mix: "small",
         mem_interval: 1.0,
         start_gate_timeout: default_start_gate_timeout_seconds,
+        upload_timeout: default_upload_timeout_seconds,
         renderer_pid: nil,
         output_dir: nil,
         smoke: false
@@ -82,6 +84,11 @@ module RendererHarness
         Float,
         "Seconds to wait for worker warmup before aborting (default: #{default_start_gate_timeout_seconds.to_i})"
       ) { |v| opts[:start_gate_timeout] = v }
+      opt_parser.on(
+        "--upload-timeout SECONDS",
+        Float,
+        "Seconds to wait for bundle upload before aborting (default: #{default_upload_timeout_seconds.to_i})"
+      ) { |v| opts[:upload_timeout] = v }
       opt_parser.on("--renderer-pid PID", Integer) { |v| opts[:renderer_pid] = v }
       opt_parser.on("--output-dir PATH", String) { |v| opts[:output_dir] = v }
       opt_parser.on("--smoke") { opts[:smoke] = true }
@@ -131,6 +138,7 @@ module RendererHarness
 
       validate_positive_option!("--mem-interval", opts[:mem_interval])
       validate_positive_option!("--start-gate-timeout", opts[:start_gate_timeout])
+      validate_positive_option!("--upload-timeout", opts[:upload_timeout])
     end
 
     def self.validate_positive_option!(flag, value)
@@ -143,9 +151,14 @@ module RendererHarness
       30.0
     end
 
+    def self.default_upload_timeout_seconds
+      10.0
+    end
+
     private_class_method :build_parser, :add_primary_flags, :add_secondary_flags,
                          :apply_smoke_preset!, :validate!,
                          :validate_scenario!, :validate_run_mode!, :validate_numeric_options!,
-                         :validate_positive_option!, :default_start_gate_timeout_seconds
+                         :validate_positive_option!, :default_start_gate_timeout_seconds,
+                         :default_upload_timeout_seconds
   end
 end
