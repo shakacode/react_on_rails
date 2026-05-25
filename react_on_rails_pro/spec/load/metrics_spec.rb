@@ -34,8 +34,13 @@ RSpec.describe RendererHarness::Metrics do
       expect(described_class.rps(count: 100, elapsed_seconds: 4.0)).to eq(25.0)
     end
 
-    it "returns 0.0 when elapsed is 0" do
-      expect(described_class.rps(count: 100, elapsed_seconds: 0)).to eq(0.0)
+    it "returns 0.0 when count is 0" do
+      expect(described_class.rps(count: 0, elapsed_seconds: 0)).to eq(0.0)
+    end
+
+    it "uses a small elapsed floor when elapsed is 0" do
+      expect(described_class.rps(count: 100, elapsed_seconds: 0))
+        .to eq(100 / described_class::MIN_RPS_ELAPSED_SECONDS)
     end
   end
 

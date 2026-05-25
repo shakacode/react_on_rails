@@ -92,10 +92,6 @@ module RendererHarness
       return nil if out.nil? || out.strip.empty?
 
       out.strip.to_i
-    rescue Errno::ESRCH, Errno::ENOENT
-      # run_ps returns nil for normal ps failures; keep this safety net for
-      # platform-specific process lookup errors during RSS conversion.
-      nil
     end
 
     def gc_snapshot
@@ -112,6 +108,8 @@ module RendererHarness
     def run_ps(pid)
       out, _err, status = Open3.capture3("ps", "-o", "rss=", "-p", pid.to_s)
       status.success? ? out : nil
+    rescue Errno::ENOENT
+      nil
     end
   end
 end

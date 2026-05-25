@@ -4,6 +4,8 @@ module RendererHarness
   module Metrics
     module_function
 
+    MIN_RPS_ELAPSED_SECONDS = 0.001
+
     def percentile(samples, pct)
       return nil if samples.empty?
 
@@ -17,9 +19,9 @@ module RendererHarness
     end
 
     def rps(count:, elapsed_seconds:)
-      return 0.0 if elapsed_seconds.to_f.zero?
+      return 0.0 if count.zero?
 
-      count.to_f / elapsed_seconds
+      count.to_f / [elapsed_seconds.to_f, MIN_RPS_ELAPSED_SECONDS].max
     end
 
     # series: Array of [time_seconds, rss_kb] pairs

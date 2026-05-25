@@ -30,9 +30,7 @@ module ReactOnRailsPro
       return @component.http_status_recorded? if @component.respond_to?(:http_status_recorded?)
       return @component.status_recorded? if @component.respond_to?(:status_recorded?)
 
-      return false unless @component.respond_to?(:http_status) || @component.respond_to?(:status)
-
-      !http_status.nil?
+      false
     end
 
     alias status_recorded? http_status_recorded?

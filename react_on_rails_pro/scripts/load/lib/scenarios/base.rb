@@ -86,7 +86,7 @@ module RendererHarness
         t_started_ms = (Time.now.to_f * 1000)
         begin
           payload = yield
-          success_result(start_ms, t_started_ms, payload)
+          payload_result(start_ms, t_started_ms, payload)
         rescue StandardError => e
           failure_result(start_ms, t_started_ms, e)
         end
@@ -109,7 +109,7 @@ module RendererHarness
         JSON.generate(metadata).bytesize + 1 + LENGTH_PREFIX_HEX_WIDTH + 1 + html_body.bytesize
       end
 
-      def success_result(start_ms, t_started_ms, payload)
+      def payload_result(start_ms, t_started_ms, payload)
         http_status = payload[:http_status]
         ok = payload.key?(:ok) ? payload[:ok] : payload_ok?(payload, http_status)
         error = payload[:error]

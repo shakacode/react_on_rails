@@ -43,6 +43,18 @@ RSpec.describe ReactOnRailsPro::StreamDecorator do
       expect(decorator.status_recorded?).to be(false)
       expect(decorator.http_status_recorded?).to be(false)
     end
+
+    it "does not infer recording state from status accessors alone" do
+      component = Class.new do
+        def status
+          nil
+        end
+      end.new
+      decorator = described_class.new(component)
+
+      expect(decorator.status).to be_nil
+      expect(decorator.status_recorded?).to be(false)
+    end
   end
 
   describe "#each_chunk" do

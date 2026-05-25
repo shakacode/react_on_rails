@@ -18,9 +18,10 @@ RSpec.describe RendererHarness::MemorySampler do
       expect(sampler.sample_rss_kb(1234)).to be_nil
     end
 
-    it "returns nil when ps raises" do
+    it "returns nil when ps cannot be executed" do
       sampler = described_class.new(pids: { rails: 1234 })
-      allow(sampler).to receive(:run_ps).with(1234).and_raise(Errno::ESRCH)
+      allow(Open3).to receive(:capture3).with("ps", "-o", "rss=", "-p", "1234").and_raise(Errno::ENOENT)
+
       expect(sampler.sample_rss_kb(1234)).to be_nil
     end
   end
