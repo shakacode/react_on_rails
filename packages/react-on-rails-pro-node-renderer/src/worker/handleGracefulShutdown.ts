@@ -12,13 +12,31 @@ const handleGracefulShutdown = (app: FastifyInstance) => {
 
   let activeRequestsCount = 0;
   let isShuttingDown = false;
+  let isDestroying = false;
+
+  const closeAppAndDestroyWorker = (context: string) => {
+    if (isDestroying) {
+      return;
+    }
+
+    isDestroying = true;
+    log.debug('Worker #%d closing Fastify app before shutdown after %s', worker.id, context);
+    void app
+      .close()
+      .catch((error: unknown) => {
+        log.warn({ msg: 'Error closing Fastify app before worker shutdown', error });
+      })
+      .finally(() => {
+        worker.destroy();
+      });
+  };
 
   // Helper to decrement counter and potentially kill worker
   const decrementAndMaybeShutdown = (context: string) => {
     activeRequestsCount -= 1;
     if (isShuttingDown && activeRequestsCount === 0) {
       log.debug('Worker #%d has no active requests after %s, killing the worker', worker.id, context);
-      worker.destroy();
+      closeAppAndDestroyWorker(context);
     }
   };
 
@@ -28,7 +46,7 @@ const handleGracefulShutdown = (app: FastifyInstance) => {
       isShuttingDown = true;
       if (activeRequestsCount === 0) {
         log.debug('Worker #%d has no active requests, killing the worker', worker.id);
-        worker.destroy();
+        closeAppAndDestroyWorker('shutdown message');
       } else {
         log.debug(
           'Worker #%d has "%d" active requests, disconnecting the worker',

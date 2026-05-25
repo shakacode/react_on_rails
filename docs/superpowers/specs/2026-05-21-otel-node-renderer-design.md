@@ -66,7 +66,7 @@ render-path functions to create sub-spans.
 
 **Framework note:** the renderer uses **Fastify**, not Express. Issue #2156's example
 references `@opentelemetry/instrumentation-express`, which would be inert here.
-We use `@opentelemetry/instrumentation-fastify` instead.
+We use `@fastify/otel` instead.
 
 ## User-facing API
 
@@ -84,7 +84,7 @@ npm install \
   @opentelemetry/exporter-trace-otlp-http \
   @opentelemetry/instrumentation \
   @opentelemetry/instrumentation-http \
-  @opentelemetry/instrumentation-fastify
+  @fastify/otel
 ```
 
 ### Enabling
@@ -235,7 +235,7 @@ Add as **optional peer dependencies** (matching the existing pattern):
   "@opentelemetry/exporter-trace-otlp-http": ">=0.203.0",
   "@opentelemetry/instrumentation": ">=0.203.0",
   "@opentelemetry/instrumentation-http": ">=0.203.0",
-  "@opentelemetry/instrumentation-fastify": ">=0.52.0"
+  "@fastify/otel": ">=0.18.0"
 },
 "peerDependenciesMeta": {
   // … existing …

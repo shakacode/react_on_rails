@@ -108,6 +108,32 @@ describe('opentelemetry integration: init()', () => {
     expect(attrs['service.name']).toBe('test-renderer');
     expect(attrs['deployment.environment']).toBe('staging');
   });
+
+  test('init() includes OTEL_RESOURCE_ATTRIBUTES and lets explicit resourceAttributes override them', () => {
+    process.env.OTEL_RESOURCE_ATTRIBUTES =
+      'deployment.environment=staging, service.version=1.2.3, custom.equals=value=with=equals';
+
+    try {
+      init({
+        serviceName: 'test-renderer',
+        resourceAttributes: { 'deployment.environment': 'test' },
+        spanProcessor: new SimpleSpanProcessor(exporter),
+      });
+
+      const tracer = otelTrace.getTracer('test');
+      tracer.startActiveSpan('manual.span', (span) => {
+        span.end();
+      });
+
+      const attrs = exporter.getFinishedSpans()[0]!.resource.attributes;
+      expect(attrs['service.name']).toBe('test-renderer');
+      expect(attrs['deployment.environment']).toBe('test');
+      expect(attrs['service.version']).toBe('1.2.3');
+      expect(attrs['custom.equals']).toBe('value=with=equals');
+    } finally {
+      delete process.env.OTEL_RESOURCE_ATTRIBUTES;
+    }
+  });
 });
 
 describe('opentelemetry integration: fastify auto-instrumentation', () => {
@@ -120,6 +146,33 @@ describe('opentelemetry integration: fastify auto-instrumentation', () => {
 
   afterAll(async () => {
     await __resetForTest();
+  });
+
+  test('init({ fastify: true }) enables Fastify auto-registration', () => {
+    const registerInstrumentations = jest.fn();
+    const HttpInstrumentation = jest.fn(() => ({ name: 'http-instrumentation' }));
+    const FastifyOtelInstrumentation = jest.fn(() => ({ name: 'fastify-instrumentation' }));
+    jest.doMock('@opentelemetry/instrumentation', () => ({ registerInstrumentations }));
+    jest.doMock('@opentelemetry/instrumentation-http', () => ({ HttpInstrumentation }));
+    jest.doMock('@fastify/otel', () => ({ FastifyOtelInstrumentation }));
+
+    try {
+      init({
+        fastify: true,
+        spanProcessor: new SimpleSpanProcessor(exporter),
+      });
+
+      expect(FastifyOtelInstrumentation).toHaveBeenCalledWith({ registerOnInitialization: true });
+      expect(registerInstrumentations).toHaveBeenCalledWith(
+        expect.objectContaining({
+          instrumentations: [{ name: 'http-instrumentation' }, { name: 'fastify-instrumentation' }],
+        }),
+      );
+    } finally {
+      jest.dontMock('@opentelemetry/instrumentation');
+      jest.dontMock('@opentelemetry/instrumentation-http');
+      jest.dontMock('@fastify/otel');
+    }
   });
 
   test('init({ fastify: true }) initializes without throwing and tracer still works', () => {

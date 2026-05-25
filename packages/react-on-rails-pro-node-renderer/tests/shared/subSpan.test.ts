@@ -20,8 +20,8 @@ describe('subSpan', () => {
   });
 
   test('setupSubSpan installs custom implementation that receives name + attributes', async () => {
-    const impl = jest.fn<SubSpanFn>(async (_opts, fn) => fn());
-    setupSubSpan(impl);
+    const impl = jest.fn(async (_opts: Parameters<SubSpanFn>[0], fn: Parameters<SubSpanFn>[1]) => fn());
+    setupSubSpan(impl as unknown as SubSpanFn);
     const result = await subSpan(
       { name: 'test.span', attributes: { 'bundle.timestamp': '123' } },
       async () => 'ok',
@@ -44,6 +44,17 @@ describe('subSpan', () => {
     expect(fn).toHaveBeenCalledTimes(1);
   });
 
+  test('installed implementation that throws after invoking fn does not invoke fn twice', async () => {
+    setupSubSpan((_opts, fn) => {
+      void fn();
+      throw new Error('impl crashed after invoking fn');
+    });
+    const fn = jest.fn(async () => 'already-started');
+
+    await expect(subSpan({ name: 'test.span' }, fn)).rejects.toThrow('impl crashed after invoking fn');
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
   test('impl async rejection propagates to caller (not swallowed by sync try/catch)', async () => {
     setupSubSpan(async () => {
       throw new Error('async-crash');
@@ -52,10 +63,10 @@ describe('subSpan', () => {
   });
 
   test('setupSubSpan called twice logs a warning and keeps the first impl installed', async () => {
-    const firstImpl = jest.fn<SubSpanFn>(async (_opts, fn) => fn());
-    const secondImpl = jest.fn<SubSpanFn>(async (_opts, fn) => fn());
-    setupSubSpan(firstImpl);
-    setupSubSpan(secondImpl);
+    const firstImpl = jest.fn(async (_opts: Parameters<SubSpanFn>[0], fn: Parameters<SubSpanFn>[1]) => fn());
+    const secondImpl = jest.fn(async (_opts: Parameters<SubSpanFn>[0], fn: Parameters<SubSpanFn>[1]) => fn());
+    setupSubSpan(firstImpl as unknown as SubSpanFn);
+    setupSubSpan(secondImpl as unknown as SubSpanFn);
 
     await subSpan({ name: 'test.span' }, async () => undefined);
     expect(firstImpl).toHaveBeenCalledTimes(1);

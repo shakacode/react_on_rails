@@ -196,8 +196,40 @@ The Node Renderer ships an optional OpenTelemetry integration for distributed tr
 
 ### Install the OpenTelemetry packages (peer dependencies)
 
+**npm:**
+
 ```bash
 npm install \
+  @opentelemetry/api \
+  @opentelemetry/sdk-trace-node \
+  @opentelemetry/sdk-trace-base \
+  @opentelemetry/resources \
+  @opentelemetry/semantic-conventions \
+  @opentelemetry/exporter-trace-otlp-http \
+  @opentelemetry/instrumentation \
+  @opentelemetry/instrumentation-http \
+  @fastify/otel
+```
+
+**yarn:**
+
+```bash
+yarn add \
+  @opentelemetry/api \
+  @opentelemetry/sdk-trace-node \
+  @opentelemetry/sdk-trace-base \
+  @opentelemetry/resources \
+  @opentelemetry/semantic-conventions \
+  @opentelemetry/exporter-trace-otlp-http \
+  @opentelemetry/instrumentation \
+  @opentelemetry/instrumentation-http \
+  @fastify/otel
+```
+
+**pnpm:**
+
+```bash
+pnpm add \
   @opentelemetry/api \
   @opentelemetry/sdk-trace-node \
   @opentelemetry/sdk-trace-base \

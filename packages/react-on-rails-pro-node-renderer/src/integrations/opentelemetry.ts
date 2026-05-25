@@ -43,6 +43,22 @@ function resolveServiceName(opts: OpenTelemetryInitOptions): string {
   return process.env.OTEL_SERVICE_NAME ?? opts.serviceName ?? DEFAULT_SERVICE_NAME;
 }
 
+function parseResourceAttributes(value: string | undefined): Record<string, string> {
+  if (!value) return {};
+
+  const attributes: Record<string, string> = {};
+  for (const pair of value.split(',')) {
+    const [rawKey, ...rawValueParts] = pair.split('=');
+    const key = rawKey?.trim();
+
+    if (key && rawValueParts.length > 0) {
+      attributes[key] = rawValueParts.join('=').trim();
+    }
+  }
+
+  return attributes;
+}
+
 export function init(opts: OpenTelemetryInitOptions = {}): void {
   try {
     /* eslint-disable @typescript-eslint/no-require-imports, global-require --
@@ -60,8 +76,9 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
 
     const serviceName = resolveServiceName(opts);
     const resource = resourceFromAttributes({
-      [ATTR_SERVICE_NAME]: serviceName,
+      ...parseResourceAttributes(process.env.OTEL_RESOURCE_ATTRIBUTES),
       ...(opts.resourceAttributes ?? {}),
+      [ATTR_SERVICE_NAME]: serviceName,
     });
 
     const defaultExporter = () => {

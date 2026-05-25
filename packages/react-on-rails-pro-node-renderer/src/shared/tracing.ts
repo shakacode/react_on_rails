@@ -140,13 +140,25 @@ export function setupSubSpan(impl: SubSpanFn): void {
  *
  * If the installed implementation throws synchronously before invoking `fn()`,
  * the caller is shielded: `fn()` is still executed and its result returned.
+ * If the implementation throws after invoking `fn()`, the error is rethrown so
+ * `fn()` is never run twice.
  */
 export function subSpan<T>(opts: SubSpanOptions, fn: () => Promise<T>): Promise<T> {
-  try {
-    return subSpanImpl(opts, fn);
-  } catch (err) {
-    message(`subSpan implementation threw before invoking fn(): ${String(err)}`);
+  let invoked = false;
+  const wrappedFn = () => {
+    invoked = true;
     return fn();
+  };
+
+  try {
+    return subSpanImpl(opts, wrappedFn);
+  } catch (err) {
+    if (invoked) {
+      return Promise.reject(err instanceof Error ? err : new Error(String(err)));
+    }
+
+    message(`subSpan implementation threw before invoking fn(): ${String(err)}`);
+    return wrappedFn();
   }
 }
 
