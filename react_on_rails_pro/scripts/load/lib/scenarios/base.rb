@@ -149,9 +149,7 @@ module RendererHarness
         "Renderer returned #{status}" if http_error_status?(status)
       end
 
-      def payload_ok?(payload, http_status)
-        return payload[:ok] if payload.key?(:ok)
-
+      def payload_ok?(_payload, http_status)
         !http_error_status?(http_status)
       end
 

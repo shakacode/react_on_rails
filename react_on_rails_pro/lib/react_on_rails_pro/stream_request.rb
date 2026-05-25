@@ -178,7 +178,7 @@ module ReactOnRailsPro
       request_start_time = Time.now
 
       stream_response.each do |chunk|
-        record_status(stream_response)
+        record_status(stream_response) unless @status_recorded
         next if stream_response.error?
 
         unless @received_first_chunk
@@ -188,7 +188,7 @@ module ReactOnRailsPro
 
         parser.feed(chunk, &block)
       end
-      record_status(stream_response)
+      record_status(stream_response) unless @status_recorded
       parser.flush
     rescue ReactOnRailsPro::RendererHttpClient::HTTPError => e
       record_status(e.response)
@@ -247,6 +247,8 @@ module ReactOnRailsPro
     end
 
     def record_status(response)
+      return if @status_recorded || !response.respond_to?(:status)
+
       status = response.status
       return if status.nil?
 

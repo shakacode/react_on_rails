@@ -28,8 +28,12 @@ RSpec.describe RendererHarness::Config do
       expect(config.scenario).to eq("standard_render")
     end
 
-    it "clears duration when applying the smoke preset" do
-      config = described_class.parse(["--duration", "1", "--smoke"])
+    it "warns and clears duration when applying the smoke preset" do
+      config = nil
+
+      expect do
+        config = described_class.parse(["--duration", "1", "--smoke"])
+      end.to output(/--smoke overrides --duration 1.0 with 10 requests/).to_stderr
 
       expect(config).to have_attributes(requests: 10, duration: nil)
     end

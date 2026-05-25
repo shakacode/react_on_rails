@@ -171,6 +171,28 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         expect(yielded.first["html"]).to eq("<div>Valid</div>")
       end
     end
+
+    it "ignores responses without status metadata" do
+      request.send(:record_status, Object.new)
+
+      expect(request.status).to be_nil
+      expect(request.http_status_recorded?).to be(false)
+    end
+
+    it "records response status only once" do
+      status_calls = 0
+      response = Object.new
+      response.define_singleton_method(:status) do
+        status_calls += 1
+        200
+      end
+
+      request.send(:record_status, response)
+      request.send(:record_status, response)
+
+      expect(status_calls).to eq(1)
+      expect(request.status).to eq(200)
+    end
   end
 
   describe "#each_chunk with tasks" do
