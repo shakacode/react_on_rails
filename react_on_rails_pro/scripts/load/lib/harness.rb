@@ -32,14 +32,13 @@ module RendererHarness
       scenario_class = RendererHarness::SCENARIO_REGISTRY.fetch(@config.scenario)
       scenario = scenario_class.new(@config)
 
-      # Upload the server bundle to the renderer before running so that the
-      # first real request does not get a 410 Send-Bundle handshake response.
-      upload_assets!
-
       sampler = MemorySampler.new(pids: { rails: Process.pid, renderer: @config.renderer_pid })
       runner = Runner.new(scenario: scenario, config: @config)
 
       begin
+        # Upload the server bundle to the renderer before running so that the
+        # first real request does not get a 410 Send-Bundle handshake response.
+        upload_assets!
         sampler.start_background(interval_seconds: @config.mem_interval)
         elapsed = runner.run
       ensure

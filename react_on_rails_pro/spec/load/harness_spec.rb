@@ -79,6 +79,23 @@ RSpec.describe RendererHarness::Harness do
       .to raise_error(RendererHarness::UserError, /bundle upload timed out/)
   end
 
+  it "cleans up the scenario when bundle upload fails" do
+    scenario = instance_double(RendererHarness::Scenarios::StandardRender, cleanup: nil)
+    runner = instance_double(RendererHarness::Runner)
+    sampler = instance_double(RendererHarness::MemorySampler, stop_background: nil)
+
+    allow(RendererHarness::SCENARIO_REGISTRY.fetch("standard_render")).to receive(:new).and_return(scenario)
+    allow(RendererHarness::MemorySampler).to receive(:new).and_return(sampler)
+    allow(RendererHarness::Runner).to receive(:new).and_return(runner)
+    allow(ReactOnRailsPro::Request).to receive(:upload_assets).and_raise(StandardError, "renderer down")
+
+    expect(sampler).not_to receive(:start_background)
+
+    expect { described_class.new(build_config).run }
+      .to raise_error(RendererHarness::UserError, /bundle upload failed/)
+    expect(scenario).to have_received(:cleanup)
+  end
+
   it "cleans up the scenario when stopping the sampler fails" do
     scenario = instance_double(RendererHarness::Scenarios::StandardRender, cleanup: nil)
     runner = instance_double(RendererHarness::Runner, run: 0.1, results: [], measurement_started_at: nil)

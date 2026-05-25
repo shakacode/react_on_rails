@@ -144,6 +144,8 @@ module ReactOnRailsPro
       # Each response attempt must record status independently; a 410 retry must
       # not reuse the previous attempt's status when parsing retry chunks.
       @status_recorded = false
+      # @status_recorded guards error handling for the attempt; this loop-local
+      # flag only avoids re-reading the same response status on every chunk.
       status_recorded_for_response = false
       stream_response.each do |chunk|
         stream_response.instance_variable_set(:@react_on_rails_received_first_chunk, true)
@@ -168,6 +170,8 @@ module ReactOnRailsPro
     # StreamRequest is consumed sequentially. Status intentionally reflects the
     # latest response attempt, so a 410 retry replaces the pre-retry status.
     def record_status(response)
+      # Keep status nil if extraction raises so the caller treats the unknown
+      # status as an error response.
       @status = nil
       @status = extract_status(response)
     ensure
