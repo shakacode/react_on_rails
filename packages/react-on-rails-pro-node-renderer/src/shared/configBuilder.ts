@@ -311,34 +311,59 @@ export function logSanitizedConfig() {
   });
 }
 
+const KNOWN_WEAK_PASSWORDS = new Set(
+  ['devPassword', 'myPassword1', 'password', 'changeme', 'admin', 'secret', 'test', 'renderer'].map((p) =>
+    p.toLowerCase(),
+  ),
+);
+
+const MIN_PASSWORD_LENGTH = 16;
+
 function validatePasswordForProduction(aConfig: Config): string | null {
-  // Only a truthy password satisfies the production-like requirement. Null, undefined, and empty strings are
-  // all treated as missing passwords.
-  if (aConfig.password) return null;
+  const isProductionLike = !runtimeEnvsAllowDevelopmentDefaults();
 
-  // Require all present runtime envs to be development/test; fail closed otherwise.
-  // If either env indicates a production-like value, or neither env is set, password is required.
-  // This preserves a fail-closed invariant across the renderer startup path and the Ruby-side checks.
-  const allowMissingPassword = runtimeEnvsAllowDevelopmentDefaults();
-  if (allowMissingPassword) return null;
+  if (!aConfig.password) {
+    if (isProductionLike) {
+      return (
+        'RENDERER_PASSWORD must be set in production-like environments ' +
+        `(NODE_ENV: "${env.NODE_ENV ?? '(not set)'}", RAILS_ENV: "${env.RAILS_ENV ?? '(not set)'}").` +
+        '\n\n' +
+        'In development and test environments, the renderer password is optional and no authentication\n' +
+        'is required. In all other environments, you must explicitly configure a password to secure\n' +
+        'communication between Rails and the Node Renderer.\n\n' +
+        'To fix this, set the RENDERER_PASSWORD environment variable:\n\n' +
+        '  export RENDERER_PASSWORD="your-secure-password"\n\n' +
+        'Or pass it in the config object:\n\n' +
+        '  reactOnRailsProNodeRenderer({ password: process.env.RENDERER_PASSWORD });\n\n' +
+        'Environment matrix:\n' +
+        '  development — password optional (no authentication)\n' +
+        '  test        — password optional (no authentication)\n' +
+        '  (neither set) — treated as production-like; RENDERER_PASSWORD required\n' +
+        '  all other environments (staging, production, qa, preview, etc.) — RENDERER_PASSWORD required'
+      );
+    }
+    return null;
+  }
 
-  return (
-    'RENDERER_PASSWORD must be set in production-like environments ' +
-    `(NODE_ENV: "${env.NODE_ENV ?? '(not set)'}", RAILS_ENV: "${env.RAILS_ENV ?? '(not set)'}").` +
-    '\n\n' +
-    'In development and test environments, the renderer password is optional and no authentication\n' +
-    'is required. In all other environments, you must explicitly configure a password to secure\n' +
-    'communication between Rails and the Node Renderer.\n\n' +
-    'To fix this, set the RENDERER_PASSWORD environment variable:\n\n' +
-    '  export RENDERER_PASSWORD="your-secure-password"\n\n' +
-    'Or pass it in the config object:\n\n' +
-    '  reactOnRailsProNodeRenderer({ password: process.env.RENDERER_PASSWORD });\n\n' +
-    'Environment matrix:\n' +
-    '  development — password optional (no authentication)\n' +
-    '  test        — password optional (no authentication)\n' +
-    '  (neither set) — treated as production-like; RENDERER_PASSWORD required\n' +
-    '  all other environments (staging, production, qa, preview, etc.) — RENDERER_PASSWORD required'
-  );
+  if (KNOWN_WEAK_PASSWORDS.has(aConfig.password.toLowerCase())) {
+    if (isProductionLike) {
+      return (
+        `RENDERER_PASSWORD is set to a known-default value ("${aConfig.password}"). ` +
+        `Set RENDERER_PASSWORD to a random value of at least ${MIN_PASSWORD_LENGTH} characters.`
+      );
+    }
+    log.warn(
+      `RENDERER_PASSWORD is set to a known-default value ("${aConfig.password}"). ` +
+        'This is acceptable for development but MUST be changed before deploying to staging/production.',
+    );
+  } else if (aConfig.password.length < MIN_PASSWORD_LENGTH && isProductionLike) {
+    return (
+      `RENDERER_PASSWORD must be at least ${MIN_PASSWORD_LENGTH} characters in production-like environments. ` +
+      `Current length: ${aConfig.password.length}.`
+    );
+  }
+
+  return null;
 }
 
 /**

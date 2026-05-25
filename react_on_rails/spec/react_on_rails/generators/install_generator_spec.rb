@@ -1335,17 +1335,21 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator", application_js: true
     include_examples "no_redux_generator"
 
-    it "creates Pro initializer with NodeRenderer configuration" do
+    it "creates Pro initializer with NodeRenderer configuration and random password" do
       assert_file "config/initializers/react_on_rails_pro.rb" do |content|
         expect(content).to include("ReactOnRailsPro.configure")
         expect(content).to include('config.server_renderer = "NodeRenderer"')
         expect(content).to include("config.renderer_url")
         expect(content).to include("config.renderer_password")
         expect(content).to include("config.ssr_timeout")
+        expect(content).not_to include("devPassword")
+        password_match = content.match(/ENV\.fetch\("RENDERER_PASSWORD",\s*"([^"]+)"\)/)
+        expect(password_match).not_to be_nil
+        expect(password_match[1].length).to eq(64)
       end
     end
 
-    it "creates node-renderer.js bootstrap file" do
+    it "creates node-renderer.js bootstrap file with random password" do
       assert_file "renderer/node-renderer.js" do |content|
         expect(content).to include("reactOnRailsProNodeRenderer")
         expect(content).to include("require('react-on-rails-pro-node-renderer')")
@@ -1355,6 +1359,10 @@ describe InstallGenerator, type: :generator do
         expect(content).to include("const configuredWorkersCount =")
         expect(content).to include("workersCount:")
         expect(content).to include("if (env.CI && configuredWorkersCount == null)")
+        expect(content).not_to include("devPassword")
+        password_match = content.match(/RENDERER_PASSWORD\s*\|\|\s*'([^']+)'/)
+        expect(password_match).not_to be_nil
+        expect(password_match[1].length).to eq(64)
       end
     end
 

@@ -24,6 +24,7 @@ import {
   sumUploadedBytes,
 } from './worker/handleRenderRequest.js';
 import handleGracefulShutdown from './worker/handleGracefulShutdown.js';
+import { SENSITIVE_REQUEST_BODY_KEYS } from './shared/sensitiveKeys.js';
 import { handleStartupListenError } from './worker/startupErrorHandler.js';
 import {
   handleIncrementalRenderRequest,
@@ -149,23 +150,6 @@ const errorCode = (error: unknown): string | undefined => {
 
 const isValidRenderingRequest = (value: unknown): value is string =>
   typeof value === 'string' && value.length > 0;
-
-const SENSITIVE_REQUEST_BODY_KEYS = new Set([
-  'password',
-  'token',
-  'secret',
-  'api_key',
-  'api-key',
-  'apikey',
-  'authorization',
-  'auth_token',
-  'auth-token',
-  'authtoken',
-  'access_token',
-  'accesstoken',
-  'bearer',
-  'credentials',
-]);
 
 const invalidRenderingRequestMessage = (body: Record<string, unknown>) => {
   const { renderingRequest } = body;

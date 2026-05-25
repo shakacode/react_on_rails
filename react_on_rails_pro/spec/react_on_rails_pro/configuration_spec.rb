@@ -464,7 +464,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
 
         it "does not raise when password comes from RENDERER_PASSWORD env var in production" do
           allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
-          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return("secure-password")
+          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return("secure-password-val")
 
           expect do
             ReactOnRailsPro.configure do |config|
@@ -473,7 +473,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
             end
           end.not_to raise_error
 
-          expect(ReactOnRailsPro.configuration.renderer_password).to eq("secure-password")
+          expect(ReactOnRailsPro.configuration.renderer_password).to eq("secure-password-val")
         end
 
         it "does not raise when password is explicitly set in production" do
@@ -482,7 +482,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
           expect do
             ReactOnRailsPro.configure do |config|
               config.server_renderer = "NodeRenderer"
-              config.renderer_password = "secure-password"
+              config.renderer_password = "secure-password-val"
             end
           end.not_to raise_error
         end
@@ -493,14 +493,14 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
           expect do
             ReactOnRailsPro.configure do |config|
               config.server_renderer = "NodeRenderer"
-              config.renderer_url = "https://:secure-password@localhost:3800"
+              config.renderer_url = "https://:secure-password-val@localhost:3800"
             end
           end.not_to raise_error
         end
 
         it "resolves from ENV when renderer_password is blank in production" do
           allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
-          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return("secure-password")
+          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return("secure-password-val")
 
           expect do
             ReactOnRailsPro.configure do |config|
@@ -510,7 +510,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
             end
           end.not_to raise_error
 
-          expect(ReactOnRailsPro.configuration.renderer_password).to eq("secure-password")
+          expect(ReactOnRailsPro.configuration.renderer_password).to eq("secure-password-val")
         end
 
         it "resolves from URL when renderer_password is blank and URL has embedded password" do
@@ -520,11 +520,11 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
             ReactOnRailsPro.configure do |config|
               config.server_renderer = "NodeRenderer"
               config.renderer_password = ""
-              config.renderer_url = "https://:url-password@localhost:3800"
+              config.renderer_url = "https://:url-password-value@localhost:3800"
             end
           end.not_to raise_error
 
-          expect(ReactOnRailsPro.configuration.renderer_password).to eq("url-password")
+          expect(ReactOnRailsPro.configuration.renderer_password).to eq("url-password-value")
         end
       end
 
@@ -606,6 +606,76 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
             ReactOnRailsPro.configure do |config|
               config.server_renderer = "ExecJS"
               config.renderer_url = "https://localhost:3800"
+            end
+          end.not_to raise_error
+        end
+      end
+
+      context "weak password rejection" do
+        before do
+          allow(ENV).to receive(:[]).and_call_original
+          allow(ENV).to receive(:fetch).and_call_original
+          allow(ENV).to receive(:fetch).with("NODE_ENV", nil).and_return(nil)
+        end
+
+        it "raises when password is a known-weak default in production" do
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
+          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return(nil)
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_password = "devPassword"
+            end
+          end.to raise_error(ReactOnRailsPro::Error, /known-default value/)
+        end
+
+        it "raises for case-insensitive weak password match in production" do
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
+          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return(nil)
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_password = "DEVPASSWORD"
+            end
+          end.to raise_error(ReactOnRailsPro::Error, /known-default value/)
+        end
+
+        it "raises when password is too short in production" do
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
+          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return(nil)
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_password = "short"
+            end
+          end.to raise_error(ReactOnRailsPro::Error, /at least 16 characters/)
+        end
+
+        it "warns but does not raise for weak password in development" do
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("development")
+          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return(nil)
+
+          expect(Rails.logger).to receive(:warn).with(/known-default value/)
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_password = "devPassword"
+            end
+          end.not_to raise_error
+        end
+
+        it "accepts strong password in production" do
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
+          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return(nil)
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_password = "a-very-secure-random-password-here"
             end
           end.not_to raise_error
         end

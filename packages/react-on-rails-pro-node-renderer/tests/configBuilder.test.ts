@@ -172,7 +172,7 @@ describe('configBuilder', () => {
 
     it('does not throw when password is set via env in production', () => {
       process.env.NODE_ENV = 'production';
-      process.env.RENDERER_PASSWORD = 'secure-password';
+      process.env.RENDERER_PASSWORD = 'secure-password-val';
 
       const { buildConfig } = loadConfigBuilderWithMockedLogger();
 
@@ -185,7 +185,7 @@ describe('configBuilder', () => {
 
       const { buildConfig } = loadConfigBuilderWithMockedLogger();
 
-      expect(() => buildConfig({ password: 'secure-password' })).not.toThrow();
+      expect(() => buildConfig({ password: 'secure-password-val' })).not.toThrow();
     });
 
     it('does not throw in development without a password', () => {
@@ -355,6 +355,60 @@ describe('configBuilder', () => {
     });
   });
 
+  describe('weak password rejection', () => {
+    it('throws when password is a known-weak default in production', () => {
+      process.env.NODE_ENV = 'production';
+      process.env.RENDERER_PASSWORD = 'devPassword';
+      const processExit = mockProcessExit();
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(() => buildConfig()).toThrow('process.exit: 1');
+      expect(processExit).toHaveBeenCalledWith(1);
+    });
+
+    it('throws for case-insensitive weak password match in production', () => {
+      process.env.NODE_ENV = 'production';
+      process.env.RENDERER_PASSWORD = 'DEVPASSWORD';
+      const processExit = mockProcessExit();
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(() => buildConfig()).toThrow('process.exit: 1');
+      expect(processExit).toHaveBeenCalledWith(1);
+    });
+
+    it('throws when password is too short in production', () => {
+      process.env.NODE_ENV = 'production';
+      process.env.RENDERER_PASSWORD = 'short';
+      const processExit = mockProcessExit();
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(() => buildConfig()).toThrow('process.exit: 1');
+      expect(processExit).toHaveBeenCalledWith(1);
+    });
+
+    it('warns but does not throw for weak password in development', () => {
+      process.env.NODE_ENV = 'development';
+      process.env.RENDERER_PASSWORD = 'devPassword';
+
+      const { buildConfig, warn } = loadConfigBuilderWithMockedLogger();
+
+      expect(() => buildConfig()).not.toThrow();
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('known-default value'));
+    });
+
+    it('accepts strong password in production', () => {
+      process.env.NODE_ENV = 'production';
+      process.env.RENDERER_PASSWORD = 'a-very-secure-random-password-here';
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(() => buildConfig()).not.toThrow();
+    });
+  });
+
   describe('replayServerAsyncOperationLogs defaults', () => {
     it('defaults to true when NODE_ENV is development', () => {
       process.env.NODE_ENV = 'development';
@@ -373,7 +427,7 @@ describe('configBuilder', () => {
       delete process.env.REPLAY_SERVER_ASYNC_OPERATION_LOGS;
 
       const { buildConfig } = loadConfigBuilderWithMockedLogger();
-      const config = buildConfig({ password: 'secure-password' });
+      const config = buildConfig({ password: 'secure-password-val' });
 
       expect(config.replayServerAsyncOperationLogs).toBe(true);
     });

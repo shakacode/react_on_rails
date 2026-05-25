@@ -12,7 +12,12 @@ const config = {
   logLevel: env.RENDERER_LOG_LEVEL || 'info',
 
   // See value in /config/initializers/react_on_rails_pro.rb
-  password: env.RENDERER_PASSWORD || 'devPassword',
+  // For production, set RENDERER_PASSWORD as an env var and remove the literal fallback.
+<% if @generated_renderer_password -%>
+  password: env.RENDERER_PASSWORD || '<%= @generated_renderer_password %>',
+<% else -%>
+  password: env.RENDERER_PASSWORD,
+<% end -%>
 
   // Number of Node.js worker threads for SSR rendering
   // Set RENDERER_WORKERS_COUNT env var to override (e.g., for production tuning)

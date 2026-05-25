@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "set"
+
 module ReactOnRailsPro
   def self.configure
     yield(configuration)
@@ -462,55 +464,73 @@ module ReactOnRailsPro
       self.renderer_password = ENV.fetch("RENDERER_PASSWORD", nil) if renderer_password.blank?
     end
 
+    KNOWN_WEAK_RENDERER_PASSWORDS = %w[
+      devPassword myPassword1 password changeme admin secret test renderer
+    ].map(&:downcase).to_set.freeze
+
+    MIN_RENDERER_PASSWORD_LENGTH = 16
+
     def validate_renderer_password_for_production
-      # Defense-in-depth: skip validation when a password is already configured (e.g. extracted
-      # from the renderer URL by setup_renderer_password, or set directly in the initializer).
-      return if renderer_password.present?
       return unless node_renderer?
 
-      # Fail closed: only skip validation when every present runtime env is explicitly
-      # development or test. This mirrors the Node-side runtimeEnvsAllowDevelopmentDefaults()
-      # which checks both NODE_ENV and RAILS_ENV. Checking NODE_ENV here surfaces
-      # misconfigurations (e.g. NODE_ENV=production + RAILS_ENV=development) at Rails boot
-      # time rather than waiting for the Node renderer to reject the request.
       runtime_envs = [ENV.fetch("RAILS_ENV", nil), ENV.fetch("NODE_ENV", nil)].compact_blank.map(&:downcase)
       allowed_envs = %w[development test].freeze
-      return if runtime_envs.any? && runtime_envs.all? { |e| allowed_envs.include?(e) }
+      is_production_like = !(runtime_envs.any? && runtime_envs.all? { |e| allowed_envs.include?(e) })
 
-      raise ReactOnRailsPro::Error, <<~MSG
-        RENDERER_PASSWORD must be set in production-like environments (staging, production, etc.)
-        when using the NodeRenderer.
+      if renderer_password.blank?
+        return unless is_production_like
 
-        In development and test environments, the renderer password is optional and no authentication
-        is required. In all other environments, you must explicitly configure a password to secure
-        communication between Rails and the Node Renderer.
+        raise ReactOnRailsPro::Error, <<~MSG
+          RENDERER_PASSWORD must be set in production-like environments (staging, production, etc.)
+          when using the NodeRenderer.
 
-        To fix this, set the RENDERER_PASSWORD environment variable:
+          In development and test environments, the renderer password is optional and no authentication
+          is required. In all other environments, you must explicitly configure a password to secure
+          communication between Rails and the Node Renderer.
 
-          export RENDERER_PASSWORD="your-secure-password"
+          To fix this, set the RENDERER_PASSWORD environment variable:
 
-        Rails reads it automatically. If you prefer to make it explicit in your initializer:
+            export RENDERER_PASSWORD="your-secure-password"
 
-          # config/initializers/react_on_rails_pro.rb
-          ReactOnRailsPro.configure do |config|
-            config.renderer_password = ENV.fetch("RENDERER_PASSWORD")
-          end
+          Rails reads it automatically. If you prefer to make it explicit in your initializer:
 
-        Set the same password for the Node Renderer via the RENDERER_PASSWORD environment variable.
-        Rails resolves the password in this order:
-          1) config.renderer_password (blank values fall through to the next step)
-          2) Password embedded in config.renderer_url (for example, https://:password@host:3800)
-          3) ENV["RENDERER_PASSWORD"]
+            # config/initializers/react_on_rails_pro.rb
+            ReactOnRailsPro.configure do |config|
+              config.renderer_password = ENV.fetch("RENDERER_PASSWORD")
+            end
 
-        If Rails and the Node Renderer disagree about startup behavior, verify both RAILS_ENV and NODE_ENV.
+          Set the same password for the Node Renderer via the RENDERER_PASSWORD environment variable.
+          Rails resolves the password in this order:
+            1) config.renderer_password (blank values fall through to the next step)
+            2) Password embedded in config.renderer_url (for example, https://:password@host:3800)
+            3) ENV["RENDERER_PASSWORD"]
 
-        Environment matrix (both RAILS_ENV and NODE_ENV are checked):
-          development/test — password optional when every set env is development or test
-          (both unset)     — treated as production-like; RENDERER_PASSWORD required
-          staging          — RENDERER_PASSWORD required
-          production       — RENDERER_PASSWORD required
-          (mixed envs)     — RENDERER_PASSWORD required (e.g. NODE_ENV=production + RAILS_ENV=development)
-      MSG
+          If Rails and the Node Renderer disagree about startup behavior, verify both RAILS_ENV and NODE_ENV.
+
+          Environment matrix (both RAILS_ENV and NODE_ENV are checked):
+            development/test — password optional when every set env is development or test
+            (both unset)     — treated as production-like; RENDERER_PASSWORD required
+            staging          — RENDERER_PASSWORD required
+            production       — RENDERER_PASSWORD required
+            (mixed envs)     — RENDERER_PASSWORD required (e.g. NODE_ENV=production + RAILS_ENV=development)
+        MSG
+      end
+
+      if KNOWN_WEAK_RENDERER_PASSWORDS.include?(renderer_password.downcase)
+        if is_production_like
+          raise ReactOnRailsPro::Error,
+                "renderer_password is set to a known-default value (\"#{renderer_password}\"). " \
+                "Set RENDERER_PASSWORD to a random value of at least #{MIN_RENDERER_PASSWORD_LENGTH} characters."
+        else
+          Rails.logger.warn "[react_on_rails_pro] renderer_password is set to a known-default value " \
+                            "(\"#{renderer_password}\"). This is acceptable for development but MUST be " \
+                            "changed before deploying to staging/production."
+        end
+      elsif renderer_password.length < MIN_RENDERER_PASSWORD_LENGTH && is_production_like
+        raise ReactOnRailsPro::Error,
+              "renderer_password must be at least #{MIN_RENDERER_PASSWORD_LENGTH} characters " \
+              "in production-like environments. Current length: #{renderer_password.length}."
+      end
     end
   end
 end
