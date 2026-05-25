@@ -231,7 +231,7 @@ permissions:
   contents: read
 
 jobs:
-  advisory-license-check:
+  verify-license:
     runs-on: ubuntu-latest
     env:
       RAILS_ENV: production
@@ -282,7 +282,7 @@ permissions:
   contents: read
 
 jobs:
-  verify-license:
+  advisory-license-check:
     runs-on: ubuntu-latest
     env:
       RAILS_ENV: production
