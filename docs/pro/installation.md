@@ -172,8 +172,8 @@ licenses, it exits 0 but reports `renewal_required: true` in JSON output when th
 The `FORMAT=json` response is part of the task's documented scripting interface; scripts should branch on `status`,
 `renewal_required`, and the process exit code, and treat additional fields as metadata that may grow over time.
 When parsing JSON output, check `status` first: `renewal_required` is also `true` for already-expired licenses, which
-exit non-zero. The built-in 30-day threshold is fixed; use the app-owned rake task below if you want a non-zero exit for
-expiring-soon licenses or a custom warning threshold.
+exit non-zero. The built-in 30-day threshold is currently hardcoded in the gem; use the app-owned rake task below if you
+want a non-zero exit for expiring-soon licenses or a custom warning threshold.
 
 The full JSON output includes license metadata such as organization, plan, and expiration. Treat CI logs, step summaries,
 and uploaded artifacts as internal if they include raw task output. For example, an expired license can include these
@@ -338,6 +338,8 @@ jobs:
 
 If the repository does not pin Ruby with `.ruby-version` or a `ruby` directive in the Gemfile, add `ruby-version:` to
 `ruby/setup-ruby` so the workflow uses the same Ruby version as production.
+Before copying the examples into a production deployment pipeline, pin third-party actions such as `actions/checkout`
+and `ruby/setup-ruby` to reviewed versions or full commit SHAs according to your organization's supply-chain policy.
 
 Call the reusable workflow before your deploy job and pass repository secrets from the caller:
 
@@ -476,7 +478,7 @@ namespace :licenses do
     end
 
     # Guard against a future gem version returning :valid with a past expiration.
-    if days_remaining && days_remaining <= 0
+    if days_remaining && days_remaining < 0
       abort(
         "React on Rails Pro license is expired (expiration date is in the past). " \
         "Renew and update REACT_ON_RAILS_PRO_LICENSE."
