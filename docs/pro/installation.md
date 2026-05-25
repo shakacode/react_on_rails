@@ -305,9 +305,9 @@ jobs:
       - name: Check React on Rails Pro license
         id: license-check
         continue-on-error: true
-        run: >-
-          bundle exec rake react_on_rails_pro:verify_license >
-          "$RUNNER_TEMP/react_on_rails_pro_license.log" 2>&1
+        run: |
+          bundle exec rake react_on_rails_pro:verify_license \
+            > "$RUNNER_TEMP/react_on_rails_pro_license.log" 2>&1
 
       - name: Summarize React on Rails Pro license
         env:
@@ -371,16 +371,20 @@ namespace :licenses do
     expiration = info[:expiration]
     # :expiration is expected to be a Time or nil; keep the guard for compatibility with future gem versions.
     expiration_time = expiration.respond_to?(:to_time) ? expiration.to_time.utc : nil
+    # The :environment task dependency loads Active Support, so 1.day is available here.
     days_remaining = expiration_time && ((expiration_time - Time.now.utc) / 1.day).ceil
     status_label = status.to_s.tr("_", " ")
 
-    if status == :expired
+    case status
+    when :valid
+      # Continue to expiration window checks below.
+    when :expired
       abort "React on Rails Pro license is expired. Renew and update REACT_ON_RAILS_PRO_LICENSE."
-    elsif status == :missing
+    when :missing
       abort "React on Rails Pro license is missing. Set REACT_ON_RAILS_PRO_LICENSE."
-    elsif status == :invalid
+    when :invalid
       abort "React on Rails Pro license is invalid. Verify the full key was copied into REACT_ON_RAILS_PRO_LICENSE."
-    elsif status != :valid
+    else
       abort "React on Rails Pro license status is #{status_label}. Update REACT_ON_RAILS_PRO_LICENSE."
     end
 
