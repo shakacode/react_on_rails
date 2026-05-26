@@ -651,8 +651,12 @@ RSpec.describe "release.rake helper methods" do
 
     context "when a check has been rerun and the latest attempt passes" do
       it "evaluates only the latest attempt per check name and passes" do
-        old_failed = failing_run("Lint").merge("id" => 1)
-        new_passed = passing_run("Lint").merge("id" => 2)
+        # Reruns from the GitHub API preserve `check_suite.id` across attempts.
+        # The dedup key includes the suite id so cross-workflow runs that share
+        # a name don't collapse; both attempts here belong to the same suite,
+        # which is what makes them a rerun rather than two distinct workflows.
+        old_failed = failing_run("Lint").merge("id" => 1, "check_suite" => { "id" => 100 })
+        new_passed = passing_run("Lint").merge("id" => 2, "check_suite" => { "id" => 100 })
         allow(self).to receive(:fetch_main_ci_checks)
           .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
           .and_return(sha: sha, check_runs: [old_failed, new_passed])

@@ -488,8 +488,13 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
   # from one workflow could mask a failing run from another. `id` is
   # monotonically increasing per check run, so `max_by { id }` reliably
   # selects the latest attempt within a suite.
+  # When `check_suite` is absent (rare — third-party integrations that don't
+  # attach to a suite), fall back to the run's own `id` for the group key so
+  # each nil-suite run sits in its own group and is never collapsed with
+  # another. The GitHub Actions Checks API always populates `check_suite`,
+  # so this only matters for external check integrations.
   check_runs = check_runs
-               .group_by { |run| [run.dig("check_suite", "id"), run["name"]] }
+               .group_by { |run| [run.dig("check_suite", "id") || run["id"], run["name"]] }
                .map { |_key, runs| runs.max_by { |run| run["id"].to_i } }
 
   # Always query branch-protection required checks (when configured) so the

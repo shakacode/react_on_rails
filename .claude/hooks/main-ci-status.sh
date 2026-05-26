@@ -43,7 +43,7 @@ fail_open() {
 # the current SHA to key the cache correctly. This is one lightweight network
 # call per session start (~50-200ms). The 5-min TTL only eliminates the more
 # expensive `gh api .../check-runs` call that follows on a cache miss.
-head_sha=$(git -C "${REPO_ROOT}" ls-remote origin main 2>/dev/null | awk 'NR==1 {print $1}')
+head_sha=$(git -C "${REPO_ROOT}" ls-remote origin refs/heads/main 2>/dev/null | awk 'NR==1 {print $1}')
 
 if [ -n "${head_sha}" ]; then
   CACHE_FILE="${CACHE_DIR}/${CACHE_PREFIX}.${head_sha:0:12}"
@@ -124,7 +124,7 @@ checks_jsonl=$(gh api \
 # that each define a `detect-changes` job). Mirrors the Ruby dedup at
 # release.rake:451-455. Keep the two in sync.
 checks_json=$(echo "${checks_jsonl}" | jq -s '
-  [.[] | {id, name, status, conclusion, html_url, suite_id: (.check_suite.id // null)}]
+  [.[] | {id, name, status, conclusion, html_url, suite_id: (.check_suite.id // .id)}]
   | group_by([.suite_id, .name])
   | map(max_by(.id))
 ' 2>/dev/null) || fail_open "jq slurp failed"
