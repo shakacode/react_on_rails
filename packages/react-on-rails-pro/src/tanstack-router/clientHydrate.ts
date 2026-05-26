@@ -24,6 +24,19 @@ type TanStackRouterChunkPreloadInternals = TanStackRouter & {
   looseRoutesById?: Record<string, unknown>;
 };
 
+// Shared across mounts of the same router instance. React 18's StrictMode
+// double-renders the component with fresh hook state on each pass, so a
+// useRef guard alone does not prevent the render-phase init from running
+// twice when options.createRouter returns the same router (e.g. user-cached).
+// Keying on the router instance via WeakMap leaves production behavior
+// unchanged (each mount creates a fresh router and gets a fresh init).
+interface SharedHydrationInitState {
+  routeChunkPreloadPromise: Promise<void> | null;
+  hydrationCallbackPromise: Promise<void> | null;
+  didSetSsrFlag: boolean;
+}
+const sharedHydrationInitStates = new WeakMap<TanStackRouter, SharedHydrationInitState>();
+
 function extractDehydratedData(dehydratedRouter: unknown): unknown {
   if (!dehydratedRouter || typeof dehydratedRouter !== 'object') {
     return undefined;
@@ -194,107 +207,130 @@ function TanStackHydrationApp({
     // block completes. If React discards this render (StrictMode/concurrency),
     // the discarded router instance is dropped and a fresh instance is created
     // and initialized on the next render.
+    //
+    // Cross-mount invariant: sharedHydrationInitStates dedupes per-router
+    // side effects (loadRouteChunk, __store.setState, options.hydrate) across
+    // React 18 StrictMode's double-render-with-fresh-hooks behavior — which
+    // resets useRef on each pass, so this `routerRef.current === null` guard
+    // alone fires twice when options.createRouter returns the same instance.
     const router = options.createRouter();
+    const cachedInit = sharedHydrationInitStates.get(router);
 
-    // Set browser history for client-side navigation
-    const browserHistory = createBrowserHistory();
-    router.update({ history: browserHistory });
+    if (cachedInit) {
+      // Same router instance was already initialized by a discarded render
+      // (or prior mount). Reattach the pending preload/hydrate promises to
+      // this mount's refs so the post-hydration effect awaits the original
+      // work; restore didSetSsrFlag so cleanup correctly clears router.ssr.
+      routeChunkPreloadPromiseRef.current = cachedInit.routeChunkPreloadPromise;
+      hydrationCallbackPromiseRef.current = cachedInit.hydrationCallbackPromise;
+      didSetSsrFlagRef.current = cachedInit.didSetSsrFlag;
+    } else {
+      // Set browser history for client-side navigation
+      const browserHistory = createBrowserHistory();
+      router.update({ history: browserHistory });
 
-    // Only apply SSR hydration when a server payload exists.
-    // Client-only renders (prerender: false) must not set router.ssr or
-    // inject matches — the Transitioner handles initial loading for those.
-    if (hasSsrPayload) {
-      if (process.env.NODE_ENV === 'development' && !didWarnPrivateInternalsRef.current) {
-        didWarnPrivateInternalsRef.current = true;
-        console.warn(
-          'react-on-rails-pro/tanstack-router: Hydration uses TanStack Router private internals ' +
-            '(matchRoutes, __store, loadRouteChunk, looseRoutesById). Keep @tanstack/react-router ' +
-            'within the supported range (>=1.139.0 <2.0.0) and run integration tests when upgrading.',
-        );
-      }
-
-      // Validate internal APIs before using them.
-      if (typeof router.matchRoutes !== 'function' || !router.__store?.setState) {
-        throw new Error(
-          'react-on-rails-pro/tanstack-router: router.matchRoutes() and router.__store are required ' +
-            'but not available. Ensure @tanstack/react-router >=1.139.0 <2.0.0 is installed.',
-        );
-      }
-      const hydrationRouter = router as TanStackRouterHydrationInternals;
-
-      // Synchronously inject route matches to match server-rendered output.
-      // The server fully loads routes (via router.load()) before rendering, so
-      // all matches are resolved. We replicate this on the client so the initial
-      // render produces the same component tree as the server HTML.
-      //
-      // When ssrRouter match data is available (from serverRenderTanStackAppAsync),
-      // we apply loaderData, beforeLoadContext, status, etc. from the server payload
-      // so routes that render from loader results can hydrate correctly.
-      // Otherwise we override 'pending' to 'success' to prevent MatchInner from
-      // throwing loadPromise (which would cause Suspense suspension).
-      const rawMatches = hydrationRouter.matchRoutes(hydrationRouter.state.location);
-      routeChunkPreloadPromiseRef.current = preloadMatchedRouteChunks(
-        router as TanStackRouterChunkPreloadInternals,
-        rawMatches,
-      );
-      const ssrMatches = dehydratedState?.ssrRouter?.matches;
-      const matches = ssrMatches?.length
-        ? applyDehydratedMatchData(rawMatches, ssrMatches, warnMissingSsrMatch)
-        : rawMatches.map((match) => {
-            const m = match as Record<string, unknown>;
-            if (m.status === 'pending') {
-              warnMissingSsrMatch(m);
-              return { ...m, status: 'success' };
-            }
-            return m;
-          });
-
-      // Render-phase store injection is required for hydration parity: this
-      // must happen before the first RouterProvider render.
-      hydrationRouter.__store.setState((s: Record<string, unknown>) => ({
-        ...s,
-        status: 'idle',
-        resolvedLocation: (s as { location: unknown }).location,
-        matches,
-      }));
-
-      // Set SSR flag so the Transitioner skips its initial router.load() call,
-      // preventing a state update during hydration that would cause a mismatch.
-      // The shape matches TanStack Router's internal $_TSR hydration contract
-      // (the Transitioner only checks truthiness).
-      // Preserve user-set values from createRouter() (e.g. TanStack Start).
-      if (!router.ssr) {
-        router.ssr = { manifest: undefined };
-        didSetSsrFlagRef.current = true;
-      }
-
-      try {
-        // Run user-defined hydration callback for custom dehydratedData
-        // (for example external query/cache payloads), matching TanStack
-        // Router's ssr-client behavior.
-        if (typeof router.options?.hydrate === 'function') {
-          const hydrationResult = router.options.hydrate(
-            extractDehydratedData(dehydratedState?.dehydratedRouter),
+      // Only apply SSR hydration when a server payload exists.
+      // Client-only renders (prerender: false) must not set router.ssr or
+      // inject matches — the Transitioner handles initial loading for those.
+      if (hasSsrPayload) {
+        if (process.env.NODE_ENV === 'development' && !didWarnPrivateInternalsRef.current) {
+          didWarnPrivateInternalsRef.current = true;
+          console.warn(
+            'react-on-rails-pro/tanstack-router: Hydration uses TanStack Router private internals ' +
+              '(matchRoutes, __store, loadRouteChunk, looseRoutesById). Keep @tanstack/react-router ' +
+              'within the supported range (>=1.139.0 <2.0.0) and run integration tests when upgrading.',
           );
-          // Let async hydration failures reject so we do not continue into
-          // router.load() with partially hydrated client state.
-          hydrationCallbackPromiseRef.current = Promise.resolve(hydrationResult).then(() => undefined);
         }
 
-        // Backward-compatibility hook: if user router exposes router.hydrate(),
-        // invoke it with the full dehydrated router payload.
-        if (hasDehydratedRouter && typeof router.hydrate === 'function') {
-          router.hydrate(dehydratedState.dehydratedRouter);
+        // Validate internal APIs before using them.
+        if (typeof router.matchRoutes !== 'function' || !router.__store?.setState) {
+          throw new Error(
+            'react-on-rails-pro/tanstack-router: router.matchRoutes() and router.__store are required ' +
+              'but not available. Ensure @tanstack/react-router >=1.139.0 <2.0.0 is installed.',
+          );
         }
-      } catch (error) {
-        // If render-phase hydration throws, clear only the temporary SSR flag
-        // created by this module so retries are not blocked.
-        if (didSetSsrFlagRef.current) {
-          router.ssr = undefined;
-          didSetSsrFlagRef.current = false;
+        const hydrationRouter = router as TanStackRouterHydrationInternals;
+
+        // Synchronously inject route matches to match server-rendered output.
+        // The server fully loads routes (via router.load()) before rendering, so
+        // all matches are resolved. We replicate this on the client so the initial
+        // render produces the same component tree as the server HTML.
+        //
+        // When ssrRouter match data is available (from serverRenderTanStackAppAsync),
+        // we apply loaderData, beforeLoadContext, status, etc. from the server payload
+        // so routes that render from loader results can hydrate correctly.
+        // Otherwise we override 'pending' to 'success' to prevent MatchInner from
+        // throwing loadPromise (which would cause Suspense suspension).
+        const rawMatches = hydrationRouter.matchRoutes(hydrationRouter.state.location);
+        routeChunkPreloadPromiseRef.current = preloadMatchedRouteChunks(
+          router as TanStackRouterChunkPreloadInternals,
+          rawMatches,
+        );
+        const ssrMatches = dehydratedState?.ssrRouter?.matches;
+        const matches = ssrMatches?.length
+          ? applyDehydratedMatchData(rawMatches, ssrMatches, warnMissingSsrMatch)
+          : rawMatches.map((match) => {
+              const m = match as Record<string, unknown>;
+              if (m.status === 'pending') {
+                warnMissingSsrMatch(m);
+                return { ...m, status: 'success' };
+              }
+              return m;
+            });
+
+        // Render-phase store injection is required for hydration parity: this
+        // must happen before the first RouterProvider render.
+        hydrationRouter.__store.setState((s: Record<string, unknown>) => ({
+          ...s,
+          status: 'idle',
+          resolvedLocation: (s as { location: unknown }).location,
+          matches,
+        }));
+
+        // Set SSR flag so the Transitioner skips its initial router.load() call,
+        // preventing a state update during hydration that would cause a mismatch.
+        // The shape matches TanStack Router's internal $_TSR hydration contract
+        // (the Transitioner only checks truthiness).
+        // Preserve user-set values from createRouter() (e.g. TanStack Start).
+        if (!router.ssr) {
+          router.ssr = { manifest: undefined };
+          didSetSsrFlagRef.current = true;
         }
-        throw error;
+
+        try {
+          // Run user-defined hydration callback for custom dehydratedData
+          // (for example external query/cache payloads), matching TanStack
+          // Router's ssr-client behavior.
+          if (typeof router.options?.hydrate === 'function') {
+            const hydrationResult = router.options.hydrate(
+              extractDehydratedData(dehydratedState?.dehydratedRouter),
+            );
+            // Let async hydration failures reject so we do not continue into
+            // router.load() with partially hydrated client state.
+            hydrationCallbackPromiseRef.current = Promise.resolve(hydrationResult).then(() => undefined);
+          }
+
+          // Backward-compatibility hook: if user router exposes router.hydrate(),
+          // invoke it with the full dehydrated router payload.
+          if (hasDehydratedRouter && typeof router.hydrate === 'function') {
+            router.hydrate(dehydratedState.dehydratedRouter);
+          }
+        } catch (error) {
+          // If render-phase hydration throws, clear only the temporary SSR flag
+          // created by this module so retries are not blocked.
+          if (didSetSsrFlagRef.current) {
+            router.ssr = undefined;
+            didSetSsrFlagRef.current = false;
+          }
+          throw error;
+        }
       }
+
+      sharedHydrationInitStates.set(router, {
+        routeChunkPreloadPromise: routeChunkPreloadPromiseRef.current,
+        hydrationCallbackPromise: hydrationCallbackPromiseRef.current,
+        didSetSsrFlag: didSetSsrFlagRef.current,
+      });
     }
 
     routerRef.current = router;
@@ -373,6 +409,14 @@ function TanStackHydrationApp({
         if (latestEffectRunIdRef.current === effectRunId && didSetSsrFlagRef.current) {
           router.ssr = undefined;
           didSetSsrFlagRef.current = false;
+          // Keep sharedHydrationInitStates in sync so a later mount of the
+          // same cached router doesn't restore a stale didSetSsrFlag=true and
+          // trigger the dev sanity-check warning below on a router whose ssr
+          // flag was already cleared correctly.
+          const cached = sharedHydrationInitStates.get(router);
+          if (cached) {
+            cached.didSetSsrFlag = false;
+          }
         }
       });
 
@@ -385,6 +429,10 @@ function TanStackHydrationApp({
         if (latestEffectRunIdRef.current === effectRunId && didSetSsrFlagRef.current) {
           router.ssr = undefined;
           didSetSsrFlagRef.current = false;
+          const cached = sharedHydrationInitStates.get(router);
+          if (cached) {
+            cached.didSetSsrFlag = false;
+          }
         }
       });
       const cancellableRouter = router as TanStackRouter & { cancelLoad?: () => void };
