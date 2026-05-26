@@ -356,19 +356,55 @@ When the user passes `rc` or `beta` as an argument:
 
 ### For Prerelease to Stable Version Release
 
-When releasing from prerelease to a stable version (e.g., `v16.5.0.rc.1` -> `v16.5.0`):
+When releasing from prerelease to a stable version (e.g., `v16.5.0.rc.1` -> `v16.5.0`), this is where the accumulated prerelease sections get coalesced into one stable section. **Curate carefully** — users landing on the stable version don't care about intermediate prerelease state, and noise here makes the upgrade story harder to read.
 
-1. **Remove all prerelease version labels** from the changelog:
-   - Change `### [16.5.0.rc.0]`, `### [16.5.0.rc.1]`, etc. to a single `### [16.5.0]` section
-   - Also handle beta versions: `### [16.5.0.beta.1]` etc.
-   - Combine all prerelease entries into the stable release section
+#### Step 1: Coalesce all prerelease sections into one stable section
 
-2. **Consolidate duplicate entries**:
-   - If bug fixes or changes were made to features introduced in earlier prereleases, keep only the final state
-   - Remove redundant changelog entries for fixes to prerelease features
-   - Keep the most recent/accurate description of each change
+- Replace `### [16.5.0.rc.0]`, `### [16.5.0.rc.1]`, `### [16.5.0.beta.1]`, etc. (however many exist) with a single `### [16.5.0] - YYYY-MM-DD` section
+- **Move any remaining entries from `### [Unreleased]` into the new stable section** — anything still under `[Unreleased]` at stable-release time is shipping in this stable version. Leave `### [Unreleased]` with only its header (no entries).
+- Combine entries from all prerelease sections and the moved `[Unreleased]` entries, consolidating duplicate category headings (e.g., merge multiple `#### Fixed` sections into one under the preferred order from "Category Organization")
+- Remove the orphaned compare links at the bottom of the file for the coalesced prerelease versions
+- Add the `[16.5.0]` compare link pointing from the **previous stable tag** (e.g., `v16.4.0`) to `v16.5.0` — **not** from the latest RC tag
+- Update the `[unreleased]:` compare link to point from `v16.5.0` to `main`
+- **Before committing**, spot-check the compare-link updates above: orphaned RC compare links removed, the new `[16.5.0]` link anchored at the previous stable tag (e.g., `v16.4.0...v16.5.0`) — not the latest RC tag — and `[unreleased]` pointing from `v16.5.0` to `main`. When `bundle exec rake "update_changelog[release]"` does the coalesce, this is handled automatically; still verify the result before pushing.
 
-3. **Update version diff links** at the bottom to point to the stable version
+#### Step 2: Curate the entries — REMOVE these
+
+1. **Prerelease-only fixes** — bugs introduced during the prerelease cycle and fixed in a later RC. If the bug never shipped in a stable release, the fix is noise to stable users.
+   - Investigate when a bug was introduced: `git log --oneline v<last_stable>..v<rc_containing_the_fix>` — search this range for the commit that introduced the bug. If the range is large and you know which files are relevant, scope it with `-- path/to/file` to cut noise. If you **find it** in this range, the bug was introduced during the RC cycle and never shipped in stable — apply the merge-or-drop rules below. If you **don't find it**, the bug predates the RC cycle and existed in `<last_stable>` — keep the fix as its own entry.
+   - Check the PR description for what was broken and when
+   - For RC-only regression fixes where the fix **changed user-visible behavior** of the original feature (e.g., extended an option's accepted values, adjusted a default, broadened a path matcher), **merge** the fix into the original PR's entry: credit both PRs and rewrite the description so it reflects the final shipped state. Don't drop these — stable consumers see the merged behavior, not the intermediate regression.
+   - **Pure-restore** fixes (the fix only restores prior behavior without changing the original entry's description) can be dropped.
+
+2. **Refinements to prerelease-only features** — if a new feature was introduced in `rc.0` and then iterated in `rc.1`/`rc.2`, keep only the final description and drop the iteration history
+
+3. **Internal/contributor-only tooling** — yalc publish fixes, git dependency support, CI/build script changes, generator handling of prerelease version formats, local-dev tooling fixes. These don't belong in a user-facing changelog.
+
+#### Step 3: Curate the entries — KEEP these
+
+1. **User-facing fixes for bugs that existed in the previous stable** — if `rc.2` fixes a bug that was in `16.4.0`, that fix matters to stable users upgrading
+
+2. **Compatibility fixes** — Ruby/Rails version support, dependency relaxations, etc.
+
+3. **All breaking changes** — API/CLI changes, removed methods, configuration changes, generator output changes. Even if a breaking change was introduced and refined across multiple prereleases, the final breaking change description belongs in stable.
+
+4. **Performance/security improvements affecting all users**
+
+**Pro tagging:** Pro-specific changes stay in the changelog tagged inline with `**[Pro]**` — do NOT drop them just because they're Pro-only. Apply the same REMOVE/KEEP rules above based on whether they're prerelease-only iteration vs user-facing changes that ship to Pro users.
+
+#### Step 4: Investigation process for each entry
+
+For each entry that doesn't obviously fall into a REMOVE or KEEP category above, ask:
+
+- Was this bug present in the last stable release? If no, drop.
+- Was this feature introduced in an earlier prerelease and then iterated/refined across later RCs? If yes, keep only the final description and drop the intermediate history.
+- Does this matter to someone upgrading from the last stable to this stable? If no, drop.
+
+#### Step 5: Final read-through
+
+Read the resulting stable section as if you're a user upgrading from the previous stable. Every entry should be something you'd want to know about. If an entry only makes sense to someone who tracked the RC cycle, drop it.
+
+**Example reference:** See [PR 2072](https://github.com/shakacode/react_on_rails/pull/2072) for a complete example of prerelease changelog curation with detailed investigation notes.
 
 ## Examples
 
@@ -417,51 +453,6 @@ To migrate to React on Rails Pro:
    // After
    import ReactOnRails from 'react-on-rails-pro';
 ```
-
-## Prerelease Changelog Curation
-
-When consolidating prerelease versions (beta, RC) into a stable release, carefully curate entries to include only user-facing changes:
-
-**Remove these types of entries:**
-
-1. **Developer-only tooling**:
-   - yalc publish fixes (local development tool)
-   - Git dependency support (contributor workflow)
-   - CI/build script improvements
-   - Internal tooling changes
-
-2. **Prerelease-specific fixes**:
-   - Bugs introduced during the prerelease cycle (not present in last stable)
-   - Fixes for new prerelease-only features
-   - Generator handling of prerelease version formats
-
-3. **Pro-specific features** (tag with `**[Pro]**` inline):
-   - Node renderer fixes/improvements
-   - Streaming-related changes
-   - Async loading features (Pro-exclusive)
-
-**Keep these types of entries:**
-
-1. **User-facing fixes**:
-   - Bugs that existed in previous stable release (e.g., 16.1.x)
-   - Compatibility fixes (Rails version support, etc.)
-   - Performance improvements affecting all users
-
-2. **Breaking changes**:
-   - API changes requiring migration
-   - Removed methods/features
-   - Configuration changes
-
-**Investigation process:**
-
-For each suspicious entry:
-
-1. Check git history: `git log --oneline <last_stable>..<current_prerelease> -- <file>`
-2. Determine when bug was introduced (stable vs prerelease cycle)
-3. Verify whether fix applies to stable users or only prerelease users
-4. Check PR description for context about what was broken
-
-**Example reference:** See [PR 2072](https://github.com/shakacode/react_on_rails/pull/2072) for a complete example of prerelease changelog curation with detailed investigation notes.
 
 ## Additional Notes
 
