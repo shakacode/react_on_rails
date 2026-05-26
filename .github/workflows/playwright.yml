@@ -54,6 +54,7 @@ jobs:
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.3'
+          # BUNDLE_PATH is intentionally absent: ruby/setup-ruby with bundler-cache manages the root bundle path.
           bundler-cache: true
 
       - uses: actions/setup-node@v4
@@ -76,13 +77,22 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Build workspace packages
         run: pnpm run build
 
+      - name: Cache dummy app Ruby gems
+        uses: actions/cache@v4
+        with:
+          path: react_on_rails/spec/dummy/vendor/bundle
+          key: dummy-app-gem-cache-${{ hashFiles('react_on_rails/spec/dummy/Gemfile.lock') }}-ruby3.3
+
       - name: Install dummy app Ruby dependencies
         working-directory: react_on_rails/spec/dummy
+        env:
+          BUNDLE_FROZEN: true
+          BUNDLE_PATH: vendor/bundle
         run: bundle install
 
       - name: Install Playwright browsers

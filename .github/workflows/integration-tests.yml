@@ -113,6 +113,9 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.setup-integration-matrix.outputs.matrix) }}
     runs-on: ubuntu-22.04
+    env:
+      BUNDLE_FROZEN: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
+      BUNDLE_PATH: vendor/bundle
     steps:
       - uses: actions/checkout@v4
         with:
@@ -169,9 +172,8 @@ jobs:
       - name: Install Ruby Gems for dummy app
         run: |
           cd react_on_rails/spec/dummy
-          bundle lock --add-platform 'x86_64-linux'
-          if ! bundle check --path=vendor/bundle; then
-            bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
+          if ! bundle check; then
+            bundle _2.5.9_ install --jobs=4 --retry=3
           fi
       - name: generate file system-based packs
         run: cd react_on_rails/spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs
@@ -206,6 +208,9 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.setup-integration-matrix.outputs.matrix) }}
     runs-on: ubuntu-22.04
+    env:
+      BUNDLE_FROZEN: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
+      BUNDLE_PATH: vendor/bundle
     steps:
       - uses: actions/checkout@v4
         with:
@@ -247,7 +252,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vendor/bundle
-          key: package-app-gem-cache-${{ hashFiles('Gemfile.lock') }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          key: package-app-gem-cache-${{ hashFiles('react_on_rails/Gemfile.lock') }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
       - name: Save dummy app ruby gems to cache
         uses: actions/cache@v4
         with:
@@ -270,16 +275,14 @@ jobs:
       - name: Install Ruby Gems for package
         run: |
           cd react_on_rails
-          bundle lock --add-platform 'x86_64-linux'
-          if ! bundle check --path=vendor/bundle; then
-            bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
+          if ! bundle check; then
+            bundle _2.5.9_ install --jobs=4 --retry=3
           fi
       - name: Install Ruby Gems for dummy app
         run: |
           cd react_on_rails/spec/dummy
-          bundle lock --add-platform 'x86_64-linux'
-          if ! bundle check --path=vendor/bundle; then
-            bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
+          if ! bundle check; then
+            bundle _2.5.9_ install --jobs=4 --retry=3
           fi
       - name: Ensure minimum required Chrome version
         run: |

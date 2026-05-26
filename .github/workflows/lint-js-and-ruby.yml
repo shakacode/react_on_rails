@@ -86,6 +86,7 @@ jobs:
       )
     env:
       BUNDLE_FROZEN: true
+      BUNDLE_PATH: vendor/bundle
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -125,16 +126,18 @@ jobs:
           echo "Node version: "; node -v
           echo "pnpm version: "; pnpm --version
           echo "Bundler version: "; bundle --version
+      - name: Check Gemfile.lock platforms
+        run: ruby script/check-gemfile-lock-platforms
       - name: Save root ruby gems to cache
         uses: actions/cache@v4
         with:
           path: vendor/bundle
-          key: package-app-gem-cache-${{ hashFiles('Gemfile.lock') }}-lint
+          key: package-app-gem-cache-${{ hashFiles('react_on_rails/Gemfile.lock') }}-lint
       - name: Install Node modules with pnpm
         run: pnpm install --frozen-lockfile
 
       - name: Install Ruby Gems for package
-        run: cd react_on_rails && bundle check --path=vendor/bundle || bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
+        run: cd react_on_rails && bundle check || bundle _2.5.9_ install --jobs=4 --retry=3
       - name: Lint Ruby
         run: cd react_on_rails && bundle exec rubocop
       - name: Validate RBS type signatures
@@ -151,9 +154,8 @@ jobs:
       - name: Install Ruby Gems for dummy app
         run: |
           cd react_on_rails/spec/dummy
-          bundle lock --add-platform 'x86_64-linux'
-          if ! bundle check --path=vendor/bundle; then
-            bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
+          if ! bundle check; then
+            bundle _2.5.9_ install --jobs=4 --retry=3
           fi
       - name: generate file system-based packs
         run: cd react_on_rails/spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs

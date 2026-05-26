@@ -255,6 +255,16 @@ pnpm install
 
 You can also run `bin/console` for an interactive prompt that will allow you to experiment.
 
+### Lockfile Platforms
+
+When committing any `Gemfile.lock`, ensure it includes the Linux platform used by CI.
+If you generated or refreshed a lockfile on macOS or another non-Linux platform and `x86_64-linux` is missing from the
+`PLATFORMS` section, the lint workflow will fail. Run this in the directory that owns that lockfile before committing:
+
+```sh
+bundle lock --add-platform x86_64-linux
+```
+
 ### Local Node Package
 
 Note, the example and dummy apps will use your local `packages/react-on-rails` folder as the `react-on-rails` node package. This will also be done automatically for you via the `rake examples:gen_all` rake task.
@@ -432,7 +442,7 @@ If you run `rspec` at the top level, you'll see this message: `require': cannot 
 
 If you run tests with `COVERAGE=true`, you can view the SimpleCov report at `coverage/index.html`.
 
-Turbolinks 5 is included in the test app, unless "DISABLE_TURBOLINKS" is set to YES in the environment.
+Turbolinks 5 is included in the test app, unless `DISABLE_TURBOLINKS=TRUE` is set in the environment.
 
 Run `rake -T` or `rake -D` to see testing options.
 
@@ -459,7 +469,7 @@ After updating the source files above, regenerate lock files by running `bundle 
 
 - `react_on_rails/` and `react_on_rails/spec/dummy/` (OSS)
 - `react_on_rails_pro/` and `react_on_rails_pro/spec/dummy/` and `react_on_rails_pro/spec/execjs-compatible-dummy/` (Pro)
-- Root `Gemfile.lock` and `pnpm-lock.yaml`
+- `react_on_rails/Gemfile.lock` and root `pnpm-lock.yaml`
 
 **Example apps (handled automatically):**
 
