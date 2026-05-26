@@ -656,17 +656,8 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       expect { client.close }.not_to raise_error
     end
 
-    it "evicts broken client from pool when connection error occurs" do
-      stub_const("FakeBrokenClient", Class.new do
-        attr_reader :closed
-
-        def close
-          @closed = true
-        end
-      end)
-
-      broken_client = FakeBrokenClient.new
-      working_client = FakeBrokenClient.new
+    it "reuses the same client after connection errors (async-http handles recovery internally)" do
+      fake_client = instance_double(Async::HTTP::Client)
       endpoint = instance_double(Async::HTTP::Endpoint, protocol: :fake_protocol)
 
       client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
@@ -674,9 +665,8 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
 
       clients_created = []
       allow(Async::HTTP::Client).to receive(:new) do |*_args|
-        created = clients_created.empty? ? broken_client : working_client
-        clients_created << created
-        created
+        clients_created << fake_client
+        fake_client
       end
 
       fake_scheduler = Object.new
@@ -689,16 +679,14 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
         end
       end.to raise_error(Errno::ECONNRESET)
 
-      # Broken client should be evicted and closed
-      expect(broken_client.closed).to be(true)
       expect(clients_created.size).to eq(1)
 
-      # Next call should create a new client (not reuse the broken one)
+      # Next call should reuse the same client (async-http's pool handles broken connections)
       yielded_client = nil
       client.__send__(:with_client, outer_scheduler: fake_scheduler) { |c| yielded_client = c }
 
-      expect(clients_created.size).to eq(2)
-      expect(yielded_client).to be(working_client)
+      expect(clients_created.size).to eq(1)
+      expect(yielded_client).to be(fake_client)
     end
   end
 end

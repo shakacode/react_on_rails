@@ -351,14 +351,7 @@ module ReactOnRailsPro
       if outer_scheduler
         # Persistent mode: reuse client across requests within same long-lived scheduler.
         # Connection pool (limit) is now effective — multiple streams share pooled connections.
-        client = scheduler_scoped_client(outer_scheduler)
-        begin
-          yield(client)
-        rescue *CONNECTION_ERRORS
-          # Evict broken client so the next request gets a fresh one
-          evict_client_from_scheduler(outer_scheduler)
-          raise
-        end
+        yield(scheduler_scoped_client(outer_scheduler))
       else
         # Ephemeral mode: no outer scheduler means either we're outside an Async context,
         # or Sync created an ephemeral scheduler. Use block-form to ensure cleanup.
