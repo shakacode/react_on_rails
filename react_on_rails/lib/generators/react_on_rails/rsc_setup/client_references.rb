@@ -33,7 +33,7 @@ module ReactOnRails
                 anchor,
                 shakapacker_config_import_statement(existing_imports_content),
                 path_resolve_import_statement(existing_imports_content),
-                "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');",
+                rsc_webpack_plugin_import_statement(content),
                 "",
                 rsc_client_references_js
               ]
@@ -51,7 +51,7 @@ module ReactOnRails
               [
                 anchor,
                 path_resolve_import_statement(existing_imports_content),
-                "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');",
+                rsc_webpack_plugin_import_statement(content),
                 "",
                 rsc_client_references_js
               ]
@@ -694,7 +694,7 @@ module ReactOnRails
               content,
               [
                 anchor,
-                "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');"
+                rsc_webpack_plugin_import_statement(content)
               ]
             )
           end
@@ -962,6 +962,18 @@ module ReactOnRails
           return if path_resolve_imported?(existing_imports_content)
 
           "const { resolve } = require('path');"
+        end
+
+        # Unlike `shakapacker_config_import_statement` / `path_resolve_import_statement` which check
+        # `existing_imports_content` (the slice up through the anchor that they piggy-back on), this
+        # helper checks the FULL file content. A user's existing `RSCWebpackPlugin` import can sit
+        # below the anchor (e.g. a partially-edited or previously-failed migration), so dedup must
+        # see the whole file or it will inject a duplicate `const { RSCWebpackPlugin } = require(...)`
+        # and webpack will fail to load with `Identifier 'RSCWebpackPlugin' has already been declared`.
+        def rsc_webpack_plugin_import_statement(content)
+          return if commonjs_named_imported?(content, "react-on-rails-rsc/WebpackPlugin", "RSCWebpackPlugin")
+
+          "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');"
         end
 
         def rsc_client_references_setup_import_pattern(is_server:)
