@@ -5,15 +5,15 @@ require_relative "../spec_helper"
 require_relative "../../../app/controllers/react_on_rails_pro/rolling_deploy/bundles_controller"
 
 describe ReactOnRailsPro::RollingDeploy::BundlesController do
-  describe "base class" do
-    # Regression guard: this controller is bearer-token authenticated, so it
-    # must not inherit the CSRF middleware that ActionController::Base ships
-    # with. CodeQL flags `protect_from_forgery with: :null_session` on a Base
-    # controller as weakened CSRF; the fix is to use ActionController::API,
-    # which omits the RequestForgeryProtection module entirely.
-    it "inherits from ActionController::API (omits CSRF middleware)" do
-      expect(described_class.ancestors).to include(ActionController::API)
-      expect(described_class.ancestors).not_to include(ActionController::RequestForgeryProtection)
+  describe ".forgery protection" do
+    # Regression guard: CodeQL flags both `protect_from_forgery with:
+    # :null_session` (weakened) and the absence of `protect_from_forgery`
+    # (not enabled). For a GET-only bearer-token API the strategy never
+    # actually fires (Rails skips CSRF on GET), so `:exception` is the
+    # form that satisfies CodeQL without changing runtime behavior.
+    it "uses Rails exception CSRF protection" do
+      expect(described_class.forgery_protection_strategy)
+        .to eq(ActionController::RequestForgeryProtection::ProtectionMethods::Exception)
     end
   end
 
