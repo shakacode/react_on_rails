@@ -41,7 +41,7 @@ Teams adopting RSC have reported dramatic wins — BlogHunch's 30% server-cost r
 
 The public demo below shows how these ideas look in an inspectable React on Rails Pro application.
 
-## Live Demo and Evidence
+## Live Demo and Evidence {#live-demo-and-evidence}
 
 The public [LocalHub marketplace demo](https://rsc.reactonrails.com/) shows the
 same marketplace-style surfaces rendered with traditional SSR, client rendering,
