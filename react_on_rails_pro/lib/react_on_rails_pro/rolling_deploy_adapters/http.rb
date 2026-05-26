@@ -196,10 +196,21 @@ module ReactOnRailsPro
 
           http = Net::HTTP.new(uri.host, uri.port)
           http.use_ssl = (uri.scheme == "https")
+          warn_plain_http_token(uri) unless http.use_ssl?
           http.verify_mode = OpenSSL::SSL::VERIFY_PEER if http.use_ssl?
           http.open_timeout = DEFAULT_OPEN_TIMEOUT_SECONDS
           http.read_timeout = read_timeout
           http.request(request)
+        end
+
+        # Plain-HTTP guardrail. The full HTTPS-only guard lands in PR 2; until
+        # then a single-line warning here protects misconfigured deployments
+        # by surfacing the cleartext-token risk in build CI logs.
+        def warn_plain_http_token(uri)
+          Rails.logger.warn(
+            "#{LOG_PREFIX} #{uri.scheme}://#{uri.host} is not HTTPS — " \
+            "the Bearer token will be transmitted in cleartext. Use HTTPS in production."
+          )
         end
       end
     end
