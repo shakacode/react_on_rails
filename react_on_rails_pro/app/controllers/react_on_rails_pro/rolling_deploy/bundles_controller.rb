@@ -23,6 +23,11 @@ module ReactOnRailsPro
     #     path: "/internal/rolling-deploy"
     #   )
     #
+    # Callers that need to mount the controller more than once (for example,
+    # the engine auto-mount plus a user-controlled secondary path) must pass
+    # a distinct `as_prefix:` per call so Rails' named-route registry
+    # doesn't raise `ArgumentError: Invalid route name, already in use`.
+    #
     # Security:
     #   * Bearer-token auth via `Authorization: Bearer <token>`, constant-time
     #     compare (ActiveSupport::SecurityUtils.secure_compare). 401 returned
@@ -39,18 +44,26 @@ module ReactOnRailsPro
       before_action :authenticate_rolling_deploy_request
       before_action :set_no_store_headers
 
+      DEFAULT_ROUTE_PREFIX = "react_on_rails_pro_rolling_deploy"
+
       class << self
         # Helper for users who want to mount manually under a custom path. The
         # auto-mount path uses these same route definitions via the engine
         # initializer (see ReactOnRailsPro::Engine).
-        def draw_routes(mapper, path:)
+        #
+        # `as_prefix:` controls the generated named-route helpers
+        # (`<prefix>_manifest`, `<prefix>_bundle`). Callers that mount the
+        # controller more than once (e.g. auto-mount plus a secondary user
+        # mount) must pass distinct prefixes so the Rails route registry
+        # doesn't raise on duplicate names.
+        def draw_routes(mapper, path:, as_prefix: DEFAULT_ROUTE_PREFIX)
           mapper.get("#{path}/manifest",
                      to: "react_on_rails_pro/rolling_deploy/bundles#manifest",
-                     as: :react_on_rails_pro_rolling_deploy_manifest)
+                     as: :"#{as_prefix}_manifest")
           mapper.get("#{path}/bundles/:hash",
                      to: "react_on_rails_pro/rolling_deploy/bundles#show",
                      constraints: { hash: SAFE_HASH_PATTERN },
-                     as: :react_on_rails_pro_rolling_deploy_bundle)
+                     as: :"#{as_prefix}_bundle")
         end
       end
 

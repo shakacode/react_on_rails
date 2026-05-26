@@ -12,6 +12,36 @@ describe ReactOnRailsPro::RollingDeploy::BundlesController do
     end
   end
 
+  describe ".draw_routes" do
+    let(:mapper) { instance_spy(ActionDispatch::Routing::Mapper) }
+
+    it "uses the default route helper prefix" do
+      described_class.draw_routes(mapper, path: "/rolling")
+
+      expect(mapper).to have_received(:get).with(
+        "/rolling/manifest",
+        hash_including(as: :react_on_rails_pro_rolling_deploy_manifest)
+      )
+      expect(mapper).to have_received(:get).with(
+        "/rolling/bundles/:hash",
+        hash_including(as: :react_on_rails_pro_rolling_deploy_bundle)
+      )
+    end
+
+    it "honors a custom as_prefix so the controller can be mounted twice without collisions" do
+      described_class.draw_routes(mapper, path: "/internal/ror", as_prefix: "internal_rolling")
+
+      expect(mapper).to have_received(:get).with(
+        "/internal/ror/manifest",
+        hash_including(as: :internal_rolling_manifest)
+      )
+      expect(mapper).to have_received(:get).with(
+        "/internal/ror/bundles/:hash",
+        hash_including(as: :internal_rolling_bundle)
+      )
+    end
+  end
+
   describe "#companion_assets" do
     it "rejects absolute companion asset paths outside Rails.root" do
       Dir.mktmpdir("ror-pro-rails-root") do |rails_root|
