@@ -159,6 +159,8 @@ namespace :licenses do
     info = ReactOnRailsPro::Utils.license_info
     status = info[:status]
     expiration = info[:expiration]
+    # `to_time` covers `Time`, `DateTime`, and (in Rails) `String` via ActiveSupport,
+    # so this works regardless of which type `license_info` returns.
     expiration_time = expiration.respond_to?(:to_time) ? expiration.to_time.utc : nil
     # 86_400 == 1 day in seconds. ceil keeps threshold comparisons conservative (fires
     # slightly early); the displayed count can be 1 higher than the true floor value.
@@ -174,13 +176,14 @@ namespace :licenses do
       abort "React on Rails Pro license status is #{status}. Update REACT_ON_RAILS_PRO_LICENSE."
     end
 
+    # Defensive: catches the gem reporting :valid while the expiration timestamp is
+    # in the past (e.g. just-expired licenses where ceil(-0.04) == 0).
     if days_remaining && days_remaining <= 0
       abort "React on Rails Pro license is expired (expiration is not in the future). Renew and update REACT_ON_RAILS_PRO_LICENSE."
     end
 
     if days_remaining && days_remaining <= threshold_days
-      expiry_phrase = days_remaining.zero? ? "expires today" : "expires in #{days_remaining} #{day_label}"
-      abort "React on Rails Pro license #{expiry_phrase}. Renew and update REACT_ON_RAILS_PRO_LICENSE."
+      abort "React on Rails Pro license expires in #{days_remaining} #{day_label}. Renew and update REACT_ON_RAILS_PRO_LICENSE."
     end
 
     puts "React on Rails Pro license is valid (#{days_remaining} #{day_label} remaining)" if days_remaining
@@ -205,7 +208,11 @@ Drop a scheduled task that emails or Slack-pings when the license is approaching
 namespace :licenses do
   desc "Email if the React on Rails Pro license expires within DAYS days (default 30)"
   task notify_react_on_rails_pro: :environment do
-    threshold_days = Integer(ENV.fetch("DAYS", "30"))
+    threshold_days = begin
+      Integer(ENV.fetch("DAYS", "30"))
+    rescue ArgumentError
+      abort "DAYS must be an integer number of days."
+    end
     info = ReactOnRailsPro::Utils.license_info
     expiration = info[:expiration]
     expiration_time = expiration.respond_to?(:to_time) ? expiration.to_time.utc : nil
@@ -227,42 +234,7 @@ Schedule it daily via `whenever`, `cron`, GitHub Actions, or your platform's sch
 
 ## JSON output parsing
 
-For scripts that branch on `status` rather than just exit codes, parse the JSON output. Most Rails apps print one JSON object per line — filter to the first line whose `status` is a known license value:
-
-```ruby
-require "json"
-require "open3"
-
-LICENSE_STATUSES = %w[valid expired invalid missing].freeze
-
-stdout, _stderr, _status = Open3.capture3(
-  { "RAILS_ENV" => "production", "FORMAT" => "json" },
-  "bundle", "exec", "rake", "react_on_rails_pro:verify_license"
-)
-
-license_info = stdout.lines.filter_map { |line|
-  parsed = JSON.parse(line) rescue nil
-  parsed if parsed.is_a?(Hash) && LICENSE_STATUSES.include?(parsed["status"])
-}.first
-
-abort "Could not parse license JSON." unless license_info
-
-case license_info["status"]
-when "expired", "invalid", "missing"
-  abort "React on Rails Pro license is #{license_info['status']}."
-when "valid"
-  if license_info["renewal_required"]
-    warn "React on Rails Pro license renewal is required soon."
-  else
-    puts "React on Rails Pro license is valid."
-  end
-end
-```
-
-<details>
-<summary>Fallback parser for noisy multi-line stdout</summary>
-
-If your Rails boot stream interleaves multi-line JSON with other content (so the task output is not on its own line), use a recursive-descent parser that scans for balanced braces:
+For scripts that branch on `status` rather than just exit codes, parse the JSON output. The rake task uses `JSON.pretty_generate`, so the payload spans multiple lines and a line-by-line `JSON.parse` will fail. Rails boot output can also interleave other content with the JSON. Use a balanced-brace scanner that locates the license object inside `stdout`:
 
 ```ruby
 require "json"
@@ -339,10 +311,17 @@ unless license_info
   abort "Could not parse React on Rails Pro license JSON. Exit: #{exit_detail}. Stderr: #{stderr}"
 end
 
-# Branch on license_info["status"] as in the primary example above.
+case license_info["status"]
+when "expired", "invalid", "missing"
+  abort "React on Rails Pro license is #{license_info['status']}."
+when "valid"
+  if license_info["renewal_required"]
+    warn "React on Rails Pro license renewal is required soon."
+  else
+    puts "React on Rails Pro license is valid."
+  end
+end
 ```
-
-</details>
 
 ## CI failure backtrace
 

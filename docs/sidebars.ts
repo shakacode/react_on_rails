@@ -193,6 +193,7 @@ const sidebars: SidebarsConfig = {
       link: { type: 'doc', id: 'pro/react-on-rails-pro' },
       items: [
         'pro/installation',
+        'pro/license-ci-integration',
         'pro/upgrading-to-pro',
         'pro/streaming-ssr',
         'pro/node-renderer',

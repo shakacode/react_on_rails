@@ -15,6 +15,7 @@ React on Rails Pro is the advanced rendering and performance tier for React on R
 - [Installation](./installation.md) - Fresh install or manual setup
 - [Upgrade from OSS to Pro](./upgrading-to-pro.md) - Three-step upgrade path
 - [Configuration](../oss/configuration/configuration-pro.md) - Pro-specific runtime settings
+- [License CI Integration](./license-ci-integration.md) - Gate deploys, monitor expirations, parse JSON output
 - [Troubleshooting](./troubleshooting.md) - Common setup and runtime issues
 
 ## Route Map
@@ -54,6 +55,7 @@ It demonstrates the Node renderer, caching, and SSR-oriented workflows in a real
 ## References
 
 - [Installation](./installation.md)
+- [License CI Integration](./license-ci-integration.md)
 - [Upgrade from OSS to Pro](./upgrading-to-pro.md)
 - [Pricing and sign up](https://pro.reactonrails.com/)
 - [Node Renderer](./node-renderer.md)
