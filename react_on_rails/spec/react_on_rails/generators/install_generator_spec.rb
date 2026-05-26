@@ -1599,6 +1599,32 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "when Procfile.dev has a node-renderer entry that is missing RENDERER_PORT" do
+    let(:install_generator) { described_class.new([], { pro: true }) }
+
+    before do
+      allow(install_generator).to receive(:destination_root).and_return("/fake/path")
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev").and_return(true)
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev-static-assets").and_return(false)
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev-prod-assets").and_return(false)
+      allow(File).to receive(:read).with("/fake/path/Procfile.dev")
+                                   .and_return("rails: bundle exec rails s\n" \
+                                               "node-renderer: node renderer/node-renderer.js\n")
+    end
+
+    specify "add_pro_to_procfiles surfaces an update-it-manually warning so the doctor agrees" do
+      # The doctor's PROCESS_WITH_RENDERER_PORT_REGEX warns when an entry is missing
+      # RENDERER_PORT, so the generator must not silently treat this as "already correct".
+      expect(install_generator).not_to receive(:append_to_file)
+      expect(install_generator).to receive(:say).with(
+        a_string_matching(/has a renderer entry that doesn't reference/), :yellow
+      )
+      allow(install_generator).to receive(:say)
+      install_generator.send(:add_pro_to_procfiles)
+    end
+  end
+
   context "with --rsc" do
     before(:all) { run_generator_test_with_args(%w[--rsc], package_json: true) }
 

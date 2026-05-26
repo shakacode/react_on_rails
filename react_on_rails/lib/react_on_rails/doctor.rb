@@ -1576,7 +1576,23 @@ module ReactOnRails
     end
 
     def node_renderer_procfile_command(filename)
-      NodeRendererProcfile.command_for(filename)
+      # When the app still has only the legacy client/node-renderer.js (Pro
+      # setup intentionally skips Procfile rewrites in that case), suggesting
+      # renderer/node-renderer.js would point at a non-existent file. Mirror
+      # the legacy path back so the doctor's hint stays runnable.
+      if legacy_node_renderer_only?
+        NodeRendererProcfile.command_for(
+          filename,
+          renderer_script: NodeRendererProcfile::LEGACY_RENDERER_SCRIPT_PATH
+        )
+      else
+        NodeRendererProcfile.command_for(filename)
+      end
+    end
+
+    def legacy_node_renderer_only?
+      File.exist?(NodeRendererProcfile::LEGACY_RENDERER_SCRIPT_PATH) &&
+        !File.exist?(NodeRendererProcfile::NEW_RENDERER_SCRIPT_PATH)
     end
 
     def detected_custom_launcher_paths

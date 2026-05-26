@@ -29,9 +29,15 @@ module ReactOnRails
                  \b(?:pnpm|npm|yarn)\s+(?:run\s+)?node-renderer\b))
     }x
 
-    def self.command_for(procfile)
+    NEW_RENDERER_SCRIPT_PATH = "renderer/node-renderer.js"
+    LEGACY_RENDERER_SCRIPT_PATH = "client/node-renderer.js"
+
+    def self.command_for(procfile, renderer_script: NEW_RENDERER_SCRIPT_PATH)
       # Unknown launchers default to the standard dev command so doctor can still show a useful manual fix.
-      DEFAULT_COMMANDS.fetch(procfile) { DEFAULT_COMMANDS.fetch("Procfile.dev") }
+      base = DEFAULT_COMMANDS.fetch(procfile) { DEFAULT_COMMANDS.fetch("Procfile.dev") }
+      return base if renderer_script == NEW_RENDERER_SCRIPT_PATH
+
+      base.sub(NEW_RENDERER_SCRIPT_PATH, renderer_script)
     end
   end
 end

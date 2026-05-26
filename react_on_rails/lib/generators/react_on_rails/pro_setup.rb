@@ -215,10 +215,18 @@ module ReactOnRails
         say "✅ Created #{initializer_path}", :green
       end
 
-      # Matches active (uncommented) Procfile.dev node-renderer lines, tolerating
-      # an optional `./` prefix that a user may have added by hand
-      # (e.g. `node ./renderer/node-renderer.js`).
-      NEW_RENDERER_COMMAND_REGEX = %r{^[ \t]*(?:node-)?renderer:[^\n]*\bnode\s+\.?/?renderer/node-renderer\.js\b}
+      # Matches active (uncommented) Procfile.dev node-renderer lines that
+      # both set RENDERER_PORT and launch renderer/node-renderer.js (optionally
+      # prefixed with `./`). Entries missing RENDERER_PORT are intentionally
+      # not matched here so they fall through to NODE_RENDERER_PROCESS_REGEX
+      # and surface the "Update it manually" warning, keeping the generator's
+      # accept/skip decision aligned with the doctor's RENDERER_PORT check in
+      # NodeRendererProcfile::PROCESS_WITH_RENDERER_PORT_REGEX.
+      NEW_RENDERER_COMMAND_REGEX = %r{
+        ^[ \t]*(?:node-)?renderer:
+        (?=[^\n]*\bRENDERER_PORT\b)
+        [^\n]*\bnode\s+\.?/?renderer/node-renderer\.js\b
+      }x
       LEGACY_RENDERER_COMMAND_REGEX = %r{^[ \t]*(?:node-)?renderer:[^\n]*\bnode\s+\.?/?client/node-renderer\.js\b}
       # Detects an existing Node Renderer process entry. The dedicated
       # `node-renderer:` label is reserved for the Pro Node Renderer, so any
@@ -239,8 +247,6 @@ module ReactOnRails
           )
         )
       }x
-      NODE_RENDERER_PROCFILE_COMMANDS = ReactOnRails::NodeRendererProcfile::DEFAULT_COMMANDS
-
       # Creates renderer/node-renderer.js unless either the new path or the legacy
       # client/node-renderer.js already exists.
       #
@@ -282,7 +288,7 @@ module ReactOnRails
       # line(s) they need to touch rather than leaving them to diff the generic
       # migration hint against their Procfiles themselves.
       def warn_on_stale_legacy_procfile_entry
-        NODE_RENDERER_PROCFILE_COMMANDS.each_key do |procfile|
+        ReactOnRails::NodeRendererProcfile::DEFAULT_COMMANDS.each_key do |procfile|
           procfile_path = File.join(destination_root, procfile)
           next unless File.exist?(procfile_path)
 
@@ -302,7 +308,7 @@ module ReactOnRails
       end
 
       def add_pro_to_procfiles
-        NODE_RENDERER_PROCFILE_COMMANDS.each do |procfile, command|
+        ReactOnRails::NodeRendererProcfile::DEFAULT_COMMANDS.each do |procfile, command|
           add_node_renderer_to_procfile(procfile, command, warn_if_missing: procfile == "Procfile.dev")
         end
       end

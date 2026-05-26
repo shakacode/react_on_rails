@@ -1946,6 +1946,50 @@ describe ProGenerator, type: :generator do
     end
   end
 
+  context "when legacy client/node-renderer.js exists and every Procfile variant still launches it" do
+    let(:legacy_renderer_content) { "// customized legacy renderer\n" }
+    let(:stale_line) do
+      "node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node client/node-renderer.js\n"
+    end
+    let(:stale_dev_procfile) { "rails: bin/rails s\n#{stale_line}" }
+    let(:stale_static_procfile) { "web: bin/rails s\n#{stale_line}" }
+    let(:stale_prod_procfile) { "rails: bin/rails s\n#{stale_line}" }
+
+    before do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails_pro"
+      RUBY
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails.rb", "ReactOnRails.configure {}")
+      simulate_existing_file("Procfile.dev", stale_dev_procfile)
+      simulate_existing_file("Procfile.dev-static-assets", stale_static_procfile)
+      simulate_existing_file("Procfile.dev-prod-assets", stale_prod_procfile)
+      simulate_base_webpack_files
+      simulate_existing_file("client/node-renderer.js", legacy_renderer_content)
+      allow(Gem).to receive(:loaded_specs).and_return({ "react_on_rails_pro" => double })
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "warns per stale Procfile variant so users see each line that needs updating" do
+      joined = GeneratorMessages.messages.join("\n")
+      expect(joined).to include("Procfile.dev still launches the legacy client/node-renderer.js")
+      expect(joined).to include("Procfile.dev-static-assets still launches the legacy client/node-renderer.js")
+      expect(joined).to include("Procfile.dev-prod-assets still launches the legacy client/node-renderer.js")
+    end
+
+    it "leaves every stale legacy Procfile entry untouched" do
+      expect(File.read(File.join(destination_root, "Procfile.dev"))).to eq(stale_dev_procfile)
+      expect(File.read(File.join(destination_root, "Procfile.dev-static-assets"))).to eq(stale_static_procfile)
+      expect(File.read(File.join(destination_root, "Procfile.dev-prod-assets"))).to eq(stale_prod_procfile)
+    end
+  end
+
   context "when legacy client/node-renderer.js exists and Procfile.dev only comments the legacy command" do
     let(:legacy_renderer_content) { "// customized legacy renderer\n" }
     let(:commented_legacy_procfile) do
