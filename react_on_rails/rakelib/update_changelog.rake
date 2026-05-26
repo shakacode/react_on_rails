@@ -418,6 +418,10 @@ def compute_auto_version(changelog, mode, monorepo_root, changelog_for_bump: nil
     if active_base
       indices = prerelease_indices_from_tags(monorepo_root, active_base, mode)
       next_index = indices.empty? ? 0 : indices.max + 1
+      if indices.empty? && !prerelease_indices_from_tags(monorepo_root, active_base, nil).empty?
+        warn "WARNING: active prerelease base #{active_base} was found via a different channel. " \
+             "Verify the computed version is correct."
+      end
       return "#{active_base}.#{mode}.#{next_index}"
     end
   end
