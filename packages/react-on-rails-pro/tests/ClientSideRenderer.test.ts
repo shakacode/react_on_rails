@@ -42,11 +42,18 @@ describe('ClientSideRenderer', () => {
     resetRailsContext();
   });
 
-  function setupTestComponentDom(domId: string, mountHtml = ''): Element {
+  function setupTestComponentDom(
+    domId: string,
+    mountHtml = '',
+    { ssrIdentifierPrefix }: { ssrIdentifierPrefix?: string } = {},
+  ): Element {
     const componentSpec = document.createElement('div');
     componentSpec.className = 'js-react-on-rails-component';
     componentSpec.setAttribute('data-component-name', 'TestComponent');
     componentSpec.setAttribute('data-dom-id', domId);
+    if (ssrIdentifierPrefix) {
+      componentSpec.setAttribute('data-ssr-identifier-prefix', ssrIdentifierPrefix);
+    }
     componentSpec.textContent = JSON.stringify({ greeting: 'hello' });
     document.body.appendChild(componentSpec);
 
@@ -191,7 +198,30 @@ describe('ClientSideRenderer', () => {
     expect(mockReactHydrateOrRender.mock.calls[0][2]).toBe(true);
     expect(mockReactHydrateOrRender.mock.calls[0][3]).toEqual(
       expect.objectContaining({
-        identifierPrefix: 'dom-id-123',
+        onRecoverableError: expect.any(Function),
+      }),
+    );
+    expect(mockReactHydrateOrRender.mock.calls[0][3]).not.toHaveProperty('identifierPrefix');
+  });
+
+  it('passes identifierPrefix for hydrated default-provider roots when server markup used one', async () => {
+    const TestComponent = ({ greeting }: { greeting: string }) => React.createElement('div', null, greeting);
+    const defaultProviderFactory = jest.fn(({ reactElement }: DefaultRSCProviderFactoryArgs) => reactElement);
+    ComponentRegistry.register({ TestComponent });
+    const componentSpec = setupTestComponentDom('dom-id-123', '<div>Server fallback</div>', {
+      ssrIdentifierPrefix: 'server-prefix-123',
+    });
+    addRailsContext({ rscPayloadGenerationUrlPath: '/rsc_payload' });
+    setDefaultRSCProviderFactory(defaultProviderFactory);
+
+    await renderOrHydrateComponent(componentSpec);
+
+    expect(defaultProviderFactory).toHaveBeenCalledTimes(1);
+    expect(mockReactHydrateOrRender).toHaveBeenCalledTimes(1);
+    expect(mockReactHydrateOrRender.mock.calls[0][2]).toBe(true);
+    expect(mockReactHydrateOrRender.mock.calls[0][3]).toEqual(
+      expect.objectContaining({
+        identifierPrefix: 'server-prefix-123',
         onRecoverableError: expect.any(Function),
       }),
     );

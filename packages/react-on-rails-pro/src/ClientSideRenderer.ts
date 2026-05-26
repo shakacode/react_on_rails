@@ -58,8 +58,14 @@ async function delegateToRenderer(
 
 const getDomId = (domIdOrElement: string | Element): string =>
   typeof domIdOrElement === 'string' ? domIdOrElement : domIdOrElement.getAttribute('data-dom-id') || '';
+
+const getSsrIdentifierPrefix = (el: Element): string | undefined =>
+  el.getAttribute('data-ssr-identifier-prefix') || undefined;
+
 class ComponentRenderer {
   private domNodeId: string;
+
+  private ssrIdentifierPrefix?: string;
 
   private state: 'unmounted' | 'rendering' | 'rendered';
 
@@ -76,6 +82,8 @@ class ComponentRenderer {
         ? document.querySelector(`[data-dom-id="${CSS.escape(domId)}"]`)
         : domIdOrElement;
     if (!el) return;
+
+    this.ssrIdentifierPrefix = getSsrIdentifierPrefix(el);
 
     const storeDependencies = el.getAttribute('data-store-dependencies');
     const storeDependenciesArray = storeDependencies ? (JSON.parse(storeDependencies) as string[]) : [];
@@ -145,14 +153,14 @@ You should return a React.Component always for the client side entry point.`);
             railsContext,
             domNodeId,
           );
-          const rootOrElement = reactHydrateOrRender(
-            domNode,
-            reactElement,
-            shouldHydrate,
+          const hydrateOptions =
             shouldHydrate && wrappedByDefaultRSCProvider
-              ? { identifierPrefix: domNodeId, onRecoverableError: handleRecoverableError }
-              : undefined,
-          );
+              ? {
+                  ...(this.ssrIdentifierPrefix ? { identifierPrefix: this.ssrIdentifierPrefix } : {}),
+                  onRecoverableError: handleRecoverableError,
+                }
+              : undefined;
+          const rootOrElement = reactHydrateOrRender(domNode, reactElement, shouldHydrate, hydrateOptions);
           this.state = 'rendered';
           if (supportsRootApi) {
             this.root = rootOrElement as Root;
