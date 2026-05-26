@@ -97,8 +97,8 @@ jobs:
     runs-on: ubuntu-22.04
     env:
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
-      # Pro gem server does not publish checksums. This must be job-level because
-      # ruby/setup-ruby's bundler-cache runs bundle install before step-level env.
+      # Pro gem server does not publish checksums. Keep this job-level so every
+      # setup-bundle install in the job sees the same Bundler setting.
       BUNDLE_DISABLE_CHECKSUM_VALIDATION: 'true'
     steps:
       - uses: actions/checkout@v4
@@ -173,8 +173,6 @@ jobs:
         working-directory: .
         run: pnpm --filter react-on-rails-pro build
 
-      # After the second setup-ruby step (Install Pro dummy app gems) ran
-      # above, $GITHUB_ENV's BUNDLE_GEMFILE points at the dummy app Gemfile.
       # These steps need the Pro package Gemfile (which carries rubocop/rbs),
       # so pin it via absolute path — robust to changes in defaults.run.
       - name: Lint Ruby

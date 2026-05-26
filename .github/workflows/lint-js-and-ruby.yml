@@ -140,12 +140,8 @@ jobs:
       - name: Install Node modules with pnpm
         run: pnpm install --frozen-lockfile
 
-      # The second setup-ruby step above (Install dummy app gems) writes
-      # BUNDLE_GEMFILE to $GITHUB_ENV, leaking the dummy Gemfile into all
-      # later steps. Both Gemfiles eval the shared dev dependencies, so
-      # rubocop/rbs are resolvable either way, but pin the package Gemfile
-      # explicitly here for parity with pro-lint.yml and to stay robust if
-      # the Gemfiles ever diverge.
+      # Pin the package Gemfile explicitly for parity with pro-lint.yml and to
+      # stay robust if the package and dummy Gemfiles ever diverge.
       - name: Lint Ruby
         env:
           BUNDLE_GEMFILE: ${{ github.workspace }}/react_on_rails/Gemfile
