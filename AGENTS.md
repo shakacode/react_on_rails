@@ -197,7 +197,7 @@ For small, focused PRs (roughly 5 files changed or fewer and one clear purpose):
 
 ### Ask First
 
-- Destructive git operations (force push, reset --hard, branch deletion)
+- Destructive git operations: `reset --hard` on a branch with work, branch deletion, or force-push that drops/squashes commits, republishes a conflicted rebase, or runs when the remote has commits you don't have locally. (Force-push after a clean rebase — no conflicts, all commits preserved — is OK without asking.)
 - Changes to CI workflows (`.github/workflows/`)
 - Changes to build configuration (`package.json` scripts, webpack config)
 - Modifying the Pro package (`react_on_rails_pro/`)
