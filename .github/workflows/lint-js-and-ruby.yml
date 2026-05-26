@@ -132,7 +132,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vendor/bundle
-          key: package-app-gem-cache-${{ hashFiles('Gemfile.lock') }}-lint
+          key: package-app-gem-cache-${{ hashFiles('react_on_rails/Gemfile.lock') }}-lint
       - name: Install Node modules with pnpm
         run: pnpm install --frozen-lockfile
 

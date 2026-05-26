@@ -469,7 +469,7 @@ After updating the source files above, regenerate lock files by running `bundle 
 
 - `react_on_rails/` and `react_on_rails/spec/dummy/` (OSS)
 - `react_on_rails_pro/` and `react_on_rails_pro/spec/dummy/` and `react_on_rails_pro/spec/execjs-compatible-dummy/` (Pro)
-- Root `Gemfile.lock` and `pnpm-lock.yaml`
+- `react_on_rails/Gemfile.lock` and root `pnpm-lock.yaml`
 
 **Example apps (handled automatically):**
 
