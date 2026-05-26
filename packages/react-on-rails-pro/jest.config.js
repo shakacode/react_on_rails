@@ -1,6 +1,15 @@
+import { createRequire } from 'module';
+import path from 'path';
 import rootConfig from '../../jest.config.base.js';
 
+const require = createRequire(import.meta.url);
 const nodeVersion = parseInt(process.version.slice(1), 10);
+
+// Resolve React package roots through Node's module resolution so the aliases
+// follow workspace structure changes (renames, hoisting strategies, package
+// manager swaps) instead of hardcoding `../../node_modules/react`.
+const reactPackageRoot = path.dirname(require.resolve('react/package.json'));
+const reactDomPackageRoot = path.dirname(require.resolve('react-dom/package.json'));
 
 // Package-specific Jest configuration
 // Inherits from root jest.config.mjs and adds package-specific settings
@@ -41,10 +50,10 @@ export default {
     ...(process.env.NODE_CONDITIONS?.includes('react-server')
       ? {}
       : {
-          '^react$': '<rootDir>/../../node_modules/react',
-          '^react/(.*)$': '<rootDir>/../../node_modules/react/$1',
-          '^react-dom$': '<rootDir>/../../node_modules/react-dom',
-          '^react-dom/(.*)$': '<rootDir>/../../node_modules/react-dom/$1',
+          '^react$': reactPackageRoot,
+          '^react/(.*)$': `${reactPackageRoot}/$1`,
+          '^react-dom$': reactDomPackageRoot,
+          '^react-dom/(.*)$': `${reactDomPackageRoot}/$1`,
         }),
   },
 

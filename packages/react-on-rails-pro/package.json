@@ -85,6 +85,8 @@
   },
   "homepage": "https://reactonrails.com/docs/pro/",
   "devDependencies": {
+    "@tanstack/react-router": "1.163.3",
+    "@tanstack/store": "0.9.1",
     "@types/mock-fs": "^4.13.4",
     "mock-fs": "^5.5.0",
     "react": "^19.0.3",
