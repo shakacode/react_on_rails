@@ -19,7 +19,9 @@ When React on Rails Pro encounters `<RSCRoute componentName="Dashboard" componen
 2. **During client-side navigation**, when `RSCRoute` appears in the tree for the first time (e.g., the user navigates to a new route), the client fetches the RSC payload from the server over HTTP and renders it.
 3. **When props change**, a new HTTP request is made for each unique combination of `componentName` and props. Identical combinations are cached (see [Performance and caching behavior](#performance-and-caching-behavior)).
 
-For this to work, the client component tree needs the React on Rails Pro RSC provider context. For server-rendered `RSCRoute` payloads, `wrapServerComponentRenderer` sets up that context. For auto-bundled roots that only defer `RSCRoute` payloads with `ssr={false}`, React on Rails Pro registers a default client provider in the generated client pack when RSC support is enabled. You never need to create an `RSCProvider` yourself.
+For this to work, `RSCRoute` needs the `RSCProvider` context it relies on internally. A client component tree that server-renders `RSCRoute` payloads must be wrapped with `wrapServerComponentRenderer`, which provides that context automatically. You never need to create an `RSCProvider` yourself.
+
+When you use `ssr={false}` to skip server rendering for a route, there is no server RSC payload work for the wrapper to do. The route still needs provider context in the browser so it can fetch its payload; if the component is not wrapped with `wrapServerComponentRenderer`, React on Rails Pro can provide that client-side `RSCProvider` context automatically. If the same tree server-renders any `RSCRoute` payloads, keep using `wrapServerComponentRenderer`.
 
 ### Deferring initial server rendering with `ssr={false}`
 
@@ -34,7 +36,11 @@ Use this for below-the-fold, collapsed, or secondary content that does not need 
 - **Less SSR work:** the server does not generate that route's RSC payload during the initial render.
 - **Smaller initial HTML:** the skipped payload is not embedded in `window.REACT_ON_RAILS_RSC_PAYLOADS` script tags.
 
-During streaming SSR, the route intentionally bails out before generating or embedding that route's RSC payload. Place it inside a scoped `Suspense` boundary so React emits that boundary's fallback HTML and retries the route on the client. In auto-bundled client-rendered roots, the initial Rails response contains only the root mount point and the browser fetches the RSC payload after the root renders. In auto-bundled streaming roots where every `RSCRoute` payload is deferred with `ssr={false}`, the server can stream scoped `Suspense` fallbacks without a manual RSC renderer wrapper. In all cases, the route uses the same `RSCProvider` path as any other `RSCRoute`: provider cache lookup, payload fetch or embedded-payload reuse when available, `PromiseWrapper`, `ServerComponentFetchError`, and the existing retry patterns all still apply.
+During streaming SSR, an `ssr={false}` route skips generating or embedding its initial RSC payload. Place the route inside a scoped `Suspense` boundary so React can stream that fallback HTML and retry the route on the client.
+
+If the component is rendered without SSR, the Rails response only contains the React mount point, and the deferred route fetches its payload after the React tree renders. If the component is streamed and all `RSCRoute` usages in that tree are `ssr={false}`, React on Rails Pro can stream their scoped `Suspense` fallbacks without a manual RSC renderer wrapper. If the same tree server-renders any `RSCRoute` payloads, keep using `wrapServerComponentRenderer`.
+
+In all cases, `ssr={false}` only changes the initial server-render decision. Once the route renders on the client, it still uses the normal `RSCProvider` path: provider cache lookup, payload fetch or embedded-payload reuse, `PromiseWrapper`, `ServerComponentFetchError`, and the existing retry behavior.
 
 The tradeoff is that the deferred content appears later. The browser must resolve the RSC payload during hydration or client rendering, so users will see the nearest `Suspense` fallback until the server component appears. Without a nearby `Suspense` boundary, the nearest parent boundary handles the bailout; in wrapped streaming roots, that may be the root `fallback={null}`, leaving an empty area until the client retry resolves. Place `Suspense` close to the deferred route so the loading UI is scoped to that route instead of replacing a large part of the page.
 
@@ -215,7 +221,11 @@ Use `stream_react_component` to render the wrapped component:
 ```
 
 > [!IMPORTANT]
-> Use `stream_react_component`, not `react_component`, whenever the initial response should server-render `RSCRoute` content or stream `Suspense` fallback HTML for `ssr={false}` routes. If you intentionally want a client-rendered root, use `react_component(..., prerender: false)` with auto-bundling and `ssr={false}` routes. The unsupported case is `react_component(..., prerender: true)` for server-rendered `RSCRoute` payloads; use `stream_react_component` for that path.
+> Choose the Rails helper based on how the root should render:
+>
+> - Use `stream_react_component` when the initial response should server-render `RSCRoute` content or stream `Suspense` fallback HTML for `ssr={false}` routes.
+> - Use `react_component(..., prerender: false)` when you intentionally want a client-rendered root whose `ssr={false}` routes fetch after the React tree renders.
+> - Do not use `react_component(..., prerender: true)` for `RSCRoute` server rendering. That helper uses React's non-streaming SSR path; use `stream_react_component` instead.
 
 That's the complete setup. The rest of this guide covers how to simplify registration with auto-bundling, understand performance and caching, handle errors, and apply common patterns.
 
@@ -248,7 +258,7 @@ Auto-bundling takes care of the **registration** layer: it generates the per-com
 
 For streaming SSR that server-renders any `RSCRoute` payload, auto-bundling does **not** replace the explicit wrappers. You must still author `AppRouter.client.tsx` and `AppRouter.server.tsx` yourself with `wrapServerComponentRenderer` as shown in [Step 3 of the walkthrough](#3-wrap-the-client-component-for-both-bundles). The generator uses whatever you export from those files as the "AppRouter" component in each bundle.
 
-For roots that only use deferred `RSCRoute ssr={false}` payloads, auto-bundling can set up the client RSC provider automatically when RSC support is enabled. Generated client component packs import `react-on-rails-pro/registerDefaultRSCProvider/client` before registering the root. This supports `RSCRoute ssr={false}` in the browser without manually wrapping the root. Fully manual client entrypoints that bypass generated packs can mirror that generated-pack setup import before calling `ReactOnRails.register`; it is not a replacement for `wrapServerComponentRenderer` when the initial response server-renders RSC payloads.
+However, when you use `ssr={false}` to skip server rendering for the route, there is no server RSC payload work for the wrapper to do. The route still needs provider context in the browser so it can fetch its payload. If the component is not wrapped with `wrapServerComponentRenderer`, auto-bundling sets up a default client provider before registering the component. Fully manual client entrypoints can mirror that setup by importing `react-on-rails-pro/registerDefaultRSCProvider/client` before calling `ReactOnRails.register`.
 
 > [!IMPORTANT]
 > The `.server.tsx` / `.client.tsx` variants here are legitimate because both wrappers are **client components** (both start with `'use client'`) that happen to use different imports for client-side vs server-side rendering. **Do not** apply the `.client` / `.server` suffixes to the actual server components referenced by `RSCRoute` (`Dashboard.jsx`, `Profile.jsx`). Server components have no client-side variant — their code never runs in the browser. See [the RSC variant rules](../../oss/core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md#when-to-use-client--server-variants-with-rsc) for details.
@@ -344,7 +354,7 @@ export default function ProfilePage({ userId }) {
 ```
 
 > [!NOTE]
-> `useRSC` is available anywhere inside a tree set up by `wrapServerComponentRenderer`, `registerServerComponent`, or the auto-bundled default client provider for deferred-only roots. You never need to create an `RSCProvider` manually — the context is always set up for you.
+> `useRSC` is available anywhere inside a tree where React on Rails Pro sets up `RSCProvider` context. That includes trees wrapped with `wrapServerComponentRenderer`, trees rendered through `registerServerComponent`, and unwrapped `ssr={false}` routes that use the default client provider. You never need to create an `RSCProvider` manually.
 
 ## Common patterns
 
@@ -458,7 +468,9 @@ Unless noted otherwise, each API below is a default export — use default-impor
 
 **Error: "Component 'X' is registered as a server component but is being rendered with the react_component helper"**
 
-This error occurs when a component that needs the RSC server-rendering context is rendered through `react_component` with `prerender: true` (or the default prerender setting). `react_component` supports normal SSR, but it does not provide the RSC streaming context required by `wrapServerComponentRenderer/server`. Either switch to `stream_react_component`, or if you don't need SSR for the RSC route, use `react_component` with `prerender: false`, auto-bundling, and `ssr={false}` — `RSCRoute` will fetch the RSC payload over HTTP on the client side.
+This error occurs when a component that needs the RSC server-rendering context is rendered through `react_component` with `prerender: true` (or the default prerender setting). `react_component` supports normal SSR, but it does not provide the RSC streaming context required by `wrapServerComponentRenderer/server`.
+
+Use `stream_react_component` when the initial response should server-render RSC payloads or stream `Suspense` fallback HTML. If you do not need SSR for the RSC route, use `react_component(..., prerender: false)` with `RSCRoute ssr={false}`. In that client-rendered path, the route fetches its RSC payload over HTTP in the browser; the required client provider context can come from `wrapServerComponentRenderer/client` or from the default client provider setup.
 
 **Empty content where the server component should appear**
 
@@ -472,7 +484,11 @@ Check the browser's network tab — is the request to your RSC payload endpoint 
 
 **`useRSC` returns `undefined` or throws**
 
-The component calling `useRSC` is not inside a tree set up by `wrapServerComponentRenderer`, `registerServerComponent`, or the default provider registration for an auto-bundled root that only defers `RSCRoute` payloads with `ssr={false}`. Make sure you registered the `.client.tsx` / `.server.tsx` variants for streaming SSR that server-renders RSC payloads, or that auto-bundling is generating the client pack for your deferred-only root. If you use a fully manual client entrypoint, mirror the generated client pack setup by importing `react-on-rails-pro/registerDefaultRSCProvider/client` before registering the root.
+`useRSC` only works inside a tree with `RSCProvider` context. You do not need to create that provider manually; React on Rails Pro sets it up through the supported entrypoints.
+
+If you are server-rendering any `RSCRoute` payloads, make sure the `.client.tsx` and `.server.tsx` wrapper files are registered as shown in the walkthrough.
+
+If you are using `RSCRoute ssr={false}` only to fetch payloads in the browser, the client still needs provider context. Generated client packs set up the default client provider automatically. Fully manual client entrypoints can mirror that setup by importing `react-on-rails-pro/registerDefaultRSCProvider/client` before calling `ReactOnRails.register`.
 
 **The bundler complains about importing a server component from a client component**
 
