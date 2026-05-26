@@ -70,6 +70,20 @@ module ReactOnRails
             return inject_rsc_webpack_plugin_import(config_path, content, is_server: is_server) ? :unscoped : :failed
           end
 
+          # `rsc_client_references_defined?` covers both scoped and unscoped declarations.
+          # Re-emitting `rsc_client_references_js` here would produce a duplicate
+          # `const rscClientReferences = {...}` and fail the file with
+          # `Identifier 'rscClientReferences' has already been declared`. Route to the
+          # plugin-import-only path and let downstream callers honor the scoped/unscoped
+          # state of whatever the user already wrote.
+          if rsc_client_references_defined?(content)
+            return :failed unless inject_rsc_webpack_plugin_import(config_path, content, is_server: is_server)
+            return :scoped if scoped_rsc_client_references_defined?(content)
+
+            warn_unscoped_rsc_client_references_helper(config_path)
+            return :unscoped
+          end
+
           return :failed unless inject_rsc_imports(config_path, content, existing_imports_content, is_server: is_server)
           return :scoped if rsc_client_references_setup_ready?(config_path, plugin_pending: true)
 

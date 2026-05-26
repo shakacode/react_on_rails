@@ -1159,6 +1159,75 @@ describe RscGenerator, type: :generator do
       )
     end
 
+    it "does not duplicate an existing scoped rscClientReferences helper on the fresh-install path" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { config } = require('shakapacker');
+          const { resolve } = require('path');
+          const commonWebpackConfig = require('./commonWebpackConfig');
+
+          const rscClientReferences = {
+            directory: resolve(config.source_path),
+            recursive: true,
+            include: /\\.(js|mjs|cjs|ts|mts|cts|jsx|tsx)$/,
+          };
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      generator.send(:update_client_webpack_config_for_rsc)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content.scan("const rscClientReferences").length).to eq(1)
+      expect(migrated_content).to include(
+        "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');"
+      )
+      expect(migrated_content).to include(
+        "new RSCWebpackPlugin({ isServer: false, clientReferences: rscClientReferences })"
+      )
+    end
+
+    it "warns and skips wiring an existing unscoped rscClientReferences helper on the fresh-install path" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+
+          const rscClientReferences = { directory: './custom' };
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      generator.send(:update_client_webpack_config_for_rsc)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content.scan("const rscClientReferences").length).to eq(1)
+      expect(migrated_content).to include(
+        "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');"
+      )
+      expect(migrated_content).to include("new RSCWebpackPlugin({ isServer: false })")
+      expect(migrated_content).not_to include("clientReferences: rscClientReferences")
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("rscClientReferences already exists but does not point to resolve(config.source_path)")
+    end
+
     it "does not inject server client references when the shakapacker config binding is unavailable" do
       config_path = "config/webpack/serverWebpackConfig.js"
       simulate_existing_file(
