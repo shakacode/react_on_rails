@@ -529,4 +529,130 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       expect(response_body.closed).to be(true)
     end
   end
+
+  describe "per-scheduler client storage" do
+    it "reuses the same async-http client within the same Fiber.scheduler context" do
+      stub_const("FakeAsyncClient", Class.new { def get(_path); end })
+      fake_async_client = instance_double(FakeAsyncClient)
+      endpoint = instance_double(Async::HTTP::Endpoint, protocol: :fake_protocol)
+
+      client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+      allow(client).to receive(:endpoint_for).and_return(endpoint)
+
+      clients_created = []
+      allow(Async::HTTP::Client).to receive(:new) do |*_args|
+        clients_created << fake_async_client
+        fake_async_client
+      end
+
+      # Simulate Fiber.scheduler being available
+      fake_scheduler = Object.new
+      allow(Fiber).to receive(:scheduler).and_return(fake_scheduler)
+
+      # First call should create a client
+      yielded_clients = []
+      client.__send__(:with_client) { |c| yielded_clients << c }
+
+      # Second call should reuse the same client
+      client.__send__(:with_client) { |c| yielded_clients << c }
+
+      expect(clients_created.size).to eq(1)
+      expect(yielded_clients).to eq([fake_async_client, fake_async_client])
+    end
+
+    it "creates a new client when Fiber.scheduler is not available (fallback mode)" do
+      stub_const("FakeEphemeralClient", Class.new { def get(_path); end })
+      fake_client = instance_double(FakeEphemeralClient)
+      endpoint = instance_double(Async::HTTP::Endpoint, protocol: :fake_protocol)
+
+      client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+      allow(client).to receive(:endpoint_for).and_return(endpoint)
+
+      # Simulate no Fiber.scheduler
+      allow(Fiber).to receive(:scheduler).and_return(nil)
+
+      open_calls = 0
+      allow(Async::HTTP::Client).to receive(:open) do |*_args, &block|
+        open_calls += 1
+        block.call(fake_client)
+      end
+
+      client.__send__(:with_client) { |_c| }
+      client.__send__(:with_client) { |_c| }
+
+      expect(open_calls).to eq(2)
+    end
+
+    it "stores clients per origin on the same scheduler" do
+      stub_const("FakeOriginClient", Class.new { def get(_path); end })
+      endpoint1 = instance_double(Async::HTTP::Endpoint, protocol: :fake_protocol)
+      endpoint2 = instance_double(Async::HTTP::Endpoint, protocol: :fake_protocol)
+
+      client1 = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+      client2 = described_class.new(origin: "http://localhost:3900", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+
+      allow(client1).to receive(:endpoint_for).and_return(endpoint1)
+      allow(client2).to receive(:endpoint_for).and_return(endpoint2)
+
+      clients_created = []
+      allow(Async::HTTP::Client).to receive(:new) do |*_args|
+        fake = instance_double(FakeOriginClient)
+        clients_created << fake
+        fake
+      end
+
+      fake_scheduler = Object.new
+      allow(Fiber).to receive(:scheduler).and_return(fake_scheduler)
+
+      client1.__send__(:with_client) { |_c| }
+      client2.__send__(:with_client) { |_c| }
+      client1.__send__(:with_client) { |_c| }
+
+      expect(clients_created.size).to eq(2)
+    end
+
+    it "close removes the client from scheduler storage" do
+      stub_const("FakeClosableClient", Class.new do
+        attr_reader :closed
+
+        def close
+          @closed = true
+        end
+      end)
+
+      fake_async_client = FakeClosableClient.new
+      endpoint = instance_double(Async::HTTP::Endpoint, protocol: :fake_protocol)
+
+      client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+      allow(client).to receive(:endpoint_for).and_return(endpoint)
+      allow(Async::HTTP::Client).to receive(:new).and_return(fake_async_client)
+
+      fake_scheduler = Object.new
+      allow(Fiber).to receive(:scheduler).and_return(fake_scheduler)
+
+      # Create the client
+      client.__send__(:with_client) { |_c| }
+
+      # Close should remove it from storage
+      client.close
+
+      expect(fake_async_client.closed).to be(true)
+
+      # Next call should create a new client
+      new_client = FakeClosableClient.new
+      allow(Async::HTTP::Client).to receive(:new).and_return(new_client)
+
+      yielded_client = nil
+      client.__send__(:with_client) { |c| yielded_client = c }
+
+      expect(yielded_client).to be(new_client)
+    end
+
+    it "close is a no-op when Fiber.scheduler is not available" do
+      client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+      allow(Fiber).to receive(:scheduler).and_return(nil)
+
+      expect { client.close }.not_to raise_error
+    end
+  end
 end

@@ -42,6 +42,16 @@ module ReactOnRailsPro
       Protocol::HTTP2::StreamError
     ].freeze
 
+    # Per-scheduler storage for persistent HTTP clients. When Fiber.scheduler is available,
+    # clients are stored on the scheduler object itself using this instance variable key.
+    # This enables connection reuse across requests within the same scheduler context.
+    # The hash maps origin URLs to Async::HTTP::Client instances.
+    SCHEDULER_CLIENTS_KEY = :@__ror_pro_http_clients__
+
+    # Mutex for thread-safe client creation in the per-scheduler storage.
+    # Uses double-check locking: fast path reads without lock, slow path acquires lock.
+    SCHEDULER_CLIENTS_MUTEX = Mutex.new
+
     # Uses only public, documented Wrapper APIs (connect with timeout:, set_timeout)
     # that have been stable since io-endpoint 0.15. No version pin needed —
     # async-http's own constraint (~> 0.14) governs the version.
@@ -281,8 +291,17 @@ module ReactOnRailsPro
     end
 
     def close
-      # No-op: async-http clients are scoped to individual requests so they never cross Async reactors.
-      # Request#reset_connection still calls close for adapter compatibility.
+      scheduler = Fiber.scheduler
+      return unless scheduler
+
+      SCHEDULER_CLIENTS_MUTEX.synchronize do
+        clients = scheduler.instance_variable_get(SCHEDULER_CLIENTS_KEY)
+        return unless clients
+
+        client = clients.delete(@origin)
+        client&.close
+        scheduler.instance_variable_set(SCHEDULER_CLIENTS_KEY, nil) if clients.empty?
+      end
     end
 
     private
@@ -328,18 +347,43 @@ module ReactOnRailsPro
     end
 
     def with_client(&block)
-      # TODO: revisit persistent async-http clients for renderer requests once
-      # https://github.com/shakacode/react_on_rails/issues/3283 settles connection-reuse direction.
-      endpoint = endpoint_for(@origin)
-      Async::HTTP::Client.open(endpoint, protocol: endpoint.protocol, retries: 0, limit: pool_limit) do |client|
-        # Retries are owned by Request/StreamRequest so bundle-upload retry behavior remains centralized.
-        # Each client is request-scoped (one connection, one request), so limit has no practical effect.
-        # It is passed through for forward-compatibility with planned persistent connections (#3283).
-        # rubocop:disable Performance/RedundantBlockCall
-        # The block is captured with &block, so yield is unavailable in this nested block.
-        block.call(client)
-        # rubocop:enable Performance/RedundantBlockCall
+      scheduler = Fiber.scheduler
+
+      if scheduler
+        # Persistent mode: reuse client across requests within same scheduler.
+        # Connection pool (limit) is now effective — multiple streams share pooled connections.
+        client = scheduler_scoped_client(scheduler)
+        yield(client)
+      else
+        # Fallback: no scheduler means we're outside an Async context (e.g., plain thread).
+        # Create a fresh client per request to avoid cross-reactor issues.
+        with_ephemeral_client(&block)
       end
+    end
+
+    def scheduler_scoped_client(scheduler)
+      # Fast path: check for existing client without lock
+      clients = scheduler.instance_variable_get(SCHEDULER_CLIENTS_KEY)
+      client = clients&.dig(@origin)
+      return client if client
+
+      # Slow path: create client with lock (double-check pattern)
+      SCHEDULER_CLIENTS_MUTEX.synchronize do
+        clients = scheduler.instance_variable_get(SCHEDULER_CLIENTS_KEY) || {}
+        client = clients[@origin]
+        return client if client
+
+        endpoint = endpoint_for(@origin)
+        client = Async::HTTP::Client.new(endpoint, protocol: endpoint.protocol, retries: 0, limit: pool_limit)
+        clients[@origin] = client
+        scheduler.instance_variable_set(SCHEDULER_CLIENTS_KEY, clients)
+        client
+      end
+    end
+
+    def with_ephemeral_client(&block)
+      endpoint = endpoint_for(@origin)
+      Async::HTTP::Client.open(endpoint, protocol: endpoint.protocol, retries: 0, limit: pool_limit, &block)
     end
 
     def endpoint_for(origin)

@@ -43,7 +43,9 @@ module ReactOnRailsPro
     DEFAULT_RENDERER_URL = "http://localhost:3800"
     DEFAULT_RENDERER_METHOD = "ExecJS"
     DEFAULT_RENDERER_FALLBACK_EXEC_JS = true
-    # async-http clients are scoped to each request, so this now limits streams on that request's client.
+    # Maximum concurrent HTTP/2 streams per persistent client. When Fiber.scheduler is available,
+    # clients are reused across requests within the same scheduler, making this limit effective.
+    # Without a scheduler, clients are per-request and this limits streams on that single request.
     DEFAULT_RENDERER_HTTP_POOL_SIZE = 10
     # TCP connect timeout. Request and response processing are still bounded by ssr_timeout.
     DEFAULT_RENDERER_HTTP_POOL_TIMEOUT = 5
@@ -71,24 +73,6 @@ module ReactOnRailsPro
     ROLLING_DEPLOY_UPLOAD_KEYWORD_PARAMS = %i[key keyreq].freeze
     ROLLING_DEPLOY_UPLOAD_ALL_KEYWORD_PARAMS = %i[keyrest].freeze
     ROLLING_DEPLOY_UPLOAD_REQUIRED_KEYWORDS = %i[bundle assets].freeze
-    RENDERER_HTTP_POOL_SIZE_WARNING = "[ReactOnRailsPro] config.renderer_http_pool_size currently has no effect. " \
-                                      "The async-http adapter creates a new client per request, so the pool limit " \
-                                      "is never reached. This setting is kept for forward-compatibility with " \
-                                      "planned persistent connection support (see issue #3283)."
-    RENDERER_HTTP_POOL_SIZE_WARNING_MUTEX = Mutex.new
-
-    private_constant :RENDERER_HTTP_POOL_SIZE_WARNING,
-                     :RENDERER_HTTP_POOL_SIZE_WARNING_MUTEX
-
-    @renderer_http_pool_size_warning_emitted = false
-
-    class << self
-      private
-
-      def reset_renderer_http_pool_size_warning!
-        RENDERER_HTTP_POOL_SIZE_WARNING_MUTEX.synchronize { @renderer_http_pool_size_warning_emitted = false }
-      end
-    end
 
     attr_accessor :renderer_url, :renderer_password, :tracing,
                   :server_renderer, :renderer_use_fallback_exec_js, :prerender_caching,
@@ -120,27 +104,32 @@ module ReactOnRailsPro
       @concurrent_component_streaming_buffer_size = value
     end
 
-    # Currently has no effect. The async-http adapter creates a new client per request,
-    # so this pool limit is never reached. Kept for forward-compatibility with planned
-    # persistent connection support (issue #3283).
+    # Sets the maximum concurrent HTTP/2 streams per persistent client.
+    #
+    # When Fiber.scheduler is available (e.g., inside Sync {} blocks), HTTP clients are
+    # reused across requests within the same scheduler context, making this limit effective
+    # for connection pooling. Without a scheduler, clients are created per-request.
+    #
+    # @param value [Integer, nil] A positive integer or nil (uses default)
+    # @raise [ReactOnRailsPro::Error] if value is not a positive integer or nil
     def renderer_http_pool_size=(value)
       validate_renderer_http_pool_size(value)
-      warn_renderer_http_pool_size_once unless value.nil? || value == DEFAULT_RENDERER_HTTP_POOL_SIZE
       @renderer_http_pool_size = value
     end
 
     # Sets the legacy keep-alive timeout configuration for node renderer HTTP connections.
     #
-    # This remains for configuration compatibility. The async-http adapter currently
-    # scopes clients to individual requests, so this value is validated but not applied.
+    # This setting is deprecated. The async-http adapter manages connection lifecycle
+    # automatically — connections are reused within the same Fiber.scheduler context
+    # and cleaned up when the scheduler ends.
     #
     # @param value [Numeric, nil] A positive number or nil
     # @raise [ReactOnRailsPro::Error] if value is not a positive number or nil
     def renderer_http_keep_alive_timeout=(value)
       validate_renderer_http_keep_alive_timeout(value)
       unless value.nil?
-        Rails.logger.warn "[ReactOnRailsPro] config.renderer_http_keep_alive_timeout is deprecated and has no effect " \
-                          "with the async-http adapter because clients are scoped per request."
+        Rails.logger.warn "[ReactOnRailsPro] config.renderer_http_keep_alive_timeout is deprecated. " \
+                          "Connection lifecycle is managed automatically by the async-http adapter."
       end
       @renderer_http_keep_alive_timeout = value
     end
@@ -246,15 +235,6 @@ module ReactOnRailsPro
     end
 
     private
-
-    def warn_renderer_http_pool_size_once
-      RENDERER_HTTP_POOL_SIZE_WARNING_MUTEX.synchronize do
-        unless self.class.instance_variable_get(:@renderer_http_pool_size_warning_emitted)
-          Rails.logger.warn RENDERER_HTTP_POOL_SIZE_WARNING
-          self.class.instance_variable_set(:@renderer_http_pool_size_warning_emitted, true)
-        end
-      end
-    end
 
     def assign_initial_renderer_http_pool_size(value)
       validate_renderer_http_pool_size(value)
