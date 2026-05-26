@@ -70,6 +70,19 @@ const UnexpectedNestedSuspenseErrorShell = () => (
   </main>
 );
 
+const MixedRSCRouteBailoutAndNestedSuspenseErrorShell = () => (
+  <main>
+    <h1>Shell before mixed boundaries</h1>
+    <React.Suspense fallback={<aside>Loading skipped route...</aside>}>
+      <RSCRoute componentName="SkippedServerRoute" componentProps={{ id: 1 }} ssr={false} />
+    </React.Suspense>
+    <React.Suspense fallback={<aside>Loading errored boundary...</aside>}>
+      <NestedSuspenseServerError />
+    </React.Suspense>
+    <footer>Shell after mixed boundaries</footer>
+  </main>
+);
+
 describe('streamServerRenderedReactComponent', () => {
   const testingRailsContext = {
     serverSideRSCPayloadParameters: {},
@@ -231,6 +244,35 @@ describe('streamServerRenderedReactComponent', () => {
     });
   };
 
+  const setupMixedRSCRouteBailoutAndNestedSuspenseErrorStreamTest = ({ onPostSSRHook } = {}) => {
+    const generateRSCPayload = jest.fn();
+    const renderFunction = (_props, railsContext) => {
+      if (onPostSSRHook) {
+        railsContext.addPostSSRHook(onPostSSRHook);
+      }
+
+      return MixedRSCRouteBailoutAndNestedSuspenseErrorShell;
+    };
+
+    ReactOnRails.register({
+      MixedRSCRouteBailoutAndNestedSuspenseErrorShell: wrapServerComponentRenderer(
+        renderFunction,
+        'MixedRSCRouteBailoutAndNestedSuspenseErrorShell',
+      ),
+    });
+
+    const renderResult = streamServerRenderedReactComponent({
+      name: 'MixedRSCRouteBailoutAndNestedSuspenseErrorShell',
+      domNodeId: 'mixedRSCRouteBailoutAndNestedSuspenseErrorDomId',
+      trace: false,
+      throwJsErrors: false,
+      railsContext: testingRailsContext,
+      generateRSCPayload,
+    });
+
+    return { renderResult, generateRSCPayload };
+  };
+
   it('renders the nearest Suspense fallback for RSCRoute ssr=false without generating an RSC payload', async () => {
     const { renderResult, generateRSCPayload } = setupRSCRouteSSRFalseStreamTest();
     const { chunks, errors } = await collectStreamResult(renderResult);
@@ -287,6 +329,31 @@ describe('streamServerRenderedReactComponent', () => {
 
       expect(errors).toHaveLength(0);
       expect(onPostSSRHook).toHaveBeenCalledTimes(1);
+      expect(chunks.some((chunk) => chunk.hasErrors)).toBe(true);
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('notifySSREnd() called multiple times'),
+      );
+    } finally {
+      consoleWarnSpy.mockRestore();
+    }
+  });
+
+  it('preserves the duplicate notifySSREnd warning when a real error occurs with an RSCRoute ssr=false bailout', async () => {
+    const onPostSSRHook = jest.fn();
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const { renderResult, generateRSCPayload } = setupMixedRSCRouteBailoutAndNestedSuspenseErrorStreamTest({
+      onPostSSRHook,
+    });
+
+    try {
+      const { chunks, errors } = await collectStreamResult(renderResult);
+      const html = chunks.map((chunk) => chunk.html).join('');
+
+      expect(errors).toHaveLength(0);
+      expect(generateRSCPayload).not.toHaveBeenCalled();
+      expect(onPostSSRHook).toHaveBeenCalledTimes(1);
+      expect(html).toContain('Loading skipped route...');
+      expect(html).toContain('Loading errored boundary...');
       expect(chunks.some((chunk) => chunk.hasErrors)).toBe(true);
       expect(consoleWarnSpy).toHaveBeenCalledWith(
         expect.stringContaining('notifySSREnd() called multiple times'),
