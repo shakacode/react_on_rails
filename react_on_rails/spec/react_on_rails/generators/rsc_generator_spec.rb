@@ -371,6 +371,52 @@ describe RscGenerator, type: :generator do
     end
   end
 
+  context "when an existing client webpack config invokes RSCWebpackPlugin with extra spacing" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            delete clientConfig.entry['server-bundle'];
+
+            clientConfig.plugins.push(
+              new RSCWebpackPlugin ({ isServer: false })
+            );
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "detects the existing plugin and routes to the update path rather than duplicating the import" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content.scan(%r{require\(['"]react-on-rails-rsc/WebpackPlugin['"]\)}).length).to eq(1)
+        expect(content.scan(/new\s+RSCWebpackPlugin\s*\(/).length).to eq(1)
+      end
+    end
+  end
+
   context "when a fresh client webpack config has a commented-out RSCWebpackPlugin and no insertion point" do
     before(:all) do
       prepare_destination

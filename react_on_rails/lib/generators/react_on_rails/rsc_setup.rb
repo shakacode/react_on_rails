@@ -484,19 +484,16 @@ module ReactOnRails
         rsc_server_signature_in_js_code?(content)
       end
 
-      # Walks every occurrence of `new RSCWebpackPlugin(` and returns true only if at least one is
-      # in actual JS code — not inside a comment or string literal. A naive `String#include?` would
-      # falsely report success when the user has a commented-out invocation like
-      # `// Old setup: new RSCWebpackPlugin(...)`, which would skip the partial-setup rollback.
-      def rsc_plugin_invocation_in_js_code?(content)
-        marker = "new RSCWebpackPlugin("
-        search_from = 0
-        while (idx = content.index(marker, search_from))
-          return true if js_code_position?(content, idx)
+      RSC_PLUGIN_INVOCATION_REGEX = /new\s+RSCWebpackPlugin\s*\(/
 
-          search_from = idx + marker.length
-        end
-        false
+      # Returns true when the file contains a real `new RSCWebpackPlugin(` invocation in actual JS
+      # code — not inside a comment or string literal. The regex allows whitespace and newlines
+      # around `new` and `(` so customised configs with extra spacing (e.g. `new RSCWebpackPlugin (`
+      # or a newline before the open paren) are still detected.
+      def rsc_plugin_invocation_in_js_code?(content)
+        content
+          .to_enum(:scan, RSC_PLUGIN_INVOCATION_REGEX)
+          .any? { js_code_position?(content, Regexp.last_match.begin(0)) }
       end
 
       def rsc_server_signature_in_js_code?(content)
