@@ -1549,13 +1549,15 @@ describe InstallGenerator, type: :generator do
       allow(install_generator).to receive(:destination_root).and_return("/fake/path")
       allow(File).to receive(:exist?).and_call_original
       allow(File).to receive(:exist?).with("/fake/path/Procfile.dev").and_return(true)
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev-static-assets").and_return(false)
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev-prod-assets").and_return(false)
       allow(File).to receive(:read).with("/fake/path/Procfile.dev")
                                    .and_return("rails: bundle exec rails s\nnode-renderer: existing config\n")
     end
 
-    specify "add_pro_to_procfile does not append duplicate entry" do
+    specify "add_pro_to_procfiles does not append duplicate entry" do
       expect(install_generator).not_to receive(:append_to_file)
-      install_generator.send(:add_pro_to_procfile)
+      install_generator.send(:add_pro_to_procfiles)
     end
   end
 
@@ -1566,13 +1568,34 @@ describe InstallGenerator, type: :generator do
       allow(install_generator).to receive(:destination_root).and_return("/fake/path")
       allow(File).to receive(:exist?).and_call_original
       allow(File).to receive(:exist?).with("/fake/path/Procfile.dev").and_return(true)
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev-static-assets").and_return(false)
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev-prod-assets").and_return(false)
       allow(File).to receive(:read).with("/fake/path/Procfile.dev")
                                    .and_return("rails: bundle exec rails s\ndev-server: bin/shakapacker\n")
     end
 
-    specify "add_pro_to_procfile appends node-renderer entry" do
+    specify "add_pro_to_procfiles appends node-renderer entry" do
       expect(install_generator).to receive(:append_to_file).with("Procfile.dev", include("node-renderer:"))
-      install_generator.send(:add_pro_to_procfile)
+      install_generator.send(:add_pro_to_procfiles)
+    end
+  end
+
+  context "when Procfile.dev contains an unrelated renderer process" do
+    let(:install_generator) { described_class.new([], { pro: true }) }
+
+    before do
+      allow(install_generator).to receive(:destination_root).and_return("/fake/path")
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev").and_return(true)
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev-static-assets").and_return(false)
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev-prod-assets").and_return(false)
+      allow(File).to receive(:read).with("/fake/path/Procfile.dev")
+                                   .and_return("rails: bundle exec rails s\nrenderer: vite\n")
+    end
+
+    specify "add_pro_to_procfiles still appends node-renderer alongside" do
+      expect(install_generator).to receive(:append_to_file).with("Procfile.dev", include("node-renderer:"))
+      install_generator.send(:add_pro_to_procfiles)
     end
   end
 
