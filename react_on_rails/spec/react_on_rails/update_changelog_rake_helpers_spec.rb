@@ -501,6 +501,10 @@ RSpec.describe "update_changelog.rake helper methods" do
           - Feature from RC
         CHANGELOG
 
+        # No v16.4.0.rc.0 git tag exists, so prerelease_indices_from_tags
+        # returns [] → next_index 0. The task would skip re-insertion because
+        # the header already exists in the changelog, which is the correct
+        # behaviour for an untagged draft.
         version = compute_auto_version(changelog, "rc", repo_dir)
 
         expect(version).to eq("16.4.0.rc.0")
