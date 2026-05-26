@@ -56,6 +56,20 @@ const RSCBailoutStreamingShell = () => (
   </main>
 );
 
+const NestedSuspenseServerError = () => {
+  throw new Error('Unexpected nested Suspense failure');
+};
+
+const UnexpectedNestedSuspenseErrorShell = () => (
+  <main>
+    <h1>Shell before errored boundary</h1>
+    <React.Suspense fallback={<aside>Loading errored boundary...</aside>}>
+      <NestedSuspenseServerError />
+    </React.Suspense>
+    <footer>Shell after errored boundary</footer>
+  </main>
+);
+
 describe('streamServerRenderedReactComponent', () => {
   const testingRailsContext = {
     serverSideRSCPayloadParameters: {},
@@ -191,6 +205,32 @@ describe('streamServerRenderedReactComponent', () => {
     return { renderResult, generateRSCPayload };
   };
 
+  const setupUnexpectedNestedSuspenseErrorStreamTest = ({ onPostSSRHook } = {}) => {
+    const renderFunction = (_props, railsContext) => {
+      if (onPostSSRHook) {
+        railsContext.addPostSSRHook(onPostSSRHook);
+      }
+
+      return UnexpectedNestedSuspenseErrorShell;
+    };
+
+    ReactOnRails.register({
+      UnexpectedNestedSuspenseErrorShell: wrapServerComponentRenderer(
+        renderFunction,
+        'UnexpectedNestedSuspenseErrorShell',
+      ),
+    });
+
+    return streamServerRenderedReactComponent({
+      name: 'UnexpectedNestedSuspenseErrorShell',
+      domNodeId: 'unexpectedNestedSuspenseErrorDomId',
+      trace: false,
+      throwJsErrors: false,
+      railsContext: testingRailsContext,
+      generateRSCPayload: jest.fn(),
+    });
+  };
+
   it('renders the nearest Suspense fallback for RSCRoute ssr=false without generating an RSC payload', async () => {
     const { renderResult, generateRSCPayload } = setupRSCRouteSSRFalseStreamTest();
     const { chunks, errors } = await collectStreamResult(renderResult);
@@ -230,6 +270,25 @@ describe('streamServerRenderedReactComponent', () => {
 
       expect(onPostSSRHook).toHaveBeenCalledTimes(1);
       expect(consoleWarnSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('notifySSREnd() called multiple times'),
+      );
+    } finally {
+      consoleWarnSpy.mockRestore();
+    }
+  });
+
+  it('preserves the duplicate notifySSREnd warning for unexpected nested Suspense errors', async () => {
+    const onPostSSRHook = jest.fn();
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const renderResult = setupUnexpectedNestedSuspenseErrorStreamTest({ onPostSSRHook });
+
+    try {
+      const { chunks, errors } = await collectStreamResult(renderResult);
+
+      expect(errors).toHaveLength(0);
+      expect(onPostSSRHook).toHaveBeenCalledTimes(1);
+      expect(chunks.some((chunk) => chunk.hasErrors)).toBe(true);
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
         expect.stringContaining('notifySSREnd() called multiple times'),
       );
     } finally {

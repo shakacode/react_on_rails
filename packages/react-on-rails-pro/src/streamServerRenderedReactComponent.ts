@@ -45,9 +45,11 @@ const streamRenderReactComponent = (
 
   const { readableStream, pipeToTransform, writeChunk, emitError, endStream } =
     transformRenderStreamChunksToResultObject(renderState);
-  let didNotifySSREnd = false;
+  let sawRSCRouteSSRFalseBailout = false;
+  let sawUnexpectedRenderError = false;
 
   const reportError = (error: Error) => {
+    sawUnexpectedRenderError = true;
     renderState.hasErrors = true;
     renderState.error = error;
 
@@ -59,13 +61,6 @@ const streamRenderReactComponent = (
   const sendErrorHtml = (error: Error) => {
     const errorHtmlStream = handleError({ e: error, name: componentName, serverSide: true });
     pipeToTransform(errorHtmlStream);
-  };
-
-  const notifySSREndOnce = () => {
-    if (didNotifySSREnd) return;
-
-    didNotifySSREnd = true;
-    streamingTrackers.postSSRHookTracker.notifySSREnd();
   };
 
   assertRailsContextWithServerStreamingCapabilities(railsContext);
@@ -102,6 +97,7 @@ const streamRenderReactComponent = (
         onError(e) {
           const error = convertToError(e);
           if (isRSCRouteSSRFalseBailoutError(error)) {
+            sawRSCRouteSSRFalseBailout = true;
             return error.digest;
           }
 
@@ -109,7 +105,12 @@ const streamRenderReactComponent = (
           return undefined;
         },
         onAllReady() {
-          notifySSREndOnce();
+          // React 19 can call onAllReady more than once when nested Suspense boundaries switch to
+          // client rendering after a server error. Keep the existing duplicate warning for unexpected
+          // errors, but silence it when the only error was the expected RSCRoute ssr=false bailout.
+          streamingTrackers.postSSRHookTracker.notifySSREnd({
+            suppressDuplicateWarning: sawRSCRouteSSRFalseBailout && !sawUnexpectedRenderError,
+          });
         },
         identifierPrefix: domNodeId,
       });
