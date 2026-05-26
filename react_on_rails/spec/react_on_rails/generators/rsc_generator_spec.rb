@@ -371,6 +371,53 @@ describe RscGenerator, type: :generator do
     end
   end
 
+  context "when a fresh client webpack config has a commented-out RSCWebpackPlugin and no insertion point" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+
+          // Old setup: clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            delete clientConfig.entry['server-bundle'];
+
+            finalizeClientConfig(clientConfig);
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "still rolls back the prepared imports rather than trusting the commented-out reference" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content).to include("// Old setup: clientConfig.plugins.push(new RSCWebpackPlugin")
+        expect(content).not_to include("rscClientReferences")
+        expect(content).not_to include("require('react-on-rails-rsc/WebpackPlugin')")
+        expect(content).to include("finalizeClientConfig(clientConfig);")
+      end
+
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("Reverted partial RSC setup; please add RSCWebpackPlugin and clientReferences manually")
+    end
+  end
+
   context "when the server webpack config uses double-quoted bundler imports" do
     before(:all) do
       prepare_destination

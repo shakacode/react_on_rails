@@ -383,7 +383,7 @@ module ReactOnRails
 
         content = File.read(full_path)
 
-        if content.include?("RSCWebpackPlugin")
+        if rsc_plugin_invocation_in_js_code?(content)
           update_existing_rsc_webpack_config(config_path, content, is_server: true)
           return
         end
@@ -433,7 +433,7 @@ module ReactOnRails
 
         content = File.read(full_path)
 
-        if content.include?("RSCWebpackPlugin")
+        if rsc_plugin_invocation_in_js_code?(content)
           update_existing_rsc_webpack_config(config_path, content, is_server: false)
           return
         end
@@ -478,10 +478,31 @@ module ReactOnRails
       end
 
       def new_rsc_plugin_setup_complete?(content, is_server:)
-        plugin_added = content.include?("new RSCWebpackPlugin(")
-        return plugin_added unless is_server
+        return false unless rsc_plugin_invocation_in_js_code?(content)
+        return true unless is_server
 
-        plugin_added && content.match?(/configureServer\s*=\s*\(\s*rscBundle\s*=\s*false\s*\)/)
+        rsc_server_signature_in_js_code?(content)
+      end
+
+      # Walks every occurrence of `new RSCWebpackPlugin(` and returns true only if at least one is
+      # in actual JS code — not inside a comment or string literal. A naive `String#include?` would
+      # falsely report success when the user has a commented-out invocation like
+      # `// Old setup: new RSCWebpackPlugin(...)`, which would skip the partial-setup rollback.
+      def rsc_plugin_invocation_in_js_code?(content)
+        marker = "new RSCWebpackPlugin("
+        search_from = 0
+        while (idx = content.index(marker, search_from))
+          return true if js_code_position?(content, idx)
+
+          search_from = idx + marker.length
+        end
+        false
+      end
+
+      def rsc_server_signature_in_js_code?(content)
+        content
+          .to_enum(:scan, /configureServer\s*=\s*\(\s*rscBundle\s*=\s*false\s*\)/)
+          .any? { js_code_position?(content, Regexp.last_match.begin(0)) }
       end
 
       def warn_incomplete_new_rsc_plugin_setup(config_path, is_server:)
