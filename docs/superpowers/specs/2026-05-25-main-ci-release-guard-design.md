@@ -160,7 +160,7 @@ end
 
 ### `.claude/hooks/main-ci-status.sh`
 
-A small bash script that runs `gh run list --branch main --limit 1 --event push --json conclusion,headSha,workflowName,databaseId,url,status` and emits a compact status block:
+A small bash script that queries `gh api repos/{slug}/commits/{sha}/check-runs` (the GitHub Checks API, not `gh run list`) and emits a compact status block:
 
 ```text
 Main CI status (3103496d, pushed 7h ago):

@@ -486,20 +486,30 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
                .group_by { |run| [run.dig("check_suite", "id"), run["name"]] }
                .map { |_key, runs| runs.max_by { |run| run["id"].to_i } }
 
-  # For prereleases, restrict the gate to GitHub-branch-protection-required checks.
-  # For stable releases, evaluate every check run on the commit.
-  required_names = is_prerelease ? required_check_names_for_main(monorepo_root: monorepo_root) : nil
-  evaluated = required_names.nil? ? check_runs : check_runs.select { |run| required_names.include?(run["name"]) }
+  # Always query branch-protection required checks (when configured) so the
+  # missing-required-check gate applies to both stable and prerelease.
+  # `evaluated` then differs by mode:
+  #   - prerelease: only the required subset (strict gate)
+  #   - stable:     every check_run on the commit (lenient — non-required
+  #                 checks like benchmarks still block on failure)
+  required_names = required_check_names_for_main(monorepo_root: monorepo_root)
+  evaluated = if is_prerelease && required_names
+                check_runs.select { |run| required_names.include?(run["name"]) }
+              else
+                check_runs
+              end
 
   # When branch protection lists required checks, treat any missing required
-  # check as blocking. Branch protection would refuse the merge in this state,
-  # so a release that ignored the gap would ship against a commit GitHub
-  # itself considers unverified. `:no_required_checks` covers the all-missing
-  # case (typically: CI hasn't started yet); `:missing_required_checks` covers
-  # the partial case (some required workflows ran, others never registered —
-  # usually a renamed/deleted workflow that branch protection still requires).
+  # check as blocking — for stable AND prerelease. Branch protection would
+  # refuse the merge in this state, so a release that ignored the gap would
+  # ship against a commit GitHub itself considers unverified.
+  # `:no_required_checks` covers the all-missing case (typically: CI hasn't
+  # started yet); `:missing_required_checks` covers the partial case (some
+  # required workflows ran, others never registered — usually a renamed or
+  # deleted workflow that branch protection still requires).
   unless required_names.nil?
-    missing_names = required_names - evaluated.map { |run| run["name"] }
+    observed_names = check_runs.map { |run| run["name"] }
+    missing_names = required_names - observed_names
     if missing_names.length == required_names.length
       handle_main_ci_status_violation!(
         message: format_main_ci_status_violation(kind: :no_required_checks, short_sha: short_sha, runs: nil) +

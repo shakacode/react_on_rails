@@ -15,19 +15,27 @@ cmd=$(printf '%s' "${input}" | jq -r '.tool_input.command // empty' 2>/dev/null)
 # Match:
 #   - `gh pr create` (any args)
 #   - explicit `git push ... origin main` or `git push ... origin HEAD`
-#   - ANY `git push` invocation while currently checked out on `main` — this
-#     covers the common shortcuts that would otherwise slip past us:
-#       `git push`              (bare, with upstream tracking main)
-#       `git push origin`       (no refspec — pushes matching branches)
-#       `git push -u origin main` (already covered by explicit match)
-#     The current-branch check keeps over-triggering minimal on feature work.
+#   - any `git push` that contains a refspec ending in `:main` or `:HEAD`
+#     (e.g. `git push origin HEAD:main`, `git push origin feature:main`)
+#   - ANY `git push` invocation while currently checked out on `main` —
+#     covers the common shortcuts: `git push`, `git push origin`,
+#     `git push -u`, etc.
+#
+# We deliberately over-trigger rather than try to enumerate every form
+# of `git push`. The 5-minute SHA-keyed cache makes the cost negligible,
+# and a false negative ("agent silently pushed to main without seeing
+# CI status") is much worse than a false positive ("status shown
+# before a feature-branch push").
 matched=0
 if [[ "${cmd}" =~ (^|[[:space:]])gh[[:space:]]+pr[[:space:]]+create([[:space:]]|$) ]]; then
   matched=1
 elif [[ "${cmd}" =~ (^|[[:space:]])git[[:space:]]+push([[:space:]]+[^[:space:]]+)*[[:space:]]+origin[[:space:]]+(main|HEAD)([[:space:]]|$) ]]; then
   matched=1
+elif [[ "${cmd}" =~ (^|[[:space:]])git[[:space:]]+push.*:(main|HEAD)([[:space:]]|$) ]]; then
+  # Refspec form: `git push origin HEAD:main`, `git push origin feature:main`, etc.
+  matched=1
 elif [[ "${cmd}" =~ (^|[[:space:]])git[[:space:]]+push([[:space:]]|$) ]]; then
-  # Any `git push` — check whether the current branch is main.
+  # Any other `git push` — check whether the current branch is main.
   script_repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
   current_branch=$(git -C "${script_repo_root}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
   if [ "${current_branch}" = "main" ]; then

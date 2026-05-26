@@ -499,7 +499,21 @@ RSpec.describe "release.rake helper methods" do
     let(:sha) { "abc1234def5678abcdef" }
     let(:short_sha) { "abc1234d" }
 
-    def passing_run(name, id: rand(1_000_000))
+    # `validate_main_ci_status!` now queries `required_check_names_for_main`
+    # unconditionally so the missing-required-check gate can apply to both
+    # stable and prerelease. The helper shells out to `git -C monorepo_root`
+    # which would abort in tests where `monorepo_root` is a stub path. Default
+    # to "no required checks configured" so tests that don't care about the
+    # gate behave as before; tests that exercise the gate override this stub.
+    before do
+      allow(self).to receive(:required_check_names_for_main)
+        .with(monorepo_root: monorepo_root).and_return(nil)
+    end
+
+    # Fixed sentinel default keeps test data deterministic. Tests that rely
+    # on `max_by { id }` ordering (rerun-dedup, cross-suite dedup) supply
+    # explicit ids via `.merge("id" => N)`.
+    def passing_run(name, id: 9999)
       {
         "id" => id,
         "name" => name,
@@ -509,7 +523,7 @@ RSpec.describe "release.rake helper methods" do
       }
     end
 
-    def failing_run(name, conclusion: "failure", id: rand(1_000_000))
+    def failing_run(name, conclusion: "failure", id: 9999)
       {
         "id" => id,
         "name" => name,
@@ -519,7 +533,7 @@ RSpec.describe "release.rake helper methods" do
       }
     end
 
-    def in_progress_run(name, id: rand(1_000_000))
+    def in_progress_run(name, id: 9999)
       {
         "id" => id,
         "name" => name,
@@ -821,6 +835,28 @@ RSpec.describe "release.rake helper methods" do
           validate_main_ci_status!(
             monorepo_root: monorepo_root,
             is_prerelease: true,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to raise_error(
+          SystemExit,
+          /Some required CI checks are missing.*Missing:\s*Build/m
+        )
+      end
+    end
+
+    context "when some required checks are missing on a stable release" do
+      it "aborts on stable too (branch protection would refuse the merge)" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
+          .and_return(sha: sha, check_runs: [passing_run("Lint"), passing_run("Test")])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root: monorepo_root).and_return(%w[Lint Test Build])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root: monorepo_root,
+            is_prerelease: false,
             allow_override: false,
             dry_run: false
           )

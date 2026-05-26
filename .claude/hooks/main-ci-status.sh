@@ -183,6 +183,10 @@ else
   )
 fi
 
-write_cache_atomic "${output}" || fail_open "cache write failed"
+# If the cache write itself fails (filesystem full, .claude/ read-only,
+# interrupted mv), still emit the computed status — we already spent a
+# full API round-trip on it and discarding the result just because the
+# cache was unwritable is worse than not caching.
+write_cache_atomic "${output}" || { printf '%s\n' "${output}"; exit 0; }
 
 exit 0
