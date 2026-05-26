@@ -338,7 +338,7 @@ rails: rails s -p 3000
 webpack-dev-server: HMR=true bin/shakapacker-dev-server
 rails-server-assets: HMR=true SERVER_BUNDLE_ONLY=true bin/shakapacker --watch
 rails-rsc-assets: HMR=true RSC_BUNDLE_ONLY=true bin/shakapacker --watch
-node-renderer: node renderer/node-renderer.js
+node-renderer: RENDERER_PORT=${RENDERER_PORT:-3800} node renderer/node-renderer.js
 ```
 
 > **For full webpack configuration details**, including the technical background on how the RSC loader, plugin, and manifests work together, see [How React Server Components Work](../../pro/react-server-components/how-react-server-components-work.md).
