@@ -385,6 +385,12 @@ def required_check_names_for_main(monorepo_root:)
   # leaves `contexts` as `[]`, so reading only `contexts` would yield an empty
   # array and trip the `:no_required_checks` abort path even when CI is green.
   jq_query = "(.contexts // []) + (.checks // [] | map(.context)) | unique"
+  # Intentional: use `capture_gh_output` (which aborts on missing `gh`) here,
+  # not `Open3.capture2e` directly like `fetch_main_ci_checks` does. The
+  # difference is deliberate — this helper's failure mode is "branch
+  # protection unknown" which we treat as nil/fail-safe (caller falls back
+  # to evaluating every check_run), so we don't need the
+  # `handle_main_ci_status_violation!` dry-run/override routing.
   output, status = capture_gh_output("api", "--jq", jq_query, api_path)
   # If branch protection isn't configured, isn't queryable with current token scope, or the
   # endpoint returns 404, fall through to nil so the caller treats all checks as required

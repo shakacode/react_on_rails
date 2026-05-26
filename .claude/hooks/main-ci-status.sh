@@ -39,6 +39,10 @@ fail_open() {
 # 5-minute window. A SHA-keyed file makes "no cache yet for this commit"
 # the natural state, and the TTL falls back to its original role of
 # rate-limiting API calls when the same SHA is checked many times.
+# NOTE: `git ls-remote` always runs — even on a cache hit — because we need
+# the current SHA to key the cache correctly. This is one lightweight network
+# call per session start (~50-200ms). The 5-min TTL only eliminates the more
+# expensive `gh api .../check-runs` call that follows on a cache miss.
 head_sha=$(git -C "${REPO_ROOT}" ls-remote origin main 2>/dev/null | awk 'NR==1 {print $1}')
 
 if [ -n "${head_sha}" ]; then
@@ -79,14 +83,18 @@ fi
 write_cache_atomic() {
   local tmp
   tmp=$(mktemp "${CACHE_FILE}.XXXXXX") || return 1
-  printf '%s' "$1" >"${tmp}" || { rm -f "${tmp}"; return 1; }
+  # Trailing newline keeps the next shell prompt on its own line. The
+  # surrounding `output=$(...)` substitution strips trailing newlines, so
+  # without explicitly re-adding one here both the cached file and the
+  # stdout print would end mid-line.
+  printf '%s\n' "$1" >"${tmp}" || { rm -f "${tmp}"; return 1; }
   mv -f "${tmp}" "${CACHE_FILE}" || { rm -f "${tmp}"; return 1; }
   find "${CACHE_DIR}" -maxdepth 1 \
     -name "${CACHE_PREFIX}*" \
     -not -name "$(basename "${CACHE_FILE}")" \
     -type f -mmin +1 \
     -delete 2>/dev/null || true
-  printf '%s' "$1"
+  printf '%s\n' "$1"
 }
 
 command -v gh >/dev/null 2>&1 || fail_open "gh CLI not installed"
@@ -186,7 +194,9 @@ fi
 # If the cache write itself fails (filesystem full, .claude/ read-only,
 # interrupted mv), still emit the computed status — we already spent a
 # full API round-trip on it and discarding the result just because the
-# cache was unwritable is worse than not caching.
+# cache was unwritable is worse than not caching. The `\n` here matches
+# write_cache_atomic's normal output path so the printed status block
+# never glues onto the next shell prompt.
 write_cache_atomic "${output}" || { printf '%s\n' "${output}"; exit 0; }
 
 exit 0
