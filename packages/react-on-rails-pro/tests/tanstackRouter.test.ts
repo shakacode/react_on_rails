@@ -2138,14 +2138,13 @@ describe('tanstack-router integration (Pro)', () => {
   });
 
   it('renders RouterProvider directly without an enclosing Suspense boundary during hydration', () => {
-    // Regression test for the client-side Suspense-gate removal: the client
-    // hydration tree must emit AppWrapper > RouterProvider with no Suspense
-    // wrapper. (serverRender.ts's `buildAppElement` does wrap RouterProvider
-    // in <Suspense> for the ServerSuspenseFallback guard, but React 18's
-    // `renderToString` emits no `<!--$-->` markers for non-suspended boundaries,
-    // so the server HTML still matches this shape exactly.) An extra Suspense
-    // on the client would produce hydration markers and force React to bail
-    // to a full client-side re-render.
+    // Regression test for the Suspense-gate removal: both the server tree
+    // (serverRender.ts's `buildAppElement`) and the client hydration tree
+    // emit AppWrapper > RouterProvider with no Suspense wrapper. A Suspense
+    // wrapper on either side would emit `<!--$-->`/`<!--/$-->` markers in
+    // the server HTML and require a matching boundary on the client; an
+    // asymmetric boundary causes a hydration mismatch and React bails to a
+    // full client-side re-render.
     const router = buildRouter();
     const renderFn = createTanStackRouterRenderFunction(
       { createRouter: () => router },
@@ -2215,13 +2214,11 @@ describe('tanstack-router integration (Pro)', () => {
       }),
     );
 
-    // React 18's legacy `renderToString` produces its own
-    // "component suspended while responding to synchronous input" error and
-    // does not reach our `ServerSuspenseFallback` synchronously, so we match
-    // either signal — the point is that SSR suspension surfaces as a loud
-    // throw, not a silent empty render.
-    expect(() => renderToString(result.appElement)).toThrow(
-      /(?:RouterProvider suspended during server render after router\.load\(\)|component suspended)/,
-    );
+    // React's legacy `renderToString` produces its own "component suspended
+    // while responding to synchronous input" error when RouterProvider
+    // suspends during SSR. The server tree no longer wraps RouterProvider in
+    // <Suspense> (doing so would break hydration parity in React 19), so the
+    // built-in React error is the loud throw we rely on here.
+    expect(() => renderToString(result.appElement)).toThrow(/component suspended/);
   });
 });
