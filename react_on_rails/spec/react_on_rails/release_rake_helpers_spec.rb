@@ -858,6 +858,46 @@ RSpec.describe "release.rake helper methods" do
       end.to raise_error(SystemExit, /GitHub CLI .* is not installed/)
     end
 
+    it "warns instead of aborting when `gh` is missing in dry-run mode" do
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "fetch", "origin", "main", "--quiet")
+        .and_return(["", success_status])
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "origin/main")
+        .and_return(["abc1234\n", success_status])
+      allow(self).to receive(:github_repo_slug).with(monorepo_root).and_return("shakacode/react_on_rails")
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", "--paginate", "--jq", ".check_runs[]",
+              "repos/shakacode/react_on_rails/commits/abc1234/check-runs")
+        .and_raise(Errno::ENOENT)
+
+      result = nil
+      expect do
+        result = fetch_main_ci_checks(monorepo_root: monorepo_root, dry_run: true)
+      end.to output(/DRY RUN.*GitHub CLI .* is not installed/m).to_stdout
+      expect(result).to be_nil
+    end
+
+    it "warns instead of aborting on unparseable check-runs JSON in dry-run mode" do
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "fetch", "origin", "main", "--quiet")
+        .and_return(["", success_status])
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "rev-parse", "origin/main")
+        .and_return(["abc1234\n", success_status])
+      allow(self).to receive(:github_repo_slug).with(monorepo_root).and_return("shakacode/react_on_rails")
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", "--paginate", "--jq", ".check_runs[]",
+              "repos/shakacode/react_on_rails/commits/abc1234/check-runs")
+        .and_return(["this is not json", success_status])
+
+      result = nil
+      expect do
+        result = fetch_main_ci_checks(monorepo_root: monorepo_root, dry_run: true)
+      end.to output(/DRY RUN.*Failed to parse check_runs response/m).to_stdout
+      expect(result).to be_nil
+    end
+
     it "parses paginated JSONL check_runs into an array of hashes" do
       allow(Open3).to receive(:capture2e)
         .with("git", "-C", monorepo_root, "fetch", "origin", "main", "--quiet")

@@ -15,10 +15,42 @@
 set -u  # No `set -e` — we want to handle errors ourselves to stay fail-open.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-CACHE_FILE="${REPO_ROOT}/.claude/.main-ci-status.cache"
+CACHE_DIR="${REPO_ROOT}/.claude"
+CACHE_PREFIX=".main-ci-status.cache"
 CACHE_TTL_SECONDS=300
 
-# If the cache is fresh, print it and exit. Per-platform stat invocation differs.
+# Helper: print an "unavailable" message and exit 0 without writing the cache.
+fail_open() {
+  echo "Main CI status unavailable: $1"
+  exit 0
+}
+
+# Resolve `origin/main` HEAD SHA up front so we can SHA-key the cache.
+# We use `git ls-remote` (not `gh run list`) so the SHA reflects the
+# current ref tip, not the latest push-workflow run — which can lag right
+# after a push (or never appear at all for docs-only pushes when
+# paths-ignore filters out every workflow). Matching the release gate's
+# SHA semantics (`git rev-parse origin/main`) keeps session-time and
+# release-time observations consistent.
+#
+# Resolving the SHA before the cache lookup also lets us key the cache by
+# commit. With a mtime-only TTL, sessions could read the prior commit's
+# summary as if it applied to today's tip when main advances inside the
+# 5-minute window. A SHA-keyed file makes "no cache yet for this commit"
+# the natural state, and the TTL falls back to its original role of
+# rate-limiting API calls when the same SHA is checked many times.
+head_sha=$(git -C "${REPO_ROOT}" ls-remote origin main 2>/dev/null | awk 'NR==1 {print $1}')
+
+if [ -n "${head_sha}" ]; then
+  CACHE_FILE="${CACHE_DIR}/${CACHE_PREFIX}.${head_sha:0:12}"
+else
+  # Network or git failure — fall back to the legacy un-keyed cache so a
+  # stale read is still possible, but a single failed `ls-remote` call
+  # doesn't force a full live re-fetch on every session start.
+  CACHE_FILE="${CACHE_DIR}/${CACHE_PREFIX}"
+fi
+
+# If the cache for THIS SHA is fresh, print it and exit. Per-platform stat invocation differs.
 if [ -f "${CACHE_FILE}" ]; then
   if [ "$(uname)" = "Darwin" ]; then
     cache_mtime=$(stat -f %m "${CACHE_FILE}" 2>/dev/null || echo 0)
@@ -33,23 +65,27 @@ if [ -f "${CACHE_FILE}" ]; then
   fi
 fi
 
-# Helper: print an "unavailable" message and exit 0 without writing the cache.
-fail_open() {
-  echo "Main CI status unavailable: $1"
-  exit 0
-}
-
 # Helper: atomically replace the cache file with the contents of $1, then
 # print $1 to stdout. A direct `tee` would leave a partial file readable
 # by a concurrent session-start if the script were interrupted mid-write.
 # We print from the parameter rather than re-reading the file, so a
 # concurrent delete between the `mv` and the print cannot trigger a
 # misleading "cache write failed" fail_open.
+#
+# After a successful swap, prune older SHA-keyed cache files so we don't
+# accumulate one per main commit ever seen. The `-mmin +1` guard avoids
+# racing a concurrent session that may have just written its own
+# different-SHA cache.
 write_cache_atomic() {
   local tmp
   tmp=$(mktemp "${CACHE_FILE}.XXXXXX") || return 1
   printf '%s' "$1" >"${tmp}" || { rm -f "${tmp}"; return 1; }
   mv -f "${tmp}" "${CACHE_FILE}" || { rm -f "${tmp}"; return 1; }
+  find "${CACHE_DIR}" -maxdepth 1 \
+    -name "${CACHE_PREFIX}*" \
+    -not -name "$(basename "${CACHE_FILE}")" \
+    -type f -mmin +1 \
+    -delete 2>/dev/null || true
   printf '%s' "$1"
 }
 
@@ -58,15 +94,7 @@ gh auth status >/dev/null 2>&1 || fail_open "gh CLI not authenticated (run \`gh 
 
 repo_slug=$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null) || fail_open "gh repo view failed"
 
-# Resolve the actual `origin/main` HEAD SHA. We use `git ls-remote` (not
-# `gh run list`) so the SHA reflects the current ref tip, not the latest
-# push-workflow run — which can lag right after a push (or never appear at
-# all for docs-only pushes when paths-ignore filters out every workflow).
-# Matching the release gate's SHA semantics (`git rev-parse origin/main`)
-# keeps session-time and release-time observations consistent.
-head_sha=$(git -C "${REPO_ROOT}" ls-remote origin main 2>/dev/null | awk 'NR==1 {print $1}') \
-  || fail_open "git ls-remote origin main failed"
-[ -n "${head_sha}" ] || fail_open "could not resolve origin/main HEAD"
+[ -n "${head_sha}" ] || fail_open "git ls-remote origin main failed"
 
 # Pull every check run on the commit. We use the Checks API because a single
 # push commit triggers multiple workflows and we want them aggregated.

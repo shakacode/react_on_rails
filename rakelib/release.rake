@@ -304,6 +304,7 @@ CI_INCOMPLETE_STATUSES = %w[in_progress queued waiting requested pending].freeze
 # paths-ignore skips, or workflows that intentionally short-circuit).
 CI_PASSING_CONCLUSIONS = %w[success skipped neutral].freeze
 
+# rubocop:disable Metrics/MethodLength
 def fetch_main_ci_checks(monorepo_root:, allow_override: false, dry_run: false)
   fetch_output, fetch_status = Open3.capture2e(
     "git", "-C", monorepo_root, "fetch", "origin", "main", "--quiet"
@@ -332,10 +333,24 @@ def fetch_main_ci_checks(monorepo_root:, allow_override: false, dry_run: false)
   api_path = "repos/#{repo_slug}/commits/#{sha}/check-runs"
 
   # `--paginate --jq '.check_runs[]'` flattens paginated responses into JSONL.
-  # Each non-empty line is one check_run object. Using `capture_gh_output` so a
-  # missing `gh` binary aborts with a friendly install hint instead of crashing
-  # with Errno::ENOENT.
-  output, status = capture_gh_output("api", "--paginate", "--jq", ".check_runs[]", api_path)
+  # Each non-empty line is one check_run object. We invoke `gh` directly here
+  # (rather than via `capture_gh_output`) so that a missing binary routes
+  # through `handle_main_ci_status_violation!` — same as a git fetch failure —
+  # instead of aborting unconditionally. This keeps `dry_run` / `allow_override`
+  # symmetric across every fetch step.
+  begin
+    output, status = Open3.capture2e(
+      "gh", "api", "--paginate", "--jq", ".check_runs[]", api_path
+    )
+  rescue Errno::ENOENT
+    handle_main_ci_status_violation!(
+      message: "❌ GitHub CLI (`gh`) is not installed. Install it from https://cli.github.com/ and retry.",
+      allow_override: allow_override,
+      dry_run: dry_run
+    )
+    return nil
+  end
+
   unless status.success?
     handle_main_ci_status_violation!(
       message: "❌ Unable to query GitHub Checks API for #{sha}.\n\n#{output}",
@@ -345,14 +360,22 @@ def fetch_main_ci_checks(monorepo_root:, allow_override: false, dry_run: false)
     return nil
   end
 
-  check_runs = output.lines.reject { |line| line.strip.empty? }.map do |line|
-    JSON.parse(line)
+  begin
+    check_runs = output.lines.reject { |line| line.strip.empty? }.map do |line|
+      JSON.parse(line)
+    end
   rescue JSON::ParserError => e
-    abort "❌ Failed to parse check_runs response from gh: #{e.message}\n\nOutput:\n#{output}"
+    handle_main_ci_status_violation!(
+      message: "❌ Failed to parse check_runs response from gh: #{e.message}\n\nOutput:\n#{output}",
+      allow_override: allow_override,
+      dry_run: dry_run
+    )
+    return nil
   end
 
   { sha: sha, check_runs: check_runs }
 end
+# rubocop:enable Metrics/MethodLength
 
 def required_check_names_for_main(monorepo_root:)
   repo_slug = github_repo_slug(monorepo_root)
