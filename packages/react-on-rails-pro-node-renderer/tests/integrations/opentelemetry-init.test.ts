@@ -395,6 +395,120 @@ describe('opentelemetry integration: init() failure path', () => {
     await resetOpenTelemetryForTest();
   });
 
+  test('init() aborts without taking ownership when another provider already owns the global tracer', async () => {
+    // Pre-register a real OTel provider so the global proxy already has a
+    // delegate before init() runs. The new init() path detects this via
+    // setGlobalTracerProvider() returning false and bails before installing
+    // module patches or running provider.register().
+    const { BasicTracerProvider, InMemorySpanExporter, SimpleSpanProcessor } = await import(
+      '@opentelemetry/sdk-trace-base'
+    );
+    const existingExporter = new InMemorySpanExporter();
+    const existingProvider = new BasicTracerProvider({
+      spanProcessors: [new SimpleSpanProcessor(existingExporter)],
+    });
+    expect(otelTrace.setGlobalTracerProvider(existingProvider)).toBe(true);
+
+    const registerSpy = jest.fn();
+    const ourShutdownSpy = jest.fn(async () => undefined);
+    jest.doMock('@opentelemetry/sdk-trace-node', () => ({
+      NodeTracerProvider: jest.fn(function NodeTracerProvider() {
+        return { register: registerSpy, shutdown: ourShutdownSpy };
+      }),
+    }));
+
+    const errorReporter = await import('../../src/shared/errorReporter');
+    const messageSpy = jest.spyOn(errorReporter, 'message');
+    const ourExporter = new InMemorySpanExporter();
+    const otel = await import('../../src/integrations/opentelemetry');
+
+    otel.init({
+      spanProcessor: new SimpleSpanProcessor(ourExporter),
+    });
+
+    // We never reach provider.register() because the silent-failure check fires first.
+    expect(registerSpy).not.toHaveBeenCalled();
+    // We shut our provider down so its span processor doesn't keep buffering.
+    expect(ourShutdownSpy).toHaveBeenCalledTimes(1);
+    expect(messageSpy).toHaveBeenCalledWith(expect.stringContaining('already registered globally'));
+
+    // Pre-existing provider still owns the global, so spans land there, not in ours.
+    otelTrace.getTracer('test').startActiveSpan('span.after.aborted.init', (span) => span.end());
+    expect(existingExporter.getFinishedSpans().map((s) => s.name)).toEqual(['span.after.aborted.init']);
+    expect(ourExporter.getFinishedSpans()).toHaveLength(0);
+
+    await existingProvider.shutdown();
+  });
+
+  test('init() caps shutdownTimeoutMs at the worker shutdown hooks ceiling', async () => {
+    jest.useFakeTimers();
+    try {
+      let configureFastifyCallback: ((app: { addHook: jest.Mock }) => void) | undefined;
+      let onClose: (() => Promise<void>) | undefined;
+      const log = {
+        debug: jest.fn(),
+        error: jest.fn(),
+        info: jest.fn(),
+        warn: jest.fn(),
+      };
+      const shutdown = jest.fn(() => new Promise<void>(() => undefined));
+
+      jest.doMock('../../src/integrations/api.js', () => ({
+        log,
+        message: jest.fn(),
+      }));
+      jest.doMock('../../src/worker/fastifyConfig.js', () => ({
+        __resetFastifyConfigFunctionsForTest: jest.fn(),
+        registerFastifyConfigFunction: jest.fn((callback: (app: { addHook: jest.Mock }) => void) => {
+          configureFastifyCallback = callback;
+          return jest.fn();
+        }),
+      }));
+      jest.doMock('@opentelemetry/sdk-trace-node', () => ({
+        NodeTracerProvider: jest.fn(function NodeTracerProvider() {
+          return {
+            register: jest.fn(),
+            shutdown,
+          };
+        }),
+      }));
+
+      const { InMemorySpanExporter, SimpleSpanProcessor } = await import('@opentelemetry/sdk-trace-base');
+      const otel = await import('../../src/integrations/opentelemetry');
+
+      // Request 60_000ms — well above the 10_000ms worker cap.
+      otel.init({
+        spanProcessor: new SimpleSpanProcessor(new InMemorySpanExporter()),
+        shutdownTimeoutMs: 60_000,
+      });
+
+      configureFastifyCallback!({
+        addHook: jest.fn((_name: string, handler: () => Promise<void>) => {
+          onClose = handler;
+        }),
+      });
+
+      const closePromise = onClose!();
+      // Cap should be 9_000ms (10_000 worker cap - 1_000 buffer).
+      jest.advanceTimersByTime(9_000);
+
+      await expect(closePromise).resolves.toBeUndefined();
+      expect(log.warn).toHaveBeenCalledWith(
+        expect.stringContaining('exceeds worker shutdown hook cap'),
+        60_000,
+        10_000,
+        9_000,
+      );
+      // The timeout warning from shutdownProviderWithTimeout should fire at the capped value.
+      expect(log.warn).toHaveBeenCalledWith(
+        '[OpenTelemetry] provider.shutdown() timed out after %dms; continuing worker shutdown',
+        9_000,
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   test('init() preserves existing OTel globals when provider.register() fails', async () => {
     const existingDiagLogger = {
       debug: jest.fn(),

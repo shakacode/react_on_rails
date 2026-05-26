@@ -11,7 +11,7 @@ import {
   setOpenTelemetryTracerProvider,
 } from '../shared/opentelemetryState.js';
 import { registerFastifyConfigFunction } from '../worker/fastifyConfig.js';
-import { registerWorkerShutdownHook } from '../worker/shutdownHooks.js';
+import { WORKER_SHUTDOWN_HOOKS_TIMEOUT_MS, registerWorkerShutdownHook } from '../worker/shutdownHooks.js';
 import { log, message } from './api.js';
 
 declare module '../shared/tracing.js' {
@@ -45,6 +45,9 @@ export interface OpenTelemetryInitOptions {
 
 const DEFAULT_SERVICE_NAME = 'react-on-rails-pro-node-renderer';
 const DEFAULT_SHUTDOWN_TIMEOUT_MS = 5_000;
+// Leave 1s of headroom under the worker's hard cap so the shutdown hook can
+// resolve cleanly even when provider.shutdown() runs right at its limit.
+const MAX_SHUTDOWN_TIMEOUT_MS = WORKER_SHUTDOWN_HOOKS_TIMEOUT_MS - 1_000;
 
 interface InstalledTracingAdapters {
   tracing: boolean;
@@ -60,8 +63,23 @@ function resolveConfiguredServiceName(opts: OpenTelemetryInitOptions): string | 
 }
 
 function resolveShutdownTimeoutMs(opts: OpenTelemetryInitOptions): number {
-  const timeoutMs = opts.shutdownTimeoutMs ?? DEFAULT_SHUTDOWN_TIMEOUT_MS;
-  return Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : DEFAULT_SHUTDOWN_TIMEOUT_MS;
+  const requested = opts.shutdownTimeoutMs;
+  if (requested === undefined) {
+    return DEFAULT_SHUTDOWN_TIMEOUT_MS;
+  }
+  if (!Number.isFinite(requested) || requested <= 0) {
+    return DEFAULT_SHUTDOWN_TIMEOUT_MS;
+  }
+  if (requested > MAX_SHUTDOWN_TIMEOUT_MS) {
+    log.warn(
+      '[OpenTelemetry] shutdownTimeoutMs=%dms exceeds worker shutdown hook cap (%dms); capping to %dms so the hook can resolve before the worker is forcibly destroyed.',
+      requested,
+      WORKER_SHUTDOWN_HOOKS_TIMEOUT_MS,
+      MAX_SHUTDOWN_TIMEOUT_MS,
+    );
+    return MAX_SHUTDOWN_TIMEOUT_MS;
+  }
+  return requested;
 }
 
 function parseResourceAttributes(value: string | undefined): Record<string, string> {
@@ -220,6 +238,35 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
       spanProcessors: [spanProcessor],
     });
 
+    // Take ownership of the global tracer provider BEFORE installing module
+    // patches via registerInstrumentations(). provider.register() calls
+    // trace.setGlobalTracerProvider() internally, which silently fails (returns
+    // false but does not throw) when another OpenTelemetry SDK already owns the
+    // global proxy's delegate. Call setGlobalTracerProvider() directly first so
+    // we can detect that silent failure and bail before patching modules.
+    const acquiredTracerGlobal = loadedOtelApi.trace.setGlobalTracerProvider(provider);
+    if (!acquiredTracerGlobal) {
+      installedAdapters = resetInstalledTracingAdapters(installedAdapters);
+      void provider.shutdown().catch(() => undefined);
+      message(
+        '[OpenTelemetry] init: another OpenTelemetry tracer provider is already registered globally; aborting.',
+      );
+      return;
+    }
+    // Mark ownership BEFORE provider.register() so the outer catch's cleanup
+    // (which keys off ownsOpenTelemetryGlobals + the module-local provider
+    // reference) correctly disables the globals if register() throws.
+    ownsOpenTelemetryGlobals = true;
+    registeredProvider = provider;
+    setOpenTelemetryTracerProvider(provider);
+
+    // Re-call provider.register() to set context manager + propagator globals.
+    // The second setGlobalTracerProvider() call inside register() is a no-op
+    // (registerGlobal returns false because the proxy is already owned by us),
+    // but the propagator + context manager setup still runs.
+    provider.register();
+    configureOpenTelemetryDiagnostics(loadedOtelApi);
+
     if (opts.fastify) {
       /* eslint-disable @typescript-eslint/no-require-imports, global-require */
       const { registerInstrumentations } =
@@ -290,21 +337,6 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
             'active; skipping OpenTelemetry sub-spans.',
         );
       }
-    }
-
-    try {
-      provider.register();
-      setOpenTelemetryTracerProvider(provider);
-      registeredProvider = provider;
-      ownsOpenTelemetryGlobals = true;
-      configureOpenTelemetryDiagnostics(loadedOtelApi);
-    } catch (err) {
-      installedAdapters = resetInstalledTracingAdapters(installedAdapters);
-      // When opts.fastify is enabled, OpenTelemetry does not expose a public
-      // rollback API for module patches applied by registerInstrumentations().
-      // With no registered provider, those shims use the no-op tracer.
-      message(`[OpenTelemetry] init failed: ${String(err)}`);
-      return;
     }
 
     let shutdownOpenTelemetryPromise: Promise<void> | undefined;
