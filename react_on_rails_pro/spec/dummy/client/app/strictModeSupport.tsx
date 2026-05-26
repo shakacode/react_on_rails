@@ -32,6 +32,7 @@ const REACT_OBJECT_COMPONENT_TYPES = new Set<symbol | number>([
   Symbol.for('react.lazy'),
   Symbol.for('react.memo'),
 ]);
+const useStrictMode = process.env.NODE_ENV !== 'production';
 
 const wrappedFunctionComponents = new WeakMap<CallableComponent | RenderFunction, ComponentWithMetadata>();
 const wrappedRenderFunctions = new WeakMap<RenderFunction, RenderFunction>();
@@ -94,6 +95,10 @@ const createStrictModeWrapper = (Component: ComponentWithMetadata): React.FC<Rec
 };
 
 const wrapComponentInStrictMode = (component: ComponentWithMetadata): ComponentWithMetadata => {
+  if (!useStrictMode) {
+    return component;
+  }
+
   if (typeof component === 'function') {
     const cachedComponent = wrappedFunctionComponents.get(component);
     if (cachedComponent) {
@@ -114,11 +119,14 @@ const wrapComponentInStrictMode = (component: ComponentWithMetadata): ComponentW
   return wrappedComponent;
 };
 
-export const wrapElementInStrictMode = (reactElement: React.ReactElement): React.ReactElement => (
-  <React.StrictMode>{reactElement}</React.StrictMode>
-);
+export const wrapElementInStrictMode = (reactElement: React.ReactElement): React.ReactElement =>
+  useStrictMode ? <React.StrictMode>{reactElement}</React.StrictMode> : reactElement;
 
 const wrapRenderFunctionResult = (result: unknown): unknown => {
+  if (!useStrictMode) {
+    return result;
+  }
+
   if (isPromiseLike(result)) {
     return result.then(wrapRenderFunctionResult);
   }
@@ -143,6 +151,10 @@ const wrapRenderFunctionResult = (result: unknown): unknown => {
 // orders the renderer check before the render-function check so a 3-arg renderer never reaches
 // this helper through the registry, but direct callers should treat this as a precondition.
 const wrapRenderFunctionInStrictMode = (renderFunction: RenderFunction): RenderFunction => {
+  if (!useStrictMode) {
+    return renderFunction;
+  }
+
   const cachedRenderFunction = wrappedRenderFunctions.get(renderFunction);
   if (cachedRenderFunction) {
     return cachedRenderFunction;
@@ -163,8 +175,12 @@ const wrapRenderFunctionInStrictMode = (renderFunction: RenderFunction): RenderF
   return wrappedRenderFunction;
 };
 
-export const wrapRegisteredComponentsWithStrictMode = (components: ComponentRegistry): ComponentRegistry =>
-  Object.fromEntries(
+export const wrapRegisteredComponentsWithStrictMode = (components: ComponentRegistry): ComponentRegistry => {
+  if (!useStrictMode) {
+    return components;
+  }
+
+  return Object.fromEntries(
     Object.entries(components).map(([name, component]) => {
       if (isRendererFunction(component)) {
         return [name, component];
@@ -181,8 +197,13 @@ export const wrapRegisteredComponentsWithStrictMode = (components: ComponentRegi
       return [name, wrapComponentInStrictMode(component)];
     }),
   );
+};
 
 export const enableStrictModeForReactOnRails = <T extends ReactOnRailsWithRegister>(reactOnRails: T): T => {
+  if (!useStrictMode) {
+    return reactOnRails;
+  }
+
   if (reactOnRails[STRICT_MODE_PATCHED]) {
     return reactOnRails;
   }

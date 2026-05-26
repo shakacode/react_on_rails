@@ -6,6 +6,8 @@ import '@hotwired/turbo-rails';
 
 import ReactOnRails from 'react-on-rails/client';
 
+const useStrictMode = process.env.NODE_ENV !== 'production';
+
 import HelloTurboStream from '../startup/HelloTurboStream';
 import ManualRenderComponent from '../startup/ManualRenderComponent';
 import SharedReduxStore from '../stores/SharedReduxStore';
@@ -27,7 +29,7 @@ const STRICT_MODE_PATCHED = '__reactOnRailsDummyStrictModePatched';
 // webpack compilation (e.g., a standalone bundle config) would get its own unpatched module
 // instance. When adding a pack like that, either fold it into this compilation or duplicate
 // this `STRICT_MODE_PATCHED` block at the top of the new pack before any `register` calls.
-if (!ReactOnRails[STRICT_MODE_PATCHED]) {
+if (useStrictMode && !ReactOnRails[STRICT_MODE_PATCHED]) {
   const originalRegister = ReactOnRails.register.bind(ReactOnRails);
 
   ReactOnRails.register = (components) =>

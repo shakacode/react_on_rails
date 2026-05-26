@@ -10,6 +10,7 @@ const wrappedFunctionComponents = new WeakMap();
 const wrappedRenderFunctions = new WeakMap();
 // Object-typed React components (memo, forwardRef, lazy) are GC-safe in a WeakMap.
 const wrappedObjectComponents = new WeakMap();
+const useStrictMode = process.env.NODE_ENV !== 'production';
 
 const isPromiseLike = (value) =>
   typeof value === 'object' && value !== null && typeof value.then === 'function';
@@ -58,6 +59,10 @@ const createStrictModeWrapper = (Component) => {
 };
 
 const wrapComponentInStrictMode = (component) => {
+  if (!useStrictMode) {
+    return component;
+  }
+
   if (typeof component === 'function') {
     const cachedComponent = wrappedFunctionComponents.get(component);
     if (cachedComponent) {
@@ -79,9 +84,14 @@ const wrapComponentInStrictMode = (component) => {
   return wrappedComponent;
 };
 
-export const wrapElementInStrictMode = (reactElement) => <React.StrictMode>{reactElement}</React.StrictMode>;
+export const wrapElementInStrictMode = (reactElement) =>
+  useStrictMode ? <React.StrictMode>{reactElement}</React.StrictMode> : reactElement;
 
 const wrapRenderFunctionResult = (result) => {
+  if (!useStrictMode) {
+    return result;
+  }
+
   if (isPromiseLike(result)) {
     return result.then(wrapRenderFunctionResult);
   }
@@ -103,6 +113,10 @@ const wrapRenderFunctionResult = (result) => {
 // re-entry path unreachable. Note: when called directly (outside the registry path), the wrapper's
 // hardcoded `length === 2` does not reflect the original function's arity.
 const wrapRenderFunctionInStrictMode = (renderFunction) => {
+  if (!useStrictMode) {
+    return renderFunction;
+  }
+
   const cachedRenderFunction = wrappedRenderFunctions.get(renderFunction);
   if (cachedRenderFunction) {
     return cachedRenderFunction;
@@ -123,8 +137,12 @@ const wrapRenderFunctionInStrictMode = (renderFunction) => {
   return wrappedRenderFunction;
 };
 
-export const wrapRegisteredComponentsWithStrictMode = (components) =>
-  Object.fromEntries(
+export const wrapRegisteredComponentsWithStrictMode = (components) => {
+  if (!useStrictMode) {
+    return components;
+  }
+
+  return Object.fromEntries(
     Object.entries(components).map(([name, component]) => {
       if (isRendererFunction(component)) {
         return [name, component];
@@ -141,3 +159,4 @@ export const wrapRegisteredComponentsWithStrictMode = (components) =>
       return [name, wrapComponentInStrictMode(component)];
     }),
   );
+};
