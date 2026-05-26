@@ -111,9 +111,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
-    env:
-      BUNDLE_FROZEN: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
-      BUNDLE_PATH: vendor/bundle
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -135,13 +132,12 @@ jobs:
       - name: run conversion script to use minimum supported dependency versions
         if: matrix.dependency-level == 'minimum'
         run: script/convert
-      - name: Save root ruby gems to cache
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails/vendor/bundle
-          key: package-app-gem-cache-${{ hashFiles('react_on_rails/Gemfile.lock') }}-${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
       - name: Install Ruby Gems for package
-        run: cd react_on_rails && (bundle check || bundle _2.5.9_ install --jobs=4 --retry=3)
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: react_on_rails
+          ruby-version: ${{ matrix.ruby-version }}
+          frozen: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
       - name: Git Stuff
         if: matrix.dependency-level == 'minimum'
         run: |

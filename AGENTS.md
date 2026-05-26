@@ -157,6 +157,12 @@ expect { evaluate(sanitized_content) }.not_to raise_error
 
 Prettier handles all formatting. Never manually format — run `rake autofix` instead.
 
+### GitHub Actions
+
+For GitHub Actions jobs that install Ruby gems, prefer `.github/actions/setup-bundle` over hand-written `actions/cache` plus `bundle install` steps.
+The action validates a committed `Gemfile.lock`, configures the bundle path and Bundler version for later `bundle exec` steps,
+restores/saves the gem cache, and supports non-frozen installs via `frozen: 'false'` for minimum-dependency jobs.
+
 ## Git Workflow
 
 **Branch naming**: `type/descriptive-name` (e.g., `fix/ssr-hydration-mismatch`)
