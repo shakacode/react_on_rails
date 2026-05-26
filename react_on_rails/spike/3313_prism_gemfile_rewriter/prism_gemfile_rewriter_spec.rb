@@ -363,6 +363,21 @@ RSpec.describe ReactOnRails::Spike::PrismGemfileRewriter do
         expect_parseable_ruby(result.content)
       end
 
+      it "preserves a preceding sibling statement when a regex-guarded stale base follows it" do
+        # When an active Pro gem is present, the rewriter calls `removal_edit`, which
+        # uses `previous_semicolon_offset` to find the statement boundary. The scanner
+        # skips `%r[...]` percent-literals but not bare `/regex/` literals, so a `;`
+        # inside `/should;load/` could be miscounted as a separator. In practice this
+        # input rewrites cleanly because `removable_statement_node` returns the full
+        # IfNode (covering the regex), so the regex's `;` falls inside the node's
+        # byte range and below the `statement_end` threshold. Lock that behavior.
+        src = "gem \"react_on_rails_pro\", \"~> 16.0\"; " \
+              "gem \"react_on_rails\" if /should;load/.match?(ENV[\"X\"])\n"
+        result = rewriter.rewrite(src)
+        expect(result.content).to eq("gem \"react_on_rails_pro\", \"~> 16.0\"\n")
+        expect_parseable_ruby(result.content)
+      end
+
       it "removes stale base when Pro is parenthesized with comments" do
         src = <<~RUBY
           source "https://rubygems.org"
@@ -430,6 +445,55 @@ RSpec.describe ReactOnRails::Spike::PrismGemfileRewriter do
         RUBY
         result = rewriter.rewrite(src)
         expect(result.content).to eq("gem \"react_on_rails_pro\", \"16.0.0\"; gem \"rails\"\n")
+        expect_parseable_ruby(result.content)
+      end
+
+      it "collapses an inline single-line if/then/else without dropping the active Pro gem" do
+        # Regression for the line-fallback in `statement_byte_range`. Inline single-line
+        # block conditionals have no statement separators on the line, so the previous
+        # fallback `[line_start, line_end]` deleted the whole conditional — taking the
+        # active Pro gem with it. Now the call's own byte range is used, and the
+        # collapse pass folds the resulting empty-else conditional to the single Pro
+        # gem declaration.
+        src = "if ENV['PRO'] then gem 'react_on_rails_pro' else gem 'react_on_rails' end\n"
+        result = rewriter.rewrite(src)
+        expect(result.content).to eq("gem 'react_on_rails_pro'\n")
+        expect_parseable_ruby(result.content)
+      end
+
+      it "terminates when an inline conditional's else branch becomes empty post-removal" do
+        # Regression for the infinite-loop in `collapse_dead_conditionals` when
+        # `remove_empty_else_branch` produced a zero-length splice for inline
+        # conditionals (else and end on the same line). The collapse loop now
+        # bails on no-op edits, so a conditional whose then-branch contains more
+        # than one statement is left intact: still parseable Ruby, uglier than
+        # ideal but no data loss and no hang.
+        src = "if ENV['PRO']; gem 'react_on_rails_pro'; gem 'rails'; " \
+              "else; gem 'react_on_rails', '16.0.0'; end\n"
+        # Use Timeout to fail loudly if the loop ever regresses to hanging.
+        require "timeout"
+        result = Timeout.timeout(5) { rewriter.rewrite(src) }
+        # The call's own byte range is removed; the surrounding `;` separators
+        # survive (`else; ; end`). Still valid Ruby, and crucially the Pro gem
+        # and the unrelated `rails` statement both remain.
+        expect(result.content).to include("gem 'react_on_rails_pro'")
+        expect(result.content).to include("gem 'rails'")
+        expect(result.content).not_to include("react_on_rails'")
+        expect_parseable_ruby(result.content)
+      end
+
+      it "collapses an unless/else conditional whose else branch held the stale base" do
+        # `conditional_else_node` routes UnlessNode to `node.else_clause` (a different
+        # accessor than IfNode's `node.subsequent`). Exercise that branch directly.
+        src = <<~RUBY
+          unless ENV["PRO"]
+            gem "react_on_rails", "16.0.0"
+          else
+            gem "react_on_rails_pro", "16.0.0"
+          end
+        RUBY
+        result = rewriter.rewrite(src)
+        expect(result.content).to eq("gem \"react_on_rails_pro\", \"16.0.0\"\n")
         expect_parseable_ruby(result.content)
       end
 
@@ -573,16 +637,24 @@ RSpec.describe ReactOnRails::Spike::PrismGemfileRewriter do
     end
 
     context "trailing comma suffix (gem(\"react_on_rails\",))" do
-      # Prism currently treats `gem("react_on_rails",)` as a syntax error in some Ruby
-      # versions but accepts it as valid in 3.3+. We document the behavior either way.
-      it "either rewrites cleanly or reports a parse failure" do
-        src = "gem(\"react_on_rails\",)\n"
-        result = rewriter.rewrite(src)
-        if result.parse_failed
-          expect(result.content).to eq(src)
-        else
+      # Ruby 3.3+ accepts trailing commas in parenthesized calls; earlier Rubies treat
+      # it as a syntax error and Prism reports a parse failure. Split into two gated
+      # tests so each Ruby tightens to a single expected outcome instead of a
+      # "does-not-crash" passthrough that hides a real regression.
+      if Gem::Version.new(RUBY_VERSION) >= Gem::Version.new("3.3.0")
+        it "rewrites cleanly on Ruby 3.3+" do
+          src = "gem(\"react_on_rails\",)\n"
+          result = rewriter.rewrite(src)
+          expect(result.parse_failed).to be(false)
           expect(result.content).to include('"react_on_rails_pro"')
           expect_parseable_ruby(result.content)
+        end
+      else
+        it "reports a parse failure on Ruby < 3.3" do
+          src = "gem(\"react_on_rails\",)\n"
+          result = rewriter.rewrite(src)
+          expect(result.parse_failed).to be(true)
+          expect(result.content).to eq(src)
         end
       end
     end

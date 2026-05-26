@@ -179,8 +179,50 @@ module ReactOnRails
         # remove the whole line; if it shares a line via semicolons, preserve the
         # neighboring statements.
         node = removable_statement_node(call, parent_map)
+
+        # Inline single-line block conditionals (`if X then gem "ror_pro" else gem "ror" end`)
+        # have no statement separators on the line, so the line-based fallback in
+        # `statement_byte_range` would delete the whole conditional — including the
+        # sibling Pro gem in the other branch. Remove only the call's own byte range;
+        # the collapse pass below tidies the resulting empty branch.
+        if node.equal?(call) && inline_conditional_with_sibling_branch?(call, parent_map)
+          return {
+            start_offset: call.location.start_offset,
+            end_offset: call.location.end_offset,
+            replacement: ""
+          }
+        end
+
         start_offset, end_offset = statement_byte_range(source, node)
         { start_offset: start_offset, end_offset: end_offset, replacement: "" }
+      end
+
+      def inline_conditional_with_sibling_branch?(call, parent_map)
+        statements = parent_map[call]
+        return false unless statements.is_a?(Prism::StatementsNode)
+
+        conditional = parent_map[statements]
+        # For the else-branch case the immediate parent is an ElseNode that
+        # itself sits inside the surrounding IfNode/UnlessNode.
+        conditional = parent_map[conditional] if conditional.is_a?(Prism::ElseNode)
+        return false unless conditional.is_a?(Prism::IfNode) || conditional.is_a?(Prism::UnlessNode)
+        return false unless conditional.respond_to?(:end_keyword_loc) && conditional.end_keyword_loc
+        return false unless conditional.location.start_line == conditional.location.end_line
+
+        sibling_branch_present?(conditional, statements)
+      end
+
+      def sibling_branch_present?(conditional, exclude_statements)
+        then_branch = conditional.statements
+        if then_branch && !then_branch.equal?(exclude_statements) && !branch_empty?(then_branch)
+          return true
+        end
+
+        else_node = conditional_else_node(conditional)
+        else_statements = else_node&.statements
+        !else_statements.nil? &&
+          !else_statements.equal?(exclude_statements) &&
+          !branch_empty?(else_statements)
       end
 
       def removable_statement_node(call, parent_map)
@@ -237,6 +279,11 @@ module ReactOnRails
         statement_separator_offsets(source, line_start, line_end).find { |offset| offset >= statement_end }
       end
 
+      # NOTE: tracks string and percent-literal contexts but does not track
+      # parenthesis depth. A semicolon inside an unquoted call argument
+      # (e.g. `gem "ror" if func(a; b)`) would be misidentified as a
+      # statement separator. Bundler's Gemfile DSL does not produce such
+      # patterns in practice; revisit if the rewriter moves outside Gemfiles.
       def statement_separator_offsets(source, line_start, line_end)
         offsets = []
         quote_byte = nil
@@ -361,21 +408,31 @@ module ReactOnRails
       #   variants; after migration there is only one variant, so the conditional has
       #   no remaining purpose).
       # - Otherwise, if a branch is empty, only that branch is removed.
+      # Safety bound: each iteration removes one collapsible conditional, so the
+      # editable-conditional count is monotonically decreasing. The explicit cap is
+      # belt-and-suspenders insurance against any future change that could let
+      # `find_collapse_edit` return a non-`nil` edit producing no net change.
+      MAX_COLLAPSE_PASSES = 100
+
       def collapse_dead_conditionals(source, preexisting_empty_ranges)
-        loop do
+        MAX_COLLAPSE_PASSES.times do
           parse_result = Prism.parse(source)
-          break source if parse_result.failure?
+          break if parse_result.failure?
 
           edit = find_collapse_edit(
             source,
             parse_result.value,
             preexisting_empty_ranges
           )
-          break source unless edit
+          break unless edit
+          # Defensive: a zero-length empty splice would be reapplied forever.
+          # Real collapse edits always remove or replace at least one byte.
+          break if edit[:start_offset] == edit[:end_offset] && edit[:replacement].empty?
 
           source = splice_source(source, edit[:start_offset], edit[:end_offset], edit[:replacement])
           preexisting_empty_ranges = adjust_ranges_after_edits(preexisting_empty_ranges, [edit])
         end
+        source
       end
 
       def find_collapse_edit(
@@ -424,6 +481,11 @@ module ReactOnRails
         then_empty = branch_empty?(then_branch)
         else_empty = has_else_node && branch_empty?(else_statements)
 
+        # NOTE: when `remove_empty_then_branch` is called the conditional cannot
+        # be collapsed to a single Pro gem (otherwise `collapse_to_branch` would
+        # have matched first). The stub returns `nil` for the spike, so the
+        # empty-`then` conditional is left in the output. See the stub itself
+        # for what production should do.
         if then_empty && has_else_node && !else_empty
           collapse_to_branch(source, node, else_statements) || remove_empty_then_branch(source, node)
         elsif has_else_node && else_empty && !then_empty
@@ -438,16 +500,20 @@ module ReactOnRails
         statements_node.body.empty?
       end
 
-      def empty_conditional_ranges(node, ranges = [])
-        return ranges unless node
+      def empty_conditional_ranges(node)
+        ranges = []
+        collect_empty_conditional_ranges(node, ranges)
+        ranges
+      end
+
+      def collect_empty_conditional_ranges(node, ranges)
+        return unless node
 
         ranges << [node.location.start_offset, node.location.end_offset] if empty_conditional?(node)
 
         node.compact_child_nodes.each do |child|
-          empty_conditional_ranges(child, ranges)
+          collect_empty_conditional_ranges(child, ranges)
         end
-
-        ranges
       end
 
       def empty_conditional?(node)
@@ -547,6 +613,12 @@ module ReactOnRails
         # Remove the entire `else ... ` (including the line) up to the `end` keyword.
         start_offset = line_start_offset(source, else_loc.start_offset)
         end_offset = line_start_offset(source, end_loc.start_offset)
+        # Inline conditionals like `if X; pro; else; end` put `else` and `end`
+        # on the same line, so both line-start lookups return the same offset.
+        # A zero-length empty splice is a no-op; refuse it to avoid leaving the
+        # collapse loop with nothing to do (the source is left unchanged).
+        return nil if start_offset == end_offset
+
         {
           start_offset: start_offset,
           end_offset: end_offset,

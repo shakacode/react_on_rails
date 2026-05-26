@@ -134,10 +134,11 @@ puts "Ruby: #{RUBY_VERSION}, Prism: #{Prism::VERSION}\n\n"
 prism = ReactOnRails::Spike::PrismGemfileRewriter.new(default_pro_version: ScannerRewriter::PRO_VERSION)
 scanner = ScannerRewriter.new
 
-printf("%-50s %14s %14s %14s\n", "Gemfile", "scanner total", "prism total", "ratio")
-
-GEMFILES.each do |label, src|
-  # Warm up so we don't measure first-call overhead.
+# One measurement pass per fixture; we derive both the totals/ratio table and
+# the per-rewrite cost table from the same timings so the two views stay
+# consistent. Re-warming and re-measuring between tables (as we used to do)
+# introduced cross-table variance from JIT/cache state drift.
+results = GEMFILES.map do |label, src|
   WARMUP_ITERATIONS.times do
     scanner.rewrite(src)
     prism.rewrite(src)
@@ -145,27 +146,27 @@ GEMFILES.each do |label, src|
 
   scanner_seconds = measure(ITERATIONS) { scanner.rewrite(src) }
   prism_seconds = measure(ITERATIONS) { prism.rewrite(src) }
-  ratio = prism_seconds / scanner_seconds
+  {
+    label: "#{label} (#{src.lines.size}l)",
+    scanner_seconds: scanner_seconds,
+    prism_seconds: prism_seconds
+  }
+end
 
+printf("%-50s %14s %14s %14s\n", "Gemfile", "scanner total", "prism total", "ratio")
+results.each do |row|
   printf("%-50s %12.2fms %12.2fms %12.2fx\n",
-         "#{label} (#{src.lines.size}l)",
-         scanner_seconds * 1000,
-         prism_seconds * 1000,
-         ratio)
+         row[:label],
+         row[:scanner_seconds] * 1000,
+         row[:prism_seconds] * 1000,
+         row[:prism_seconds] / row[:scanner_seconds])
 end
 
 puts
 puts "Per-rewrite cost (scanner / prism):"
-GEMFILES.each do |label, src|
-  WARMUP_ITERATIONS.times do
-    scanner.rewrite(src)
-    prism.rewrite(src)
-  end
-
-  scanner_seconds = measure(ITERATIONS) { scanner.rewrite(src) }
-  prism_seconds = measure(ITERATIONS) { prism.rewrite(src) }
+results.each do |row|
   printf("  %-50s %8.3fms / %8.3fms\n",
-         "#{label} (#{src.lines.size}l)",
-         (scanner_seconds / ITERATIONS) * 1000,
-         (prism_seconds / ITERATIONS) * 1000)
+         row[:label],
+         (row[:scanner_seconds] / ITERATIONS) * 1000,
+         (row[:prism_seconds] / ITERATIONS) * 1000)
 end
