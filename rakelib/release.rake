@@ -541,6 +541,23 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
     return
   end
 
+  # Catch any run whose status falls outside both the "completed" and
+  # `CI_INCOMPLETE_STATUSES` buckets — e.g. a new GitHub status value we
+  # don't yet know about, or a `nil` from a malformed response. Treat the
+  # ambiguity as a failure rather than letting it slip through as green;
+  # the release gate is supposed to be the last-line check.
+  unknown = evaluated.reject do |run|
+    run["status"] == "completed" || CI_INCOMPLETE_STATUSES.include?(run["status"])
+  end
+  if unknown.any?
+    handle_main_ci_status_violation!(
+      message: format_main_ci_status_violation(kind: :failed, short_sha: short_sha, runs: unknown),
+      allow_override: allow_override,
+      dry_run: dry_run
+    )
+    return
+  end
+
   qualifier = required_names.nil? ? "" : "required "
   noun = evaluated.length == 1 ? "check" : "checks"
   puts "✓ Main CI is healthy on #{short_sha} (#{evaluated.length} #{qualifier}#{noun})"

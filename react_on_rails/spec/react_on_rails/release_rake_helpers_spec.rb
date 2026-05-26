@@ -781,6 +781,40 @@ RSpec.describe "release.rake helper methods" do
         )
       end
     end
+
+    context "when a check has an unknown status (neither completed nor in CI_INCOMPLETE_STATUSES)" do
+      it "treats the ambiguity as a failure rather than silently passing through" do
+        weird_run = passing_run("Future Status").merge("status" => "scheduled", "conclusion" => nil)
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
+          .and_return(sha: sha, check_runs: [passing_run("Lint"), weird_run])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root: monorepo_root,
+            is_prerelease: false,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to raise_error(SystemExit, %r{CI on origin/main is not healthy.*Future Status}m)
+      end
+
+      it "treats a nil status as a failure too" do
+        weird_run = passing_run("Malformed").merge("status" => nil, "conclusion" => nil)
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
+          .and_return(sha: sha, check_runs: [passing_run("Lint"), weird_run])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root: monorepo_root,
+            is_prerelease: false,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to raise_error(SystemExit, %r{CI on origin/main is not healthy.*Malformed}m)
+      end
+    end
   end
 
   describe "#fetch_main_ci_checks" do
