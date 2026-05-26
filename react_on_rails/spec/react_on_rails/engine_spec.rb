@@ -356,17 +356,73 @@ module ReactOnRails
     end
 
     describe ".suppress_shakapacker_package_manager_check_if_not_bundler! with missing Shakapacker internals" do
-      before do
-        stub_const("Shakapacker", Module.new)
-        allow(described_class).to receive(:shakapacker_configured_as_bundler?).and_return(false)
-        allow(Rails.logger).to receive(:warn)
+      context "when Shakapacker is not defined at all" do
+        before do
+          hide_const("Shakapacker")
+          allow(Rails.logger).to receive(:warn)
+        end
+
+        it "does not log a diagnostic warning" do
+          described_class.suppress_shakapacker_package_manager_check_if_not_bundler!
+
+          expect(Rails.logger).not_to have_received(:warn)
+        end
       end
 
-      it "logs a diagnostic warning" do
-        described_class.suppress_shakapacker_package_manager_check_if_not_bundler!
+      context "when Shakapacker::Utils::Manager is not defined" do
+        before do
+          stub_const("Shakapacker", Module.new)
+          allow(described_class).to receive(:shakapacker_configured_as_bundler?).and_return(false)
+          allow(Rails.logger).to receive(:warn)
+        end
 
-        expect(Rails.logger).to have_received(:warn)
-          .with(a_string_including("Shakapacker::Utils::Manager is not defined"))
+        it "logs a diagnostic warning" do
+          described_class.suppress_shakapacker_package_manager_check_if_not_bundler!
+
+          expect(Rails.logger).to have_received(:warn)
+            .with(a_string_including("Shakapacker::Utils::Manager is not defined"))
+        end
+      end
+
+      context "when Shakapacker::Utils::Manager is defined but does not respond to the guard method" do
+        before do
+          stub_const("Shakapacker", Module.new)
+          stub_const("Shakapacker::Utils", Module.new)
+          stub_const("Shakapacker::Utils::Manager", Module.new)
+          allow(described_class).to receive(:shakapacker_configured_as_bundler?).and_return(false)
+          allow(Rails.logger).to receive(:warn)
+        end
+
+        it "logs a diagnostic warning naming the missing method" do
+          described_class.suppress_shakapacker_package_manager_check_if_not_bundler!
+
+          expect(Rails.logger).to have_received(:warn)
+            .with(a_string_including("does not define error_unless_package_manager_is_obvious!"))
+        end
+      end
+
+      context "when SHAKAPACKER_CONFIG is set to a missing file" do
+        let(:missing_config_path) { "/nonexistent/path/shakapacker.yml" }
+
+        around do |example|
+          original_config_path = ENV.fetch("SHAKAPACKER_CONFIG", nil)
+          ENV["SHAKAPACKER_CONFIG"] = missing_config_path
+          example.run
+        ensure
+          ENV["SHAKAPACKER_CONFIG"] = original_config_path
+        end
+
+        before do
+          stub_const("Shakapacker", Module.new)
+          allow(Rails.logger).to receive(:warn)
+        end
+
+        it "logs a warning naming the missing path" do
+          described_class.suppress_shakapacker_package_manager_check_if_not_bundler!
+
+          expect(Rails.logger).to have_received(:warn)
+            .with(a_string_including("SHAKAPACKER_CONFIG is set to '#{missing_config_path}'"))
+        end
       end
     end
 
@@ -392,37 +448,7 @@ module ReactOnRails
     describe "booting Rails without config/shakapacker.yml" do
       let(:lib_path) { File.expand_path("../../lib", __dir__) }
       let(:npm_version) { ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(ReactOnRails::VERSION) }
-      let(:boot_script) do
-        <<~RUBY
-          require "logger"
-          require "pathname"
-
-          lib_path = ARGV.fetch(0)
-          app_root = Pathname.new(ARGV.fetch(1))
-          $LOAD_PATH.unshift(lib_path)
-
-          require "rails"
-          require "action_controller/railtie"
-          require "react_on_rails"
-
-          module ViteOnlyBootApp
-          end
-
-          ViteOnlyBootApp.const_set(
-            :Application,
-            Class.new(Rails::Application) do
-              config.root = app_root
-              config.eager_load = false
-              config.secret_key_base = "test-secret"
-              config.logger = Logger.new($stdout)
-              config.load_defaults Rails::VERSION::STRING.to_f
-            end
-          )
-
-          ViteOnlyBootApp::Application.initialize!
-          puts "booted"
-        RUBY
-      end
+      let(:boot_script_path) { File.expand_path("fixtures/vite_only_boot_app.rb", __dir__) }
 
       def write_vite_only_package_files(app_root, npm_version)
         FileUtils.mkdir_p(File.join(app_root, "config"))
@@ -455,8 +481,7 @@ module ReactOnRails
               "REACT_ON_RAILS_SKIP_VALIDATION" => nil
             },
             RbConfig.ruby,
-            "-e",
-            boot_script,
+            boot_script_path,
             lib_path,
             app_root
           )

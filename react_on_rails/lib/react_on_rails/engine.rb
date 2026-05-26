@@ -120,13 +120,22 @@ module ReactOnRails
     # The wrapper checks Shakapacker config presence at call time so the original guard
     # still runs if another app in the same process configures Shakapacker later.
     def self.suppress_shakapacker_package_manager_check_if_not_bundler!
+      # Nothing to suppress when Shakapacker is genuinely absent from the load path.
+      return unless defined?(::Shakapacker)
       return if shakapacker_configured_as_bundler?
 
+      warn_if_shakapacker_env_config_missing
+      install_shakapacker_package_manager_check_wrapper
+    end
+
+    def self.install_shakapacker_package_manager_check_wrapper
       manager = shakapacker_utils_manager
       return unless manager
 
       original_package_manager_check = shakapacker_package_manager_check(manager)
       return unless original_package_manager_check
+      # Idempotency: source_location points back to this file once the wrapper is installed,
+      # so repeated calls (test reloads, multi-app processes) skip re-patching the singleton.
       return if original_package_manager_check.source_location&.first == __FILE__
 
       Rails.logger&.info(
@@ -135,10 +144,25 @@ module ReactOnRails
         "is not the configured bundler)."
       )
 
+      # Define the override on the singleton (not the class) so that any subsequent reopening
+      # of Shakapacker::Utils::Manager that redefines the class method is still shadowed by
+      # this singleton method, which Ruby resolves first.
       manager.define_singleton_method(SHAKAPACKER_PACKAGE_MANAGER_CHECK) do
-        # no-op while React on Rails detects Shakapacker is not the configured bundler.
+        # Delegate back to the original guard once Shakapacker becomes the configured bundler.
         original_package_manager_check.call if ReactOnRails::Engine.shakapacker_configured_as_bundler?
       end
+    end
+
+    # Warn at boot when SHAKAPACKER_CONFIG points to a missing file so typos or
+    # not-yet-created paths surface clearly instead of silently suppressing the guard.
+    def self.warn_if_shakapacker_env_config_missing
+      env_config_path = ENV.fetch("SHAKAPACKER_CONFIG", nil)
+      return if env_config_path.to_s.empty?
+
+      Rails.logger&.warn(
+        "[React on Rails] SHAKAPACKER_CONFIG is set to '#{env_config_path}' but the file " \
+        "does not exist. Shakapacker will not be treated as the configured bundler."
+      )
     end
 
     def self.shakapacker_utils_manager
