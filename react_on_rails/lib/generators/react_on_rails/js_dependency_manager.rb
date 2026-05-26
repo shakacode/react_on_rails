@@ -578,10 +578,17 @@ module ReactOnRails
         end
 
         File.write("package.json", "#{JSON.pretty_generate(content)}\n")
+        GeneratorMessages.add_warning(package_json_pin_fallback_warning(versioned_packages))
         true
       rescue StandardError => e
         GeneratorMessages.add_warning("⚠️  Could not write dependency pins to package.json: #{e.message}")
         false
+      end
+
+      def package_json_pin_fallback_warning(versioned_packages)
+        pinned_list = versioned_packages.map { |name, version| "#{name}@#{version}" }.join(", ")
+        "⚠️  Package manager install failed. Wrote the following version pins to package.json " \
+          "so you can rerun your package manager manually: #{pinned_list}"
       end
 
       def fallback_package_manager

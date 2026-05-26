@@ -475,9 +475,10 @@ module ReactOnRails
         # Central dispatcher for the lightweight JS scanner shared by every JS-aware pass in this
         # generator (`matching_js_closing_brace`, `js_top_level_position?`, `js_code_position?`,
         # `rsc_plugin_options_without_comments`, `first_significant_js_index`,
-        # `rsc_plugin_options_followed_by_close_paren?`, `last_js_code_char_index`). Return index
-        # is the last consumed character. Line comments leave the newline for the caller's normal
-        # index increment; block comments consume the closing slash.
+        # `rsc_plugin_options_followed_by_close_paren?`, `last_js_code_char_index`,
+        # `last_js_code_line_start`). Return index is the last consumed character. Line comments
+        # leave the newline for the caller's normal index increment; block comments consume the
+        # closing slash.
         #
         # Supported lexical constructs:
         # - Line comments (`// ...\n`) and block comments (`/* ... */`).
@@ -485,8 +486,11 @@ module ReactOnRails
         #   strings, including escape sequences and the simple `${expr}` interpolation form
         #   (interpolation braces stay inside the string state and never reach the depth counter).
         #
-        # Outside the supported surface — the scanner cannot distinguish these from the syntax
-        # they shadow, so `{`/`}` characters they contain can confuse the depth counter:
+        # Outside the supported surface for callers that do **not** run `js_regex_literal_start?`
+        # preprocessing (e.g. `matching_js_closing_brace`, `rsc_plugin_options_without_comments`),
+        # the scanner cannot distinguish these from the syntax they shadow, so `{`/`}` characters
+        # they contain can confuse the depth counter. `js_top_level_position?` and
+        # `js_code_position?` handle regex literals via their own pre-pass and are unaffected.
         # - Regex literals (e.g. `/a{2}/`, `/\{/`, `/[{]/`): not recognized as a distinct state,
         #   so brace-containing patterns walk the depth counter past the real options close. The
         #   user-facing warning text in `warn_unparseable_rsc_plugin_sections` calls these out
@@ -961,8 +965,8 @@ module ReactOnRails
           # load, and the cost of the duplicate check is two boolean ops on the already-loaded
           # file body. Leaving the method defensive is cheaper than re-deriving the precondition
           # at each new call site.
-          return if scoped_rsc_client_references_defined?(content)
-          return if rsc_client_references_defined?(content)
+          return false if scoped_rsc_client_references_defined?(content)
+          return false if rsc_client_references_defined?(content)
 
           replace_rsc_client_references_setup_anchor(config_path, content, is_server: is_server) do |anchor|
             join_rsc_client_references_setup(

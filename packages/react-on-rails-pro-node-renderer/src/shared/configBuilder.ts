@@ -61,8 +61,9 @@ export interface Config {
   // `child_process`, and `os`. This disables VM sandboxing for the bundle, even when no globals
   // are added. Only use with fully trusted, first-party bundle sources.
   // To keep the VM sandboxed without `require`, set BOTH `additionalContext: null` AND
-  // `supportModules: false`. SECURITY: When `supportModules: true`, the renderer also wraps the
-  // bundle and injects the host `require` regardless of `additionalContext`.
+  // `supportModules: false`.
+  // SECURITY: When `supportModules: true`, the renderer also wraps the bundle and injects the
+  // host `require` regardless of `additionalContext`.
   // Mechanically, "wrapping" means the renderer passes the bundle source through `module.wrap()`
   // (the standard CommonJS `(function (exports, require, module, __filename, __dirname) { ... })`
   // wrapper) and then invokes the wrapped function with the host `require`. See the `buildVM`
