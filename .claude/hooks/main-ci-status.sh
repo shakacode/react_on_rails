@@ -109,14 +109,15 @@ checks_jsonl=$(gh api \
   --jq '.check_runs[]' \
   2>/dev/null) || fail_open "gh api check-runs failed"
 
-# Collapse multiple runs per check name to the most recent attempt (highest
-# check_run id). Without this, an old failed run that was later re-run and
-# passed would still be picked up by the `failed` filter below and show as
-# red here — while `validate_main_ci_status!` in `release.rake` (which does
-# the same dedup) would correctly report green. Keep the two in sync.
+# Collapse multiple runs per (check_suite_id, name) to the most recent
+# attempt (highest check_run id). The key intentionally includes the
+# suite id so we only collapse true reruns and not unrelated workflows
+# that happen to share a job name (e.g. this repo has multiple workflows
+# that each define a `detect-changes` job). Mirrors the Ruby dedup at
+# release.rake:451-455. Keep the two in sync.
 checks_json=$(echo "${checks_jsonl}" | jq -s '
-  [.[] | {id, name, status, conclusion, html_url}]
-  | group_by(.name)
+  [.[] | {id, name, status, conclusion, html_url, suite_id: (.check_suite.id // null)}]
+  | group_by([.suite_id, .name])
   | map(max_by(.id))
 ' 2>/dev/null) || fail_open "jq slurp failed"
 

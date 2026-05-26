@@ -473,14 +473,18 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
     return
   end
 
-  # Collapse multiple runs per check name to the most recent attempt (highest
-  # check_run id). Without this, an old failed run that was later re-run and
-  # passed would still be picked up by the `failed` filter below and block the
-  # release. `id` is monotonically increasing per check run on a commit, so
-  # `max_by { id }` reliably selects the latest attempt.
+  # Collapse multiple runs per (check_suite_id, name) to the most recent
+  # attempt (highest check_run id). The key intentionally includes
+  # check_suite_id so we only collapse *true* reruns (same workflow run,
+  # same job name) and not unrelated workflows that happen to share a job
+  # name. For example, this repo has multiple workflows that each define a
+  # `detect-changes` job; without the suite_id in the key, a passing run
+  # from one workflow could mask a failing run from another. `id` is
+  # monotonically increasing per check run, so `max_by { id }` reliably
+  # selects the latest attempt within a suite.
   check_runs = check_runs
-               .group_by { |run| run["name"] }
-               .map { |_name, runs| runs.max_by { |run| run["id"].to_i } }
+               .group_by { |run| [run.dig("check_suite", "id"), run["name"]] }
+               .map { |_key, runs| runs.max_by { |run| run["id"].to_i } }
 
   # For prereleases, restrict the gate to GitHub-branch-protection-required checks.
   # For stable releases, evaluate every check run on the commit.

@@ -654,6 +654,55 @@ RSpec.describe "release.rake helper methods" do
       end
     end
 
+    context "when two workflows emit jobs with the same name on the same commit" do
+      it "preserves both runs (different check_suite ids) instead of collapsing them" do
+        workflow_a_passing = passing_run("detect-changes").merge(
+          "id" => 1, "check_suite" => { "id" => 100 }
+        )
+        workflow_b_failing = failing_run("detect-changes").merge(
+          "id" => 2, "check_suite" => { "id" => 200 }
+        )
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
+          .and_return(sha: sha, check_runs: [workflow_a_passing, workflow_b_failing])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root: monorepo_root,
+            is_prerelease: false,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to raise_error(SystemExit, %r{CI on origin/main is not healthy.*detect-changes}m)
+      end
+    end
+
+    context "when a rerun and a same-named distinct-suite run exist together" do
+      it "collapses only within a suite (same-suite rerun) and keeps cross-suite runs distinct" do
+        suite_a_old_failed = failing_run("detect-changes").merge(
+          "id" => 1, "check_suite" => { "id" => 100 }
+        )
+        suite_a_new_passed = passing_run("detect-changes").merge(
+          "id" => 3, "check_suite" => { "id" => 100 }
+        )
+        suite_b_passing = passing_run("detect-changes").merge(
+          "id" => 2, "check_suite" => { "id" => 200 }
+        )
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
+          .and_return(sha: sha, check_runs: [suite_a_old_failed, suite_a_new_passed, suite_b_passing])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root: monorepo_root,
+            is_prerelease: false,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to output(/Main CI is healthy on #{short_sha} \(2 checks\)/).to_stdout
+      end
+    end
+
     context "when there are zero check runs visible" do
       it "aborts with a 'no CI data' message" do
         allow(self).to receive(:fetch_main_ci_checks)
