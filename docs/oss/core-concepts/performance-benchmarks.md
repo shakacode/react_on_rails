@@ -93,7 +93,7 @@ Server components produce HTML that does not need hydration — they have no cli
 > This section covers public, non-production directional benchmarks first, then a production case study. For validated,
 > at-scale results, see the [Production Case Study: Popmenu](#popmenu) below.
 
-### Public Marketplace RSC Demo Evidence
+### Public Marketplace RSC Demo Evidence {#public-marketplace-rsc-demo}
 
 The [LocalHub marketplace demo](https://rsc.reactonrails.com/) is a public,
 inspectable React on Rails Pro + RSC demo showing the same page families
