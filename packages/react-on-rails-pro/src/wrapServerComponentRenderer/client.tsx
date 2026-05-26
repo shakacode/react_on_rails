@@ -103,7 +103,9 @@ const wrapServerComponentRenderer = (
         identifierPrefix: domNodeId,
         onRecoverableError(error) {
           const cause =
-            error instanceof Error && 'cause' in error ? (error as Error & { cause?: unknown }).cause : error;
+            error instanceof Error && 'cause' in error
+              ? (error as Error & { cause?: unknown }).cause
+              : undefined;
 
           if (isRSCRouteSSRFalseBailoutError(error) || isRSCRouteSSRFalseBailoutError(cause)) {
             return;

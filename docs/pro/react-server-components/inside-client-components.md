@@ -391,7 +391,7 @@ export default function AdminLayout() {
 
 ### `Suspense` for loading states
 
-Wrap `RSCRoute` in `Suspense` to show a loading indicator while the RSC payload is being fetched. This is relevant for client-side navigation and for `ssr={false}` routes during the initial streaming response. With default `ssr={true}`, the payload is already embedded during SSR. With `ssr={false}`, React on Rails Pro skips the route's server payload work, streams the nearest `Suspense` fallback, and retries the route on the client.
+Wrap `RSCRoute` in `Suspense` to show a loading indicator while the RSC payload is being fetched during client-side navigation:
 
 ```tsx
 'use client';
@@ -401,11 +401,13 @@ import RSCRoute from 'react-on-rails-pro/RSCRoute';
 export default function Page({ user }) {
   return (
     <Suspense fallback={<div>Loading…</div>}>
-      <RSCRoute componentName="SlowServerComponent" componentProps={{ user }} ssr={false} />
+      <RSCRoute componentName="SlowServerComponent" componentProps={{ user }} />
     </Suspense>
   );
 }
 ```
+
+This same scoped `Suspense` pattern is important for `ssr={false}` routes during the initial streaming response. With default `ssr={true}`, the payload is already embedded during SSR. With `ssr={false}`, React on Rails Pro skips the route's server payload work, streams the nearest `Suspense` fallback, and retries the route on the client.
 
 ### Conditional rendering
 

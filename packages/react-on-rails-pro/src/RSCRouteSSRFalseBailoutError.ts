@@ -22,7 +22,7 @@ export const RSC_ROUTE_SSR_FALSE_BAILOUT_DIGEST = 'REACT_ON_RAILS_RSC_ROUTE_SSR_
  * path as a real server-rendering failure.
  */
 export class RSCRouteSSRFalseBailoutError extends Error {
-  digest = RSC_ROUTE_SSR_FALSE_BAILOUT_DIGEST;
+  readonly digest = RSC_ROUTE_SSR_FALSE_BAILOUT_DIGEST;
 
   constructor(componentName: string) {
     super(`RSCRoute "${componentName}" skipped server rendering because it was rendered with ssr={false}.`);
@@ -31,11 +31,16 @@ export class RSCRouteSSRFalseBailoutError extends Error {
 }
 
 export function isRSCRouteSSRFalseBailoutError(error: unknown): error is RSCRouteSSRFalseBailoutError {
+  if (error instanceof RSCRouteSSRFalseBailoutError) {
+    return true;
+  }
+
+  // Hydration can surface React's recoverable boundary error instead of the
+  // original class instance, so the digest is the stable signal.
   return (
-    error instanceof RSCRouteSSRFalseBailoutError ||
-    (typeof error === 'object' &&
-      error !== null &&
-      'digest' in error &&
-      (error as { digest?: unknown }).digest === RSC_ROUTE_SSR_FALSE_BAILOUT_DIGEST)
+    typeof error === 'object' &&
+    error !== null &&
+    'digest' in error &&
+    (error as { digest?: unknown }).digest === RSC_ROUTE_SSR_FALSE_BAILOUT_DIGEST
   );
 }
