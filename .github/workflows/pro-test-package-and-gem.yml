@@ -173,14 +173,18 @@ jobs:
         working-directory: .
         run: pnpm --filter react-on-rails-pro build
 
+      # After the second setup-ruby step (Install Pro dummy app gems) ran
+      # above, $GITHUB_ENV's BUNDLE_GEMFILE points at the dummy app Gemfile.
+      # These steps need the Pro package Gemfile (which carries rubocop/rbs),
+      # so pin it via absolute path — robust to changes in defaults.run.
       - name: Lint Ruby
         env:
-          BUNDLE_GEMFILE: Gemfile
+          BUNDLE_GEMFILE: ${{ github.workspace }}/react_on_rails_pro/Gemfile
         run: bundle exec rubocop --ignore-parent-exclusion
 
       - name: Validate RBS type signatures
         env:
-          BUNDLE_GEMFILE: Gemfile
+          BUNDLE_GEMFILE: ${{ github.workspace }}/react_on_rails_pro/Gemfile
         run: bundle exec rake rbs:validate
 
       - name: Check TypeScript

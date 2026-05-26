@@ -290,8 +290,12 @@ jobs:
           working-directory: react_on_rails/spec/dummy
           ruby-version: ${{ env.RUBY_VERSION }}
 
+      # Pin Core steps that shell out to bundle exec, directly or via
+      # bin/prod-assets, bin/prod, or benchmarks/bench.rb, to the Core dummy Gemfile.
       - name: Prepare Core production assets
         if: env.RUN_CORE
+        env:
+          BUNDLE_GEMFILE: ${{ github.workspace }}/react_on_rails/spec/dummy/Gemfile
         run: |
           set -e  # Exit on any error
           echo "🔨 Building production assets..."
@@ -306,6 +310,8 @@ jobs:
 
       - name: Start Core production server
         if: env.RUN_CORE
+        env:
+          BUNDLE_GEMFILE: ${{ github.workspace }}/react_on_rails/spec/dummy/Gemfile
         run: |
           set -e  # Exit on any error
           echo "🚀 Starting production server..."
@@ -332,9 +338,13 @@ jobs:
       # STEP 4: RUN CORE BENCHMARKS
       # ============================================
 
+      # bench.rb shells out to `bundle exec rails routes` from the Core dummy;
+      # see the BUNDLE_GEMFILE note above the Core production steps.
       - name: Execute Core benchmark suite
         if: env.RUN_CORE
         timeout-minutes: 120
+        env:
+          BUNDLE_GEMFILE: ${{ github.workspace }}/react_on_rails/spec/dummy/Gemfile
         run: |
           set -e  # Exit on any error
           echo "🏃 Running Core benchmark suite..."
@@ -652,6 +662,10 @@ jobs:
           # when the pinned hash isn't in its DB. A single combined pattern
           # avoids false-positive matches across unrelated lines.
           if [ $BENCHER_EXIT_CODE -ne 0 ] && grep -q "Head Version.*not found" "$BENCHER_STDERR" && ! grep -qiE "alert|threshold violation|boundary violation" "$BENCHER_STDERR"; then
+            # When START_POINT_HASH_ARG is empty (e.g. workflow_dispatch on a
+            # non-main branch where the merge-base lookup returned ""), the
+            # substitution is a no-op; the inequality guard below skips the
+            # redundant retry.
             RETRY_ARGS="${START_POINT_ARGS/$START_POINT_HASH_ARG/}"
             if [ "$RETRY_ARGS" != "$START_POINT_ARGS" ]; then
               echo ""
@@ -763,7 +777,7 @@ jobs:
           SUMMARY=""
           if [ -f bench_results/summary.txt ]; then
             FORMATTED=$(column -t -s $'\t' "bench_results/summary.txt" 2>/dev/null) || FORMATTED=$(cat "bench_results/summary.txt")
-            SUMMARY=$(printf "\n### Benchmark Summary\n\n\`\`\`\n%s\n\`\`\`" "$FORMATTED")
+            SUMMARY=$(printf '\n### Benchmark Summary\n\n```\n%s\n```' "$FORMATTED")
           fi
 
           if [ -n "$EXISTING_ISSUE" ]; then
