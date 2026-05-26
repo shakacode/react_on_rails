@@ -6,6 +6,14 @@ module ReactOnRails
       module ClientReferences # rubocop:disable Metrics/ModuleLength
         JS_STRING_DELIMITERS = ["'", '"', "`"].freeze
         JS_COMMENT_STATES = %i[line_comment block_comment].freeze
+        # Known limitation: this list only covers single-character regex preceders. Multi-character
+        # JavaScript keywords that legally precede a regex literal (`return`, `typeof`, `void`,
+        # `delete`, `throw`, `case`, `in`, `instanceof`) are not represented. A regex like `/\{/`
+        # appearing after `return` may be misidentified as a division operator and let `{` / `}`
+        # inside the regex body throw off `matching_js_closing_brace`'s depth counter. The
+        # unparseable-section detection in `rsc_plugin_options_followed_by_close_paren?` catches
+        # the resulting corruption and flags the section as unparseable, so the migration falls
+        # back safely rather than producing a wrong rewrite.
         REGEX_LITERAL_PRECEDERS = ["(", "{", "[", "=", ":", ",", ";", "!", "?", "&", "|", "+", "-", "*", "~", "^",
                                    "<", ">"].freeze
         # Matches `new RSCWebpackPlugin(` allowing whitespace/newlines between `new`, the class
@@ -1178,6 +1186,11 @@ module ReactOnRails
         end
 
         def rsc_client_references_setup_ready?(config_path, plugin_pending: false)
+          # In pretend/skip modes nothing is written to disk, so reading the file back would
+          # report the helper as missing and the caller would fall through to a misleading
+          # "injection failed" warning. Reporting success here lets callers show what *would*
+          # be added (e.g. `, clientReferences: rscClientReferences` in the pretend plugin
+          # output) instead.
           return true if options[:pretend]
           return true if options[:skip]
           return true if scoped_rsc_client_references_defined?(File.read(File.join(destination_root, config_path)))
