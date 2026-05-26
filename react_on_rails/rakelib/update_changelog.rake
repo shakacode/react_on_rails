@@ -411,7 +411,7 @@ end
 # channels on a single base version (e.g., we don't ship both 16.4.0.beta.N
 # and 16.4.0.rc.N), so the active base unambiguously belongs to the current
 # channel in practice.
-def next_active_prerelease_version(mode, monorepo_root, changelog)
+def next_active_prerelease_version(changelog, mode, monorepo_root)
   return nil unless %w[rc beta].include?(mode)
 
   active_base = active_prerelease_base_version(monorepo_root, changelog)
@@ -432,7 +432,7 @@ def compute_auto_version(changelog, mode, monorepo_root, changelog_for_bump: nil
   # prerelease base). It is ignored once an rc/beta series has begun.
   changelog_for_bump ||= changelog
 
-  active_version = next_active_prerelease_version(mode, monorepo_root, changelog)
+  active_version = next_active_prerelease_version(changelog, mode, monorepo_root)
   return active_version if active_version
 
   bump_type = inferred_bump_type_from_unreleased(changelog_for_bump)
