@@ -2,6 +2,7 @@
 
 require "fileutils"
 require "react_on_rails_pro/renderer_cache_helpers"
+require "react_on_rails_pro/rolling_deploy/safe_hash_pattern"
 require "securerandom"
 require "timeout"
 
@@ -97,12 +98,13 @@ module ReactOnRailsPro
     private_class_method :handle_missing_adapter
 
     # Bundle hashes are used as directory names under the renderer cache path
-    # (<cache>/<hash>/<hash>.js). Reject path separators, `.` / `..`, and any
-    # leading dot. `bundle_directory`'s `start_with?` guard already prevents
-    # path traversal, but a leading-dot hash (e.g. `.hidden`) would still
-    # create a hidden cache subdirectory invisible to `ls`, surprising
-    # operators who count bundle-hash entries during incident response.
-    SAFE_HASH_PATTERN = /\A(?!\.)[A-Za-z0-9_.-]+\z/
+    # (<cache>/<hash>/<hash>.js). The shared pattern rejects path separators,
+    # `.` / `..`, and any leading dot. `bundle_directory`'s `start_with?`
+    # guard already prevents path traversal, but a leading-dot hash (e.g.
+    # `.hidden`) would still create a hidden cache subdirectory invisible to
+    # `ls`, surprising operators who count bundle-hash entries during
+    # incident response.
+    SAFE_HASH_PATTERN = ReactOnRailsPro::RollingDeploy::SAFE_HASH_PATTERN
 
     def self.resolve_previous_hashes(adapter, current_hashes)
       explicit = ENV["PREVIOUS_BUNDLE_HASHES"].to_s.split(",").map(&:strip).reject(&:empty?)

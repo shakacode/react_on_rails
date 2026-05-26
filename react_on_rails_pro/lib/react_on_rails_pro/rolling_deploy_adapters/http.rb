@@ -7,6 +7,7 @@ require "openssl"
 require "uri"
 
 require "react_on_rails_pro/error"
+require "react_on_rails_pro/rolling_deploy/safe_hash_pattern"
 require "react_on_rails_pro/rolling_deploy/tarball"
 
 module ReactOnRailsPro
@@ -57,6 +58,11 @@ module ReactOnRailsPro
           base = configured_previous_url
           return [] if base.nil?
 
+          if token_missing?
+            return warn_and_return("rolling_deploy_token is not configured; skipping manifest fetch",
+                                   [])
+          end
+
           response = http_get(
             URI("#{base}/manifest"),
             read_timeout: MANIFEST_READ_TIMEOUT_SECONDS
@@ -74,6 +80,11 @@ module ReactOnRailsPro
           return nil if base.nil?
           return nil if hash_invalid?(bundle_hash)
 
+          if token_missing?
+            return warn_and_return("rolling_deploy_token is not configured; skipping fetch(#{bundle_hash.inspect})",
+                                   nil)
+          end
+
           dir = bundle_dir(bundle_hash)
           FileUtils.mkdir_p(dir)
           tarball_body = download_bundle_tarball(base, bundle_hash)
@@ -81,7 +92,7 @@ module ReactOnRailsPro
 
           extract_payload(tarball_body, dir, bundle_hash)
         rescue StandardError => e
-          cleanup_and_return(dir, nil) if defined?(dir) && dir
+          cleanup_and_return(dir, nil) if dir
           warn_and_return("fetch(#{bundle_hash.inspect}) failed: #{e.class}: #{e.message}", nil)
         end
 
@@ -106,18 +117,21 @@ module ReactOnRailsPro
           ReactOnRailsPro.configuration.rolling_deploy_token.to_s
         end
 
+        def token_missing?
+          configured_token.empty?
+        end
+
         # Reject the same hash shapes that RollingDeployCacheStager would
         # reject downstream so we don't issue a wasted HTTP request, and so a
-        # path-like hash never reaches the URL builder. Mirrors
-        # RollingDeployCacheStager::SAFE_HASH_PATTERN.
+        # path-like hash never reaches the URL builder.
         def hash_invalid?(bundle_hash)
           str = bundle_hash.to_s
           return true if str.empty?
 
-          unsafe = !str.match?(/\A(?!\.)[A-Za-z0-9_.-]+\z/)
+          unsafe = !str.match?(ReactOnRailsPro::RollingDeploy::SAFE_HASH_PATTERN)
           return false unless unsafe
 
-          warn "#{LOG_PREFIX} fetch(#{bundle_hash.inspect}) rejected: hash contains unsafe characters."
+          Rails.logger.warn("#{LOG_PREFIX} fetch(#{bundle_hash.inspect}) rejected: hash contains unsafe characters.")
           true
         end
 
@@ -128,7 +142,9 @@ module ReactOnRailsPro
         def download_bundle_tarball(base, bundle_hash)
           response = http_get(URI("#{base}/bundles/#{bundle_hash}"))
           unless response.is_a?(Net::HTTPSuccess)
-            warn "#{LOG_PREFIX} bundles/#{bundle_hash} returned HTTP #{response.code}; skipping this hash."
+            Rails.logger.warn(
+              "#{LOG_PREFIX} bundles/#{bundle_hash} returned HTTP #{response.code}; skipping this hash."
+            )
             return nil
           end
           response.body
@@ -163,7 +179,7 @@ module ReactOnRailsPro
         end
 
         def warn_and_return(message, value)
-          warn "#{LOG_PREFIX} #{message}"
+          Rails.logger.warn("#{LOG_PREFIX} #{message}")
           value
         end
 

@@ -3,6 +3,7 @@
 require "fileutils"
 require "rubygems/package"
 require "stringio"
+require "tempfile"
 require "zlib"
 
 require "react_on_rails_pro/error"
@@ -87,8 +88,14 @@ module ReactOnRailsPro
       #   * Cumulative uncompressed bytes must not exceed `max_size`.
       #
       # Returns the list of basenames extracted, in the order seen in the
-      # archive. Raises ReactOnRailsPro::Error on any safety or size violation;
-      # callers are expected to rm_rf the partial directory and skip the hash.
+      # archive. Raises ReactOnRailsPro::Error on any safety or size violation.
+      #
+      # Cleanup contract: each entry is written to a Tempfile inside
+      # `dest_dir` and atomically renamed into place only after the size cap
+      # check passes for that entry. On raise, no partial file is left at
+      # the entry's final path, but earlier entries in the archive may have
+      # been written successfully. Callers must `rm_rf` `dest_dir` when
+      # extract raises so partial archives don't leak into the cache.
       def extract(source, dest_dir, max_size: DEFAULT_MAX_SIZE)
         FileUtils.mkdir_p(dest_dir)
         io = source.is_a?(String) ? StringIO.new(source) : source
@@ -177,7 +184,12 @@ module ReactOnRailsPro
       def write_entry!(entry, dest_dir, name, total_size, max_size)
         dest = File.join(dest_dir, name)
         running = total_size
-        File.open(dest, "wb") do |out|
+        # Write to a sibling Tempfile in `dest_dir` so the rename to `dest`
+        # is atomic on the same filesystem. If the size cap raises mid-write
+        # the Tempfile block unlinks the partial — no half-written file
+        # lingers at the final entry path.
+        Tempfile.create([name, ".partial"], dest_dir) do |tmp|
+          tmp.binmode
           while (chunk = entry.read(EXTRACT_CHUNK_SIZE))
             running += chunk.bytesize
             if running > max_size
@@ -185,8 +197,10 @@ module ReactOnRailsPro
                     "Rolling-deploy tarball exceeds max uncompressed size of #{max_size} bytes " \
                     "(entry #{name.inspect} pushed total to #{running})."
             end
-            out.write(chunk)
+            tmp.write(chunk)
           end
+          tmp.close
+          File.rename(tmp.path, dest)
         end
         running
       end

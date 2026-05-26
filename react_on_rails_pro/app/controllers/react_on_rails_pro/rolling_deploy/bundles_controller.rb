@@ -2,6 +2,7 @@
 
 require "active_support/security_utils"
 
+require "react_on_rails_pro/rolling_deploy/safe_hash_pattern"
 require "react_on_rails_pro/rolling_deploy/tarball"
 
 module ReactOnRailsPro
@@ -53,11 +54,16 @@ module ReactOnRailsPro
         end
       end
 
-      # Mirrors RollingDeployCacheStager::SAFE_HASH_PATTERN. Defense-in-depth:
-      # even if the route constraint somehow let a path-traversal value
-      # through, the controller still rejects it before any disk lookup
-      # because the hash must be in the (regex-validated) current-hash set.
-      SAFE_HASH_PATTERN = /\A(?!\.)[A-Za-z0-9_.\-]+\z/
+      # Defense-in-depth: even if the route constraint somehow let a
+      # path-traversal value through, the controller still rejects it
+      # before any disk lookup because the hash must be in the
+      # (regex-validated) current-hash set.
+      SAFE_HASH_PATTERN = ReactOnRailsPro::RollingDeploy::SAFE_HASH_PATTERN
+
+      # Tarball entry name reserved for the server bundle. Companion assets
+      # whose basename collides with this are skipped to keep the receiver
+      # from extracting the wrong bytes into the bundle slot.
+      BUNDLE_ENTRY_NAME = "bundle.js"
 
       PROTOCOL_VERSION = 1
 
@@ -129,7 +135,7 @@ module ReactOnRailsPro
 
         pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
         ReactOnRailsPro::RendererCacheHelpers.bundle_sources(pool, "serving rolling-deploy tarball")
-      rescue ReactOnRailsPro::Error => e
+      rescue StandardError => e
         Rails.logger.warn(
           "[ReactOnRailsPro::RollingDeploy::BundlesController] " \
           "bundle source discovery failed: #{e.class}: #{e.message}. " \
@@ -160,12 +166,48 @@ module ReactOnRailsPro
       # companion set so the receiver can stage a complete cache entry without
       # a second round-trip — matching the rolling_deploy_adapter contract
       # that `fetch(hash)` returns bundle + assets together.
+      #
+      # Companions are skipped (with a warning) when they would shadow the
+      # bundle entry, collide with another companion's basename, or carry a
+      # name that the tarball helper would reject during compose. This
+      # matches the publish-side behavior in AssetsPrecompile where missing
+      # or unsafe assets degrade rather than fail the build.
       def tarball_entries(bundle_path)
-        entries = { "bundle.js" => bundle_path }
+        entries = { BUNDLE_ENTRY_NAME => bundle_path }
         companion_assets.each do |asset_path|
-          entries[File.basename(asset_path)] = asset_path
+          name = File.basename(asset_path)
+          next if skip_companion?(name, asset_path, entries)
+
+          entries[name] = asset_path
         end
         entries
+      end
+
+      def skip_companion?(name, asset_path, entries)
+        if name == BUNDLE_ENTRY_NAME
+          warn_companion_skipped(
+            "companion #{asset_path.inspect} basename collides with bundle entry #{BUNDLE_ENTRY_NAME.inspect}"
+          )
+          return true
+        end
+        unless ReactOnRailsPro::RollingDeploy::Tarball::ENTRY_NAME_PATTERN.match?(name)
+          warn_companion_skipped(
+            "companion #{asset_path.inspect} basename #{name.inspect} is not a safe tarball entry name"
+          )
+          return true
+        end
+        if entries.key?(name)
+          warn_companion_skipped(
+            "duplicate companion basename #{name.inspect}; " \
+            "keeping #{entries[name].inspect}, dropping #{asset_path.inspect}"
+          )
+          return true
+        end
+        false
+      end
+
+      def warn_companion_skipped(message)
+        Rails.logger.warn("[ReactOnRailsPro::RollingDeploy::BundlesController] #{message}.")
       end
 
       def companion_assets

@@ -73,6 +73,35 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
     end
   end
 
+  describe "token-not-configured short-circuit" do
+    let(:config) do
+      instance_double(
+        ReactOnRailsPro::Configuration,
+        rolling_deploy_previous_url: "https://example.com",
+        rolling_deploy_token: ""
+      )
+    end
+
+    before do
+      allow(ReactOnRailsPro).to receive(:configuration).and_return(config)
+      allow(Rails).to receive(:logger).and_return(instance_double(Logger, warn: nil))
+    end
+
+    it "returns an empty list and warns when previous_bundle_hashes runs without a token" do
+      expect(Net::HTTP).not_to receive(:new)
+
+      expect(described_class.previous_bundle_hashes).to eq([])
+      expect(Rails.logger).to have_received(:warn).with(/rolling_deploy_token is not configured/)
+    end
+
+    it "returns nil and warns when fetch runs without a token" do
+      expect(Net::HTTP).not_to receive(:new)
+
+      expect(described_class.fetch("hash123")).to be_nil
+      expect(Rails.logger).to have_received(:warn).with(/rolling_deploy_token is not configured/)
+    end
+  end
+
   def compose_tarball(entries)
     body = nil
     ReactOnRailsPro::RollingDeploy::Tarball.compose_to_tempfile(entries) { |io| body = io.read }
