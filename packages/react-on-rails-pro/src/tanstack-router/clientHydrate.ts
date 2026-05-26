@@ -335,6 +335,8 @@ function TanStackHydrationApp({
       if (
         process.env.NODE_ENV !== 'production' &&
         hasStoresHydrationApi(router) &&
+        // Identity check only: an in-place mutation of the same location object
+        // would slip past this guard. The dev warning is best-effort.
         router.state.location !== locationBeforeUpdate
       ) {
         console.warn(
