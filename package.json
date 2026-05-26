@@ -154,6 +154,16 @@
       "picomatch@<2.3.2": ">=2.3.2 <3",
       "picomatch@>=4.0.0 <4.0.4": ">=4.0.4 <5",
       "yaml@>=1.0.0 <1.10.3": ">=1.10.3 <2"
-    }
+    },
+    "// for onlyBuiltDependencies": [
+      "pnpm 10 blocks lifecycle scripts by default. Allowlist packages we trust.",
+      "When adding native or compiled dependencies, run pnpm ignored-builds and add trusted packages here.",
+      "@swc/core: postinstall verifies the platform-specific native binary loads.",
+      "unrs-resolver: napi-postinstall check, used by eslint-import-resolver-typescript."
+    ],
+    "onlyBuiltDependencies": [
+      "@swc/core",
+      "unrs-resolver"
+    ]
   }
 }

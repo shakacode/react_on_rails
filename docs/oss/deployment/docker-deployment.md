@@ -110,7 +110,7 @@ CMD ["bundle", "exec", "puma", "-C", "config/puma.rb"]
 Replace the Yarn lines with:
 
 ```dockerfile
-RUN corepack enable && corepack prepare pnpm@9 --activate  # pin to your project's major version
+RUN corepack enable && corepack prepare pnpm@10 --activate  # pin to your project's major version
 
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
