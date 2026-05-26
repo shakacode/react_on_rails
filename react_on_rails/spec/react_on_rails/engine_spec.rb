@@ -214,6 +214,29 @@ module ReactOnRails
         end
       end
 
+      context "when SHAKAPACKER_CONFIG is a relative path" do
+        around do |example|
+          original_config_path = ENV.fetch("SHAKAPACKER_CONFIG", nil)
+          original_cwd = Dir.pwd
+          ENV["SHAKAPACKER_CONFIG"] = "config/custom-shakapacker.yml"
+          example.run
+        ensure
+          ENV["SHAKAPACKER_CONFIG"] = original_config_path
+          Dir.chdir(original_cwd)
+        end
+
+        it "resolves the path against Rails.root, not the process working directory" do
+          FileUtils.mkdir_p(app_root.join("config"))
+          File.write(app_root.join("config", "custom-shakapacker.yml"), "default: {}\n")
+
+          Dir.mktmpdir("react-on-rails-cwd") do |unrelated_cwd|
+            Dir.chdir(unrelated_cwd)
+
+            expect(described_class.shakapacker_configured_as_bundler?).to be true
+          end
+        end
+      end
+
       it "does not call Shakapacker.config while checking for the config file" do
         expect(::Shakapacker).not_to receive(:config)
         expect(described_class.shakapacker_configured_as_bundler?).to be false

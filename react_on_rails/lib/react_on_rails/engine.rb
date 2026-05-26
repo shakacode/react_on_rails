@@ -5,7 +5,7 @@ require "rails/railtie"
 module ReactOnRails
   class Engine < ::Rails::Engine
     SHAKAPACKER_PACKAGE_MANAGER_CHECK = :error_unless_package_manager_is_obvious!
-    SHAKAPACKER_MANAGER_GUARD_ISSUE_URL = "https://github.com/shakacode/react_on_rails/issues"
+    SHAKAPACKER_MANAGER_GUARD_ISSUE_URL = "https://github.com/shakacode/react_on_rails/issues/3145"
 
     # Suppress Shakapacker's packageManager guard when Shakapacker is not the configured bundler.
     #
@@ -106,9 +106,12 @@ module ReactOnRails
       shakapacker_config_path.exist?
     end
 
+    # Resolves the Shakapacker config path, mirroring how Shakapacker itself locates the file.
+    # Relative SHAKAPACKER_CONFIG values are expanded against Rails.root so bundler detection
+    # stays consistent with Shakapacker when the process starts from a different working directory.
     def self.shakapacker_config_path
       env_config_path = ENV.fetch("SHAKAPACKER_CONFIG", nil)
-      return Pathname.new(env_config_path) unless env_config_path.to_s.empty?
+      return Pathname.new(env_config_path).expand_path(Rails.root) unless env_config_path.to_s.empty?
 
       Rails.root.join("config", "shakapacker.yml")
     end
