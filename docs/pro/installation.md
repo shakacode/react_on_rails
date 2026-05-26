@@ -139,6 +139,40 @@ export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
 
 ⚠️ **Security Warning**: Never commit your license token to version control. For production, use environment variables or secure secret management systems (Rails credentials, Heroku config vars, AWS Secrets Manager, etc.).
 
+### License Validation Lifecycle
+
+React on Rails Pro currently validates licenses offline with the public key embedded in the gem and node renderer
+package. There is no network call to ShakaCode during validation.
+
+License validation happens in these places:
+
+- Rails checks the license after application initialization and logs the result.
+- The standalone node renderer checks the license when the renderer master process starts and logs the result.
+- The browser receives `railsContext.rorPro` as a Pro-installed signal only; it does not validate the license.
+
+A missing, expired, or invalid license does not prevent Rails or the node renderer from starting. In production, license
+issues are logged as warnings, and Rails includes an HTML attribution comment indicating the license state.
+
+### Verify License Compliance
+
+Pro validates licenses **offline** at boot, and a missing, invalid, or expired license never crashes the app — Rails and the node renderer simply log the issue. The recommended way to catch license problems before they reach production is the built-in rake task, which exits non-zero when the license is missing, invalid, or expired:
+
+```bash
+RAILS_ENV=production bundle exec rake react_on_rails_pro:verify_license
+```
+
+Add it to your deploy pipeline as a one-line gate:
+
+```yaml
+- name: Verify React on Rails Pro license
+  env:
+    REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE }}
+    RAILS_ENV: production
+  run: bundle exec rake react_on_rails_pro:verify_license
+```
+
+A valid-but-expiring license (within 30 days) still exits 0; the task logs a renewal-required warning. To fail closed on expiring-soon licenses, send renewal emails, run advisory (non-blocking) scheduled checks, or parse the JSON output, see [License CI Integration](./license-ci-integration.md).
+
 For complete license setup instructions, see [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/LICENSE_SETUP.md).
 
 ## Rails Configuration
