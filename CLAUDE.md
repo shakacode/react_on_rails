@@ -19,10 +19,11 @@ If this file conflicts with `AGENTS.md`, follow `AGENTS.md`.
 
 ## Git Safety
 
-- **NEVER force-push** (`--force`, `--force-with-lease`) unless the user explicitly requests it. Force-pushing destroys commit history that may represent significant prior work.
-- **NEVER `git reset --hard`** on a branch that has existing commits (yours or others'). This destroys work.
-- When you need to start fresh or test something without affecting an existing branch, **use a git worktree** (`git worktree add`) or **create a new branch** instead of resetting the current one.
-- If a rebase has conflicts, abort and ask the user how to proceed rather than force-pushing a rewritten history.
+- **Clean rebase → `git push --force-with-lease` without asking.** When `git rebase origin/main` (or `git pull --rebase`) reports no conflicts, every commit is preserved — republishing is the expected workflow. Just push and report the result.
+- **Ask first when force-pushing in these cases:** you resolved rebase conflicts, you dropped/squashed/reordered commits, or the remote branch has commits you don't have locally.
+- **NEVER `git reset --hard`** on a branch with existing commits (yours or others'). This destroys work. Use a worktree or a new branch instead.
+- **NEVER force-push to `main` or `master`.**
+- If a rebase has conflicts you can't resolve cleanly, abort and ask the user how to proceed.
 
 ## Claude-Specific Workflow
 
