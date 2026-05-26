@@ -121,8 +121,8 @@ checks_jsonl=$(gh api \
 # attempt (highest check_run id). The key intentionally includes the
 # suite id so we only collapse true reruns and not unrelated workflows
 # that happen to share a job name (e.g. this repo has multiple workflows
-# that each define a `detect-changes` job). Mirrors the Ruby dedup at
-# release.rake:451-455. Keep the two in sync.
+# that each define a `detect-changes` job). Mirrors the Ruby dedup in
+# `validate_main_ci_status!` (rakelib/release.rake). Keep the two in sync.
 checks_json=$(echo "${checks_jsonl}" | jq -s '
   [.[] | {id, name, status, conclusion, html_url, suite_id: (.check_suite.id // .id)}]
   | group_by([.suite_id, .name])

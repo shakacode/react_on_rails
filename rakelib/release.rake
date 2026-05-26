@@ -583,7 +583,12 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
     return
   end
 
-  qualifier = required_names.nil? ? "" : "required "
+  # Only label the count "required" when `evaluated` was actually filtered to
+  # the required subset (prerelease + branch protection visible). On stable
+  # releases we keep evaluating every check_run, so the count includes
+  # non-required runs and labelling them "required" would misrepresent the
+  # gate.
+  qualifier = is_prerelease && required_names ? "required " : ""
   noun = evaluated.length == 1 ? "check" : "checks"
   puts "✓ Main CI is healthy on #{short_sha} (#{evaluated.length} #{qualifier}#{noun})"
 end
