@@ -290,7 +290,7 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       allow(Async::HTTP::Client).to receive(:open).and_yield(async_client)
 
       yielded_client = nil
-      client.__send__(:with_client) { |opened_client| yielded_client = opened_client }
+      client.__send__(:with_client, outer_scheduler: nil) { |opened_client| yielded_client = opened_client }
 
       expect(Async::HTTP::Client).to have_received(:open).with(
         endpoint,
@@ -551,10 +551,10 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
 
       # First call should create a client
       yielded_clients = []
-      client.__send__(:with_client) { |c| yielded_clients << c }
+      client.__send__(:with_client, outer_scheduler: fake_scheduler) { |c| yielded_clients << c }
 
       # Second call should reuse the same client
-      client.__send__(:with_client) { |c| yielded_clients << c }
+      client.__send__(:with_client, outer_scheduler: fake_scheduler) { |c| yielded_clients << c }
 
       expect(clients_created.size).to eq(1)
       expect(yielded_clients).to eq([fake_async_client, fake_async_client])
@@ -577,8 +577,9 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
         block.call(fake_client)
       end
 
-      client.__send__(:with_client) { |_c| }
-      client.__send__(:with_client) { |_c| }
+      # outer_scheduler: nil triggers ephemeral mode
+      client.__send__(:with_client, outer_scheduler: nil) { |_c| }
+      client.__send__(:with_client, outer_scheduler: nil) { |_c| }
 
       expect(open_calls).to eq(2)
     end
@@ -604,9 +605,9 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       fake_scheduler = Object.new
       allow(Fiber).to receive(:scheduler).and_return(fake_scheduler)
 
-      client1.__send__(:with_client) { |_c| }
-      client2.__send__(:with_client) { |_c| }
-      client1.__send__(:with_client) { |_c| }
+      client1.__send__(:with_client, outer_scheduler: fake_scheduler) { |_c| }
+      client2.__send__(:with_client, outer_scheduler: fake_scheduler) { |_c| }
+      client1.__send__(:with_client, outer_scheduler: fake_scheduler) { |_c| }
 
       expect(clients_created.size).to eq(2)
     end
@@ -631,7 +632,7 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       allow(Fiber).to receive(:scheduler).and_return(fake_scheduler)
 
       # Create the client
-      client.__send__(:with_client) { |_c| }
+      client.__send__(:with_client, outer_scheduler: fake_scheduler) { |_c| }
 
       # Close should remove it from storage
       client.close
@@ -643,7 +644,7 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       allow(Async::HTTP::Client).to receive(:new).and_return(new_client)
 
       yielded_client = nil
-      client.__send__(:with_client) { |c| yielded_client = c }
+      client.__send__(:with_client, outer_scheduler: fake_scheduler) { |c| yielded_client = c }
 
       expect(yielded_client).to be(new_client)
     end
@@ -653,6 +654,51 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       allow(Fiber).to receive(:scheduler).and_return(nil)
 
       expect { client.close }.not_to raise_error
+    end
+
+    it "evicts broken client from pool when connection error occurs" do
+      stub_const("FakeBrokenClient", Class.new do
+        attr_reader :closed
+
+        def close
+          @closed = true
+        end
+      end)
+
+      broken_client = FakeBrokenClient.new
+      working_client = FakeBrokenClient.new
+      endpoint = instance_double(Async::HTTP::Endpoint, protocol: :fake_protocol)
+
+      client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+      allow(client).to receive(:endpoint_for).and_return(endpoint)
+
+      clients_created = []
+      allow(Async::HTTP::Client).to receive(:new) do |*_args|
+        created = clients_created.empty? ? broken_client : working_client
+        clients_created << created
+        created
+      end
+
+      fake_scheduler = Object.new
+      allow(Fiber).to receive(:scheduler).and_return(fake_scheduler)
+
+      # First call creates a client, then block raises a connection error
+      expect do
+        client.__send__(:with_client, outer_scheduler: fake_scheduler) do |_c|
+          raise Errno::ECONNRESET, "Connection reset by peer"
+        end
+      end.to raise_error(Errno::ECONNRESET)
+
+      # Broken client should be evicted and closed
+      expect(broken_client.closed).to be(true)
+      expect(clients_created.size).to eq(1)
+
+      # Next call should create a new client (not reuse the broken one)
+      yielded_client = nil
+      client.__send__(:with_client, outer_scheduler: fake_scheduler) { |c| yielded_client = c }
+
+      expect(clients_created.size).to eq(2)
+      expect(yielded_client).to be(working_client)
     end
   end
 end
