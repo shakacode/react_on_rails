@@ -578,8 +578,8 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       end
 
       # outer_scheduler: nil triggers ephemeral mode
-      client.__send__(:with_client, outer_scheduler: nil) { |_c| }
-      client.__send__(:with_client, outer_scheduler: nil) { |_c| }
+      client.__send__(:with_client, outer_scheduler: nil) { |_c| nil }
+      client.__send__(:with_client, outer_scheduler: nil) { |_c| nil }
 
       expect(open_calls).to eq(2)
     end
@@ -605,9 +605,9 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       fake_scheduler = Object.new
       allow(Fiber).to receive(:scheduler).and_return(fake_scheduler)
 
-      client1.__send__(:with_client, outer_scheduler: fake_scheduler) { |_c| }
-      client2.__send__(:with_client, outer_scheduler: fake_scheduler) { |_c| }
-      client1.__send__(:with_client, outer_scheduler: fake_scheduler) { |_c| }
+      client1.__send__(:with_client, outer_scheduler: fake_scheduler) { |_c| nil }
+      client2.__send__(:with_client, outer_scheduler: fake_scheduler) { |_c| nil }
+      client1.__send__(:with_client, outer_scheduler: fake_scheduler) { |_c| nil }
 
       expect(clients_created.size).to eq(2)
     end
@@ -632,7 +632,7 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       allow(Fiber).to receive(:scheduler).and_return(fake_scheduler)
 
       # Create the client
-      client.__send__(:with_client, outer_scheduler: fake_scheduler) { |_c| }
+      client.__send__(:with_client, outer_scheduler: fake_scheduler) { |_c| nil }
 
       # Close should remove it from storage
       client.close
