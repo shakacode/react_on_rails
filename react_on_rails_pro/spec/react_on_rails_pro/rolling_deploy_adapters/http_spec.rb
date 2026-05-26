@@ -94,6 +94,72 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
     end
   end
 
+  describe "previous_url scheme validation" do
+    let(:config) do
+      instance_double(
+        ReactOnRailsPro::Configuration,
+        rolling_deploy_previous_url: previous_url,
+        rolling_deploy_token: "token"
+      )
+    end
+
+    before do
+      allow(ReactOnRailsPro).to receive(:configuration).and_return(config)
+      allow(Rails).to receive(:logger).and_return(instance_double(Logger, warn: nil))
+    end
+
+    context "when configured with a file:// URL" do
+      let(:previous_url) { "file:///etc/passwd" }
+
+      it "rejects the URL with a warning and returns no manifest hashes" do
+        expect(Net::HTTP).not_to receive(:new)
+
+        expect(described_class.previous_bundle_hashes).to eq([])
+        expect(Rails.logger).to have_received(:warn).with(/unsupported scheme "file"/)
+      end
+    end
+
+    context "when configured with an unparsable URL" do
+      let(:previous_url) { "http://exa mple.com" }
+
+      it "rejects the URL with a warning and returns no manifest hashes" do
+        expect(Net::HTTP).not_to receive(:new)
+
+        expect(described_class.previous_bundle_hashes).to eq([])
+        expect(Rails.logger).to have_received(:warn).with(/is not a valid URI/)
+      end
+    end
+  end
+
+  describe "manifest hash sanitization" do
+    let(:config) do
+      instance_double(
+        ReactOnRailsPro::Configuration,
+        rolling_deploy_previous_url: "https://example.com",
+        rolling_deploy_token: "token"
+      )
+    end
+    let(:http) { instance_double(Net::HTTP) }
+    let(:response) { Net::HTTPOK.new("1.1", "200", "OK") }
+
+    before do
+      allow(ReactOnRailsPro).to receive(:configuration).and_return(config)
+      allow(Net::HTTP).to receive(:new).with("example.com", 443).and_return(http)
+      allow(http).to receive(:use_ssl=)
+      allow(http).to receive(:verify_mode=)
+      allow(http).to receive(:open_timeout=)
+      allow(http).to receive(:read_timeout=)
+      allow(http).to receive_messages(use_ssl?: true, request: response)
+      allow(response).to receive(:body).and_return(
+        { hashes: ["safe123", "-unsafe", "../escape", "also-safe-456"] }.to_json
+      )
+    end
+
+    it "drops manifest hashes that fail SAFE_HASH_PATTERN before they reach log output" do
+      expect(described_class.previous_bundle_hashes).to contain_exactly("safe123", "also-safe-456")
+    end
+  end
+
   describe "token-not-configured short-circuit" do
     let(:config) do
       instance_double(

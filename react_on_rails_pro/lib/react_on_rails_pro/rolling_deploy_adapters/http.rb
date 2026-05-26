@@ -70,7 +70,16 @@ module ReactOnRailsPro
           return warn_and_return("manifest returned HTTP #{response.code}", []) unless response.is_a?(Net::HTTPSuccess)
 
           parsed = JSON.parse(response.body)
-          Array(parsed["hashes"]).map(&:to_s).reject(&:empty?)
+          # Filter manifest hashes through SAFE_HASH_PATTERN before returning
+          # so server-supplied strings never appear verbatim in downstream
+          # warning logs. Each hash is re-validated inside `fetch`, so this is
+          # defense-in-depth — nothing unsafe could reach the filesystem layer
+          # — but it keeps log lines from a misbehaving or compromised server
+          # from echoing arbitrary content.
+          Array(parsed["hashes"])
+            .map(&:to_s)
+            .reject(&:empty?)
+            .grep(ReactOnRailsPro::RollingDeploy::SAFE_HASH_PATTERN)
         rescue StandardError => e
           warn_and_return("previous_bundle_hashes failed: #{e.class}: #{e.message}", [])
         end
@@ -110,7 +119,21 @@ module ReactOnRailsPro
           url = ReactOnRailsPro.configuration.rolling_deploy_previous_url.to_s.strip
           return nil if url.empty?
 
-          url.chomp("/")
+          uri = URI.parse(url.chomp("/"))
+          unless %w[http https].include?(uri.scheme)
+            Rails.logger.warn(
+              "#{LOG_PREFIX} rolling_deploy_previous_url has unsupported scheme " \
+              "#{uri.scheme.inspect}; expected http or https. Skipping discovery."
+            )
+            return nil
+          end
+          uri.to_s
+        rescue URI::InvalidURIError => e
+          Rails.logger.warn(
+            "#{LOG_PREFIX} rolling_deploy_previous_url is not a valid URI: #{e.message}. " \
+            "Skipping discovery."
+          )
+          nil
         end
 
         def configured_token

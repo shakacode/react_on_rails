@@ -135,7 +135,11 @@ module ReactOnRailsPro
         return "" if header.blank?
         return "" unless header.start_with?("Bearer ", "bearer ")
 
-        header[7..].to_s.strip
+        # Take the token bytes verbatim. We deliberately do not `.strip` here
+        # because the configured side is compared without stripping — if an
+        # operator misconfigures a token with trailing whitespace, an
+        # asymmetric strip would silently authenticate a shorter token.
+        header[7..].to_s
       end
 
       def set_no_store_headers

@@ -43,6 +43,11 @@ module ReactOnRailsPro
       # attacker can never write outside the target directory or hide files
       # from `ls`. The `./` prefix permitted by tar is normalised away before
       # this match runs.
+      #
+      # Stricter than `ReactOnRailsPro::RollingDeploy::SAFE_HASH_PATTERN`:
+      # the first character must be `[A-Za-z0-9_]`. Hash strings may legally
+      # begin with a hyphen, but on-disk entry names must not — leading
+      # hyphens are a common footgun in shell contexts.
       ENTRY_NAME_PATTERN = /\A(?!\.)[A-Za-z0-9_][A-Za-z0-9_.\-]*\z/
 
       # Compose a gzipped tarball from the given entries and yield the
@@ -55,8 +60,6 @@ module ReactOnRailsPro
       # in the tarball so the client adapter can stage it without needing
       # to know the source filename.
       def compose_to_tempfile(entries)
-        require "tempfile"
-
         Tempfile.create(["rolling-deploy-tarball-", ".tar.gz"]) do |tempfile|
           tempfile.binmode
           compose_to_io(entries, tempfile)
@@ -116,6 +119,14 @@ module ReactOnRailsPro
       rescue Zlib::GzipFile::Error, Zlib::DataError => e
         raise ReactOnRailsPro::Error,
               "Rolling-deploy tarball is not a valid gzip stream: #{e.class}: #{e.message}"
+      rescue Gem::Package::Error => e
+        # `Gem::Package::TarReader` raises subclasses of Gem::Package::Error
+        # (e.g. TarInvalidError) on malformed tar headers inside an
+        # otherwise-valid gzip stream. Wrap them in our error type so the HTTP
+        # adapter's StandardError rescue produces a "tarball is malformed"
+        # warning instead of leaking the underlying RubyGems class.
+        raise ReactOnRailsPro::Error,
+              "Rolling-deploy tarball has malformed tar entries: #{e.class}: #{e.message}"
       end
 
       def validate_compose_entries!(entries)
