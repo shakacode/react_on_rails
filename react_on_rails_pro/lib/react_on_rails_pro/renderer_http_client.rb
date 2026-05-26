@@ -42,6 +42,17 @@ module ReactOnRailsPro
       Protocol::HTTP2::StreamError
     ].freeze
 
+    # Per-scheduler storage for persistent HTTP clients. When an outer Fiber.scheduler
+    # exists BEFORE we enter `Sync {}`, clients are stored on the scheduler object using
+    # this instance variable key. This enables connection reuse across requests within
+    # the same long-lived scheduler context (e.g., Falcon, Puma with async scheduler).
+    # The hash maps origin URLs to Async::HTTP::Client instances.
+    #
+    # IMPORTANT: We only use persistent mode when a scheduler already exists before
+    # `execute_request` enters `Sync {}`. If `Sync {}` creates an ephemeral scheduler,
+    # we use the ephemeral client path to ensure proper cleanup when the block exits.
+    SCHEDULER_CLIENTS_KEY = :@__ror_pro_http_clients__
+
     # Uses only public, documented Wrapper APIs (connect with timeout:, set_timeout)
     # that have been stable since io-endpoint 0.15. No version pin needed —
     # async-http's own constraint (~> 0.14) governs the version.
@@ -281,8 +292,10 @@ module ReactOnRailsPro
     end
 
     def close
-      # No-op: async-http clients are scoped to individual requests so they never cross Async reactors.
-      # Request#reset_connection still calls close for adapter compatibility.
+      scheduler = Fiber.scheduler
+      return unless scheduler
+
+      evict_client_from_scheduler(scheduler)
     end
 
     private
@@ -309,8 +322,13 @@ module ReactOnRailsPro
     def execute_request(method, path, request_body, yielder, status_assigner)
       headers, body = request_body
 
+      # Capture scheduler BEFORE entering Sync. If a scheduler already exists, we can
+      # use persistent mode. If Sync creates an ephemeral scheduler, we must use
+      # ephemeral clients to ensure cleanup when Sync exits.
+      outer_scheduler = Fiber.scheduler
+
       Sync do
-        with_client do |client|
+        with_client(outer_scheduler: outer_scheduler) do |client|
           raw_response = if method == :post
                            client.post(path, headers: Protocol::HTTP::Headers[headers], body: body)
                          else
@@ -327,19 +345,50 @@ module ReactOnRailsPro
       raise ConnectionError, e.message
     end
 
-    def with_client(&block)
-      # TODO: revisit persistent async-http clients for renderer requests once
-      # https://github.com/shakacode/react_on_rails/issues/3283 settles connection-reuse direction.
-      endpoint = endpoint_for(@origin)
-      Async::HTTP::Client.open(endpoint, protocol: endpoint.protocol, retries: 0, limit: pool_limit) do |client|
-        # Retries are owned by Request/StreamRequest so bundle-upload retry behavior remains centralized.
-        # Each client is request-scoped (one connection, one request), so limit has no practical effect.
-        # It is passed through for forward-compatibility with planned persistent connections (#3283).
-        # rubocop:disable Performance/RedundantBlockCall
-        # The block is captured with &block, so yield is unavailable in this nested block.
-        block.call(client)
-        # rubocop:enable Performance/RedundantBlockCall
+    def with_client(outer_scheduler:, &block)
+      # Only use persistent mode if a scheduler existed BEFORE entering Sync.
+      # If Sync created an ephemeral scheduler, use ephemeral clients to ensure cleanup.
+      if outer_scheduler
+        # Persistent mode: reuse client across requests within same long-lived scheduler.
+        # Connection pool (limit) is now effective — multiple streams share pooled connections.
+        yield(scheduler_scoped_client(outer_scheduler))
+      else
+        # Ephemeral mode: no outer scheduler means either we're outside an Async context,
+        # or Sync created an ephemeral scheduler. Use block-form to ensure cleanup.
+        with_ephemeral_client(&block)
       end
+    end
+
+    def scheduler_scoped_client(scheduler)
+      # Fiber.scheduler is per-OS-thread, and within a thread fibers are cooperatively
+      # scheduled (only one runs at a time). No mutex needed for per-scheduler operations.
+      clients = scheduler.instance_variable_get(SCHEDULER_CLIENTS_KEY)
+      client = clients&.[](@origin)
+      return client if client
+
+      # Create new client and store it
+      clients ||= {}
+      endpoint = endpoint_for(@origin)
+      client = Async::HTTP::Client.new(endpoint, protocol: endpoint.protocol, retries: 0, limit: pool_limit)
+      clients[@origin] = client
+      scheduler.instance_variable_set(SCHEDULER_CLIENTS_KEY, clients)
+      client
+    end
+
+    def evict_client_from_scheduler(scheduler)
+      clients = scheduler.instance_variable_get(SCHEDULER_CLIENTS_KEY)
+      return unless clients
+
+      client = clients.delete(@origin)
+      scheduler.instance_variable_set(SCHEDULER_CLIENTS_KEY, nil) if clients.empty?
+
+      # Close after removing from hash to avoid any re-entrancy issues
+      client&.close
+    end
+
+    def with_ephemeral_client(&block)
+      endpoint = endpoint_for(@origin)
+      Async::HTTP::Client.open(endpoint, protocol: endpoint.protocol, retries: 0, limit: pool_limit, &block)
     end
 
     def endpoint_for(origin)

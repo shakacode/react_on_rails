@@ -725,13 +725,8 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
         expect(ReactOnRailsPro.configuration.renderer_http_pool_size).to eq(10)
       end
 
-      it "warns when configured because async-http changed the setting semantics" do
-        expect(Rails.logger).to receive(:warn).with(
-          "[ReactOnRailsPro] config.renderer_http_pool_size currently has no effect. " \
-          "The async-http adapter creates a new client per request, so the pool limit " \
-          "is never reached. This setting is kept for forward-compatibility with " \
-          "planned persistent connection support (see issue #3283)."
-        )
+      it "accepts custom values without warning (setting is now effective with scheduler)" do
+        expect(Rails.logger).not_to receive(:warn)
 
         ReactOnRailsPro.configure do |config|
           config.renderer_http_pool_size = 20
@@ -740,40 +735,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
         expect(ReactOnRailsPro.configuration.renderer_http_pool_size).to eq(20)
       end
 
-      it "does not warn for the default value assigned during configuration initialization" do
-        expect(Rails.logger).not_to receive(:warn).with(
-          "[ReactOnRailsPro] config.renderer_http_pool_size currently has no effect. " \
-          "The async-http adapter creates a new client per request, so the pool limit " \
-          "is never reached. This setting is kept for forward-compatibility with " \
-          "planned persistent connection support (see issue #3283)."
-        )
-
-        expect(ReactOnRailsPro.configuration.renderer_http_pool_size).to eq(10)
-      end
-
-      it "does not warn when explicitly configured with the default value" do
-        expect(Rails.logger).not_to receive(:warn).with(
-          "[ReactOnRailsPro] config.renderer_http_pool_size currently has no effect. " \
-          "The async-http adapter creates a new client per request, so the pool limit " \
-          "is never reached. This setting is kept for forward-compatibility with " \
-          "planned persistent connection support (see issue #3283)."
-        )
-
-        ReactOnRailsPro.configure do |config|
-          config.renderer_http_pool_size = 10
-        end
-
-        expect(ReactOnRailsPro.configuration.renderer_http_pool_size).to eq(10)
-      end
-
-      it "does not warn when explicitly cleared" do
-        expect(Rails.logger).not_to receive(:warn).with(
-          "[ReactOnRailsPro] config.renderer_http_pool_size currently has no effect. " \
-          "The async-http adapter creates a new client per request, so the pool limit " \
-          "is never reached. This setting is kept for forward-compatibility with " \
-          "planned persistent connection support (see issue #3283)."
-        )
-
+      it "accepts nil to clear the value" do
         ReactOnRailsPro.configure do |config|
           config.renderer_http_pool_size = nil
         end
@@ -819,10 +781,10 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
         expect(ReactOnRailsPro.configuration.renderer_http_keep_alive_timeout).to eq(30)
       end
 
-      it "accepts positive numbers" do
+      it "accepts positive numbers and warns about deprecation" do
         expect(Rails.logger).to receive(:warn).with(
-          "[ReactOnRailsPro] config.renderer_http_keep_alive_timeout is deprecated and has no effect " \
-          "with the async-http adapter because clients are scoped per request."
+          "[ReactOnRailsPro] config.renderer_http_keep_alive_timeout is deprecated. " \
+          "Connection lifecycle is managed automatically by the async-http adapter."
         )
 
         ReactOnRailsPro.configure do |config|
