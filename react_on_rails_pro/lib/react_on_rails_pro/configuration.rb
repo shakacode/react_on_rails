@@ -466,7 +466,7 @@ module ReactOnRailsPro
 
     KNOWN_WEAK_RENDERER_PASSWORDS = %w[
       devPassword myPassword1 password changeme admin secret test renderer
-    ].map(&:downcase).to_set.freeze
+    ].to_set(&:downcase).freeze
 
     MIN_RENDERER_PASSWORD_LENGTH = 16
 
@@ -516,13 +516,18 @@ module ReactOnRailsPro
         MSG
       end
 
+      warn_if_renderer_password_weak
+    end
+
+    def warn_if_renderer_password_weak
       if KNOWN_WEAK_RENDERER_PASSWORDS.include?(renderer_password.downcase)
         Rails.logger.warn "[react_on_rails_pro] renderer_password is set to a known-default value " \
-                          "(\"#{renderer_password}\"). " \
-                          "Set RENDERER_PASSWORD to a random value of at least #{MIN_RENDERER_PASSWORD_LENGTH} characters."
+                          "(\"#{renderer_password}\"). Set RENDERER_PASSWORD to a random value " \
+                          "of at least #{MIN_RENDERER_PASSWORD_LENGTH} characters."
       elsif renderer_password.length < MIN_RENDERER_PASSWORD_LENGTH
-        Rails.logger.warn "[react_on_rails_pro] renderer_password is shorter than #{MIN_RENDERER_PASSWORD_LENGTH} " \
-                          "characters (current length: #{renderer_password.length}). " \
+        Rails.logger.warn "[react_on_rails_pro] renderer_password is shorter than " \
+                          "#{MIN_RENDERER_PASSWORD_LENGTH} characters " \
+                          "(current length: #{renderer_password.length}). " \
                           "Consider using a stronger password."
       end
     end

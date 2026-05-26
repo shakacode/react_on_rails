@@ -322,7 +322,7 @@ const MIN_PASSWORD_LENGTH = 16;
 function validatePasswordForProduction(aConfig: Config): string | null {
   const isProductionLike = !runtimeEnvsAllowDevelopmentDefaults();
 
-  if (!aConfig.password) {
+  if (!aConfig.password || aConfig.password.trim() === '') {
     if (isProductionLike) {
       return (
         'RENDERER_PASSWORD must be set in production-like environments ' +

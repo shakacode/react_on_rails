@@ -172,7 +172,7 @@ describe('configBuilder', () => {
 
     it('does not throw when password is set via env in production', () => {
       process.env.NODE_ENV = 'production';
-      process.env.RENDERER_PASSWORD = 'secure-password';
+      process.env.RENDERER_PASSWORD = 'secure-password!!';
 
       const { buildConfig } = loadConfigBuilderWithMockedLogger();
 
@@ -185,7 +185,7 @@ describe('configBuilder', () => {
 
       const { buildConfig } = loadConfigBuilderWithMockedLogger();
 
-      expect(() => buildConfig({ password: 'secure-password' })).not.toThrow();
+      expect(() => buildConfig({ password: 'secure-password!!' })).not.toThrow();
     });
 
     it('does not throw in development without a password', () => {
@@ -336,7 +336,7 @@ describe('configBuilder', () => {
 
     it('does not warn about undefined password in development environments', () => {
       process.env.NODE_ENV = 'development';
-      process.env.RENDERER_PASSWORD = 'dev-password';
+      process.env.RENDERER_PASSWORD = 'dev-password-long-enough';
 
       const { buildConfig, warn } = loadConfigBuilderWithMockedLogger();
 
@@ -425,7 +425,7 @@ describe('configBuilder', () => {
       delete process.env.REPLAY_SERVER_ASYNC_OPERATION_LOGS;
 
       const { buildConfig } = loadConfigBuilderWithMockedLogger();
-      const config = buildConfig({ password: 'secure-password' });
+      const config = buildConfig({ password: 'secure-password!!' });
 
       expect(config.replayServerAsyncOperationLogs).toBe(true);
     });

@@ -14,7 +14,7 @@ const config = {
   // See value in /config/initializers/react_on_rails_pro.rb
   // For production, set RENDERER_PASSWORD as an env var and remove the literal fallback.
 <% if @generated_renderer_password -%>
-  password: env.RENDERER_PASSWORD || '<%= @generated_renderer_password %>',
+  password: env.RENDERER_PASSWORD ?? '<%= @generated_renderer_password %>',
 <% else -%>
   password: env.RENDERER_PASSWORD,
 <% end -%>

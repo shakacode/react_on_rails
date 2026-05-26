@@ -280,8 +280,11 @@ module ReactOnRails
               "to migrate, move it to #{node_renderer_path} and update any references " \
               "(e.g. Procfile.dev, Procfile.prod, Docker CMD / command):", :yellow
           say "      #{node_renderer_procfile_command('Procfile.dev')}", :yellow
-          say set_color("⚠️  Ensure the password in #{legacy_node_renderer_path} matches " \
-                        "config/initializers/react_on_rails_pro.rb. Both must use the same RENDERER_PASSWORD.", :yellow)
+          say set_color(
+            "⚠️  Ensure the password in #{legacy_node_renderer_path} matches " \
+            "config/initializers/react_on_rails_pro.rb. Both must use the same RENDERER_PASSWORD.",
+            :yellow
+          )
           warn_on_stale_legacy_procfile_entry
           return true
         end

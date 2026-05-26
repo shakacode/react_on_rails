@@ -464,7 +464,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
 
         it "does not raise when password comes from RENDERER_PASSWORD env var in production" do
           allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
-          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return("secure-password")
+          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return("secure-password!!")
 
           expect do
             ReactOnRailsPro.configure do |config|
@@ -473,7 +473,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
             end
           end.not_to raise_error
 
-          expect(ReactOnRailsPro.configuration.renderer_password).to eq("secure-password")
+          expect(ReactOnRailsPro.configuration.renderer_password).to eq("secure-password!!")
         end
 
         it "does not raise when password is explicitly set in production" do
@@ -482,7 +482,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
           expect do
             ReactOnRailsPro.configure do |config|
               config.server_renderer = "NodeRenderer"
-              config.renderer_password = "secure-password"
+              config.renderer_password = "secure-password!!"
             end
           end.not_to raise_error
         end
@@ -500,7 +500,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
 
         it "resolves from ENV when renderer_password is blank in production" do
           allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
-          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return("secure-password")
+          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return("secure-password!!")
 
           expect do
             ReactOnRailsPro.configure do |config|
@@ -510,7 +510,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
             end
           end.not_to raise_error
 
-          expect(ReactOnRailsPro.configuration.renderer_password).to eq("secure-password")
+          expect(ReactOnRailsPro.configuration.renderer_password).to eq("secure-password!!")
         end
 
         it "resolves from URL when renderer_password is blank and URL has embedded password" do
@@ -611,7 +611,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
         end
       end
 
-      context "weak password warnings" do
+      context "with weak password warnings" do
         before do
           allow(ENV).to receive(:[]).and_call_original
           allow(ENV).to receive(:fetch).and_call_original
