@@ -1539,7 +1539,7 @@ module ReactOnRails
         checker.add_info("  💡 Run: rails generate react_on_rails:install")
       end
 
-      check_node_renderer_launcher_procfiles(procfiles.keys)
+      check_node_renderer_launcher_procfiles(NodeRendererProcfile::DEFAULT_COMMANDS.keys)
     end
 
     def check_node_renderer_launcher_procfiles(procfiles)
@@ -1572,7 +1572,7 @@ module ReactOnRails
     end
 
     def active_procfile_lines(content)
-      content.each_line.grep_v(/^\s*#/)
+      content.each_line.grep_v(/^\s*#/).map { |line| line.sub(/#.*/, "") }
     end
 
     def node_renderer_procfile_command(filename)
