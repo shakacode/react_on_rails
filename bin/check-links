@@ -29,7 +29,7 @@ if ! command -v lychee &> /dev/null; then
   exit 1
 fi
 
-# shellcheck disable=SC2068
+# shellcheck disable=SC2035
 # Word-split the globs so *.md and react_on_rails_pro/*.md expand, matching
 # the workflow's `args: --config .lychee.toml docs/ *.md react_on_rails_pro/*.md`.
 exec lychee --config .lychee.toml docs/ *.md react_on_rails_pro/*.md
