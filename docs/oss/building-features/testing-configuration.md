@@ -49,7 +49,7 @@ Use this recipe for Capybara, system, and end-to-end tests that exercise `stream
 
 This recipe uses the React on Rails TestHelper with `build_test_command`: Rails checks whether generated bundles are stale, runs your test build command when needed, and fails fast if compilation fails.
 
-The Step 3 renderer-lifecycle helper is **RSpec-only** because it relies on `before(:suite)` and `after(:suite)` hooks. Minitest suites can still reuse the Step 1 ENV setup and `ReactOnRails::TestHelper.ensure_assets_compiled`; a turnkey Minitest renderer-lifecycle recipe is future work. Until then, adapt the Step 3 harness into a `Minitest.after_run { ... }` block plus a suite-level startup hook (for example, a Minitest plugin that boots the renderer before the first test) if you need Minitest coverage.
+The Step 3 renderer-lifecycle helper is **RSpec-focused** because it uses `before(:suite)` and `after(:suite)` hooks; for Minitest, see [Minitest Equivalent](#minitest-equivalent) for a parallel adaptation that reuses the same safety points from a `test/test_helper.rb` harness plus `Minitest.after_run`.
 
 See [Two Approaches to Test Asset Compilation](#two-approaches-to-test-asset-compilation) for the underlying compilation tradeoffs.
 
@@ -421,6 +421,241 @@ Avoid letting system tests depend on live third-party APIs. RSC failures from ex
 - Compile assets before the renderer accepts requests.
 - Do not share a mutable fake API server across workers unless it isolates state per worker.
 - If flakes remain, serialize the RSC system-test group first, then re-enable parallelism once port/cache isolation is proven.
+
+### Minitest Equivalent
+
+Steps 1, 2, 5, and 6 apply to Minitest unchanged, with one path adjustment: Minitest-only projects (no `spec/` directory) should place the Step 1 `RscTestWorker` module at `test/support/rsc_test_worker.rb` so the `require_relative` below resolves correctly. For Step 4, adapt the RSpec system-test example to `ApplicationSystemTestCase` with `assert_css`/`assert_text`, and the request-spec example to an `ActionDispatch::IntegrationTest` subclass with `assert_response`/`assert_equal`. Only the suite-level renderer lifecycle differs: Minitest has no `before(:suite)` hook, so the renderer starts when `test/test_helper.rb` requires its support file (after assets compile) and stops in [`Minitest.after_run`](https://github.com/minitest/minitest/blob/master/lib/minitest.rb). The Rails.root/tmp containment check, port probe, spawn options, `wait_until_ready!` helper, and graceful SIGTERM→SIGKILL shutdown are all reused from [Step 3](#3-start-one-test-renderer-per-worker).
+
+Rails-generated Minitest apps often enable `parallelize(workers: :number_of_processors)`. The file-scope startup below assumes each worker is an independent Ruby test process that loads `test/test_helper.rb` separately, such as a `parallel_tests` CI shard. If Rails-native process parallelization remains enabled for RSC system tests, move the renderer startup and cleanup into `parallelize_setup` / `parallelize_teardown` and derive the worker ID from the hook argument, or serialize the RSC system-test group. In that Rails-native variant, keep one cleanup owner per renderer: do not leave the file-scope `Minitest.after_run` block below stopping the same PID that `parallelize_teardown` already stops.
+
+If a CI job can run the RSpec and Minitest RSC suites at the same time, give each suite a different renderer port range. For example, keep the RSpec recipe on the default `3900 + RscTestWorker::ID.to_i` range and set a Minitest-specific base such as `3950` before the `RENDERER_PORT` assignment below.
+
+Wire `test/test_helper.rb` with the same ENV-before-Rails-boot preamble used in `spec/rails_helper.rb`, then require the renderer lifecycle support file before any test runs. Keep the compilation check at file scope: it runs once for ordinary Minitest suites and, when `RSC_NODE_RENDERER_TESTS=1`, populates the renderer bundle cache before the support file starts the node renderer.
+
+```ruby
+# test/test_helper.rb
+ENV["RAILS_ENV"] ||= "test"
+# Same module as Step 1. For Minitest-only projects, create test/support/rsc_test_worker.rb
+# with the same content as spec/support/rsc_test_worker.rb.
+require_relative "support/rsc_test_worker"
+
+ENV["RENDERER_PORT"] ||= (3900 + RscTestWorker::ID.to_i).to_s
+renderer_url = "http://127.0.0.1:#{ENV["RENDERER_PORT"]}"
+ENV["REACT_RENDERER_URL"] ||= renderer_url # used by config.renderer_url = ENV["REACT_RENDERER_URL"]
+ENV["RENDERER_URL"] ||= renderer_url       # used by some older/custom initializers
+ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] ||=
+  File.expand_path("../tmp/node-renderer-bundles-test-#{RscTestWorker::ID}", __dir__)
+
+require_relative "../config/environment"
+require "rails/test_help"
+require "react_on_rails/test_helper"
+
+# Run once at suite start before the optional renderer spawns.
+ReactOnRails::TestHelper.ensure_assets_compiled
+
+require_relative "support/rsc_node_renderer"
+```
+
+The renderer support file mirrors `spec/support/rsc_node_renderer.rb`. The `RscNodeRenderer` module and `wait_until_ready!` helper are framework-agnostic; if your project uses both RSpec and Minitest, extract the module to a shared file (for example, `lib/test_support/rsc_node_renderer.rb`) and require it from both helper files instead of redefining it.
+
+```ruby
+# test/support/rsc_node_renderer.rb
+require "fileutils"
+require "socket"
+require_relative "rsc_test_worker"
+
+module RscNodeRenderer
+  module_function
+
+  # Keep in sync with spec/support/rsc_node_renderer.rb (Step 3).
+  # Keep in sync with spec/support/rsc_node_renderer.rb (Step 3).
+  # Prefer extracting this to a shared file (e.g. lib/test_support/rsc_node_renderer.rb)
+  # and requiring it from both helpers. Copy it here only for single-framework (Minitest-only) projects
+  # where a shared lib/ location adds unnecessary indirection.
+  def wait_until_ready!(host:, port:, timeout_seconds: 30, log_path: nil, pid: nil)
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout_seconds
+    saw_reset = false
+
+    loop do
+      begin
+        Socket.tcp(host, port, connect_timeout: 1).close
+        break
+      rescue Errno::ECONNREFUSED, Errno::ETIMEDOUT
+        # Port not yet open; renderer still booting.
+      rescue Errno::ECONNRESET
+        # Connection reset: renderer bound the port but closed the connection before accepting.
+        # Fall through — the PID check below will detect a dead process and raise before the deadline.
+        # If the deadline expires without a successful connect, the deadline error mentions the reset
+        # so a port already used by another service is easier to diagnose than a generic timeout.
+        saw_reset = true
+      rescue Errno::EADDRNOTAVAIL, Errno::EHOSTUNREACH, SocketError => e
+        raise "Cannot reach node renderer at #{host}:#{port}. " \
+              "Check the host configuration (#{e.class}: #{e.message})."
+      end
+
+      if pid
+        begin
+          # Heuristic early-exit check: if the launcher process has already died, raise now rather than
+          # waiting for the deadline. For `pnpm run <script>`, pnpm typically stays resident while Node
+          # is alive, but process managers that exec directly into Node (or daemonize) will exit here even
+          # though the renderer is still starting, surfacing a misleading ESRCH. The TCP probe above is
+          # the authoritative readiness signal; this check is only a fast-fail shortcut for the common
+          # pnpm/npm/yarn case. Replace it with an app-specific health check if your launcher daemonizes.
+          Process.kill(0, pid)
+        rescue Errno::ESRCH
+          hint = log_path ? " Check #{log_path} for startup errors." : ""
+          raise "Node renderer process (pid #{pid}) exited before binding to #{host}:#{port}.#{hint}"
+        rescue Errno::EPERM
+          # Process exists but we lack permission to signal it (different UID, seccomp, container boundary).
+          # Continue waiting for the TCP port — the port probe is authoritative for readiness.
+        end
+      end
+
+      if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+        hint = log_path ? " Check #{log_path} for startup errors." : ""
+        reset_hint = saw_reset ? " (TCP connections were reset — another process may already be using this port)" : ""
+        raise "Node renderer did not boot on #{host}:#{port} within #{timeout_seconds}s.#{hint}#{reset_hint}"
+      end
+
+      sleep 0.1
+    end
+  end
+end
+
+# File-scope state shared by the eager startup below and the Minitest.after_run hook.
+rsc_node_renderer_pid = nil
+rsc_node_renderer_waiter = nil
+
+if ENV["RSC_NODE_RENDERER_TESTS"] == "1"
+  cache_path = ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH") do
+    raise "RENDERER_SERVER_BUNDLE_CACHE_PATH is not set. " \
+          "Follow Step 1 of this guide to set it before Rails boots so every parallel worker " \
+          "gets a unique renderer bundle cache directory."
+  end
+  cache_path = cache_path.strip
+  raise "RENDERER_SERVER_BUNDLE_CACHE_PATH is empty." if cache_path.empty?
+
+  expanded_cache_path = File.expand_path(cache_path, Rails.root.to_s)
+  FileUtils.mkdir_p(Rails.root.join("tmp"))
+  tmp_root = Rails.root.join("tmp").to_s
+  unless expanded_cache_path.start_with?("#{tmp_root}#{File::SEPARATOR}")
+    raise "RENDERER_SERVER_BUNDLE_CACHE_PATH must be inside Rails.root/tmp " \
+          "(got: #{expanded_cache_path}). " \
+          "This path is deleted and recreated on every test run, so only paths " \
+          "inside Rails.root/tmp are permitted to prevent accidental data loss."
+  end
+  FileUtils.rm_rf(expanded_cache_path)
+  FileUtils.mkdir_p(expanded_cache_path)
+
+  renderer_env = {
+    "NODE_ENV" => "test",
+    "RAILS_ENV" => "test",
+    "RENDERER_PORT" => ENV.fetch("RENDERER_PORT") do
+      raise "RENDERER_PORT is not set. " \
+            "Follow Step 1 of this guide to set it before Rails boots so every parallel worker " \
+            "gets a unique renderer port."
+    end,
+    "RENDERER_SERVER_BUNDLE_CACHE_PATH" => expanded_cache_path
+  }
+
+  renderer_port = begin
+    Integer(renderer_env["RENDERER_PORT"])
+  rescue ArgumentError
+    raise "RENDERER_PORT must be an integer port number " \
+          "(got: #{renderer_env['RENDERER_PORT'].inspect})"
+  end
+  begin
+    Socket.tcp("127.0.0.1", renderer_port, connect_timeout: 1).close
+    raise "RENDERER_PORT #{renderer_env['RENDERER_PORT']} is already in use. " \
+          "A previous test run may have left an orphaned node renderer. " \
+          "Kill it manually or restart the CI job."
+  rescue Errno::ECONNREFUSED
+    # Port refused immediately — nothing is listening; safe to spawn.
+  rescue Errno::ETIMEDOUT
+    # SYN dropped (firewall/throttle); assume nothing is listening and proceed.
+  rescue Errno::ECONNRESET
+    raise "RENDERER_PORT #{renderer_env['RENDERER_PORT']} accepted and reset a connection. " \
+          "Another service may already be using it."
+  rescue Errno::EADDRNOTAVAIL, Errno::EHOSTUNREACH, SocketError => e
+    raise "Cannot probe RENDERER_PORT #{renderer_env['RENDERER_PORT']}: #{e.class}: #{e.message}"
+  end
+
+  FileUtils.mkdir_p(Rails.root.join("log"))
+  renderer_log_path = Rails.root.join("log/node-renderer-test-#{RscTestWorker::ID}.log").to_s
+  rsc_node_renderer_pid = Process.spawn(
+    renderer_env,
+    "pnpm", # replace with "npm", "yarn", or "bun" if that is your package manager
+    "run",
+    "node-renderer",
+    chdir: Rails.root.to_s,
+    out: renderer_log_path,
+    err: [:child, :out],
+    pgroup: true # place pnpm and its child Node process in a new process group
+  )
+  rsc_node_renderer_waiter = Process.detach(rsc_node_renderer_pid)
+
+  renderer_timeout_value = ENV.fetch("RSC_NODE_RENDERER_BOOT_TIMEOUT", "30")
+  renderer_timeout = begin
+    Integer(renderer_timeout_value)
+  rescue ArgumentError
+    raise "RSC_NODE_RENDERER_BOOT_TIMEOUT must be an integer number of seconds " \
+          "(got: #{ENV['RSC_NODE_RENDERER_BOOT_TIMEOUT'].inspect})"
+  end
+  begin
+    RscNodeRenderer.wait_until_ready!(
+      host: "127.0.0.1",
+      port: renderer_port,
+      timeout_seconds: renderer_timeout,
+      log_path: renderer_log_path,
+      pid: rsc_node_renderer_pid
+    )
+  rescue StandardError
+    begin
+      Process.kill("-TERM", rsc_node_renderer_pid)
+    rescue Errno::ESRCH, Errno::EPERM
+      # Already stopped or no permission to signal; surfaces the original startup error.
+    end
+    rsc_node_renderer_waiter&.join(2)
+    rsc_node_renderer_pid = nil
+    rsc_node_renderer_waiter = nil
+    raise
+  end
+end
+
+Minitest.after_run do
+  pid = rsc_node_renderer_pid
+  next unless pid
+
+  begin
+    # Sends SIGTERM to the entire process group so pnpm and the Node child both stop.
+    Process.kill("-TERM", pid)
+    # Thread#join returns the waiter thread when the process exits, and nil on timeout.
+    # SIGKILL only fires when SIGTERM did not stop the process within the join window.
+    unless rsc_node_renderer_waiter&.join(5)
+      begin
+        Process.kill("-KILL", pid)
+      rescue Errno::ESRCH
+        # Stopped between the join timeout and the SIGKILL; nothing more to do.
+      else
+        unless rsc_node_renderer_waiter&.join(5)
+          warn "Node renderer process group #{pid} did not stop after SIGKILL; " \
+               "it may still occupy the renderer port for the next CI retry."
+        end
+      end
+    end
+  rescue Errno::ESRCH
+    # Already stopped.
+  rescue Errno::EPERM
+    warn "No permission to stop node renderer process group #{pid}; " \
+         "it may need manual cleanup."
+  ensure
+    rsc_node_renderer_pid = nil
+    rsc_node_renderer_waiter = nil
+  end
+end
+```
+
+The [caveats listed for the RSpec recipe](#3-start-one-test-renderer-per-worker) apply equally here: the TCP probe is a fallback for renderers without a health endpoint, `pgroup: true` and the negative-PID `Process.kill` calls are POSIX-only, and CI hard-kills bypass `Minitest.after_run` so clear orphaned renderer processes or occupied ports before retrying the job. Set `RSC_NODE_RENDERER_TESTS=1` on CI jobs that need the renderer; leaving it unset lets local non-RSC Minitest runs skip the renderer entirely.
 
 ## Two Approaches to Test Asset Compilation
 
