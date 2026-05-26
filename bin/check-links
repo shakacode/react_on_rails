@@ -1,11 +1,19 @@
 #!/usr/bin/env bash
 #
-# Check markdown links using lychee (matches CI behavior exactly)
+# Check markdown links using lychee (matches CI behavior exactly).
 #
-# Only checks git-tracked, user-facing docs to match CI workflow:
-#   - docs/**/*.md
-#   - *.md (root level only)
-#   - react_on_rails_pro/*.md
+# Mirrors .github/workflows/check-markdown-links.yml so local results agree
+# with CI. Passes the same directory + glob inputs the workflow uses rather
+# than an explicit file list, because lychee resolves relative links against
+# each input file's directory -- and feeding the docs/oss/upgrading/changelog.md
+# symlink via --files-from causes its relative links (e.g. docs/oss/...) to
+# resolve against docs/oss/upgrading/ instead of the repo root, producing
+# bogus "file not found" errors that CI never sees.
+#
+# CI pins lycheeVersion: v0.23.0 in lycheeverse/lychee-action. Install the
+# same version locally; lychee 0.24+ changed the schema for the
+# `include_fragments` config key and will reject .lychee.toml until that
+# upgrade is made.
 #
 # Usage:
 #   bin/check-links
@@ -14,12 +22,14 @@
 set -eo pipefail
 
 if ! command -v lychee &> /dev/null; then
-  echo "Error: lychee is not installed. Install it with: cargo install lychee" >&2
+  echo "Error: lychee is not installed." >&2
+  echo "Install v0.23.0 (matches CI):" >&2
+  echo "  cargo install lychee --version 0.23.0" >&2
+  echo "  # or download from https://github.com/lycheeverse/lychee/releases/tag/lychee-v0.23.0" >&2
   exit 1
 fi
 
-{
-  git ls-files 'docs/*.md' 'docs/**/*.md'
-  git ls-files '*.md' | grep -v '/' || true
-  git ls-files 'react_on_rails_pro/*.md'
-} | sort -u | lychee --config .lychee.toml --files-from -
+# shellcheck disable=SC2068
+# Word-split the globs so *.md and react_on_rails_pro/*.md expand, matching
+# the workflow's `args: --config .lychee.toml docs/ *.md react_on_rails_pro/*.md`.
+exec lychee --config .lychee.toml docs/ *.md react_on_rails_pro/*.md
