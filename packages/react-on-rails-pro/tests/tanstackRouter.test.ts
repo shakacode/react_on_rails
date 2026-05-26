@@ -132,10 +132,9 @@ function buildStoresHydrationHarness({
     setMatches: (matches: unknown[]) => storeState.matches.set(matches),
   };
   const batch = useBatch ? jest.fn((callback: () => void) => tanstackStoreBatch(callback)) : undefined;
-  const routerWithStores = router as TanStackRouter & { batch?: typeof batch; stores: typeof stores };
-  routerWithStores.stores = stores;
+  router.stores = stores;
   if (batch) {
-    routerWithStores.batch = batch;
+    router.batch = batch;
   }
 
   const renderFn = createTanStackRouterRenderFunction(

@@ -19,21 +19,12 @@ type TanStackRouterHydrationInternals = TanStackRouter & {
   };
 };
 
-type TanStackRouterWritableStore<TValue = unknown> = {
-  set: (nextOrUpdater: TValue | ((prev: TValue) => TValue)) => void;
-};
-
+// stores is optional on the public TanStackRouter type so consumers can model
+// it without casts; this narrowed alias requires it to be present so the
+// hydration code below can access fields without `?.` chains.
 type TanStackRouterStoresHydrationInternals = TanStackRouter & {
   matchRoutes: (location: unknown) => unknown[];
-  stores: {
-    status: TanStackRouterWritableStore<string>;
-    resolvedLocation: TanStackRouterWritableStore<TanStackRouter['state']['location']>;
-    // setMatches is a batch-utility helper on the stores object, not a store atom
-    // with a `.set()` method — that's why it doesn't follow the TanStackRouterWritableStore<T>
-    // pattern used by status/resolvedLocation above.
-    setMatches: (nextMatches: unknown[]) => void;
-  };
-  batch?: (callback: () => void) => void;
+  stores: NonNullable<TanStackRouter['stores']>;
 };
 
 type TanStackRouterChunkPreloadInternals = TanStackRouter & {
@@ -103,7 +94,7 @@ function hasLegacyHydrationStore(router: TanStackRouter): router is TanStackRout
 }
 
 function hasStoresHydrationApi(router: TanStackRouter): router is TanStackRouterStoresHydrationInternals {
-  const { stores } = router as Partial<TanStackRouterStoresHydrationInternals>;
+  const { stores } = router;
 
   return (
     typeof router.matchRoutes === 'function' &&
