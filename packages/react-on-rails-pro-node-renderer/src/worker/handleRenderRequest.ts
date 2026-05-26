@@ -26,7 +26,7 @@ import {
   validateBundlesExist,
 } from '../shared/utils.js';
 import { getConfig } from '../shared/configBuilder.js';
-import type { TracingContext } from '../shared/tracing.js';
+import { subSpan, type TracingContext } from '../shared/tracing.js';
 import { buildExecutionContext, ExecutionContext, VMContextNotFoundError } from './vm.js';
 
 export type ProvidedNewBundle = {
@@ -39,48 +39,52 @@ async function prepareResult(
   bundleFilePathPerTimestamp: string,
   executionContext: ExecutionContext,
 ): Promise<ResponseResult> {
-  try {
-    const result = await executionContext.runInVM(renderingRequest, bundleFilePathPerTimestamp, cluster);
-
-    let exceptionMessage = null;
-    if (!result) {
-      const error = new Error(
-        'INVALID NIL or NULL result for rendering. Ensure renderingRequest is a valid string and returns a value.',
+  return subSpan({ name: 'ror.result.prepare' }, async () => {
+    try {
+      const result = await subSpan({ name: 'ror.vm.execute' }, () =>
+        executionContext.runInVM(renderingRequest, bundleFilePathPerTimestamp, cluster),
       );
-      exceptionMessage = formatExceptionMessage(
-        { renderingRequest },
-        error,
-        'INVALID result for prepareResult',
-      );
-    } else if (isErrorRenderResult(result)) {
-      ({ exceptionMessage } = result);
-    }
 
-    if (exceptionMessage) {
-      return errorResponseResult(exceptionMessage);
-    }
+      let exceptionMessage = null;
+      if (!result) {
+        const error = new Error(
+          'INVALID NIL or NULL result for rendering. Ensure renderingRequest is a valid string and returns a value.',
+        );
+        exceptionMessage = formatExceptionMessage(
+          { renderingRequest },
+          error,
+          'INVALID result for prepareResult',
+        );
+      } else if (isErrorRenderResult(result)) {
+        ({ exceptionMessage } = result);
+      }
 
-    if (isReadableStream(result)) {
+      if (exceptionMessage) {
+        return errorResponseResult(exceptionMessage);
+      }
+
+      if (isReadableStream(result)) {
+        return {
+          headers: { 'Cache-Control': 'public, max-age=31536000' },
+          status: 200,
+          stream: result,
+        };
+      }
+
       return {
         headers: { 'Cache-Control': 'public, max-age=31536000' },
         status: 200,
-        stream: result,
+        data: result,
       };
+    } catch (err) {
+      const exceptionMessage = formatExceptionMessage(
+        { renderingRequest },
+        err,
+        'Unknown error calling runInVM',
+      );
+      return errorResponseResult(exceptionMessage);
     }
-
-    return {
-      headers: { 'Cache-Control': 'public, max-age=31536000' },
-      status: 200,
-      data: result,
-    };
-  } catch (err) {
-    const exceptionMessage = formatExceptionMessage(
-      { renderingRequest },
-      err,
-      'Unknown error calling runInVM',
-    );
-    return errorResponseResult(exceptionMessage);
-  }
+  });
 }
 
 /**
@@ -235,7 +239,17 @@ export async function handleRenderRequest({
     }
 
     try {
-      const executionContext = await buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ false);
+      const executionContext = await subSpan(
+        {
+          name: 'ror.bundle.build_execution_context',
+          attributes: {
+            'bundle.timestamp': String(bundleTimestamp),
+            'bundle.paths.count': allBundleFilePaths.length,
+            'cache.strategy': 'cache-first',
+          },
+        },
+        () => buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ false),
+      );
       return {
         response: await prepareResult(renderingRequest, entryBundleFilePath, executionContext),
         executionContext,
@@ -250,7 +264,16 @@ export async function handleRenderRequest({
 
     // If gem has posted updated bundle:
     if (providedNewBundles && providedNewBundles.length > 0) {
-      const result = await handleNewBundlesProvided({ renderingRequest }, providedNewBundles, assetsToCopy);
+      const result = await subSpan(
+        {
+          name: 'ror.bundle.upload',
+          attributes: {
+            'bundle.count': providedNewBundles.length,
+            'assets.count': assetsToCopy?.length ?? 0,
+          },
+        },
+        () => handleNewBundlesProvided({ renderingRequest }, providedNewBundles, assetsToCopy),
+      );
       if (result) {
         return { response: result };
       }
@@ -269,7 +292,17 @@ export async function handleRenderRequest({
       entryBundleFilePath,
       workerIdLabel(),
     );
-    const executionContext = await buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ true);
+    const executionContext = await subSpan(
+      {
+        name: 'ror.bundle.build_execution_context',
+        attributes: {
+          'bundle.timestamp': String(bundleTimestamp),
+          'bundle.paths.count': allBundleFilePaths.length,
+          'cache.strategy': 'cache-miss',
+        },
+      },
+      () => buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ true),
+    );
     return {
       response: await prepareResult(renderingRequest, entryBundleFilePath, executionContext),
       executionContext,

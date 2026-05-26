@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Added
+
+- **[Pro]** **OpenTelemetry integration for the Node Renderer**: New optional integration at `react-on-rails-pro-node-renderer/integrations/opentelemetry` that adds distributed tracing via standard OpenTelemetry. Users enable it by installing the `@opentelemetry/*` and `@fastify/otel` packages (optional peer deps) and calling `init({ fastify: true, tracing: true })` from their renderer entrypoint, before `reactOnRailsProNodeRenderer()`. Provides auto-instrumented HTTP and Fastify spans, an SSR root span (`ror.ssr.request`), and render-path sub-spans (`ror.bundle.build_execution_context`, `ror.bundle.upload`, `ror.vm.execute`, `ror.result.prepare`, `ror.incremental.stream`, `ror.incremental.process_chunk`). Configuration follows standard OpenTelemetry env-var conventions (`OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES`, etc.); defaults to `BatchSpanProcessor` in production and `SimpleSpanProcessor` otherwise. The integration is fully optional — users who do not enable it pay zero runtime cost, and the renderer has no direct dependency on OpenTelemetry. Closes [Issue 2156](https://github.com/shakacode/react_on_rails/issues/2156). [PR 3382](https://github.com/shakacode/react_on_rails/pull/3382) by [justin808](https://github.com/justin808).
+
 #### Changed
 
 - **Upgrade contributor pnpm tooling to 10.33.4**: The monorepo now pins pnpm 10.33.4 with Corepack's hash-qualified `packageManager` format, keeps the install-generator CI fallback on the same pnpm version, and relies on the root workspace pin instead of duplicate workspace `packageManager` declarations. [PR 3400](https://github.com/shakacode/react_on_rails/pull/3400) by [alexeyr-ci2](https://github.com/alexeyr-ci2).

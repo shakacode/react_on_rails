@@ -36,8 +36,12 @@ export {
 } from '../shared/errorReporter.js';
 export {
   setupTracing,
+  setupSubSpan,
+  subSpan,
   TracingContext,
   TracingIntegrationOptions,
   UnitOfWorkOptions,
+  SubSpanOptions,
+  SubSpanFn,
 } from '../shared/tracing.js';
-export { configureFastify, FastifyConfigFunction } from '../worker.js';
+export { configureFastify, FastifyConfigFunction } from '../worker/fastifyConfig.js';

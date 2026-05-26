@@ -5,9 +5,10 @@ import querystring from 'querystring';
 import { createReadStream } from 'fs-extra';
 // eslint-disable-next-line import/no-relative-packages
 import packageJson from '../package.json';
-import worker, { disableHttp2 } from '../src/worker';
+import worker, { configureFastify, disableHttp2 } from '../src/worker';
 import * as vm from '../src/worker/vm';
 import * as errorReporter from '../src/shared/errorReporter';
+import { __resetTracingForTest, setupTracing, type TracingContext } from '../src/shared/tracing';
 import {
   BUNDLE_TIMESTAMP,
   SECONDARY_BUNDLE_TIMESTAMP,
@@ -50,6 +51,10 @@ describe('worker', () => {
 
   afterAll(async () => {
     await resetForTest(testName);
+  });
+
+  test('worker subpath keeps configureFastify available for custom entrypoints', () => {
+    expect(configureFastify).toEqual(expect.any(Function));
   });
 
   test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest when bundle is provided and did not yet exist', async () => {
@@ -1094,6 +1099,41 @@ describe('worker', () => {
       );
 
       expect(res.payload).toContain('Invalid first incremental render request chunk received');
+    });
+
+    test('reports initial render errors with the active tracing context', async () => {
+      const app = createWorkerApp();
+      const tracingContext = { testContext: true } as TracingContext;
+      const reportMessageSpy = jest.spyOn(errorReporter, 'message').mockImplementation(jest.fn());
+
+      try {
+        __resetTracingForTest();
+        expect(setupTracing({ executor: async (fn) => fn(tracingContext) })).toBe(true);
+
+        const incompletePayload = {
+          gemVersion,
+          protocolVersion,
+          password: 'my_password',
+          dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP)],
+        };
+
+        const res = await callIncrementalRender(
+          app,
+          BUNDLE_TIMESTAMP,
+          'd41d8cd98f00b204e9800998ecf8427e',
+          incompletePayload,
+          400,
+        );
+
+        expect(res.payload).toContain('Invalid first incremental render request chunk received');
+        expect(reportMessageSpy).toHaveBeenCalledWith(
+          expect.stringContaining('Invalid first incremental render request chunk received'),
+          tracingContext,
+        );
+      } finally {
+        __resetTracingForTest();
+        reportMessageSpy.mockRestore();
+      }
     });
 
     test('fails when password is missing', async () => {
