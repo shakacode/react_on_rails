@@ -176,16 +176,21 @@ exit non-zero. The built-in 30-day threshold is currently hardcoded in the gem; 
 want a non-zero exit for expiring-soon licenses or a custom warning threshold.
 
 The full JSON output includes license metadata such as organization, plan, and expiration. Treat CI logs, step summaries,
-and uploaded artifacts as internal if they include raw task output. For example, an expired license can include these
-fields among the full response:
+and uploaded artifacts as internal if they include raw task output. The complete schema for an expired license is:
 
 ```json
 {
   "status": "expired",
+  "organization": "Acme Corp",
+  "plan": "paid",
+  "expiration": "2024-01-01T00:00:00Z",
+  "attribution_required": false,
   "days_remaining": -2,
   "renewal_required": true
 }
 ```
+
+Additional fields may appear in future gem versions; scripts should ignore unknown keys.
 
 JSON parsers should branch on `status` before treating `renewal_required` as an expiring-soon signal. If your app
 guarantees JSON-only stdout, `JSON.parse(stdout.strip)` is enough. The example below also tolerates Rails boot output
