@@ -1,4 +1,4 @@
-/* eslint-disable react/prefer-es6-class,react/destructuring-assignment,react/no-unused-class-component-methods */
+/* eslint-disable react/prefer-es6-class,react/no-unused-class-component-methods */
 
 'use client';
 

@@ -12,7 +12,6 @@ const ReactHelmet = (props) => (
     <HelloWorld {...props} />
     <div>
       result from api request during server rendering:{' '}
-      {/* eslint-disable-next-line react/destructuring-assignment */}
       {JSON.stringify(props.apiRequestResponse, consistentKeysReplacer)}
     </div>
   </div>

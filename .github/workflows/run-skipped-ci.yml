@@ -120,8 +120,7 @@ jobs:
               'Rspec test for gem': 'gem-tests.yml',
               'Generator tests': 'examples.yml',
               'React on Rails Pro - Integration Tests': 'pro-integration-tests.yml',
-              'React on Rails Pro - Package Tests': 'pro-test-package-and-gem.yml',
-              'React on Rails Pro - Lint': 'pro-lint.yml'
+              'React on Rails Pro - Package Tests': 'pro-test-package-and-gem.yml'
             };
 
             // Get unique workflows that have skipped checks

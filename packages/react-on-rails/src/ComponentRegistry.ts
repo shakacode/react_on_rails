@@ -65,7 +65,7 @@ Registered component names include [ ${keys} ]. Maybe you forgot to register the
    * @param _name Component name to wait for
    * @throws Always throws error indicating pro package is required
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   getOrWaitForComponent(_name: string): never {
     throw new Error('getOrWaitForComponent requires react-on-rails-pro package');
   },

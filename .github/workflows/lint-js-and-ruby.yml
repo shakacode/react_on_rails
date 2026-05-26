@@ -16,7 +16,6 @@ on:
       - 'llms.txt'
       - 'llms-full.txt'
       - '.lychee.toml'
-      - 'react_on_rails_pro/**'
   workflow_dispatch:
     inputs:
       force_run:

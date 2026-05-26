@@ -22,8 +22,6 @@ const config = defineConfig([
   globalIgnores([
     // compiled code
     'packages/*/lib/',
-    // pro package (has its own linting)
-    'react_on_rails_pro/',
     // used for tests only
     'spec/react_on_rails/dummy-for-generators',
     'react_on_rails/spec/dummy-for-generators',
@@ -190,10 +188,47 @@ const config = defineConfig([
     },
   },
   {
-    files: ['react_on_rails/spec/dummy/**/*', 'react_on_rails_pro/spec/dummy/**/*'],
+    files: [
+      'react_on_rails/spec/dummy/**/*',
+      'react_on_rails_pro/spec/dummy/**/*',
+      'react_on_rails_pro/spec/execjs-compatible-dummy/**/*',
+    ],
     rules: {
       // The dummy app dependencies are managed separately and may not be installed
       'import/no-unresolved': 'off',
+    },
+  },
+  {
+    // Pro dummy apps were written under a more permissive lint config (see Pro's
+    // pre-unification eslint.config.mjs). Keeping these rules off preserves
+    // behavior; tightening them is out of scope for the lint-config unification.
+    files: ['react_on_rails_pro/spec/dummy/**/*', 'react_on_rails_pro/spec/execjs-compatible-dummy/**/*'],
+    rules: {
+      'import/extensions': 'off',
+      'import/prefer-default-export': 'off',
+      'import/named': 'off',
+      'react/prop-types': 'off',
+      'no-underscore-dangle': 'off',
+      // Pre-existing: a few .server.tsx files have 'use client' directives.
+      // Not a regression introduced by unification; track fixing separately.
+      'react-on-rails/no-use-client-in-server-files': 'off',
+    },
+  },
+  {
+    // Pro node-renderer integrations must only use the public integration API
+    files: ['packages/react-on-rails-pro-node-renderer/src/integrations/**'],
+    ignores: ['packages/react-on-rails-pro-node-renderer/src/integrations/api.ts'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: ['../*'] }],
+    },
+  },
+  {
+    // Pro Playwright e2e tests: fixtures use empty object patterns,
+    // and Playwright's `test` function false-positives on react-hooks rules
+    files: ['react_on_rails_pro/spec/dummy/e2e-tests/**/*'],
+    rules: {
+      'no-empty-pattern': ['error', { allowObjectPatternsAsParameters: true }],
+      'react-hooks/rules-of-hooks': 'off',
     },
   },
   {
@@ -228,6 +263,7 @@ const config = defineConfig([
       '@typescript-eslint/no-unused-vars': [
         'error',
         {
+          argsIgnorePattern: '^_',
           caughtErrorsIgnorePattern: '^_',
         },
       ],
@@ -279,6 +315,13 @@ const config = defineConfig([
       '@typescript-eslint/no-unsafe-argument': 'off',
       // Allow missing extensions in require() calls - dynamic imports
       'import/extensions': 'off',
+      // FastifyReply is a known-safe floating promise in node-renderer
+      '@typescript-eslint/no-floating-promises': [
+        'error',
+        {
+          allowForKnownSafePromises: [{ from: 'package', package: 'fastify', name: 'FastifyReply' }],
+        },
+      ],
     },
   },
   {

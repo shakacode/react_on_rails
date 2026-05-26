@@ -134,7 +134,7 @@ while IFS= read -r file; do
       ;;
 
     # React on Rails Pro package / dummy app
-    react_on_rails_pro/spec/dummy/*|react_on_rails_pro/spec/dummy/**/*|.github/workflows/pro-integration-tests.yml)
+    react_on_rails_pro/spec/dummy/*|react_on_rails_pro/spec/dummy/**/*|react_on_rails_pro/spec/execjs-compatible-dummy/*|react_on_rails_pro/spec/execjs-compatible-dummy/**/*|.github/workflows/pro-integration-tests.yml)
       DOCS_ONLY=false
       PRO_DUMMY_CHANGED=true
       ;;
@@ -146,13 +146,13 @@ while IFS= read -r file; do
       ;;
 
     # Lint/format configuration
-    .rubocop.yml|.eslintrc*|.prettierrc*|tsconfig.json|.editorconfig|.github/workflows/lint-js-and-ruby.yml)
+    .rubocop.yml|.eslintrc*|eslint.config.*|.prettierrc*|.prettierignore|tsconfig.json|.editorconfig|package-scripts.yml|.github/workflows/lint-js-and-ruby.yml)
       DOCS_ONLY=false
       LINT_CONFIG_CHANGED=true
       ;;
 
-    # React on Rails Pro lint/format configuration
-    react_on_rails_pro/.rubocop.yml|react_on_rails_pro/.eslintrc*|react_on_rails_pro/.prettierrc*|react_on_rails_pro/tsconfig.json|react_on_rails_pro/.editorconfig|.github/workflows/pro-lint.yml)
+    # React on Rails Pro Ruby/RBS/TypeScript lint configuration
+    react_on_rails_pro/.rubocop.yml|react_on_rails_pro/.eslintrc*|react_on_rails_pro/eslint.config.*|react_on_rails_pro/.prettierrc*|react_on_rails_pro/.prettierignore|react_on_rails_pro/tsconfig.json|react_on_rails_pro/.editorconfig|react_on_rails_pro/package-scripts.yml)
       DOCS_ONLY=false
       PRO_LINT_CONFIG_CHANGED=true
       ;;
@@ -246,7 +246,7 @@ echo "Changed file categories:"
 [ "$PRO_DUMMY_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro Dummy app${NC}"
 [ "$PRO_NODE_RENDERER_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro Node Renderer package${NC}"
 [ "$LINT_CONFIG_CHANGED" = true ] && echo -e "${YELLOW}  • Lint/format configuration${NC}"
-[ "$PRO_LINT_CONFIG_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro lint/format configuration${NC}"
+[ "$PRO_LINT_CONFIG_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro lint configuration${NC}"
 [ "$UNCATEGORIZED_CHANGED" = true ] && echo -e "${YELLOW}  • Uncategorized changes (running full suite for safety)${NC}"
 
 echo ""
@@ -263,7 +263,7 @@ RUN_PRO_TESTS=false
 RUN_PRO_DUMMY_TESTS=false
 RUN_PRO_NODE_RENDERER_TESTS=false
 
-if [ "$LINT_CONFIG_CHANGED" = true ] || [ "$RUBY_CORE_CHANGED" = true ] || [ "$JS_CHANGED" = true ] || [ "$SPEC_DUMMY_CHANGED" = true ]; then
+if [ "$LINT_CONFIG_CHANGED" = true ] || [ "$RUBY_CORE_CHANGED" = true ] || [ "$JS_CHANGED" = true ] || [ "$SPEC_DUMMY_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ] || [ "$PRO_DUMMY_CHANGED" = true ] || [ "$PRO_NODE_RENDERER_CHANGED" = true ]; then
   RUN_LINT=true
 fi
 
@@ -319,7 +319,7 @@ fi
 [ "$RUN_JS_TESTS" = true ] && echo "  ✓ JS unit tests"
 [ "$RUN_DUMMY_TESTS" = true ] && echo "  ✓ Dummy app integration tests"
 [ "$RUN_GENERATORS" = true ] && echo "  ✓ Generator tests"
-[ "$RUN_PRO_LINT" = true ] && echo "  ✓ React on Rails Pro Lint (Ruby + JS)"
+[ "$RUN_PRO_LINT" = true ] && echo "  ✓ React on Rails Pro Lint (Ruby + RBS + TypeScript)"
 [ "$RUN_PRO_TESTS" = true ] && echo "  ✓ React on Rails Pro RSpec unit tests (Ruby + JS)"
 [ "$RUN_PRO_DUMMY_TESTS" = true ] && echo "  ✓ React on Rails Pro Dummy app integration tests"
 [ "$RUN_PRO_NODE_RENDERER_TESTS" = true ] && echo "  ✓ React on Rails Pro Node Renderer tests"
