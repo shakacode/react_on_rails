@@ -721,9 +721,7 @@ describe('opentelemetry integration: end-to-end render request', () => {
       startSsrRequestOptions({ renderingRequest: 'ReactOnRails.dummy' }),
     );
 
-    const bundleUploadSpan = exporter
-      .getFinishedSpans()
-      .find((s) => s.name === 'ror.bundle.upload');
+    const bundleUploadSpan = exporter.getFinishedSpans().find((s) => s.name === 'ror.bundle.upload');
     expect(bundleUploadSpan!.attributes['bytes.total']).toBe(bundleSize + Buffer.byteLength(assetContent));
   });
 });
