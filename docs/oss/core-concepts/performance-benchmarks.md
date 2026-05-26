@@ -90,10 +90,20 @@ Server components produce HTML that does not need hydration — they have no cli
 ## Real-World Results
 
 > [!NOTE]
-> This section covers a non-production local directional benchmark first, then a production case study. For validated,
+> This section links to a public live demo first, then covers a non-production local directional benchmark, then a production case study. For validated,
 > at-scale results, see the [Production Case Study: Popmenu](#popmenu) below.
 
-### Non-Production Local Directional Benchmark: Gumroad-Style RSC Demo (April 2026) <a id="gumroad-style-rsc-demo"></a>
+### Public Marketplace RSC Demo Overview {#public-marketplace-rsc-demo}
+
+The [LocalHub marketplace demo](https://rsc.reactonrails.com/) is a public,
+inspectable React on Rails Pro + RSC demo showing the same page families
+rendered with traditional SSR, client rendering, and React Server Components.
+See the [Live Demo and Evidence](../../pro/react-server-components/index.md#live-demo-and-evidence)
+section for the canonical link inventory and caveats: performance showcase, raw
+Lighthouse reports, bundle-size breakdowns, the `/why-rsc` walkthrough, and the
+demo source.
+
+### Non-Production Local Directional Benchmark: Gumroad-Style RSC Demo (April 2026) {#gumroad-style-rsc-demo}
 
 The [Gumroad-style RSC benchmark demo](https://github.com/shakacode/react-on-rails-demo-gumroad-rsc)
 is a public ShakaCode comparison repo modeled after a creator-dashboard surface with product listings and sales metrics,
@@ -205,7 +215,7 @@ captured by this benchmark methodology and remain a follow-up; see
 - _The source artifact does not publish a p95 or per-run distribution for `action_total`, so its -2.3% median delta
   cannot be distinguished from measurement noise at n=8._
 
-#### `responseEnd` p95 counter-signal <a id="gumroad-rsc-worst-case-responseend"></a>
+#### `responseEnd` p95 counter-signal {#gumroad-rsc-worst-case-responseend}
 
 | Metric                  | Inertia demo | RSC demo | Delta % (negative = RSC faster) |
 | ----------------------- | -----------: | -------: | ------------------------------: |
@@ -225,7 +235,7 @@ are still required before making stronger production-performance claims.
 See [Issue 3128](https://github.com/shakacode/react_on_rails/issues/3128) and
 [Issue 3144](https://github.com/shakacode/react_on_rails/issues/3144) for the ongoing tracking discussion.
 
-### Production Case Study: Popmenu <a id="popmenu"></a>
+### Production Case Study: Popmenu {#popmenu}
 
 Popmenu, a restaurant platform serving tens of millions of SSR requests daily, adopted React on Rails Pro and reported:
 

@@ -64,6 +64,8 @@ For detailed proof criteria and migration contribution guidance, see
 ### Marketplace RSC Performance Demo
 
 - Repo: [shakacode/react-on-rails-demo-marketplace-rsc](https://github.com/shakacode/react-on-rails-demo-marketplace-rsc)
+- Live demo & evidence: see the [Live Demo and Evidence](../../pro/react-server-components/index.md#live-demo-and-evidence)
+  section for Lighthouse reports, bundle-size breakdowns, and the demo itself.
 - Use it when you want a public performance-oriented RSC demo showing the shape
   of the user-visible win on a marketplace-style surface.
 
