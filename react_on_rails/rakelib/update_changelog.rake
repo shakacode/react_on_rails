@@ -397,8 +397,9 @@ end
 # rubocop:enable Metrics/AbcSize
 
 def compute_auto_version(changelog, mode, monorepo_root, changelog_for_bump: nil)
-  # Keep backward compatibility with older callers that pass changelog_for_bump
-  # as a keyword while allowing the new 3-argument call shape.
+  # changelog_for_bump is only consulted when the bump type must be inferred
+  # from [Unreleased]: namely release mode, and rc/beta cold-start (no active
+  # prerelease base). It is ignored once an rc/beta series has begun.
   changelog_for_bump ||= changelog
 
   # For rc/beta modes, if an active prerelease base already exists (from a
@@ -406,6 +407,12 @@ def compute_auto_version(changelog, mode, monorepo_root, changelog_for_bump: nil
   # directly. The bump decision was made when the first RC of the series
   # was stamped; once rc.0 ships, rc.1 must stay on the same base version
   # even if Unreleased is empty or its headings suggest a different bump.
+  #
+  # Note: active_prerelease_base_version is channel-agnostic — it returns the
+  # highest active base across rc, beta, alpha, etc. This project does not mix
+  # channels on a single base version (e.g., we don't ship both 16.4.0.beta.N
+  # and 16.4.0.rc.N), so the active base unambiguously belongs to the current
+  # channel in practice.
   if %w[rc beta].include?(mode)
     active_base = active_prerelease_base_version(monorepo_root, changelog)
     if active_base

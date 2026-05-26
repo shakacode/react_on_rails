@@ -501,8 +501,7 @@ RSpec.describe "update_changelog.rake helper methods" do
           - Feature from RC
         CHANGELOG
 
-        prepared_changelog = prepare_changelog_for_auto_version(changelog, repo_dir)
-        version = compute_auto_version(changelog, "rc", repo_dir, changelog_for_bump: prepared_changelog)
+        version = compute_auto_version(changelog, "rc", repo_dir)
 
         expect(version).to eq("16.4.0.rc.0")
       end
@@ -525,6 +524,28 @@ RSpec.describe "update_changelog.rake helper methods" do
         version = compute_auto_version(changelog, "rc", repo_dir)
 
         expect(version).to eq("16.4.0.rc.1")
+      end
+    end
+
+    it "increments beta index from existing beta tag of the same base version" do
+      # Mirrors the rc.1 increment test for the beta channel, since both modes
+      # share the early-return code path in compute_auto_version.
+      Dir.mktmpdir do |repo_dir|
+        init_git_repo!(repo_dir)
+        run_git!("tag", "v16.3.0", chdir: repo_dir)
+        run_git!("tag", "v16.4.0.beta.0", chdir: repo_dir)
+
+        changelog = <<~CHANGELOG
+          ### [Unreleased]
+
+          ### [16.4.0.beta.0] - 2026-03-01
+          #### Added
+          - Feature from beta.0
+        CHANGELOG
+
+        version = compute_auto_version(changelog, "beta", repo_dir)
+
+        expect(version).to eq("16.4.0.beta.1")
       end
     end
 
