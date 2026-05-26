@@ -82,6 +82,12 @@ jobs:
       - name: Build workspace packages
         run: pnpm run build
 
+      - name: Cache dummy app Ruby gems
+        uses: actions/cache@v4
+        with:
+          path: react_on_rails/spec/dummy/vendor/bundle
+          key: dummy-app-gem-cache-${{ hashFiles('react_on_rails/spec/dummy/Gemfile.lock') }}-ruby3.3
+
       - name: Install dummy app Ruby dependencies
         working-directory: react_on_rails/spec/dummy
         env:
