@@ -651,4 +651,79 @@ describe('opentelemetry integration: end-to-end render request', () => {
       expect(descendants.has(span!.spanContext().spanId)).toBe(true);
     }
   });
+
+  test('SSR render records bundle.timestamp, bytes.total, and response.bytes attributes', async () => {
+    init({
+      tracing: true,
+      spanProcessor: new SimpleSpanProcessor(exporter),
+    });
+
+    await createUploadedBundle(testName);
+    const uploadedBundle = uploadedBundleForTest();
+    const { stat } = await import('fs/promises');
+    const uploadedSize = (await stat(uploadedBundle.savedFilePath)).size;
+
+    await trace(
+      async () => {
+        const result = await handleRenderRequest({
+          renderingRequest: 'ReactOnRails.dummy',
+          bundleTimestamp: BUNDLE_TIMESTAMP,
+          providedNewBundles: [{ bundle: uploadedBundle, timestamp: BUNDLE_TIMESTAMP }],
+        });
+        expect(result.response.status).toBe(200);
+      },
+      startSsrRequestOptions({ renderingRequest: 'ReactOnRails.dummy' }),
+    );
+
+    const spans = exporter.getFinishedSpans();
+    const vmExecuteSpan = spans.find((s) => s.name === 'ror.vm.execute');
+    const resultPrepareSpan = spans.find((s) => s.name === 'ror.result.prepare');
+    const bundleUploadSpan = spans.find((s) => s.name === 'ror.bundle.upload');
+
+    expect(vmExecuteSpan!.attributes['bundle.timestamp']).toBe(String(BUNDLE_TIMESTAMP));
+    expect(resultPrepareSpan!.attributes['response.bytes']).toEqual(expect.any(Number));
+    expect(resultPrepareSpan!.attributes['response.bytes']).toBeGreaterThan(0);
+    expect(bundleUploadSpan!.attributes['bytes.total']).toBe(uploadedSize);
+  });
+
+  test('bundle upload span records bytes.total summing both bundle and asset upload sizes', async () => {
+    init({
+      tracing: true,
+      spanProcessor: new SimpleSpanProcessor(exporter),
+    });
+
+    const { stat, writeFile } = await import('fs/promises');
+
+    await createUploadedBundle(testName);
+    const uploadedBundle = uploadedBundleForTest();
+    const bundleSize = (await stat(uploadedBundle.savedFilePath)).size;
+
+    // Create a small asset alongside the bundle to verify bytes.total sums both.
+    const assetPath = `${uploadedBundle.savedFilePath}.asset.json`;
+    const assetContent = '{"hello":"world"}';
+    await writeFile(assetPath, assetContent);
+    const asset: Asset = {
+      type: 'asset',
+      savedFilePath: assetPath,
+      filename: 'asset.json',
+    };
+
+    await trace(
+      async () => {
+        const result = await handleRenderRequest({
+          renderingRequest: 'ReactOnRails.dummy',
+          bundleTimestamp: BUNDLE_TIMESTAMP,
+          providedNewBundles: [{ bundle: uploadedBundle, timestamp: BUNDLE_TIMESTAMP }],
+          assetsToCopy: [asset],
+        });
+        expect(result.response.status).toBe(200);
+      },
+      startSsrRequestOptions({ renderingRequest: 'ReactOnRails.dummy' }),
+    );
+
+    const bundleUploadSpan = exporter
+      .getFinishedSpans()
+      .find((s) => s.name === 'ror.bundle.upload');
+    expect(bundleUploadSpan!.attributes['bytes.total']).toBe(bundleSize + Buffer.byteLength(assetContent));
+  });
 });
