@@ -37,6 +37,10 @@ const config: KnipConfig = {
         // This is an optional peer dependency because users without RSC don't need it
         // but Knip doesn't like such dependencies to be referenced directly in code
         'react-on-rails-rsc',
+        // Optional peer dependency: only apps using the TanStack Router adapter need it.
+        // It is pinned as a devDependency in packages/react-on-rails-pro for tests,
+        // but Knip still flags optional peers referenced in code.
+        '@tanstack/react-router',
         // SWC transpiler dependencies used by Shakapacker in dummy apps
         '@swc/core',
         'swc-loader',
