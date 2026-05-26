@@ -6,6 +6,7 @@ const setupWrappedHydration = async () => {
   const getReactServerComponent = jest.fn(() => jest.fn());
 
   jest.doMock('react-dom/client', () => ({ createRoot, hydrateRoot }));
+  jest.doMock('react-on-rails-rsc/client.browser', () => ({}));
   jest.doMock('../src/getReactServerComponent.client.ts', () => ({
     __esModule: true,
     default: getReactServerComponent,
@@ -60,6 +61,7 @@ describe('wrapServerComponentRenderer/client recoverable errors', () => {
     }
 
     jest.dontMock('react-dom/client');
+    jest.dontMock('react-on-rails-rsc/client.browser');
     jest.dontMock('../src/getReactServerComponent.client.ts');
     jest.resetModules();
     document.body.innerHTML = '';
