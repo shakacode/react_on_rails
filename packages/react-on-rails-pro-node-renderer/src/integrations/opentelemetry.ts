@@ -169,6 +169,7 @@ async function shutdownProviderWithTimeout(
           timedOut = true;
           // shutdownPromise rejection (if any) is handled by observedShutdownPromise above.
           void shutdownPromise.catch(() => undefined);
+          // shutdownPromise rejection (if any) is handled by observedShutdownPromise above.
           log.warn(
             '[OpenTelemetry] provider.shutdown() timed out after %dms; continuing worker shutdown',
             shutdownTimeoutMs,
