@@ -366,11 +366,12 @@ When releasing from prerelease to a stable version (e.g., `v16.5.0.rc.1` -> `v16
 - Remove the orphaned compare links at the bottom of the file for the coalesced prerelease versions
 - Add the `[16.5.0]` compare link pointing from the **previous stable tag** (e.g., `v16.4.0`) to `v16.5.0` — **not** from the latest RC tag
 - Update the `[unreleased]:` compare link to point from `v16.5.0` to `main`
+- **Before committing**, spot-check the compare-link updates above: orphaned RC compare links removed, the new `[16.5.0]` link anchored at the previous stable tag (e.g., `v16.4.0...v16.5.0`) — not the latest RC tag — and `[unreleased]` pointing from `v16.5.0` to `main`. When `bundle exec rake "update_changelog[release]"` does the coalesce, this is handled automatically; still verify the result before pushing.
 
 #### Step 2: Curate the entries — REMOVE these
 
 1. **Prerelease-only fixes** — bugs introduced during the prerelease cycle and fixed in a later RC. If the bug never shipped in a stable release, the fix is noise to stable users.
-   - Investigate when a bug was introduced: `git log --oneline v<last_stable>..v<rc_that_fixed_the_bug>` — search this range for the commit that introduced the bug. If you **find it** in this range, the bug was introduced during the RC cycle and never shipped in stable — apply the merge-or-drop rules below. If you **don't find it**, the bug predates the RC cycle and existed in `<last_stable>` — keep the fix as its own entry.
+   - Investigate when a bug was introduced: `git log --oneline v<last_stable>..v<rc_that_fixed_the_bug>` — search this range for the commit that introduced the bug. If the range is large and you know which files are relevant, scope it with `-- path/to/file` to cut noise. If you **find it** in this range, the bug was introduced during the RC cycle and never shipped in stable — apply the merge-or-drop rules below. If you **don't find it**, the bug predates the RC cycle and existed in `<last_stable>` — keep the fix as its own entry.
    - Check the PR description for what was broken and when
    - For RC-only regression fixes where the fix **changed user-visible behavior** of the original feature (e.g., extended an option's accepted values, adjusted a default, broadened a path matcher), **merge** the fix into the original PR's entry: credit both PRs and rewrite the description so it reflects the final shipped state. Don't drop these — stable consumers see the merged behavior, not the intermediate regression.
    - **Pure-restore** fixes (the fix only restores prior behavior without changing the original entry's description) can be dropped.
@@ -402,10 +403,6 @@ For each entry that doesn't obviously fall into a REMOVE or KEEP category above,
 #### Step 5: Final read-through
 
 Read the resulting stable section as if you're a user upgrading from the previous stable. Every entry should be something you'd want to know about. If an entry only makes sense to someone who tracked the RC cycle, drop it.
-
-#### Step 6: Verify the compare links from Step 1 (before committing)
-
-Before committing, confirm the compare-link updates from Step 1 are in place: orphaned RC compare links removed, the new `[16.5.0]` link anchored at the **previous stable tag** (e.g., `v16.4.0...v16.5.0`) — not the latest RC tag — and `[unreleased]` pointing from `v16.5.0` to `main`. When `bundle exec rake "update_changelog[release]"` does the coalesce, this is handled automatically; still spot-check the result before pushing.
 
 **Example reference:** See [PR 2072](https://github.com/shakacode/react_on_rails/pull/2072) for a complete example of prerelease changelog curation with detailed investigation notes.
 
