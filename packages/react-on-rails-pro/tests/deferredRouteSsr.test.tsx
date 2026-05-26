@@ -117,7 +117,7 @@ describe('RSCRoute deferred SSR behavior', () => {
     );
   });
 
-  it('does not generate provider cache keys or call the loader before the server bailout', () => {
+  it('bails out before entering the provider fetch/cache path', () => {
     const circularProps: Record<string, unknown> = {};
     circularProps.self = circularProps;
 
