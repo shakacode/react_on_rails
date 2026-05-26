@@ -262,7 +262,8 @@ module ReactOnRails
       end
 
       # Snapshot and restore the singleton method so the patch never leaks between examples,
-      # regardless of suite ordering or whether earlier tests already replaced it.
+      # regardless of suite ordering or whether earlier tests already replaced it. Also reset
+      # Engine's idempotency flag so each example re-installs the wrapper from a clean state.
       around do |example|
         singleton = nil
         snapshot = nil
@@ -271,8 +272,10 @@ module ReactOnRails
           had_override = singleton_defines_package_manager_check?(singleton)
           snapshot = ::Shakapacker::Utils::Manager.method(:error_unless_package_manager_is_obvious!) if had_override
         end
+        described_class.instance_variable_set(:@shakapacker_guard_suppressed, nil)
         example.run
       ensure
+        described_class.instance_variable_set(:@shakapacker_guard_suppressed, nil)
         if singleton
           if singleton_defines_package_manager_check?(singleton)
             singleton.send(:remove_method, :error_unless_package_manager_is_obvious!)
@@ -356,6 +359,11 @@ module ReactOnRails
     end
 
     describe ".suppress_shakapacker_package_manager_check_if_not_bundler! with missing Shakapacker internals" do
+      # Reset the idempotency flag so tests that observe a single install attempt are not
+      # short-circuited by state left over from an earlier example.
+      before { described_class.instance_variable_set(:@shakapacker_guard_suppressed, nil) }
+      after { described_class.instance_variable_set(:@shakapacker_guard_suppressed, nil) }
+
       context "when Shakapacker is not defined at all" do
         before do
           hide_const("Shakapacker")
@@ -478,7 +486,10 @@ module ReactOnRails
             {
               "APP_ROOT" => app_root,
               "RAILS_ENV" => "test",
-              "REACT_ON_RAILS_SKIP_VALIDATION" => nil
+              # Skip version validation so this test isolates the Shakapacker guard
+              # fix. The temp app has no node_modules, and we don't want a VersionChecker
+              # exit to masquerade as a Shakapacker boot failure.
+              "REACT_ON_RAILS_SKIP_VALIDATION" => "true"
             },
             RbConfig.ruby,
             boot_script_path,
