@@ -31,6 +31,9 @@ defaults:
   run:
     working-directory: react_on_rails_pro
 
+env:
+  RUBY_VERSION: 3.3.7
+
 jobs:
   detect-changes:
     # Skip Dependabot PRs — they can't access the Pro license secret.
@@ -101,7 +104,7 @@ jobs:
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 3.3.7
+          ruby-version: ${{ env.RUBY_VERSION }}
           bundler: 2.5.4
 
       - name: Setup Node
@@ -140,7 +143,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: react_on_rails_pro/spec/dummy/vendor/bundle
-          key: v4-pro-dummy-app-gem-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
+          key: v5-pro-dummy-app-gem-cache-ubuntu-22.04-ruby${{ env.RUBY_VERSION }}-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
 
       - name: Install Node modules with pnpm
         working-directory: .
@@ -209,7 +212,7 @@ jobs:
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 3.3.7
+          ruby-version: ${{ env.RUBY_VERSION }}
           bundler: 2.5.4
 
       - name: Setup Node
@@ -248,13 +251,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: react_on_rails_pro/vendor/bundle
-          key: v4-pro-package-gem-cache-${{ hashFiles('react_on_rails_pro/react_on_rails_pro.gemspec') }}
+          key: v5-pro-package-gem-cache-ubuntu-22.04-ruby${{ env.RUBY_VERSION }}-${{ hashFiles('react_on_rails_pro/react_on_rails_pro.gemspec') }}
 
       - name: Cache Pro dummy app Ruby gems
         uses: actions/cache@v4
         with:
           path: react_on_rails_pro/spec/dummy/vendor/bundle
-          key: v4-pro-dummy-app-gem-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
+          key: v5-pro-dummy-app-gem-cache-ubuntu-22.04-ruby${{ env.RUBY_VERSION }}-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
 
       - name: Remove old webpack bundles
         run: |
@@ -410,7 +413,7 @@ jobs:
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 3.3.7
+          ruby-version: ${{ env.RUBY_VERSION }}
           bundler: 2.5.4
 
       - name: Setup Node
@@ -449,13 +452,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: react_on_rails_pro/vendor/bundle
-          key: v4-pro-package-gem-cache-${{ hashFiles('react_on_rails_pro/react_on_rails_pro.gemspec') }}
+          key: v5-pro-package-gem-cache-ubuntu-22.04-ruby${{ env.RUBY_VERSION }}-${{ hashFiles('react_on_rails_pro/react_on_rails_pro.gemspec') }}
 
       - name: Cache Pro dummy app Ruby gems
         uses: actions/cache@v4
         with:
           path: react_on_rails_pro/spec/dummy/vendor/bundle
-          key: v4-pro-dummy-app-gem-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
+          key: v5-pro-dummy-app-gem-cache-ubuntu-22.04-ruby${{ env.RUBY_VERSION }}-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
 
       - name: Remove old webpack bundles
         run: |
