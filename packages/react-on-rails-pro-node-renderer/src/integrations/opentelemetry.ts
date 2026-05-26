@@ -5,6 +5,11 @@
 import type { Attributes } from '@opentelemetry/api';
 import type { NodeTracerProvider as NodeTracerProviderType } from '@opentelemetry/sdk-trace-node';
 import type { SpanExporter, SpanProcessor } from '@opentelemetry/sdk-trace-base';
+/* eslint-disable no-restricted-imports --
+ * This integration needs internal worker/shared modules that the public
+ * api.ts does not yet re-export (tracing adapter slots, OTel global state,
+ * fastify config + worker shutdown hook registration). Tracked in #3419
+ * — once api.ts surfaces these, remove this disable. */
 import { resetSubSpan, resetTracing, setupTracing, setupSubSpan, type SubSpanFn } from '../shared/tracing.js';
 import {
   getOpenTelemetryTracerProvider,
@@ -12,6 +17,7 @@ import {
 } from '../shared/opentelemetryState.js';
 import { registerFastifyConfigFunction } from '../worker/fastifyConfig.js';
 import { WORKER_SHUTDOWN_HOOKS_TIMEOUT_MS, registerWorkerShutdownHook } from '../worker/shutdownHooks.js';
+/* eslint-enable no-restricted-imports */
 import { log, message } from './api.js';
 
 declare module '../shared/tracing.js' {
@@ -161,8 +167,9 @@ async function shutdownProviderWithTimeout(
       new Promise<void>((resolve) => {
         timeoutId = setTimeout(() => {
           timedOut = true;
-          void shutdownPromise.catch(() => undefined);
           // shutdownPromise rejection (if any) is handled by observedShutdownPromise above.
+          void shutdownPromise.catch(() => undefined);
+          log.warn(
             '[OpenTelemetry] provider.shutdown() timed out after %dms; continuing worker shutdown',
             shutdownTimeoutMs,
           );
