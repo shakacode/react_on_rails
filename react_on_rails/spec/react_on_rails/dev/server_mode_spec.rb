@@ -88,24 +88,44 @@ RSpec.describe ReactOnRails::Dev::ServerMode do
       expect(described_class.detect("config/shakapacker.yml")).to eq(:hmr)
     end
 
-    it "ignores quoted HMR boolean strings" do
+    it "accepts quoted true as HMR enabled" do
       write_shakapacker_config(<<~YAML)
         development:
           dev_server:
             hmr: "true"
       YAML
 
-      expect(described_class.detect("config/shakapacker.yml")).to eq(:live_reload)
+      expect(described_class.detect("config/shakapacker.yml")).to eq(:hmr)
     end
 
-    it "ignores quoted live_reload boolean strings" do
+    it "accepts quoted false on live_reload as development server mode" do
       write_shakapacker_config(<<~YAML)
         development:
           dev_server:
             live_reload: "false"
       YAML
 
+      expect(described_class.detect("config/shakapacker.yml")).to eq(:development_server)
+    end
+
+    it "accepts quoted false on hmr as the live reload default" do
+      write_shakapacker_config(<<~YAML)
+        development:
+          dev_server:
+            hmr: "false"
+      YAML
+
       expect(described_class.detect("config/shakapacker.yml")).to eq(:live_reload)
+    end
+
+    it "matches quoted booleans case-insensitively with surrounding whitespace" do
+      write_shakapacker_config(<<~YAML)
+        development:
+          dev_server:
+            hmr: " TRUE "
+      YAML
+
+      expect(described_class.detect("config/shakapacker.yml")).to eq(:hmr)
     end
 
     it "ignores invalid HMR values when live reload uses the Shakapacker default" do
@@ -239,6 +259,16 @@ RSpec.describe ReactOnRails::Dev::ServerMode do
         development:
           dev_server:
             hmr: only
+      YAML
+
+      expect(described_class.hmr_enabled?("config/shakapacker.yml")).to be(true)
+    end
+
+    it "returns true when HMR is set to a quoted true string" do
+      write_shakapacker_config(<<~YAML)
+        development:
+          dev_server:
+            hmr: "true"
       YAML
 
       expect(described_class.hmr_enabled?("config/shakapacker.yml")).to be(true)

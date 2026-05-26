@@ -164,10 +164,17 @@ module ReactOnRails
         end
 
         def boolean_config(value)
-          # Match Shakapacker's YAML config semantics: booleans must be booleans, not quoted strings.
-          # Quoted "true" and "false" values are deliberately ignored here.
+          # Accept unquoted YAML booleans and their quoted, case-insensitive equivalents.
+          # Other values (integers, arbitrary strings) return nil so callers can apply mode-specific defaults
+          # rather than guessing at JS-style truthiness.
           return true if value == true
           return false if value == false
+
+          if value.is_a?(String)
+            stripped = value.strip
+            return true if stripped.casecmp?("true")
+            return false if stripped.casecmp?("false")
+          end
 
           nil
         end
