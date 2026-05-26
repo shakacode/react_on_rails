@@ -92,8 +92,6 @@ jobs:
       )
     runs-on: ubuntu-22.04
     env:
-      BUNDLE_FROZEN: true
-      BUNDLE_PATH: vendor/bundle
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
     steps:
       - uses: actions/checkout@v4
@@ -138,23 +136,11 @@ jobs:
           echo "pnpm version: "; pnpm --version
           echo "Bundler version: "; bundle --version
 
-      - name: Cache Pro package Ruby gems
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails_pro/vendor/bundle
-          key: v5-pro-package-gem-cache-ubuntu-22.04-ruby${{ env.RUBY_VERSION }}-${{ hashFiles('react_on_rails_pro/react_on_rails_pro.gemspec') }}
-
-      - name: Cache Pro dummy app Ruby gems
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails_pro/spec/dummy/vendor/bundle
-          key: v5-pro-dummy-app-gem-cache-ubuntu-22.04-ruby${{ env.RUBY_VERSION }}-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
-
       - name: Install Ruby Gems for Pro package
-        run: |
-          gem install bundler -v "2.5.4"
-          echo "Bundler version: "; bundle --version
-          bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: react_on_rails_pro
+          ruby-version: ${{ env.RUBY_VERSION }}
 
       - name: Install Node modules with pnpm
         working-directory: .
@@ -164,9 +150,10 @@ jobs:
         run: node script/check-react-major-version.mjs react_on_rails_pro/spec/execjs-compatible-dummy 18
 
       - name: Install Ruby Gems for Pro dummy app
-        run: |
-          cd spec/dummy
-          bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: react_on_rails_pro/spec/dummy
+          ruby-version: ${{ env.RUBY_VERSION }}
 
       - name: Generate file-system based entrypoints
         run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
@@ -200,8 +187,6 @@ jobs:
       )
     runs-on: ubuntu-22.04
     env:
-      BUNDLE_FROZEN: true
-      BUNDLE_PATH: vendor/bundle
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
     steps:
       - uses: actions/checkout@v4
@@ -246,12 +231,6 @@ jobs:
           echo "pnpm version: "; pnpm --version
           echo "Bundler version: "; bundle --version
 
-      - name: Cache Pro dummy app Ruby gems
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails_pro/spec/dummy/vendor/bundle
-          key: v5-pro-dummy-app-gem-cache-ubuntu-22.04-ruby${{ env.RUBY_VERSION }}-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
-
       - name: Install Node modules with pnpm
         working-directory: .
         run: pnpm install --frozen-lockfile
@@ -267,10 +246,10 @@ jobs:
         run: node script/check-react-major-version.mjs react_on_rails_pro/spec/execjs-compatible-dummy 18
 
       - name: Install Ruby Gems for Pro dummy app
-        run: |
-          gem install bundler -v "2.5.4"
-          cd spec/dummy
-          bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: react_on_rails_pro/spec/dummy
+          ruby-version: ${{ env.RUBY_VERSION }}
 
       - name: Generate file-system based entrypoints
         run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
@@ -411,8 +390,6 @@ jobs:
         ruby-version: ['3.3.7']
     runs-on: ubuntu-22.04
     env:
-      BUNDLE_FROZEN: true
-      BUNDLE_PATH: vendor/bundle
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
     steps:
       - uses: actions/checkout@v4
@@ -433,17 +410,11 @@ jobs:
           echo "Ruby version: "; ruby -v
           echo "Bundler version: "; bundle --version
 
-      - name: Cache Pro package Ruby gems
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails_pro/vendor/bundle
-          key: v5-pro-package-gem-cache-ubuntu-22.04-ruby${{ matrix.ruby-version }}-${{ hashFiles('react_on_rails_pro/react_on_rails_pro.gemspec') }}
-
       - name: Install Ruby Gems for Pro package
-        run: |
-          gem install bundler -v "2.5.4"
-          echo "Bundler version: "; bundle --version
-          bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: react_on_rails_pro
+          ruby-version: ${{ matrix.ruby-version }}
 
       - name: Run RSpec tests for Pro package
         run: bundle exec rspec spec/react_on_rails_pro
