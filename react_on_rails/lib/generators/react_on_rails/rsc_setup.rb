@@ -484,12 +484,10 @@ module ReactOnRails
         rsc_server_signature_in_js_code?(content)
       end
 
-      RSC_PLUGIN_INVOCATION_REGEX = /new\s+RSCWebpackPlugin\s*\(/
-
       # Returns true when the file contains a real `new RSCWebpackPlugin(` invocation in actual JS
-      # code — not inside a comment or string literal. The regex allows whitespace and newlines
-      # around `new` and `(` so customised configs with extra spacing (e.g. `new RSCWebpackPlugin (`
-      # or a newline before the open paren) are still detected.
+      # code — not inside a comment or string literal. Reuses `RSC_PLUGIN_INVOCATION_REGEX` from
+      # the ClientReferences module so the routing check and the option-section partition match
+      # the same set of invocations (including whitespace/newline variants).
       def rsc_plugin_invocation_in_js_code?(content)
         content
           .to_enum(:scan, RSC_PLUGIN_INVOCATION_REGEX)

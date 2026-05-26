@@ -8,6 +8,10 @@ module ReactOnRails
         JS_COMMENT_STATES = %i[line_comment block_comment].freeze
         REGEX_LITERAL_PRECEDERS = ["(", "{", "[", "=", ":", ",", ";", "!", "?", "&", "|", "+", "-", "*", "~", "^",
                                    "<", ">"].freeze
+        # Matches `new RSCWebpackPlugin(` allowing whitespace/newlines between `new`, the class
+        # name, and the open paren. Shared by the partition scanner and the routing checks so
+        # both detect the same set of invocations.
+        RSC_PLUGIN_INVOCATION_REGEX = /new\s+RSCWebpackPlugin\s*\(/
 
         private
 
@@ -292,17 +296,18 @@ module ReactOnRails
           safe = []
           unparseable = 0
           search_from = 0
-          marker = "new RSCWebpackPlugin("
 
-          while (call_start = content.index(marker, search_from))
+          while (match = content.match(RSC_PLUGIN_INVOCATION_REGEX, search_from))
+            call_start = match.begin(0)
+            after_open_paren = match.end(0)
             unless js_code_position?(content, call_start)
-              search_from = call_start + marker.length
+              search_from = after_open_paren
               next
             end
 
-            options_start = first_significant_js_index(content, call_start + marker.length)
+            options_start = first_significant_js_index(content, after_open_paren)
             unless options_start && content[options_start] == "{"
-              search_from = call_start + marker.length
+              search_from = after_open_paren
               next
             end
 

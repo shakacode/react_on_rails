@@ -415,6 +415,17 @@ describe RscGenerator, type: :generator do
         expect(content.scan(/new\s+RSCWebpackPlugin\s*\(/).length).to eq(1)
       end
     end
+
+    it "injects scoped clientReferences into the spaced plugin call" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content).to include("clientReferences: rscClientReferences")
+        expect(content).to include("const rscClientReferences")
+        expect(content).to include("directory: resolve(config.source_path)")
+      end
+
+      expect(GeneratorMessages.messages.join("\n"))
+        .not_to include("no plugin options with isServer: false could be rewritten")
+    end
   end
 
   context "when a fresh client webpack config has a commented-out RSCWebpackPlugin and no insertion point" do
