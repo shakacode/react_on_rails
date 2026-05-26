@@ -163,7 +163,7 @@ The rake task handles:
 - Auto-computing the next version from git tags (prerelease index is determined solely from tags, not changelog headers)
 - Inserting the version header right after `### [Unreleased]`
 - Updating version diff links at the bottom of the file
-- For `rc`/`beta` modes: collapsing prior prerelease sections of the same base version into a single section
+- For `release` mode: collapsing prior `rc`/`beta` sections of the same base version into the new stable section (rc/beta modes leave prior prerelease sections intact so users can see what changed between RCs)
 
 Do NOT manually insert version headers or update diff links -- the rake task does this correctly.
 
@@ -290,7 +290,8 @@ If the user passed `release`, `rc`, `beta`, or an explicit version string as an 
    - Auto-compute the next version
    - Insert the header after `### [Unreleased]`
    - Update diff links at the bottom
-   - For `rc`/`beta`: collapse prior prerelease sections
+   - For `release`: collapse prior `rc`/`beta` sections of the same base version into the new stable section
+   - For `rc`/`beta`: leave prior prerelease sections intact (each prerelease keeps its own section so users on an earlier RC can see what changed)
 
 3. **Verify** the computed version looks correct. If not, the user can manually adjust.
 
@@ -343,16 +344,44 @@ When the user passes `rc` or `beta` as an argument:
 
 2. **Auto-compute the next prerelease version** using the process in "Auto-Computing the Next Version" above.
 
-3. **Always collapse prior prereleases into the current prerelease** (this is the default behavior):
-   - Combine all prior prerelease changelog entries into the new prerelease version section
-   - Remove previous prerelease version sections (e.g., remove `### [16.5.0.rc.0]` when creating `### [16.5.0.rc.1]`)
-   - When collapsing, **consolidate duplicate category headings** — if both the Unreleased section and a prior prerelease section have `#### Fixed`, merge all entries under a single `#### Fixed` heading
-   - **Remove orphaned version diff links** at the bottom of the file for collapsed prerelease sections
-   - Add any new user-visible changes from commits since the last prerelease
-   - Update version diff links to point from the last stable version to the new prerelease
-   - This keeps the changelog clean with a single prerelease section that accumulates all changes since the last stable release
+3. **Do NOT collapse prior prereleases.** Each RC/beta is a separately-tagged release that users install — they need to see what changed between, for example, `rc.0` and `rc.1` (especially when diagnosing a regression in a specific RC). Each `bundle exec rake release` reads only the top-most `### [VERSION]` section, so as long as each RC has its own section, the corresponding GitHub release gets its own focused notes. Instead:
+   - Insert the new prerelease version section immediately after `### [Unreleased]`, **above** any prior prerelease sections (preserves newest-first ordering)
+   - Any entries already under `### [Unreleased]` belong to this prerelease — the rake task moves them under the new header automatically when it inserts the version line right after `### [Unreleased]`
+   - Leave prior prerelease sections (e.g., `### [16.5.0.rc.0]`) untouched — keep their entries and their compare links at the bottom of the file
+   - Add any new user-visible changes from commits since the last prerelease tag to the new section only
+   - Add a new compare link at the bottom comparing the previous prerelease tag (or the last stable tag if this is the first RC) to the new prerelease tag
+   - Update the `[unreleased]:` compare link to point from the new prerelease tag to `main`
 
-**Note**: The new version header must be inserted **immediately after `### [Unreleased]`** (see Step 4). This ensures correct ordering of version headers.
+**Resulting structure** after stamping `16.5.0.rc.1` (with `16.5.0.rc.0` already shipped on top of stable `16.4.0`):
+
+```markdown
+### [Unreleased]
+
+### [16.5.0.rc.1] - 2026-03-15
+
+#### Fixed
+
+- **Fix regression introduced in rc.0**. [PR 2500](https://github.com/shakacode/react_on_rails/pull/2500) by [justin808](https://github.com/justin808).
+
+### [16.5.0.rc.0] - 2026-03-01
+
+#### Added
+
+- **New feature**. [PR 2490](https://github.com/shakacode/react_on_rails/pull/2490) by [justin808](https://github.com/justin808).
+
+### [16.4.0] - 2026-02-15
+
+...
+
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.5.0.rc.1...main
+[16.5.0.rc.1]: https://github.com/shakacode/react_on_rails/compare/v16.5.0.rc.0...v16.5.0.rc.1
+[16.5.0.rc.0]: https://github.com/shakacode/react_on_rails/compare/v16.4.0...v16.5.0.rc.0
+[16.4.0]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...v16.4.0
+```
+
+Both RC sections remain intact with their own compare links until the stable release coalesces them. **Coalescing happens only at the stable release** — see "For Prerelease to Stable Version Release" below.
+
+**Note**: The new version header must be inserted **immediately after `### [Unreleased]`** (see Step 4). This ensures correct newest-first ordering of version headers.
 
 ### For Prerelease to Stable Version Release
 
