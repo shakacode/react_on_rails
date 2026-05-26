@@ -115,7 +115,9 @@ module ReactOnRails
           return nil unless File.exist?(config_path)
 
           # ERB uses TOPLEVEL_BINDING here so config files can reference ENV and top-level constants.
-          YAML.safe_load(ERB.new(File.read(config_path)).result, permitted_classes: [Symbol], aliases: true)
+          # Shakapacker YAML uses string keys (e.g. "hmr"), never YAML symbol literals, so the default
+          # safe_load permitted_classes is sufficient.
+          YAML.safe_load(ERB.new(File.read(config_path)).result, aliases: true)
         rescue SyntaxError, StandardError => e
           warn(
             "[ReactOnRails] Could not parse #{config_path} for dev-server mode detection: #{e.message}"

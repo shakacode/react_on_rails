@@ -733,6 +733,11 @@ module ReactOnRails
           mode == :prod ? 3001 : 3000
         end
 
+        # Intentionally not memoized: ServerManager methods live on `class << self`, so memoizing
+        # would persist across the entire process and leak state between specs that swap
+        # shakapacker.yml. `show_help` captures the result in a local before passing it down,
+        # so there is only one ServerMode.detect call per help render. Doctor memoizes because
+        # it owns instance state on a fresh Doctor instance per invocation.
         def default_dev_server_mode
           ServerMode.detect
         end

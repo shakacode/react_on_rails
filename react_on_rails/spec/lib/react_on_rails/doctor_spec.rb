@@ -944,6 +944,8 @@ RSpec.describe ReactOnRails::Doctor do
       write_project_file("config/shakapacker.yml", <<~YAML)
         development:
           public_output_path: packs
+          dev_server:
+            hmr: true
 
         test:
           public_output_path: packs
