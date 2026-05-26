@@ -34,7 +34,11 @@ export default {
           '^@testing-library/react$': '<rootDir>/tests/emptyForTesting.js',
         }
       : {}),
-    ...(process.env.NODE_CONDITIONS
+    // Scope the dedup-skip to RSC tests specifically: only NODE_CONDITIONS
+    // values containing `react-server` need the default resolution (so
+    // conditional exports are honored). Any unrelated env var that happens to
+    // set NODE_CONDITIONS must not silently disable React deduplication.
+    ...(process.env.NODE_CONDITIONS?.includes('react-server')
       ? {}
       : {
           '^react$': '<rootDir>/../../node_modules/react',

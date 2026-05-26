@@ -33,7 +33,10 @@ export interface TanStackRouter {
   // 1.x releases. Either this OR `__store` must be available for SSR hydration;
   // clientHydrate.ts prefers `__store` when both are present.
   stores?: {
-    status: TanStackRouterWritableStore<string>;
+    // 'idle' | 'pending' covers every value we read or write here. Tightening
+    // from `string` means stores.status.set('typo') is a compile error rather
+    // than a silent type-check pass.
+    status: TanStackRouterWritableStore<'idle' | 'pending'>;
     resolvedLocation: TanStackRouterWritableStore<TanStackRouter['state']['location']>;
     // setMatches is a batch-utility helper on the stores object, not a store
     // atom with a `.set()` method — that's why it doesn't follow the

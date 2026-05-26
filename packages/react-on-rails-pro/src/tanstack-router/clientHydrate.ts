@@ -107,10 +107,14 @@ function hasStoresHydrationApi(router: TanStackRouter): router is TanStackRouter
 function hasHydrationInternals(
   router: TanStackRouter,
 ): router is TanStackRouterHydrationInternals | TanStackRouterStoresHydrationInternals {
+  // The ordering here is load-bearing: legacy `__store` wins when both APIs
+  // are present, so routers exposing both during a TanStack upgrade keep
+  // taking the well-tested __store.setState path until the legacy API is
+  // removed. applyHydrationMatches mirrors this preference at the call site.
   return hasLegacyHydrationStore(router) || hasStoresHydrationApi(router);
 }
 
-function raiseMissingHydrationInternals(): never {
+function throwMissingHydrationInternals(): never {
   throw new Error(
     'react-on-rails-pro/tanstack-router: router.matchRoutes() and router.__store.setState() or ' +
       'router.stores.setMatches() are required but not available. Ensure @tanstack/react-router ' +
@@ -322,7 +326,24 @@ function TanStackHydrationApp({
     } else {
       // Set browser history for client-side navigation
       const browserHistory = createBrowserHistory();
+      // Snapshot state.location before router.update so the dev-mode assertion
+      // below can verify the equivalence the stores hydration path relies on
+      // (see applyHydrationMatches: router.stores.resolvedLocation.set
+      // assumes router.update does not mutate state.location synchronously).
+      const locationBeforeUpdate = process.env.NODE_ENV !== 'production' ? router.state.location : undefined;
       router.update({ history: browserHistory });
+      if (
+        process.env.NODE_ENV !== 'production' &&
+        hasStoresHydrationApi(router) &&
+        router.state.location !== locationBeforeUpdate
+      ) {
+        console.warn(
+          'react-on-rails-pro/tanstack-router: router.update({ history }) mutated router.state.location ' +
+            'synchronously. The stores hydration path writes router.state.location to ' +
+            'router.stores.resolvedLocation, which would diverge from the legacy __store path that ' +
+            'snapshots the pre-update s.location. File an issue with your @tanstack/react-router version.',
+        );
+      }
 
       // Only apply SSR hydration when a server payload exists.
       // Client-only renders (prerender: false) must not set router.ssr or
@@ -339,7 +360,7 @@ function TanStackHydrationApp({
 
         // Validate internal APIs before using them.
         if (!hasHydrationInternals(router)) {
-          raiseMissingHydrationInternals();
+          throwMissingHydrationInternals();
         }
 
         // Synchronously inject route matches to match server-rendered output.

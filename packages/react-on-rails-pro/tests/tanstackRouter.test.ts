@@ -122,7 +122,7 @@ function buildStoresHydrationHarness({
   router.matchRoutes = jest.fn().mockReturnValue([{ id: '/products', status: 'pending', updatedAt: 0 }]);
 
   const storeState = {
-    status: createAtom('pending'),
+    status: createAtom<'idle' | 'pending'>('pending'),
     resolvedLocation: createAtom<unknown>(null),
     matches: createAtom<unknown[]>([]),
   };
@@ -308,7 +308,14 @@ describe('tanstack-router integration (Pro)', () => {
 
   it('hydrates an actual TanStack Router instance through the installed private internals', () => {
     const router = buildActualTanStackRouter();
-    const rawMatches = router.matchRoutes?.(router.state.location) as Array<{ id: string; routeId: string }>;
+    // buildActualTanStackRouter always exposes matchRoutes; a missing function
+    // would mean an upstream contract break, so assert before use rather than
+    // letting `?.` produce a downstream TypeError on `.find()`.
+    expect(typeof router.matchRoutes).toBe('function');
+    const rawMatches = router.matchRoutes!(router.state.location) as Array<{
+      id: string;
+      routeId: string;
+    }>;
     const productsMatch = rawMatches.find((match) => match.routeId === '/products');
     expect(productsMatch).toBeDefined();
     const dehydratedProductsMatchId = productsMatch?.id.split('/').join('\0');
