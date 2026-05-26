@@ -1,26 +1,22 @@
 export type WorkerShutdownHook = () => void | Promise<void>;
 
+/**
+ * Upper bound on how long the worker waits for all registered shutdown hooks
+ * to settle before forcibly destroying the worker. Integration shutdown
+ * timeouts (e.g. OpenTelemetry `shutdownTimeoutMs`) must stay below this so
+ * the worker doesn't kill an in-flight hook before it finishes flushing.
+ */
+export const WORKER_SHUTDOWN_HOOKS_TIMEOUT_MS = 10_000;
+
 const workerShutdownHooks: WorkerShutdownHook[] = [];
 
-type AggregateErrorWithErrors = Error & { errors: readonly unknown[] };
-type AggregateErrorConstructor = new (
+// AggregateError is native on Node 15+. The renderer's transitive OTel/Fastify
+// deps require Node 18+, so the runtime is guaranteed. The `declare` is only
+// needed because the renderer's tsconfig still targets es2020 lib.
+declare const AggregateError: new (
   errors: readonly unknown[],
   message?: string,
-) => AggregateErrorWithErrors;
-
-function createAggregateShutdownHookError(errors: readonly unknown[]): AggregateErrorWithErrors {
-  const { AggregateError: AggregateErrorCtor } = globalThis as typeof globalThis & {
-    AggregateError?: AggregateErrorConstructor;
-  };
-  const aggregateError = AggregateErrorCtor
-    ? new AggregateErrorCtor(errors, 'Multiple worker shutdown hooks failed')
-    : Object.assign(new Error('Multiple worker shutdown hooks failed'), {
-        errors,
-        name: 'AggregateError',
-      });
-
-  return aggregateError;
-}
+) => Error & { errors: readonly unknown[] };
 
 export function registerWorkerShutdownHook(hook: WorkerShutdownHook): () => void {
   workerShutdownHooks.push(hook);
@@ -47,7 +43,10 @@ export async function runWorkerShutdownHooks(): Promise<void> {
     throw firstRejectedResult.reason;
   }
   if (rejectedResults.length > 1) {
-    throw createAggregateShutdownHookError(rejectedResults.map((result) => result.reason));
+    throw new AggregateError(
+      rejectedResults.map((result) => result.reason),
+      'Multiple worker shutdown hooks failed',
+    );
   }
 }
 

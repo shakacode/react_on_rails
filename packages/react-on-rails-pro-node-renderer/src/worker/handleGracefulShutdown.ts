@@ -2,9 +2,7 @@ import cluster from 'cluster';
 import { FastifyInstance } from './types.js';
 import { SHUTDOWN_WORKER_MESSAGE } from '../shared/utils.js';
 import log from '../shared/log.js';
-import { runWorkerShutdownHooks } from './shutdownHooks.js';
-
-const WORKER_SHUTDOWN_HOOKS_TIMEOUT_MS = 10_000;
+import { WORKER_SHUTDOWN_HOOKS_TIMEOUT_MS, runWorkerShutdownHooks } from './shutdownHooks.js';
 
 function errorCode(error: unknown): string | undefined {
   const code = (error as { code?: unknown })?.code;
