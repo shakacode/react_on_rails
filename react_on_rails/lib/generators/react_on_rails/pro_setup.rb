@@ -19,7 +19,9 @@ module ReactOnRails
     #
     # Including classes must also include GeneratorHelper which provides:
     # - use_pro?, use_rsc?: Feature flag helpers
-    # - pro_gem_installed?: Pro gem detection
+    # - pro_gem_installed?: Pro gem detection (real lockfile / loaded-specs state)
+    # - pro_gem_install_deferred?, defer_pro_gem_install!: deferred-install tracking
+    # - invalidate_pro_gem_installed_cache!: invalidate memoized pro_gem_installed?
     #
     # rubocop:disable Metrics/ModuleLength
     module ProSetup
@@ -63,7 +65,7 @@ module ReactOnRails
       #   is deferred to the Gemfile swap.
       def missing_pro_gem?(force: false)
         return false unless force || use_pro?
-        return false if pro_gem_installed?
+        return false if pro_gem_installed? || pro_gem_install_deferred?
         return false if defer_pro_gem_install_to_gemfile_swap
         return false if attempt_pro_gem_auto_install
 
@@ -126,7 +128,8 @@ module ReactOnRails
 
         # The gem is now in Gemfile/lockfile but not loaded in the current Ruby process.
         # Generator code that follows must not reference ReactOnRailsPro constants directly.
-        mark_pro_gem_installed!
+        # The lockfile changed, so the memoized pro_gem_installed? must be refreshed.
+        invalidate_pro_gem_installed_cache!
         true
       rescue StandardError => e
         say "⚠️  Failed to run bundle add: #{e.message}", :red
@@ -542,7 +545,7 @@ module ReactOnRails
       def defer_pro_gem_install_to_gemfile_swap
         return false unless base_react_on_rails_gem_in_gemfile?
 
-        mark_pro_gem_installed!
+        defer_pro_gem_install!
         true
       end
 

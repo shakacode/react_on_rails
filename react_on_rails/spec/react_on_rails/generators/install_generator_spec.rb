@@ -3138,11 +3138,17 @@ describe InstallGenerator, type: :generator do
       install_generator.instance_variable_set(:@pro_gem_installed, false)
     end
 
-    specify "missing_pro_gem? marks memoized pro_gem_installed? state as installed" do
+    specify "missing_pro_gem? invalidates memoized pro_gem_installed? cache so it re-reads the lockfile" do
       expect(install_generator.send(:missing_pro_gem?)).to be false
       expect(Bundler).to have_received(:with_unbundled_env)
       expect(Process).to have_received(:spawn)
-      expect(install_generator.instance_variable_get(:@pro_gem_installed)).to be true
+      # bundle add updated the lockfile, so the stale `false` cache must be cleared.
+      expect(install_generator.instance_variable_defined?(:@pro_gem_installed)).to be false
+      # Auto-install is a real install, not a deferred one; the deferred flag must stay false.
+      expect(install_generator.send(:pro_gem_install_deferred?)).to be false
+      # Re-stub gem_in_lockfile? to simulate what bundle add wrote, then verify the re-read.
+      allow(install_generator).to receive(:gem_in_lockfile?).with("react_on_rails_pro").and_return(true)
+      expect(install_generator.send(:pro_gem_installed?)).to be true
     end
   end
 

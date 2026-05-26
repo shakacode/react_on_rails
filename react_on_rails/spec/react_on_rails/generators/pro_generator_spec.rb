@@ -81,7 +81,8 @@ describe ProGenerator, type: :generator do
     specify "missing_pro_gem? returns false and bypasses bundle add to let swap handle the Gemfile" do
       expect(generator.send(:missing_pro_gem?, force: true)).to be false
       expect(Process).not_to have_received(:spawn)
-      expect(generator.send(:pro_gem_installed?)).to be true
+      expect(generator.send(:pro_gem_install_deferred?)).to be true
+      expect(generator.send(:pro_gem_installed?)).to be false
     end
 
     specify "missing_pro_gem? also defers for parenthesized declarations with leading comments" do
@@ -97,7 +98,8 @@ describe ProGenerator, type: :generator do
 
       expect(generator.send(:missing_pro_gem?, force: true)).to be false
       expect(Process).not_to have_received(:spawn)
-      expect(generator.send(:pro_gem_installed?)).to be true
+      expect(generator.send(:pro_gem_install_deferred?)).to be true
+      expect(generator.send(:pro_gem_installed?)).to be false
     end
   end
 
