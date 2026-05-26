@@ -38,9 +38,14 @@ module ReactOnRailsPro
     #     hash never touches the filesystem layer.
     #   * Responses include `Cache-Control: no-store` so a misconfigured
     #     intermediary doesn't cache the bundle behind the auth check.
-    class BundlesController < ActionController::Base
-      protect_from_forgery with: :null_session
-
+    #   * Inherits from `ActionController::API` rather than `Base`, which
+    #     omits cookie/session/view machinery and the CSRF middleware
+    #     entirely. CSRF only protects against ambient-credential abuse
+    #     (e.g. session cookies a browser auto-attaches); a Bearer-token
+    #     API has no ambient credential, so there's nothing for CSRF to
+    #     protect. Using API avoids `protect_from_forgery with: :null_session`,
+    #     which CodeQL (correctly) flags as weakened CSRF on a Base controller.
+    class BundlesController < ActionController::API
       before_action :authenticate_rolling_deploy_request
       before_action :set_no_store_headers
 
