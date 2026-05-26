@@ -502,6 +502,8 @@ task :update_changelog, %i[mode_or_tag] do |_, args|
     # Collapse prior prerelease sections only when stamping the stable
     # release. For rc/beta modes, each prerelease keeps its own section
     # so users on an earlier RC can see what changed between RCs.
+    # For release mode, collapse prior prerelease sections before computing
+    # the version; for rc/beta, the changelog is used as-is.
     prepared_changelog = if auto_mode == "release"
                            prepare_changelog_for_auto_version(changelog, monorepo_root)
                          else
