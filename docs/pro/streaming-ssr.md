@@ -122,6 +122,14 @@ end
 
 You can test your application by running `rails server` and navigating to the appropriate route.
 
+### Error Handling Note for React on Rails Pro 16.7
+
+React on Rails Pro 16.7 reports streaming renderer failures as `ReactOnRailsPro::Error` during chunk iteration.
+That includes unreadable response statuses and readable HTTP error statuses delivered as streaming bodies. If
+your code directly iterates a stream from `render_code_as_stream`, wrap `each_chunk` in normal error handling and
+treat that exception as a renderer failure. Older releases could return no chunks for these responses, so custom
+callers should not use an empty stream as a success signal.
+
 ### 6. What Happens During Streaming
 
 When a user visits the page, they'll experience the following sequence:

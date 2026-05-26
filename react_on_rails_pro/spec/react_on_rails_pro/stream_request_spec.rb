@@ -55,6 +55,8 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       expect(yielded.first["html"]).to eq("<div>Hello</div>")
       expect(yielded.first["hasErrors"]).to be false
       expect(yielded.first["consoleReplayScript"]).to eq("")
+      expect(request.http_status).to eq(200)
+      expect(request.http_status_recorded?).to be(true)
     end
 
     it "skips LPP parsing when response has error status" do
@@ -66,6 +68,19 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       end.to raise_error(ReactOnRailsPro::RendererHttpClient::HTTPError)
 
       expect(yielded).to be_empty
+      expect(request.http_status).to eq(500)
+      expect(request.http_status_recorded?).to be(true)
+    end
+
+    it "records status for empty responses" do
+      response = ReactOnRailsPro::RendererHttpClient::Response.new do |_yielder, status_assigner|
+        status_assigner.call(204)
+      end
+
+      request.send(:process_response_chunks, response) { |_| nil }
+
+      expect(request.http_status).to eq(204)
+      expect(request.http_status_recorded?).to be(true)
     end
 
     context "with length-prefixed protocol parsing" do
@@ -155,6 +170,28 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         expect(yielded.size).to eq(1)
         expect(yielded.first["html"]).to eq("<div>Valid</div>")
       end
+    end
+
+    it "ignores responses without status metadata" do
+      request.send(:record_status, Object.new)
+
+      expect(request.http_status).to be_nil
+      expect(request.http_status_recorded?).to be(false)
+    end
+
+    it "records response status only once" do
+      status_calls = 0
+      response = Object.new
+      response.define_singleton_method(:status) do
+        status_calls += 1
+        200
+      end
+
+      request.send(:record_status, response)
+      request.send(:record_status, response)
+
+      expect(status_calls).to eq(1)
+      expect(request.http_status).to eq(200)
     end
   end
 
@@ -274,6 +311,8 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       stream.each_chunk { |c| chunks << c }
       expect(call_count).to eq(2)
       expect(chunks.first).to include("html" => "ok")
+      expect(stream.http_status).to eq(200)
+      expect(stream.http_status_recorded?).to be(true)
     end
 
     it "stops and clears tasks before retrying on transport error" do
@@ -326,6 +365,8 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         ReactOnRailsPro::Error,
         /Unexpected response code from renderer: 503/
       )
+      expect(stream.http_status).to eq(503)
+      expect(stream.http_status_recorded?).to be(true)
     end
 
     it "retries with bundle upload on HTTP 410 (send bundle)" do
@@ -374,6 +415,33 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
 
       expect(call_count).to eq(2)
       expect(task_stopped).to be true
+    end
+
+    it "clears retry status before transport failures" do
+      allow(ReactOnRailsPro).to receive(:configuration).and_return(
+        instance_double(ReactOnRailsPro::Configuration, renderer_request_retry_limit: 0)
+      )
+      call_count = 0
+
+      stream = described_class.create do |send_bundle, _tasks|
+        call_count += 1
+        if call_count == 1
+          mock_error_response(410, "bundle not found")
+        else
+          expect(send_bundle).to be true
+          ReactOnRailsPro::RendererHttpClient::Response.new do |_yielder, _status_assigner|
+            raise ReactOnRailsPro::RendererHttpClient::ConnectionError, "connection reset"
+          end
+        end
+      end
+
+      expect { stream.each_chunk(&:itself) }.to raise_error(
+        ReactOnRailsPro::Error,
+        /Connection error while server side render streaming a component/
+      )
+      expect(call_count).to eq(2)
+      expect(stream.http_status).to be_nil
+      expect(stream.http_status_recorded?).to be(false)
     end
   end
 

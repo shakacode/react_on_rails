@@ -17,6 +17,18 @@ AllCops:
     - 'spec/dummy/bin/**/*'
     - 'bin/**/*'
 
+Naming/VariableNumber:
+  AllowedIdentifiers:
+    - p99_9
+
+RSpec/FilePath:
+  Exclude:
+    - 'spec/load/**/*_spec.rb'
+
+RSpec/SpecFilePathFormat:
+  Exclude:
+    - 'spec/load/**/*_spec.rb'
+
 RSpec/BeforeAfterAll:
   Exclude:
     - 'spec/react_on_rails/generators/dev_tests_generator_spec.rb'

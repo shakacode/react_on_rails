@@ -15,6 +15,18 @@ module ReactOnRailsPro
       @rescue_blocks = []
     end
 
+    def http_status
+      return @component.http_status if @component.respond_to?(:http_status)
+
+      nil
+    end
+
+    def http_status_recorded?
+      return @component.http_status_recorded? if @component.respond_to?(:http_status_recorded?)
+
+      false
+    end
+
     # Add a prepend action
     def prepend
       @actions << ->(chunk, position) { position == :first ? "#{yield}#{chunk}" : chunk }
@@ -85,9 +97,19 @@ module ReactOnRailsPro
   end
 
   class StreamRequest
+    def http_status
+      @status
+    end
+
+    def http_status_recorded?
+      @status_recorded
+    end
+
     def initialize(first_chunk_warn_callback: nil, &request_block)
       @request_executor = request_block
       @first_chunk_warn_callback = first_chunk_warn_callback
+      @status = nil
+      @status_recorded = false
     end
 
     private_class_method :new
@@ -111,6 +133,10 @@ module ReactOnRailsPro
 
       begin
         loop do
+          # Pre-call reset guards transport failures that happen before a response object
+          # exists; process_response_chunks resets again so parsing state belongs to that
+          # response attempt.
+          reset_response_status
           @received_first_chunk = false
           stream_response = @request_executor.call(send_bundle, tasks)
 
@@ -134,9 +160,13 @@ module ReactOnRailsPro
 
     def process_response_chunks(stream_response, &block)
       parser = ReactOnRails::LengthPrefixedParser.new
+      # This repeats the pre-call reset in each_chunk intentionally: once a
+      # response object exists, parsing state belongs to this response attempt.
+      reset_response_status
       request_start_time = Time.now
 
       stream_response.each do |chunk|
+        record_status(stream_response) unless @status_recorded
         next if stream_response.error?
 
         unless @received_first_chunk
@@ -146,7 +176,14 @@ module ReactOnRailsPro
 
         parser.feed(chunk, &block)
       end
+      record_status(stream_response) unless @status_recorded
       parser.flush
+    rescue ReactOnRailsPro::RendererHttpClient::HTTPError => e
+      record_status(e.response)
+      raise
+    rescue ReactOnRailsPro::RendererHttpClient::Error
+      record_status(stream_response)
+      raise
     end
 
     # Retrying after first chunk would duplicate content in the page.
@@ -174,6 +211,7 @@ module ReactOnRailsPro
 
     def handle_http_error(error, send_bundle)
       response = error.response
+      record_status(response)
       status = response.status
       body = response.body
 
@@ -189,6 +227,23 @@ module ReactOnRailsPro
       else
         raise ReactOnRailsPro::Error, "Unexpected response code from renderer: #{status}:\n#{body}"
       end
+    end
+
+    def reset_response_status
+      @status = nil
+      @status_recorded = false
+    end
+
+    def record_status(response)
+      return if @status_recorded || !response.respond_to?(:status)
+
+      status = response.status
+      # Leave nil status unrecorded so a later call can retry after a lazy
+      # transport response has populated its metadata.
+      return if status.nil?
+
+      @status = status
+      @status_recorded = true
     end
   end
 end

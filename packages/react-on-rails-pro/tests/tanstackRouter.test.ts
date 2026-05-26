@@ -1687,6 +1687,96 @@ describe('tanstack-router integration (Pro)', () => {
     });
   });
 
+  it('does not warn about cleared router.ssr after full remount of a cached router', async () => {
+    // Regression test for the WeakMap cache: after a full unmount+remount of
+    // the same router instance, the cached didSetSsrFlag must reflect the
+    // post-hydration clear — otherwise the dev sanity-check below at
+    // clientHydrate.ts:361 would falsely warn that router.ssr "was unexpectedly
+    // cleared" on the second mount even though we cleared it correctly.
+    const router = buildRouter();
+    const productsRoute = { id: '/products' };
+    const loadRouteChunk = jest.fn().mockResolvedValue(undefined);
+    (router.matchRoutes as jest.Mock).mockReturnValue([
+      { id: '/products', routeId: '/products', status: 'pending', updatedAt: 0, loaderData: undefined },
+    ]);
+    router.looseRoutesById = { '/products': productsRoute };
+    router.loadRouteChunk = loadRouteChunk;
+    router.options = { hydrate: undefined };
+
+    const originalNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'development';
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const renderFn = createTanStackRouterRenderFunction(
+      { createRouter: () => router },
+      {
+        RouterProvider: (_: { router: TanStackRouter }) => React.createElement('div'),
+        createMemoryHistory: jest.fn(),
+        createBrowserHistory: jest.fn().mockReturnValue({
+          location: {
+            pathname: '/products',
+            search: '?category=tools',
+            hash: '',
+            href: '/products?category=tools',
+            state: null,
+          },
+        }),
+      },
+    );
+    const props = {
+      __tanstackRouterDehydratedState: {
+        url: '/products?category=tools',
+        dehydratedRouter: { matches: [{ id: 'products' }] },
+      },
+    };
+    const Client = renderFn(props, {
+      serverSide: false,
+      pathname: '/products',
+      search: '?category=tools',
+    } as unknown as RailsContext) as React.ComponentType<Record<string, unknown>>;
+
+    try {
+      // First mount: render-phase init runs, post-hydration effect clears router.ssr.
+      const container1 = document.createElement('div');
+      const root1 = createRoot(container1);
+      await compatAct(async () => {
+        root1.render(React.createElement(Client, props));
+        await new Promise((r) => {
+          setTimeout(r, 0);
+        });
+      });
+      expect(router.ssr).toBeUndefined();
+      await compatAct(async () => {
+        root1.unmount();
+      });
+
+      // Second mount of the same cached router. The render-phase guard hits
+      // the WeakMap and restores didSetSsrFlag from the cache. If the cache
+      // had been left stale at didSetSsrFlag=true, the dev sanity check would
+      // fire here because router.ssr is already null on the cached router.
+      warnSpy.mockClear();
+      const container2 = document.createElement('div');
+      const root2 = createRoot(container2);
+      await compatAct(async () => {
+        root2.render(React.createElement(Client, props));
+        await new Promise((r) => {
+          setTimeout(r, 0);
+        });
+      });
+
+      expect(warnSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('router.ssr was unexpectedly cleared'),
+      );
+
+      await compatAct(async () => {
+        root2.unmount();
+      });
+    } finally {
+      process.env.NODE_ENV = originalNodeEnv;
+      warnSpy.mockRestore();
+    }
+  });
+
   it('renders RouterProvider directly without an enclosing Suspense boundary during hydration', () => {
     // Regression test for the Suspense-gate removal: serverRender.ts's
     // buildAppElement emits AppWrapper > RouterProvider with no Suspense
