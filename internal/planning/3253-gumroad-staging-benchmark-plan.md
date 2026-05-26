@@ -76,14 +76,18 @@ Required configuration:
 
 ## Run protocol
 
-1. **Warmup floor.** Before any measured run, hit each route at least 20 times sequentially. This is well above the
-   single warmup of the local run; the goal is to push the Pro Node renderer worker pool past JIT and RSC-payload
-   compilation steady state. Record the wall-clock duration of the warmup phase.
+1. **Warmup floor.** Before any measured run, hit each route at least 20 times sequentially (RSC first, then Inertia;
+   40 total warmup requests). This is well above the single warmup of the local run; the goal is to push the Pro Node
+   renderer worker pool past JIT and RSC-payload compilation steady state. Record the wall-clock duration of the
+   warmup phase.
 2. **Alternation.** Measured runs alternate strictly between Inertia and RSC, starting with the route that has more
    variance historically (RSC).
 3. **Sample size.** Target `n = 30` per route (60 total measured runs). This is enough to compute a real p95 rather
    than a max-as-p95 substitute, and to bound the confidence interval on the median.
 4. **Browser-cache policy.** Run each measured request in a fresh Chrome profile (cold cache). Record this explicitly.
+   _Note: the April 30, 2026 local run used a warm-cache policy (one warmup request primed Chrome's disk cache before
+   each measured run). Cold-cache and warm-cache JS-transfer numbers are not directly comparable; call out this
+   difference when presenting staging results alongside the local run._
 5. **Per-run capture.** For each measured run, record: navigation duration (Playwright), LCP, `responseEnd`, controller
    `action_total`, `Server-Timing` values, page-script request count, total transfer size.
 
@@ -142,8 +146,8 @@ When the staging numbers land, update
 
 Issue #3253 closes when:
 
-- [x] Criterion 1: doc explicitly states the April 30 specs were not preserved. _(covered by the doc edits in this
-      branch, jg/3253-benchmark-env-metadata)._
+- [x] Criterion 1: doc explicitly states the April 30 specs were not preserved. _(covered by the doc edits in
+      [PR #3342](https://github.com/shakacode/react_on_rails/pull/3342).)_
 - [ ] Criterion 2: staging repeat published with the four artifacts listed above.
 - [ ] Criterion 3: residual measurement gaps named in the new WARNING block.
 
