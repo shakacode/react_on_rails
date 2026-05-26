@@ -6,12 +6,12 @@ import '@hotwired/turbo-rails';
 
 import ReactOnRails from 'react-on-rails/client';
 
-const useStrictMode = process.env.NODE_ENV !== 'production';
-
 import HelloTurboStream from '../startup/HelloTurboStream';
 import ManualRenderComponent from '../startup/ManualRenderComponent';
 import SharedReduxStore from '../stores/SharedReduxStore';
 import { wrapRegisteredComponentsWithStrictMode } from '../strictModeSupport';
+
+const useStrictMode = process.env.NODE_ENV !== 'production';
 
 const STRICT_MODE_PATCHED = '__reactOnRailsDummyStrictModePatched';
 
