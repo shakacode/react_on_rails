@@ -215,7 +215,6 @@ module ReactOnRailsPro
     def rolling_deploy_http_adapter?
       adapter = rolling_deploy_adapter
       return false if adapter.nil?
-      return false unless defined?(ReactOnRailsPro::RollingDeployAdapters::Http)
 
       adapter.is_a?(Class) && adapter <= ReactOnRailsPro::RollingDeployAdapters::Http
     end
@@ -365,11 +364,17 @@ module ReactOnRailsPro
               "with SecureRandom.hex(32) and set it on both Rails and your build CI. " \
               "See docs/pro/rolling-deploy-http-adapter.md."
       end
-      return if token.length >= ROLLING_DEPLOY_TOKEN_MIN_LENGTH
+      # Compare on `bytesize` (not `length`) so the validator matches the
+      # byte-level constant-time check in `BundlesController#authenticate_rolling_deploy_request`.
+      # For ASCII tokens (the SecureRandom.hex output we recommend) the two
+      # are identical; for a UTF-8 passphrase a 32-codepoint string could be
+      # as short as 32 bytes or as long as 128, and the auth path enforces
+      # the byte count.
+      return if token.bytesize >= ROLLING_DEPLOY_TOKEN_MIN_LENGTH
 
       raise ReactOnRailsPro::Error,
             "config.rolling_deploy_token must be at least " \
-            "#{ROLLING_DEPLOY_TOKEN_MIN_LENGTH} characters (got #{token.length}). " \
+            "#{ROLLING_DEPLOY_TOKEN_MIN_LENGTH} bytes (got #{token.bytesize}). " \
             "Generate a stronger token with SecureRandom.hex(32). " \
             "See docs/pro/rolling-deploy-http-adapter.md."
     end

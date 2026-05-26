@@ -85,6 +85,12 @@ module ReactOnRailsPro
       # Tarball entry name reserved for the server bundle. Companion assets
       # whose basename collides with this are skipped to keep the receiver
       # from extracting the wrong bytes into the bundle slot.
+      #
+      # Wire-format constant: must stay in sync with
+      # `ReactOnRailsPro::RollingDeployAdapters::Http::BUNDLE_ENTRY_NAME`. If
+      # one side bumps the entry name (e.g. a protocol version change) the
+      # other must follow or the client extraction will fail to find the
+      # bundle file.
       BUNDLE_ENTRY_NAME = "bundle.js"
 
       PROTOCOL_VERSION = 1
@@ -127,9 +133,14 @@ module ReactOnRailsPro
         provided = extract_bearer_token(request.headers["Authorization"])
         return head(:unauthorized) if provided.empty?
 
-        # secure_compare requires equal-length strings. Tokens are configured
-        # with a fixed minimum length, so this rejects malformed input before
-        # comparing same-length token bytes.
+        # `secure_compare` raises ArgumentError when the two strings differ
+        # in length, so we gate on bytesize first. This does leak whether
+        # the provided token has the correct byte length, but the
+        # configuration validator enforces a minimum of 32 bytes and
+        # operators are advised to use `SecureRandom.hex(32)` (64 bytes),
+        # so the only information exposed is the token's exact byte length
+        # — not any of its bits. The body of the comparison is constant-time
+        # via `secure_compare` regardless of which byte differs.
         match = provided.bytesize == configured.bytesize &&
                 ActiveSupport::SecurityUtils.secure_compare(provided, configured)
         head(:unauthorized) unless match
@@ -157,7 +168,15 @@ module ReactOnRailsPro
       # the build-CI side sees "this server has nothing to seed" instead of a
       # 500 that would otherwise show up as a noisy deploy alert.
       def safe_current_bundle_sources
-        return [] unless ReactOnRailsPro.configuration.node_renderer?
+        unless ReactOnRailsPro.configuration.node_renderer?
+          Rails.logger.warn(
+            "[ReactOnRailsPro::RollingDeploy::BundlesController] " \
+            "node_renderer? is false — returning an empty manifest. " \
+            "Verify that the Pro configuration enables the node renderer; " \
+            "the HTTP rolling-deploy adapter only serves bundles when it does."
+          )
+          return []
+        end
 
         pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
         ReactOnRailsPro::RendererCacheHelpers.bundle_sources(pool, "serving rolling-deploy tarball")

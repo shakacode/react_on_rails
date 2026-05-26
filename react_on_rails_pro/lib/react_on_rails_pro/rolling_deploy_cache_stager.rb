@@ -99,11 +99,17 @@ module ReactOnRailsPro
 
     # Bundle hashes are used as directory names under the renderer cache path
     # (<cache>/<hash>/<hash>.js). The shared pattern rejects path separators,
-    # `.` / `..`, and any leading dot. `bundle_directory`'s `start_with?`
-    # guard already prevents path traversal, but a leading-dot hash (e.g.
-    # `.hidden`) would still create a hidden cache subdirectory invisible to
-    # `ls`, surprising operators who count bundle-hash entries during
-    # incident response.
+    # `.` / `..`, any leading dot, and any leading hyphen. `bundle_directory`'s
+    # `start_with?` guard already prevents path traversal, but a leading-dot
+    # hash (e.g. `.hidden`) would still create a hidden cache subdirectory
+    # invisible to `ls`, surprising operators who count bundle-hash entries
+    # during incident response.
+    #
+    # NOTE: this is a tightening of the previous local pattern, which allowed
+    # leading hyphens. Webpack content hashes never start with `-` in
+    # practice, but custom adapters emitting hyphen-prefixed hashes will now
+    # see those hashes silently dropped from the staged set. See CHANGELOG
+    # for the upgrade note.
     SAFE_HASH_PATTERN = ReactOnRailsPro::RollingDeploy::SAFE_HASH_PATTERN
 
     def self.resolve_previous_hashes(adapter, current_hashes)

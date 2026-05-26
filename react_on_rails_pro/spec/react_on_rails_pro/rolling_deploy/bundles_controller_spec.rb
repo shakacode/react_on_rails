@@ -128,6 +128,90 @@ describe ReactOnRailsPro::RollingDeploy::BundlesController do
     end
   end
 
+  describe "#authenticate_rolling_deploy_request" do
+    let(:controller) { described_class.new }
+    let(:valid_token) { "a" * 32 }
+
+    def stub_token(token)
+      allow(ReactOnRailsPro).to receive(:configuration).and_return(
+        instance_double(ReactOnRailsPro::Configuration, rolling_deploy_token: token)
+      )
+    end
+
+    def stub_request_headers(headers)
+      allow(controller).to receive(:request).and_return(
+        instance_double(ActionDispatch::Request, headers: headers)
+      )
+    end
+
+    before do
+      # Spy on `head` so the spec doesn't need a real response cycle.
+      allow(controller).to receive(:head)
+    end
+
+    context "when no token is configured" do
+      before { stub_token("") }
+
+      it "returns 401 with no Authorization header" do
+        stub_request_headers({})
+        controller.send(:authenticate_rolling_deploy_request)
+        expect(controller).to have_received(:head).with(:unauthorized)
+      end
+
+      it "returns 401 even when a syntactically valid Bearer header is provided" do
+        stub_request_headers({ "Authorization" => "Bearer #{valid_token}" })
+        controller.send(:authenticate_rolling_deploy_request)
+        expect(controller).to have_received(:head).with(:unauthorized)
+      end
+    end
+
+    context "when a token is configured" do
+      before { stub_token(valid_token) }
+
+      it "returns 401 when the Authorization header is missing" do
+        stub_request_headers({})
+        controller.send(:authenticate_rolling_deploy_request)
+        expect(controller).to have_received(:head).with(:unauthorized)
+      end
+
+      it "returns 401 when the Authorization scheme is not Bearer" do
+        stub_request_headers({ "Authorization" => "Token #{valid_token}" })
+        controller.send(:authenticate_rolling_deploy_request)
+        expect(controller).to have_received(:head).with(:unauthorized)
+      end
+
+      it "returns 401 when the Bearer value is empty" do
+        stub_request_headers({ "Authorization" => "Bearer " })
+        controller.send(:authenticate_rolling_deploy_request)
+        expect(controller).to have_received(:head).with(:unauthorized)
+      end
+
+      it "returns 401 when the token bytes are wrong but the length matches" do
+        stub_request_headers({ "Authorization" => "Bearer #{'b' * 32}" })
+        controller.send(:authenticate_rolling_deploy_request)
+        expect(controller).to have_received(:head).with(:unauthorized)
+      end
+
+      it "returns 401 when the token is the right value but the wrong length (truncation guard)" do
+        stub_request_headers({ "Authorization" => "Bearer #{valid_token[0..-2]}" })
+        controller.send(:authenticate_rolling_deploy_request)
+        expect(controller).to have_received(:head).with(:unauthorized)
+      end
+
+      it "passes through (no head invocation) when the Bearer token matches exactly" do
+        stub_request_headers({ "Authorization" => "Bearer #{valid_token}" })
+        controller.send(:authenticate_rolling_deploy_request)
+        expect(controller).not_to have_received(:head)
+      end
+
+      it "accepts the lowercase 'bearer' scheme prefix" do
+        stub_request_headers({ "Authorization" => "bearer #{valid_token}" })
+        controller.send(:authenticate_rolling_deploy_request)
+        expect(controller).not_to have_received(:head)
+      end
+    end
+  end
+
   describe "#safe_current_bundle_sources" do
     let(:controller) { described_class.new }
     let(:pool) { class_double(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool) }
@@ -147,6 +231,15 @@ describe ReactOnRailsPro::RollingDeploy::BundlesController do
 
       expect(controller.send(:safe_current_bundle_sources)).to eq([])
       expect(Rails.logger).to have_received(:warn).with(/bundle source discovery failed/)
+    end
+
+    it "warns and returns [] when node_renderer? is false so operators see the misconfiguration" do
+      allow(ReactOnRailsPro).to receive(:configuration).and_return(
+        instance_double(ReactOnRailsPro::Configuration, node_renderer?: false)
+      )
+
+      expect(controller.send(:safe_current_bundle_sources)).to eq([])
+      expect(Rails.logger).to have_received(:warn).with(/node_renderer\? is false/)
     end
   end
 end

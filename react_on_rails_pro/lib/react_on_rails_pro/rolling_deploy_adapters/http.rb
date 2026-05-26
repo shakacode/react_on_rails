@@ -51,6 +51,11 @@ module ReactOnRailsPro
 
       LOG_PREFIX = "[ReactOnRailsPro::RollingDeployAdapters::Http]"
 
+      # Wire-format constant: must stay in sync with
+      # `ReactOnRailsPro::RollingDeploy::BundlesController::BUNDLE_ENTRY_NAME`.
+      # The controller serves the bundle file under this entry name; if the
+      # two ever diverge the client will fail to locate the bundle after
+      # extracting the tarball.
       BUNDLE_ENTRY_NAME = "bundle.js"
 
       class << self
@@ -170,6 +175,13 @@ module ReactOnRailsPro
             )
             return nil
           end
+          # `response.body` buffers the full tarball (up to DEFAULT_MAX_SIZE)
+          # into a single Ruby String, and `Tarball.extract` then re-reads it
+          # through a `StringIO`. For v1 this is acceptable: build CI fetches
+          # are infrequent and the 200 MB ceiling fits in heap. A future
+          # follow-up should stream the body into a Tempfile (mirroring the
+          # controller's `compose_to_tempfile`) to reduce build-CI heap
+          # pressure for very large bundles.
           response.body
         end
 
@@ -229,7 +241,17 @@ module ReactOnRailsPro
         # Plain-HTTP guardrail. The full HTTPS-only guard lands in PR 2; until
         # then a single-line warning here protects misconfigured deployments
         # by surfacing the cleartext-token risk in build CI logs.
+        #
+        # Loopback hosts are intentionally exempt so developers running a
+        # local Rails server for `rolling_deploy_previous_url` during
+        # development don't see noise on every build CI rehearsal — the
+        # token never leaves the host in that case.
+        LOOPBACK_HOST_PATTERN = /\A(localhost|127(?:\.\d{1,3}){3}|::1|\[::1\])\z/
+        private_constant :LOOPBACK_HOST_PATTERN
+
         def warn_plain_http_token(uri)
+          return if uri.host.to_s.match?(LOOPBACK_HOST_PATTERN)
+
           Rails.logger.warn(
             "#{LOG_PREFIX} #{uri.scheme}://#{uri.host} is not HTTPS — " \
             "the Bearer token will be transmitted in cleartext. Use HTTPS in production."

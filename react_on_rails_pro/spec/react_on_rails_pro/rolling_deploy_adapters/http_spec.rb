@@ -85,6 +85,27 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
       end
     end
 
+    context "with a loopback host" do
+      let(:http) { instance_double(Net::HTTP) }
+
+      before do
+        allow(Net::HTTP).to receive(:new).with("localhost", 80).and_return(http)
+        allow(http).to receive(:use_ssl=)
+        allow(http).to receive(:verify_mode=)
+        allow(http).to receive(:open_timeout=)
+        allow(http).to receive(:read_timeout=)
+        allow(http).to receive_messages(use_ssl?: false, request: response)
+        allow(Rails).to receive(:logger).and_return(instance_double(Logger, warn: nil))
+      end
+
+      it "does not log a cleartext warning for localhost so dev rehearsals stay quiet" do
+        described_class.send(:http_get, URI("http://localhost/manifest"))
+
+        expect(Rails.logger).not_to have_received(:warn)
+          .with(/is not HTTPS/)
+      end
+    end
+
     it "uses a discovery read timeout that fits inside the cache stager budget" do
       described_class.previous_bundle_hashes
 

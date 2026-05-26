@@ -39,16 +39,16 @@ module ReactOnRailsPro
       EXTRACT_CHUNK_SIZE = 64 * 1024
 
       # Path-safety regex for tar entries. We require entries to be flat
-      # basenames (no slashes, no `..`, no NUL bytes, no leading dot) so an
-      # attacker can never write outside the target directory or hide files
-      # from `ls`. The `./` prefix permitted by tar is normalised away before
-      # this match runs.
+      # basenames (no slashes, no `..`, no NUL bytes, no leading dot, no
+      # leading hyphen) so an attacker can never write outside the target
+      # directory or hide files from `ls`. The `./` prefix permitted by tar
+      # is normalised away before this match runs.
       #
-      # Stricter than `ReactOnRailsPro::RollingDeploy::SAFE_HASH_PATTERN`:
-      # the first character must be `[A-Za-z0-9_]`. Hash strings may legally
-      # begin with a hyphen, but on-disk entry names must not — leading
-      # hyphens are a common footgun in shell contexts.
-      ENTRY_NAME_PATTERN = /\A(?!\.)[A-Za-z0-9_][A-Za-z0-9_.\-]*\z/
+      # Functionally identical to `ReactOnRailsPro::RollingDeploy::SAFE_HASH_PATTERN`
+      # — kept as a separate constant because tarball entry names and
+      # rolling-deploy hash strings are conceptually distinct: a future
+      # protocol change might tighten one without the other.
+      ENTRY_NAME_PATTERN = /\A[A-Za-z0-9_][A-Za-z0-9_.\-]*\z/
 
       # Compose a gzipped tarball from the given entries and yield the
       # resulting Tempfile. The temp file is removed when the block returns.
@@ -75,12 +75,26 @@ module ReactOnRailsPro
         validate_compose_entries!(entries)
 
         gz = Zlib::GzipWriter.new(io)
-        Gem::Package::TarWriter.new(gz) do |tar|
-          entries.each do |name, path|
-            add_file_to_tar(tar, name, path)
+        begin
+          Gem::Package::TarWriter.new(gz) do |tar|
+            entries.each do |name, path|
+              add_file_to_tar(tar, name, path)
+            end
           end
+          gz.finish
+        rescue StandardError
+          # On the happy path `gz.finish` flushes and closes the writer; on the
+          # exceptional path the TarWriter's `ensure` already wrote the tar EOF
+          # record into `gz`, so we just need to release the GzipWriter's IO
+          # reference before re-raising. Swallow any close error so the
+          # original exception still surfaces.
+          begin
+            gz.close
+          rescue StandardError
+            nil
+          end
+          raise
         end
-        gz.finish
         io
       end
 
