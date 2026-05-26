@@ -499,8 +499,9 @@ RSpec.describe "release.rake helper methods" do
     let(:sha) { "abc1234def5678abcdef" }
     let(:short_sha) { "abc1234d" }
 
-    def passing_run(name)
+    def passing_run(name, id: rand(1_000_000))
       {
+        "id" => id,
         "name" => name,
         "status" => "completed",
         "conclusion" => "success",
@@ -508,8 +509,9 @@ RSpec.describe "release.rake helper methods" do
       }
     end
 
-    def failing_run(name, conclusion: "failure")
+    def failing_run(name, conclusion: "failure", id: rand(1_000_000))
       {
+        "id" => id,
         "name" => name,
         "status" => "completed",
         "conclusion" => conclusion,
@@ -517,8 +519,9 @@ RSpec.describe "release.rake helper methods" do
       }
     end
 
-    def in_progress_run(name)
+    def in_progress_run(name, id: rand(1_000_000))
       {
+        "id" => id,
         "name" => name,
         "status" => "in_progress",
         "conclusion" => nil,
@@ -756,6 +759,28 @@ RSpec.describe "release.rake helper methods" do
         end.to raise_error(SystemExit, /No required CI check runs found.*DoesNotExist/m)
       end
     end
+
+    context "when some required checks are present but others are missing on a prerelease" do
+      it "aborts and lists the missing required check names" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
+          .and_return(sha: sha, check_runs: [passing_run("Lint"), passing_run("Test")])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root: monorepo_root).and_return(%w[Lint Test Build])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root: monorepo_root,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to raise_error(
+          SystemExit,
+          /Some required CI checks are missing.*Missing:\s*Build/m
+        )
+      end
+    end
   end
 
   describe "#fetch_main_ci_checks" do
@@ -771,6 +796,18 @@ RSpec.describe "release.rake helper methods" do
       expect do
         fetch_main_ci_checks(monorepo_root: monorepo_root)
       end.to raise_error(SystemExit, %r{Unable to fetch origin/main})
+    end
+
+    it "warns instead of aborting when `git fetch` fails with allow_override" do
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", monorepo_root, "fetch", "origin", "main", "--quiet")
+        .and_return(["fetch failed: network down", failure_status])
+
+      result = nil
+      expect do
+        result = fetch_main_ci_checks(monorepo_root: monorepo_root, allow_override: true)
+      end.to output(%r{CI STATUS OVERRIDE enabled.*Unable to fetch origin/main}m).to_stdout
+      expect(result).to be_nil
     end
 
     it "warns instead of aborting when `git fetch` fails in dry-run mode" do

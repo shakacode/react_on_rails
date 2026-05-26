@@ -148,6 +148,10 @@ def verify_gh_auth(monorepo_root:)
 end
 
 def run_release_preflight_checks!(monorepo_root:, dry_run:)
+  # The main-CI status check (`validate_main_ci_status!`) is intentionally
+  # NOT in this function — it runs inside `with_release_checkout` (after
+  # `git pull --rebase` but before tagging) so it still fires under
+  # `dry_run: true` and surfaces the warning operators need to see.
   return if dry_run
 
   puts "\n#{'=' * 80}"
@@ -385,6 +389,9 @@ def format_main_ci_status_violation(kind:, short_sha:, runs:) # rubocop:disable 
              "CI may not have started yet, or the GitHub Checks API is unavailable."
            when :no_required_checks
              "❌ No required CI check runs found on origin/main (commit #{short_sha})."
+           when :missing_required_checks
+             "❌ Some required CI checks are missing on origin/main (commit #{short_sha}). " \
+             "Branch protection would refuse this merge."
            else
              "❌ CI on origin/main is not healthy (commit #{short_sha})."
            end
@@ -457,14 +464,32 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
   required_names = is_prerelease ? required_check_names_for_main(monorepo_root: monorepo_root) : nil
   evaluated = required_names.nil? ? check_runs : check_runs.select { |run| required_names.include?(run["name"]) }
 
-  if evaluated.empty? && !required_names.nil?
-    handle_main_ci_status_violation!(
-      message: format_main_ci_status_violation(kind: :no_required_checks, short_sha: short_sha, runs: nil) +
-               "\nRequired: #{required_names.join(', ')}",
-      allow_override: allow_override,
-      dry_run: dry_run
-    )
-    return
+  # When branch protection lists required checks, treat any missing required
+  # check as blocking. Branch protection would refuse the merge in this state,
+  # so a release that ignored the gap would ship against a commit GitHub
+  # itself considers unverified. `:no_required_checks` covers the all-missing
+  # case (typically: CI hasn't started yet); `:missing_required_checks` covers
+  # the partial case (some required workflows ran, others never registered —
+  # usually a renamed/deleted workflow that branch protection still requires).
+  unless required_names.nil?
+    missing_names = required_names - evaluated.map { |run| run["name"] }
+    if missing_names.length == required_names.length
+      handle_main_ci_status_violation!(
+        message: format_main_ci_status_violation(kind: :no_required_checks, short_sha: short_sha, runs: nil) +
+                 "\nRequired: #{required_names.join(', ')}",
+        allow_override: allow_override,
+        dry_run: dry_run
+      )
+      return
+    elsif missing_names.any?
+      handle_main_ci_status_violation!(
+        message: format_main_ci_status_violation(kind: :missing_required_checks, short_sha: short_sha, runs: nil) +
+                 "\nRequired: #{required_names.join(', ')}\nMissing: #{missing_names.join(', ')}",
+        allow_override: allow_override,
+        dry_run: dry_run
+      )
+      return
+    end
   end
 
   # Report failures before in-progress runs. If both are present, the operator

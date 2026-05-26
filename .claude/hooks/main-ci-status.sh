@@ -39,15 +39,18 @@ fail_open() {
   exit 0
 }
 
-# Helper: atomically replace the cache file with the contents of $1, then cat
-# the new file to stdout. A direct `tee` would leave a partial file readable
+# Helper: atomically replace the cache file with the contents of $1, then
+# print $1 to stdout. A direct `tee` would leave a partial file readable
 # by a concurrent session-start if the script were interrupted mid-write.
+# We print from the parameter rather than re-reading the file, so a
+# concurrent delete between the `mv` and the print cannot trigger a
+# misleading "cache write failed" fail_open.
 write_cache_atomic() {
   local tmp
   tmp=$(mktemp "${CACHE_FILE}.XXXXXX") || return 1
   printf '%s' "$1" >"${tmp}" || { rm -f "${tmp}"; return 1; }
   mv -f "${tmp}" "${CACHE_FILE}" || { rm -f "${tmp}"; return 1; }
-  cat "${CACHE_FILE}"
+  printf '%s' "$1"
 }
 
 command -v gh >/dev/null 2>&1 || fail_open "gh CLI not installed"
@@ -78,8 +81,16 @@ checks_jsonl=$(gh api \
   --jq '.check_runs[]' \
   2>/dev/null) || fail_open "gh api check-runs failed"
 
-checks_json=$(echo "${checks_jsonl}" | jq -s '[.[] | {name, status, conclusion, html_url}]' 2>/dev/null) \
-  || fail_open "jq slurp failed"
+# Collapse multiple runs per check name to the most recent attempt (highest
+# check_run id). Without this, an old failed run that was later re-run and
+# passed would still be picked up by the `failed` filter below and show as
+# red here — while `validate_main_ci_status!` in `release.rake` (which does
+# the same dedup) would correctly report green. Keep the two in sync.
+checks_json=$(echo "${checks_jsonl}" | jq -s '
+  [.[] | {id, name, status, conclusion, html_url}]
+  | group_by(.name)
+  | map(max_by(.id))
+' 2>/dev/null) || fail_open "jq slurp failed"
 
 # Aggregate counts with jq. `success`, `skipped`, `neutral` are all "passing".
 # Anything completed with another conclusion is a failure. Anything not yet
@@ -105,6 +116,10 @@ total=$(echo "${summary}" | grep "^TOTAL=" | cut -d= -f2)
 passed=$(echo "${summary}" | grep "^PASSED=" | cut -d= -f2)
 failed_count=$(echo "${summary}" | grep "^FAILED_COUNT=" | cut -d= -f2)
 in_progress_count=$(echo "${summary}" | grep "^IN_PROGRESS_COUNT=" | cut -d= -f2)
+# Default to 0 when the parse step produced no line (partial-output edge case).
+# The `total=0` branch below already covers the all-empty case, but a defensive
+# default here keeps `[ "${failed_count}" -gt 0 ]` from silently failing.
+: "${failed_count:=0}" "${in_progress_count:=0}"
 
 # Build the output as a single string, then atomically swap it into the cache
 # so a concurrent reader never sees a half-written file.
