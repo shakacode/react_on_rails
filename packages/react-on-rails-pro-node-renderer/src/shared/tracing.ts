@@ -1,3 +1,4 @@
+import log from './log.js';
 import { message } from './errorReporter.js';
 
 /* eslint-disable @typescript-eslint/no-empty-object-type -- empty interfaces are used as targets for augmentation */
@@ -173,7 +174,12 @@ export function subSpan<T>(opts: SubSpanOptions, fn: () => Promise<T>): Promise<
         return Promise.reject(err instanceof Error ? err : new Error(String(err)));
       }
 
-      message(`subSpan implementation rejected before invoking fn(): ${String(err)}`);
+      // log.warn (not message) for the silent-fallback path. message() goes to
+      // log.error + external notifiers (Sentry/Bugsnag/etc.) on every request,
+      // which is too noisy for a per-request recoverable failure where fn() is
+      // still executed. log.warn surfaces the broken integration without
+      // paging the on-call team for every render.
+      log.warn({ err }, 'subSpan implementation rejected before invoking fn(); running fn() without a span');
       return wrappedFn();
     });
   } catch (err) {
@@ -181,7 +187,7 @@ export function subSpan<T>(opts: SubSpanOptions, fn: () => Promise<T>): Promise<
       return Promise.reject(err instanceof Error ? err : new Error(String(err)));
     }
 
-    message(`subSpan implementation threw before invoking fn(): ${String(err)}`);
+    log.warn({ err }, 'subSpan implementation threw before invoking fn(); running fn() without a span');
     return wrappedFn();
   }
 }
