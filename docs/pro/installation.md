@@ -193,8 +193,55 @@ and uploaded artifacts as internal if they include raw task output. The complete
 Additional fields may appear in future gem versions; scripts should ignore unknown keys.
 
 JSON parsers should branch on `status` before treating `renewal_required` as an expiring-soon signal. If your app
-guarantees JSON-only stdout, `JSON.parse(stdout.strip)` is enough. The example below also tolerates Rails boot output
-or structured logs written to stdout before the task prints its own JSON object:
+guarantees JSON-only stdout, `JSON.parse(stdout.strip)` is enough. Most Rails apps print structured logs one JSON
+object per line, so the example below filters stdout to the first line whose `status` is a known license value:
+
+```ruby
+require "json"
+require "open3"
+
+LICENSE_STATUSES = %w[valid expired invalid missing].freeze
+
+# command_status (exit code) is captured for diagnostics only; control flow branches on the JSON status field.
+stdout, stderr, command_status = Open3.capture3(
+  { "RAILS_ENV" => "production", "FORMAT" => "json" },
+  "bundle", "exec", "rake", "react_on_rails_pro:verify_license"
+)
+
+license_info = stdout.lines.filter_map { |line|
+  parsed = JSON.parse(line) rescue nil
+  parsed if parsed.is_a?(Hash) && LICENSE_STATUSES.include?(parsed["status"])
+}.first
+
+unless license_info
+  exit_detail = command_status.exitstatus || "signal(#{command_status.termsig})"
+  abort "Could not parse React on Rails Pro license JSON object. Exit: #{exit_detail}. Stderr: #{stderr}"
+end
+
+status = license_info["status"]
+abort "React on Rails Pro license JSON output did not include a status." unless status
+
+case status
+when "expired", "invalid", "missing"
+  abort "React on Rails Pro license is #{status}. Verify REACT_ON_RAILS_PRO_LICENSE is present and current."
+when "valid"
+  if license_info["renewal_required"]
+    # warn writes to STDERR; the script exits 0 here by design (matching the built-in task's
+    # behavior for expiring-soon licenses). Use the wrapper task below with DAYS= to fail-closed.
+    warn "React on Rails Pro license renewal is required soon."
+  else
+    puts "React on Rails Pro license is valid."
+  end
+else
+  abort "Unexpected React on Rails Pro license status: #{status}."
+end
+```
+
+If your Rails boot stream interleaves multi-line JSON with other content (so the task output is not on its own
+line), use the recursive-descent fallback that scans for balanced braces:
+
+<details>
+<summary>Fallback parser for noisy multi-line stdout</summary>
 
 ```ruby
 require "json"
@@ -264,6 +311,7 @@ def parse_json_object_at(output, start_index)
   [nil, nil]
 end
 
+# command_status (exit code) is captured for diagnostics only; control flow branches on the JSON status field.
 stdout, stderr, command_status = Open3.capture3(
   { "RAILS_ENV" => "production", "FORMAT" => "json" },
   "bundle", "exec", "rake", "react_on_rails_pro:verify_license"
@@ -283,6 +331,8 @@ when "expired", "invalid", "missing"
   abort "React on Rails Pro license is #{status}. Verify REACT_ON_RAILS_PRO_LICENSE is present and current."
 when "valid"
   if license_info["renewal_required"]
+    # warn writes to STDERR; the script exits 0 here by design (matching the built-in task's
+    # behavior for expiring-soon licenses). Use the wrapper task below with DAYS= to fail-closed.
     warn "React on Rails Pro license renewal is required soon."
   else
     puts "React on Rails Pro license is valid."
@@ -291,6 +341,8 @@ else
   abort "Unexpected React on Rails Pro license status: #{status}."
 end
 ```
+
+</details>
 
 #### Blocking CI Example
 
@@ -349,6 +401,9 @@ If the repository does not pin Ruby with `.ruby-version` or a `ruby` directive i
 `ruby/setup-ruby` so the workflow uses the same Ruby version as production.
 Before copying the examples into a production deployment pipeline, pin third-party actions such as `actions/checkout`
 and `ruby/setup-ruby` to reviewed versions or full commit SHAs according to your organization's supply-chain policy.
+
+The built-in rake task ends with `raise` rather than a plain `exit`, so the captured log file in `$RUNNER_TEMP`
+will contain a Ruby backtrace after the task output on failure. That is expected behavior, not a workflow error.
 
 Call the reusable workflow before your deploy job and pass repository secrets from the caller:
 
@@ -411,17 +466,26 @@ jobs:
 
       - name: Summarize React on Rails Pro license
         env:
+          # Use `outcome` (pre-continue-on-error) so failure of the license check is still visible
+          # even though `continue-on-error: true` would mark the step's `conclusion` as success.
           LICENSE_CHECK_OUTCOME: ${{ steps.license-check.outcome }}
         run: |
           {
             echo "## React on Rails Pro license"
             echo
-            if [ "$LICENSE_CHECK_OUTCOME" = "success" ]; then
-              echo "License validation passed."
-            else
-              echo "License validation did not pass; the license may be invalid, expired, or unavailable to this workflow."
-              echo "Run the check locally or inspect a redacted log for details."
-            fi
+            case "$LICENSE_CHECK_OUTCOME" in
+              success)
+                echo "License validation passed."
+                ;;
+              skipped)
+                echo "License check did not run; an earlier setup step failed before it could start."
+                echo "Inspect the job logs to identify the failing step."
+                ;;
+              *)
+                echo "License validation did not pass; the license may be invalid, expired, or unavailable to this workflow."
+                echo "Run the check locally or inspect a redacted log for details."
+                ;;
+            esac
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [ "$LICENSE_CHECK_OUTCOME" != "success" ]; then
@@ -438,8 +502,10 @@ Both workflow examples redirect raw task output to `$RUNNER_TEMP` and write only
 organization, plan, and expiration metadata are not copied into Actions output. Remove the redirect or upload a redacted
 artifact only after verifying that the task output is acceptable for everyone who can read your repository's Actions
 logs. The `$RUNNER_TEMP` log file is intentionally ephemeral; if you need diagnostics after the job ends, run the task
-locally or upload a redacted artifact with restricted retention. If the license secret is absent, the advisory workflow
-emits the warning but still exits successfully by design.
+locally or upload a redacted artifact with restricted retention. If the license secret is absent, the license-check
+step records a failure, the job's `continue-on-error: true` absorbs it, and the job itself still exits with a zero
+status by design — the step summary and the GitHub Actions warning annotation surface the issue without failing the
+workflow.
 
 ### Monitor License Expiration
 
@@ -458,7 +524,7 @@ value should fail closed in the catch-all branch:
 
 # lib/tasks/react_on_rails_pro_license.rake
 namespace :licenses do
-  desc "Fail if the React on Rails Pro license is invalid, expired, or expiring within DAYS"
+  desc "Fail if the React on Rails Pro license is invalid, expired, or expires within DAYS days (inclusive; default 30)"
   task check_react_on_rails_pro: :environment do
     threshold_days = begin
       Integer(ENV.fetch("DAYS", "30"))
@@ -467,14 +533,24 @@ namespace :licenses do
     end
     abort "DAYS must be a non-negative integer number of days." if threshold_days.negative?
 
-    info = ReactOnRailsPro::Utils.license_info
+    # Wrap the call to the internal helper so a future rename/removal aborts cleanly instead of
+    # raising NameError/NoMethodError with a noisy backtrace from the rake task.
+    info = begin
+      ReactOnRailsPro::Utils.license_info
+    rescue NameError, NoMethodError => e
+      abort "ReactOnRailsPro::Utils.license_info is unavailable (#{e.message}). " \
+            "Review this task after upgrading react_on_rails_pro."
+    end
     status = info[:status]
     expiration = info[:expiration]
     # :expiration is expected to be a Time or nil; keep the guard for compatibility with future gem versions.
     expiration_time = expiration.respond_to?(:to_time) ? expiration.to_time.utc : nil
-    # The :environment task dependency loads Active Support, so 1.day is available here.
-    days_remaining = expiration_time && ((expiration_time - Time.now.utc) / 1.day).ceil
-    day_label = days_remaining && "day".pluralize(days_remaining)
+    # ceil keeps threshold comparisons conservative (fires slightly early); the displayed count
+    # can be 1 higher than the true floor value. 86_400 == 1 day in seconds — using a literal
+    # avoids relying on Active Support's Numeric#day, so this task also works in api-only Rails
+    # apps that do not load the numeric core extensions.
+    days_remaining = expiration_time && ((expiration_time - Time.now.utc) / 86_400.0).ceil
+    day_label = days_remaining && (days_remaining.abs == 1 ? "day" : "days")
 
     case status
     when :valid
@@ -499,14 +575,18 @@ namespace :licenses do
     end
 
     if days_remaining && days_remaining <= threshold_days
+      expiry_phrase = days_remaining.zero? ? "expires today" : "expires in #{days_remaining} #{day_label}"
       abort(
-        "React on Rails Pro license expires in #{days_remaining} #{day_label}. " \
+        "React on Rails Pro license #{expiry_phrase}. " \
         "Renew and update REACT_ON_RAILS_PRO_LICENSE."
       )
     end
 
     message = "React on Rails Pro license is valid"
-    message += " (#{days_remaining} #{day_label} remaining)" if days_remaining
+    if days_remaining
+      remaining_phrase = days_remaining.zero? ? "expires today" : "#{days_remaining} #{day_label} remaining"
+      message += " (#{remaining_phrase})"
+    end
     puts message
   end
 end
@@ -518,8 +598,9 @@ Run it from your scheduler or CI:
 RAILS_ENV=production DAYS=30 bundle exec rake licenses:check_react_on_rails_pro
 ```
 
-Partial days are rounded up, so a license with any time remaining today counts as 1 day remaining. Use `DAYS=0` when
-you only want the wrapper to fail for invalid, missing, already expired, or past-dated valid license metadata.
+Partial days are rounded up, so a license with any time remaining today counts as 1 day remaining. `DAYS=N` fails when
+the license expires within N days (inclusive: `days_remaining <= N`); use `DAYS=0` to fail only for invalid, missing,
+already expired, or past-dated valid license metadata.
 
 For complete license setup instructions, see [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/LICENSE_SETUP.md).
 
