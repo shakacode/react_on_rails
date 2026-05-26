@@ -468,7 +468,10 @@ module RscNodeRenderer
   module_function
 
   # Keep in sync with spec/support/rsc_node_renderer.rb (Step 3).
-  # Copy this method here, or require a shared file if your project uses both frameworks.
+  # Keep in sync with spec/support/rsc_node_renderer.rb (Step 3).
+  # Prefer extracting this to a shared file (e.g. lib/test_support/rsc_node_renderer.rb)
+  # and requiring it from both helpers. Copy it here only for single-framework (Minitest-only) projects
+  # where a shared lib/ location adds unnecessary indirection.
   def wait_until_ready!(host:, port:, timeout_seconds: 30, log_path: nil, pid: nil)
     deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout_seconds
     saw_reset = false
