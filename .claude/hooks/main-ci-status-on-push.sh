@@ -14,16 +14,16 @@ cmd=$(printf '%s' "${input}" | jq -r '.tool_input.command // empty' 2>/dev/null)
 
 # Match:
 #   - `gh pr create` (any args)
-#   - `git push` to main / HEAD (with explicit origin main, or bare `git push`
-#     while on main — we don't try to detect the current branch here, just
-#     match the explicit-target forms).
+#   - `git push ... origin main` or `git push ... origin HEAD` — must be
+#     followed by whitespace or end-of-string. Without that anchor, a glob
+#     substring match would also fire on `git push origin main-feature`,
+#     `maintenance`, etc.
 matched=0
-case "${cmd}" in
-  *gh\ pr\ create*)            matched=1 ;;
-  *git\ push*origin\ main*)    matched=1 ;;
-  *git\ push*origin\ HEAD*)    matched=1 ;;
-  *git\ push\ --force*main*)   matched=1 ;;
-esac
+if [[ "${cmd}" =~ (^|[[:space:]])gh[[:space:]]+pr[[:space:]]+create([[:space:]]|$) ]]; then
+  matched=1
+elif [[ "${cmd}" =~ (^|[[:space:]])git[[:space:]]+push([[:space:]]+[^[:space:]]+)*[[:space:]]+origin[[:space:]]+(main|HEAD)([[:space:]]|$) ]]; then
+  matched=1
+fi
 
 [ "${matched}" -eq 1 ] || exit 0
 

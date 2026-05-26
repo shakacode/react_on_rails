@@ -300,25 +300,46 @@ CI_INCOMPLETE_STATUSES = %w[in_progress queued waiting requested pending].freeze
 # paths-ignore skips, or workflows that intentionally short-circuit).
 CI_PASSING_CONCLUSIONS = %w[success skipped neutral].freeze
 
-def fetch_main_ci_checks(monorepo_root:)
+def fetch_main_ci_checks(monorepo_root:, allow_override: false, dry_run: false)
   fetch_output, fetch_status = Open3.capture2e(
     "git", "-C", monorepo_root, "fetch", "origin", "main", "--quiet"
   )
-  abort "❌ Unable to fetch origin/main for CI status check.\n\n#{fetch_output}" unless fetch_status.success?
+  unless fetch_status.success?
+    handle_main_ci_status_violation!(
+      message: "❌ Unable to fetch origin/main for CI status check.\n\n#{fetch_output}",
+      allow_override: allow_override,
+      dry_run: dry_run
+    )
+    return nil
+  end
 
   sha_output, sha_status = Open3.capture2e("git", "-C", monorepo_root, "rev-parse", "origin/main")
-  abort "❌ Unable to resolve origin/main HEAD.\n\n#{sha_output}" unless sha_status.success?
+  unless sha_status.success?
+    handle_main_ci_status_violation!(
+      message: "❌ Unable to resolve origin/main HEAD.\n\n#{sha_output}",
+      allow_override: allow_override,
+      dry_run: dry_run
+    )
+    return nil
+  end
   sha = sha_output.strip
 
   repo_slug = github_repo_slug(monorepo_root)
   api_path = "repos/#{repo_slug}/commits/#{sha}/check-runs"
 
   # `--paginate --jq '.check_runs[]'` flattens paginated responses into JSONL.
-  # Each non-empty line is one check_run object.
-  output, status = Open3.capture2e(
-    "gh", "api", "--paginate", "--jq", ".check_runs[]", api_path
-  )
-  abort "❌ Unable to query GitHub Checks API for #{sha}.\n\n#{output}" unless status.success?
+  # Each non-empty line is one check_run object. Using `capture_gh_output` so a
+  # missing `gh` binary aborts with a friendly install hint instead of crashing
+  # with Errno::ENOENT.
+  output, status = capture_gh_output("api", "--paginate", "--jq", ".check_runs[]", api_path)
+  unless status.success?
+    handle_main_ci_status_violation!(
+      message: "❌ Unable to query GitHub Checks API for #{sha}.\n\n#{output}",
+      allow_override: allow_override,
+      dry_run: dry_run
+    )
+    return nil
+  end
 
   check_runs = output.lines.reject { |line| line.strip.empty? }.map do |line|
     JSON.parse(line)
@@ -332,7 +353,12 @@ end
 def required_check_names_for_main(monorepo_root:)
   repo_slug = github_repo_slug(monorepo_root)
   api_path = "repos/#{repo_slug}/branches/main/protection/required_status_checks"
-  output, status = Open3.capture2e("gh", "api", "--jq", ".contexts // []", api_path)
+  # Combine the legacy `contexts` list (older protection rules) with the newer
+  # `checks[].context` list. Branch protection set up via the `checks` API
+  # leaves `contexts` as `[]`, so reading only `contexts` would yield an empty
+  # array and trip the `:no_required_checks` abort path even when CI is green.
+  jq_query = "(.contexts // []) + (.checks // [] | map(.context)) | unique"
+  output, status = capture_gh_output("api", "--jq", jq_query, api_path)
   # If branch protection isn't configured, isn't queryable with current token scope, or the
   # endpoint returns 404, fall through to nil so the caller treats all checks as required
   # (fail-safe).
@@ -340,7 +366,11 @@ def required_check_names_for_main(monorepo_root:)
 
   begin
     parsed = JSON.parse(output)
-    parsed.is_a?(Array) ? parsed : nil
+    return nil unless parsed.is_a?(Array)
+
+    # Empty array (no required names parseable) is treated the same as "no
+    # branch protection visible" — fail-safe to evaluating every check run.
+    parsed.empty? ? nil : parsed
   rescue JSON::ParserError
     nil
   end
@@ -384,9 +414,9 @@ def handle_main_ci_status_violation!(message:, allow_override:, dry_run:)
     #{message}
 
     To override (use only if the failures are known-unrelated to this release):
-      RELEASE_CI_STATUS_OVERRIDE=true rake release[...]
+      RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake release[...]
       # or pass override_ci_status as the 4th positional argument:
-      rake "release[VERSION,false,false,true]"
+      bundle exec rake "release[VERSION,false,false,true]"
   ERROR
 end
 
@@ -394,7 +424,12 @@ end
 def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dry_run:)
   puts "\nChecking CI status on origin/main..."
 
-  data = fetch_main_ci_checks(monorepo_root: monorepo_root)
+  data = fetch_main_ci_checks(monorepo_root: monorepo_root, allow_override: allow_override, dry_run: dry_run)
+  # `fetch_main_ci_checks` returns nil when it surfaced a violation through
+  # `handle_main_ci_status_violation!` (dry-run or override path). In that case
+  # the warning has already been printed and we should not continue.
+  return if data.nil?
+
   sha = data[:sha]
   short_sha = sha[0, 8]
   check_runs = data[:check_runs]
@@ -407,6 +442,15 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
     )
     return
   end
+
+  # Collapse multiple runs per check name to the most recent attempt (highest
+  # check_run id). Without this, an old failed run that was later re-run and
+  # passed would still be picked up by the `failed` filter below and block the
+  # release. `id` is monotonically increasing per check run on a commit, so
+  # `max_by { id }` reliably selects the latest attempt.
+  check_runs = check_runs
+               .group_by { |run| run["name"] }
+               .map { |_name, runs| runs.max_by { |run| run["id"].to_i } }
 
   # For prereleases, restrict the gate to GitHub-branch-protection-required checks.
   # For stable releases, evaluate every check run on the commit.
@@ -423,16 +467,10 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
     return
   end
 
-  in_progress = evaluated.select { |run| CI_INCOMPLETE_STATUSES.include?(run["status"]) }
-  if in_progress.any?
-    handle_main_ci_status_violation!(
-      message: format_main_ci_status_violation(kind: :in_progress, short_sha: short_sha, runs: in_progress),
-      allow_override: allow_override,
-      dry_run: dry_run
-    )
-    return
-  end
-
+  # Report failures before in-progress runs. If both are present, the operator
+  # needs to know about the failure right away — telling them to "wait or
+  # override" would just make them wait and re-run before seeing the real
+  # blocker.
   failed = evaluated.select do |run|
     run["status"] == "completed" && !CI_PASSING_CONCLUSIONS.include?(run["conclusion"])
   end
@@ -445,8 +483,19 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
     return
   end
 
-  scope = required_names.nil? ? "all" : "required"
-  puts "✓ Main CI is healthy on #{short_sha} (#{evaluated.length} #{scope} checks)"
+  in_progress = evaluated.select { |run| CI_INCOMPLETE_STATUSES.include?(run["status"]) }
+  if in_progress.any?
+    handle_main_ci_status_violation!(
+      message: format_main_ci_status_violation(kind: :in_progress, short_sha: short_sha, runs: in_progress),
+      allow_override: allow_override,
+      dry_run: dry_run
+    )
+    return
+  end
+
+  qualifier = required_names.nil? ? "" : "required "
+  noun = evaluated.length == 1 ? "check" : "checks"
+  puts "✓ Main CI is healthy on #{short_sha} (#{evaluated.length} #{qualifier}#{noun})"
 end
 # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 

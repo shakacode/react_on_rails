@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Prints a compact CI-status block for origin/main's latest push commit.
+# Prints a compact CI-status block for origin/main's current HEAD commit.
 #
 # Designed to be wired into Claude Code's SessionStart and PreToolUse hooks
 # (see .claude/settings.json) so the agent always sees whether main is green
@@ -39,32 +39,39 @@ fail_open() {
   exit 0
 }
 
+# Helper: atomically replace the cache file with the contents of $1, then cat
+# the new file to stdout. A direct `tee` would leave a partial file readable
+# by a concurrent session-start if the script were interrupted mid-write.
+write_cache_atomic() {
+  local tmp
+  tmp=$(mktemp "${CACHE_FILE}.XXXXXX") || return 1
+  printf '%s' "$1" >"${tmp}" || { rm -f "${tmp}"; return 1; }
+  mv -f "${tmp}" "${CACHE_FILE}" || { rm -f "${tmp}"; return 1; }
+  cat "${CACHE_FILE}"
+}
+
 command -v gh >/dev/null 2>&1 || fail_open "gh CLI not installed"
 gh auth status >/dev/null 2>&1 || fail_open "gh CLI not authenticated (run \`gh auth login\`)"
 
-# Pull the latest push run's status check rollup. `--limit 1 --event push`
-# isolates main pushes from PR/comment-triggered runs that we don't care about.
-runs_json=$(gh run list \
-  --branch main \
-  --limit 1 \
-  --event push \
-  --json conclusion,headSha,workflowName,url,status,createdAt \
-  2>/dev/null) || fail_open "gh run list failed"
-
-[ -n "${runs_json}" ] || fail_open "no main push runs visible"
-
-# Resolve the head SHA from the most recent push run, then pull every check
-# run on that commit. We use the Checks API (not `gh run list`) because a
-# single push commit triggers multiple workflows and we want them aggregated.
-head_sha=$(echo "${runs_json}" | jq -r '.[0].headSha // empty' 2>/dev/null) || fail_open "jq parse failed"
-[ -n "${head_sha}" ] || fail_open "no headSha on most recent push run"
-
 repo_slug=$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null) || fail_open "gh repo view failed"
 
-# Use `--paginate` with `--jq '.check_runs[]'` to emit JSONL (one check_run per
-# line). A separate `jq -s` then slurps the JSONL back into a single array.
-# This avoids the gotcha where `gh --paginate` with `--jq '[...]'` produces one
-# array per page (concatenated), breaking single-array aggregation.
+# Resolve the actual `origin/main` HEAD SHA. We use `git ls-remote` (not
+# `gh run list`) so the SHA reflects the current ref tip, not the latest
+# push-workflow run — which can lag right after a push (or never appear at
+# all for docs-only pushes when paths-ignore filters out every workflow).
+# Matching the release gate's SHA semantics (`git rev-parse origin/main`)
+# keeps session-time and release-time observations consistent.
+head_sha=$(git -C "${REPO_ROOT}" ls-remote origin main 2>/dev/null | awk 'NR==1 {print $1}') \
+  || fail_open "git ls-remote origin main failed"
+[ -n "${head_sha}" ] || fail_open "could not resolve origin/main HEAD"
+
+# Pull every check run on the commit. We use the Checks API because a single
+# push commit triggers multiple workflows and we want them aggregated.
+#
+# `--paginate` with `--jq '.check_runs[]'` emits JSONL (one check_run per line).
+# A separate `jq -s` slurps the JSONL back into a single array. This avoids
+# the gotcha where `gh --paginate` with `--jq '[...]'` produces one array per
+# page (concatenated), breaking single-array aggregation.
 checks_jsonl=$(gh api \
   --paginate \
   "repos/${repo_slug}/commits/${head_sha}/check-runs" \
@@ -93,34 +100,45 @@ summary=$(echo "${checks_json}" | jq -r '
     (.in_progress[] | "INPROGRESS_LINE=" + .name + " — " + (.status // "in_progress") + " — " + (.html_url // ""))
 ') || fail_open "jq summary failed"
 
-# Pull short SHA + workflow run URL for the header. Both fields come from runs_json.
 short_sha="${head_sha:0:8}"
-created_at=$(echo "${runs_json}" | jq -r '.[0].createdAt // ""')
+total=$(echo "${summary}" | grep "^TOTAL=" | cut -d= -f2)
+passed=$(echo "${summary}" | grep "^PASSED=" | cut -d= -f2)
+failed_count=$(echo "${summary}" | grep "^FAILED_COUNT=" | cut -d= -f2)
+in_progress_count=$(echo "${summary}" | grep "^IN_PROGRESS_COUNT=" | cut -d= -f2)
 
-# Build the output as a single string, then write it to cache + stdout.
-{
-  printf 'Main CI status (origin/main %s, pushed at %s):\n' "${short_sha}" "${created_at}"
-  total=$(echo "${summary}" | grep "^TOTAL=" | cut -d= -f2)
-  passed=$(echo "${summary}" | grep "^PASSED=" | cut -d= -f2)
-  failed_count=$(echo "${summary}" | grep "^FAILED_COUNT=" | cut -d= -f2)
-  in_progress_count=$(echo "${summary}" | grep "^IN_PROGRESS_COUNT=" | cut -d= -f2)
+# Build the output as a single string, then atomically swap it into the cache
+# so a concurrent reader never sees a half-written file.
+if [ "${total:-0}" = "0" ]; then
+  # No check runs visible for this commit. The Checks API may simply not have
+  # registered any workflows yet (right after a push), or all workflows were
+  # filtered out by paths-ignore. Either way, the agent should NOT read this
+  # as "all green" — say so explicitly. The release gate treats the same case
+  # as a blocking violation; aligning the wording here keeps the two signals
+  # honest.
+  output=$(printf 'Main CI status (origin/main %s): no check runs visible yet.\n  CI may not have started for this commit, or the Checks API is unavailable.\n  See: https://github.com/%s/commit/%s/checks\n' \
+    "${short_sha}" "${repo_slug}" "${head_sha}")
+else
+  output=$(
+    printf 'Main CI status (origin/main %s):\n' "${short_sha}"
+    printf '  Total: %s | Passed: %s | Failed: %s | In progress: %s\n' \
+      "${total}" "${passed}" "${failed_count}" "${in_progress_count}"
 
-  printf '  Total: %s | Passed: %s | Failed: %s | In progress: %s\n' \
-    "${total}" "${passed}" "${failed_count}" "${in_progress_count}"
+    if [ "${failed_count}" -gt 0 ] 2>/dev/null; then
+      echo "  Failures:"
+      echo "${summary}" | grep "^FAILED_LINE=" | sed 's/^FAILED_LINE=/    - /'
+    fi
 
-  if [ "${failed_count}" -gt 0 ] 2>/dev/null; then
-    echo "  Failures:"
-    echo "${summary}" | grep "^FAILED_LINE=" | sed 's/^FAILED_LINE=/    - /'
-  fi
+    if [ "${in_progress_count}" -gt 0 ] 2>/dev/null; then
+      echo "  In progress:"
+      echo "${summary}" | grep "^INPROGRESS_LINE=" | sed 's/^INPROGRESS_LINE=/    - /'
+    fi
 
-  if [ "${in_progress_count}" -gt 0 ] 2>/dev/null; then
-    echo "  In progress:"
-    echo "${summary}" | grep "^INPROGRESS_LINE=" | sed 's/^INPROGRESS_LINE=/    - /'
-  fi
+    if [ "${failed_count}" -gt 0 ] 2>/dev/null || [ "${in_progress_count}" -gt 0 ] 2>/dev/null; then
+      echo "  See: https://github.com/${repo_slug}/commit/${head_sha}/checks"
+    fi
+  )
+fi
 
-  if [ "${failed_count}" -gt 0 ] 2>/dev/null || [ "${in_progress_count}" -gt 0 ] 2>/dev/null; then
-    echo "  See: https://github.com/${repo_slug}/commit/${head_sha}/checks"
-  fi
-} | tee "${CACHE_FILE}"
+write_cache_atomic "${output}" || fail_open "cache write failed"
 
 exit 0

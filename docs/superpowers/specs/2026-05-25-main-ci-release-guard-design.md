@@ -1,6 +1,6 @@
 # Main CI release guard + continuous monitoring
 
-**Status**: Design — awaiting user review
+**Status**: Implemented (see PR #3407)
 **Date**: 2026-05-25
 **Owner**: Justin Gordon (with Claude Code)
 
@@ -51,11 +51,11 @@ Note: `run_release_preflight_checks!` runs _before_ `with_release_checkout` (and
 
 The `:release` task gets a new 4th positional argument and a paired env var, paralleling the existing `override_version_policy`:
 
-```
+```ruby
 task :release, %i[version dry_run override_version_policy override_ci_status]
 ```
 
-```
+```bash
 RELEASE_CI_STATUS_OVERRIDE=true   # bypass the CI status check
 ```
 
@@ -77,7 +77,7 @@ The target commit is **always `origin/main` HEAD**, regardless of where the rele
 
 When blocked, the error names the failing checks, links to them, and tells the operator exactly how to proceed:
 
-```
+```text
 ❌ CI on main is not healthy — refusing to release.
 
 Commit: 3103496d
@@ -87,9 +87,9 @@ Commit: 3103496d
       https://github.com/shakacode/react_on_rails/actions/runs/26404417325
 
 To override (use only if the failures are known-unrelated to this release):
-  RELEASE_CI_STATUS_OVERRIDE=true rake release[...]
+  RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake release[...]
   # or
-  rake "release[16.2.0,false,false,true]"
+  bundle exec rake "release[16.2.0,false,false,true]"
 ```
 
 In-progress checks get a separate message ("CI in progress — wait for it to finish, or override").
@@ -162,7 +162,7 @@ end
 
 A small bash script that runs `gh run list --branch main --limit 1 --event push --json conclusion,headSha,workflowName,databaseId,url,status` and emits a compact status block:
 
-```
+```text
 Main CI status (3103496d, pushed 7h ago):
   ✅ 11 success
   ❌ 2 failure:
