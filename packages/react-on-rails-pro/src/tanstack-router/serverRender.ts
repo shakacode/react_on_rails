@@ -10,6 +10,21 @@ import type {
 import type { RailsContext } from 'react-on-rails/types';
 import { normalizeSearch } from './utils.ts';
 
+/**
+ * Defensive Suspense fallback that throws if `RouterProvider` suspends during SSR.
+ *
+ * In practice, React 18's legacy `renderToString` produces its own
+ * "component suspended while responding to synchronous input" error before
+ * reaching this fallback synchronously, so the explicit message below acts as
+ * a backstop for React versions or configurations where the fallback IS
+ * invoked. Either way, suspension surfaces as a loud throw rather than a
+ * silent empty render.
+ *
+ * Streaming renderers (`renderToPipeableStream`, `renderToReadableStream`)
+ * resolve suspended chunks asynchronously and never invoke a throwing
+ * fallback at all — if streaming SSR is added later, this guard must be
+ * redesigned (for example, moved into a custom RouterProvider wrapper).
+ */
 function ServerSuspenseFallback(): never {
   throw new Error(
     'react-on-rails-pro/tanstack-router: RouterProvider suspended during server render after router.load(). ' +
@@ -19,6 +34,15 @@ function ServerSuspenseFallback(): never {
 
 /**
  * Builds a React element tree with RouterProvider and optional AppWrapper.
+ *
+ * The <Suspense> boundary here is intentionally asymmetric with the client
+ * hydration tree (which renders RouterProvider without any wrapping <Suspense>).
+ * This is safe ONLY because React 18's `renderToString` does not emit
+ * `<!--$-->`/`<!--/$-->` streaming markers for non-suspended boundaries — the
+ * DOM output is identical whether or not the boundary is present. If a caller
+ * ever switches this path to `renderToPipeableStream` or `renderToReadableStream`,
+ * the boundary WOULD emit markers and the client (with no matching <Suspense>)
+ * would hit a hydration mismatch.
  */
 function buildAppElement(
   router: TanStackRouter,

@@ -28,6 +28,9 @@ type TanStackRouterStoresHydrationInternals = TanStackRouter & {
   stores: {
     status: TanStackRouterWritableStore<string>;
     resolvedLocation: TanStackRouterWritableStore<TanStackRouter['state']['location']>;
+    // setMatches is a batch-utility helper on the stores object, not a store atom
+    // with a `.set()` method — that's why it doesn't follow the TanStackRouterWritableStore<T>
+    // pattern used by status/resolvedLocation above.
     setMatches: (nextMatches: unknown[]) => void;
   };
   batch?: (callback: () => void) => void;
@@ -125,7 +128,17 @@ function raiseMissingHydrationInternals(): never {
   );
 }
 
-function applyHydrationMatches(router: TanStackRouter, matches: unknown[]): void {
+/**
+ * Apply server-rendered route matches to the router's internal hydration state.
+ *
+ * Precondition: callers must validate the router with `hasHydrationInternals(router)`
+ * before invoking this; the union parameter type encodes that contract so TypeScript
+ * enforces it at the call site.
+ */
+function applyHydrationMatches(
+  router: TanStackRouterHydrationInternals | TanStackRouterStoresHydrationInternals,
+  matches: unknown[],
+): void {
   if (hasLegacyHydrationStore(router)) {
     router.__store.setState((s: Record<string, unknown>) => ({
       ...s,
@@ -136,38 +149,38 @@ function applyHydrationMatches(router: TanStackRouter, matches: unknown[]): void
     return;
   }
 
-  if (hasStoresHydrationApi(router)) {
-    const applyStoresUpdate = (): void => {
-      router.stores.status.set('idle');
-      // The freshly-created router has not rendered or awaited work yet, so
-      // router.state.location matches the legacy __store updater's s.location.
-      // Invariant: router.update({ history }) does not mutate state.location synchronously;
-      // if that ever changes, this path and the legacy __store path diverge.
-      router.stores.resolvedLocation.set(router.state.location);
-      router.stores.setMatches(matches);
-    };
+  // Legacy path didn't match, so the union narrows to TanStackRouterStoresHydrationInternals.
+  const applyStoresUpdate = (): void => {
+    router.stores.status.set('idle');
+    // The freshly-created router has not rendered or awaited work yet, so
+    // router.state.location matches the legacy __store updater's s.location.
+    // Invariant: router.update({ history }) does not mutate state.location synchronously;
+    // if that ever changes, this path and the legacy __store path diverge.
+    router.stores.resolvedLocation.set(router.state.location);
+    router.stores.setMatches(matches);
+  };
 
-    if (typeof router.batch === 'function') {
-      router.batch(applyStoresUpdate);
-    } else {
-      // Without router.batch, the stores API cannot make these writes atomic like
-      // legacy __store.setState(); this render-phase update runs before
-      // RouterProvider subscribes, so hydration still starts from the final state.
-      // NOTE: correctness here depends on RouterProvider not subscribing to stores
-      // during synchronous render. Re-validate this path on TanStack Router major upgrades.
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn(
-          'react-on-rails-pro/tanstack-router: router.batch is unavailable; stores hydration writes ' +
-            'are not atomic. Upgrade @tanstack/react-router to a version that exposes router.batch ' +
-            'for safer hydration.',
-        );
-      }
-      applyStoresUpdate();
-    }
+  if (typeof router.batch === 'function') {
+    router.batch(applyStoresUpdate);
     return;
   }
 
-  raiseMissingHydrationInternals();
+  // Without router.batch, the stores API cannot make these writes atomic like
+  // legacy __store.setState(); this render-phase update runs before
+  // RouterProvider subscribes, so hydration still starts from the final state.
+  // NOTE: correctness here depends on RouterProvider not subscribing to stores
+  // during synchronous render. Re-validate this path on TanStack Router major upgrades.
+  // In practice router.batch is present in the supported range (>=1.139.0), so this
+  // branch is a defensive belt-and-suspenders fallback rather than an expected runtime
+  // path — the dev warning below should not fire on a correctly pinned dependency.
+  if (process.env.NODE_ENV !== 'production') {
+    console.warn(
+      'react-on-rails-pro/tanstack-router: router.batch is unavailable; stores hydration writes ' +
+        'are not atomic. Upgrade @tanstack/react-router to a version that exposes router.batch ' +
+        'for safer hydration.',
+    );
+  }
+  applyStoresUpdate();
 }
 
 /**

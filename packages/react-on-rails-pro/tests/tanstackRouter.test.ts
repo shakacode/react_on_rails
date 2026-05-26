@@ -91,6 +91,26 @@ async function compatAct(callback: () => void | Promise<void>): Promise<void> {
   await actFn(callback);
 }
 
+// `@tanstack/react-router`'s SSR helpers reference `globalThis.Response` (a Fetch
+// API global that jest's jsdom environment does not always polyfill). Tests that
+// exercise the real router in Node must stub it for the duration of the test
+// and restore it afterwards, otherwise other tests inherit the stub.
+async function withResponsePolyfill<T>(fn: () => Promise<T>): Promise<T> {
+  const originalResponse = globalThis.Response;
+  if (typeof originalResponse === 'undefined') {
+    globalThis.Response = class Response {} as typeof Response;
+  }
+  try {
+    return await fn();
+  } finally {
+    if (typeof originalResponse === 'undefined') {
+      delete (globalThis as { Response?: typeof Response }).Response;
+    } else {
+      globalThis.Response = originalResponse;
+    }
+  }
+}
+
 function buildStoresHydrationHarness({
   useBatch = false,
   includeLegacyStore = false,
@@ -343,13 +363,8 @@ describe('tanstack-router integration (Pro)', () => {
     );
   });
 
-  it('round-trips actual TanStack Router SSR match data through the public entrypoint', async () => {
-    const originalResponse = globalThis.Response;
-    if (typeof originalResponse === 'undefined') {
-      globalThis.Response = class Response {} as typeof Response;
-    }
-
-    try {
+  it('round-trips actual TanStack Router SSR match data through the public entrypoint', () =>
+    withResponsePolyfill(async () => {
       const serverRouter = buildActualTanStackRouter();
       const serverResult = await serverRenderTanStackAppAsync(
         { createRouter: () => serverRouter },
@@ -400,22 +415,10 @@ describe('tanstack-router integration (Pro)', () => {
           }),
         ]),
       );
-    } finally {
-      if (typeof originalResponse === 'undefined') {
-        delete (globalThis as { Response?: typeof Response }).Response;
-      } else {
-        globalThis.Response = originalResponse;
-      }
-    }
-  });
+    }));
 
-  it('hydrates server-rendered HTML from actual router loader state without recoverable hydration errors', async () => {
-    const originalResponse = globalThis.Response;
-    if (typeof originalResponse === 'undefined') {
-      globalThis.Response = class Response {} as typeof Response;
-    }
-
-    try {
+  it('hydrates server-rendered HTML from actual router loader state without recoverable hydration errors', () =>
+    withResponsePolyfill(async () => {
       // This narrow provider intentionally reads the first-render router state.
       // The stores-path tests below cover TanStack store atoms separately; this
       // hydration test verifies that SSR-injected state is present before the
@@ -492,14 +495,7 @@ describe('tanstack-router integration (Pro)', () => {
         }
         container.remove();
       }
-    } finally {
-      if (typeof originalResponse === 'undefined') {
-        delete (globalThis as { Response?: typeof Response }).Response;
-      } else {
-        globalThis.Response = originalResponse;
-      }
-    }
-  });
+    }));
 
   it('renders RouterProvider (not RouterClient) on client hydration with SSR match data', () => {
     // Regression test: the old code used RouterClient when ssrRouter data existed.
@@ -2143,10 +2139,14 @@ describe('tanstack-router integration (Pro)', () => {
   });
 
   it('renders RouterProvider directly without an enclosing Suspense boundary during hydration', () => {
-    // Regression test for the Suspense-gate removal: serverRender.ts's
-    // buildAppElement emits AppWrapper > RouterProvider with no Suspense
-    // boundary. Any extra Suspense in the client tree produces a shape
-    // mismatch and React bails to a full client-side re-render.
+    // Regression test for the client-side Suspense-gate removal: the client
+    // hydration tree must emit AppWrapper > RouterProvider with no Suspense
+    // wrapper. (serverRender.ts's `buildAppElement` does wrap RouterProvider
+    // in <Suspense> for the ServerSuspenseFallback guard, but React 18's
+    // `renderToString` emits no `<!--$-->` markers for non-suspended boundaries,
+    // so the server HTML still matches this shape exactly.) An extra Suspense
+    // on the client would produce hydration markers and force React to bail
+    // to a full client-side re-render.
     const router = buildRouter();
     const renderFn = createTanStackRouterRenderFunction(
       { createRouter: () => router },
@@ -2216,6 +2216,13 @@ describe('tanstack-router integration (Pro)', () => {
       }),
     );
 
-    expect(() => renderToString(result.appElement)).toThrow();
+    // React 18's legacy `renderToString` produces its own
+    // "component suspended while responding to synchronous input" error and
+    // does not reach our `ServerSuspenseFallback` synchronously, so we match
+    // either signal — the point is that SSR suspension surfaces as a loud
+    // throw, not a silent empty render.
+    expect(() => renderToString(result.appElement)).toThrow(
+      /(?:RouterProvider suspended during server render after router\.load\(\)|component suspended)/,
+    );
   });
 });
