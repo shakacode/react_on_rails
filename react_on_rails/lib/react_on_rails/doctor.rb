@@ -60,7 +60,6 @@ module ReactOnRails
     DEFAULT_SHAKAPACKER_CONFIG_PATH = "config/shakapacker.yml"
     SERVER_BUNDLE_SOURCE_EXTENSIONS = %w[.js .jsx .ts .tsx .mjs .cjs].freeze
     CUSTOM_LAUNCHER_INDICATOR_FILES = %w[dev].freeze
-    RENDERER_PROCESS_WITH_PORT_REGEX = NodeRendererProcfile::PROCESS_WITH_RENDERER_PORT_REGEX
     RAILS_SERVER_COMMAND_REGEX = %r{\b(?:(?:bin/)?rails\s+(?:server|s)|puma|unicorn|rackup|passenger\s+start)\b}
 
     # Deprecated-renderer-cache scan (used by check_deprecated_renderer_cache_task):
@@ -1568,7 +1567,7 @@ module ReactOnRails
 
     def procfile_starts_node_renderer_on_renderer_port?(content)
       active_procfile_lines(content).any? do |line|
-        line.match?(RENDERER_PROCESS_WITH_PORT_REGEX)
+        line.match?(NodeRendererProcfile::PROCESS_WITH_RENDERER_PORT_REGEX)
       end
     end
 

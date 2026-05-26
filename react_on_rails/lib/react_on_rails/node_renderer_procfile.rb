@@ -2,8 +2,8 @@
 
 module ReactOnRails
   module NodeRendererProcfile
-    DEV_RENDERER_COMMAND = "node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=${RENDERER_PORT:-3800} " \
-                           "node renderer/node-renderer.js"
+    DEV_RENDERER_COMMAND = "node-renderer: RENDERER_LOG_LEVEL=${RENDERER_LOG_LEVEL:-debug} " \
+                           "RENDERER_PORT=${RENDERER_PORT:-3800} node renderer/node-renderer.js"
 
     DEFAULT_COMMANDS = {
       # HMR dev and static-asset dev use the same renderer config.
@@ -15,12 +15,18 @@ module ReactOnRails
         "node renderer/node-renderer.js"
     }.freeze
 
+    # Matches a Procfile process line that both (a) sets RENDERER_PORT via env
+    # var AND (b) starts a recognized Node Renderer command. Hard-coded ports
+    # intentionally do not match — doctor always nudges users toward the
+    # RENDERER_PORT env-var idiom the generator writes (overridable,
+    # self-documenting). The recognized-command branch mirrors
+    # NODE_RENDERER_PROCESS_REGEX in pro_setup.rb so the doctor accepts the same
+    # set of invocations the generator does (pnpm/npm/yarn with optional `run`).
     PROCESS_WITH_RENDERER_PORT_REGEX = %r{
       ^[ \t]*[^:\s]+:
       (?=[^\n]*\bRENDERER_PORT\b)
       (?=[^\n]*(?:\bnode\s+\.?/?(?:renderer|client)/node-renderer\.js\b|
-                 \b(?:pnpm|npm)\s+run\s+node-renderer\b|
-                 \byarn\s+(?:run\s+)?node-renderer\b))
+                 \b(?:pnpm|npm|yarn)\s+(?:run\s+)?node-renderer\b))
     }x
 
     def self.command_for(procfile)
