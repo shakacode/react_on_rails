@@ -71,6 +71,7 @@ env:
   RUBY_VERSION: '3.3.7'
   K6_VERSION: '2.0.0'
   VEGETA_VERSION: '12.13.0'
+  MAX_ROUTES_PER_SHARD: 60
   # Determine which apps/benchmarks to run (default is 'both' for all triggers)
   RUN_CORE: ${{ contains(fromJSON('["both", "core_only"]'), github.event.inputs.app_version || 'both') && 'true' || '' }}
   RUN_PRO: ${{ (github.event.inputs.app_version || 'both') != 'core_only' && 'true' || '' }}
@@ -98,6 +99,8 @@ jobs:
       run_core_benchmarks: ${{ steps.benchmark-outputs.outputs.run_core_benchmarks }}
       run_pro_benchmarks: ${{ steps.benchmark-outputs.outputs.run_pro_benchmarks }}
       run_pro_node_renderer_benchmarks: ${{ steps.benchmark-outputs.outputs.run_pro_node_renderer_benchmarks }}
+      core_benchmark_matrix: ${{ steps.benchmark-matrices.outputs.core_benchmark_matrix }}
+      pro_benchmark_matrix: ${{ steps.benchmark-matrices.outputs.pro_benchmark_matrix }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -138,19 +141,33 @@ jobs:
           echo "run_pro_benchmarks=$RUN_PRO_BENCHMARKS" >> "$GITHUB_OUTPUT"
           echo "run_pro_node_renderer_benchmarks=$RUN_PRO_NODE_RENDERER_BENCHMARKS" >> "$GITHUB_OUTPUT"
         shell: bash
-      - name: Guard docs-only main pushes
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: ./.github/actions/ensure-main-docs-safety
-        with:
-          docs-only: ${{ steps.detect.outputs.docs_only }}
-          previous-sha: ${{ github.event.before }}
+      - name: Set benchmark matrices
+        id: benchmark-matrices
+        if: steps.detect.outputs.docs_only != 'true'
+        run: |
+          CORE_BENCHMARK_MATRIX=$(BENCHMARK_SUITE_NAME=Core BENCHMARK_SUITE_PREFIX=CORE MAX_ROUTES_PER_SHARD="$MAX_ROUTES_PER_SHARD" ruby benchmarks/count_benchmark_shards.rb)
+          PRO_BENCHMARK_MATRIX=$(PRO=true BENCHMARK_SUITE_NAME=Pro BENCHMARK_SUITE_PREFIX=PRO MAX_ROUTES_PER_SHARD="$MAX_ROUTES_PER_SHARD" ruby benchmarks/count_benchmark_shards.rb)
+
+          {
+            echo "core_benchmark_matrix<<EOF"
+            echo "$CORE_BENCHMARK_MATRIX"
+            echo "EOF"
+            echo "pro_benchmark_matrix<<EOF"
+            echo "$PRO_BENCHMARK_MATRIX"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+        shell: bash
 
   benchmark-core:
     needs: detect-changes
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.detect-changes.outputs.core_benchmark_matrix) }}
     # Run on: push to main, workflow_dispatch, or PRs with 'benchmark' / 'benchmark-core' label.
     # The 'full-ci' label is intentionally excluded — it controls test workflows,
     # not benchmarks. Use dedicated benchmark labels to trigger perf runs on PRs.
     # See https://bencher.dev/docs/how-to/github-actions/#pull-requests for the extra pull_request condition
+    name: Core benchmarks (shard ${{ matrix.shard_label }})
     if: |
       contains(fromJSON('["both", "core_only"]'), github.event.inputs.app_version || 'both') &&
       (
@@ -183,6 +200,9 @@ jobs:
       checks: write
     env:
       SECRET_KEY_BASE: 'dummy-secret-key-for-ci-testing-not-used-in-production'
+      BENCHMARK_SHARD_INDEX: ${{ matrix.shard_index }}
+      BENCHMARK_TOTAL_SHARDS: ${{ matrix.shard_total }}
+      BENCHMARK_SHARD_LABEL: ${{ matrix.shard_label }}
 
     steps:
       - name: Checkout repository
@@ -274,7 +294,7 @@ jobs:
         uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: benchmark-core-results-${{ github.run_number }}
+          name: benchmark-core-results-${{ github.run_number }}-${{ matrix.shard_slug }}
           path: bench_results/
           retention-days: 30
           if-no-files-found: warn
@@ -282,8 +302,8 @@ jobs:
       - name: Track Core benchmarks with Bencher
         env:
           BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
-          BENCHER_REPORT_MARKER: '<!-- BENCHER_REPORT_CORE -->'
-          BENCHMARK_SUITE_NAME: Core
+          BENCHER_REPORT_MARKER: ${{ matrix.report_marker }}
+          BENCHMARK_SUITE_NAME: ${{ matrix.suite_name }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
           PR_NUMBER: ${{ github.event.pull_request.number || '' }}
@@ -295,6 +315,7 @@ jobs:
           echo "📋 Benchmark Workflow Summary"
           echo "===================================="
           echo "Suite: Core"
+          echo "Shard: ${{ matrix.shard_label }}"
           echo "Status: ${{ job.status }}"
           echo "Run number: ${{ github.run_number }}"
           echo "Triggered by: ${{ github.actor }}"
@@ -302,9 +323,13 @@ jobs:
 
   benchmark-pro:
     needs: detect-changes
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.detect-changes.outputs.pro_benchmark_matrix) }}
     # Run on: push to main, workflow_dispatch, or PRs with 'benchmark' / 'benchmark-pro' label.
     # The 'full-ci' label is intentionally excluded; use the dedicated
     # benchmark labels to trigger perf runs on PRs.
+    name: Pro benchmarks (shard ${{ matrix.shard_label }})
     if: |
       contains(fromJSON('["both", "pro_only", "pro_rails_only"]'), github.event.inputs.app_version || 'both') &&
       (
@@ -338,6 +363,9 @@ jobs:
     env:
       SECRET_KEY_BASE: 'dummy-secret-key-for-ci-testing-not-used-in-production'
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+      BENCHMARK_SHARD_INDEX: ${{ matrix.shard_index }}
+      BENCHMARK_TOTAL_SHARDS: ${{ matrix.shard_total }}
+      BENCHMARK_SHARD_LABEL: ${{ matrix.shard_label }}
 
     steps:
       - name: Checkout repository
@@ -435,7 +463,7 @@ jobs:
         uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: benchmark-pro-results-${{ github.run_number }}
+          name: benchmark-pro-results-${{ github.run_number }}-${{ matrix.shard_slug }}
           path: bench_results/
           retention-days: 30
           if-no-files-found: warn
@@ -443,8 +471,8 @@ jobs:
       - name: Track Pro benchmarks with Bencher
         env:
           BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
-          BENCHER_REPORT_MARKER: '<!-- BENCHER_REPORT_PRO -->'
-          BENCHMARK_SUITE_NAME: Pro
+          BENCHER_REPORT_MARKER: ${{ matrix.report_marker }}
+          BENCHMARK_SUITE_NAME: ${{ matrix.suite_name }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
           PR_NUMBER: ${{ github.event.pull_request.number || '' }}
@@ -456,6 +484,7 @@ jobs:
           echo "📋 Benchmark Workflow Summary"
           echo "===================================="
           echo "Suite: Pro"
+          echo "Shard: ${{ matrix.shard_label }}"
           echo "Status: ${{ job.status }}"
           echo "Run number: ${{ github.run_number }}"
           echo "Triggered by: ${{ github.actor }}"
@@ -476,7 +505,7 @@ jobs:
           github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository &&
           (
             contains(github.event.pull_request.labels.*.name, 'benchmark') ||
-            contains(github.event.pull_request.labels.*.name, 'benchmark-pro')
+            contains(github.event.pull_request.labels.*.name, 'benchmark-pro-node-renderer')
           )
         )
       ) &&
@@ -487,7 +516,8 @@ jobs:
           github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository &&
           (
             contains(github.event.pull_request.labels.*.name, 'benchmark') ||
-            contains(github.event.pull_request.labels.*.name, 'benchmark-pro')
+            contains(github.event.pull_request.labels.*.name, 'benchmark-pro') ||
+            contains(github.event.pull_request.labels.*.name, 'benchmark-pro-node-renderer')
           )
         )
       )
