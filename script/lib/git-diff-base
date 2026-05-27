@@ -463,7 +463,7 @@ git_diff_base_resolve() {
       # the initial fetch and the eventual --unshallow fallback. Keeps the
       # noise low (one line per round) while preserving the full git fetch
       # diagnostics that follow.
-      echo "Deepening shallow history (attempt $deepen_attempts/$max_attempts, depth $deepen_depth)" >&2
+      echo "Deepening shallow history (attempt $deepen_attempts/$max_attempts, fetching $deepen_depth more commits)" >&2
 
       # A successful deepen on either side can reveal the common ancestor, even
       # when the other branch fetch fails. Stop early only when every attempted
