@@ -1761,6 +1761,144 @@ RSpec.describe ReactOnRails::Doctor do
       expect(warning_messages).not_to include(a_string_including("Missing Procfile.dev-prod-assets"))
       expect(all_messages).not_to include(a_string_including("Launcher Procfiles"))
     end
+
+    it "warns when NodeRenderer static and prod Procfiles do not start the renderer on RENDERER_PORT" do
+      allow(doctor).to receive(:resolved_pro_server_renderer).and_return("NodeRenderer")
+      write_project_file("bin/dev", "ReactOnRails::Dev::ServerManager\n")
+      write_project_file("Procfile.dev", <<~PROCFILE)
+        rails: bundle exec rails s -p ${PORT:-3000}
+        node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=${RENDERER_PORT:-3800} node renderer/node-renderer.js
+      PROCFILE
+      write_project_file("Procfile.dev-static-assets", <<~PROCFILE)
+        web: bin/rails server -p ${PORT:-3000}
+        js: bin/shakapacker-watch --watch
+      PROCFILE
+      write_project_file("Procfile.dev-prod-assets", <<~PROCFILE)
+        rails: bundle exec rails s -p ${PORT:-3001}
+      PROCFILE
+
+      doctor.send(:check_bin_dev_launcher)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("Procfile.dev-static-assets"))
+      expect(warning_messages).to include(a_string_including("Procfile.dev-prod-assets"))
+      expect(warning_messages).to include(a_string_including("Node Renderer on RENDERER_PORT"))
+    end
+
+    it "warns when a common Rack server command starts without the Node Renderer" do
+      allow(doctor).to receive(:resolved_pro_server_renderer).and_return("NodeRenderer")
+      write_project_file("bin/dev", "ReactOnRails::Dev::ServerManager\n")
+      write_project_file("Procfile.dev", <<~PROCFILE)
+        web: bundle exec puma -C config/puma.rb
+      PROCFILE
+
+      doctor.send(:check_bin_dev_launcher)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("Procfile.dev"))
+      expect(warning_messages).to include(a_string_including("Node Renderer on RENDERER_PORT"))
+    end
+
+    it "accepts complete NodeRenderer Procfiles for all bin/dev modes" do
+      allow(doctor).to receive(:resolved_pro_server_renderer).and_return("NodeRenderer")
+      write_project_file("bin/dev", "ReactOnRails::Dev::ServerManager\n")
+      write_project_file("Procfile.dev", <<~PROCFILE)
+        rails: bundle exec rails s -p ${PORT:-3000}
+        node-renderer: RENDERER_PORT=${RENDERER_PORT:-3800} node renderer/node-renderer.js
+      PROCFILE
+      write_project_file("Procfile.dev-static-assets", <<~PROCFILE)
+        web: bin/rails server -p ${PORT:-3000}
+        custom-renderer: RENDERER_PORT=${RENDERER_PORT:-3800} node renderer/node-renderer.js
+      PROCFILE
+      write_project_file("Procfile.dev-prod-assets", <<~PROCFILE)
+        rails: bundle exec rails s -p ${PORT:-3001}
+        node-renderer: RENDERER_PORT=${RENDERER_PORT:-3800} pnpm run node-renderer
+      PROCFILE
+
+      doctor.send(:check_bin_dev_launcher)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).not_to include(a_string_including("Node Renderer on RENDERER_PORT"))
+    end
+
+    it "accepts npm and yarn NodeRenderer package scripts" do
+      allow(doctor).to receive(:resolved_pro_server_renderer).and_return("NodeRenderer")
+      write_project_file("bin/dev", "ReactOnRails::Dev::ServerManager\n")
+      write_project_file("Procfile.dev", <<~PROCFILE)
+        rails: bundle exec rails s -p ${PORT:-3000}
+        node-renderer: RENDERER_PORT=${RENDERER_PORT:-3800} npm run node-renderer
+      PROCFILE
+      write_project_file("Procfile.dev-static-assets", <<~PROCFILE)
+        web: bin/rails server -p ${PORT:-3000}
+        node-renderer: RENDERER_PORT=${RENDERER_PORT:-3800} yarn node-renderer
+      PROCFILE
+      write_project_file("Procfile.dev-prod-assets", <<~PROCFILE)
+        rails: bundle exec rails s -p ${PORT:-3001}
+        node-renderer: RENDERER_PORT=${RENDERER_PORT:-3800} yarn run node-renderer
+      PROCFILE
+
+      doctor.send(:check_bin_dev_launcher)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).not_to include(a_string_including("Node Renderer on RENDERER_PORT"))
+    end
+
+    it "warns when a renderer process uses RENDERER_PORT but does not start the Node Renderer" do
+      allow(doctor).to receive(:resolved_pro_server_renderer).and_return("NodeRenderer")
+      write_project_file("bin/dev", "ReactOnRails::Dev::ServerManager\n")
+      write_project_file("Procfile.dev", <<~PROCFILE)
+        rails: bundle exec rails s -p ${PORT:-3000}
+        renderer: RENDERER_PORT=${RENDERER_PORT:-3800} vite
+      PROCFILE
+      write_project_file("Procfile.dev-static-assets", <<~PROCFILE)
+        web: bin/rails server -p ${PORT:-3000}
+        node-renderer: RENDERER_PORT=${RENDERER_PORT:-3800} node renderer/node-renderer.js
+      PROCFILE
+      write_project_file("Procfile.dev-prod-assets", <<~PROCFILE)
+        rails: bundle exec rails s -p ${PORT:-3001}
+        node-renderer: RENDERER_PORT=${RENDERER_PORT:-3800} pnpm run node-renderer
+      PROCFILE
+
+      doctor.send(:check_bin_dev_launcher)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("Procfile.dev"))
+      expect(warning_messages).to include(a_string_including("Node Renderer on RENDERER_PORT"))
+    end
+
+    it "warns when a node-renderer entry omits RENDERER_PORT (matches generator's update-it-manually decision)" do
+      # Mirrors the install_generator_spec case: NEW_RENDERER_COMMAND_REGEX now requires
+      # RENDERER_PORT, so the generator surfaces "Update it manually" for this Procfile.
+      # The doctor must agree by warning, otherwise the user gets contradictory feedback.
+      allow(doctor).to receive(:resolved_pro_server_renderer).and_return("NodeRenderer")
+      write_project_file("bin/dev", "ReactOnRails::Dev::ServerManager\n")
+      write_project_file("Procfile.dev", <<~PROCFILE)
+        rails: bundle exec rails s -p ${PORT:-3000}
+        node-renderer: node renderer/node-renderer.js
+      PROCFILE
+
+      doctor.send(:check_bin_dev_launcher)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("Procfile.dev"))
+      expect(warning_messages).to include(a_string_including("Node Renderer on RENDERER_PORT"))
+    end
+
+    it "suggests the legacy client/node-renderer.js path when that is the only renderer file present" do
+      # Pro setup skips Procfile rewrites when it detects a legacy client/node-renderer.js,
+      # so the doctor's suggested fix must reference the file that actually exists rather
+      # than pointing the user at the renderer/ path that the generator didn't create.
+      allow(doctor).to receive(:resolved_pro_server_renderer).and_return("NodeRenderer")
+      write_project_file("bin/dev", "ReactOnRails::Dev::ServerManager\n")
+      write_project_file("client/node-renderer.js", "// legacy renderer\n")
+      write_project_file("Procfile.dev", "rails: bundle exec rails s -p ${PORT:-3000}\n")
+
+      doctor.send(:check_bin_dev_launcher)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("client/node-renderer.js"))
+      expect(warning_messages).not_to include(a_string_including("node renderer/node-renderer.js"))
+    end
   end
 
   describe "server bundle path Shakapacker integration" do

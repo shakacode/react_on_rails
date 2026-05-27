@@ -11,6 +11,7 @@ require_relative "version_syntax_converter"
 require_relative "version_synchronizer"
 require_relative "system_checker"
 require_relative "pro_migration"
+require_relative "node_renderer_procfile"
 
 begin
   require "rainbow"
@@ -59,6 +60,7 @@ module ReactOnRails
     DEFAULT_SHAKAPACKER_CONFIG_PATH = "config/shakapacker.yml"
     SERVER_BUNDLE_SOURCE_EXTENSIONS = %w[.js .jsx .ts .tsx .mjs .cjs].freeze
     CUSTOM_LAUNCHER_INDICATOR_FILES = %w[dev].freeze
+    RAILS_SERVER_COMMAND_REGEX = %r{\b(?:(?:bin/)?rails\s+(?:server|s)|puma|unicorn|rackup|passenger\s+start)\b}
 
     # Deprecated-renderer-cache scan (used by check_deprecated_renderer_cache_task):
     # look for references to the old pre_stage_bundle_for_node_renderer task in
@@ -1513,6 +1515,7 @@ module ReactOnRails
     end
 
     def check_launcher_procfiles
+      # Keep these launcher filenames aligned with NodeRendererProcfile::DEFAULT_COMMANDS.
       procfiles = {
         "Procfile.dev" => "HMR development (bin/dev default)",
         "Procfile.dev-static-assets" => "Static development (bin/dev static)",
@@ -1535,6 +1538,61 @@ module ReactOnRails
       else
         checker.add_info("  💡 Run: rails generate react_on_rails:install")
       end
+
+      check_node_renderer_launcher_procfiles(NodeRendererProcfile::DEFAULT_COMMANDS.keys)
+    end
+
+    def check_node_renderer_launcher_procfiles(procfiles)
+      return unless resolved_pro_server_renderer == "NodeRenderer"
+
+      procfiles.each do |filename|
+        next unless File.exist?(filename)
+
+        content = File.read(filename)
+        next unless procfile_serves_rails_pages?(content)
+        next if procfile_starts_node_renderer_on_renderer_port?(content)
+
+        checker.add_warning(<<~MSG.strip)
+          ⚠️  #{filename} can serve SSR pages but does not start the Node Renderer on RENDERER_PORT.
+
+          Add a process such as:
+            #{node_renderer_procfile_command(filename)}
+        MSG
+      end
+    end
+
+    def procfile_serves_rails_pages?(content)
+      active_procfile_lines(content).any? { |line| line.match?(RAILS_SERVER_COMMAND_REGEX) }
+    end
+
+    def procfile_starts_node_renderer_on_renderer_port?(content)
+      active_procfile_lines(content).any? do |line|
+        line.match?(NodeRendererProcfile::PROCESS_WITH_RENDERER_PORT_REGEX)
+      end
+    end
+
+    def active_procfile_lines(content)
+      content.each_line.grep_v(/^\s*#/).map { |line| line.sub(/#.*/, "") }
+    end
+
+    def node_renderer_procfile_command(filename)
+      # When the app still has only the legacy client/node-renderer.js (Pro
+      # setup intentionally skips Procfile rewrites in that case), suggesting
+      # renderer/node-renderer.js would point at a non-existent file. Mirror
+      # the legacy path back so the doctor's hint stays runnable.
+      if legacy_node_renderer_only?
+        NodeRendererProcfile.command_for(
+          filename,
+          renderer_script: NodeRendererProcfile::LEGACY_RENDERER_SCRIPT_PATH
+        )
+      else
+        NodeRendererProcfile.command_for(filename)
+      end
+    end
+
+    def legacy_node_renderer_only?
+      File.exist?(NodeRendererProcfile::LEGACY_RENDERER_SCRIPT_PATH) &&
+        !File.exist?(NodeRendererProcfile::NEW_RENDERER_SCRIPT_PATH)
     end
 
     def detected_custom_launcher_paths

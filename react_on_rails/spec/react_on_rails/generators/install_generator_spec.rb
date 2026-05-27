@@ -1358,11 +1358,13 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    it "adds node-renderer process to Procfile.dev" do
-      assert_file "Procfile.dev" do |content|
-        expect(content).to include("node-renderer:")
-        expect(content).to include("RENDERER_PORT=${RENDERER_PORT:-3800}")
-        expect(content).to include("node renderer/node-renderer.js")
+    it "adds node-renderer process to every bin/dev Procfile that can serve SSR pages" do
+      %w[Procfile.dev Procfile.dev-static-assets Procfile.dev-prod-assets].each do |procfile|
+        assert_file procfile do |content|
+          expect(content).to include("node-renderer:")
+          expect(content).to include("RENDERER_PORT=${RENDERER_PORT:-3800}")
+          expect(content).to include("node renderer/node-renderer.js")
+        end
       end
     end
 
@@ -1547,13 +1549,15 @@ describe InstallGenerator, type: :generator do
       allow(install_generator).to receive(:destination_root).and_return("/fake/path")
       allow(File).to receive(:exist?).and_call_original
       allow(File).to receive(:exist?).with("/fake/path/Procfile.dev").and_return(true)
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev-static-assets").and_return(false)
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev-prod-assets").and_return(false)
       allow(File).to receive(:read).with("/fake/path/Procfile.dev")
                                    .and_return("rails: bundle exec rails s\nnode-renderer: existing config\n")
     end
 
-    specify "add_pro_to_procfile does not append duplicate entry" do
+    specify "add_pro_to_procfiles does not append duplicate entry" do
       expect(install_generator).not_to receive(:append_to_file)
-      install_generator.send(:add_pro_to_procfile)
+      install_generator.send(:add_pro_to_procfiles)
     end
   end
 
@@ -1564,13 +1568,60 @@ describe InstallGenerator, type: :generator do
       allow(install_generator).to receive(:destination_root).and_return("/fake/path")
       allow(File).to receive(:exist?).and_call_original
       allow(File).to receive(:exist?).with("/fake/path/Procfile.dev").and_return(true)
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev-static-assets").and_return(false)
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev-prod-assets").and_return(false)
       allow(File).to receive(:read).with("/fake/path/Procfile.dev")
                                    .and_return("rails: bundle exec rails s\ndev-server: bin/shakapacker\n")
     end
 
-    specify "add_pro_to_procfile appends node-renderer entry" do
+    specify "add_pro_to_procfiles appends node-renderer entry" do
       expect(install_generator).to receive(:append_to_file).with("Procfile.dev", include("node-renderer:"))
-      install_generator.send(:add_pro_to_procfile)
+      install_generator.send(:add_pro_to_procfiles)
+    end
+  end
+
+  context "when Procfile.dev contains an unrelated renderer process" do
+    let(:install_generator) { described_class.new([], { pro: true }) }
+
+    before do
+      allow(install_generator).to receive(:destination_root).and_return("/fake/path")
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev").and_return(true)
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev-static-assets").and_return(false)
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev-prod-assets").and_return(false)
+      allow(File).to receive(:read).with("/fake/path/Procfile.dev")
+                                   .and_return("rails: bundle exec rails s\nrenderer: vite\n")
+    end
+
+    specify "add_pro_to_procfiles still appends node-renderer alongside" do
+      expect(install_generator).to receive(:append_to_file).with("Procfile.dev", include("node-renderer:"))
+      install_generator.send(:add_pro_to_procfiles)
+    end
+  end
+
+  context "when Procfile.dev has a node-renderer entry that is missing RENDERER_PORT" do
+    let(:install_generator) { described_class.new([], { pro: true }) }
+
+    before do
+      allow(install_generator).to receive(:destination_root).and_return("/fake/path")
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev").and_return(true)
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev-static-assets").and_return(false)
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev-prod-assets").and_return(false)
+      allow(File).to receive(:read).with("/fake/path/Procfile.dev")
+                                   .and_return("rails: bundle exec rails s\n" \
+                                               "node-renderer: node renderer/node-renderer.js\n")
+    end
+
+    specify "add_pro_to_procfiles surfaces an update-it-manually warning so the doctor agrees" do
+      # The doctor's PROCESS_WITH_RENDERER_PORT_REGEX warns when an entry is missing
+      # RENDERER_PORT, so the generator must not silently treat this as "already correct".
+      expect(install_generator).not_to receive(:append_to_file)
+      expect(install_generator).to receive(:say).with(
+        a_string_matching(/has a renderer entry that doesn't reference/), :yellow
+      )
+      allow(install_generator).to receive(:say)
+      install_generator.send(:add_pro_to_procfiles)
     end
   end
 
