@@ -108,7 +108,10 @@ module ReactOnRails
           config = parse_config(config_path)
           return nil unless config.is_a?(Hash)
 
-          detect_from_dev_server_config(dev_server_config(config))
+          dev_server = dev_server_config(config)
+          return :live_reload unless dev_server
+
+          detect_from_dev_server_config(dev_server)
         end
 
         def parse_config(config_path)
@@ -116,9 +119,8 @@ module ReactOnRails
 
           # ERB uses the default top-level binding so config files can reference ENV and top-level
           # constants — this mirrors how Shakapacker itself evaluates shakapacker.yml.
-          # YAML uses string keys (e.g. "hmr"), never symbol literals, so the default safe_load
-          # permitted_classes list is sufficient.
-          YAML.safe_load(ERB.new(File.read(config_path)).result, aliases: true)
+          # Symbol values are permitted to match adjacent Shakapacker config parsers.
+          YAML.safe_load(ERB.new(File.read(config_path)).result, aliases: true, permitted_classes: [Symbol])
         rescue SyntaxError, StandardError => e
           warn(
             "[ReactOnRails] Could not parse #{config_path} for dev-server mode detection: #{e.message}"
@@ -141,7 +143,7 @@ module ReactOnRails
         end
 
         def detect_from_dev_server_config(dev_server)
-          return nil if dev_server.empty?
+          return :live_reload if dev_server.empty?
 
           hmr = hmr_config(dev_server["hmr"])
           live_reload = boolean_config(dev_server["live_reload"])

@@ -739,7 +739,7 @@ module ReactOnRails
         # so there is only one ServerMode.detect call per help render. Doctor memoizes because
         # it owns instance state on a fresh Doctor instance per invocation.
         def default_dev_server_mode
-          ServerMode.detect
+          ServerMode.detect(shakapacker_config_path)
         end
 
         def default_dev_server_detail_lines(mode)

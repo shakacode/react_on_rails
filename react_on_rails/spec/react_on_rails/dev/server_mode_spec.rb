@@ -149,39 +149,39 @@ RSpec.describe ReactOnRails::Dev::ServerMode do
       expect(described_class.detect("config/shakapacker.yml")).to eq(:development_server)
     end
 
-    it "uses the fallback mode when dev_server is empty" do
+    it "uses Shakapacker's package live reload default when dev_server is empty" do
       write_shakapacker_config(<<~YAML)
         development:
           dev_server:
       YAML
 
-      expect(described_class.detect("config/shakapacker.yml")).to eq(:hmr)
+      expect(described_class.detect("config/shakapacker.yml")).to eq(:live_reload)
     end
 
-    it "uses the fallback mode when the default section is not a mapping" do
+    it "uses Shakapacker's package live reload default when the default section is not a mapping" do
       write_shakapacker_config(<<~YAML)
         default: false
       YAML
 
-      expect(described_class.detect("config/shakapacker.yml")).to eq(:hmr)
+      expect(described_class.detect("config/shakapacker.yml")).to eq(:live_reload)
     end
 
-    it "uses the fallback mode when the development section is not a mapping" do
+    it "uses Shakapacker's package live reload default when the development section is not a mapping" do
       write_shakapacker_config(<<~YAML)
         development: false
       YAML
 
-      expect(described_class.detect("config/shakapacker.yml")).to eq(:hmr)
+      expect(described_class.detect("config/shakapacker.yml")).to eq(:live_reload)
     end
 
-    it "uses the fallback mode when development is absent even if default has dev_server settings" do
+    it "does not merge app default dev_server settings into development without a YAML anchor" do
       write_shakapacker_config(<<~YAML)
         default:
           dev_server:
             hmr: true
       YAML
 
-      expect(described_class.detect("config/shakapacker.yml")).to eq(:hmr)
+      expect(described_class.detect("config/shakapacker.yml")).to eq(:live_reload)
     end
 
     it "detects HMR from default settings merged into development by YAML anchors" do
@@ -266,6 +266,17 @@ RSpec.describe ReactOnRails::Dev::ServerMode do
       YAML
 
       expect(described_class.detect("config/shakapacker.yml")).to eq(:hmr)
+    end
+
+    it "permits unrelated symbol values in Shakapacker config" do
+      write_shakapacker_config(<<~YAML)
+        development:
+          dev_server:
+            hmr: false
+            server: :https
+      YAML
+
+      expect(described_class.detect("config/shakapacker.yml")).to eq(:live_reload)
     end
   end
 

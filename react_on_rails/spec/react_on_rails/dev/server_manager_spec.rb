@@ -1574,7 +1574,18 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
 
       it "detects the default dev-server mode once per help render" do
-        expect(ReactOnRails::Dev::ServerMode).to receive(:detect).once.and_return(:live_reload)
+        expect(ReactOnRails::Dev::ServerMode)
+          .to receive(:detect).once.with(File.expand_path("config/shakapacker.yml", Dir.pwd)).and_return(:live_reload)
+
+        expect { described_class.show_help }
+          .to output(/Live reload development mode \(default\)/).to_stdout_from_any_process
+      end
+
+      it "passes the resolved Shakapacker config path into ServerMode" do
+        allow(described_class)
+          .to receive(:shakapacker_config_path).and_return("/tmp/app/config/custom-shakapacker.yml")
+        expect(ReactOnRails::Dev::ServerMode)
+          .to receive(:detect).with("/tmp/app/config/custom-shakapacker.yml").and_return(:live_reload)
 
         expect { described_class.show_help }
           .to output(/Live reload development mode \(default\)/).to_stdout_from_any_process
