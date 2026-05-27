@@ -445,11 +445,14 @@ module ReactOnRails
             FileUtils.remove_entry(app_root)
           end
 
-          it "logs the resolved path that was checked" do
+          it "names the raw env value and the Rails-root-resolved path" do
             described_class.suppress_shakapacker_package_manager_check_if_not_bundler!
 
             expect(Rails.logger).to have_received(:warn)
-              .with(a_string_including("resolved to '#{resolved_config_path}'"))
+              .with(
+                a_string_including("SHAKAPACKER_CONFIG is set to '#{missing_config_path}'")
+                  .and(a_string_including("resolved to '#{resolved_config_path}'"))
+              )
           end
         end
       end
