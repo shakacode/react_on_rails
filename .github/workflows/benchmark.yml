@@ -171,18 +171,8 @@ jobs:
     if: |
       contains(fromJSON('["both", "core_only"]'), github.event.inputs.app_version || 'both') &&
       (
-        github.event_name == 'workflow_dispatch' ||
-        needs.detect-changes.outputs.run_core_benchmarks == 'true' ||
-        (
-          github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository &&
-          (
-            contains(github.event.pull_request.labels.*.name, 'benchmark') ||
-            contains(github.event.pull_request.labels.*.name, 'benchmark-core')
-          )
-        )
-      ) &&
-      (
         github.event_name == 'push' ||
+        needs.detect-changes.outputs.run_core_benchmarks == 'true' ||
         github.event_name == 'workflow_dispatch' ||
         (
           github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository &&
@@ -333,18 +323,8 @@ jobs:
     if: |
       contains(fromJSON('["both", "pro_only", "pro_rails_only"]'), github.event.inputs.app_version || 'both') &&
       (
-        github.event_name == 'workflow_dispatch' ||
-        needs.detect-changes.outputs.run_pro_benchmarks == 'true' ||
-        (
-          github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository &&
-          (
-            contains(github.event.pull_request.labels.*.name, 'benchmark') ||
-            contains(github.event.pull_request.labels.*.name, 'benchmark-pro')
-          )
-        )
-      ) &&
-      (
         github.event_name == 'push' ||
+        needs.detect-changes.outputs.run_pro_benchmarks == 'true' ||
         github.event_name == 'workflow_dispatch' ||
         (
           github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository &&
@@ -421,7 +401,6 @@ jobs:
           exit 1
 
       - name: Execute Pro benchmark suite
-        if: env.RUN_PRO_RAILS
         timeout-minutes: 120
         run: |
           set -e

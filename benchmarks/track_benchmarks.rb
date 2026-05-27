@@ -15,6 +15,7 @@ end
 
 SUITE_NAME = env!("BENCHMARK_SUITE_NAME")
 REPORT_MARKER = env!("BENCHER_REPORT_MARKER")
+BENCHER_API_TOKEN = env!("BENCHER_API_TOKEN")
 BENCHMARK_JSON = ENV.fetch("BENCHMARK_JSON", "bench_results/benchmark.json")
 REPORT_HTML = ENV.fetch("BENCHER_REPORT_HTML", "bench_results/bencher_report.html")
 
@@ -75,7 +76,6 @@ def bencher_args(branch, start_point_args)
   [
     "bencher", "run",
     "--project", "react-on-rails-t8a9ncxo",
-    "--token", ENV.fetch("BENCHER_API_TOKEN"),
     "--branch", branch,
     *start_point_args,
     "--testbed", "github-actions",
@@ -142,7 +142,9 @@ end
 
 def split_report_for_comments
   ENV["BENCHER_REPORT_MARKER"] = REPORT_MARKER
-  run_command("ruby", "benchmarks/split_html_report.rb", REPORT_HTML, "bench_results/bencher_chunk")
+  return if run_command("ruby", "benchmarks/split_html_report.rb", REPORT_HTML, "bench_results/bencher_chunk")
+
+  warn "Failed to split HTML report; skipping PR comments"
 end
 
 def stale_comment_ids
@@ -156,19 +158,23 @@ def stale_comment_ids
   stdout.lines.map(&:strip).reject(&:empty?)
 end
 
-def replace_pr_comments
-  return unless ENV.fetch("GITHUB_EVENT_NAME") == "pull_request"
-  return unless File.size?(REPORT_HTML)
-
-  split_report_for_comments
-
+def delete_stale_report_comments
   stale_comment_ids.each do |comment_id|
     puts "Deleting stale #{SUITE_NAME} Bencher report comment #{comment_id}"
     run_command("gh", "api", "-X", "DELETE", "repos/#{ENV.fetch('GITHUB_REPOSITORY')}/issues/comments/#{comment_id}")
   end
+end
 
+def post_report_comment_chunks
   comment_failed = false
-  Dir["bench_results/bencher_chunk*.html"].each do |chunk_file|
+
+  chunk_files = Dir["bench_results/bencher_chunk*.html"].sort_by do |chunk_file|
+    chunk_file[/bencher_chunk(\d+)\.html\z/, 1].to_i
+  end
+
+  posted_any = false
+  any_failed = false
+  chunk_files.each do |chunk_file|
     puts "Posting #{chunk_file} (#{File.size(chunk_file)} bytes)..."
     next if run_command("gh", "pr", "comment", ENV.fetch("PR_NUMBER"), "--body-file", chunk_file)
 
@@ -176,7 +182,26 @@ def replace_pr_comments
     comment_failed = true
   end
 
-  return unless comment_failed
+  [posted_any, any_failed]
+end
+
+def replace_pr_comments
+  return unless ENV.fetch("GITHUB_EVENT_NAME") == "pull_request"
+  return unless File.size?(REPORT_HTML)
+
+  return unless split_report_for_comments
+
+  # Post first, then GC stale comments. If every post fails, the prior run's comments stay
+  # visible — better than racing the user with an empty PR while the new report is broken.
+  posted_any, any_failed = post_report_comment_chunks
+
+  if posted_any
+    delete_stale_report_comments
+  else
+    warn "No #{SUITE_NAME} chunks were posted successfully; keeping prior Bencher comments in place."
+  end
+
+  return unless any_failed
 
   fallback_body = <<~MARKDOWN
     #{REPORT_MARKER}

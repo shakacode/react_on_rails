@@ -2,6 +2,8 @@
 
 # Shared benchmark route discovery helpers.
 
+require "open3"
+
 def route_has_required_params?(path)
   path_without_optional = path.gsub(/\([^)]*\)/, "")
   path_without_optional.include?(":")
@@ -18,25 +20,45 @@ def sanitize_route_name(route)
   name.gsub(/[":.<>|*?\r\n$`;&#!()\[\]{}]+/, "_").squeeze("_").gsub(/^_|_$/, "")
 end
 
-def benchmark_routes_from_routes_file(routes_file)
-  routes = []
+def benchmark_routes_from_rails_routes(app_dir)
+  stdout, stderr, status = Open3.capture3(
+    {
+      "RAILS_ENV" => "test",
+      "SECRET_KEY_BASE" => ENV.fetch("SECRET_KEY_BASE", "benchmark-secret-key-base")
+    },
+    "bundle",
+    "exec",
+    "rails",
+    "routes",
+    "--expanded",
+    chdir: app_dir
+  )
+  warn stderr unless stderr.empty?
+  raise "Failed to get routes from #{app_dir}" unless status.success?
 
-  File.foreach(routes_file) do |line|
+  benchmark_routes_from_rails_routes_output(stdout)
+end
+
+def benchmark_routes_from_rails_routes_output(routes_output)
+  routes = []
+  current_route = {}
+
+  routes_output.each_line do |line|
     stripped = line.strip
 
     case stripped
-    when /\Aroot\s+"([^"]+)"\z/
-      controller_action = Regexp.last_match(1)
-      routes << "/" if benchmark_controller_action?(controller_action)
-    when /\Aget\s+"([^"]+)"\s*=>\s*"([^"]+)"/
-      path = Regexp.last_match(1)
-      controller_action = Regexp.last_match(2)
+    when /\APrefix\s+\|\s*(.*)\z/
+      current_route[:prefix] = Regexp.last_match(1)
+    when /\AVerb\s+\|\s*(.*)\z/
+      current_route[:verb] = Regexp.last_match(1)
+    when /\AURI\s+\|\s*(.*)\z/
+      current_route[:uri] = Regexp.last_match(1)
+    when /\AController#Action\s+\|\s*(.*)\z/
+      current_route[:controller_action] = Regexp.last_match(1)
 
-      next unless benchmark_controller_action?(controller_action)
-      next if route_has_required_params?(path)
-      next if path.include?("_for_testing")
-
-      routes << normalize_route_path(path)
+      route = benchmark_route_from_rails_output(current_route)
+      routes << route if route
+      current_route = {}
     end
   end
 
@@ -54,14 +76,22 @@ def benchmark_routes_for_app(app_dir, explicit_routes)
            end
   end
 
-  routes_file = File.join(app_dir, "config", "routes.rb")
-  raise "Routes file not found: #{routes_file}" unless File.exist?(routes_file)
-
-  benchmark_routes_from_routes_file(routes_file)
+  benchmark_routes_from_rails_routes(app_dir)
 end
 
 def normalize_route_path(route)
   return route if route.start_with?("/")
 
   "/#{route}"
+end
+
+def benchmark_route_from_rails_output(route)
+  return unless route[:verb] == "GET"
+  return unless benchmark_controller_action?(route[:controller_action])
+
+  path = route[:uri]
+  return if route_has_required_params?(path)
+  return if path.include?("_for_testing")
+
+  normalize_route_path(strip_optional_params(path))
 end
