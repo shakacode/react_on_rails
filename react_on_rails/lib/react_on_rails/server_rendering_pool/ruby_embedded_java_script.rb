@@ -147,8 +147,10 @@ module ReactOnRails
           begin
             if ReactOnRails.configuration.trace
               Rails.logger.info do
-                "[react_on_rails] Created JavaScript context with file " \
-                  "#{ReactOnRails::Utils.server_bundle_js_file_path}"
+                safe_bundle_path = UrlSanitizer.redact_password(
+                  ReactOnRails::Utils.server_bundle_js_file_path.to_s
+                )
+                "[react_on_rails] Created JavaScript context with file #{safe_bundle_path}"
               end
             end
             ExecJS.compile(base_js_code)

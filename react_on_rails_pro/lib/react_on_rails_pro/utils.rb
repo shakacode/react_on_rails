@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "react_on_rails_pro/renderer_cache_path"
+require "react_on_rails/url_sanitizer"
 
 module ReactOnRailsPro
   module Utils
@@ -132,10 +133,23 @@ module ReactOnRailsPro
       else
         "#{Digest::MD5.file(server_bundle_js_file_path)}-#{Rails.env}"
       end
+    rescue SystemCallError => e
+      # File.mtime / Digest::MD5.file include the raw path in their Errno
+      # exceptions (e.g. "No such file or directory @ rb_file_s_mtime - <path>").
+      # If the path is a URL with userinfo (dev-server bundle serving), the
+      # original credential would leak verbatim. Re-raise with the path
+      # redacted so the credential never reaches an upstream error reporter.
+      safe_path = ReactOnRails::UrlSanitizer.redact_password(server_bundle_js_file_path.to_s)
+      raise e.class, "#{e.class}: bundle hash computation failed for #{safe_path}", cause: nil
     end
 
     def self.bundle_mtime_same?(server_bundle_js_file_path)
       @test_dev_server_bundle_mtime == File.mtime(server_bundle_js_file_path)
+    rescue SystemCallError => e
+      # Same sanitization as calc_bundle_hash — File.mtime's Errno exceptions
+      # embed the raw path, which can be a URL with userinfo.
+      safe_path = ReactOnRails::UrlSanitizer.redact_password(server_bundle_js_file_path.to_s)
+      raise e.class, "#{e.class}: bundle mtime check failed for #{safe_path}", cause: nil
     end
 
     def self.contains_hash?(server_bundle_basename)
