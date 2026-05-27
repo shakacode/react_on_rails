@@ -363,7 +363,8 @@ module ReactOnRailsPro
           Original error is
           #{ReactOnRails::UrlSanitizer.redact_password(e.to_s)}
         MSG
-        raise ReactOnRailsPro::Error, message
+        # Suppress implicit cause so reporters can't see the raw HTTPX/URI error.
+        raise ReactOnRailsPro::Error, message, cause: nil
       end
 
       def get_form_body_for_file(path)

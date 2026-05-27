@@ -357,6 +357,9 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
           # carry the literal password — both must go through the sanitizer.
           expect(error.message).not_to include(sensitive_password)
           expect(error.message).to include("__REDACTED__")
+          # The implicit Exception#cause chain would otherwise expose the raw
+          # URI::InvalidURIError (which embeds the unsanitized URL). Suppress.
+          expect(error.cause).to be_nil
         end
       end
     end

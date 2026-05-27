@@ -308,7 +308,9 @@ module ReactOnRailsPro
       safe_error_message = ReactOnRails::UrlSanitizer.redact_password(e.message)
       message = "Unparseable ReactOnRailsPro.config.renderer_url #{safe_url} provided.\n" \
                 "#{safe_error_message}"
-      raise ReactOnRailsPro::Error, message
+      # Suppress implicit cause so reporters walking the chain don't see the raw
+      # URI::InvalidURIError (which embeds the original unsanitized URL).
+      raise ReactOnRailsPro::Error, message, cause: nil
     end
 
     def validate_remote_bundle_cache_adapter
