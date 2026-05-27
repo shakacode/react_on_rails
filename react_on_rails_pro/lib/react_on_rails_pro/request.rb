@@ -123,8 +123,7 @@ module ReactOnRailsPro
         # validates existence, but these provide clearer context for the rake task user.
         server_bundle_path = ReactOnRails::Utils.server_bundle_js_file_path
         unless File.exist?(server_bundle_path)
-          safe_path = ReactOnRails::UrlSanitizer.redact_password(server_bundle_path.to_s)
-          raise ReactOnRailsPro::Error, "Server bundle not found at #{safe_path}. " \
+          raise ReactOnRailsPro::Error, "Server bundle not found at #{server_bundle_path}. " \
                                         "Please build your bundles before uploading assets."
         end
 
@@ -136,8 +135,7 @@ module ReactOnRailsPro
         if ReactOnRailsPro.configuration.enable_rsc_support
           rsc_bundle_path = ReactOnRailsPro::Utils.rsc_bundle_js_file_path
           unless File.exist?(rsc_bundle_path)
-            safe_rsc_path = ReactOnRails::UrlSanitizer.redact_password(rsc_bundle_path.to_s)
-            raise ReactOnRailsPro::Error, "RSC bundle not found at #{safe_rsc_path}. " \
+            raise ReactOnRailsPro::Error, "RSC bundle not found at #{rsc_bundle_path}. " \
                                           "Please build your bundles before uploading assets."
           end
           target_bundles << pool.rsc_bundle_hash
@@ -280,10 +278,7 @@ module ReactOnRailsPro
       end
 
       def add_bundle_to_form(form, bundle_path:, bundle_file_name:, bundle_hash:, check_bundle:)
-        if check_bundle && !File.exist?(bundle_path)
-          safe_bundle_path = ReactOnRails::UrlSanitizer.redact_password(bundle_path.to_s)
-          raise ReactOnRailsPro::Error, "Bundle not found #{safe_bundle_path}"
-        end
+        raise ReactOnRailsPro::Error, "Bundle not found #{bundle_path}" if check_bundle && !File.exist?(bundle_path)
 
         form["bundle_#{bundle_hash}"] = {
           body: get_form_body_for_file(bundle_path),
@@ -303,13 +298,9 @@ module ReactOnRailsPro
         return form unless assets_to_copy.present?
 
         assets_to_copy.each_with_index do |asset_path, idx|
-          # URL-backed dev-server assets may embed userinfo (https://:pw@…).
-          # Sanitize every interpolation of asset_path so the password never
-          # reaches a log line.
-          safe_asset_path = ReactOnRails::UrlSanitizer.redact_password(asset_path)
-          Rails.logger.info { "[ReactOnRailsPro] Uploading asset #{safe_asset_path}" }
+          Rails.logger.info { "[ReactOnRailsPro] Uploading asset #{asset_path}" }
           unless http_url?(asset_path) || File.exist?(asset_path)
-            warn "Asset not found #{safe_asset_path}"
+            warn "Asset not found #{asset_path}"
             next
           end
 
@@ -319,11 +310,10 @@ module ReactOnRailsPro
             form["assetsToCopy#{idx}"] = {
               body: get_form_body_for_file(asset_path),
               content_type: content_type,
-              filename: filename_for_asset(asset_path)
+              filename: File.basename(asset_path)
             }
           rescue StandardError => e
-            safe_error = ReactOnRails::UrlSanitizer.redact_password(e.to_s)
-            warn "[ReactOnRailsPro] Error uploading asset #{safe_asset_path}: #{safe_error}"
+            warn "[ReactOnRailsPro] Error uploading asset #{asset_path}: #{e}"
           end
         end
 
@@ -372,7 +362,8 @@ module ReactOnRailsPro
           Original error is
           #{ReactOnRails::UrlSanitizer.redact_password(e.to_s)}
         MSG
-        # Suppress implicit cause so reporters can't see the raw HTTPX/URI error.
+        # Suppress implicit cause so reporters can't see the raw transport/URI error
+        # (which may embed the renderer URL including any userinfo).
         raise ReactOnRailsPro::Error, message, cause: nil
       end
 
@@ -399,27 +390,7 @@ module ReactOnRailsPro
       end
 
       def http_url?(path)
-        path.to_s.match?(%r{https?://}i)
-      end
-
-      # File.basename treats the whole string after the last `/` as the file
-      # name, so a bare URL like "http://:pw@host:3035" yields ":pw@host:3035"
-      # — which the node renderer would then log as the asset filename, leaking
-      # the credential. For URL-backed assets, extract the path component via
-      # URI.parse so the filename is purely the asset's path basename. If the
-      # URL has no usable path, fall back to a generic placeholder rather than
-      # risk emitting a credential-bearing basename.
-      def filename_for_asset(asset_path)
-        return File.basename(asset_path) unless http_url?(asset_path)
-
-        begin
-          uri = URI.parse(asset_path.to_s)
-          path = uri.path
-          return File.basename(path) if path && !path.empty? && path != "/"
-        rescue URI::InvalidURIError
-          # fall through to placeholder
-        end
-        "asset"
+        path.to_s.match?(%r{https?://})
       end
     end
   end

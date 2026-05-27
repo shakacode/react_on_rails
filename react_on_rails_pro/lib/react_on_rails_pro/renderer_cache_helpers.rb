@@ -6,7 +6,6 @@ require "pathname"
 require "set"
 
 require "react_on_rails_pro/error"
-require "react_on_rails/url_sanitizer"
 
 module ReactOnRailsPro
   # Shared helpers for staging the Node Renderer bundle cache. Used by both
@@ -114,8 +113,7 @@ module ReactOnRailsPro
     def each_stageable_asset(assets, rsc_required_paths, action_description)
       assets.each do |asset_path|
         if http_url?(asset_path)
-          safe_asset_path = ReactOnRails::UrlSanitizer.redact_password(asset_path)
-          warn "[ReactOnRailsPro] Skipping URL-backed asset #{safe_asset_path} while " \
+          warn "[ReactOnRailsPro] Skipping URL-backed asset #{asset_path} while " \
                "#{action_description} the renderer cache; the dev server is serving " \
                "this asset, so the renderer will fetch it on first request."
           next
@@ -131,9 +129,8 @@ module ReactOnRailsPro
 
         unless File.file?(expanded)
           if rsc_required_paths.include?(expanded)
-            raise ReactOnRailsPro::Error,
-                  "Required RSC asset not found or not a file: #{asset_label(asset_path)}. " \
-                  "Build your bundles before #{action_description} the renderer cache."
+            raise ReactOnRailsPro::Error, "Required RSC asset not found or not a file: #{asset_path}. " \
+                                          "Build your bundles before #{action_description} the renderer cache."
           end
           warn "[ReactOnRailsPro] Asset not found #{asset_label(asset_path)} (missing or not a file)"
           next
@@ -155,22 +152,14 @@ module ReactOnRailsPro
     end
 
     def asset_label(asset_path)
-      return "<blank>" if asset_path.to_s.empty?
-
-      # Sanitize so log messages can't surface a credential embedded in a
-      # URL-backed asset path (e.g. https://:password@host/...). For
-      # filesystem paths this is a no-op.
-      ReactOnRails::UrlSanitizer.redact_password(asset_path.to_s)
+      asset_path.to_s.empty? ? "<blank>" : asset_path
     end
 
     # Mirrors `Request#http_url?`: detects dev-server-served assets returned
     # by `ReactOnRails::PackerUtils.asset_uri_from_packer` so the staging
     # path can skip them instead of treating them as filesystem paths.
-    # Case-insensitive because `HTTPS://...` is still an HTTP URL — and
-    # treating it as a filesystem path would leak the URL into the "asset
-    # not found" warning.
     def http_url?(path)
-      path.to_s.match?(%r{\Ahttps?://}i)
+      path.to_s.match?(%r{\Ahttps?://})
     end
 
     # Must expand against Rails.root so that callers who expand per-asset paths
@@ -193,9 +182,8 @@ module ReactOnRailsPro
     def validate_bundle_exists!(path, action_description)
       return if File.file?(path)
 
-      safe_path = ReactOnRails::UrlSanitizer.redact_password(path.to_s)
       raise ReactOnRailsPro::Error,
-            "Bundle not found or not a file at #{safe_path}. " \
+            "Bundle not found or not a file at #{path}. " \
             "Please build your bundles before #{action_description} the renderer cache."
     end
 

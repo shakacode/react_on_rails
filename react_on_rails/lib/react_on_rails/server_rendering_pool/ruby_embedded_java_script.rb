@@ -3,7 +3,6 @@
 require "open-uri"
 require "execjs"
 require "react_on_rails/length_prefixed_parser"
-require "react_on_rails/url_sanitizer"
 
 module ReactOnRails
   module ServerRenderingPool
@@ -123,14 +122,10 @@ module ReactOnRails
             File.read(server_js_file)
           end
         rescue StandardError => e
-          # server_js_file can be a URL (with userinfo) when bundles are
-          # served from a dev server. Sanitize to avoid leaking credentials.
-          safe_path = UrlSanitizer.redact_password(server_js_file.to_s)
-          safe_error = UrlSanitizer.redact_password(e.to_s)
-          msg = "You specified server rendering JS file: #{safe_path}, but it cannot be " \
+          msg = "You specified server rendering JS file: #{server_js_file}, but it cannot be " \
                 "read. You may set the server_bundle_js_file in your configuration to be \"\" to " \
-                "avoid this warning.\nError is: #{safe_error}\n\n#{Utils.default_troubleshooting_section}"
-          raise ReactOnRails::Error, msg, cause: nil
+                "avoid this warning.\nError is: #{e}\n\n#{Utils.default_troubleshooting_section}"
+          raise ReactOnRails::Error, msg
         end
 
         def create_js_context
@@ -147,10 +142,8 @@ module ReactOnRails
           begin
             if ReactOnRails.configuration.trace
               Rails.logger.info do
-                safe_bundle_path = UrlSanitizer.redact_password(
-                  ReactOnRails::Utils.server_bundle_js_file_path.to_s
-                )
-                "[react_on_rails] Created JavaScript context with file #{safe_bundle_path}"
+                "[react_on_rails] Created JavaScript context with file " \
+                  "#{ReactOnRails::Utils.server_bundle_js_file_path}"
               end
             end
             ExecJS.compile(base_js_code)
@@ -231,11 +224,8 @@ module ReactOnRails
           encoding_type = match[:encoding]
           response.body.force_encoding(encoding_type)
         rescue StandardError => e
-          safe_url = UrlSanitizer.redact_password(url.to_s)
-          safe_error = UrlSanitizer.redact_password(e.to_s)
-          msg = "file_url_to_string #{safe_url} failed\nError is: #{safe_error}\n\n" \
-                "#{Utils.default_troubleshooting_section}"
-          raise ReactOnRails::Error, msg, cause: nil
+          msg = "file_url_to_string #{url} failed\nError is: #{e}\n\n#{Utils.default_troubleshooting_section}"
+          raise ReactOnRails::Error, msg
         end
 
         def parse_render_result(result_string, render_options)
