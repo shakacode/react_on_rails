@@ -93,6 +93,24 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
       expect(File.exist?(fetch_dir)).to be(false)
       expect(logger).to have_received(:warn).with(/returned more than 5 compressed bytes/)
     end
+
+    it "drains oversized non-success responses through the compressed response cap" do
+      stub_const("#{described_class}::COMPRESSED_BODY_CAP", 5)
+      not_found = Net::HTTPNotFound.new("1.1", "404", "Not Found")
+
+      allow(http).to receive(:request) do |_request, &block|
+        block.call(not_found)
+        not_found
+      end
+      allow(not_found).to receive(:read_body).and_yield("abc").and_yield("def")
+
+      expect(not_found).not_to receive(:body)
+
+      expect(described_class.fetch("hash123")).to be_nil
+      expect(File.exist?(fetch_dir)).to be(false)
+      expect(logger).to have_received(:warn).with(%r{bundles/hash123 returned HTTP 404})
+      expect(logger).to have_received(:warn).with(/returned more than 5 compressed bytes/)
+    end
   end
 
   describe ".http_get" do

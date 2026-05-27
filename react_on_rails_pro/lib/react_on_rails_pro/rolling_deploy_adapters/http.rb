@@ -184,6 +184,7 @@ module ReactOnRailsPro
                 Rails.logger.warn(
                   "#{LOG_PREFIX} bundles/#{bundle_hash} returned HTTP #{streaming_response.code}; skipping this hash."
                 )
+                drain_response_body(streaming_response)
                 next
               end
 
@@ -198,6 +199,14 @@ module ReactOnRailsPro
         end
 
         def stream_response_body(response, io)
+          each_capped_body_chunk(response) { |chunk| io.write(chunk) }
+        end
+
+        def drain_response_body(response)
+          each_capped_body_chunk(response) { |_chunk| nil }
+        end
+
+        def each_capped_body_chunk(response)
           bytes = 0
           response.read_body do |chunk|
             bytes += chunk.bytesize
@@ -205,7 +214,7 @@ module ReactOnRailsPro
               raise ReactOnRailsPro::Error,
                     "rolling_deploy_previous_url returned more than #{COMPRESSED_BODY_CAP} compressed bytes; aborting"
             end
-            io.write(chunk)
+            yield chunk
           end
         end
 
