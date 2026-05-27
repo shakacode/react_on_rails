@@ -330,6 +330,7 @@ describe('opentelemetry integration: init() failure path', () => {
     };
 
     jest.doMock('../../src/integrations/api.js', () => ({
+      ...jest.requireActual<typeof import('../../src/integrations/api.js')>('../../src/integrations/api.js'),
       log,
       message: jest.fn(),
     }));
@@ -453,16 +454,19 @@ describe('opentelemetry integration: init() failure path', () => {
       };
       const shutdown = jest.fn(() => new Promise<void>(() => undefined));
 
-      jest.doMock('../../src/integrations/api.js', () => ({
-        log,
-        message: jest.fn(),
-      }));
       jest.doMock('../../src/worker/fastifyConfig.js', () => ({
         __resetFastifyConfigFunctionsForTest: jest.fn(),
         registerFastifyConfigFunction: jest.fn((callback: (app: { addHook: jest.Mock }) => void) => {
           configureFastifyCallback = callback;
           return jest.fn();
         }),
+      }));
+      jest.doMock('../../src/integrations/api.js', () => ({
+        ...jest.requireActual<typeof import('../../src/integrations/api.js')>(
+          '../../src/integrations/api.js',
+        ),
+        log,
+        message: jest.fn(),
       }));
       jest.doMock('@opentelemetry/sdk-trace-node', () => ({
         NodeTracerProvider: jest.fn(function NodeTracerProvider() {
@@ -575,16 +579,19 @@ describe('opentelemetry integration: init() failure path', () => {
           }),
       );
 
-      jest.doMock('../../src/integrations/api.js', () => ({
-        log,
-        message: jest.fn(),
-      }));
       jest.doMock('../../src/worker/fastifyConfig.js', () => ({
         __resetFastifyConfigFunctionsForTest: jest.fn(),
         registerFastifyConfigFunction: jest.fn((callback: (app: { addHook: jest.Mock }) => void) => {
           configureFastifyCallback = callback;
           return jest.fn();
         }),
+      }));
+      jest.doMock('../../src/integrations/api.js', () => ({
+        ...jest.requireActual<typeof import('../../src/integrations/api.js')>(
+          '../../src/integrations/api.js',
+        ),
+        log,
+        message: jest.fn(),
       }));
       jest.doMock('@opentelemetry/sdk-trace-node', () => ({
         NodeTracerProvider: jest.fn(function NodeTracerProvider() {

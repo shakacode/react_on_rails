@@ -35,6 +35,8 @@ export {
   MessageNotifier,
 } from '../shared/errorReporter.js';
 export {
+  resetTracing,
+  resetSubSpan,
   setupTracing,
   setupSubSpan,
   subSpan,
@@ -45,4 +47,17 @@ export {
   SubSpanFn,
   SubSpanController,
 } from '../shared/tracing.js';
-export { configureFastify, FastifyConfigFunction } from '../worker/fastifyConfig.js';
+export {
+  getOpenTelemetryTracerProvider,
+  setOpenTelemetryTracerProvider,
+} from '../shared/opentelemetryState.js';
+export {
+  configureFastify,
+  registerFastifyConfigFunction,
+  FastifyConfigFunction,
+} from '../worker/fastifyConfig.js';
+export {
+  registerWorkerShutdownHook,
+  WORKER_SHUTDOWN_HOOKS_TIMEOUT_MS,
+  WorkerShutdownHook,
+} from '../worker/shutdownHooks.js';
