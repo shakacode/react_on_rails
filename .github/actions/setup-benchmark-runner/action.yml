@@ -1,6 +1,12 @@
 name: Setup benchmark runner
 description: Install common tools and build packages needed by benchmark jobs.
 
+inputs:
+  install-k6:
+    description: Whether to install k6 for Rails benchmark jobs.
+    required: false
+    default: 'true'
+
 runs:
   using: composite
   steps:
@@ -18,6 +24,7 @@ runs:
         echo "$HOME/bin" >> "$GITHUB_PATH"
 
     - name: Setup k6
+      if: inputs.install-k6 == 'true'
       uses: grafana/setup-k6-action@v1
       with:
         k6-version: ${{ env.K6_VERSION }}
