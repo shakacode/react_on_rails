@@ -174,11 +174,23 @@ RSpec.describe ReactOnRails::Dev::ServerMode do
       expect(described_class.detect("config/shakapacker.yml")).to eq(:hmr)
     end
 
-    it "detects HMR from the default section when development is absent" do
+    it "uses the fallback mode when development is absent even if default has dev_server settings" do
       write_shakapacker_config(<<~YAML)
         default:
           dev_server:
             hmr: true
+      YAML
+
+      expect(described_class.detect("config/shakapacker.yml")).to eq(:hmr)
+    end
+
+    it "detects HMR from default settings merged into development by YAML anchors" do
+      write_shakapacker_config(<<~YAML)
+        default: &default
+          dev_server:
+            hmr: true
+        development:
+          <<: *default
       YAML
 
       expect(described_class.detect("config/shakapacker.yml")).to eq(:hmr)
@@ -197,7 +209,7 @@ RSpec.describe ReactOnRails::Dev::ServerMode do
       expect(described_class.detect("config/shakapacker.yml")).to eq(:live_reload)
     end
 
-    it "merges default and development dev_server settings" do
+    it "does not deep-merge default and development dev_server settings" do
       write_shakapacker_config(<<~YAML)
         default:
           dev_server:
@@ -207,7 +219,21 @@ RSpec.describe ReactOnRails::Dev::ServerMode do
             live_reload: false
       YAML
 
-      expect(described_class.detect("config/shakapacker.yml")).to eq(:hmr)
+      expect(described_class.detect("config/shakapacker.yml")).to eq(:development_server)
+    end
+
+    it "treats a development dev_server block as replacing default dev_server settings after YAML merge" do
+      write_shakapacker_config(<<~YAML)
+        default: &default
+          dev_server:
+            hmr: true
+        development:
+          <<: *default
+          dev_server:
+            port: 3035
+      YAML
+
+      expect(described_class.detect("config/shakapacker.yml")).to eq(:live_reload)
     end
 
     it "warns when Shakapacker config parsing fails" do
@@ -276,6 +302,16 @@ RSpec.describe ReactOnRails::Dev::ServerMode do
 
     it "does not treat missing config as HMR enabled" do
       expect(described_class.hmr_enabled?("config/missing.yml")).to be(false)
+    end
+
+    it "does not treat default-only HMR settings as development HMR" do
+      write_shakapacker_config(<<~YAML)
+        default:
+          dev_server:
+            hmr: true
+      YAML
+
+      expect(described_class.hmr_enabled?("config/shakapacker.yml")).to be(false)
     end
   end
 

@@ -127,10 +127,10 @@ module ReactOnRails
         end
 
         def dev_server_config(config)
-          default_dev_server = dev_server_section(config["default"])
-          development_dev_server = dev_server_section(config["development"])
-
-          default_dev_server.merge(development_dev_server)
+          # YAML anchors already apply environment-level defaults before this point.
+          # Match Shakapacker by reading the resolved development section instead of deep-merging nested
+          # dev_server hashes, because a development dev_server block replaces the default one.
+          dev_server_section(config["development"])
         end
 
         def dev_server_section(environment_config)
