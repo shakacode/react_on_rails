@@ -1,0 +1,109 @@
+name: Setup benchmark runner
+description: Install common tools and build packages needed by benchmark jobs.
+
+runs:
+  using: composite
+  steps:
+    - name: Install Bencher CLI
+      # Pinned: alert-detection heuristics grep stderr for "Alert[s]",
+      # "threshold violation", and "boundary violation". Those strings
+      # are not a documented API contract, so upgrading the CLI requires
+      # re-verifying that the expected phrases still appear in alert output.
+      uses: bencherdev/bencher@v0.6.2
+
+    - name: Add tools directory to PATH
+      shell: bash
+      run: |
+        mkdir -p ~/bin
+        echo "$HOME/bin" >> "$GITHUB_PATH"
+
+    - name: Setup k6
+      uses: grafana/setup-k6-action@v1
+      with:
+        k6-version: ${{ env.K6_VERSION }}
+
+    - name: Setup Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ env.RUBY_VERSION }}
+
+    - name: Get gem home directory
+      shell: bash
+      run: echo "GEM_HOME_PATH=$(gem env home)" >> "$GITHUB_ENV"
+
+    - name: Cache foreman gem
+      id: cache-foreman
+      uses: actions/cache@v5
+      with:
+        path: ${{ env.GEM_HOME_PATH }}
+        key: foreman-gem-${{ runner.os }}-ruby-${{ env.RUBY_VERSION }}
+
+    - name: Install foreman
+      if: steps.cache-foreman.outputs.cache-hit != 'true'
+      shell: bash
+      run: gem install foreman
+
+    - name: Fix dependency for libyaml-dev
+      shell: bash
+      run: sudo apt install libyaml-dev -y
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v6
+      with:
+        cache: true
+        cache_dependency_path: '**/pnpm-lock.yaml'
+        run_install: false
+
+    - name: Setup Node
+      uses: actions/setup-node@v6
+      with:
+        node-version: '22'
+
+    - name: Print system information
+      shell: bash
+      run: |
+        echo "Linux release: "
+        cat /etc/issue
+        echo "Current user: "
+        whoami
+        echo "Current directory: "
+        pwd
+        echo "Ruby version: "
+        ruby -v
+        echo "Node version: "
+        node -v
+        echo "Pnpm version: "
+        pnpm --version
+        echo "Bundler version: "
+        bundle --version
+
+    - name: Configure CPU pinning and process priority
+      shell: bash
+      run: |
+        NPROC=$(nproc)
+        echo "Available CPUs: $NPROC"
+
+        SERVER_CMD="nice -n -20 taskset -c 1-$((NPROC-1)) bin/prod"
+        BENCH_CMD="nice -n -10 taskset -c 0 ruby"
+
+        echo "SERVER_CMD=$SERVER_CMD" >> "$GITHUB_ENV"
+        echo "BENCH_CMD=$BENCH_CMD" >> "$GITHUB_ENV"
+
+        if [ -z "$WEB_CONCURRENCY" ]; then
+          WEB_CONCURRENCY=$((NPROC-1))
+          echo "WEB_CONCURRENCY=$WEB_CONCURRENCY" >> "$GITHUB_ENV"
+          echo "WEB_CONCURRENCY (auto): $WEB_CONCURRENCY"
+        else
+          echo "WEB_CONCURRENCY (from input): $WEB_CONCURRENCY"
+        fi
+
+        echo "SERVER_CMD: $SERVER_CMD"
+        echo "BENCH_CMD: $BENCH_CMD"
+
+    - name: Install Node modules with pnpm
+      shell: bash
+      run: pnpm install --frozen-lockfile
+
+    - name: Build workspace packages
+      shell: bash
+      run: pnpm run build
