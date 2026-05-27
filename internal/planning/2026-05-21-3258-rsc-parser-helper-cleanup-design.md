@@ -1,6 +1,6 @@
 # Issue #3258 — RSC Migration Parser Helper Clarity Cleanup
 
-**Status:** Approved
+**Status:** Design approved; implementation in review
 **Author:** Justin Gordon (drafted with Claude Code)
 **Date:** 2026-05-21
 **Related PR:** #3219 (`codex/fix-rsc-client-reference-scope`)
@@ -12,7 +12,7 @@ PR #3219 (`fix: scope RSC client reference discovery`) ships a behavioral fix
 that scopes `RSCWebpackPlugin#clientReferences` to the Shakapacker
 `config.source_path` for both new installs and existing webpack configs. The PR
 introduces a sizeable migration path in
-`react_on_rails/lib/generators/react_on_rails/rsc_setup.rb` that detects an
+`react_on_rails/lib/generators/react_on_rails/rsc_setup/client_references.rb` that detects an
 existing `RSCWebpackPlugin(...)` call, parses its options block with a
 lightweight JS scanner, and either rewrites the options or warns when a rewrite
 is unsafe.
@@ -32,7 +32,7 @@ This spec covers only those three items. No behavior changes.
 3. Remove the duplicate defensive guards at the top of
    `add_rsc_client_references_setup`, and document its precondition.
 
-All three changes are confined to `rsc_setup.rb` and its existing spec file.
+All three changes are confined to `client_references.rb` and its existing spec file.
 
 ## Out of Scope
 
@@ -75,10 +75,11 @@ but a reader who only inspects the name would expect that case to return
 
 ### Affected sites
 
-Only one call site exists in `rsc_setup.rb`:
+Only two call sites exist in `client_references.rb`:
 
 ```text
-react_on_rails/lib/generators/react_on_rails/rsc_setup.rb:576
+react_on_rails/lib/generators/react_on_rails/rsc_setup/client_references.rb:141
+react_on_rails/lib/generators/react_on_rails/rsc_setup/client_references.rb:163
 ```
 
 The method is private to the generator class; no spec asserts on the method
@@ -87,7 +88,7 @@ references the symbol.
 
 ### Acceptance
 
-- `bundle exec rubocop react_on_rails/lib/generators/react_on_rails/rsc_setup.rb`
+- `bundle exec rubocop react_on_rails/lib/generators/react_on_rails/rsc_setup/client_references.rb`
   passes.
 - `bundle exec rspec react_on_rails/spec/react_on_rails/generators/rsc_generator_spec.rb`
   passes unchanged.
@@ -202,7 +203,7 @@ and framework guarantees."
 ## Test Plan
 
 - `bundle exec rspec react_on_rails/spec/react_on_rails/generators/rsc_generator_spec.rb`
-- `bundle exec rubocop react_on_rails/lib/generators/react_on_rails/rsc_setup.rb react_on_rails/spec/react_on_rails/generators/rsc_generator_spec.rb`
+- `bundle exec rubocop react_on_rails/lib/generators/react_on_rails/rsc_setup/client_references.rb react_on_rails/spec/react_on_rails/generators/rsc_generator_spec.rb`
 - Manual `grep` for the old method name across the repo to confirm zero stale
   references after the rename.
 
