@@ -22,6 +22,9 @@ module ReactOnRailsPro
       excluded_dependency_globs: Configuration::DEFAULT_EXCLUDED_DEPENDENCY_GLOBS,
       remote_bundle_cache_adapter: Configuration::DEFAULT_REMOTE_BUNDLE_CACHE_ADAPTER,
       rolling_deploy_adapter: Configuration::DEFAULT_ROLLING_DEPLOY_ADAPTER,
+      rolling_deploy_token: Configuration::DEFAULT_ROLLING_DEPLOY_TOKEN,
+      rolling_deploy_previous_url: Configuration::DEFAULT_ROLLING_DEPLOY_PREVIOUS_URL,
+      rolling_deploy_mount_path: Configuration::DEFAULT_ROLLING_DEPLOY_MOUNT_PATH,
       ssr_timeout: Configuration::DEFAULT_SSR_TIMEOUT,
       ssr_pre_hook_js: nil,
       assets_to_copy: nil,
@@ -58,6 +61,13 @@ module ReactOnRailsPro
     DEFAULT_EXCLUDED_DEPENDENCY_GLOBS = [].freeze
     DEFAULT_REMOTE_BUNDLE_CACHE_ADAPTER = nil
     DEFAULT_ROLLING_DEPLOY_ADAPTER = nil
+    DEFAULT_ROLLING_DEPLOY_TOKEN = nil
+    DEFAULT_ROLLING_DEPLOY_PREVIOUS_URL = nil
+    DEFAULT_ROLLING_DEPLOY_MOUNT_PATH = "/react_on_rails_pro/rolling_deploy"
+    # Minimum bearer-token length when using the built-in HTTP rolling-deploy adapter.
+    # 32 chars matches SecureRandom.hex(16) and rules out obviously low-entropy values
+    # like "secret" or short app names without forcing a specific generator.
+    ROLLING_DEPLOY_TOKEN_MIN_LENGTH = 32
     DEFAULT_RENDERER_REQUEST_RETRY_LIMIT = 5
     DEFAULT_THROW_JS_ERRORS = true
     DEFAULT_RENDERING_RETURNS_PROMISES = false
@@ -78,7 +88,9 @@ module ReactOnRailsPro
                   :server_renderer, :renderer_use_fallback_exec_js, :prerender_caching,
                   :renderer_http_pool_timeout, :renderer_http_pool_warn_timeout,
                   :dependency_globs, :excluded_dependency_globs, :rendering_returns_promises,
-                  :remote_bundle_cache_adapter, :rolling_deploy_adapter, :ssr_pre_hook_js, :assets_to_copy,
+                  :remote_bundle_cache_adapter, :rolling_deploy_adapter,
+                  :rolling_deploy_token, :rolling_deploy_previous_url, :rolling_deploy_mount_path,
+                  :ssr_pre_hook_js, :assets_to_copy,
                   :renderer_request_retry_limit, :throw_js_errors, :ssr_timeout,
                   :profile_server_rendering_js_code, :raise_non_shell_server_rendering_errors, :enable_rsc_support,
                   :rsc_payload_generation_url_path, :rsc_bundle_js_file, :react_client_manifest_file,
@@ -141,6 +153,8 @@ module ReactOnRailsPro
                    tracing: nil,
                    dependency_globs: nil, excluded_dependency_globs: nil, rendering_returns_promises: nil,
                    remote_bundle_cache_adapter: nil, rolling_deploy_adapter: nil,
+                   rolling_deploy_token: nil, rolling_deploy_previous_url: nil,
+                   rolling_deploy_mount_path: nil,
                    ssr_pre_hook_js: nil, assets_to_copy: nil,
                    renderer_request_retry_limit: nil, throw_js_errors: nil, ssr_timeout: nil,
                    profile_server_rendering_js_code: nil, raise_non_shell_server_rendering_errors: nil,
@@ -164,6 +178,9 @@ module ReactOnRailsPro
       self.excluded_dependency_globs = excluded_dependency_globs
       self.remote_bundle_cache_adapter = remote_bundle_cache_adapter
       self.rolling_deploy_adapter = rolling_deploy_adapter
+      self.rolling_deploy_token = rolling_deploy_token
+      self.rolling_deploy_previous_url = rolling_deploy_previous_url
+      self.rolling_deploy_mount_path = rolling_deploy_mount_path.presence || DEFAULT_ROLLING_DEPLOY_MOUNT_PATH
       self.ssr_pre_hook_js = ssr_pre_hook_js
       self.assets_to_copy = assets_to_copy
       self.renderer_request_retry_limit = renderer_request_retry_limit
@@ -184,11 +201,22 @@ module ReactOnRailsPro
       validate_url
       validate_remote_bundle_cache_adapter
       validate_rolling_deploy_adapter
+      validate_rolling_deploy_http_adapter_config
       setup_renderer_password
       validate_renderer_password_for_production
       setup_assets_to_copy
       setup_execjs_profiler_if_needed
       check_react_on_rails_support_for_rsc
+    end
+
+    # True when the configured rolling_deploy_adapter is the built-in HTTP
+    # adapter (or a subclass). Used by the engine to decide whether to
+    # auto-mount the rolling-deploy bundles controller.
+    def rolling_deploy_http_adapter?
+      adapter = rolling_deploy_adapter
+      return false if adapter.nil?
+
+      adapter.is_a?(Class) && adapter <= ReactOnRailsPro::RollingDeployAdapters::Http
     end
 
     def check_react_on_rails_support_for_rsc
@@ -318,6 +346,37 @@ module ReactOnRailsPro
       end
 
       validate_rolling_deploy_upload_signature
+    end
+
+    # Only fires when the user has selected the built-in HTTP adapter. Custom
+    # adapters that re-use the new config knobs for their own reasons are not
+    # forced through this validation. We do not validate previous_url here:
+    # an unset URL is a valid "discovery off; this is the upload-only side of
+    # a one-way deploy" mode (the adapter returns [] for previous_bundle_hashes).
+    def validate_rolling_deploy_http_adapter_config
+      return unless rolling_deploy_http_adapter?
+
+      token = rolling_deploy_token.to_s
+      if token.empty?
+        raise ReactOnRailsPro::Error,
+              "config.rolling_deploy_token is required when using the built-in " \
+              "ReactOnRailsPro::RollingDeployAdapters::Http adapter. Generate one " \
+              "with SecureRandom.hex(32) and set it on both Rails and your build CI. " \
+              "See docs/pro/rolling-deploy-http-adapter.md."
+      end
+      # Compare on `bytesize` (not `length`) so the validator matches the
+      # byte-level constant-time check in `BundlesController#authenticate_rolling_deploy_request`.
+      # For ASCII tokens (the SecureRandom.hex output we recommend) the two
+      # are identical; for a UTF-8 passphrase a 32-codepoint string could be
+      # as short as 32 bytes or as long as 128, and the auth path enforces
+      # the byte count.
+      return if token.bytesize >= ROLLING_DEPLOY_TOKEN_MIN_LENGTH
+
+      raise ReactOnRailsPro::Error,
+            "config.rolling_deploy_token must be at least " \
+            "#{ROLLING_DEPLOY_TOKEN_MIN_LENGTH} bytes (got #{token.bytesize}). " \
+            "Generate a stronger token with SecureRandom.hex(32). " \
+            "See docs/pro/rolling-deploy-http-adapter.md."
     end
 
     def validate_rolling_deploy_upload_signature
