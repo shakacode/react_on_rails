@@ -6,7 +6,7 @@ gem "shakapacker", "9.6.1"
 gem "bootsnap", require: false
 gem "rails", "~> 7.1.0"
 
-gem "sqlite3", "~> 1.6"
+gem "sqlite3", "~> 2.0"
 gem "sass-rails", "~> 6.0"
 gem "uglifier"
 gem "jquery-rails"
