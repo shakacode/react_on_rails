@@ -426,10 +426,10 @@ describe('tanstack-router integration (Pro)', () => {
   it('hydrates server-rendered HTML from actual router loader state without recoverable hydration errors', () =>
     withResponsePolyfill(async () => {
       // This narrow provider intentionally reads the first-render router state.
-    // Minimal stub: TanStack Router only checks `typeof Response !== 'undefined'` for
-    // its SSR helpers. If a future release constructs Response instances, this stub
-    // will need to be replaced with a more complete polyfill.
-    globalThis.Response = class Response {} as typeof Response;
+      // Minimal stub: TanStack Router only checks `typeof Response !== 'undefined'` for
+      // its SSR helpers. If a future release constructs Response instances, this stub
+      // will need to be replaced with a more complete polyfill.
+      globalThis.Response = class Response {} as typeof Response;
       // hydration test verifies that SSR-injected state is present before the
       // first client render, which is the hydration contract this adapter owns.
       // Using ActualRouterProvider here exercises TanStack's subscription layer
