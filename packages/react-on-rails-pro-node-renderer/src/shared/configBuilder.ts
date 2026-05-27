@@ -50,6 +50,9 @@ export interface Config {
   // See docs/oss/building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc.
   // This option is required to equal `true` if you want to use loadable components.
   // Setting this value to false causes the NodeRenderer to behave like ExecJS.
+  // SECURITY: When `supportModules: true`, the renderer also wraps the bundle and injects the
+  // host `require` regardless of `additionalContext`. See the detailed `additionalContext`
+  // security note below.
   supportModules: boolean;
   // additionalContext enables you to specify additional NodeJS objects (usually from
   // https://nodejs.org/api/globals.html) to add to the VM context in addition to our supportModules defaults.

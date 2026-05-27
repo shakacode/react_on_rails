@@ -980,6 +980,15 @@ def replace_workspace_protocol_dependencies_for_publish!(package_json, package_v
   changed
 end
 
+def write_publishable_package_json(package_json_path, package_json)
+  Tempfile.create(["package-json-", ".json"], File.dirname(package_json_path)) do |tmp|
+    tmp.write("#{JSON.pretty_generate(package_json)}\n")
+    tmp.chmod(File.stat(package_json_path).mode & 0o777)
+    tmp.close
+    File.rename(tmp.path, package_json_path)
+  end
+end
+
 def with_publishable_package_json(dir, package_version)
   package_json_path = File.join(dir, "package.json")
   changed = false
@@ -987,13 +996,9 @@ def with_publishable_package_json(dir, package_version)
   package_json = JSON.parse(original_content)
 
   if replace_workspace_protocol_dependencies_for_publish!(package_json, package_version)
-    File.write(package_json_path, "#{JSON.pretty_generate(package_json)}\n")
-    # Only flip `changed` after a successful write so a failed `File.write` doesn't drive the
-    # `ensure` block to re-write an unchanged file. Trade-off: if `File.write` partially writes
-    # before raising (rare on local filesystems for small files), `ensure` will not attempt to
-    # restore the original content; we accept this as a known limitation of the single-buffer
-    # write approach, since this is a release-time helper running on local disk where
-    # `File.write` is effectively atomic for small JSON files.
+    write_publishable_package_json(package_json_path, package_json)
+    # Only flip `changed` after the atomic same-directory rename succeeds so the `ensure`
+    # restore runs only after package.json was actually replaced.
     changed = true
   end
 

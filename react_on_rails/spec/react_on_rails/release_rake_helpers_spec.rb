@@ -362,10 +362,8 @@ RSpec.describe "release.rake helper methods" do
           "#{JSON.pretty_generate({ 'dependencies' => { 'react-on-rails' => 'workspace:*' } })}\n"
         )
 
-        write_count = 0
         allow(File).to receive(:write).and_wrap_original do |method, *args|
-          write_count += 1 if args.first == package_json_path
-          raise "restore failed" if args.first == package_json_path && write_count == 2
+          raise "restore failed" if args.first == package_json_path
 
           method.call(*args)
         end
