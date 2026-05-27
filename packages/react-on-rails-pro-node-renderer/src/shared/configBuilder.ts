@@ -346,8 +346,10 @@ function validatePasswordForProduction(aConfig: Config): string | null {
   }
 
   if (KNOWN_WEAK_PASSWORDS.has(aConfig.password.toLowerCase())) {
+    // Don't log the literal value — even a known-default value is the user's
+    // *current* live credential until they rotate it.
     log.warn(
-      `RENDERER_PASSWORD is set to a known-default value ("${aConfig.password}"). ` +
+      'RENDERER_PASSWORD matches a known-default value. ' +
         `Set RENDERER_PASSWORD to a random value of at least ${MIN_PASSWORD_LENGTH} characters.`,
     );
   } else if (aConfig.password.length < MIN_PASSWORD_LENGTH) {

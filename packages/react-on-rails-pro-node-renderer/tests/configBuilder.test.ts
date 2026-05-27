@@ -364,6 +364,9 @@ describe('configBuilder', () => {
 
       expect(() => buildConfig()).not.toThrow();
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('known-default value'));
+      // The warning must not echo the literal password value — even a known-default
+      // value is the user's *current* live credential until they rotate it.
+      expect(warn).not.toHaveBeenCalledWith(expect.stringContaining('devPassword'));
     });
 
     it('warns for case-insensitive weak password match', () => {

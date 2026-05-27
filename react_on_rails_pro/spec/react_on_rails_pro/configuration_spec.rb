@@ -640,7 +640,11 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
           allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
           allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return(nil)
 
-          expect(Rails.logger).to receive(:warn).with(/known-default value/)
+          # The warning must match the phrase but must NOT echo the literal password.
+          expect(Rails.logger).to receive(:warn) do |msg|
+            expect(msg).to match(/known-default value/)
+            expect(msg).not_to include("devPassword")
+          end
 
           expect do
             ReactOnRailsPro.configure do |config|

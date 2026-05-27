@@ -528,9 +528,11 @@ module ReactOnRailsPro
 
     def warn_if_renderer_password_weak
       if KNOWN_WEAK_RENDERER_PASSWORDS.include?(renderer_password.downcase)
-        Rails.logger.warn "[react_on_rails_pro] renderer_password is set to a known-default value " \
-                          "(\"#{renderer_password}\"). Set RENDERER_PASSWORD to a random value " \
-                          "of at least #{MIN_RENDERER_PASSWORD_LENGTH} characters."
+        # Don't log the literal value — even a known-default value is the
+        # user's *current* live credential until they rotate it.
+        Rails.logger.warn "[react_on_rails_pro] renderer_password matches a known-default value. " \
+                          "Set RENDERER_PASSWORD to a random value of at least " \
+                          "#{MIN_RENDERER_PASSWORD_LENGTH} characters."
       elsif renderer_password.length < MIN_RENDERER_PASSWORD_LENGTH
         Rails.logger.warn "[react_on_rails_pro] renderer_password is shorter than " \
                           "#{MIN_RENDERER_PASSWORD_LENGTH} characters " \
