@@ -2069,7 +2069,7 @@ describe RscGenerator, type: :generator do
       )
       content = File.read(File.join(destination_root, config_path))
 
-      expect(generator.send(:rsc_plugin_sections_safe_to_rewrite?, config_path, content, is_server: true))
+      expect(generator.send(:rsc_plugin_sections_safe_to_rewrite?, config_path, content))
         .to be(false)
 
       messages = GeneratorMessages.messages.join("\n")
@@ -2111,6 +2111,38 @@ describe RscGenerator, type: :generator do
 
       expect(true_partition.fetch(:safe).length).to eq(0)
       expect(false_partition.fetch(:safe).length).to eq(1)
+    end
+
+    it "keeps the client references rewrite predicate free of file writes" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(
+              new RSCWebpackPlugin({
+                isServer: false,
+                clientReferences: rscClientReferences,
+              }),
+            );
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      full_path = File.join(destination_root, config_path)
+      content = File.read(full_path)
+
+      expect(generator.send(:rsc_plugin_needs_client_references_rewrite?, content, is_server: false))
+        .to be(false)
+      expect(File.read(full_path)).to eq(content)
     end
 
     it "does not inject duplicate imports for legacy let or var CommonJS destructuring" do
