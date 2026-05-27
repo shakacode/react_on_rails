@@ -379,10 +379,10 @@ GEM
       actionpack (>= 5.2)
       activesupport (>= 5.2)
       sprockets (>= 3.0.0)
-    sqlite3 (1.7.3)
+    sqlite3 (2.9.4)
       mini_portile2 (~> 2.8.0)
-    sqlite3 (1.7.3-arm64-darwin)
-    sqlite3 (1.7.3-x86_64-linux)
+    sqlite3 (2.9.4-arm64-darwin)
+    sqlite3 (2.9.4-x86_64-linux-gnu)
     steep (1.9.4)
       activesupport (>= 5.1)
       concurrent-ruby (>= 1.1.10)
@@ -479,7 +479,7 @@ DEPENDENCIES
   simplecov (~> 0.16.1)
   spring (~> 4.0)
   sprockets (~> 4.0)
-  sqlite3 (~> 1.6)
+  sqlite3 (~> 2.0)
   steep
   turbo-rails
   turbolinks
