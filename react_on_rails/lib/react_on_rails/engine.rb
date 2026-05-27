@@ -170,7 +170,8 @@ module ReactOnRails
       return if env_config_path.to_s.empty?
 
       Rails.logger&.warn(
-        "[React on Rails] SHAKAPACKER_CONFIG is set to '#{env_config_path}' but the file " \
+        "[React on Rails] SHAKAPACKER_CONFIG is set to '#{env_config_path}' " \
+        "(resolved to '#{shakapacker_config_path}') but the file " \
         "does not exist. Bundler detection treated Shakapacker as not configured for this app; " \
         "fix the path or unset the variable if this is unintended."
       )
