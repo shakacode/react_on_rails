@@ -75,7 +75,6 @@ env:
   # Determine which apps/benchmarks to run (default is 'both' for all triggers)
   RUN_CORE: ${{ contains(fromJSON('["both", "core_only"]'), github.event.inputs.app_version || 'both') && 'true' || '' }}
   RUN_PRO: ${{ (github.event.inputs.app_version || 'both') != 'core_only' && 'true' || '' }}
-  RUN_PRO_RAILS: ${{ contains(fromJSON('["both", "pro_only", "pro_rails_only"]'), github.event.inputs.app_version || 'both') && 'true' || '' }}
   RUN_PRO_NODE_RENDERER: ${{ contains(fromJSON('["both", "pro_only", "pro_node_renderer_only"]'), github.event.inputs.app_version || 'both') && 'true' || '' }}
   # Benchmark parameters (defaults in bench.rb unless overridden here for CI)
   ROUTES: ${{ github.event.inputs.routes }}
@@ -96,6 +95,7 @@ jobs:
       actions: read
     runs-on: ubuntu-22.04
     outputs:
+      docs_only: ${{ steps.detect.outputs.docs_only }}
       run_core_benchmarks: ${{ steps.benchmark-outputs.outputs.run_core_benchmarks }}
       run_pro_benchmarks: ${{ steps.benchmark-outputs.outputs.run_pro_benchmarks }}
       run_pro_node_renderer_benchmarks: ${{ steps.benchmark-outputs.outputs.run_pro_node_renderer_benchmarks }}
@@ -112,6 +112,18 @@ jobs:
           BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}"
           script/ci-changes-detector "$BASE_REF"
         shell: bash
+      - name: Install Ruby Gems for Core dummy app
+        if: steps.detect.outputs.docs_only != 'true'
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: react_on_rails/spec/dummy
+          ruby-version: ${{ env.RUBY_VERSION }}
+      - name: Install Ruby Gems for Pro dummy app
+        if: steps.detect.outputs.docs_only != 'true'
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: react_on_rails_pro/spec/dummy
+          ruby-version: ${{ env.RUBY_VERSION }}
       - name: Set benchmark outputs
         id: benchmark-outputs
         if: steps.detect.outputs.non_runtime_only != 'true'
@@ -170,6 +182,7 @@ jobs:
     name: Core benchmarks (shard ${{ matrix.shard_label }})
     if: |
       contains(fromJSON('["both", "core_only"]'), github.event.inputs.app_version || 'both') &&
+      needs.detect-changes.outputs.docs_only != 'true' &&
       (
         github.event_name == 'push' ||
         needs.detect-changes.outputs.run_core_benchmarks == 'true' ||
@@ -322,6 +335,7 @@ jobs:
     name: Pro benchmarks (shard ${{ matrix.shard_label }})
     if: |
       contains(fromJSON('["both", "pro_only", "pro_rails_only"]'), github.event.inputs.app_version || 'both') &&
+      needs.detect-changes.outputs.docs_only != 'true' &&
       (
         github.event_name == 'push' ||
         needs.detect-changes.outputs.run_pro_benchmarks == 'true' ||
@@ -418,15 +432,13 @@ jobs:
           set -e
           echo "🔍 Validating Pro benchmark results..."
 
-          if [ "$RUN_PRO_RAILS" = "true" ]; then
-            if [ ! -f "bench_results/summary.txt" ]; then
-              echo "❌ ERROR: Rails benchmark summary file not found"
-              exit 1
-            fi
-            echo "📊 Rails Benchmark Summary:"
-            column -t -s $'\t' "bench_results/summary.txt"
-            echo ""
+          if [ ! -f "bench_results/summary.txt" ]; then
+            echo "❌ ERROR: Rails benchmark summary file not found"
+            exit 1
           fi
+          echo "📊 Rails Benchmark Summary:"
+          column -t -s $'\t' "bench_results/summary.txt"
+          echo ""
 
           if [ ! -f "bench_results/benchmark.json" ]; then
             echo "❌ ERROR: benchmark JSON file not found"
@@ -468,28 +480,19 @@ jobs:
           echo "Run number: ${{ github.run_number }}"
           echo "Triggered by: ${{ github.actor }}"
           echo "Branch: ${{ github.ref_name }}"
-          echo "Run Pro Rails: ${{ env.RUN_PRO_RAILS || 'false' }}"
 
   benchmark-pro-node-renderer:
     needs: detect-changes
-    # Run on: push to main, workflow_dispatch, or PRs with 'benchmark' / 'benchmark-pro' label.
+    # Run on: push to main, workflow_dispatch, or PRs with 'benchmark', 'benchmark-pro',
+    # or 'benchmark-pro-node-renderer' label.
     # The 'full-ci' label is intentionally excluded; use the dedicated
     # benchmark labels to trigger perf runs on PRs.
     if: |
       contains(fromJSON('["both", "pro_only", "pro_node_renderer_only"]'), github.event.inputs.app_version || 'both') &&
-      (
-        github.event_name == 'workflow_dispatch' ||
-        needs.detect-changes.outputs.run_pro_node_renderer_benchmarks == 'true' ||
-        (
-          github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository &&
-          (
-            contains(github.event.pull_request.labels.*.name, 'benchmark') ||
-            contains(github.event.pull_request.labels.*.name, 'benchmark-pro-node-renderer')
-          )
-        )
-      ) &&
+      needs.detect-changes.outputs.docs_only != 'true' &&
       (
         github.event_name == 'push' ||
+        needs.detect-changes.outputs.run_pro_node_renderer_benchmarks == 'true' ||
         github.event_name == 'workflow_dispatch' ||
         (
           github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository &&

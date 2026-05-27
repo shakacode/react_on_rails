@@ -90,8 +90,13 @@ runs:
         NPROC=$(nproc)
         echo "Available CPUs: $NPROC"
 
-        SERVER_CMD="nice -n -20 taskset -c 1-$((NPROC-1)) bin/prod"
-        BENCH_CMD="nice -n -10 taskset -c 0 ruby"
+        if [ "$NPROC" -le 1 ]; then
+          SERVER_CMD="bin/prod"
+          BENCH_CMD="ruby"
+        else
+          SERVER_CMD="nice -n -20 taskset -c 1-$((NPROC-1)) bin/prod"
+          BENCH_CMD="nice -n -10 taskset -c 0 ruby"
+        fi
 
         echo "SERVER_CMD=$SERVER_CMD" >> "$GITHUB_ENV"
         echo "BENCH_CMD=$BENCH_CMD" >> "$GITHUB_ENV"

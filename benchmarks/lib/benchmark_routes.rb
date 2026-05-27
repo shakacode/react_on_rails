@@ -23,7 +23,10 @@ end
 def benchmark_routes_from_rails_routes(app_dir)
   stdout, stderr, status = Open3.capture3(
     {
-      "RAILS_ENV" => "test",
+      # Match the benchmark server environment so route discovery sees the same
+      # mounted engines and conditional routes as the production process.
+      "RAILS_ENV" => "production",
+      "NODE_ENV" => "production",
       "SECRET_KEY_BASE" => ENV.fetch("SECRET_KEY_BASE", "benchmark-secret-key-base")
     },
     "bundle",

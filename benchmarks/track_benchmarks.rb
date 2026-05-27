@@ -15,13 +15,9 @@ end
 
 SUITE_NAME = env!("BENCHMARK_SUITE_NAME")
 REPORT_MARKER = env!("BENCHER_REPORT_MARKER")
-BENCHER_API_TOKEN = env!("BENCHER_API_TOKEN")
+env!("BENCHER_API_TOKEN")
 BENCHMARK_JSON = ENV.fetch("BENCHMARK_JSON", "bench_results/benchmark.json")
 REPORT_HTML = ENV.fetch("BENCHER_REPORT_HTML", "bench_results/bencher_report.html")
-
-def run_command(*args)
-  system(*args)
-end
 
 def capture_command(*args)
   stdout, stderr, status = Open3.capture3(*args)
@@ -142,9 +138,10 @@ end
 
 def split_report_for_comments
   ENV["BENCHER_REPORT_MARKER"] = REPORT_MARKER
-  return if run_command("ruby", "benchmarks/split_html_report.rb", REPORT_HTML, "bench_results/bencher_chunk")
+  return true if system("ruby", "benchmarks/split_html_report.rb", REPORT_HTML, "bench_results/bencher_chunk")
 
   warn "Failed to split HTML report; skipping PR comments"
+  false
 end
 
 def stale_comment_ids
@@ -161,25 +158,25 @@ end
 def delete_stale_report_comments
   stale_comment_ids.each do |comment_id|
     puts "Deleting stale #{SUITE_NAME} Bencher report comment #{comment_id}"
-    run_command("gh", "api", "-X", "DELETE", "repos/#{ENV.fetch('GITHUB_REPOSITORY')}/issues/comments/#{comment_id}")
+    system("gh", "api", "-X", "DELETE", "repos/#{ENV.fetch('GITHUB_REPOSITORY')}/issues/comments/#{comment_id}")
   end
 end
 
 def post_report_comment_chunks
-  comment_failed = false
-
-  chunk_files = Dir["bench_results/bencher_chunk*.html"].sort_by do |chunk_file|
-    chunk_file[/bencher_chunk(\d+)\.html\z/, 1].to_i
+  chunk_files = Dir["#{CHUNK_PREFIX}*.html"].sort_by do |chunk_file|
+    chunk_file[/bencher_chunk(?:\.(\d+))?\.html\z/, 1].to_i
   end
 
   posted_any = false
   any_failed = false
   chunk_files.each do |chunk_file|
     puts "Posting #{chunk_file} (#{File.size(chunk_file)} bytes)..."
-    next if run_command("gh", "pr", "comment", ENV.fetch("PR_NUMBER"), "--body-file", chunk_file)
-
-    warn "Failed to post #{chunk_file}"
-    comment_failed = true
+    if system("gh", "pr", "comment", ENV.fetch("PR_NUMBER"), "--body-file", chunk_file)
+      posted_any = true
+    else
+      warn "Failed to post #{chunk_file}"
+      any_failed = true
+    end
   end
 
   [posted_any, any_failed]
@@ -209,7 +206,7 @@ def replace_pr_comments
 
     View the full report in the job summary: #{github_run_url}
   MARKDOWN
-  run_command("gh", "pr", "comment", ENV.fetch("PR_NUMBER"), "--body", fallback_body)
+  system("gh", "pr", "comment", ENV.fetch("PR_NUMBER"), "--body", fallback_body)
 end
 
 def formatted_summary(title, path)
@@ -236,7 +233,7 @@ def benchmark_summary
 end
 
 def ensure_regression_label
-  run_command(
+  system(
     "gh", "label", "create", "performance-regression",
     "--description", "Automated: benchmark regression detected on main",
     "--color", "D93F0B",
@@ -271,7 +268,7 @@ def comment_on_regression_issue(issue_number, summary)
     > View the full Bencher report in the workflow run summary or on the [Bencher dashboard](#{BENCHER_URL}).
   MARKDOWN
 
-  run_command("gh", "issue", "comment", issue_number, "--body", body)
+  system("gh", "issue", "comment", issue_number, "--body", body)
 end
 
 def create_regression_issue(summary)
@@ -304,7 +301,7 @@ def create_regression_issue(summary)
     *This issue was created automatically by the benchmark CI workflow.*
   MARKDOWN
 
-  run_command(
+  system(
     "gh", "issue", "create",
     "--title", "Performance Regression Detected on main (#{commit_short})",
     "--label", "performance-regression",
