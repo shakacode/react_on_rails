@@ -1549,6 +1549,17 @@ describe InstallGenerator, type: :generator do
         expect(content).not_to include("reactOnRailsProNodeRenderer")
       end
     end
+
+    # Regression: a new Pro initializer must not embed a fresh random literal
+    # password when the existing Node renderer file already contains its own
+    # literal — Rails and Node would otherwise disagree.
+    it "creates the Pro initializer with env-only password (no literal) so it cannot mismatch the existing renderer" do
+      assert_file "config/initializers/react_on_rails_pro.rb" do |content|
+        expect(content).to include("ReactOnRailsPro.configure")
+        expect(content).to include('config.renderer_password = ENV["RENDERER_PASSWORD"]')
+        expect(content).not_to match(/ENV\.fetch\("RENDERER_PASSWORD",\s*"[^"]+"\)/)
+      end
+    end
   end
 
   context "when Procfile.dev already contains node-renderer" do

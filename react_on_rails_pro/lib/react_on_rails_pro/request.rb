@@ -4,6 +4,7 @@ require "uri"
 require_relative "renderer_http_client"
 require_relative "stream_request"
 require_relative "async_props_emitter"
+require_relative "url_sanitizer"
 
 module ReactOnRailsPro
   class Request # rubocop:disable Metrics/ClassLength
@@ -338,8 +339,9 @@ module ReactOnRailsPro
 
       def create_connection
         url = ReactOnRailsPro.configuration.renderer_url
+        safe_url = ReactOnRailsPro::UrlSanitizer.redact_password(url)
         Rails.logger.info do
-          "[ReactOnRailsPro] Setting up Node Renderer connection to #{url}"
+          "[ReactOnRailsPro] Setting up Node Renderer connection to #{safe_url}"
         end
 
         ReactOnRailsPro::RendererHttpClient.new(
@@ -355,7 +357,7 @@ module ReactOnRailsPro
           renderer_http_pool_timeout = #{ReactOnRailsPro.configuration.renderer_http_pool_timeout}
           renderer_http_pool_warn_timeout = #{ReactOnRailsPro.configuration.renderer_http_pool_warn_timeout}
           renderer_http_keep_alive_timeout = #{ReactOnRailsPro.configuration.renderer_http_keep_alive_timeout}
-          renderer_url = #{url}
+          renderer_url = #{safe_url}
           Be sure to use a url that contains the protocol of http or https.
           Original error is
           #{e}

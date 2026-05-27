@@ -47,24 +47,53 @@ module ReactOnRails
         say set_color("🚀 REACT ON RAILS PRO SETUP", :cyan, :bold)
         say set_color("=" * 80, :cyan)
 
+        # The Rails initializer and Node renderer bootstrap must share the same
+        # password literal. Only mint a fresh random password when BOTH files will
+        # be created — otherwise leave it nil so each template falls back to the
+        # env-only branch, avoiding a literal mismatch with any existing file.
+        if pro_initializer_will_be_created? && node_renderer_will_be_created?
+          @generated_renderer_password = SecureRandom.hex(32)
+        end
+
         initializer_created = create_pro_initializer
-        @generated_renderer_password = nil unless initializer_created
         legacy_renderer_detected = create_node_renderer
         add_pro_to_procfiles unless legacy_renderer_detected
         update_webpack_config_for_pro
 
-        if initializer_created
+        say_renderer_password_setup_summary(initializer_created)
+
+        say set_color("=" * 80, :cyan)
+        say "✅ React on Rails Pro setup complete!", :green
+        say set_color("=" * 80, :cyan)
+      end
+
+      def say_renderer_password_setup_summary(initializer_created)
+        if @generated_renderer_password
           say ""
           say set_color("🔐 A random renderer password was written into your config files.", :yellow, :bold)
           say "   For production, set RENDERER_PASSWORD as an env var instead and"
           say "   remove the literal value from version control."
           say "   See: https://www.shakacode.com/react-on-rails/docs/pro/node-renderer/"
           say ""
+        elsif initializer_created
+          # Initializer was newly created but the Node renderer file already exists;
+          # the new initializer falls back to ENV["RENDERER_PASSWORD"] only so it doesn't
+          # disagree with whatever literal the existing renderer file contains.
+          say ""
+          say set_color("⚠️  Existing Node renderer detected — Rails initializer uses " \
+                        "ENV[\"RENDERER_PASSWORD\"] only.", :yellow, :bold)
+          say "   Set RENDERER_PASSWORD in your environment to match the password in your existing renderer."
+          say ""
         end
+      end
 
-        say set_color("=" * 80, :cyan)
-        say "✅ React on Rails Pro setup complete!", :green
-        say set_color("=" * 80, :cyan)
+      def pro_initializer_will_be_created?
+        !File.exist?(File.join(destination_root, "config/initializers/react_on_rails_pro.rb"))
+      end
+
+      def node_renderer_will_be_created?
+        !File.exist?(File.join(destination_root, "renderer/node-renderer.js")) &&
+          !File.exist?(File.join(destination_root, "client/node-renderer.js"))
       end
 
       # Check if the Pro gem is missing. When the base react_on_rails gem is in
@@ -221,7 +250,9 @@ module ReactOnRails
 
         say "📝 Creating React on Rails Pro initializer...", :yellow
 
-        @generated_renderer_password ||= SecureRandom.hex(32)
+        # @generated_renderer_password is set by setup_pro only when both this
+        # file and the Node renderer bootstrap will be created together; nil here
+        # means the template emits the env-only fallback (no literal password).
         template("templates/pro/base/config/initializers/react_on_rails_pro.rb.tt", initializer_path)
 
         say "✅ Created #{initializer_path}", :green
