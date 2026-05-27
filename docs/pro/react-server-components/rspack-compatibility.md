@@ -98,7 +98,13 @@ To test RSC with Rspack in your project:
    internally calls `require('webpack')`, which loads webpack even in Rspack projects.
    Generated Rspack configs avoid that direct plugin path and use `rscManifestPlugin.js`.
 
-3. **Native Rspack RSC is a future migration path**: Rspack documents native RSC support through
+3. **New client files may need a dev-server restart**: The generated helper scans
+   Shakapacker source paths while the Rspack config is evaluated. Editing an existing
+   `'use client'` file is picked up by normal rebuilds, but adding a brand-new client
+   component while `rspack serve` is already running may require restarting the dev server
+   so the helper can add that file to the bundle entries.
+
+4. **Native Rspack RSC is a future migration path**: Rspack documents native RSC support through
    `@rspack/core`'s `experiments.rsc` APIs and `react-server-dom-rspack`, but that path currently
    targets React 19.1+ and a different manifest/runtime shape. React on Rails Pro's current RSC
    integration stays on the `react-on-rails-rsc` protocol for React 19.0.x compatibility.

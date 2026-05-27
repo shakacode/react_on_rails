@@ -30,15 +30,39 @@ const isExcluded = (pattern, value) => {
   return pattern.test(value);
 };
 
+const skipLeadingJavaScriptComments = (source) => {
+  let remaining = source.trimStart();
+
+  while (remaining.length > 0) {
+    if (remaining.startsWith('//')) {
+      const lineEnd = remaining.indexOf('\n');
+      remaining = lineEnd === -1 ? '' : remaining.slice(lineEnd + 1).trimStart();
+      continue;
+    }
+
+    if (remaining.startsWith('/*')) {
+      const blockEnd = remaining.indexOf('*/');
+      if (blockEnd === -1) return '';
+
+      remaining = remaining.slice(blockEnd + 2).trimStart();
+      continue;
+    }
+
+    return remaining;
+  }
+
+  return remaining;
+};
+
 const hasUseClientDirective = (source) => {
-  let remaining = source.replace(/^\uFEFF/, '').trimStart();
+  let remaining = skipLeadingJavaScriptComments(source.replace(/^\uFEFF/, ''));
 
   while (remaining.length > 0) {
     const match = remaining.match(/^(['"])(.*?)\1\s*;?/);
     if (!match) return false;
     if (match[2] === 'use client') return true;
 
-    remaining = remaining.slice(match[0].length).trimStart();
+    remaining = skipLeadingJavaScriptComments(remaining.slice(match[0].length));
   }
 
   return false;
@@ -154,6 +178,18 @@ const addClientReferencesToEntry = (bundlerConfig, clientReferenceFiles) => {
   bundlerConfig.entry = addRequestsToEntry(entry);
 };
 
+const getModuleChunkFiles = (compilation, module) => {
+  const chunks = compilation.chunkGraph.getModuleChunksIterable(module);
+  if (!chunks) return [];
+
+  const files = new Set();
+  for (const chunk of chunks) {
+    Array.from(chunk.files || []).forEach((file) => files.add(file));
+  }
+
+  return Array.from(files).sort();
+};
+
 class RspackRSCManifestPlugin {
   constructor(options, clientReferenceFiles) {
     if (!options || typeof options.isServer !== 'boolean') {
@@ -187,7 +223,7 @@ class RspackRSCManifestPlugin {
 
           const filePathToModuleMetadata = {};
 
-          const recordModule = (moduleId, module) => {
+          const recordModule = (moduleId, module, chunkModule = module) => {
             if (
               !module.resource ||
               !clientReferenceSet.has(path.resolve(module.resource)) ||
@@ -197,7 +233,7 @@ class RspackRSCManifestPlugin {
 
             filePathToModuleMetadata[url.pathToFileURL(module.resource).href] = {
               id: moduleId,
-              chunks: [],
+              chunks: getModuleChunkFiles(compilation, chunkModule),
               name: '*',
             };
           };
@@ -207,13 +243,16 @@ class RspackRSCManifestPlugin {
             recordModule(moduleId, module);
 
             if (module.modules) {
-              module.modules.forEach((concatenatedModule) => recordModule(moduleId, concatenatedModule));
+              module.modules.forEach((concatenatedModule) =>
+                recordModule(moduleId, concatenatedModule, module),
+              );
             }
           }
 
+          const publicPath = compilation.outputOptions.publicPath;
           const manifest = {
             moduleLoading: {
-              prefix: compilation.outputOptions.publicPath || '',
+              prefix: typeof publicPath === 'string' && publicPath !== 'auto' ? publicPath : '',
               crossOrigin,
             },
             filePathToModuleMetadata,

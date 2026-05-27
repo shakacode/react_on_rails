@@ -36,7 +36,7 @@ module ReactOnRails
       MAX_LAYOUT_NAME_ATTEMPTS = 99
       RSC_MANIFEST_HELPER_IMPORT = "const { addRSCManifestPlugin } = require('./rscManifestPlugin');"
       RSC_WEBPACK_PLUGIN_IMPORT_PATTERN =
-        %r{^const \{ RSCWebpackPlugin \} = require\('react-on-rails-rsc/WebpackPlugin'\);$}
+        %r{^const \{ RSCWebpackPlugin \} = require\((['"])react-on-rails-rsc/WebpackPlugin\1\);$}
 
       # Main entry point for RSC setup.
       # Orchestrates creation of all RSC-related files and configuration.
@@ -401,15 +401,34 @@ module ReactOnRails
         return unless File.exist?(full_path)
 
         content = File.read(full_path)
+        original_content = content
 
         # Skip if the current helper-based RSC manifest wiring is already configured.
         return if content.include?("addRSCManifestPlugin")
 
-        add_or_replace_rsc_manifest_helper_import(
-          config_path,
-          content,
-          %r{(const bundler = config\.assets_bundler.*\n.*require\('@rspack/core'\).*\n.*: require\('webpack'\);)}
-        )
+        fallback_import_pattern = server_bundler_fallback_import_pattern
+
+        if rsc_webpack_plugin_invocation?(content)
+          migrate_rsc_webpack_plugin_to_manifest_helper(
+            config_path,
+            content,
+            bundler_config_name: "serverWebpackConfig",
+            fallback_import_pattern: fallback_import_pattern,
+            is_server: true
+          )
+          return
+        end
+
+        ensure_rsc_client_references_setup(config_path, content, is_server: true, plugin_pending: true)
+        content = File.read(full_path)
+        return unless add_rsc_manifest_helper_import(config_path, content, fallback_import_pattern)
+
+        content = File.read(full_path)
+        server_plugin_anchor = server_limit_chunk_count_plugin_anchor
+        unless content.match?(server_plugin_anchor)
+          rollback_incomplete_rsc_manifest_setup(config_path, original_content)
+          return
+        end
 
         # Add rscBundle parameter to configureServer function
         gsub_file(
@@ -420,24 +439,36 @@ module ReactOnRails
         )
 
         # Add RSC manifest generation before LimitChunkCountPlugin (matches template ordering)
-        rsc_plugin_code = "// Add RSC plugin for server bundle (handles client component references)\n  " \
-                          "// Skip for RSC bundle - it doesn't need manifest generation\n  " \
-                          "if (!rscBundle) {\n    " \
-                          "addRSCManifestPlugin(serverWebpackConfig, { isServer: true });\n  " \
-                          "}"
-        if content.include?("RSCWebpackPlugin")
-          gsub_file(
-            config_path,
-            /serverWebpackConfig\.plugins\.push\(new RSCWebpackPlugin\(\{ isServer: true \}\)\);/,
-            "addRSCManifestPlugin(serverWebpackConfig, { isServer: true });"
-          )
-        else
-          gsub_file(
-            config_path,
-            /(serverWebpackConfig\.plugins\.unshift\(new bundler\.optimize\.LimitChunkCountPlugin.*\);)/,
-            "#{rsc_plugin_code}\n  \\1"
-          )
-        end
+        rsc_plugin_code = server_rsc_manifest_plugin_code(content)
+        gsub_file(
+          config_path,
+          server_plugin_anchor,
+          "#{rsc_plugin_code}\n  \\1"
+        )
+      end
+
+      def server_bundler_fallback_import_pattern
+        Regexp.new(
+          "(const bundler = config\\.assets_bundler.*\\n" \
+          ".*require\\(['\"]@rspack/core['\"]\\).*\\n" \
+          ".*: require\\(['\"]webpack['\"]\\);)"
+        )
+      end
+
+      def server_limit_chunk_count_plugin_anchor
+        Regexp.new(
+          "(serverWebpackConfig\\.plugins\\.unshift\\(" \
+          "new bundler\\.optimize\\.LimitChunkCountPlugin.*\\);)"
+        )
+      end
+
+      def server_rsc_manifest_plugin_code(content)
+        plugin_options = rsc_manifest_plugin_options(content, true)
+        "// Add RSC plugin for server bundle (handles client component references)\n  " \
+          "// Skip for RSC bundle - it doesn't need manifest generation\n  " \
+          "if (!rscBundle) {\n    " \
+          "addRSCManifestPlugin(serverWebpackConfig, #{plugin_options});\n  " \
+          "}"
       end
 
       def update_client_webpack_config_for_rsc
@@ -447,40 +478,136 @@ module ReactOnRails
         return unless File.exist?(full_path)
 
         content = File.read(full_path)
+        original_content = content
 
         # Skip if the current helper-based RSC manifest wiring is already configured.
         return if content.include?("addRSCManifestPlugin")
 
-        add_or_replace_rsc_manifest_helper_import(
-          config_path,
-          content,
-          %r{(const commonWebpackConfig = require\('\./commonWebpackConfig'\);)}
-        )
+        fallback_import_pattern = %r{(const commonWebpackConfig = require\(['"]\./commonWebpackConfig['"]\);)}
+
+        if rsc_webpack_plugin_invocation?(content)
+          migrate_rsc_webpack_plugin_to_manifest_helper(
+            config_path,
+            content,
+            bundler_config_name: "clientConfig",
+            fallback_import_pattern: fallback_import_pattern,
+            is_server: false
+          )
+          return
+        end
+
+        ensure_rsc_client_references_setup(config_path, content, is_server: false, plugin_pending: true)
+        content = File.read(full_path)
+        return unless add_rsc_manifest_helper_import(config_path, content, fallback_import_pattern)
+
+        content = File.read(full_path)
+        unless content.match?(/^( *return clientConfig;)$/)
+          rollback_incomplete_rsc_manifest_setup(config_path, original_content)
+          return
+        end
 
         # Add RSC manifest generation to client config before return statement
         rsc_plugin_code = "  // Add React Server Components plugin for client bundle\n  " \
-                          "addRSCManifestPlugin(clientConfig, { isServer: false });"
-        if content.include?("RSCWebpackPlugin")
-          gsub_file(
-            config_path,
-            /clientConfig\.plugins\.push\(new RSCWebpackPlugin\(\{ isServer: false \}\)\);/,
-            "addRSCManifestPlugin(clientConfig, { isServer: false });"
-          )
-        else
-          gsub_file(
-            config_path,
-            /^( *return clientConfig;)$/,
-            "#{rsc_plugin_code}\n\n\\1"
-          )
+                          "addRSCManifestPlugin(clientConfig, #{rsc_manifest_plugin_options(content, false)});"
+        gsub_file(
+          config_path,
+          /^( *return clientConfig;)$/,
+          "#{rsc_plugin_code}\n\n\\1"
+        )
+      end
+
+      def migrate_rsc_webpack_plugin_to_manifest_helper(config_path, content, bundler_config_name:,
+                                                        fallback_import_pattern:, is_server:)
+        update_existing_rsc_webpack_config(config_path, content, is_server: is_server)
+        content = File.read(File.join(destination_root, config_path))
+        return unless rsc_manifest_plugin_sections_ready?(content, is_server: is_server)
+        return unless replace_rsc_webpack_plugin_pushes_with_helper(config_path, content, bundler_config_name,
+                                                                    is_server: is_server)
+
+        content = File.read(File.join(destination_root, config_path))
+        replace_rsc_webpack_plugin_import_with_helper(config_path, content, fallback_import_pattern)
+      end
+
+      def rsc_manifest_plugin_sections_ready?(content, is_server:)
+        sections = rsc_plugin_option_sections(content, is_server: is_server)
+        return false if sections.empty?
+
+        sections.all? do |section|
+          rsc_plugin_body_has_top_level_key?(section.fetch(:body), "clientReferences")
         end
       end
 
-      def add_or_replace_rsc_manifest_helper_import(config_path, content, fallback_import_pattern)
-        if content.include?("RSCWebpackPlugin")
+      def replace_rsc_webpack_plugin_pushes_with_helper(config_path, content, bundler_config_name, is_server:)
+        replacements = rsc_plugin_option_sections(content, is_server: is_server).filter_map do |section|
+          replacement_range = rsc_plugin_push_replacement_range(content, section, bundler_config_name)
+          next unless replacement_range
+
+          options_body = normalize_rsc_manifest_helper_options_body(section.fetch(:body))
+          [replacement_range, "addRSCManifestPlugin(#{bundler_config_name}, {#{options_body}});"]
+        end
+        return false if replacements.empty?
+
+        replacements.reverse_each do |range, replacement|
+          content[range] = replacement
+        end
+        write_existing_rsc_config(config_path, content, action: :rewrite)
+      end
+
+      def rsc_plugin_push_replacement_range(content, section, bundler_config_name)
+        prefix = content[0...section.fetch(:call_start)]
+        prefix_pattern = /#{Regexp.escape(bundler_config_name)}\.plugins\.push\(\s*\z/m
+        prefix_match = prefix.match(prefix_pattern)
+        return unless prefix_match
+
+        suffix = content[section.fetch(:call_end)..]
+        suffix_match = suffix.match(/\A\s*,?\s*\);/)
+        return unless suffix_match
+
+        prefix_match.begin(0)...(section.fetch(:call_end) + suffix_match.end(0))
+      end
+
+      def normalize_rsc_manifest_helper_options_body(body)
+        return body unless body.include?("\n")
+
+        body.gsub(/^  /, "")
+      end
+
+      def replace_rsc_webpack_plugin_import_with_helper(config_path, content, fallback_import_pattern)
+        if content.match?(RSC_WEBPACK_PLUGIN_IMPORT_PATTERN)
           gsub_file(config_path, RSC_WEBPACK_PLUGIN_IMPORT_PATTERN, RSC_MANIFEST_HELPER_IMPORT)
         else
-          gsub_file(config_path, fallback_import_pattern, "\\1\n#{RSC_MANIFEST_HELPER_IMPORT}")
+          add_rsc_manifest_helper_import(config_path, content, fallback_import_pattern)
         end
+      end
+
+      def add_rsc_manifest_helper_import(config_path, content, fallback_import_pattern)
+        return true if content.include?(RSC_MANIFEST_HELPER_IMPORT)
+
+        if content.match?(RSC_WEBPACK_PLUGIN_IMPORT_PATTERN)
+          gsub_file(config_path, RSC_WEBPACK_PLUGIN_IMPORT_PATTERN, RSC_MANIFEST_HELPER_IMPORT)
+          return true
+        end
+        return false unless content.match?(fallback_import_pattern)
+
+        gsub_file(config_path, fallback_import_pattern, "\\1\n#{RSC_MANIFEST_HELPER_IMPORT}")
+        true
+      end
+
+      def rsc_manifest_plugin_options(content, is_server)
+        options = "isServer: #{is_server}"
+        options += ", clientReferences: rscClientReferences" if scoped_rsc_client_references_defined?(content)
+        "{ #{options} }"
+      end
+
+      def rollback_incomplete_rsc_manifest_setup(config_path, original_content)
+        return if options[:pretend] || options[:skip]
+
+        say_status(:revert, config_path, :yellow)
+        File.write(File.join(destination_root, config_path), original_content)
+        GeneratorMessages.add_warning(
+          "Reverted partial RSC manifest helper setup in #{config_path}; please add " \
+          "addRSCManifestPlugin and clientReferences manually."
+        )
       end
 
       def verify_rsc_webpack_transforms

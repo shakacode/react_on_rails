@@ -194,7 +194,7 @@ module ReactOnRails
           )
         end
 
-        def ensure_rsc_client_references_setup(config_path, content, is_server:)
+        def ensure_rsc_client_references_setup(config_path, content, is_server:, plugin_pending: false)
           return true if scoped_rsc_client_references_defined?(content)
 
           if rsc_client_references_defined?(content)
@@ -203,13 +203,14 @@ module ReactOnRails
           end
 
           unless rsc_client_references_setup_anchor?(content, is_server: is_server)
-            warn_missing_rsc_client_references_anchor(config_path)
+            warn_missing_rsc_client_references_anchor(config_path, plugin_pending: plugin_pending)
             return false
           end
 
           existing_imports_content = content_through_rsc_setup_anchor(content, is_server: is_server)
           return false if rsc_setup_blocked_by_later_imports?(config_path, content, existing_imports_content,
-                                                              is_server: is_server)
+                                                              is_server: is_server,
+                                                              plugin_pending: plugin_pending)
 
           return false unless add_rsc_client_references_setup(config_path, content, existing_imports_content,
                                                               is_server: is_server)
@@ -319,6 +320,17 @@ module ReactOnRails
           rsc_plugin_option_sections_partition(content, is_server: is_server).fetch(:safe)
         end
 
+        def rsc_webpack_plugin_invocation?(content)
+          search_from = 0
+          while (match = content.match(RSC_PLUGIN_INVOCATION_REGEX, search_from))
+            return true if js_code_position?(content, match.begin(0))
+
+            search_from = match.end(0)
+          end
+
+          false
+        end
+
         # Returns the matching plugin sections plus a count of `RSCWebpackPlugin(` invocations
         # whose options block could not be parsed cleanly. An invocation is treated as
         # unparseable when the depth scanner cannot find a matching `}` (over-count caused by an
@@ -352,7 +364,8 @@ module ReactOnRails
               next
             end
 
-            unless rsc_plugin_options_followed_by_close_paren?(content, options_end)
+            call_end = rsc_plugin_call_end_index(content, options_end)
+            unless call_end
               unparseable += 1
               search_from = options_end + 1
               next
@@ -360,7 +373,13 @@ module ReactOnRails
 
             body = content[(options_start + 1)...options_end]
             if rsc_plugin_is_server_match?(body, is_server: is_server)
-              safe << { body: body, body_start: options_start + 1, body_end: options_end }
+              safe << {
+                body: body,
+                body_start: options_start + 1,
+                body_end: options_end,
+                call_start: call_start,
+                call_end: call_end
+              }
             end
             search_from = options_end + 1
           end
@@ -378,6 +397,10 @@ module ReactOnRails
         # simply be returned as a non-`)` and the section would be marked unparseable, which is
         # the safe outcome.
         def rsc_plugin_options_followed_by_close_paren?(content, options_end)
+          !!rsc_plugin_call_end_index(content, options_end)
+        end
+
+        def rsc_plugin_call_end_index(content, options_end)
           state = nil
           escaped = false
           index = options_end + 1
@@ -399,8 +422,8 @@ module ReactOnRails
             end
 
             unless char.match?(/\s/)
-              return true if char == ")"
-              return false if comma_seen || char != ","
+              return index + 1 if char == ")"
+              return nil if comma_seen || char != ","
 
               comma_seen = true
             end
@@ -408,7 +431,7 @@ module ReactOnRails
             index += 1
           end
 
-          false
+          nil
         end
 
         # Skips whitespace, JS line/block comments, and leading string literals so callers see the
@@ -1138,11 +1161,13 @@ module ReactOnRails
 
           manual_action =
             if plugin_pending
-              "RSCWebpackPlugin will be added without scoped clientReferences; please add clientReferences manually."
+              "addRSCManifestPlugin will be added without scoped clientReferences; " \
+                "please add clientReferences manually."
             elsif content.include?("RSCWebpackPlugin")
               "Please add clientReferences manually."
             else
-              "RSCWebpackPlugin was not added to #{config_path}; please add the plugin and clientReferences manually."
+              "addRSCManifestPlugin was not added to #{config_path}; " \
+                "please add the plugin and clientReferences manually."
             end
 
           GeneratorMessages.add_warning(
@@ -1274,7 +1299,7 @@ module ReactOnRails
 
         def manual_rsc_plugin_action(config_path, plugin_pending:)
           if plugin_pending
-            "RSCWebpackPlugin was not added to #{config_path}; please add the plugin and clientReferences manually."
+            "addRSCManifestPlugin was not added to #{config_path}; please add the plugin and clientReferences manually."
           else
             "Please add clientReferences manually."
           end
@@ -1289,7 +1314,7 @@ module ReactOnRails
 
         def warn_missing_rsc_plugin_target(config_path, is_server:)
           GeneratorMessages.add_warning(
-            "Could not update RSCWebpackPlugin in #{config_path}: no plugin options with isServer: #{is_server} " \
+            "Could not update addRSCManifestPlugin in #{config_path}: no plugin options with isServer: #{is_server} " \
             "could be rewritten. Please add clientReferences manually. Dynamic or computed plugin options cannot be " \
             "verified automatically, so verify this file manually after adding clientReferences."
           )
