@@ -6,6 +6,7 @@ require "pathname"
 require "set"
 
 require "react_on_rails_pro/error"
+require "react_on_rails/url_sanitizer"
 
 module ReactOnRailsPro
   # Shared helpers for staging the Node Renderer bundle cache. Used by both
@@ -113,7 +114,8 @@ module ReactOnRailsPro
     def each_stageable_asset(assets, rsc_required_paths, action_description)
       assets.each do |asset_path|
         if http_url?(asset_path)
-          warn "[ReactOnRailsPro] Skipping URL-backed asset #{asset_path} while " \
+          safe_asset_path = ReactOnRails::UrlSanitizer.redact_password(asset_path)
+          warn "[ReactOnRailsPro] Skipping URL-backed asset #{safe_asset_path} while " \
                "#{action_description} the renderer cache; the dev server is serving " \
                "this asset, so the renderer will fetch it on first request."
           next

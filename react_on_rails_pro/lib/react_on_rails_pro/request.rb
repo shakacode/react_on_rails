@@ -298,9 +298,13 @@ module ReactOnRailsPro
         return form unless assets_to_copy.present?
 
         assets_to_copy.each_with_index do |asset_path, idx|
-          Rails.logger.info { "[ReactOnRailsPro] Uploading asset #{asset_path}" }
+          # URL-backed dev-server assets may embed userinfo (https://:pw@…).
+          # Sanitize every interpolation of asset_path so the password never
+          # reaches a log line.
+          safe_asset_path = ReactOnRails::UrlSanitizer.redact_password(asset_path)
+          Rails.logger.info { "[ReactOnRailsPro] Uploading asset #{safe_asset_path}" }
           unless http_url?(asset_path) || File.exist?(asset_path)
-            warn "Asset not found #{asset_path}"
+            warn "Asset not found #{safe_asset_path}"
             next
           end
 
@@ -314,7 +318,7 @@ module ReactOnRailsPro
             }
           rescue StandardError => e
             safe_error = ReactOnRails::UrlSanitizer.redact_password(e.to_s)
-            warn "[ReactOnRailsPro] Error uploading asset #{asset_path}: #{safe_error}"
+            warn "[ReactOnRailsPro] Error uploading asset #{safe_asset_path}: #{safe_error}"
           end
         end
 
