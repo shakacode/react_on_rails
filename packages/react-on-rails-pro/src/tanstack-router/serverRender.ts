@@ -12,6 +12,14 @@ import { normalizeSearch } from './utils.ts';
 
 /**
  * Builds a React element tree with RouterProvider and optional AppWrapper.
+ *
+ * No <Suspense> boundary is inserted here. The client hydration tree renders
+ * RouterProvider directly without a wrapping <Suspense>, so introducing one
+ * on the server would emit `<!--$-->`/`<!--/$-->` markers (React 19's
+ * `renderToString` emits these for every Suspense boundary, even
+ * non-suspended ones) and break hydration parity. If RouterProvider suspends
+ * during SSR, React's own `renderToString` throws synchronously — that is
+ * already a loud failure mode and does not need a custom guard.
  */
 function buildAppElement(
   router: TanStackRouter,
