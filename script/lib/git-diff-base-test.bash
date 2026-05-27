@@ -250,10 +250,21 @@ test_run_test_counts_non_final_assertion_failure() {
 # ---------------------------------------------------------------------------
 
 # Build a minimal local "remote" + clone pair inside the current tempdir.
-# After this returns, cwd is the clone repo with the named branches and refs.
+# After this returns, cwd is the clone repo with branch refs needed by the
+# requested fixture mode.
+#
+# Arguments:
+#   $1 clone_kind     "full" (default) or "shallow"
+#   $2 depth          shallow-clone depth (default 2; ignored for full clones)
+#   $3 main_extra     extra commits to add to main AFTER feature branches off
+#                     (default 0). Use a large value to force the deepen loop
+#                     to exhaust its budget and exercise the --unshallow path.
+#                     In shallow clones with main_extra, origin/main is left for
+#                     git_diff_base_resolve to fetch depth-limited.
 setup_repo_fixture() {
   local clone_kind="${1:-full}"
   local depth="${2:-2}"
+  local main_extra="${3:-0}"
 
   git -c init.defaultBranch=main init --bare remote.git >/dev/null
   git -c init.defaultBranch=main init seed >/dev/null
@@ -270,6 +281,11 @@ setup_repo_fixture() {
     git commit --allow-empty -m "feat-1" >/dev/null
     git commit --allow-empty -m "feat-2" >/dev/null
     git checkout main >/dev/null 2>&1
+    if [ "$main_extra" -gt 0 ]; then
+      for ((i = 1; i <= main_extra; i++)); do
+        git commit --allow-empty -m "main-extra-$i" >/dev/null
+      done
+    fi
     git remote add origin "$PWD/../remote.git"
     git push origin main feature >/dev/null 2>&1
   )
@@ -285,6 +301,15 @@ setup_repo_fixture() {
   cd clone || return 1
   git config user.email "t@example.com"
   git config user.name "test"
+
+  if [ "$clone_kind" = "shallow" ] && [ "$main_extra" -gt 0 ]; then
+    # Leave origin/main for git_diff_base_resolve's own initial depth-limited
+    # fetch. Fully prefetching it here would make fallback tests depend on
+    # whether this Git version re-shallows an already complete remote-tracking
+    # ref when a later `git fetch --depth=N` runs.
+    return 0
+  fi
+
   # Clones default to fetching only the checked-out branch, so make sure the
   # base branch is also tracked locally for the deepen path tests. Warn on
   # failure so downstream test failures trace back to the setup step rather
@@ -329,8 +354,66 @@ test_sha_ref_classifies_full_length_sha() {
   setup_repo_fixture full
   local sha
   sha="$(git rev-parse HEAD)"
+  # Sanity check: default git installs produce 40-char SHA-1 hashes. If a future
+  # default flips to SHA-256, this test will fail with an explicit diagnostic —
+  # the 64-char classifier path is covered independently by
+  # test_sha_ref_classifies_64_char_hex.
+  if [ "${#sha}" -ne 40 ]; then
+    fail "expected 40-char SHA from git rev-parse HEAD, got ${#sha}-char '$sha' -- if git now defaults to SHA-256, update this test; the 64-char classifier path is covered by test_sha_ref_classifies_64_char_hex"
+    return 1
+  fi
   if ! git_diff_base_sha_ref "$sha"; then
     fail "$sha should classify as a SHA"
+    return 1
+  fi
+}
+
+test_sha_ref_classifies_64_char_hex() {
+  # The classifier accepts 64-char SHA-256 hashes without local verification
+  # (same policy as 40-char SHA-1). No repo state is required: the
+  # verify_ref call is short-circuited for 40/64-char inputs, and the two
+  # branch-name rev-parse checks that follow fail gracefully when there is no
+  # .git in the current directory, so neither match fires and the function
+  # returns 0. Cwd is still the per-test tmpdir, which has no .git.
+  if git rev-parse --git-dir >/dev/null 2>&1; then
+    fail "test must run outside a git repo (no setup_repo_fixture)"
+    return 1
+  fi
+
+  local hex="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  if [ "${#hex}" -ne 64 ]; then
+    fail "test fixture broken: expected 64-char hex, got ${#hex}"
+    return 1
+  fi
+  if ! git_diff_base_sha_ref "$hex"; then
+    fail "$hex should classify as a 64-char SHA"
+    return 1
+  fi
+}
+
+test_sha_ref_classifies_short_local_sha() {
+  # Short hex strings classify as SHAs only when they resolve locally. This
+  # exercises the verify_ref branch of the classifier, which protects against
+  # treating arbitrary short hex strings as commit refs.
+  setup_repo_fixture full
+  local short_sha
+  short_sha="$(git rev-parse --short=7 HEAD)"
+  if [ "${#short_sha}" -ne 7 ]; then
+    fail "expected 7-char short SHA, got ${#short_sha}-char '$short_sha'"
+    return 1
+  fi
+  if ! git_diff_base_sha_ref "$short_sha"; then
+    fail "$short_sha should classify as a short local SHA"
+    return 1
+  fi
+}
+
+test_sha_ref_rejects_short_unknown_hex() {
+  # A short hex string that does not resolve to any local object must NOT
+  # classify as a SHA. Using all zeros guarantees no real commit collision.
+  setup_repo_fixture full
+  if git_diff_base_sha_ref "0000000"; then
+    fail "unknown short hex string should not classify as a SHA"
     return 1
   fi
 }
@@ -435,6 +518,58 @@ test_resolve_lenient_continues_after_initial_fetch_failure() {
   fi
 }
 
+test_resolve_unshallow_fallback_finds_merge_base() {
+  # Force the deepen budget to exhaust without finding the merge base, so the
+  # --unshallow fallback runs. The fixture adds 10 extra commits on main after
+  # feature branches off (merge base = c5, main tip = main-extra-10).
+  # git_diff_base_resolve uses GIT_DIFF_BASE_FETCH_DEPTH=2:
+  #   - initial fetch (--depth=2): main-extra-9, main-extra-10
+  #   - one deepen round (--deepen=2): adds main-extra-7, main-extra-8
+  #   - total visible from main: main-extra-7..main-extra-10 (4 commits)
+  # c5 is at depth 11 from the main tip (main-extra-10 → main-extra-9 → … → main-extra-1 → c5),
+  # so it is still not reachable; the --unshallow fallback then fetches all of
+  # main and exposes the merge base.
+  # setup_repo_fixture intentionally leaves origin/main unfetched for this
+  # main_extra shallow clone so the test does not depend on git fetch --depth
+  # re-shallowing an already complete remote-tracking ref.
+  setup_repo_fixture shallow 1 10
+  local out err_file
+  err_file="$(mktemp resolve-err.XXXXXX)"
+  if ! out="$(GIT_DIFF_BASE_FETCH_DEPTH=2 GIT_DIFF_BASE_MAX_ATTEMPTS=1 \
+      git_diff_base_resolve "origin/main" "HEAD" strict 2>"$err_file")"; then
+    fail "resolve should succeed after unshallow; stderr was: $(cat "$err_file")"
+    return 1
+  fi
+  if ! git cat-file -e "$out^{commit}" 2>/dev/null; then
+    fail "unshallow path returned non-commit '$out'"
+    return 1
+  fi
+  local stderr_text
+  stderr_text="$(cat "$err_file")"
+  assert_contains "$stderr_text" "falling back to --unshallow" "unshallow warning"
+}
+
+test_resolve_logs_deepen_progress() {
+  # Operators need a visible breadcrumb per deepen iteration so a slow CI run
+  # is not opaque between the initial fetch and the eventual unshallow. This
+  # checks each deepen depth in the 2 -> 4 -> 8 sequence and verifies the
+  # fallback still fires after the deepen budget is exhausted.
+  setup_repo_fixture shallow 1 20
+  local err_file
+  err_file="$(mktemp resolve-err.XXXXXX)"
+  if ! GIT_DIFF_BASE_FETCH_DEPTH=2 GIT_DIFF_BASE_MAX_ATTEMPTS=3 \
+      git_diff_base_resolve "origin/main" "HEAD" strict >/dev/null 2>"$err_file"; then
+    fail "resolve failed; stderr was: $(cat "$err_file")"
+    return 1
+  fi
+  local stderr_text
+  stderr_text="$(cat "$err_file")"
+  assert_contains "$stderr_text" "Deepening shallow history (attempt 1/3, depth 2)" "first deepen progress line"
+  assert_contains "$stderr_text" "Deepening shallow history (attempt 2/3, depth 4)" "second deepen progress line"
+  assert_contains "$stderr_text" "Deepening shallow history (attempt 3/3, depth 8)" "third deepen progress line"
+  assert_contains "$stderr_text" "falling back to --unshallow" "unshallow fallback fires after budget exhausted"
+}
+
 test_resolve_cross_repo_sha_hint_appears() {
   # The hint only fires from the bottom of git_diff_base_resolve after the
   # deepen+unshallow loop has run. To exercise that path, the clone must be
@@ -483,6 +618,9 @@ ALL_TESTS=(
   test_is_shallow_repository_detects_full_clone
   test_is_shallow_repository_detects_shallow_clone
   test_sha_ref_classifies_full_length_sha
+  test_sha_ref_classifies_64_char_hex
+  test_sha_ref_classifies_short_local_sha
+  test_sha_ref_rejects_short_unknown_hex
   test_sha_ref_rejects_existing_branch_name
   test_sha_ref_rejects_non_hex_strings
   test_resolve_full_clone_happy_path
@@ -490,6 +628,8 @@ ALL_TESTS=(
   test_resolve_shallow_deepens_to_find_merge_base
   test_resolve_full_clone_missing_base_ref_errors
   test_resolve_lenient_continues_after_initial_fetch_failure
+  test_resolve_unshallow_fallback_finds_merge_base
+  test_resolve_logs_deepen_progress
   test_resolve_cross_repo_sha_hint_appears
 )
 

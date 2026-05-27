@@ -2,6 +2,10 @@
 # CI Changes Detector
 # Analyzes git changes to determine which CI jobs need to run
 # Usage: script/ci-changes-detector [base-ref]
+#
+# Diff-base logic lives in script/lib/git-diff-base. Run its self-contained
+# tests with: bash script/lib/git-diff-base-test.bash
+# CI invokes the same harness via .github/workflows/git-diff-base-tests.yml.
 
 set -euo pipefail
 
