@@ -216,6 +216,31 @@ For small, focused PRs (roughly 5 files changed or fewer and one clear purpose):
 - Add files to the `docs/` root — OSS docs go in `docs/oss/` subdirectories (`getting-started/`, `core-concepts/`, `building-features/`, `configuration/`, `api-reference/`, `deployment/`, `migrating/`, `upgrading/`, `misc/`); Pro docs go in `docs/pro/`
 - Force push to `main` or `master`
 
+## Main branch health
+
+The `main` branch must stay green. CI failures on `main` block releases:
+`rake release` refuses to publish over a red `main` unless you explicitly
+override (via `RELEASE_CI_STATUS_OVERRIDE=true` or the 4th positional arg).
+Stable releases require every check to pass; pre-releases require only the
+GitHub-branch-protection-required checks.
+
+Claude Code sessions get `main`'s CI status injected at session start (and
+again before `gh pr create` / pushing to `main`) via
+`.claude/hooks/main-ci-status.sh`. Read it.
+
+If `main` is red:
+
+1. **Decide whether the failure is related to your work.** If yes, your job
+   is to fix it (or revert) before adding new commits on top.
+2. **If unrelated, decide whether your work is safe to merge on top.** PRs
+   that add risk on top of a known-broken `main` should usually wait.
+3. **If you're the one merging a PR**, check `main` post-merge within 30
+   minutes (see `.claude/docs/main-health-monitoring.md`).
+
+**Never silently override the release CI gate.** If you set
+`RELEASE_CI_STATUS_OVERRIDE=true`, document in the PR / release notes why
+the red checks are unrelated to the release.
+
 ## Key Concept: File Suffixes vs. RSC Directive
 
 React on Rails has two **independent** systems that both use "client" and "server" terminology. Do not confuse them.

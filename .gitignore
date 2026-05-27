@@ -87,6 +87,7 @@ ssr-generated
 # Claude Code local settings
 .claude/settings.local.json
 .claude/napkin.md
+.claude/.main-ci-status.cache*
 .Codex/napkin.md
 
 # AI assistant internal files
