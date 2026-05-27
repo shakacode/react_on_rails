@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require "set"
-require_relative "url_sanitizer"
+require "react_on_rails/url_sanitizer"
 
 module ReactOnRailsPro
   def self.configure
@@ -302,9 +302,12 @@ module ReactOnRailsPro
     def validate_url
       URI(renderer_url)
     rescue URI::InvalidURIError => e
-      safe_url = ReactOnRailsPro::UrlSanitizer.redact_password(renderer_url)
+      # URI::InvalidURIError#message embeds the raw URL ("bad URI (is not URI?): ...")
+      # so we have to sanitize it too — sanitizing the bare `renderer_url` is not enough.
+      safe_url = ReactOnRails::UrlSanitizer.redact_password(renderer_url)
+      safe_error_message = ReactOnRails::UrlSanitizer.redact_password(e.message)
       message = "Unparseable ReactOnRailsPro.config.renderer_url #{safe_url} provided.\n" \
-                "#{e.message}"
+                "#{safe_error_message}"
       raise ReactOnRailsPro::Error, message
     end
 

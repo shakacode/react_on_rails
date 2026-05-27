@@ -2,9 +2,9 @@
 
 require "uri"
 require_relative "renderer_http_client"
+require "react_on_rails/url_sanitizer"
 require_relative "stream_request"
 require_relative "async_props_emitter"
-require_relative "url_sanitizer"
 
 module ReactOnRailsPro
   class Request # rubocop:disable Metrics/ClassLength
@@ -339,7 +339,7 @@ module ReactOnRailsPro
 
       def create_connection
         url = ReactOnRailsPro.configuration.renderer_url
-        safe_url = ReactOnRailsPro::UrlSanitizer.redact_password(url)
+        safe_url = ReactOnRails::UrlSanitizer.redact_password(url)
         Rails.logger.info do
           "[ReactOnRailsPro] Setting up Node Renderer connection to #{safe_url}"
         end

@@ -49,8 +49,11 @@ module ReactOnRails
 
         # The Rails initializer and Node renderer bootstrap must share the same
         # password literal. Only mint a fresh random password when BOTH files will
-        # be created — otherwise leave it nil so each template falls back to the
-        # env-only branch, avoiding a literal mismatch with any existing file.
+        # be created — otherwise nil so each template falls back to the env-only
+        # branch, avoiding a literal mismatch with any existing file.
+        # Always reassign so a stale value from a prior invocation on the same
+        # instance can't leak into a later partial-install run.
+        @generated_renderer_password = nil
         if pro_initializer_will_be_created? && node_renderer_will_be_created?
           @generated_renderer_password = SecureRandom.hex(32)
         end
