@@ -94,7 +94,8 @@ module ReactOnRails
       "scripts/deploy.sh",
       ".circleci/config.yml",
       ".gitlab-ci.yml",
-      "bitbucket-pipelines.yml"
+      "bitbucket-pipelines.yml",
+      "Jenkinsfile"
     ].freeze
     # Bounded glob allowlist for deploy manifests that live in a known directory
     # but use per-environment or per-workflow filenames. Each pattern matches
