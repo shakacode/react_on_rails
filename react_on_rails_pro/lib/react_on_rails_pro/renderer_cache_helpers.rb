@@ -131,8 +131,9 @@ module ReactOnRailsPro
 
         unless File.file?(expanded)
           if rsc_required_paths.include?(expanded)
-            raise ReactOnRailsPro::Error, "Required RSC asset not found or not a file: #{asset_path}. " \
-                                          "Build your bundles before #{action_description} the renderer cache."
+            raise ReactOnRailsPro::Error,
+                  "Required RSC asset not found or not a file: #{asset_label(asset_path)}. " \
+                  "Build your bundles before #{action_description} the renderer cache."
           end
           warn "[ReactOnRailsPro] Asset not found #{asset_label(asset_path)} (missing or not a file)"
           next
@@ -154,14 +155,22 @@ module ReactOnRailsPro
     end
 
     def asset_label(asset_path)
-      asset_path.to_s.empty? ? "<blank>" : asset_path
+      return "<blank>" if asset_path.to_s.empty?
+
+      # Sanitize so log messages can't surface a credential embedded in a
+      # URL-backed asset path (e.g. https://:password@host/...). For
+      # filesystem paths this is a no-op.
+      ReactOnRails::UrlSanitizer.redact_password(asset_path.to_s)
     end
 
     # Mirrors `Request#http_url?`: detects dev-server-served assets returned
     # by `ReactOnRails::PackerUtils.asset_uri_from_packer` so the staging
     # path can skip them instead of treating them as filesystem paths.
+    # Case-insensitive because `HTTPS://...` is still an HTTP URL — and
+    # treating it as a filesystem path would leak the URL into the "asset
+    # not found" warning.
     def http_url?(path)
-      path.to_s.match?(%r{\Ahttps?://})
+      path.to_s.match?(%r{\Ahttps?://}i)
     end
 
     # Must expand against Rails.root so that callers who expand per-asset paths

@@ -314,7 +314,7 @@ module ReactOnRailsPro
             form["assetsToCopy#{idx}"] = {
               body: get_form_body_for_file(asset_path),
               content_type: content_type,
-              filename: File.basename(asset_path)
+              filename: filename_for_asset(asset_path)
             }
           rescue StandardError => e
             safe_error = ReactOnRails::UrlSanitizer.redact_password(e.to_s)
@@ -394,7 +394,27 @@ module ReactOnRailsPro
       end
 
       def http_url?(path)
-        path.to_s.match?(%r{https?://})
+        path.to_s.match?(%r{https?://}i)
+      end
+
+      # File.basename treats the whole string after the last `/` as the file
+      # name, so a bare URL like "http://:pw@host:3035" yields ":pw@host:3035"
+      # — which the node renderer would then log as the asset filename, leaking
+      # the credential. For URL-backed assets, extract the path component via
+      # URI.parse so the filename is purely the asset's path basename. If the
+      # URL has no usable path, fall back to a generic placeholder rather than
+      # risk emitting a credential-bearing basename.
+      def filename_for_asset(asset_path)
+        return File.basename(asset_path) unless http_url?(asset_path)
+
+        begin
+          uri = URI.parse(asset_path.to_s)
+          path = uri.path
+          return File.basename(path) if path && !path.empty? && path != "/"
+        rescue URI::InvalidURIError
+          # fall through to placeholder
+        end
+        "asset"
       end
     end
   end
