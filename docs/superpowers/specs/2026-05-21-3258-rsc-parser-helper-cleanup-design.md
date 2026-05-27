@@ -77,7 +77,7 @@ but a reader who only inspects the name would expect that case to return
 
 Only one call site exists in `rsc_setup.rb`:
 
-```
+```text
 react_on_rails/lib/generators/react_on_rails/rsc_setup.rb:576
 ```
 
@@ -133,11 +133,10 @@ is needed.
 ### Current state
 
 ```ruby
-def add_rsc_client_references_setup(config_path, content, is_server:)
-  return if scoped_rsc_client_references_defined?(content)
-  return if rsc_client_references_defined?(content)
+def add_rsc_client_references_setup(config_path, content, existing_imports_content, is_server:)
+  return false if scoped_rsc_client_references_defined?(content)
+  return false if rsc_client_references_defined?(content)
 
-  existing_imports_content = content_before_rsc_setup_anchor(content, is_server: is_server)
   replace_rsc_client_references_setup_anchor(config_path, content, is_server: is_server) do |anchor|
     [
       anchor,
@@ -162,7 +161,7 @@ def ensure_rsc_client_references_setup(config_path, content, is_server:)
     return false
   end
   ...
-  add_rsc_client_references_setup(config_path, content, is_server: is_server)
+  add_rsc_client_references_setup(config_path, content, existing_imports_content, is_server: is_server)
   ...
 end
 ```

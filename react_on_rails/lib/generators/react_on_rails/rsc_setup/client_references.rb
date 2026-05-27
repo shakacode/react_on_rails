@@ -441,12 +441,15 @@ module ReactOnRails
         end
 
         # Expects `content[open_index] == "{"`; callers pass the options-object opening brace.
-        # See `advance_js_scan_state` for the scanner's supported surface — in short, simple
-        # `${...}` interpolations inside template literals stay inside the string state, while
-        # nested template literals and regex literals fall outside the scanner. When the depth
-        # counter is confused by either, the section is caught downstream via
-        # `rsc_plugin_options_followed_by_close_paren?` and marked unparseable so the migration
-        # warns the user instead of corrupting the rewrite.
+        # This lightweight scanner supports strings (including template literals for simple
+        # `${...}` interpolation) plus JS line/block comments. It does not classify regex
+        # literals, so braces inside constructs such as `/a{2}/` or `/[{]/` can be counted as
+        # object braces. Nested template literals (for example, `outer ${`inner`}`) are also
+        # unsupported: the inner backtick falsely closes the outer string state, exposing later
+        # braces to the depth counter. `rsc_plugin_options_without_comments` shares the same
+        # supported surface, and callers detect corrupted sections via
+        # `rsc_plugin_options_followed_by_close_paren?` so the migration warns instead of
+        # producing a corrupt rewrite.
         def matching_js_closing_brace(content, open_index)
           depth = 0
           index = open_index
