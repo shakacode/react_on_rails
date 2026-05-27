@@ -29,7 +29,7 @@ import { getConfig } from '../shared/configBuilder.js';
 import { subSpan, type TracingContext } from '../shared/tracing.js';
 import { buildExecutionContext, ExecutionContext, VMContextNotFoundError } from './vm.js';
 
-async function sumUploadedBytes(assets: Asset[]): Promise<number> {
+export async function sumUploadedBytes(assets: Asset[]): Promise<number> {
   const sizes = await Promise.all(
     assets.map(async (asset) => {
       try {
