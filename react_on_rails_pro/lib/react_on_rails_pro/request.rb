@@ -123,7 +123,8 @@ module ReactOnRailsPro
         # validates existence, but these provide clearer context for the rake task user.
         server_bundle_path = ReactOnRails::Utils.server_bundle_js_file_path
         unless File.exist?(server_bundle_path)
-          raise ReactOnRailsPro::Error, "Server bundle not found at #{server_bundle_path}. " \
+          safe_path = ReactOnRails::UrlSanitizer.redact_password(server_bundle_path.to_s)
+          raise ReactOnRailsPro::Error, "Server bundle not found at #{safe_path}. " \
                                         "Please build your bundles before uploading assets."
         end
 
@@ -135,7 +136,8 @@ module ReactOnRailsPro
         if ReactOnRailsPro.configuration.enable_rsc_support
           rsc_bundle_path = ReactOnRailsPro::Utils.rsc_bundle_js_file_path
           unless File.exist?(rsc_bundle_path)
-            raise ReactOnRailsPro::Error, "RSC bundle not found at #{rsc_bundle_path}. " \
+            safe_rsc_path = ReactOnRails::UrlSanitizer.redact_password(rsc_bundle_path.to_s)
+            raise ReactOnRailsPro::Error, "RSC bundle not found at #{safe_rsc_path}. " \
                                           "Please build your bundles before uploading assets."
           end
           target_bundles << pool.rsc_bundle_hash
@@ -278,7 +280,10 @@ module ReactOnRailsPro
       end
 
       def add_bundle_to_form(form, bundle_path:, bundle_file_name:, bundle_hash:, check_bundle:)
-        raise ReactOnRailsPro::Error, "Bundle not found #{bundle_path}" if check_bundle && !File.exist?(bundle_path)
+        if check_bundle && !File.exist?(bundle_path)
+          safe_bundle_path = ReactOnRails::UrlSanitizer.redact_password(bundle_path.to_s)
+          raise ReactOnRailsPro::Error, "Bundle not found #{safe_bundle_path}"
+        end
 
         form["bundle_#{bundle_hash}"] = {
           body: get_form_body_for_file(bundle_path),

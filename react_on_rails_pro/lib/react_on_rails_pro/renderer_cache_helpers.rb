@@ -193,8 +193,9 @@ module ReactOnRailsPro
     def validate_bundle_exists!(path, action_description)
       return if File.file?(path)
 
+      safe_path = ReactOnRails::UrlSanitizer.redact_password(path.to_s)
       raise ReactOnRailsPro::Error,
-            "Bundle not found or not a file at #{path}. " \
+            "Bundle not found or not a file at #{safe_path}. " \
             "Please build your bundles before #{action_description} the renderer cache."
     end
 

@@ -72,7 +72,10 @@ module ReactOnRails
     end
 
     def self.server_bundle_path_is_http?
-      server_bundle_js_file_path =~ %r{https?://}
+      # Case-insensitive so "HTTPS://..." is correctly identified as a URL
+      # (otherwise it falls through the filesystem-path branch and any error
+      # message can leak userinfo embedded in the URL).
+      server_bundle_js_file_path =~ %r{https?://}i
     end
 
     def self.bundle_js_file_path(bundle_name)
