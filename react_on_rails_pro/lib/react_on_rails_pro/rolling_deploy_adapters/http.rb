@@ -175,13 +175,14 @@ module ReactOnRailsPro
             )
             return nil
           end
-          # `response.body` buffers the full tarball (up to DEFAULT_MAX_SIZE)
-          # into a single Ruby String, and `Tarball.extract` then re-reads it
-          # through a `StringIO`. For v1 this is acceptable: build CI fetches
-          # are infrequent and the 200 MB ceiling fits in heap. A future
-          # follow-up should stream the body into a Tempfile (mirroring the
-          # controller's `compose_to_tempfile`) to reduce build-CI heap
-          # pressure for very large bundles.
+          # `response.body` buffers the full compressed tarball into a single
+          # Ruby String before `Tarball.extract` can enforce DEFAULT_MAX_SIZE on
+          # uncompressed bytes. For v1 this is acceptable: build CI fetches are
+          # infrequent, the 200 MB uncompressed ceiling fits in heap, and the
+          # read timeout bounds slow responses. A future follow-up should stream
+          # the body into a Tempfile with its own compressed-byte cap (mirroring
+          # the controller's `compose_to_tempfile`) so an oversized wire payload
+          # cannot fill build-CI heap before extraction aborts.
           response.body
         end
 

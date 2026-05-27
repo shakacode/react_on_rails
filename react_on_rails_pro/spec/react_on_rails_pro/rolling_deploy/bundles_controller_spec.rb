@@ -68,6 +68,23 @@ describe ReactOnRailsPro::RollingDeploy::BundlesController do
     end
   end
 
+  describe "#set_no_store_headers" do
+    it "sets no-store and content-sniffing guard headers" do
+      controller = described_class.new
+      headers = {}
+
+      allow(controller).to receive(:response).and_return(instance_double(ActionDispatch::Response, headers: headers))
+
+      controller.send(:set_no_store_headers)
+
+      expect(headers).to eq(
+        "Cache-Control" => "no-store",
+        "Pragma" => "no-cache",
+        "X-Content-Type-Options" => "nosniff"
+      )
+    end
+  end
+
   describe "#tarball_entries" do
     let(:controller) { described_class.new }
 

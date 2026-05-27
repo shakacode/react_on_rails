@@ -159,6 +159,8 @@ module ReactOnRailsPro
 
       def set_no_store_headers
         response.headers["Cache-Control"] = "no-store"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["X-Content-Type-Options"] = "nosniff"
       end
 
       # Wraps bundle_sources to absorb the "bundle file not present yet" case
