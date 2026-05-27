@@ -73,7 +73,6 @@ env:
   VEGETA_VERSION: '12.13.0'
   # Determine which apps/benchmarks to run (default is 'both' for all triggers)
   RUN_CORE: ${{ contains(fromJSON('["both", "core_only"]'), github.event.inputs.app_version || 'both') && 'true' || '' }}
-  RUN_PRO: ${{ (github.event.inputs.app_version || 'both') != 'core_only' && 'true' || '' }}
   RUN_PRO_RAILS: ${{ contains(fromJSON('["both", "pro_only", "pro_rails_only"]'), github.event.inputs.app_version || 'both') && 'true' || '' }}
   RUN_PRO_NODE_RENDERER: ${{ contains(fromJSON('["both", "pro_only", "pro_node_renderer_only"]'), github.event.inputs.app_version || 'both') && 'true' || '' }}
   # Benchmark parameters (defaults in bench.rb unless overridden here for CI)
@@ -114,7 +113,7 @@ jobs:
           docs-only: ${{ steps.detect.outputs.docs_only }}
           previous-sha: ${{ github.event.before }}
 
-  benchmark:
+  benchmark-core:
     needs: detect-changes
     # Run on: push to main, workflow_dispatch, or PRs with 'benchmark' label.
     # The 'full-ci' label is intentionally excluded — it controls test workflows,
@@ -133,16 +132,12 @@ jobs:
           github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository &&
           contains(github.event.pull_request.labels.*.name, 'benchmark')
         )
-      )
+      ) && contains(fromJSON('["both", "core_only"]'), github.event.inputs.app_version || 'both')
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      issues: write
-      pull-requests: write
-      checks: write
     env:
       SECRET_KEY_BASE: 'dummy-secret-key-for-ci-testing-not-used-in-production'
-      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
 
     steps:
       # ============================================
@@ -155,38 +150,10 @@ jobs:
       # STEP 2: INSTALL BENCHMARKING TOOLS
       # ============================================
 
-      - name: Install Bencher CLI
-        # Pinned: step 7a's alert-detection heuristic greps stderr for
-        # "Alert[s]" / "threshold violation" / "boundary violation". Those strings
-        # are not a documented API contract, so upgrading the CLI requires
-        # re-verifying that the expected phrases still appear in alert output.
-        # Expected stderr phrases at v0.6.2: "🚨 N Alerts", "Alert detected".
-        uses: bencherdev/bencher@v0.6.2
-
       - name: Add tools directory to PATH
         run: |
           mkdir -p ~/bin
-          echo "$HOME/bin" >> $GITHUB_PATH
-
-      - name: Cache Vegeta binary
-        id: cache-vegeta
-        if: env.RUN_PRO
-        uses: actions/cache@v4
-        with:
-          path: ~/bin/vegeta
-          key: vegeta-${{ runner.os }}-${{ runner.arch }}-${{ env.VEGETA_VERSION }}
-
-      - name: Install Vegeta
-        if: env.RUN_PRO && steps.cache-vegeta.outputs.cache-hit != 'true'
-        run: |
-          echo "📦 Installing Vegeta v${VEGETA_VERSION}"
-
-          # Download and extract vegeta binary
-          wget -q https://github.com/tsenart/vegeta/releases/download/v${VEGETA_VERSION}/vegeta_${VEGETA_VERSION}_linux_amd64.tar.gz
-          tar -xzf vegeta_${VEGETA_VERSION}_linux_amd64.tar.gz
-
-          # Store in cache directory
-          mv vegeta ~/bin/
+          echo "$HOME/bin" >> "$GITHUB_PATH"
 
       - name: Setup k6
         uses: grafana/setup-k6-action@v1
@@ -203,7 +170,7 @@ jobs:
           ruby-version: ${{ env.RUBY_VERSION }}
 
       - name: Get gem home directory
-        run: echo "GEM_HOME_PATH=$(gem env home)" >> $GITHUB_ENV
+        run: echo "GEM_HOME_PATH=$(gem env home)" >> "$GITHUB_ENV"
 
       - name: Cache foreman gem
         id: cache-foreman
@@ -254,13 +221,13 @@ jobs:
           SERVER_CMD="nice -n -20 taskset -c 1-$((NPROC-1)) bin/prod"
           BENCH_CMD="nice -n -10 taskset -c 0 ruby"
 
-          echo "SERVER_CMD=$SERVER_CMD" >> $GITHUB_ENV
-          echo "BENCH_CMD=$BENCH_CMD" >> $GITHUB_ENV
+          echo "SERVER_CMD=$SERVER_CMD" >> "$GITHUB_ENV"
+          echo "BENCH_CMD=$BENCH_CMD" >> "$GITHUB_ENV"
 
           # Set Puma workers to match available server CPUs (only if not explicitly set)
           if [ -z "$WEB_CONCURRENCY" ]; then
             WEB_CONCURRENCY=$((NPROC-1))
-            echo "WEB_CONCURRENCY=$WEB_CONCURRENCY" >> $GITHUB_ENV
+            echo "WEB_CONCURRENCY=$WEB_CONCURRENCY" >> "$GITHUB_ENV"
             echo "WEB_CONCURRENCY (auto): $WEB_CONCURRENCY"
           else
             echo "WEB_CONCURRENCY (from input): $WEB_CONCURRENCY"
@@ -276,14 +243,12 @@ jobs:
         run: pnpm run build
 
       - name: Install Ruby Gems for Core dummy app
-        if: env.RUN_CORE
         uses: ./.github/actions/setup-bundle
         with:
           working-directory: react_on_rails/spec/dummy
           ruby-version: ${{ env.RUBY_VERSION }}
 
       - name: Prepare Core production assets
-        if: env.RUN_CORE
         run: |
           set -e  # Exit on any error
           echo "🔨 Building production assets..."
@@ -297,7 +262,6 @@ jobs:
           echo "✅ Production assets built successfully"
 
       - name: Start Core production server
-        if: env.RUN_CORE
         run: |
           set -e  # Exit on any error
           echo "🚀 Starting production server..."
@@ -325,7 +289,6 @@ jobs:
       # ============================================
 
       - name: Execute Core benchmark suite
-        if: env.RUN_CORE
         timeout-minutes: 120
         run: |
           set -e  # Exit on any error
@@ -339,7 +302,6 @@ jobs:
           echo "✅ Benchmark suite completed successfully"
 
       - name: Validate Core benchmark results
-        if: env.RUN_CORE
         run: |
           set -e
           echo "🔍 Validating benchmark results..."
@@ -359,53 +321,187 @@ jobs:
 
       - name: Upload Core benchmark results
         uses: actions/upload-artifact@v4
-        if: env.RUN_CORE && always()
+        if: always()
         with:
           name: benchmark-core-results-${{ github.run_number }}
           path: bench_results/
           retention-days: 30
           if-no-files-found: warn
 
-      - name: Stop Core production server
-        # RUN_PRO because we only need to stop it to run the Pro server
-        if: env.RUN_CORE && env.RUN_PRO && always()
+      - name: Core benchmark summary
+        if: always()
         run: |
-          echo "🛑 Stopping Core production server..."
-          # Kill all server-related processes (safe in isolated CI environment)
-          pkill -9 -f "ruby|node|foreman|overmind|puma" || true
+          echo "📋 Core Benchmark Job Summary"
+          echo "===================================="
+          echo "Status: ${{ job.status }}"
+          echo "Run number: ${{ github.run_number }}"
+          echo "Triggered by: ${{ github.actor }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Run Core: ${{ env.RUN_CORE || 'false' }}"
 
-          # Wait for port 3001 to be free
-          echo "⏳ Waiting for port 3001 to be free..."
-          for _ in {1..10}; do
-            if ! lsof -ti:3001 > /dev/null 2>&1; then
-              echo "✅ Port 3001 is now free"
-              exit 0
-            fi
-            sleep 1
-          done
+  benchmark-pro:
+    needs: detect-changes
+    # Run on: push to main, workflow_dispatch, or PRs with 'benchmark' label.
+    # Skip docs-only pushes to main to avoid wasting CI resources on non-code changes.
+    if: |
+      !(
+        github.event_name == 'push' &&
+        github.ref == 'refs/heads/main' &&
+        needs.detect-changes.outputs.docs_only == 'true'
+      ) && (
+        github.event_name == 'push' ||
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository &&
+          contains(github.event.pull_request.labels.*.name, 'benchmark')
+        )
+      ) && (github.event.inputs.app_version || 'both') != 'core_only'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      SECRET_KEY_BASE: 'dummy-secret-key-for-ci-testing-not-used-in-production'
+      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
 
-          echo "❌ ERROR: Port 3001 is still in use after 10 seconds"
-          echo "Processes using port 3001:"
-          lsof -i:3001 || true
-          exit 1
+    steps:
+      # ============================================
+      # STEP 1: CHECKOUT CODE
+      # ============================================
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ============================================
+      # STEP 2: INSTALL BENCHMARKING TOOLS
+      # ============================================
+
+      - name: Add tools directory to PATH
+        run: |
+          mkdir -p ~/bin
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+
+      - name: Cache Vegeta binary
+        id: cache-vegeta
+        if: env.RUN_PRO_NODE_RENDERER
+        uses: actions/cache@v4
+        with:
+          path: ~/bin/vegeta
+          key: vegeta-${{ runner.os }}-${{ runner.arch }}-${{ env.VEGETA_VERSION }}
+
+      - name: Install Vegeta
+        if: env.RUN_PRO_NODE_RENDERER && steps.cache-vegeta.outputs.cache-hit != 'true'
+        run: |
+          echo "📦 Installing Vegeta v${VEGETA_VERSION}"
+
+          # Download and extract vegeta binary
+          VEGETA_ARCHIVE="vegeta_${VEGETA_VERSION}_linux_amd64.tar.gz"
+          wget -q "https://github.com/tsenart/vegeta/releases/download/v${VEGETA_VERSION}/${VEGETA_ARCHIVE}"
+          tar -xzf "$VEGETA_ARCHIVE"
+
+          # Store in cache directory
+          mv vegeta "$HOME/bin/"
+
+      - name: Setup k6
+        if: env.RUN_PRO_RAILS
+        uses: grafana/setup-k6-action@v1
+        with:
+          k6-version: ${{ env.K6_VERSION }}
+
+      # ============================================
+      # STEP 3: START APPLICATION SERVER
+      # ============================================
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
+
+      - name: Get gem home directory
+        run: echo "GEM_HOME_PATH=$(gem env home)" >> "$GITHUB_ENV"
+
+      - name: Cache foreman gem
+        id: cache-foreman
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.GEM_HOME_PATH }}
+          key: foreman-gem-${{ runner.os }}-ruby-${{ env.RUBY_VERSION }}
+
+      - name: Install foreman
+        if: steps.cache-foreman.outputs.cache-hit != 'true'
+        run: gem install foreman
+
+      - name: Fix dependency for libyaml-dev
+        run: sudo apt install libyaml-dev -y
+
+      # Follow https://github.com/pnpm/action-setup?tab=readme-ov-file#use-cache-to-reduce-installation-time
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          cache: true
+          cache_dependency_path: '**/pnpm-lock.yaml'
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Print system information
+        run: |
+          echo "Linux release: "; cat /etc/issue
+          echo "Current user: "; whoami
+          echo "Current directory: "; pwd
+          echo "Ruby version: "; ruby -v
+          echo "Node version: "; node -v
+          echo "Pnpm version: "; pnpm --version
+          echo "Bundler version: "; bundle --version
+
+      - name: Configure CPU pinning and process priority
+        run: |
+          # CPU pinning: server gets CPUs 1-(nproc-1), benchmark script gets CPU 0
+          # This avoids contention and improves consistency on GitHub Actions runners
+          NPROC=$(nproc)
+          echo "Available CPUs: $NPROC"
+
+          # Server: high priority (-20), pinned to CPUs 1+
+          # Benchmark: elevated priority (-10), pinned to CPU 0
+          SERVER_CMD="nice -n -20 taskset -c 1-$((NPROC-1)) bin/prod"
+          BENCH_CMD="nice -n -10 taskset -c 0 ruby"
+
+          echo "SERVER_CMD=$SERVER_CMD" >> "$GITHUB_ENV"
+          echo "BENCH_CMD=$BENCH_CMD" >> "$GITHUB_ENV"
+
+          # Set Puma workers to match available server CPUs (only if not explicitly set)
+          if [ -z "$WEB_CONCURRENCY" ]; then
+            WEB_CONCURRENCY=$((NPROC-1))
+            echo "WEB_CONCURRENCY=$WEB_CONCURRENCY" >> "$GITHUB_ENV"
+            echo "WEB_CONCURRENCY (auto): $WEB_CONCURRENCY"
+          else
+            echo "WEB_CONCURRENCY (from input): $WEB_CONCURRENCY"
+          fi
+
+          echo "SERVER_CMD: $SERVER_CMD"
+          echo "BENCH_CMD: $BENCH_CMD"
+
+      - name: Install Node modules with pnpm
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace packages
+        run: pnpm run build
 
       # ============================================
       # STEP 5: SETUP PRO APPLICATION SERVER
       # ============================================
 
       - name: Install Ruby Gems for Pro dummy app
-        if: env.RUN_PRO
         uses: ./.github/actions/setup-bundle
         with:
           working-directory: react_on_rails_pro/spec/dummy
           ruby-version: ${{ env.RUBY_VERSION }}
 
       - name: Generate file-system based entrypoints for Pro
-        if: env.RUN_PRO
         run: cd react_on_rails_pro/spec/dummy && bundle exec rake react_on_rails:generate_packs
 
       - name: Prepare Pro production assets
-        if: env.RUN_PRO
         run: |
           set -e
           echo "🔨 Building Pro production assets..."
@@ -419,7 +515,6 @@ jobs:
           echo "✅ Production assets built successfully"
 
       - name: Start Pro production server
-        if: env.RUN_PRO
         run: |
           set -e
           echo "🚀 Starting Pro production server..."
@@ -475,7 +570,6 @@ jobs:
           echo "✅ Node Renderer benchmark suite completed successfully"
 
       - name: Validate Pro benchmark results
-        if: env.RUN_PRO
         run: |
           set -e
           echo "🔍 Validating benchmark results..."
@@ -507,12 +601,110 @@ jobs:
 
       - name: Upload Pro benchmark results
         uses: actions/upload-artifact@v4
-        if: env.RUN_PRO && always()
+        if: always()
         with:
           name: benchmark-pro-results-${{ github.run_number }}
           path: bench_results/
           retention-days: 30
           if-no-files-found: warn
+
+      - name: Pro benchmark summary
+        if: always()
+        run: |
+          echo "📋 Pro Benchmark Job Summary"
+          echo "===================================="
+          echo "Status: ${{ job.status }}"
+          echo "Run number: ${{ github.run_number }}"
+          echo "Triggered by: ${{ github.actor }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Run Pro Rails: ${{ env.RUN_PRO_RAILS || 'false' }}"
+          echo "Run Pro Node Renderer: ${{ env.RUN_PRO_NODE_RENDERER || 'false' }}"
+
+  track-benchmarks:
+    needs:
+      - detect-changes
+      - benchmark-core
+      - benchmark-pro
+    if: |
+      always() &&
+      !cancelled() &&
+      (needs['benchmark-core'].result == 'success' || needs['benchmark-core'].result == 'skipped') &&
+      (needs['benchmark-pro'].result == 'success' || needs['benchmark-pro'].result == 'skipped') &&
+      (needs['benchmark-core'].result == 'success' || needs['benchmark-pro'].result == 'success')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+      checks: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
+
+      - name: Install Bencher CLI
+        # Pinned: step 7a's alert-detection heuristic greps stderr for
+        # "Alert[s]" / "threshold violation" / "boundary violation". Those strings
+        # are not a documented API contract, so upgrading the CLI requires
+        # re-verifying that the expected phrases still appear in alert output.
+        # Expected stderr phrases at v0.6.2: "🚨 N Alerts", "Alert detected".
+        uses: bencherdev/bencher@v0.6.2
+
+      - name: Download benchmark artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: benchmark-*-results-${{ github.run_number }}
+          path: bench_artifacts
+
+      - name: Merge benchmark artifacts
+        run: |
+          set -e
+          rm -rf bench_results
+          mkdir -p bench_results
+
+          ruby <<'RUBY'
+          require "json"
+          require "fileutils"
+
+          merged = {}
+          benchmark_json_files = Dir.glob("bench_artifacts/**/benchmark.json").sort
+          abort "No benchmark.json files found in downloaded artifacts" if benchmark_json_files.empty?
+
+          benchmark_json_files.each do |path|
+            data = JSON.parse(File.read(path))
+            duplicate_keys = merged.keys & data.keys
+            unless duplicate_keys.empty?
+              abort "Duplicate benchmark names while merging #{path}: #{duplicate_keys.join(', ')}"
+            end
+
+            merged.merge!(data)
+          end
+
+          File.write("bench_results/benchmark.json", JSON.pretty_generate(merged))
+          puts "Merged #{merged.length} benchmarks into bench_results/benchmark.json"
+
+          Dir.glob("bench_artifacts/*").sort.each do |artifact_dir|
+            next unless File.directory?(artifact_dir)
+
+            artifact_name = File.basename(artifact_dir)
+            prefix = artifact_name
+                     .sub(/^benchmark-/, "")
+                     .sub(/-results-\d+\z/, "")
+
+            Dir.glob(File.join(artifact_dir, "*summary.txt")).sort.each do |summary_path|
+              destination = File.join("bench_results", "#{prefix}_#{File.basename(summary_path)}")
+              FileUtils.cp(summary_path, destination)
+              puts "Copied #{summary_path} to #{destination}"
+            end
+          end
+          RUBY
+
+          echo "Generated merged benchmark files:"
+          ls -lh bench_results/
 
       # ============================================
       # STEP 7: STORE BENCHMARK DATA
@@ -639,6 +831,7 @@ jobs:
           # when the pinned hash isn't in its DB. A single combined pattern
           # avoids false-positive matches across unrelated lines.
           if [ $BENCHER_EXIT_CODE -ne 0 ] && grep -q "Head Version.*not found" "$BENCHER_STDERR" && ! grep -qiE "alert|threshold violation|boundary violation" "$BENCHER_STDERR"; then
+            # shellcheck disable=SC2001
             RETRY_ARGS=$(echo "$START_POINT_ARGS" | sed 's/--start-point-hash [^ ]*//')
             if [ "$RETRY_ARGS" != "$START_POINT_ARGS" ]; then
               echo ""
@@ -748,10 +941,13 @@ jobs:
 
           # Build the benchmark summary snippet (defensive: don't let column failure block alerting)
           SUMMARY=""
-          if [ -f bench_results/summary.txt ]; then
-            FORMATTED=$(column -t -s $'\t' "bench_results/summary.txt" 2>/dev/null) || FORMATTED=$(cat "bench_results/summary.txt")
-            SUMMARY=$(printf '\n### Benchmark Summary\n\n```\n%s\n```' "$FORMATTED")
-          fi
+          for SUMMARY_FILE in bench_results/*summary.txt; do
+            [ -f "$SUMMARY_FILE" ] || continue
+
+            TITLE=$(basename "$SUMMARY_FILE" .txt | tr '_' ' ')
+            FORMATTED=$(column -t -s $'\t' "$SUMMARY_FILE" 2>/dev/null) || FORMATTED=$(cat "$SUMMARY_FILE")
+            SUMMARY="${SUMMARY}"$'\n### '"$TITLE"$'\n\n```\n'"$FORMATTED"$'\n```'
+          done
 
           if [ -n "$EXISTING_ISSUE" ]; then
             echo "Open regression issue already exists: #${EXISTING_ISSUE} — adding comment"
