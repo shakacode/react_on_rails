@@ -295,8 +295,9 @@ export async function handleRenderRequest({
 
     // If gem has posted updated bundle:
     if (providedNewBundles && providedNewBundles.length > 0) {
-      // Stat upload sources before they're moved by handleNewBundlesProvided so
-      // we report the bytes that actually crossed the wire.
+      // Stat upload sources before they're moved by handleNewBundlesProvided.
+      // bytes.total reflects source file sizes at upload time, not compressed
+      // wire bytes.
       const bytesTotal = await sumUploadedBytes([
         ...providedNewBundles.map((b) => b.bundle),
         ...(assetsToCopy ?? []),
