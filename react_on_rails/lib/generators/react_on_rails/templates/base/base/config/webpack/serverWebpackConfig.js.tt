@@ -7,7 +7,14 @@ const bundler = config.assets_bundler === 'rspack'
   ? require('@rspack/core')
   : require('webpack');
 <% if use_rsc? -%>
+const { resolve } = require('path');
 const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+const rscClientReferences = {
+  directory: resolve(config.source_path),
+  recursive: true,
+  include: /\.(js|mjs|cjs|ts|mts|cts|jsx|tsx)$/,
+};
 <% end -%>
 
 <% if use_pro? -%>
@@ -78,7 +85,9 @@ const configureServer = () => {
   // Add RSC plugin for server bundle (handles client component references)
   // Skip for RSC bundle - it doesn't need RSCWebpackPlugin
   if (!rscBundle) {
-    serverWebpackConfig.plugins.push(new RSCWebpackPlugin({ isServer: true }));
+    serverWebpackConfig.plugins.push(
+      new RSCWebpackPlugin({ isServer: true, clientReferences: rscClientReferences }),
+    );
   }
 <% end -%>
   serverWebpackConfig.plugins.unshift(new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));

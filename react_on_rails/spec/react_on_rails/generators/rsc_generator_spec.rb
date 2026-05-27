@@ -100,6 +100,10 @@ describe RscGenerator, type: :generator do
         assert_file "config/webpack/serverWebpackConfig.js" do |content|
           expect(content).to include("RSCWebpackPlugin")
           expect(content).to include("react-on-rails-rsc/WebpackPlugin")
+          expect(content).to include("clientReferences: rscClientReferences")
+          expect(content).to include("directory: resolve(config.source_path)")
+          expect(content).to include('include: /\.(js|mjs|cjs|ts|mts|cts|jsx|tsx)$/')
+          expect(content).to include("isServer: true")
         end
       end
 
@@ -113,7 +117,10 @@ describe RscGenerator, type: :generator do
         assert_file "config/webpack/clientWebpackConfig.js" do |content|
           expect(content).to include("RSCWebpackPlugin")
           expect(content).to include("react-on-rails-rsc/WebpackPlugin")
-          expect(content).to include("new RSCWebpackPlugin({ isServer: false })")
+          expect(content).to include("clientReferences: rscClientReferences")
+          expect(content).to include("directory: resolve(config.source_path)")
+          expect(content).to include('include: /\.(js|mjs|cjs|ts|mts|cts|jsx|tsx)$/')
+          expect(content).to include("isServer: false")
         end
       end
 
@@ -123,6 +130,2775 @@ describe RscGenerator, type: :generator do
           expect(content).to include("RSC_BUNDLE_ONLY")
           expect(content).to include("rscConfig")
         end
+      end
+    end
+  end
+
+  context "when the client webpack config already imports Shakapacker config" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        "const { config } = require('shakapacker');\n#{base_client_webpack_content}"
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "does not inject a duplicate config import" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content.scan("const { config } = require('shakapacker');").length).to eq(1)
+        expect(content).to include("clientReferences: rscClientReferences")
+        expect(content).to include("directory: resolve(config.source_path)")
+        expect(content).to include("isServer: false")
+      end
+    end
+  end
+
+  context "when the client webpack config already imports Shakapacker config across multiple lines" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const {
+            config,
+          } = require('shakapacker');
+          #{base_client_webpack_content}
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "does not inject a duplicate config import" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content.scan("require('shakapacker')").length).to eq(1)
+        expect(content).to include("clientReferences: rscClientReferences")
+        expect(content).to include("directory: resolve(config.source_path)")
+        expect(content).to include("isServer: false")
+      end
+    end
+  end
+
+  context "when the client webpack config uses a double-quoted common config import" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        base_client_webpack_content.sub("require('./commonWebpackConfig')", 'require("./commonWebpackConfig")')
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "adds RSCWebpackPlugin to clientWebpackConfig" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content).to include("RSCWebpackPlugin")
+        expect(content).to include("clientReferences: rscClientReferences")
+        expect(content).to include("directory: resolve(config.source_path)")
+        expect(content).to include("isServer: false")
+      end
+    end
+  end
+
+  context "when the client webpack config cannot inject the scoped helper before adding the plugin" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const resolve = require('custom-resolver');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            delete clientConfig.entry['server-bundle'];
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "adds the plugin without scoped client references and warns that the helper was not added" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content).to include("RSCWebpackPlugin")
+        expect(content).to include("new RSCWebpackPlugin({ isServer: false })")
+        expect(content).not_to include("rscClientReferences")
+      end
+
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("RSCWebpackPlugin will be added without scoped clientReferences")
+    end
+  end
+
+  context "when a fresh client webpack config uses an unsupported import anchor" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const commonWebpackConfig = require(`./commonWebpackConfig`);
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            delete clientConfig.entry['server-bundle'];
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "leaves the plugin out and explicitly tells users the plugin was not added" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content).not_to include("RSCWebpackPlugin")
+        expect(content).not_to include("rscClientReferences")
+      end
+
+      messages = GeneratorMessages.messages.join("\n")
+      expect(messages).to include("backtick template-literal require paths")
+      expect(messages).to include("RSCWebpackPlugin was not added to config/webpack/clientWebpackConfig.js")
+    end
+  end
+
+  context "when a fresh client webpack config misses the plugin insertion point" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            delete clientConfig.entry['server-bundle'];
+
+            finalizeClientConfig(clientConfig);
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "rolls back the prepared imports and scoped helper" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content).not_to include("RSCWebpackPlugin")
+        expect(content).not_to include("rscClientReferences")
+        expect(content).to include("finalizeClientConfig(clientConfig);")
+      end
+
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("Reverted partial RSC setup; please add RSCWebpackPlugin and clientReferences manually")
+    end
+  end
+
+  context "when the client webpack config already imports RSCWebpackPlugin but has no active plugin call" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            delete clientConfig.entry['server-bundle'];
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "reuses the existing import rather than re-declaring it" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content.scan(%r{require\(['"]react-on-rails-rsc/WebpackPlugin['"]\)}).length).to eq(1)
+        expect(content.scan(/new\s+RSCWebpackPlugin\s*\(/).length).to eq(1)
+      end
+    end
+  end
+
+  context "when an existing client webpack config invokes RSCWebpackPlugin with extra spacing" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            delete clientConfig.entry['server-bundle'];
+
+            clientConfig.plugins.push(
+              new RSCWebpackPlugin ({ isServer: false })
+            );
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "detects the existing plugin and routes to the update path rather than duplicating the import" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content.scan(%r{require\(['"]react-on-rails-rsc/WebpackPlugin['"]\)}).length).to eq(1)
+        expect(content.scan(/new\s+RSCWebpackPlugin\s*\(/).length).to eq(1)
+      end
+    end
+
+    it "injects scoped clientReferences into the spaced plugin call" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content).to include("clientReferences: rscClientReferences")
+        expect(content).to include("const rscClientReferences")
+        expect(content).to include("directory: resolve(config.source_path)")
+      end
+
+      expect(GeneratorMessages.messages.join("\n"))
+        .not_to include("no plugin options with isServer: false could be rewritten")
+    end
+  end
+
+  context "when a fresh client webpack config has a commented-out RSCWebpackPlugin and no insertion point" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+
+          // Old setup: clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            delete clientConfig.entry['server-bundle'];
+
+            finalizeClientConfig(clientConfig);
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "still rolls back the prepared imports rather than trusting the commented-out reference" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content).to include("// Old setup: clientConfig.plugins.push(new RSCWebpackPlugin")
+        expect(content).not_to include("rscClientReferences")
+        expect(content).not_to include("require('react-on-rails-rsc/WebpackPlugin')")
+        expect(content).to include("finalizeClientConfig(clientConfig);")
+      end
+
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("Reverted partial RSC setup; please add RSCWebpackPlugin and clientReferences manually")
+    end
+  end
+
+  context "when the server webpack config uses double-quoted bundler imports" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/serverWebpackConfig.js",
+        pro_server_webpack_content
+          .sub("require('@rspack/core')", 'require("@rspack/core")')
+          .sub("require('webpack')", 'require("webpack")')
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "adds RSCWebpackPlugin to serverWebpackConfig" do
+      assert_file "config/webpack/serverWebpackConfig.js" do |content|
+        expect(content).to include("RSCWebpackPlugin")
+        expect(content).to include("clientReferences: rscClientReferences")
+        expect(content).to include("directory: resolve(config.source_path)")
+        expect(content).to include("isServer: true")
+      end
+    end
+  end
+
+  context "when a fresh server webpack config misses the plugin insertion point" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/serverWebpackConfig.js",
+        pro_server_webpack_content.sub(
+          "  serverWebpackConfig.plugins.unshift(new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));\n\n",
+          ""
+        )
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "rolls back the prepared imports, scoped helper, and rscBundle parameter" do
+      assert_file "config/webpack/serverWebpackConfig.js" do |content|
+        expect(content).not_to include("RSCWebpackPlugin")
+        expect(content).not_to include("rscClientReferences")
+        expect(content).not_to include("rscBundle")
+        expect(content).to include("const configureServer = () => {")
+      end
+
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("Reverted partial RSC setup; please add RSCWebpackPlugin and clientReferences manually")
+    end
+  end
+
+  context "when the server webpack config already imports path resolve" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/serverWebpackConfig.js",
+        "const { resolve } = require('path');\n#{pro_server_webpack_content}"
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "does not inject a duplicate resolve import" do
+      assert_file "config/webpack/serverWebpackConfig.js" do |content|
+        expect(content.scan("const { resolve } = require('path');").length).to eq(1)
+        expect(content).to include("clientReferences: rscClientReferences")
+        expect(content).to include("directory: resolve(config.source_path)")
+        expect(content).to include("isServer: true")
+      end
+    end
+  end
+
+  context "when existing RSC webpack configs lack scoped client references" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      limit_chunk_plugin = "serverWebpackConfig.plugins.unshift(" \
+                           "new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));"
+      old_rsc_plugin = <<~JS.chomp
+        if (!rscBundle) {
+          serverWebpackConfig.plugins.push(new RSCWebpackPlugin({ chunkName: 'server', isServer: true }));
+        }
+
+        #{limit_chunk_plugin}
+      JS
+      simulate_existing_file(
+        "config/webpack/serverWebpackConfig.js",
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          #{pro_server_webpack_content
+            .sub('const configureServer = () => {', 'const configureServer = (rscBundle = false) => {')
+            .sub(limit_chunk_plugin, old_rsc_plugin)}
+        JS
+      )
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const config = require('shakapacker').config;
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          #{base_client_webpack_content.sub(
+            'return clientConfig;',
+            [
+              "clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false, chunkName: 'client' }));",
+              '',
+              '  return clientConfig;'
+            ].join("\n")
+          )}
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "updates the existing server plugin to use scoped client references" do
+      assert_file "config/webpack/serverWebpackConfig.js" do |content|
+        rsc_plugin_import = "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');"
+        expect(content.scan(rsc_plugin_import).length).to eq(1)
+        expect(content).to include("const { resolve } = require('path');")
+        plugin_config = content[/new RSCWebpackPlugin\(\{([^}]*)\}\)/m, 1]
+        expect(plugin_config).not_to be_nil
+        expect(plugin_config).to include("clientReferences: rscClientReferences")
+        expect(content).to include("directory: resolve(config.source_path)")
+        expect(plugin_config).to include("chunkName: 'server'")
+        expect(plugin_config).to include("isServer: true")
+      end
+    end
+
+    it "updates the existing client plugin to use scoped client references" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        rsc_plugin_import = "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');"
+        expect(content.scan(rsc_plugin_import).length).to eq(1)
+        expect(content).to include("const config = require('shakapacker').config;")
+        expect(content).not_to include("const { config } = require('shakapacker');")
+        expect(content).to include("const { resolve } = require('path');")
+        plugin_config = content[/new RSCWebpackPlugin\(\{([^}]*)\}\)/m, 1]
+        expect(plugin_config).not_to be_nil
+        expect(plugin_config).to include("clientReferences: rscClientReferences")
+        expect(content).to include("directory: resolve(config.source_path)")
+        expect(plugin_config).to include("chunkName: 'client'")
+        expect(plugin_config).to include("isServer: false")
+      end
+    end
+  end
+
+  context "when a server config has multiple RSC plugin targets" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      limit_chunk_plugin = "serverWebpackConfig.plugins.unshift(" \
+                           "new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));"
+      old_rsc_plugins = <<~JS.chomp
+        if (!rscBundle) {
+          serverWebpackConfig.plugins.push(
+            new RSCWebpackPlugin({
+              isServer: false,
+              clientReferences: customClientReferences,
+            }),
+          );
+          serverWebpackConfig.plugins.push(
+            new RSCWebpackPlugin({
+              chunkName: getChunkName(),
+              metadata: { owner: 'server' },
+              isServer: true,
+            }),
+          );
+        }
+
+        #{limit_chunk_plugin}
+      JS
+      simulate_existing_file(
+        "config/webpack/serverWebpackConfig.js",
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          const customClientReferences = { directory: './custom' };
+          const getChunkName = () => 'server';
+          #{pro_server_webpack_content
+            .sub('const configureServer = () => {', 'const configureServer = (rscBundle = false) => {')
+            .sub(limit_chunk_plugin, old_rsc_plugins)}
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "only rewrites the matching server plugin and preserves the other target" do
+      assert_file "config/webpack/serverWebpackConfig.js" do |content|
+        expect(content.scan("clientReferences: customClientReferences").length).to eq(1)
+        expect(content.scan("clientReferences: rscClientReferences").length).to eq(1)
+        expect(content).to include("metadata: { owner: 'server' }")
+        expect(content).to include("directory: resolve(config.source_path)")
+        expect(content).to match(/isServer: true,\s*\n\s*clientReferences: rscClientReferences,/)
+      end
+    end
+  end
+
+  context "when an existing client RSC webpack config uses a double-quoted import anchor" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const commonWebpackConfig = require("./commonWebpackConfig");
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "updates the existing plugin to use scoped client references" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content).to include("clientReferences: rscClientReferences")
+        expect(content).to include("const rscClientReferences")
+        expect(content).to include("directory: resolve(config.source_path)")
+        expect(content).to include("isServer: false")
+      end
+    end
+  end
+
+  context "when an existing RSC webpack config has no matching plugin target" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(new RSCWebpackPlugin({ mode: 'client' }));
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "leaves the plugin untouched and warns that no target was rewritten" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content).to include("new RSCWebpackPlugin({ mode: 'client' })")
+        expect(content).not_to include("clientReferences: rscClientReferences")
+        expect(content).not_to include("const rscClientReferences")
+      end
+
+      messages = GeneratorMessages.messages.join("\n")
+      expect(messages).to include("no plugin options with isServer: false")
+      expect(messages).to include("Dynamic or computed plugin options cannot be verified automatically")
+    end
+  end
+
+  context "when an existing RSC webpack config has unsupported import anchors" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const buildClientWebpackConfig = require("./commonWebpackConfig");
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = buildClientWebpackConfig();
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "does not rewrite the plugin when the helper setup cannot be inserted" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content).not_to include("clientReferences: rscClientReferences")
+        expect(content).not_to include("const rscClientReferences")
+        expect(content).to include("new RSCWebpackPlugin({ isServer: false })")
+      end
+
+      expect(GeneratorMessages.messages.join("\n")).to include("scoped clientReferences in clientWebpackConfig.js")
+    end
+  end
+
+  context "when an existing RSC webpack config already defines custom client references" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          const customClientReferences = { directory: './custom' };
+          const getChunkName = () => 'client';
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(
+              new RSCWebpackPlugin({
+                chunkName: getChunkName(),
+                clientReferences: customClientReferences,
+                isServer: false,
+              }),
+            );
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "leaves the custom client references untouched without adding a duplicate property" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content.scan("clientReferences:").length).to eq(1)
+        expect(content).to include("clientReferences: customClientReferences")
+        expect(content).not_to include("clientReferences: rscClientReferences")
+        expect(content).not_to include("const rscClientReferences")
+      end
+
+      messages = GeneratorMessages.messages.join("\n")
+      expect(messages).to include("already define clientReferences")
+      expect(messages).to include("some may already be correctly scoped")
+      expect(messages).not_to include("generated scoped clientReferences in clientWebpackConfig.js")
+    end
+  end
+
+  context "when an existing RSC webpack config mentions scoped client references in a comment" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(
+              new RSCWebpackPlugin({
+                // clientReferences: rscClientReferences
+                isServer: false,
+              }),
+            );
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "does not treat the comment as a configured clientReferences option" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content).to include("const rscClientReferences")
+        expect(content).to match(/^\s*isServer: false,\n\s*clientReferences: rscClientReferences,/)
+      end
+    end
+  end
+
+  context "when an existing RSC webpack config uses shorthand clientReferences" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          const clientReferences = { directory: './custom' };
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(
+              new RSCWebpackPlugin({
+                isServer: false,
+                clientReferences,
+              }),
+            );
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "treats shorthand clientReferences as configured without overriding the local variable" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content.scan(/\bclientReferences\b/).length).to eq(2)
+        expect(content).to include("const clientReferences = { directory: './custom' };")
+        expect(content).not_to include("clientReferences: rscClientReferences")
+        expect(content).not_to include("const rscClientReferences")
+      end
+
+      messages = GeneratorMessages.messages.join("\n")
+      expect(messages).to include("already define clientReferences")
+      expect(messages).not_to include("generated scoped clientReferences in clientWebpackConfig.js")
+    end
+  end
+
+  context "when an existing RSC webpack config uses quoted clientReferences" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          const customClientReferences = { directory: './custom' };
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(
+              new RSCWebpackPlugin({
+                isServer: false,
+                "clientReferences": customClientReferences,
+              }),
+            );
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "treats quoted clientReferences as configured without appending a duplicate key" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content.scan("clientReferences").length).to eq(1)
+        expect(content).to include('"clientReferences": customClientReferences')
+        expect(content).not_to include("clientReferences: rscClientReferences")
+      end
+
+      messages = GeneratorMessages.messages.join("\n")
+      expect(messages).to include("already define clientReferences")
+      expect(messages).not_to include("generated scoped clientReferences in clientWebpackConfig.js")
+    end
+  end
+
+  describe "existing RSC webpack config migration helpers" do
+    let(:generator) { described_class.new([], {}, { destination_root: destination_root }) }
+
+    before do
+      prepare_destination
+    end
+
+    it "rewrites an unscoped plugin when another same-target plugin has custom references" do
+      config_path = "config/webpack/serverWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { config } = require('shakapacker');
+          const bundler = config.assets_bundler === 'rspack'
+            ? require('@rspack/core')
+            : require('webpack');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          const customClientReferences = { directory: './custom' };
+
+          serverWebpackConfig.plugins.push(
+            new RSCWebpackPlugin({
+              isServer: true,
+              clientReferences: customClientReferences,
+            }),
+          );
+          serverWebpackConfig.plugins.push(
+            new RSCWebpackPlugin({
+              chunkName: 'server',
+              isServer: true,
+            }),
+          );
+        JS
+      )
+
+      content = File.read(File.join(destination_root, config_path))
+      generator.send(:update_existing_rsc_webpack_config, config_path, content, is_server: true)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content.scan("clientReferences: customClientReferences").length).to eq(1)
+      expect(migrated_content.scan("clientReferences: rscClientReferences").length).to eq(1)
+      expect(migrated_content).to include("chunkName: 'server'")
+      expect(migrated_content).to include("directory: resolve(config.source_path)")
+      expect(migrated_content).to match(/isServer: true,\s*\n\s*clientReferences: rscClientReferences,/)
+      expect(generator.send(:check_rsc_server_config)).not_to include(
+        "generated scoped clientReferences in serverWebpackConfig.js"
+      )
+    end
+
+    it "does not duplicate an existing scoped rscClientReferences helper on the fresh-install path" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { config } = require('shakapacker');
+          const { resolve } = require('path');
+          const commonWebpackConfig = require('./commonWebpackConfig');
+
+          const rscClientReferences = {
+            directory: resolve(config.source_path),
+            recursive: true,
+            include: /\\.(js|mjs|cjs|ts|mts|cts|jsx|tsx)$/,
+          };
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      generator.send(:update_client_webpack_config_for_rsc)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content.scan("const rscClientReferences").length).to eq(1)
+      expect(migrated_content).to include(
+        "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');"
+      )
+      expect(migrated_content).to include(
+        "new RSCWebpackPlugin({ isServer: false, clientReferences: rscClientReferences })"
+      )
+    end
+
+    it "warns and skips wiring an existing unscoped rscClientReferences helper on the fresh-install path" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+
+          const rscClientReferences = { directory: './custom' };
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      generator.send(:update_client_webpack_config_for_rsc)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content.scan("const rscClientReferences").length).to eq(1)
+      expect(migrated_content).to include(
+        "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');"
+      )
+      expect(migrated_content).to include("new RSCWebpackPlugin({ isServer: false })")
+      expect(migrated_content).not_to include("clientReferences: rscClientReferences")
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("rscClientReferences already exists but does not point to resolve(config.source_path)")
+    end
+
+    it "does not inject server client references when the shakapacker config binding is unavailable" do
+      config_path = "config/webpack/serverWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const bundler = config.assets_bundler === 'rspack'
+            ? require('@rspack/core')
+            : require('webpack');
+          const commonWebpackConfig = require('./commonWebpackConfig');
+
+          const configureServer = () => {
+            const serverWebpackConfig = commonWebpackConfig();
+            serverWebpackConfig.plugins.unshift(new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
+
+            return serverWebpackConfig;
+          };
+
+          module.exports = configureServer;
+        JS
+      )
+
+      generator.send(:update_server_webpack_config_for_rsc)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).not_to include("const rscClientReferences")
+      expect(migrated_content).not_to include("clientReferences: rscClientReferences")
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("shakapacker's `config` is not imported in this file")
+    end
+
+    it "ignores plugin markers in comments when finding rewrite targets" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          // Previously used: new RSCWebpackPlugin({ isServer: false })
+          const migrationNote = "new RSCWebpackPlugin({ isServer: false })";
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      content = File.read(File.join(destination_root, config_path))
+      generator.send(:update_existing_rsc_webpack_config, config_path, content, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).to include("// Previously used: new RSCWebpackPlugin({ isServer: false })")
+      expect(migrated_content).to include('const migrationNote = "new RSCWebpackPlugin({ isServer: false })";')
+      expect(migrated_content).to include(
+        "new RSCWebpackPlugin({ isServer: false, clientReferences: rscClientReferences })"
+      )
+    end
+
+    it "appends clientReferences at the end of a single-line options object that has options after isServer" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false, chunkName: 'client' }));
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      content = File.read(File.join(destination_root, config_path))
+      generator.send(:update_existing_rsc_webpack_config, config_path, content, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).to include(
+        "new RSCWebpackPlugin({ isServer: false, chunkName: 'client', clientReferences: rscClientReferences })"
+      )
+      expect(migrated_content).not_to match(/isServer: false, clientReferences: rscClientReferences, chunkName/)
+    end
+
+    it "rewrites plugin options that include a template-literal value with simple ${} interpolation" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          const env = process.env.RAILS_ENV;
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(
+              new RSCWebpackPlugin({
+                isServer: false,
+                chunkName: `${env}-bundle`,
+              }),
+            );
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      content = File.read(File.join(destination_root, config_path))
+      generator.send(:update_existing_rsc_webpack_config, config_path, content, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).to include("chunkName: `${env}-bundle`,")
+      expect(migrated_content).to match(
+        /chunkName: `\$\{env\}-bundle`,\n\s+clientReferences: rscClientReferences,/
+      )
+      expect(migrated_content.scan("clientReferences: rscClientReferences").length).to eq(1)
+    end
+
+    it "adds clientReferences to the real isServer option when comments mention isServer first" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(
+              new RSCWebpackPlugin({
+                // isServer: false is documented here, but this is not the option.
+                isServer: false,
+              }),
+            );
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      content = File.read(File.join(destination_root, config_path))
+      generator.send(:update_existing_rsc_webpack_config, config_path, content, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).to include("// isServer: false is documented here, but this is not the option.")
+      expect(migrated_content).not_to include("// isServer: false, clientReferences: rscClientReferences")
+      expect(migrated_content).to match(/^\s*isServer: false,\n\s*clientReferences: rscClientReferences,/)
+    end
+
+    it "inserts the splice comma before a trailing line comment on the last option" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(
+              new RSCWebpackPlugin({
+                isServer: false // intentional: no trailing comma
+              }),
+            );
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      content = File.read(File.join(destination_root, config_path))
+      generator.send(:update_existing_rsc_webpack_config, config_path, content, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).to include("isServer: false, // intentional: no trailing comma")
+      expect(migrated_content).not_to include("// intentional: no trailing comma,")
+      expect(migrated_content).to match(
+        %r{isServer: false, // intentional: no trailing comma\n\s+clientReferences: rscClientReferences,}
+      )
+    end
+
+    it "does not treat function-scoped path module bindings as top-level setup blockers" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const resolve = require('path');
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      content = File.read(File.join(destination_root, config_path))
+      generator.send(:update_existing_rsc_webpack_config, config_path, content, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).to include("const { resolve } = require('path');")
+      expect(migrated_content).to include("const resolve = require('path');")
+      expect(migrated_content).to include("directory: resolve(config.source_path)")
+      expect(migrated_content).to include(
+        "new RSCWebpackPlugin({ isServer: false, clientReferences: rscClientReferences })"
+      )
+    end
+
+    it "blocks setup when an indented top-level resolve binding would conflict with the injected import" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+            const resolve = (...parts) => path.resolve(__dirname, ...parts);
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      content = File.read(File.join(destination_root, config_path))
+      generator.send(:update_existing_rsc_webpack_config, config_path, content, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).to include("  const resolve = (...parts) => path.resolve(__dirname, ...parts);")
+      expect(migrated_content).not_to include("const { resolve } = require('path');")
+      expect(migrated_content).not_to include("clientReferences: rscClientReferences")
+      expect(migrated_content).not_to include("const rscClientReferences")
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("a top-level `resolve` binding already exists that would conflict")
+    end
+
+    it "does not inject client references setup into a commented client import anchor" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          /*
+           * const commonWebpackConfig = require('./commonWebpackConfig');
+           */
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = { plugins: [] };
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      content = File.read(File.join(destination_root, config_path))
+      generator.send(:update_existing_rsc_webpack_config, config_path, content, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).not_to include("const rscClientReferences")
+      expect(migrated_content).not_to include("clientReferences: rscClientReferences")
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("expected webpack import anchor was not found")
+    end
+
+    it "explains that backtick require anchors must be migrated manually" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require(`./commonWebpackConfig`);
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      content = File.read(File.join(destination_root, config_path))
+      generator.send(:update_existing_rsc_webpack_config, config_path, content, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).not_to include("const rscClientReferences")
+      expect(migrated_content).not_to include("clientReferences: rscClientReferences")
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("backtick template-literal require paths")
+    end
+
+    it "explains that rspack-only server anchors must be migrated manually" do
+      config_path = "config/webpack/serverWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { config } = require('shakapacker');
+          const bundler = require('@rspack/core');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureServer = () => {
+            const serverWebpackConfig = { plugins: [] };
+            serverWebpackConfig.plugins.push(new RSCWebpackPlugin({ isServer: true }));
+
+            return serverWebpackConfig;
+          };
+
+          module.exports = configureServer;
+        JS
+      )
+
+      content = File.read(File.join(destination_root, config_path))
+      generator.send(:update_existing_rsc_webpack_config, config_path, content, is_server: true)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).not_to include("const rscClientReferences")
+      expect(migrated_content).not_to include("clientReferences: rscClientReferences")
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("Rspack-only server configs without the webpack fallback ternary")
+    end
+
+    it "does not treat a stale generated client references helper as scoped" do
+      content = <<~JS
+        const rscClientReferences = { directory: '.' };
+        clientConfig.plugins.push(
+          new RSCWebpackPlugin({
+            isServer: false,
+            clientReferences: rscClientReferences,
+          }),
+        );
+      JS
+
+      expect(generator.send(:rsc_plugin_uses_scoped_client_references?, content, is_server: false)).to be(false)
+    end
+
+    it "treats a server plugin with scoped client references as already migrated" do
+      content = <<~JS
+        const { config } = require('shakapacker');
+        const { resolve } = require('path');
+        const rscClientReferences = {
+          directory: resolve(config.source_path),
+          recursive: true,
+          include: /\\.(js|ts|jsx|tsx)$/,
+        };
+        serverWebpackConfig.plugins.push(
+          new RSCWebpackPlugin({
+            isServer: true,
+            clientReferences: rscClientReferences,
+          }),
+        );
+      JS
+
+      expect(generator.send(:rsc_plugin_uses_scoped_client_references?, content, is_server: true)).to be(true)
+    end
+
+    it "detects scoped client references when resolve has inner whitespace" do
+      content = <<~JS
+        const rscClientReferences = {
+          directory: resolve( config.source_path ),
+        };
+      JS
+
+      expect(generator.send(:scoped_rsc_client_references_defined?, content)).to be(true)
+    end
+
+    it "detects scoped client references when the directory key follows regex values with braces" do
+      content = <<~JS
+        const rscClientReferences = {
+          include: /component\\.(js|jsx){1,2}$/,
+          directory: resolve(config.source_path),
+        };
+      JS
+
+      expect(generator.send(:scoped_rsc_client_references_defined?, content)).to be(true)
+    end
+
+    it "ignores a function-scoped rscClientReferences declaration" do
+      content = <<~JS
+        function buildServerConfig() {
+          const rscClientReferences = {
+            directory: resolve(config.source_path),
+            recursive: true,
+            include: /\\.(js|ts|jsx|tsx)$/,
+          };
+          return rscClientReferences;
+        }
+      JS
+
+      expect(generator.send(:rsc_client_references_defined?, content)).to be(false)
+      expect(generator.send(:scoped_rsc_client_references_defined?, content)).to be(false)
+    end
+
+    it "detects a module-scope let rscClientReferences declaration" do
+      content = <<~JS
+        let rscClientReferences = {
+          directory: resolve(config.source_path),
+          recursive: true,
+          include: /\\.(js|ts|jsx|tsx)$/,
+        };
+      JS
+
+      expect(generator.send(:rsc_client_references_defined?, content)).to be(true)
+      expect(generator.send(:scoped_rsc_client_references_defined?, content)).to be(true)
+    end
+
+    it "detects a module-scope var rscClientReferences declaration" do
+      content = <<~JS
+        var rscClientReferences = {
+          directory: resolve(config.source_path),
+        };
+      JS
+
+      expect(generator.send(:rsc_client_references_defined?, content)).to be(true)
+    end
+
+    it "does not skip migration when only a commented-out directory key matches the scoped pattern" do
+      content = <<~JS
+        const rscClientReferences = {
+          // directory: resolve(config.source_path),
+          directory: './app/javascript',
+        };
+      JS
+
+      expect(generator.send(:rsc_client_references_defined?, content)).to be(true)
+      expect(generator.send(:scoped_rsc_client_references_defined?, content)).to be(false)
+    end
+
+    it "treats a plugin invocation without parseable isServer options as out-of-scope" do
+      content = <<~JS
+        const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+        clientConfig.plugins.push(new RSCWebpackPlugin(buildOptions()));
+      JS
+
+      expect(generator.send(:rsc_plugin_client_references_configured?, content, is_server: false)).to be(true)
+    end
+
+    it "treats shorthand clientReferences as a top-level configured option" do
+      body = <<~JS
+        isServer: false,
+        clientReferences,
+      JS
+
+      expect(generator.send(:rsc_plugin_body_has_top_level_key?, body, "clientReferences")).to be(true)
+    end
+
+    it "treats quoted clientReferences as a top-level configured option" do
+      body = <<~JS
+        isServer: false,
+        "clientReferences": customClientReferences,
+      JS
+
+      expect(generator.send(:rsc_plugin_body_has_top_level_key?, body, "clientReferences")).to be(true)
+    end
+
+    it "does not treat a top-level value reference as a configured clientReferences option" do
+      body = <<~JS
+        isServer: false,
+        metadata: clientReferences,
+      JS
+
+      expect(generator.send(:rsc_plugin_body_has_top_level_key?, body, "clientReferences")).to be(false)
+    end
+
+    it "detects quoted scoped clientReferences as already configured" do
+      body = <<~JS
+        isServer: false,
+        "clientReferences": rscClientReferences,
+      JS
+
+      expect(generator.send(:rsc_plugin_body_has_top_level_scoped_client_references?, body)).to be(true)
+    end
+
+    it "matches the server setup anchor with CRLF line endings" do
+      content = [
+        "const bundler = config.assets_bundler === 'rspack'",
+        "  ? require('@rspack/core')",
+        "  : require('webpack');"
+      ].join("\r\n")
+
+      expect(generator.send(:rsc_client_references_setup_anchor?, content, is_server: true)).to be(true)
+    end
+
+    it "matches the server setup anchor with comments around the bundler ternary" do
+      content = <<~JS
+        const bundler = config.assets_bundler /* generated by Shakapacker */ === 'rspack'
+          // Rspack is selected by app config.
+          ? require('@rspack/core')
+          /* Keep webpack as the fallback for non-Rspack apps. */
+          : require('webpack');
+      JS
+
+      expect(generator.send(:rsc_client_references_setup_anchor?, content, is_server: true)).to be(true)
+    end
+
+    it "matches the client setup anchor with CRLF line endings" do
+      content = [
+        "const commonWebpackConfig = require('./commonWebpackConfig');",
+        "const next = 1;"
+      ].join("\r\n")
+
+      expect(generator.send(:rsc_client_references_setup_anchor?, content, is_server: false)).to be(true)
+    end
+
+    it "preserves CRLF line endings when injecting and rewriting scoped client references" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      crlf_content = [
+        "const commonWebpackConfig = require('./commonWebpackConfig');",
+        "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');",
+        "",
+        "const configureClient = () => {",
+        "  const clientConfig = commonWebpackConfig();",
+        "  clientConfig.plugins.push(",
+        "    new RSCWebpackPlugin({",
+        "      isServer: false,",
+        "    }),",
+        "  );",
+        "",
+        "  return clientConfig;",
+        "};",
+        "",
+        "module.exports = configureClient;"
+      ].join("\r\n")
+
+      simulate_existing_file(
+        config_path,
+        "#{crlf_content}\r\n"
+      )
+
+      content = File.binread(File.join(destination_root, config_path))
+      generator.send(:update_existing_rsc_webpack_config, config_path, content, is_server: false)
+
+      migrated_content = File.binread(File.join(destination_root, config_path))
+      expect(migrated_content).to include("const rscClientReferences = {\r\n")
+      expect(migrated_content).to include("      isServer: false,\r\n      clientReferences: rscClientReferences,")
+      expect(migrated_content).not_to match(/(?<!\r)\n/)
+    end
+
+    it "detects named imports with trailing commas" do
+      content = "const { config, } = require('shakapacker');"
+
+      expect(generator.send(:commonjs_named_imported?, content, "shakapacker", "config")).to be(true)
+    end
+
+    it "detects named imports with leading indentation" do
+      shakapacker_content = "  const { config, } = require('shakapacker');"
+      path_content = "\tlet { resolve } = require('path');"
+
+      expect(generator.send(:commonjs_named_imported?, shakapacker_content, "shakapacker", "config"))
+        .to be(true)
+      expect(generator.send(:commonjs_named_imported?, path_content, "path", "resolve"))
+        .to be(true)
+    end
+
+    it "detects named imports when destructuring comments contain braces" do
+      content = <<~JS
+        const {
+          /* kept for docs: } */
+          config,
+        } = require('shakapacker');
+      JS
+
+      expect(generator.send(:commonjs_named_imported?, content, "shakapacker", "config"))
+        .to be(true)
+    end
+
+    it "detects named imports with defaults and self aliases" do
+      default_without_space = "const { config=fallbackConfig } = require('shakapacker');"
+      self_aliased_config = "const { config: config } = require('shakapacker');"
+      self_aliased_resolve = "const { resolve: resolve } = require('path');"
+
+      expect(generator.send(:commonjs_named_imported?, default_without_space, "shakapacker", "config"))
+        .to be(true)
+      expect(generator.send(:commonjs_named_imported?, self_aliased_config, "shakapacker", "config"))
+        .to be(true)
+      expect(generator.send(:commonjs_named_imported?, self_aliased_resolve, "path", "resolve"))
+        .to be(true)
+    end
+
+    it "does not treat renamed aliases as the exact binding used by rscClientReferences" do
+      aliased_config = "const { config: shakapackerConfig } = require('shakapacker');"
+      aliased_resolve = "const { resolve: pathResolve } = require('path');"
+
+      expect(generator.send(:commonjs_named_imported?, aliased_config, "shakapacker", "config"))
+        .to be(false)
+      expect(generator.send(:commonjs_named_imported?, aliased_resolve, "path", "resolve"))
+        .to be(false)
+    end
+
+    it "detects legacy let or var dot-access shakapacker config imports" do
+      expect(generator.send(:shakapacker_config_imported?, "let config = require('shakapacker').config;"))
+        .to be(true)
+      expect(generator.send(:shakapacker_config_imported?, "var config = require('shakapacker').config;"))
+        .to be(true)
+      expect(generator.send(:shakapacker_config_imported?, "  const config = require('shakapacker').config;"))
+        .to be(true)
+    end
+
+    it "detects legacy let or var dot-access path resolve imports" do
+      expect(generator.send(:path_resolve_imported?, "let resolve = require('path').resolve;"))
+        .to be(true)
+      expect(generator.send(:path_resolve_imported?, "var resolve = require('path').resolve;"))
+        .to be(true)
+      expect(generator.send(:path_resolve_imported?, "  const resolve = require('path').resolve;"))
+        .to be(true)
+    end
+
+    it "treats function-scoped shakapacker config imports as not module-scope" do
+      function_scoped = <<~JS
+        function getShakapackerConfig() {
+          const { config } = require('shakapacker');
+          return config;
+        }
+      JS
+      dot_access_scoped = <<~JS
+        function getShakapackerConfig() {
+          const config = require('shakapacker').config;
+          return config;
+        }
+      JS
+
+      expect(generator.send(:shakapacker_config_imported?, function_scoped)).to be(false)
+      expect(generator.send(:shakapacker_config_imported?, dot_access_scoped)).to be(false)
+    end
+
+    it "treats function-scoped path resolve imports as not module-scope" do
+      function_scoped = <<~JS
+        function helper() {
+          const { resolve } = require('path');
+          return resolve('a', 'b');
+        }
+      JS
+      dot_access_scoped = <<~JS
+        function helper() {
+          const resolve = require('path').resolve;
+          return resolve('a', 'b');
+        }
+      JS
+
+      expect(generator.send(:path_resolve_imported?, function_scoped)).to be(false)
+      expect(generator.send(:path_resolve_imported?, dot_access_scoped)).to be(false)
+    end
+
+    it "detects top-level imports after regex literals with braces" do
+      content = <<~JS
+        const literalOpenBrace = /\\{/;
+        const { resolve } = require('path');
+        const { config } = require('shakapacker');
+      JS
+
+      expect(generator.send(:path_resolve_imported?, content)).to be(true)
+      expect(generator.send(:shakapacker_config_imported?, content)).to be(true)
+    end
+
+    it "detects top-level imports after regex literals preceded by block comments" do
+      content = <<~JS
+        const literalOpenBrace = /* comment */ /\\{/;
+        const { resolve } = require('path');
+        const { config } = require('shakapacker');
+      JS
+
+      expect(generator.send(:path_resolve_imported?, content)).to be(true)
+      expect(generator.send(:shakapacker_config_imported?, content)).to be(true)
+    end
+
+    it "does not detect imports after an unterminated regex literal" do
+      content = <<~JS
+        const invalidRegex = /abc
+        const { resolve } = require('path');
+      JS
+
+      expect(generator.send(:path_resolve_imported?, content)).to be(false)
+    end
+
+    it "detects top-level destructuring that creates config or resolve bindings" do
+      config_content = "const { config } = require('custom-package');"
+      resolve_content = "const { resolve: resolve } = require('custom-paths');"
+
+      expect(generator.send(:top_level_config_binding?, config_content)).to be(true)
+      expect(generator.send(:top_level_resolve_binding?, resolve_content)).to be(true)
+    end
+
+    it "detects top-level class declarations that create config or resolve bindings" do
+      expect(generator.send(:top_level_config_binding?, "class config {}")).to be(true)
+      expect(generator.send(:top_level_resolve_binding?, "  class resolve extends BaseResolve {}")).to be(true)
+    end
+
+    it "ignores top-level destructuring that renames config or resolve bindings" do
+      config_content = "const { config: customConfig } = require('custom-package');"
+      resolve_content = "const { resolve: customResolve } = require('custom-paths');"
+
+      expect(generator.send(:top_level_config_binding?, config_content)).to be(false)
+      expect(generator.send(:top_level_resolve_binding?, resolve_content)).to be(false)
+    end
+
+    it "preserves URL-like substrings inside string options when stripping comments" do
+      options = "isServer: false, namespace: 'https://example.com/rsc', label: \"http://b//c\""
+
+      stripped = generator.send(:rsc_plugin_options_without_comments, options)
+
+      expect(stripped).to include("'https://example.com/rsc'")
+      expect(stripped).to include("\"http://b//c\"")
+    end
+
+    it "still strips line and block comments outside string literals" do
+      options = "isServer: true, // a comment\n  /* block */ chunkName: 'main'"
+
+      stripped = generator.send(:rsc_plugin_options_without_comments, options)
+
+      expect(stripped).not_to include("a comment")
+      expect(stripped).not_to include("block")
+      expect(stripped).to include("isServer: true,")
+      expect(stripped).to include("chunkName: 'main'")
+    end
+
+    it "treats normal RSCWebpackPlugin invocations as parseable" do
+      content = <<~JS
+        new RSCWebpackPlugin({
+          isServer: true,
+          include: /\\.(js|jsx){1,3}$/,
+        });
+      JS
+
+      partition = generator.send(:rsc_plugin_option_sections_partition, content, is_server: true)
+      expect(partition.fetch(:safe).length).to eq(1)
+      expect(partition.fetch(:unparseable)).to eq(0)
+    end
+
+    it "flags plugin invocations whose options block was scanned past the wrong closing brace" do
+      # The unmatched `}` inside the regex literal causes the depth scanner to return early,
+      # so the `}` it picks is not followed by `)` — `rsc_plugin_options_followed_by_close_paren?`
+      # detects the mismatch and the section is counted as unparseable rather than rewritten.
+      content = <<~JS
+        new RSCWebpackPlugin({
+          isServer: true,
+          include: /\\}/,
+        });
+      JS
+
+      partition = generator.send(:rsc_plugin_option_sections_partition, content, is_server: true)
+      expect(partition.fetch(:safe).length).to eq(0)
+      expect(partition.fetch(:unparseable)).to eq(1)
+    end
+
+    it "treats a block comment between the options object and `)` as parseable" do
+      # `advance_js_block_comment_state` exits with state=nil and index pointing at the
+      # closing `/` of `*/`. Without skipping that consumed character, the scanner would
+      # falsely flag this invocation as unparseable.
+      content = "new RSCWebpackPlugin({ isServer: true } /* keep me */ );\n"
+
+      partition = generator.send(:rsc_plugin_option_sections_partition, content, is_server: true)
+      expect(partition.fetch(:safe).length).to eq(1)
+      expect(partition.fetch(:unparseable)).to eq(0)
+    end
+
+    it "treats a trailing comma between the options object and `)` as parseable" do
+      # Prettier's `trailingComma: "all"` emits `new RSCWebpackPlugin({...},)`. Without
+      # tolerating the single trailing comma the scanner would mark these as unparseable
+      # and the user's migration would silently bail.
+      content = "new RSCWebpackPlugin({ isServer: true },);\n"
+
+      partition = generator.send(:rsc_plugin_option_sections_partition, content, is_server: true)
+      expect(partition.fetch(:safe).length).to eq(1)
+      expect(partition.fetch(:unparseable)).to eq(0)
+    end
+
+    it "skips leading string literals when looking for the first significant token" do
+      content = %(  "client-bundle", { isServer: false })
+
+      index = generator.send(:first_significant_js_index, content, 0)
+      expect(content[index]).to eq(",")
+    end
+
+    it "clears state but leaves index on the closing `/` when advance_js_scan_state exits a block comment" do
+      # `block_comment_exit_guard` invariant: when `*/` is consumed, state must be nil and
+      # index must point at the closing `/` so the caller's trailing `index += 1` lands on
+      # the first character after the comment. Several callers (`matching_js_closing_brace`,
+      # `js_code_position?`, `js_top_level_position?`) rely on this without an explicit
+      # `prev_state == :block_comment` guard, so a regression here would silently misroute
+      # downstream `char == '{' / '}' / ')'` checks.
+      content = "/* x */next"
+      state = :block_comment
+      escaped = false
+      # Advance to the `*` of `*/` so `char == '*'` and `next_char == '/'`.
+      slash_index = content.index("*/") + 1
+      next_state, _next_escaped, returned_index =
+        generator.send(:advance_js_scan_state, state, escaped, "*", "/", slash_index - 1)
+
+      expect(next_state).to be_nil
+      expect(returned_index).to eq(slash_index)
+      expect(content[returned_index]).to eq("/")
+      expect(content[returned_index + 1]).to eq("n")
+    end
+
+    it "warns and skips the rewrite when an RSCWebpackPlugin options block is unparseable" do
+      config_path = "config/webpack/serverWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { config } = require('shakapacker');
+          const bundler = config.assets_bundler === 'rspack'
+            ? require('@rspack/core')
+            : require('webpack');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          serverWebpackConfig.plugins.push(
+            new RSCWebpackPlugin({
+              isServer: true,
+              include: /\\}/,
+            }),
+          );
+        JS
+      )
+      content = File.read(File.join(destination_root, config_path))
+
+      expect(generator.send(:rsc_plugin_sections_safe_to_rewrite?, config_path, content, is_server: true))
+        .to be(false)
+
+      messages = GeneratorMessages.messages.join("\n")
+      expect(messages).to include(config_path)
+      expect(messages).to include("cannot parse safely")
+      expect(messages).to include("regex literal with an unmatched")
+      expect(messages).not_to include("isServer: true")
+    end
+
+    it "flags plugin invocations whose options block cannot find a closing brace" do
+      content = <<~JS
+        new RSCWebpackPlugin({
+          isServer: true,
+          include: /\\{/,
+        });
+      JS
+
+      partition = generator.send(:rsc_plugin_option_sections_partition, content, is_server: true)
+      expect(partition.fetch(:safe).length).to eq(0)
+      expect(partition.fetch(:unparseable)).to eq(1)
+    end
+
+    it "does not bucket a section by a nested isServer value into the wrong partition" do
+      # `metadata: { isServer: true }` must not route this section into the `is_server: true`
+      # bucket; only the top-level `isServer: false` should match the `is_server: false` bucket.
+      # Without depth-aware matching, the `is_server: true` partition would falsely include this
+      # section, the rewrite would correctly bail (the splice helper IS depth-aware), and the
+      # user would see a misleading "no plugin options with isServer: true could be rewritten"
+      # warning for a config that is actually fine.
+      content = <<~JS
+        new RSCWebpackPlugin({
+          metadata: { isServer: true },
+          isServer: false,
+        });
+      JS
+
+      true_partition = generator.send(:rsc_plugin_option_sections_partition, content, is_server: true)
+      false_partition = generator.send(:rsc_plugin_option_sections_partition, content, is_server: false)
+
+      expect(true_partition.fetch(:safe).length).to eq(0)
+      expect(false_partition.fetch(:safe).length).to eq(1)
+    end
+
+    it "does not inject duplicate imports for legacy let or var CommonJS destructuring" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          var { config } = require('shakapacker');
+          let { resolve } = require('path');
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      content = File.read(File.join(destination_root, config_path))
+      generator.send(:update_existing_rsc_webpack_config, config_path, content, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).to include("var { config } = require('shakapacker');")
+      expect(migrated_content).to include("let { resolve } = require('path');")
+      expect(migrated_content).not_to include("const { config } = require('shakapacker');")
+      expect(migrated_content).not_to include("const { resolve } = require('path');")
+      expect(migrated_content).to include("directory: resolve(config.source_path)")
+      expect(migrated_content).to include(
+        "new RSCWebpackPlugin({ isServer: false, clientReferences: rscClientReferences })"
+      )
+    end
+
+    it "does not inject duplicate imports when existing bindings are indented" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+            const { config } = require('shakapacker');
+          \tconst { resolve } = require('path');
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      content = File.read(File.join(destination_root, config_path))
+      generator.send(:update_existing_rsc_webpack_config, config_path, content, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content.scan("const { config } = require('shakapacker');").length).to eq(1)
+      expect(migrated_content.scan("const { resolve } = require('path');").length).to eq(1)
+      expect(migrated_content).to include("directory: resolve(config.source_path)")
+      expect(migrated_content).to include(
+        "new RSCWebpackPlugin({ isServer: false, clientReferences: rscClientReferences })"
+      )
+    end
+
+    it "blocks setup when a custom top-level resolve binding would conflict with the injected import" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const resolve = (...parts) => path.resolve(__dirname, ...parts);
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      content = File.read(File.join(destination_root, config_path))
+      generator.send(:update_existing_rsc_webpack_config, config_path, content, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).to include("const resolve = (...parts) => path.resolve(__dirname, ...parts);")
+      expect(migrated_content).not_to include("const { resolve } = require('path');")
+      expect(migrated_content).not_to include("clientReferences: rscClientReferences")
+      expect(migrated_content).not_to include("const rscClientReferences")
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("a top-level `resolve` binding already exists that would conflict")
+    end
+
+    it "blocks setup when a custom top-level config binding would conflict with the injected import" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const config = { source_path: 'app/javascript' };
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      content = File.read(File.join(destination_root, config_path))
+      generator.send(:update_existing_rsc_webpack_config, config_path, content, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).to include("const config = { source_path: 'app/javascript' };")
+      expect(migrated_content).not_to include("const { config } = require('shakapacker');")
+      expect(migrated_content).not_to include("clientReferences: rscClientReferences")
+      expect(migrated_content).not_to include("const rscClientReferences")
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("a top-level `config` binding already exists that would conflict")
+    end
+
+    it "blocks setup when a destructured top-level config binding would conflict with the injected import" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const { config } = require('custom-webpack-config');
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      content = File.read(File.join(destination_root, config_path))
+      generator.send(:update_existing_rsc_webpack_config, config_path, content, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).to include("const { config } = require('custom-webpack-config');")
+      expect(migrated_content).not_to include("const { config } = require('shakapacker');")
+      expect(migrated_content).not_to include("clientReferences: rscClientReferences")
+      expect(migrated_content).not_to include("const rscClientReferences")
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("a top-level `config` binding already exists that would conflict")
+    end
+
+    it "logs the direct file rewrite as a generator action" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+        JS
+      )
+
+      expect(generator).to receive(:say_status).with(:rewrite, config_path, :green)
+      expect(generator.send(:rewrite_rsc_plugin_client_references, config_path, is_server: false)).to be(true)
+    end
+
+    it "places clientReferences on its own line for multi-line plugin rewrites" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          clientConfig.plugins.push(
+            new RSCWebpackPlugin({
+              chunkName: 'client',
+              isServer: false,
+            }),
+          );
+        JS
+      )
+
+      generator.send(:rewrite_rsc_plugin_client_references, config_path, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).to match(
+        /chunkName: 'client',\n\s*isServer: false,\n\s*clientReferences: rscClientReferences,/
+      )
+      expect(GeneratorMessages.messages.join("\n")).not_to include("npx prettier")
+    end
+
+    it "matches indentation from the last code line when a template-literal value contains a newline" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          clientConfig.plugins.push(
+            new RSCWebpackPlugin({
+              isServer: false,
+              message: `hello
+          world`,
+            }),
+          );
+        JS
+      )
+
+      generator.send(:rewrite_rsc_plugin_client_references, config_path, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).to include(
+        "    message: `hello\nworld`,\n    clientReferences: rscClientReferences,"
+      )
+      expect(migrated_content).not_to include("world`,\n  clientReferences")
+    end
+
+    it "does not write plugin rewrites in pretend mode" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      pretend_generator = described_class.new([], { pretend: true }, { destination_root: destination_root })
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+        JS
+      )
+
+      original_content = File.read(File.join(destination_root, config_path))
+      expect(pretend_generator).to receive(:say_status)
+        .with(:pretend, "Would rewrite #{config_path}", :yellow)
+      expect(pretend_generator.send(:rewrite_rsc_plugin_client_references, config_path, is_server: false)).to be(true)
+      expect(File.read(File.join(destination_root, config_path))).to eq(original_content)
+    end
+
+    it "does not write plugin rewrites in skip mode" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      skip_generator = described_class.new([], { skip: true }, { destination_root: destination_root })
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+        JS
+      )
+
+      original_content = File.read(File.join(destination_root, config_path))
+      expect(skip_generator).to receive(:say_status).with(:skip, config_path, :yellow)
+      expect(skip_generator.send(:rewrite_rsc_plugin_client_references, config_path, is_server: false)).to be(true)
+      expect(File.read(File.join(destination_root, config_path))).to eq(original_content)
+    end
+
+    it "continues planning later setup steps after scoped helper setup in pretend mode" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      pretend_generator = described_class.new([], { pretend: true }, { destination_root: destination_root })
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      original_content = File.read(File.join(destination_root, config_path))
+      expect(pretend_generator).to receive(:say_status)
+        .with(:pretend, "Would inject rscClientReferences into #{config_path}", :yellow)
+      expect(pretend_generator).to receive(:say_status)
+        .with(:pretend, "Would rewrite #{config_path}", :yellow)
+      pretend_generator.send(:update_existing_rsc_webpack_config, config_path, original_content, is_server: false)
+
+      expect(File.read(File.join(destination_root, config_path))).to eq(original_content)
+      expect(GeneratorMessages.messages.join("\n")).not_to include("generated scoped helper setup was not written")
+    end
+
+    it "rolls back helper setup when the follow-up plugin rewrite cannot be applied" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      original_content = File.read(File.join(destination_root, config_path))
+      allow(generator).to receive(:rewrite_rsc_plugin_client_references)
+        .with(config_path, is_server: false)
+        .and_return(false)
+      allow(generator).to receive(:say_status).and_call_original
+
+      generator.send(:update_existing_rsc_webpack_config, config_path, original_content, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(generator).to have_received(:rewrite_rsc_plugin_client_references)
+        .with(config_path, is_server: false)
+      expect(generator).to have_received(:say_status).with(:revert, config_path, :yellow)
+      expect(migrated_content).to eq(original_content)
+      expect(migrated_content).not_to include("const rscClientReferences")
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("no plugin options with isServer: false could be rewritten")
+    end
+
+    it "does not inject scoped helper setup in skip mode" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      skip_generator = described_class.new([], { skip: true }, { destination_root: destination_root })
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      original_content = File.read(File.join(destination_root, config_path))
+      expect(skip_generator).to receive(:say_status).with(:skip, config_path, :yellow).twice
+      skip_generator.send(:update_existing_rsc_webpack_config, config_path, original_content, is_server: false)
+
+      expect(File.read(File.join(destination_root, config_path))).to eq(original_content)
+      expect(GeneratorMessages.messages.join("\n")).not_to include("generated scoped helper setup was not written")
+    end
+
+    it "treats skipped from-scratch scoped helper setup as ready" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      skip_generator = described_class.new([], { skip: true }, { destination_root: destination_root })
+      simulate_existing_file(config_path, base_client_webpack_content)
+
+      expect(skip_generator.send(:rsc_client_references_setup_ready?, config_path)).to be(true)
+      expect(GeneratorMessages.messages.join("\n")).not_to include("generated scoped helper setup was not written")
+    end
+
+    it "splices clientReferences at the top level when isServer also appears in a nested object" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          clientConfig.plugins.push(
+            new RSCWebpackPlugin({
+              metadata: {
+                isServer: false,
+              },
+              chunkName: 'client',
+              isServer: false,
+            }),
+          );
+        JS
+      )
+
+      generator.send(:rewrite_rsc_plugin_client_references, config_path, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content.scan("clientReferences: rscClientReferences").length).to eq(1)
+      # The new key must land in the top-level options object, not inside `metadata`.
+      expect(migrated_content).to match(
+        /chunkName: 'client',\n\s*isServer: false,\n\s*clientReferences: rscClientReferences,\n\s*\}\),/
+      )
+      expect(migrated_content).not_to match(/metadata: \{\n\s*isServer: false,\n\s*clientReferences:/)
+    end
+
+    it "rewrites the options object even when a JS comment sits between '(' and '{'" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          clientConfig.plugins.push(
+            new RSCWebpackPlugin( /* client-side opts */ {
+              isServer: false,
+            }),
+          );
+        JS
+      )
+
+      expect(generator.send(:rewrite_rsc_plugin_client_references, config_path, is_server: false)).to be(true)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).to match(
+        /isServer: false,\n\s*clientReferences: rscClientReferences,\n\s*\}\),/
+      )
+      expect(GeneratorMessages.messages.join("\n")).not_to include("no plugin options")
+    end
+
+    it "still rewrites when clientReferences appears only inside a nested sibling object" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          clientConfig.plugins.push(
+            new RSCWebpackPlugin({
+              metadata: {
+                clientReferences: 'unused',
+              },
+              isServer: false,
+            }),
+          );
+        JS
+      )
+
+      generator.send(:rewrite_rsc_plugin_client_references, config_path, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).to include("clientReferences: rscClientReferences")
+      # Nested mention is preserved verbatim, and a real top-level option is added.
+      expect(migrated_content).to include("clientReferences: 'unused'")
+      expect(migrated_content).to match(
+        /isServer: false,\n\s*clientReferences: rscClientReferences,\n\s*\}\),/
+      )
+    end
+
+    it "does not treat a nested clientReferences: rscClientReferences as already migrated" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(
+              new RSCWebpackPlugin({
+                metadata: {
+                  clientReferences: rscClientReferences,
+                },
+                isServer: false,
+              }),
+            );
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      original_content = File.read(File.join(destination_root, config_path))
+      generator.send(:update_existing_rsc_webpack_config, config_path, original_content, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content.scan("clientReferences: rscClientReferences").length).to eq(2)
+      expect(migrated_content).to match(
+        /isServer: false,\n\s*clientReferences: rscClientReferences,\n\s*\}\),/
+      )
+    end
+
+    it "reports missing scoped clientReferences when only a nested clientReferences exists" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          clientConfig.plugins.push(
+            new RSCWebpackPlugin({
+              metadata: {
+                clientReferences: 'unused',
+              },
+              isServer: false,
+            }),
+          );
+        JS
+      )
+
+      missing = generator.send(:check_rsc_client_config)
+      expect(missing).to include("generated scoped clientReferences in clientWebpackConfig.js")
+    end
+  end
+
+  context "when required imports appear after the client RSC setup anchor" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+
+            return clientConfig;
+          };
+
+          const { config } = require('shakapacker');
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "warns why the scoped client references migration was skipped" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content).not_to include("clientReferences: rscClientReferences")
+        expect(content).not_to include("const rscClientReferences")
+      end
+
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("shakapacker's `config` is imported after the `commonWebpackConfig` anchor")
+    end
+  end
+
+  context "when an existing client RSC webpack config already references the scoped helper" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const { config } = require('shakapacker');
+          const { resolve } = require('path');
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(
+              new RSCWebpackPlugin({
+                isServer: false,
+                clientReferences: rscClientReferences,
+              }),
+            );
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "injects the missing scoped helper instead of warning that all plugins already define clientReferences" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content).to include("const rscClientReferences = {")
+        expect(content).to include("directory: resolve(config.source_path)")
+        expect(content).to include("clientReferences: rscClientReferences")
+      end
+
+      expect(GeneratorMessages.messages.join("\n"))
+        .not_to include("all matching RSCWebpackPlugin instances already define clientReferences")
+    end
+  end
+
+  context "when an existing client RSC webpack config mixes custom and scoped client references" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const { config } = require('shakapacker');
+          const { resolve } = require('path');
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const customClientReferences = { directory: './custom' };
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(
+              new RSCWebpackPlugin({
+                isServer: false,
+                clientReferences: customClientReferences,
+              }),
+              new RSCWebpackPlugin({
+                isServer: false,
+                clientReferences: rscClientReferences,
+              }),
+            );
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "injects the missing scoped helper without touching the custom clientReferences" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content).to include("const rscClientReferences = {")
+        expect(content).to include("directory: resolve(config.source_path)")
+        expect(content.scan("clientReferences: customClientReferences").length).to eq(1)
+        expect(content.scan("clientReferences: rscClientReferences").length).to eq(1)
+      end
+
+      expect(GeneratorMessages.messages.join("\n"))
+        .not_to include("all matching RSCWebpackPlugin instances already define clientReferences")
+    end
+  end
+
+  context "when path is imported into an unusable resolve binding" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const resolve = require('path');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "does not add a duplicate resolve binding or half-apply scoped client references" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content.scan("const resolve = require('path');").length).to eq(1)
+        expect(content).not_to include("const { resolve } = require('path');")
+        expect(content).not_to include("clientReferences: rscClientReferences")
+        expect(content).not_to include("const rscClientReferences")
+      end
+
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("a top-level `resolve` binding already exists that would conflict")
+    end
+  end
+
+  context "when the client webpack config uses aliased imports" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const { config: shakapackerConfig } = require('shakapacker');
+          const { resolve } = require('path');
+          #{base_client_webpack_content}
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "injects a usable config import without redeclaring resolve" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        # An aliased destructuring import does not create the plain `config` binding that
+        # rscClientReferences uses, so the duplicate require is intentional and harmless.
+        expect(content.scan("const { config } = require('shakapacker');").length).to eq(1)
+        expect(content.scan("const { resolve } = require('path');").length).to eq(1)
+        expect(content).to include("const { config: shakapackerConfig } = require('shakapacker');")
+        expect(content).to include("directory: resolve(config.source_path)")
+        expect(content).to include("isServer: false")
+      end
+    end
+  end
+
+  context "when the client webpack config uses self-aliased imports" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const { config: config } = require('shakapacker');
+          const { resolve: resolve } = require('path');
+          #{base_client_webpack_content}
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "reuses the self-aliased imports without adding duplicate bindings" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content).to include("const { config: config } = require('shakapacker');")
+        expect(content).to include("const { resolve: resolve } = require('path');")
+        expect(content).not_to include("const { config } = require('shakapacker');")
+        expect(content).not_to include("const { resolve } = require('path');")
+        expect(content).to include("directory: resolve(config.source_path)")
+        expect(content).to include("isServer: false")
       end
     end
   end
@@ -639,6 +3415,9 @@ describe RscGenerator, type: :generator do
         assert_file "config/rspack/serverWebpackConfig.js" do |content|
           expect(content).to include("RSCWebpackPlugin")
           expect(content).to include("react-on-rails-rsc/WebpackPlugin")
+          expect(content).to include("clientReferences: rscClientReferences")
+          expect(content).to include("directory: resolve(config.source_path)")
+          expect(content).to include("isServer: true")
         end
       end
 
@@ -651,7 +3430,9 @@ describe RscGenerator, type: :generator do
       it "adds RSCWebpackPlugin to clientWebpackConfig" do
         assert_file "config/rspack/clientWebpackConfig.js" do |content|
           expect(content).to include("RSCWebpackPlugin")
-          expect(content).to include("new RSCWebpackPlugin({ isServer: false })")
+          expect(content).to include("clientReferences: rscClientReferences")
+          expect(content).to include("directory: resolve(config.source_path)")
+          expect(content).to include("isServer: false")
         end
       end
 
@@ -724,7 +3505,9 @@ describe RscGenerator, type: :generator do
       it "serverWebpackConfig.js conditionally skips RSCWebpackPlugin when rscBundle is true" do
         assert_file "config/rspack/serverWebpackConfig.js" do |content|
           expect(content).to include("if (!rscBundle)")
-          expect(content).to include("RSCWebpackPlugin({ isServer: true })")
+          expect(content).to include("clientReferences: rscClientReferences")
+          expect(content).to include("directory: resolve(config.source_path)")
+          expect(content).to include("isServer: true")
         end
       end
 
