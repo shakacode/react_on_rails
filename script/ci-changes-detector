@@ -83,7 +83,9 @@ comment_line_is_runtime_directive() {
 
   case "$line" in
     *"frozen_string_literal:"*|*"encoding:"*|*"coding:"*|*"shareable_constant_value:"*|\
-    *"webpack"*|*"vite-ignore"*|*"@jsxImportSource"*|*"@jsx"*|*"@babel"*|*"#__PURE__"*|\
+    *"webpackChunkName"*|*"webpackMode"*|*"webpackPrefetch"*|*"webpackPreload"*|\
+    *"webpackInclude"*|*"webpackExclude"*|*"webpackIgnore"*|*"webpackExports"*|\
+    *"webpackFetchPriority"*|*"vite-ignore"*|*"@jsxImportSource"*|*"@jsx"*|*"@babel"*|*"#__PURE__"*|\
     *"sourceMappingURL"*|*"@preserve"*|*"@license"*)
       return 0
       ;;
@@ -101,6 +103,7 @@ comment_line_is_runtime_directive() {
 
 diff_line_is_comment_or_blank() {
   local line="$1"
+  local in_block_comment="${2:-false}"
   local trimmed="${line#"${line%%[![:space:]]*}"}"
 
   [ -z "$trimmed" ] && return 0
@@ -112,6 +115,7 @@ diff_line_is_comment_or_blank() {
   case "$trimmed" in
     '#'*|'//'*) return 0 ;;
     '/*'*|'*/'*) return 0 ;;
+    '*'*) [ "$in_block_comment" = true ] && return 0 ;;
     '=begin'*|'=end'*) return 0 ;;
   esac
 
@@ -128,15 +132,24 @@ source_file_comment_only_change() {
     *) return 1 ;;
   esac
 
-  local changed_line saw_changed_line=false
+  local changed_line saw_changed_line=false in_block_comment=false
   while IFS= read -r changed_line; do
     case "$changed_line" in
-      '+++'*|'---'*) continue ;;
+      '+++ '*|'--- '*) continue ;;
       '+'*|'-'*)
         saw_changed_line=true
-        if ! diff_line_is_comment_or_blank "${changed_line:1}"; then
+        if ! diff_line_is_comment_or_blank "${changed_line:1}" "$in_block_comment"; then
           return 1
         fi
+        case "${changed_line:1}" in
+          *'/*'*)
+            case "${changed_line:1}" in
+              *'*/'*) ;;
+              *) in_block_comment=true ;;
+            esac
+            ;;
+          *'*/'*) in_block_comment=false ;;
+        esac
         ;;
     esac
   done < <(git diff --no-ext-diff --unified=0 "$MERGE_BASE" "$CURRENT_REF" -- "$file")

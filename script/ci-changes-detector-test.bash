@@ -140,7 +140,7 @@ test_ruby_comment_only_change_skips_heavy_tests_but_keeps_lint() {
 
 test_javascript_block_comment_only_change_skips_heavy_tests_but_keeps_lint() {
   setup_repo
-  perl -0pi -e 's/export function/\/** Explains the fixture. *\/\nexport function/' \
+  perl -0pi -e 's/export function/\/**\n * Explains the fixture.\n *\/\nexport function/' \
     packages/react-on-rails/src/example.ts
   commit_change "js comment"
 
@@ -149,6 +149,30 @@ test_javascript_block_comment_only_change_skips_heavy_tests_but_keeps_lint() {
   assert_contains "$out" '"non_runtime_only": true' "js comment output"
   assert_contains "$out" '"run_lint": true' "js comment output"
   assert_contains "$out" '"run_js_tests": false' "js comment output"
+}
+
+test_prose_comment_containing_webpack_is_not_a_runtime_directive() {
+  setup_repo
+  perl -0pi -e 's/export function/\/\/ Documents a webpack migration note.\nexport function/' \
+    packages/react-on-rails/src/example.ts
+  commit_change "webpack prose comment"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"non_runtime_only": true' "webpack prose output"
+  assert_contains "$out" '"run_js_tests": false' "webpack prose output"
+}
+
+test_code_line_starting_with_plus_plus_remains_runtime_affecting() {
+  setup_repo
+  perl -0pi -e 's/  return .ok.;/  \/\/ Count calls.\n  ++counter;\n  return counter.toString();/' \
+    packages/react-on-rails/src/example.ts
+  commit_change "prefix increment code"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"non_runtime_only": false' "prefix increment output"
+  assert_contains "$out" '"run_js_tests": true' "prefix increment output"
 }
 
 test_spec_comment_only_change_skips_rspec() {
@@ -190,6 +214,8 @@ test_executable_source_change_remains_runtime_affecting() {
 run_test test_docs_changes_are_non_runtime_only
 run_test test_ruby_comment_only_change_skips_heavy_tests_but_keeps_lint
 run_test test_javascript_block_comment_only_change_skips_heavy_tests_but_keeps_lint
+run_test test_prose_comment_containing_webpack_is_not_a_runtime_directive
+run_test test_code_line_starting_with_plus_plus_remains_runtime_affecting
 run_test test_spec_comment_only_change_skips_rspec
 run_test test_ruby_magic_comment_remains_runtime_affecting
 run_test test_executable_source_change_remains_runtime_affecting

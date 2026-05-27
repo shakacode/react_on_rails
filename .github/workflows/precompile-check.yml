@@ -54,12 +54,7 @@ jobs:
             exit 0
           fi
 
-          PR_BEFORE="${{ github.event.before || '' }}"
-          if [ "${{ github.event_name }}" = "pull_request" ] && [ -n "$PR_BEFORE" ] && [[ ! "$PR_BEFORE" =~ ^0+$ ]]; then
-            BASE_REF="$PR_BEFORE"
-          else
-            BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}"
-          fi
+          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}"
           script/ci-changes-detector "$BASE_REF"
         shell: bash
       - name: Guard docs-only main pushes
