@@ -143,6 +143,15 @@ commit_change() {
   git commit -m "$message" >/dev/null
 }
 
+write_file_change() {
+  local path="$1"
+  local content="${2:-changed}"
+
+  mkdir -p "$(dirname "$path")"
+  printf '%s\n' "$content" > "$path"
+  commit_change "change $path"
+}
+
 test_docs_changes_are_non_runtime_only() {
   setup_repo
   printf '\nMore docs.\n' >> docs/guide.md
@@ -402,6 +411,66 @@ test_block_comment_with_trailing_code_remains_runtime_affecting() {
   assert_contains "$out" '"run_js_tests": true' "trailing code after block close output"
 }
 
+test_pro_only_changes_do_not_request_e2e() {
+  setup_repo
+  write_file_change "react_on_rails_pro/lib/react_on_rails_pro/example.rb"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"run_e2e_tests": false' "pro-only output"
+}
+
+test_rspec_only_changes_do_not_request_e2e() {
+  setup_repo
+  write_file_change "react_on_rails/spec/react_on_rails/some_spec.rb"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"run_ruby_tests": true' "rspec-only output"
+  assert_contains "$out" '"run_dummy_tests": false' "rspec-only output"
+  assert_contains "$out" '"run_e2e_tests": false' "rspec-only output"
+}
+
+test_generator_only_changes_do_not_request_e2e() {
+  setup_repo
+  write_file_change "react_on_rails/lib/generators/react_on_rails/install/example.rb"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"run_ruby_tests": true' "generator-only output"
+  assert_contains "$out" '"run_generators": true' "generator-only output"
+  assert_contains "$out" '"run_dummy_tests": false' "generator-only output"
+  assert_contains "$out" '"run_e2e_tests": false' "generator-only output"
+}
+
+test_dummy_app_changes_request_e2e() {
+  setup_repo
+  write_file_change "react_on_rails/spec/dummy/app/views/pages/example.html.erb"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"run_e2e_tests": true' "dummy app output"
+}
+
+test_core_ruby_changes_request_e2e() {
+  setup_repo
+  write_file_change "react_on_rails/lib/react_on_rails/example.rb"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"run_dummy_tests": true' "core ruby output"
+  assert_contains "$out" '"run_e2e_tests": true' "core ruby output"
+}
+
+test_core_js_changes_request_e2e() {
+  setup_repo
+  write_file_change "packages/react-on-rails/src/example.ts"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"run_e2e_tests": true' "core js output"
+}
+
 run_test test_docs_changes_are_non_runtime_only
 run_test test_ruby_comment_only_change_skips_heavy_tests_but_keeps_lint
 run_test test_ruby_block_comment_only_change_skips_heavy_tests_but_keeps_lint
@@ -423,6 +492,12 @@ run_test test_jsdoc_jsx_import_source_pragma_remains_runtime_affecting
 run_test test_inline_block_comment_license_remains_runtime_affecting
 run_test test_pure_annotation_remains_runtime_affecting
 run_test test_block_comment_with_trailing_code_remains_runtime_affecting
+run_test test_pro_only_changes_do_not_request_e2e
+run_test test_rspec_only_changes_do_not_request_e2e
+run_test test_generator_only_changes_do_not_request_e2e
+run_test test_dummy_app_changes_request_e2e
+run_test test_core_ruby_changes_request_e2e
+run_test test_core_js_changes_request_e2e
 
 echo
 echo "CI changes detector tests: $TESTS_RUN run, $TESTS_FAILED failed"
