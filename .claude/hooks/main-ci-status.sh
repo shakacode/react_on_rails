@@ -25,24 +25,70 @@ fail_open() {
   exit 0
 }
 
-# Resolve `origin/main` HEAD SHA up front so we can SHA-key the cache.
-# We use `git ls-remote` (not `gh run list`) so the SHA reflects the
-# current ref tip, not the latest push-workflow run — which can lag right
-# after a push (or never appear at all for docs-only pushes when
-# paths-ignore filters out every workflow). Matching the release gate's
-# SHA semantics (`git rev-parse origin/main`) keeps session-time and
+read_fresh_cache() {
+  local cache_file="$1"
+  local cache_mtime
+  local now
+  local age
+
+  [ -f "${cache_file}" ] || return 1
+
+  if [ "$(uname)" = "Darwin" ]; then
+    cache_mtime=$(stat -f %m "${cache_file}" 2>/dev/null || echo 0)
+  else
+    cache_mtime=$(stat -c %Y "${cache_file}" 2>/dev/null || echo 0)
+  fi
+
+  now=$(date +%s)
+  age=$((now - cache_mtime))
+  if [ "${age}" -lt "${CACHE_TTL_SECONDS}" ]; then
+    cat "${cache_file}"
+    exit 0
+  fi
+
+  return 1
+}
+
+github_slug_from_origin() {
+  local origin_url
+  local slug
+
+  origin_url=$(git -C "${REPO_ROOT}" remote get-url origin 2>/dev/null) || return 1
+  case "${origin_url}" in
+    https://github.com/*)
+      slug=${origin_url#https://github.com/}
+      ;;
+    git@github.com:*)
+      slug=${origin_url#git@github.com:}
+      ;;
+    ssh://git@github.com/*)
+      slug=${origin_url#ssh://git@github.com/}
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+
+  slug=${slug%.git}
+  [ -n "${slug}" ] || return 1
+  printf '%s\n' "${slug}"
+}
+
+# Fast path: if the local remote-tracking ref has a warm SHA-keyed cache,
+# print it without making a live network call. On cache miss we still ask the
+# remote for the authoritative current SHA before querying GitHub checks.
+local_head_sha=$(git -C "${REPO_ROOT}" rev-parse --verify origin/main 2>/dev/null || echo "")
+if [ -n "${local_head_sha}" ]; then
+  CACHE_FILE="${CACHE_DIR}/${CACHE_PREFIX}.${local_head_sha:0:12}"
+  read_fresh_cache "${CACHE_FILE}"
+fi
+
+# Resolve `origin/main` HEAD SHA from the remote before querying checks. We use
+# `git ls-remote` (not `gh run list`) so the SHA reflects the current ref tip,
+# not the latest push-workflow run — which can lag right after a push (or never
+# appear at all for docs-only pushes when paths-ignore filters every workflow).
+# Matching the release gate's origin/main semantics keeps session-time and
 # release-time observations consistent.
-#
-# Resolving the SHA before the cache lookup also lets us key the cache by
-# commit. With a mtime-only TTL, sessions could read the prior commit's
-# summary as if it applied to today's tip when main advances inside the
-# 5-minute window. A SHA-keyed file makes "no cache yet for this commit"
-# the natural state, and the TTL falls back to its original role of
-# rate-limiting API calls when the same SHA is checked many times.
-# NOTE: `git ls-remote` always runs — even on a cache hit — because we need
-# the current SHA to key the cache correctly. This is one lightweight network
-# call per session start (~50-200ms). The 5-min TTL only eliminates the more
-# expensive `gh api .../check-runs` call that follows on a cache miss.
 head_sha=$(git -C "${REPO_ROOT}" ls-remote origin refs/heads/main 2>/dev/null | awk 'NR==1 {print $1}')
 
 if [ -n "${head_sha}" ]; then
@@ -54,20 +100,8 @@ else
   CACHE_FILE="${CACHE_DIR}/${CACHE_PREFIX}"
 fi
 
-# If the cache for THIS SHA is fresh, print it and exit. Per-platform stat invocation differs.
-if [ -f "${CACHE_FILE}" ]; then
-  if [ "$(uname)" = "Darwin" ]; then
-    cache_mtime=$(stat -f %m "${CACHE_FILE}" 2>/dev/null || echo 0)
-  else
-    cache_mtime=$(stat -c %Y "${CACHE_FILE}" 2>/dev/null || echo 0)
-  fi
-  now=$(date +%s)
-  age=$((now - cache_mtime))
-  if [ "${age}" -lt "${CACHE_TTL_SECONDS}" ]; then
-    cat "${CACHE_FILE}"
-    exit 0
-  fi
-fi
+# If the cache for THIS SHA is fresh, print it and exit.
+read_fresh_cache "${CACHE_FILE}"
 
 # Helper: atomically replace the cache file with the contents of $1, then
 # print $1 to stdout. A direct `tee` would leave a partial file readable
@@ -100,7 +134,7 @@ write_cache_atomic() {
 command -v gh >/dev/null 2>&1 || fail_open "gh CLI not installed"
 gh auth status >/dev/null 2>&1 || fail_open "gh CLI not authenticated (run \`gh auth login\`)"
 
-repo_slug=$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null) || fail_open "gh repo view failed"
+repo_slug=$(github_slug_from_origin) || fail_open "unable to determine GitHub repo from origin"
 
 [ -n "${head_sha}" ] || fail_open "git ls-remote origin main failed"
 
@@ -129,23 +163,36 @@ checks_json=$(echo "${checks_jsonl}" | jq -s '
   | map(max_by(.id))
 ' 2>/dev/null) || fail_open "jq slurp failed"
 
+required_json=$(gh api \
+  "repos/${repo_slug}/branches/main/protection/required_status_checks" \
+  --jq '(.contexts // []) + (.checks // [] | map(.context)) | unique' \
+  2>/dev/null || echo "null")
+case "${required_json}" in
+  \[*\]) ;;
+  *) required_json="null" ;;
+esac
+
 # Aggregate counts with jq. `success`, `skipped`, `neutral` are all "passing".
 # Anything completed with another conclusion is a failure. Anything not yet
 # completed is in_progress.
-summary=$(echo "${checks_json}" | jq -r '
+summary=$(echo "${checks_json}" | jq -r --argjson required_names "${required_json}" '
   . as $all
+  | ($all | map(.name)) as $observed_names
   | {
       total: length,
       passed: [.[] | select(.status == "completed" and (.conclusion | IN("success", "skipped", "neutral")))] | length,
       failed: [.[] | select(.status == "completed" and (.conclusion | IN("success", "skipped", "neutral") | not))],
-      in_progress: [.[] | select(.status != "completed")]
+      in_progress: [.[] | select(.status != "completed")],
+      missing_required: (if $required_names == null then [] else ($required_names - $observed_names) end)
     }
   | "TOTAL=\(.total)",
     "PASSED=\(.passed)",
     "FAILED_COUNT=\(.failed | length)",
     "IN_PROGRESS_COUNT=\(.in_progress | length)",
+    "MISSING_REQUIRED_COUNT=\(.missing_required | length)",
     (.failed[] | "FAILED_LINE=" + .name + " — " + (.conclusion // "incomplete") + " — " + (.html_url // "")),
-    (.in_progress[] | "INPROGRESS_LINE=" + .name + " — " + (.status // "in_progress") + " — " + (.html_url // ""))
+    (.in_progress[] | "INPROGRESS_LINE=" + .name + " — " + (.status // "in_progress") + " — " + (.html_url // "")),
+    (.missing_required[] | "MISSING_REQUIRED_LINE=" + .)
 ') || fail_open "jq summary failed"
 
 short_sha="${head_sha:0:8}"
@@ -153,10 +200,11 @@ total=$(echo "${summary}" | grep "^TOTAL=" | cut -d= -f2)
 passed=$(echo "${summary}" | grep "^PASSED=" | cut -d= -f2)
 failed_count=$(echo "${summary}" | grep "^FAILED_COUNT=" | cut -d= -f2)
 in_progress_count=$(echo "${summary}" | grep "^IN_PROGRESS_COUNT=" | cut -d= -f2)
+missing_required_count=$(echo "${summary}" | grep "^MISSING_REQUIRED_COUNT=" | cut -d= -f2)
 # Default to 0 when the parse step produced no line (partial-output edge case).
 # The `total=0` branch below already covers the all-empty case, but a defensive
 # default here keeps `[ "${failed_count}" -gt 0 ]` from silently failing.
-: "${failed_count:=0}" "${in_progress_count:=0}"
+: "${failed_count:=0}" "${in_progress_count:=0}" "${missing_required_count:=0}"
 
 # Build the output as a single string, then atomically swap it into the cache
 # so a concurrent reader never sees a half-written file.
@@ -172,20 +220,25 @@ if [ "${total:-0}" = "0" ]; then
 else
   output=$(
     printf 'Main CI status (origin/main %s):\n' "${short_sha}"
-    printf '  Total: %s | Passed: %s | Failed: %s | In progress: %s\n' \
-      "${total}" "${passed}" "${failed_count}" "${in_progress_count}"
+    printf '  Total: %s | Passed: %s | Failed: %s | In progress: %s | Required missing: %s\n' \
+      "${total}" "${passed}" "${failed_count}" "${in_progress_count}" "${missing_required_count}"
 
-    if [ "${failed_count}" -gt 0 ] 2>/dev/null; then
+    if [ "${failed_count}" -gt 0 ]; then
       echo "  Failures:"
       echo "${summary}" | grep "^FAILED_LINE=" | sed 's/^FAILED_LINE=/    - /'
     fi
 
-    if [ "${in_progress_count}" -gt 0 ] 2>/dev/null; then
+    if [ "${in_progress_count}" -gt 0 ]; then
       echo "  In progress:"
       echo "${summary}" | grep "^INPROGRESS_LINE=" | sed 's/^INPROGRESS_LINE=/    - /'
     fi
 
-    if [ "${failed_count}" -gt 0 ] 2>/dev/null || [ "${in_progress_count}" -gt 0 ] 2>/dev/null; then
+    if [ "${missing_required_count}" -gt 0 ]; then
+      echo "  Missing required checks:"
+      echo "${summary}" | grep "^MISSING_REQUIRED_LINE=" | sed 's/^MISSING_REQUIRED_LINE=/    - /'
+    fi
+
+    if [ "${failed_count}" -gt 0 ] || [ "${in_progress_count}" -gt 0 ] || [ "${missing_required_count}" -gt 0 ]; then
       echo "  See: https://github.com/${repo_slug}/commit/${head_sha}/checks"
     fi
   )

@@ -373,24 +373,22 @@ def fetch_main_ci_checks(monorepo_root:, allow_override: false, dry_run: false)
     return nil
   end
 
-  { sha: sha, check_runs: check_runs }
+  { sha: sha, repo_slug: repo_slug, check_runs: check_runs }
 end
 # rubocop:enable Metrics/MethodLength
 
-def required_check_names_for_main(monorepo_root:)
-  repo_slug = github_repo_slug(monorepo_root)
+def required_check_names_for_main(monorepo_root:, repo_slug: nil)
+  repo_slug ||= github_repo_slug(monorepo_root)
   api_path = "repos/#{repo_slug}/branches/main/protection/required_status_checks"
   # Combine the legacy `contexts` list (older protection rules) with the newer
   # `checks[].context` list. Branch protection set up via the `checks` API
   # leaves `contexts` as `[]`, so reading only `contexts` would yield an empty
   # array and trip the `:no_required_checks` abort path even when CI is green.
   jq_query = "(.contexts // []) + (.checks // [] | map(.context)) | unique"
-  # Intentional: use `capture_gh_output` (which aborts on missing `gh`) here,
-  # not `Open3.capture2e` directly like `fetch_main_ci_checks` does. The
-  # difference is deliberate — this helper's failure mode is "branch
-  # protection unknown" which we treat as nil/fail-safe (caller falls back
-  # to evaluating every check_run), so we don't need the
-  # `handle_main_ci_status_violation!` dry-run/override routing.
+  # Precondition: `fetch_main_ci_checks` already verified `gh` is installed
+  # before `validate_main_ci_status!` calls this helper. The remaining failure
+  # mode here is "branch protection unknown", which returns nil so the caller
+  # fail-safes to evaluating every visible check_run.
   output, status = capture_gh_output("api", "--jq", jq_query, api_path)
   # If branch protection isn't configured, isn't queryable with current token scope, or the
   # endpoint returns 404, fall through to nil so the caller treats all checks as required
@@ -421,8 +419,12 @@ def format_main_ci_status_violation(kind:, short_sha:, runs:) # rubocop:disable 
            when :missing_required_checks
              "❌ Some required CI checks are missing on origin/main (commit #{short_sha}). " \
              "Branch protection would refuse this merge."
-           else
+           when :failed
              "❌ CI on origin/main is not healthy (commit #{short_sha})."
+           when :unknown_status
+             "❌ Check run(s) with unrecognized status on origin/main (commit #{short_sha})."
+           else
+             raise ArgumentError, "Unknown CI violation kind: #{kind.inspect}"
            end
   return header if runs.nil? || runs.empty?
 
@@ -436,13 +438,14 @@ end
 
 def handle_main_ci_status_violation!(message:, allow_override:, dry_run:)
   if dry_run
-    puts "⚠️ DRY RUN: #{message}"
+    puts message.lines.map { |line| "⚠️ DRY RUN: #{line}" }.join
     puts "⚠️ DRY RUN: Real release would block. Use RELEASE_CI_STATUS_OVERRIDE=true to bypass."
     return
   end
 
   if allow_override
-    puts "⚠️ CI STATUS OVERRIDE enabled: #{message.lines.first.strip}"
+    puts "⚠️ CI STATUS OVERRIDE enabled — proceeding despite the following:"
+    puts message.lines.map { |line| "  #{line}" }.join
     return
   end
 
@@ -468,6 +471,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
 
   sha = data[:sha]
   short_sha = sha[0, 8]
+  repo_slug = data[:repo_slug]
   check_runs = data[:check_runs]
 
   if check_runs.empty?
@@ -500,10 +504,11 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
   # Always query branch-protection required checks (when configured) so the
   # missing-required-check gate applies to both stable and prerelease.
   # `evaluated` then differs by mode:
-  #   - prerelease: only the required subset (strict gate)
-  #   - stable:     every check_run on the commit (lenient — non-required
-  #                 checks like benchmarks still block on failure)
-  required_names = required_check_names_for_main(monorepo_root: monorepo_root)
+  #   - prerelease: only the required subset (narrower filter; non-required failures are advisory)
+  #   - stable:     every check_run on the commit (broader filter; any failure blocks)
+  required_args = { monorepo_root: monorepo_root }
+  required_args[:repo_slug] = repo_slug if repo_slug
+  required_names = required_check_names_for_main(**required_args)
   evaluated = if is_prerelease && required_names
                 check_runs.select { |run| required_names.include?(run["name"]) }
               else
@@ -576,7 +581,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
   end
   if unknown.any?
     handle_main_ci_status_violation!(
-      message: format_main_ci_status_violation(kind: :failed, short_sha: short_sha, runs: unknown),
+      message: format_main_ci_status_violation(kind: :unknown_status, short_sha: short_sha, runs: unknown),
       allow_override: allow_override,
       dry_run: dry_run
     )

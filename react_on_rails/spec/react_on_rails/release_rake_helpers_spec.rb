@@ -510,10 +510,15 @@ RSpec.describe "release.rake helper methods" do
         .with(monorepo_root: monorepo_root).and_return(nil)
     end
 
-    # Fixed sentinel default keeps test data deterministic. Tests that rely
-    # on `max_by { id }` ordering (rerun-dedup, cross-suite dedup) supply
-    # explicit ids via `.merge("id" => N)`.
-    def passing_run(name, id: 9999)
+    def next_check_run_id
+      @next_check_run_id ||= 999
+      @next_check_run_id += 1
+    end
+
+    # Distinct defaults keep same-named helper-generated runs from collapsing
+    # in the nil-check_suite dedup path. Tests can still pin an id to model a
+    # specific GitHub payload.
+    def passing_run(name, id: next_check_run_id)
       {
         "id" => id,
         "name" => name,
@@ -523,7 +528,7 @@ RSpec.describe "release.rake helper methods" do
       }
     end
 
-    def failing_run(name, conclusion: "failure", id: 9999)
+    def failing_run(name, conclusion: "failure", id: next_check_run_id)
       {
         "id" => id,
         "name" => name,
@@ -533,7 +538,7 @@ RSpec.describe "release.rake helper methods" do
       }
     end
 
-    def in_progress_run(name, id: 9999)
+    def in_progress_run(name, id: next_check_run_id)
       {
         "id" => id,
         "name" => name,
@@ -695,6 +700,23 @@ RSpec.describe "release.rake helper methods" do
       end
     end
 
+    context "when same-named checks do not include check_suite data" do
+      it "keeps helper-generated runs distinct by default" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
+          .and_return(sha: sha, check_runs: [passing_run("Lint"), failing_run("Lint")])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root: monorepo_root,
+            is_prerelease: false,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to raise_error(SystemExit, %r{CI on origin/main is not healthy.*Lint}m)
+      end
+    end
+
     context "when a rerun and a same-named distinct-suite run exist together" do
       it "collapses only within a suite (same-suite rerun) and keeps cross-suite runs distinct" do
         suite_a_old_failed = failing_run("detect-changes").merge(
@@ -751,7 +773,7 @@ RSpec.describe "release.rake helper methods" do
             allow_override: true,
             dry_run: false
           )
-        end.to output(/CI STATUS OVERRIDE enabled/).to_stdout
+        end.to output(%r{CI STATUS OVERRIDE enabled.*Lint.*https://github.com}m).to_stdout
       end
     end
 
@@ -768,7 +790,7 @@ RSpec.describe "release.rake helper methods" do
             allow_override: false,
             dry_run: true
           )
-        end.to output(%r{DRY RUN.*CI on origin/main is not healthy}m).to_stdout
+        end.to output(%r{DRY RUN.*CI on origin/main is not healthy.*DRY RUN:.*Lint}m).to_stdout
       end
     end
 
@@ -885,7 +907,7 @@ RSpec.describe "release.rake helper methods" do
             allow_override: false,
             dry_run: false
           )
-        end.to raise_error(SystemExit, %r{CI on origin/main is not healthy.*Future Status}m)
+        end.to raise_error(SystemExit, /Check run\(s\) with unrecognized status.*Future Status/m)
       end
 
       it "treats a nil status as a failure too" do
@@ -901,8 +923,14 @@ RSpec.describe "release.rake helper methods" do
             allow_override: false,
             dry_run: false
           )
-        end.to raise_error(SystemExit, %r{CI on origin/main is not healthy.*Malformed}m)
+        end.to raise_error(SystemExit, /Check run\(s\) with unrecognized status.*Malformed/m)
       end
+    end
+
+    it "raises when asked to format an unknown CI violation kind" do
+      expect do
+        format_main_ci_status_violation(kind: :typo, short_sha: short_sha, runs: [])
+      end.to raise_error(ArgumentError, /Unknown CI violation kind: :typo/)
     end
   end
 
@@ -1040,6 +1068,7 @@ RSpec.describe "release.rake helper methods" do
 
       result = fetch_main_ci_checks(monorepo_root: monorepo_root)
       expect(result[:sha]).to eq("abc1234def")
+      expect(result[:repo_slug]).to eq("shakacode/react_on_rails")
       expect(result[:check_runs].length).to eq(2)
       expect(result[:check_runs].first["name"]).to eq("Lint")
     end
@@ -1055,13 +1084,31 @@ RSpec.describe "release.rake helper methods" do
       allow(self).to receive(:github_repo_slug).with(monorepo_root).and_return("shakacode/react_on_rails")
     end
 
-    it "returns the array of required context names when branch protection is configured" do
+    it "returns legacy required status contexts when branch protection is configured" do
       allow(Open3).to receive(:capture2e)
         .with("gh", "api", "--jq", expected_jq,
               "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks")
         .and_return([%w[Lint Test].to_json, success_status])
 
       expect(required_check_names_for_main(monorepo_root: monorepo_root)).to eq(%w[Lint Test])
+    end
+
+    it "returns modern required check contexts when branch protection uses checks" do
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", "--jq", expected_jq,
+              "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks")
+        .and_return([%w[CodeQL Lint].to_json, success_status])
+
+      expect(required_check_names_for_main(monorepo_root: monorepo_root)).to eq(%w[CodeQL Lint])
+    end
+
+    it "returns the deduplicated union when branch protection has contexts and checks" do
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", "--jq", expected_jq,
+              "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks")
+        .and_return([%w[CodeQL Lint Test].to_json, success_status])
+
+      expect(required_check_names_for_main(monorepo_root: monorepo_root)).to eq(%w[CodeQL Lint Test])
     end
 
     it "returns nil when the branch protection endpoint returns an error" do
