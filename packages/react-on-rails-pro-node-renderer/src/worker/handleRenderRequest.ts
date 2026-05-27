@@ -62,7 +62,7 @@ async function prepareResult(
           name: 'ror.vm.execute',
           attributes: { 'bundle.timestamp': String(bundleTimestamp) },
         },
-        () => executionContext.runInVM(renderingRequest, bundleFilePathPerTimestamp, cluster),
+        (_controller) => executionContext.runInVM(renderingRequest, bundleFilePathPerTimestamp, cluster),
       );
 
       let exceptionMessage = null;

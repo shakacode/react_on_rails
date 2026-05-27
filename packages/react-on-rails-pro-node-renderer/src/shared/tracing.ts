@@ -143,8 +143,8 @@ const noOpSubSpanController: SubSpanController = {
  * Signature of a sub-span implementation installed via {@link setupSubSpan}.
  * Must invoke `fn(controller)` and return its result. May wrap `fn` in a
  * tracing span. The implementation supplies a controller that forwards
- * `setAttributes` to the span; pass {@link noOpSubSpanController} when no
- * span is being created.
+ * `setAttributes` to the span; pass a no-op controller (e.g.
+ * `{ setAttributes() {} }`) when no span is being created.
  *
  * Implementations must either invoke `fn` synchronously or not invoke it at
  * all before throwing/rejecting. Deferred invocation, such as scheduling `fn`

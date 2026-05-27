@@ -1,4 +1,5 @@
 import path from 'path';
+import { stat, writeFile } from 'fs/promises';
 import { trace as otelTrace, type Tracer } from '@opentelemetry/api';
 import { InMemorySpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base';
 import { init } from '../../src/integrations/opentelemetry';
@@ -660,7 +661,6 @@ describe('opentelemetry integration: end-to-end render request', () => {
 
     await createUploadedBundle(testName);
     const uploadedBundle = uploadedBundleForTest();
-    const { stat } = await import('fs/promises');
     const uploadedSize = (await stat(uploadedBundle.savedFilePath)).size;
 
     await trace(
@@ -680,6 +680,9 @@ describe('opentelemetry integration: end-to-end render request', () => {
     const resultPrepareSpan = spans.find((s) => s.name === 'ror.result.prepare');
     const bundleUploadSpan = spans.find((s) => s.name === 'ror.bundle.upload');
 
+    expect(vmExecuteSpan).toBeDefined();
+    expect(resultPrepareSpan).toBeDefined();
+    expect(bundleUploadSpan).toBeDefined();
     expect(vmExecuteSpan!.attributes['bundle.timestamp']).toBe(String(BUNDLE_TIMESTAMP));
     expect(resultPrepareSpan!.attributes['response.bytes']).toEqual(expect.any(Number));
     expect(resultPrepareSpan!.attributes['response.bytes']).toBeGreaterThan(0);
@@ -692,8 +695,6 @@ describe('opentelemetry integration: end-to-end render request', () => {
       spanProcessor: new SimpleSpanProcessor(exporter),
     });
 
-    const { stat, writeFile } = await import('fs/promises');
-
     await createUploadedBundle(testName);
     const uploadedBundle = uploadedBundleForTest();
     const bundleSize = (await stat(uploadedBundle.savedFilePath)).size;
@@ -702,6 +703,7 @@ describe('opentelemetry integration: end-to-end render request', () => {
     const assetPath = `${uploadedBundle.savedFilePath}.asset.json`;
     const assetContent = '{"hello":"world"}';
     await writeFile(assetPath, assetContent);
+    const assetSize = (await stat(assetPath)).size;
     const asset: Asset = {
       type: 'asset',
       savedFilePath: assetPath,
@@ -722,6 +724,7 @@ describe('opentelemetry integration: end-to-end render request', () => {
     );
 
     const bundleUploadSpan = exporter.getFinishedSpans().find((s) => s.name === 'ror.bundle.upload');
-    expect(bundleUploadSpan!.attributes['bytes.total']).toBe(bundleSize + Buffer.byteLength(assetContent));
+    expect(bundleUploadSpan).toBeDefined();
+    expect(bundleUploadSpan!.attributes['bytes.total']).toBe(bundleSize + assetSize);
   });
 });

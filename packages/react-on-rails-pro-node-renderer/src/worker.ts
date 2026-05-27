@@ -548,7 +548,7 @@ export default function run(config: Partial<Config>) {
       // See https://github.com/shakacode/react_on_rails/issues/2463
       const bytesTotal = await sumUploadedBytes([
         ...providedNewBundles.map((b) => b.bundle),
-        ...assetsToCopy,
+        ...(assetsToCopy ?? []),
       ]);
       const result = await subSpan(
         {
