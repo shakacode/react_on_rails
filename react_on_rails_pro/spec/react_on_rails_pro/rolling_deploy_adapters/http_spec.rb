@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "fileutils"
 require "tmpdir"
 require_relative "../spec_helper"
 require "react_on_rails_pro/rolling_deploy_adapters/http"
@@ -33,6 +34,64 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
           )
         end
       end
+    end
+  end
+
+  describe ".fetch" do
+    let(:config) do
+      instance_double(
+        ReactOnRailsPro::Configuration,
+        rolling_deploy_previous_url: "https://example.com",
+        rolling_deploy_token: "token"
+      )
+    end
+    let(:http) { instance_double(Net::HTTP) }
+    let(:response) { Net::HTTPOK.new("1.1", "200", "OK") }
+    let(:logger) { instance_double(Logger, warn: nil) }
+    let(:tmpdir) { Dir.mktmpdir("ror-pro-http-fetch") }
+    let(:fetch_dir) { File.join(tmpdir, "hash123") }
+
+    after do
+      FileUtils.rm_rf(tmpdir)
+    end
+
+    before do
+      allow(ReactOnRailsPro).to receive(:configuration).and_return(config)
+      allow(Rails).to receive(:logger).and_return(logger)
+      allow(described_class).to receive(:bundle_dir).with("hash123").and_return(fetch_dir)
+      allow(Net::HTTP).to receive(:new).with("example.com", 443).and_return(http)
+      allow(http).to receive(:use_ssl=)
+      allow(http).to receive(:verify_mode=)
+      allow(http).to receive(:open_timeout=)
+      allow(http).to receive(:read_timeout=)
+      allow(http).to receive(:request) do |_request, &block|
+        block.call(response)
+        response
+      end
+      allow(http).to receive(:use_ssl?).and_return(true)
+    end
+
+    it "streams the bundle response into a tempfile before extracting it" do
+      tarball_body = compose_tarball_from_strings("bundle.js" => "bundle")
+      first_chunk = tarball_body.byteslice(0, 10)
+      second_chunk = tarball_body.byteslice(10, tarball_body.bytesize - 10)
+
+      expect(response).to receive(:read_body).and_yield(first_chunk).and_yield(second_chunk)
+      expect(response).not_to receive(:body)
+
+      result = described_class.fetch("hash123")
+
+      expect(result[:bundle]).to eq(File.join(fetch_dir, "bundle.js"))
+      expect(File.read(result[:bundle])).to eq("bundle")
+    end
+
+    it "aborts and cleans up when the compressed response exceeds the cap mid-stream" do
+      stub_const("#{described_class}::COMPRESSED_BODY_CAP", 5)
+      allow(response).to receive(:read_body).and_yield("abc").and_yield("def")
+
+      expect(described_class.fetch("hash123")).to be_nil
+      expect(File.exist?(fetch_dir)).to be(false)
+      expect(logger).to have_received(:warn).with(/returned more than 5 compressed bytes/)
     end
   end
 
@@ -214,5 +273,17 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
     body = nil
     ReactOnRailsPro::RollingDeploy::Tarball.compose_to_tempfile(entries) { |io| body = io.read }
     body
+  end
+
+  def compose_tarball_from_strings(entries)
+    Dir.mktmpdir("ror-pro-http-source") do |source_dir|
+      source_paths = entries.transform_values.with_index do |content, index|
+        path = File.join(source_dir, "source-#{index}")
+        File.write(path, content)
+        path
+      end
+
+      compose_tarball(source_paths)
+    end
   end
 end

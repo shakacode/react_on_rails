@@ -4,6 +4,7 @@ require "fileutils"
 require "json"
 require "net/http"
 require "openssl"
+require "tempfile"
 require "uri"
 
 require "react_on_rails_pro/error"
@@ -32,6 +33,7 @@ module ReactOnRailsPro
     # Error contract matches the rolling_deploy_adapter protocol: every
     # exception is caught and reported as a warning so a failed seed degrades
     # to the runtime 410-retry fallback rather than failing the build.
+    # rubocop:disable Metrics/ClassLength
     class Http
       # Per-request HTTP timeouts. The outer Timeout.timeout in
       # RollingDeployCacheStager bounds the total wall-clock budget (10s for
@@ -48,6 +50,10 @@ module ReactOnRailsPro
       # tarball helper default so a misbehaving or malicious server cannot
       # exhaust disk via a zip-bomb-style response.
       DEFAULT_MAX_SIZE = ReactOnRailsPro::RollingDeploy::Tarball::DEFAULT_MAX_SIZE
+
+      # Maximum compressed bytes accepted from /bundles/:hash before extract
+      # enforces DEFAULT_MAX_SIZE on the uncompressed tarball contents.
+      COMPRESSED_BODY_CAP = 50 * 1024 * 1024
 
       LOG_PREFIX = "[ReactOnRailsPro::RollingDeployAdapters::Http]"
 
@@ -101,10 +107,13 @@ module ReactOnRailsPro
 
           dir = bundle_dir(bundle_hash)
           FileUtils.mkdir_p(dir)
-          tarball_body = download_bundle_tarball(base, bundle_hash)
-          return cleanup_and_return(dir, nil) if tarball_body.nil?
 
-          extract_payload(tarball_body, dir, bundle_hash)
+          result = download_bundle_tarball(base, bundle_hash) do |tarball|
+            extract_payload(tarball, dir, bundle_hash)
+          end
+          return cleanup_and_return(dir, nil) if result.nil?
+
+          result
         rescue StandardError => e
           cleanup_and_return(dir, nil) if dir
           warn_and_return("fetch(#{bundle_hash.inspect}) failed: #{e.class}: #{e.message}", nil)
@@ -168,26 +177,40 @@ module ReactOnRailsPro
         end
 
         def download_bundle_tarball(base, bundle_hash)
-          response = http_get(URI("#{base}/bundles/#{bundle_hash}"))
-          unless response.is_a?(Net::HTTPSuccess)
-            Rails.logger.warn(
-              "#{LOG_PREFIX} bundles/#{bundle_hash} returned HTTP #{response.code}; skipping this hash."
-            )
-            return nil
+          Tempfile.create(["rolling-deploy-download-", ".tar.gz"]) do |tmp|
+            tmp.binmode
+            response = http_stream(URI("#{base}/bundles/#{bundle_hash}")) do |streaming_response|
+              unless streaming_response.is_a?(Net::HTTPSuccess)
+                Rails.logger.warn(
+                  "#{LOG_PREFIX} bundles/#{bundle_hash} returned HTTP #{streaming_response.code}; skipping this hash."
+                )
+                next
+              end
+
+              stream_response_body(streaming_response, tmp)
+            end
+            return nil unless response.is_a?(Net::HTTPSuccess)
+
+            tmp.flush
+            tmp.rewind
+            yield tmp
           end
-          # `response.body` buffers the full compressed tarball into a single
-          # Ruby String before `Tarball.extract` can enforce DEFAULT_MAX_SIZE on
-          # uncompressed bytes. For v1 this is acceptable: build CI fetches are
-          # infrequent, the 200 MB uncompressed ceiling fits in heap, and the
-          # read timeout bounds slow responses. A future follow-up should stream
-          # the body into a Tempfile with its own compressed-byte cap (mirroring
-          # the controller's `compose_to_tempfile`) so an oversized wire payload
-          # cannot fill build-CI heap before extraction aborts.
-          response.body
         end
 
-        def extract_payload(tarball_body, dir, bundle_hash)
-          ReactOnRailsPro::RollingDeploy::Tarball.extract(tarball_body, dir, max_size: DEFAULT_MAX_SIZE)
+        def stream_response_body(response, io)
+          bytes = 0
+          response.read_body do |chunk|
+            bytes += chunk.bytesize
+            if bytes > COMPRESSED_BODY_CAP
+              raise ReactOnRailsPro::Error,
+                    "rolling_deploy_previous_url returned more than #{COMPRESSED_BODY_CAP} compressed bytes; aborting"
+            end
+            io.write(chunk)
+          end
+        end
+
+        def extract_payload(tarball_source, dir, bundle_hash)
+          ReactOnRailsPro::RollingDeploy::Tarball.extract(tarball_source, dir, max_size: DEFAULT_MAX_SIZE)
           bundle_path = File.join(dir, BUNDLE_ENTRY_NAME)
           unless File.file?(bundle_path)
             return cleanup_and_return(
@@ -225,18 +248,34 @@ module ReactOnRailsPro
         # connection pooling would force us to manage lifecycle / cleanup
         # across threads.
         def http_get(uri, read_timeout: DEFAULT_READ_TIMEOUT_SECONDS)
+          http_for(uri, read_timeout: read_timeout).request(build_request(uri))
+        end
+
+        def http_stream(uri, read_timeout: DEFAULT_READ_TIMEOUT_SECONDS)
+          response = nil
+          http_for(uri, read_timeout: read_timeout).request(build_request(uri)) do |streaming_response|
+            response = streaming_response
+            yield streaming_response
+          end
+          response
+        end
+
+        def build_request(uri)
           request = Net::HTTP::Get.new(uri.request_uri)
           token = configured_token
           request["Authorization"] = "Bearer #{token}" unless token.empty?
           request["Accept-Encoding"] = "identity" # tarball is already gzipped; don't double-compress
+          request
+        end
 
+        def http_for(uri, read_timeout:)
           http = Net::HTTP.new(uri.host, uri.port)
           http.use_ssl = (uri.scheme == "https")
           warn_plain_http_token(uri) unless http.use_ssl?
           http.verify_mode = OpenSSL::SSL::VERIFY_PEER if http.use_ssl?
           http.open_timeout = DEFAULT_OPEN_TIMEOUT_SECONDS
           http.read_timeout = read_timeout
-          http.request(request)
+          http
         end
 
         # Plain-HTTP guardrail. The full HTTPS-only guard lands in PR 2; until
@@ -260,5 +299,6 @@ module ReactOnRailsPro
         end
       end
     end
+    # rubocop:enable Metrics/ClassLength
   end
 end
