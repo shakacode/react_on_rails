@@ -2900,15 +2900,12 @@ module ReactOnRails
     end
 
     def deploy_script_references_deprecated_task?(full_path)
-      # Filter `#` comments since Procfile, Dockerfile*, YAML, Ruby, and bin/*
-      # scripts all use `#`. Jenkinsfile (Groovy) uses `//`; we accept the rare
-      # false positive of a `//`-commented mention as the cost of keeping the
-      # filter simple — real `sh` invocations are flagged correctly.
+      # Filter whole-line comments used by the scanned deploy and CI files.
       # The trailing-comment strip requires whitespace before `#`, so a fragment
       # like `task#name` stays intact while `cmd # was: <deprecated>` is filtered.
       full_path.binread.each_line.any? do |line|
         stripped = line.lstrip
-        next false if stripped.start_with?("#")
+        next false if stripped.start_with?("#", "//")
 
         without_inline_comment = stripped.sub(/ +#.*/, "")
         without_inline_comment.include?(DEPRECATED_RENDERER_CACHE_TASK)

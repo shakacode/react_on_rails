@@ -3409,7 +3409,7 @@ RSpec.describe ReactOnRails::Doctor do
         expect(suggestion_line).to include("MODE=symlink")
       end
 
-      it "still flags a //-commented reference as a known Groovy false positive" do
+      it "does not flag a //-commented Jenkinsfile reference" do
         File.write(
           File.join(tmpdir, "Jenkinsfile"),
           "// sh 'bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer'\n"
@@ -3420,7 +3420,7 @@ RSpec.describe ReactOnRails::Doctor do
         suggestion_line = warning_msgs
                           .flat_map { |m| m[:content].split("\n") }
                           .find { |line| line.include?("Jenkinsfile →") }
-        expect(suggestion_line).not_to be_nil
+        expect(suggestion_line).to be_nil
       end
     end
 

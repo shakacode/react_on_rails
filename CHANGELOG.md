@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Changed
+
+- **`react_on_rails:doctor` renderer-cache scan covers Jenkinsfile**: The deprecated-task scan that flags `react_on_rails_pro:pre_stage_bundle_for_node_renderer` now also checks `Jenkinsfile`, alongside the existing CI/CD manifests (`.circleci/config.yml`, `.gitlab-ci.yml`, `bitbucket-pipelines.yml`, `.github/workflows/*.yml`/`.yaml`) and deploy scripts. Fixes [Issue 3269](https://github.com/shakacode/react_on_rails/issues/3269). [PR 3345](https://github.com/shakacode/react_on_rails/pull/3345) by [justin808](https://github.com/justin808).
+
 ### [16.7.0.rc.3] - 2026-05-25
 
 #### Breaking Changes
@@ -52,10 +56,6 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   - **No implicit transport retry** for connection drops: drops surface immediately as `ReactOnRailsPro::Error`/connection failures. HTTPX previously performed one implicit transport retry; the new adapter uses `retries: 0` and leaves retry policy to the existing bundle-upload retry loop.
 
   See `docs/pro/updating.md` for the full upgrade guide. [PR 3320](https://github.com/shakacode/react_on_rails/pull/3320) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
-#### Changed
-
-- **`react_on_rails:doctor` renderer-cache scan covers Jenkinsfile**: The deprecated-task scan that flags `react_on_rails_pro:pre_stage_bundle_for_node_renderer` now also checks `Jenkinsfile`, alongside the existing CI/CD manifests (`.circleci/config.yml`, `.gitlab-ci.yml`, `bitbucket-pipelines.yml`, `.github/workflows/*.yml`/`.yaml`) and deploy scripts. Fixes [Issue 3269](https://github.com/shakacode/react_on_rails/issues/3269).
 
 #### Fixed
 
