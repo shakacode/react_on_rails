@@ -21,6 +21,7 @@ import {
   handleRenderRequest,
   type ProvidedNewBundle,
   handleNewBundlesProvided,
+  sumUploadedBytes,
 } from './worker/handleRenderRequest.js';
 import handleGracefulShutdown from './worker/handleGracefulShutdown.js';
 import { handleStartupListenError } from './worker/startupErrorHandler.js';
@@ -545,12 +546,17 @@ export default function run(config: Partial<Config>) {
       // endpoint so that concurrent /upload-assets and render requests
       // targeting the same bundle directory are mutually exclusive.
       // See https://github.com/shakacode/react_on_rails/issues/2463
+      const bytesTotal = await sumUploadedBytes([
+        ...providedNewBundles.map((b) => b.bundle),
+        ...(assetsToCopy ?? []),
+      ]);
       const result = await subSpan(
         {
           name: 'ror.bundle.upload',
           attributes: {
             'bundle.count': providedNewBundles.length,
             'assets.count': assetsToCopy.length,
+            'bytes.total': bytesTotal,
           },
         },
         () =>

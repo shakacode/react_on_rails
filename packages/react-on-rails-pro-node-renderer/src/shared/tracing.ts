@@ -115,7 +115,7 @@ export function __resetTracingForTest(): void {
  * Options passed to a sub-span wrapper.
  *
  * `name` is the span name (use dot.namespaced form, e.g. `ror.bundle.upload`).
- * `attributes` are arbitrary key/value pairs attached to the span.
+ * `attributes` are arbitrary key/value pairs attached to the span at creation.
  */
 export interface SubSpanOptions {
   name: string;
@@ -123,17 +123,41 @@ export interface SubSpanOptions {
 }
 
 /**
- * Signature of a sub-span implementation installed via {@link setupSubSpan}.
- * Must invoke `fn()` and return its result. May wrap `fn()` in a tracing span.
+ * Handed to the wrapped function so it can record attributes that are only
+ * known after the work runs (e.g., response byte counts). Implementations
+ * forward calls to the underlying span; the no-op default discards them.
  *
- * Implementations must either invoke `fn()` synchronously or not invoke it at
- * all before throwing/rejecting. Deferred invocation, such as scheduling `fn()`
- * with `setImmediate`, is unsupported because the fallback may run `fn()` to
- * preserve renderer behavior when an implementation fails before invocation.
+ * Only include byte counts, hashes, and counts here — never raw request or
+ * response payloads. Span attributes are not redacted by the renderer's
+ * logging policy.
  */
-export type SubSpanFn = <T>(opts: SubSpanOptions, fn: () => Promise<T>) => Promise<T>;
+export interface SubSpanController {
+  setAttributes(attributes: Record<string, string | number | boolean>): void;
+}
 
-const defaultSubSpan: SubSpanFn = (_opts, fn) => fn();
+const noOpSubSpanController: SubSpanController = {
+  setAttributes() {},
+};
+
+/**
+ * Signature of a sub-span implementation installed via {@link setupSubSpan}.
+ * Must invoke `fn(controller)` and return its result. May wrap `fn` in a
+ * tracing span. The implementation supplies a controller that forwards
+ * `setAttributes` to the span; pass a no-op controller (e.g.
+ * `{ setAttributes() {} }`) when no span is being created.
+ *
+ * Implementations must either invoke `fn` synchronously or not invoke it at
+ * all before throwing/rejecting. Deferred invocation, such as scheduling `fn`
+ * with `setImmediate`, is unsupported because the fallback may run `fn`
+ * itself to preserve renderer behavior when an implementation fails before
+ * invocation.
+ */
+export type SubSpanFn = <T>(
+  opts: SubSpanOptions,
+  fn: (controller: SubSpanController) => Promise<T>,
+) => Promise<T>;
+
+const defaultSubSpan: SubSpanFn = (_opts, fn) => fn(noOpSubSpanController);
 let subSpanImpl: SubSpanFn = defaultSubSpan;
 let subSpanSetupRun = false;
 
@@ -154,18 +178,25 @@ export function setupSubSpan(impl: SubSpanFn): boolean {
 
 /**
  * Wrap an async function in a named sub-span. Safe to call even when no
- * integration is installed — defaults to passing through to `fn()`.
+ * integration is installed — defaults to passing through to `fn`.
  *
- * If the installed implementation throws or rejects before invoking `fn()`, the
- * caller is shielded: `fn()` is still executed outside any sub-span and its
- * result returned. If the implementation fails after invoking `fn()`, the error
- * is rethrown so `fn()` is never run twice.
+ * The wrapped function receives a {@link SubSpanController} it can use to
+ * attach attributes that are only known after the work runs (e.g., response
+ * byte counts). With no integration installed, attribute updates are dropped.
+ *
+ * If the installed implementation throws or rejects before invoking `fn`, the
+ * caller is shielded: `fn` is still executed outside any sub-span (with the
+ * no-op controller) and its result returned. If the implementation fails
+ * after invoking `fn`, the error is rethrown so `fn` is never run twice.
  */
-export function subSpan<T>(opts: SubSpanOptions, fn: () => Promise<T>): Promise<T> {
+export function subSpan<T>(
+  opts: SubSpanOptions,
+  fn: (controller: SubSpanController) => Promise<T>,
+): Promise<T> {
   let invoked = false;
-  const wrappedFn = () => {
+  const wrappedFn = (controller: SubSpanController) => {
     invoked = true;
-    return fn();
+    return fn(controller);
   };
 
   try {
@@ -180,7 +211,7 @@ export function subSpan<T>(opts: SubSpanOptions, fn: () => Promise<T>): Promise<
       // still executed. log.warn surfaces the broken integration without
       // paging the on-call team for every render.
       log.warn({ err }, 'subSpan implementation rejected before invoking fn(); running fn() without a span');
-      return wrappedFn();
+      return wrappedFn(noOpSubSpanController);
     });
   } catch (err) {
     if (invoked) {
@@ -188,7 +219,7 @@ export function subSpan<T>(opts: SubSpanOptions, fn: () => Promise<T>): Promise<
     }
 
     log.warn({ err }, 'subSpan implementation threw before invoking fn(); running fn() without a span');
-    return wrappedFn();
+    return wrappedFn(noOpSubSpanController);
   }
 }
 

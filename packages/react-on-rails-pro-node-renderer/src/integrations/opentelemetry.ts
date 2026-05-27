@@ -169,7 +169,6 @@ async function shutdownProviderWithTimeout(
           timedOut = true;
           // shutdownPromise rejection (if any) is handled by observedShutdownPromise above.
           void shutdownPromise.catch(() => undefined);
-          // shutdownPromise rejection (if any) is handled by observedShutdownPromise above.
           log.warn(
             '[OpenTelemetry] provider.shutdown() timed out after %dms; continuing worker shutdown',
             shutdownTimeoutMs,
@@ -326,8 +325,13 @@ export function init(opts: OpenTelemetryInitOptions = {}): void {
       if (installedAdapters.tracing) {
         const subSpanImpl: SubSpanFn = (subOpts, fn) =>
           tracer.startActiveSpan(subOpts.name, { attributes: subOpts.attributes }, async (span) => {
+            const controller = {
+              setAttributes(attributes: Record<string, string | number | boolean>) {
+                span.setAttributes(attributes);
+              },
+            };
             try {
-              return await fn();
+              return await fn(controller);
             } catch (err) {
               span.setStatus({
                 code: loadedOtelApi.SpanStatusCode.ERROR,

@@ -211,7 +211,7 @@ describe('opentelemetry integration: init() failure path', () => {
         executor: (fn) => fn(),
       }),
     ).toBe(true);
-    expect(tracing.setupSubSpan((_opts, fn) => fn())).toBe(true);
+    expect(tracing.setupSubSpan((_opts, fn) => fn({ setAttributes: () => undefined }))).toBe(true);
     tracing.__resetTracingForTest();
     tracing.__resetSubSpanForTest();
   });
