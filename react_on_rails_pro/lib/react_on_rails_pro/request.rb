@@ -313,7 +313,8 @@ module ReactOnRailsPro
               filename: File.basename(asset_path)
             }
           rescue StandardError => e
-            warn "[ReactOnRailsPro] Error uploading asset #{asset_path}: #{e}"
+            safe_error = ReactOnRails::UrlSanitizer.redact_password(e.to_s)
+            warn "[ReactOnRailsPro] Error uploading asset #{asset_path}: #{safe_error}"
           end
         end
 
@@ -360,7 +361,7 @@ module ReactOnRailsPro
           renderer_url = #{safe_url}
           Be sure to use a url that contains the protocol of http or https.
           Original error is
-          #{e}
+          #{ReactOnRails::UrlSanitizer.redact_password(e.to_s)}
         MSG
         raise ReactOnRailsPro::Error, message
       end

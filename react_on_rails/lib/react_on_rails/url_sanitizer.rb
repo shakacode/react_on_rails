@@ -33,18 +33,23 @@ module ReactOnRails
     def redact_password(input)
       return input if input.nil? || input.empty?
 
-      # If the entire input is a parseable URL with a password, use the URI
-      # API for an exact, structure-aware replacement.
+      # If the entire input is a parseable URL, trust URI's structural view:
+      # either redact via the URI API or — when there's no password to redact —
+      # return the input unchanged. Skipping the regex for clean parseable URLs
+      # avoids false positives on URLs whose query/fragment contains an '@'
+      # (e.g. https://host/path?email=a@b would otherwise be corrupted into
+      # https://host:__REDACTED__@b).
       uri = URI.parse(input)
       if uri.password && !uri.password.empty?
         uri.password = REDACTED_PLACEHOLDER
         return uri.to_s
       end
-      # No password in a parseable URL → still run the regex on the input in
-      # case the parser tolerated a malformed userinfo segment that contains
-      # a literal password we ought to mask.
-      apply_regex_redaction(input)
+      input
     rescue URI::InvalidURIError
+      # URL is either malformed OR embedded inside a larger string (e.g.
+      # `URI::InvalidURIError#message`, "Setting up Node Renderer connection
+      # to <url>", HTTPX error messages). Fall back to a regex that can
+      # locate a `userinfo@host` pattern inside arbitrary surrounding text.
       apply_regex_redaction(input)
     end
 

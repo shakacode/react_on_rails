@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "async"
+require "react_on_rails/url_sanitizer"
 
 module ReactOnRailsPro
   class StreamDecorator

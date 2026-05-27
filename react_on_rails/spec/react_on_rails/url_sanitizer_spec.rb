@@ -113,6 +113,25 @@ module ReactOnRails
         expect(result).not_to include(sensitive)
         expect(result).to include("__REDACTED__")
       end
+
+      # Regression: a parseable URL with no userinfo and an '@' in the query
+      # or fragment must not be corrupted. The regex fallback used to match
+      # 'renderer:3800/path?email=a' + '@' + 'b' and emit `:__REDACTED__@b`,
+      # which is log corruption.
+      it "does not corrupt parseable URLs with '@' in the query string" do
+        input = "https://renderer:3800/path?email=a@b"
+        expect(described_class.redact_password(input)).to eq(input)
+      end
+
+      it "does not corrupt parseable URLs with '@' in the fragment" do
+        input = "https://renderer:3800/path#user@example.com"
+        expect(described_class.redact_password(input)).to eq(input)
+      end
+
+      it "does not corrupt parseable URLs with multiple '@' in the query string" do
+        input = "https://renderer:3800/render?cc=a@b.com&bcc=c@d.com"
+        expect(described_class.redact_password(input)).to eq(input)
+      end
     end
   end
 end
