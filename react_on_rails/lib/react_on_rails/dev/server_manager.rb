@@ -469,12 +469,30 @@ module ReactOnRails
         end
 
         def parsed_shakapacker_config
-          config_path = ENV["SHAKAPACKER_CONFIG"] || "config/shakapacker.yml"
+          config_path = shakapacker_config_path
           return nil unless File.exist?(config_path)
 
           YAML.safe_load(ERB.new(File.read(config_path)).result, aliases: true, permitted_classes: [Symbol])
         rescue StandardError
           nil
+        end
+
+        # Resolves SHAKAPACKER_CONFIG the same way ReactOnRails::Engine does, so this CLI
+        # sees the same config file as Rails boot even when invoked from a directory other
+        # than the Rails root. Falls back to Dir.pwd when Rails isn't loaded (bin/dev does
+        # not require Rails directly).
+        def shakapacker_config_path
+          env_config_path = ENV.fetch("SHAKAPACKER_CONFIG", nil)
+          base = shakapacker_config_base_dir
+          return File.expand_path("config/shakapacker.yml", base) if env_config_path.to_s.empty?
+
+          File.expand_path(env_config_path, base)
+        end
+
+        def shakapacker_config_base_dir
+          return Rails.root.to_s if defined?(Rails) && Rails.respond_to?(:root) && Rails.root
+
+          Dir.pwd
         end
 
         # rubocop:disable Metrics/AbcSize
