@@ -2145,6 +2145,25 @@ describe RscGenerator, type: :generator do
       expect(File.read(full_path)).to eq(content)
     end
 
+    it "returns true from the client references rewrite predicate without file writes" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+        JS
+      )
+
+      full_path = File.join(destination_root, config_path)
+      content = File.read(full_path)
+
+      expect(generator.send(:rsc_plugin_needs_client_references_rewrite?, content, is_server: false))
+        .to be(true)
+      expect(File.read(full_path)).to eq(content)
+    end
+
     it "does not inject duplicate imports for legacy let or var CommonJS destructuring" do
       config_path = "config/webpack/clientWebpackConfig.js"
       simulate_existing_file(

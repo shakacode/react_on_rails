@@ -123,6 +123,8 @@ module ReactOnRails
         def update_existing_rsc_webpack_config(config_path, content, is_server:)
           return unless rsc_plugin_sections_safe_to_rewrite?(config_path, content)
           return if rsc_plugin_uses_scoped_client_references?(content, is_server: is_server)
+
+          # May inject the scoped helper before the rewrite step re-reads the config from disk.
           return unless prepare_rsc_client_references_setup(config_path, content, is_server: is_server)
           return unless rsc_plugin_needs_client_references_rewrite?(content, is_server: is_server)
 
@@ -150,7 +152,9 @@ module ReactOnRails
         # counter past the real closing brace). When found, we warn and refuse to rewrite anything
         # in the file so a sibling rewrite cannot accidentally splice into a wrong location.
         def rsc_plugin_sections_safe_to_rewrite?(config_path, content)
-          # The unparseable count is file-wide; the target-specific safe bucket is ignored here.
+          # The unparseable count is file-wide: the partition increments it for every invocation
+          # that cannot be parsed, regardless of the `is_server` argument. The argument only
+          # filters the target-specific safe bucket, which is ignored here.
           unparseable = rsc_plugin_option_sections_partition(content, is_server: true).fetch(:unparseable)
           return true if unparseable.zero?
 
