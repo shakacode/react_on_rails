@@ -89,6 +89,11 @@ export function example(): string {
   return 'ok';
 }
 TS
+  cat > packages/react-on-rails/src/template.ts <<'TS'
+export const template = `
+// runtime fixture text
+`;
+TS
   cat > react_on_rails/spec/react_on_rails/example_spec.rb <<'RUBY'
 RSpec.describe "example" do
   it "works" do
@@ -175,6 +180,17 @@ test_code_line_starting_with_plus_plus_remains_runtime_affecting() {
   assert_contains "$out" '"run_js_tests": true' "prefix increment output"
 }
 
+test_comment_like_template_literal_change_remains_runtime_affecting() {
+  setup_repo
+  perl -0pi -e 's/runtime fixture text/changed fixture text/' packages/react-on-rails/src/template.ts
+  commit_change "template literal text"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"non_runtime_only": false' "template literal output"
+  assert_contains "$out" '"run_js_tests": true' "template literal output"
+}
+
 test_spec_comment_only_change_skips_rspec() {
   setup_repo
   perl -0pi -e 's/it "works"/# Fixture intent.\n  it "works"/' \
@@ -186,6 +202,19 @@ test_spec_comment_only_change_skips_rspec() {
   assert_contains "$out" '"non_runtime_only": true' "spec comment output"
   assert_contains "$out" '"run_lint": true' "spec comment output"
   assert_contains "$out" '"run_ruby_tests": false' "spec comment output"
+}
+
+test_mixed_comment_and_code_change_remains_runtime_affecting() {
+  setup_repo
+  perl -0pi -e 's/    def call/    # Explain the fixture.\n    def call/' \
+    react_on_rails/lib/react_on_rails/example.rb
+  perl -0pi -e 's/"ok"/"changed"/' react_on_rails/lib/react_on_rails/example.rb
+  commit_change "mixed comment and code"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"non_runtime_only": false' "mixed output"
+  assert_contains "$out" '"run_ruby_tests": true' "mixed output"
 }
 
 test_ruby_magic_comment_remains_runtime_affecting() {
@@ -216,7 +245,9 @@ run_test test_ruby_comment_only_change_skips_heavy_tests_but_keeps_lint
 run_test test_javascript_block_comment_only_change_skips_heavy_tests_but_keeps_lint
 run_test test_prose_comment_containing_webpack_is_not_a_runtime_directive
 run_test test_code_line_starting_with_plus_plus_remains_runtime_affecting
+run_test test_comment_like_template_literal_change_remains_runtime_affecting
 run_test test_spec_comment_only_change_skips_rspec
+run_test test_mixed_comment_and_code_change_remains_runtime_affecting
 run_test test_ruby_magic_comment_remains_runtime_affecting
 run_test test_executable_source_change_remains_runtime_affecting
 

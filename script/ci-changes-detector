@@ -122,9 +122,32 @@ diff_line_is_comment_or_blank() {
   return 1
 }
 
+source_file_has_multiline_string_construct() {
+  local file="$1"
+  local content
+
+  content="$(git show "$CURRENT_REF:$file" 2>/dev/null || cat "$file" 2>/dev/null || true)"
+
+  case "$file" in
+    *.rb|Gemfile|*.rake)
+      grep -Eq "<<[-~]?[[:space:]]*['\"]?[A-Za-z_][A-Za-z0-9_]*" <<< "$content"
+      ;;
+    *.js|*.jsx|*.ts|*.tsx)
+      grep -q '`' <<< "$content"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 source_file_comment_only_change() {
   local file="$1"
   local status
+
+  if source_file_has_multiline_string_construct "$file"; then
+    return 1
+  fi
 
   status="$(git diff --name-status "$MERGE_BASE" "$CURRENT_REF" -- "$file" | awk 'NR == 1 { print $1 }')"
   case "$status" in
