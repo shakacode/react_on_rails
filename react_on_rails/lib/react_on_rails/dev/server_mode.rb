@@ -114,9 +114,10 @@ module ReactOnRails
         def parse_config(config_path)
           return nil unless File.exist?(config_path)
 
-          # ERB uses TOPLEVEL_BINDING here so config files can reference ENV and top-level constants.
-          # Shakapacker YAML uses string keys (e.g. "hmr"), never YAML symbol literals, so the default
-          # safe_load permitted_classes is sufficient.
+          # ERB uses the default top-level binding so config files can reference ENV and top-level
+          # constants — this mirrors how Shakapacker itself evaluates shakapacker.yml.
+          # YAML uses string keys (e.g. "hmr"), never symbol literals, so the default safe_load
+          # permitted_classes list is sufficient.
           YAML.safe_load(ERB.new(File.read(config_path)).result, aliases: true)
         rescue SyntaxError, StandardError => e
           warn(
@@ -149,7 +150,7 @@ module ReactOnRails
           return :live_reload if live_reload == true
           return :development_server if live_reload == false
 
-          # For a non-empty dev_server config without explicit HMR or live_reload: false, default to live reload.
+          # For a non-empty dev_server config without hmr: true or live_reload: false, default to live reload.
           # Shakapacker enables live reload by default unless explicitly disabled:
           # https://github.com/shakacode/shakapacker/blob/main/package/webpackDevServerConfig.ts
           # See generators/react_on_rails/templates/base/base/config/shakapacker.yml.tt.
