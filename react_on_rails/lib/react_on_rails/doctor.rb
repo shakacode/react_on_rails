@@ -2901,13 +2901,14 @@ module ReactOnRails
 
     def deploy_script_references_deprecated_task?(full_path)
       # Filter whole-line comments used by the scanned deploy and CI files.
-      # The trailing-comment strip requires whitespace before `#`, so a fragment
-      # like `task#name` stays intact while `cmd # was: <deprecated>` is filtered.
+      # The trailing-comment strip requires whitespace before the comment marker,
+      # so fragments like `task#name` or `https://...` stay intact while
+      # `cmd # was: <deprecated>` and `cmd // was: <deprecated>` are filtered.
       full_path.binread.each_line.any? do |line|
         stripped = line.lstrip
         next false if stripped.start_with?("#", "//")
 
-        without_inline_comment = stripped.sub(/ +#.*/, "")
+        without_inline_comment = stripped.sub(%r{ +(?:#|//).*}, "")
         without_inline_comment.include?(DEPRECATED_RENDERER_CACHE_TASK)
       end
     end

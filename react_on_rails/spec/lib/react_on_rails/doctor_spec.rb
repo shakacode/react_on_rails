@@ -3408,13 +3408,46 @@ RSpec.describe ReactOnRails::Doctor do
         expect(suggestion_line).to include("pre_seed_renderer_cache")
         expect(suggestion_line).to include("MODE=symlink")
       end
+    end
 
-      it "does not flag a //-commented Jenkinsfile reference" do
+    context "when a Jenkinsfile has a whole-line //-commented reference" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
         File.write(
           File.join(tmpdir, "Jenkinsfile"),
           "// sh 'bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer'\n"
         )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
 
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "does not flag the Jenkinsfile" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        suggestion_line = warning_msgs
+                          .flat_map { |m| m[:content].split("\n") }
+                          .find { |line| line.include?("Jenkinsfile →") }
+        expect(suggestion_line).to be_nil
+      end
+    end
+
+    context "when a Jenkinsfile has an inline //-commented reference" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        File.write(
+          File.join(tmpdir, "Jenkinsfile"),
+          "sh 'bundle exec rake react_on_rails_pro:pre_seed_renderer_cache' " \
+          "// replaced react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "does not flag the Jenkinsfile" do
         doctor.send(:check_deprecated_renderer_cache_task)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         suggestion_line = warning_msgs
