@@ -88,6 +88,31 @@ module ReactOnRails
         expect(result).to include("__REDACTED__")
         expect(result).to include("host:3800")
       end
+
+      # Email-as-username is malformed per RFC 3986 (raw '@' is reserved in
+      # userinfo) but real users do this and don't percent-encode the '@'.
+      it "redacts the password when the username itself contains a raw '@' (email-as-username)" do
+        sensitive = "s3cr3t_password"
+        result = described_class.redact_password("https://user@example.com:#{sensitive}@renderer:3800")
+        expect(result).not_to include(sensitive)
+        expect(result).to include("__REDACTED__")
+        expect(result).to include("renderer:3800")
+      end
+
+      it "redacts email-as-username passwords for IPv6 hosts" do
+        sensitive = "s3cr3t_password"
+        result = described_class.redact_password("https://user@example.com:#{sensitive}@[::1]:3800")
+        expect(result).not_to include(sensitive)
+        expect(result).to include("__REDACTED__")
+        expect(result).to include("[::1]:3800")
+      end
+
+      it "redacts passwords containing both '@' and ':' (multi-char-class fallback)" do
+        sensitive = "p@d:w"
+        result = described_class.redact_password("https://user:#{sensitive}@host:3800")
+        expect(result).not_to include(sensitive)
+        expect(result).to include("__REDACTED__")
+      end
     end
   end
 end

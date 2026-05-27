@@ -11,13 +11,13 @@ module ReactOnRails
   module UrlSanitizer
     REDACTED_PLACEHOLDER = "__REDACTED__"
 
-    # Matches `scheme://[user]:password@…` even when the password contains `@`,
-    # `/`, `?`, or `#` (which RFC 3986 says should be percent-encoded but in
-    # practice often aren't). Uses greedy `.*` plus a lookahead so it captures
-    # through the LAST `@` before the host portion (which can't contain `@`).
-    # The `m` flag lets `.` cross newlines so we don't leak passwords that
-    # embed control characters.
-    USERINFO_PASSWORD_REGEX = %r{(://[^@:/?#\s]*:)(.*)@(?=[^@]*(?:[/?#\s]|\z))}m
+    # Matches `scheme://[user]:password@…` even when the user or password
+    # contains a raw `@` (which RFC 3986 says should be percent-encoded but
+    # in practice often isn't — e.g. when an email address is used as the
+    # username). Captures through the LAST `@` before the host portion via
+    # a greedy `.*` + lookahead. The `m` flag lets `.` cross newlines so we
+    # don't leak passwords with embedded control characters.
+    USERINFO_PASSWORD_REGEX = %r{(://[^:/?#\s]*:)(.*)@(?=[^@]*(?:[/?#\s]|\z))}m
 
     module_function
 

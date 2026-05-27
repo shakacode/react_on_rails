@@ -1199,7 +1199,8 @@ module ReactOnRails
           existing = ENV.fetch(var_name, nil)
           return if existing.nil? || existing.strip.empty? || existing.strip == derived_url
 
-          warn "WARNING: Overriding #{var_name}=#{existing.inspect} with #{derived_url} " \
+          safe_existing = UrlSanitizer.redact_password(existing)
+          warn "WARNING: Overriding #{var_name}=#{safe_existing.inspect} with #{derived_url} " \
                "because base port mode is active."
         end
 
