@@ -122,7 +122,7 @@ jobs:
           persist-credentials: false
       # libyaml-dev is needed for psych v5 native extensions (sdoc -> rdoc -> psych)
       - name: Install libyaml-dev (required for psych v5 native extensions)
-        run: sudo apt-get update && sudo apt-get install -y libyaml-dev
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libyaml-dev
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
@@ -144,6 +144,8 @@ jobs:
         with:
           working-directory: react_on_rails
           ruby-version: ${{ matrix.ruby-version }}
+          # Minimum-dependency legs intentionally install with frozen=false after script/convert,
+          # matching the historical bundle install behavior for converted dependency files.
           frozen: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
       - name: Git Stuff
         if: matrix.dependency-level == 'minimum'

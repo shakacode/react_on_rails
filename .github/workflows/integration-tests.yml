@@ -124,7 +124,7 @@ jobs:
       # libyaml-dev is needed for psych v5
       # this gem depends on sdoc which depends on rdoc which depends on psych
       - name: Install libyaml-dev (required for psych v5 native extensions)
-        run: sudo apt-get update && sudo apt-get install -y libyaml-dev
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libyaml-dev
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
@@ -210,7 +210,7 @@ jobs:
           persist-credentials: false
       # libyaml-dev is needed for psych v5 native extensions (sdoc -> rdoc -> psych)
       - name: Install libyaml-dev (required for psych v5 native extensions)
-        run: sudo apt-get update && sudo apt-get install -y libyaml-dev
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libyaml-dev
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:

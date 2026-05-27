@@ -204,9 +204,9 @@ jobs:
       # libyaml-dev is needed for psych v5 native extensions; install before
       # setup-bundle so bundle install can compile psych if required.
       - name: Install libyaml-dev (required for psych v5 native extensions)
-        run: sudo apt-get update && sudo apt-get install -y libyaml-dev
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libyaml-dev
 
-      # Sets up Ruby for unconditional steps like `gem env home`.
+      # Sets up Ruby for unconditional steps (`gem env home`, Foreman cache/install).
       # Dummy app gems are installed in the conditional setup-bundle steps below.
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1

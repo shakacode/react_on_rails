@@ -12,13 +12,7 @@ gem "uglifier"
 gem "jquery-rails"
 gem "puma", "~> 6.0"
 
-# Keep turbolinks declared so the Gemfile remains lock-compatible under frozen Bundler.
-# DISABLE_TURBOLINKS only controls whether the dummy app loads the asset in
-# react_on_rails/spec/dummy/app/assets/javascripts/application_non_webpack.js.erb.
-# Do NOT reintroduce a conditional like `gem "turbolinks" if ENV["DISABLE_TURBOLINKS"].nil?` —
-# conditional gem inclusion produces a different dependency set than the lock
-# file, which breaks `bundle install --frozen` in CI when the env var differs
-# between `bundle lock` and `bundle install`.
+# Unconditional -- see AGENTS.md for why the ENV conditional broke frozen installs.
 gem "turbolinks"
 
 # Build JSON APIs with ease. Read more: https://github.com/rails/jbuilder

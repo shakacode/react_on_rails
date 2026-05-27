@@ -85,7 +85,7 @@ jobs:
           persist-credentials: false
       # libyaml-dev is needed for psych v5
       - name: Install libyaml-dev (required for psych v5 native extensions)
-        run: sudo apt-get update && sudo apt-get install -y libyaml-dev
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libyaml-dev
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
