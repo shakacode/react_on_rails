@@ -354,7 +354,6 @@ PLATFORMS
   x86_64-linux
 
 DEPENDENCIES
-  base64
   benchmark
   bootsnap
   capybara

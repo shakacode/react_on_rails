@@ -202,7 +202,7 @@ jobs:
       # libyaml-dev is needed for psych v5 native extensions; install before any
       # bundler-cache step so bundle install can compile psych if required.
       - name: Fix dependency for libyaml-dev
-        run: sudo apt install libyaml-dev -y
+        run: sudo apt-get update && sudo apt-get install -y libyaml-dev
 
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
