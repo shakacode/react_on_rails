@@ -526,7 +526,7 @@ test_resolve_unshallow_fallback_finds_merge_base() {
   #   - initial fetch (--depth=2): main-extra-9, main-extra-10
   #   - one deepen round (--deepen=2): adds main-extra-7, main-extra-8
   #   - total visible from main: main-extra-7..main-extra-10 (4 commits)
-  # c5 is at depth 11 from the main tip (10 hops: main-extra-10..main-extra-1, c5),
+  # c5 is at depth 11 from the main tip (main-extra-10 → main-extra-9 → … → main-extra-1 → c5),
   # so it is still not reachable; the --unshallow fallback then fetches all of
   # main and exposes the merge base.
   # setup_repo_fixture intentionally leaves origin/main unfetched for this
