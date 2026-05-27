@@ -93,7 +93,7 @@ export function trace<T>(fn: UnitOfWork<T>, unitOfWorkOptions: UnitOfWorkOptions
 
 /**
  * Resets the installed tracing executor + startSsrRequestOptions back to
- * defaults. Internal integrations use this during lifecycle teardown.
+ * defaults. Integrations use this during lifecycle teardown or failed initialization cleanup.
  */
 export function resetTracing(): void {
   executor = (fn) => fn();
@@ -225,7 +225,7 @@ export function subSpan<T>(
 
 /**
  * Resets the installed sub-span implementation back to the default pass-through.
- * Internal integrations use this during lifecycle teardown.
+ * Integrations use this during lifecycle teardown or failed initialization cleanup.
  */
 export function resetSubSpan(): void {
   subSpanImpl = defaultSubSpan;
