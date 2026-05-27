@@ -564,9 +564,9 @@ test_resolve_logs_deepen_progress() {
   fi
   local stderr_text
   stderr_text="$(cat "$err_file")"
-  assert_contains "$stderr_text" "Deepening shallow history (attempt 1/3, depth 2)" "first deepen progress line"
-  assert_contains "$stderr_text" "Deepening shallow history (attempt 2/3, depth 4)" "second deepen progress line"
-  assert_contains "$stderr_text" "Deepening shallow history (attempt 3/3, depth 8)" "third deepen progress line"
+  assert_contains "$stderr_text" "Deepening shallow history (attempt 1/3, fetching 2 more commits)" "first deepen progress line"
+  assert_contains "$stderr_text" "Deepening shallow history (attempt 2/3, fetching 4 more commits)" "second deepen progress line"
+  assert_contains "$stderr_text" "Deepening shallow history (attempt 3/3, fetching 8 more commits)" "third deepen progress line"
   assert_contains "$stderr_text" "falling back to --unshallow" "unshallow fallback fires after budget exhausted"
 }
 

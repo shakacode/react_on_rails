@@ -6,6 +6,9 @@ on:
       docs_only:
         description: 'Only documentation files changed'
         value: ${{ jobs.detect.outputs.docs_only }}
+      non_runtime_only:
+        description: 'Only documentation or source comments changed'
+        value: ${{ jobs.detect.outputs.non_runtime_only }}
       run_lint:
         description: 'Should run linting'
         value: ${{ jobs.detect.outputs.run_lint }}
@@ -30,6 +33,7 @@ jobs:
       actions: read
     outputs:
       docs_only: ${{ steps.changes.outputs.docs_only }}
+      non_runtime_only: ${{ steps.changes.outputs.non_runtime_only }}
       run_lint: ${{ steps.changes.outputs.run_lint }}
       run_ruby_tests: ${{ steps.changes.outputs.run_ruby_tests }}
       run_js_tests: ${{ steps.changes.outputs.run_js_tests }}

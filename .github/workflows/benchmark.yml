@@ -51,7 +51,7 @@ on:
   push:
     branches:
       - main
-    # Always trigger on main; docs-only detection handles skipping heavy jobs
+    # Always trigger on main; non-runtime detection handles skipping heavy jobs
   pull_request:
     types: [opened, synchronize, reopened, labeled]
     paths-ignore:
@@ -96,6 +96,7 @@ jobs:
     runs-on: ubuntu-22.04
     outputs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
+      non_runtime_only: ${{ steps.detect.outputs.non_runtime_only }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -104,7 +105,12 @@ jobs:
       - name: Detect relevant changes
         id: detect
         run: |
-          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}"
+          PR_BEFORE="${{ github.event.before || '' }}"
+          if [ "${{ github.event_name }}" = "pull_request" ] && [ -n "$PR_BEFORE" ] && [[ ! "$PR_BEFORE" =~ ^0+$ ]]; then
+            BASE_REF="$PR_BEFORE"
+          else
+            BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}"
+          fi
           script/ci-changes-detector "$BASE_REF"
         shell: bash
       - name: Guard docs-only main pushes
@@ -120,12 +126,12 @@ jobs:
     # The 'full-ci' label is intentionally excluded — it controls test workflows,
     # not benchmarks. Use the dedicated 'benchmark' label to trigger perf runs on PRs.
     # See https://bencher.dev/docs/how-to/github-actions/#pull-requests for the extra pull_request condition
-    # Skip docs-only pushes to main to avoid wasting CI resources on non-code changes.
+    # Skip non-runtime-only pushes to main to avoid wasting CI resources on non-code changes.
     if: |
       !(
         github.event_name == 'push' &&
         github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.docs_only == 'true'
+        needs.detect-changes.outputs.non_runtime_only == 'true'
       ) && (
         github.event_name == 'push' ||
         github.event_name == 'workflow_dispatch' ||

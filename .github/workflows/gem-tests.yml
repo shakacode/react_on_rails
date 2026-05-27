@@ -11,7 +11,7 @@ on:
   push:
     branches:
       - 'main'
-    # Always trigger on main; docs-only detection handles skipping heavy jobs
+    # Always trigger on main; non-runtime detection handles skipping heavy jobs
   pull_request:
     paths-ignore:
       - '**.md'
@@ -38,6 +38,7 @@ jobs:
     runs-on: ubuntu-22.04
     outputs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
+      non_runtime_only: ${{ steps.detect.outputs.non_runtime_only }}
       run_lint: ${{ steps.detect.outputs.run_lint }}
       run_js_tests: ${{ steps.detect.outputs.run_js_tests }}
       run_ruby_tests: ${{ steps.detect.outputs.run_ruby_tests }}
@@ -65,10 +66,16 @@ jobs:
             echo "run_dummy_tests=true" >> "$GITHUB_OUTPUT"
             echo "run_generators=true" >> "$GITHUB_OUTPUT"
             echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            echo "non_runtime_only=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}"
+          PR_BEFORE="${{ github.event.before || '' }}"
+          if [ "${{ github.event_name }}" = "pull_request" ] && [ -n "$PR_BEFORE" ] && [[ ! "$PR_BEFORE" =~ ^0+$ ]]; then
+            BASE_REF="$PR_BEFORE"
+          else
+            BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}"
+          fi
           script/ci-changes-detector "$BASE_REF"
         shell: bash
       - name: Set gem tests matrix
@@ -96,14 +103,14 @@ jobs:
 
   rspec-package-tests:
     needs: detect-changes
-    # Skip only if: main push AND docs-only changes
+    # Skip only if: main push AND non-runtime-only changes
     # Otherwise run if: on main OR Ruby tests needed
-    # This allows docs-only commits to skip heavy jobs while ensuring full CI on main for code changes
+    # This allows docs/comment-only commits to skip heavy jobs while ensuring full CI on main for code changes
     if: |
       !(
         github.event_name == 'push' &&
         github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.docs_only == 'true'
+        needs.detect-changes.outputs.non_runtime_only == 'true'
       ) && (
         github.ref == 'refs/heads/main' ||
         needs.detect-changes.outputs.run_ruby_tests == 'true'
