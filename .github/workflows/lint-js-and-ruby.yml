@@ -95,14 +95,11 @@ jobs:
           # No need for history in lint job
           fetch-depth: 1
           persist-credentials: false
-      # libyaml-dev is needed for psych v5 native extensions (sdoc -> rdoc -> psych)
-      - name: Install libyaml-dev (required for psych v5 native extensions)
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libyaml-dev
       - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ./.github/actions/setup-ruby
         with:
           ruby-version: 3
-          bundler: 2.5.9
+          bundler-version: 2.5.9
       - name: Setup Node
         uses: actions/setup-node@v4
         with:

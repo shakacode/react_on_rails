@@ -97,23 +97,16 @@ jobs:
     runs-on: ubuntu-22.04
     env:
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
-      # Pro gem server does not publish checksums. Keep this job-level so every
-      # setup-bundle install in the job sees the same Bundler setting.
-      BUNDLE_DISABLE_CHECKSUM_VALIDATION: 'true'
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
 
-      # libyaml-dev is needed for psych v5
-      - name: Install libyaml-dev (required for psych v5 native extensions)
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libyaml-dev
-
       - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ./.github/actions/setup-ruby
         with:
           ruby-version: ${{ env.RUBY_VERSION }}
-          bundler: 2.5.4
+          bundler-version: 2.5.4
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -205,21 +198,16 @@ jobs:
     runs-on: ubuntu-22.04
     env:
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
-      BUNDLE_DISABLE_CHECKSUM_VALIDATION: 'true'
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
 
-      # libyaml-dev is needed for psych v5
-      - name: Install libyaml-dev (required for psych v5 native extensions)
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libyaml-dev
-
       - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ./.github/actions/setup-ruby
         with:
           ruby-version: ${{ env.RUBY_VERSION }}
-          bundler: 2.5.4
+          bundler-version: 2.5.4
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -413,21 +401,16 @@ jobs:
     runs-on: ubuntu-22.04
     env:
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
-      BUNDLE_DISABLE_CHECKSUM_VALIDATION: 'true'
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
 
-      # libyaml-dev is needed for psych v5
-      - name: Install libyaml-dev (required for psych v5 native extensions)
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libyaml-dev
-
       - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ./.github/actions/setup-ruby
         with:
           ruby-version: ${{ matrix.ruby-version }}
-          bundler: 2.5.4
+          bundler-version: 2.5.4
 
       - name: Print system information
         run: |

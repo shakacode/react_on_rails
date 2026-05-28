@@ -144,8 +144,6 @@ jobs:
     env:
       SECRET_KEY_BASE: 'dummy-secret-key-for-ci-testing-not-used-in-production'
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
-      # Pro gem server does not publish checksums; needed for Pro benchmark gem installs.
-      BUNDLE_DISABLE_CHECKSUM_VALIDATION: 'true'
       BENCHMARK_PORT: '3001'
 
     steps:
@@ -201,15 +199,10 @@ jobs:
       # STEP 3: START APPLICATION SERVER
       # ============================================
 
-      # libyaml-dev is needed for psych v5 native extensions; install before
-      # setup-bundle so bundle install can compile psych if required.
-      - name: Install libyaml-dev (required for psych v5 native extensions)
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libyaml-dev
-
       # Sets up Ruby for unconditional steps (`gem env home`, Foreman cache/install).
       # Dummy app gems are installed in the conditional setup-bundle steps below.
       - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ./.github/actions/setup-ruby
         with:
           ruby-version: ${{ env.RUBY_VERSION }}
 
