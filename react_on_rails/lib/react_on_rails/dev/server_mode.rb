@@ -119,6 +119,7 @@ module ReactOnRails
           # constants — this mirrors how Shakapacker itself evaluates shakapacker.yml.
           # Symbol values are permitted to match adjacent Shakapacker config parsers.
           YAML.safe_load(ERB.new(File.read(config_path)).result, aliases: true, permitted_classes: [Symbol])
+        # SyntaxError inherits from ScriptError, not StandardError. StandardError covers ERB/YAML/Errno failures.
         rescue SyntaxError, StandardError => e
           warn(
             "[ReactOnRails] Could not parse #{config_path} for dev-server mode detection: #{e.message}"
@@ -141,6 +142,7 @@ module ReactOnRails
         end
 
         def detect_from_dev_server_config(dev_server)
+          # Empty also covers malformed values coerced by dev_server_section, matching Shakapacker's default.
           return :live_reload if dev_server.empty?
 
           hmr = hmr_config(dev_server["hmr"])
@@ -158,6 +160,8 @@ module ReactOnRails
         end
 
         def hmr_config(value)
+          return nil if value.nil?
+
           # Shakapacker's "hmr: only" is webpack-dev-server-only HMR, not a React on Rails custom value.
           return true if value.to_s.strip.casecmp?("only")
 
