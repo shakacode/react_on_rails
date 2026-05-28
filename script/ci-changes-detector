@@ -89,19 +89,26 @@ comment_line_is_runtime_directive() {
   esac
 
   local comment_body="$trimmed"
+  # NOTE: `/*` is quoted so the pattern strips the literal two-char prefix
+  # rather than `/` plus a zero-length glob (which is what `${var#/*}` does).
   case "$comment_body" in
     '//'*) comment_body="${comment_body#//}" ;;
     '#'* ) comment_body="${comment_body#\#}" ;;
-    '/*'*) comment_body="${comment_body#/*}" ;;
+    '/*'*) comment_body="${comment_body#'/*'}" ;;
     '*'*) comment_body="${comment_body#\*}" ;;
   esac
+  # Strip remaining leading `*` characters (handles `/**` JSDoc openers and
+  # continuation lines like ` ** @param`).
+  while [ "${comment_body#\*}" != "$comment_body" ]; do
+    comment_body="${comment_body#\*}"
+  done
   comment_body="${comment_body#"${comment_body%%[![:space:]]*}"}"
 
   case "$comment_body" in
     frozen_string_literal:*|encoding:*|coding:*|shareable_constant_value:*|\
     webpackChunkName:*|webpackMode:*|webpackPrefetch:*|webpackPreload:*|\
     webpackInclude:*|webpackExclude:*|webpackIgnore:*|webpackExports:*|webpackFetchPriority:*|\
-    @vite-ignore*|@jsxImportSource*|@jsx*|@babel*|'#'__PURE__*|\
+    @vite-ignore*|@jsxImportSource*|@jsx*|@babel*|'#'__PURE__*|@__PURE__*|\
     @ts-ignore*|@ts-expect-error*|@ts-nocheck*|@ts-check*|\
     sourceMappingURL*|@preserve*|@license*)
       return 0
@@ -123,12 +130,37 @@ diff_line_is_comment_or_blank() {
     return 1
   fi
 
-  [ "$in_block_comment" = true ] && return 0
+  local after_close after_trimmed
+  if [ "$in_block_comment" = true ]; then
+    case "$trimmed" in
+      *'*/'*)
+        # Block closes on this line — require no executable code after `*/`.
+        after_close="${trimmed##*'*/'}"
+        after_trimmed="${after_close#"${after_close%%[![:space:]]*}"}"
+        [ -z "$after_trimmed" ] && return 0
+        return 1
+        ;;
+      *) return 0 ;;
+    esac
+  fi
   [ "$in_ruby_block_comment" = true ] && return 0
 
   case "$trimmed" in
     '#'*|'//'*) return 0 ;;
-    '/*'*) return 0 ;;
+    '/*'*)
+      # Single-line `/* ... */` is comment-only only when nothing follows the
+      # close. Lines like `/* istanbul ignore next */ exports.foo = bar` must
+      # not be classified as comment-only.
+      case "$trimmed" in
+        *'*/'*)
+          after_close="${trimmed##*'*/'}"
+          after_trimmed="${after_close#"${after_close%%[![:space:]]*}"}"
+          [ -z "$after_trimmed" ] && return 0
+          return 1
+          ;;
+        *) return 0 ;;
+      esac
+      ;;
     '=begin'*) return 0 ;;
   esac
 
@@ -190,7 +222,7 @@ source_file_comment_only_change() {
               *) in_block_comment=true ;;
             esac
             ;;
-          *'*/'*) in_block_comment=false ;;
+          *'*/'*) [ "$in_block_comment" = true ] && in_block_comment=false ;;
         esac
         case "${changed_line:1}" in
           '=begin'*) in_ruby_block_comment=true ;;

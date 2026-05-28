@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Test harness for script/ci-changes-detector. Self-contained: no extra
-# binaries beyond bash + git. Run with `bash script/ci-changes-detector-test.bash`.
+# Test harness for script/ci-changes-detector. Requires bash, git, and perl
+# (perl is used for inline fixture rewrites). Run with
+# `bash script/ci-changes-detector-test.bash`.
 
 set -uo pipefail
 
@@ -16,6 +17,12 @@ fail() {
   local message="$1"
   TESTS_FAILED=$((TESTS_FAILED + 1))
   FAILURES+=("$CURRENT_TEST: $message")
+  # When invoked from inside a run_test subshell, also persist the message so
+  # the outer summary can show the specific assertion rather than a generic
+  # "subshell exited" line.
+  if [ -n "${SUBSHELL_FAILURES_FILE:-}" ]; then
+    printf '%s\n' "$CURRENT_TEST: $message" >> "$SUBSHELL_FAILURES_FILE"
+  fi
   echo "  FAIL: $message" >&2
 }
 
@@ -38,8 +45,10 @@ run_test() {
   TESTS_RUN=$((TESTS_RUN + 1))
   echo "-> $test_fn"
 
-  local tmpdir before_failed had_errexit=false
+  local tmpdir before_failed had_errexit=false subshell_failures
   tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/ci-changes-detector-test.XXXXXX")"
+  subshell_failures="$tmpdir/failures.log"
+  : > "$subshell_failures"
   before_failed="$TESTS_FAILED"
 
   case "$-" in
@@ -49,12 +58,24 @@ run_test() {
   set +e
   (
     set -euo pipefail
+    SUBSHELL_FAILURES_FILE="$subshell_failures"
+    export SUBSHELL_FAILURES_FILE
     cd "$tmpdir" || exit 1
     "$test_fn"
   )
   local rc=$?
   if [ "$had_errexit" = true ]; then
     set -e
+  fi
+
+  # Ingest detailed failure messages recorded inside the subshell so the final
+  # summary reflects the actual assertion text instead of a generic exit code.
+  if [ -s "$subshell_failures" ]; then
+    while IFS= read -r failure_line; do
+      [ -n "$failure_line" ] || continue
+      TESTS_FAILED=$((TESTS_FAILED + 1))
+      FAILURES+=("$failure_line")
+    done < "$subshell_failures"
   fi
   rm -rf "$tmpdir"
 
@@ -333,6 +354,54 @@ test_executable_source_change_remains_runtime_affecting() {
   assert_contains "$out" '"run_ruby_tests": true' "runtime source output"
 }
 
+test_jsdoc_jsx_import_source_pragma_remains_runtime_affecting() {
+  setup_repo
+  perl -0pi -e 's{export function}{/** \@jsxImportSource @emotion/react */\nexport function}' \
+    packages/react-on-rails/src/example.ts
+  commit_change "jsdoc jsx import source pragma"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"non_runtime_only": false' "jsdoc pragma output"
+  assert_contains "$out" '"run_js_tests": true' "jsdoc pragma output"
+}
+
+test_inline_block_comment_license_remains_runtime_affecting() {
+  setup_repo
+  perl -0pi -e 's{export function}{/* \@license MIT */\nexport function}' \
+    packages/react-on-rails/src/example.ts
+  commit_change "inline block comment license"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"non_runtime_only": false' "license directive output"
+  assert_contains "$out" '"run_js_tests": true' "license directive output"
+}
+
+test_pure_annotation_remains_runtime_affecting() {
+  setup_repo
+  perl -0pi -e 's{export function}{/* \@__PURE__ */\nexport function}' \
+    packages/react-on-rails/src/example.ts
+  commit_change "pure annotation"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"non_runtime_only": false' "pure annotation output"
+  assert_contains "$out" '"run_js_tests": true' "pure annotation output"
+}
+
+test_block_comment_with_trailing_code_remains_runtime_affecting() {
+  setup_repo
+  perl -0pi -e 's{export function}{/* note */ exports.flag = true;\nexport function}' \
+    packages/react-on-rails/src/example.ts
+  commit_change "block comment plus trailing code"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"non_runtime_only": false' "trailing code after block close output"
+  assert_contains "$out" '"run_js_tests": true' "trailing code after block close output"
+}
+
 run_test test_docs_changes_are_non_runtime_only
 run_test test_ruby_comment_only_change_skips_heavy_tests_but_keeps_lint
 run_test test_ruby_block_comment_only_change_skips_heavy_tests_but_keeps_lint
@@ -350,6 +419,10 @@ run_test test_pro_node_renderer_comment_only_change_runs_pro_lint_only
 run_test test_mixed_comment_and_code_change_remains_runtime_affecting
 run_test test_ruby_magic_comment_remains_runtime_affecting
 run_test test_executable_source_change_remains_runtime_affecting
+run_test test_jsdoc_jsx_import_source_pragma_remains_runtime_affecting
+run_test test_inline_block_comment_license_remains_runtime_affecting
+run_test test_pure_annotation_remains_runtime_affecting
+run_test test_block_comment_with_trailing_code_remains_runtime_affecting
 
 echo
 echo "CI changes detector tests: $TESTS_RUN run, $TESTS_FAILED failed"
