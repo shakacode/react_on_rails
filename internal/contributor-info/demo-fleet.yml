@@ -1,0 +1,144 @@
+# Demo fleet manifest — canonical list of demo repos under cross-repo
+# upgrade automation. Read by `rake demo_fleet:*` tasks and by humans
+# running the RC testing workflow described in rc-testing-plan-design.md.
+#
+# Schema version is bumped on breaking changes. Consumers must check it.
+#
+# Field semantics:
+#   tier           — hard_gate (Tier 1) | soft_track (Tier 2). Matches the
+#                    RC plan. hard_gate failures block a final release.
+#   packages       — which of our gems/npm packages the demo consumes. The
+#                    orchestrator only proposes bumps for listed packages.
+#   needs_pro      — demo consumes private react_on_rails_pro source. The
+#                    automation credentials must have access to the Pro
+#                    gem source for these repos.
+#   package_manager — npm | yarn_classic | yarn_berry | pnpm. Determines
+#                    the install + lockfile-update strategy.
+#   ruby_test      — command run inside the repo for Ruby tests.
+#   js_test        — command run inside the repo for JS tests. nil if none.
+#   build          — command that must succeed before deploy (asset compile).
+#   review_app     — CPFlow review-app workflow file and the status check
+#                    name the orchestrator polls. nil if the demo has no
+#                    review-app pipeline yet.
+#   smoke          — list of paths the orchestrator hits against the
+#                    review-app URL after deploy. Each must return 2xx.
+#   headline       — short name of the per-repo appendix in the RC plan.
+#                    The orchestrator uses this only for PR-body templating.
+#
+# Items marked `verify: true` have not been confirmed by inspecting the
+# demo repo. A one-time verification pass (per the RC plan's `*` convention)
+# must clear every verify flag before the manifest is treated as authoritative.
+
+schema_version: 1
+
+defaults:
+  package_manager: pnpm
+  ruby_test: bundle exec rspec
+  js_test: null
+  build: bin/shakapacker
+  branch_prefix: chore/demo-fleet
+  review_app:
+    workflow: cpflow-review-app.yml
+    status_check: cpflow/review-app
+  age_gate:
+    npm_min_days: 7
+    gem_min_days: 7
+    actions_min_days: 7
+    # Our own packages bypass the gate when the orchestrator is invoked
+    # with --release-track. Listed here so policy lives with the manifest.
+    own_packages:
+      npm:
+        - react-on-rails
+        - react-on-rails-pro
+      gem:
+        - react_on_rails
+        - react_on_rails_pro
+        - shakapacker
+        - cpflow
+
+repos:
+  # ---------- Tier 1 (hard gate) ----------
+
+  - name: shakacode/react-on-rails-rsc-demo
+    tier: hard_gate
+    headline: Minimal RSC starter
+    packages: [react_on_rails, react-on-rails, shakapacker]
+    needs_pro: false
+    smoke: [/]
+    verify: true
+
+  - name: shakacode/react-on-rails-demo-hacker-news-rsc
+    tier: hard_gate
+    headline: RSC streaming with comment trees
+    packages: [react_on_rails, react-on-rails, react_on_rails_pro, react-on-rails-pro, shakapacker]
+    needs_pro: true
+    smoke: [/, /news]
+    verify: true
+
+  - name: shakacode/react-on-rails-demo-marketplace-rsc
+    tier: hard_gate
+    headline: RSC product grid + filter
+    packages: [react_on_rails, react-on-rails, react_on_rails_pro, react-on-rails-pro, shakapacker]
+    needs_pro: true
+    smoke: [/, /products]
+    verify: true
+
+  - name: shakacode/react-on-rails-demo-gumroad-rsc
+    tier: hard_gate
+    headline: RSC dashboards + performance
+    packages: [react_on_rails, react-on-rails, react_on_rails_pro, react-on-rails-pro, shakapacker]
+    needs_pro: true
+    smoke: [/]
+    verify: true
+
+  - name: shakacode/react_on_rails-demo-octochangelog-on-rails-pro
+    tier: hard_gate
+    headline: RSC + server-rendered markdown
+    packages: [react_on_rails, react-on-rails, react_on_rails_pro, react-on-rails-pro, shakapacker]
+    needs_pro: true
+    smoke: [/]
+    verify: true
+
+  - name: shakacode/react-on-rails-demo-ssr-hmr
+    tier: hard_gate
+    headline: SSR + HMR coexistence
+    packages: [react_on_rails, react-on-rails, shakapacker]
+    needs_pro: false
+    smoke: [/]
+    verify: true
+
+  - name: shakacode/react-on-rails-demo-v16-bundle-splitting
+    tier: hard_gate
+    headline: On-demand bundle loading
+    packages: [react_on_rails, react-on-rails, shakapacker]
+    needs_pro: false
+    smoke: [/]
+    verify: true
+
+  # ---------- Tier 2 (soft track) ----------
+
+  - name: shakacode/react-on-rails-example-open-flights
+    tier: soft_track
+    headline: Larger migrated app (search + map)
+    packages: [react_on_rails, react-on-rails, shakapacker]
+    needs_pro: false
+    package_manager: yarn_classic
+    smoke: [/]
+    verify: true
+
+  - name: shakacode/react-on-rails-example-migration
+    tier: soft_track
+    headline: react-rails → React on Rails migration
+    packages: [react_on_rails, react-on-rails, shakapacker]
+    needs_pro: false
+    smoke: [/]
+    verify: true
+
+  - name: shakacode/react-webpack-rails-tutorial
+    tier: soft_track
+    headline: Legacy tutorial reference app
+    packages: [react_on_rails, react-on-rails, shakapacker]
+    needs_pro: false
+    package_manager: yarn_classic
+    smoke: [/]
+    verify: true
