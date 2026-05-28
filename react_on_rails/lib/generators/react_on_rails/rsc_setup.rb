@@ -454,11 +454,7 @@ module ReactOnRails
       end
 
       def server_bundler_fallback_import_pattern
-        Regexp.new(
-          "(const bundler = config\\.assets_bundler.*\\n" \
-          ".*require\\(['\"]@rspack/core['\"]\\).*\\n" \
-          ".*: require\\(['\"]webpack['\"]\\);)"
-        )
+        /(const bundler\s*=\s*config\.assets_bundler.*?require\(['"]webpack['"]\);?)/m
       end
 
       def server_limit_chunk_count_plugin_anchor

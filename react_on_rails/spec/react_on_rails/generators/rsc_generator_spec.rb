@@ -1300,6 +1300,29 @@ describe RscGenerator, type: :generator do
       expect(generator.send(:check_rsc_server_config)).to eq([])
     end
 
+    it "inserts the helper import when the server bundler ternary is on one line" do
+      config_path = "config/webpack/serverWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        pro_server_webpack_content.sub(
+          %r{
+            const\ bundler\ =\ config\.assets_bundler\ ===\ 'rspack'\n
+            \s+\?\ require\('@rspack/core'\)\n
+            \s+:\ require\('webpack'\);
+          }x,
+          "const bundler = config.assets_bundler === 'rspack' ? require('@rspack/core') : require('webpack');"
+        )
+      )
+
+      generator.send(:update_server_webpack_config_for_rsc)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content.scan("./rscManifestPlugin").length).to eq(1)
+      expect(migrated_content).to include(
+        "addRSCManifestPlugin(serverWebpackConfig, { isServer: true, clientReferences: rscClientReferences });"
+      )
+    end
+
     it "ignores commented-out helper calls when verifying manifest helper setup" do
       config_path = "config/webpack/clientWebpackConfig.js"
       simulate_existing_file(
@@ -3891,10 +3914,16 @@ describe RscGenerator, type: :generator do
           expect(content).to include("normalizeClientReferenceList")
           expect(content).to include("/\\.(?:js|mjs|cjs|jsx|ts|mts|cts|tsx)$/")
           expect(content).to include("config.source_path is not set; no client references will be scanned.")
+          expect(content).not_to include("fs.existsSync(absolutePath)")
           expect(content).to include("RSC_CLIENT_REFERENCES_ENTRY_NAME")
           expect(content).to include("[RSC_CLIENT_REFERENCES_ENTRY_NAME]: requests")
-          expect(content).to include("if (!options.isServer) addClientReferencesToEntry")
+          expect(content).to include("addClientReferencesToServerEntry")
+          expect(content).to include("'server-bundle': appendImports(entryValue['server-bundle'], requests)")
+          expect(content).to include("if (options.isServer)")
+          expect(content).to include("addClientReferencesToServerEntry(bundlerConfig, clientReferenceFiles)")
           expect(content).to include("bundlerConfig.plugins = bundlerConfig.plugins ?? []")
+          expect(content).to include("compiler.webpack is not available")
+          expect(content).to include("new WebpackError")
           expect(content).not_to include("Object.fromEntries")
           # Manifest must emit alternating [chunkId, filename] pairs (collectChunkGroupPairs),
           # and walk chunkGroups via getChunkModulesIterable to compute them.

@@ -184,8 +184,6 @@ const collectClientReferenceFiles = (context, clientReferences = normalizeClient
   normalizeClientReferenceList(clientReferences).forEach((reference) => {
     if (typeof reference === 'string') {
       const absolutePath = path.isAbsolute(reference) ? reference : path.resolve(context, reference);
-      if (!fs.existsSync(absolutePath) || !fs.statSync(absolutePath).isFile()) return;
-
       collectFile(absolutePath);
       return;
     }
@@ -269,6 +267,45 @@ const addClientReferencesToEntry = (bundlerConfig, clientReferenceFiles) => {
   bundlerConfig.entry = addRequestsToEntry(entry);
 };
 
+const addClientReferencesToServerEntry = (bundlerConfig, clientReferenceFiles) => {
+  if (clientReferenceFiles.length === 0) return;
+
+  const context = bundlerConfig.context || process.cwd();
+  const requests = clientReferenceFiles.map((filePath) => toImportRequest(context, filePath));
+  const { entry } = bundlerConfig;
+
+  const addRequestsToServerEntry = (entryValue) => {
+    if (
+      entryValue &&
+      typeof entryValue === 'object' &&
+      !Array.isArray(entryValue) &&
+      !isEntryDescription(entryValue)
+    ) {
+      if (!('server-bundle' in entryValue)) {
+        console.warn(
+          '[RspackRSCManifestPlugin] Webpack entry object has no server-bundle entry. ' +
+            'Add the discovered `use client` modules to the server entry manually.',
+        );
+        return entryValue;
+      }
+
+      return {
+        ...entryValue,
+        'server-bundle': appendImports(entryValue['server-bundle'], requests),
+      };
+    }
+
+    return appendImports(entryValue, requests);
+  };
+
+  if (typeof entry === 'function') {
+    bundlerConfig.entry = async (...args) => addRequestsToServerEntry(await entry(...args));
+    return;
+  }
+
+  bundlerConfig.entry = addRequestsToServerEntry(entry);
+};
+
 const collectChunkGroupPairs = (chunkGroup) => {
   // The RSC runtime reads `chunks` as alternating [chunkId, filename, chunkId, filename, ...]
   // pairs (see react-server-dom-webpack/plugin), so emit one [id, file] pair per chunk.
@@ -312,6 +349,13 @@ class RspackRSCManifestPlugin {
   }
 
   apply(compiler) {
+    if (!compiler.webpack) {
+      throw new Error(
+        '[RspackRSCManifestPlugin] compiler.webpack is not available. ' +
+          'RspackRSCManifestPlugin requires Rspack >= 1.0.0.',
+      );
+    }
+
     const WebpackError = compiler.webpack.WebpackError || Error;
     const clientReferenceSet = new Set(this.clientReferenceFiles.map(resolveRealPath));
 
@@ -409,7 +453,11 @@ const addRSCManifestPlugin = (bundlerConfig, options) => {
     const context = bundlerConfig.context || process.cwd();
     // Omitted clientReferences intentionally falls back to the Shakapacker source-path scan.
     const clientReferenceFiles = collectClientReferenceFiles(context, options.clientReferences);
-    if (!options.isServer) addClientReferencesToEntry(bundlerConfig, clientReferenceFiles);
+    if (options.isServer) {
+      addClientReferencesToServerEntry(bundlerConfig, clientReferenceFiles);
+    } else {
+      addClientReferencesToEntry(bundlerConfig, clientReferenceFiles);
+    }
     bundlerConfig.plugins = bundlerConfig.plugins ?? [];
     bundlerConfig.plugins.push(new RspackRSCManifestPlugin(options, clientReferenceFiles));
     return;
