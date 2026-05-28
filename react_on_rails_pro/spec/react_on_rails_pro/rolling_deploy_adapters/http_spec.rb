@@ -91,7 +91,7 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
 
       expect(described_class.fetch("hash123")).to be_nil
       expect(File.exist?(fetch_dir)).to be(false)
-      expect(logger).to have_received(:warn).with(/returned more than 5 compressed bytes/)
+      expect(logger).to have_received(:warn).with(/bundle body exceeded compressed body cap \(5 bytes\)/)
     end
 
     it "drains oversized non-success responses through the compressed response cap" do
@@ -109,7 +109,25 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
       expect(described_class.fetch("hash123")).to be_nil
       expect(File.exist?(fetch_dir)).to be(false)
       expect(logger).to have_received(:warn).with(%r{bundles/hash123 returned HTTP 404})
-      expect(logger).to have_received(:warn).with(/returned more than 5 compressed bytes/)
+      expect(logger).to have_received(:warn).with(
+        /non-success response body exceeded compressed body cap \(5 bytes\)/
+      )
+    end
+
+    it "returns nil and cleans up when a non-success response stays within the cap" do
+      not_found = Net::HTTPNotFound.new("1.1", "404", "Not Found")
+
+      allow(http).to receive(:request) do |_request, &block|
+        block.call(not_found)
+        not_found
+      end
+      allow(not_found).to receive(:read_body).and_yield("small error body")
+
+      expect(not_found).not_to receive(:body)
+
+      expect(described_class.fetch("hash123")).to be_nil
+      expect(File.exist?(fetch_dir)).to be(false)
+      expect(logger).to have_received(:warn).with(%r{bundles/hash123 returned HTTP 404})
     end
   end
 
@@ -295,10 +313,11 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
 
   def compose_tarball_from_strings(entries)
     Dir.mktmpdir("ror-pro-http-source") do |source_dir|
-      source_paths = entries.transform_values.with_index do |content, index|
+      source_paths = {}
+      entries.each_with_index do |(entry_name, content), index|
         path = File.join(source_dir, "source-#{index}")
         File.write(path, content)
-        path
+        source_paths[entry_name] = path
       end
 
       compose_tarball(source_paths)

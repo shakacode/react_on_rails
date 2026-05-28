@@ -53,6 +53,8 @@ module ReactOnRailsPro
 
       # Maximum compressed bytes accepted from /bundles/:hash before extract
       # enforces DEFAULT_MAX_SIZE on the uncompressed tarball contents.
+      # Set near 1/4 of DEFAULT_MAX_SIZE: JS bundles typically decompress 3-5x,
+      # so a 50 MB wire payload that decompresses beyond 200 MB is anomalous.
       COMPRESSED_BODY_CAP = 50 * 1024 * 1024
 
       LOG_PREFIX = "[ReactOnRailsPro::RollingDeployAdapters::Http]"
@@ -199,23 +201,32 @@ module ReactOnRailsPro
         end
 
         def stream_response_body(response, io)
-          each_capped_body_chunk(response) { |chunk| io.write(chunk) }
+          each_capped_body_chunk(response, context: "bundle body") { |chunk| io.write(chunk) }
         end
 
         def drain_response_body(response)
-          each_capped_body_chunk(response) { |_chunk| nil }
+          each_capped_body_chunk(response, context: "non-success response body") { |_chunk| nil }
         end
 
-        def each_capped_body_chunk(response)
+        def each_capped_body_chunk(response, context:)
           bytes = 0
           response.read_body do |chunk|
             bytes += chunk.bytesize
             if bytes > COMPRESSED_BODY_CAP
               raise ReactOnRailsPro::Error,
-                    "rolling_deploy_previous_url returned more than #{COMPRESSED_BODY_CAP} compressed bytes; aborting"
+                    "bundle download #{context} exceeded compressed body cap " \
+                    "(#{compressed_body_cap_label}); aborting"
             end
             yield chunk
           end
+        end
+
+        def compressed_body_cap_label
+          megabyte_bytes = 1024 * 1024
+          megabytes = COMPRESSED_BODY_CAP / megabyte_bytes
+          return "#{megabytes} MB" if megabytes.positive? && megabytes * megabyte_bytes == COMPRESSED_BODY_CAP
+
+          "#{COMPRESSED_BODY_CAP} bytes"
         end
 
         def extract_payload(tarball_source, dir, bundle_hash)
