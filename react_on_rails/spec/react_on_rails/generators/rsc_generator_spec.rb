@@ -596,6 +596,40 @@ describe RscGenerator, type: :generator do
     end
   end
 
+  context "when a fresh server webpack config has a custom configureServer signature" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/serverWebpackConfig.js",
+        pro_server_webpack_content.sub("const configureServer = () => {", "function configureServer() {")
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "rolls back instead of inserting a guard with an unbound rscBundle reference" do
+      assert_file "config/webpack/serverWebpackConfig.js" do |content|
+        expect(content).to include("function configureServer() {")
+        expect(content).not_to include("addRSCManifestPlugin")
+        expect(content).not_to include("if (!rscBundle)")
+      end
+
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("configureServer signature was not recognized")
+    end
+  end
+
   context "when the server webpack config already imports path resolve" do
     before(:all) do
       prepare_destination

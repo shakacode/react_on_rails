@@ -423,21 +423,18 @@ module ReactOnRails
         # blocked by later imports, or conflicting existing definition), we still add the helper
         # import and plugin call. The helper falls back to scanning `config.source_path` at
         # runtime, so the config remains functional without scoped references.
+        return unless server_config_ready_for_manifest_helper?(config_path, content, original_content)
+
         ensure_rsc_client_references_setup(config_path, content, is_server: true, plugin_pending: true)
         content = File.read(full_path)
         return unless add_rsc_manifest_helper_import(config_path, content, fallback_import_pattern)
 
         content = File.read(full_path)
-        server_plugin_anchor = server_limit_chunk_count_plugin_anchor
-        unless content.match?(server_plugin_anchor)
-          rollback_incomplete_rsc_manifest_setup(config_path, original_content)
-          return
-        end
 
         # Add rscBundle parameter to configureServer function
         gsub_file(
           config_path,
-          /^const configureServer = \(\) => \{/,
+          server_configure_without_rsc_bundle_pattern,
           "// rscBundle parameter: when true, skips manifest generation (RSC bundle doesn't need it)\n" \
           "const configureServer = (rscBundle = false) => {"
         )
@@ -446,7 +443,7 @@ module ReactOnRails
         rsc_plugin_code = server_rsc_manifest_plugin_code(content)
         gsub_file(
           config_path,
-          server_plugin_anchor,
+          server_limit_chunk_count_plugin_anchor,
           "#{rsc_plugin_code}\n  \\1"
         )
       end
@@ -464,6 +461,35 @@ module ReactOnRails
           "(serverWebpackConfig\\.plugins\\.unshift\\(" \
           "new bundler\\.optimize\\.LimitChunkCountPlugin.*\\);)"
         )
+      end
+
+      def server_configure_without_rsc_bundle_pattern
+        /^const configureServer\s*=\s*\(\s*\)\s*=>\s*\{/
+      end
+
+      def server_configure_with_rsc_bundle_pattern
+        /^const configureServer\s*=\s*\(\s*rscBundle\s*=\s*false\s*\)\s*=>\s*\{/
+      end
+
+      def rewritable_server_configure_signature?(content)
+        content.match?(server_configure_without_rsc_bundle_pattern) ||
+          content.match?(server_configure_with_rsc_bundle_pattern)
+      end
+
+      def server_config_ready_for_manifest_helper?(config_path, content, original_content)
+        unless content.match?(server_limit_chunk_count_plugin_anchor)
+          rollback_incomplete_rsc_manifest_setup(config_path, original_content)
+          return false
+        end
+
+        return true if rewritable_server_configure_signature?(content)
+
+        rollback_incomplete_rsc_manifest_setup(
+          config_path,
+          original_content,
+          reason: "configureServer signature was not recognized"
+        )
+        false
       end
 
       def server_rsc_manifest_plugin_code(content)
@@ -706,7 +732,9 @@ module ReactOnRails
         content = File.read(path)
         missing = []
         missing << "addRSCManifestPlugin in serverWebpackConfig.js" unless content.include?("addRSCManifestPlugin")
-        missing << "rscBundle parameter in serverWebpackConfig.js" unless content.include?("rscBundle")
+        unless content.match?(server_configure_with_rsc_bundle_pattern)
+          missing << "rscBundle parameter in serverWebpackConfig.js"
+        end
         missing
       end
 
