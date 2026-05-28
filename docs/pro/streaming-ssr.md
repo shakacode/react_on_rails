@@ -135,49 +135,26 @@ callers should not use an empty stream as a success signal.
 
 ### 6. What Happens During Streaming
 
-When a user visits the page, they'll experience the following sequence:
+`stream_react_component` calls React's `renderToPipeableStream`, which streams HTML to the browser progressively as React renders the component tree:
 
-1. The initial HTML shell is sent immediately, including:
-   - The page layout
-   - Any static content (like the `<h1>` and footer)
-   - Placeholder content for the React component (typically a loading state)
+1. The HTML response starts immediately — the browser doesn't wait for the entire page to finish rendering
+2. React renders sections of the tree and flushes HTML chunks to the browser
+3. The browser parses and displays each chunk as it arrives
 
-2. As the React component processes and suspense boundaries resolve:
-   - HTML chunks are streamed to the browser progressively
-   - Each chunk updates a specific part of the page
-   - The browser renders these updates without a full-page reload
+With synchronous props (as in this example), all data is available when rendering starts. React renders the full tree in one pass, and `renderToPipeableStream` flushes the HTML progressively — the browser receives the header, posts, and footer as a stream rather than waiting for the complete response. This reduces Time to First Byte (TTFB) on large pages.
 
-For example, with our `MyStreamingComponent`, the sequence might be:
+For pages with independent data sources that load at different speeds, use separate `stream_react_component` calls so each section streams as its data becomes ready:
 
-1. The initial HTML includes the header, footer, and Suspense placeholder.
-
-```html
-<header>
-  <h1>Hello, Streaming World!</h1>
-</header>
-<template id="s0">
-  <div>Loading...</div>
-</template>
-<footer>
-  <p>Footer content</p>
-</footer>
+```erb
+<%# Each component streams independently %>
+<%= stream_react_component("Header", props: { title: "Dashboard" }) %>
+<%= stream_react_component("PostFeed",
+      props: { posts: @posts.as_json(only: [:id, :title]) }) %>
+<%= stream_react_component("Sidebar",
+      props: { stats: @stats.as_json }) %>
 ```
 
-2. As `renderToPipeableStream` finishes rendering the post list, the HTML chunk is streamed to the browser:
-
-```html
-<template hidden id="b0">
-  <ul>
-    <li>First Post</li>
-    <li>Second Post</li>
-  </ul>
-</template>
-
-<script>
-  // This implementation is slightly simplified
-  document.getElementById('s0').replaceChildren(document.getElementById('b0'));
-</script>
-```
+When combined with React Server Components (async components), `<Suspense>` boundaries show a fallback while the async content resolves, then the rendered HTML streams to the browser as a replacement — creating a progressive loading experience. See the [RSC tutorial](./react-server-components/tutorial.md) for details.
 
 ## Compression Middleware Compatibility
 
