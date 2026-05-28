@@ -51,6 +51,8 @@ export default Profile;
 ```
 
 > **React on Rails note:** These server components receive `user` as a prop rather than calling `await fetchUser(userId)`. The Node renderer that produces the RSC payload has no Rails models or database connection, and an in-component fetch would bypass Rails' authorization and caching. Rails loads the user in the controller and passes it down the tree (Rails view → `AppRouter` → `RSCRoute` `componentProps`). See [RSC Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md).
+>
+> **Security:** `componentProps` are serialized into the RSC payload and, on client-side navigation, sent from the browser to the RSC payload endpoint — so they are client-visible and can be tampered with. Pass only display-safe fields (the [step-5 view](#5-render-from-the-rails-view) uses `only: [:id, :name, :bio]`) and never rely on `componentProps` for authorization; re-derive anything security-sensitive on the server from the Rails session.
 
 ### 2. Create the client component that uses `RSCRoute`
 

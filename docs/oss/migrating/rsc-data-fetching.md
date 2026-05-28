@@ -144,7 +144,7 @@ function ReviewList({ reviews }: { reviews: Review[] }) {
 >
 > **More details:** For setup instructions and configuration options, see the [React on Rails Pro RSC documentation](../../pro/react-server-components/tutorial.md).
 
-### Async Props: Stream Each Slow Prop Independently
+### Async Props: Stream Each Slow Prop Independently {#async-props-stream-each-slow-prop-independently}
 
 The synchronous example above loads every prop in the controller before React starts rendering. When one data source is slow (a recommendations service, an expensive aggregate), it holds up the whole render. **Async props** let Rails send the fast props immediately and stream each slow prop to the browser as it resolves, so React shows the shell and fills in each `<Suspense>` boundary independently.
 
@@ -205,6 +205,9 @@ async function ReviewList({ reviews }: { reviews: Promise<Review[]> }) {
     </ul>
   );
 }
+
+// RecommendationList mirrors ReviewList: an async component that awaits its
+// `items` prop (the recommendations Promise) and maps over the resolved array.
 ```
 
 **Sync props vs. async props — which to use:**

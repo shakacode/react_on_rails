@@ -78,9 +78,12 @@ Rails prepares the `posts` data and passes it into the page as a prop. Update th
 
 ```erb
 <%# app/views/pages/react_server_component_without_ssr.html.erb %>
+<%# Scope the query — in the no-SSR flow these props are serialized into the
+    RSC payload request URL, so avoid passing an unbounded table. %>
 <%= react_component("ReactServerComponentPage",
       prerender: false,
-      props: { posts: Post.all.as_json(only: [:id, :title, :body, :user_id, :created_at]) }) %>
+      props: { posts: Post.order(created_at: :desc).limit(20)
+                          .as_json(only: [:id, :title, :body, :user_id, :created_at]) }) %>
 ```
 
 > **React on Rails note:** In React on Rails, Rails is the backend. The component receives `posts` as a prop instead of calling `fetch('/api/posts')` itself — an in-component fetch bypasses Rails' authorization and caching, and the Node renderer has no `fetch` global by default. The artificial `setTimeout` above only simulates a slow render so you can watch streaming work. When the **data** itself is slow to load, stream each prop as it resolves with [async props](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently) (covered after you [add SSR](./server-side-rendering.md)). See [RSC Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md).
