@@ -37,8 +37,28 @@ import loadJsonFile from '../loadJsonFile.ts';
 
 let serverRendererPromise: Promise<ReturnType<typeof buildServerRenderer>> | undefined;
 
-const CLIENT_HOOK_RUNTIME_ERROR_REGEX =
-  /\b(?:React\.)?(useState|useEffect|useReducer|useCallback|useMemo|useRef|useLayoutEffect|useImperativeHandle|useContext|useSyncExternalStore|useTransition|useDeferredValue) is not a function\b/;
+const CLIENT_HOOK_NAMES = [
+  'useState',
+  'useEffect',
+  'useReducer',
+  'useCallback',
+  'useMemo',
+  'useRef',
+  'useLayoutEffect',
+  'useImperativeHandle',
+  'useContext',
+  'useSyncExternalStore',
+  'useTransition',
+  'useDeferredValue',
+  'useId',
+  'useDebugValue',
+  'useInsertionEffect',
+  'useOptimistic',
+  'useActionState',
+].join('|');
+const CLIENT_HOOK_RUNTIME_ERROR_REGEX = new RegExp(
+  `(?:(?:React\\.)|\\(0\\s*,\\s*[\\w$]+\\.)?(${CLIENT_HOOK_NAMES})\\)? is not a function\\b`,
+);
 
 const addRSCClientHookDiagnostic = (error: Error, componentName: string): Error => {
   const match = error.message.match(CLIENT_HOOK_RUNTIME_ERROR_REGEX);
@@ -59,7 +79,10 @@ const addRSCClientHookDiagnostic = (error: Error, componentName: string): Error 
 
   enhancedError.name = error.name;
   enhancedError.cause = error;
-  enhancedError.stack = `${enhancedError.name}: ${enhancedError.message}\nCaused by: ${error.stack || error.message}`;
+  const enhancedStackFrames = enhancedError.stack?.split('\n').slice(1).join('\n');
+  enhancedError.stack = `${enhancedError.name}: ${enhancedError.message}${
+    enhancedStackFrames ? `\n${enhancedStackFrames}` : ''
+  }\nCaused by: ${error.stack || error.message}`;
 
   return enhancedError;
 };
@@ -83,7 +106,7 @@ const streamRenderRSCComponent = (
   const { pipeToTransform, readableStream, emitError } =
     transformRenderStreamChunksToResultObject(renderState);
 
-  const reportError = (error: Error) => {
+  const reportError = (error: Error): Error => {
     const diagnosticError = addRSCClientHookDiagnostic(error, componentName);
     console.error('Error in RSC stream', diagnosticError);
     if (throwJsErrors) {
