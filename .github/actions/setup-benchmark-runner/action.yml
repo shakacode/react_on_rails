@@ -23,6 +23,12 @@ runs:
         mkdir -p ~/bin
         echo "$HOME/bin" >> "$GITHUB_PATH"
 
+    - name: Install libyaml-dev
+      # Must precede any gem install/load: psych links libyaml dynamically. On warm caches the
+      # missing-lib failure is silent; cold runs hit it.
+      shell: bash
+      run: sudo apt-get install -y libyaml-dev
+
     - name: Setup k6
       if: inputs.install-k6 == 'true'
       uses: grafana/setup-k6-action@v1
@@ -49,10 +55,6 @@ runs:
       if: steps.cache-foreman.outputs.cache-hit != 'true'
       shell: bash
       run: gem install foreman
-
-    - name: Fix dependency for libyaml-dev
-      shell: bash
-      run: sudo apt install libyaml-dev -y
 
     - name: Setup pnpm
       uses: pnpm/action-setup@v6
