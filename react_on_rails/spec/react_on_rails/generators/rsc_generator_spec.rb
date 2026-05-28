@@ -4475,6 +4475,7 @@ describe RscGenerator, type: :generator do
           expect(content).to include("filename: mergedEntry.filename || `${RSC_CLIENT_REFERENCES_ENTRY_NAME}.js`")
           expect(content).to include("if (!useFixedFilename) return mergedEntry;")
           expect(content).to include("do not fold client-only modules into server-bundle.js")
+          expect(content).to include("there is no safe entry shape to preserve")
           expect(content).to include("addClientReferencesToEntry(")
           expect(content).to include("clientReferenceRequests,\n      options.isServer,")
           expect(content).not_to include("'server-bundle': appendImports(entryValue['server-bundle'], requests)")
@@ -4491,6 +4492,9 @@ describe RscGenerator, type: :generator do
           expect(content).to include("new WebpackError")
           expect(content).to include("mergeChunkPairsInPlace(existing.chunks, chunkPairs)")
           expect(content).to include("regression can warn again")
+          expect(content).to include("for (const concatenatedModule of module.modules)")
+          expect(content).to include("normalizeCrossOrigin")
+          expect(content).to include("Unsupported crossOriginLoading value")
           expect(content).not_to include("Object.fromEntries")
           expect(content).not_to include("addClientReferencesToEntry,")
           # Manifest must emit alternating [chunkId, filename] pairs (collectChunkGroupPairs),

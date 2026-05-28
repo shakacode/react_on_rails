@@ -868,6 +868,8 @@ module ReactOnRails
 
       def adjacent_blank_line_after_removed_import?(lines, import_index)
         return false unless lines[import_index]&.strip&.empty?
+
+        # If the removed import was first, drop the following blank to avoid a leading blank line.
         return true if import_index.zero?
 
         lines[import_index - 1].strip.empty?

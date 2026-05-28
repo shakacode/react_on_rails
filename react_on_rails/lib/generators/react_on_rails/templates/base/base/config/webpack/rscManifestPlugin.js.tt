@@ -411,6 +411,8 @@ const appendImports = (entryValue, importRequests, entryName = null) => {
     const entryLabel = entryName ? ` '${entryName}'` : '';
     // EntryDescription with `filename` / `library` / `dependOn` but no `import` key:
     // we cannot inject client references without overwriting the user's shape.
+    // Returning unchanged also skips filename injection; without an import key,
+    // there is no safe entry shape to preserve.
     // eslint-disable-next-line no-console
     console.warn(
       `[rscManifestPlugin] Entry${entryLabel} has no \`import\` key; client references were not appended automatically. ` +
@@ -545,6 +547,21 @@ const mergeChunkPairsInPlace = (existing, additions) => {
   }
 };
 
+const normalizeCrossOrigin = (crossOrigin) => {
+  if (typeof crossOrigin !== 'string') return { value: null };
+
+  if (crossOrigin === 'use-credentials' || crossOrigin === 'anonymous') {
+    return { value: crossOrigin };
+  }
+
+  return {
+    value: 'anonymous',
+    warning:
+      `[RspackRSCManifestPlugin] Unsupported crossOriginLoading value '${crossOrigin}'; ` +
+      "falling back to 'anonymous' for the RSC manifest.",
+  };
+};
+
 class RspackRSCManifestPlugin {
   constructor(options, clientReferenceFiles, clientReferenceRequests) {
     if (!options || typeof options.isServer !== 'boolean') {
@@ -584,13 +601,11 @@ class RspackRSCManifestPlugin {
           stage: compiler.webpack.Compilation.PROCESS_ASSETS_STAGE_REPORT,
         },
         () => {
-          let crossOrigin = compilation.outputOptions.crossOriginLoading;
-          crossOrigin =
-            typeof crossOrigin === 'string'
-              ? crossOrigin === 'use-credentials'
-                ? crossOrigin
-                : 'anonymous'
-              : null;
+          const crossOriginResult = normalizeCrossOrigin(compilation.outputOptions.crossOriginLoading);
+          if (crossOriginResult.warning) {
+            compilation.warnings.push(new WebpackError(crossOriginResult.warning));
+          }
+          const { value: crossOrigin } = crossOriginResult;
 
           const filePathToModuleMetadata = {};
 
@@ -643,9 +658,9 @@ class RspackRSCManifestPlugin {
                 // Intentional: a shared module can be visited via multiple chunk groups.
                 // `mergeChunkPairsInPlace` dedupes the accumulated pairs.
                 if (module.modules) {
-                  module.modules.forEach((concatenatedModule) =>
-                    recordModule(moduleId, concatenatedModule, chunkPairs),
-                  );
+                  for (const concatenatedModule of module.modules) {
+                    recordModule(moduleId, concatenatedModule, chunkPairs);
+                  }
                 }
               }
             });
