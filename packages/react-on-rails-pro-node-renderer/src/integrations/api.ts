@@ -35,8 +35,6 @@ export {
   MessageNotifier,
 } from '../shared/errorReporter.js';
 export {
-  resetTracing,
-  resetSubSpan,
   setupTracing,
   setupSubSpan,
   subSpan,
@@ -47,10 +45,22 @@ export {
   SubSpanFn,
   SubSpanController,
 } from '../shared/tracing.js';
-export {
-  getOpenTelemetryTracerProvider,
-  setOpenTelemetryTracerProvider,
-} from '../shared/opentelemetryState.js';
+/**
+ * Lifecycle teardown helpers for integrations that own the active tracing state.
+ * Do not call these while another integration owns tracing or while SSR requests
+ * are in flight.
+ */
+export { resetTracing, resetSubSpan } from '../shared/tracing.js';
+export { getOpenTelemetryTracerProvider } from '../shared/opentelemetryState.js';
+/**
+ * Updates the OpenTelemetry lifecycle owner. Callers must pair provider
+ * ownership with cleanup and must not call this during another init/shutdown
+ * cycle.
+ *
+ * Note: getOpenTelemetryTracerProvider above is read-only and has no such
+ * restriction.
+ */
+export { setOpenTelemetryTracerProvider } from '../shared/opentelemetryState.js';
 export {
   configureFastify,
   registerFastifyConfigFunction,

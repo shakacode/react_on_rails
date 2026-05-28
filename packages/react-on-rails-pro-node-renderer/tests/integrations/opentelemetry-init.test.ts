@@ -6,11 +6,33 @@ import {
   propagation as otelPropagation,
   trace as otelTrace,
 } from '@opentelemetry/api';
+import { WORKER_SHUTDOWN_HOOKS_TIMEOUT_MS } from '../../src/integrations/api.js';
 
 const resetOpenTelemetryForTest = async () => {
   const testUtils = await import('../../src/testUtils/opentelemetry');
   await testUtils.resetOpenTelemetryForTest();
 };
+
+const createLogMock = () => ({
+  debug: jest.fn(),
+  error: jest.fn(),
+  info: jest.fn(),
+  warn: jest.fn(),
+});
+
+const createIntegrationsApiMock = (log: ReturnType<typeof createLogMock>) => ({
+  log,
+  message: jest.fn(),
+  resetTracing: jest.fn(),
+  resetSubSpan: jest.fn(),
+  setupTracing: jest.fn(),
+  setupSubSpan: jest.fn(),
+  getOpenTelemetryTracerProvider: jest.fn(() => null),
+  setOpenTelemetryTracerProvider: jest.fn(),
+  registerFastifyConfigFunction: jest.fn(() => jest.fn()),
+  WORKER_SHUTDOWN_HOOKS_TIMEOUT_MS,
+  registerWorkerShutdownHook: jest.fn(() => jest.fn()),
+});
 
 describe('opentelemetry integration: init() failure path', () => {
   beforeEach(() => {
@@ -30,8 +52,6 @@ describe('opentelemetry integration: init() failure path', () => {
     jest.dontMock('@opentelemetry/sdk-trace-base');
     jest.dontMock('@opentelemetry/sdk-trace-node');
     jest.dontMock('../../src/integrations/api.js');
-    jest.dontMock('../../src/worker/fastifyConfig.js');
-    jest.dontMock('../../src/worker/shutdownHooks.js');
     jest.dontMock('fastify');
     jest.restoreAllMocks();
     otelTrace.disable();
@@ -135,13 +155,15 @@ describe('opentelemetry integration: init() failure path', () => {
       let configureFastifyCallback: ((app: { addHook: jest.Mock }) => void) | undefined;
       let onClose: (() => Promise<void>) | undefined;
       const shutdown = jest.fn(() => new Promise<void>(() => undefined));
+      const log = createLogMock();
+      const registerFastifyConfigFunction = jest.fn((callback: (app: { addHook: jest.Mock }) => void) => {
+        configureFastifyCallback = callback;
+        return jest.fn();
+      });
 
-      jest.doMock('../../src/worker/fastifyConfig.js', () => ({
-        __resetFastifyConfigFunctionsForTest: jest.fn(),
-        registerFastifyConfigFunction: jest.fn((callback: (app: { addHook: jest.Mock }) => void) => {
-          configureFastifyCallback = callback;
-          return jest.fn();
-        }),
+      jest.doMock('../../src/integrations/api.js', () => ({
+        ...createIntegrationsApiMock(log),
+        registerFastifyConfigFunction,
       }));
       jest.doMock('@opentelemetry/sdk-trace-node', () => ({
         NodeTracerProvider: jest.fn(function NodeTracerProvider() {
@@ -178,9 +200,10 @@ describe('opentelemetry integration: init() failure path', () => {
 
   test('init() does not register a Fastify shutdown hook when provider.register() fails', async () => {
     const registerFastifyConfigFunction = jest.fn();
+    const log = createLogMock();
 
-    jest.doMock('../../src/worker/fastifyConfig.js', () => ({
-      __resetFastifyConfigFunctionsForTest: jest.fn(),
+    jest.doMock('../../src/integrations/api.js', () => ({
+      ...createIntegrationsApiMock(log),
       registerFastifyConfigFunction,
     }));
     jest.doMock('@opentelemetry/sdk-trace-node', () => ({
@@ -218,13 +241,26 @@ describe('opentelemetry integration: init() failure path', () => {
 
   test('Fastify onClose disables the global tracer provider so init() can run again', async () => {
     const configureFastifyCallbacks: Array<(app: { addHook: jest.Mock }) => void> = [];
+    const log = createLogMock();
+    // Import real implementations before jest.doMock so the mock factory can
+    // capture their references. beforeEach reset the module registry, so these
+    // are the same fresh instances that the code under test will share.
+    const tracing = await import('../../src/shared/tracing');
+    const opentelemetryState = await import('../../src/shared/opentelemetryState');
+    const registerFastifyConfigFunction = jest.fn((callback: (app: { addHook: jest.Mock }) => void) => {
+      configureFastifyCallbacks.push(callback);
+      return jest.fn();
+    });
 
-    jest.doMock('../../src/worker/fastifyConfig.js', () => ({
-      __resetFastifyConfigFunctionsForTest: jest.fn(),
-      registerFastifyConfigFunction: jest.fn((callback: (app: { addHook: jest.Mock }) => void) => {
-        configureFastifyCallbacks.push(callback);
-        return jest.fn();
-      }),
+    jest.doMock('../../src/integrations/api.js', () => ({
+      ...createIntegrationsApiMock(log),
+      setupTracing: tracing.setupTracing,
+      setupSubSpan: tracing.setupSubSpan,
+      resetTracing: tracing.resetTracing,
+      resetSubSpan: tracing.resetSubSpan,
+      getOpenTelemetryTracerProvider: opentelemetryState.getOpenTelemetryTracerProvider,
+      setOpenTelemetryTracerProvider: opentelemetryState.setOpenTelemetryTracerProvider,
+      registerFastifyConfigFunction,
     }));
 
     const { trace } = await import('@opentelemetry/api');
@@ -232,7 +268,6 @@ describe('opentelemetry integration: init() failure path', () => {
     const firstExporter = new InMemorySpanExporter();
     const secondExporter = new InMemorySpanExporter();
     const otel = await import('../../src/integrations/opentelemetry');
-    const tracing = await import('../../src/shared/tracing');
 
     const installOnCloseHook = async () => {
       let onClose: (() => Promise<void>) | undefined;
@@ -285,13 +320,18 @@ describe('opentelemetry integration: init() failure path', () => {
 
   test('worker shutdown hook disables the global tracer provider so init() can run again', async () => {
     let workerShutdownHook: (() => Promise<void>) | undefined;
+    const log = createLogMock();
+    const opentelemetryState = await import('../../src/shared/opentelemetryState');
+    const registerWorkerShutdownHook = jest.fn((hook: () => Promise<void>) => {
+      workerShutdownHook = hook;
+      return jest.fn();
+    });
 
-    jest.doMock('../../src/worker/shutdownHooks.js', () => ({
-      __resetWorkerShutdownHooksForTest: jest.fn(),
-      registerWorkerShutdownHook: jest.fn((hook: () => Promise<void>) => {
-        workerShutdownHook = hook;
-        return jest.fn();
-      }),
+    jest.doMock('../../src/integrations/api.js', () => ({
+      ...createIntegrationsApiMock(log),
+      getOpenTelemetryTracerProvider: opentelemetryState.getOpenTelemetryTracerProvider,
+      setOpenTelemetryTracerProvider: opentelemetryState.setOpenTelemetryTracerProvider,
+      registerWorkerShutdownHook,
     }));
 
     const { trace } = await import('@opentelemetry/api');
@@ -322,18 +362,9 @@ describe('opentelemetry integration: init() failure path', () => {
   });
 
   test('OpenTelemetry diagnostics preserve warn and error severity in renderer logs', async () => {
-    const log = {
-      debug: jest.fn(),
-      error: jest.fn(),
-      info: jest.fn(),
-      warn: jest.fn(),
-    };
+    const log = createLogMock();
 
-    jest.doMock('../../src/integrations/api.js', () => ({
-      ...jest.requireActual<typeof import('../../src/integrations/api.js')>('../../src/integrations/api.js'),
-      log,
-      message: jest.fn(),
-    }));
+    jest.doMock('../../src/integrations/api.js', () => createIntegrationsApiMock(log));
 
     const { diag } = await import('@opentelemetry/api');
     const { InMemorySpanExporter, SimpleSpanProcessor } = await import('@opentelemetry/sdk-trace-base');
@@ -357,6 +388,10 @@ describe('opentelemetry integration: init() failure path', () => {
   });
 
   test('init() clears global OTel state when Fastify shutdown hook registration fails', async () => {
+    const log = createLogMock();
+    const errorReporter = await import('../../src/shared/errorReporter');
+    const messageSpy = jest.spyOn(errorReporter, 'message');
+    const opentelemetryState = await import('../../src/shared/opentelemetryState');
     const registerFastifyConfigFunction = jest
       .fn((_callback: (app: { addHook: jest.Mock }) => void) => jest.fn())
       .mockImplementationOnce(() => {
@@ -364,15 +399,16 @@ describe('opentelemetry integration: init() failure path', () => {
       })
       .mockImplementationOnce(() => jest.fn());
 
-    jest.doMock('../../src/worker/fastifyConfig.js', () => ({
-      __resetFastifyConfigFunctionsForTest: jest.fn(),
+    jest.doMock('../../src/integrations/api.js', () => ({
+      ...createIntegrationsApiMock(log),
+      message: errorReporter.message,
+      getOpenTelemetryTracerProvider: opentelemetryState.getOpenTelemetryTracerProvider,
+      setOpenTelemetryTracerProvider: opentelemetryState.setOpenTelemetryTracerProvider,
       registerFastifyConfigFunction,
     }));
 
     const { trace } = await import('@opentelemetry/api');
     const { InMemorySpanExporter, SimpleSpanProcessor } = await import('@opentelemetry/sdk-trace-base');
-    const errorReporter = await import('../../src/shared/errorReporter');
-    const messageSpy = jest.spyOn(errorReporter, 'message');
     const firstExporter = new InMemorySpanExporter();
     const secondExporter = new InMemorySpanExporter();
     const otel = await import('../../src/integrations/opentelemetry');
@@ -446,27 +482,16 @@ describe('opentelemetry integration: init() failure path', () => {
     try {
       let configureFastifyCallback: ((app: { addHook: jest.Mock }) => void) | undefined;
       let onClose: (() => Promise<void>) | undefined;
-      const log = {
-        debug: jest.fn(),
-        error: jest.fn(),
-        info: jest.fn(),
-        warn: jest.fn(),
-      };
+      const log = createLogMock();
       const shutdown = jest.fn(() => new Promise<void>(() => undefined));
+      const registerFastifyConfigFunction = jest.fn((callback: (app: { addHook: jest.Mock }) => void) => {
+        configureFastifyCallback = callback;
+        return jest.fn();
+      });
 
-      jest.doMock('../../src/worker/fastifyConfig.js', () => ({
-        __resetFastifyConfigFunctionsForTest: jest.fn(),
-        registerFastifyConfigFunction: jest.fn((callback: (app: { addHook: jest.Mock }) => void) => {
-          configureFastifyCallback = callback;
-          return jest.fn();
-        }),
-      }));
       jest.doMock('../../src/integrations/api.js', () => ({
-        ...jest.requireActual<typeof import('../../src/integrations/api.js')>(
-          '../../src/integrations/api.js',
-        ),
-        log,
-        message: jest.fn(),
+        ...createIntegrationsApiMock(log),
+        registerFastifyConfigFunction,
       }));
       jest.doMock('@opentelemetry/sdk-trace-node', () => ({
         NodeTracerProvider: jest.fn(function NodeTracerProvider() {
@@ -566,32 +591,21 @@ describe('opentelemetry integration: init() failure path', () => {
       let configureFastifyCallback: ((app: { addHook: jest.Mock }) => void) | undefined;
       let onClose: (() => Promise<void>) | undefined;
       let rejectShutdown: ((error: Error) => void) | undefined;
-      const log = {
-        debug: jest.fn(),
-        error: jest.fn(),
-        info: jest.fn(),
-        warn: jest.fn(),
-      };
+      const log = createLogMock();
       const shutdown = jest.fn(
         () =>
           new Promise<void>((_resolve, reject) => {
             rejectShutdown = reject;
           }),
       );
+      const registerFastifyConfigFunction = jest.fn((callback: (app: { addHook: jest.Mock }) => void) => {
+        configureFastifyCallback = callback;
+        return jest.fn();
+      });
 
-      jest.doMock('../../src/worker/fastifyConfig.js', () => ({
-        __resetFastifyConfigFunctionsForTest: jest.fn(),
-        registerFastifyConfigFunction: jest.fn((callback: (app: { addHook: jest.Mock }) => void) => {
-          configureFastifyCallback = callback;
-          return jest.fn();
-        }),
-      }));
       jest.doMock('../../src/integrations/api.js', () => ({
-        ...jest.requireActual<typeof import('../../src/integrations/api.js')>(
-          '../../src/integrations/api.js',
-        ),
-        log,
-        message: jest.fn(),
+        ...createIntegrationsApiMock(log),
+        registerFastifyConfigFunction,
       }));
       jest.doMock('@opentelemetry/sdk-trace-node', () => ({
         NodeTracerProvider: jest.fn(function NodeTracerProvider() {
