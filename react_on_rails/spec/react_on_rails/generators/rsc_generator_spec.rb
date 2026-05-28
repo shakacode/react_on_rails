@@ -1592,6 +1592,21 @@ describe RscGenerator, type: :generator do
       expect(generator.send(:check_rsc_server_config)).to eq([])
     end
 
+    it "uses the rewritten server config content when generating fresh manifest plugin code" do
+      config_path = "config/webpack/serverWebpackConfig.js"
+      simulate_existing_file(config_path, pro_server_webpack_content)
+
+      manifest_code_input = nil
+      allow(generator).to receive(:server_rsc_manifest_plugin_code).and_wrap_original do |original, content|
+        manifest_code_input = content
+        original.call(content)
+      end
+
+      generator.send(:update_server_webpack_config_for_rsc)
+
+      expect(manifest_code_input).to include("const configureServer = (rscBundle = false) => {")
+    end
+
     it "removes remaining server RSCWebpackPlugin calls when the helper call already exists" do
       config_path = "config/webpack/serverWebpackConfig.js"
       simulate_existing_file(
@@ -1933,6 +1948,14 @@ describe RscGenerator, type: :generator do
       expect(migrated_content.scan("./rscManifestPlugin").length).to eq(1)
       expect(migrated_content).not_to include("react-on-rails-rsc/WebpackPlugin")
       expect(migrated_content).to include("addRSCManifestPlugin(clientConfig, {")
+      expect(migrated_content).to include(
+        "const { addRSCManifestPlugin } = require('./rscManifestPlugin');\n\n" \
+        "const rscClientReferences = {"
+      )
+      expect(migrated_content).not_to include(
+        "const { addRSCManifestPlugin } = require('./rscManifestPlugin');\n\n\n" \
+        "const rscClientReferences = {"
+      )
       expect(migrated_content).not_to include("new RSCWebpackPlugin")
     end
 
@@ -4396,6 +4419,7 @@ describe RscGenerator, type: :generator do
           expect(content).to include("const globToRegExpSource")
           expect(content).to include(".map(globToRegExpSource)")
           expect(content).to include("Ignoring invalid glob pattern")
+          expect(content).to include("Consider adding an explicit base path")
           expect(content).to include("scanning from context")
           expect(content).to include("requests.add(reference)")
           expect(content).to include("collectStringReference")
@@ -4445,6 +4469,7 @@ describe RscGenerator, type: :generator do
           expect(content).to include("if (chunk.id == null) continue;")
           expect(content).to include("Rspack helper does not yet enumerate named exports")
           expect(content).to include("webpack/rspack name a bare string/array entry")
+          expect(content).to include("possibly synchronous")
           expect(content).to include("resolveRealPath")
           expect(content).to include("clientReferenceSet = new Set(this.clientReferenceFiles.map(resolveRealPath))")
           expect(content).to include("clientReferenceRequestSet = new Set(this.clientReferenceRequests)")
@@ -4455,6 +4480,7 @@ describe RscGenerator, type: :generator do
           expect(content).to include(
             "new RspackRSCManifestPlugin(options, clientReferenceFiles, clientReferenceRequests)"
           )
+          expect(content).to include("delegates entirely to RSCWebpackPlugin")
           expect(content).to include("const chunkPairs = collectChunkGroupPairs(chunkGroup);")
           expect(content).to include("compilation.warnings.push")
           expect(content).to include("'use client' file was not found in compilation modules")

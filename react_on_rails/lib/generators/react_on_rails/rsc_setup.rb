@@ -441,8 +441,6 @@ module ReactOnRails
           return
         end
 
-        content = File.read(full_path)
-
         # Add rscBundle parameter to configureServer function
         gsub_file(
           config_path,
@@ -450,6 +448,7 @@ module ReactOnRails
           "// rscBundle parameter: when true, skips manifest generation (RSC bundle doesn't need it)\n" \
           "const configureServer = (rscBundle = false) => {"
         )
+        content = File.read(full_path)
 
         # Add RSC manifest generation before LimitChunkCountPlugin (matches template ordering)
         rsc_plugin_code = server_rsc_manifest_plugin_code(content)
@@ -683,8 +682,15 @@ module ReactOnRails
 
       def replace_rsc_webpack_plugin_import_with_helper(config_path, content, fallback_import_pattern)
         if content.match?(RSC_WEBPACK_PLUGIN_IMPORT_PATTERN)
-          replacement = rsc_manifest_helper_import?(content) ? "" : RSC_MANIFEST_HELPER_IMPORT
-          gsub_file(config_path, RSC_WEBPACK_PLUGIN_IMPORT_PATTERN, replacement)
+          if rsc_manifest_helper_import?(content)
+            write_existing_rsc_config(
+              config_path,
+              remove_rsc_webpack_plugin_import_line(content),
+              action: :rewrite
+            )
+          else
+            gsub_file(config_path, RSC_WEBPACK_PLUGIN_IMPORT_PATTERN, RSC_MANIFEST_HELPER_IMPORT)
+          end
           return true
         end
 

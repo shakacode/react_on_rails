@@ -148,7 +148,8 @@ const globBaseDirectory = (context, reference) => {
   // eslint-disable-next-line no-console
   console.warn(
     `[rscManifestPlugin] Glob pattern '${reference}' has no static base directory; ` +
-      `scanning from context '${context}' instead of filesystem root.`,
+      `scanning from context '${context}' instead. ` +
+      `Consider adding an explicit base path to avoid scanning large trees.`,
   );
   return context;
 };
@@ -496,8 +497,9 @@ const addClientReferencesToEntry = (
   };
 
   if (typeof entry === 'function') {
-    // This intentionally changes the factory type to AsyncFunction; webpack 5 and
-    // Rspack both normalize sync and async entry factories at build time.
+    // This intentionally wraps the original factory, possibly synchronous, in an
+    // AsyncFunction; webpack 5 and Rspack both normalize sync and async entry
+    // factories at build time.
     bundlerConfig.entry = async (...args) => addRequestsToEntry(await entry(...args));
     return;
   }
@@ -708,6 +710,8 @@ const addRSCManifestPlugin = (bundlerConfig, options) => {
   }
 
   // Lazy require keeps Rspack-only projects from pulling in webpack at config-load time.
+  // The webpack path delegates entirely to RSCWebpackPlugin, which discovers client
+  // references through webpack's module graph, so entry injection is not needed here.
   // eslint-disable-next-line global-require
   const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
   bundlerConfig.plugins = bundlerConfig.plugins ?? [];
