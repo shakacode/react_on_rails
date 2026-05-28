@@ -93,4 +93,19 @@ describe('RSC diagnostics', () => {
       ),
     ).toHaveLength(1);
   });
+
+  it('treats a merged diagnostic as idempotent even when the message format changes', () => {
+    const diagnosticError = new Error('[ReactOnRails] RSC bundle rendering failed.');
+    diagnosticError.name = 'ReactOnRailsRSCStreamError';
+    const genericStreamError = new Error('boom');
+
+    const mergedError = mergeRSCStreamDiagnosticError(genericStreamError, diagnosticError);
+
+    // Tampering with the merged error's message should still leave it recognized as merged
+    // because the guard is now structural (flag property), not message-text based.
+    mergedError.message = 'unrelated message';
+    const mergedAgainError = mergeRSCStreamDiagnosticError(mergedError, diagnosticError);
+
+    expect(mergedAgainError).toBe(mergedError);
+  });
 });

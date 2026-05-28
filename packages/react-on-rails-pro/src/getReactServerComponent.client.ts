@@ -18,7 +18,11 @@ import { RailsContext } from 'react-on-rails/types';
 import { createRSCPayloadKey, fetch, wrapInNewPromise, extractErrorMessage } from './utils.ts';
 import sanitizeNonce from 'react-on-rails/@internal/sanitizeNonce';
 import LengthPrefixedStreamParser from './parseLengthPrefixedStream.ts';
-import { buildRSCStreamDiagnosticError, mergeRSCStreamDiagnosticError } from './rscDiagnostics.ts';
+import {
+  buildRSCStreamDiagnosticError,
+  mergeRSCStreamDiagnosticError,
+  RSC_STREAM_DIAGNOSTIC_ERROR_NAME,
+} from './rscDiagnostics.ts';
 
 declare global {
   interface Window {
@@ -115,16 +119,9 @@ const createFromFetch = async (
   });
 
   const renderPromise = createFromReadableStream<React.ReactNode>(transformedStream);
-  return wrapInNewPromise(renderPromise)
-    .then((result) => {
-      if (result instanceof Error && rscDiagnosticError) {
-        throw result;
-      }
-      return result;
-    })
-    .catch((error: unknown) => {
-      throw mergeRSCStreamDiagnosticError(error, rscDiagnosticError);
-    });
+  return wrapInNewPromise(renderPromise).catch((error: unknown) => {
+    throw mergeRSCStreamDiagnosticError(error, rscDiagnosticError);
+  });
 };
 
 /**
@@ -169,9 +166,14 @@ const fetchRSC = ({
       cspNonce: railsContext.cspNonce,
       source: fetchUrl,
     }).catch((error: unknown) => {
-      throw new Error(
+      // RSC stream diagnostic errors already carry component/source context — preserve them
+      // (including .cause and the merged stack) instead of flattening to a plain Error.
+      if (error instanceof Error && error.name === RSC_STREAM_DIAGNOSTIC_ERROR_NAME) throw error;
+      const wrapper: Error & { cause?: unknown } = new Error(
         `Failed to fetch RSC payload for component "${componentName}" from "${fetchUrl}": ${extractErrorMessage(error)}`,
       );
+      wrapper.cause = error;
+      throw wrapper;
     });
   } catch (error: unknown) {
     // Handle JSON.stringify errors or other synchronous errors

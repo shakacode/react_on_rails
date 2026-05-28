@@ -597,6 +597,24 @@ describe ReactOnRailsHelper do
         expect(error.message).to include("/app/components/CommentsToggle.jsx:12:15")
       }
     end
+
+    it "drops the V8 error-type header line from the backtrace built from renderingError" do
+      json_result = {
+        "renderingError" => {
+          "message" => "useState is not a function",
+          "stack" => <<~STACK.chomp
+            TypeError: useState is not a function
+                at CommentsToggle (/app/components/CommentsToggle.jsx:12:15)
+                at PostsPage (/app/components/PostsPage.jsx:8:3)
+          STACK
+        }
+      }
+
+      error = helper.send(:rendering_error_from_result, json_result)
+
+      expect(error.backtrace.first).to start_with("at CommentsToggle")
+      expect(error.backtrace).not_to include(/^TypeError:/)
+    end
   end
 
   describe "#redux_store" do

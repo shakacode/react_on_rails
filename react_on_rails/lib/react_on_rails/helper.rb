@@ -724,8 +724,18 @@ module ReactOnRails
       return if message.blank?
 
       error = StandardError.new(message)
-      error.set_backtrace(rendering_error["stack"].to_s.lines.map(&:chomp))
+      error.set_backtrace(normalize_js_stack_lines(rendering_error["stack"]))
       error
+    end
+
+    # V8 stack strings typically begin with a `"TypeError: ..."` header line that does
+    # not match Ruby's `file:line:in 'method'` backtrace format. Drop the leading header
+    # so backtrace cleaners and error reporters can parse the remaining `at <frame>` lines.
+    # Frames are also `.strip`-ed to drop V8's leading indentation, which Ruby backtraces never carry.
+    def normalize_js_stack_lines(stack)
+      lines = stack.to_s.lines.map { |line| line.chomp.strip }
+      frames = lines.drop_while { |line| !line.start_with?("at ") }
+      frames.empty? ? lines : frames
     end
 
     def should_raise_streaming_prerender_error?(chunk_json_result, render_options)

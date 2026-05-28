@@ -28,26 +28,23 @@ type RenderingErrorMetadata = {
   stack?: unknown;
 };
 
-const RSC_STREAM_DIAGNOSTIC_ERROR_NAME = 'ReactOnRailsRSCStreamError';
+export const RSC_STREAM_DIAGNOSTIC_ERROR_NAME = 'ReactOnRailsRSCStreamError';
+const MERGED_DIAGNOSTIC_FLAG = '__rorRSCDiagMerged';
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
+type RSCStreamDiagnosticError = Error & {
+  [MERGED_DIAGNOSTIC_FLAG]?: true;
+  cause?: unknown;
+};
 
-const stringValue = (value: unknown) => (typeof value === 'string' && value.length > 0 ? value : undefined);
+const str = (value: unknown) => (typeof value === 'string' && value.length > 0 ? value : undefined);
 
 export const extractModulePathFromStack = (stack?: string) => {
   if (!stack) return undefined;
-
-  const stackLines = stack.split('\n').map((line) => line.trim());
-  for (const line of stackLines) {
-    const parenthesizedLocation = /\(([^()]+):\d+:\d+\)$/.exec(line);
-    const directLocation = /\bat\s+(.+):\d+:\d+$/.exec(line);
-    const location = parenthesizedLocation?.[1] ?? directLocation?.[1];
-    if (location) {
-      return location.replace(/\?.*$/, '');
-    }
+  for (const line of stack.split('\n')) {
+    const match = /\(([^()]+):\d+:\d+\)$|\bat\s+(.+):\d+:\d+$/.exec(line.trim());
+    const location = match?.[1] ?? match?.[2];
+    if (location) return location.replace(/\?.*$/, '');
   }
-
   return undefined;
 };
 
@@ -55,23 +52,18 @@ export const buildRSCStreamDiagnosticError = (
   metadata: Record<string, unknown>,
   context: RSCStreamDiagnosticContext = {},
 ) => {
-  const renderingErrorMetadata = isRecord(metadata.renderingError)
-    ? (metadata.renderingError as RenderingErrorMetadata)
-    : {};
-  const originalMessage = stringValue(renderingErrorMetadata.message);
-  const originalStack = stringValue(renderingErrorMetadata.stack);
-  const hasErrors = metadata.hasErrors === true;
-
-  if (!hasErrors && !originalMessage && !originalStack) {
-    return undefined;
-  }
+  const raw = metadata.renderingError;
+  const re = (typeof raw === 'object' && raw !== null ? raw : {}) as RenderingErrorMetadata;
+  const originalMessage = str(re.message);
+  const originalStack = str(re.stack);
+  if (metadata.hasErrors !== true && !originalMessage && !originalStack) return undefined;
 
   const modulePath = extractModulePathFromStack(originalStack);
   const message = [
     '[ReactOnRails] RSC bundle rendering failed.',
-    context.componentName ? `Component: ${context.componentName}` : undefined,
-    context.source ? `Source: ${context.source}` : undefined,
-    modulePath ? `Module: ${modulePath}` : undefined,
+    context.componentName && `Component: ${context.componentName}`,
+    context.source && `Source: ${context.source}`,
+    modulePath && `Module: ${modulePath}`,
     `Original error: ${originalMessage ?? 'RSC stream metadata reported hasErrors=true'}`,
   ]
     .filter((line): line is string => Boolean(line))
@@ -82,35 +74,25 @@ export const buildRSCStreamDiagnosticError = (
   if (originalStack) {
     diagnosticError.stack = `${diagnosticError.name}: ${message}\nOriginal stack:\n${originalStack}`;
   }
-
   return diagnosticError;
 };
 
-const isMergedRSCStreamDiagnosticError = (error: Error, diagnosticError: Error) =>
-  error.name === RSC_STREAM_DIAGNOSTIC_ERROR_NAME &&
-  error.message.includes(diagnosticError.message) &&
-  error.message.includes('React stream error:');
-
 export const mergeRSCStreamDiagnosticError = (error: unknown, diagnosticError?: Error) => {
-  const streamError = error instanceof Error ? error : new Error(extractErrorMessage(error));
-  if (!diagnosticError) {
-    return streamError;
-  }
-  if (isMergedRSCStreamDiagnosticError(streamError, diagnosticError)) {
-    return streamError;
-  }
+  const streamError: RSCStreamDiagnosticError =
+    error instanceof Error ? error : new Error(extractErrorMessage(error));
+  if (!diagnosticError || streamError[MERGED_DIAGNOSTIC_FLAG]) return streamError;
 
   const message = `${diagnosticError.message}\nReact stream error: ${streamError.message}`;
-  const mergedError = new Error(message) as Error & { cause?: unknown };
+  const mergedError: RSCStreamDiagnosticError = new Error(message);
   mergedError.name = RSC_STREAM_DIAGNOSTIC_ERROR_NAME;
   mergedError.cause = streamError;
+  mergedError[MERGED_DIAGNOSTIC_FLAG] = true;
   mergedError.stack = [
     `${mergedError.name}: ${message}`,
-    diagnosticError.stack ? `RSC diagnostic stack:\n${diagnosticError.stack}` : undefined,
-    streamError.stack ? `React stream stack:\n${streamError.stack}` : undefined,
+    diagnosticError.stack && `RSC diagnostic stack:\n${diagnosticError.stack}`,
+    streamError.stack && `React stream stack:\n${streamError.stack}`,
   ]
     .filter((line): line is string => Boolean(line))
     .join('\n\n');
-
   return mergedError;
 };
