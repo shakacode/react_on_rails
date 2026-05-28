@@ -144,7 +144,9 @@ jobs:
         shell: bash
       - name: Set benchmark matrices
         id: benchmark-matrices
-        if: steps.detect.outputs.non_runtime_only != 'true'
+        # Always runs. GitHub Actions evaluates `strategy.matrix` for downstream jobs at
+        # workflow-construction time, before their `if:` gates — so an empty output would
+        # crash `fromJSON('')` even when the consuming job is otherwise skipped.
         # Bump shard totals here when a suite's route set outgrows its current shard count.
         # The script is stdlib-only, so the runner's system Ruby is enough (no Bundler/Rails boot).
         run: |
