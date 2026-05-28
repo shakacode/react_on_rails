@@ -1,5 +1,7 @@
 name: Setup Bundler dependencies
-description: Setup Ruby, cache, and install gems for a Bundler project.
+description: >
+  Setup Ruby, cache, and install gems for a Bundler project. On Linux,
+  ensure libyaml-dev is already present or install it before calling this action.
 
 inputs:
   working-directory:

@@ -659,14 +659,14 @@ jobs:
           # when the pinned hash isn't in its DB. A single combined pattern
           # avoids false-positive matches across unrelated lines.
           if [ $BENCHER_EXIT_CODE -ne 0 ] && grep -q "Head Version.*not found" "$BENCHER_STDERR" && ! grep -qiE "alert|threshold violation|boundary violation" "$BENCHER_STDERR"; then
-          if [ -n "$START_POINT_HASH_ARG" ]; then
-            RETRY_ARGS="${START_POINT_ARGS/$START_POINT_HASH_ARG/}"
-          else
-            RETRY_ARGS="$START_POINT_ARGS"
-          fi
-          if [ "$RETRY_ARGS" != "$START_POINT_ARGS" ]; then
-            echo ""
-            echo "⚠️ Start-point hash not found in Bencher — retrying without --start-point-hash (will use latest baseline)"
+            if [ -n "$START_POINT_HASH_ARG" ]; then
+              RETRY_ARGS="${START_POINT_ARGS/$START_POINT_HASH_ARG/}"
+            else
+              RETRY_ARGS="$START_POINT_ARGS"
+            fi
+            if [ "$RETRY_ARGS" != "$START_POINT_ARGS" ]; then
+              echo ""
+              echo "⚠️ Start-point hash not found in Bencher — retrying without --start-point-hash (will use latest baseline)"
               echo "::warning::Start-point hash not found in Bencher — falling back to latest baseline for comparison"
               set +e
               run_bencher "$RETRY_ARGS" > bench_results/bencher_report.html 2>"$BENCHER_STDERR"
