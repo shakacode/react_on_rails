@@ -13,6 +13,7 @@ const DEFAULT_EXCLUDED_DIRECTORIES = new Set(['node_modules', 'public', 'tmp', '
 const GLOB_MAGIC_PATTERN = /[*?\[\]{}]/;
 // Empty negative lookahead is impossible to satisfy, so this rejects every candidate.
 const NEVER_MATCH_PATTERN = /(?!)/;
+const clientReferenceScanCache = new Map();
 
 const toPosixPath = (filePath) => filePath.split(path.sep).join('/');
 
@@ -245,6 +246,39 @@ const normalizeClientReferenceList = (clientReferences) => {
   if (clientReferences == null) return normalizeClientReferences();
 
   return Array.isArray(clientReferences) ? clientReferences : [clientReferences];
+};
+
+const patternCacheKey = (pattern) => {
+  if (!pattern) return null;
+  if (pattern instanceof RegExp) return `regexp:${pattern.source}/${pattern.flags}`;
+
+  return String(pattern);
+};
+
+const clientReferenceCacheKey = (context, clientReferences) =>
+  JSON.stringify({
+    context: path.resolve(context),
+    clientReferences: clientReferences.map((reference) => {
+      if (typeof reference === 'string') return { type: 'request-or-path', value: reference };
+
+      return {
+        type: 'directory',
+        directory: reference.directory,
+        recursive: reference.recursive ?? true,
+        include: patternCacheKey(reference.include),
+        exclude: patternCacheKey(reference.exclude),
+      };
+    }),
+  });
+
+const getClientReferenceFiles = (context, clientReferences) => {
+  const normalizedClientReferences = normalizeClientReferenceList(clientReferences);
+  const cacheKey = clientReferenceCacheKey(context, normalizedClientReferences);
+  if (!clientReferenceScanCache.has(cacheKey)) {
+    clientReferenceScanCache.set(cacheKey, collectClientReferenceFiles(context, normalizedClientReferences));
+  }
+
+  return clientReferenceScanCache.get(cacheKey);
 };
 
 const resolveReferenceDirectory = (context, directory) =>
@@ -593,6 +627,8 @@ class RspackRSCManifestPlugin {
     this.isServer = options.isServer;
     this.clientReferenceFiles = clientReferenceFiles;
     this.clientReferenceRequests = clientReferenceRequests;
+    this.clientReferenceSet = new Set(clientReferenceFiles.map(resolveRealPath));
+    this.clientReferenceRequestSet = new Set(clientReferenceRequests);
     this.clientManifestFilename =
       options.clientManifestFilename ||
       (options.isServer ? 'react-server-client-manifest.json' : 'react-client-manifest.json');
@@ -613,8 +649,7 @@ class RspackRSCManifestPlugin {
 
     // Rspack should expose WebpackError; fallback keeps warnings usable with custom builds.
     const WebpackError = compiler.webpack.WebpackError || Error;
-    const clientReferenceSet = new Set(this.clientReferenceFiles.map(resolveRealPath));
-    const clientReferenceRequestSet = new Set(this.clientReferenceRequests);
+    const { clientReferenceSet, clientReferenceRequestSet } = this;
 
     compiler.hooks.thisCompilation.tap('RspackRSCManifestPlugin', (compilation) => {
       compilation.hooks.processAssets.tap(
@@ -705,7 +740,9 @@ class RspackRSCManifestPlugin {
             this._warnedMissingModules.add(fileUrl);
             compilation.warnings.push(
               new WebpackError(
-                `[RspackRSCManifestPlugin] 'use client' file was not found in compilation modules: ${filePath}`,
+                `[RspackRSCManifestPlugin] 'use client' file was not found in compilation modules: ${filePath}\n` +
+                  'If this file was added while rspack was watching, restart the dev server so it is included ' +
+                  'in the entry scan. Otherwise, ensure it is imported or narrow clientReferences.',
               ),
             );
           }
@@ -750,7 +787,7 @@ const addRSCManifestPlugin = (bundlerConfig, options) => {
     // discover unimported `use client` files that webpack's module graph ignores.
     // Narrow `clientReferences` if stale/unimported files cause unexpected build failures.
     // Omitted clientReferences intentionally falls back to the Shakapacker source-path scan.
-    const { files: clientReferenceFiles, requests: clientReferenceRequests } = collectClientReferenceFiles(
+    const { files: clientReferenceFiles, requests: clientReferenceRequests } = getClientReferenceFiles(
       context,
       options.clientReferences,
     );
@@ -781,6 +818,5 @@ const addRSCManifestPlugin = (bundlerConfig, options) => {
 };
 
 module.exports = {
-  RspackRSCManifestPlugin,
   addRSCManifestPlugin,
 };

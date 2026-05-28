@@ -4439,6 +4439,9 @@ describe RscGenerator, type: :generator do
           expect(content).to include("react-client-manifest.json")
           expect(content).to include("react-server-client-manifest.json")
           expect(content).to include("addClientReferencesToEntry")
+          expect(content).to include("const clientReferenceScanCache = new Map();")
+          expect(content).to include("const clientReferenceCacheKey")
+          expect(content).to include("const getClientReferenceFiles")
           expect(content).to include("compilation.emitAsset")
           expect(content).to include("skipLeadingJavaScriptComments")
           expect(content).to include("(?:;|\\n|$)")
@@ -4526,12 +4529,15 @@ describe RscGenerator, type: :generator do
           expect(content).to include("webpack/rspack name a bare string/array entry")
           expect(content).to include("possibly synchronous")
           expect(content).to include("resolveRealPath")
-          expect(content).to include("clientReferenceSet = new Set(this.clientReferenceFiles.map(resolveRealPath))")
-          expect(content).to include("clientReferenceRequestSet = new Set(this.clientReferenceRequests)")
+          expect(content).to include("this.clientReferenceSet = new Set(clientReferenceFiles.map(resolveRealPath))")
+          expect(content).to include("this.clientReferenceRequestSet = new Set(clientReferenceRequests)")
+          expect(content).to include("clientReferenceSet.has(moduleResource)")
+          expect(content).to include("clientReferenceRequestSet.has(request)")
           expect(content).to include("this._warnedMissingModules.delete(fileUrl)")
           expect(content).to include("this._warnedMissingModules.delete(`request:${matchedRequest}`)")
           expect(content).to include("module.rawRequest")
           expect(content).to include("client reference request was not found in compilation modules")
+          expect(content).to include("restart the dev server")
           expect(content).to include(
             "new RspackRSCManifestPlugin(options, clientReferenceFiles, clientReferenceRequests)"
           )
@@ -4545,6 +4551,8 @@ describe RscGenerator, type: :generator do
           expect(content).to include("publicPath !== 'auto'")
           expect(content).not_to include("chunks: []")
           expect(content).not_to match(/^const \{ RSCWebpackPlugin \} = require/)
+          expect(content).to include("module.exports = {\n  addRSCManifestPlugin,\n};")
+          expect(content).not_to include("RspackRSCManifestPlugin,\n  addRSCManifestPlugin")
         end
       end
 
