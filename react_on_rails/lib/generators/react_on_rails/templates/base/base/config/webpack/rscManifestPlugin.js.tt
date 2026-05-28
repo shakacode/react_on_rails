@@ -427,6 +427,22 @@ const clientReferenceEntry = (requests) => ({
   filename: `${RSC_CLIENT_REFERENCES_ENTRY_NAME}.js`,
 });
 
+const mergeClientReferenceEntry = (entryValue, requests) => {
+  const mergedEntry = appendImports(entryValue, requests);
+  if (typeof mergedEntry === 'string' || Array.isArray(mergedEntry)) {
+    return clientReferenceEntry(Array.isArray(mergedEntry) ? mergedEntry : [mergedEntry]);
+  }
+
+  if (isEntryDescription(mergedEntry)) {
+    return {
+      ...mergedEntry,
+      filename: mergedEntry.filename || `${RSC_CLIENT_REFERENCES_ENTRY_NAME}.js`,
+    };
+  }
+
+  return mergedEntry;
+};
+
 const addClientReferencesToEntry = (bundlerConfig, clientReferenceFiles, clientReferenceRequests) => {
   if (clientReferenceFiles.length === 0 && clientReferenceRequests.length === 0) return;
 
@@ -451,7 +467,7 @@ const addClientReferencesToEntry = (bundlerConfig, clientReferenceFiles, clientR
       return {
         ...entryValue,
         [RSC_CLIENT_REFERENCES_ENTRY_NAME]: existingReferencesEntry
-          ? appendImports(existingReferencesEntry, requests)
+          ? mergeClientReferenceEntry(existingReferencesEntry, requests)
           : clientReferenceEntry(requests),
       };
     }
@@ -486,7 +502,7 @@ const collectChunkGroupPairs = (chunkGroup) => {
   return pairs;
 };
 
-const mergeChunkPairs = (existing, additions) => {
+const mergeChunkPairsInPlace = (existing, additions) => {
   // Mutates `existing` so shared modules accumulate pairs from all chunk groups.
   const seenIds = new Set();
   for (let i = 0; i < existing.length; i += 2) seenIds.add(existing[i]);
@@ -563,7 +579,7 @@ class RspackRSCManifestPlugin {
             const fileUrl = url.pathToFileURL(moduleResource).href;
             const existing = filePathToModuleMetadata[fileUrl];
             if (existing) {
-              mergeChunkPairs(existing.chunks, chunkPairs);
+              mergeChunkPairsInPlace(existing.chunks, chunkPairs);
               return;
             }
 
@@ -585,7 +601,7 @@ class RspackRSCManifestPlugin {
                 recordModule(moduleId, module, chunkPairs);
 
                 // Intentional: a shared module can be visited via multiple chunk groups.
-                // `mergeChunkPairs` dedupes the accumulated pairs.
+                // `mergeChunkPairsInPlace` dedupes the accumulated pairs.
                 if (module.modules) {
                   module.modules.forEach((concatenatedModule) =>
                     recordModule(moduleId, concatenatedModule, chunkPairs),

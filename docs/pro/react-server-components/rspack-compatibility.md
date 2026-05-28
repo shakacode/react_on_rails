@@ -107,14 +107,20 @@ To test RSC with Rspack in your project:
    bundler startup time. Missing-reference warnings are deduped for the dev-server session; if
    a warned reference later fixes and regresses, restart the dev server to see that warning again.
 
-4. **Wildcard named-export tracking**: The Rspack helper records each client reference with
+4. **`publicPath: 'auto'` with CDN assets needs verification**: The Rspack helper cannot
+   know the runtime-resolved public path while emitting the manifest. When `output.publicPath`
+   is `'auto'`, the manifest prefix is empty. Same-origin builds commonly still work, but apps
+   serving chunks from a CDN or asset host should set an explicit public path or verify RSC
+   client chunk loading under their deployed asset URL.
+
+5. **Wildcard named-export tracking**: The Rspack helper records each client reference with
    `name: '*'` rather than enumerating individual named exports through `compilation.moduleGraph`
    the way `RSCWebpackPlugin` does on webpack. Apps that destructure named exports from
    `'use client'` modules across the server/client boundary should verify those code paths
    under Rspack; if the RSC runtime relies on specific export names, stay on webpack for now
    or contribute a Rspack-side enumeration.
 
-5. **Native Rspack RSC is a future migration path**: Rspack documents native RSC support through
+6. **Native Rspack RSC is a future migration path**: Rspack documents native RSC support through
    `@rspack/core`'s `experiments.rsc` APIs and `react-server-dom-rspack`, but that path currently
    targets React 19.1+ and a different manifest/runtime shape. React on Rails Pro's current RSC
    integration stays on the `react-on-rails-rsc` protocol for React 19.0.x compatibility.
