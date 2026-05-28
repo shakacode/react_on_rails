@@ -146,7 +146,7 @@ module ReactOnRails
         end
 
         def rsc_plugin_needs_client_references_rewrite?(content, is_server:)
-          any_rsc_plugin_missing_client_references?(content, is_server: is_server)
+          any_rsc_plugin_section_without_client_references?(content, is_server: is_server)
         end
 
         # Detects RSCWebpackPlugin option blocks that the lightweight JS scanner could not parse
@@ -166,7 +166,7 @@ module ReactOnRails
         def rewritable_rsc_plugin?(config_path, content, is_server:)
           # Mixed same-target plugins are still rewritable: the later rewrite only updates plugins
           # missing clientReferences and leaves sibling custom clientReferences untouched.
-          return true if any_rsc_plugin_missing_client_references?(content, is_server: is_server)
+          return true if any_rsc_plugin_section_without_client_references?(content, is_server: is_server)
 
           if rsc_plugin_defines_client_references?(content, is_server: is_server)
             GeneratorMessages.add_warning(
@@ -269,14 +269,15 @@ module ReactOnRails
         # which uses the same any-section semantics for the opposite condition. The two are not
         # complements when multiple plugin sections exist — a file with one configured plugin and
         # one unconfigured plugin returns true from both.
-        def any_rsc_plugin_missing_client_references?(content, is_server:)
+        def any_rsc_plugin_section_without_client_references?(content, is_server:)
           rsc_plugin_option_sections(content, is_server: is_server).any? do |section|
             !rsc_plugin_body_has_top_level_key?(section.fetch(:body), "clientReferences")
           end
         end
 
         # Strips JavaScript line and block comments while preserving string-literal contents,
-        # so `clientReferences:` / `isServer:` substrings inside strings are not mis-detected.
+        # including simple `${...}` template-literal interpolation, so `clientReferences:` /
+        # `isServer:` substrings inside strings are not mis-detected.
         # Shares the `advance_js_scan_state` family used by `js_top_level_position?` and
         # `matching_js_closing_brace` so all JS-aware passes follow the same comment/string rules.
         # See `advance_js_scan_state` for the scanner's supported surface (including the regex-
@@ -440,12 +441,15 @@ module ReactOnRails
         end
 
         # Expects `content[open_index] == "{"`; callers pass the options-object opening brace.
-        # See `advance_js_scan_state` for the scanner's supported surface — in short, simple
-        # `${...}` interpolations inside template literals stay inside the string state, while
-        # nested template literals and regex literals fall outside the scanner. When the depth
-        # counter is confused by either, the section is caught downstream via
-        # `rsc_plugin_options_followed_by_close_paren?` and marked unparseable so the migration
-        # warns the user instead of corrupting the rewrite.
+        # This lightweight scanner supports strings (including template literals for simple
+        # `${...}` interpolation) plus JS line/block comments. It does not classify regex
+        # literals, so braces inside constructs such as `/a{2}/` or `/[{]/` can be counted as
+        # object braces. Nested template literals (for example, `outer ${`inner`}`) are also
+        # unsupported: the inner backtick falsely closes the outer string state, exposing later
+        # braces to the depth counter. `rsc_plugin_options_without_comments` shares the same
+        # supported surface, and callers detect corrupted sections via
+        # `rsc_plugin_options_followed_by_close_paren?` so the migration warns instead of
+        # producing a corrupt rewrite.
         def matching_js_closing_brace(content, open_index)
           depth = 0
           index = open_index
@@ -960,20 +964,12 @@ module ReactOnRails
         # generator has already confirmed `RSCWebpackPlugin` is imported in the file. That's why
         # this helper deliberately omits the `RSCWebpackPlugin` import that `inject_rsc_*_imports`
         # adds on the from-scratch path — adding it here would produce a duplicate import.
+        # Must only be called via `ensure_rsc_client_references_setup`, which has already verified
+        # that no module-scope `rscClientReferences` declaration exists and that the import anchor
+        # is present and not yet consumed by a previous call. Bypassing that guard can write a
+        # duplicate `const rscClientReferences` declaration and leave the user's webpack config with
+        # a Node SyntaxError at load time.
         def add_rsc_client_references_setup(config_path, content, existing_imports_content, is_server:)
-          # The only caller, `ensure_rsc_client_references_setup`, already runs these same checks
-          # before delegating here, so in normal flow both conditions evaluate to `false` and no
-          # early return is triggered. They are kept (rather than deleted) so a future second
-          # caller — or a refactor that bypasses `ensure_rsc_client_references_setup` — cannot
-          # accidentally splice a second `const rscClientReferences = { ... }` into a file that
-          # already declares one. JavaScript would reject that with an
-          # `Identifier 'rscClientReferences' has already been declared` SyntaxError at config
-          # load, and the cost of the duplicate check is two boolean ops on the already-loaded
-          # file body. Leaving the method defensive is cheaper than re-deriving the precondition
-          # at each new call site.
-          return false if scoped_rsc_client_references_defined?(content)
-          return false if rsc_client_references_defined?(content)
-
           replace_rsc_client_references_setup_anchor(config_path, content, is_server: is_server) do |anchor|
             join_rsc_client_references_setup(
               content,
