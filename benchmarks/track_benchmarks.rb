@@ -23,12 +23,20 @@ def env!(key)
   end
 end
 
-SUITE_NAME = env!("BENCHMARK_SUITE_NAME")
-REPORT_MARKER = env!("BENCHER_REPORT_MARKER")
-env!("BENCHER_API_TOKEN")
 BENCHMARK_JSON = ENV.fetch("BENCHMARK_JSON", "bench_results/benchmark.json")
 REPORT_HTML = ENV.fetch("BENCHER_REPORT_HTML", "bench_results/bencher_report.html")
 CHUNK_PREFIX = "bench_results/bencher_chunk"
+
+# Check the input file before validating env vars — a missing benchmark.json is the more
+# actionable failure (almost always upstream `bench.rb` didn't produce results).
+unless File.exist?(BENCHMARK_JSON)
+  warn "Benchmark JSON file not found: #{BENCHMARK_JSON}"
+  exit 1
+end
+
+SUITE_NAME = env!("BENCHMARK_SUITE_NAME")
+REPORT_MARKER = env!("BENCHER_REPORT_MARKER")
+env!("BENCHER_API_TOKEN")
 
 def capture_command(*args)
   stdout, stderr, status = Open3.capture3(*args)
@@ -320,11 +328,6 @@ end
 
 def main_push?
   ENV.fetch("GITHUB_EVENT_NAME") == "push" && ENV.fetch("GITHUB_REF") == "refs/heads/main"
-end
-
-unless File.exist?(BENCHMARK_JSON)
-  warn "Benchmark JSON file not found: #{BENCHMARK_JSON}"
-  exit 1
 end
 
 branch, start_point_args = branch_and_start_point_args
