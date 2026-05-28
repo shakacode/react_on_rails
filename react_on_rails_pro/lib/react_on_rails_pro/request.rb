@@ -2,7 +2,6 @@
 
 require "uri"
 require_relative "renderer_http_client"
-require "react_on_rails/url_sanitizer"
 require_relative "stream_request"
 require_relative "async_props_emitter"
 
@@ -339,9 +338,8 @@ module ReactOnRailsPro
 
       def create_connection
         url = ReactOnRailsPro.configuration.renderer_url
-        safe_url = ReactOnRails::UrlSanitizer.redact_password(url)
         Rails.logger.info do
-          "[ReactOnRailsPro] Setting up Node Renderer connection to #{safe_url}"
+          "[ReactOnRailsPro] Setting up Node Renderer connection to #{url}"
         end
 
         ReactOnRailsPro::RendererHttpClient.new(
@@ -357,14 +355,12 @@ module ReactOnRailsPro
           renderer_http_pool_timeout = #{ReactOnRailsPro.configuration.renderer_http_pool_timeout}
           renderer_http_pool_warn_timeout = #{ReactOnRailsPro.configuration.renderer_http_pool_warn_timeout}
           renderer_http_keep_alive_timeout = #{ReactOnRailsPro.configuration.renderer_http_keep_alive_timeout}
-          renderer_url = #{safe_url}
+          renderer_url = #{url}
           Be sure to use a url that contains the protocol of http or https.
           Original error is
-          #{ReactOnRails::UrlSanitizer.redact_password(e.to_s)}
+          #{e}
         MSG
-        # Suppress implicit cause so reporters can't see the raw transport/URI error
-        # (which may embed the renderer URL including any userinfo).
-        raise ReactOnRailsPro::Error, message, cause: nil
+        raise ReactOnRailsPro::Error, message
       end
 
       def get_form_body_for_file(path)

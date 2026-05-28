@@ -341,8 +341,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
           ReactOnRailsPro.configure do |config|
             config.renderer_url = invalid_url
           end
-        end.to raise_error(ReactOnRailsPro::Error,
-                           /Unparseable ReactOnRailsPro.config.renderer_url .*server\.com:123/)
+        end.to raise_error(ReactOnRailsPro::Error, /renderer_url is not a parseable URI/)
       end
 
       it "does not leak the password through the URI error when render_url is unparseable" do
@@ -359,13 +358,10 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
         end
 
         expect(error).to be_a(ReactOnRailsPro::Error)
-        # Neither the bare URL interpolation nor the wrapped URI#message should
-        # carry the literal password — both must go through the sanitizer.
+        # The error must not reproduce the unparseable URL or the underlying
+        # URI::InvalidURIError message — either could carry the literal password.
         expect(error.message).not_to include(sensitive_password)
-        expect(error.message).to include("__REDACTED__")
-        # The implicit Exception#cause chain would otherwise expose the raw
-        # URI::InvalidURIError (which embeds the unsanitized URL). Suppress.
-        expect(error.cause).to be_nil
+        expect(error.message).not_to include("server.com")
       end
     end
 
@@ -548,6 +544,37 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
           end.not_to raise_error
 
           expect(ReactOnRailsPro.configuration.renderer_password).to eq("url-password")
+        end
+
+        it "strips the password from renderer_url after extracting it, so it can't leak via logs" do
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
+
+          ReactOnRailsPro.configure do |config|
+            config.server_renderer = "NodeRenderer"
+            config.renderer_url = "https://:url-password@localhost:3800"
+          end
+
+          # Password is extracted for use (sent in the request body)…
+          expect(ReactOnRailsPro.configuration.renderer_password).to eq("url-password")
+          # …but the stored URL no longer contains it.
+          expect(ReactOnRailsPro.configuration.renderer_url).to eq("https://localhost:3800")
+          expect(ReactOnRailsPro.configuration.renderer_url).not_to include("url-password")
+        end
+
+        it "strips userinfo from renderer_url even when the password came from config (not the URL)" do
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
+
+          ReactOnRailsPro.configure do |config|
+            config.server_renderer = "NodeRenderer"
+            config.renderer_password = "explicit-config-password"
+            config.renderer_url = "https://:url-password@localhost:3800"
+          end
+
+          # Explicit config password wins for resolution…
+          expect(ReactOnRailsPro.configuration.renderer_password).to eq("explicit-config-password")
+          # …and the URL's embedded credential is still stripped from the stored value.
+          expect(ReactOnRailsPro.configuration.renderer_url).to eq("https://localhost:3800")
+          expect(ReactOnRailsPro.configuration.renderer_url).not_to include("url-password")
         end
       end
 

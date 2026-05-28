@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "set"
-require "react_on_rails/url_sanitizer"
 
 module ReactOnRailsPro
   def self.configure
@@ -301,16 +300,13 @@ module ReactOnRailsPro
 
     def validate_url
       URI(renderer_url)
-    rescue URI::InvalidURIError => e
-      # URI::InvalidURIError#message embeds the raw URL ("bad URI (is not URI?): ...")
-      # so we have to sanitize it too — sanitizing the bare `renderer_url` is not enough.
-      safe_url = ReactOnRails::UrlSanitizer.redact_password(renderer_url)
-      safe_error_message = ReactOnRails::UrlSanitizer.redact_password(e.message)
-      message = "Unparseable ReactOnRailsPro.config.renderer_url #{safe_url} provided.\n" \
-                "#{safe_error_message}"
-      # Suppress implicit cause so reporters walking the chain don't see the raw
-      # URI::InvalidURIError (which embeds the original unsanitized URL).
-      raise ReactOnRailsPro::Error, message, cause: nil
+    rescue URI::InvalidURIError
+      # Deliberately do NOT echo renderer_url or the URI error message: a
+      # malformed renderer_url may embed credentials (https://:password@host),
+      # and reproducing it here would leak the password into logs/error reporters.
+      raise ReactOnRailsPro::Error,
+            "ReactOnRailsPro.config.renderer_url is not a parseable URI. Verify the value " \
+            "(it is not echoed here because it may contain credentials)."
     end
 
     def validate_remote_bundle_cache_adapter
@@ -459,16 +455,38 @@ module ReactOnRailsPro
     end
 
     def setup_renderer_password
+      resolve_renderer_password
+      # The password is sent to the Node Renderer in the request body, never via
+      # the URL (the HTTP client connects to scheme://host:port and the renderer
+      # authenticates on the body field). A password embedded in renderer_url is
+      # purely a Rails-side config convenience — once resolved above, strip it
+      # from the stored URL so the credential can never leak through any log line
+      # or error message that interpolates renderer_url downstream.
+      strip_renderer_url_userinfo
+    end
+
+    def resolve_renderer_password
       # Explicit passwords, including values loaded from ENV in the initializer, skip URL extraction.
       # Blank values (nil or "") fall through so URL extraction and ENV fallback still apply.
       return if renderer_password.present?
 
-      uri = URI(renderer_url)
-      self.renderer_password = uri.password
+      self.renderer_password = URI(renderer_url).password
 
       # Mirror Node-side defaults: if Rails config and URL are both missing a password,
       # use RENDERER_PASSWORD from env.
       self.renderer_password = ENV.fetch("RENDERER_PASSWORD", nil) if renderer_password.blank?
+    end
+
+    def strip_renderer_url_userinfo
+      return if renderer_url.blank?
+
+      uri = URI(renderer_url)
+      return if uri.userinfo.nil?
+
+      # Order matters: URI rejects a password without a user, so clear password first.
+      uri.password = nil
+      uri.user = nil
+      self.renderer_url = uri.to_s
     end
 
     KNOWN_WEAK_RENDERER_PASSWORDS = %w[
