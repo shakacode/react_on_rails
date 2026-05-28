@@ -289,11 +289,7 @@ jobs:
       - name: Set packer version environment variable
         run: |
           echo "CI_DEPENDENCY_LEVEL=ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}" >> "$GITHUB_ENV"
-      # Pin the package Gemfile explicitly for parity with pro-lint.yml/benchmark.yml
-      # and to stay robust if the package and dummy Gemfiles ever diverge.
       - name: Main CI
-        env:
-          BUNDLE_GEMFILE: ${{ github.workspace }}/react_on_rails/Gemfile
         run: cd react_on_rails && bundle exec rake run_rspec:all_dummy
       - name: Store test results
         uses: actions/upload-artifact@v4
