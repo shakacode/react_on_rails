@@ -118,7 +118,7 @@ const createFromFetch = async (
   return wrapInNewPromise(renderPromise)
     .then((result) => {
       if (result instanceof Error && rscDiagnosticError) {
-        throw mergeRSCStreamDiagnosticError(result, rscDiagnosticError);
+        throw result;
       }
       return result;
     })

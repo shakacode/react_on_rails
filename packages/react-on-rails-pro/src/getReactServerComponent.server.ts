@@ -59,7 +59,7 @@ const createFromReactOnRailsNodeStream = async (
   try {
     const result = await createFromNodeStream<React.ReactNode>(transformedStream);
     if (result instanceof Error && rscDiagnosticError) {
-      throw mergeRSCStreamDiagnosticError(result, rscDiagnosticError);
+      throw result;
     }
     return result;
   } catch (error: unknown) {

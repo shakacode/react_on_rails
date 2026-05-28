@@ -72,4 +72,25 @@ describe('RSC diagnostics', () => {
     );
     expect(mergedError.stack).toContain('CommentsToggle.jsx:12:15');
   });
+
+  it('keeps diagnostic merges idempotent when a merged error reaches another catch handler', () => {
+    const diagnosticError = new Error(
+      '[ReactOnRails] RSC bundle rendering failed.\n' +
+        'Component: CommentsToggle\n' +
+        'Original error: useState is not a function',
+    );
+    diagnosticError.name = 'ReactOnRailsRSCStreamError';
+    const genericStreamError = new Error('An error occurred in the Server Components render.');
+
+    const mergedError = mergeRSCStreamDiagnosticError(genericStreamError, diagnosticError);
+    const mergedAgainError = mergeRSCStreamDiagnosticError(mergedError, diagnosticError);
+
+    expect(mergedAgainError).toBe(mergedError);
+    expect(mergedAgainError.message.match(/Original error: useState is not a function/g)).toHaveLength(1);
+    expect(
+      mergedAgainError.message.match(
+        /React stream error: An error occurred in the Server Components render\./g,
+      ),
+    ).toHaveLength(1);
+  });
 });

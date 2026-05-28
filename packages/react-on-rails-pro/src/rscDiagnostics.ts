@@ -28,6 +28,8 @@ type RenderingErrorMetadata = {
   stack?: unknown;
 };
 
+const RSC_STREAM_DIAGNOSTIC_ERROR_NAME = 'ReactOnRailsRSCStreamError';
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
@@ -76,7 +78,7 @@ export const buildRSCStreamDiagnosticError = (
     .join('\n');
 
   const diagnosticError = new Error(message);
-  diagnosticError.name = 'ReactOnRailsRSCStreamError';
+  diagnosticError.name = RSC_STREAM_DIAGNOSTIC_ERROR_NAME;
   if (originalStack) {
     diagnosticError.stack = `${diagnosticError.name}: ${message}\nOriginal stack:\n${originalStack}`;
   }
@@ -84,15 +86,23 @@ export const buildRSCStreamDiagnosticError = (
   return diagnosticError;
 };
 
+const isMergedRSCStreamDiagnosticError = (error: Error, diagnosticError: Error) =>
+  error.name === RSC_STREAM_DIAGNOSTIC_ERROR_NAME &&
+  error.message.includes(diagnosticError.message) &&
+  error.message.includes('React stream error:');
+
 export const mergeRSCStreamDiagnosticError = (error: unknown, diagnosticError?: Error) => {
   const streamError = error instanceof Error ? error : new Error(extractErrorMessage(error));
   if (!diagnosticError) {
     return streamError;
   }
+  if (isMergedRSCStreamDiagnosticError(streamError, diagnosticError)) {
+    return streamError;
+  }
 
   const message = `${diagnosticError.message}\nReact stream error: ${streamError.message}`;
   const mergedError = new Error(message) as Error & { cause?: unknown };
-  mergedError.name = 'ReactOnRailsRSCStreamError';
+  mergedError.name = RSC_STREAM_DIAGNOSTIC_ERROR_NAME;
   mergedError.cause = streamError;
   mergedError.stack = [
     `${mergedError.name}: ${message}`,
