@@ -251,7 +251,11 @@ const resolveRealDirectory = resolveRealPath;
 const statSymbolicLink = (absolutePath) => {
   try {
     return fs.statSync(absolutePath);
-  } catch {
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      // eslint-disable-next-line no-console
+      console.warn(`[rscManifestPlugin] statSync failed for symlink ${absolutePath}: ${error.message}`);
+    }
     return null;
   }
 };
@@ -436,6 +440,7 @@ const addClientReferencesToEntry = (bundlerConfig, clientReferenceFiles, clientR
   };
 
   if (typeof entry === 'function') {
+    // This intentionally changes the factory type to AsyncFunction; webpack 5 and Rspack both accept async entries.
     bundlerConfig.entry = async (...args) => addRequestsToEntry(await entry(...args));
     return;
   }

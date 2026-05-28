@@ -794,7 +794,10 @@ module ReactOnRails
       end
 
       def add_rsc_manifest_helper_import(config_path, content, fallback_import_pattern)
-        return true if rsc_manifest_helper_import?(content)
+        if rsc_manifest_helper_import?(content)
+          remove_stale_rsc_webpack_plugin_import(config_path, content)
+          return true
+        end
 
         if content.match?(RSC_WEBPACK_PLUGIN_IMPORT_PATTERN)
           gsub_file(config_path, RSC_WEBPACK_PLUGIN_IMPORT_PATTERN, RSC_MANIFEST_HELPER_IMPORT)
@@ -804,6 +807,13 @@ module ReactOnRails
 
         gsub_file(config_path, fallback_import_pattern, "\\1\n#{RSC_MANIFEST_HELPER_IMPORT}")
         true
+      end
+
+      def remove_stale_rsc_webpack_plugin_import(config_path, content)
+        return if rsc_webpack_plugin_invocation?(content)
+        return unless content.match?(RSC_WEBPACK_PLUGIN_IMPORT_PATTERN)
+
+        gsub_file(config_path, RSC_WEBPACK_PLUGIN_IMPORT_PATTERN, "")
       end
 
       def rsc_manifest_helper_import?(content)

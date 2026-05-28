@@ -1343,6 +1343,38 @@ describe RscGenerator, type: :generator do
       expect(missing).to include("generated scoped clientReferences in clientWebpackConfig.js")
     end
 
+    it "removes a stale RSCWebpackPlugin import when an existing helper call needs no migration" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { addRSCManifestPlugin } = require('./rscManifestPlugin');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const rscClientReferences = { directory: './app/javascript' };
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            addRSCManifestPlugin(clientConfig, {
+              isServer: false,
+              clientReferences: rscClientReferences,
+            });
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      generator.send(:update_client_webpack_config_for_rsc)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content.scan("./rscManifestPlugin").length).to eq(1)
+      expect(migrated_content).not_to include("react-on-rails-rsc/WebpackPlugin")
+      expect(migrated_content).to include("addRSCManifestPlugin(clientConfig, {")
+    end
+
     it "inserts a missing helper import when the client helper call already exists" do
       config_path = "config/webpack/clientWebpackConfig.js"
       simulate_existing_file(
