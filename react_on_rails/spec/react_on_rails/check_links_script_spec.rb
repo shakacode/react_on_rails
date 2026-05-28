@@ -3,6 +3,7 @@
 require "fileutils"
 require "open3"
 require "tmpdir"
+require_relative "spec_helper"
 
 RSpec.describe "bin/check-links" do
   let(:repo_root) { File.expand_path("../../..", __dir__) }
