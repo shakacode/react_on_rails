@@ -280,6 +280,8 @@ const isFileEntry = (entry, symlinkStats) => {
 const collectClientReferenceFiles = (context, clientReferences = normalizeClientReferences()) => {
   // This runs while webpack/rspack evaluates the generated config. Keep the scan
   // dependency-free and skip unreadable paths so config load remains resilient.
+  // For large source trees, pass explicit `clientReferences` with a narrower
+  // directory or `include` glob to reduce startup time.
   const files = new Set();
   const requests = new Set();
 
@@ -457,6 +459,9 @@ const mergeClientReferenceEntry = (entryValue, requests, useFixedFilename) => {
     };
   }
 
+  // If appendImports could not inject imports, it already warned with the entry
+  // name. Return the original shape so webpack/rspack can report its own entry
+  // diagnostics rather than inventing a synthetic filename-only entry.
   return mergedEntry;
 };
 
@@ -509,6 +514,8 @@ const addClientReferencesToEntry = (
     // This intentionally wraps the original factory, possibly synchronous, in an
     // AsyncFunction; webpack 5 and Rspack both normalize sync and async entry
     // factories at build time.
+    // If the original factory throws synchronously, that error is deferred until
+    // compilation starts rather than surfacing at config-parse time.
     bundlerConfig.entry = async (...args) => addRequestsToEntry(await entry(...args));
     return;
   }
@@ -548,6 +555,8 @@ const mergeChunkPairsInPlace = (existing, additions) => {
 };
 
 const normalizeCrossOrigin = (crossOrigin) => {
+  // Boolean/non-string crossOriginLoading values are narrowed to null so the
+  // manifest matches the upstream RSC plugin shape.
   if (typeof crossOrigin !== 'string') return { value: null };
 
   if (crossOrigin === 'use-credentials' || crossOrigin === 'anonymous') {
@@ -608,6 +617,13 @@ class RspackRSCManifestPlugin {
           const { value: crossOrigin } = crossOriginResult;
 
           const filePathToModuleMetadata = {};
+          const realpathCache = new Map();
+          const cachedRealPath = (filePath) => {
+            if (!realpathCache.has(filePath)) {
+              realpathCache.set(filePath, resolveRealPath(filePath));
+            }
+            return realpathCache.get(filePath);
+          };
 
           const manifestedRequests = new Set();
           const matchingRequest = (module) =>
@@ -618,7 +634,7 @@ class RspackRSCManifestPlugin {
           const recordModule = (moduleId, module, chunkPairs) => {
             if (!module.resource || moduleId == null) return;
 
-            const moduleResource = resolveRealPath(module.resource);
+            const moduleResource = cachedRealPath(module.resource);
             const matchedFile = clientReferenceSet.has(moduleResource);
             const matchedRequest = matchingRequest(module);
             if (!matchedFile && !matchedRequest) return;
@@ -668,7 +684,7 @@ class RspackRSCManifestPlugin {
 
           const manifestedUrls = new Set(Object.keys(filePathToModuleMetadata));
           for (const filePath of this.clientReferenceFiles) {
-            const fileUrl = url.pathToFileURL(resolveRealPath(filePath)).href;
+            const fileUrl = url.pathToFileURL(cachedRealPath(filePath)).href;
             if (manifestedUrls.has(fileUrl) || this._warnedMissingModules.has(fileUrl)) continue;
             this._warnedMissingModules.add(fileUrl);
             compilation.warnings.push(

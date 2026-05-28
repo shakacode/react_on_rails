@@ -4463,6 +4463,7 @@ describe RscGenerator, type: :generator do
           expect(content).to include("reference.recursive ?? true")
           expect(content).to include("config.source_path is not set; no client references will be scanned.")
           expect(content).to include("Skipped unreadable directory")
+          expect(content).to include("For large source trees, pass explicit `clientReferences`")
           expect(content).to include("RSC_CLIENT_REFERENCES_ENTRY_NAME")
           expect(content).to include(
             "[RSC_CLIENT_REFERENCES_ENTRY_NAME]: clientReferenceEntry(requests, useFixedFilename)"
@@ -4476,6 +4477,7 @@ describe RscGenerator, type: :generator do
           expect(content).to include("if (!useFixedFilename) return mergedEntry;")
           expect(content).to include("do not fold client-only modules into server-bundle.js")
           expect(content).to include("there is no safe entry shape to preserve")
+          expect(content).to include("it already warned with the entry")
           expect(content).to include("addClientReferencesToEntry(")
           expect(content).to include("clientReferenceRequests,\n      options.isServer,")
           expect(content).not_to include("'server-bundle': appendImports(entryValue['server-bundle'], requests)")
@@ -4493,8 +4495,12 @@ describe RscGenerator, type: :generator do
           expect(content).to include("mergeChunkPairsInPlace(existing.chunks, chunkPairs)")
           expect(content).to include("regression can warn again")
           expect(content).to include("for (const concatenatedModule of module.modules)")
+          expect(content).to include("cachedRealPath")
+          expect(content).to include("realpathCache")
           expect(content).to include("normalizeCrossOrigin")
+          expect(content).to include("Boolean/non-string crossOriginLoading values")
           expect(content).to include("Unsupported crossOriginLoading value")
+          expect(content).to include("that error is deferred")
           expect(content).not_to include("Object.fromEntries")
           expect(content).not_to include("addClientReferencesToEntry,")
           # Manifest must emit alternating [chunkId, filename] pairs (collectChunkGroupPairs),
