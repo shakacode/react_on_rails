@@ -24,28 +24,32 @@ A `.server.jsx` file is NOT a React Server Component. A `.client.jsx` file is NO
 
 Components that run exclusively on the server (not included in the client bundle). They can:
 
-- Directly access server-side resources (databases, filesystems)
-- Keep dependencies server-side
-- Perform async operations
+- Use server-only modules and heavy dependencies that never ship to the client (e.g. `fs`, `os`, Markdown parsers)
+- Perform async operations during rendering
+- Receive their data as props from Rails (Rails owns database access, authorization, and caching)
 - Cannot contain state or browser-only APIs
 
-For example:
+For example, a Server Component renders from data that Rails passes as props:
 
 ```jsx
-import fetch from 'node-fetch';
-
-async function ServerComponent() {
-  const data = await (await fetch('https://jsonplaceholder.org/posts/1')).json();
-  const databaseData = await getDatabaseData();
+// Server Component (no 'use client' directive) — receives data as props
+function ServerComponent({ post }) {
   return (
     <div>
-      <h1>{data.title}</h1>
-      <p>{data.body}</p>
-      <p>{databaseData}</p>
+      <h1>{post.title}</h1>
+      <p>{post.body}</p>
     </div>
   );
 }
 ```
+
+```erb
+<%# Rails prepares the data in the controller and passes it as props %>
+<%= stream_react_component("ServerComponent",
+      props: { post: Post.find(params[:id]).as_json(only: [:id, :title, :body]) }) %>
+```
+
+> **React on Rails note:** In React on Rails, Rails is the backend. The generic async-fetch-in-component pattern from other RSC frameworks (`await fetch(...)` / `await getDatabaseData()` in the component body) bypasses Rails' authorization, caching, and session layers — and the Node renderer has no database connection or `fetch` global. Prepare data in your controller and pass it as props, or stream slow data with [async props](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently). See [RSC Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md).
 
 ### Client Components
 

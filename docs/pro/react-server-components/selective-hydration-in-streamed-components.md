@@ -26,6 +26,8 @@ const LongWaitingComponent = async () => {
 };
 ```
 
+> **React on Rails note:** The `setTimeout` here just simulates a slow component so you can see selective hydration in action. In a real app, slow data comes from Rails — load it in your controller and stream it in as an [async prop](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently) so the rest of the page stays interactive while it resolves. See [RSC Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md).
+
 Add the component to the page.
 
 ```jsx

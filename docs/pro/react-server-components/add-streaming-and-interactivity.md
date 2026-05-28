@@ -10,22 +10,20 @@ React Server Components support progressive loading, which means they can be bui
 2. Maintaining interactivity while loading;
 3. Streaming updates to the page as server components resolve.
 
-This progressive enhancement approach allows React Server Components to efficiently handle data fetching and rendering without blocking the initial page load.
+This progressive enhancement approach lets React Server Components render and stream their output to the client without blocking the initial page load.
 
-Let's create an `async` React Server Component that will be progressively loaded.
+Let's create an `async` React Server Component that will be progressively loaded. It receives its `posts` from Rails as a prop — the component doesn't fetch its own data (see the [React on Rails note](#where-the-data-comes-from) below).
 
 ```js
 // app/javascript/components/Posts.jsx
 import React from 'react';
-import fetch from 'node-fetch';
 import _ from 'lodash';
 import moment from 'moment';
 
-const Posts = async () => {
-  // Add artificial delay to simulate network latency
+const Posts = async ({ posts }) => {
+  // Artificial delay to simulate a slow render and demonstrate streaming
   await new Promise((resolve) => setTimeout(resolve, 1000));
 
-  const posts = await (await fetch(`http://localhost:3000/api/posts`)).json();
   const postsByUser = _.groupBy(posts, 'user_id');
   const onePostPerUser = _.map(postsByUser, (group) => group[0]);
 
@@ -48,9 +46,9 @@ const Posts = async () => {
 export default Posts;
 ```
 
-The async `Posts` component fetches and displays a list of posts, showing one post per user with title, body, timestamp and thumbnail image.
+The async `Posts` component displays a list of posts it receives as a prop, showing one post per user with title, body, timestamp and thumbnail image.
 
-Let's add the Posts component to the React Server Component Page.
+Let's add the Posts component to the React Server Component Page, forwarding the `posts` prop down to it.
 
 ```js
 // app/javascript/packs/components/ReactServerComponentPage.jsx
@@ -58,12 +56,12 @@ import React from 'react';
 import ReactServerComponent from '../../components/ReactServerComponent';
 import Posts from '../../components/Posts';
 
-const ReactServerComponentPage = () => {
+const ReactServerComponentPage = ({ posts }) => {
   return (
     <div>
       <ReactServerComponent />
       <Suspense fallback={<div>Loading...</div>}>
-        <Posts />
+        <Posts posts={posts} />
       </Suspense>
     </div>
   );
@@ -73,6 +71,19 @@ export default ReactServerComponentPage;
 ```
 
 The `Suspense` component is used to wrap the Posts component to handle its loading state. The `fallback` prop is used to display a loading message while the Posts component is loading.
+
+### Where the data comes from {#where-the-data-comes-from}
+
+Rails prepares the `posts` data and passes it into the page as a prop. Update the view from the previous tutorial to pass the data:
+
+```erb
+<%# app/views/pages/react_server_component_without_ssr.html.erb %>
+<%= react_component("ReactServerComponentPage",
+      prerender: false,
+      props: { posts: Post.all.as_json(only: [:id, :title, :body, :user_id, :created_at]) }) %>
+```
+
+> **React on Rails note:** In React on Rails, Rails is the backend. The component receives `posts` as a prop instead of calling `fetch('/api/posts')` itself — an in-component fetch bypasses Rails' authorization and caching, and the Node renderer has no `fetch` global by default. The artificial `setTimeout` above only simulates a slow render so you can watch streaming work. When the **data** itself is slow to load, stream each prop as it resolves with [async props](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently) (covered after you [add SSR](./server-side-rendering.md)). See [RSC Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md).
 
 ## Run the Development Server
 
@@ -88,7 +99,7 @@ Navigate to the React Server Component Page:
 http://localhost:3000/react_server_component_without_ssr
 ```
 
-When you open the page, you'll see the React Server Component render immediately, followed by the "Loading..." fallback state from the Suspense component. After a 1-second delay, the Posts component will render with the fetched data. This artificial delay helps demonstrate how React Server Components handle asynchronous operations and streaming:
+When you open the page, you'll see the React Server Component render immediately, followed by the "Loading..." fallback state from the Suspense component. After a 1-second delay, the Posts component will render with the `posts` data passed from Rails. This artificial delay helps demonstrate how React Server Components handle asynchronous operations and streaming:
 
 1. The page loads instantly with the ReactServerComponent.
 2. The Suspense fallback shows "Loading..." where the Posts will appear.
@@ -136,7 +147,7 @@ Now, let's use the `ToggleContainer` component to wrap the post image.
 // app/javascript/components/Posts.jsx
 import ToggleContainer from './ToggleContainer';
 
-const Posts = () => {
+const Posts = async ({ posts }) => {
   // existing code..
 
   return (
@@ -158,7 +169,7 @@ export default Posts;
 
 Now when you visit the page, you'll see a "Toggle" button for each post. Clicking the button will show/hide that post's image. This demonstrates how we can add client-side interactivity to a React Server Component by creating a client component (`ToggleContainer`) that manages its own state.
 
-The `ToggleContainer` is marked with [`'use client'`](https://react.dev/reference/rsc/use-client) directive, indicating it runs on the client-side and can handle user interactions. It uses the `useState` hook to maintain the visibility state of its children. Meanwhile, the parent `Posts` component remains a server component, fetching and rendering the initial posts data on the server.
+The `ToggleContainer` is marked with [`'use client'`](https://react.dev/reference/rsc/use-client) directive, indicating it runs on the client-side and can handle user interactions. It uses the `useState` hook to maintain the visibility state of its children. Meanwhile, the parent `Posts` component remains a server component, rendering the Rails-provided posts data on the server.
 
 It's important to note that while client components (like `ToggleContainer`) cannot directly import server components, they can receive server components as props (like children in this case). This is why we can pass the server-rendered image element as a child to our client-side `ToggleContainer` component. This pattern allows for flexible composition while maintaining the boundaries between server and client code.
 

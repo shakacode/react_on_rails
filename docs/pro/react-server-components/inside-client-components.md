@@ -4,7 +4,7 @@ React doesn't normally allow a client component to directly render a server comp
 
 ## When to use this feature
 
-Use this feature when a `'use client'` component needs to render server components at some point in its tree. The most common case is **client-side routing with server-rendered routes** — for example, a React Router app where some routes are server components that fetch data on the server.
+Use this feature when a `'use client'` component needs to render server components at some point in its tree. The most common case is **client-side routing with server-rendered routes** — for example, a React Router app where some routes are server components that render server-prepared data.
 
 **You probably don't need this feature if:**
 
@@ -13,7 +13,7 @@ Use this feature when a `'use client'` component needs to render server componen
 
 ## How it works
 
-When React on Rails Pro encounters `<RSCRoute componentName="Dashboard" componentProps={{ userId: 42 }} />` inside a client component, it does **not** look up a client-side implementation of `Dashboard`. Instead, it references the server component by name and relies on the framework to deliver its RSC payload:
+When React on Rails Pro encounters `<RSCRoute componentName="Dashboard" componentProps={{ user }} />` inside a client component, it does **not** look up a client-side implementation of `Dashboard`. Instead, it references the server component by name and relies on the framework to deliver its RSC payload:
 
 1. **During server-side rendering**, the server renders `Dashboard` alongside the client component tree and embeds its RSC payload directly in the HTML response. When the browser hydrates, `RSCRoute` reads the embedded payload — no extra HTTP request.
 2. **During client-side navigation**, when `RSCRoute` appears in the tree for the first time (e.g., the user navigates to a new route), the client fetches the RSC payload from the server over HTTP and renders it.
@@ -23,16 +23,15 @@ For this to work, the client component tree must be wrapped with `wrapServerComp
 
 ## Walkthrough: A router with server component routes
 
-This walkthrough builds a client-side router where some routes are server components that fetch data on the server. Let's build an app with two routes: a `Dashboard` and a `Profile`, each rendered as a server component.
+This walkthrough builds a client-side router where some routes are server components that render server-prepared data. Let's build an app with two routes: a `Dashboard` and a `Profile`, each rendered as a server component.
 
 ### 1. Create the server components
 
-Server components are regular React components **without** a `'use client'` directive. They can be `async` and access server-only resources.
+Server components are regular React components **without** a `'use client'` directive. They run on the server and render from data passed as props — in React on Rails, Rails prepares that data (see [step 5](#5-render-from-the-rails-view)).
 
 ```jsx
 // components/Dashboard.jsx (no 'use client' — this is a server component)
-const Dashboard = async ({ userId }) => {
-  const user = await fetchUser(userId);
+const Dashboard = ({ user }) => {
   return <div>Welcome back, {user.name}</div>;
 };
 export default Dashboard;
@@ -40,8 +39,7 @@ export default Dashboard;
 
 ```jsx
 // components/Profile.jsx
-const Profile = async ({ userId }) => {
-  const user = await fetchUser(userId);
+const Profile = ({ user }) => {
   return (
     <div>
       <h1>{user.name}</h1>
@@ -52,6 +50,8 @@ const Profile = async ({ userId }) => {
 export default Profile;
 ```
 
+> **React on Rails note:** These server components receive `user` as a prop rather than calling `await fetchUser(userId)`. The Node renderer that produces the RSC payload has no Rails models or database connection, and an in-component fetch would bypass Rails' authorization and caching. Rails loads the user in the controller and passes it down the tree (Rails view → `AppRouter` → `RSCRoute` `componentProps`). See [RSC Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md).
+
 ### 2. Create the client component that uses `RSCRoute`
 
 This component references server components **by name** via `RSCRoute` — it does not import them. It doesn't need a `'use client'` directive itself because it's imported by the wrapper files (Step 3), which declare the client boundary.
@@ -61,7 +61,7 @@ This component references server components **by name** via `RSCRoute` — it do
 import { Routes, Route, Link } from 'react-router-dom';
 import RSCRoute from 'react-on-rails-pro/RSCRoute';
 
-export default function AppRouter({ userId }) {
+export default function AppRouter({ user }) {
   return (
     <>
       <nav>
@@ -69,11 +69,8 @@ export default function AppRouter({ userId }) {
         <Link to="/profile">Profile</Link>
       </nav>
       <Routes>
-        <Route
-          path="/dashboard"
-          element={<RSCRoute componentName="Dashboard" componentProps={{ userId }} />}
-        />
-        <Route path="/profile" element={<RSCRoute componentName="Profile" componentProps={{ userId }} />} />
+        <Route path="/dashboard" element={<RSCRoute componentName="Dashboard" componentProps={{ user }} />} />
+        <Route path="/profile" element={<RSCRoute componentName="Profile" componentProps={{ user }} />} />
       </Routes>
     </>
   );
@@ -178,10 +175,11 @@ If you **are** using `auto_load_bundle`, you can skip the registration files ent
 
 ### 5. Render from the Rails view
 
-Use `stream_react_component` to render the wrapped component:
+Use `stream_react_component` to render the wrapped component. Rails loads the user and passes it as a prop, so the server components don't fetch it themselves:
 
 ```erb
-<%= stream_react_component("AppRouter", props: { userId: current_user.id }) %>
+<%= stream_react_component("AppRouter",
+      props: { user: current_user.as_json(only: [:id, :name, :bio]) }) %>
 ```
 
 > [!IMPORTANT]
@@ -300,10 +298,10 @@ function RetryFallback({ error, resetErrorBoundary }) {
   throw error;
 }
 
-export default function ProfilePage({ userId }) {
+export default function ProfilePage({ user }) {
   return (
     <ErrorBoundary FallbackComponent={RetryFallback}>
-      <RSCRoute componentName="Profile" componentProps={{ userId }} />
+      <RSCRoute componentName="Profile" componentProps={{ user }} />
     </ErrorBoundary>
   );
 }

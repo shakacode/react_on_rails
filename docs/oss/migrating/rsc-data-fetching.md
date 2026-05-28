@@ -140,9 +140,82 @@ function ReviewList({ reviews }: { reviews: Review[] }) {
 4. No client-side fetching, loading states, or error handling needed
 5. The component renders with zero JavaScript cost as a Server Component
 
-> **HTML streaming vs. progressive data streaming:** With synchronous props, all data is loaded in Rails before rendering begins. The streaming here is _HTML streaming_ — React sends rendered HTML to the browser as it processes the component tree, rather than waiting for the entire page to finish rendering. For progressive data streaming where slow data sources resolve independently via Suspense boundaries, see [Streaming SSR](../../pro/streaming-ssr.md) (React on Rails Pro).
+> **HTML streaming vs. progressive data streaming:** With synchronous props, all data is loaded in Rails before rendering begins. The streaming here is _HTML streaming_ — React sends rendered HTML to the browser as it processes the component tree, rather than waiting for the entire page to finish rendering. For progressive data streaming where slow data sources resolve independently via Suspense boundaries, see [Async props](#async-props-stream-each-slow-prop-independently) below.
 >
 > **More details:** For setup instructions and configuration options, see the [React on Rails Pro RSC documentation](../../pro/react-server-components/tutorial.md).
+
+### Async Props: Stream Each Slow Prop Independently
+
+The synchronous example above loads every prop in the controller before React starts rendering. When one data source is slow (a recommendations service, an expensive aggregate), it holds up the whole render. **Async props** let Rails send the fast props immediately and stream each slow prop to the browser as it resolves, so React shows the shell and fills in each `<Suspense>` boundary independently.
+
+Use `stream_react_component_with_async_props` and emit each slow prop from the block. The fast props go in `props:`; each `emit.call(name, value)` streams one more prop as soon as Rails has it:
+
+```erb
+<%# Controller must include ReactOnRailsPro::Stream and render the view via
+    stream_view_containing_react_components. Requires config.enable_rsc_support = true. %>
+<%= stream_react_component_with_async_props("ProductPage",
+      props: { name: product.name, price: product.price }) do |emit|
+  # Each emit.call streams a prop to the browser the moment Rails has it.
+  emit.call("reviews", product.reviews.as_json(only: [:id, :text, :rating]))
+  emit.call("recommendations",
+            RecommendationService.for(product).as_json(only: [:id, :name, :price]))
+end %>
+```
+
+On the React side, the component receives a `getReactOnRailsAsyncProp` helper alongside its synchronous props. Calling it returns a Promise for that prop; wrap the consumer in `<Suspense>` so React streams it in when Rails emits it:
+
+```tsx
+import { Suspense } from 'react';
+import { WithAsyncProps } from 'react-on-rails-pro';
+
+type SyncProps = { name: string; price: number };
+type AsyncProps = { reviews: Review[]; recommendations: Product[] };
+
+export default function ProductPage({
+  name,
+  price,
+  getReactOnRailsAsyncProp,
+}: WithAsyncProps<AsyncProps, SyncProps>) {
+  const reviewsPromise = getReactOnRailsAsyncProp('reviews');
+  const recommendationsPromise = getReactOnRailsAsyncProp('recommendations');
+
+  return (
+    <div>
+      <h1>{name}</h1>
+      <p>${price}</p>
+
+      <Suspense fallback={<ReviewsSkeleton />}>
+        <ReviewList reviews={reviewsPromise} />
+      </Suspense>
+      <Suspense fallback={<RecommendationsSkeleton />}>
+        <RecommendationList items={recommendationsPromise} />
+      </Suspense>
+    </div>
+  );
+}
+
+// Each async child awaits only the prop it was handed.
+async function ReviewList({ reviews }: { reviews: Promise<Review[]> }) {
+  const resolved = await reviews;
+  return (
+    <ul>
+      {resolved.map((r) => (
+        <li key={r.id}>{r.text}</li>
+      ))}
+    </ul>
+  );
+}
+```
+
+**Sync props vs. async props — which to use:**
+
+|                         | Sync props (`stream_react_component`)    | Async props (`stream_react_component_with_async_props`) |
+| ----------------------- | ---------------------------------------- | ------------------------------------------------------- |
+| When Rails has the data | All props loaded before rendering begins | Fast props now; each slow prop streamed as it resolves  |
+| What streams            | Rendered HTML, as React walks the tree   | Rendered HTML **plus** each prop independently          |
+| Best for                | All data sources are fast                | One or more data sources are slow                       |
+
+Async props keep Rails as the backend: the controller still owns the queries, authorization, and caching — it just emits each result the moment it has it instead of blocking the whole render on the slowest source. Requires React Server Components (`config.enable_rsc_support = true`).
 
 ## Migrating from React Query / TanStack Query
 

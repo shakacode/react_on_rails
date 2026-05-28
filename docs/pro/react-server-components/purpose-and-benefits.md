@@ -28,7 +28,7 @@ React Server Components significantly reduce client-side JavaScript by:
 
 1. **Server-Only Code Elimination:**
    - Dependencies used only in server components never ship to the client
-   - Database queries, API calls, and their libraries stay server-side
+   - Data-access and API-client libraries stay server-side — in React on Rails, Rails runs the queries and passes results to components as props
    - Heavy data processing utilities remain on the server
    - Server-only NPM packages don't impact client bundle
 
@@ -204,9 +204,8 @@ export default function InteractiveWidget() {
 ```jsx
 // app/components/LazyLoadedSection.jsx
 // Remove lazy loading wrapper
-// Convert to async server component
-async function LazyLoadedSection() {
-  const data = await fetchData();
+// Convert to a server component that receives its data as props from Rails
+function LazyLoadedSection({ data }) {
   return (
     <div>
       <ServerContent data={data} />
@@ -215,6 +214,8 @@ async function LazyLoadedSection() {
   );
 }
 ```
+
+> **React on Rails note:** In React on Rails, Rails is the backend — prepare the data in your controller and pass it to the component as a prop via `stream_react_component`, rather than calling `await fetchData()` inside the component. The Node renderer has no Rails models or database connection, and an in-component fetch bypasses Rails' authorization and caching. For data that's slow to compute, stream it with [async props](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently). See [RSC Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md).
 
 This migration approach allows you to:
 
