@@ -4418,6 +4418,7 @@ describe RscGenerator, type: :generator do
           expect(content).to include("globToRegExp")
           expect(content).to include("const globToRegExpSource")
           expect(content).to include(".map(globToRegExpSource)")
+          expect(content).to include("firstClosable")
           expect(content).to include("Ignoring invalid glob pattern")
           expect(content).to include("Consider adding an explicit base path")
           expect(content).to include("scanning from context")
@@ -4449,6 +4450,7 @@ describe RscGenerator, type: :generator do
           expect(content).to include(
             "Unrecognized entry value type; client references were not injected."
           )
+          expect(content).to include("Entry${entryLabel} has no \\`import\\` key")
           expect(content).to include("Object.prototype.hasOwnProperty.call(bundlerConfig, 'entry')")
           expect(content).to include("Server and client manifest builds share the same synthetic-entry injection")
           expect(content).to include("Client builds inherit the app's output filename template")
@@ -4469,6 +4471,7 @@ describe RscGenerator, type: :generator do
           expect(content).to include("if (!file.endsWith('.js') || file.endsWith('.hot-update.js')) continue;")
           expect(content).to include("if (chunk.id == null) continue;")
           expect(content).to include("Rspack helper does not yet enumerate named exports")
+          expect(content).to include("Verify named-export")
           expect(content).to include("webpack/rspack name a bare string/array entry")
           expect(content).to include("possibly synchronous")
           expect(content).to include("resolveRealPath")

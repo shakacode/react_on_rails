@@ -102,12 +102,17 @@ const globToRegExpSource = (glob) => {
     }
 
     if (char === '[') {
-      const closingBracketIndex = normalized.indexOf(']', index + 1);
+      // In glob bracket syntax, a `]` immediately after `[` or `[!` is literal.
+      const bracketInnerStart = index + 1;
+      const negated = normalized[bracketInnerStart] === '!' || normalized[bracketInnerStart] === '^';
+      const firstClosable = bracketInnerStart + (negated ? 1 : 0);
+      const closingSearchStart = normalized[firstClosable] === ']' ? firstClosable + 1 : firstClosable;
+      const closingBracketIndex = normalized.indexOf(']', closingSearchStart);
       if (closingBracketIndex !== -1) {
         const inner = normalized.slice(index + 1, closingBracketIndex);
         // Glob and regex bracket expressions mostly share syntax; translate only
         // glob's leading `!` negation to regex's `^` form.
-        const regexInner = inner.startsWith('!') ? `^${inner.slice(1)}` : inner;
+        const regexInner = (inner.startsWith('!') ? `^${inner.slice(1)}` : inner).replace(/^(\^?)]/, '$1\\]');
         source += `[${regexInner}]`;
         index = closingBracketIndex;
         continue;
@@ -384,7 +389,7 @@ const collectClientReferenceFiles = (context, clientReferences = normalizeClient
   };
 };
 
-const appendImports = (entryValue, importRequests) => {
+const appendImports = (entryValue, importRequests, entryName = null) => {
   if (typeof entryValue === 'string') {
     return [entryValue, ...importRequests];
   }
@@ -399,15 +404,16 @@ const appendImports = (entryValue, importRequests) => {
     if ('import' in entryValue) {
       return {
         ...entryValue,
-        import: appendImports(entryValue.import, importRequests),
+        import: appendImports(entryValue.import, importRequests, entryName),
       };
     }
 
+    const entryLabel = entryName ? ` '${entryName}'` : '';
     // EntryDescription with `filename` / `library` / `dependOn` but no `import` key:
     // we cannot inject client references without overwriting the user's shape.
     // eslint-disable-next-line no-console
     console.warn(
-      '[rscManifestPlugin] Entry has no `import` key; client references were not appended automatically. ' +
+      `[rscManifestPlugin] Entry${entryLabel} has no \`import\` key; client references were not appended automatically. ` +
         'Add the discovered `use client` modules to this entry manually.',
     );
   }
@@ -435,7 +441,7 @@ const clientReferenceEntry = (requests, useFixedFilename) => {
 };
 
 const mergeClientReferenceEntry = (entryValue, requests, useFixedFilename) => {
-  const mergedEntry = appendImports(entryValue, requests);
+  const mergedEntry = appendImports(entryValue, requests, RSC_CLIENT_REFERENCES_ENTRY_NAME);
   if (typeof mergedEntry === 'string' || Array.isArray(mergedEntry)) {
     return clientReferenceEntry(Array.isArray(mergedEntry) ? mergedEntry : [mergedEntry], useFixedFilename);
   }
@@ -619,7 +625,8 @@ class RspackRSCManifestPlugin {
               id: moduleId,
               chunks: chunkPairs.slice(),
               // Rspack helper does not yet enumerate named exports like RSCWebpackPlugin.
-              // Wildcard means all exports are client references; see the Rspack compatibility doc.
+              // Wildcard means all exports are client references. Verify named-export
+              // code paths under Rspack; see the Rspack compatibility doc.
               name: '*',
             };
           };
