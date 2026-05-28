@@ -214,10 +214,17 @@ const hasUseClientDirective = (source) => {
 const normalizeClientReferences = () => {
   // `config.additional_paths` is an internal Shakapacker property (not part of the
   // documented public API). Verified against Shakapacker 7.x/8.x. If a future
-  // Shakapacker release removes it, scan scope silently narrows to `source_path`
-  // only — `'use client'` files outside source_path would be missed at runtime
-  // without any diagnostic. Revisit if Shakapacker exposes an official accessor.
-  const directories = [config.source_path, ...(config.additional_paths || [])].filter(Boolean);
+  // Shakapacker release removes it, dev builds warn and scan scope narrows to
+  // `source_path` only. Revisit if Shakapacker exposes an official accessor.
+  const additionalPaths = config.additional_paths;
+  if (additionalPaths === undefined && process.env.NODE_ENV !== 'production') {
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[rscManifestPlugin] config.additional_paths is not available; scan is limited to config.source_path. ' +
+        'Check Shakapacker upgrade notes for source path API changes.',
+    );
+  }
+  const directories = [config.source_path, ...(additionalPaths || [])].filter(Boolean);
   if (directories.length === 0) {
     const message =
       '[rscManifestPlugin] config.source_path is not set; no client references will be scanned.';
@@ -280,8 +287,8 @@ const isFileEntry = (entry, symlinkStats) => {
 };
 
 const collectClientReferenceFiles = (context, clientReferences = normalizeClientReferences()) => {
-  // This runs while webpack/rspack evaluates the generated config. Keep the scan
-  // dependency-free and skip unreadable paths so config load remains resilient.
+  // This runs at webpack/rspack config-evaluation time, before any compilation.
+  // Keep the scan dependency-free and skip unreadable paths so config load remains resilient.
   // For large source trees, pass explicit `clientReferences` with a narrower
   // directory or `include` glob to reduce startup time.
   const files = new Set();
@@ -331,6 +338,8 @@ const collectClientReferenceFiles = (context, clientReferences = normalizeClient
       if (!isFileEntry(entry, symlinkStats)) return;
 
       const requestPath = `./${toPosixPath(path.relative(rootDirectory, absolutePath))}`;
+      // include accepts either the relative request path or absolute path; exclude
+      // must reject both forms so either style can opt a file out.
       if (
         (testPattern(reference.include, requestPath) || testPattern(reference.include, absolutePath)) &&
         !isExcluded(reference.exclude, requestPath) &&
@@ -545,7 +554,9 @@ const collectChunkGroupPairs = (chunkGroup) => {
 };
 
 const mergeChunkPairsInPlace = (existing, additions) => {
-  // Mutates `existing` so shared modules accumulate pairs from all chunk groups.
+  // `existing` is always a `.slice()` copy from the recordModule first-write path;
+  // mutate it so shared modules accumulate pairs from all chunk groups without
+  // altering the caller's chunkPairs array.
   const seenIds = new Set();
   for (let i = 0; i < existing.length; i += 2) seenIds.add(existing[i]);
   for (let i = 0; i < additions.length; i += 2) {
@@ -657,9 +668,9 @@ class RspackRSCManifestPlugin {
             filePathToModuleMetadata[fileUrl] = {
               id: moduleId,
               chunks: chunkPairs.slice(),
+              // Known limitation: all exports are treated as client references.
               // Rspack helper does not yet enumerate named exports like RSCWebpackPlugin.
-              // Wildcard means all exports are client references. Verify named-export
-              // code paths under Rspack; see the Rspack compatibility doc.
+              // Verify named-export code paths under Rspack; see the Rspack compatibility doc.
               name: '*',
             };
           };

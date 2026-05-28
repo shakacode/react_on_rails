@@ -420,7 +420,7 @@ module ReactOnRails
           config_path, content, "serverWebpackConfig", fallback_import_pattern, is_server: true
         )
 
-        return if migrate_or_block_rsc_webpack_plugin?(
+        return if handle_existing_rsc_webpack_plugin(
           config_path, content, "serverWebpackConfig", fallback_import_pattern, true
         )
 
@@ -526,7 +526,7 @@ module ReactOnRails
           config_path, content, "clientConfig", fallback_import_pattern, is_server: false
         )
 
-        return if migrate_or_block_rsc_webpack_plugin?(
+        return if handle_existing_rsc_webpack_plugin(
           config_path, content, "clientConfig", fallback_import_pattern, false
         )
 
@@ -702,7 +702,7 @@ module ReactOnRails
         )
       end
 
-      def migrate_or_block_rsc_webpack_plugin?(
+      def handle_existing_rsc_webpack_plugin(
         config_path,
         content,
         bundler_config_name,

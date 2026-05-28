@@ -4464,8 +4464,11 @@ describe RscGenerator, type: :generator do
           expect(content).to include("/\\.(?:js|mjs|cjs|jsx|ts|mts|cts|tsx)$/")
           expect(content).to include("reference.recursive ?? true")
           expect(content).to include("config.source_path is not set; no client references will be scanned.")
+          expect(content).to include("config.additional_paths is not available")
           expect(content).to include("Skipped unreadable directory")
           expect(content).to include("For large source trees, pass explicit `clientReferences`")
+          expect(content).to include("config-evaluation time")
+          expect(content).to include("include accepts either the relative request path or absolute path")
           expect(content).to include("RSC_CLIENT_REFERENCES_ENTRY_NAME")
           expect(content).to include(
             "[RSC_CLIENT_REFERENCES_ENTRY_NAME]: clientReferenceEntry(requests, useFixedFilename)"
@@ -4495,6 +4498,7 @@ describe RscGenerator, type: :generator do
           expect(content).to include("fallback keeps warnings usable")
           expect(content).to include("new WebpackError")
           expect(content).to include("mergeChunkPairsInPlace(existing.chunks, chunkPairs)")
+          expect(content).to include("existing` is always a `.slice()` copy")
           expect(content).to include("regression can warn again")
           expect(content).to include("for (const concatenatedModule of module.modules)")
           expect(content).to include("cachedRealPath")
@@ -4514,6 +4518,7 @@ describe RscGenerator, type: :generator do
           expect(content).to include("if (!file.endsWith('.js') || file.endsWith('.hot-update.js')) continue;")
           expect(content).to include("if (chunk.id == null) continue;")
           expect(content).to include("Rspack helper does not yet enumerate named exports")
+          expect(content).to include("Known limitation: all exports are treated as client references")
           expect(content).to include("Verify named-export")
           expect(content).to include("webpack/rspack name a bare string/array entry")
           expect(content).to include("possibly synchronous")
