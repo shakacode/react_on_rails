@@ -740,8 +740,15 @@ class RspackRSCManifestPlugin {
 }
 
 const addRSCManifestPlugin = (bundlerConfig, options) => {
+  if (!options || typeof options.isServer !== 'boolean') {
+    throw new Error('addRSCManifestPlugin: You must pass { isServer: boolean } as the second argument.');
+  }
+
   if (config.assets_bundler === 'rspack') {
     const context = bundlerConfig.context || process.cwd();
+    // Rspack path scans configured files at config-evaluation time, so it can
+    // discover unimported `use client` files that webpack's module graph ignores.
+    // Narrow `clientReferences` if stale/unimported files cause unexpected build failures.
     // Omitted clientReferences intentionally falls back to the Shakapacker source-path scan.
     const { files: clientReferenceFiles, requests: clientReferenceRequests } = collectClientReferenceFiles(
       context,
@@ -765,8 +772,8 @@ const addRSCManifestPlugin = (bundlerConfig, options) => {
   }
 
   // Lazy require keeps Rspack-only projects from pulling in webpack at config-load time.
-  // The webpack path delegates entirely to RSCWebpackPlugin, which discovers client
-  // references through webpack's module graph, so entry injection is not needed here.
+  // The webpack path delegates discovery to RSCWebpackPlugin's module graph, so
+  // only imported client references are included and entry injection is not needed here.
   // eslint-disable-next-line global-require
   const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
   bundlerConfig.plugins = bundlerConfig.plugins ?? [];

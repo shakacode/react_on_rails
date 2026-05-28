@@ -4491,7 +4491,10 @@ describe RscGenerator, type: :generator do
           )
           expect(content).to include("Entry${entryLabel} has no \\`import\\` key")
           expect(content).to include("Object.prototype.hasOwnProperty.call(bundlerConfig, 'entry')")
+          expect(content).to include("addRSCManifestPlugin: You must pass { isServer: boolean }")
           expect(content).to include("Server and client manifest builds share the same synthetic-entry injection")
+          expect(content).to include("Rspack path scans configured files at config-evaluation time")
+          expect(content).to include("webpack path delegates discovery to RSCWebpackPlugin's module graph")
           expect(content).to include("Client builds inherit the app's output filename template")
           expect(content).to include("bundlerConfig.plugins = bundlerConfig.plugins ?? []")
           expect(content).to include("compiler.webpack is not available")
@@ -4532,7 +4535,7 @@ describe RscGenerator, type: :generator do
           expect(content).to include(
             "new RspackRSCManifestPlugin(options, clientReferenceFiles, clientReferenceRequests)"
           )
-          expect(content).to include("delegates entirely to RSCWebpackPlugin")
+          expect(content).to include("delegates discovery to RSCWebpackPlugin")
           expect(content).to include("const chunkPairs = collectChunkGroupPairs(chunkGroup);")
           expect(content).to include("chunkPairs covers all chunks in the group")
           expect(content).to include("compilation.warnings.push")
