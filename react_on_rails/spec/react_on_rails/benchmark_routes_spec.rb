@@ -48,38 +48,40 @@ RSpec.describe "benchmark route discovery helpers" do
 
   describe "#benchmark_routes_for_app" do
     it "runs rails routes in the app directory" do
-      app_dir = Dir.mktmpdir
-      routes_output = <<~TEXT
-        --[ Route 1 ]-------------------------------------------------------------------
-        Prefix            | client_side_hello_world
-        Verb              | GET
-        URI               | /client_side_hello_world(.:format)
-        Controller#Action | pages#client_side_hello_world
-      TEXT
-      status = instance_double(Process::Status, success?: true)
+      Dir.mktmpdir do |app_dir|
+        routes_output = <<~TEXT
+          --[ Route 1 ]-------------------------------------------------------------------
+          Prefix            | client_side_hello_world
+          Verb              | GET
+          URI               | /client_side_hello_world(.:format)
+          Controller#Action | pages#client_side_hello_world
+        TEXT
+        status = instance_double(Process::Status, success?: true)
 
-      allow(Open3).to receive(:capture3).with(
-        hash_including("RAILS_ENV" => "production"),
-        "bundle",
-        "exec",
-        "rails",
-        "routes",
-        "--expanded",
-        chdir: app_dir
-      ).and_return([routes_output, "", status])
+        allow(Open3).to receive(:capture3).with(
+          hash_including("RAILS_ENV" => "production"),
+          "bundle",
+          "exec",
+          "rails",
+          "routes",
+          "--expanded",
+          chdir: app_dir
+        ).and_return([routes_output, "", status])
 
-      expect(benchmark_routes_for_app(app_dir, nil)).to eq(["/client_side_hello_world"])
+        expect(benchmark_routes_for_app(app_dir, nil)).to eq(["/client_side_hello_world"])
+      end
     end
 
     it "raises when rails routes fails" do
-      app_dir = Dir.mktmpdir
-      status = instance_double(Process::Status, success?: false)
+      Dir.mktmpdir do |app_dir|
+        status = instance_double(Process::Status, success?: false)
 
-      allow(Open3).to receive(:capture3).and_return(["", "boom", status])
+        allow(Open3).to receive(:capture3).and_return(["", "boom", status])
 
-      expect do
-        benchmark_routes_for_app(app_dir, nil)
-      end.to raise_error("Failed to get routes from #{app_dir}")
+        expect do
+          benchmark_routes_for_app(app_dir, nil)
+        end.to raise_error("Failed to get routes from #{app_dir}")
+      end
     end
   end
 end
