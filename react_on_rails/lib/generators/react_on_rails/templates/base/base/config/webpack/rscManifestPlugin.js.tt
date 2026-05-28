@@ -10,6 +10,7 @@ const { config } = require('shakapacker');
 const CLIENT_REFERENCE_EXTENSIONS = /\.(?:js|mjs|cjs|jsx|ts|mts|cts|tsx)$/;
 const RSC_CLIENT_REFERENCES_ENTRY_NAME = 'rsc-client-references';
 const DEFAULT_EXCLUDED_DIRECTORIES = new Set(['node_modules', 'public', 'tmp', 'log', 'storage']);
+const GLOB_MAGIC_PATTERN = /[*?\[\]{}]/;
 
 const toPosixPath = (filePath) => filePath.split(path.sep).join('/');
 
@@ -20,6 +21,81 @@ const toImportRequest = (context, filePath) => {
   }
 
   return relativePath.startsWith('.') ? relativePath : `./${relativePath}`;
+};
+
+const escapeRegExp = (value) => value.replace(/[|\\{}()[\]^$+?.]/g, '\\$&');
+
+const hasGlobMagic = (reference) => GLOB_MAGIC_PATTERN.test(reference);
+
+const globToRegExp = (glob) => {
+  const normalized = toPosixPath(glob);
+  let source = '^';
+
+  for (let index = 0; index < normalized.length; index += 1) {
+    const char = normalized[index];
+
+    if (char === '*') {
+      if (normalized[index + 1] === '*') {
+        if (normalized[index + 2] === '/') {
+          source += '(?:.*\\/)?';
+          index += 2;
+        } else {
+          source += '.*';
+          index += 1;
+        }
+      } else {
+        source += '[^/]*';
+      }
+      continue;
+    }
+
+    if (char === '?') {
+      source += '[^/]';
+      continue;
+    }
+
+    if (char === '{') {
+      const closingBraceIndex = normalized.indexOf('}', index + 1);
+      if (closingBraceIndex !== -1) {
+        const alternatives = normalized
+          .slice(index + 1, closingBraceIndex)
+          .split(',')
+          .map(escapeRegExp)
+          .join('|');
+        source += `(?:${alternatives})`;
+        index = closingBraceIndex;
+        continue;
+      }
+    }
+
+    if (char === '[') {
+      const closingBracketIndex = normalized.indexOf(']', index + 1);
+      if (closingBracketIndex !== -1) {
+        source += normalized.slice(index, closingBracketIndex + 1);
+        index = closingBracketIndex;
+        continue;
+      }
+    }
+
+    source += escapeRegExp(char);
+  }
+
+  return new RegExp(`${source}$`);
+};
+
+const globBaseDirectory = (context, reference) => {
+  const absolutePattern = path.isAbsolute(reference)
+    ? path.normalize(reference)
+    : path.resolve(context, reference);
+  const segments = toPosixPath(absolutePattern).split('/');
+  const baseSegments = [];
+
+  for (const segment of segments) {
+    if (GLOB_MAGIC_PATTERN.test(segment)) break;
+    baseSegments.push(segment);
+  }
+
+  return path.resolve(baseSegments.join('/') || path.parse(absolutePattern).root);
 };
 
 const matchesPattern = (pattern, value, defaultIfAbsent) => {
@@ -151,7 +227,7 @@ const collectClientReferenceFiles = (context, clientReferences = normalizeClient
     }
   };
 
-  const walk = (directory, reference, visitedDirectories = new Set()) => {
+  const walk = (directory, reference, visitedDirectories = new Set(), rootDirectory = directory) => {
     if (!fs.existsSync(directory)) return;
 
     const realDirectory = resolveRealDirectory(directory);
@@ -171,15 +247,15 @@ const collectClientReferenceFiles = (context, clientReferences = normalizeClient
       const absolutePath = path.join(directory, entry.name);
 
       if (isDirectoryEntry(entry, absolutePath)) {
-        if (reference.recursive && !DEFAULT_EXCLUDED_DIRECTORIES.has(entry.name)) {
-          walk(absolutePath, reference, visitedDirectories);
+        if ((reference.recursive ?? true) && !DEFAULT_EXCLUDED_DIRECTORIES.has(entry.name)) {
+          walk(absolutePath, reference, visitedDirectories, rootDirectory);
         }
         return;
       }
 
       if (!isFileEntry(entry, absolutePath)) return;
 
-      const requestPath = `./${toPosixPath(path.relative(directory, absolutePath))}`;
+      const requestPath = `./${toPosixPath(path.relative(rootDirectory, absolutePath))}`;
       if (
         (testPattern(reference.include, requestPath) || testPattern(reference.include, absolutePath)) &&
         !isExcluded(reference.exclude, requestPath) &&
@@ -190,10 +266,21 @@ const collectClientReferenceFiles = (context, clientReferences = normalizeClient
     });
   };
 
+  const collectStringReference = (reference) => {
+    const absolutePath = path.isAbsolute(reference) ? reference : path.resolve(context, reference);
+    if (!hasGlobMagic(reference)) {
+      collectFile(absolutePath);
+      return;
+    }
+
+    const baseDirectory = globBaseDirectory(context, reference);
+    const relativePattern = `./${toPosixPath(path.relative(baseDirectory, absolutePath))}`;
+    walk(baseDirectory, { recursive: true, include: globToRegExp(relativePattern) });
+  };
+
   normalizeClientReferenceList(clientReferences).forEach((reference) => {
     if (typeof reference === 'string') {
-      const absolutePath = path.isAbsolute(reference) ? reference : path.resolve(context, reference);
-      collectFile(absolutePath);
+      collectStringReference(reference);
       return;
     }
 

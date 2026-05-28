@@ -644,7 +644,7 @@ module ReactOnRails
         return "" if indents.empty?
 
         common_indent = indents.reduce do |common, indent|
-          common_leading_whitespace(common, indent)
+          common_string_prefix(common, indent)
         end
         closing_indent = body[/\n([ \t]*)\z/, 1] || ""
 
@@ -653,7 +653,7 @@ module ReactOnRails
         common_indent.delete_prefix(closing_indent)
       end
 
-      def common_leading_whitespace(left, right)
+      def common_string_prefix(left, right)
         index = 0
         index += 1 while index < left.length && index < right.length && left[index] == right[index]
         left[0...index]
