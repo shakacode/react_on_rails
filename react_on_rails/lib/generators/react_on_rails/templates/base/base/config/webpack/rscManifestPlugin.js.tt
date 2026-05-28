@@ -333,12 +333,30 @@ const collectClientReferenceFiles = (context, clientReferences = normalizeClient
   const collectStringReference = (reference) => {
     const absolutePath = path.isAbsolute(reference) ? reference : path.resolve(context, reference);
     if (!hasGlobMagic(reference)) {
-      if (fs.existsSync(absolutePath)) {
+      let stats;
+      try {
+        stats = fs.statSync(absolutePath);
+      } catch (error) {
+        if (error.code === 'ENOENT') {
+          // Match RSCWebpackPlugin string references: preserve unresolved request strings
+          // so webpack/rspack aliases and package requests stay in the bundle graph.
+          requests.add(reference);
+        } else {
+          // eslint-disable-next-line no-console
+          console.warn(
+            `[rscManifestPlugin] Skipped unreadable clientReference ${absolutePath}: ${error.message}`,
+          );
+        }
+        return;
+      }
+
+      if (stats.isDirectory()) {
+        walk(absolutePath, { recursive: true, include: CLIENT_REFERENCE_EXTENSIONS });
+      } else if (stats.isFile()) {
         collectFile(absolutePath);
       } else {
-        // Match RSCWebpackPlugin string references: preserve unresolved request strings
-        // so webpack/rspack aliases and package requests stay in the bundle graph.
-        requests.add(reference);
+        // eslint-disable-next-line no-console
+        console.warn(`[rscManifestPlugin] Skipped unsupported clientReference ${absolutePath}`);
       }
       return;
     }
@@ -492,6 +510,7 @@ class RspackRSCManifestPlugin {
       (options.isServer ? 'react-server-client-manifest.json' : 'react-client-manifest.json');
     // Dedupe warnings across rebuilds in watch mode so a missing client file
     // only generates one warning per dev-server session, not one per save.
+    // A later fix-then-regression for the same request stays quiet until restart.
     this._warnedMissingModules = new Set();
   }
 

@@ -469,6 +469,8 @@ module ReactOnRails
       end
 
       def server_limit_chunk_count_plugin_anchor
+        # This intentionally matches only the generated serverWebpackConfig.js shape. Custom configs that move or
+        # rewrite LimitChunkCountPlugin will fail the guarded update and receive the rollback/warning path.
         Regexp.new(
           "(serverWebpackConfig\\.plugins\\.unshift\\(\\s*" \
           "new bundler\\.optimize\\.LimitChunkCountPlugin[\\s\\S]*?\\);)"

@@ -4232,6 +4232,8 @@ describe RscGenerator, type: :generator do
           expect(content).to include("scanning from context")
           expect(content).to include("requests.add(reference)")
           expect(content).to include("collectStringReference")
+          expect(content).to include("stats.isDirectory()")
+          expect(content).to include("walk(absolutePath, { recursive: true, include: CLIENT_REFERENCE_EXTENSIONS })")
           expect(content).to include("/\\.(?:js|mjs|cjs|jsx|ts|mts|cts|tsx)$/")
           expect(content).to include("reference.recursive ?? true")
           expect(content).to include("config.source_path is not set; no client references will be scanned.")
@@ -4249,6 +4251,7 @@ describe RscGenerator, type: :generator do
           expect(content).to include("compiler.webpack is not available")
           expect(content).to include("fallback keeps warnings usable")
           expect(content).to include("new WebpackError")
+          expect(content).to include("fix-then-regression for the same request stays quiet")
           expect(content).not_to include("Object.fromEntries")
           expect(content).not_to include("addClientReferencesToEntry,")
           # Manifest must emit alternating [chunkId, filename] pairs (collectChunkGroupPairs),
