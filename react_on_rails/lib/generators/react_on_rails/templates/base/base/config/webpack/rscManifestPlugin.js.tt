@@ -11,6 +11,7 @@ const CLIENT_REFERENCE_EXTENSIONS = /\.(?:js|mjs|cjs|jsx|ts|mts|cts|tsx)$/;
 const RSC_CLIENT_REFERENCES_ENTRY_NAME = 'rsc-client-references';
 const DEFAULT_EXCLUDED_DIRECTORIES = new Set(['node_modules', 'public', 'tmp', 'log', 'storage']);
 const GLOB_MAGIC_PATTERN = /[*?\[\]{}]/;
+const NEVER_MATCH_PATTERN = /a^/;
 
 const toPosixPath = (filePath) => filePath.split(path.sep).join('/');
 
@@ -118,7 +119,15 @@ const globToRegExpSource = (glob) => {
   return source;
 };
 
-const globToRegExp = (glob) => new RegExp(`^${globToRegExpSource(glob)}$`);
+const globToRegExp = (glob) => {
+  try {
+    return new RegExp(`^${globToRegExpSource(glob)}$`);
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.warn(`[rscManifestPlugin] Ignoring invalid glob pattern '${glob}': ${error.message}`);
+    return NEVER_MATCH_PATTERN;
+  }
+};
 
 const globBaseDirectory = (context, reference) => {
   const absolutePattern = path.isAbsolute(reference)
@@ -132,7 +141,15 @@ const globBaseDirectory = (context, reference) => {
     baseSegments.push(segment);
   }
 
-  return path.resolve(baseSegments.join('/') || path.parse(absolutePattern).root);
+  const base = baseSegments.join('/');
+  if (base) return path.resolve(base);
+
+  // eslint-disable-next-line no-console
+  console.warn(
+    `[rscManifestPlugin] Glob pattern '${reference}' has no static base directory; ` +
+      `scanning from context '${context}' instead of filesystem root.`,
+  );
+  return context;
 };
 
 const matchesPattern = (pattern, value, defaultIfAbsent) => {
@@ -599,14 +616,10 @@ const addRSCManifestPlugin = (bundlerConfig, options) => {
       context,
       options.clientReferences,
     );
-    if (options.isServer) {
-      // Use a dedicated synthetic entry for server manifest builds too. This keeps
-      // client-only modules in the graph for manifest generation without executing
-      // them as part of the Node `server-bundle` entry at startup.
-      addClientReferencesToEntry(bundlerConfig, clientReferenceFiles, clientReferenceRequests);
-    } else {
-      addClientReferencesToEntry(bundlerConfig, clientReferenceFiles, clientReferenceRequests);
-    }
+    // Server and client manifest builds share the same synthetic-entry injection.
+    // This keeps client-only modules in the graph for server manifest generation
+    // without executing them as part of the Node `server-bundle` entry at startup.
+    addClientReferencesToEntry(bundlerConfig, clientReferenceFiles, clientReferenceRequests);
     bundlerConfig.plugins = bundlerConfig.plugins ?? [];
     bundlerConfig.plugins.push(
       new RspackRSCManifestPlugin(options, clientReferenceFiles, clientReferenceRequests),

@@ -1922,6 +1922,9 @@ describe InstallGenerator, type: :generator do
         assert_file "config/rspack/clientWebpackConfig.js" do |content|
           expect(content).to include("addRSCManifestPlugin")
           expect(content).to include("./rscManifestPlugin")
+          expect(content).to include(
+            "addRSCManifestPlugin(clientConfig, { isServer: false, clientReferences: rscClientReferences })"
+          )
         end
       end
 

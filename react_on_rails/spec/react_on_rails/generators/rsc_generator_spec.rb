@@ -4170,6 +4170,8 @@ describe RscGenerator, type: :generator do
           expect(content).to include("globToRegExp")
           expect(content).to include("const globToRegExpSource")
           expect(content).to include(".map(globToRegExpSource)")
+          expect(content).to include("Ignoring invalid glob pattern")
+          expect(content).to include("scanning from context")
           expect(content).to include("requests.add(reference)")
           expect(content).to include("collectStringReference")
           expect(content).to include("/\\.(?:js|mjs|cjs|jsx|ts|mts|cts|tsx)$/")
@@ -4181,7 +4183,7 @@ describe RscGenerator, type: :generator do
           expect(content).to include("without executing")
           expect(content).to include("Node `server-bundle` entry")
           expect(content).not_to include("'server-bundle': appendImports(entryValue['server-bundle'], requests)")
-          expect(content).to include("if (options.isServer)")
+          expect(content).to include("Server and client manifest builds share the same synthetic-entry injection")
           expect(content).to include(
             "addClientReferencesToEntry(bundlerConfig, clientReferenceFiles, clientReferenceRequests)"
           )

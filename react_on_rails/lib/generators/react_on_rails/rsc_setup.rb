@@ -707,6 +707,9 @@ module ReactOnRails
           fallback_import_pattern: fallback_import_pattern,
           is_server: is_server
         )
+        # A handled migration attempt should stop fresh setup even when it rolled
+        # back and warned, because blindly adding new helper setup would compound
+        # an already ambiguous existing RSCWebpackPlugin configuration.
         true
       end
 
