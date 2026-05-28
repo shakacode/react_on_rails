@@ -80,20 +80,30 @@ PRO_SOURCE_COMMENT_ONLY_CHANGED=false
 
 comment_line_is_runtime_directive() {
   local line="$1"
+  local trimmed="${line#"${line%%[![:space:]]*}"}"
 
-  case "$line" in
-    *"frozen_string_literal:"*|*"encoding:"*|*"coding:"*|*"shareable_constant_value:"*|\
-    *"webpackChunkName"*|*"webpackMode"*|*"webpackPrefetch"*|*"webpackPreload"*|\
-    *"webpackInclude"*|*"webpackExclude"*|*"webpackIgnore"*|*"webpackExports"*|\
-    *"webpackFetchPriority"*|*"vite-ignore"*|*"@jsxImportSource"*|*"@jsx"*|*"@babel"*|*"#__PURE__"*|\
-    *"sourceMappingURL"*|*"@preserve"*|*"@license"*)
+  case "$trimmed" in
+    '#!'*)
       return 0
       ;;
   esac
 
-  local trimmed="${line#"${line%%[![:space:]]*}"}"
-  case "$trimmed" in
-    '#!'*)
+  local comment_body="$trimmed"
+  case "$comment_body" in
+    '//'*) comment_body="${comment_body#//}" ;;
+    '#'* ) comment_body="${comment_body#\#}" ;;
+    '/*'*) comment_body="${comment_body#/*}" ;;
+    '*'*) comment_body="${comment_body#\*}" ;;
+  esac
+  comment_body="${comment_body#"${comment_body%%[![:space:]]*}"}"
+
+  case "$comment_body" in
+    frozen_string_literal:*|encoding:*|coding:*|shareable_constant_value:*|\
+    webpackChunkName:*|webpackMode:*|webpackPrefetch:*|webpackPreload:*|\
+    webpackInclude:*|webpackExclude:*|webpackIgnore:*|webpackExports:*|webpackFetchPriority:*|\
+    @vite-ignore*|@jsxImportSource*|@jsx*|@babel*|'#'__PURE__*|\
+    @ts-ignore*|@ts-expect-error*|@ts-nocheck*|@ts-check*|\
+    sourceMappingURL*|@preserve*|@license*)
       return 0
       ;;
   esac
@@ -104,6 +114,7 @@ comment_line_is_runtime_directive() {
 diff_line_is_comment_or_blank() {
   local line="$1"
   local in_block_comment="${2:-false}"
+  local in_ruby_block_comment="${3:-false}"
   local trimmed="${line#"${line%%[![:space:]]*}"}"
 
   [ -z "$trimmed" ] && return 0
@@ -112,11 +123,13 @@ diff_line_is_comment_or_blank() {
     return 1
   fi
 
+  [ "$in_block_comment" = true ] && return 0
+  [ "$in_ruby_block_comment" = true ] && return 0
+
   case "$trimmed" in
     '#'*|'//'*) return 0 ;;
-    '/*'*|'*/'*) return 0 ;;
-    '*'*) [ "$in_block_comment" = true ] && return 0 ;;
-    '=begin'*|'=end'*) return 0 ;;
+    '/*'*) return 0 ;;
+    '=begin'*) return 0 ;;
   esac
 
   return 1
@@ -157,13 +170,17 @@ source_file_comment_only_change() {
       ;;
   esac
 
-  local changed_line saw_changed_line=false in_block_comment=false
+  local changed_line saw_changed_line=false in_block_comment=false in_ruby_block_comment=false
   while IFS= read -r changed_line; do
     case "$changed_line" in
+      '@@ '*)
+        [ "$in_block_comment" = true ] && return 1
+        [ "$in_ruby_block_comment" = true ] && return 1
+        ;;
       '+++ '*|'--- '*) continue ;;
       '+'*|'-'*)
         saw_changed_line=true
-        if ! diff_line_is_comment_or_blank "${changed_line:1}" "$in_block_comment"; then
+        if ! diff_line_is_comment_or_blank "${changed_line:1}" "$in_block_comment" "$in_ruby_block_comment"; then
           return 1
         fi
         case "${changed_line:1}" in
@@ -175,10 +192,16 @@ source_file_comment_only_change() {
             ;;
           *'*/'*) in_block_comment=false ;;
         esac
+        case "${changed_line:1}" in
+          '=begin'*) in_ruby_block_comment=true ;;
+          '=end'*) in_ruby_block_comment=false ;;
+        esac
         ;;
     esac
   done <<< "$diff_output"
 
+  [ "$in_block_comment" = true ] && return 1
+  [ "$in_ruby_block_comment" = true ] && return 1
   [ "$saw_changed_line" = true ]
 }
 
@@ -289,7 +312,7 @@ while IFS= read -r file; do
     packages/react-on-rails-pro-node-renderer/src/*|packages/react-on-rails-pro-node-renderer/src/**/*|packages/react-on-rails-pro-node-renderer/tests/*|packages/react-on-rails-pro-node-renderer/tests/**/*|packages/react-on-rails-pro-node-renderer/scripts/*|packages/react-on-rails-pro-node-renderer/scripts/**/*|packages/react-on-rails-pro-node-renderer/package.json|packages/react-on-rails-pro-node-renderer/tsconfig.json|.github/workflows/node-renderer-tests.yml)
       DOCS_ONLY=false
       if source_file_comment_only_change "$file"; then
-        SOURCE_COMMENT_ONLY_CHANGED=true
+        PRO_SOURCE_COMMENT_ONLY_CHANGED=true
       else
         PRO_NODE_RENDERER_CHANGED=true
       fi

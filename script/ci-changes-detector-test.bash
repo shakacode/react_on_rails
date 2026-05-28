@@ -71,6 +71,7 @@ setup_repo() {
   git config user.name "CI Detector Test"
 
   mkdir -p docs react_on_rails/lib/react_on_rails packages/react-on-rails/src
+  mkdir -p packages/react-on-rails-pro-node-renderer/src
   mkdir -p react_on_rails/spec/react_on_rails
   cat > docs/guide.md <<'DOC'
 # Guide
@@ -93,6 +94,11 @@ TS
 export const template = `
 // runtime fixture text
 `;
+TS
+  cat > packages/react-on-rails-pro-node-renderer/src/example.ts <<'TS'
+export function render(): string {
+  return 'ok';
+}
 TS
   cat > react_on_rails/spec/react_on_rails/example_spec.rb <<'RUBY'
 RSpec.describe "example" do
@@ -143,9 +149,34 @@ test_ruby_comment_only_change_skips_heavy_tests_but_keeps_lint() {
   assert_contains "$out" '"run_dummy_tests": false' "ruby comment output"
 }
 
+test_ruby_block_comment_only_change_skips_heavy_tests_but_keeps_lint() {
+  setup_repo
+  perl -0pi -e 's/module ReactOnRails/=begin\nExplains the fixture.\n=end\nmodule ReactOnRails/' \
+    react_on_rails/lib/react_on_rails/example.rb
+  commit_change "ruby block comment"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"non_runtime_only": true' "ruby block comment output"
+  assert_contains "$out" '"run_lint": true' "ruby block comment output"
+  assert_contains "$out" '"run_ruby_tests": false' "ruby block comment output"
+}
+
+test_wrapping_ruby_code_with_block_comment_delimiters_remains_runtime_affecting() {
+  setup_repo
+  perl -0pi -e 's/module ReactOnRails/=begin\nmodule ReactOnRails/' react_on_rails/lib/react_on_rails/example.rb
+  printf '\n=end\n' >> react_on_rails/lib/react_on_rails/example.rb
+  commit_change "comment out ruby code"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"non_runtime_only": false' "commented ruby code output"
+  assert_contains "$out" '"run_ruby_tests": true' "commented ruby code output"
+}
+
 test_javascript_block_comment_only_change_skips_heavy_tests_but_keeps_lint() {
   setup_repo
-  perl -0pi -e 's/export function/\/**\n * Explains the fixture.\n *\/\nexport function/' \
+  perl -0pi -e 's/export function/\/\*\n * Explains the fixture.\n *\/\nexport function/' \
     packages/react-on-rails/src/example.ts
   commit_change "js comment"
 
@@ -154,6 +185,18 @@ test_javascript_block_comment_only_change_skips_heavy_tests_but_keeps_lint() {
   assert_contains "$out" '"non_runtime_only": true' "js comment output"
   assert_contains "$out" '"run_lint": true' "js comment output"
   assert_contains "$out" '"run_js_tests": false' "js comment output"
+}
+
+test_wrapping_code_with_block_comment_delimiters_remains_runtime_affecting() {
+  setup_repo
+  perl -0pi -e 's/export function/\/\*\nexport function/' packages/react-on-rails/src/example.ts
+  printf '\n*/\n' >> packages/react-on-rails/src/example.ts
+  commit_change "comment out code"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"non_runtime_only": false' "commented code output"
+  assert_contains "$out" '"run_js_tests": true' "commented code output"
 }
 
 test_prose_comment_containing_webpack_is_not_a_runtime_directive() {
@@ -166,6 +209,42 @@ test_prose_comment_containing_webpack_is_not_a_runtime_directive() {
   out="$(detector_output)"
   assert_contains "$out" '"non_runtime_only": true' "webpack prose output"
   assert_contains "$out" '"run_js_tests": false' "webpack prose output"
+}
+
+test_webpack_magic_comment_keyword_remains_runtime_affecting() {
+  setup_repo
+  perl -0pi -e 's/export function/\/\/ webpackChunkName: "example"\nexport function/' \
+    packages/react-on-rails/src/example.ts
+  commit_change "webpack directive comment"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"non_runtime_only": false' "webpack directive output"
+  assert_contains "$out" '"run_js_tests": true' "webpack directive output"
+}
+
+test_prose_comment_containing_encoding_is_not_a_runtime_directive() {
+  setup_repo
+  perl -0pi -e 's/class Example/class Example\n    # Documents response encoding: utf-8./' \
+    react_on_rails/lib/react_on_rails/example.rb
+  commit_change "encoding prose comment"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"non_runtime_only": true' "encoding prose output"
+  assert_contains "$out" '"run_ruby_tests": false' "encoding prose output"
+}
+
+test_typescript_suppression_comment_remains_runtime_affecting() {
+  setup_repo
+  perl -0pi -e 's/export function/\/\/ \@ts-expect-error documents expected type failure\nexport function/' \
+    packages/react-on-rails/src/example.ts
+  commit_change "typescript directive comment"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"non_runtime_only": false' "typescript directive output"
+  assert_contains "$out" '"run_js_tests": true' "typescript directive output"
 }
 
 test_code_line_starting_with_plus_plus_remains_runtime_affecting() {
@@ -202,6 +281,20 @@ test_spec_comment_only_change_skips_rspec() {
   assert_contains "$out" '"non_runtime_only": true' "spec comment output"
   assert_contains "$out" '"run_lint": true' "spec comment output"
   assert_contains "$out" '"run_ruby_tests": false' "spec comment output"
+}
+
+test_pro_node_renderer_comment_only_change_runs_pro_lint_only() {
+  setup_repo
+  perl -0pi -e 's/export function/\/\/ Explains the Pro node renderer fixture.\nexport function/' \
+    packages/react-on-rails-pro-node-renderer/src/example.ts
+  commit_change "pro node renderer comment"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"non_runtime_only": true' "pro node renderer comment output"
+  assert_contains "$out" '"run_lint": false' "pro node renderer comment output"
+  assert_contains "$out" '"run_pro_lint": true' "pro node renderer comment output"
+  assert_contains "$out" '"run_pro_node_renderer_tests": false' "pro node renderer comment output"
 }
 
 test_mixed_comment_and_code_change_remains_runtime_affecting() {
@@ -242,11 +335,18 @@ test_executable_source_change_remains_runtime_affecting() {
 
 run_test test_docs_changes_are_non_runtime_only
 run_test test_ruby_comment_only_change_skips_heavy_tests_but_keeps_lint
+run_test test_ruby_block_comment_only_change_skips_heavy_tests_but_keeps_lint
+run_test test_wrapping_ruby_code_with_block_comment_delimiters_remains_runtime_affecting
 run_test test_javascript_block_comment_only_change_skips_heavy_tests_but_keeps_lint
+run_test test_wrapping_code_with_block_comment_delimiters_remains_runtime_affecting
 run_test test_prose_comment_containing_webpack_is_not_a_runtime_directive
+run_test test_webpack_magic_comment_keyword_remains_runtime_affecting
+run_test test_prose_comment_containing_encoding_is_not_a_runtime_directive
+run_test test_typescript_suppression_comment_remains_runtime_affecting
 run_test test_code_line_starting_with_plus_plus_remains_runtime_affecting
 run_test test_comment_like_template_literal_change_remains_runtime_affecting
 run_test test_spec_comment_only_change_skips_rspec
+run_test test_pro_node_renderer_comment_only_change_runs_pro_lint_only
 run_test test_mixed_comment_and_code_change_remains_runtime_affecting
 run_test test_ruby_magic_comment_remains_runtime_affecting
 run_test test_executable_source_change_remains_runtime_affecting
