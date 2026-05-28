@@ -163,7 +163,7 @@ while IFS= read -r file; do
 
     # CI infrastructure files (scripts, workflows, CI configs)
     # Changes to CI infrastructure should trigger tests to validate the changes work
-    script/*|script/**/*|bin/*|bin/**/*|.github/workflows/*|.github/actions/*|.github/actions/**/*|lefthook.yml)
+    script/*|script/**/*|bin/*|bin/**/*|.github/workflows/*|.github/actions/*|.github/actions/**/*|.lefthook.yml)
       DOCS_ONLY=false
       RUBY_CORE_CHANGED=true  # Trigger all tests for CI infrastructure changes
       JS_CHANGED=true
