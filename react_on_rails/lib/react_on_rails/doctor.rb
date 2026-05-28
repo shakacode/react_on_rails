@@ -94,7 +94,8 @@ module ReactOnRails
       "scripts/deploy.sh",
       ".circleci/config.yml",
       ".gitlab-ci.yml",
-      "bitbucket-pipelines.yml"
+      "bitbucket-pipelines.yml",
+      "Jenkinsfile"
     ].freeze
     # Bounded glob allowlist for deploy manifests that live in a known directory
     # but use per-environment or per-workflow filenames. Each pattern matches
@@ -2898,18 +2899,27 @@ module ReactOnRails
       checker.add_warning("⚠️  Could not complete scan for deprecated renderer-cache task references: #{e.message}")
     end
 
-    def deploy_script_references_deprecated_task?(full_path)
-      # Only `#` comments matter for the scanned file types: Procfile, Dockerfile*,
-      # and bin/* scripts all use `#`. None use `//`, so we don't filter it.
-      # The trailing-comment strip requires whitespace before `#`, so a fragment
-      # like `task#name` stays intact while `cmd # was: <deprecated>` is filtered.
+    def deploy_script_references_deprecated_task?(full_path, path)
+      comment_prefixes = renderer_cache_deploy_script_comment_prefixes(path)
+
+      # The trailing-comment strip requires whitespace before the comment marker,
+      # so fragments like `task#name` stay intact while `cmd # was: <deprecated>`
+      # and Jenkinsfile `cmd // was: <deprecated>` comments are filtered.
       full_path.binread.each_line.any? do |line|
         stripped = line.lstrip
-        next false if stripped.start_with?("#")
+        next false if comment_prefixes.any? { |prefix| stripped.start_with?(prefix) }
 
-        without_inline_comment = stripped.sub(/ +#.*/, "")
+        without_inline_comment = comment_prefixes.reduce(stripped) do |content, prefix|
+          content.sub(/ +#{Regexp.escape(prefix)}.*/, "")
+        end
         without_inline_comment.include?(DEPRECATED_RENDERER_CACHE_TASK)
       end
+    end
+
+    def renderer_cache_deploy_script_comment_prefixes(path)
+      return ["#", "//"] if path == "Jenkinsfile"
+
+      ["#"]
     end
 
     def deploy_script_path_references_deprecated_task?(path)
@@ -2920,7 +2930,7 @@ module ReactOnRails
       # deploy scripts and CI manifests should be tiny.
       return false if full_path.size > RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES
 
-      deploy_script_references_deprecated_task?(full_path)
+      deploy_script_references_deprecated_task?(full_path, path)
     rescue StandardError => e
       checker.add_warning(
         "⚠️  Could not scan #{path} for deprecated renderer-cache task references: #{e.message}"
