@@ -36,7 +36,12 @@ module ReactOnRails
       MAX_LAYOUT_NAME_ATTEMPTS = 99
       RSC_MANIFEST_HELPER_IMPORT = "const { addRSCManifestPlugin } = require('./rscManifestPlugin');"
       RSC_WEBPACK_PLUGIN_IMPORT_PATTERN =
-        %r{^const \{ RSCWebpackPlugin \} = require\((['"])react-on-rails-rsc/WebpackPlugin\1\);$}
+        %r{
+          ^const\s+
+          (?:\{\s*RSCWebpackPlugin\s*\}|RSCWebpackPlugin)\s*=\s*
+          require\((['"])react-on-rails-rsc/WebpackPlugin\1\)
+          (?:\.RSCWebpackPlugin)?;?$
+        }x
 
       # Main entry point for RSC setup.
       # Orchestrates creation of all RSC-related files and configuration.

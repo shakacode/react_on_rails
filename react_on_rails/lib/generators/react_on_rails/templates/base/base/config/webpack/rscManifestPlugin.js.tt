@@ -22,17 +22,15 @@ const toImportRequest = (context, filePath) => {
   return relativePath.startsWith('.') ? relativePath : `./${relativePath}`;
 };
 
-const testPattern = (pattern, value) => {
-  if (!pattern) return true;
+const matchesPattern = (pattern, value, defaultIfAbsent) => {
+  if (!pattern) return defaultIfAbsent;
   pattern.lastIndex = 0;
   return pattern.test(value);
 };
 
-const isExcluded = (pattern, value) => {
-  if (!pattern) return false;
-  pattern.lastIndex = 0;
-  return pattern.test(value);
-};
+const testPattern = (pattern, value) => matchesPattern(pattern, value, true);
+
+const isExcluded = (pattern, value) => matchesPattern(pattern, value, false);
 
 const skipLeadingJavaScriptComments = (source) => {
   let remaining = source.trimStart();
@@ -409,7 +407,8 @@ const addRSCManifestPlugin = (bundlerConfig, options) => {
     const context = bundlerConfig.context || process.cwd();
     // Omitted clientReferences intentionally falls back to the Shakapacker source-path scan.
     const clientReferenceFiles = collectClientReferenceFiles(context, options.clientReferences);
-    addClientReferencesToEntry(bundlerConfig, clientReferenceFiles);
+    if (!options.isServer) addClientReferencesToEntry(bundlerConfig, clientReferenceFiles);
+    bundlerConfig.plugins = bundlerConfig.plugins ?? [];
     bundlerConfig.plugins.push(new RspackRSCManifestPlugin(options, clientReferenceFiles));
     return;
   }
@@ -417,6 +416,7 @@ const addRSCManifestPlugin = (bundlerConfig, options) => {
   // Lazy require keeps Rspack-only projects from pulling in webpack at config-load time.
   // eslint-disable-next-line global-require
   const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+  bundlerConfig.plugins = bundlerConfig.plugins ?? [];
   bundlerConfig.plugins.push(new RSCWebpackPlugin(options));
 };
 

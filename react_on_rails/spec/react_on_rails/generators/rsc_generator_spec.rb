@@ -1323,7 +1323,7 @@ describe RscGenerator, type: :generator do
       expect(migrated_content).not_to include("          isServer: false")
     end
 
-    it "rolls back manifest-helper migration when helper import cannot be inserted" do
+    it "migrates dot-access RSCWebpackPlugin imports without leaving an eager import" do
       config_path = "config/webpack/clientWebpackConfig.js"
       simulate_existing_file(
         config_path,
@@ -1355,11 +1355,12 @@ describe RscGenerator, type: :generator do
       generator.send(:update_client_webpack_config_for_rsc)
 
       migrated_content = File.read(File.join(destination_root, config_path))
-      expect(generator).to have_received(:say_status).with(:revert, config_path, :yellow)
-      expect(migrated_content).to eq(original_content)
-      expect(migrated_content).not_to include("addRSCManifestPlugin")
-      expect(GeneratorMessages.messages.join("\n"))
-        .to include("Reverted partial RSC manifest helper setup in #{config_path}")
+      expect(generator).not_to have_received(:say_status).with(:revert, config_path, :yellow)
+      expect(migrated_content).not_to eq(original_content)
+      expect(migrated_content).to include("const { addRSCManifestPlugin } = require('./rscManifestPlugin');")
+      expect(migrated_content).to include("addRSCManifestPlugin(clientConfig, {")
+      expect(migrated_content).not_to include("react-on-rails-rsc/WebpackPlugin")
+      expect(migrated_content).not_to include("new RSCWebpackPlugin")
     end
 
     it "migrates multiline server RSCWebpackPlugin calls to the manifest helper" do
@@ -3821,6 +3822,8 @@ describe RscGenerator, type: :generator do
           expect(content).to include("config.source_path is not set; no client references will be scanned.")
           expect(content).to include("RSC_CLIENT_REFERENCES_ENTRY_NAME")
           expect(content).to include("[RSC_CLIENT_REFERENCES_ENTRY_NAME]: requests")
+          expect(content).to include("if (!options.isServer) addClientReferencesToEntry")
+          expect(content).to include("bundlerConfig.plugins = bundlerConfig.plugins ?? []")
           expect(content).not_to include("Object.fromEntries")
           # Manifest must emit alternating [chunkId, filename] pairs (collectChunkGroupPairs),
           # and walk chunkGroups via getChunkModulesIterable to compute them.
