@@ -11,7 +11,7 @@ on:
   push:
     branches:
       - 'main'
-    # Always trigger on main; docs-only detection handles skipping heavy jobs
+    # Always trigger on main; non-runtime detection handles skipping heavy jobs
   pull_request:
     paths-ignore:
       - '**.md'
@@ -37,6 +37,7 @@ jobs:
     runs-on: ubuntu-22.04
     outputs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
+      non_runtime_only: ${{ steps.detect.outputs.non_runtime_only }}
       run_lint: ${{ steps.detect.outputs.run_lint }}
       run_js_tests: ${{ steps.detect.outputs.run_js_tests }}
       run_ruby_tests: ${{ steps.detect.outputs.run_ruby_tests }}
@@ -63,6 +64,7 @@ jobs:
             echo "run_dummy_tests=true" >> "$GITHUB_OUTPUT"
             echo "run_generators=true" >> "$GITHUB_OUTPUT"
             echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            echo "non_runtime_only=false" >> "$GITHUB_OUTPUT"
           else
             BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}"
             script/ci-changes-detector "$BASE_REF"
@@ -97,14 +99,14 @@ jobs:
 
   build-dummy-app-webpack-test-bundles:
     needs: [detect-changes, setup-integration-matrix]
-    # Skip only if: main push AND docs-only changes
+    # Skip only if: main push AND non-runtime-only changes
     # Otherwise run if: on main OR workflow_dispatch OR dummy tests needed
-    # This allows docs-only commits to skip heavy jobs while ensuring full CI on main for code changes
+    # This allows docs/comment-only commits to skip heavy jobs while ensuring full CI on main for code changes
     if: |
       !(
         github.event_name == 'push' &&
         github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.docs_only == 'true'
+        needs.detect-changes.outputs.non_runtime_only == 'true'
       ) && (
         github.ref == 'refs/heads/main' ||
         github.event_name == 'workflow_dispatch' ||
@@ -191,7 +193,7 @@ jobs:
       !(
         github.event_name == 'push' &&
         github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.docs_only == 'true'
+        needs.detect-changes.outputs.non_runtime_only == 'true'
       ) && (
         github.ref == 'refs/heads/main' ||
         github.event_name == 'workflow_dispatch' ||
