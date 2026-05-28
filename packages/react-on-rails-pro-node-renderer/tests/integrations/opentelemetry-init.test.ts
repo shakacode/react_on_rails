@@ -6,6 +6,8 @@ import {
   propagation as otelPropagation,
   trace as otelTrace,
 } from '@opentelemetry/api';
+// Static import is intentional: WORKER_SHUTDOWN_HOOKS_TIMEOUT_MS is a primitive
+// constant, so it is unaffected by jest.resetModules() in beforeEach.
 import { WORKER_SHUTDOWN_HOOKS_TIMEOUT_MS } from '../../src/integrations/api.js';
 
 const resetOpenTelemetryForTest = async () => {
