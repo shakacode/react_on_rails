@@ -349,7 +349,7 @@ jobs:
           set -e  # Exit on any error
           echo "🏃 Running Core benchmark suite..."
 
-          if ! $BENCH_CMD benchmarks/bench.rb; then
+          if ! BASE_URL="localhost:${BENCHMARK_PORT}" $BENCH_CMD benchmarks/bench.rb; then
             echo "❌ ERROR: Benchmark execution failed"
             exit 1
           fi
@@ -473,7 +473,7 @@ jobs:
           set -e
           echo "🏃 Running Pro benchmark suite..."
 
-          if ! PRO=true $BENCH_CMD benchmarks/bench.rb; then
+          if ! BASE_URL="localhost:${BENCHMARK_PORT}" PRO=true $BENCH_CMD benchmarks/bench.rb; then
             echo "❌ ERROR: Benchmark execution failed"
             exit 1
           fi
