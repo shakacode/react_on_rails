@@ -364,7 +364,8 @@ const collectClientReferenceFiles = (context, clientReferences = normalizeClient
     }
 
     const baseDirectory = globBaseDirectory(context, reference);
-    const relativePattern = `./${toPosixPath(path.relative(baseDirectory, absolutePath))}`;
+    const absoluteGlobPattern = absolutePath;
+    const relativePattern = `./${toPosixPath(path.relative(baseDirectory, absoluteGlobPattern))}`;
     walk(baseDirectory, { recursive: true, include: globToRegExp(relativePattern) });
   };
 

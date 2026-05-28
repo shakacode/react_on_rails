@@ -420,7 +420,7 @@ module ReactOnRails
           config_path, content, "serverWebpackConfig", fallback_import_pattern, is_server: true
         )
 
-        return if migrate_rsc_webpack_plugin_invocation?(
+        return if migrate_or_block_rsc_webpack_plugin?(
           config_path, content, "serverWebpackConfig", fallback_import_pattern, true
         )
 
@@ -530,7 +530,7 @@ module ReactOnRails
           config_path, content, "clientConfig", fallback_import_pattern, is_server: false
         )
 
-        return if migrate_rsc_webpack_plugin_invocation?(
+        return if migrate_or_block_rsc_webpack_plugin?(
           config_path, content, "clientConfig", fallback_import_pattern, false
         )
 
@@ -706,7 +706,7 @@ module ReactOnRails
         )
       end
 
-      def migrate_rsc_webpack_plugin_invocation?(
+      def migrate_or_block_rsc_webpack_plugin?(
         config_path,
         content,
         bundler_config_name,
@@ -722,10 +722,10 @@ module ReactOnRails
           fallback_import_pattern: fallback_import_pattern,
           is_server: is_server
         )
-        # Always returns true so the caller's `return if ...` exits whether migration
-        # succeeded or rolled back. Re-entering fresh setup after an ambiguous
-        # RSCWebpackPlugin invocation would compound an already-broken config; even a
-        # rolled-back attempt must block that path.
+        # Always returns true after seeing an RSCWebpackPlugin invocation so the
+        # caller's `return if ...` exits whether migration succeeded or rolled back.
+        # Re-entering fresh setup after an ambiguous invocation would compound an
+        # already-broken config; even a rolled-back attempt must block that path.
         true
       end
 
@@ -871,7 +871,10 @@ module ReactOnRails
       end
 
       def adjacent_blank_line_after_removed_import?(lines, import_index)
-        lines[import_index]&.strip&.empty? && (import_index.zero? || lines[import_index - 1].strip.empty?)
+        return false unless lines[import_index]&.strip&.empty?
+        return true if import_index.zero?
+
+        lines[import_index - 1].strip.empty?
       end
 
       def rsc_manifest_helper_import?(content)
