@@ -17,6 +17,7 @@ import { buildClientRenderer } from 'react-on-rails-rsc/client.node';
 import type { RailsContextWithServerStreamingCapabilities } from 'react-on-rails/types';
 import transformRSCStream from './transformRSCNodeStream.ts';
 import loadJsonFile from './loadJsonFile.ts';
+import { mergeRSCStreamDiagnosticError } from './rscDiagnostics.ts';
 
 type GetReactServerComponentOnServerProps = {
   componentName: string;
@@ -29,6 +30,7 @@ const createFromReactOnRailsNodeStream = async (
   stream: NodeJS.ReadableStream,
   reactServerManifestFileName: string,
   reactClientManifestFileName: string,
+  componentName: string,
 ) => {
   if (!clientRendererPromise) {
     clientRendererPromise = Promise.all([
@@ -45,8 +47,24 @@ const createFromReactOnRailsNodeStream = async (
   }
 
   const { createFromNodeStream } = await clientRendererPromise;
-  const transformedStream = transformRSCStream(stream);
-  return createFromNodeStream<React.ReactNode>(transformedStream);
+  let rscDiagnosticError: Error | undefined;
+  const transformedStream = transformRSCStream(stream, {
+    componentName,
+    onDiagnosticError(error) {
+      rscDiagnosticError = error;
+      console.error(error);
+    },
+  });
+
+  try {
+    const result = await createFromNodeStream<React.ReactNode>(transformedStream);
+    if (result instanceof Error && rscDiagnosticError) {
+      throw mergeRSCStreamDiagnosticError(result, rscDiagnosticError);
+    }
+    return result;
+  } catch (error: unknown) {
+    throw mergeRSCStreamDiagnosticError(error, rscDiagnosticError);
+  }
 };
 
 /**
@@ -89,6 +107,7 @@ const getReactServerComponent =
       rscPayloadStream,
       railsContext.reactServerClientManifestFileName,
       railsContext.reactClientManifestFileName,
+      componentName,
     );
   };
 

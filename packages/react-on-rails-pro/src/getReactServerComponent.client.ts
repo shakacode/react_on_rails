@@ -18,6 +18,7 @@ import { RailsContext } from 'react-on-rails/types';
 import { createRSCPayloadKey, fetch, wrapInNewPromise, extractErrorMessage } from './utils.ts';
 import sanitizeNonce from 'react-on-rails/@internal/sanitizeNonce';
 import LengthPrefixedStreamParser from './parseLengthPrefixedStream.ts';
+import { buildRSCStreamDiagnosticError, mergeRSCStreamDiagnosticError } from './rscDiagnostics.ts';
 
 declare global {
   interface Window {
@@ -56,7 +57,18 @@ const replayConsole = (consoleReplayScript: string, nonce?: string) => {
  *
  * Extracts raw Flight data for React, replays console from metadata.
  */
-const createFromFetch = async (fetchPromise: Promise<Response>, cspNonce?: string) => {
+const createFromFetch = async (
+  fetchPromise: Promise<Response>,
+  {
+    componentName,
+    cspNonce,
+    source,
+  }: {
+    componentName: string;
+    cspNonce?: string;
+    source: string;
+  },
+) => {
   const response = await fetchPromise;
   const { body } = response;
   if (!body) {
@@ -65,6 +77,14 @@ const createFromFetch = async (fetchPromise: Promise<Response>, cspNonce?: strin
 
   const nonce = sanitizeNonce(cspNonce);
   const parser = new LengthPrefixedStreamParser();
+  let rscDiagnosticError: Error | undefined;
+  const reportDiagnosticError = (metadata: Record<string, unknown>) => {
+    const diagnosticError = buildRSCStreamDiagnosticError(metadata, { componentName, source });
+    if (diagnosticError && !rscDiagnosticError) {
+      rscDiagnosticError = diagnosticError;
+      console.error(diagnosticError);
+    }
+  };
 
   const transformedStream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -77,6 +97,7 @@ const createFromFetch = async (fetchPromise: Promise<Response>, cspNonce?: strin
           done = readResult.done;
           if (readResult.value) {
             parser.feed(readResult.value, (content, metadata) => {
+              reportDiagnosticError(metadata);
               controller.enqueue(content);
               const consoleScript = (metadata.consoleReplayScript as string) ?? '';
               if (consoleScript) {
@@ -94,7 +115,16 @@ const createFromFetch = async (fetchPromise: Promise<Response>, cspNonce?: strin
   });
 
   const renderPromise = createFromReadableStream<React.ReactNode>(transformedStream);
-  return wrapInNewPromise(renderPromise);
+  return wrapInNewPromise(renderPromise)
+    .then((result) => {
+      if (result instanceof Error && rscDiagnosticError) {
+        throw mergeRSCStreamDiagnosticError(result, rscDiagnosticError);
+      }
+      return result;
+    })
+    .catch((error: unknown) => {
+      throw mergeRSCStreamDiagnosticError(error, rscDiagnosticError);
+    });
 };
 
 /**
@@ -134,7 +164,11 @@ const fetchRSC = ({
     const encodedParams = new URLSearchParams({ props: propsString }).toString();
     const fetchUrl = `/${strippedUrlPath}/${componentName}?${encodedParams}`;
 
-    return createFromFetch(fetch(fetchUrl), railsContext.cspNonce).catch((error: unknown) => {
+    return createFromFetch(fetch(fetchUrl), {
+      componentName,
+      cspNonce: railsContext.cspNonce,
+      source: fetchUrl,
+    }).catch((error: unknown) => {
       throw new Error(
         `Failed to fetch RSC payload for component "${componentName}" from "${fetchUrl}": ${extractErrorMessage(error)}`,
       );

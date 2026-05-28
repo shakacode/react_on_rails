@@ -710,10 +710,22 @@ module ReactOnRails
       raise ReactOnRails::PrerenderError.new(
         component_name: react_component_name,
         props: sanitized_props_string(props),
-        err: nil,
+        err: rendering_error_from_result(json_result),
         js_code: js_code,
         console_messages: json_result["consoleReplayScript"]
       )
+    end
+
+    def rendering_error_from_result(json_result)
+      rendering_error = json_result["renderingError"]
+      return unless rendering_error.is_a?(Hash)
+
+      message = rendering_error["message"]
+      return if message.blank?
+
+      error = StandardError.new(message)
+      error.set_backtrace(rendering_error["stack"].to_s.lines.map(&:chomp))
+      error
     end
 
     def should_raise_streaming_prerender_error?(chunk_json_result, render_options)

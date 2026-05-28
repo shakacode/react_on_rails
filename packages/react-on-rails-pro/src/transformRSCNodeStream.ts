@@ -15,6 +15,7 @@
 import { Readable, Transform } from 'stream';
 import safePipe from './safePipe.ts';
 import LengthPrefixedStreamParser from './parseLengthPrefixedStream.ts';
+import { buildRSCStreamDiagnosticError, RSCStreamDiagnosticsOptions } from './rscDiagnostics.ts';
 
 /**
  * Transforms an RSC Node.js stream for server-side processing.
@@ -30,13 +31,22 @@ import LengthPrefixedStreamParser from './parseLengthPrefixedStream.ts';
  * @param stream - The Node.js RSC payload stream
  * @returns A transformed stream compatible with React's SSR runtime
  */
-export default function transformRSCStream(stream: NodeJS.ReadableStream): NodeJS.ReadableStream {
+export default function transformRSCStream(
+  stream: NodeJS.ReadableStream,
+  diagnosticsOptions: RSCStreamDiagnosticsOptions = {},
+): NodeJS.ReadableStream {
   const parser = new LengthPrefixedStreamParser();
+  let reportedDiagnosticError = false;
 
   const htmlExtractor = new Transform({
     transform(chunk: Buffer, _, callback) {
       try {
-        parser.feed(chunk, (content) => {
+        parser.feed(chunk, (content, metadata) => {
+          const diagnosticError = buildRSCStreamDiagnosticError(metadata, diagnosticsOptions);
+          if (diagnosticError && !reportedDiagnosticError) {
+            reportedDiagnosticError = true;
+            diagnosticsOptions.onDiagnosticError?.(diagnosticError);
+          }
           this.push(content);
         });
         callback();

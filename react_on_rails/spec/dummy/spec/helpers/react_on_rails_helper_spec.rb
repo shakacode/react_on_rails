@@ -574,6 +574,29 @@ describe ReactOnRailsHelper do
         server_render_js("(function() { throw 42; })()", throw_js_errors: true)
       end.to raise_error(ReactOnRails::PrerenderError)
     end
+
+    it "includes streaming renderingError metadata in PrerenderError details" do
+      allow(ReactOnRails::Utils).to receive(:full_text_errors_enabled?).and_return(true)
+
+      chunk_result = {
+        "consoleReplayScript" => "",
+        "hasErrors" => true,
+        "renderingError" => {
+          "message" => "useState is not a function",
+          "stack" => <<~STACK.chomp
+            TypeError: useState is not a function
+                at CommentsToggle (/app/components/CommentsToggle.jsx:12:15)
+          STACK
+        }
+      }
+
+      expect do
+        helper.send(:raise_prerender_error, chunk_result, "CommentsToggle", {}, "generated js")
+      end.to raise_error(ReactOnRails::PrerenderError) { |error|
+        expect(error.message).to include("useState is not a function")
+        expect(error.message).to include("/app/components/CommentsToggle.jsx:12:15")
+      }
+    end
   end
 
   describe "#redux_store" do
