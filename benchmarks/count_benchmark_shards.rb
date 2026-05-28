@@ -1,33 +1,28 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require "json"
-require_relative "lib/benchmark_config"
-require_relative "lib/benchmark_routes"
+# Emits the GitHub Actions matrix `include:` payload for one benchmark suite.
+# Stdlib-only so the workflow can invoke it with the runner's system Ruby — no
+# Bundler, no Rails boot. The actual route discovery happens later inside each
+# benchmark-* job, where bench.rb has the proper Ruby + gem setup.
 
-PRO = ENV.fetch("PRO", "false") == "true"
-APP_DIR = PRO ? "react_on_rails_pro/spec/dummy" : "react_on_rails/spec/dummy"
-MAX_ROUTES_PER_SHARD = Integer(env_or_default("MAX_ROUTES_PER_SHARD", 60))
+require "json"
+
+SHARD_TOTAL = Integer(ENV.fetch("BENCHMARK_TOTAL_SHARDS"))
 SUITE_NAME = ENV.fetch("BENCHMARK_SUITE_NAME")
 SUITE_PREFIX = ENV.fetch("BENCHMARK_SUITE_PREFIX")
-ROUTES = env_or_default("ROUTES", nil)
 
-routes = benchmark_routes_for_app(APP_DIR, ROUTES)
-raise "No routes to benchmark" if routes.empty?
-
-validate_positive_integer(MAX_ROUTES_PER_SHARD, "MAX_ROUTES_PER_SHARD")
-
-shard_total = [(routes.length.to_f / MAX_ROUTES_PER_SHARD).ceil, 1].max
+raise "BENCHMARK_TOTAL_SHARDS must be positive (got #{SHARD_TOTAL})" unless SHARD_TOTAL.positive?
 
 matrix = {
-  include: Array.new(shard_total) do |index|
+  include: Array.new(SHARD_TOTAL) do |index|
     shard_number = index + 1
-    shard_label = "#{shard_number}/#{shard_total}"
-    shard_slug = "shard-#{shard_number}-of-#{shard_total}"
+    shard_label = "#{shard_number}/#{SHARD_TOTAL}"
+    shard_slug = "shard-#{shard_number}-of-#{SHARD_TOTAL}"
 
     {
       shard_index: index,
-      shard_total: shard_total,
+      shard_total: SHARD_TOTAL,
       shard_label: shard_label,
       shard_slug: shard_slug,
       suite_name: "#{SUITE_NAME} (shard #{shard_label})",
