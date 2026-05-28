@@ -41,7 +41,14 @@ const PromiseContainer = ({ name }: { name: string }) => {
   );
 };
 
-ReactOnRails.register({ PromiseContainer });
+const HooksWithoutClientDirective = () => {
+  const { useState } = React;
+  useState('client state');
+
+  return <p>Client hook in RSC runtime</p>;
+};
+
+ReactOnRails.register({ HooksWithoutClientDirective, PromiseContainer });
 
 const manifestFileDirectory = path.resolve(__dirname, '../src');
 const clientManifestPath = path.join(manifestFileDirectory, 'react-client-manifest.json');
@@ -157,4 +164,31 @@ test('[bug] catches logs outside the component during reading the stream', async
   expect(content1).not.toContain('From Interval');
   // Here's the bug
   expect(content1).toContain('Outside The Component');
+});
+
+test('explains likely missing use client directive when a server component calls a client hook', async () => {
+  const readable = ReactOnRails.serverRenderRSCReactComponent({
+    railsContext: {
+      reactClientManifestFileName: 'react-client-manifest.json',
+      reactServerClientManifestFileName: 'react-server-client-manifest.json',
+    } as unknown as RailsContextWithServerStreamingCapabilities,
+    name: 'HooksWithoutClientDirective',
+    renderingReturnsPromises: true,
+    throwJsErrors: true,
+    domNodeId: 'dom-id',
+    props: {},
+  });
+
+  let error: unknown;
+  try {
+    await text(readable);
+  } catch (e) {
+    error = e;
+  }
+
+  expect(error).toBeInstanceOf(Error);
+  expect((error as Error).message).toContain('HooksWithoutClientDirective');
+  expect((error as Error).message).toContain('client hook');
+  expect((error as Error).message).toContain('"use client";');
+  expect((error as Error).message).toContain('Original error: useState is not a function');
 });

@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Fixed
+
+- **[Pro]** **RSC client-hook runtime errors now explain the missing client boundary**: React on Rails Pro now rewrites RSC runtime hook failures such as `useState is not a function` with a diagnostic that names the registered component, points to the likely missing `"use client";` directive, and clarifies that `.client`/`.server` suffixes only control bundle placement. Fixes [Issue 3184](https://github.com/shakacode/react_on_rails/issues/3184).
+
 ### [16.7.0.rc.3] - 2026-05-25
 
 #### Breaking Changes
