@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require "open3"
+require "time"
 BOUNDARY = "0.95"
 MAX_SAMPLE = "64"
 BENCHER_URL = "https://bencher.dev/perf/react-on-rails-t8a9ncxo"
@@ -24,10 +25,6 @@ end
 
 SUITE_NAME = env!("BENCHMARK_SUITE_NAME")
 REPORT_MARKER = env!("BENCHER_REPORT_MARKER")
-# Cleanup pattern matches every sharded marker of this suite ("<!-- BENCHER_REPORT_CORE_SHARD_") so
-# topology changes (e.g. 2 shards → 3) don't strand old comments on the PR. Falls back to the literal
-# marker for unsharded suites (Pro Node Renderer).
-REPORT_MARKER_PREFIX = REPORT_MARKER[/\A<!-- BENCHER_REPORT_[A-Z_]+_SHARD_/] || REPORT_MARKER
 env!("BENCHER_API_TOKEN")
 BENCHMARK_JSON = ENV.fetch("BENCHMARK_JSON", "bench_results/benchmark.json")
 REPORT_HTML = ENV.fetch("BENCHER_REPORT_HTML", "bench_results/bencher_report.html")
@@ -149,21 +146,24 @@ def split_report_for_comments
   false
 end
 
-def stale_comment_ids
-  # startswith() pairs with split_html_report writing the marker at body start, so reviewers
-  # quoting the marker in their own comments aren't deleted as stale.
-  stdout, status = capture_command(
+def stale_comment_ids(before:)
+  # Marker + cutoff are passed via env so the jq filter reads them through `env.X`,
+  # avoiding the Ruby-#dump vs jq-string-escape mismatch that interpolated strings invite.
+  # The cutoff makes the GC skip comments the current run just posted (same marker).
+  stdout, stderr, status = Open3.capture3(
+    { "MARKER" => REPORT_MARKER, "CUTOFF_TS" => before },
     "gh", "api", "repos/#{ENV.fetch('GITHUB_REPOSITORY')}/issues/#{ENV.fetch('PR_NUMBER')}/comments",
     "--paginate",
-    "--jq", ".[] | select(.body | startswith(#{REPORT_MARKER_PREFIX.dump})) | .id"
+    "--jq", ".[] | select(.body | startswith(env.MARKER)) | select(.created_at < env.CUTOFF_TS) | .id"
   )
+  warn stderr unless stderr.empty?
   return [] unless status.success?
 
   stdout.lines.map(&:strip).reject(&:empty?)
 end
 
-def delete_stale_report_comments
-  stale_comment_ids.each do |comment_id|
+def delete_stale_report_comments(before:)
+  stale_comment_ids(before: before).each do |comment_id|
     puts "Deleting stale #{SUITE_NAME} Bencher report comment #{comment_id}"
     system("gh", "api", "-X", "DELETE", "repos/#{ENV.fetch('GITHUB_REPOSITORY')}/issues/comments/#{comment_id}")
   end
@@ -195,12 +195,14 @@ def replace_pr_comments
 
   return unless split_report_for_comments
 
-  # Post first, then GC stale comments. If every post fails, the prior run's comments stay
-  # visible — better than racing the user with an empty PR while the new report is broken.
+  # Capture cutoff before posting so the GC sweeps only pre-existing comments and leaves
+  # the chunks this run just posted intact. If every post fails the GC is skipped entirely
+  # and the prior run's comments stay visible.
+  cutoff_ts = Time.now.utc.iso8601
   posted_any, any_failed = post_report_comment_chunks
 
   if posted_any
-    delete_stale_report_comments
+    delete_stale_report_comments(before: cutoff_ts)
   else
     warn "No #{SUITE_NAME} chunks were posted successfully; keeping prior Bencher comments in place."
   end
