@@ -214,8 +214,8 @@ module ReactOnRailsPro
             bytes += chunk.bytesize
             if bytes > COMPRESSED_BODY_CAP
               raise ReactOnRailsPro::Error,
-                    "bundle download #{context} exceeded compressed body cap " \
-                    "(#{compressed_body_cap_label}); aborting"
+                    "#{context} exceeded compressed body cap " \
+                    "(#{compressed_body_cap_label}); aborting download"
             end
             yield chunk
           end
@@ -271,13 +271,8 @@ module ReactOnRailsPro
           http_for(uri, read_timeout: read_timeout).request(build_request(uri))
         end
 
-        def http_stream(uri, read_timeout: DEFAULT_READ_TIMEOUT_SECONDS)
-          response = nil
-          http_for(uri, read_timeout: read_timeout).request(build_request(uri)) do |streaming_response|
-            response = streaming_response
-            yield streaming_response
-          end
-          response
+        def http_stream(uri, read_timeout: DEFAULT_READ_TIMEOUT_SECONDS, &block)
+          http_for(uri, read_timeout: read_timeout).request(build_request(uri), &block)
         end
 
         def build_request(uri)
