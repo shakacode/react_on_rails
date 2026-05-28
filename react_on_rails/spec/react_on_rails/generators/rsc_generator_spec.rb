@@ -1208,6 +1208,79 @@ describe RscGenerator, type: :generator do
       expect(migrated_content).not_to include("RSCWebpackPlugin")
     end
 
+    it "rolls back manifest-helper migration when scoped sections are not ready after helper setup" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      original_content = File.read(File.join(destination_root, config_path))
+      allow(generator).to receive(:rsc_manifest_plugin_sections_ready?).and_return(false)
+      allow(generator).to receive(:say_status).and_call_original
+
+      generator.send(:update_client_webpack_config_for_rsc)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(generator).to have_received(:say_status).with(:revert, config_path, :yellow)
+      expect(migrated_content).to eq(original_content)
+      expect(migrated_content).not_to include("addRSCManifestPlugin")
+      expect(migrated_content).not_to include("const rscClientReferences")
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("Reverted partial RSC manifest helper setup in #{config_path}")
+    end
+
+    it "rolls back manifest-helper migration when helper import cannot be inserted" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { config } = require('shakapacker');
+          const { resolve } = require('path');
+          const RSCWebpackPlugin = require('react-on-rails-rsc/WebpackPlugin').RSCWebpackPlugin;
+
+          const rscClientReferences = {
+            directory: resolve(config.source_path),
+            recursive: true,
+            include: /\\.(js|mjs|cjs|ts|mts|cts|jsx|tsx)$/,
+          };
+
+          const configureClient = () => {
+            const clientConfig = { plugins: [] };
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      original_content = File.read(File.join(destination_root, config_path))
+      allow(generator).to receive(:say_status).and_call_original
+
+      generator.send(:update_client_webpack_config_for_rsc)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(generator).to have_received(:say_status).with(:revert, config_path, :yellow)
+      expect(migrated_content).to eq(original_content)
+      expect(migrated_content).not_to include("addRSCManifestPlugin")
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("Reverted partial RSC manifest helper setup in #{config_path}")
+    end
+
     it "migrates multiline server RSCWebpackPlugin calls to the manifest helper" do
       config_path = "config/webpack/serverWebpackConfig.js"
       simulate_existing_file(
@@ -3609,10 +3682,16 @@ describe RscGenerator, type: :generator do
           expect(content).to include("compilation.emitAsset")
           expect(content).to include("skipLeadingJavaScriptComments")
           expect(content).to include("entry.isSymbolicLink()")
+          expect(content).to include("isFileEntry")
           expect(content).to include("visitedDirectories")
+          expect(content).to include("normalizeClientReferenceList")
+          expect(content).to include("/\\.(?:js|mjs|cjs|jsx|ts|mts|cts|tsx)$/")
+          expect(content).to include("config.source_path is not set; no client references will be scanned.")
           expect(content).to include("Object.fromEntries")
           expect(content).to include("getModuleChunksIterable")
           expect(content).to include("Array.from(chunk.files")
+          expect(content).to include("compilation.warnings.push")
+          expect(content).to include("'use client' file was not found in compilation modules")
           expect(content).to include("publicPath !== 'auto'")
           expect(content).not_to include("chunks: []")
         end

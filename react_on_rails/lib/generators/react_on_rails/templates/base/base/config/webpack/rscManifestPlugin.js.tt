@@ -4,7 +4,7 @@ const url = require('url');
 const { config } = require('shakapacker');
 const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
 
-const CLIENT_REFERENCE_EXTENSIONS = /\.(?:js|mjs|cjs|jsx|ts|tsx)$/;
+const CLIENT_REFERENCE_EXTENSIONS = /\.(?:js|mjs|cjs|jsx|ts|mts|cts|tsx)$/;
 const DEFAULT_EXCLUDED_DIRECTORIES = new Set(['node_modules', 'public', 'tmp', 'log', 'storage']);
 
 const toPosixPath = (filePath) => filePath.split(path.sep).join('/');
@@ -70,13 +70,23 @@ const hasUseClientDirective = (source) => {
 
 const normalizeClientReferences = () => {
   const defaultDirectories = [config.source_path, ...(config.additional_paths || [])].filter(Boolean);
-  const directories = defaultDirectories.length > 0 ? defaultDirectories : ['.'];
+  const directories = defaultDirectories;
+  if (directories.length === 0) {
+    // eslint-disable-next-line no-console
+    console.warn('[rscManifestPlugin] config.source_path is not set; no client references will be scanned.');
+  }
 
   return directories.map((directory) => ({
     directory,
     recursive: true,
     include: CLIENT_REFERENCE_EXTENSIONS,
   }));
+};
+
+const normalizeClientReferenceList = (clientReferences) => {
+  if (clientReferences == null) return normalizeClientReferences();
+
+  return Array.isArray(clientReferences) ? clientReferences : [clientReferences];
 };
 
 const resolveReferenceDirectory = (context, directory) =>
@@ -101,12 +111,21 @@ const isDirectoryEntry = (entry, absolutePath) => {
   }
 };
 
+const isFileEntry = (entry, absolutePath) => {
+  if (entry.isFile()) return true;
+  if (!entry.isSymbolicLink()) return false;
+
+  try {
+    return fs.statSync(absolutePath).isFile();
+  } catch {
+    return false;
+  }
+};
+
 const collectClientReferenceFiles = (context, clientReferences = normalizeClientReferences()) => {
   const files = new Set();
 
   const collectFile = (filePath) => {
-    if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) return;
-
     const source = fs.readFileSync(filePath, 'utf8');
     if (hasUseClientDirective(source)) {
       files.add(path.resolve(filePath));
@@ -130,6 +149,8 @@ const collectClientReferenceFiles = (context, clientReferences = normalizeClient
         return;
       }
 
+      if (!isFileEntry(entry, absolutePath)) return;
+
       const requestPath = `./${toPosixPath(path.relative(directory, absolutePath))}`;
       if (
         (testPattern(reference.include, requestPath) || testPattern(reference.include, absolutePath)) &&
@@ -141,9 +162,12 @@ const collectClientReferenceFiles = (context, clientReferences = normalizeClient
     });
   };
 
-  clientReferences.forEach((reference) => {
+  normalizeClientReferenceList(clientReferences).forEach((reference) => {
     if (typeof reference === 'string') {
-      collectFile(path.isAbsolute(reference) ? reference : path.resolve(context, reference));
+      const absolutePath = path.isAbsolute(reference) ? reference : path.resolve(context, reference);
+      if (!fs.existsSync(absolutePath) || !fs.statSync(absolutePath).isFile()) return;
+
+      collectFile(absolutePath);
       return;
     }
 
@@ -269,6 +293,20 @@ class RspackRSCManifestPlugin {
               module.modules.forEach((concatenatedModule) =>
                 recordModule(moduleId, concatenatedModule, module),
               );
+            }
+          }
+
+          if (process.env.NODE_ENV !== 'production') {
+            const manifestedUrls = new Set(Object.keys(filePathToModuleMetadata));
+            for (const filePath of this.clientReferenceFiles) {
+              const fileUrl = url.pathToFileURL(filePath).href;
+              if (!manifestedUrls.has(fileUrl)) {
+                compilation.warnings.push(
+                  new Error(
+                    `[RspackRSCManifestPlugin] 'use client' file was not found in compilation modules: ${filePath}`,
+                  ),
+                );
+              }
             }
           }
 

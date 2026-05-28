@@ -518,14 +518,23 @@ module ReactOnRails
 
       def migrate_rsc_webpack_plugin_to_manifest_helper(config_path, content, bundler_config_name:,
                                                         fallback_import_pattern:, is_server:)
+        original_content = content
         update_existing_rsc_webpack_config(config_path, content, is_server: is_server)
         content = File.read(File.join(destination_root, config_path))
-        return unless rsc_manifest_plugin_sections_ready?(content, is_server: is_server)
-        return unless replace_rsc_webpack_plugin_pushes_with_helper(config_path, content, bundler_config_name,
-                                                                    is_server: is_server)
+        unless rsc_manifest_plugin_sections_ready?(content, is_server: is_server)
+          rollback_incomplete_rsc_manifest_setup(config_path, original_content)
+          return
+        end
+        unless replace_rsc_webpack_plugin_pushes_with_helper(config_path, content, bundler_config_name,
+                                                             is_server: is_server)
+          warn_rsc_manifest_helper_migration_failed(config_path)
+          return
+        end
 
         content = File.read(File.join(destination_root, config_path))
-        replace_rsc_webpack_plugin_import_with_helper(config_path, content, fallback_import_pattern)
+        return if replace_rsc_webpack_plugin_import_with_helper(config_path, content, fallback_import_pattern)
+
+        rollback_incomplete_rsc_manifest_setup(config_path, original_content)
       end
 
       def rsc_manifest_plugin_sections_ready?(content, is_server:)
@@ -575,9 +584,18 @@ module ReactOnRails
       def replace_rsc_webpack_plugin_import_with_helper(config_path, content, fallback_import_pattern)
         if content.match?(RSC_WEBPACK_PLUGIN_IMPORT_PATTERN)
           gsub_file(config_path, RSC_WEBPACK_PLUGIN_IMPORT_PATTERN, RSC_MANIFEST_HELPER_IMPORT)
-        else
-          add_rsc_manifest_helper_import(config_path, content, fallback_import_pattern)
+          return true
         end
+
+        add_rsc_manifest_helper_import(config_path, content, fallback_import_pattern)
+      end
+
+      def warn_rsc_manifest_helper_migration_failed(config_path)
+        GeneratorMessages.add_warning(
+          "Skipped RSC manifest helper migration for #{config_path}: no RSCWebpackPlugin push calls could be " \
+          "rewritten automatically. Scoped clientReferences setup was preserved; please migrate the plugin " \
+          "call to addRSCManifestPlugin manually."
+        )
       end
 
       def add_rsc_manifest_helper_import(config_path, content, fallback_import_pattern)
