@@ -770,7 +770,8 @@ jobs:
           SUMMARY=""
           if [ -f bench_results/summary.txt ]; then
             FORMATTED=$(column -t -s $'\t' "bench_results/summary.txt" 2>/dev/null) || FORMATTED=$(cat "bench_results/summary.txt")
-            SUMMARY=$(printf "\n### Benchmark Summary\n\n\`\`\`\n%s\n\`\`\`" "$FORMATTED")
+            # shellcheck disable=SC2016
+            SUMMARY=$(printf '\n### Benchmark Summary\n\n```\n%s\n```' "$FORMATTED")
           fi
 
           if [ -n "$EXISTING_ISSUE" ]; then
