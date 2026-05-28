@@ -44,40 +44,39 @@ Ensure you're using React 19 in your `package.json`:
 
 ### 2. Prepare Your React Components
 
-Create async React components that return a promise. Use the `Suspense` component to render a fallback UI while the component is loading.
+Create React components that receive data as props from Rails. Use `<Suspense>` boundaries to define which sections of the page stream independently via `renderToPipeableStream`.
 
 ```jsx
 // app/javascript/components/MyStreamingComponent.jsx
 import React, { Suspense } from 'react';
 
-const fetchData = async () => {
-  // Simulate API call
-  const response = await fetch('api/endpoint');
-  return response.json();
-};
-
-const MyStreamingComponent = () => {
+const MyStreamingComponent = ({ greeting, posts }) => {
   return (
     <>
       <header>
-        <h1>Streaming Server Rendering</h1>
+        <h1>{greeting}</h1>
       </header>
       <Suspense fallback={<div>Loading...</div>}>
-        <SlowDataComponent />
+        <PostList posts={posts} />
       </Suspense>
     </>
   );
 };
 
-const SlowDataComponent = async () => {
-  const data = await fetchData();
-  return <div>{data}</div>;
+const PostList = ({ posts }) => {
+  return (
+    <ul>
+      {posts.map((post) => (
+        <li key={post.id}>{post.title}</li>
+      ))}
+    </ul>
+  );
 };
 
 export default MyStreamingComponent;
 ```
 
-> **Note:** The `async () => { ... }` function component pattern (`SlowDataComponent` above) is a React Server Components feature. If you are using streaming SSR without RSC, use a data-fetching library (such as React Query or SWR) with `<Suspense>` instead. For RSC-based streaming (which does support async components), see the [RSC tutorial](./react-server-components/tutorial.md).
+> **React on Rails note:** In React on Rails, database queries, authentication, and API calls happen on the Rails side — in controllers and models. Components receive the results as props via [`stream_react_component`](../oss/migrating/rsc-data-fetching.md#data-fetching-in-react-on-rails-pro), and HTML streams to the browser as React renders the component tree. Components do not fetch data directly. See [RSC Migration: Data Fetching Patterns](../oss/migrating/rsc-data-fetching.md) for the full explanation.
 
 ```jsx
 // app/javascript/packs/registration.jsx
@@ -92,7 +91,10 @@ ReactOnRails.register({ MyStreamingComponent });
 ```erb
 <!-- app/views/example/show.html.erb -->
 
-<%= stream_react_component('MyStreamingComponent', props: { greeting: 'Hello, Streaming World!' }) %>
+<%= stream_react_component('MyStreamingComponent', props: {
+  greeting: 'Hello, Streaming World!',
+  posts: @posts.as_json(only: [:id, :title])
+}) %>
 
 <footer>
   <p>Footer content</p>
@@ -113,6 +115,7 @@ class ExampleController < ApplicationController
   # but you can include it explicitly if you prefer.
 
   def show
+    @posts = Post.recent.limit(20)
     stream_view_containing_react_components(template: 'example/show')
   end
 end
@@ -146,11 +149,11 @@ When a user visits the page, they'll experience the following sequence:
 
 For example, with our `MyStreamingComponent`, the sequence might be:
 
-1. The initial HTML includes the header, footer, and loading state.
+1. The initial HTML includes the header, footer, and Suspense placeholder.
 
 ```html
 <header>
-  <h1>Streaming Server Rendering</h1>
+  <h1>Hello, Streaming World!</h1>
 </header>
 <template id="s0">
   <div>Loading...</div>
@@ -160,11 +163,14 @@ For example, with our `MyStreamingComponent`, the sequence might be:
 </footer>
 ```
 
-2. As the component resolves, HTML chunks are streamed to the browser:
+2. As `renderToPipeableStream` finishes rendering the post list, the HTML chunk is streamed to the browser:
 
 ```html
 <template hidden id="b0">
-  <div>[Fetched data]</div>
+  <ul>
+    <li>First Post</li>
+    <li>Second Post</li>
+  </ul>
 </template>
 
 <script>

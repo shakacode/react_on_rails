@@ -38,6 +38,8 @@ SSR Streaming sends HTML to the browser in chunks as it’s generated, enabling 
 - **50% lower** server response time with Server Components [[5]]
 - **15% improvement** in Core Web Vitals and **23% reduction** in Time to First Byte at Airbnb after RSC migration [[5]]
 
+> **React on Rails note:** These performance benefits carry over to React on Rails Pro. In React on Rails, data delivery is prop-based — Rails controllers handle database queries, authentication, and caching, then pass data to components as props via [`stream_react_component`](../../oss/migrating/rsc-data-fetching.md#data-fetching-in-react-on-rails-pro). Components do not fetch data directly. See [RSC Migration: Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md).
+
 ---
 
 Adopting these features in React on Rails Pro will help you deliver faster, leaner, and more SEO‑friendly applications with fewer client‑side resources.
