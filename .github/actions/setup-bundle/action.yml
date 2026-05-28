@@ -37,6 +37,13 @@ runs:
           exit 1
         fi
 
+    - name: Install libyaml-dev
+      # Required by psych (Ruby's YAML parser). Without it Ruby falls back to a gem load
+      # path that pulls in date_core.so and fails with cryptic glibc errors when the bundle
+      # cache was populated on a different ubuntu image.
+      shell: bash
+      run: sudo apt-get install -y libyaml-dev
+
     - name: Restore Ruby gems cache
       id: restore-ruby-gems-cache
       uses: actions/cache/restore@v5

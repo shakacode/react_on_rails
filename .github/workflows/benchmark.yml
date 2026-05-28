@@ -93,7 +93,13 @@ jobs:
     permissions:
       contents: read
       actions: read
-    runs-on: ubuntu-22.04
+    # Must match benchmark-* jobs' runner image so the setup-bundle cache (whose key only
+    # carries `runner.os` = "Linux") doesn't bleed native gems across glibc versions.
+    runs-on: ubuntu-latest
+    env:
+      # `bundle exec rails routes` boots the Pro dummy app; some Pro initializers refuse
+      # to start without a license. Mirror the value the benchmark-pro / benchmark-pro-node-renderer jobs use.
+      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
     outputs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
       run_core_benchmarks: ${{ steps.benchmark-outputs.outputs.run_core_benchmarks }}
