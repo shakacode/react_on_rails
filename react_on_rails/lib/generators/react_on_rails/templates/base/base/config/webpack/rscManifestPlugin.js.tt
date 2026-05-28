@@ -102,6 +102,7 @@ const globToRegExpSource = (glob) => {
       }
       // eslint-disable-next-line no-console
       console.warn(`[rscManifestPlugin] Unmatched '{' in glob pattern at position ${index}: '${glob}'`);
+      // Treat unmatched opening braces as literal glob characters by falling through.
     }
 
     if (char === '[') {

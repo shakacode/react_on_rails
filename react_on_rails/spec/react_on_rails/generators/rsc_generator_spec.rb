@@ -4454,6 +4454,7 @@ describe RscGenerator, type: :generator do
           expect(content).to include("const globToRegExpSource")
           expect(content).to include(".map(globToRegExpSource)")
           expect(content).to include("Unmatched '{' in glob pattern")
+          expect(content).to include("Treat unmatched opening braces as literal glob characters")
           expect(content).to include("firstClosable")
           expect(content).to include("Ignoring invalid glob pattern")
           expect(content).to include("Consider adding an explicit base path")
