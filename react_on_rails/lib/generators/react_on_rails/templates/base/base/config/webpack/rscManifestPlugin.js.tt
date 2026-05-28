@@ -246,8 +246,6 @@ const resolveRealPath = (filePath) => {
   }
 };
 
-const resolveRealDirectory = resolveRealPath;
-
 const statSymbolicLink = (absolutePath) => {
   try {
     return fs.statSync(absolutePath);
@@ -295,9 +293,7 @@ const collectClientReferenceFiles = (context, clientReferences = normalizeClient
   };
 
   const walk = (directory, reference, visitedDirectories = new Set(), rootDirectory = directory) => {
-    if (!fs.existsSync(directory)) return;
-
-    const realDirectory = resolveRealDirectory(directory);
+    const realDirectory = resolveRealPath(directory);
     if (visitedDirectories.has(realDirectory)) return;
     visitedDirectories.add(realDirectory);
 
@@ -406,6 +402,12 @@ const clientReferenceImportRequests = (context, clientReferenceFiles, clientRefe
   ...clientReferenceRequests,
 ];
 
+const clientReferenceEntry = (requests) => ({
+  import: requests,
+  // Keep the synthetic client-reference entry out of the fixed server-bundle.js output.
+  filename: `${RSC_CLIENT_REFERENCES_ENTRY_NAME}.js`,
+});
+
 const addClientReferencesToEntry = (bundlerConfig, clientReferenceFiles, clientReferenceRequests) => {
   if (clientReferenceFiles.length === 0 && clientReferenceRequests.length === 0) return;
 
@@ -419,7 +421,7 @@ const addClientReferencesToEntry = (bundlerConfig, clientReferenceFiles, clientR
         // webpack/rspack name a bare string/array entry "main"; keep that implicit name
         // when adding the synthetic client-reference entry.
         main: entryValue,
-        [RSC_CLIENT_REFERENCES_ENTRY_NAME]: requests,
+        [RSC_CLIENT_REFERENCES_ENTRY_NAME]: clientReferenceEntry(requests),
       };
     }
 
@@ -430,12 +432,12 @@ const addClientReferencesToEntry = (bundlerConfig, clientReferenceFiles, clientR
         ...entryValue,
         [RSC_CLIENT_REFERENCES_ENTRY_NAME]: existingReferencesEntry
           ? appendImports(existingReferencesEntry, requests)
-          : requests,
+          : clientReferenceEntry(requests),
       };
     }
 
     return {
-      [RSC_CLIENT_REFERENCES_ENTRY_NAME]: requests,
+      [RSC_CLIENT_REFERENCES_ENTRY_NAME]: clientReferenceEntry(requests),
     };
   };
 
@@ -622,8 +624,8 @@ const addRSCManifestPlugin = (bundlerConfig, options) => {
       options.clientReferences,
     );
     // Server and client manifest builds share the same synthetic-entry injection.
-    // This keeps client-only modules in the graph for server manifest generation
-    // without executing them as part of the Node `server-bundle` entry at startup.
+    // The synthetic entry has its own filename so fixed server output settings and
+    // LimitChunkCountPlugin do not fold client-only modules into server-bundle.js.
     addClientReferencesToEntry(bundlerConfig, clientReferenceFiles, clientReferenceRequests);
     bundlerConfig.plugins = bundlerConfig.plugins ?? [];
     bundlerConfig.plugins.push(

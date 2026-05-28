@@ -1373,6 +1373,10 @@ describe RscGenerator, type: :generator do
       expect(migrated_content.scan("./rscManifestPlugin").length).to eq(1)
       expect(migrated_content).not_to include("react-on-rails-rsc/WebpackPlugin")
       expect(migrated_content).to include("addRSCManifestPlugin(clientConfig, {")
+      expect(migrated_content).to include(
+        "const { addRSCManifestPlugin } = require('./rscManifestPlugin');\n\n" \
+        "const rscClientReferences = { directory: './app/javascript' };"
+      )
     end
 
     it "inserts a missing helper import when the client helper call already exists" do
@@ -4233,9 +4237,9 @@ describe RscGenerator, type: :generator do
           expect(content).to include("config.source_path is not set; no client references will be scanned.")
           expect(content).to include("Skipped unreadable directory")
           expect(content).to include("RSC_CLIENT_REFERENCES_ENTRY_NAME")
-          expect(content).to include("[RSC_CLIENT_REFERENCES_ENTRY_NAME]: requests")
-          expect(content).to include("without executing")
-          expect(content).to include("Node `server-bundle` entry")
+          expect(content).to include("[RSC_CLIENT_REFERENCES_ENTRY_NAME]: clientReferenceEntry(requests)")
+          expect(content).to include("filename: `${RSC_CLIENT_REFERENCES_ENTRY_NAME}.js`")
+          expect(content).to include("do not fold client-only modules into server-bundle.js")
           expect(content).not_to include("'server-bundle': appendImports(entryValue['server-bundle'], requests)")
           expect(content).to include("Server and client manifest builds share the same synthetic-entry injection")
           expect(content).to include(

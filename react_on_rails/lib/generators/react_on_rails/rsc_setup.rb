@@ -814,6 +814,7 @@ module ReactOnRails
         return unless content.match?(RSC_WEBPACK_PLUGIN_IMPORT_PATTERN)
 
         gsub_file(config_path, RSC_WEBPACK_PLUGIN_IMPORT_PATTERN, "")
+        gsub_file(config_path, /\n{3,}/, "\n\n")
       end
 
       def rsc_manifest_helper_import?(content)
