@@ -5,6 +5,22 @@ require_relative "../spec_helper"
 describe ReactOnRails::TestHelper::WebpackAssetsCompiler do
   describe "#ensureAssetsCompiled" do
     let(:invalid_command) { "sh -c 'exit 1'" }
+    let(:valid_command) { "RAILS_ENV=test bin/shakapacker" }
+
+    context "when assets compiler command succeeds" do
+      before do
+        allow(ReactOnRails.configuration)
+          .to receive(:build_test_command)
+          .and_return(valid_command)
+        allow(ReactOnRails::Utils).to receive(:invoke_and_exit_if_failed)
+      end
+
+      it "prints bundler-neutral build messages" do
+        expect do
+          described_class.new.compile_assets
+        end.to output("\nBuilding assets...\nCompleted building assets.\n").to_stdout
+      end
+    end
 
     context "when assets compiler command is invalid" do
       before do
@@ -29,7 +45,7 @@ describe ReactOnRails::TestHelper::WebpackAssetsCompiler do
         escaped_cmd = Regexp.escape(invalid_command)
         expected_pattern = Regexp.new(
           "React on Rails FATAL ERROR!.*" \
-          "React on Rails: Error building webpack assets!.*" \
+          "React on Rails: Error building test assets!.*" \
           "cmd: cd \"#{escaped_root}\" && #{escaped_cmd}.*" \
           "exitstatus: 1",
           Regexp::MULTILINE
