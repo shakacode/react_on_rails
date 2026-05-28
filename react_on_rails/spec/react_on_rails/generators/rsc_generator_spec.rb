@@ -1415,6 +1415,39 @@ describe RscGenerator, type: :generator do
       expect(generator.send(:check_rsc_client_config)).to eq([])
     end
 
+    it "inserts missing scoped client references when an existing client helper call references them" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { config } = require('shakapacker');
+          const { resolve } = require('path');
+          const commonWebpackConfig = require('./commonWebpackConfig');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            delete clientConfig.entry['server-bundle'];
+            addRSCManifestPlugin(clientConfig, {
+              isServer: false,
+              clientReferences: rscClientReferences,
+            });
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      generator.send(:update_client_webpack_config_for_rsc)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).to include("const rscClientReferences = {")
+      expect(migrated_content).to include("directory: resolve(config.source_path)")
+      expect(migrated_content).to include("const { addRSCManifestPlugin } = require('./rscManifestPlugin');")
+      expect(generator.send(:check_rsc_client_config)).to eq([])
+    end
+
     it "does not treat a commented helper import as a live import" do
       config_path = "config/webpack/clientWebpackConfig.js"
       simulate_existing_file(
@@ -1509,6 +1542,45 @@ describe RscGenerator, type: :generator do
       migrated_content = File.read(File.join(destination_root, config_path))
       expect(migrated_content).to include("const { addRSCManifestPlugin } = require('./rscManifestPlugin');")
       expect(migrated_content.scan("addRSCManifestPlugin(serverWebpackConfig").length).to eq(1)
+      expect(generator.send(:check_rsc_server_config)).to eq([])
+    end
+
+    it "inserts missing scoped client references when an existing server helper call references them" do
+      config_path = "config/webpack/serverWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { config } = require('shakapacker');
+          const { resolve } = require('path');
+          const bundler = config.assets_bundler === 'rspack'
+            ? require('@rspack/core')
+            : require('webpack');
+
+          const configureServer = (rscBundle = false) => {
+            const serverWebpackConfig = { plugins: [] };
+            if (!rscBundle) {
+              addRSCManifestPlugin(serverWebpackConfig, {
+                isServer: true,
+                clientReferences: rscClientReferences,
+              });
+            }
+            serverWebpackConfig.plugins.unshift(
+              new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }),
+            );
+
+            return serverWebpackConfig;
+          };
+
+          module.exports = configureServer;
+        JS
+      )
+
+      generator.send(:update_server_webpack_config_for_rsc)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).to include("const rscClientReferences = {")
+      expect(migrated_content).to include("directory: resolve(config.source_path)")
+      expect(migrated_content).to include("const { addRSCManifestPlugin } = require('./rscManifestPlugin');")
       expect(generator.send(:check_rsc_server_config)).to eq([])
     end
 

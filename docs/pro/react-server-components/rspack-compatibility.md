@@ -102,7 +102,10 @@ To test RSC with Rspack in your project:
    Shakapacker source paths while the Rspack config is evaluated. Editing an existing
    `'use client'` file is picked up by normal rebuilds, but adding a brand-new client
    component while `rspack serve` is already running may require restarting the dev server
-   so the helper can add that file to the bundle entries.
+   so the helper can add that file to the bundle entries. This scan is synchronous and runs
+   once in each generated client/server config at startup, so very large source trees can add
+   bundler startup time. Missing-reference warnings are deduped for the dev-server session; if
+   a warned reference later fixes and regresses, restart the dev server to see that warning again.
 
 4. **Wildcard named-export tracking**: The Rspack helper records each client reference with
    `name: '*'` rather than enumerating individual named exports through `compilation.moduleGraph`

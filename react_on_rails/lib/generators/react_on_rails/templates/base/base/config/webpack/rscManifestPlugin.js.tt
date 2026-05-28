@@ -11,6 +11,7 @@ const CLIENT_REFERENCE_EXTENSIONS = /\.(?:js|mjs|cjs|jsx|ts|mts|cts|tsx)$/;
 const RSC_CLIENT_REFERENCES_ENTRY_NAME = 'rsc-client-references';
 const DEFAULT_EXCLUDED_DIRECTORIES = new Set(['node_modules', 'public', 'tmp', 'log', 'storage']);
 const GLOB_MAGIC_PATTERN = /[*?\[\]{}]/;
+// `a` followed by start-of-input is impossible, so this rejects every candidate.
 const NEVER_MATCH_PATTERN = /a^/;
 
 const toPosixPath = (filePath) => filePath.split(path.sep).join('/');
@@ -437,7 +438,8 @@ const addClientReferencesToEntry = (bundlerConfig, clientReferenceFiles, clientR
     if (typeof entryValue === 'string' || Array.isArray(entryValue) || isEntryDescription(entryValue)) {
       return {
         // webpack/rspack name a bare string/array entry "main"; keep that implicit name
-        // when adding the synthetic client-reference entry.
+        // when adding the synthetic client-reference entry. This promotes the entry
+        // to an explicit key, so [name] output templates can surface "main".
         main: entryValue,
         [RSC_CLIENT_REFERENCES_ENTRY_NAME]: clientReferenceEntry(requests),
       };

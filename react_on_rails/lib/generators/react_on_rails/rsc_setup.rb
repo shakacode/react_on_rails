@@ -417,7 +417,7 @@ module ReactOnRails
 
         # Skip if the current helper-based RSC manifest wiring is already configured.
         return if existing_rsc_manifest_helper_invocation_handled?(
-          config_path, content, "serverWebpackConfig", fallback_import_pattern
+          config_path, content, "serverWebpackConfig", fallback_import_pattern, is_server: true
         )
 
         return if migrate_rsc_webpack_plugin_invocation?(
@@ -528,7 +528,7 @@ module ReactOnRails
 
         # Skip if the current helper-based RSC manifest wiring is already configured.
         return if existing_rsc_manifest_helper_invocation_handled?(
-          config_path, content, "clientConfig", fallback_import_pattern
+          config_path, content, "clientConfig", fallback_import_pattern, is_server: false
         )
 
         return if migrate_rsc_webpack_plugin_invocation?(
@@ -719,13 +719,36 @@ module ReactOnRails
         config_path,
         content,
         bundler_config_name,
-        fallback_import_pattern
+        fallback_import_pattern,
+        is_server:
       )
         return false unless rsc_manifest_helper_invocation?(content, bundler_config_name)
 
         warn_rsc_manifest_helper_import_missing(config_path) unless
           add_rsc_manifest_helper_import(config_path, content, fallback_import_pattern)
+        content = File.read(File.join(destination_root, config_path))
+        ensure_scoped_rsc_client_references_for_existing_helper(
+          config_path, content, bundler_config_name, is_server: is_server
+        )
         true
+      end
+
+      def ensure_scoped_rsc_client_references_for_existing_helper(
+        config_path,
+        content,
+        bundler_config_name,
+        is_server:
+      )
+        return unless rsc_manifest_helper_uses_scoped_client_references?(content, bundler_config_name)
+        return if scoped_rsc_client_references_defined?(content)
+
+        ensure_rsc_client_references_setup(config_path, content, is_server: is_server)
+      end
+
+      def rsc_manifest_helper_uses_scoped_client_references?(content, bundler_config_name)
+        rsc_manifest_helper_option_sections(content, bundler_config_name).any? do |body|
+          rsc_plugin_body_has_top_level_scoped_client_references?(body)
+        end
       end
 
       def warn_rsc_manifest_helper_import_missing(config_path)
