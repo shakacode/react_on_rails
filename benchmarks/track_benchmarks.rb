@@ -122,7 +122,6 @@ def run_bencher(branch, start_point_args)
 end
 
 def retry_without_start_point_hash?(stderr, exit_code)
-  # \bAlerts?\b avoids false matches on URL paths like "/alerts/..." that Bencher prints in stderr.
   exit_code != 0 &&
     stderr.match?(/Head Version.*not found/) &&
     !stderr.match?(/\bAlerts?\b|threshold violation|boundary violation/i)
@@ -144,8 +143,8 @@ def post_report_to_summary
 end
 
 def split_report_for_comments
-  # Clear leftover chunks from prior runs so post_report_comment_chunks doesn't
-  # mix fresh output with stale data (matters on self-hosted/cached runners).
+  # Clear leftover chunks before splitting so a shorter new report doesn't leave
+  # numbered chunks from the previous run lying around for the post step to pick up.
   Dir.glob("#{CHUNK_PREFIX}*.html").each { |path| File.delete(path) }
   return true if system({ "BENCHER_REPORT_MARKER" => REPORT_MARKER },
                         "ruby", "benchmarks/split_html_report.rb", REPORT_HTML, CHUNK_PREFIX)

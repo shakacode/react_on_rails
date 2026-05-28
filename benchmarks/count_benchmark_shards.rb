@@ -3,8 +3,7 @@
 
 # Emits the GitHub Actions matrix `include:` payload for one benchmark suite.
 # Stdlib-only so the workflow can invoke it with the runner's system Ruby — no
-# Bundler, no Rails boot. The actual route discovery happens later inside each
-# benchmark-* job, where bench.rb has the proper Ruby + gem setup.
+# Bundler, no Rails boot.
 
 require "json"
 

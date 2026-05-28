@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-# Shared benchmark route discovery helpers.
-
 require "open3"
 
 def route_has_required_params?(path)
@@ -16,7 +14,7 @@ end
 def sanitize_route_name(route)
   name = strip_optional_params(route).gsub(%r{^/}, "").tr("/", "_")
   name = "root" if name.empty?
-  # Replace invalid characters: " : < > | * ? \r \n $ ` ; & ( ) [ ] { } ! #
+  # Strip shell metacharacters and GitHub Actions artifact-name disallowed characters.
   name.gsub(/[":.<>|*?\r\n$`;&#!()\[\]{}]+/, "_").squeeze("_").gsub(/^_|_$/, "")
 end
 

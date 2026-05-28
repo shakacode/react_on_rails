@@ -17,7 +17,6 @@ BMF_SUFFIX = PRO ? ": Pro" : ": Core"
 BENCHMARK_SHARD_INDEX = Integer(env_or_default("BENCHMARK_SHARD_INDEX", 0))
 BENCHMARK_TOTAL_SHARDS = Integer(env_or_default("BENCHMARK_TOTAL_SHARDS", 1))
 
-# Local wrapper for add_summary_line to use local constant
 def add_to_summary(*parts)
   add_summary_line(SUMMARY_TXT, *parts)
 end
@@ -30,7 +29,6 @@ def shard_benchmark_routes(routes, shard_index, total_shards)
   end
 end
 
-# Get all routes to benchmark
 all_routes = benchmark_routes_for_app(APP_DIR, ROUTES)
 
 raise "No routes to benchmark" if all_routes.empty?
