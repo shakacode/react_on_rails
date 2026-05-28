@@ -1243,6 +1243,50 @@ describe RscGenerator, type: :generator do
       expect(migrated_content).not_to include("const rscClientReferences")
       expect(GeneratorMessages.messages.join("\n"))
         .to include("Reverted partial RSC manifest helper setup in #{config_path}")
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("missing top-level clientReferences in the existing RSCWebpackPlugin options")
+    end
+
+    it "dedents multiline RSCWebpackPlugin options using the existing indentation width" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const rscClientReferences = {
+              directory: './app/javascript',
+              recursive: true,
+          };
+
+          const configureClient = () => {
+              const clientConfig = commonWebpackConfig();
+              clientConfig.plugins.push(
+                  new RSCWebpackPlugin({
+                      isServer: false,
+                      clientReferences: rscClientReferences,
+                  }),
+              );
+
+              return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      generator.send(:update_client_webpack_config_for_rsc)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expected_helper_call = [
+        "    addRSCManifestPlugin(clientConfig, {",
+        "        isServer: false,",
+        "        clientReferences: rscClientReferences,",
+        "    });"
+      ].join("\n")
+      expect(migrated_content).to include(expected_helper_call)
+      expect(migrated_content).not_to include("          isServer: false")
     end
 
     it "rolls back manifest-helper migration when helper import cannot be inserted" do
@@ -3703,6 +3747,7 @@ describe RscGenerator, type: :generator do
       it "adds RSC manifest helper to clientWebpackConfig" do
         assert_file "config/rspack/clientWebpackConfig.js" do |content|
           expect(content).to include("addRSCManifestPlugin")
+          expect(content).to include("./rscManifestPlugin")
           expect(content).to include(
             "addRSCManifestPlugin(clientConfig, { isServer: false, clientReferences: rscClientReferences })"
           )
@@ -3747,6 +3792,10 @@ describe RscGenerator, type: :generator do
           expect(content).to include("compilation.chunkGroups")
           expect(content).to include("getChunkModulesIterable")
           expect(content).to include("pairs.push(chunk.id, file)")
+          expect(content).to include("if (!file.endsWith('.js') || file.endsWith('.hot-update.js')) continue;")
+          expect(content).to include("resolveRealPath")
+          expect(content).to include("clientReferenceSet = new Set(this.clientReferenceFiles.map(resolveRealPath))")
+          expect(content).to include("const chunkPairs = collectChunkGroupPairs(chunkGroup);")
           expect(content).to include("compilation.warnings.push")
           expect(content).to include("'use client' file was not found in compilation modules")
           expect(content).to include("_warnedMissingModules")
@@ -3758,6 +3807,7 @@ describe RscGenerator, type: :generator do
 
       it "client and server configs route manifest generation through the helper" do
         assert_file "config/rspack/clientWebpackConfig.js" do |content|
+          expect(content).to include("./rscManifestPlugin")
           expect(content).to include(
             "addRSCManifestPlugin(clientConfig, { isServer: false, clientReferences: rscClientReferences })"
           )

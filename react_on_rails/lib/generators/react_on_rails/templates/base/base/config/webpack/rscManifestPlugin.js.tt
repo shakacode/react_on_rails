@@ -101,13 +101,15 @@ const normalizeClientReferenceList = (clientReferences) => {
 const resolveReferenceDirectory = (context, directory) =>
   path.isAbsolute(directory) ? directory : path.resolve(context, directory);
 
-const resolveRealDirectory = (directory) => {
+const resolveRealPath = (filePath) => {
   try {
-    return fs.realpathSync(directory);
+    return fs.realpathSync(filePath);
   } catch {
-    return path.resolve(directory);
+    return path.resolve(filePath);
   }
 };
+
+const resolveRealDirectory = resolveRealPath;
 
 const isDirectoryEntry = (entry, absolutePath) => {
   if (entry.isDirectory()) return true;
@@ -257,12 +259,12 @@ const addClientReferencesToEntry = (bundlerConfig, clientReferenceFiles) => {
 
 const collectChunkGroupPairs = (chunkGroup) => {
   // The RSC runtime reads `chunks` as alternating [chunkId, filename, chunkId, filename, ...]
-  // pairs (see react-server-dom-webpack/plugin), so emit one [id, file] pair per chunk and
-  // pick the first non-hot-update .js file just like the upstream webpack plugin.
+  // pairs (see react-server-dom-webpack/plugin), so emit one [id, file] pair per chunk.
+  // Keep chunk-group-level pairs to mirror the upstream manifest shape.
   const pairs = [];
   for (const chunk of chunkGroup.chunks) {
     for (const file of chunk.files || []) {
-      if (!file.endsWith('.js') || file.endsWith('.hot-update.js')) break;
+      if (!file.endsWith('.js') || file.endsWith('.hot-update.js')) continue;
       pairs.push(chunk.id, file);
       break;
     }
@@ -298,7 +300,7 @@ class RspackRSCManifestPlugin {
   }
 
   apply(compiler) {
-    const clientReferenceSet = new Set(this.clientReferenceFiles.map((filePath) => path.resolve(filePath)));
+    const clientReferenceSet = new Set(this.clientReferenceFiles.map(resolveRealPath));
 
     compiler.hooks.thisCompilation.tap('RspackRSCManifestPlugin', (compilation) => {
       compilation.hooks.processAssets.tap(
@@ -318,14 +320,12 @@ class RspackRSCManifestPlugin {
           const filePathToModuleMetadata = {};
 
           const recordModule = (moduleId, module, chunkPairs) => {
-            if (
-              !module.resource ||
-              !clientReferenceSet.has(path.resolve(module.resource)) ||
-              moduleId == null
-            )
-              return;
+            if (!module.resource || moduleId == null) return;
 
-            const fileUrl = url.pathToFileURL(module.resource).href;
+            const moduleResource = resolveRealPath(module.resource);
+            if (!clientReferenceSet.has(moduleResource)) return;
+
+            const fileUrl = url.pathToFileURL(moduleResource).href;
             const existing = filePathToModuleMetadata[fileUrl];
             if (existing) {
               mergeChunkPairs(existing.chunks, chunkPairs);
@@ -360,7 +360,7 @@ class RspackRSCManifestPlugin {
           if (process.env.NODE_ENV !== 'production') {
             const manifestedUrls = new Set(Object.keys(filePathToModuleMetadata));
             for (const filePath of this.clientReferenceFiles) {
-              const fileUrl = url.pathToFileURL(filePath).href;
+              const fileUrl = url.pathToFileURL(resolveRealPath(filePath)).href;
               if (manifestedUrls.has(fileUrl) || this._warnedMissingModules.has(fileUrl)) continue;
               this._warnedMissingModules.add(fileUrl);
               compilation.warnings.push(
@@ -393,6 +393,7 @@ class RspackRSCManifestPlugin {
 const addRSCManifestPlugin = (bundlerConfig, options) => {
   if (config.assets_bundler === 'rspack') {
     const context = bundlerConfig.context || process.cwd();
+    // Omitted clientReferences intentionally falls back to the Shakapacker source-path scan.
     const clientReferenceFiles = collectClientReferenceFiles(context, options.clientReferences);
     addClientReferencesToEntry(bundlerConfig, clientReferenceFiles);
     bundlerConfig.plugins.push(new RspackRSCManifestPlugin(options, clientReferenceFiles));

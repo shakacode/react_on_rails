@@ -530,7 +530,11 @@ module ReactOnRails
         update_existing_rsc_webpack_config(config_path, content, is_server: is_server)
         content = File.read(File.join(destination_root, config_path))
         unless rsc_manifest_plugin_sections_ready?(content, is_server: is_server)
-          rollback_incomplete_rsc_manifest_setup(config_path, original_content)
+          rollback_incomplete_rsc_manifest_setup(
+            config_path,
+            original_content,
+            reason: "missing top-level clientReferences in the existing RSCWebpackPlugin options"
+          )
           return
         end
         unless replace_rsc_webpack_plugin_pushes_with_helper(config_path, content, bundler_config_name,
@@ -596,7 +600,36 @@ module ReactOnRails
       def normalize_rsc_manifest_helper_options_body(body)
         return body unless body.include?("\n")
 
-        body.gsub(/^  /, "")
+        strip_indent = rsc_manifest_helper_options_body_strip_indent(body)
+        return body if strip_indent.empty?
+
+        body.lines.map do |line|
+          line.start_with?(strip_indent) ? line.delete_prefix(strip_indent) : line
+        end.join
+      end
+
+      def rsc_manifest_helper_options_body_strip_indent(body)
+        indents = body.lines.filter_map do |line|
+          next if line.strip.empty?
+
+          line[/\A[ \t]*/]
+        end
+        return "" if indents.empty?
+
+        common_indent = indents.reduce do |common, indent|
+          common_leading_whitespace(common, indent)
+        end
+        closing_indent = body[/\n([ \t]*)\z/, 1] || ""
+
+        return common_indent unless common_indent.start_with?(closing_indent)
+
+        common_indent.delete_prefix(closing_indent)
+      end
+
+      def common_leading_whitespace(left, right)
+        index = 0
+        index += 1 while index < left.length && index < right.length && left[index] == right[index]
+        left[0...index]
       end
 
       def replace_rsc_webpack_plugin_import_with_helper(config_path, content, fallback_import_pattern)
@@ -636,13 +669,14 @@ module ReactOnRails
         "{ #{options} }"
       end
 
-      def rollback_incomplete_rsc_manifest_setup(config_path, original_content)
+      def rollback_incomplete_rsc_manifest_setup(config_path, original_content, reason: nil)
         return if options[:pretend] || options[:skip]
 
         say_status(:revert, config_path, :yellow)
         File.write(File.join(destination_root, config_path), original_content)
+        reason_text = reason ? " #{reason};" : ""
         GeneratorMessages.add_warning(
-          "Reverted partial RSC manifest helper setup in #{config_path}; please add " \
+          "Reverted partial RSC manifest helper setup in #{config_path};#{reason_text} please add " \
           "addRSCManifestPlugin and clientReferences manually."
         )
       end
