@@ -547,28 +547,26 @@ class RspackRSCManifestPlugin {
             });
           });
 
-          if (process.env.NODE_ENV !== 'production') {
-            const manifestedUrls = new Set(Object.keys(filePathToModuleMetadata));
-            for (const filePath of this.clientReferenceFiles) {
-              const fileUrl = url.pathToFileURL(resolveRealPath(filePath)).href;
-              if (manifestedUrls.has(fileUrl) || this._warnedMissingModules.has(fileUrl)) continue;
-              this._warnedMissingModules.add(fileUrl);
-              compilation.warnings.push(
-                new WebpackError(
-                  `[RspackRSCManifestPlugin] 'use client' file was not found in compilation modules: ${filePath}`,
-                ),
-              );
-            }
-            for (const request of this.clientReferenceRequests) {
-              const warningKey = `request:${request}`;
-              if (manifestedRequests.has(request) || this._warnedMissingModules.has(warningKey)) continue;
-              this._warnedMissingModules.add(warningKey);
-              compilation.warnings.push(
-                new WebpackError(
-                  `[RspackRSCManifestPlugin] client reference request was not found in compilation modules: ${request}`,
-                ),
-              );
-            }
+          const manifestedUrls = new Set(Object.keys(filePathToModuleMetadata));
+          for (const filePath of this.clientReferenceFiles) {
+            const fileUrl = url.pathToFileURL(resolveRealPath(filePath)).href;
+            if (manifestedUrls.has(fileUrl) || this._warnedMissingModules.has(fileUrl)) continue;
+            this._warnedMissingModules.add(fileUrl);
+            compilation.warnings.push(
+              new WebpackError(
+                `[RspackRSCManifestPlugin] 'use client' file was not found in compilation modules: ${filePath}`,
+              ),
+            );
+          }
+          for (const request of this.clientReferenceRequests) {
+            const warningKey = `request:${request}`;
+            if (manifestedRequests.has(request) || this._warnedMissingModules.has(warningKey)) continue;
+            this._warnedMissingModules.add(warningKey);
+            compilation.warnings.push(
+              new WebpackError(
+                `[RspackRSCManifestPlugin] client reference request was not found in compilation modules: ${request}`,
+              ),
+            );
           }
 
           const publicPath = compilation.outputOptions.publicPath;

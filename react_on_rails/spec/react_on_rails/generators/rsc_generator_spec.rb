@@ -4090,6 +4090,7 @@ describe RscGenerator, type: :generator do
           expect(content).to include("compilation.warnings.push")
           expect(content).to include("'use client' file was not found in compilation modules")
           expect(content).to include("_warnedMissingModules")
+          expect(content).not_to include("NODE_ENV")
           expect(content).to include("publicPath !== 'auto'")
           expect(content).not_to include("chunks: []")
           expect(content).not_to match(/^const \{ RSCWebpackPlugin \} = require/)
