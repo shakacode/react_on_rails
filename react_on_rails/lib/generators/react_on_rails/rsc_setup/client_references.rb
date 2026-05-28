@@ -966,7 +966,9 @@ module ReactOnRails
         # adds on the from-scratch path — adding it here would produce a duplicate import.
         # Must only be called via `ensure_rsc_client_references_setup`, which has already verified
         # that no module-scope `rscClientReferences` declaration exists and that the import anchor
-        # is present and not yet consumed by a previous call.
+        # is present and not yet consumed by a previous call. Bypassing that guard can write a
+        # duplicate `const rscClientReferences` declaration and leave the user's webpack config with
+        # a Node SyntaxError at load time.
         def add_rsc_client_references_setup(config_path, content, existing_imports_content, is_server:)
           replace_rsc_client_references_setup_anchor(config_path, content, is_server: is_server) do |anchor|
             join_rsc_client_references_setup(
