@@ -40,7 +40,12 @@ module ReactOnRails
           ^const\s+
           (?:\{\s*RSCWebpackPlugin\s*\}|RSCWebpackPlugin)\s*=\s*
           require\((['"])react-on-rails-rsc/WebpackPlugin\1\)
-          (?:\.RSCWebpackPlugin)?;?$
+          (?:\.RSCWebpackPlugin)?;?(?:\s*//[^\n]*)?$
+        }x
+      RSC_MANIFEST_HELPER_IMPORT_PATTERN =
+        %r{
+          ^const\s+\{\s*addRSCManifestPlugin\s*\}\s*=\s*
+          require\((['"])\./rscManifestPlugin\1\);?(?:\s*//[^\n]*)?$
         }x
 
       # Main entry point for RSC setup.
@@ -432,7 +437,14 @@ module ReactOnRails
 
         ensure_rsc_client_references_setup(config_path, content, is_server: true, plugin_pending: true)
         content = File.read(full_path)
-        return unless add_rsc_manifest_helper_import(config_path, content, fallback_import_pattern)
+        unless add_rsc_manifest_helper_import(config_path, content, fallback_import_pattern)
+          rollback_incomplete_rsc_manifest_setup(
+            config_path,
+            original_content,
+            reason: "missing helper import anchor"
+          )
+          return
+        end
 
         content = File.read(full_path)
 
@@ -533,7 +545,14 @@ module ReactOnRails
         # runtime, so the config remains functional without scoped references.
         ensure_rsc_client_references_setup(config_path, content, is_server: false, plugin_pending: true)
         content = File.read(full_path)
-        return unless add_rsc_manifest_helper_import(config_path, content, fallback_import_pattern)
+        unless add_rsc_manifest_helper_import(config_path, content, fallback_import_pattern)
+          rollback_incomplete_rsc_manifest_setup(
+            config_path,
+            original_content,
+            reason: "missing helper import anchor"
+          )
+          return
+        end
 
         content = File.read(full_path)
         unless content.match?(/^( *return clientConfig;)$/)
@@ -690,7 +709,7 @@ module ReactOnRails
       end
 
       def add_rsc_manifest_helper_import(config_path, content, fallback_import_pattern)
-        return true if content.include?(RSC_MANIFEST_HELPER_IMPORT)
+        return true if rsc_manifest_helper_import?(content)
 
         if content.match?(RSC_WEBPACK_PLUGIN_IMPORT_PATTERN)
           gsub_file(config_path, RSC_WEBPACK_PLUGIN_IMPORT_PATTERN, RSC_MANIFEST_HELPER_IMPORT)
@@ -700,6 +719,17 @@ module ReactOnRails
 
         gsub_file(config_path, fallback_import_pattern, "\\1\n#{RSC_MANIFEST_HELPER_IMPORT}")
         true
+      end
+
+      def rsc_manifest_helper_import?(content)
+        search_from = 0
+        while (match = content.match(RSC_MANIFEST_HELPER_IMPORT_PATTERN, search_from))
+          return true if js_code_position?(content, match.begin(0))
+
+          search_from = match.end(0)
+        end
+
+        false
       end
 
       def rsc_manifest_plugin_options(content, is_server)

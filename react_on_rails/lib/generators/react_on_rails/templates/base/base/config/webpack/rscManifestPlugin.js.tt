@@ -186,29 +186,29 @@ const resolveRealPath = (filePath) => {
 
 const resolveRealDirectory = resolveRealPath;
 
-const isDirectoryEntry = (entry, absolutePath) => {
-  if (entry.isDirectory()) return true;
-  if (!entry.isSymbolicLink()) return false;
-
+const statSymbolicLink = (absolutePath) => {
   try {
-    return fs.statSync(absolutePath).isDirectory();
+    return fs.statSync(absolutePath);
   } catch {
-    return false;
+    return null;
   }
 };
 
-const isFileEntry = (entry, absolutePath) => {
-  if (entry.isFile()) return true;
-  if (!entry.isSymbolicLink()) return false;
+const isDirectoryEntry = (entry, symlinkStats) => {
+  if (entry.isDirectory()) return true;
 
-  try {
-    return fs.statSync(absolutePath).isFile();
-  } catch {
-    return false;
-  }
+  return Boolean(symlinkStats?.isDirectory());
+};
+
+const isFileEntry = (entry, symlinkStats) => {
+  if (entry.isFile()) return true;
+
+  return Boolean(symlinkStats?.isFile());
 };
 
 const collectClientReferenceFiles = (context, clientReferences = normalizeClientReferences()) => {
+  // This runs while webpack/rspack evaluates the generated config. Keep the scan
+  // dependency-free and skip unreadable paths so config load remains resilient.
   const files = new Set();
 
   const collectFile = (filePath) => {
@@ -245,15 +245,16 @@ const collectClientReferenceFiles = (context, clientReferences = normalizeClient
 
     entries.forEach((entry) => {
       const absolutePath = path.join(directory, entry.name);
+      const symlinkStats = entry.isSymbolicLink() ? statSymbolicLink(absolutePath) : null;
 
-      if (isDirectoryEntry(entry, absolutePath)) {
+      if (isDirectoryEntry(entry, symlinkStats)) {
         if ((reference.recursive ?? true) && !DEFAULT_EXCLUDED_DIRECTORIES.has(entry.name)) {
           walk(absolutePath, reference, visitedDirectories, rootDirectory);
         }
         return;
       }
 
-      if (!isFileEntry(entry, absolutePath)) return;
+      if (!isFileEntry(entry, symlinkStats)) return;
 
       const requestPath = `./${toPosixPath(path.relative(rootDirectory, absolutePath))}`;
       if (
@@ -334,6 +335,8 @@ const addClientReferencesToEntry = (bundlerConfig, clientReferenceFiles) => {
   const addRequestsToEntry = (entryValue) => {
     if (typeof entryValue === 'string' || Array.isArray(entryValue) || isEntryDescription(entryValue)) {
       return {
+        // webpack/rspack name a bare string/array entry "main"; keep that implicit name
+        // when adding the synthetic client-reference entry.
         main: entryValue,
         [RSC_CLIENT_REFERENCES_ENTRY_NAME]: requests,
       };
@@ -378,6 +381,7 @@ const addClientReferencesToServerEntry = (bundlerConfig, clientReferenceFiles) =
       !isEntryDescription(entryValue)
     ) {
       if (!('server-bundle' in entryValue)) {
+        // eslint-disable-next-line no-console
         console.warn(
           '[RspackRSCManifestPlugin] Webpack entry object has no server-bundle entry. ' +
             'Add the discovered `use client` modules to the server entry manually.',
@@ -410,6 +414,7 @@ const collectChunkGroupPairs = (chunkGroup) => {
   for (const chunk of chunkGroup.chunks) {
     for (const file of chunk.files || []) {
       if (!file.endsWith('.js') || file.endsWith('.hot-update.js')) continue;
+      if (chunk.id == null) continue;
       pairs.push(chunk.id, file);
       break; // Take only the primary JS file per chunk, mirroring react-server-dom-webpack/plugin.
     }
@@ -418,6 +423,7 @@ const collectChunkGroupPairs = (chunkGroup) => {
 };
 
 const mergeChunkPairs = (existing, additions) => {
+  // Mutates `existing` so shared modules accumulate pairs from all chunk groups.
   const seenIds = new Set();
   for (let i = 0; i < existing.length; i += 2) seenIds.add(existing[i]);
   for (let i = 0; i < additions.length; i += 2) {
@@ -502,6 +508,8 @@ class RspackRSCManifestPlugin {
                 const moduleId = compilation.chunkGraph.getModuleId(module);
                 recordModule(moduleId, module, chunkPairs);
 
+                // Intentional: a shared module can be visited via multiple chunk groups.
+                // `mergeChunkPairs` dedupes the accumulated pairs.
                 if (module.modules) {
                   module.modules.forEach((concatenatedModule) =>
                     recordModule(moduleId, concatenatedModule, chunkPairs),

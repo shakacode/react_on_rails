@@ -476,6 +476,53 @@ describe RscGenerator, type: :generator do
     end
   end
 
+  context "when an existing client webpack config imports RSCWebpackPlugin with a trailing comment" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin'); // legacy import
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            delete clientConfig.entry['server-bundle'];
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "removes the stale import while migrating the plugin call" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content.scan("./rscManifestPlugin").length).to eq(1)
+        expect(content).to include(
+          "addRSCManifestPlugin(clientConfig, { isServer: false, clientReferences: rscClientReferences });"
+        )
+        expect(content).not_to include("react-on-rails-rsc/WebpackPlugin")
+        expect(content).not_to include("legacy import")
+      end
+    end
+  end
+
   context "when a fresh client webpack config has a commented-out RSCWebpackPlugin and no insertion point" do
     before(:all) do
       prepare_destination
@@ -1274,6 +1321,35 @@ describe RscGenerator, type: :generator do
       expect(generator.send(:check_rsc_client_config)).to eq([])
     end
 
+    it "does not treat a commented helper import as a live import" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          // const { addRSCManifestPlugin } = require('./rscManifestPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            delete clientConfig.entry['server-bundle'];
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      generator.send(:update_client_webpack_config_for_rsc)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).to include("// const { addRSCManifestPlugin } = require('./rscManifestPlugin');")
+      expect(migrated_content).to match(%r{^const \{ addRSCManifestPlugin \} = require\('\./rscManifestPlugin'\);$})
+      expect(migrated_content).to include(
+        "addRSCManifestPlugin(clientConfig, { isServer: false, clientReferences: rscClientReferences });"
+      )
+    end
+
     it "does not treat a helper import without a server plugin call as already configured" do
       config_path = "config/webpack/serverWebpackConfig.js"
       helper_imports = [
@@ -1298,6 +1374,33 @@ describe RscGenerator, type: :generator do
         "addRSCManifestPlugin(serverWebpackConfig, { isServer: true, clientReferences: rscClientReferences });"
       )
       expect(generator.send(:check_rsc_server_config)).to eq([])
+    end
+
+    it "rolls back fresh server setup when the helper import anchor is missing" do
+      config_path = "config/webpack/serverWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { config } = require('shakapacker');
+
+          const configureServer = () => {
+            const serverWebpackConfig = { plugins: [] };
+            serverWebpackConfig.plugins.unshift(new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
+
+            return serverWebpackConfig;
+          };
+
+          module.exports = configureServer;
+        JS
+      )
+
+      generator.send(:update_server_webpack_config_for_rsc)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).not_to include("rscClientReferences")
+      expect(migrated_content).not_to include("addRSCManifestPlugin")
+      expect(migrated_content).to include("const configureServer = () => {")
+      expect(GeneratorMessages.messages.join("\n")).to include("missing helper import anchor")
     end
 
     it "inserts the helper import when the server bundler ternary is on one line" do
@@ -3910,6 +4013,7 @@ describe RscGenerator, type: :generator do
           expect(content).to include("skipLeadingJavaScriptComments")
           expect(content).to include("entry.isSymbolicLink()")
           expect(content).to include("isFileEntry")
+          expect(content).to include("statSymbolicLink")
           expect(content).to include("visitedDirectories")
           expect(content).to include("normalizeClientReferenceList")
           expect(content).to include("globToRegExp")
@@ -3936,6 +4040,8 @@ describe RscGenerator, type: :generator do
           expect(content).to include("getChunkModulesIterable")
           expect(content).to include("pairs.push(chunk.id, file)")
           expect(content).to include("if (!file.endsWith('.js') || file.endsWith('.hot-update.js')) continue;")
+          expect(content).to include("if (chunk.id == null) continue;")
+          expect(content).to include("webpack/rspack name a bare string/array entry")
           expect(content).to include("resolveRealPath")
           expect(content).to include("clientReferenceSet = new Set(this.clientReferenceFiles.map(resolveRealPath))")
           expect(content).to include("const chunkPairs = collectChunkGroupPairs(chunkGroup);")
