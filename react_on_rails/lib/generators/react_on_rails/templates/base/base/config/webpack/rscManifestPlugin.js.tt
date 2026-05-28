@@ -8,6 +8,7 @@ const { config } = require('shakapacker');
 // Rspack-only projects that have no webpack dependency installed.
 
 const CLIENT_REFERENCE_EXTENSIONS = /\.(?:js|mjs|cjs|jsx|ts|mts|cts|tsx)$/;
+const RSC_CLIENT_REFERENCES_ENTRY_NAME = 'rsc-client-references';
 const DEFAULT_EXCLUDED_DIRECTORIES = new Set(['node_modules', 'public', 'tmp', 'log', 'storage']);
 
 const toPosixPath = (filePath) => filePath.split(path.sep).join('/');
@@ -228,6 +229,9 @@ const appendImports = (entryValue, requests) => {
   return entryValue;
 };
 
+const isEntryDescription = (entryValue) =>
+  entryValue && typeof entryValue === 'object' && 'import' in entryValue;
+
 const addClientReferencesToEntry = (bundlerConfig, clientReferenceFiles) => {
   if (clientReferenceFiles.length === 0) return;
 
@@ -236,17 +240,27 @@ const addClientReferencesToEntry = (bundlerConfig, clientReferenceFiles) => {
   const { entry } = bundlerConfig;
 
   const addRequestsToEntry = (entryValue) => {
-    if (typeof entryValue === 'string' || Array.isArray(entryValue)) {
-      return appendImports(entryValue, requests);
+    if (typeof entryValue === 'string' || Array.isArray(entryValue) || isEntryDescription(entryValue)) {
+      return {
+        main: entryValue,
+        [RSC_CLIENT_REFERENCES_ENTRY_NAME]: requests,
+      };
     }
 
     if (entryValue && typeof entryValue === 'object') {
-      return Object.fromEntries(
-        Object.entries(entryValue).map(([entryName, value]) => [entryName, appendImports(value, requests)]),
-      );
+      const existingReferencesEntry = entryValue[RSC_CLIENT_REFERENCES_ENTRY_NAME];
+
+      return {
+        ...entryValue,
+        [RSC_CLIENT_REFERENCES_ENTRY_NAME]: existingReferencesEntry
+          ? appendImports(existingReferencesEntry, requests)
+          : requests,
+      };
     }
 
-    return entryValue;
+    return {
+      [RSC_CLIENT_REFERENCES_ENTRY_NAME]: requests,
+    };
   };
 
   if (typeof entry === 'function') {
