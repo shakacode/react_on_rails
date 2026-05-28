@@ -475,8 +475,8 @@ module ReactOnRails
 
       def server_limit_chunk_count_plugin_anchor
         Regexp.new(
-          "(serverWebpackConfig\\.plugins\\.unshift\\(" \
-          "new bundler\\.optimize\\.LimitChunkCountPlugin.*\\);)"
+          "(serverWebpackConfig\\.plugins\\.unshift\\(\\s*" \
+          "new bundler\\.optimize\\.LimitChunkCountPlugin[\\s\\S]*?\\);)"
         )
       end
 

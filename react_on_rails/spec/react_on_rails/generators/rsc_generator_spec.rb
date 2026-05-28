@@ -1385,7 +1385,11 @@ describe RscGenerator, type: :generator do
 
           const configureServer = () => {
             const serverWebpackConfig = { plugins: [] };
-            serverWebpackConfig.plugins.unshift(new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
+            serverWebpackConfig.plugins.unshift(
+              new bundler.optimize.LimitChunkCountPlugin({
+                maxChunks: 1,
+              }),
+            );
 
             return serverWebpackConfig;
           };
@@ -4058,7 +4062,9 @@ describe RscGenerator, type: :generator do
           expect(content).to include("RSC_CLIENT_REFERENCES_ENTRY_NAME")
           expect(content).to include("[RSC_CLIENT_REFERENCES_ENTRY_NAME]: requests")
           expect(content).to include("addClientReferencesToServerEntry")
-          expect(content).to include("'server-bundle': appendImports(entryValue['server-bundle'], requests)")
+          expect(content).to include("without executing")
+          expect(content).to include("Node `server-bundle` entry")
+          expect(content).not_to include("'server-bundle': appendImports(entryValue['server-bundle'], requests)")
           expect(content).to include("if (options.isServer)")
           expect(content).to include(
             "addClientReferencesToServerEntry(bundlerConfig, clientReferenceFiles, clientReferenceRequests)"

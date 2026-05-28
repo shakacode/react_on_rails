@@ -55,6 +55,7 @@ const globToRegExpSource = (glob) => {
     }
 
     if (char === '{') {
+      // Nested brace groups such as `{a,{b,c}}` are not supported; use flat alternatives.
       const closingBraceIndex = normalized.indexOf('}', index + 1);
       if (closingBraceIndex !== -1) {
         const alternatives = normalized
@@ -384,43 +385,10 @@ const addClientReferencesToEntry = (bundlerConfig, clientReferenceFiles, clientR
 };
 
 const addClientReferencesToServerEntry = (bundlerConfig, clientReferenceFiles, clientReferenceRequests) => {
-  if (clientReferenceFiles.length === 0 && clientReferenceRequests.length === 0) return;
-
-  const context = bundlerConfig.context || process.cwd();
-  const requests = clientReferenceImportRequests(context, clientReferenceFiles, clientReferenceRequests);
-  const { entry } = bundlerConfig;
-
-  const addRequestsToServerEntry = (entryValue) => {
-    if (
-      entryValue &&
-      typeof entryValue === 'object' &&
-      !Array.isArray(entryValue) &&
-      !isEntryDescription(entryValue)
-    ) {
-      if (!('server-bundle' in entryValue)) {
-        // eslint-disable-next-line no-console
-        console.warn(
-          '[RspackRSCManifestPlugin] Webpack entry object has no server-bundle entry. ' +
-            'Add the discovered `use client` modules to the server entry manually.',
-        );
-        return entryValue;
-      }
-
-      return {
-        ...entryValue,
-        'server-bundle': appendImports(entryValue['server-bundle'], requests),
-      };
-    }
-
-    return appendImports(entryValue, requests);
-  };
-
-  if (typeof entry === 'function') {
-    bundlerConfig.entry = async (...args) => addRequestsToServerEntry(await entry(...args));
-    return;
-  }
-
-  bundlerConfig.entry = addRequestsToServerEntry(entry);
+  // Use a dedicated synthetic entry for server manifest builds too. This keeps
+  // client-only modules in the graph for manifest generation without executing
+  // them as part of the Node `server-bundle` entry at startup.
+  addClientReferencesToEntry(bundlerConfig, clientReferenceFiles, clientReferenceRequests);
 };
 
 const collectChunkGroupPairs = (chunkGroup) => {
