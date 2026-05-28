@@ -459,9 +459,13 @@ jobs:
       # STEP 6: RUN PRO BENCHMARKS
       # ============================================
 
+      # bench.rb shells out to `bundle exec rails routes`; pin the Pro dummy
+      # Gemfile so those calls use the same bundle as the Pro server.
       - name: Execute Pro benchmark suite
         if: env.RUN_PRO_RAILS
         timeout-minutes: 120
+        env:
+          BUNDLE_GEMFILE: ${{ github.workspace }}/react_on_rails_pro/spec/dummy/Gemfile
         run: |
           set -e
           echo "🏃 Running Pro benchmark suite..."
@@ -655,14 +659,14 @@ jobs:
           # when the pinned hash isn't in its DB. A single combined pattern
           # avoids false-positive matches across unrelated lines.
           if [ $BENCHER_EXIT_CODE -ne 0 ] && grep -q "Head Version.*not found" "$BENCHER_STDERR" && ! grep -qiE "alert|threshold violation|boundary violation" "$BENCHER_STDERR"; then
-            # When START_POINT_HASH_ARG is empty (e.g. workflow_dispatch on a
-            # non-main branch where the merge-base lookup returned ""), the
-            # substitution is a no-op; the inequality guard below skips the
-            # redundant retry.
+          if [ -n "$START_POINT_HASH_ARG" ]; then
             RETRY_ARGS="${START_POINT_ARGS/$START_POINT_HASH_ARG/}"
-            if [ "$RETRY_ARGS" != "$START_POINT_ARGS" ]; then
-              echo ""
-              echo "⚠️ Start-point hash not found in Bencher — retrying without --start-point-hash (will use latest baseline)"
+          else
+            RETRY_ARGS="$START_POINT_ARGS"
+          fi
+          if [ "$RETRY_ARGS" != "$START_POINT_ARGS" ]; then
+            echo ""
+            echo "⚠️ Start-point hash not found in Bencher — retrying without --start-point-hash (will use latest baseline)"
               echo "::warning::Start-point hash not found in Bencher — falling back to latest baseline for comparison"
               set +e
               run_bencher "$RETRY_ARGS" > bench_results/bencher_report.html 2>"$BENCHER_STDERR"

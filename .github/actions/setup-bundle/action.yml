@@ -38,6 +38,7 @@ runs:
       env:
         BUNDLE_FROZEN: ${{ inputs.frozen }}
         BUNDLE_RETRY: '3'
+        BUNDLE_JOBS: '4'
       with:
         ruby-version: ${{ inputs.ruby-version }}
         working-directory: ${{ inputs.working-directory }}

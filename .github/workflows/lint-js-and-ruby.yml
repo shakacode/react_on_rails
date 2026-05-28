@@ -98,7 +98,7 @@ jobs:
       - name: Setup Ruby
         uses: ./.github/actions/setup-ruby
         with:
-          ruby-version: 3
+          ruby-version: '3.4'
           bundler-version: 2.5.9
       - name: Setup Node
         uses: actions/setup-node@v4
