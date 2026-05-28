@@ -348,19 +348,24 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
       it "does not leak the password through the URI error when render_url is unparseable" do
         sensitive_password = "an#@!invalidpassword"
         invalid_url = "https://:#{sensitive_password}@server.com:123"
-        expect do
+
+        error = nil
+        begin
           ReactOnRailsPro.configure do |config|
             config.renderer_url = invalid_url
           end
-        end.to raise_error(ReactOnRailsPro::Error) do |error|
-          # Neither the bare URL interpolation nor the wrapped URI#message should
-          # carry the literal password — both must go through the sanitizer.
-          expect(error.message).not_to include(sensitive_password)
-          expect(error.message).to include("__REDACTED__")
-          # The implicit Exception#cause chain would otherwise expose the raw
-          # URI::InvalidURIError (which embeds the unsanitized URL). Suppress.
-          expect(error.cause).to be_nil
+        rescue ReactOnRailsPro::Error => e
+          error = e
         end
+
+        expect(error).to be_a(ReactOnRailsPro::Error)
+        # Neither the bare URL interpolation nor the wrapped URI#message should
+        # carry the literal password — both must go through the sanitizer.
+        expect(error.message).not_to include(sensitive_password)
+        expect(error.message).to include("__REDACTED__")
+        # The implicit Exception#cause chain would otherwise expose the raw
+        # URI::InvalidURIError (which embeds the unsanitized URL). Suppress.
+        expect(error.cause).to be_nil
       end
     end
 
