@@ -3914,6 +3914,7 @@ describe RscGenerator, type: :generator do
           expect(content).to include("normalizeClientReferenceList")
           expect(content).to include("/\\.(?:js|mjs|cjs|jsx|ts|mts|cts|tsx)$/")
           expect(content).to include("config.source_path is not set; no client references will be scanned.")
+          expect(content).to include("Skipped unreadable directory")
           expect(content).not_to include("fs.existsSync(absolutePath)")
           expect(content).to include("RSC_CLIENT_REFERENCES_ENTRY_NAME")
           expect(content).to include("[RSC_CLIENT_REFERENCES_ENTRY_NAME]: requests")

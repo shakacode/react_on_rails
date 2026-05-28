@@ -158,7 +158,16 @@ const collectClientReferenceFiles = (context, clientReferences = normalizeClient
     if (visitedDirectories.has(realDirectory)) return;
     visitedDirectories.add(realDirectory);
 
-    fs.readdirSync(directory, { withFileTypes: true }).forEach((entry) => {
+    let entries;
+    try {
+      entries = fs.readdirSync(directory, { withFileTypes: true });
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.warn(`[rscManifestPlugin] Skipped unreadable directory ${directory}: ${error.message}`);
+      return;
+    }
+
+    entries.forEach((entry) => {
       const absolutePath = path.join(directory, entry.name);
 
       if (isDirectoryEntry(entry, absolutePath)) {
