@@ -413,21 +413,16 @@ module ReactOnRails
         content = File.read(full_path)
         original_content = content
 
-        # Skip if the current helper-based RSC manifest wiring is already configured.
-        return if rsc_manifest_helper_invocation?(content, "serverWebpackConfig")
-
         fallback_import_pattern = server_bundler_fallback_import_pattern
 
-        if rsc_webpack_plugin_invocation?(content)
-          migrate_rsc_webpack_plugin_to_manifest_helper(
-            config_path,
-            content,
-            bundler_config_name: "serverWebpackConfig",
-            fallback_import_pattern: fallback_import_pattern,
-            is_server: true
-          )
-          return
-        end
+        # Skip if the current helper-based RSC manifest wiring is already configured.
+        return if existing_rsc_manifest_helper_invocation_handled?(
+          config_path, content, "serverWebpackConfig", fallback_import_pattern
+        )
+
+        return if migrate_rsc_webpack_plugin_invocation?(
+          config_path, content, "serverWebpackConfig", fallback_import_pattern, true
+        )
 
         # Intentionally non-fatal: if scoped `rscClientReferences` setup fails (missing anchor,
         # blocked by later imports, or conflicting existing definition), we still add the helper
@@ -527,21 +522,16 @@ module ReactOnRails
         content = File.read(full_path)
         original_content = content
 
-        # Skip if the current helper-based RSC manifest wiring is already configured.
-        return if rsc_manifest_helper_invocation?(content, "clientConfig")
-
         fallback_import_pattern = %r{(const commonWebpackConfig = require\(['"]\./commonWebpackConfig['"]\);)}
 
-        if rsc_webpack_plugin_invocation?(content)
-          migrate_rsc_webpack_plugin_to_manifest_helper(
-            config_path,
-            content,
-            bundler_config_name: "clientConfig",
-            fallback_import_pattern: fallback_import_pattern,
-            is_server: false
-          )
-          return
-        end
+        # Skip if the current helper-based RSC manifest wiring is already configured.
+        return if existing_rsc_manifest_helper_invocation_handled?(
+          config_path, content, "clientConfig", fallback_import_pattern
+        )
+
+        return if migrate_rsc_webpack_plugin_invocation?(
+          config_path, content, "clientConfig", fallback_import_pattern, false
+        )
 
         # Intentionally non-fatal: if scoped `rscClientReferences` setup fails (missing anchor,
         # blocked by later imports, or conflicting existing definition), we still add the helper
@@ -700,6 +690,45 @@ module ReactOnRails
         )
       end
 
+      def migrate_rsc_webpack_plugin_invocation?(
+        config_path,
+        content,
+        bundler_config_name,
+        fallback_import_pattern,
+        is_server
+      )
+        return false unless rsc_webpack_plugin_invocation?(content)
+
+        migrate_rsc_webpack_plugin_to_manifest_helper(
+          config_path,
+          content,
+          bundler_config_name: bundler_config_name,
+          fallback_import_pattern: fallback_import_pattern,
+          is_server: is_server
+        )
+        true
+      end
+
+      def existing_rsc_manifest_helper_invocation_handled?(
+        config_path,
+        content,
+        bundler_config_name,
+        fallback_import_pattern
+      )
+        return false unless rsc_manifest_helper_invocation?(content, bundler_config_name)
+
+        warn_rsc_manifest_helper_import_missing(config_path) unless
+          add_rsc_manifest_helper_import(config_path, content, fallback_import_pattern)
+        true
+      end
+
+      def warn_rsc_manifest_helper_import_missing(config_path)
+        GeneratorMessages.add_warning(
+          "RSC manifest helper call already exists in #{config_path}, but the helper import could not be " \
+          "inserted automatically. Please add #{RSC_MANIFEST_HELPER_IMPORT} manually."
+        )
+      end
+
       def rsc_manifest_helper_invocation?(content, bundler_config_name)
         pattern = /\baddRSCManifestPlugin\s*\(\s*#{Regexp.escape(bundler_config_name)}\b/
         search_from = 0
@@ -781,6 +810,9 @@ module ReactOnRails
         unless rsc_manifest_helper_invocation?(content, "serverWebpackConfig")
           missing << "addRSCManifestPlugin in serverWebpackConfig.js"
         end
+        unless rsc_manifest_helper_import?(content)
+          missing << "addRSCManifestPlugin helper import in serverWebpackConfig.js"
+        end
         unless content.match?(server_configure_with_rsc_bundle_pattern)
           missing << "rscBundle parameter in serverWebpackConfig.js"
         end
@@ -792,9 +824,16 @@ module ReactOnRails
         return [] unless File.exist?(path)
 
         content = File.read(path)
-        return [] if rsc_manifest_helper_invocation?(content, "clientConfig")
+        return [] if rsc_manifest_helper_invocation?(content, "clientConfig") && rsc_manifest_helper_import?(content)
 
-        ["addRSCManifestPlugin in clientWebpackConfig.js"]
+        missing = []
+        unless rsc_manifest_helper_invocation?(content, "clientConfig")
+          missing << "addRSCManifestPlugin in clientWebpackConfig.js"
+        end
+        unless rsc_manifest_helper_import?(content)
+          missing << "addRSCManifestPlugin helper import in clientWebpackConfig.js"
+        end
+        missing
       end
 
       def check_rsc_scob_config

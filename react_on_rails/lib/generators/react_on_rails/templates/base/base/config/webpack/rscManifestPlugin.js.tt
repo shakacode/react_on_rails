@@ -17,6 +17,8 @@ const toPosixPath = (filePath) => filePath.split(path.sep).join('/');
 const toImportRequest = (context, filePath) => {
   const relativePath = toPosixPath(path.relative(context, filePath));
   if (!relativePath || relativePath.startsWith('..')) {
+    // Webpack and Rspack entry imports accept absolute filesystem paths; keep
+    // cross-context Shakapacker source files importable without alias resolution.
     return filePath;
   }
 
@@ -26,6 +28,37 @@ const toImportRequest = (context, filePath) => {
 const escapeRegExp = (value) => value.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&');
 
 const hasGlobMagic = (reference) => GLOB_MAGIC_PATTERN.test(reference);
+
+const findClosingBraceIndex = (value, openingBraceIndex) => {
+  let depth = 1;
+  for (let index = openingBraceIndex + 1; index < value.length; index += 1) {
+    if (value[index] === '{') depth += 1;
+    if (value[index] === '}') {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+  }
+
+  return -1;
+};
+
+const splitBraceAlternatives = (value) => {
+  const alternatives = [];
+  let depth = 0;
+  let startIndex = 0;
+
+  for (let index = 0; index < value.length; index += 1) {
+    if (value[index] === '{') depth += 1;
+    if (value[index] === '}') depth -= 1;
+    if (value[index] === ',' && depth === 0) {
+      alternatives.push(value.slice(startIndex, index));
+      startIndex = index + 1;
+    }
+  }
+
+  alternatives.push(value.slice(startIndex));
+  return alternatives;
+};
 
 const globToRegExpSource = (glob) => {
   const normalized = toPosixPath(glob);
@@ -55,12 +88,9 @@ const globToRegExpSource = (glob) => {
     }
 
     if (char === '{') {
-      // Nested brace groups such as `{a,{b,c}}` are not supported; use flat alternatives.
-      const closingBraceIndex = normalized.indexOf('}', index + 1);
+      const closingBraceIndex = findClosingBraceIndex(normalized, index);
       if (closingBraceIndex !== -1) {
-        const alternatives = normalized
-          .slice(index + 1, closingBraceIndex)
-          .split(',')
+        const alternatives = splitBraceAlternatives(normalized.slice(index + 1, closingBraceIndex))
           .map(globToRegExpSource)
           .join('|');
         source += `(?:${alternatives})`;
