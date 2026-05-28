@@ -981,11 +981,19 @@ def replace_workspace_protocol_dependencies_for_publish!(package_json, package_v
 end
 
 def write_publishable_package_json(package_json_path, package_json)
-  Tempfile.create(["package-json-", ".json"], File.dirname(package_json_path)) do |tmp|
+  tmp = Tempfile.create(["package-json-", ".json"], File.dirname(package_json_path))
+  tmp_path = tmp.path
+  renamed = false
+
+  begin
     tmp.write("#{JSON.pretty_generate(package_json)}\n")
     tmp.chmod(File.stat(package_json_path).mode & 0o777)
     tmp.close
-    File.rename(tmp.path, package_json_path)
+    File.rename(tmp_path, package_json_path)
+    renamed = true
+  ensure
+    tmp.close unless tmp.closed?
+    File.unlink(tmp_path) if !renamed && File.exist?(tmp_path)
   end
 end
 

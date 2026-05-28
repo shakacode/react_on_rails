@@ -123,7 +123,7 @@ module ReactOnRails
         def update_existing_rsc_webpack_config(config_path, content, is_server:)
           return unless rsc_plugin_sections_safe_to_rewrite?(config_path, content, is_server: is_server)
           return if rsc_plugin_uses_scoped_client_references?(content, is_server: is_server)
-          return unless rsc_client_references_rewrite_needed?(config_path, content, is_server: is_server)
+          return unless prepare_rsc_client_references_rewrite!(config_path, content, is_server: is_server)
 
           return if rewrite_rsc_plugin_client_references(config_path, is_server: is_server)
 
@@ -131,18 +131,22 @@ module ReactOnRails
           warn_missing_rsc_plugin_target(config_path, is_server: is_server)
         end
 
-        def rsc_client_references_rewrite_needed?(config_path, content, is_server:)
-          # This predicate prepares the rewrite too: when it returns true, the scoped helper
-          # may already have been injected on disk so `rewrite_rsc_plugin_client_references`
-          # can re-read fresh content with valid offsets.
+        def prepare_rsc_client_references_rewrite!(config_path, content, is_server:)
+          # This prepares the rewrite and returns whether it should continue. When it returns true,
+          # the scoped helper may already have been injected on disk so
+          # `rewrite_rsc_plugin_client_references` can re-read fresh content with valid offsets.
           if rsc_plugin_references_any_scoped_client_references?(content, is_server: is_server)
             return false unless ensure_rsc_client_references_setup(config_path, content, is_server: is_server)
 
-            return any_rsc_plugin_missing_client_references?(content, is_server: is_server)
+            return rsc_plugin_needs_client_references_rewrite?(content, is_server: is_server)
           end
 
           rewritable_rsc_plugin?(config_path, content, is_server: is_server) &&
             ensure_rsc_client_references_setup(config_path, content, is_server: is_server)
+        end
+
+        def rsc_plugin_needs_client_references_rewrite?(content, is_server:)
+          any_rsc_plugin_missing_client_references?(content, is_server: is_server)
         end
 
         # Detects RSCWebpackPlugin option blocks that the lightweight JS scanner could not parse
@@ -150,6 +154,8 @@ module ReactOnRails
         # counter past the real closing brace). When found, we warn and refuse to rewrite anything
         # in the file so a sibling rewrite cannot accidentally splice into a wrong location.
         def rsc_plugin_sections_safe_to_rewrite?(config_path, content, is_server:)
+          # `:unparseable` is file-wide: the partitioner increments it before filtering parseable
+          # sections by the current `is_server` target.
           unparseable = rsc_plugin_option_sections_partition(content, is_server: is_server).fetch(:unparseable)
           return true if unparseable.zero?
 
