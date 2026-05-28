@@ -18,6 +18,7 @@ The orchestrator is the executor of the existing RC plan, not a parallel system.
 - **`react_on_rails` (this repo)** — owns the manifest ([demo-fleet.yml](demo-fleet.yml)), the RC plan, the orchestrator Rake tasks, and the tracking-issue template. Nothing in this repo opens cross-repo PRs at runtime by itself — see the credential model below.
 - **Per demo repo** — owns its own CI, CPFlow review-app workflow, and Playwright smoke. The orchestrator dispatches and observes; it does not push CI definitions into demos.
 - **No separate `react-on-rails-demos` repo, yet.** Defer until the orchestrator is stable here. When promoted, the manifest stays in `react_on_rails` (it's policy); only the runtime moves.
+- **`reactonrails.com` is deliberately not the control plane.** It's a public documentation/marketing surface, not an operational repo. The control plane belongs in a contributor-only repo where credentials, manifests, and tracking issues already live.
 
 ## Manifest
 
@@ -125,6 +126,17 @@ Cache responses for the duration of a single orchestrator run (TTL 1h) to avoid 
 ### Why uniform-in-orchestrator instead of per-PM config
 
 Demos in the fleet span pnpm, yarn classic, yarn berry, and bare npm (see manifest `package_manager` field). pnpm's `minimumReleaseAge` would only cover the pnpm demos and only after upgrading them all to pnpm 10+. The orchestrator computes bumps anyway (it has to know which versions to propose), so it's the natural enforcement point. Each demo's own Dependabot config keeps its `cooldown` for routine background updates; the orchestrator is the second layer for the bumps it drives.
+
+### Defense-in-depth, not just the age gate
+
+The age gate stops the orchestrator from introducing a too-young package, but it does not catch a package that is old enough yet known-vulnerable. Each demo's PR-side CI must also run [`actions/dependency-review-action`](https://github.com/actions/dependency-review-action) on every PR — it diffs the lockfile against the base branch and fails the PR if any newly-introduced dependency (direct or transitive) is on the GitHub Advisory Database. The orchestrator does not enforce this directly; instead, the demo-fleet manifest documents it as a required check, and the verification pass that clears `verify: true` flags also confirms each demo's CI runs the action.
+
+Layers, in order:
+
+1. **Per-demo Dependabot `cooldown`** — already in use in this repo (3-day default); catches routine background updates before they reach the orchestrator.
+2. **Orchestrator age gate** — uniform across ecosystems for the bumps the orchestrator drives (7-day default; see `age_gate` in the manifest).
+3. **Per-demo `dependency-review-action` on every PR** — fails the PR if any newly-introduced dep is vulnerable, regardless of age.
+4. **Break-glass override** — labelled tracking issue, audited in the PR body (next section).
 
 ### Break-glass
 
