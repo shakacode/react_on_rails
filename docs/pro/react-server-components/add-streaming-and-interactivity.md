@@ -52,7 +52,7 @@ Let's add the Posts component to the React Server Component Page, forwarding the
 
 ```js
 // app/javascript/packs/components/ReactServerComponentPage.jsx
-import React from 'react';
+import React, { Suspense } from 'react';
 import ReactServerComponent from '../../components/ReactServerComponent';
 import Posts from '../../components/Posts';
 

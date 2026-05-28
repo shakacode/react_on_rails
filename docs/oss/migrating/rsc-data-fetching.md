@@ -169,6 +169,10 @@ import { Suspense } from 'react';
 import { WithAsyncProps } from 'react-on-rails-pro';
 
 type SyncProps = { name: string; price: number };
+
+// AsyncProps lists the *resolved* prop types. WithAsyncProps wraps each in a
+// Promise at the call site, so getReactOnRailsAsyncProp('reviews') returns
+// Promise<Review[]> — which is then forwarded to an async child that awaits it.
 type AsyncProps = { reviews: Review[]; recommendations: Product[] };
 
 export default function ProductPage({
@@ -206,8 +210,17 @@ async function ReviewList({ reviews }: { reviews: Promise<Review[]> }) {
   );
 }
 
-// RecommendationList mirrors ReviewList: an async component that awaits its
-// `items` prop (the recommendations Promise) and maps over the resolved array.
+// RecommendationList mirrors ReviewList: it awaits the recommendations Promise.
+async function RecommendationList({ items }: { items: Promise<Product[]> }) {
+  const resolved = await items;
+  return (
+    <ul>
+      {resolved.map((p) => (
+        <li key={p.id}>{p.name}</li>
+      ))}
+    </ul>
+  );
+}
 ```
 
 **Sync props vs. async props — which to use:**
