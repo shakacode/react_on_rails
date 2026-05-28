@@ -1353,6 +1353,8 @@ describe RscGenerator, type: :generator do
           const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
 
           const rscClientReferences = { directory: './app/javascript' };
+          const deliberateSpacing = true;
+
 
           const configureClient = () => {
             const clientConfig = commonWebpackConfig();
@@ -1377,6 +1379,51 @@ describe RscGenerator, type: :generator do
         "const { addRSCManifestPlugin } = require('./rscManifestPlugin');\n\n" \
         "const rscClientReferences = { directory: './app/javascript' };"
       )
+      expect(migrated_content).to include(
+        "const deliberateSpacing = true;\n\n\nconst configureClient = () => {"
+      )
+    end
+
+    it "removes remaining client RSCWebpackPlugin calls when the helper call already exists" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { config } = require('shakapacker');
+          const { resolve } = require('path');
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { addRSCManifestPlugin } = require('./rscManifestPlugin');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const rscClientReferences = {
+            directory: resolve(config.source_path),
+            recursive: true,
+          };
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            addRSCManifestPlugin(clientConfig, {
+              isServer: false,
+              clientReferences: rscClientReferences,
+            });
+            clientConfig.plugins.push(
+              new RSCWebpackPlugin({ isServer: false, clientReferences: rscClientReferences }),
+            );
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      generator.send(:update_client_webpack_config_for_rsc)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content.scan("./rscManifestPlugin").length).to eq(1)
+      expect(migrated_content).not_to include("react-on-rails-rsc/WebpackPlugin")
+      expect(migrated_content).not_to include("new RSCWebpackPlugin")
+      expect(migrated_content.scan("addRSCManifestPlugin(clientConfig").length).to eq(1)
+      expect(generator.send(:check_rsc_client_config)).to eq([])
     end
 
     it "inserts a missing helper import when the client helper call already exists" do
@@ -1541,6 +1588,54 @@ describe RscGenerator, type: :generator do
 
       migrated_content = File.read(File.join(destination_root, config_path))
       expect(migrated_content).to include("const { addRSCManifestPlugin } = require('./rscManifestPlugin');")
+      expect(migrated_content.scan("addRSCManifestPlugin(serverWebpackConfig").length).to eq(1)
+      expect(generator.send(:check_rsc_server_config)).to eq([])
+    end
+
+    it "removes remaining server RSCWebpackPlugin calls when the helper call already exists" do
+      config_path = "config/webpack/serverWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { config } = require('shakapacker');
+          const { resolve } = require('path');
+          const bundler = config.assets_bundler === 'rspack'
+            ? require('@rspack/core')
+            : require('webpack');
+          const { addRSCManifestPlugin } = require('./rscManifestPlugin');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          const rscClientReferences = {
+            directory: resolve(config.source_path),
+            recursive: true,
+          };
+
+          const configureServer = (rscBundle = false) => {
+            const serverWebpackConfig = { plugins: [] };
+            if (!rscBundle) {
+              addRSCManifestPlugin(serverWebpackConfig, {
+                isServer: true,
+                clientReferences: rscClientReferences,
+              });
+            }
+            serverWebpackConfig.plugins.push(
+              new RSCWebpackPlugin({ isServer: true, clientReferences: rscClientReferences }),
+            );
+            serverWebpackConfig.plugins.unshift(
+              new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }),
+            );
+
+            return serverWebpackConfig;
+          };
+
+          module.exports = configureServer;
+        JS
+      )
+
+      generator.send(:update_server_webpack_config_for_rsc)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).not_to include("react-on-rails-rsc/WebpackPlugin")
+      expect(migrated_content).not_to include("new RSCWebpackPlugin")
       expect(migrated_content.scan("addRSCManifestPlugin(serverWebpackConfig").length).to eq(1)
       expect(generator.send(:check_rsc_server_config)).to eq([])
     end
@@ -4306,6 +4401,7 @@ describe RscGenerator, type: :generator do
           expect(content).to include("collectStringReference")
           expect(content).to include("stats.isDirectory()")
           expect(content).to include("walk(absolutePath, { recursive: true, include: CLIENT_REFERENCE_EXTENSIONS })")
+          expect(content).to include("const NEVER_MATCH_PATTERN = /(?!)/;")
           expect(content).to include("/\\.(?:js|mjs|cjs|jsx|ts|mts|cts|tsx)$/")
           expect(content).to include("reference.recursive ?? true")
           expect(content).to include("config.source_path is not set; no client references will be scanned.")
@@ -4318,6 +4414,10 @@ describe RscGenerator, type: :generator do
           expect(content).to include("filename: mergedEntry.filename || `${RSC_CLIENT_REFERENCES_ENTRY_NAME}.js`")
           expect(content).to include("do not fold client-only modules into server-bundle.js")
           expect(content).not_to include("'server-bundle': appendImports(entryValue['server-bundle'], requests)")
+          expect(content).to include(
+            "Unrecognized entry value type; client references were not injected."
+          )
+          expect(content).to include("Object.prototype.hasOwnProperty.call(bundlerConfig, 'entry')")
           expect(content).to include("Server and client manifest builds share the same synthetic-entry injection")
           expect(content).to include(
             "addClientReferencesToEntry(bundlerConfig, clientReferenceFiles, clientReferenceRequests)"

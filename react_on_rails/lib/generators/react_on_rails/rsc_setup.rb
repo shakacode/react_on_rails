@@ -601,12 +601,19 @@ module ReactOnRails
       end
 
       def replace_rsc_webpack_plugin_pushes_with_helper(config_path, content, bundler_config_name, is_server:)
+        helper_invocation_exists = rsc_manifest_helper_invocation?(content, bundler_config_name)
         replacements = rsc_plugin_option_sections(content, is_server: is_server).filter_map do |section|
           replacement_range = rsc_plugin_push_replacement_range(content, section, bundler_config_name)
           next unless replacement_range
 
-          options_body = normalize_rsc_manifest_helper_options_body(section.fetch(:body))
-          [replacement_range, "addRSCManifestPlugin(#{bundler_config_name}, {#{options_body}});"]
+          replacement =
+            if helper_invocation_exists
+              ""
+            else
+              options_body = normalize_rsc_manifest_helper_options_body(section.fetch(:body))
+              "addRSCManifestPlugin(#{bundler_config_name}, {#{options_body}});"
+            end
+          [replacement_range, replacement]
         end
         return false if replacements.empty?
 
@@ -723,6 +730,7 @@ module ReactOnRails
         is_server:
       )
         return false unless rsc_manifest_helper_invocation?(content, bundler_config_name)
+        return false if rsc_webpack_plugin_invocation?(content)
 
         warn_rsc_manifest_helper_import_missing(config_path) unless
           add_rsc_manifest_helper_import(config_path, content, fallback_import_pattern)
@@ -838,8 +846,25 @@ module ReactOnRails
         return if rsc_webpack_plugin_invocation?(content)
         return unless content.match?(RSC_WEBPACK_PLUGIN_IMPORT_PATTERN)
 
-        gsub_file(config_path, RSC_WEBPACK_PLUGIN_IMPORT_PATTERN, "")
-        gsub_file(config_path, /\n{3,}/, "\n\n")
+        write_existing_rsc_config(
+          config_path,
+          remove_rsc_webpack_plugin_import_line(content),
+          action: :rewrite
+        )
+      end
+
+      def remove_rsc_webpack_plugin_import_line(content)
+        lines = content.lines
+        import_index = lines.index { |line| line.match?(RSC_WEBPACK_PLUGIN_IMPORT_PATTERN) }
+        return content unless import_index
+
+        lines.delete_at(import_index)
+        lines.delete_at(import_index) if adjacent_blank_line_after_removed_import?(lines, import_index)
+        lines.join
+      end
+
+      def adjacent_blank_line_after_removed_import?(lines, import_index)
+        lines[import_index]&.strip&.empty? && (import_index.zero? || lines[import_index - 1].strip.empty?)
       end
 
       def rsc_manifest_helper_import?(content)

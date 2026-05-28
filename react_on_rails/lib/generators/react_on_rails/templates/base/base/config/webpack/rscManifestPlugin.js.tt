@@ -11,8 +11,8 @@ const CLIENT_REFERENCE_EXTENSIONS = /\.(?:js|mjs|cjs|jsx|ts|mts|cts|tsx)$/;
 const RSC_CLIENT_REFERENCES_ENTRY_NAME = 'rsc-client-references';
 const DEFAULT_EXCLUDED_DIRECTORIES = new Set(['node_modules', 'public', 'tmp', 'log', 'storage']);
 const GLOB_MAGIC_PATTERN = /[*?\[\]{}]/;
-// `a` followed by start-of-input is impossible, so this rejects every candidate.
-const NEVER_MATCH_PATTERN = /a^/;
+// Empty negative lookahead is impossible to satisfy, so this rejects every candidate.
+const NEVER_MATCH_PATTERN = /(?!)/;
 
 const toPosixPath = (filePath) => filePath.split(path.sep).join('/');
 
@@ -449,6 +449,7 @@ const addClientReferencesToEntry = (bundlerConfig, clientReferenceFiles, clientR
   const context = bundlerConfig.context || process.cwd();
   const requests = clientReferenceImportRequests(context, clientReferenceFiles, clientReferenceRequests);
   const { entry } = bundlerConfig;
+  const hasExplicitEntry = Object.prototype.hasOwnProperty.call(bundlerConfig, 'entry');
 
   const addRequestsToEntry = (entryValue) => {
     if (typeof entryValue === 'string' || Array.isArray(entryValue) || isEntryDescription(entryValue)) {
@@ -472,9 +473,14 @@ const addClientReferencesToEntry = (bundlerConfig, clientReferenceFiles, clientR
       };
     }
 
-    return {
-      [RSC_CLIENT_REFERENCES_ENTRY_NAME]: clientReferenceEntry(requests),
-    };
+    // Unexpected entry type (null, undefined, primitive). Do not replace it;
+    // let webpack/rspack validate the original value with its own diagnostics.
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[rscManifestPlugin] Unrecognized entry value type; client references were not injected. ' +
+        'Set bundlerConfig.entry to a string, array, object, or function before calling addRSCManifestPlugin.',
+    );
+    return entryValue;
   };
 
   if (typeof entry === 'function') {
@@ -483,7 +489,10 @@ const addClientReferencesToEntry = (bundlerConfig, clientReferenceFiles, clientR
     return;
   }
 
-  bundlerConfig.entry = addRequestsToEntry(entry);
+  const updatedEntry = addRequestsToEntry(entry);
+  if (updatedEntry === entry && !hasExplicitEntry) return;
+
+  bundlerConfig.entry = updatedEntry;
 };
 
 const collectChunkGroupPairs = (chunkGroup) => {
