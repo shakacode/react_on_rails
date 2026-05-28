@@ -980,14 +980,35 @@ def replace_workspace_protocol_dependencies_for_publish!(package_json, package_v
   changed
 end
 
+def write_publishable_package_json(package_json_path, package_json)
+  tmp = Tempfile.create(["package-json-", ".json"], File.dirname(package_json_path))
+  tmp_path = tmp.path
+  renamed = false
+
+  begin
+    tmp.write("#{JSON.pretty_generate(package_json)}\n")
+    tmp.chmod(File.stat(package_json_path).mode & 0o777)
+    tmp.close
+    File.rename(tmp_path, package_json_path)
+    renamed = true
+  ensure
+    tmp.close unless tmp.closed?
+    File.unlink(tmp_path) if !renamed && File.exist?(tmp_path)
+  end
+end
+
 def with_publishable_package_json(dir, package_version)
   package_json_path = File.join(dir, "package.json")
   changed = false
   original_content = File.read(package_json_path)
   package_json = JSON.parse(original_content)
 
-  changed = replace_workspace_protocol_dependencies_for_publish!(package_json, package_version)
-  File.write(package_json_path, "#{JSON.pretty_generate(package_json)}\n") if changed
+  if replace_workspace_protocol_dependencies_for_publish!(package_json, package_version)
+    write_publishable_package_json(package_json_path, package_json)
+    # Only flip `changed` after the atomic same-directory rename succeeds so the `ensure`
+    # restore runs only after package.json was actually replaced.
+    changed = true
+  end
 
   yield
 ensure
@@ -1027,10 +1048,10 @@ def fetch_npm_package_metadata_with_retries(package_ref, registry_url:, attempts
 
     last_output = output
     last_status = status
-    next if attempt == attempts - 1
-
-    puts "npm did not return #{package_ref} yet; retrying in #{retry_delay_seconds} seconds..."
-    sleep retry_delay_seconds
+    unless attempt == attempts - 1
+      puts "npm did not return #{package_ref} yet; retrying in #{retry_delay_seconds} seconds..."
+      sleep retry_delay_seconds
+    end
   end
 
   [last_output, last_status]

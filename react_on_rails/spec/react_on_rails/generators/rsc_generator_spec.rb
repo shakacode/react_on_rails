@@ -2069,7 +2069,7 @@ describe RscGenerator, type: :generator do
       )
       content = File.read(File.join(destination_root, config_path))
 
-      expect(generator.send(:rsc_plugin_sections_safe_to_rewrite?, config_path, content))
+      expect(generator.send(:rsc_plugin_sections_safe_to_rewrite?, config_path, content, is_server: true))
         .to be(false)
 
       messages = GeneratorMessages.messages.join("\n")

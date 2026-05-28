@@ -362,10 +362,8 @@ RSpec.describe "release.rake helper methods" do
           "#{JSON.pretty_generate({ 'dependencies' => { 'react-on-rails' => 'workspace:*' } })}\n"
         )
 
-        write_count = 0
         allow(File).to receive(:write).and_wrap_original do |method, *args|
-          write_count += 1 if args.first == package_json_path
-          raise "restore failed" if args.first == package_json_path && write_count == 2
+          raise "restore failed" if args.first == package_json_path
 
           method.call(*args)
         end
@@ -375,6 +373,29 @@ RSpec.describe "release.rake helper methods" do
             raise "publish failed"
           end
         end.to raise_error(RuntimeError, "publish failed")
+      end
+    end
+
+    it "removes the temporary package manifest when atomic rename fails" do
+      Dir.mktmpdir do |dir|
+        package_json_path = File.join(dir, "package.json")
+        original_package_json = JSON.pretty_generate({ "dependencies" => { "react-on-rails" => "workspace:*" } })
+        File.write(package_json_path, "#{original_package_json}\n")
+
+        allow(File).to receive(:rename).and_wrap_original do |method, source, destination|
+          if destination == package_json_path && File.basename(source).start_with?("package-json-")
+            raise "rename failed"
+          end
+
+          method.call(source, destination)
+        end
+
+        expect do
+          with_publishable_package_json(dir, "16.7.0-rc.1") { raise "publish should not run" }
+        end.to raise_error(RuntimeError, "rename failed")
+
+        expect(Dir.glob(File.join(dir, "package-json-*.json"))).to be_empty
+        expect(File.read(package_json_path)).to eq("#{original_package_json}\n")
       end
     end
   end
