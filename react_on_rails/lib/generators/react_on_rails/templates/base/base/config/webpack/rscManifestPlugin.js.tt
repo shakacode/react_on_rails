@@ -278,7 +278,7 @@ const collectChunkGroupPairs = (chunkGroup) => {
     for (const file of chunk.files || []) {
       if (!file.endsWith('.js') || file.endsWith('.hot-update.js')) continue;
       pairs.push(chunk.id, file);
-      break;
+      break; // Take only the primary JS file per chunk, mirroring react-server-dom-webpack/plugin.
     }
   }
   return pairs;
@@ -312,6 +312,7 @@ class RspackRSCManifestPlugin {
   }
 
   apply(compiler) {
+    const WebpackError = compiler.webpack.WebpackError || Error;
     const clientReferenceSet = new Set(this.clientReferenceFiles.map(resolveRealPath));
 
     compiler.hooks.thisCompilation.tap('RspackRSCManifestPlugin', (compilation) => {
@@ -347,6 +348,7 @@ class RspackRSCManifestPlugin {
             filePathToModuleMetadata[fileUrl] = {
               id: moduleId,
               chunks: chunkPairs.slice(),
+              // Wildcard means all exports are client references; per-export narrowing needs webpack ModuleGraph.
               name: '*',
             };
           };
@@ -376,7 +378,7 @@ class RspackRSCManifestPlugin {
               if (manifestedUrls.has(fileUrl) || this._warnedMissingModules.has(fileUrl)) continue;
               this._warnedMissingModules.add(fileUrl);
               compilation.warnings.push(
-                new Error(
+                new WebpackError(
                   `[RspackRSCManifestPlugin] 'use client' file was not found in compilation modules: ${filePath}`,
                 ),
               );

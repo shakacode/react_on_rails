@@ -409,7 +409,7 @@ module ReactOnRails
         original_content = content
 
         # Skip if the current helper-based RSC manifest wiring is already configured.
-        return if content.include?("addRSCManifestPlugin")
+        return if rsc_manifest_helper_invocation?(content, "serverWebpackConfig")
 
         fallback_import_pattern = server_bundler_fallback_import_pattern
 
@@ -516,7 +516,7 @@ module ReactOnRails
         original_content = content
 
         # Skip if the current helper-based RSC manifest wiring is already configured.
-        return if content.include?("addRSCManifestPlugin")
+        return if rsc_manifest_helper_invocation?(content, "clientConfig")
 
         fallback_import_pattern = %r{(const commonWebpackConfig = require\(['"]\./commonWebpackConfig['"]\);)}
 
@@ -681,6 +681,18 @@ module ReactOnRails
         )
       end
 
+      def rsc_manifest_helper_invocation?(content, bundler_config_name)
+        pattern = /\baddRSCManifestPlugin\s*\(\s*#{Regexp.escape(bundler_config_name)}\b/
+        search_from = 0
+        while (match = content.match(pattern, search_from))
+          return true if js_code_position?(content, match.begin(0))
+
+          search_from = match.end(0)
+        end
+
+        false
+      end
+
       def add_rsc_manifest_helper_import(config_path, content, fallback_import_pattern)
         return true if content.include?(RSC_MANIFEST_HELPER_IMPORT)
 
@@ -736,7 +748,9 @@ module ReactOnRails
 
         content = File.read(path)
         missing = []
-        missing << "addRSCManifestPlugin in serverWebpackConfig.js" unless content.include?("addRSCManifestPlugin")
+        unless rsc_manifest_helper_invocation?(content, "serverWebpackConfig")
+          missing << "addRSCManifestPlugin in serverWebpackConfig.js"
+        end
         unless content.match?(server_configure_with_rsc_bundle_pattern)
           missing << "rscBundle parameter in serverWebpackConfig.js"
         end
@@ -748,7 +762,9 @@ module ReactOnRails
         return [] unless File.exist?(path)
 
         content = File.read(path)
-        content.include?("addRSCManifestPlugin") ? [] : ["addRSCManifestPlugin in clientWebpackConfig.js"]
+        return [] if rsc_manifest_helper_invocation?(content, "clientConfig")
+
+        ["addRSCManifestPlugin in clientWebpackConfig.js"]
       end
 
       def check_rsc_scob_config

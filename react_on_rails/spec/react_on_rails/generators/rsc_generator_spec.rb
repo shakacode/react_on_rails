@@ -1245,6 +1245,77 @@ describe RscGenerator, type: :generator do
       expect(migrated_content).not_to include("RSCWebpackPlugin")
     end
 
+    it "does not treat a helper import without a client plugin call as already configured" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { addRSCManifestPlugin } = require('./rscManifestPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            delete clientConfig.entry['server-bundle'];
+
+            // Interrupted setup mentioned addRSCManifestPlugin but never invoked it.
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      generator.send(:update_client_webpack_config_for_rsc)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).to include(
+        "addRSCManifestPlugin(clientConfig, { isServer: false, clientReferences: rscClientReferences });"
+      )
+      expect(generator.send(:check_rsc_client_config)).to eq([])
+    end
+
+    it "does not treat a helper import without a server plugin call as already configured" do
+      config_path = "config/webpack/serverWebpackConfig.js"
+      helper_imports = [
+        "const commonWebpackConfig = require('./commonWebpackConfig');",
+        "const { addRSCManifestPlugin } = require('./rscManifestPlugin');"
+      ].join("\n")
+      simulate_existing_file(
+        config_path,
+        pro_server_webpack_content
+          .sub(
+            "const commonWebpackConfig = require('./commonWebpackConfig');",
+            helper_imports
+          )
+          .sub("const configureServer = () => {", "const configureServer = (rscBundle = false) => {")
+      )
+
+      generator.send(:update_server_webpack_config_for_rsc)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).to include("if (!rscBundle)")
+      expect(migrated_content).to include(
+        "addRSCManifestPlugin(serverWebpackConfig, { isServer: true, clientReferences: rscClientReferences });"
+      )
+      expect(generator.send(:check_rsc_server_config)).to eq([])
+    end
+
+    it "ignores commented-out helper calls when verifying manifest helper setup" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { addRSCManifestPlugin } = require('./rscManifestPlugin');
+
+          // addRSCManifestPlugin(clientConfig, { isServer: false });
+          module.exports = () => commonWebpackConfig();
+        JS
+      )
+
+      expect(generator.send(:check_rsc_client_config)).to include("addRSCManifestPlugin in clientWebpackConfig.js")
+    end
+
     it "rolls back manifest-helper migration when scoped sections are not ready after helper setup" do
       config_path = "config/webpack/clientWebpackConfig.js"
       simulate_existing_file(
