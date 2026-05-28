@@ -724,7 +724,8 @@ module ReactOnRails
       return if message.blank?
 
       error = StandardError.new(message)
-      error.set_backtrace(normalize_js_stack_lines(rendering_error["stack"]))
+      frames = normalize_js_stack_lines(rendering_error["stack"])
+      error.set_backtrace(frames) unless frames.empty?
       error
     end
 

@@ -56,6 +56,11 @@ const createFromReactOnRailsNodeStream = async (
     },
   });
 
+  // Note: this try/catch only intercepts errors thrown during the initial stream parse.
+  // React RSC errors that surface during the deferred render phase (e.g. when a Suspense
+  // boundary resolves a lazy element) propagate through React's error-boundary mechanism
+  // instead and won't be enriched here. The raw diagnostic is still captured via
+  // `onDiagnosticError` above, so the information isn't lost.
   try {
     return await createFromNodeStream<React.ReactNode>(transformedStream);
   } catch (error: unknown) {

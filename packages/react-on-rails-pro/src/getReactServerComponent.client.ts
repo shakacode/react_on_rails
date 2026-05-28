@@ -159,12 +159,15 @@ const fetchRSC = ({
     const propsString = JSON.stringify(componentProps);
     const strippedUrlPath = rscPayloadGenerationUrlPath.replace(/^\/|\/$/g, '');
     const encodedParams = new URLSearchParams({ props: propsString }).toString();
-    const fetchUrl = `/${strippedUrlPath}/${componentName}?${encodedParams}`;
+    const sourcePath = `/${strippedUrlPath}/${componentName}`;
+    const fetchUrl = `${sourcePath}?${encodedParams}`;
 
     return createFromFetch(fetch(fetchUrl), {
       componentName,
       cspNonce: railsContext.cspNonce,
-      source: fetchUrl,
+      // Keep `source` query-string free so serialized props aren't echoed into error messages
+      // or attached error-monitoring events. The outer wrapper below retains `fetchUrl` for reproducibility.
+      source: sourcePath,
     }).catch((error: unknown) => {
       // RSC stream diagnostic errors already carry component/source context — preserve them
       // (including .cause and the merged stack) instead of flattening to a plain Error.

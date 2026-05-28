@@ -615,6 +615,18 @@ describe ReactOnRailsHelper do
       expect(error.backtrace.first).to start_with("at CommentsToggle")
       expect(error.backtrace).not_to include(/^TypeError:/)
     end
+
+    it "leaves backtrace nil when renderingError has no stack so error reporters can enrich it" do
+      json_result = {
+        "renderingError" => {
+          "message" => "useState is not a function"
+        }
+      }
+
+      error = helper.send(:rendering_error_from_result, json_result)
+
+      expect(error.backtrace).to be_nil
+    end
   end
 
   describe "#redux_store" do
