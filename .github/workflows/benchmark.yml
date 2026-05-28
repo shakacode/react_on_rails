@@ -112,6 +112,19 @@ jobs:
           BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}"
           script/ci-changes-detector "$BASE_REF"
         shell: bash
+      - name: Guard docs-only main pushes
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: ./.github/actions/ensure-main-docs-safety
+        with:
+          docs-only: ${{ steps.detect.outputs.docs_only }}
+          previous-sha: ${{ github.event.before }}
+      # Everything below is needed only to compute the benchmark matrix.
+      # Skip on docs-only triggers — every benchmark-* job is gated on `docs_only != 'true'` anyway.
+      - name: Setup Ruby
+        if: steps.detect.outputs.docs_only != 'true'
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
       - name: Install Ruby Gems for Core dummy app
         if: steps.detect.outputs.docs_only != 'true'
         uses: ./.github/actions/setup-bundle
@@ -584,7 +597,6 @@ jobs:
           exit 1
 
       - name: Execute Pro Node Renderer benchmark suite
-        if: env.RUN_PRO_NODE_RENDERER
         timeout-minutes: 30
         run: |
           set -e

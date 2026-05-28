@@ -74,8 +74,10 @@ end
 
 def benchmark_routes_for_app(app_dir, explicit_routes)
   if explicit_routes
+    # strip_optional_params keeps the BMF benchmark name (which bench.rb uses as-is) stable
+    # across runs when callers pass routes copied from `rails routes` output containing "(.:format)".
     return explicit_routes.split(",").map(&:strip).reject(&:empty?).map do |route|
-             normalize_route_path(route)
+             strip_optional_params(normalize_route_path(route))
            end
   end
 

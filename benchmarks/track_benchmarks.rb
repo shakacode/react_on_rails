@@ -5,6 +5,15 @@ require "open3"
 BOUNDARY = "0.95"
 MAX_SAMPLE = "64"
 BENCHER_URL = "https://bencher.dev/perf/react-on-rails-t8a9ncxo"
+# Threshold direction: :lower for "regression = drop" measures (rps),
+# :upper for "regression = climb" measures (latency, failure rate).
+THRESHOLDS = [
+  ["rps", :lower],
+  ["p50_latency", :upper],
+  ["p90_latency", :upper],
+  ["p99_latency", :upper],
+  ["failed_pct", :upper]
+].freeze
 
 def env!(key)
   ENV.fetch(key) do
@@ -15,9 +24,14 @@ end
 
 SUITE_NAME = env!("BENCHMARK_SUITE_NAME")
 REPORT_MARKER = env!("BENCHER_REPORT_MARKER")
+# Cleanup pattern matches every sharded marker of this suite ("<!-- BENCHER_REPORT_CORE_SHARD_") so
+# topology changes (e.g. 2 shards → 3) don't strand old comments on the PR. Falls back to the literal
+# marker for unsharded suites (Pro Node Renderer).
+REPORT_MARKER_PREFIX = REPORT_MARKER[/\A<!-- BENCHER_REPORT_[A-Z_]+_SHARD_/] || REPORT_MARKER
 env!("BENCHER_API_TOKEN")
 BENCHMARK_JSON = ENV.fetch("BENCHMARK_JSON", "bench_results/benchmark.json")
 REPORT_HTML = ENV.fetch("BENCHER_REPORT_HTML", "bench_results/bencher_report.html")
+CHUNK_PREFIX = "bench_results/bencher_chunk"
 
 def capture_command(*args)
   stdout, stderr, status = Open3.capture3(*args)
@@ -68,6 +82,17 @@ def branch_and_start_point_args
   end
 end
 
+def threshold_args(measure, direction)
+  lower, upper = direction == :lower ? [BOUNDARY, "_"] : ["_", BOUNDARY]
+  [
+    "--threshold-measure", measure,
+    "--threshold-test", "t_test",
+    "--threshold-max-sample-size", MAX_SAMPLE,
+    "--threshold-lower-boundary", lower,
+    "--threshold-upper-boundary", upper
+  ]
+end
+
 def bencher_args(branch, start_point_args)
   [
     "bencher", "run",
@@ -80,31 +105,7 @@ def bencher_args(branch, start_point_args)
     "--err",
     "--quiet",
     "--format", "html",
-    "--threshold-measure", "rps",
-    "--threshold-test", "t_test",
-    "--threshold-max-sample-size", MAX_SAMPLE,
-    "--threshold-lower-boundary", BOUNDARY,
-    "--threshold-upper-boundary", "_",
-    "--threshold-measure", "p50_latency",
-    "--threshold-test", "t_test",
-    "--threshold-max-sample-size", MAX_SAMPLE,
-    "--threshold-lower-boundary", "_",
-    "--threshold-upper-boundary", BOUNDARY,
-    "--threshold-measure", "p90_latency",
-    "--threshold-test", "t_test",
-    "--threshold-max-sample-size", MAX_SAMPLE,
-    "--threshold-lower-boundary", "_",
-    "--threshold-upper-boundary", BOUNDARY,
-    "--threshold-measure", "p99_latency",
-    "--threshold-test", "t_test",
-    "--threshold-max-sample-size", MAX_SAMPLE,
-    "--threshold-lower-boundary", "_",
-    "--threshold-upper-boundary", BOUNDARY,
-    "--threshold-measure", "failed_pct",
-    "--threshold-test", "t_test",
-    "--threshold-max-sample-size", MAX_SAMPLE,
-    "--threshold-lower-boundary", "_",
-    "--threshold-upper-boundary", BOUNDARY
+    *THRESHOLDS.flat_map { |measure, direction| threshold_args(measure, direction) }
   ]
 end
 
@@ -116,9 +117,10 @@ def run_bencher(branch, start_point_args)
 end
 
 def retry_without_start_point_hash?(stderr, exit_code)
+  # \bAlerts?\b avoids false matches on URL paths like "/alerts/..." that Bencher prints in stderr.
   exit_code != 0 &&
     stderr.match?(/Head Version.*not found/) &&
-    !stderr.match?(/alert|threshold violation|boundary violation/i)
+    !stderr.match?(/\bAlerts?\b|threshold violation|boundary violation/i)
 end
 
 def alert?(stderr, exit_code)
@@ -137,18 +139,23 @@ def post_report_to_summary
 end
 
 def split_report_for_comments
-  ENV["BENCHER_REPORT_MARKER"] = REPORT_MARKER
-  return true if system("ruby", "benchmarks/split_html_report.rb", REPORT_HTML, "bench_results/bencher_chunk")
+  # Clear leftover chunks from prior runs so post_report_comment_chunks doesn't
+  # mix fresh output with stale data (matters on self-hosted/cached runners).
+  Dir.glob("#{CHUNK_PREFIX}*.html").each { |path| File.delete(path) }
+  return true if system({ "BENCHER_REPORT_MARKER" => REPORT_MARKER },
+                        "ruby", "benchmarks/split_html_report.rb", REPORT_HTML, CHUNK_PREFIX)
 
   warn "Failed to split HTML report; skipping PR comments"
   false
 end
 
 def stale_comment_ids
+  # startswith() pairs with split_html_report writing the marker at body start, so reviewers
+  # quoting the marker in their own comments aren't deleted as stale.
   stdout, status = capture_command(
     "gh", "api", "repos/#{ENV.fetch('GITHUB_REPOSITORY')}/issues/#{ENV.fetch('PR_NUMBER')}/comments",
     "--paginate",
-    "--jq", ".[] | select(.body | contains(#{REPORT_MARKER.dump})) | .id"
+    "--jq", ".[] | select(.body | startswith(#{REPORT_MARKER_PREFIX.dump})) | .id"
   )
   return [] unless status.success?
 
