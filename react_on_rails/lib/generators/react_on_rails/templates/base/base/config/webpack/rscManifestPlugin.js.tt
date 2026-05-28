@@ -99,6 +99,8 @@ const globToRegExpSource = (glob) => {
         index = closingBraceIndex;
         continue;
       }
+      // eslint-disable-next-line no-console
+      console.warn(`[rscManifestPlugin] Unmatched '{' in glob pattern at position ${index}: '${glob}'`);
     }
 
     if (char === '[') {
@@ -199,7 +201,7 @@ const hasUseClientDirective = (source) => {
   let remaining = skipLeadingJavaScriptComments(source.replace(/^\uFEFF/, ''));
 
   while (remaining.length > 0) {
-    const match = remaining.match(/^(['"])(.*?)\1\s*;?/);
+    const match = remaining.match(/^(['"])(.*?)\1\s*(?:;|\n|$)/);
     if (!match) return false;
     if (match[2] === 'use client') return true;
 
@@ -669,6 +671,9 @@ class RspackRSCManifestPlugin {
               if (!modules) return;
               for (const module of modules) {
                 const moduleId = compilation.chunkGraph.getModuleId(module);
+                // chunkPairs covers all chunks in the group, matching upstream
+                // react-server-dom-webpack/plugin; this may over-list preloads for
+                // modules that appear in only one chunk of a multi-chunk group.
                 recordModule(moduleId, module, chunkPairs);
 
                 // Intentional: a shared module can be visited via multiple chunk groups.
