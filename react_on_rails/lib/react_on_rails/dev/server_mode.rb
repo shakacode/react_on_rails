@@ -109,8 +109,6 @@ module ReactOnRails
           return nil unless config.is_a?(Hash)
 
           dev_server = dev_server_config(config)
-          return :live_reload unless dev_server
-
           detect_from_dev_server_config(dev_server)
         end
 
