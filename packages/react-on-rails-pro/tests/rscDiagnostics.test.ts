@@ -6,7 +6,11 @@ import { text } from 'stream/consumers';
 import { Readable } from 'stream';
 
 import transformRSCStream from '../src/transformRSCNodeStream.ts';
-import { buildRSCStreamDiagnosticError, mergeRSCStreamDiagnosticError } from '../src/rscDiagnostics.ts';
+import {
+  buildRSCStreamDiagnosticError,
+  extractModulePathFromStack,
+  mergeRSCStreamDiagnosticError,
+} from '../src/rscDiagnostics.ts';
 
 const encodeLengthPrefixedChunk = (metadata: Record<string, unknown>, content: string) => {
   const contentBuffer = Buffer.from(content, 'utf-8');
@@ -117,6 +121,26 @@ describe('RSC diagnostics', () => {
 
     expect(diagnosticError).toBeDefined();
     expect(diagnosticError?.message).toContain('Original error: useState is not a function');
+  });
+
+  it('strips the V8 `async ` keyword from anonymous async stack frames', () => {
+    const stack =
+      'TypeError: useState is not a function\n' +
+      '    at async /app/server.js:42:3\n' +
+      '    at PostsPage (/app/components/PostsPage.jsx:8:3)';
+
+    expect(extractModulePathFromStack(stack)).toBe('/app/server.js');
+  });
+
+  it('keeps the merged-diagnostic marker non-enumerable so error reporters do not serialize it', () => {
+    const diagnosticError = new Error('[ReactOnRails] RSC bundle rendering failed.');
+    diagnosticError.name = 'ReactOnRailsRSCStreamError';
+    const genericStreamError = new Error('boom');
+
+    const mergedError = mergeRSCStreamDiagnosticError(genericStreamError, diagnosticError);
+
+    expect(Object.keys(mergedError)).not.toContain('__rorRSCDiagMerged');
+    expect(Object.prototype.hasOwnProperty.call(mergedError, '__rorRSCDiagMerged')).toBe(true);
   });
 
   it('treats a merged diagnostic as idempotent even when the message format changes', () => {

@@ -42,7 +42,9 @@ export const extractModulePathFromStack = (stack?: string) => {
   if (!stack) return undefined;
   for (const line of stack.split('\n')) {
     const match = /\(([^()]+):\d+:\d+\)$|\bat\s+(.+):\d+:\d+$/.exec(line.trim());
-    const location = match?.[1] ?? match?.[2];
+    // V8 emits anonymous async frames as `at async /path:l:c`; strip the `async ` keyword
+    // so the diagnostic reports `Module: /path` instead of `Module: async /path`.
+    const location = match?.[1] ?? match?.[2]?.replace(/^async\s+/, '');
     if (location) return location.replace(/\?.*$/, '');
   }
   return undefined;
@@ -90,7 +92,14 @@ export const mergeRSCStreamDiagnosticError = (error: unknown, diagnosticError?: 
   const mergedError: RSCStreamDiagnosticError = new Error(message);
   mergedError.name = RSC_STREAM_DIAGNOSTIC_ERROR_NAME;
   mergedError.cause = streamError;
-  mergedError[MERGED_DIAGNOSTIC_FLAG] = true;
+  // Non-enumerable so error reporters that iterate own keys (Sentry "extra data",
+  // structured cloning, etc.) don't pick up this internal marker.
+  Object.defineProperty(mergedError, MERGED_DIAGNOSTIC_FLAG, {
+    value: true,
+    writable: false,
+    enumerable: false,
+    configurable: false,
+  });
   mergedError.stack = [
     `${mergedError.name}: ${message}`,
     diagnosticError.stack && `RSC diagnostic stack:\n${diagnosticError.stack}`,
