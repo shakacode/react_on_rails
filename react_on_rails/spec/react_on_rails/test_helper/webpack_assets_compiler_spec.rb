@@ -5,7 +5,7 @@ require_relative "../spec_helper"
 describe ReactOnRails::TestHelper::WebpackAssetsCompiler do
   describe "#ensureAssetsCompiled" do
     let(:invalid_command) { "sh -c 'exit 1'" }
-    let(:valid_command) { "RAILS_ENV=test bin/shakapacker" }
+    let(:valid_command) { "true" }
 
     context "when assets compiler command succeeds" do
       before do
