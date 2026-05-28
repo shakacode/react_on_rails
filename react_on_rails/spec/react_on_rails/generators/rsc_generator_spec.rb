@@ -1321,6 +1321,28 @@ describe RscGenerator, type: :generator do
       expect(generator.send(:check_rsc_client_config)).to eq([])
     end
 
+    it "reports missing scoped clientReferences when the client helper call and import already exist" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { addRSCManifestPlugin } = require('./rscManifestPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            addRSCManifestPlugin(clientConfig, { isServer: false });
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      missing = generator.send(:check_rsc_client_config)
+      expect(missing).to include("generated scoped clientReferences in clientWebpackConfig.js")
+    end
+
     it "inserts a missing helper import when the client helper call already exists" do
       config_path = "config/webpack/clientWebpackConfig.js"
       simulate_existing_file(

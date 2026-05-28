@@ -745,6 +745,54 @@ module ReactOnRails
         false
       end
 
+      def rsc_client_references_configured?(content, bundler_config_name, is_server:)
+        sections = rsc_manifest_helper_option_sections(content, bundler_config_name)
+        return rsc_manifest_plugin_sections_ready?(content, is_server: is_server) if sections.empty?
+
+        sections.all? do |body|
+          if rsc_plugin_body_has_top_level_scoped_client_references?(body)
+            scoped_rsc_client_references_defined?(content)
+          else
+            rsc_plugin_body_has_top_level_key?(body, "clientReferences")
+          end
+        end
+      end
+
+      def rsc_manifest_helper_option_sections(content, bundler_config_name)
+        pattern = /\baddRSCManifestPlugin\s*\(\s*#{Regexp.escape(bundler_config_name)}\b/
+        sections = []
+        search_from = 0
+
+        while (match = content.match(pattern, search_from))
+          call_start = match.begin(0)
+          after_config_name = match.end(0)
+          unless js_code_position?(content, call_start)
+            search_from = after_config_name
+            next
+          end
+
+          comma_index = first_significant_js_index(content, after_config_name)
+          options_start = if comma_index && content[comma_index] == ","
+                            first_significant_js_index(content, comma_index + 1)
+                          end
+          unless options_start && content[options_start] == "{"
+            search_from = after_config_name
+            next
+          end
+
+          options_end = matching_js_closing_brace(content, options_start)
+          unless options_end
+            search_from = options_start + 1
+            next
+          end
+
+          sections << content[(options_start + 1)...options_end]
+          search_from = options_end + 1
+        end
+
+        sections
+      end
+
       def add_rsc_manifest_helper_import(config_path, content, fallback_import_pattern)
         return true if rsc_manifest_helper_import?(content)
 
@@ -817,7 +865,7 @@ module ReactOnRails
         unless rsc_manifest_helper_import?(content)
           missing << "addRSCManifestPlugin helper import in serverWebpackConfig.js"
         end
-        unless scoped_rsc_client_references_defined?(content)
+        unless rsc_client_references_configured?(content, "serverWebpackConfig", is_server: true)
           missing << "generated scoped clientReferences in serverWebpackConfig.js"
         end
         unless content.match?(server_configure_with_rsc_bundle_pattern)
@@ -831,8 +879,6 @@ module ReactOnRails
         return [] unless File.exist?(path)
 
         content = File.read(path)
-        return [] if rsc_manifest_helper_invocation?(content, "clientConfig") && rsc_manifest_helper_import?(content)
-
         missing = []
         unless rsc_manifest_helper_invocation?(content, "clientConfig")
           missing << "addRSCManifestPlugin in clientWebpackConfig.js"
@@ -840,7 +886,7 @@ module ReactOnRails
         unless rsc_manifest_helper_import?(content)
           missing << "addRSCManifestPlugin helper import in clientWebpackConfig.js"
         end
-        unless scoped_rsc_client_references_defined?(content)
+        unless rsc_client_references_configured?(content, "clientConfig", is_server: false)
           missing << "generated scoped clientReferences in clientWebpackConfig.js"
         end
         missing
