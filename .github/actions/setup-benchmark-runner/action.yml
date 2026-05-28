@@ -104,7 +104,9 @@ runs:
         echo "BENCH_CMD=$BENCH_CMD" >> "$GITHUB_ENV"
 
         if [ -z "$WEB_CONCURRENCY" ]; then
-          WEB_CONCURRENCY=$((NPROC-1))
+          # Clamp to >=1 so single-CPU runners don't end up with WEB_CONCURRENCY=0 (Puma
+          # would start in single-mode, which the benchmarks aren't tuned for).
+          WEB_CONCURRENCY=$((NPROC > 1 ? NPROC - 1 : 1))
           echo "WEB_CONCURRENCY=$WEB_CONCURRENCY" >> "$GITHUB_ENV"
           echo "WEB_CONCURRENCY (auto): $WEB_CONCURRENCY"
         else
