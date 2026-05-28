@@ -24,6 +24,10 @@ on:
       run_generators:
         description: 'Should run generator tests'
         value: ${{ jobs.detect.outputs.run_generators }}
+      run_e2e_tests:
+        description: 'Should run Playwright E2E tests'
+        # TODO: wire into .github/workflows/playwright.yml job gating.
+        value: ${{ jobs.detect.outputs.run_e2e_tests }}
 
 jobs:
   detect:
@@ -39,6 +43,7 @@ jobs:
       run_js_tests: ${{ steps.changes.outputs.run_js_tests }}
       run_dummy_tests: ${{ steps.changes.outputs.run_dummy_tests }}
       run_generators: ${{ steps.changes.outputs.run_generators }}
+      run_e2e_tests: ${{ steps.changes.outputs.run_e2e_tests }}
     steps:
       - uses: actions/checkout@v4
         with:

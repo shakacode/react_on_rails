@@ -173,6 +173,16 @@ restores/saves the gem cache, and supports non-frozen installs via `frozen: 'fal
 
 ## Review Workflow
 
+### PR CI Labels
+
+Agents should recommend PR labels based on change complexity and risk. The goal is to keep low-risk PRs mergeable on fast, path-relevant CI while still escalating high-risk PRs (HPRs) before merge.
+
+- **Default: no CI-expansion label.** For docs-only changes, focused tests, small isolated fixes, and refactors with no cross-package behavior change, rely on the standard path-based CI selection and local verification.
+- **Use `full-ci`** (or ask a maintainer to comment `/run-skipped-ci`) when the PR is high-risk or broad: CI workflow/detector changes, dependency or lockfile updates, package manager/Ruby/Node version changes, release/build/package publishing logic, generator output, dummy app boot/build behavior, SSR or hydration behavior, cross-cutting core Ruby changes, Pro/core boundary changes, or changes where skipped suites would leave a credible regression path.
+- **Use `benchmark`** for performance-sensitive changes: server rendering paths, Node renderer, caching, bundle generation, asset serving/precompile behavior, concurrency/pooling, or anything expected to affect throughput, latency, memory, or bundle size. `full-ci` does not trigger benchmarks; use both labels when a PR is both high-risk and performance-sensitive.
+- **Remove `full-ci` when no longer needed** with `/stop-run-skipped-ci` if the PR returns to a low-risk state after splitting or reverting broad changes.
+- In PR descriptions and handoffs, state the recommended label decision explicitly: `Labels: none`, `Labels: full-ci`, `Labels: benchmark`, or `Labels: full-ci, benchmark`, with one sentence explaining why.
+
 For small, focused PRs (roughly 5 files changed or fewer and one clear purpose):
 
 - Use at most one AI reviewer that leaves inline comments. Additional AI tools should be summary-only or used manually.
