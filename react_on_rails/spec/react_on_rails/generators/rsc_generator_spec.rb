@@ -100,6 +100,9 @@ describe RscGenerator, type: :generator do
         assert_file "config/webpack/serverWebpackConfig.js" do |content|
           expect(content).to include("addRSCManifestPlugin")
           expect(content).to include("./rscManifestPlugin")
+          expect(content).to include(
+            "addRSCManifestPlugin(serverWebpackConfig, { isServer: true, clientReferences: rscClientReferences })"
+          )
         end
       end
 
@@ -3738,12 +3741,18 @@ describe RscGenerator, type: :generator do
           expect(content).to include("/\\.(?:js|mjs|cjs|jsx|ts|mts|cts|tsx)$/")
           expect(content).to include("config.source_path is not set; no client references will be scanned.")
           expect(content).to include("Object.fromEntries")
-          expect(content).to include("getModuleChunksIterable")
-          expect(content).to include("Array.from(chunk.files")
+          # Manifest must emit alternating [chunkId, filename] pairs (collectChunkGroupPairs),
+          # and walk chunkGroups via getChunkModulesIterable to compute them.
+          expect(content).to include("collectChunkGroupPairs")
+          expect(content).to include("compilation.chunkGroups")
+          expect(content).to include("getChunkModulesIterable")
+          expect(content).to include("pairs.push(chunk.id, file)")
           expect(content).to include("compilation.warnings.push")
           expect(content).to include("'use client' file was not found in compilation modules")
+          expect(content).to include("_warnedMissingModules")
           expect(content).to include("publicPath !== 'auto'")
           expect(content).not_to include("chunks: []")
+          expect(content).not_to match(/^const \{ RSCWebpackPlugin \} = require/)
         end
       end
 

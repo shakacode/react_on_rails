@@ -419,6 +419,10 @@ module ReactOnRails
           return
         end
 
+        # Intentionally non-fatal: if scoped `rscClientReferences` setup fails (missing anchor,
+        # blocked by later imports, or conflicting existing definition), we still add the helper
+        # import and plugin call. The helper falls back to scanning `config.source_path` at
+        # runtime, so the config remains functional without scoped references.
         ensure_rsc_client_references_setup(config_path, content, is_server: true, plugin_pending: true)
         content = File.read(full_path)
         return unless add_rsc_manifest_helper_import(config_path, content, fallback_import_pattern)
@@ -496,6 +500,10 @@ module ReactOnRails
           return
         end
 
+        # Intentionally non-fatal: if scoped `rscClientReferences` setup fails (missing anchor,
+        # blocked by later imports, or conflicting existing definition), we still add the helper
+        # import and plugin call. The helper falls back to scanning `config.source_path` at
+        # runtime, so the config remains functional without scoped references.
         ensure_rsc_client_references_setup(config_path, content, is_server: false, plugin_pending: true)
         content = File.read(full_path)
         return unless add_rsc_manifest_helper_import(config_path, content, fallback_import_pattern)
