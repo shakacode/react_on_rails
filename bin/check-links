@@ -31,8 +31,5 @@ fi
 
 # shellcheck disable=SC2035
 # Word-split the globs so *.md and react_on_rails_pro/*.md expand, matching
-# Word-split the globs so *.md and react_on_rails_pro/*.md expand, matching
 # the workflow's `args: --config .lychee.toml docs/ *.md react_on_rails_pro/*.md`.
-# shellcheck disable=SC2035
-exec lychee --config .lychee.toml docs/ *.md react_on_rails_pro/*.md
 exec lychee --config .lychee.toml docs/ *.md react_on_rails_pro/*.md
