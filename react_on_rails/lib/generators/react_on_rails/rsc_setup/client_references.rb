@@ -11,7 +11,7 @@ module ReactOnRails
         # `delete`, `throw`, `case`, `in`, `instanceof`) are not represented. A regex like `/\{/`
         # appearing after `return` may be misidentified as a division operator and let `{` / `}`
         # inside the regex body throw off `matching_js_closing_brace`'s depth counter. The
-        # unparseable-section detection in `rsc_plugin_options_followed_by_close_paren?` catches
+        # unparseable-section detection in `rsc_plugin_call_end_index` catches
         # the resulting corruption and flags the section as unparseable, so the migration falls
         # back safely rather than producing a wrong rewrite.
         REGEX_LITERAL_PRECEDERS = ["(", "{", "[", "=", ":", ",", ";", "!", "?", "&", "|", "+", "-", "*", "~", "^",
@@ -365,10 +365,6 @@ module ReactOnRails
         # there in `new RSCWebpackPlugin({...})` — a leading string-delimiter character would
         # simply be returned as a non-`)` and the section would be marked unparseable, which is
         # the safe outcome.
-        def rsc_plugin_options_followed_by_close_paren?(content, options_end)
-          !!rsc_plugin_call_end_index(content, options_end)
-        end
-
         def rsc_plugin_call_end_index(content, options_end)
           state = nil
           escaped = false
@@ -440,7 +436,7 @@ module ReactOnRails
         # unsupported: the inner backtick falsely closes the outer string state, exposing later
         # braces to the depth counter. `rsc_plugin_options_without_comments` shares the same
         # supported surface, and callers detect corrupted sections via
-        # `rsc_plugin_options_followed_by_close_paren?` so the migration warns instead of
+        # `rsc_plugin_call_end_index` so the migration warns instead of
         # producing a corrupt rewrite.
         def matching_js_closing_brace(content, open_index)
           depth = 0
@@ -477,7 +473,7 @@ module ReactOnRails
         # Central dispatcher for the lightweight JS scanner shared by every JS-aware pass in this
         # generator (`matching_js_closing_brace`, `js_top_level_position?`, `js_code_position?`,
         # `rsc_plugin_options_without_comments`, `first_significant_js_index`,
-        # `rsc_plugin_options_followed_by_close_paren?`, `last_js_code_char_index`,
+        # `rsc_plugin_call_end_index`, `last_js_code_char_index`,
         # `last_js_code_line_start`). Return index is the last consumed character. Line comments
         # leave the newline for the caller's normal index increment; block comments consume the
         # closing slash.

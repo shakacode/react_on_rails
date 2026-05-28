@@ -1326,12 +1326,21 @@ describe RscGenerator, type: :generator do
       simulate_existing_file(
         config_path,
         <<~JS
+          const { config } = require('shakapacker');
           const commonWebpackConfig = require('./commonWebpackConfig');
+          const { resolve } = require('path');
+          const rscClientReferences = {
+            directory: resolve(config.source_path),
+            recursive: true,
+          };
 
           const configureClient = () => {
             const clientConfig = commonWebpackConfig();
             delete clientConfig.entry['server-bundle'];
-            addRSCManifestPlugin(clientConfig, { isServer: false });
+            addRSCManifestPlugin(clientConfig, {
+              isServer: false,
+              clientReferences: rscClientReferences,
+            });
 
             return clientConfig;
           };
@@ -1409,14 +1418,22 @@ describe RscGenerator, type: :generator do
         config_path,
         <<~JS
           const { config } = require('shakapacker');
+          const { resolve } = require('path');
           const bundler = config.assets_bundler === 'rspack'
             ? require('@rspack/core')
             : require('webpack');
+          const rscClientReferences = {
+            directory: resolve(config.source_path),
+            recursive: true,
+          };
 
           const configureServer = (rscBundle = false) => {
             const serverWebpackConfig = { plugins: [] };
             if (!rscBundle) {
-              addRSCManifestPlugin(serverWebpackConfig, { isServer: true });
+              addRSCManifestPlugin(serverWebpackConfig, {
+                isServer: true,
+                clientReferences: rscClientReferences,
+              });
             }
             serverWebpackConfig.plugins.unshift(
               new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }),
@@ -1652,6 +1669,45 @@ describe RscGenerator, type: :generator do
       expect(migrated_content).to include("const { addRSCManifestPlugin } = require('./rscManifestPlugin');")
       expect(migrated_content).to include("addRSCManifestPlugin(clientConfig, {")
       expect(migrated_content).not_to include("react-on-rails-rsc/WebpackPlugin")
+      expect(migrated_content).not_to include("new RSCWebpackPlugin")
+    end
+
+    it "removes a stale RSCWebpackPlugin import when the helper import already exists" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { addRSCManifestPlugin } = require('./rscManifestPlugin');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const rscClientReferences = {
+            directory: './app/javascript',
+            recursive: true,
+          };
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(
+              new RSCWebpackPlugin({
+                isServer: false,
+                clientReferences: rscClientReferences,
+              }),
+            );
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      generator.send(:update_client_webpack_config_for_rsc)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content.scan("./rscManifestPlugin").length).to eq(1)
+      expect(migrated_content).not_to include("react-on-rails-rsc/WebpackPlugin")
+      expect(migrated_content).to include("addRSCManifestPlugin(clientConfig, {")
       expect(migrated_content).not_to include("new RSCWebpackPlugin")
     end
 
@@ -4122,13 +4178,12 @@ describe RscGenerator, type: :generator do
           expect(content).to include("Skipped unreadable directory")
           expect(content).to include("RSC_CLIENT_REFERENCES_ENTRY_NAME")
           expect(content).to include("[RSC_CLIENT_REFERENCES_ENTRY_NAME]: requests")
-          expect(content).to include("addClientReferencesToServerEntry")
           expect(content).to include("without executing")
           expect(content).to include("Node `server-bundle` entry")
           expect(content).not_to include("'server-bundle': appendImports(entryValue['server-bundle'], requests)")
           expect(content).to include("if (options.isServer)")
           expect(content).to include(
-            "addClientReferencesToServerEntry(bundlerConfig, clientReferenceFiles, clientReferenceRequests)"
+            "addClientReferencesToEntry(bundlerConfig, clientReferenceFiles, clientReferenceRequests)"
           )
           expect(content).to include("bundlerConfig.plugins = bundlerConfig.plugins ?? []")
           expect(content).to include("compiler.webpack is not available")
@@ -4157,7 +4212,7 @@ describe RscGenerator, type: :generator do
           expect(content).to include("compilation.warnings.push")
           expect(content).to include("'use client' file was not found in compilation modules")
           expect(content).to include("_warnedMissingModules")
-          expect(content).not_to include("NODE_ENV")
+          expect(content).to include("process.env.NODE_ENV === 'production'")
           expect(content).to include("publicPath !== 'auto'")
           expect(content).not_to include("chunks: []")
           expect(content).not_to match(/^const \{ RSCWebpackPlugin \} = require/)

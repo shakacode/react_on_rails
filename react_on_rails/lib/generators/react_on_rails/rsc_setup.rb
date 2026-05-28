@@ -674,7 +674,8 @@ module ReactOnRails
 
       def replace_rsc_webpack_plugin_import_with_helper(config_path, content, fallback_import_pattern)
         if content.match?(RSC_WEBPACK_PLUGIN_IMPORT_PATTERN)
-          gsub_file(config_path, RSC_WEBPACK_PLUGIN_IMPORT_PATTERN, RSC_MANIFEST_HELPER_IMPORT)
+          replacement = rsc_manifest_helper_import?(content) ? "" : RSC_MANIFEST_HELPER_IMPORT
+          gsub_file(config_path, RSC_WEBPACK_PLUGIN_IMPORT_PATTERN, replacement)
           return true
         end
 
@@ -813,6 +814,9 @@ module ReactOnRails
         unless rsc_manifest_helper_import?(content)
           missing << "addRSCManifestPlugin helper import in serverWebpackConfig.js"
         end
+        unless scoped_rsc_client_references_defined?(content)
+          missing << "generated scoped clientReferences in serverWebpackConfig.js"
+        end
         unless content.match?(server_configure_with_rsc_bundle_pattern)
           missing << "rscBundle parameter in serverWebpackConfig.js"
         end
@@ -832,6 +836,9 @@ module ReactOnRails
         end
         unless rsc_manifest_helper_import?(content)
           missing << "addRSCManifestPlugin helper import in clientWebpackConfig.js"
+        end
+        unless scoped_rsc_client_references_defined?(content)
+          missing << "generated scoped clientReferences in clientWebpackConfig.js"
         end
         missing
       end

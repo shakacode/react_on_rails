@@ -102,7 +102,11 @@ const globToRegExpSource = (glob) => {
     if (char === '[') {
       const closingBracketIndex = normalized.indexOf(']', index + 1);
       if (closingBracketIndex !== -1) {
-        source += normalized.slice(index, closingBracketIndex + 1);
+        const inner = normalized.slice(index + 1, closingBracketIndex);
+        // Glob and regex bracket expressions mostly share syntax; translate only
+        // glob's leading `!` negation to regex's `^` form.
+        const regexInner = inner.startsWith('!') ? `^${inner.slice(1)}` : inner;
+        source += `[${regexInner}]`;
         index = closingBracketIndex;
         continue;
       }
@@ -189,8 +193,12 @@ const normalizeClientReferences = () => {
   // without any diagnostic. Revisit if Shakapacker exposes an official accessor.
   const directories = [config.source_path, ...(config.additional_paths || [])].filter(Boolean);
   if (directories.length === 0) {
+    const message =
+      '[rscManifestPlugin] config.source_path is not set; no client references will be scanned.';
+    if (process.env.NODE_ENV === 'production') throw new Error(message);
+
     // eslint-disable-next-line no-console
-    console.warn('[rscManifestPlugin] config.source_path is not set; no client references will be scanned.');
+    console.warn(message);
   }
 
   return directories.map((directory) => ({
@@ -212,7 +220,11 @@ const resolveReferenceDirectory = (context, directory) =>
 const resolveRealPath = (filePath) => {
   try {
     return fs.realpathSync(filePath);
-  } catch {
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      // eslint-disable-next-line no-console
+      console.warn(`[rscManifestPlugin] realpathSync failed for ${filePath}: ${error.message}`);
+    }
     return path.resolve(filePath);
   }
 };
@@ -414,22 +426,15 @@ const addClientReferencesToEntry = (bundlerConfig, clientReferenceFiles, clientR
   bundlerConfig.entry = addRequestsToEntry(entry);
 };
 
-const addClientReferencesToServerEntry = (bundlerConfig, clientReferenceFiles, clientReferenceRequests) => {
-  // Use a dedicated synthetic entry for server manifest builds too. This keeps
-  // client-only modules in the graph for manifest generation without executing
-  // them as part of the Node `server-bundle` entry at startup.
-  addClientReferencesToEntry(bundlerConfig, clientReferenceFiles, clientReferenceRequests);
-};
-
 const collectChunkGroupPairs = (chunkGroup) => {
   // The RSC runtime reads `chunks` as alternating [chunkId, filename, chunkId, filename, ...]
   // pairs (see react-server-dom-webpack/plugin), so emit one [id, file] pair per chunk.
   // Keep chunk-group-level pairs to mirror the upstream manifest shape.
   const pairs = [];
   for (const chunk of chunkGroup.chunks) {
+    if (chunk.id == null) continue;
     for (const file of chunk.files || []) {
       if (!file.endsWith('.js') || file.endsWith('.hot-update.js')) continue;
-      if (chunk.id == null) continue;
       pairs.push(chunk.id, file);
       break; // Take only the primary JS file per chunk, mirroring react-server-dom-webpack/plugin.
     }
@@ -595,7 +600,10 @@ const addRSCManifestPlugin = (bundlerConfig, options) => {
       options.clientReferences,
     );
     if (options.isServer) {
-      addClientReferencesToServerEntry(bundlerConfig, clientReferenceFiles, clientReferenceRequests);
+      // Use a dedicated synthetic entry for server manifest builds too. This keeps
+      // client-only modules in the graph for manifest generation without executing
+      // them as part of the Node `server-bundle` entry at startup.
+      addClientReferencesToEntry(bundlerConfig, clientReferenceFiles, clientReferenceRequests);
     } else {
       addClientReferencesToEntry(bundlerConfig, clientReferenceFiles, clientReferenceRequests);
     }
