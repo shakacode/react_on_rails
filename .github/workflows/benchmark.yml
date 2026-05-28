@@ -580,6 +580,17 @@ jobs:
 
           echo "✅ Production assets built successfully"
 
+      - name: Pre-seed Node Renderer bundle cache
+        # Stages the just-built bundles into `.node-renderer-bundles/<hash>-production/`
+        # so bench-node-renderer.rb finds them at startup instead of waiting for the
+        # first SSR request to upload them.
+        run: |
+          set -e
+          echo "🔧 Pre-seeding node renderer bundle cache..."
+          cd react_on_rails_pro/spec/dummy
+          RAILS_ENV=production NODE_ENV=production \
+            bundle exec rake react_on_rails_pro:pre_seed_renderer_cache MODE=symlink
+
       - name: Start Pro node renderer
         run: |
           set -e
