@@ -37,12 +37,62 @@ import loadJsonFile from '../loadJsonFile.ts';
 
 let serverRendererPromise: Promise<ReturnType<typeof buildServerRenderer>> | undefined;
 
+const CLIENT_HOOK_NAMES = [
+  'useState',
+  'useEffect',
+  'useReducer',
+  'useCallback',
+  'useMemo',
+  'useRef',
+  'useLayoutEffect',
+  'useImperativeHandle',
+  'useContext',
+  'useSyncExternalStore',
+  'useTransition',
+  'useDeferredValue',
+  'useId',
+  'useDebugValue',
+  'useInsertionEffect',
+  'useOptimistic',
+  'useActionState',
+].join('|');
+const CLIENT_HOOK_RUNTIME_ERROR_REGEX = new RegExp(
+  `(?:(?:React\\.)|\\(0\\s*,\\s*[\\w$]+\\.)?(${CLIENT_HOOK_NAMES})\\)? is not a function\\b`,
+);
+
+const addRSCClientHookDiagnostic = (error: Error, componentName: string): Error => {
+  const match = error.message.match(CLIENT_HOOK_RUNTIME_ERROR_REGEX);
+  if (!match) return error;
+
+  const hookName = match[1];
+  const enhancedError = new Error(
+    `[React on Rails Pro] Component "${componentName}" called client hook "${hookName}" while rendering in ` +
+      `the React Server Components runtime.\n\n` +
+      `Most likely cause: "${componentName}", or a component it imports, uses client-only APIs but is missing ` +
+      `the '"use client";' directive.\n\n` +
+      `Add '"use client";' as the first statement of the client component file, or move hooks, event handlers, ` +
+      `and class components into a separate client component.\n\n` +
+      `Note: .client/.server file suffixes only control bundle placement. The '"use client";' directive controls ` +
+      `RSC client/server classification.\n\n` +
+      `Original error: ${error.message}`,
+  ) as Error & { cause?: unknown };
+
+  enhancedError.name = error.name;
+  enhancedError.cause = error;
+  const enhancedStackFrames = enhancedError.stack?.split('\n').slice(1).join('\n');
+  enhancedError.stack = `${enhancedError.name}: ${enhancedError.message}${
+    enhancedStackFrames ? `\n${enhancedStackFrames}` : ''
+  }\nCaused by: ${error.stack || error.message}`;
+
+  return enhancedError;
+};
+
 const streamRenderRSCComponent = (
   reactRenderingResult: StreamableComponentResult,
   options: RSCRenderParams,
   streamingTrackers: StreamingTrackers,
 ): Readable => {
-  const { throwJsErrors } = options;
+  const { name: componentName, throwJsErrors } = options;
   const { railsContext } = options;
   assertRailsContextWithServerStreamingCapabilities(railsContext);
 
@@ -56,13 +106,16 @@ const streamRenderRSCComponent = (
   const { pipeToTransform, readableStream, emitError } =
     transformRenderStreamChunksToResultObject(renderState);
 
-  const reportError = (error: Error) => {
-    console.error('Error in RSC stream', error);
+  const reportError = (error: Error): Error => {
+    const diagnosticError = addRSCClientHookDiagnostic(error, componentName);
+    console.error('Error in RSC stream', diagnosticError);
     if (throwJsErrors) {
-      emitError(error);
+      emitError(diagnosticError);
     }
     renderState.hasErrors = true;
-    renderState.error = error;
+    renderState.error = diagnosticError;
+
+    return diagnosticError;
   };
 
   const initializeAndRender = async () => {
@@ -86,8 +139,7 @@ const streamRenderRSCComponent = (
   };
 
   initializeAndRender().catch((e: unknown) => {
-    const error = convertToError(e);
-    reportError(error);
+    const error = reportError(convertToError(e));
     const errorHtml = handleError({ e: error, name: options.name, serverSide: true });
     pipeToTransform(errorHtml);
   });
