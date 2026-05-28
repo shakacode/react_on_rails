@@ -90,7 +90,7 @@ jobs:
       actions: read
     runs-on: ubuntu-22.04
     outputs:
-      docs_only: ${{ steps.detect.outputs.docs_only }}
+      non_runtime_only: ${{ steps.detect.outputs.non_runtime_only }}
       run_core_benchmarks: ${{ steps.benchmark-outputs.outputs.run_core_benchmarks }}
       run_pro_benchmarks: ${{ steps.benchmark-outputs.outputs.run_pro_benchmarks }}
       run_pro_node_renderer_benchmarks: ${{ steps.benchmark-outputs.outputs.run_pro_node_renderer_benchmarks }}
@@ -144,7 +144,7 @@ jobs:
         shell: bash
       - name: Set benchmark matrices
         id: benchmark-matrices
-        if: steps.detect.outputs.docs_only != 'true'
+        if: steps.detect.outputs.non_runtime_only != 'true'
         # Bump shard totals here when a suite's route set outgrows its current shard count.
         # The script is stdlib-only, so the runner's system Ruby is enough (no Bundler/Rails boot).
         run: |
@@ -173,7 +173,7 @@ jobs:
     name: Core benchmarks (shard ${{ matrix.shard_label }})
     if: |
       contains(fromJSON('["both", "core_only"]'), github.event.inputs.app_version || 'both') &&
-      needs.detect-changes.outputs.docs_only != 'true' &&
+      needs.detect-changes.outputs.non_runtime_only != 'true' &&
       (
         github.event_name == 'push' ||
         needs.detect-changes.outputs.run_core_benchmarks == 'true' ||
@@ -326,7 +326,7 @@ jobs:
     name: Pro benchmarks (shard ${{ matrix.shard_label }})
     if: |
       contains(fromJSON('["both", "pro_only", "pro_rails_only"]'), github.event.inputs.app_version || 'both') &&
-      needs.detect-changes.outputs.docs_only != 'true' &&
+      needs.detect-changes.outputs.non_runtime_only != 'true' &&
       (
         github.event_name == 'push' ||
         needs.detect-changes.outputs.run_pro_benchmarks == 'true' ||
@@ -480,7 +480,7 @@ jobs:
     # benchmark labels to trigger perf runs on PRs.
     if: |
       contains(fromJSON('["both", "pro_only", "pro_node_renderer_only"]'), github.event.inputs.app_version || 'both') &&
-      needs.detect-changes.outputs.docs_only != 'true' &&
+      needs.detect-changes.outputs.non_runtime_only != 'true' &&
       (
         github.event_name == 'push' ||
         needs.detect-changes.outputs.run_pro_node_renderer_benchmarks == 'true' ||
