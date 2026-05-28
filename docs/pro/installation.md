@@ -284,7 +284,7 @@ const config = {
 
   // Password for Rails <-> Node renderer communication
   // See value in /config/initializers/react_on_rails_pro.rb
-  password: env.RENDERER_PASSWORD || 'changeme',
+  password: env.RENDERER_PASSWORD,
 
   port: env.RENDERER_PORT || 3800,
 

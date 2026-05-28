@@ -1335,17 +1335,21 @@ describe InstallGenerator, type: :generator do
     include_examples "base_generator", application_js: true
     include_examples "no_redux_generator"
 
-    it "creates Pro initializer with NodeRenderer configuration" do
+    it "creates Pro initializer and node-renderer.js with matching random passwords" do
+      ruby_password = nil
       assert_file "config/initializers/react_on_rails_pro.rb" do |content|
         expect(content).to include("ReactOnRailsPro.configure")
         expect(content).to include('config.server_renderer = "NodeRenderer"')
         expect(content).to include("config.renderer_url")
         expect(content).to include("config.renderer_password")
         expect(content).to include("config.ssr_timeout")
+        expect(content).not_to include("devPassword")
+        password_match = content.match(/ENV\.fetch\("RENDERER_PASSWORD",\s*"([^"]+)"\)/)
+        expect(password_match).not_to be_nil
+        expect(password_match[1].length).to eq(64)
+        ruby_password = password_match[1]
       end
-    end
 
-    it "creates node-renderer.js bootstrap file" do
       assert_file "renderer/node-renderer.js" do |content|
         expect(content).to include("reactOnRailsProNodeRenderer")
         expect(content).to include("require('react-on-rails-pro-node-renderer')")
@@ -1355,6 +1359,11 @@ describe InstallGenerator, type: :generator do
         expect(content).to include("const configuredWorkersCount =")
         expect(content).to include("workersCount:")
         expect(content).to include("if (env.CI && configuredWorkersCount == null)")
+        expect(content).not_to include("devPassword")
+        password_match = content.match(/RENDERER_PASSWORD\s*\?\?\s*'([^']+)'/)
+        expect(password_match).not_to be_nil
+        expect(password_match[1].length).to eq(64)
+        expect(password_match[1]).to eq(ruby_password)
       end
     end
 
@@ -1538,6 +1547,17 @@ describe InstallGenerator, type: :generator do
       assert_file "renderer/node-renderer.js" do |content|
         expect(content).to include("// existing node-renderer")
         expect(content).not_to include("reactOnRailsProNodeRenderer")
+      end
+    end
+
+    # Regression: a new Pro initializer must not embed a fresh random literal
+    # password when the existing Node renderer file already contains its own
+    # literal — Rails and Node would otherwise disagree.
+    it "creates the Pro initializer with env-only password (no literal) so it cannot mismatch the existing renderer" do
+      assert_file "config/initializers/react_on_rails_pro.rb" do |content|
+        expect(content).to include("ReactOnRailsPro.configure")
+        expect(content).to include('config.renderer_password = ENV["RENDERER_PASSWORD"]')
+        expect(content).not_to match(/ENV\.fetch\("RENDERER_PASSWORD",\s*"[^"]+"\)/)
       end
     end
   end

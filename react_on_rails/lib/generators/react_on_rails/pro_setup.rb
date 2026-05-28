@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "securerandom"
 require_relative "generator_messages"
 require "react_on_rails/node_renderer_procfile"
 require "react_on_rails/pro_migration"
@@ -46,14 +47,56 @@ module ReactOnRails
         say set_color("🚀 REACT ON RAILS PRO SETUP", :cyan, :bold)
         say set_color("=" * 80, :cyan)
 
-        create_pro_initializer
+        # The Rails initializer and Node renderer bootstrap must share the same
+        # password literal. Only mint a fresh random password when BOTH files will
+        # be created — otherwise nil so each template falls back to the env-only
+        # branch, avoiding a literal mismatch with any existing file.
+        # Always reassign so a stale value from a prior invocation on the same
+        # instance can't leak into a later partial-install run.
+        @generated_renderer_password = nil
+        if pro_initializer_will_be_created? && node_renderer_will_be_created?
+          @generated_renderer_password = SecureRandom.hex(32)
+        end
+
+        initializer_created = create_pro_initializer
         legacy_renderer_detected = create_node_renderer
         add_pro_to_procfiles unless legacy_renderer_detected
         update_webpack_config_for_pro
 
+        say_renderer_password_setup_summary(initializer_created)
+
         say set_color("=" * 80, :cyan)
         say "✅ React on Rails Pro setup complete!", :green
         say set_color("=" * 80, :cyan)
+      end
+
+      def say_renderer_password_setup_summary(initializer_created)
+        if @generated_renderer_password
+          say ""
+          say set_color("🔐 A random renderer password was written into your config files.", :yellow, :bold)
+          say "   For production, set RENDERER_PASSWORD as an env var instead and"
+          say "   remove the literal value from version control."
+          say "   See: https://www.shakacode.com/react-on-rails/docs/pro/node-renderer/"
+          say ""
+        elsif initializer_created
+          # Initializer was newly created but the Node renderer file already exists;
+          # the new initializer falls back to ENV["RENDERER_PASSWORD"] only so it doesn't
+          # disagree with whatever literal the existing renderer file contains.
+          say ""
+          say set_color("⚠️  Existing Node renderer detected — Rails initializer uses " \
+                        "ENV[\"RENDERER_PASSWORD\"] only.", :yellow, :bold)
+          say "   Set RENDERER_PASSWORD in your environment to match the password in your existing renderer."
+          say ""
+        end
+      end
+
+      def pro_initializer_will_be_created?
+        !File.exist?(File.join(destination_root, "config/initializers/react_on_rails_pro.rb"))
+      end
+
+      def node_renderer_will_be_created?
+        !File.exist?(File.join(destination_root, "renderer/node-renderer.js")) &&
+          !File.exist?(File.join(destination_root, "client/node-renderer.js"))
       end
 
       # Check if the Pro gem is missing. When the base react_on_rails gem is in
@@ -205,14 +248,18 @@ module ReactOnRails
 
         if File.exist?(File.join(destination_root, initializer_path))
           say "ℹ️  #{initializer_path} already exists, skipping", :yellow
-          return
+          return false
         end
 
         say "📝 Creating React on Rails Pro initializer...", :yellow
 
+        # @generated_renderer_password is set by setup_pro only when both this
+        # file and the Node renderer bootstrap will be created together; nil here
+        # means the template emits the env-only fallback (no literal password).
         template("templates/pro/base/config/initializers/react_on_rails_pro.rb.tt", initializer_path)
 
         say "✅ Created #{initializer_path}", :green
+        true
       end
 
       # Matches active (uncommented) Procfile.dev node-renderer lines that
@@ -267,6 +314,11 @@ module ReactOnRails
               "to migrate, move it to #{node_renderer_path} and update any references " \
               "(e.g. Procfile.dev, Procfile.prod, Docker CMD / command):", :yellow
           say "      #{node_renderer_procfile_command('Procfile.dev')}", :yellow
+          say set_color(
+            "⚠️  Ensure the password in #{legacy_node_renderer_path} matches " \
+            "config/initializers/react_on_rails_pro.rb. Both must use the same RENDERER_PASSWORD.",
+            :yellow
+          )
           warn_on_stale_legacy_procfile_entry
           return true
         end
@@ -275,8 +327,8 @@ module ReactOnRails
 
         empty_directory("renderer")
 
-        template_path = "templates/pro/base/renderer/node-renderer.js"
-        copy_file(template_path, node_renderer_path)
+        template_path = "templates/pro/base/renderer/node-renderer.js.tt"
+        template(template_path, node_renderer_path)
 
         say "✅ Created #{node_renderer_path}", :green
         false

@@ -70,7 +70,7 @@ Configure Rails to use the Node Renderer:
 ReactOnRailsPro.configure do |config|
   config.server_renderer = "NodeRenderer"
   config.renderer_url = ENV["REACT_RENDERER_URL"] || "http://localhost:3800"
-  config.renderer_password = ENV.fetch("RENDERER_PASSWORD", "devPassword")
+  config.renderer_password = ENV["RENDERER_PASSWORD"]
 end
 ```
 
@@ -87,11 +87,16 @@ The renderer password secures communication between Rails and the Node Renderer.
 | `production`          | **Yes**            | Raises error on boot if `RENDERER_PASSWORD` is missing   |
 | `qa`, `preview`, etc. | **Yes**            | Raises error on boot if `RENDERER_PASSWORD` is missing   |
 
-In production-like environments (anything other than `development` or `test`), both the Rails app and the Node Renderer will refuse to start without a non-empty password. Set the same `RENDERER_PASSWORD` for both sides:
+In production-like environments (anything other than `development` or `test`), both the Rails app and the Node Renderer will refuse to start without a non-empty password. Additionally, a warning is logged if the password:
+
+- Matches a known-weak default (e.g. `devPassword`, `myPassword1`, `password`, `changeme`, `admin`, `secret`, `test`, `renderer`)
+- Is shorter than 16 characters
+
+Set the same `RENDERER_PASSWORD` for both sides:
 
 ```bash
-# Set for both Rails and Node Renderer
-export RENDERER_PASSWORD="your-secure-password"
+# Set for both Rails and Node Renderer — use a strong random value
+export RENDERER_PASSWORD="$(openssl rand -hex 32)"
 ```
 
 The Node Renderer reads `RENDERER_PASSWORD` directly from `process.env`. On the Ruby side, React on Rails Pro
@@ -107,11 +112,16 @@ the initializer or URL.
 If neither `NODE_ENV` nor `RAILS_ENV` is set, the Node Renderer treats the environment as
 production-like and still requires `RENDERER_PASSWORD`.
 
-For local development, you can either omit the password entirely (no authentication) or set a convenience default:
+The install generator writes a random password into your config files for development convenience.
+For production, always set `RENDERER_PASSWORD` as an environment variable and remove any literal
+password from version control.
 
-```ruby
-config.renderer_password = ENV.fetch("RENDERER_PASSWORD", "devPassword")
-```
+#### Password Rotation
+
+To rotate the renderer password:
+
+1. Set the new `RENDERER_PASSWORD` env var on both the Rails app and the Node Renderer.
+2. Restart both processes. The new password takes effect immediately.
 
 ## Eliminating Cold-Start Latency in Docker Deployments
 
