@@ -76,11 +76,7 @@ but a reader who only inspects the name would expect that case to return
 ### Affected sites
 
 Only two call sites exist in `client_references.rb`:
-
-```text
-react_on_rails/lib/generators/react_on_rails/rsc_setup/client_references.rb:141
-react_on_rails/lib/generators/react_on_rails/rsc_setup/client_references.rb:163
-```
+`rsc_plugin_needs_client_references_rewrite?` and `rewritable_rsc_plugin?`.
 
 The method is private to the generator class; no spec asserts on the method
 name directly. A repo-wide grep confirms no other production or test code
@@ -97,10 +93,9 @@ references the symbol.
 
 ### Current state
 
-`rsc_plugin_options_without_comments` (around line 671 on the PR branch) carries
-a comment noting that regex literals like `/a{2}/` are outside the scanner's
-supported surface because brace quantifiers can confuse
-`matching_js_closing_brace`'s depth counter.
+`rsc_plugin_options_without_comments` carries a comment noting that regex
+literals like `/a{2}/` are outside the scanner's supported surface because
+brace quantifiers can confuse `matching_js_closing_brace`'s depth counter.
 
 `matching_js_closing_brace` itself (the helper that actually does the brace
 tracking) carries no such note. A reader who lands on that helper directly —
@@ -139,13 +134,16 @@ def add_rsc_client_references_setup(config_path, content, existing_imports_conte
   return false if rsc_client_references_defined?(content)
 
   replace_rsc_client_references_setup_anchor(config_path, content, is_server: is_server) do |anchor|
-    [
-      anchor,
-      shakapacker_config_import_statement(existing_imports_content),
-      path_resolve_import_statement(existing_imports_content),
-      "",
-      rsc_client_references_js
-    ].compact.join("\n")
+    join_rsc_client_references_setup(
+      content,
+      [
+        anchor,
+        shakapacker_config_import_statement(existing_imports_content),
+        path_resolve_import_statement(existing_imports_content),
+        "",
+        rsc_client_references_js
+      ]
+    )
   end
 end
 ```
