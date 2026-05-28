@@ -164,5 +164,4 @@ end
 puts "\nSummary saved to #{SUMMARY_TXT}"
 system("column", "-t", "-s", "\t", SUMMARY_TXT)
 
-# Write BMF JSON for Bencher (append if Pro to combine with Core results)
-bmf_collector.write_bmf_json(BENCHMARK_JSON, append: PRO)
+bmf_collector.write_bmf_json(BENCHMARK_JSON)
