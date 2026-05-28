@@ -25,7 +25,7 @@ This spec covers only those three items. No behavior changes.
 
 ## In Scope
 
-1. Rename `rsc_plugin_without_client_references?` so the per-section
+1. Rename `any_rsc_plugin_missing_client_references?` so the per-section
    ("any one of the sections lacks `clientReferences`") semantics are explicit.
 2. Tighten the scanner-supported-surface documentation around regex literals
    with curly braces. No parser changes.
@@ -45,24 +45,23 @@ All three changes are confined to `client_references.rb` and its existing spec f
 - Touching any other PR #3219 review feedback. Each remaining cloud-review item
   either has its own follow-up issue or was already addressed in #3219.
 
-## Item 1 — Rename `rsc_plugin_without_client_references?`
+## Item 1 — Rename `any_rsc_plugin_missing_client_references?`
 
 ### Current state
 
 ```ruby
-def rsc_plugin_without_client_references?(content, is_server:)
+def any_rsc_plugin_missing_client_references?(content, is_server:)
   rsc_plugin_option_sections(content, is_server: is_server).any? do |section|
-    !rsc_plugin_options_without_comments(section.fetch(:body)).match?(/\bclientReferences\s*:/)
+    !rsc_plugin_body_has_top_level_key?(section.fetch(:body), "clientReferences")
   end
 end
 ```
 
-The implementation uses `.any?`, but the method name suggests an all-or-nothing
-check ("the plugin has no clientReferences"). When two plugin instances share
-the same `isServer` value and one already has `clientReferences` while the
-other does not, the method correctly returns `true` and the rewrite proceeds —
-but a reader who only inspects the name would expect that case to return
-`false`.
+The implementation uses `.any?`, but the method name does not make the
+per-section scan explicit. When two plugin instances share the same `isServer`
+value and one already has `clientReferences` while the other does not, the
+method correctly returns `true` and the rewrite proceeds. The new name spells
+out that this is an existential section check, not a whole-file/plugin summary.
 
 ### New name
 
