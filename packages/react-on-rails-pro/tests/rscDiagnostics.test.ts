@@ -6,7 +6,7 @@ import { text } from 'stream/consumers';
 import { Readable } from 'stream';
 
 import transformRSCStream from '../src/transformRSCNodeStream.ts';
-import { mergeRSCStreamDiagnosticError } from '../src/rscDiagnostics.ts';
+import { buildRSCStreamDiagnosticError, mergeRSCStreamDiagnosticError } from '../src/rscDiagnostics.ts';
 
 const encodeLengthPrefixedChunk = (metadata: Record<string, unknown>, content: string) => {
   const contentBuffer = Buffer.from(content, 'utf-8');
@@ -92,6 +92,18 @@ describe('RSC diagnostics', () => {
         /React stream error: An error occurred in the Server Components render\./g,
       ),
     ).toHaveLength(1);
+  });
+
+  it('emits the hasErrors=true fallback diagnostic when the stream provides no message or stack', () => {
+    const diagnosticError = buildRSCStreamDiagnosticError(
+      { hasErrors: true },
+      { componentName: 'CommentsToggle', source: '/rsc/CommentsToggle' },
+    );
+
+    expect(diagnosticError).toBeDefined();
+    expect(diagnosticError?.message).toContain('Component: CommentsToggle');
+    expect(diagnosticError?.message).toContain('Source: /rsc/CommentsToggle');
+    expect(diagnosticError?.message).toContain('Original error: RSC stream metadata reported hasErrors=true');
   });
 
   it('treats a merged diagnostic as idempotent even when the message format changes', () => {
