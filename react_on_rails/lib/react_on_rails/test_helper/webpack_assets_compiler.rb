@@ -56,7 +56,7 @@ module ReactOnRails
           Quick alternatives to get unblocked:
             • Run 'bin/dev static' in another terminal (assets auto-reuse for tests)
             • Run 'bin/dev test-watch' to keep test assets fresh in the background
-            • Run 'RAILS_ENV=test bin/shakapacker' manually to compile once
+            • Run '#{ReactOnRails.configuration.build_test_command}' manually to compile once
 
           For full details: #{TESTING_DOCS_URL}
           Run 'bin/dev --help' for development server modes.

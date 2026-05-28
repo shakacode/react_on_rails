@@ -264,15 +264,15 @@ HMR assets cannot be reused for tests — they exist in webpack-dev-server memor
 
 **Fix:** Use `bin/dev static` instead, or run `bin/dev test-watch` alongside HMR. If you have TestHelper configured, this is just informational — it will compile test assets separately.
 
-### `React on Rails: Error building webpack assets!`
+### `React on Rails: Error building test assets!`
 
 ```text
-React on Rails: Error building webpack assets!
+React on Rails: Error building test assets!
 
 The build_test_command failed. This means test assets could not be compiled.
 ```
 
-**Fix:** Check the build output above this message for the actual webpack error. Quick workaround: `bin/dev static` or `RAILS_ENV=test bin/shakapacker` to compile manually.
+**Fix:** Check the build output above this message for the actual build error. Quick workarounds: `bin/dev static`, `bin/dev test-watch`, or rerun your configured `build_test_command` manually.
 
 ### Blank pages in Capybara system tests (no Ruby error)
 

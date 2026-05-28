@@ -3,8 +3,8 @@
 require_relative "../spec_helper"
 
 describe ReactOnRails::TestHelper::WebpackAssetsCompiler do
-  describe "#ensureAssetsCompiled" do
-    let(:invalid_command) { "sh -c 'exit 1'" }
+  describe "#compile_assets" do
+    let(:invalid_command) { "false" }
     let(:valid_command) { "true" }
 
     context "when assets compiler command succeeds" do
@@ -48,6 +48,20 @@ describe ReactOnRails::TestHelper::WebpackAssetsCompiler do
           "React on Rails: Error building test assets!.*" \
           "cmd: cd \"#{escaped_root}\" && #{escaped_cmd}.*" \
           "exitstatus: 1",
+          Regexp::MULTILINE
+        )
+
+        expect do
+          described_class.new.compile_assets
+        rescue SystemExit
+          # No op
+        end.to output(expected_pattern).to_stderr
+      end
+
+      it "suggests rerunning the configured build command without naming a specific bundler" do
+        expected_command = Regexp.escape("Run '#{invalid_command}' manually to compile once")
+        expected_pattern = Regexp.new(
+          "\\A(?=.*#{expected_command})(?!.*bin/shakapacker).*\\z",
           Regexp::MULTILINE
         )
 
