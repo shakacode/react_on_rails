@@ -4407,27 +4407,32 @@ describe RscGenerator, type: :generator do
           expect(content).to include("config.source_path is not set; no client references will be scanned.")
           expect(content).to include("Skipped unreadable directory")
           expect(content).to include("RSC_CLIENT_REFERENCES_ENTRY_NAME")
-          expect(content).to include("[RSC_CLIENT_REFERENCES_ENTRY_NAME]: clientReferenceEntry(requests)")
+          expect(content).to include(
+            "[RSC_CLIENT_REFERENCES_ENTRY_NAME]: clientReferenceEntry(requests, useFixedFilename)"
+          )
           expect(content).to include("[RSC_CLIENT_REFERENCES_ENTRY_NAME]: existingReferencesEntry")
-          expect(content).to include("mergeClientReferenceEntry(existingReferencesEntry, requests)")
-          expect(content).to include("filename: `${RSC_CLIENT_REFERENCES_ENTRY_NAME}.js`")
+          expect(content).to include(
+            "mergeClientReferenceEntry(existingReferencesEntry, requests, useFixedFilename)"
+          )
+          expect(content).to include("entry.filename = `${RSC_CLIENT_REFERENCES_ENTRY_NAME}.js`")
           expect(content).to include("filename: mergedEntry.filename || `${RSC_CLIENT_REFERENCES_ENTRY_NAME}.js`")
+          expect(content).to include("if (!useFixedFilename) return mergedEntry;")
           expect(content).to include("do not fold client-only modules into server-bundle.js")
+          expect(content).to include("addClientReferencesToEntry(")
+          expect(content).to include("clientReferenceRequests,\n      options.isServer,")
           expect(content).not_to include("'server-bundle': appendImports(entryValue['server-bundle'], requests)")
           expect(content).to include(
             "Unrecognized entry value type; client references were not injected."
           )
           expect(content).to include("Object.prototype.hasOwnProperty.call(bundlerConfig, 'entry')")
           expect(content).to include("Server and client manifest builds share the same synthetic-entry injection")
-          expect(content).to include(
-            "addClientReferencesToEntry(bundlerConfig, clientReferenceFiles, clientReferenceRequests)"
-          )
+          expect(content).to include("Client builds inherit the app's output filename template")
           expect(content).to include("bundlerConfig.plugins = bundlerConfig.plugins ?? []")
           expect(content).to include("compiler.webpack is not available")
           expect(content).to include("fallback keeps warnings usable")
           expect(content).to include("new WebpackError")
           expect(content).to include("mergeChunkPairsInPlace(existing.chunks, chunkPairs)")
-          expect(content).to include("fix-then-regression for the same request stays quiet")
+          expect(content).to include("regression can warn again")
           expect(content).not_to include("Object.fromEntries")
           expect(content).not_to include("addClientReferencesToEntry,")
           # Manifest must emit alternating [chunkId, filename] pairs (collectChunkGroupPairs),
@@ -4438,10 +4443,13 @@ describe RscGenerator, type: :generator do
           expect(content).to include("pairs.push(chunk.id, file)")
           expect(content).to include("if (!file.endsWith('.js') || file.endsWith('.hot-update.js')) continue;")
           expect(content).to include("if (chunk.id == null) continue;")
+          expect(content).to include("Rspack helper does not yet enumerate named exports")
           expect(content).to include("webpack/rspack name a bare string/array entry")
           expect(content).to include("resolveRealPath")
           expect(content).to include("clientReferenceSet = new Set(this.clientReferenceFiles.map(resolveRealPath))")
           expect(content).to include("clientReferenceRequestSet = new Set(this.clientReferenceRequests)")
+          expect(content).to include("this._warnedMissingModules.delete(fileUrl)")
+          expect(content).to include("this._warnedMissingModules.delete(`request:${matchedRequest}`)")
           expect(content).to include("module.rawRequest")
           expect(content).to include("client reference request was not found in compilation modules")
           expect(content).to include(

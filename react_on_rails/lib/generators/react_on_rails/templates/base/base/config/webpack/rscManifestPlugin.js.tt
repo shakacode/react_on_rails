@@ -421,19 +421,26 @@ const clientReferenceImportRequests = (context, clientReferenceFiles, clientRefe
   ...clientReferenceRequests,
 ];
 
-const clientReferenceEntry = (requests) => ({
-  import: requests,
-  // Keep the synthetic client-reference entry out of the fixed server-bundle.js output.
-  filename: `${RSC_CLIENT_REFERENCES_ENTRY_NAME}.js`,
-});
+const clientReferenceEntry = (requests, useFixedFilename) => {
+  const entry = { import: requests };
 
-const mergeClientReferenceEntry = (entryValue, requests) => {
+  if (useFixedFilename) {
+    // Keep the synthetic client-reference entry out of the fixed server-bundle.js output.
+    entry.filename = `${RSC_CLIENT_REFERENCES_ENTRY_NAME}.js`;
+  }
+
+  return entry;
+};
+
+const mergeClientReferenceEntry = (entryValue, requests, useFixedFilename) => {
   const mergedEntry = appendImports(entryValue, requests);
   if (typeof mergedEntry === 'string' || Array.isArray(mergedEntry)) {
-    return clientReferenceEntry(Array.isArray(mergedEntry) ? mergedEntry : [mergedEntry]);
+    return clientReferenceEntry(Array.isArray(mergedEntry) ? mergedEntry : [mergedEntry], useFixedFilename);
   }
 
   if (isEntryDescription(mergedEntry)) {
+    if (!useFixedFilename) return mergedEntry;
+
     return {
       ...mergedEntry,
       filename: mergedEntry.filename || `${RSC_CLIENT_REFERENCES_ENTRY_NAME}.js`,
@@ -443,7 +450,12 @@ const mergeClientReferenceEntry = (entryValue, requests) => {
   return mergedEntry;
 };
 
-const addClientReferencesToEntry = (bundlerConfig, clientReferenceFiles, clientReferenceRequests) => {
+const addClientReferencesToEntry = (
+  bundlerConfig,
+  clientReferenceFiles,
+  clientReferenceRequests,
+  useFixedFilename,
+) => {
   if (clientReferenceFiles.length === 0 && clientReferenceRequests.length === 0) return;
 
   const context = bundlerConfig.context || process.cwd();
@@ -458,7 +470,7 @@ const addClientReferencesToEntry = (bundlerConfig, clientReferenceFiles, clientR
         // when adding the synthetic client-reference entry. This promotes the entry
         // to an explicit key, so [name] output templates can surface "main".
         main: entryValue,
-        [RSC_CLIENT_REFERENCES_ENTRY_NAME]: clientReferenceEntry(requests),
+        [RSC_CLIENT_REFERENCES_ENTRY_NAME]: clientReferenceEntry(requests, useFixedFilename),
       };
     }
 
@@ -468,8 +480,8 @@ const addClientReferencesToEntry = (bundlerConfig, clientReferenceFiles, clientR
       return {
         ...entryValue,
         [RSC_CLIENT_REFERENCES_ENTRY_NAME]: existingReferencesEntry
-          ? mergeClientReferenceEntry(existingReferencesEntry, requests)
-          : clientReferenceEntry(requests),
+          ? mergeClientReferenceEntry(existingReferencesEntry, requests, useFixedFilename)
+          : clientReferenceEntry(requests, useFixedFilename),
       };
     }
 
@@ -484,7 +496,8 @@ const addClientReferencesToEntry = (bundlerConfig, clientReferenceFiles, clientR
   };
 
   if (typeof entry === 'function') {
-    // This intentionally changes the factory type to AsyncFunction; webpack 5 and Rspack both accept async entries.
+    // This intentionally changes the factory type to AsyncFunction; webpack 5 and
+    // Rspack both normalize sync and async entry factories at build time.
     bundlerConfig.entry = async (...args) => addRequestsToEntry(await entry(...args));
     return;
   }
@@ -535,9 +548,10 @@ class RspackRSCManifestPlugin {
     this.clientManifestFilename =
       options.clientManifestFilename ||
       (options.isServer ? 'react-server-client-manifest.json' : 'react-client-manifest.json');
-    // Dedupe warnings across rebuilds in watch mode so a missing client file
-    // only generates one warning per dev-server session, not one per save.
-    // A later fix-then-regression for the same request stays quiet until restart.
+    // Dedupe warnings across rebuilds in watch mode so a missing client file only
+    // generates one warning per dev-server session, not one per save. When a
+    // missing reference later appears, recordModule removes its key so a future
+    // regression can warn again.
     this._warnedMissingModules = new Set();
   }
 
@@ -581,11 +595,17 @@ class RspackRSCManifestPlugin {
             if (!module.resource || moduleId == null) return;
 
             const moduleResource = resolveRealPath(module.resource);
+            const matchedFile = clientReferenceSet.has(moduleResource);
             const matchedRequest = matchingRequest(module);
-            if (!clientReferenceSet.has(moduleResource) && !matchedRequest) return;
-            if (matchedRequest) manifestedRequests.add(matchedRequest);
+            if (!matchedFile && !matchedRequest) return;
 
             const fileUrl = url.pathToFileURL(moduleResource).href;
+            if (matchedFile) this._warnedMissingModules.delete(fileUrl);
+            if (matchedRequest) {
+              manifestedRequests.add(matchedRequest);
+              this._warnedMissingModules.delete(`request:${matchedRequest}`);
+            }
+
             const existing = filePathToModuleMetadata[fileUrl];
             if (existing) {
               mergeChunkPairsInPlace(existing.chunks, chunkPairs);
@@ -595,7 +615,8 @@ class RspackRSCManifestPlugin {
             filePathToModuleMetadata[fileUrl] = {
               id: moduleId,
               chunks: chunkPairs.slice(),
-              // Wildcard means all exports are client references; per-export narrowing needs webpack ModuleGraph.
+              // Rspack helper does not yet enumerate named exports like RSCWebpackPlugin.
+              // Wildcard means all exports are client references; see the Rspack compatibility doc.
               name: '*',
             };
           };
@@ -670,9 +691,15 @@ const addRSCManifestPlugin = (bundlerConfig, options) => {
       options.clientReferences,
     );
     // Server and client manifest builds share the same synthetic-entry injection.
-    // The synthetic entry has its own filename so fixed server output settings and
+    // Server builds need a fixed synthetic filename so fixed output settings and
     // LimitChunkCountPlugin do not fold client-only modules into server-bundle.js.
-    addClientReferencesToEntry(bundlerConfig, clientReferenceFiles, clientReferenceRequests);
+    // Client builds inherit the app's output filename template for cache-busting.
+    addClientReferencesToEntry(
+      bundlerConfig,
+      clientReferenceFiles,
+      clientReferenceRequests,
+      options.isServer,
+    );
     bundlerConfig.plugins = bundlerConfig.plugins ?? [];
     bundlerConfig.plugins.push(
       new RspackRSCManifestPlugin(options, clientReferenceFiles, clientReferenceRequests),
