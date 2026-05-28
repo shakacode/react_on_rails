@@ -460,11 +460,7 @@ module ReactOnRails
       end
 
       def server_bundler_fallback_import_pattern
-        %r{
-          (^const\s+bundler\s*=\s*config\.assets_bundler\s*===\s*['"]rspack['"]\s*
-          \?\s*require\(['"]@rspack/core['"]\)\s*
-          :\s*require\(['"]webpack['"]\);?)
-        }x
+        rsc_client_references_setup_import_pattern(is_server: true)
       end
 
       def server_limit_chunk_count_plugin_anchor
