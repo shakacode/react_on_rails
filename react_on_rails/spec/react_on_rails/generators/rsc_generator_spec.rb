@@ -1426,6 +1426,36 @@ describe RscGenerator, type: :generator do
       )
     end
 
+    it "does not use unrelated webpack requires as the server helper import anchor" do
+      config_path = "config/webpack/serverWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { config } = require('shakapacker');
+          const bundler = config.assets_bundler === 'rspack'
+            ? require('@rspack/core')
+            : require(customWebpackPackage);
+          const webpack = require('webpack');
+
+          const configureServer = () => {
+            const serverWebpackConfig = { plugins: [] };
+            serverWebpackConfig.plugins.unshift(new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
+
+            return serverWebpackConfig;
+          };
+
+          module.exports = configureServer;
+        JS
+      )
+
+      generator.send(:update_server_webpack_config_for_rsc)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).not_to include("rscClientReferences")
+      expect(migrated_content).not_to include("addRSCManifestPlugin")
+      expect(GeneratorMessages.messages.join("\n")).to include("missing helper import anchor")
+    end
+
     it "ignores commented-out helper calls when verifying manifest helper setup" do
       config_path = "config/webpack/clientWebpackConfig.js"
       simulate_existing_file(
@@ -4017,6 +4047,8 @@ describe RscGenerator, type: :generator do
           expect(content).to include("visitedDirectories")
           expect(content).to include("normalizeClientReferenceList")
           expect(content).to include("globToRegExp")
+          expect(content).to include("const globToRegExpSource")
+          expect(content).to include(".map(globToRegExpSource)")
           expect(content).to include("collectStringReference")
           expect(content).to include("/\\.(?:js|mjs|cjs|jsx|ts|mts|cts|tsx)$/")
           expect(content).to include("reference.recursive ?? true")
@@ -4031,8 +4063,10 @@ describe RscGenerator, type: :generator do
           expect(content).to include("addClientReferencesToServerEntry(bundlerConfig, clientReferenceFiles)")
           expect(content).to include("bundlerConfig.plugins = bundlerConfig.plugins ?? []")
           expect(content).to include("compiler.webpack is not available")
+          expect(content).to include("fallback keeps warnings usable")
           expect(content).to include("new WebpackError")
           expect(content).not_to include("Object.fromEntries")
+          expect(content).not_to include("addClientReferencesToEntry,")
           # Manifest must emit alternating [chunkId, filename] pairs (collectChunkGroupPairs),
           # and walk chunkGroups via getChunkModulesIterable to compute them.
           expect(content).to include("collectChunkGroupPairs")

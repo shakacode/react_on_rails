@@ -23,13 +23,13 @@ const toImportRequest = (context, filePath) => {
   return relativePath.startsWith('.') ? relativePath : `./${relativePath}`;
 };
 
-const escapeRegExp = (value) => value.replace(/[|\\{}()[\]^$+?.]/g, '\\$&');
+const escapeRegExp = (value) => value.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&');
 
 const hasGlobMagic = (reference) => GLOB_MAGIC_PATTERN.test(reference);
 
-const globToRegExp = (glob) => {
+const globToRegExpSource = (glob) => {
   const normalized = toPosixPath(glob);
-  let source = '^';
+  let source = '';
 
   for (let index = 0; index < normalized.length; index += 1) {
     const char = normalized[index];
@@ -60,7 +60,7 @@ const globToRegExp = (glob) => {
         const alternatives = normalized
           .slice(index + 1, closingBraceIndex)
           .split(',')
-          .map(escapeRegExp)
+          .map(globToRegExpSource)
           .join('|');
         source += `(?:${alternatives})`;
         index = closingBraceIndex;
@@ -80,8 +80,10 @@ const globToRegExp = (glob) => {
     source += escapeRegExp(char);
   }
 
-  return new RegExp(`${source}$`);
+  return source;
 };
+
+const globToRegExp = (glob) => new RegExp(`^${globToRegExpSource(glob)}$`);
 
 const globBaseDirectory = (context, reference) => {
   const absolutePattern = path.isAbsolute(reference)
@@ -458,6 +460,7 @@ class RspackRSCManifestPlugin {
       );
     }
 
+    // Rspack should expose WebpackError; fallback keeps warnings usable with custom builds.
     const WebpackError = compiler.webpack.WebpackError || Error;
     const clientReferenceSet = new Set(this.clientReferenceFiles.map(resolveRealPath));
 
@@ -576,6 +579,5 @@ const addRSCManifestPlugin = (bundlerConfig, options) => {
 
 module.exports = {
   RspackRSCManifestPlugin,
-  addClientReferencesToEntry,
   addRSCManifestPlugin,
 };
