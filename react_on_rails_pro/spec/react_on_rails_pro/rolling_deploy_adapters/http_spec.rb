@@ -313,11 +313,10 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
 
   def compose_tarball_from_strings(entries)
     Dir.mktmpdir("ror-pro-http-source") do |source_dir|
-      source_paths = {}
-      entries.each_with_index do |(entry_name, content), index|
-        path = File.join(source_dir, "source-#{index}")
+      source_paths = entries.to_h do |entry_name, content|
+        path = File.join(source_dir, entry_name.tr("/", "-"))
         File.write(path, content)
-        source_paths[entry_name] = path
+        [entry_name, path]
       end
 
       compose_tarball(source_paths)

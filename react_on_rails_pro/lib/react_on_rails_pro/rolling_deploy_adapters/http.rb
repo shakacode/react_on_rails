@@ -192,6 +192,8 @@ module ReactOnRailsPro
 
               stream_response_body(streaming_response, tmp)
             end
+            # Non-local return: exits `download_bundle_tarball`; Tempfile.create's
+            # ensure block still unlinks `tmp` before the method returns.
             return nil unless response.is_a?(Net::HTTPSuccess)
 
             tmp.flush
@@ -212,6 +214,8 @@ module ReactOnRailsPro
           bytes = 0
           response.read_body do |chunk|
             bytes += chunk.bytesize
+            # Raise before `yield chunk`: the offending chunk is counted but never
+            # written/drained, so the Tempfile never sees more than COMPRESSED_BODY_CAP bytes.
             if bytes > COMPRESSED_BODY_CAP
               raise ReactOnRailsPro::Error,
                     "#{context} exceeded compressed body cap " \
@@ -221,6 +225,8 @@ module ReactOnRailsPro
           end
         end
 
+        # Dynamic (not a constant) so specs that `stub_const` the cap to a small
+        # value still see the stubbed value reflected in the warning message.
         def compressed_body_cap_label
           megabyte_bytes = 1024 * 1024
           megabytes = COMPRESSED_BODY_CAP / megabyte_bytes
