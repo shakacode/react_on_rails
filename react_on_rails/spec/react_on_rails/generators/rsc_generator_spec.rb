@@ -1330,6 +1330,56 @@ describe RscGenerator, type: :generator do
       expect(migrated_content).not_to include("RSCWebpackPlugin")
     end
 
+    it "preserves RSCWebpackPlugin import when a mixed server/client invocation cannot be fully migrated" do
+      config_path = "config/webpack/serverWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { config } = require('shakapacker');
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const bundler = config.assets_bundler === 'rspack'
+            ? require('@rspack/core')
+            : require('webpack');
+          const { resolve } = require('path');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const rscClientReferences = {
+            directory: resolve(config.source_path),
+            recursive: true,
+            include: /\\.(js|mjs|cjs|ts|mts|cts|jsx|tsx)$/,
+          };
+
+          const configureServer = () => {
+            const serverWebpackConfig = commonWebpackConfig();
+            serverWebpackConfig.plugins.push(
+              new RSCWebpackPlugin({ isServer: true, clientReferences: rscClientReferences }),
+            );
+            serverWebpackConfig.plugins.push(
+              new RSCWebpackPlugin({ isServer: false, clientReferences: rscClientReferences }),
+            );
+
+            return serverWebpackConfig;
+          };
+
+          module.exports = configureServer;
+        JS
+      )
+
+      generator.send(:update_server_webpack_config_for_rsc)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      # Import must stay intact so the still-present client-side `new RSCWebpackPlugin(...)`
+      # does not become a ReferenceError at build time.
+      expect(migrated_content).to include("const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');")
+      expect(migrated_content).not_to include("const { addRSCManifestPlugin }")
+      # The original server-side `new RSCWebpackPlugin({ isServer: true, ... })` invocation
+      # remains in place because the partial-migration check rejected the rewrite.
+      expect(migrated_content).to include("new RSCWebpackPlugin({ isServer: true,")
+      expect(migrated_content).to include("new RSCWebpackPlugin({ isServer: false,")
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("Skipped RSC manifest helper migration for #{config_path}")
+    end
+
     it "does not duplicate an existing scoped rscClientReferences helper on the fresh-install path" do
       config_path = "config/webpack/clientWebpackConfig.js"
       simulate_existing_file(

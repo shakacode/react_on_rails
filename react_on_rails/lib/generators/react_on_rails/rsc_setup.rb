@@ -556,10 +556,20 @@ module ReactOnRails
         end
         return false if replacements.empty?
 
+        rewritten = content.dup
         replacements.reverse_each do |range, replacement|
-          content[range] = replacement
+          rewritten[range] = replacement
         end
-        write_existing_rsc_config(config_path, content, action: :rewrite)
+
+        # Refuse a partial migration: if any `new RSCWebpackPlugin(...)` invocation still
+        # exists after the planned rewrites (opposite `isServer:` target in the same file,
+        # or a `plugins.push(...)` shape that didn't match), replacing the import would
+        # leave a `ReferenceError` at build time. Bail without writing — the caller treats
+        # this the same as the "no matches" case (warn + preserve scoped clientReferences
+        # for manual migration).
+        return false if rsc_webpack_plugin_invocation?(rewritten)
+
+        write_existing_rsc_config(config_path, rewritten, action: :rewrite)
       end
 
       def rsc_plugin_push_replacement_range(content, section, bundler_config_name)
@@ -592,9 +602,10 @@ module ReactOnRails
 
       def warn_rsc_manifest_helper_migration_failed(config_path)
         GeneratorMessages.add_warning(
-          "Skipped RSC manifest helper migration for #{config_path}: no RSCWebpackPlugin push calls could be " \
-          "rewritten automatically. Scoped clientReferences setup was preserved; please migrate the plugin " \
-          "call to addRSCManifestPlugin manually."
+          "Skipped RSC manifest helper migration for #{config_path}: one or more RSCWebpackPlugin push calls " \
+          "could not be rewritten automatically (no matching push shape, or a mixed server/client invocation " \
+          "in the same file). Scoped clientReferences setup was preserved; please migrate the plugin call to " \
+          "addRSCManifestPlugin manually."
         )
       end
 

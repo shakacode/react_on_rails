@@ -104,7 +104,14 @@ To test RSC with Rspack in your project:
    component while `rspack serve` is already running may require restarting the dev server
    so the helper can add that file to the bundle entries.
 
-4. **Native Rspack RSC is a future migration path**: Rspack documents native RSC support through
+4. **Wildcard named-export tracking**: The Rspack helper records each client reference with
+   `name: '*'` rather than enumerating individual named exports through `compilation.moduleGraph`
+   the way `RSCWebpackPlugin` does on webpack. Apps that destructure named exports from
+   `'use client'` modules across the server/client boundary should verify those code paths
+   under Rspack; if the RSC runtime relies on specific export names, stay on webpack for now
+   or contribute a Rspack-side enumeration.
+
+5. **Native Rspack RSC is a future migration path**: Rspack documents native RSC support through
    `@rspack/core`'s `experiments.rsc` APIs and `react-server-dom-rspack`, but that path currently
    targets React 19.1+ and a different manifest/runtime shape. React on Rails Pro's current RSC
    integration stays on the `react-on-rails-rsc` protocol for React 19.0.x compatibility.
