@@ -168,6 +168,9 @@ On the React side, the component receives a `getReactOnRailsAsyncProp` helper al
 import { Suspense } from 'react';
 import { WithAsyncProps } from 'react-on-rails-pro';
 
+type Review = { id: number; text: string };
+type Product = { id: number; name: string; price: number };
+
 type SyncProps = { name: string; price: number };
 
 // AsyncProps lists the *resolved* prop types. WithAsyncProps wraps each in a

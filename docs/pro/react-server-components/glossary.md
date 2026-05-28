@@ -49,7 +49,7 @@ function ServerComponent({ post }) {
       props: { post: Post.find(params[:id]).as_json(only: [:id, :title, :body]) }) %>
 ```
 
-> **React on Rails note:** In React on Rails, Rails is the backend. The generic async-fetch-in-component pattern from other RSC frameworks (`await fetch(...)` / `await getDatabaseData()` in the component body) bypasses Rails' authorization, caching, and session layers — and the Node renderer has no database connection or `fetch` global. Prepare data in your controller and pass it as props, or stream slow data with [async props](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently). See [RSC Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md).
+> **React on Rails note:** In React on Rails, Rails is the backend. The generic async-fetch-in-component pattern from other RSC frameworks (`await fetch(...)` / `await getDatabaseData()` in the component body) bypasses Rails' authorization, caching, and session layers — and the Node renderer has no database connection and no `fetch` global by default. Prepare data in your controller and pass it as props, or stream slow data with [async props](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently). See [RSC Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md).
 
 ### Client Components
 
