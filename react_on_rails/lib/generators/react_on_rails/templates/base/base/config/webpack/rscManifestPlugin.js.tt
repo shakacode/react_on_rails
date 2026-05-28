@@ -212,6 +212,7 @@ const collectClientReferenceFiles = (context, clientReferences = normalizeClient
   // This runs while webpack/rspack evaluates the generated config. Keep the scan
   // dependency-free and skip unreadable paths so config load remains resilient.
   const files = new Set();
+  const requests = new Set();
 
   const collectFile = (filePath) => {
     // Files can disappear or lose read permission between `readdirSync` and this read
@@ -272,7 +273,13 @@ const collectClientReferenceFiles = (context, clientReferences = normalizeClient
   const collectStringReference = (reference) => {
     const absolutePath = path.isAbsolute(reference) ? reference : path.resolve(context, reference);
     if (!hasGlobMagic(reference)) {
-      collectFile(absolutePath);
+      if (fs.existsSync(absolutePath)) {
+        collectFile(absolutePath);
+      } else {
+        // Match RSCWebpackPlugin string references: preserve unresolved request strings
+        // so webpack/rspack aliases and package requests stay in the bundle graph.
+        requests.add(reference);
+      }
       return;
     }
 
@@ -290,16 +297,19 @@ const collectClientReferenceFiles = (context, clientReferences = normalizeClient
     walk(resolveReferenceDirectory(context, reference.directory), reference);
   });
 
-  return Array.from(files).sort();
+  return {
+    files: Array.from(files).sort(),
+    requests: Array.from(requests).sort(),
+  };
 };
 
-const appendImports = (entryValue, requests) => {
+const appendImports = (entryValue, importRequests) => {
   if (typeof entryValue === 'string') {
-    return [entryValue, ...requests];
+    return [entryValue, ...importRequests];
   }
 
   if (Array.isArray(entryValue)) {
-    return [...entryValue, ...requests];
+    return [...entryValue, ...importRequests];
   }
 
   if (entryValue && typeof entryValue === 'object') {
@@ -308,7 +318,7 @@ const appendImports = (entryValue, requests) => {
     if ('import' in entryValue) {
       return {
         ...entryValue,
-        import: appendImports(entryValue.import, requests),
+        import: appendImports(entryValue.import, importRequests),
       };
     }
 
@@ -327,11 +337,16 @@ const appendImports = (entryValue, requests) => {
 const isEntryDescription = (entryValue) =>
   entryValue && typeof entryValue === 'object' && 'import' in entryValue;
 
-const addClientReferencesToEntry = (bundlerConfig, clientReferenceFiles) => {
-  if (clientReferenceFiles.length === 0) return;
+const clientReferenceImportRequests = (context, clientReferenceFiles, clientReferenceRequests) => [
+  ...clientReferenceFiles.map((filePath) => toImportRequest(context, filePath)),
+  ...clientReferenceRequests,
+];
+
+const addClientReferencesToEntry = (bundlerConfig, clientReferenceFiles, clientReferenceRequests) => {
+  if (clientReferenceFiles.length === 0 && clientReferenceRequests.length === 0) return;
 
   const context = bundlerConfig.context || process.cwd();
-  const requests = clientReferenceFiles.map((filePath) => toImportRequest(context, filePath));
+  const requests = clientReferenceImportRequests(context, clientReferenceFiles, clientReferenceRequests);
   const { entry } = bundlerConfig;
 
   const addRequestsToEntry = (entryValue) => {
@@ -368,11 +383,11 @@ const addClientReferencesToEntry = (bundlerConfig, clientReferenceFiles) => {
   bundlerConfig.entry = addRequestsToEntry(entry);
 };
 
-const addClientReferencesToServerEntry = (bundlerConfig, clientReferenceFiles) => {
-  if (clientReferenceFiles.length === 0) return;
+const addClientReferencesToServerEntry = (bundlerConfig, clientReferenceFiles, clientReferenceRequests) => {
+  if (clientReferenceFiles.length === 0 && clientReferenceRequests.length === 0) return;
 
   const context = bundlerConfig.context || process.cwd();
-  const requests = clientReferenceFiles.map((filePath) => toImportRequest(context, filePath));
+  const requests = clientReferenceImportRequests(context, clientReferenceFiles, clientReferenceRequests);
   const { entry } = bundlerConfig;
 
   const addRequestsToServerEntry = (entryValue) => {
@@ -437,13 +452,14 @@ const mergeChunkPairs = (existing, additions) => {
 };
 
 class RspackRSCManifestPlugin {
-  constructor(options, clientReferenceFiles) {
+  constructor(options, clientReferenceFiles, clientReferenceRequests) {
     if (!options || typeof options.isServer !== 'boolean') {
       throw new Error('RspackRSCManifestPlugin: You must specify the isServer option as a boolean.');
     }
 
     this.isServer = options.isServer;
     this.clientReferenceFiles = clientReferenceFiles;
+    this.clientReferenceRequests = clientReferenceRequests;
     this.clientManifestFilename =
       options.clientManifestFilename ||
       (options.isServer ? 'react-server-client-manifest.json' : 'react-client-manifest.json');
@@ -463,6 +479,7 @@ class RspackRSCManifestPlugin {
     // Rspack should expose WebpackError; fallback keeps warnings usable with custom builds.
     const WebpackError = compiler.webpack.WebpackError || Error;
     const clientReferenceSet = new Set(this.clientReferenceFiles.map(resolveRealPath));
+    const clientReferenceRequestSet = new Set(this.clientReferenceRequests);
 
     compiler.hooks.thisCompilation.tap('RspackRSCManifestPlugin', (compilation) => {
       compilation.hooks.processAssets.tap(
@@ -481,11 +498,19 @@ class RspackRSCManifestPlugin {
 
           const filePathToModuleMetadata = {};
 
+          const manifestedRequests = new Set();
+          const matchingRequest = (module) =>
+            [module.rawRequest, module.userRequest, module.request].find((request) =>
+              clientReferenceRequestSet.has(request),
+            );
+
           const recordModule = (moduleId, module, chunkPairs) => {
             if (!module.resource || moduleId == null) return;
 
             const moduleResource = resolveRealPath(module.resource);
-            if (!clientReferenceSet.has(moduleResource)) return;
+            const matchedRequest = matchingRequest(module);
+            if (!clientReferenceSet.has(moduleResource) && !matchedRequest) return;
+            if (matchedRequest) manifestedRequests.add(matchedRequest);
 
             const fileUrl = url.pathToFileURL(moduleResource).href;
             const existing = filePathToModuleMetadata[fileUrl];
@@ -534,6 +559,16 @@ class RspackRSCManifestPlugin {
                 ),
               );
             }
+            for (const request of this.clientReferenceRequests) {
+              const warningKey = `request:${request}`;
+              if (manifestedRequests.has(request) || this._warnedMissingModules.has(warningKey)) continue;
+              this._warnedMissingModules.add(warningKey);
+              compilation.warnings.push(
+                new WebpackError(
+                  `[RspackRSCManifestPlugin] client reference request was not found in compilation modules: ${request}`,
+                ),
+              );
+            }
           }
 
           const publicPath = compilation.outputOptions.publicPath;
@@ -559,14 +594,19 @@ const addRSCManifestPlugin = (bundlerConfig, options) => {
   if (config.assets_bundler === 'rspack') {
     const context = bundlerConfig.context || process.cwd();
     // Omitted clientReferences intentionally falls back to the Shakapacker source-path scan.
-    const clientReferenceFiles = collectClientReferenceFiles(context, options.clientReferences);
+    const { files: clientReferenceFiles, requests: clientReferenceRequests } = collectClientReferenceFiles(
+      context,
+      options.clientReferences,
+    );
     if (options.isServer) {
-      addClientReferencesToServerEntry(bundlerConfig, clientReferenceFiles);
+      addClientReferencesToServerEntry(bundlerConfig, clientReferenceFiles, clientReferenceRequests);
     } else {
-      addClientReferencesToEntry(bundlerConfig, clientReferenceFiles);
+      addClientReferencesToEntry(bundlerConfig, clientReferenceFiles, clientReferenceRequests);
     }
     bundlerConfig.plugins = bundlerConfig.plugins ?? [];
-    bundlerConfig.plugins.push(new RspackRSCManifestPlugin(options, clientReferenceFiles));
+    bundlerConfig.plugins.push(
+      new RspackRSCManifestPlugin(options, clientReferenceFiles, clientReferenceRequests),
+    );
     return;
   }
 
