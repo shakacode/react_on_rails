@@ -7,8 +7,11 @@
 # Field semantics:
 #   tier           — hard_gate (Tier 1) | soft_track (Tier 2). Matches the
 #                    RC plan. hard_gate failures block a final release.
-#   packages       — which of our gems/npm packages the demo consumes. The
-#                    orchestrator only proposes bumps for listed packages.
+#   packages       — which of our packages the demo consumes. Each entry must
+#                    declare an ecosystem (`gem` | `npm`) and a package name.
+#                    The orchestrator only proposes bumps for listed packages,
+#                    queries the matching registry, and updates that ecosystem's
+#                    lockfile.
 #   needs_pro      — demo consumes private react_on_rails_pro source. The
 #                    automation credentials must have access to the Pro
 #                    gem source for these repos.
@@ -17,9 +20,11 @@
 #   ruby_test      — command run inside the repo for Ruby tests.
 #   js_test        — command run inside the repo for JS tests. nil if none.
 #   build          — command that must succeed before deploy (asset compile).
-#   review_app     — CPFlow review-app workflow file and the status check
-#                    name the orchestrator polls. nil if the demo has no
-#                    review-app pipeline yet.
+#   review_app     — CPFlow review-app workflow file, the status check name the
+#                    orchestrator polls, and the CPFlow app name used to derive
+#                    the review-app base URL. nil if the demo has no review-app
+#                    pipeline yet. `cpflow_app_name` must be non-null before
+#                    a repo's `verify: true` flag can be cleared.
 #   smoke          — list of paths the orchestrator hits against the
 #                    review-app URL after deploy. Each must return 2xx.
 #   headline       — short name of the per-repo appendix in the RC plan.
@@ -40,6 +45,7 @@ defaults:
   review_app:
     workflow: cpflow-review-app.yml
     status_check: cpflow/review-app
+    cpflow_app_name: null
   age_gate:
     npm_min_days: 7
     gem_min_days: 7
@@ -50,6 +56,7 @@ defaults:
       npm:
         - react-on-rails
         - react-on-rails-pro
+        - shakapacker
       gem:
         - react_on_rails
         - react_on_rails_pro
@@ -62,7 +69,11 @@ repos:
   - name: shakacode/react-on-rails-rsc-demo
     tier: hard_gate
     headline: Minimal RSC starter
-    packages: [react_on_rails, react-on-rails, shakapacker]
+    packages:
+      - { ecosystem: gem, name: react_on_rails }
+      - { ecosystem: npm, name: react-on-rails }
+      - { ecosystem: gem, name: shakapacker }
+      - { ecosystem: npm, name: shakapacker }
     needs_pro: false
     smoke: [/]
     verify: true
@@ -70,7 +81,13 @@ repos:
   - name: shakacode/react-on-rails-demo-hacker-news-rsc
     tier: hard_gate
     headline: RSC streaming with comment trees
-    packages: [react_on_rails, react-on-rails, react_on_rails_pro, react-on-rails-pro, shakapacker]
+    packages:
+      - { ecosystem: gem, name: react_on_rails }
+      - { ecosystem: npm, name: react-on-rails }
+      - { ecosystem: gem, name: react_on_rails_pro }
+      - { ecosystem: npm, name: react-on-rails-pro }
+      - { ecosystem: gem, name: shakapacker }
+      - { ecosystem: npm, name: shakapacker }
     needs_pro: true
     smoke: [/, /news]
     verify: true
@@ -78,7 +95,13 @@ repos:
   - name: shakacode/react-on-rails-demo-marketplace-rsc
     tier: hard_gate
     headline: RSC product grid + filter
-    packages: [react_on_rails, react-on-rails, react_on_rails_pro, react-on-rails-pro, shakapacker]
+    packages:
+      - { ecosystem: gem, name: react_on_rails }
+      - { ecosystem: npm, name: react-on-rails }
+      - { ecosystem: gem, name: react_on_rails_pro }
+      - { ecosystem: npm, name: react-on-rails-pro }
+      - { ecosystem: gem, name: shakapacker }
+      - { ecosystem: npm, name: shakapacker }
     needs_pro: true
     smoke: [/, /products]
     verify: true
@@ -86,7 +109,13 @@ repos:
   - name: shakacode/react-on-rails-demo-gumroad-rsc
     tier: hard_gate
     headline: RSC dashboards + performance
-    packages: [react_on_rails, react-on-rails, react_on_rails_pro, react-on-rails-pro, shakapacker]
+    packages:
+      - { ecosystem: gem, name: react_on_rails }
+      - { ecosystem: npm, name: react-on-rails }
+      - { ecosystem: gem, name: react_on_rails_pro }
+      - { ecosystem: npm, name: react-on-rails-pro }
+      - { ecosystem: gem, name: shakapacker }
+      - { ecosystem: npm, name: shakapacker }
     needs_pro: true
     smoke: [/]
     verify: true
@@ -94,7 +123,13 @@ repos:
   - name: shakacode/react_on_rails-demo-octochangelog-on-rails-pro
     tier: hard_gate
     headline: RSC + server-rendered markdown
-    packages: [react_on_rails, react-on-rails, react_on_rails_pro, react-on-rails-pro, shakapacker]
+    packages:
+      - { ecosystem: gem, name: react_on_rails }
+      - { ecosystem: npm, name: react-on-rails }
+      - { ecosystem: gem, name: react_on_rails_pro }
+      - { ecosystem: npm, name: react-on-rails-pro }
+      - { ecosystem: gem, name: shakapacker }
+      - { ecosystem: npm, name: shakapacker }
     needs_pro: true
     smoke: [/]
     verify: true
@@ -102,7 +137,11 @@ repos:
   - name: shakacode/react-on-rails-demo-ssr-hmr
     tier: hard_gate
     headline: SSR + HMR coexistence
-    packages: [react_on_rails, react-on-rails, shakapacker]
+    packages:
+      - { ecosystem: gem, name: react_on_rails }
+      - { ecosystem: npm, name: react-on-rails }
+      - { ecosystem: gem, name: shakapacker }
+      - { ecosystem: npm, name: shakapacker }
     needs_pro: false
     smoke: [/]
     verify: true
@@ -110,7 +149,11 @@ repos:
   - name: shakacode/react-on-rails-demo-v16-bundle-splitting
     tier: hard_gate
     headline: On-demand bundle loading
-    packages: [react_on_rails, react-on-rails, shakapacker]
+    packages:
+      - { ecosystem: gem, name: react_on_rails }
+      - { ecosystem: npm, name: react-on-rails }
+      - { ecosystem: gem, name: shakapacker }
+      - { ecosystem: npm, name: shakapacker }
     needs_pro: false
     smoke: [/]
     verify: true
@@ -120,7 +163,11 @@ repos:
   - name: shakacode/react-on-rails-example-open-flights
     tier: soft_track
     headline: Larger migrated app (search + map)
-    packages: [react_on_rails, react-on-rails, shakapacker]
+    packages:
+      - { ecosystem: gem, name: react_on_rails }
+      - { ecosystem: npm, name: react-on-rails }
+      - { ecosystem: gem, name: shakapacker }
+      - { ecosystem: npm, name: shakapacker }
     needs_pro: false
     package_manager: yarn_classic
     smoke: [/]
@@ -129,7 +176,11 @@ repos:
   - name: shakacode/react-on-rails-example-migration
     tier: soft_track
     headline: react-rails → React on Rails migration
-    packages: [react_on_rails, react-on-rails, shakapacker]
+    packages:
+      - { ecosystem: gem, name: react_on_rails }
+      - { ecosystem: npm, name: react-on-rails }
+      - { ecosystem: gem, name: shakapacker }
+      - { ecosystem: npm, name: shakapacker }
     needs_pro: false
     smoke: [/]
     verify: true
@@ -137,7 +188,11 @@ repos:
   - name: shakacode/react-webpack-rails-tutorial
     tier: soft_track
     headline: Legacy tutorial reference app
-    packages: [react_on_rails, react-on-rails, shakapacker]
+    packages:
+      - { ecosystem: gem, name: react_on_rails }
+      - { ecosystem: npm, name: react-on-rails }
+      - { ecosystem: gem, name: shakapacker }
+      - { ecosystem: npm, name: shakapacker }
     needs_pro: false
     package_manager: yarn_classic
     smoke: [/]

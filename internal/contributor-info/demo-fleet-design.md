@@ -26,6 +26,8 @@ Lives at [demo-fleet.yml](demo-fleet.yml). Schema documented in the file's heade
 
 The manifest captures **data**, not docs. Headlines and per-repo appendix text stay in the RC plan; the orchestrator only references the `headline` field for PR-body templating.
 
+Package references are structured as `{ ecosystem: gem|npm, name: ... }`, not inferred from underscores or dashes. `DemoFleet` validates every package ref against the manifest's `age_gate.own_packages` set for ShakaCode-owned packages or against an explicit allowlist for third-party package bumps before it can compute registry lookups or lockfile updates.
+
 ## Orchestrator skeleton
 
 Convention in this repo: orchestration lives in Rake (`rakelib/release.rake`), with `script/*` as a thin shim. Demo-fleet follows the same pattern.
@@ -34,37 +36,40 @@ Convention in this repo: orchestration lives in Rake (`rakelib/release.rake`), w
 
 ```ruby
 # Release track — invoked per RC and per final
-task "demo_fleet:release_track", [:react_on_rails, :shakapacker, :pro, :cpflow] do |_, args|
+task "demo_fleet:release_track", [:react_on_rails, :shakapacker, :react_on_rails_pro, :cpflow] do |_, args|
   fleet = DemoFleet.load("internal/contributor-info/demo-fleet.yml")
-  versions = args.to_h.compact
+  versions = VersionSet.from_rake_args(args.to_h.compact) # keys match manifest package names
   tracking_issue = TrackingIssue.create_or_update(versions)
+  target_repos = fleet.repos.select { |repo| repo.consumes?(versions.package_refs) }
 
-  fleet.repos.each do |repo|
-    next unless repo.consumes?(versions.keys)
+  results = DemoFleet::Runner.run_concurrently(target_repos, concurrency: fleet.concurrency) do |repo|
     pr = DemoPR.open_or_update(repo, versions, mode: :release_track)
     pr.wait_for_ci_and_review_app(timeout: 90.minutes)
-    tracking_issue.record(repo, pr.result)
+    pr.result
   end
 
+  tracking_issue.record_all(results)
   tracking_issue.gate_check!  # fails if any hard_gate PR is red
 end
 
 # Freshness track — weekly scheduled
 task "demo_fleet:freshness_track" do
   fleet = DemoFleet.load("internal/contributor-info/demo-fleet.yml")
+  target_repos = fleet.repos.reject { |repo| DemoPR.open_release_pr?(repo) }
 
-  fleet.repos.each do |repo|
-    next if DemoPR.open_release_pr?(repo)  # don't fight an in-flight RC PR
+  results = DemoFleet::Runner.run_concurrently(target_repos, concurrency: fleet.concurrency) do |repo|
     proposed_bumps = DependencyBumps.compute(repo, age_gate: fleet.age_gate)
-    next if proposed_bumps.empty?
+    next DemoResult.skipped(repo, "no permitted bumps") if proposed_bumps.empty?
     pr = DemoPR.open_or_update(repo, proposed_bumps, mode: :freshness)
     pr.wait_for_ci_and_review_app(timeout: 90.minutes)
-    pr.file_issue_if_red(repo)  # freshness failures file issues, do not block
+    pr.result
   end
+
+  results.each { |result| FreshnessIssue.file_if_red(result) unless result.green? } # freshness failures file issues, do not block
 end
 
 # Local-only: show what a release would propose, without opening anything
-task "demo_fleet:plan", [:react_on_rails, :shakapacker, :pro, :cpflow] do |_, args|
+task "demo_fleet:plan", [:react_on_rails, :shakapacker, :react_on_rails_pro, :cpflow] do |_, args|
   # ...prints a table; no network mutations
 end
 ```
@@ -80,10 +85,18 @@ exec bundle exec rake "demo_fleet:${1:-plan}"
 ### Pieces the skeleton hides
 
 - `DemoFleet` — manifest loader; validates `schema_version` and rejects unknown keys.
+- `DemoFleet::Runner` — bounded parallel executor. It records per-repo exceptions as red `DemoResult` objects, keeps processing the remaining repos, and re-raises only after `tracking_issue.record_all` and `tracking_issue.gate_check!` have made the failure visible.
 - `DemoPR` — opens/updates the bump PR in a demo repo via a GitHub App installation token (see Credentials). Generates the PR body from the RC plan's RC Test Report template, prefilled with the demo's manifest data.
 - `DependencyBumps` — computes proposed version bumps with the age gate (next section).
 - `TrackingIssue` — creates/updates the per-RC tracking issue in `shakacode/react_on_rails` from `.github/ISSUE_TEMPLATE/rc-release-tracking.yml`; ticks checkboxes as PRs land.
-- `pr.wait_for_ci_and_review_app` — polls GitHub Checks API for `cpflow/review-app`, then hits each `smoke` URL against the review-app deploy URL exposed by the workflow.
+- `ReviewApp` — validates `review_app.cpflow_app_name`, polls GitHub Checks API for `review_app.status_check`, asks CPFlow for that app's review URL for the PR branch, and hits each `smoke` path against that base URL. It never derives the URL from the repo slug.
+- `pr.wait_for_ci_and_review_app` — coordinates CI polling plus `ReviewApp` smoke checks.
+
+### Parallel execution and failure recording
+
+Release-track and freshness-track both dispatch repo work in parallel with a bounded concurrency limit (default 8, overridable by CI). Wall time is therefore capped by the slowest repo, not by `repos.count * 90.minutes`.
+
+The runner treats each repo as an independent result. Network failures, rate limits, missing review-app checks, and timeouts are rescued at the repo boundary and recorded on the tracking issue as red results. The overall task can still exit non-zero after all repos have reported, but it must not abandon later repos or skip `gate_check!` because an earlier repo raised.
 
 ## Age-gate logic
 
@@ -107,9 +120,12 @@ def DependencyBumps.permitted?(package, candidate_version, mode:, age_gate:)
 
   return true if age_days >= min_days
 
-  # Allow break-glass override via a labelled tracking issue. Operator must
-  # add the `age-gate-override` label and a one-line justification.
-  return true if AgeGateOverride.active?(package, candidate_version)
+  return true if AgeGateOverride.active?(
+    package,
+    candidate_version,
+    tracking_issue: ReleaseTrackingIssue.current,
+    now: Time.now
+  )
 
   false
 end
@@ -142,10 +158,12 @@ Layers, in order:
 
 For CVEs that need a sub-min-days patched version:
 
-1. Operator opens or updates a tracking issue in `shakacode/react_on_rails` titled `age-gate override: <pkg>@<version>`.
-2. Issue body includes the CVE link and a justification.
-3. Operator applies the `age-gate-override` label. The orchestrator's next run sees the label and permits that exact `pkg@version` for 7 days.
-4. The override is logged in the tracking issue and in the resulting PR body.
+1. Release manager opens or updates a tracking issue in `shakacode/react_on_rails` titled `age-gate override: <pkg>@<version>`.
+2. Issue body includes the CVE link, affected package, candidate version, and justification.
+3. A second maintainer approves the override in an issue comment.
+4. Release manager applies the `age-gate-override` label after approval. The orchestrator reads GitHub issue timeline events and uses the most recent label-applied timestamp as the start of the 7-day window; `updated_at` is not used because ordinary edits would extend the window accidentally.
+5. `AgeGateOverride.active?` permits only the exact `ecosystem/name@version` named in the issue title/body and only while `now - label_applied_at <= 7.days`.
+6. The override, approver, and expiry timestamp are logged in the tracking issue and in the resulting PR body.
 
 This keeps audit trail in GitHub, not in shell history or env vars.
 
@@ -180,9 +198,8 @@ When a release-track run lands while a freshness PR is open:
 ## Open items requiring user input
 
 1. **Manifest verification owner.** Who runs the one-time pass to clear `verify: true` flags? Default: assigned during the next RC cycle, one demo per release manager.
-2. **Default freshness conflict mode.** Confirmed default is `close + reopen`?
-3. **Pro gem source credential model.** Confirmed App installation, or do we need a separate machine user for the Pro source specifically?
-4. **`react-on-rails-demos` promotion criteria.** What "stable" means before we move the runtime out of `react_on_rails`. Suggested: orchestrator has driven two consecutive successful RC cycles end-to-end without manual fixups.
+2. **Pro gem source credential model.** Confirmed App installation, or do we need a separate machine user for the Pro source specifically?
+3. **`react-on-rails-demos` promotion criteria.** What "stable" means before we move the runtime out of `react_on_rails`. Suggested: orchestrator has driven two consecutive successful RC cycles end-to-end without manual fixups.
 
 ## Out of scope (v1)
 
