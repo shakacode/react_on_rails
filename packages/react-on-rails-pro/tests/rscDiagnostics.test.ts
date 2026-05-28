@@ -106,6 +106,19 @@ describe('RSC diagnostics', () => {
     expect(diagnosticError?.message).toContain('Original error: RSC stream metadata reported hasErrors=true');
   });
 
+  it('treats a renderingError message as a failure signal even when hasErrors is not set', () => {
+    // Locks in the wire contract: the server bundle only emits `renderingError` on actual
+    // failure, so a message alone is enough to trigger the diagnostic. If this ever needs
+    // to change, the guard in buildRSCStreamDiagnosticError must change with it.
+    const diagnosticError = buildRSCStreamDiagnosticError(
+      { hasErrors: false, renderingError: { message: 'useState is not a function' } },
+      { componentName: 'CommentsToggle' },
+    );
+
+    expect(diagnosticError).toBeDefined();
+    expect(diagnosticError?.message).toContain('Original error: useState is not a function');
+  });
+
   it('treats a merged diagnostic as idempotent even when the message format changes', () => {
     const diagnosticError = new Error('[ReactOnRails] RSC bundle rendering failed.');
     diagnosticError.name = 'ReactOnRailsRSCStreamError';

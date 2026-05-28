@@ -52,7 +52,6 @@ const createFromReactOnRailsNodeStream = async (
     componentName,
     onDiagnosticError(error) {
       rscDiagnosticError = error;
-      console.error(error);
     },
   });
 

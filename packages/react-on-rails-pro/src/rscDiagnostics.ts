@@ -56,6 +56,10 @@ export const buildRSCStreamDiagnosticError = (
   const re = (typeof raw === 'object' && raw !== null ? raw : {}) as RenderingErrorMetadata;
   const originalMessage = str(re.message);
   const originalStack = str(re.stack);
+  // Wire contract: the React on Rails server bundle only emits `renderingError` on actual
+  // failure, so presence of a message or stack is treated as a failure signal even when
+  // `hasErrors` isn't explicitly set. Belt-and-suspenders intentional — if a future producer
+  // wants to use `renderingError` for non-fatal info, this guard needs to change with it.
   if (metadata.hasErrors !== true && !originalMessage && !originalStack) return undefined;
 
   const modulePath = extractModulePathFromStack(originalStack);

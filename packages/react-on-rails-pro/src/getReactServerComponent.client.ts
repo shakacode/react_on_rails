@@ -86,7 +86,6 @@ const createFromFetch = async (
     const diagnosticError = buildRSCStreamDiagnosticError(metadata, { componentName, source });
     if (diagnosticError && !rscDiagnosticError) {
       rscDiagnosticError = diagnosticError;
-      console.error(diagnosticError);
     }
   };
 
