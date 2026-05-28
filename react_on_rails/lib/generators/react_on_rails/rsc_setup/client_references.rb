@@ -1276,7 +1276,7 @@ module ReactOnRails
 
         def warn_missing_rsc_plugin_target(config_path, is_server:)
           GeneratorMessages.add_warning(
-            "Could not update addRSCManifestPlugin in #{config_path}: no plugin options with isServer: #{is_server} " \
+            "Could not update RSCWebpackPlugin in #{config_path}: no plugin options with isServer: #{is_server} " \
             "could be rewritten. Please add clientReferences manually. Dynamic or computed plugin options cannot be " \
             "verified automatically, so verify this file manually after adding clientReferences."
           )
