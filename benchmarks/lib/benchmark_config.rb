@@ -8,11 +8,11 @@ require "fileutils"
 require "net/http"
 require "uri"
 
-# Helper to get env var with default,
-# treating empty string and "0" as unset since they can come from the benchmark workflow.
+# Helper to get env var with default, treating empty string as unset
+# (the benchmark workflow passes "" when a workflow_dispatch input is omitted).
 def env_or_default(key, default)
   value = ENV[key].to_s
-  value.empty? || value == "0" ? default : value
+  value.empty? ? default : value
 end
 
 # Validation helpers
