@@ -186,16 +186,7 @@ For example, with our `MyStreamingComponent`, the sequence is:
 </script>
 ```
 
-For top-level sections that are fully independent, you can instead use separate `stream_react_component` calls — each renders as its own data becomes ready:
-
-```erb
-<%# Each component streams independently %>
-<%= stream_react_component("Header", props: { title: "Dashboard" }) %>
-<%= stream_react_component("PostFeed",
-      props: { posts: @posts.as_json(only: [:id, :title]) }) %>
-<%= stream_react_component("Sidebar",
-      props: { stats: @stats.as_json }) %>
-```
+To render more of the page progressively, add an async prop and a `<Suspense>` boundary for each slow section — emit each one from the block as Rails resolves it, and every boundary streams in independently. This keeps the whole page in a single component tree (shared layout, context, and props) rather than splitting it across multiple `stream_react_component` calls.
 
 ## Compression Middleware Compatibility
 
