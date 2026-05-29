@@ -147,7 +147,34 @@ class ExampleController < ApplicationController
 end
 ```
 
-The controller prepares `@posts`; the view's `emit.call` streams it. For one slow source like this, loading it in the controller is fine. When several sources are slow and independent, fetch them in parallel with the [`async` gem](https://github.com/socketry/async) rather than Ruby threads — Pro's streaming stack is fiber-based and already runs inside an Async reactor, so wrap each query in an `Async { ... }` task and await them. That way no `emit.call` waits on an unrelated query.
+The controller prepares `@posts`; the view's `emit.call` streams it. For one slow source like this, loading it in the controller is fine.
+
+#### Loading Multiple Slow Sources in Parallel
+
+When several sources are slow and independent, run them concurrently with the [`async` gem](https://github.com/socketry/async). Pro's streaming stack is already fiber-based, so fan out with fibers from the running reactor rather than introducing a separate Ruby-thread concurrency model. The emit block runs inside an `Async` task — capture it once and spawn one child task per source with `parent.async`, so each prop is emitted the moment its own query resolves:
+
+```erb
+<%= stream_react_component_with_async_props('Dashboard',
+      props: { title: 'Dashboard' }) do |emit|
+  parent  = Async::Task.current
+  user_id = current_user.id # capture request state before fanning out
+
+  # Each task runs its query concurrently and emits its prop as soon as that
+  # query resolves — the slowest source no longer blocks the others.
+  tasks = [
+    parent.async { emit.call('posts', Post.for_user(user_id).recent.limit(20).as_json(only: [:id, :title])) },
+    parent.async { emit.call('stats', DashboardStats.for(user_id).as_json) },
+    parent.async { emit.call('feed',  FeedService.for(user_id).as_json(only: [:id, :title])) },
+  ]
+  tasks.each(&:wait) # block stays open until each task finishes
+end %>
+```
+
+On the React side, give each async prop its own `<Suspense>` boundary (as in Step 2) so each section streams in independently as its query finishes.
+
+> **Error handling:** an unhandled error in a child task propagates through `wait` and closes the stream, so the remaining props may not be sent. If one source failing shouldn't cut off the others, wrap each task body in a `rescue` and emit a fallback (or skip that prop).
+
+> **Concurrent ActiveRecord needs fiber-aware connections.** Set `config.active_support.isolation_level = :fiber` (Rails 7.0.2+) so each fiber checks out its own pooled connection. Size your connection pool for the total number of DB-using fibers in flight across all concurrent requests — not just this one fan-out — or extra fibers block on connection checkout. Queries only truly overlap on a fiber-scheduler-aware driver such as `pg` (PostgreSQL); blocking drivers like `mysql2` and `sqlite3` serialize on the reactor. Capture request-scoped state (like `current_user.id`) **before** fanning out, since per-fiber isolation does not copy `CurrentAttributes` into child tasks.
 
 ### 5. Test Your Application
 
