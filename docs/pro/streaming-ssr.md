@@ -47,7 +47,7 @@ Ensure you're using React 19 in your `package.json`:
 
 ### 2. Prepare Your React Components
 
-For a Suspense boundary to actually stream — show a fallback first, then swap in real content — something inside it must suspend on a Promise. In React on Rails, that data still comes from Rails: with **async props**, Rails sends the fast props immediately and emits each slow prop as it resolves. The component receives a `getReactOnRailsAsyncProp` helper that returns a Promise for each async prop; an async child `await`s it inside a `<Suspense>` boundary.
+For a Suspense boundary to actually stream — show a fallback first, then swap in real content — something inside it must suspend on a Promise. In React on Rails, that data still comes from Rails: with **async props**, Rails sends the fast props immediately and emits each slow prop as it resolves. React on Rails Pro injects a `getReactOnRailsAsyncProp` helper into the root component's props (alongside the `props:` you pass) — you don't import or create it. Calling it returns a Promise for the named async prop; an async child `await`s that Promise inside a `<Suspense>` boundary.
 
 ```jsx
 // app/javascript/components/MyStreamingComponent.jsx
@@ -87,14 +87,16 @@ export default MyStreamingComponent;
 
 > **React on Rails note:** Database queries, authentication, authorization, and caching all stay on the Rails side — the controller and view own them. Async props just let Rails emit each result the moment it has it, instead of blocking the whole render on the slowest source. The component never fetches data directly. In TypeScript, type the props with `WithAsyncProps<AsyncProps, SyncProps>` from `react-on-rails-pro`. See [Data Fetching in React on Rails Pro](../oss/migrating/rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) for the prop-based data model this builds on.
 
-> **Handle failures:** if a prop's query rejects, the `await` throws inside the async component and React propagates it up the tree. In production, wrap each `<Suspense>` in an error boundary so a single failed source degrades to a fallback instead of breaking the whole render:
+> **Handle failures:** if a prop's query rejects, the `await` throws inside the async component and React propagates it up the tree. In production, wrap each `<Suspense>` in an error boundary so a single failed source degrades to a fallback instead of breaking the whole render. React does not ship an `ErrorBoundary` — use the [`react-error-boundary`](https://github.com/bvaughn/react-error-boundary) package (or your own class component):
 >
 > ```jsx
+> import { ErrorBoundary } from 'react-error-boundary';
+>
 > <ErrorBoundary fallback={<div>Posts unavailable</div>}>
 >   <Suspense fallback={<div>Loading posts...</div>}>
 >     <PostList posts={postsPromise} />
 >   </Suspense>
-> </ErrorBoundary>
+> </ErrorBoundary>;
 > ```
 
 With `auto_load_bundle` enabled (recommended), `MyStreamingComponent` is registered automatically. Otherwise, register it as a server component — server components use `registerServerComponent`, **not** `ReactOnRails.register`:
