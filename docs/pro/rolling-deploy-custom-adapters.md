@@ -344,6 +344,8 @@ require "json"
 class FilesystemRollingDeployAdapter
   RETENTION = 6 # keep last ~3 deploys' worth (2 hashes per deploy when RSC is enabled)
 
+  # Lazy accessor — env var is read when first used, not at require time.
+  # This avoids KeyError at class-load in dev/test environments where ROLLING_DEPLOY_DIR is not set.
   def self.root
     Pathname.new(ENV.fetch("ROLLING_DEPLOY_DIR"))
   end

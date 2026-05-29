@@ -115,7 +115,8 @@ That exposes two authenticated endpoints under the mount path:
 | `GET /manifest`      | JSON: `{ hashes: [...], rsc_enabled, generated_at, protocol_version }` for the current deploy. |
 | `GET /bundles/:hash` | `application/gzip` tarball containing `bundle.js` plus that hash's companion assets.           |
 
-> **Note:** Engine auto-mount is planned for a follow-up release but is not yet wired — mount the controller explicitly with `draw_routes` as shown. When auto-mount lands, drop the manual mount or pass a distinct `as_prefix:` to avoid duplicate-route-name errors.
+> [!IMPORTANT]
+> Engine auto-mount is planned for a follow-up release but is not yet wired — mount the controller explicitly with `draw_routes` as shown. When auto-mount lands, drop the manual mount or pass a distinct `as_prefix:` to avoid duplicate-route-name errors.
 
 ### Security
 
@@ -123,7 +124,9 @@ That exposes two authenticated endpoints under the mount path:
 - The `:hash` parameter is matched against an **allowlist** of the current deployment's real bundle hashes — anything else returns `404` before touching the filesystem.
 - Responses carry `Cache-Control: no-store`, `Pragma: no-cache`, and `X-Content-Type-Options: nosniff`.
 - Tarball extraction is **path-traversal-proofed**, accepts regular files only, and enforces a 200 MB uncompressed cap (zip-bomb guard).
-- **Use HTTPS in production.** The token is a bearer credential; over plain HTTP to a non-loopback host the adapter logs a cleartext-token warning today, and a hard HTTPS gate is planned for a follow-up release.
+
+> [!WARNING]
+> **Use HTTPS in production.** The token is a bearer credential. Over plain HTTP to a non-loopback host the adapter logs a cleartext-token warning today; a hard HTTPS gate is planned for a follow-up release. Until then, ensure `rolling_deploy_previous_url` always uses `https://` in production environments.
 
 ### Companion assets are handled automatically
 
