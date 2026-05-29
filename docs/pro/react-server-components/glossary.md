@@ -44,7 +44,7 @@ function ServerComponent({ post }) {
 ```
 
 ```erb
-<%# Rails prepares the data in the controller and passes it as props %>
+<%# Rails prepares the data and passes it as props %>
 <%= stream_react_component("ServerComponent",
       props: { post: Post.find(params[:id]).as_json(only: [:id, :title, :body]) }) %>
 ```

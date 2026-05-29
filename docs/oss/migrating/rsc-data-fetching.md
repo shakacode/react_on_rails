@@ -246,10 +246,11 @@ In the block above, `reviews` is emitted before `recommendations` — the second
 ```erb
 <%= stream_react_component_with_async_props("ProductPage",
       props: { name: product.name, price: product.price }) do |emit|
-  # The block is already running inside an Async reactor. `Sync` reuses it (no
-  # new thread) and acts as a synchronization barrier: it runs the block with
-  # the current task (`parent`) and returns only after every child started via
-  # `parent.async` has finished — exactly when the stream should close.
+  # The block is already running inside an Async reactor. `Sync` reuses it (or
+  # starts one if none exists — either way no new OS thread) and acts as a
+  # synchronization barrier: it runs the block with the current task (`parent`)
+  # and returns only after every child started via `parent.async` has finished
+  # — exactly when the stream should close.
   Sync do |parent|
     parent.async do
       # Each concurrent fiber checks out its OWN connection for the duration of
