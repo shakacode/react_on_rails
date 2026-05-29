@@ -109,9 +109,12 @@ To test RSC with Rspack in your project:
 
 4. **`publicPath: 'auto'` with CDN assets needs verification**: The Rspack helper cannot
    know the runtime-resolved public path while emitting the manifest. When `output.publicPath`
-   is `'auto'`, the manifest prefix is empty. Same-origin builds commonly still work, but apps
-   serving chunks from a CDN or asset host should set an explicit public path or verify RSC
-   client chunk loading under their deployed asset URL.
+   is `'auto'`, the manifest prefix is empty. The same applies to a function-form
+   `publicPath` (for example `(pathData) => '/cdn/'`), which is also resolved to an empty
+   prefix because the helper only reads string public paths at manifest-emit time.
+   Same-origin builds commonly still work, but apps serving chunks from a CDN or asset host
+   should set an explicit string public path or verify RSC client chunk loading under their
+   deployed asset URL.
 
 5. **Wildcard named-export tracking**: The Rspack helper records each client reference with
    `name: '*'` rather than enumerating individual named exports through `compilation.moduleGraph`

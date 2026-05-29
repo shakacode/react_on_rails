@@ -42,6 +42,7 @@ function loadHelperInternals() {
     '  globToRegExp,',
     '  splitBraceAlternatives,',
     '  hasUseClientDirective,',
+    '  globBaseDirectory,',
     '  mergeChunkPairsInPlace,',
     '  normalizeCrossOrigin,',
     '};',
@@ -68,6 +69,7 @@ const {
   globToRegExp,
   splitBraceAlternatives,
   hasUseClientDirective,
+  globBaseDirectory,
   mergeChunkPairsInPlace,
   normalizeCrossOrigin,
 } = loadHelperInternals();
@@ -223,6 +225,25 @@ describe('rscManifestPlugin helper', () => {
       const result = normalizeCrossOrigin('bogus');
       expect(result.value).toBe('anonymous');
       expect(result.warning).toEqual(expect.stringContaining("'bogus'"));
+    });
+  });
+
+  describe('globBaseDirectory', () => {
+    // The production-throw vs dev-warn branch is environment-dependent and reads
+    // `process.env.NODE_ENV`/`console` from the helper's own realm, which the
+    // Module._compile harness here does not share. That branch is locked instead by
+    // the generator spec (rsc_generator_spec.rb asserts the production-throw and
+    // dev-warn strings are emitted). Here we cover the realm-independent base split.
+    test('returns the static prefix before the first glob segment', () => {
+      expect(globBaseDirectory('/root', 'app/javascript/**/*.client.jsx')).toBe(
+        path.resolve('/root/app/javascript'),
+      );
+    });
+
+    test('keeps a fully static path intact', () => {
+      expect(globBaseDirectory('/root', 'app/javascript/packs')).toBe(
+        path.resolve('/root/app/javascript/packs'),
+      );
     });
   });
 });

@@ -13,6 +13,15 @@ const DEFAULT_EXCLUDED_DIRECTORIES = new Set(['node_modules', 'public', 'tmp', '
 const GLOB_MAGIC_PATTERN = /[*?\[\]{}]/;
 // Empty negative lookahead is impossible to satisfy, so this rejects every candidate.
 const NEVER_MATCH_PATTERN = /(?!)/;
+// Scan results are cached for the Node.js process lifetime (not per build), so the
+// client and server configs evaluated in the same process share a single filesystem
+// scan. This is intentional: the key (see `clientReferenceCacheKey`) encodes only the
+// context and `clientReferences` shape, not file mtimes or contents, so new or edited
+// 'use client' files added while the dev server is running are not reflected until the
+// dev server restarts (see rspack-compatibility.md, "New client files may need a
+// dev-server restart"). In normal config evaluation this Map holds only a couple of
+// entries; it is never invalidated, so a harness that evaluates many distinct configs
+// in one long-lived process would accumulate entries.
 const clientReferenceScanCache = new Map();
 
 const toPosixPath = (filePath) => filePath.split(path.sep).join('/');
@@ -153,6 +162,16 @@ const globBaseDirectory = (context, reference) => {
 
   const base = baseSegments.join('/');
   if (base) return path.resolve(base);
+
+  if (process.env.NODE_ENV === 'production') {
+    // Mirror the missing-`source_path` guard below: refuse to scan from the context
+    // root in production rather than silently walking a potentially huge tree.
+    throw new Error(
+      `[rscManifestPlugin] Glob pattern '${reference}' has no static base directory; ` +
+        'refusing to scan from the context root in production. ' +
+        'Add an explicit base path (for example app/javascript/**/*.client.jsx).',
+    );
+  }
 
   // eslint-disable-next-line no-console
   console.warn(
@@ -591,15 +610,15 @@ const collectChunkGroupPairs = (chunkGroup) => {
   return pairs;
 };
 
-const mergeChunkPairsInPlace = (existing, additions) => {
-  // `existing` is always a `.slice()` copy from the recordModule first-write path;
-  // mutate it so shared modules accumulate pairs from all chunk groups without
-  // altering the caller's chunkPairs array.
+const mergeChunkPairsInPlace = (existingCopy, additions) => {
+  // `existingCopy` must be a private array the caller owns (the recordModule
+  // first-write path passes a `.slice()` copy); this mutates it in place so shared
+  // modules accumulate pairs from all chunk groups without altering the source array.
   const seenIds = new Set();
-  for (let i = 0; i < existing.length; i += 2) seenIds.add(existing[i]);
+  for (let i = 0; i < existingCopy.length; i += 2) seenIds.add(existingCopy[i]);
   for (let i = 0; i < additions.length; i += 2) {
     if (!seenIds.has(additions[i])) {
-      existing.push(additions[i], additions[i + 1]);
+      existingCopy.push(additions[i], additions[i + 1]);
       seenIds.add(additions[i]);
     }
   }
@@ -706,6 +725,8 @@ class RspackRSCManifestPlugin {
 
             filePathToModuleMetadata[fileUrl] = {
               id: moduleId,
+              // .slice() is required: mergeChunkPairsInPlace mutates its first argument
+              // in place, so each module's metadata must own a private chunk-pair copy.
               chunks: chunkPairs.slice(),
               // Known limitation: all exports are treated as client references.
               // Rspack helper does not yet enumerate named exports like RSCWebpackPlugin.

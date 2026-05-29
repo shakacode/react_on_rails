@@ -4459,6 +4459,7 @@ describe RscGenerator, type: :generator do
           expect(content).to include("Ignoring invalid glob pattern")
           expect(content).to include("Consider adding an explicit base path")
           expect(content).to include("scanning from context")
+          expect(content).to include("refusing to scan from the context root in production")
           expect(content).to include("absoluteGlobPattern")
           expect(content).to include("requests.add(reference)")
           expect(content).to include("collectStringReference")
