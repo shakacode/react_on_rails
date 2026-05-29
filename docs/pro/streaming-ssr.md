@@ -108,16 +108,17 @@ See [Create a React Server Component](./react-server-components/create-without-s
 
 ### 3. Add The Component To Your Rails View
 
-Use `stream_react_component_with_async_props`. Fast props go in `props:`; each `emit.call(name, value)` streams one more prop to the browser as soon as Rails has it. The controller still owns the query (see Step 4) — the view just emits the prepared result when ready.
+Use `stream_react_component_with_async_props`. Fast props go in `props:`; each `emit.call(name, value)` streams one more prop to the browser as soon as it resolves. Run the slow query **inside the block** — that's what lets the shell render first and the prop stream in afterward. (Loading it in the controller before this helper would block the shell until the query finished, defeating the point of async props.) Keep the block thin: call a model scope or query object, not business logic.
 
 ```erb
 <!-- app/views/example/show.html.erb -->
 
 <%= stream_react_component_with_async_props('MyStreamingComponent',
       props: { greeting: 'Hello, Streaming World!' }) do |emit|
-  # Streams the `posts` prop to the browser the moment Rails has it —
-  # the shell renders first, then this fills the Suspense boundary.
-  emit.call('posts', @posts.as_json(only: [:id, :title]))
+  # Runs in the streaming flow: the shell (greeting + Suspense fallback) is
+  # sent first, then this emits `posts` once the query resolves. Rails still
+  # owns the query, auth, and caching — `Post.recent` is a model scope.
+  emit.call('posts', Post.recent.limit(20).as_json(only: [:id, :title]))
 end %>
 
 <footer>
@@ -125,7 +126,7 @@ end %>
 </footer>
 ```
 
-> If every data source is fast, use the simpler `stream_react_component` and pass all props synchronously — React still streams the rendered HTML to the browser as it walks the tree. Reach for async props when one or more sources are slow. See the [sync vs. async props comparison](../oss/migrating/rsc-data-fetching.md#data-fetching-in-react-on-rails-pro).
+> If every data source is fast, use the simpler `stream_react_component` and pass all props synchronously — React still streams the rendered HTML to the browser as it walks the tree. Reach for async props when one or more sources are slow. See [Data Fetching in React on Rails Pro](../oss/migrating/rsc-data-fetching.md#data-fetching-in-react-on-rails-pro).
 
 ### 4. Render The View Using The `stream_view_containing_react_components` Helper
 
@@ -141,13 +142,12 @@ class ExampleController < ApplicationController
   # but you can include it explicitly if you prefer.
 
   def show
-    @posts = Post.recent.limit(20)
     stream_view_containing_react_components(template: 'example/show')
   end
 end
 ```
 
-The controller prepares `@posts`; the view's `emit.call` streams it. For one slow source like this, loading it in the controller is fine.
+The controller just renders — the async prop's query runs in the view's `emit` block (Step 3) so the shell can stream before the query finishes. The controller still owns request-level concerns: authentication, authorization, and any fast props you pass synchronously.
 
 #### Loading Multiple Slow Sources in Parallel
 
