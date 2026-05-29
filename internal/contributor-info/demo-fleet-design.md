@@ -49,7 +49,7 @@ task "demo_fleet:release_track", [:react_on_rails, :shakapacker, :react_on_rails
   end
 
   tracking_issue.record_all(results)
-  tracking_issue.gate_check!  # fails if any hard_gate PR is red
+  tracking_issue.gate_check!  # fails unless every hard_gate checkbox is ticked (CI green + manual sign-off)
 end
 
 # Freshness track — weekly scheduled
@@ -88,7 +88,7 @@ exec bundle exec rake "demo_fleet:${1:-plan}"
 - `DemoFleet::Runner` — bounded parallel executor. It records per-repo exceptions as red `DemoResult` objects, keeps processing the remaining repos, and re-raises only after `tracking_issue.record_all` and `tracking_issue.gate_check!` have made the failure visible.
 - `DemoPR` — opens/updates the bump PR in a demo repo via a GitHub App installation token (see Credentials). Generates the PR body from the RC plan's RC Test Report template, prefilled with the demo's manifest data.
 - `DependencyBumps` — computes proposed version bumps with the age gate (next section).
-- `TrackingIssue` — creates/updates the per-RC tracking issue in `shakacode/react_on_rails` from `.github/ISSUE_TEMPLATE/rc-release-tracking.yml`; ticks checkboxes as PRs land.
+- `TrackingIssue` — creates/updates the per-RC tracking issue in `shakacode/react_on_rails` from `.github/ISSUE_TEMPLATE/rc-release-tracking.yml`. `record_all` ticks only the _automated_ sub-items (CI green + review-app smoke) from each `DemoResult`; the _manual_ RC-checklist items stay for a human to tick. `gate_check!` gates on the issue's checkbox state, not on the raw `DemoResult`s — so a hard_gate demo that is automated-green but still has an unchecked manual item blocks the final release. This keeps the RC plan the owner of release policy; the orchestrator only fills in the mechanical checkboxes.
 - `ReviewApp` — when `review_app.cpflow_app_name` is non-null, polls the GitHub Checks API for `review_app.status_check`, asks CPFlow for that app's review URL for the PR branch, and hits each `smoke` path against that base URL (it never derives the URL from the repo slug). When `cpflow_app_name` is null — a demo with no review-app pipeline yet — it short-circuits: no status-check poll, no URL lookup, no smoke run. A repo with a `review_app` block cannot clear `verify: true` while `cpflow_app_name` is null; demos that genuinely have no pipeline set `review_app: null` instead.
 - `pr.wait_for_ci_and_review_app` — coordinates CI polling plus `ReviewApp` smoke checks.
 
@@ -160,9 +160,9 @@ For CVEs that need a sub-min-days patched version:
 
 1. Release manager opens or updates a tracking issue in `shakacode/react_on_rails` titled `age-gate override: <pkg>@<version>`.
 2. Issue body includes the CVE link, affected package, candidate version, and justification.
-3. A second maintainer approves the override in an issue comment.
+3. A second maintainer approves the override in an issue comment. The approval is only honored if the commenter is a verified member of the designated maintainers team (e.g. `shakacode/maintainers`): `AgeGateOverride.active?` checks `GET /orgs/shakacode/teams/maintainers/memberships/<user>` for both the issue author and the approver, so a free-text "approved" from anyone outside the team is ignored.
 4. Release manager applies the `age-gate-override` label after approval. The orchestrator reads GitHub issue timeline events and uses the most recent label-applied timestamp as the start of the 7-day window; `updated_at` is not used because ordinary edits would extend the window accidentally.
-5. `AgeGateOverride.active?` permits only the exact `ecosystem/name@version` named in the issue title/body and only while `now - label_applied_at <= 7.days`.
+5. `AgeGateOverride.active?` permits only the exact `ecosystem/name@version` named in the issue title/body, only while `now - label_applied_at <= 7.days`, and only when both the issue author and the approver pass the team-membership check from step 3.
 6. The override, approver, and expiry timestamp are logged in the tracking issue and in the resulting PR body.
 
 This keeps audit trail in GitHub, not in shell history or env vars.
