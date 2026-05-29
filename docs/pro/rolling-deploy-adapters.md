@@ -116,7 +116,7 @@ That exposes two authenticated endpoints under the mount path:
 | `GET /bundles/:hash` | `application/gzip` tarball containing `bundle.js` plus that hash's companion assets.                                      |
 
 > [!IMPORTANT]
-> Engine auto-mount is planned for a follow-up release but is not yet wired — mount the controller explicitly with `draw_routes` as shown. When auto-mount lands, check whether its default path matches your configured `path:`. If they match, you can remove the explicit `draw_routes` call; if they differ, keep it or pass a distinct `as_prefix:` to avoid duplicate-route-name errors.
+> Engine auto-mount is planned for a follow-up release but is not yet wired — mount the controller explicitly with `draw_routes` as shown. When auto-mount lands and you still need a custom path, keep the explicit `draw_routes` call and pass a distinct `as_prefix:` keyword (e.g. `as_prefix: "my_rolling_deploy"`) to avoid duplicate named-route errors. If the auto-mount's default path suits you, you can remove the explicit call entirely.
 
 ### Security
 
@@ -126,7 +126,7 @@ That exposes two authenticated endpoints under the mount path:
 - Tarball extraction is **path-traversal-proofed**, accepts regular files only, and enforces a 200 MB uncompressed cap (zip-bomb guard).
 
 > [!WARNING]
-> **Use HTTPS in production.** The token is a bearer credential. Over plain HTTP to a non-loopback host the adapter logs a cleartext-token warning today; a hard HTTPS gate is planned for a follow-up release. Until then, ensure `rolling_deploy_previous_url` always uses `https://` in production environments.
+> **Use HTTPS in production.** The token is a bearer credential. Over plain HTTP to a non-loopback host the adapter logs a warning that the token is being sent over an unencrypted connection; a hard HTTPS gate is planned for a follow-up release. Until then, ensure `rolling_deploy_previous_url` always uses `https://` in production environments.
 
 ### Companion assets are handled automatically
 

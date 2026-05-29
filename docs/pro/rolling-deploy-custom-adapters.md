@@ -354,7 +354,7 @@ class FilesystemRollingDeployAdapter
     manifest = root.join("_manifest.json")
     return [] unless manifest.exist?
 
-    JSON.parse(manifest.read).fetch("hashes", [])
+    JSON.parse(manifest.read).fetch("hashes", []).last(RETENTION)
   end
 
   def self.fetch(hash)
