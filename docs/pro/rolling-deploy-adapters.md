@@ -110,13 +110,13 @@ ReactOnRailsPro::RollingDeploy::BundlesController.draw_routes(
 
 That exposes two authenticated endpoints under the mount path:
 
-| Endpoint             | Returns                                                                                        |
-| -------------------- | ---------------------------------------------------------------------------------------------- |
-| `GET /manifest`      | JSON: `{ hashes: [...], rsc_enabled, generated_at, protocol_version }` for the current deploy. |
-| `GET /bundles/:hash` | `application/gzip` tarball containing `bundle.js` plus that hash's companion assets.           |
+| Endpoint             | Returns                                                                                                                   |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `GET /manifest`      | JSON: `{ hashes: [...], rsc_enabled: true\|false, generated_at: "ISO8601", protocol_version: 1 }` for the current deploy. |
+| `GET /bundles/:hash` | `application/gzip` tarball containing `bundle.js` plus that hash's companion assets.                                      |
 
 > [!IMPORTANT]
-> Engine auto-mount is planned for a follow-up release but is not yet wired — mount the controller explicitly with `draw_routes` as shown. When auto-mount lands, drop the manual mount or pass a distinct `as_prefix:` to avoid duplicate-route-name errors.
+> Engine auto-mount is planned for a follow-up release but is not yet wired — mount the controller explicitly with `draw_routes` as shown. When auto-mount lands, check whether its default path matches your configured `path:`. If they match, you can remove the explicit `draw_routes` call; if they differ, keep it or pass a distinct `as_prefix:` to avoid duplicate-route-name errors.
 
 ### Security
 
@@ -134,7 +134,8 @@ Each bundle hash ships with the companion assets built alongside it — `loadabl
 
 ## Deploy the renderer before Rails
 
-> **Important:** during a rolling deploy, the new Node Renderer must be live and cache-warm **before** the new Rails server starts serving traffic. If Rails goes first, this won't work — you get exactly the 410 storm the adapter is meant to prevent.
+> [!IMPORTANT]
+> During a rolling deploy, the new Node Renderer must be live and cache-warm **before** the new Rails server starts serving traffic. If Rails goes first, the adapter's warm-cache guarantee doesn't hold for that window — you get exactly the 410 storm it's meant to prevent.
 
 Pre-seeding warms the **renderer's** cache. Rails renders nothing itself; it sends SSR requests to the renderer. So a warm cache only helps if the new renderer is already up and serving when the new Rails (bundle `def`) starts sending it traffic:
 
