@@ -61,18 +61,7 @@ module ReactOnRails
 
         MSG
 
-        error_backtrace = err.backtrace
-        backtrace = if error_backtrace.nil? || error_backtrace.empty?
-                      # JS-originated errors (e.g. an RSC renderingError carrying a message but
-                      # no parseable stack) have no Ruby backtrace. Skip it rather than crashing
-                      # on `nil.join` / `Rails.backtrace_cleaner.clean(nil)`.
-                      nil
-                    elsif Utils.full_text_errors_enabled?
-                      error_backtrace.join("\n")
-                    else
-                      "#{Rails.backtrace_cleaner.clean(error_backtrace).join("\n")}\n" +
-                        Rainbow("💡 Tip: Set FULL_TEXT_ERRORS=true to see the full backtrace").yellow
-                    end
+        backtrace = formatted_backtrace(err)
       else
         backtrace = nil
       end
@@ -99,6 +88,26 @@ module ReactOnRails
 
       [backtrace, message]
       # rubocop:enable Metrics/AbcSize
+    end
+
+    # Formats `err.backtrace` for display, or returns nil when there are no frames.
+    def formatted_backtrace(err)
+      error_backtrace = err.backtrace
+      # JS-originated errors (e.g. an RSC renderingError carrying a message but no parseable
+      # stack) have no Ruby backtrace. Skip it rather than crashing on `nil.join` /
+      # `Rails.backtrace_cleaner.clean(nil)`.
+      return nil if error_backtrace.nil? || error_backtrace.empty?
+      return error_backtrace.join("\n") if Utils.full_text_errors_enabled?
+
+      cleaned = Rails.backtrace_cleaner.clean(error_backtrace)
+      cleaned_text = cleaned.join("\n")
+      # Only advertise FULL_TEXT_ERRORS when cleaning actually dropped frames. JS backtraces
+      # (e.g. `at CommentsToggle (/app/components/Foo.jsx:12:15)`) don't match Rails' default
+      # silencers, so they pass through unchanged and the tip would falsely imply more frames
+      # are hidden.
+      return cleaned_text unless cleaned.length < error_backtrace.length
+
+      "#{cleaned_text}\n#{Rainbow('💡 Tip: Set FULL_TEXT_ERRORS=true to see the full backtrace').yellow}"
     end
 
     # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity

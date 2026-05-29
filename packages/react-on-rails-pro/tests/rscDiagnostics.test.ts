@@ -10,6 +10,7 @@ import {
   buildRSCStreamDiagnosticError,
   extractModulePathFromStack,
   mergeRSCStreamDiagnosticError,
+  MERGED_DIAGNOSTIC_FLAG,
 } from '../src/rscDiagnostics.ts';
 
 const encodeLengthPrefixedChunk = (metadata: Record<string, unknown>, content: string) => {
@@ -193,6 +194,18 @@ describe('RSC diagnostics', () => {
     expect(diagnosticError?.message).not.toContain('hasErrors=true');
   });
 
+  it('reduces the stack to the header line when no original stack is present', () => {
+    // Without an original stack, the V8-generated stack would point at this diagnostics module
+    // and mislead error monitors about the error origin.
+    const diagnosticError = buildRSCStreamDiagnosticError(
+      { hasErrors: true },
+      { componentName: 'CommentsToggle' },
+    );
+
+    expect(diagnosticError?.stack).toBe(`${diagnosticError?.name}: ${diagnosticError?.message}`);
+    expect(diagnosticError?.stack).not.toContain('rscDiagnostics');
+  });
+
   it('keeps the merged-diagnostic marker non-enumerable so error reporters do not serialize it', () => {
     const diagnosticError = new Error('[ReactOnRails] RSC bundle rendering failed.');
     diagnosticError.name = 'ReactOnRailsRSCStreamError';
@@ -200,8 +213,8 @@ describe('RSC diagnostics', () => {
 
     const mergedError = mergeRSCStreamDiagnosticError(genericStreamError, diagnosticError);
 
-    expect(Object.keys(mergedError)).not.toContain('__rorRSCDiagMerged');
-    expect(Object.prototype.hasOwnProperty.call(mergedError, '__rorRSCDiagMerged')).toBe(true);
+    expect(Object.keys(mergedError)).not.toContain(MERGED_DIAGNOSTIC_FLAG);
+    expect(Object.prototype.hasOwnProperty.call(mergedError, MERGED_DIAGNOSTIC_FLAG)).toBe(true);
   });
 
   it('treats a merged diagnostic as idempotent even when the message format changes', () => {

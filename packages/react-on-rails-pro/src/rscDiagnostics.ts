@@ -29,14 +29,16 @@ type RenderingErrorMetadata = {
 };
 
 export const RSC_STREAM_DIAGNOSTIC_ERROR_NAME = 'ReactOnRailsRSCStreamError';
-const MERGED_DIAGNOSTIC_FLAG = '__rorRSCDiagMerged';
+// Exported so tests reference the marker by constant rather than a duplicated string literal.
+export const MERGED_DIAGNOSTIC_FLAG = '__rorRSCDiagMerged';
 
 type RSCStreamDiagnosticError = Error & {
   [MERGED_DIAGNOSTIC_FLAG]?: true;
   cause?: unknown;
 };
 
-const str = (value: unknown) => (typeof value === 'string' && value.length > 0 ? value : undefined);
+const nonEmptyString = (value: unknown) =>
+  typeof value === 'string' && value.length > 0 ? value : undefined;
 
 // Bundler/framework frames point at library code rather than the failing component, so they
 // are a poor value for `Module:`. Skip them when a later user-code frame is available.
@@ -71,10 +73,10 @@ export const buildRSCStreamDiagnosticError = (
 ) => {
   const raw = metadata.renderingError;
   // `RenderingErrorMetadata` has only optional `unknown` fields, so a plain annotation
-  // accepts any object without a type assertion; `str()` validates each field at runtime.
+  // accepts any object without a type assertion; `nonEmptyString()` validates each field at runtime.
   const re: RenderingErrorMetadata = typeof raw === 'object' && raw !== null ? raw : {};
-  const originalMessage = str(re.message);
-  const originalStack = str(re.stack);
+  const originalMessage = nonEmptyString(re.message);
+  const originalStack = nonEmptyString(re.stack);
   // Wire contract: the React on Rails server bundle only emits `renderingError` on actual
   // failure, so presence of a message or stack is treated as a failure signal even when
   // `hasErrors` isn't explicitly set. Belt-and-suspenders intentional — if a future producer
@@ -101,12 +103,27 @@ export const buildRSCStreamDiagnosticError = (
 
   const diagnosticError = new Error(message);
   diagnosticError.name = RSC_STREAM_DIAGNOSTIC_ERROR_NAME;
-  if (originalStack) {
-    diagnosticError.stack = `${diagnosticError.name}: ${message}\nOriginal stack:\n${originalStack}`;
-  }
+  // Always overwrite the auto-generated stack. With an original stack we surface it; without one
+  // we reduce the stack to just the header line, because the V8-generated stack would otherwise
+  // point at this diagnostics module and error monitors (Sentry, Honeybadger) would misattribute
+  // the error origin to react-on-rails internals.
+  diagnosticError.stack = originalStack
+    ? `${diagnosticError.name}: ${message}\nOriginal stack:\n${originalStack}`
+    : `${diagnosticError.name}: ${message}`;
   return diagnosticError;
 };
 
+/**
+ * Merges a generic React stream error with the original RSC bundle diagnostic.
+ *
+ * Idempotent on `error`: if `error` is already a merged result (carries `MERGED_DIAGNOSTIC_FLAG`)
+ * it is returned untouched, so re-entering this in a chain of catch handlers won't double-wrap.
+ *
+ * Precondition: `diagnosticError` must be a fresh (non-merged) diagnostic — in practice it always
+ * comes from `buildRSCStreamDiagnosticError`, which never sets the flag. The idempotency guard
+ * intentionally only inspects `error`; passing an already-merged error as `diagnosticError` would
+ * duplicate context.
+ */
 export const mergeRSCStreamDiagnosticError = (error: unknown, diagnosticError?: Error) => {
   const streamError: RSCStreamDiagnosticError =
     error instanceof Error ? error : new Error(extractErrorMessage(error));
