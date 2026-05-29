@@ -150,9 +150,10 @@ The synchronous example above loads every prop in the controller before React st
 
 Use `stream_react_component_with_async_props` and emit each slow prop from the block. The fast props go in `props:`; each `emit.call(name, value)` streams one more prop as soon as Rails has it:
 
+> [!NOTE]
+> **Prerequisites:** the controller must `include ReactOnRailsPro::Stream` and render the view via `stream_view_containing_react_components`, and `config.enable_rsc_support = true` must be set in your React on Rails initializer. Without these you'll get a confusing `NoMethodError` rather than a clear "missing setup" message.
+
 ```erb
-<%# Controller must include ReactOnRailsPro::Stream and render the view via
-    stream_view_containing_react_components. Requires config.enable_rsc_support = true. %>
 <%= stream_react_component_with_async_props("ProductPage",
       props: { name: product.name, price: product.price }) do |emit|
   # Each emit.call streams a prop to the browser the moment Rails has it.
@@ -168,7 +169,7 @@ On the React side, the component receives a `getReactOnRailsAsyncProp` helper al
 import { Suspense } from 'react';
 import { WithAsyncProps } from 'react-on-rails-pro';
 
-type Review = { id: number; text: string };
+type Review = { id: number; text: string; rating: number };
 type Product = { id: number; name: string; price: number };
 
 type SyncProps = { name: string; price: number };
@@ -191,10 +192,10 @@ export default function ProductPage({
       <h1>{name}</h1>
       <p>${price}</p>
 
-      <Suspense fallback={<ReviewsSkeleton />}>
+      <Suspense fallback={<div>Loading reviews…</div>}>
         <ReviewList reviews={reviewsPromise} />
       </Suspense>
-      <Suspense fallback={<RecommendationsSkeleton />}>
+      <Suspense fallback={<div>Loading recommendations…</div>}>
         <RecommendationList items={recommendationsPromise} />
       </Suspense>
     </div>
@@ -226,6 +227,8 @@ async function RecommendationList({ items }: { items: Promise<Product[]> }) {
 }
 ```
 
+> **Production note:** Wrap each `<Suspense>` in an `<ErrorBoundary>` so that if an async-prop stream rejects (e.g. a Rails-side exception while emitting), the boundary degrades to a fallback instead of crashing the whole page. See the [error-handling pattern](../../pro/react-server-components/inside-client-components.md#error-handling) for a reusable boundary.
+
 **Sync props vs. async props — which to use:**
 
 |                         | Sync props (`stream_react_component`)    | Async props (`stream_react_component_with_async_props`) |
@@ -234,7 +237,7 @@ async function RecommendationList({ items }: { items: Promise<Product[]> }) {
 | What streams            | Rendered HTML, as React walks the tree   | Rendered HTML **plus** each prop independently          |
 | Best for                | All data sources are fast                | One or more data sources are slow                       |
 
-Async props keep Rails as the backend: the controller still owns the queries, authorization, and caching — it just emits each result the moment it has it instead of blocking the whole render on the slowest source. Requires React Server Components (`config.enable_rsc_support = true`).
+Async props keep Rails as the backend: Rails still owns the queries, authorization, and caching — the `emit` block is ordinary Rails code running in the streaming view helper, not the React component. It just emits each result the moment it has it instead of blocking the whole render on the slowest source. (Don't move these queries into the controller action: the controller runs to completion _before_ the view streams, so doing the work there would resolve everything up front and defeat the progressive streaming.) Requires React Server Components (`config.enable_rsc_support = true`).
 
 #### Parallelize the queries with the `async` gem
 
