@@ -2980,6 +2980,16 @@ describe InstallGenerator, type: :generator do
   end
 
   describe "#using_rspack?" do
+    # Regression guard for the load-bearing Thor invariant: --rspack must declare NO static
+    # default. If a `default:` is ever added, Thor always includes :rspack in the options hash,
+    # so options.key?(:rspack) is always true and the fresh-install Rspack default silently
+    # breaks (every unflagged CLI run would fall back to Webpack). Verified empirically against
+    # Thor 1.5.0: a no-default boolean option is absent from the options hash unless its flag is
+    # passed on the CLI, whereas a `default:`-bearing option (e.g. --typescript) is always present.
+    it "declares --rspack without a static default so the fresh-install default applies" do
+      expect(described_class.class_options[:rspack].default).to be_nil
+    end
+
     context "when --rspack option is provided" do
       let(:install_generator) { described_class.new([], { rspack: true }) }
 

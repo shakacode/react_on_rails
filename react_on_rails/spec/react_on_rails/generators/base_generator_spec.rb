@@ -202,6 +202,13 @@ RSpec.describe ReactOnRails::Generators::BaseGenerator, type: :generator do
     before { FileUtils.rm_rf(destination) }
     after { FileUtils.rm_rf(destination) }
 
+    it "declares --rspack without a static default so the fresh-install default applies" do
+      # Regression guard (see install_generator_spec for full rationale): a `default:` on the
+      # --rspack class_option would make options.key?(:rspack) always true and silently break the
+      # fresh-install Rspack default for unflagged CLI runs.
+      expect(described_class.class_options[:rspack].default).to be_nil
+    end
+
     it "defaults a fresh install (no flag, no existing config) to Rspack" do
       expect(base_generator.using_rspack?).to be(true)
     end

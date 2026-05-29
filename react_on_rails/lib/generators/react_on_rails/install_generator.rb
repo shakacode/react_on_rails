@@ -42,6 +42,11 @@ module ReactOnRails
                    aliases: "-T"
 
       # --rspack / --no-rspack (Rspack is the default on fresh installs; --no-rspack selects Webpack)
+      # IMPORTANT: do NOT add a `default:` here. The absence of a default is load-bearing — Thor
+      # only includes :rspack in the options hash when the flag is explicitly passed, which is how
+      # GeneratorHelper#using_rspack? tells an explicit choice from "no flag given" (the latter
+      # falls back to rspack_bundler_default). Adding `default: false` would make
+      # options.key?(:rspack) always true and silently break the fresh-install Rspack default.
       class_option :rspack,
                    type: :boolean,
                    desc: "Use Rspack (default) as the bundler; pass --no-rspack to use Webpack"
