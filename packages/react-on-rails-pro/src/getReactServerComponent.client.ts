@@ -118,6 +118,10 @@ const createFromFetch = async (
   });
 
   const renderPromise = createFromReadableStream<React.ReactNode>(transformedStream);
+  // `rscDiagnosticError` is populated synchronously while the stream is parsed in the
+  // ReadableStream `start` callback above. React cannot produce a render error until it has
+  // consumed that stream, so by the time `renderPromise` rejects the diagnostic — if the
+  // stream carried one — is already set; it is never undefined purely because of timing.
   return wrapInNewPromise(renderPromise).catch((error: unknown) => {
     throw mergeRSCStreamDiagnosticError(error, rscDiagnosticError);
   });

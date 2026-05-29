@@ -627,6 +627,51 @@ describe ReactOnRailsHelper do
 
       expect(error.backtrace).to be_nil
     end
+
+    it "leaves backtrace nil when the stack is a header line with no parseable frames" do
+      json_result = {
+        "renderingError" => {
+          "message" => "useState is not a function",
+          "stack" => "TypeError: useState is not a function"
+        }
+      }
+
+      error = helper.send(:rendering_error_from_result, json_result)
+
+      expect(error.backtrace).to be_nil
+    end
+
+    it "raises PrerenderError without crashing when renderingError has no stack (full text errors)" do
+      allow(ReactOnRails::Utils).to receive(:full_text_errors_enabled?).and_return(true)
+
+      chunk_result = {
+        "consoleReplayScript" => "",
+        "hasErrors" => true,
+        "renderingError" => { "message" => "useState is not a function" }
+      }
+
+      expect do
+        helper.send(:raise_prerender_error, chunk_result, "CommentsToggle", {}, "generated js")
+      end.to raise_error(ReactOnRails::PrerenderError) { |error|
+        expect(error.message).to include("useState is not a function")
+      }
+    end
+
+    it "raises PrerenderError without crashing when renderingError has no stack (cleaned backtrace)" do
+      allow(ReactOnRails::Utils).to receive(:full_text_errors_enabled?).and_return(false)
+
+      chunk_result = {
+        "consoleReplayScript" => "",
+        "hasErrors" => true,
+        "renderingError" => { "message" => "useState is not a function" }
+      }
+
+      expect do
+        helper.send(:raise_prerender_error, chunk_result, "CommentsToggle", {}, "generated js")
+      end.to raise_error(ReactOnRails::PrerenderError) { |error|
+        expect(error.message).to include("useState is not a function")
+      }
+    end
   end
 
   describe "#redux_store" do

@@ -733,10 +733,13 @@ module ReactOnRails
     # not match Ruby's `file:line:in 'method'` backtrace format. Drop the leading header
     # so backtrace cleaners and error reporters can parse the remaining `at <frame>` lines.
     # Frames are also `.strip`-ed to drop V8's leading indentation, which Ruby backtraces never carry.
+    #
+    # When the stack has no `at <frame>` lines (e.g. a header-only or non-V8 string) this
+    # returns `[]`, leaving the backtrace nil rather than seeding it with an unparseable
+    # header line that Rails/APM backtrace cleaners would silently drop or misgroup.
     def normalize_js_stack_lines(stack)
       lines = stack.to_s.lines.map { |line| line.chomp.strip }
-      frames = lines.drop_while { |line| !line.start_with?("at ") }
-      frames.empty? ? lines : frames
+      lines.drop_while { |line| !line.start_with?("at ") }
     end
 
     def should_raise_streaming_prerender_error?(chunk_json_result, render_options)

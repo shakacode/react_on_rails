@@ -61,10 +61,16 @@ module ReactOnRails
 
         MSG
 
-        backtrace = if Utils.full_text_errors_enabled?
-                      err.backtrace.join("\n")
+        error_backtrace = err.backtrace
+        backtrace = if error_backtrace.nil? || error_backtrace.empty?
+                      # JS-originated errors (e.g. an RSC renderingError carrying a message but
+                      # no parseable stack) have no Ruby backtrace. Skip it rather than crashing
+                      # on `nil.join` / `Rails.backtrace_cleaner.clean(nil)`.
+                      nil
+                    elsif Utils.full_text_errors_enabled?
+                      error_backtrace.join("\n")
                     else
-                      "#{Rails.backtrace_cleaner.clean(err.backtrace).join("\n")}\n" +
+                      "#{Rails.backtrace_cleaner.clean(error_backtrace).join("\n")}\n" +
                         Rainbow("💡 Tip: Set FULL_TEXT_ERRORS=true to see the full backtrace").yellow
                     end
       else

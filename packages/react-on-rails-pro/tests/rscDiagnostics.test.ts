@@ -132,6 +132,47 @@ describe('RSC diagnostics', () => {
     expect(extractModulePathFromStack(stack)).toBe('/app/server.js');
   });
 
+  it('skips node_modules and webpack-internal frames in favor of the first user-code frame', () => {
+    const stack =
+      'Error: boom\n' +
+      '    at useState (/app/node_modules/react/cjs/react.development.js:1:1)\n' +
+      '    at Inner (webpack-internal:///./node_modules/x.js:2:2)\n' +
+      '    at MyComponent (/app/components/MyComponent.jsx:5:7)';
+
+    expect(extractModulePathFromStack(stack)).toBe('/app/components/MyComponent.jsx');
+  });
+
+  it('falls back to the first frame when every frame is framework-internal', () => {
+    const stack =
+      'Error: boom\n' +
+      '    at x (/app/node_modules/react/index.js:1:1)\n' +
+      '    at y (/app/node_modules/react-dom/index.js:2:2)';
+
+    expect(extractModulePathFromStack(stack)).toBe('/app/node_modules/react/index.js');
+  });
+
+  it('does not mistake a bare function name for the module path in anonymous frames', () => {
+    // Unusual but valid V8 frame where a function name precedes a path without parens; the
+    // anonymous-frame regex is anchored to an absolute path so it skips this frame rather than
+    // returning the function name, and the next user-code frame wins.
+    const stack = 'Error: boom\n    at someFunction /weird/frame:3:9\n    at Real (/app/real.js:5:5)';
+
+    expect(extractModulePathFromStack(stack)).toBe('/app/real.js');
+  });
+
+  it('uses a stack-derived fallback when triggered by a stack without hasErrors or message', () => {
+    const diagnosticError = buildRSCStreamDiagnosticError(
+      { renderingError: { stack: 'TypeError: boom\n    at Foo (/app/foo.js:1:1)' } },
+      { componentName: 'Foo' },
+    );
+
+    expect(diagnosticError).toBeDefined();
+    expect(diagnosticError?.message).toContain(
+      'Original error: RSC stream metadata reported a rendering error',
+    );
+    expect(diagnosticError?.message).not.toContain('hasErrors=true');
+  });
+
   it('keeps the merged-diagnostic marker non-enumerable so error reporters do not serialize it', () => {
     const diagnosticError = new Error('[ReactOnRails] RSC bundle rendering failed.');
     diagnosticError.name = 'ReactOnRailsRSCStreamError';

@@ -38,16 +38,31 @@ type RSCStreamDiagnosticError = Error & {
 
 const str = (value: unknown) => (typeof value === 'string' && value.length > 0 ? value : undefined);
 
+// Bundler/framework frames point at library code rather than the failing component, so they
+// are a poor value for `Module:`. Skip them when a later user-code frame is available.
+const INTERNAL_FRAME_RE =
+  /(?:^|[\\/])node_modules[\\/]|\bwebpack[\\/]|\bwebpack-internal:|\b__webpack_require__\b/;
+
 export const extractModulePathFromStack = (stack?: string) => {
   if (!stack) return undefined;
-  for (const line of stack.split('\n')) {
-    const match = /\(([^()]+):\d+:\d+\)$|\bat\s+(.+):\d+:\d+$/.exec(line.trim());
-    // V8 emits anonymous async frames as `at async /path:l:c`; strip the `async ` keyword
-    // so the diagnostic reports `Module: /path` instead of `Module: async /path`.
-    const location = match?.[1] ?? match?.[2]?.replace(/^async\s+/, '');
-    if (location) return location.replace(/\?.*$/, '');
+  let firstLocation: string | undefined;
+  for (const rawLine of stack.split('\n')) {
+    const line = rawLine.trim();
+    // Two V8 frame shapes:
+    //   `at fn (/path/to/file.js:10:5)`  -> parenthesized
+    //   `at /path:10:5` / `at async /path:10:5` -> anonymous/top-level
+    // The anonymous form is anchored to an absolute path (POSIX `/` or a Windows drive) and
+    // tolerates the optional `async ` keyword, so a bare function name in an unusual
+    // `at fn /path:10:5` frame isn't mistaken for the module path.
+    const match = /\(([^()]+):\d+:\d+\)$|\bat\s+(?:async\s+)?((?:\/|[A-Za-z]:[\\/]).*?):\d+:\d+$/.exec(line);
+    const location = (match?.[1] ?? match?.[2])?.replace(/\?.*$/, '');
+    if (location) {
+      firstLocation ??= location;
+      if (!INTERNAL_FRAME_RE.test(location)) return location;
+    }
   }
-  return undefined;
+  // Every frame was framework-internal — fall back to the first so `Module:` is still populated.
+  return firstLocation;
 };
 
 export const buildRSCStreamDiagnosticError = (
@@ -55,7 +70,9 @@ export const buildRSCStreamDiagnosticError = (
   context: RSCStreamDiagnosticContext = {},
 ) => {
   const raw = metadata.renderingError;
-  const re = (typeof raw === 'object' && raw !== null ? raw : {}) as RenderingErrorMetadata;
+  // `RenderingErrorMetadata` has only optional `unknown` fields, so a plain annotation
+  // accepts any object without a type assertion; `str()` validates each field at runtime.
+  const re: RenderingErrorMetadata = typeof raw === 'object' && raw !== null ? raw : {};
   const originalMessage = str(re.message);
   const originalStack = str(re.stack);
   // Wire contract: the React on Rails server bundle only emits `renderingError` on actual
@@ -65,12 +82,19 @@ export const buildRSCStreamDiagnosticError = (
   if (metadata.hasErrors !== true && !originalMessage && !originalStack) return undefined;
 
   const modulePath = extractModulePathFromStack(originalStack);
+  // Without a message, name the actual signal that triggered the diagnostic: `hasErrors=true`
+  // when that flag is set, otherwise a stack-only `renderingError` (claiming `hasErrors=true`
+  // in the latter case would be inaccurate).
+  const fallbackOriginalError =
+    metadata.hasErrors === true
+      ? 'RSC stream metadata reported hasErrors=true'
+      : 'RSC stream metadata reported a rendering error';
   const message = [
     '[ReactOnRails] RSC bundle rendering failed.',
     context.componentName && `Component: ${context.componentName}`,
     context.source && `Source: ${context.source}`,
     modulePath && `Module: ${modulePath}`,
-    `Original error: ${originalMessage ?? 'RSC stream metadata reported hasErrors=true'}`,
+    `Original error: ${originalMessage ?? fallbackOriginalError}`,
   ]
     .filter((line): line is string => Boolean(line))
     .join('\n');
