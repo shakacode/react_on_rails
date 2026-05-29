@@ -85,7 +85,7 @@ const MyStreamingComponent = ({ greeting, getReactOnRailsAsyncProp }) => {
 export default MyStreamingComponent;
 ```
 
-> **React on Rails note:** Database queries, authentication, authorization, and caching all stay on the Rails side — the controller and view own them. Async props just let Rails emit each result the moment it has it, instead of blocking the whole render on the slowest source. The component never fetches data directly. In TypeScript, type the props with `WithAsyncProps<AsyncProps, SyncProps>` from `react-on-rails-pro`. See [Data Fetching in React on Rails Pro](../oss/migrating/rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) for the prop-based data model this builds on.
+> **React on Rails note:** Database queries, authentication, authorization, and caching all stay on the Rails side — the controller and view own them. Async props just let Rails emit each result the moment it has it, instead of blocking the whole render on the slowest source. The component never fetches data directly. In TypeScript, type the root component's props with `WithAsyncProps<AsyncProps, SyncProps>` from `react-on-rails-pro`, and type each async child's prop as a `Promise` (e.g. `posts: Promise<Post[]>`) — `getReactOnRailsAsyncProp` returns a Promise, not the resolved value. See [Data Fetching in React on Rails Pro](../oss/migrating/rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) for the prop-based data model this builds on.
 
 > **Handle failures:** if a prop's query rejects, the `await` throws inside the async component and React propagates it up the tree. In production, wrap each `<Suspense>` in an error boundary so a single failed source degrades to a fallback instead of breaking the whole render. React does not ship an `ErrorBoundary` — use the [`react-error-boundary`](https://github.com/bvaughn/react-error-boundary) package (or your own class component):
 >
@@ -175,7 +175,7 @@ When several sources are slow and independent, run them concurrently with the [`
   # query resolves — the slowest source no longer blocks the others.
   tasks = [
     parent.async { emit.call('posts', Post.for_user(user_id).recent.limit(20).as_json(only: [:id, :title])) },
-    parent.async { emit.call('stats', DashboardStats.for(user_id).as_json) },
+    parent.async { emit.call('stats', DashboardStats.for(user_id).as_json(only: [:metric, :value])) },
     parent.async { emit.call('feed',  FeedService.for(user_id).as_json(only: [:id, :title])) },
   ]
   tasks.each(&:wait) # block stays open until each task finishes
@@ -187,7 +187,7 @@ On the React side, give each async prop its own `<Suspense>` boundary (as in Ste
 > **Error handling — two distinct failure modes:**
 >
 > - An error raised in the task **body before `emit.call`** (e.g. a query raising `ActiveRecord::StatementInvalid`) propagates through `wait` and closes the stream, so the remaining props may not be sent. If one source failing shouldn't cut off the others, wrap each task body in a `rescue` and emit a fallback (or skip that prop).
-> - An error raised **inside `emit.call`** (a non-serializable value, a write failure) is caught and logged by the emitter without re-raising — the task completes normally and `wait` sees nothing, but the prop is never delivered and its `<Suspense>` boundary never resolves. Pass only JSON-serializable values (e.g. `.as_json(only: [...])`) to `emit.call` to avoid a silently hanging boundary.
+> - An error raised **inside `emit.call`** (a non-serializable value, a write failure) may be swallowed by the emitter — logged rather than re-raised — so the task completes normally and `wait` sees nothing, yet the prop is never delivered and its `<Suspense>` boundary never resolves. Pass only JSON-serializable values (e.g. `.as_json(only: [...])`) to `emit.call` to avoid a silently hanging boundary.
 
 **Requirements and footguns for concurrent async props:**
 
