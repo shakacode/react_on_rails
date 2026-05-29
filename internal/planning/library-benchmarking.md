@@ -166,7 +166,7 @@ The current Bencher invocation lives in `.github/workflows/benchmark.yml` inside
 
    Record each boundary value, its dwell run IDs, and the resulting overlap in
    [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169). End to end this is at most 5 boundary values
-   (`0.95` through `0.99`); it locks earlier if overlap reaches `0.40` sooner.
+   (`0.95` through `0.99`).
 
    **Interaction with the false-positive target and real regressions during tuning:**
    - The 1-in-20 false-positive target (Acceptance Criteria 4 and 5) is evaluated only after the hard gate is restored, so
