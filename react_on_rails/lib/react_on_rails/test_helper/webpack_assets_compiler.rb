@@ -13,7 +13,7 @@ module ReactOnRails
           exit!(1)
         end
 
-        puts "\nBuilding Webpack assets..."
+        puts "\nBuilding assets..."
 
         cmd = ReactOnRails::Utils.prepend_cd_node_modules_directory(
           ReactOnRails.configuration.build_test_command
@@ -21,7 +21,7 @@ module ReactOnRails
 
         ReactOnRails::Utils.invoke_and_exit_if_failed(cmd, compilation_failed_message)
 
-        puts "Completed building Webpack assets."
+        puts "Completed building assets."
       end
 
       private
@@ -49,14 +49,14 @@ module ReactOnRails
 
       def compilation_failed_message
         <<~MSG
-          React on Rails: Error building webpack assets!
+          React on Rails: Error building test assets!
 
           The build_test_command failed. This means test assets could not be compiled.
 
           Quick alternatives to get unblocked:
             • Run 'bin/dev static' in another terminal (assets auto-reuse for tests)
             • Run 'bin/dev test-watch' to keep test assets fresh in the background
-            • Run 'RAILS_ENV=test bin/shakapacker' manually to compile once
+            • Run '#{ReactOnRails.configuration.build_test_command}' manually to compile once
 
           For full details: #{TESTING_DOCS_URL}
           Run 'bin/dev --help' for development server modes.

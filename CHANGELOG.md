@@ -27,6 +27,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 #### Fixed
 
 - **[Pro]** **RSC client-hook runtime errors now explain the missing client boundary**: React on Rails Pro now rewrites RSC runtime hook failures such as `useState is not a function` with a diagnostic that names the registered component, points to the likely missing `"use client";` directive, and clarifies that `.client`/`.server` suffixes only control bundle placement. Fixes [Issue 3184](https://github.com/shakacode/react_on_rails/issues/3184).
+- **Test asset compiler output is now bundler-neutral**: Test asset compilation now prints "Building assets..." and "Completed building assets." instead of Webpack-specific wording, and failure guidance tells users to rerun their configured `build_test_command` instead of naming Shakapacker. Fixes [Issue 3455](https://github.com/shakacode/react_on_rails/issues/3455). [PR 3462](https://github.com/shakacode/react_on_rails/pull/3462) by [justin808](https://github.com/justin808).
 
 ### [16.7.0.rc.3] - 2026-05-25
 
