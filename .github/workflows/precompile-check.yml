@@ -84,13 +84,10 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ./.github/actions/setup-ruby
         with:
           ruby-version: '3.4'
-          bundler: 2.5.9
-      # libyaml-dev is needed for psych v5
-      - name: Fix dependency for libyaml-dev
-        run: sudo apt install libyaml-dev
+          bundler-version: 2.5.9
       - name: Setup Node
         uses: actions/setup-node@v4
         with:

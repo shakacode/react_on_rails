@@ -1,5 +1,7 @@
 name: Setup Bundler dependencies
-description: Cache and install Ruby gems for a Bundler project.
+description: >
+  Setup Ruby, cache, and install gems for a Bundler project. On Linux,
+  ensure libyaml-dev is already present or install it before calling this action.
 
 inputs:
   working-directory:
@@ -8,22 +10,18 @@ inputs:
   ruby-version:
     description: Ruby version used by the job.
     required: true
-  bundle-path:
-    description: Bundler install path, relative to the working directory.
-    required: false
-    default: vendor/bundle
   frozen:
-    description: Whether to run Bundler in frozen mode. Cache saving is disabled when false; restore still runs.
+    description: Whether to run Bundler in frozen mode.
     required: false
     default: 'true'
   bundler-version:
-    description: Bundler version selector. Use lockfile, system, or x.y.z.
+    description: Bundler version selector. Use Gemfile.lock, default, latest, none, or x.y.z.
     required: false
-    default: lockfile
-  install-args:
-    description: Arguments for bundle install.
+    default: Gemfile.lock
+  cache-version:
+    description: Arbitrary cache-version value passed through to ruby/setup-ruby.
     required: false
-    default: --jobs=4 --retry=3
+    default: '0'
 
 runs:
   using: composite
@@ -37,36 +35,15 @@ runs:
           exit 1
         fi
 
-    - name: Restore Ruby gems cache
-      id: restore-ruby-gems-cache
-      uses: actions/cache/restore@v5
-      with:
-        path: ${{ inputs.working-directory }}/${{ inputs.bundle-path }}
-        # Update to bundle-...-v1 in the future to break the cache if necessary
-        # or v1-bundle-... if you want restore-keys not to trigger either (update the key there in that case)
-        key: bundle-${{ runner.os }}-${{ inputs.working-directory }}-${{ inputs.bundle-path }}-ruby${{ inputs.ruby-version }}-${{ hashFiles(format('{0}/Gemfile.lock', inputs.working-directory)) }}
-        restore-keys: |
-          bundle-${{ runner.os }}-${{ inputs.working-directory }}-${{ inputs.bundle-path }}-ruby${{ inputs.ruby-version }}-
-
-    - name: Install Ruby gems
-      shell: bash
-      working-directory: ${{ inputs.working-directory }}
+    - name: Setup Ruby and install cached gems
+      uses: ruby/setup-ruby@v1
       env:
         BUNDLE_FROZEN: ${{ inputs.frozen }}
-        BUNDLE_INSTALL_ARGS: ${{ inputs.install-args }}
-        BUNDLE_PATH_CONFIG: ${{ inputs.bundle-path }}
-        BUNDLER_VERSION_CONFIG: ${{ inputs.bundler-version }}
-      run: |
-        bundle config set --local path "$BUNDLE_PATH_CONFIG"
-        bundle config set --local version "$BUNDLER_VERSION_CONFIG"
-        # shellcheck disable=SC2086
-        # Intentionally allow install args to split into separate bundle arguments
-        bundle check || bundle install $BUNDLE_INSTALL_ARGS
-
-    - name: Save Ruby gems cache
-      # We don't want to overwrite the cache for non-frozen Bundler runs
-      if: inputs.frozen == 'true' && steps.restore-ruby-gems-cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v5
+        BUNDLE_RETRY: '3'
+        BUNDLE_JOBS: '4'
       with:
-        path: ${{ inputs.working-directory }}/${{ inputs.bundle-path }}
-        key: ${{ steps.restore-ruby-gems-cache.outputs.cache-primary-key }}
+        ruby-version: ${{ inputs.ruby-version }}
+        working-directory: ${{ inputs.working-directory }}
+        bundler: ${{ inputs.bundler-version }}
+        bundler-cache: true
+        cache-version: ${{ inputs.cache-version }}

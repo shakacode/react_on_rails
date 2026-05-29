@@ -60,13 +60,15 @@ jobs:
         run: |
           # If force_run is true OR full-ci label is present, run everything
           if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
-            echo "run_lint=true" >> "$GITHUB_OUTPUT"
-            echo "run_js_tests=true" >> "$GITHUB_OUTPUT"
-            echo "run_ruby_tests=true" >> "$GITHUB_OUTPUT"
-            echo "run_dummy_tests=true" >> "$GITHUB_OUTPUT"
-            echo "run_generators=true" >> "$GITHUB_OUTPUT"
-            echo "docs_only=false" >> "$GITHUB_OUTPUT"
-            echo "non_runtime_only=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "run_lint=true"
+              echo "run_js_tests=true"
+              echo "run_ruby_tests=true"
+              echo "run_dummy_tests=true"
+              echo "run_generators=true"
+              echo "docs_only=false"
+              echo "non_runtime_only=false"
+            } >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -91,13 +93,13 @@ jobs:
           # Determine if we should run full matrix (main, workflow_dispatch, force_run, or full-ci label)
           if [[ "${{ github.ref }}" == "refs/heads/main" ]] || \
              [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
-             [[ "${{ inputs.force_run }}" == "true" ]] || \
-             [[ "${{ needs.detect-changes.outputs.has_full_ci_label }}" == "true" ]]; then
+            [[ "${{ inputs.force_run }}" == "true" ]] || \
+            [[ "${{ needs.detect-changes.outputs.has_full_ci_label }}" == "true" ]]; then
             # Full matrix: test both latest and minimum supported versions
-            echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest"},{"ruby-version":"3.2","dependency-level":"minimum"}]}' >> $GITHUB_OUTPUT
+            echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest"},{"ruby-version":"3.2","dependency-level":"minimum"}]}' >> "$GITHUB_OUTPUT"
           else
             # PR matrix: test only latest versions for fast feedback
-            echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest"}]}' >> $GITHUB_OUTPUT
+            echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest"}]}' >> "$GITHUB_OUTPUT"
           fi
 
   examples:
@@ -122,10 +124,10 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ./.github/actions/setup-ruby
         with:
           ruby-version: ${{ matrix.ruby-version }}
-          bundler: 2.5.9
+          bundler-version: 2.5.9
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -134,7 +136,7 @@ jobs:
         uses: pnpm/action-setup@v4
       - name: Get pnpm store directory
         shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
       - name: Setup pnpm cache
         uses: actions/cache@v4
         with:
@@ -167,6 +169,8 @@ jobs:
         with:
           working-directory: react_on_rails
           ruby-version: ${{ matrix.ruby-version }}
+          # Minimum-dependency legs intentionally install with frozen=false after script/convert,
+          # matching the historical bundle install behavior for converted dependency files.
           frozen: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
       - name: Ensure minimum required Chrome version
         run: |
@@ -184,7 +188,7 @@ jobs:
         run: echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
       - name: Set packer version environment variable
         run: |
-          echo "CI_DEPENDENCY_LEVEL=${{ matrix.dependency-level }}" >> $GITHUB_ENV
+          echo "CI_DEPENDENCY_LEVEL=${{ matrix.dependency-level }}" >> "$GITHUB_ENV"
       - name: Verify rake tasks exist
         run: |
           cd react_on_rails

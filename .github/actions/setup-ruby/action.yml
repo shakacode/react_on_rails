@@ -1,0 +1,30 @@
+name: Setup Ruby runtime
+description: Install Ruby runtime prerequisites and setup Ruby without installing gems.
+
+inputs:
+  ruby-version:
+    description: Ruby version used by the job.
+    required: true
+  bundler-version:
+    description: Bundler version selector passed through to ruby/setup-ruby.
+    required: false
+    default: Gemfile.lock
+  install-libyaml:
+    description: Whether to install libyaml-dev before Ruby/Bundler steps.
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Install libyaml-dev
+      if: runner.os == 'Linux' && inputs.install-libyaml == 'true'
+      shell: bash
+      run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libyaml-dev
+
+    - name: Setup Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ inputs.ruby-version }}
+        bundler: ${{ inputs.bundler-version }}
+        bundler-cache: false

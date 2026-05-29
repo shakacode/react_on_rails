@@ -63,10 +63,12 @@ jobs:
         run: |
           # If force_run is true OR full-ci label is present, run everything
           if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
-            echo "run_pro_lint=true" >> "$GITHUB_OUTPUT"
-            echo "run_pro_tests=true" >> "$GITHUB_OUTPUT"
-            echo "docs_only=false" >> "$GITHUB_OUTPUT"
-            echo "non_runtime_only=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "run_pro_lint=true"
+              echo "run_pro_tests=true"
+              echo "docs_only=false"
+              echo "non_runtime_only=false"
+            } >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -102,10 +104,10 @@ jobs:
           persist-credentials: false
 
       - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ./.github/actions/setup-ruby
         with:
           ruby-version: ${{ env.RUBY_VERSION }}
-          bundler: 2.5.4
+          bundler-version: 2.5.4
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -119,7 +121,7 @@ jobs:
 
       - name: Get pnpm store directory
         shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
 
       - name: Setup pnpm cache
         uses: actions/cache@v4
@@ -202,10 +204,10 @@ jobs:
           persist-credentials: false
 
       - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ./.github/actions/setup-ruby
         with:
           ruby-version: ${{ env.RUBY_VERSION }}
-          bundler: 2.5.4
+          bundler-version: 2.5.4
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -219,7 +221,7 @@ jobs:
 
       - name: Get pnpm store directory
         shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
 
       - name: Setup pnpm cache
         uses: actions/cache@v4
@@ -389,10 +391,10 @@ jobs:
           persist-credentials: false
 
       - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ./.github/actions/setup-ruby
         with:
           ruby-version: ${{ env.RUBY_VERSION }}
-          bundler: 2.5.4
+          bundler-version: 2.5.4
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -406,7 +408,7 @@ jobs:
 
       - name: Get pnpm store directory
         shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
 
       - name: Setup pnpm cache
         uses: actions/cache@v4
