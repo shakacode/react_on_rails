@@ -162,7 +162,7 @@ export default function App() {
 
 #### 2. Identify Server Component Candidates:
 
-- Data fetching components
+- Components that currently fetch read-only data on the client (e.g. `useEffect` + `fetch`, React Query) — convert them to receive that data as Rails props instead (see [RSC Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md))
 - Non-interactive UI
 - Static content sections
 - Layout components

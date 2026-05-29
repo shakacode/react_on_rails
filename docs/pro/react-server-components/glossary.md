@@ -5,7 +5,7 @@
 A React architecture that allows components to execute exclusively on the server while streaming results to the client. Benefits include:
 
 - Reduced client-side JavaScript
-- Direct access to server resources
+- Renders from server-prepared data passed as props (in React on Rails, Rails owns database access, authorization, and caching)
 - Improved initial page load
 - Better SEO
 
