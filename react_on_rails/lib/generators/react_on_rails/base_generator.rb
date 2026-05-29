@@ -32,6 +32,12 @@ module ReactOnRails
                    type: :boolean,
                    desc: "Use Rspack (default) as the bundler; pass --no-rspack to use Webpack"
 
+      # --webpack: friendly alias for --no-rspack (reconciled in GeneratorHelper#explicit_bundler_choice).
+      # No `default:` here either — same load-bearing reason as --rspack above.
+      class_option :webpack,
+                   type: :boolean,
+                   desc: "Use Webpack as the bundler (alias for --no-rspack)"
+
       # --pro
       class_option :pro,
                    type: :boolean,

@@ -10,7 +10,7 @@ import { promptForMode, PROMPT_CANCELLED } from './prompt.js';
 // eslint-disable-next-line @typescript-eslint/no-require-imports, global-require
 const packageJson = require('../package.json') as { version: string };
 
-async function run(appName: string, rawOpts: Record<string, unknown>): Promise<void> {
+async function run(appName: string, rawOpts: Record<string, unknown>, command?: Command): Promise<void> {
   const { template } = rawOpts;
   if (typeof template !== 'string' || (template !== 'javascript' && template !== 'typescript')) {
     logError(`Invalid template "${String(template)}". Must be "javascript" or "typescript".`);
@@ -29,6 +29,18 @@ async function run(appName: string, rawOpts: Record<string, unknown>): Promise<v
 
   if (rawOpts.standard && (rawOpts.pro || rawOpts.rsc)) {
     logError('--standard cannot be combined with --pro or --rsc.');
+    process.exit(1);
+  }
+
+  // --webpack is a friendly alias for --no-rspack. Commander reports --no-rspack's declared
+  // default as rawOpts.rspack === true, so we use the option source to distinguish an explicit
+  // --rspack from the default and reject contradictory flags (--rspack --webpack).
+  const rspackExplicitlyTrue = rawOpts.rspack === true && command?.getOptionValueSource('rspack') === 'cli';
+  const webpackRequested = rawOpts.webpack === true;
+  if (webpackRequested && rspackExplicitlyTrue) {
+    logError(
+      'Conflicting bundler flags: pass either --rspack or --webpack (alias for --no-rspack), not both.',
+    );
     process.exit(1);
   }
 
@@ -64,11 +76,10 @@ async function run(appName: string, rawOpts: Record<string, unknown>): Promise<v
   const options: CliOptions = {
     template,
     packageManager: packageManager as 'npm' | 'pnpm',
-    // Commander's `--no-rspack` negation option defaults rawOpts.rspack to `true`, so an
-    // omitted flag selects Rspack and only an explicit --no-rspack (=== false) selects Webpack.
-    // Footgun: re-adding `.option('--rspack', desc, false)` would default this to false and
-    // silently flip the default back to Webpack.
-    rspack: rawOpts.rspack !== false,
+    // Rspack is the default; an explicit --no-rspack or its --webpack alias selects Webpack.
+    // (Footgun: re-adding `.option('--rspack', desc, false)` would default rawOpts.rspack to
+    // false and silently flip the default back to Webpack.)
+    rspack: webpackRequested ? false : rawOpts.rspack !== false,
     pro,
     rsc,
   };
@@ -137,6 +148,7 @@ program
   .option('-p, --package-manager <pm>', 'npm or pnpm (auto-detected if not specified)')
   .option('--rspack', 'Use Rspack as the bundler (default, ~20x faster builds)')
   .option('--no-rspack', 'Use Webpack instead of Rspack')
+  .option('--webpack', 'Use Webpack as the bundler (alias for --no-rspack)')
   .option('--standard', 'Generate open-source React on Rails setup (skip prompt)')
   .option('--pro', 'Generate React on Rails Pro setup (installs react_on_rails_pro)')
   .option('--rsc', 'Generate React Server Components setup (installs react_on_rails_pro)')
@@ -150,6 +162,7 @@ Examples:
   $ npx create-react-on-rails-app my-app --standard             # skip prompt, use Standard
   $ npx create-react-on-rails-app my-app --template javascript
   $ npx create-react-on-rails-app my-app --no-rspack             # use Webpack instead of Rspack
+  $ npx create-react-on-rails-app my-app --webpack               # same as --no-rspack
   $ npx create-react-on-rails-app my-app --no-rspack --rsc
   $ npx create-react-on-rails-app my-app --package-manager pnpm
 
@@ -181,9 +194,9 @@ The generated app includes one git commit per logical setup step.`,
 
 Documentation: https://reactonrails.com/docs/`,
   )
-  .action(async (appName: string, opts: Record<string, unknown>) => {
+  .action(async (appName: string, opts: Record<string, unknown>, command: Command) => {
     try {
-      await run(appName, opts);
+      await run(appName, opts, command);
     } catch (error) {
       if (error instanceof Error && error.message === PROMPT_CANCELLED) {
         console.log('');

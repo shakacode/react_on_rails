@@ -2399,6 +2399,14 @@ describe InstallGenerator, type: :generator do
       expect(command).to eq("rails generate react_on_rails:install --pro")
     end
 
+    specify "recovery_install_command normalizes the --webpack alias to --no-rspack" do
+      install_generator = described_class.new([], { webpack: true })
+
+      command = install_generator.send(:recovery_install_command)
+
+      expect(command).to eq("rails generate react_on_rails:install --no-rspack")
+    end
+
     specify "shakapacker install error preserves original install flags" do
       install_generator = described_class.new([], { redux: true, typescript: true, ignore_warnings: true })
 
@@ -3004,6 +3012,39 @@ describe InstallGenerator, type: :generator do
       # --rspack declares no default, so options.key?(:rspack) is true only when the flag
       # is explicitly passed. --no-rspack sets it to false, selecting Webpack.
       it "returns false" do
+        expect(install_generator.send(:using_rspack?)).to be false
+      end
+    end
+
+    context "when --webpack is passed (alias for --no-rspack)" do
+      let(:install_generator) { described_class.new([], { webpack: true }) }
+
+      it "returns false" do
+        expect(install_generator.send(:using_rspack?)).to be false
+      end
+    end
+
+    context "when --no-webpack is passed" do
+      let(:install_generator) { described_class.new([], { webpack: false }) }
+
+      it "returns true" do
+        expect(install_generator.send(:using_rspack?)).to be true
+      end
+    end
+
+    context "when --rspack and --webpack contradict each other" do
+      let(:install_generator) { described_class.new([], { rspack: true, webpack: true }) }
+
+      it "raises a Thor::Error" do
+        expect { install_generator.send(:using_rspack?) }
+          .to raise_error(Thor::Error, /Conflicting bundler flags/)
+      end
+    end
+
+    context "when --no-rspack and --webpack agree (both Webpack)" do
+      let(:install_generator) { described_class.new([], { rspack: false, webpack: true }) }
+
+      it "returns false without raising" do
         expect(install_generator.send(:using_rspack?)).to be false
       end
     end

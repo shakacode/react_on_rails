@@ -51,6 +51,12 @@ module ReactOnRails
                    type: :boolean,
                    desc: "Use Rspack (default) as the bundler; pass --no-rspack to use Webpack"
 
+      # --webpack: friendly alias for --no-rspack (reconciled in GeneratorHelper#explicit_bundler_choice).
+      # No `default:` here either — same load-bearing reason as --rspack above.
+      class_option :webpack,
+                   type: :boolean,
+                   desc: "Use Webpack as the bundler (alias for --no-rspack)"
+
       # --ignore-warnings
       class_option :ignore_warnings,
                    type: :boolean,
@@ -700,11 +706,10 @@ module ReactOnRails
         flags = []
         flags << "--redux" if options.redux?
         flags << "--typescript" if options.typescript?
-        # Echo the bundler choice only when it was explicit; an unset flag re-resolves to the
-        # fresh-install default on re-run, so we don't pin it in the recovery command.
-        # `== true` keeps the intent explicit: only a genuine true echoes --rspack. The
-        # options.key? guard already excludes the unset case, so this never coerces nil.
-        flags << (options[:rspack] == true ? "--rspack" : "--no-rspack") if options.key?(:rspack)
+        # Echo the resolved bundler choice (normalized to --rspack/--no-rspack, so a --webpack
+        # alias re-runs as --no-rspack) only when the user passed one explicitly. An unset choice
+        # re-resolves to the fresh-install default on re-run, so we don't pin it here.
+        flags << (using_rspack? ? "--rspack" : "--no-rspack") if bundler_flag_given?
 
         if options.rsc?
           flags << "--rsc"

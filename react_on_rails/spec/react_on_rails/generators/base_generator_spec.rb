@@ -228,6 +228,19 @@ RSpec.describe ReactOnRails::Generators::BaseGenerator, type: :generator do
       expect(base_generator(rspack: true).using_rspack?).to be(true)
     end
 
+    it "treats --webpack as an alias for --no-rspack" do
+      expect(base_generator(webpack: true).using_rspack?).to be(false)
+    end
+
+    it "treats --no-webpack as selecting Rspack" do
+      expect(base_generator(webpack: false).using_rspack?).to be(true)
+    end
+
+    it "raises on contradictory --rspack and --webpack flags" do
+      expect { base_generator(rspack: true, webpack: true).using_rspack? }
+        .to raise_error(Thor::Error, /Conflicting bundler flags/)
+    end
+
     it "does not flip an existing Webpack app that omits the flag" do
       write_shakapacker_yml("webpack")
 

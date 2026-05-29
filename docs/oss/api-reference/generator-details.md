@@ -1,6 +1,6 @@
 # Generator Details
 
-The `react_on_rails:install` generator combined with the example pull requests of generator runs will get you up and running efficiently. There's a fair bit of setup with integrating a bundler with Rails. Most options default to off — for example, the default for `-R` is that `redux` is off. The exception is the bundler: **fresh installs now default to Rspack**, so pass `--no-rspack` if you want Webpack instead. Existing apps that already declare a bundler in `config/shakapacker.yml` are left unchanged.
+The `react_on_rails:install` generator combined with the example pull requests of generator runs will get you up and running efficiently. There's a fair bit of setup with integrating a bundler with Rails. Most options default to off — for example, the default for `-R` is that `redux` is off. The exception is the bundler: **fresh installs now default to Rspack**, so pass `--no-rspack` (or its alias `--webpack`) if you want Webpack instead. Existing apps that already declare a bundler in `config/shakapacker.yml` are left unchanged.
 
 Run `rails generate react_on_rails:install --help` for descriptions of all available options:
 
@@ -12,6 +12,7 @@ Options:
   -R, [--redux], [--no-redux]                      # Install Redux package and Redux version of Hello World Example. Default: false
   -T, [--typescript], [--no-typescript]            # Generate TypeScript files and install TypeScript dependencies. Default: false
       [--rspack], [--no-rspack]                    # Use Rspack (default) as the bundler; pass --no-rspack to use Webpack
+      [--webpack], [--no-webpack]                  # Use Webpack as the bundler (alias for --no-rspack)
       [--pro], [--no-pro]                          # Install React on Rails Pro with Node Renderer. Default: false
       [--rsc], [--no-rsc]                          # Install React Server Components support (includes Pro). Default: false
       [--ignore-warnings], [--no-ignore-warnings]  # Skip warnings. Default: false
@@ -41,10 +42,10 @@ can pass the redux option if you'd like to have redux setup for you automaticall
 * Rspack (default)
 
     Rspack is the default bundler for fresh installs, providing significantly
-    faster builds (~20x improvement with SWC). Pass --no-rspack to use Webpack
-    instead. Either way you get a unified configuration that works with both
-    bundlers and a bin/switch-bundler utility to switch between them
-    post-installation.
+    faster builds (~20x improvement with SWC). Pass --no-rspack (or its alias
+    --webpack) to use Webpack instead. Either way you get a unified
+    configuration that works with both bundlers and a bin/switch-bundler
+    utility to switch between them post-installation.
 
 * Pro
 
@@ -146,11 +147,11 @@ Rspack is the default bundler for fresh installs, so a plain install gives you R
 # Rspack (default)
 rails generate react_on_rails:install
 
-# Webpack instead
+# Webpack instead (--webpack is an alias for --no-rspack)
 rails generate react_on_rails:install --no-rspack
 ```
 
-The default applies only to fresh installs. If `config/shakapacker.yml` already declares an `assets_bundler`, the generator keeps your existing choice. An explicit `--rspack` / `--no-rspack` always wins. (Rspack requires Shakapacker 9.0+; on older Shakapacker the generator falls back to Webpack.)
+The default applies only to fresh installs. If `config/shakapacker.yml` already declares an `assets_bundler`, the generator keeps your existing choice. An explicit `--rspack` / `--no-rspack` (or its `--webpack` alias) always wins. (Rspack requires Shakapacker 9.0+; on older Shakapacker the generator falls back to Webpack.)
 
 **Benefits:**
 

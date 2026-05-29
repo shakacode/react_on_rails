@@ -30,7 +30,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Changed
 
-- **Generator defaults to Rspack for fresh installs**: `rails generate react_on_rails:install` and `create-react-on-rails-app` now default to the Rspack bundler on fresh installs (significantly faster builds via SWC), instead of Webpack. Pass `--no-rspack` to use Webpack. This only affects fresh installs — existing apps that already declare an `assets_bundler` in `config/shakapacker.yml` are left unchanged, an explicit `--rspack`/`--no-rspack` always wins, and the default falls back to Webpack on Shakapacker versions below 9.0 (where Rspack is unsupported). [PR 3484](https://github.com/shakacode/react_on_rails/pull/3484) by [justin808](https://github.com/justin808).
+- **Generator defaults to Rspack for fresh installs**: `rails generate react_on_rails:install` and `create-react-on-rails-app` now default to the Rspack bundler on fresh installs (significantly faster builds via SWC), instead of Webpack. Pass `--no-rspack` (or its alias `--webpack`) to use Webpack. This only affects fresh installs — existing apps that already declare an `assets_bundler` in `config/shakapacker.yml` are left unchanged, an explicit `--rspack`/`--no-rspack`/`--webpack` always wins, and the default falls back to Webpack on Shakapacker versions below 9.0 (where Rspack is unsupported). [PR 3484](https://github.com/shakacode/react_on_rails/pull/3484) by [justin808](https://github.com/justin808).
 
 #### Fixed
 

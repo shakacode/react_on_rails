@@ -2,6 +2,7 @@
 
 require "json"
 
+# rubocop:disable Metrics/ModuleLength
 module GeneratorHelper
   def package_json
     # Lazy load package_json gem only when actually needed for dependency management
@@ -128,24 +129,49 @@ module GeneratorHelper
   def using_rspack?
     return @using_rspack if defined?(@using_rspack)
 
-    # The --rspack option declares no default (see InstallGenerator/BaseGenerator), so
-    # options.key?(:rspack) is true only when the user explicitly passed --rspack or
-    # --no-rspack. An explicit flag always wins. When the flag is unset (or the generator
-    # doesn't declare it, e.g. RscGenerator/ProGenerator), we fall back to the bundler
-    # default, which each generator defines for its own context.
-    #
-    # IMPORTANT: this relies on Thor NOT including a nil-defaulted option in the hash when
-    # the flag is absent. Re-adding `default: false` to the `--rspack` class_option would
-    # break this — the key would always be present (as false), overriding the fresh-install
-    # Rspack default below.
-    @using_rspack = if options.key?(:rspack)
-                      options[:rspack]
-                    else
-                      rspack_bundler_default
-                    end
+    # An explicit bundler flag always wins. When none was passed (or the generator doesn't
+    # declare the flags, e.g. RscGenerator/ProGenerator), fall back to the bundler default,
+    # which each generator defines for its own context.
+    explicit = explicit_bundler_choice
+    @using_rspack = explicit.nil? ? rspack_bundler_default : explicit
   end
 
-  # Bundler to use when neither --rspack nor --no-rspack was passed.
+  # Resolve the explicit bundler flags into a single choice.
+  #
+  # --rspack selects Rspack; --no-rspack and --webpack select Webpack (--webpack is a friendly
+  # alias for --no-rspack, and the auto-generated --no-webpack mirrors --rspack). Returns true
+  # for Rspack, false for Webpack, or nil when no bundler flag was passed (so the caller falls
+  # back to rspack_bundler_default).
+  #
+  # IMPORTANT: this relies on Thor NOT including a nil-defaulted option in the hash when the flag
+  # is absent — options.key?(:rspack)/(:webpack) is true only when the user passed that flag.
+  # Re-adding `default:` to either class_option would make the key always present and break both
+  # the "no flag given" fallback and the conflict detection here.
+  #
+  # Passing contradictory flags (e.g. --rspack --webpack) raises a Thor::Error.
+  def explicit_bundler_choice
+    choices = []
+    choices << options[:rspack] if options.key?(:rspack)
+    # --webpack means "use Webpack" (rspack = false); --no-webpack means "use Rspack".
+    choices << !options[:webpack] if options.key?(:webpack)
+    return nil if choices.empty?
+
+    if choices.uniq.length > 1
+      raise Thor::Error,
+            "Conflicting bundler flags: pass either Rspack (--rspack) or Webpack " \
+            "(--webpack / --no-rspack), not both."
+    end
+
+    choices.first
+  end
+
+  # True when the user passed any explicit bundler flag
+  # (--rspack/--no-rspack/--webpack/--no-webpack).
+  def bundler_flag_given?
+    options.key?(:rspack) || options.key?(:webpack)
+  end
+
+  # Bundler to use when no explicit bundler flag was passed.
   # Default (standalone generators like RscGenerator/ProGenerator): respect the existing
   # project's shakapacker.yml and never impose a bundler. InstallGenerator/BaseGenerator
   # override this to default fresh installs to Rspack.
@@ -376,3 +402,4 @@ module GeneratorHelper
     !config.dig("default", "assets_bundler").nil?
   end
 end
+# rubocop:enable Metrics/ModuleLength
