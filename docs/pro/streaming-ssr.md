@@ -182,7 +182,10 @@ end %>
 
 On the React side, give each async prop its own `<Suspense>` boundary (as in Step 2) so each section streams in independently as its query finishes.
 
-> **Error handling:** an unhandled error in a child task propagates through `wait` and closes the stream, so the remaining props may not be sent. If one source failing shouldn't cut off the others, wrap each task body in a `rescue` and emit a fallback (or skip that prop).
+> **Error handling — two distinct failure modes:**
+>
+> - An error raised in the task **body before `emit.call`** (e.g. a query raising `ActiveRecord::StatementInvalid`) propagates through `wait` and closes the stream, so the remaining props may not be sent. If one source failing shouldn't cut off the others, wrap each task body in a `rescue` and emit a fallback (or skip that prop).
+> - An error raised **inside `emit.call`** (a non-serializable value, a write failure) is caught and logged by the emitter without re-raising — the task completes normally and `wait` sees nothing, but the prop is never delivered and its `<Suspense>` boundary never resolves. Pass only JSON-serializable values (e.g. `.as_json(only: [...])`) to `emit.call` to avoid a silently hanging boundary.
 
 **Requirements and footguns for concurrent async props:**
 
