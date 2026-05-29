@@ -442,7 +442,7 @@ If you run `rspec` at the top level, you'll see this message: `require': cannot 
 
 If you run tests with `COVERAGE=true`, you can view the SimpleCov report at `coverage/index.html`.
 
-Turbolinks 5 is included in the test app, unless `DISABLE_TURBOLINKS=TRUE` is set in the environment.
+The Turbolinks 5 gem is always bundled in the test app. Setting `DISABLE_TURBOLINKS=TRUE` in the environment suppresses the `require_asset` call in `react_on_rails/spec/dummy/app/assets/javascripts/application_non_webpack.js.erb`, so Turbolinks does not load at runtime — but the gem itself stays in the bundle to keep the gemset consistent with `Gemfile.lock`.
 
 Run `rake -T` or `rake -D` to see testing options.
 

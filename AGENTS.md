@@ -225,6 +225,7 @@ For small, focused PRs (roughly 5 files changed or fewer and one clear purpose):
 - Commit `package-lock.json`, `yarn.lock`, or other non-pnpm lock files
 - Add files to the `docs/` root — OSS docs go in `docs/oss/` subdirectories (`getting-started/`, `core-concepts/`, `building-features/`, `configuration/`, `api-reference/`, `deployment/`, `migrating/`, `upgrading/`, `misc/`); Pro docs go in `docs/pro/`
 - Force push to `main` or `master`
+- Reintroduce conditional gem declarations like `gem "turbolinks" if ENV["DISABLE_TURBOLINKS"].nil?` in `react_on_rails/Gemfile.development_dependencies` — conditional inclusion diverges from the lockfile and breaks `bundle install --frozen` in CI. See the comment in that Gemfile for the full explanation.
 
 ## Main branch health
 
