@@ -90,8 +90,8 @@ jobs:
           # Determine if we should run full matrix (main, workflow_dispatch, force_run, or full-ci label)
           if [[ "${{ github.ref }}" == "refs/heads/main" ]] || \
              [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
-            [[ "${{ inputs.force_run }}" == "true" ]] || \
-            [[ "${{ needs.detect-changes.outputs.has_full_ci_label }}" == "true" ]]; then
+             [[ "${{ inputs.force_run }}" == "true" ]] || \
+             [[ "${{ needs.detect-changes.outputs.has_full_ci_label }}" == "true" ]]; then
             # Full matrix: test both latest and minimum supported versions
             echo 'matrix={"include":[{"ruby-version":"3.4","node-version":"22","dependency-level":"latest"},{"ruby-version":"3.2","node-version":"20","dependency-level":"minimum"}]}' >> "$GITHUB_OUTPUT"
           else
