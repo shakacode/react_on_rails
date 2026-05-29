@@ -172,6 +172,14 @@ describe('RSC diagnostics', () => {
     expect(extractModulePathFromStack(stack)).toBe('/app/real.js');
   });
 
+  it('extracts Windows drive paths from both parenthesized and anonymous frames', () => {
+    const parenthesized = 'Error: boom\n    at Component (C:\\app\\components\\Foo.jsx:10:5)';
+    expect(extractModulePathFromStack(parenthesized)).toBe('C:\\app\\components\\Foo.jsx');
+
+    const anonymous = 'Error: boom\n    at async C:\\app\\server.js:42:3';
+    expect(extractModulePathFromStack(anonymous)).toBe('C:\\app\\server.js');
+  });
+
   it('does not mistake a bare function name for the module path in anonymous frames', () => {
     // Unusual but valid V8 frame where a function name precedes a path without parens; the
     // anonymous-frame regex is anchored to an absolute path so it skips this frame rather than

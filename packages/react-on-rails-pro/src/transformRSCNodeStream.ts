@@ -43,6 +43,9 @@ export default function transformRSCStream(
       try {
         parser.feed(chunk, (content, metadata) => {
           const diagnosticError = buildRSCStreamDiagnosticError(metadata, diagnosticsOptions);
+          // First-wins: report only the earliest diagnostic. A failing RSC stream emits a single
+          // renderingError, so this avoids duplicate reports of the same failure. (A later chunk
+          // carrying a richer renderingError would be dropped, but that doesn't occur in practice.)
           if (diagnosticError && !reportedDiagnosticError) {
             reportedDiagnosticError = true;
             diagnosticsOptions.onDiagnosticError?.(diagnosticError);
