@@ -32,7 +32,7 @@ flowchart TB
     style Miss fill:#ffe5e5,stroke:#d1242f,color:#000
 ```
 
-The cold path is bounded and self-healing — but until the draining bundle is warm, every request that touches it eats an extra round trip (a re-upload plus a retry), which shows up as a latency and error-rate spike for the duration of the deploy.
+The cold path is bounded and self-healing, but it is not free. On a cache miss the renderer can't serve the request on its own: it returns `410 Gone`, Rails ships the bundle over to the renderer, and only then does the request render. That extra renderer ↔ Rails round-trip — a network hop plus the bundle transfer — adds latency to **every** request that touches a cold bundle, and it repeats per request until that bundle is cached, so a deploy shows up as a latency and error-rate spike. The whole point of a rolling-deploy adapter is to **avoid these cache misses entirely** so no request ever pays that cost during a deploy.
 
 ## The solution
 
@@ -128,6 +128,29 @@ That exposes two authenticated endpoints under the mount path:
 ### Companion assets are handled automatically
 
 Each bundle hash ships with the companion assets built alongside it — `loadable-stats.json`, plus `react-client-manifest.json` and `react-server-client-manifest.json` when RSC is enabled. They map chunk and component IDs to the exact asset URLs that hash's build produced, so serving a draining hash with the **wrong** build's manifests would break client-side hydration. The HTTP adapter packs each hash's companions into the same tarball, so this stays correct with no work on your part. (Custom adapters must return them explicitly — see [Companion assets](./rolling-deploy-custom-adapters.md#companion-assets).)
+
+## Deploy the renderer before Rails
+
+> **Important:** during a rolling deploy, the new Node Renderer must be live and cache-warm **before** the new Rails server starts serving traffic. If Rails goes first, this won't work — you get exactly the 410 storm the adapter is meant to prevent.
+
+Pre-seeding warms the **renderer's** cache. Rails renders nothing itself; it sends SSR requests to the renderer. So a warm cache only helps if the new renderer is already up and serving when the new Rails (bundle `def`) starts sending it traffic:
+
+- New Rails (`def`) can only be served warm by a renderer that has `def` cached — and that's the **new** renderer instances.
+- Draining old Rails (`abc`) is served warm by either fleet, because the new renderer was pre-seeded with `abc` too.
+
+If the new Rails goes live first, its `def` requests hit renderers that don't have `def` yet → 410 → re-upload → retry, per request, until the new renderer catches up. Roll the renderer out first and that never happens.
+
+### On Control Plane (and other multi-workload platforms)
+
+Rails and the Node Renderer are **separate workloads** with independent deploy lifecycles, readiness checks, and warmup periods. Deploying both at once does **not** guarantee the renderer wins the race — the two can have different warmup/readiness settings, so Rails may begin taking traffic before the renderer's new revision is ready.
+
+Make the ordering explicit in your pipeline rather than relying on timing:
+
+1. Deploy/promote the **Node Renderer** workload (new image, cache pre-seeded during its build).
+2. Wait until its new revision is **live and healthy** — readiness passing and all new renderer instances up.
+3. Only then deploy/promote the **Rails** workload.
+
+The invariant to enforce is **renderer-ready-before-Rails-live**: gate the Rails workload's release on the renderer workload's release completing (sequence them as separate steps in your deploy pipeline), and/or tune the renderer's readiness probe and Rails' startup so Rails does not accept traffic until the renderer reports ready. The exact wiring depends on your deploy tooling.
 
 ## Verify your setup with `react_on_rails:doctor`
 
