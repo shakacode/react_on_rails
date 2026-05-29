@@ -697,7 +697,9 @@ module ReactOnRails
         flags << "--typescript" if options.typescript?
         # Echo the bundler choice only when it was explicit; an unset flag re-resolves to the
         # fresh-install default on re-run, so we don't pin it in the recovery command.
-        flags << (options[:rspack] ? "--rspack" : "--no-rspack") if options.key?(:rspack)
+        # `== true` keeps the intent explicit: only a genuine true echoes --rspack. The
+        # options.key? guard already excludes the unset case, so this never coerces nil.
+        flags << (options[:rspack] == true ? "--rspack" : "--no-rspack") if options.key?(:rspack)
 
         if options.rsc?
           flags << "--rsc"

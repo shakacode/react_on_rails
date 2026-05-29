@@ -133,6 +133,11 @@ module GeneratorHelper
     # --no-rspack. An explicit flag always wins. When the flag is unset (or the generator
     # doesn't declare it, e.g. RscGenerator/ProGenerator), we fall back to the bundler
     # default, which each generator defines for its own context.
+    #
+    # IMPORTANT: this relies on Thor NOT including a nil-defaulted option in the hash when
+    # the flag is absent. Re-adding `default: false` to the `--rspack` class_option would
+    # break this — the key would always be present (as false), overriding the fresh-install
+    # Rspack default below.
     @using_rspack = if options.key?(:rspack)
                       options[:rspack]
                     else

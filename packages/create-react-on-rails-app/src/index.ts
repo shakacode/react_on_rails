@@ -64,7 +64,10 @@ async function run(appName: string, rawOpts: Record<string, unknown>): Promise<v
   const options: CliOptions = {
     template,
     packageManager: packageManager as 'npm' | 'pnpm',
-    // Rspack is the default; only an explicit --no-rspack (rawOpts.rspack === false) selects Webpack.
+    // Commander's `--no-rspack` negation option defaults rawOpts.rspack to `true`, so an
+    // omitted flag selects Rspack and only an explicit --no-rspack (=== false) selects Webpack.
+    // Footgun: re-adding `.option('--rspack', desc, false)` would default this to false and
+    // silently flip the default back to Webpack.
     rspack: rawOpts.rspack !== false,
     pro,
     rsc,
