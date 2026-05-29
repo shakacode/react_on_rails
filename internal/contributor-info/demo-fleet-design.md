@@ -26,7 +26,7 @@ Lives at [demo-fleet.yml](demo-fleet.yml). Schema documented in the file's heade
 
 The manifest captures **data**, not docs. Headlines and per-repo appendix text stay in the RC plan; the orchestrator only references the `headline` field for PR-body templating.
 
-Package references are structured as `{ ecosystem: gem|npm, name: ... }`, not inferred from underscores or dashes. `DemoFleet` validates every package ref against the manifest's `age_gate.own_packages` set for ShakaCode-owned packages or against an explicit allowlist for third-party package bumps before it can compute registry lookups or lockfile updates.
+Package references are structured as `{ ecosystem: gem|npm, name: ... }`, not inferred from underscores or dashes. `DemoFleet` resolves each ref's ecosystem so it queries the right registry and updates the right lockfile. ShakaCode-owned packages (the `age_gate.own_packages` set) bypass the age gate on release-track runs; every other package — including the transitive third-party bumps the freshness track proposes — is governed by the age gate, not a separate allowlist.
 
 ## Orchestrator skeleton
 
@@ -65,7 +65,7 @@ task "demo_fleet:freshness_track" do
     pr.result
   end
 
-  results.each { |result| FreshnessIssue.file_if_red(result) unless result.green? } # freshness failures file issues, do not block
+  results.each { |result| FreshnessIssue.file_if_red(result) } # freshness failures file issues, do not block
 end
 
 # Local-only: show what a release would propose, without opening anything
@@ -89,12 +89,12 @@ exec bundle exec rake "demo_fleet:${1:-plan}"
 - `DemoPR` — opens/updates the bump PR in a demo repo via a GitHub App installation token (see Credentials). Generates the PR body from the RC plan's RC Test Report template, prefilled with the demo's manifest data.
 - `DependencyBumps` — computes proposed version bumps with the age gate (next section).
 - `TrackingIssue` — creates/updates the per-RC tracking issue in `shakacode/react_on_rails` from `.github/ISSUE_TEMPLATE/rc-release-tracking.yml`; ticks checkboxes as PRs land.
-- `ReviewApp` — validates `review_app.cpflow_app_name`, polls GitHub Checks API for `review_app.status_check`, asks CPFlow for that app's review URL for the PR branch, and hits each `smoke` path against that base URL. It never derives the URL from the repo slug.
+- `ReviewApp` — when `review_app.cpflow_app_name` is non-null, polls the GitHub Checks API for `review_app.status_check`, asks CPFlow for that app's review URL for the PR branch, and hits each `smoke` path against that base URL (it never derives the URL from the repo slug). When `cpflow_app_name` is null — a demo with no review-app pipeline yet — it short-circuits: no status-check poll, no URL lookup, no smoke run. A repo with a `review_app` block cannot clear `verify: true` while `cpflow_app_name` is null; demos that genuinely have no pipeline set `review_app: null` instead.
 - `pr.wait_for_ci_and_review_app` — coordinates CI polling plus `ReviewApp` smoke checks.
 
 ### Parallel execution and failure recording
 
-Release-track and freshness-track both dispatch repo work in parallel with a bounded concurrency limit (default 8, overridable by CI). Wall time is therefore capped by the slowest repo, not by `repos.count * 90.minutes`.
+Release-track and freshness-track both dispatch repo work in parallel with a bounded concurrency limit (`concurrency` in the manifest, default 8; override per-run with the `DEMO_FLEET_CONCURRENCY` env var). Wall time is therefore capped by the slowest repo, not by `repos.count * 90.minutes`.
 
 The runner treats each repo as an independent result. Network failures, rate limits, missing review-app checks, and timeouts are rescued at the repo boundary and recorded on the tracking issue as red results. The overall task can still exit non-zero after all repos have reported, but it must not abandon later repos or skip `gate_check!` because an earlier repo raised.
 

@@ -22,9 +22,11 @@
 #   build          — command that must succeed before deploy (asset compile).
 #   review_app     — CPFlow review-app workflow file, the status check name the
 #                    orchestrator polls, and the CPFlow app name used to derive
-#                    the review-app base URL. nil if the demo has no review-app
-#                    pipeline yet. `cpflow_app_name` must be non-null before
-#                    a repo's `verify: true` flag can be cleared.
+#                    the review-app base URL. Set the whole block to null (or
+#                    leave `cpflow_app_name: null`) for a demo with no review-app
+#                    pipeline yet; the orchestrator then skips smoke for that
+#                    repo. `cpflow_app_name` must be non-null before a repo's
+#                    `verify: true` flag can be cleared.
 #   smoke          — list of paths the orchestrator hits against the
 #                    review-app URL after deploy. Each must return 2xx.
 #   headline       — short name of the per-repo appendix in the RC plan.
@@ -35,6 +37,11 @@
 # must clear every verify flag before the manifest is treated as authoritative.
 
 schema_version: 1
+
+# Bounded parallelism for a single release/freshness run. Caps wall time at the
+# slowest repo rather than the sum of all repos. Override per-run with the
+# DEMO_FLEET_CONCURRENCY env var (read by the demo_fleet:* Rake tasks).
+concurrency: 8
 
 defaults:
   package_manager: pnpm
@@ -74,6 +81,7 @@ repos:
       - { ecosystem: npm, name: react-on-rails }
       - { ecosystem: gem, name: shakapacker }
       - { ecosystem: npm, name: shakapacker }
+      - { ecosystem: gem, name: cpflow }
     needs_pro: false
     smoke: [/]
     verify: true
@@ -88,6 +96,7 @@ repos:
       - { ecosystem: npm, name: react-on-rails-pro }
       - { ecosystem: gem, name: shakapacker }
       - { ecosystem: npm, name: shakapacker }
+      - { ecosystem: gem, name: cpflow }
     needs_pro: true
     smoke: [/, /news]
     verify: true
@@ -102,6 +111,7 @@ repos:
       - { ecosystem: npm, name: react-on-rails-pro }
       - { ecosystem: gem, name: shakapacker }
       - { ecosystem: npm, name: shakapacker }
+      - { ecosystem: gem, name: cpflow }
     needs_pro: true
     smoke: [/, /products]
     verify: true
@@ -116,6 +126,7 @@ repos:
       - { ecosystem: npm, name: react-on-rails-pro }
       - { ecosystem: gem, name: shakapacker }
       - { ecosystem: npm, name: shakapacker }
+      - { ecosystem: gem, name: cpflow }
     needs_pro: true
     smoke: [/]
     verify: true
@@ -130,6 +141,7 @@ repos:
       - { ecosystem: npm, name: react-on-rails-pro }
       - { ecosystem: gem, name: shakapacker }
       - { ecosystem: npm, name: shakapacker }
+      - { ecosystem: gem, name: cpflow }
     needs_pro: true
     smoke: [/]
     verify: true
@@ -142,6 +154,7 @@ repos:
       - { ecosystem: npm, name: react-on-rails }
       - { ecosystem: gem, name: shakapacker }
       - { ecosystem: npm, name: shakapacker }
+      - { ecosystem: gem, name: cpflow }
     needs_pro: false
     smoke: [/]
     verify: true
@@ -154,6 +167,7 @@ repos:
       - { ecosystem: npm, name: react-on-rails }
       - { ecosystem: gem, name: shakapacker }
       - { ecosystem: npm, name: shakapacker }
+      - { ecosystem: gem, name: cpflow }
     needs_pro: false
     smoke: [/]
     verify: true
@@ -168,6 +182,7 @@ repos:
       - { ecosystem: npm, name: react-on-rails }
       - { ecosystem: gem, name: shakapacker }
       - { ecosystem: npm, name: shakapacker }
+      - { ecosystem: gem, name: cpflow }
     needs_pro: false
     package_manager: yarn_classic
     smoke: [/]
@@ -181,6 +196,7 @@ repos:
       - { ecosystem: npm, name: react-on-rails }
       - { ecosystem: gem, name: shakapacker }
       - { ecosystem: npm, name: shakapacker }
+      - { ecosystem: gem, name: cpflow }
     needs_pro: false
     smoke: [/]
     verify: true
@@ -193,6 +209,7 @@ repos:
       - { ecosystem: npm, name: react-on-rails }
       - { ecosystem: gem, name: shakapacker }
       - { ecosystem: npm, name: shakapacker }
+      - { ecosystem: gem, name: cpflow }
     needs_pro: false
     package_manager: yarn_classic
     smoke: [/]
