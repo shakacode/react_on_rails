@@ -44,7 +44,7 @@ Ensure you're using React 19 in your `package.json`:
 
 ### 2. Prepare Your React Components
 
-Create React components that receive data as props from Rails. Use `<Suspense>` boundaries to define which sections of the page stream independently via `renderToPipeableStream`.
+Create async React Server Components that receive data as props from Rails. Wrap them in `<Suspense>` boundaries to define which sections stream independently — React sends the fallback first, then streams the rendered content when the async component resolves.
 
 ```jsx
 // app/javascript/components/MyStreamingComponent.jsx
@@ -56,14 +56,14 @@ const MyStreamingComponent = ({ greeting, posts }) => {
       <header>
         <h1>{greeting}</h1>
       </header>
-      <Suspense fallback={<div>Loading...</div>}>
+      <Suspense fallback={<div>Loading posts...</div>}>
         <PostList posts={posts} />
       </Suspense>
     </>
   );
 };
 
-const PostList = ({ posts }) => {
+async function PostList({ posts }) {
   return (
     <ul>
       {posts.map((post) => (
@@ -71,12 +71,12 @@ const PostList = ({ posts }) => {
       ))}
     </ul>
   );
-};
+}
 
 export default MyStreamingComponent;
 ```
 
-> **React on Rails note:** In React on Rails, database queries, authentication, and API calls happen on the Rails side — in controllers and models. Components receive the results as props via [`stream_react_component`](../oss/migrating/rsc-data-fetching.md#data-fetching-in-react-on-rails-pro), and HTML streams to the browser as React renders the component tree. Components do not fetch data directly. See [RSC Migration: Data Fetching Patterns](../oss/migrating/rsc-data-fetching.md) for the full explanation.
+> **React on Rails note:** The `async function` component pattern is a React Server Components feature — it requires [RSC support](./react-server-components/tutorial.md) enabled in React on Rails Pro. Database queries, authentication, and API calls happen on the Rails side — in controllers and models. Components receive the results as props via [`stream_react_component`](../oss/migrating/rsc-data-fetching.md#data-fetching-in-react-on-rails-pro); they do not fetch data directly. See [RSC Migration: Data Fetching Patterns](../oss/migrating/rsc-data-fetching.md) for the full explanation.
 
 ```jsx
 // app/javascript/packs/registration.jsx
@@ -138,10 +138,40 @@ callers should not use an empty stream as a success signal.
 `stream_react_component` calls React's `renderToPipeableStream`, which streams HTML to the browser progressively as React renders the component tree:
 
 1. The HTML response starts immediately — the browser doesn't wait for the entire page to finish rendering
-2. React renders sections of the tree and flushes HTML chunks to the browser
-3. The browser parses and displays each chunk as it arrives
+2. React sends the shell (header, footer, and Suspense fallbacks) first
+3. When async components resolve, their rendered HTML streams to the browser as replacement chunks
 
-With synchronous props (as in this example), all data is available when rendering starts. React renders the full tree in one pass, and `renderToPipeableStream` flushes the HTML progressively — the browser receives the header, posts, and footer as a stream rather than waiting for the complete response. This reduces Time to First Byte (TTFB) on large pages.
+For example, with our `MyStreamingComponent`, the sequence is:
+
+1. The browser receives the shell immediately, including the Suspense fallback:
+
+```html
+<header>
+  <h1>Hello, Streaming World!</h1>
+</header>
+<template id="s0">
+  <div>Loading posts...</div>
+</template>
+<footer>
+  <p>Footer content</p>
+</footer>
+```
+
+2. When the async `PostList` resolves, its rendered HTML streams to the browser:
+
+```html
+<template hidden id="b0">
+  <ul>
+    <li>First Post</li>
+    <li>Second Post</li>
+  </ul>
+</template>
+
+<script>
+  // This implementation is slightly simplified
+  document.getElementById('s0').replaceChildren(document.getElementById('b0'));
+</script>
+```
 
 For pages with independent data sources that load at different speeds, use separate `stream_react_component` calls so each section streams as its data becomes ready:
 
@@ -153,8 +183,6 @@ For pages with independent data sources that load at different speeds, use separ
 <%= stream_react_component("Sidebar",
       props: { stats: @stats.as_json }) %>
 ```
-
-When combined with React Server Components (async components), `<Suspense>` boundaries show a fallback while the async content resolves, then the rendered HTML streams to the browser as a replacement — creating a progressive loading experience. See the [RSC tutorial](./react-server-components/tutorial.md) for details.
 
 ## Compression Middleware Compatibility
 
