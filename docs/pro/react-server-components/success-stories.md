@@ -61,7 +61,7 @@ BlogHunch's reported outcome is notable because it measures _operational_ cost r
 
 **Why this matters for React on Rails teams.** Server-cost reductions come from doing _less_ rendering work per request — static server components cache well, streaming lets the renderer release resources sooner, and offloading data fetching to the server removes redundant API round-trips. For how this maps to Pro's node renderer, see [Node Renderer basics](../../oss/building-features/node-renderer/basics.md) and [Fragment Caching](../fragment-caching.md). For gradual rollout techniques, see [Preparing Your App](../../oss/migrating/rsc-preparing-app.md).
 
-- Source: [BlogHunch migration case study (Entesta)](https://entesta.com/case-studies/bloghunch-migration)
+- Source: BlogHunch migration case study (Entesta)
 
 ## Developerway — Honest Technical Analysis
 
@@ -96,5 +96,5 @@ React on Rails Pro gives you these three mechanisms via the node renderer, `stre
 - [DoorDash — Improving Web Page Performance with Next.js](https://careersatdoordash.com/blog/improving-web-page-performance-at-doordash-through-server-side-rendering-with-next-js/)
 - [Mux — What are React Server Components?](https://www.mux.com/blog/what-are-react-server-components)
 - [Frigade — Bundle size reduction with RSC](https://frigade.com/blog/bundle-size-reduction-with-rsc-and-frigade)
-- [BlogHunch migration case study (Entesta)](https://entesta.com/case-studies/bloghunch-migration)
+- BlogHunch migration case study (Entesta)
 - [Developerway — React Server Components performance](https://www.developerway.com/posts/react-server-components-performance)
