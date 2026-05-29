@@ -6,9 +6,14 @@ inputs:
     description: Ruby version used by the job.
     required: true
   bundler-version:
-    description: Bundler version selector passed through to ruby/setup-ruby.
+    description: >
+      Bundler version selector passed through to ruby/setup-ruby.
+      Use default, latest, none, Gemfile.lock, or x.y.z. Defaults to "default"
+      (the bundler shipped with the chosen Ruby) rather than "Gemfile.lock",
+      because this action has no working-directory and the repo-root Gemfile.lock
+      is gitignored — reading it would be meaningless here.
     required: false
-    default: Gemfile.lock
+    default: default
   install-libyaml:
     description: Whether to install libyaml-dev before Ruby/Bundler steps.
     required: false
