@@ -215,7 +215,7 @@ function LazyLoadedSection({ data }) {
 }
 ```
 
-> **React on Rails note:** In React on Rails, Rails is the backend — prepare the data in your controller and pass it to the component as a prop via `stream_react_component`, rather than calling `await fetchData()` inside the component. The Node renderer has no Rails models or database connection, and an in-component fetch bypasses Rails' authorization and caching. For data that's slow to compute, stream it with [async props](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently). See [RSC Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md).
+> **React on Rails note:** When converting a lazy-loaded component, the new server component receives its `data` as a prop — don't move the old client-side fetch into the component body. In React on Rails, Rails is the backend: prepare the data in your controller and pass it via `stream_react_component`. The Node renderer has no Rails models or database connection, and an in-component fetch bypasses Rails' authorization and caching. For data that's slow to compute, stream it with [async props](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently). See [RSC Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md).
 
 This migration approach allows you to:
 
