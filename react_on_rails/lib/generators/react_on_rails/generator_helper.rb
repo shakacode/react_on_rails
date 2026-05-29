@@ -128,11 +128,24 @@ module GeneratorHelper
   def using_rspack?
     return @using_rspack if defined?(@using_rspack)
 
-    # options.key?(:rspack) is true when the generator declares --rspack (e.g. InstallGenerator),
-    # false when it does not (e.g. RscGenerator, ProGenerator). Using .key? rather than .nil?
-    # check on the value makes the intent explicit and avoids relying on Thor returning nil for
-    # undeclared options.
-    @using_rspack = options.key?(:rspack) ? options[:rspack] : rspack_configured_in_project?
+    # The --rspack option declares no default (see InstallGenerator/BaseGenerator), so
+    # options.key?(:rspack) is true only when the user explicitly passed --rspack or
+    # --no-rspack. An explicit flag always wins. When the flag is unset (or the generator
+    # doesn't declare it, e.g. RscGenerator/ProGenerator), we fall back to the bundler
+    # default, which each generator defines for its own context.
+    @using_rspack = if options.key?(:rspack)
+                      options[:rspack]
+                    else
+                      rspack_bundler_default
+                    end
+  end
+
+  # Bundler to use when neither --rspack nor --no-rspack was passed.
+  # Default (standalone generators like RscGenerator/ProGenerator): respect the existing
+  # project's shakapacker.yml and never impose a bundler. InstallGenerator/BaseGenerator
+  # override this to default fresh installs to Rspack.
+  def rspack_bundler_default
+    rspack_configured_in_project?
   end
 
   # Remap a config path from config/webpack/ to config/rspack/ when using rspack.
@@ -335,5 +348,26 @@ module GeneratorHelper
 
     config = parse_shakapacker_yml(shakapacker_yml_path)
     config.dig("default", "assets_bundler") == "rspack"
+  end
+
+  # Fresh-install bundler default used by InstallGenerator/BaseGenerator: prefer Rspack
+  # when Shakapacker supports it (Rspack landed in Shakapacker 9.0), but never override an
+  # existing app's explicit assets_bundler choice. On a brand-new install where Shakapacker
+  # isn't loaded yet, shakapacker_version_9_or_higher? optimistically returns true.
+  def fresh_install_rspack_default
+    return rspack_configured_in_project? if project_declares_assets_bundler?
+
+    shakapacker_version_9_or_higher?
+  end
+
+  # True when config/shakapacker.yml exists and its default: section declares an
+  # assets_bundler (i.e., the project has already made an explicit bundler choice).
+  # Same default-section assumption as rspack_configured_in_project?.
+  def project_declares_assets_bundler?
+    shakapacker_yml_path = File.join(destination_root, "config/shakapacker.yml")
+    return false unless File.exist?(shakapacker_yml_path)
+
+    config = parse_shakapacker_yml(shakapacker_yml_path)
+    !config.dig("default", "assets_bundler").nil?
   end
 end

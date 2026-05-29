@@ -22,11 +22,10 @@ module ReactOnRails
                    desc: "Install Redux package and Redux version of Hello World Example",
                    aliases: "-R"
 
-      # --rspack
+      # --rspack / --no-rspack (Rspack is the default on fresh installs; --no-rspack selects Webpack)
       class_option :rspack,
                    type: :boolean,
-                   default: false,
-                   desc: "Use Rspack instead of Webpack as the bundler"
+                   desc: "Use Rspack (default) as the bundler; pass --no-rspack to use Webpack"
 
       # --pro
       class_option :pro,
@@ -312,6 +311,12 @@ module ReactOnRails
       STR
 
       private
+
+      # Fresh-install context: default to Rspack (when Shakapacker supports it) unless the
+      # app already declares a bundler. See GeneratorHelper#fresh_install_rspack_default.
+      def rspack_bundler_default
+        fresh_install_rspack_default
+      end
 
       def generate_new_app_home_page?
         options.new_app? && new_app_root_route_added?

@@ -1,6 +1,6 @@
 # Generator Details
 
-The `react_on_rails:install` generator combined with the example pull requests of generator runs will get you up and running efficiently. There's a fair bit of setup with integrating Webpack with Rails. Defaults for options are such that the default is for the flag to be off. For example, the default for `-R` is that `redux` is off.
+The `react_on_rails:install` generator combined with the example pull requests of generator runs will get you up and running efficiently. There's a fair bit of setup with integrating a bundler with Rails. Most options default to off — for example, the default for `-R` is that `redux` is off. The exception is the bundler: **fresh installs now default to Rspack**, so pass `--no-rspack` if you want Webpack instead. Existing apps that already declare a bundler in `config/shakapacker.yml` are left unchanged.
 
 Run `rails generate react_on_rails:install --help` for descriptions of all available options:
 
@@ -11,7 +11,7 @@ Usage:
 Options:
   -R, [--redux], [--no-redux]                      # Install Redux package and Redux version of Hello World Example. Default: false
   -T, [--typescript], [--no-typescript]            # Generate TypeScript files and install TypeScript dependencies. Default: false
-      [--rspack], [--no-rspack]                    # Use Rspack instead of Webpack as the bundler. Default: false
+      [--rspack], [--no-rspack]                    # Use Rspack (default) as the bundler; pass --no-rspack to use Webpack
       [--pro], [--no-pro]                          # Install React on Rails Pro with Node Renderer. Default: false
       [--rsc], [--no-rsc]                          # Install React Server Components support (includes Pro). Default: false
       [--ignore-warnings], [--no-ignore-warnings]  # Skip warnings. Default: false
@@ -38,12 +38,13 @@ can pass the redux option if you'd like to have redux setup for you automaticall
     Passing the --typescript generator option generates TypeScript files (.tsx)
     instead of JavaScript files (.jsx) and sets up TypeScript configuration.
 
-* Rspack
+* Rspack (default)
 
-    Passing the --rspack generator option uses Rspack instead of Webpack as the
-    bundler, providing significantly faster builds (~20x improvement with SWC).
-    Includes unified configuration that works with both bundlers and a
-    bin/switch-bundler utility to switch between bundlers post-installation.
+    Rspack is the default bundler for fresh installs, providing significantly
+    faster builds (~20x improvement with SWC). Pass --no-rspack to use Webpack
+    instead. Either way you get a unified configuration that works with both
+    bundlers and a bin/switch-bundler utility to switch between them
+    post-installation.
 
 * Pro
 
@@ -139,11 +140,17 @@ This creates `.tsx` files instead of `.jsx` and adds TypeScript configuration.
 
 ### Rspack Support
 
-The generator supports a `--rspack` option for using Rspack instead of Webpack as the bundler:
+Rspack is the default bundler for fresh installs, so a plain install gives you Rspack:
 
 ```bash
-rails generate react_on_rails:install --rspack
+# Rspack (default)
+rails generate react_on_rails:install
+
+# Webpack instead
+rails generate react_on_rails:install --no-rspack
 ```
+
+The default applies only to fresh installs. If `config/shakapacker.yml` already declares an `assets_bundler`, the generator keeps your existing choice. An explicit `--rspack` / `--no-rspack` always wins. (Rspack requires Shakapacker 9.0+; on older Shakapacker the generator falls back to Webpack.)
 
 **Benefits:**
 
@@ -187,13 +194,13 @@ For apps with custom webpack configurations, review the generated config templat
 **Combining with other options:**
 
 ```bash
-# Rspack with TypeScript
-rails generate react_on_rails:install --rspack --typescript
+# Rspack (default) with TypeScript
+rails generate react_on_rails:install --typescript
 
-# Rspack with Redux
-rails generate react_on_rails:install --rspack --redux
+# Webpack with Redux
+rails generate react_on_rails:install --no-rspack --redux
 
-# All options combined
+# Explicit Rspack with TypeScript and Redux
 rails generate react_on_rails:install --rspack --typescript --redux
 ```
 

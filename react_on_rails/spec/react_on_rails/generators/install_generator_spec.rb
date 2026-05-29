@@ -1330,7 +1330,9 @@ describe InstallGenerator, type: :generator do
   end
 
   context "with --pro" do
-    before(:all) { run_generator_test_with_args(%w[--pro], package_json: true) }
+    # Pin to --no-rspack so this context keeps exercising the Webpack Pro transforms.
+    # Rspack is the default now and is covered by the "with --pro --rspack" context.
+    before(:all) { run_generator_test_with_args(%w[--pro --no-rspack], package_json: true) }
 
     include_examples "base_generator", application_js: true
     include_examples "no_redux_generator"
@@ -1646,7 +1648,9 @@ describe InstallGenerator, type: :generator do
   end
 
   context "with --rsc" do
-    before(:all) { run_generator_test_with_args(%w[--rsc], package_json: true) }
+    # Pin to --no-rspack so this context keeps exercising the Webpack RSC transforms.
+    # Rspack is the default now and is covered by the "with --rsc --rspack" context.
+    before(:all) { run_generator_test_with_args(%w[--rsc --no-rspack], package_json: true) }
 
     include_examples "rsc_common_files"
     include_examples "scaffold_ci_and_scripts"
@@ -2829,7 +2833,7 @@ describe InstallGenerator, type: :generator do
     let(:destination) { File.expand_path("../dummy-for-generators", __dir__) }
 
     context "when using webpack" do
-      let(:generator) { BaseGenerator.new([], {}, { destination_root: destination }) }
+      let(:generator) { BaseGenerator.new([], { rspack: false }, { destination_root: destination }) }
 
       it "returns .ts path when TypeScript config exists" do
         allow(File).to receive(:exist?).and_call_original
@@ -2984,14 +2988,26 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    context "when --rspack is false (default)" do
-      let(:install_generator) { described_class.new }
+    context "when --no-rspack is passed" do
+      let(:install_generator) { described_class.new([], { rspack: false }) }
 
-      # InstallGenerator declares --rspack with default: false, so options[:rspack]
-      # is false (not nil). using_rspack? returns false via the first branch without
-      # reaching the YAML fallback (rspack_configured_in_project?).
+      # --rspack declares no default, so options.key?(:rspack) is true only when the flag
+      # is explicitly passed. --no-rspack sets it to false, selecting Webpack.
       it "returns false" do
         expect(install_generator.send(:using_rspack?)).to be false
+      end
+    end
+
+    context "when no bundler flag is passed (fresh install)" do
+      let(:install_generator) { described_class.new }
+
+      # With no flag and no existing bundler choice, the default resolves to Rspack when
+      # Shakapacker supports it (Rspack landed in 9.0).
+      it "defaults to Rspack" do
+        allow(install_generator).to receive_messages(project_declares_assets_bundler?: false,
+                                                     shakapacker_version_9_or_higher?: true)
+
+        expect(install_generator.send(:using_rspack?)).to be true
       end
     end
   end
@@ -3011,8 +3027,8 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    context "without --rspack" do
-      let(:install_generator) { described_class.new }
+    context "with --no-rspack" do
+      let(:install_generator) { described_class.new([], { rspack: false }) }
 
       it "returns path unchanged" do
         expect(install_generator.send(:destination_config_path, "config/webpack/serverWebpackConfig.js"))
@@ -3025,7 +3041,9 @@ describe InstallGenerator, type: :generator do
   # Bundler subprocess commands must run in unbundled environment to prevent
   # BUNDLE_GEMFILE inheritance from parent process
   describe "bundler environment isolation" do
-    let(:install_generator) { described_class.new }
+    # Pin to Webpack (--no-rspack) so shakapacker:install runs with an empty env hash here;
+    # the SHAKAPACKER_ASSETS_BUNDLER=rspack env is covered by the dedicated example below.
+    let(:install_generator) { described_class.new([], { rspack: false }) }
 
     it "clears BUNDLE_GEMFILE when running bundle add" do
       allow(install_generator).to receive(:shakapacker_in_gemfile?).and_return(false)

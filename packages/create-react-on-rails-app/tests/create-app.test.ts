@@ -135,13 +135,19 @@ describe('validateAppName', () => {
 
 describe('buildGeneratorArgs', () => {
   it('includes ignore-warnings by default', () => {
-    expect(buildGeneratorArgs(baseOptions)).toEqual(['--new-app', '--force', '--ignore-warnings']);
+    expect(buildGeneratorArgs(baseOptions)).toEqual([
+      '--new-app',
+      '--no-rspack',
+      '--force',
+      '--ignore-warnings',
+    ]);
   });
 
   it('adds typescript flag when template is typescript', () => {
     expect(buildGeneratorArgs({ ...baseOptions, template: 'typescript' })).toEqual([
       '--new-app',
       '--typescript',
+      '--no-rspack',
       '--force',
       '--ignore-warnings',
     ]);
@@ -156,9 +162,19 @@ describe('buildGeneratorArgs', () => {
     ]);
   });
 
+  it('adds --no-rspack when rspack is disabled', () => {
+    expect(buildGeneratorArgs({ ...baseOptions, rspack: false })).toEqual([
+      '--new-app',
+      '--no-rspack',
+      '--force',
+      '--ignore-warnings',
+    ]);
+  });
+
   it('adds rsc flag when enabled', () => {
     expect(buildGeneratorArgs({ ...baseOptions, rsc: true })).toEqual([
       '--new-app',
+      '--no-rspack',
       '--rsc',
       '--force',
       '--ignore-warnings',
@@ -168,6 +184,7 @@ describe('buildGeneratorArgs', () => {
   it('adds pro flag when enabled', () => {
     expect(buildGeneratorArgs({ ...baseOptions, pro: true })).toEqual([
       '--new-app',
+      '--no-rspack',
       '--pro',
       '--force',
       '--ignore-warnings',
@@ -208,6 +225,7 @@ describe('buildGeneratorArgs', () => {
   it('prefers --rsc over --pro when both are set', () => {
     expect(buildGeneratorArgs({ ...baseOptions, pro: true, rsc: true })).toEqual([
       '--new-app',
+      '--no-rspack',
       '--rsc',
       '--force',
       '--ignore-warnings',
@@ -358,6 +376,7 @@ describe('createApp', () => {
         'generate',
         'react_on_rails:install',
         '--new-app',
+        '--no-rspack',
         '--rsc',
         '--force',
         '--ignore-warnings',
@@ -409,6 +428,7 @@ describe('createApp', () => {
         'generate',
         'react_on_rails:install',
         '--new-app',
+        '--no-rspack',
         '--pro',
         '--force',
         '--ignore-warnings',
@@ -541,6 +561,7 @@ describe('createApp', () => {
         'generate',
         'react_on_rails:install',
         '--new-app',
+        '--no-rspack',
         '--rsc',
         '--force',
         '--ignore-warnings',
@@ -556,6 +577,7 @@ describe('createApp', () => {
         'generate',
         'react_on_rails:install',
         '--new-app',
+        '--no-rspack',
         '--pro',
         '--force',
         '--ignore-warnings',
@@ -582,7 +604,16 @@ describe('createApp', () => {
     expect(mockedExecLiveArgs).toHaveBeenCalledWith('bundle', ['add', 'react_on_rails', '--strict'], appPath);
     expect(mockedExecLiveArgs).toHaveBeenCalledWith(
       'bundle',
-      ['exec', 'rails', 'generate', 'react_on_rails:install', '--new-app', '--force', '--ignore-warnings'],
+      [
+        'exec',
+        'rails',
+        'generate',
+        'react_on_rails:install',
+        '--new-app',
+        '--no-rspack',
+        '--force',
+        '--ignore-warnings',
+      ],
       appPath,
       expect.objectContaining({ REACT_ON_RAILS_PACKAGE_MANAGER: 'npm' }),
     );
@@ -619,7 +650,16 @@ describe('createApp', () => {
 
     expect(mockedExecLiveArgs).toHaveBeenCalledWith(
       'bundle',
-      ['exec', 'rails', 'generate', 'react_on_rails:install', '--new-app', '--force', '--ignore-warnings'],
+      [
+        'exec',
+        'rails',
+        'generate',
+        'react_on_rails:install',
+        '--new-app',
+        '--no-rspack',
+        '--force',
+        '--ignore-warnings',
+      ],
       appPath,
       expect.objectContaining({ REACT_ON_RAILS_PACKAGE_MANAGER: 'pnpm' }),
     );

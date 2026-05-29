@@ -64,7 +64,8 @@ async function run(appName: string, rawOpts: Record<string, unknown>): Promise<v
   const options: CliOptions = {
     template,
     packageManager: packageManager as 'npm' | 'pnpm',
-    rspack: Boolean(rawOpts.rspack),
+    // Rspack is the default; only an explicit --no-rspack (rawOpts.rspack === false) selects Webpack.
+    rspack: rawOpts.rspack !== false,
     pro,
     rsc,
   };
@@ -112,7 +113,7 @@ async function run(appName: string, rawOpts: Record<string, unknown>): Promise<v
     modeLabel = ', mode: pro';
   }
   logInfo(
-    `Creating "${appName}" with template: ${options.template}, package manager: ${options.packageManager}${options.rspack ? ', bundler: rspack' : ''}${modeLabel}`,
+    `Creating "${appName}" with template: ${options.template}, package manager: ${options.packageManager}, bundler: ${options.rspack ? 'rspack' : 'webpack'}${modeLabel}`,
   );
 
   createApp(appName, options);
@@ -131,7 +132,8 @@ program
   .argument('<app-name>', 'Name of the application to create')
   .option('-t, --template <type>', 'javascript or typescript', 'typescript')
   .option('-p, --package-manager <pm>', 'npm or pnpm (auto-detected if not specified)')
-  .option('--rspack', 'Use Rspack instead of Webpack (~20x faster builds)', false)
+  .option('--rspack', 'Use Rspack as the bundler (default, ~20x faster builds)')
+  .option('--no-rspack', 'Use Webpack instead of Rspack')
   .option('--standard', 'Generate open-source React on Rails setup (skip prompt)')
   .option('--pro', 'Generate React on Rails Pro setup (installs react_on_rails_pro)')
   .option('--rsc', 'Generate React Server Components setup (installs react_on_rails_pro)')
@@ -144,8 +146,8 @@ Examples:
   $ npx create-react-on-rails-app my-app --pro                  # skip prompt, use Pro
   $ npx create-react-on-rails-app my-app --standard             # skip prompt, use Standard
   $ npx create-react-on-rails-app my-app --template javascript
-  $ npx create-react-on-rails-app my-app --rspack
-  $ npx create-react-on-rails-app my-app --rspack --rsc
+  $ npx create-react-on-rails-app my-app --no-rspack             # use Webpack instead of Rspack
+  $ npx create-react-on-rails-app my-app --no-rspack --rsc
   $ npx create-react-on-rails-app my-app --package-manager pnpm
 
 When no mode flag (--standard, --pro, or --rsc) is given, an interactive prompt
