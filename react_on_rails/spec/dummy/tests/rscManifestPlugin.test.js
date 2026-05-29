@@ -9,8 +9,8 @@
  * throwaway `node` probes. These tests load the template directly and lock
  * that behavior in so it is regression-tested in CI.
  *
- * See the PR #3385 review:
- * https://github.com/shakacode/react_on_rails/pull/3385#issuecomment-4565058647
+ * See PR #3385:
+ * https://github.com/shakacode/react_on_rails/pull/3385
  */
 const fs = require('fs');
 const path = require('path');
@@ -43,6 +43,7 @@ function loadHelperInternals() {
     '  splitBraceAlternatives,',
     '  hasUseClientDirective,',
     '  globBaseDirectory,',
+    '  collectChunkGroupPairs,',
     '  mergeChunkPairsInPlace,',
     '  normalizeCrossOrigin,',
     '};',
@@ -70,6 +71,7 @@ const {
   splitBraceAlternatives,
   hasUseClientDirective,
   globBaseDirectory,
+  collectChunkGroupPairs,
   mergeChunkPairsInPlace,
   normalizeCrossOrigin,
 } = loadHelperInternals();
@@ -167,6 +169,8 @@ describe('rscManifestPlugin helper', () => {
       ["'use client' // legacy compat", true],
       ["'use client' // legacy compat\nexport {};", true],
       ["'use client' /* note */;", true],
+      // A trailing block comment may span multiple lines.
+      ["'use client' /* multi\nline note */;", true],
       // A trailing comment on an earlier directive must not break the scan.
       ["'use strict' // first\n'use client';", true],
       // A leading byte-order mark is ignored.
@@ -179,6 +183,46 @@ describe('rscManifestPlugin helper', () => {
       ['', false],
     ])('%j -> %s', (source, expected) => {
       expect(hasUseClientDirective(source)).toBe(expected);
+    });
+  });
+
+  describe('collectChunkGroupPairs', () => {
+    test('emits one [id, file] pair per chunk', () => {
+      const group = {
+        chunks: [
+          { id: 1, files: ['main.js'] },
+          { id: 2, files: ['vendor.js'] },
+        ],
+      };
+      expect(collectChunkGroupPairs(group)).toEqual([1, 'main.js', 2, 'vendor.js']);
+    });
+
+    test('skips non-JS files before the primary JS file (issue #1828 regression)', () => {
+      // The original bug `break`-ed on the first non-JS file, suppressing the pair
+      // when a `.css` entry preceded the `.js` entry in chunk.files. The fix
+      // `continue`s past non-JS files so the JS pair is still emitted.
+      const group = { chunks: [{ id: 1, files: ['styles.css', 'main.js'] }] };
+      expect(collectChunkGroupPairs(group)).toEqual([1, 'main.js']);
+    });
+
+    test('skips hot-update files', () => {
+      const group = { chunks: [{ id: 1, files: ['main.hot-update.js', 'main.js'] }] };
+      expect(collectChunkGroupPairs(group)).toEqual([1, 'main.js']);
+    });
+
+    test('takes only the first JS file per chunk', () => {
+      const group = { chunks: [{ id: 1, files: ['main.js', 'extra.js'] }] };
+      expect(collectChunkGroupPairs(group)).toEqual([1, 'main.js']);
+    });
+
+    test('skips chunks with a null id', () => {
+      const group = {
+        chunks: [
+          { id: null, files: ['orphan.js'] },
+          { id: 2, files: ['b.js'] },
+        ],
+      };
+      expect(collectChunkGroupPairs(group)).toEqual([2, 'b.js']);
     });
   });
 

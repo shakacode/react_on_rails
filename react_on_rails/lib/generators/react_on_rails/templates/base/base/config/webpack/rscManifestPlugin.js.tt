@@ -224,8 +224,10 @@ const hasUseClientDirective = (source) => {
   while (remaining.length > 0) {
     // A directive may carry a trailing line or block comment before its
     // terminator (e.g. `'use client' // legacy`); consume an optional comment
-    // between the string literal and the `;` / newline / end-of-input.
-    const match = remaining.match(/^(['"])(.*?)\1\s*(?:\/\/[^\n]*|\/\*.*?\*\/)?\s*(?:;|\n|$)/);
+    // between the string literal and the `;` / newline / end-of-input. The block
+    // alternative uses `[\s\S]*?` (not `.*?`) so a trailing block comment that
+    // spans multiple lines still matches.
+    const match = remaining.match(/^(['"])(.*?)\1\s*(?:\/\/[^\n]*|\/\*[\s\S]*?\*\/)?\s*(?:;|\n|$)/);
     if (!match) return false;
     if (match[2] === 'use client') return true;
 
