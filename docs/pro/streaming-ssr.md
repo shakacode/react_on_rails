@@ -26,6 +26,7 @@ Traditional SSR renders the full page on the server, then sends the complete HTM
 - React 19
 - React on Rails v16.0.0 or higher
 - Node Renderer running (streaming requires Node.js, not ExecJS)
+- For async props (streaming each slow prop independently): React Server Components enabled — `config.enable_rsc_support = true`
 
 ## Implementation Steps
 
@@ -44,39 +45,44 @@ Ensure you're using React 19 in your `package.json`:
 
 ### 2. Prepare Your React Components
 
-Create async React Server Components that receive data as props from Rails. Wrap them in `<Suspense>` boundaries to define which sections stream independently — React sends the fallback first, then streams the rendered content when the async component resolves.
+For a Suspense boundary to actually stream — show a fallback first, then swap in real content — something inside it must suspend on a Promise. In React on Rails, that data still comes from Rails: with **async props**, Rails sends the fast props immediately and emits each slow prop as it resolves. The component receives a `getReactOnRailsAsyncProp` helper that returns a Promise for each async prop; an async child `await`s it inside a `<Suspense>` boundary.
 
 ```jsx
 // app/javascript/components/MyStreamingComponent.jsx
 import React, { Suspense } from 'react';
 
-const MyStreamingComponent = ({ greeting, posts }) => {
-  return (
-    <>
-      <header>
-        <h1>{greeting}</h1>
-      </header>
-      <Suspense fallback={<div>Loading posts...</div>}>
-        <PostList posts={posts} />
-      </Suspense>
-    </>
-  );
-};
-
+// Async Server Component — awaits the streamed `posts` prop, then renders.
 async function PostList({ posts }) {
+  const resolved = await posts;
   return (
     <ul>
-      {posts.map((post) => (
+      {resolved.map((post) => (
         <li key={post.id}>{post.title}</li>
       ))}
     </ul>
   );
 }
 
+const MyStreamingComponent = ({ greeting, getReactOnRailsAsyncProp }) => {
+  // Returns a Promise that resolves when Rails emits the `posts` prop.
+  const postsPromise = getReactOnRailsAsyncProp('posts');
+
+  return (
+    <>
+      <header>
+        <h1>{greeting}</h1>
+      </header>
+      <Suspense fallback={<div>Loading posts...</div>}>
+        <PostList posts={postsPromise} />
+      </Suspense>
+    </>
+  );
+};
+
 export default MyStreamingComponent;
 ```
 
-> **React on Rails note:** The `async function` component pattern is a React Server Components feature — it requires [RSC support](./react-server-components/tutorial.md) enabled in React on Rails Pro. Database queries, authentication, and API calls happen on the Rails side — in controllers and models. Components receive the results as props via [`stream_react_component`](../oss/migrating/rsc-data-fetching.md#data-fetching-in-react-on-rails-pro); they do not fetch data directly. See [RSC Migration: Data Fetching Patterns](../oss/migrating/rsc-data-fetching.md) for the full explanation.
+> **React on Rails note:** Database queries, authentication, authorization, and caching all stay on the Rails side — the controller and view own them. Async props just let Rails emit each result the moment it has it, instead of blocking the whole render on the slowest source. The component never fetches data directly. In TypeScript, type the props with `WithAsyncProps<AsyncProps, SyncProps>` from `react-on-rails-pro`. See [Async Props: Stream Each Slow Prop Independently](../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently) for the full pattern.
 
 ```jsx
 // app/javascript/packs/registration.jsx
@@ -88,18 +94,24 @@ ReactOnRails.register({ MyStreamingComponent });
 
 ### 3. Add The Component To Your Rails View
 
+Use `stream_react_component_with_async_props`. Fast props go in `props:`; each `emit.call(name, value)` streams one more prop to the browser as soon as Rails has it. Rails still runs the query — it just emits the result when ready.
+
 ```erb
 <!-- app/views/example/show.html.erb -->
 
-<%= stream_react_component('MyStreamingComponent', props: {
-  greeting: 'Hello, Streaming World!',
-  posts: @posts.as_json(only: [:id, :title])
-}) %>
+<%= stream_react_component_with_async_props('MyStreamingComponent',
+      props: { greeting: 'Hello, Streaming World!' }) do |emit|
+  # Rails owns the query, authorization, and caching. This streams the `posts`
+  # prop to the browser the moment Rails has it — the shell renders first.
+  emit.call('posts', Post.recent.limit(20).as_json(only: [:id, :title]))
+end %>
 
 <footer>
   <p>Footer content</p>
 </footer>
 ```
+
+> If every data source is fast, use the simpler `stream_react_component` and pass all props synchronously — React still streams the rendered HTML to the browser as it walks the tree. Reach for async props when one or more sources are slow. See the [sync vs. async props comparison](../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently).
 
 ### 4. Render The View Using The `stream_view_containing_react_components` Helper
 
@@ -115,11 +127,12 @@ class ExampleController < ApplicationController
   # but you can include it explicitly if you prefer.
 
   def show
-    @posts = Post.recent.limit(20)
     stream_view_containing_react_components(template: 'example/show')
   end
 end
 ```
+
+> **Note:** `stream_react_component_with_async_props` requires React Server Components — set `config.enable_rsc_support = true` in your React on Rails Pro configuration. It raises `ReactOnRailsPro::Error` otherwise.
 
 ### 5. Test Your Application
 
@@ -135,11 +148,11 @@ callers should not use an empty stream as a success signal.
 
 ### 6. What Happens During Streaming
 
-`stream_react_component` calls React's `renderToPipeableStream`, which streams HTML to the browser progressively as React renders the component tree:
+`stream_react_component_with_async_props` uses React's `renderToPipeableStream` to stream the shell first, then streams each async prop as Rails emits it:
 
-1. The HTML response starts immediately — the browser doesn't wait for the entire page to finish rendering
-2. React sends the shell (header, footer, and Suspense fallbacks) first
-3. When async components resolve, their rendered HTML streams to the browser as replacement chunks
+1. React renders everything outside the unresolved `<Suspense>` boundaries and streams that shell immediately — the header and footer appear, with the `Loading posts...` fallback in place
+2. When Rails runs `emit.call('posts', ...)`, the resolved value streams to the renderer and the `posts` Promise resolves
+3. The async `PostList` awaits that Promise, renders, and React streams the post-list HTML chunk that replaces the fallback
 
 For example, with our `MyStreamingComponent`, the sequence is:
 
@@ -157,7 +170,7 @@ For example, with our `MyStreamingComponent`, the sequence is:
 </footer>
 ```
 
-2. When the async `PostList` resolves, its rendered HTML streams to the browser:
+2. Once Rails emits `posts` and `PostList` resolves, its rendered HTML streams to the browser:
 
 ```html
 <template hidden id="b0">
@@ -173,7 +186,7 @@ For example, with our `MyStreamingComponent`, the sequence is:
 </script>
 ```
 
-For pages with independent data sources that load at different speeds, use separate `stream_react_component` calls so each section streams as its data becomes ready:
+For top-level sections that are fully independent, you can instead use separate `stream_react_component` calls — each renders as its own data becomes ready:
 
 ```erb
 <%# Each component streams independently %>
