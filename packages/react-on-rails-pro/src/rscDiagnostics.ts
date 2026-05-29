@@ -37,13 +37,19 @@ type RSCStreamDiagnosticError = Error & {
   cause?: unknown;
 };
 
-const nonEmptyString = (value: unknown) =>
-  typeof value === 'string' && value.length > 0 ? value : undefined;
+const nonEmptyString = (value: unknown) => {
+  if (typeof value !== 'string') return undefined;
+  // Trim so a whitespace-only `renderingError.message`/`stack` (e.g. `"  "` or `"\n"`) is
+  // treated as absent rather than surfacing as `Original error:` with blank text.
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
 
 // Bundler/framework frames point at library code rather than the failing component, so they
 // are a poor value for `Module:`. Skip them when a later user-code frame is available.
-const INTERNAL_FRAME_RE =
-  /(?:^|[\\/])node_modules[\\/]|(?:^|[\\/])webpack[\\/]|\bwebpack-internal:|\b__webpack_require__\b/;
+// Note: this is matched against the extracted file *path*, not the raw frame, so a webpack
+// runtime frame is caught by its `webpack/` or `webpack-internal:` path, not its function name.
+const INTERNAL_FRAME_RE = /(?:^|[\\/])node_modules[\\/]|(?:^|[\\/])webpack[\\/]|\bwebpack-internal:/;
 
 export const extractModulePathFromStack = (stack?: string) => {
   if (!stack) return undefined;
