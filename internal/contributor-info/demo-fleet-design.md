@@ -43,7 +43,7 @@ task "demo_fleet:release_track", [:react_on_rails, :shakapacker, :react_on_rails
   target_repos = fleet.repos.select { |repo| repo.consumes?(versions.package_refs) }
 
   results = DemoFleet::Runner.run_concurrently(target_repos, concurrency: fleet.concurrency) do |repo|
-    pr = DemoPR.open_or_update(repo, versions, mode: :release_track)
+    pr = DemoPR.open_or_update(repo, versions, mode: :release_track, age_gate: fleet.age_gate)
     pr.wait_for_ci_and_review_app(timeout: 90.minutes)
     pr.result
   end
@@ -107,11 +107,12 @@ The supply-chain defense. Uniform across package managers so policy is consisten
 - `age_gate.npm_min_days`, `age_gate.gem_min_days`, `age_gate.actions_min_days` from the manifest.
 - `age_gate.own_packages.{npm,gem}` — our own packages bypass the gate on release-track runs.
 - Mode (`:release_track` vs `:freshness`).
+- The open break-glass override issue, if any (`override_issue`), resolved once per run and passed down to `permitted?` — never read from a global, so concurrent checks in the parallel runner stay thread-safe.
 
 ### Per-package decision
 
 ```ruby
-def DependencyBumps.permitted?(package, candidate_version, mode:, age_gate:)
+def DependencyBumps.permitted?(package, candidate_version, mode:, age_gate:, override_issue: nil)
   min_days = age_gate.min_days_for(package.ecosystem)
   return true if mode == :release_track && age_gate.own?(package)
 
@@ -120,12 +121,17 @@ def DependencyBumps.permitted?(package, candidate_version, mode:, age_gate:)
 
   return true if age_days >= min_days
 
-  return true if AgeGateOverride.active?(
-    package,
-    candidate_version,
-    tracking_issue: ReleaseTrackingIssue.current,
-    now: Time.now
-  )
+  # Break-glass override: resolved once by the caller and passed in explicitly
+  # (never read from a global) so concurrent calls in the parallel runner stay
+  # thread-safe. nil when no override issue is open — e.g. an ordinary freshness
+  # run — in which case a too-young bump is simply not permitted.
+  return true if override_issue &&
+                 AgeGateOverride.active?(
+                   package,
+                   candidate_version,
+                   tracking_issue: override_issue,
+                   now: Time.now
+                 )
 
   false
 end
@@ -197,7 +203,7 @@ When a release-track run lands while a freshness PR is open:
 
 ## Open items requiring user input
 
-1. **Manifest verification owner.** Who runs the one-time pass to clear `verify: true` flags? Default: assigned during the next RC cycle, one demo per release manager.
+1. **Manifest verification owner.** Who runs the one-time pass to clear `verify: true` flags? Default: assigned during the next RC cycle, one demo per release manager. The pass must also supply a real `cpflow_app_name` for each repo (or set `review_app: null` for demos with no CPFlow pipeline) — every repo currently inherits the `null` default, which holds the `verify: true` gate shut.
 2. **Pro gem source credential model.** Confirmed App installation, or do we need a separate machine user for the Pro source specifically?
 3. **`react-on-rails-demos` promotion criteria.** What "stable" means before we move the runtime out of `react_on_rails`. Suggested: orchestrator has driven two consecutive successful RC cycles end-to-end without manual fixups.
 
