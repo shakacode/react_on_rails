@@ -249,23 +249,25 @@ In the block above, `reviews` is emitted before `recommendations` — the second
   # every child finishes — exactly when the stream should close.
   Sync do |parent|
     parent.async do
-      # Give each concurrent fiber its own DB connection (see the note below).
-      ActiveRecord::Base.connection_pool.with_connection do
-        emit.call("reviews", product.reviews.as_json(only: [:id, :text, :rating]))
+      # Each concurrent fiber checks out its OWN connection for the duration of
+      # its query, then releases it before emitting (see the note below).
+      reviews = ActiveRecord::Base.connection_pool.with_connection do
+        product.reviews.as_json(only: [:id, :text, :rating])
       end
+      emit.call("reviews", reviews)
     end
 
     parent.async do
-      # An external service called through a fiber-aware HTTP client runs
-      # concurrently with the reviews query above.
-      emit.call("recommendations",
-                RecommendationService.for(product).as_json(only: [:id, :name, :price]))
+      recommendations = ActiveRecord::Base.connection_pool.with_connection do
+        product.recommended_products.as_json(only: [:id, :name, :price])
+      end
+      emit.call("recommendations", recommendations)
     end
   end
 end %>
 ```
 
-Each child task emits on its own, so props arrive in whatever order they resolve and React fills each `<Suspense>` boundary as its prop lands — the fastest source paints first and the total time is roughly the slowest source instead of the sum of all of them.
+Both tasks follow the same shape — wrap each query in its own `with_connection`, then emit. (If a prop comes from an external service over a fiber-aware HTTP client rather than the database, that task skips `with_connection` since it never touches the connection pool.) Each child task emits on its own, so props arrive in whatever order they resolve and React fills each `<Suspense>` boundary as its prop lands — the fastest source paints first and the total time is roughly the slowest source instead of the sum of all of them.
 
 > **When this actually runs in parallel:** the `async` gem parallelizes **I/O-bound** work that yields to the fiber scheduler — most reliably calls to external services through a fiber-aware HTTP client (the renderer already depends on [`async-http`](https://github.com/socketry/async-http)). For ActiveRecord, give each concurrent fiber its own connection with `ActiveRecord::Base.connection_pool.with_connection`, run with fiber-based connection isolation (`config.active_support.isolation_level = :fiber`), and size the pool for the fan-out — otherwise the fibers share one connection and the queries serialize. For CPU-bound work, or a database driver that doesn't cooperate with `Fiber.scheduler`, parallelize with threads instead (see [Avoiding Server-Side Waterfalls](#avoiding-server-side-waterfalls)).
 
