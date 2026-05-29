@@ -367,7 +367,7 @@ module ReactOnRailsPro
               "config.rolling_deploy_token is required when using the built-in " \
               "ReactOnRailsPro::RollingDeployAdapters::Http adapter. Generate one " \
               "with SecureRandom.hex(32) and set it on both Rails and your build CI. " \
-              "See docs/pro/rolling-deploy-http-adapter.md."
+              "See docs/pro/rolling-deploy-adapters.md."
       end
       # Compare on `bytesize` (not `length`) so the validator matches the
       # byte-level constant-time check in `BundlesController#authenticate_rolling_deploy_request`.

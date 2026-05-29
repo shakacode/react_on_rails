@@ -21,7 +21,7 @@ module ReactOnRailsPro
     # The currently-deployed Rails server already has the bundles + companion
     # assets sitting on disk; this adapter pulls them via authenticated HTTP.
     #
-    # Configuration (see docs/pro/rolling-deploy-http-adapter.md):
+    # Configuration (see docs/pro/rolling-deploy-adapters.md):
     #
     #   ReactOnRailsPro.configure do |config|
     #     config.rolling_deploy_adapter      = ReactOnRailsPro::RollingDeployAdapters::Http
@@ -113,7 +113,7 @@ module ReactOnRailsPro
         # Intentional no-op. The running Rails server IS the artifact store —
         # bundle + companion assets are already on local disk where the
         # mountable BundlesController will serve them on the next deploy's
-        # build CI. Documented in docs/pro/rolling-deploy-http-adapter.md.
+        # build CI. Documented in docs/pro/rolling-deploy-adapters.md.
         def upload(_bundle_hash, bundle:, assets:)
           # See class doc above.
         end

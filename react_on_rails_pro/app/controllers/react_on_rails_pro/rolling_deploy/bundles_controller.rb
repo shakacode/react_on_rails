@@ -13,9 +13,11 @@ module ReactOnRailsPro
     # ReactOnRailsPro::RollingDeployAdapters::Http adapter on the next
     # deploy's build CI consumes both endpoints.
     #
-    # Auto-mounted by the engine when `config.rolling_deploy_adapter` is the
-    # Http adapter (or a subclass). Users who need a custom mount path or want
-    # to layer their own auth middleware can mount manually:
+    # Mount this in your application's routes with `draw_routes` so the Http
+    # adapter on the next deploy can reach it. (Engine auto-mount keyed on
+    # `config.rolling_deploy_adapter` is planned for a follow-up but is not
+    # wired yet, so an explicit mount is currently required.) You can also use
+    # a custom mount path or layer your own auth middleware:
     #
     #   # config/routes.rb
     #   ReactOnRailsPro::RollingDeploy::BundlesController.draw_routes(
@@ -23,10 +25,10 @@ module ReactOnRailsPro
     #     path: "/internal/rolling-deploy"
     #   )
     #
-    # Callers that need to mount the controller more than once (for example,
-    # the engine auto-mount plus a user-controlled secondary path) must pass
-    # a distinct `as_prefix:` per call so Rails' named-route registry
-    # doesn't raise `ArgumentError: Invalid route name, already in use`.
+    # Callers that mount the controller more than once (for example, a future
+    # engine auto-mount plus a user-controlled secondary path) must pass a
+    # distinct `as_prefix:` per call so Rails' named-route registry doesn't
+    # raise `ArgumentError: Invalid route name, already in use`.
     #
     # Security:
     #   * Bearer-token auth via `Authorization: Bearer <token>`, constant-time
@@ -56,9 +58,8 @@ module ReactOnRailsPro
       DEFAULT_ROUTE_PREFIX = "react_on_rails_pro_rolling_deploy"
 
       class << self
-        # Helper for users who want to mount manually under a custom path. The
-        # auto-mount path uses these same route definitions via the engine
-        # initializer (see ReactOnRailsPro::Engine).
+        # Helper for mounting the controller in your application's routes. A
+        # planned engine auto-mount will reuse these same route definitions.
         #
         # `as_prefix:` controls the generated named-route helpers
         # (`<prefix>_manifest`, `<prefix>_bundle`). Callers that mount the
