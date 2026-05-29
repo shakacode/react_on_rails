@@ -58,7 +58,7 @@ task "demo_fleet:freshness_track" do
   target_repos = fleet.repos.reject { |repo| DemoPR.open_release_pr?(repo) }
 
   results = DemoFleet::Runner.run_concurrently(target_repos, concurrency: fleet.concurrency) do |repo|
-    proposed_bumps = DependencyBumps.compute(repo, age_gate: fleet.age_gate)
+    proposed_bumps = DependencyBumps.compute(repo, age_gate: fleet.age_gate, skip_own: true) # own packages ship via release-track
     next DemoResult.skipped(repo, "no permitted bumps") if proposed_bumps.empty?
     pr = DemoPR.open_or_update(repo, proposed_bumps, mode: :freshness)
     pr.wait_for_ci_and_review_app(timeout: 90.minutes)
@@ -87,7 +87,7 @@ exec bundle exec rake "demo_fleet:${1:-plan}"
 - `DemoFleet` — manifest loader; validates `schema_version` and rejects unknown keys.
 - `DemoFleet::Runner` — bounded parallel executor. It records per-repo exceptions as red `DemoResult` objects, keeps processing the remaining repos, and re-raises only after `tracking_issue.record_all` and `tracking_issue.gate_check!` have made the failure visible.
 - `DemoPR` — opens/updates the bump PR in a demo repo via a GitHub App installation token (see Credentials). Generates the PR body from the RC plan's RC Test Report template, prefilled with the demo's manifest data.
-- `DependencyBumps` — computes proposed version bumps with the age gate (next section).
+- `DependencyBumps` — computes proposed version bumps with the age gate (next section). On the freshness track (`skip_own: true`) it proposes only third-party/transitive bumps; our own packages (`age_gate.own_packages`, including `cpflow`) are driven exclusively by the release track, so the weekly train never bumps a deploy tool on its own cadence.
 - `TrackingIssue` — creates/updates the per-RC tracking issue in `shakacode/react_on_rails` from `.github/ISSUE_TEMPLATE/rc-release-tracking.yml`. `record_all` ticks only the _automated_ sub-items (CI green + review-app smoke) from each `DemoResult`; the _manual_ RC-checklist items stay for a human to tick. `gate_check!` gates on the issue's checkbox state, not on the raw `DemoResult`s — so a hard_gate demo that is automated-green but still has an unchecked manual item blocks the final release. This keeps the RC plan the owner of release policy; the orchestrator only fills in the mechanical checkboxes.
 - `ReviewApp` — when `review_app.cpflow_app_name` is non-null, polls the GitHub Checks API for `review_app.status_check`, asks CPFlow for that app's review URL for the PR branch, and hits each `smoke` path against that base URL (it never derives the URL from the repo slug). When `cpflow_app_name` is null — a demo with no review-app pipeline yet — it short-circuits: no status-check poll, no URL lookup, no smoke run. A repo with a `review_app` block cannot clear `verify: true` while `cpflow_app_name` is null; demos that genuinely have no pipeline set `review_app: null` instead.
 - `pr.wait_for_ci_and_review_app` — coordinates CI polling plus `ReviewApp` smoke checks.
@@ -112,25 +112,27 @@ The supply-chain defense. Uniform across package managers so policy is consisten
 ### Per-package decision
 
 ```ruby
-def DependencyBumps.permitted?(package, candidate_version, mode:, age_gate:, override_issue: nil)
+def DependencyBumps.permitted?(package, candidate_version, mode:, age_gate:, override_issue: nil, now: Time.now)
   min_days = age_gate.min_days_for(package.ecosystem)
   return true if mode == :release_track && age_gate.own?(package)
 
   published_at = Registry.published_at(package, candidate_version)
-  age_days = (Time.now - published_at) / 86_400
+  age_days = (now - published_at) / 86_400
 
   return true if age_days >= min_days
 
   # Break-glass override: resolved once by the caller and passed in explicitly
   # (never read from a global) so concurrent calls in the parallel runner stay
   # thread-safe. nil when no override issue is open — e.g. an ordinary freshness
-  # run — in which case a too-young bump is simply not permitted.
+  # run — in which case a too-young bump is simply not permitted. `now` is a
+  # single injectable snapshot so the age check and the expiry check share one
+  # clock (and tests can pin it).
   return true if override_issue &&
                  AgeGateOverride.active?(
                    package,
                    candidate_version,
                    tracking_issue: override_issue,
-                   now: Time.now
+                   now: now
                  )
 
   false
@@ -139,8 +141,8 @@ end
 
 ### Registry lookups
 
-- **npm** — `GET https://registry.npmjs.org/<pkg>` → `time[<version>]` is the publish timestamp. No auth required.
-- **RubyGems** — `GET https://rubygems.org/api/v1/versions/<gem>.json` → array of `{number, created_at, yanked}`. Pick matching `number`. No auth required.
+- **npm** — `GET https://registry.npmjs.org/<pkg>` → `time[<version>]` is the publish timestamp. Percent-encode the package name unconditionally (`URI.encode_www_form_component`) so scoped names like `@scope/pkg` resolve to `@scope%2Fpkg`. No auth required.
+- **RubyGems** — `GET https://rubygems.org/api/v1/versions/<gem>.json` → array of `{number, created_at, yanked}`. Reject `yanked: true` entries before matching `number`, so a yanked version that clears the age threshold can't pass the gate. No auth required.
 - **GitHub Actions** — `GET https://api.github.com/repos/<owner>/<repo>/releases/tags/<tag>` → `published_at`. Auth via the orchestrator's installation token.
 
 Cache responses for the duration of a single orchestrator run (TTL 1h) to avoid hammering registries when many demos consume the same package.
@@ -166,9 +168,9 @@ For CVEs that need a sub-min-days patched version:
 
 1. Release manager opens or updates a tracking issue in `shakacode/react_on_rails` titled `age-gate override: <pkg>@<version>`.
 2. Issue body includes the CVE link, affected package, candidate version, and justification.
-3. A second maintainer approves the override in an issue comment. The approval is only honored if the commenter is a verified member of the designated maintainers team (e.g. `shakacode/maintainers`): `AgeGateOverride.active?` checks `GET /orgs/shakacode/teams/maintainers/memberships/<user>` for both the issue author and the approver, so a free-text "approved" from anyone outside the team is ignored.
+3. A second maintainer — **different from the issue author** — approves the override in an issue comment. The approval is only honored if the commenter is a verified member of the designated maintainers team (e.g. `shakacode/maintainers`): `AgeGateOverride.active?` checks `GET /orgs/shakacode/teams/maintainers/memberships/<user>` for both the issue author and the approver, so a free-text "approved" from anyone outside the team is ignored.
 4. Release manager applies the `age-gate-override` label after approval. The orchestrator reads GitHub issue timeline events and uses the most recent label-applied timestamp as the start of the 7-day window; `updated_at` is not used because ordinary edits would extend the window accidentally.
-5. `AgeGateOverride.active?` permits only the exact `ecosystem/name@version` named in the issue title/body, only while `now - label_applied_at <= 7.days`, and only when both the issue author and the approver pass the team-membership check from step 3.
+5. `AgeGateOverride.active?` permits only the exact `ecosystem/name@version` named in the issue title/body, only while `now - label_applied_at <= 7.days`, and only when both the issue author and the approver pass the team-membership check from step 3 **and are distinct accounts** — self-approval (the same login opening and approving) is rejected, so a single compromised account cannot clear the gate alone.
 6. The override, approver, and expiry timestamp are logged in the tracking issue and in the resulting PR body.
 
 This keeps audit trail in GitHub, not in shell history or env vars.
@@ -180,6 +182,8 @@ A ShakaCode GitHub App, installed on:
 - `shakacode/react_on_rails` (read code, write issues/PRs)
 - Every demo repo in the manifest (write contents for the bump branch, write PRs)
 - The Pro gem source for repos with `needs_pro: true`
+
+The App also needs the org-level `members: read` permission so the break-glass flow can verify maintainers-team membership (`GET /orgs/shakacode/teams/maintainers/memberships/<user>`); without it that lookup 404s the first time an override is exercised.
 
 The orchestrator uses the App installation token. No long-lived PATs in CI.
 
@@ -194,7 +198,7 @@ When the weekly freshness train runs and a demo has an open release-track PR:
 
 When a release-track run lands while a freshness PR is open:
 
-- Release-track takes priority. The orchestrator rebases or closes the open freshness PR (configurable per demo; default: close + reopen after the release-track PR merges).
+- Release-track takes priority. v1 behavior is fixed: the orchestrator closes the open freshness PR and reopens it after the release-track PR merges. (A per-repo `conflict_mode` override — e.g. `rebase` instead of `close_and_reopen` — is a future enhancement and is intentionally not in the manifest schema yet.)
 
 ## Cadence
 
