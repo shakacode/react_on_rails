@@ -236,12 +236,24 @@ const createRSCStreamFromArray = (payloads: string[]) => {
  * the payload is already embedded in the page.
  *
  * @param payloads - Array of raw Flight data strings from the global array
+ * @param componentName - Name of the server component, used for error context
  * @returns A Promise resolving to the rendered React element
  */
-const createFromPreloadedPayloads = (payloads: string[]) => {
+const createFromPreloadedPayloads = (payloads: string[], componentName: string) => {
   const stream = createRSCStreamFromArray(payloads);
   const renderPromise = createFromReadableStream<React.ReactNode>(stream);
-  return wrapInNewPromise(renderPromise);
+  return wrapInNewPromise(renderPromise).catch((error: unknown) => {
+    // Preloaded payloads carry only raw Flight data — the server consumes the length-prefixed
+    // `renderingError` metadata during injection (see injectRSCPayload), so there is no RSC
+    // bundle diagnostic to merge here. Still, name the failing component (and preserve the
+    // original error as `cause`) so a hydration failure is attributable instead of surfacing a
+    // bare React error.
+    const wrapper: Error & { cause?: unknown } = new Error(
+      `Failed to hydrate preloaded RSC payload for component "${componentName}": ${extractErrorMessage(error)}`,
+    );
+    wrapper.cause = error;
+    throw wrapper;
+  });
 };
 
 /**
@@ -283,7 +295,7 @@ const getReactServerComponent =
       const rscPayloadKey = createRSCPayloadKey(componentName, componentProps, domNodeId);
       const payloads = window.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey];
       if (payloads) {
-        return createFromPreloadedPayloads(payloads);
+        return createFromPreloadedPayloads(payloads, componentName);
       }
     }
     return fetchRSC({ componentName, componentProps, railsContext });
