@@ -115,7 +115,7 @@ That exposes two authenticated endpoints under the mount path:
 | `GET /manifest`      | JSON: `{ hashes: [...], rsc_enabled, generated_at, protocol_version }` for the current deploy. |
 | `GET /bundles/:hash` | `application/gzip` tarball containing `bundle.js` plus that hash's companion assets.           |
 
-> **Note:** the controller's source describes itself as auto-mounted by the engine, but that wiring is not active in the current scaffold release — mount it explicitly with `draw_routes` as shown. Auto-mount is planned for a follow-up; when it lands, drop the manual mount or pass a distinct `as_prefix:` to avoid duplicate-route-name errors.
+> **Note:** Engine auto-mount is planned for a follow-up release but is not yet wired — mount the controller explicitly with `draw_routes` as shown. When auto-mount lands, drop the manual mount or pass a distinct `as_prefix:` to avoid duplicate-route-name errors.
 
 ### Security
 

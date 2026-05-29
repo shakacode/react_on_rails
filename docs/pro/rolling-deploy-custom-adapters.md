@@ -133,7 +133,7 @@ This runs the adapter's `fetch(hash)` for each listed hash but skips discovery. 
 
 `assets:precompile` invokes `upload` for the current build's bundle hashes whenever an adapter is configured **and** `Rails.env` is anything other than `development` or `test`. That includes `staging`, `production`, custom envs like `qa` or `preview`, and any other non-dev/non-test value.
 
-In practice this means a `staging` deploy hits the same artifact store as production — it must have the same credentials and write access. This is intentional: a `staging`-→-`staging` rolling deploy needs the previous staging hash seeded, and a `staging`-→-`production` promotion benefits from staging having warmed the store. If you need to keep `staging` out of the artifact store entirely, set `config.rolling_deploy_adapter = nil` in a `staging`-specific initializer rather than relying on env-based skipping at the gem level.
+In practice this means a `staging` deploy hits the same artifact store as production — it must have the same credentials and write access. This is intentional: a `staging` → `staging` rolling deploy needs the previous staging hash seeded, and a `staging` → `production` promotion benefits from staging having warmed the store. If you need to keep `staging` out of the artifact store entirely, set `config.rolling_deploy_adapter = nil` in a `staging`-specific initializer rather than relying on env-based skipping at the gem level.
 
 > The built-in HTTP adapter's `upload` is a no-op, so this section only matters for custom adapters that publish to an external store.
 

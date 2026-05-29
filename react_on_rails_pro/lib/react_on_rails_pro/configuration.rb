@@ -381,7 +381,7 @@ module ReactOnRailsPro
             "config.rolling_deploy_token must be at least " \
             "#{ROLLING_DEPLOY_TOKEN_MIN_LENGTH} bytes (got #{token.bytesize}). " \
             "Generate a stronger token with SecureRandom.hex(32). " \
-            "See docs/pro/rolling-deploy-http-adapter.md."
+            "See docs/pro/rolling-deploy-adapters.md."
     end
 
     def validate_rolling_deploy_upload_signature
