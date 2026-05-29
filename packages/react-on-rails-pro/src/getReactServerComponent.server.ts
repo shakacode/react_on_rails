@@ -55,13 +55,13 @@ const createFromReactOnRailsNodeStream = async (
     },
   });
 
-  // Note: this try/catch only intercepts errors thrown during the initial stream parse.
-  // React RSC errors that surface during the deferred render phase (e.g. when a Suspense
-  // boundary resolves a lazy element) propagate through React's error-boundary mechanism
-  // rather than rejecting `createFromNodeStream`, so they are NOT enriched here. In that case
-  // `rscDiagnosticError` (a local that goes out of scope when this function returns) is
-  // discarded and the caller sees only the generic React stream error. Enriching the
-  // deferred-render path is tracked in #3475.
+  // Note: this try/catch enriches any error that rejects `createFromNodeStream` — stream read
+  // failures, malformed Flight data, or synchronous render errors. It does NOT catch errors
+  // React surfaces through its error-boundary / Suspense mechanism during the deferred render
+  // phase (e.g. when a Suspense boundary resolves a lazy element); those never reject this
+  // promise. In that case `rscDiagnosticError` (a local that goes out of scope when this
+  // function returns) is discarded and the caller sees only the generic React error. Enriching
+  // the deferred-render path is tracked in #3475.
   try {
     return await createFromNodeStream<React.ReactNode>(transformedStream);
   } catch (error: unknown) {
