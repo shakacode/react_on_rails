@@ -147,7 +147,7 @@ class ExampleController < ApplicationController
 end
 ```
 
-The controller prepares `@posts`; the view's `emit.call` streams it. For one slow source like this, loading it in the controller is fine. When several sources are slow and independent, load them in parallel (e.g. Ruby threads) so no `emit.call` waits on an unrelated query — see [Avoiding Server-Side Waterfalls](../oss/migrating/rsc-data-fetching.md#avoiding-server-side-waterfalls).
+The controller prepares `@posts`; the view's `emit.call` streams it. For one slow source like this, loading it in the controller is fine. When several sources are slow and independent, fetch them in parallel with the [`async` gem](https://github.com/socketry/async) rather than Ruby threads — Pro's streaming stack is fiber-based and already runs inside an Async reactor, so wrap each query in an `Async { ... }` task and await them. That way no `emit.call` waits on an unrelated query.
 
 ### 5. Test Your Application
 
