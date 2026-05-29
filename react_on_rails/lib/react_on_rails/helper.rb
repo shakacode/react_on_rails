@@ -720,26 +720,30 @@ module ReactOnRails
       rendering_error = json_result["renderingError"]
       return unless rendering_error.is_a?(Hash)
 
-      message = rendering_error["message"]
-      return if message.blank?
+      stack = rendering_error["stack"]
+      # Mirror the JS `buildRSCStreamDiagnosticError` fallback: a renderingError that carries only
+      # a stack (no message) should still surface a diagnostic rather than be silently dropped.
+      message = rendering_error["message"].presence ||
+                (stack.present? ? "RSC stream metadata reported a rendering error" : nil)
+      return if message.nil?
 
       error = StandardError.new(message)
-      frames = normalize_js_stack_lines(rendering_error["stack"])
+      frames = normalize_js_stack_lines(stack)
       error.set_backtrace(frames) unless frames.empty?
       error
     end
 
-    # V8 stack strings typically begin with a `"TypeError: ..."` header line that does
-    # not match Ruby's `file:line:in 'method'` backtrace format. Drop the leading header
-    # so backtrace cleaners and error reporters can parse the remaining `at <frame>` lines.
+    # V8 stack strings begin with a `"TypeError: ..."` header line — and chained-exception stacks
+    # add further non-frame headers mid-stack (e.g. `Caused by: ...`) — none of which match Ruby's
+    # `file:line:in 'method'` backtrace format. Keep only the `at <frame>` lines so backtrace
+    # cleaners and APM tools that ship the array raw don't choke on unparseable strings.
     # Frames are also `.strip`-ed to drop V8's leading indentation, which Ruby backtraces never carry.
     #
-    # When the stack has no `at <frame>` lines (e.g. a header-only or non-V8 string) this
-    # returns `[]`, leaving the backtrace nil rather than seeding it with an unparseable
-    # header line that Rails/APM backtrace cleaners would silently drop or misgroup.
+    # When the stack has no `at <frame>` lines (e.g. a header-only or non-V8 string) this returns
+    # `[]`, leaving the backtrace nil rather than seeding it with unparseable header lines.
     def normalize_js_stack_lines(stack)
       lines = stack.to_s.lines.map { |line| line.chomp.strip }
-      lines.drop_while { |line| !line.start_with?("at ") }
+      lines.select { |line| line.start_with?("at ") }
     end
 
     def should_raise_streaming_prerender_error?(chunk_json_result, render_options)

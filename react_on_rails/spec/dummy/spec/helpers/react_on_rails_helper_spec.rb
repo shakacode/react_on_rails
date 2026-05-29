@@ -616,6 +616,44 @@ describe ReactOnRailsHelper do
       expect(error.backtrace).not_to include(/^TypeError:/)
     end
 
+    it "filters non-`at` header lines that appear mid-stack (chained exceptions)" do
+      json_result = {
+        "renderingError" => {
+          "message" => "boom",
+          "stack" => <<~STACK.chomp
+            TypeError: boom
+                at A (/app/a.js:1:1)
+            Caused by: Error: root
+                at B (/app/b.js:2:2)
+          STACK
+        }
+      }
+
+      error = helper.send(:rendering_error_from_result, json_result)
+
+      expect(error.backtrace).to eq(["at A (/app/a.js:1:1)", "at B (/app/b.js:2:2)"])
+    end
+
+    it "builds a diagnostic from a stack-only renderingError with no message" do
+      json_result = {
+        "renderingError" => {
+          "stack" => "TypeError: boom\n    at Foo (/app/foo.js:1:1)"
+        }
+      }
+
+      error = helper.send(:rendering_error_from_result, json_result)
+
+      expect(error).not_to be_nil
+      expect(error.message).to eq("RSC stream metadata reported a rendering error")
+      expect(error.backtrace.first).to start_with("at Foo")
+    end
+
+    it "returns nil when renderingError has neither message nor stack" do
+      error = helper.send(:rendering_error_from_result, { "renderingError" => {} })
+
+      expect(error).to be_nil
+    end
+
     it "leaves backtrace nil when renderingError has no stack so error reporters can enrich it" do
       json_result = {
         "renderingError" => {

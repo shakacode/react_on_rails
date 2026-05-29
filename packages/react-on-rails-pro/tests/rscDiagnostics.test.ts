@@ -151,6 +151,26 @@ describe('RSC diagnostics', () => {
     expect(extractModulePathFromStack(stack)).toBe('/app/node_modules/react/index.js');
   });
 
+  it('treats a user directory like "my-webpack/" as user code, not a framework frame', () => {
+    // The webpack arm is anchored to a path separator, so `webpack` preceded by `-` (a word
+    // boundary) is not misclassified as a bundler-internal frame.
+    const stack =
+      'Error: boom\n' +
+      '    at Comp (/app/my-webpack/Component.jsx:1:1)\n' +
+      '    at Real (/app/real.js:2:2)';
+
+    expect(extractModulePathFromStack(stack)).toBe('/app/my-webpack/Component.jsx');
+  });
+
+  it('still treats a real /webpack/ runtime frame as framework-internal', () => {
+    const stack =
+      'Error: boom\n' +
+      '    at __webpack_require__ (/app/webpack/runtime.js:9:9)\n' +
+      '    at Real (/app/real.js:2:2)';
+
+    expect(extractModulePathFromStack(stack)).toBe('/app/real.js');
+  });
+
   it('does not mistake a bare function name for the module path in anonymous frames', () => {
     // Unusual but valid V8 frame where a function name precedes a path without parens; the
     // anonymous-frame regex is anchored to an absolute path so it skips this frame rather than

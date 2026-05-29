@@ -41,7 +41,7 @@ const str = (value: unknown) => (typeof value === 'string' && value.length > 0 ?
 // Bundler/framework frames point at library code rather than the failing component, so they
 // are a poor value for `Module:`. Skip them when a later user-code frame is available.
 const INTERNAL_FRAME_RE =
-  /(?:^|[\\/])node_modules[\\/]|\bwebpack[\\/]|\bwebpack-internal:|\b__webpack_require__\b/;
+  /(?:^|[\\/])node_modules[\\/]|(?:^|[\\/])webpack[\\/]|\bwebpack-internal:|\b__webpack_require__\b/;
 
 export const extractModulePathFromStack = (stack?: string) => {
   if (!stack) return undefined;
