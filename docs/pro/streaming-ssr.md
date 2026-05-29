@@ -30,6 +30,8 @@ Traditional SSR renders the full page on the server, then sends the complete HTM
 
 ## Implementation Steps
 
+> **This example uses async props**, which build on React Server Components. Enable RSC before you start: set `config.enable_rsc_support = true` in your React on Rails Pro configuration (see the [RSC tutorial](./react-server-components/tutorial.md)). Without it, the `async function` server component won't render and `stream_react_component_with_async_props` raises `ReactOnRailsPro::Error`. If all your data is fast and you don't need progressive streaming, you can skip RSC and use the synchronous `stream_react_component` instead (see the note after Step 3).
+
 ### 1. Use React 19
 
 Ensure you're using React 19 in your `package.json`:
@@ -51,7 +53,8 @@ For a Suspense boundary to actually stream — show a fallback first, then swap 
 // app/javascript/components/MyStreamingComponent.jsx
 import React, { Suspense } from 'react';
 
-// Async Server Component — awaits the streamed `posts` prop, then renders.
+// Async Server Component (requires RSC — see callout above). Awaits the
+// streamed `posts` prop, then renders.
 async function PostList({ posts }) {
   const resolved = await posts;
   return (
@@ -82,28 +85,39 @@ const MyStreamingComponent = ({ greeting, getReactOnRailsAsyncProp }) => {
 export default MyStreamingComponent;
 ```
 
-> **React on Rails note:** Database queries, authentication, authorization, and caching all stay on the Rails side — the controller and view own them. Async props just let Rails emit each result the moment it has it, instead of blocking the whole render on the slowest source. The component never fetches data directly. In TypeScript, type the props with `WithAsyncProps<AsyncProps, SyncProps>` from `react-on-rails-pro`. See [Async Props: Stream Each Slow Prop Independently](../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently) for the full pattern.
+> **React on Rails note:** Database queries, authentication, authorization, and caching all stay on the Rails side — the controller and view own them. Async props just let Rails emit each result the moment it has it, instead of blocking the whole render on the slowest source. The component never fetches data directly. In TypeScript, type the props with `WithAsyncProps<AsyncProps, SyncProps>` from `react-on-rails-pro`. See [Data Fetching in React on Rails Pro](../oss/migrating/rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) for the full pattern.
 
-```jsx
-// app/javascript/packs/registration.jsx
-import ReactOnRails from 'react-on-rails';
+With `auto_load_bundle` enabled (recommended), `MyStreamingComponent` is registered automatically. Otherwise, register it as a server component — server components use `registerServerComponent`, **not** `ReactOnRails.register`:
+
+```js
+// Server bundle — bundles the actual component code
+import registerServerComponent from 'react-on-rails-pro/registerServerComponent/server';
 import MyStreamingComponent from '../components/MyStreamingComponent';
 
-ReactOnRails.register({ MyStreamingComponent });
+registerServerComponent({ MyStreamingComponent });
 ```
+
+```js
+// Client bundle — registers by name; the component code stays out of the client bundle
+import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';
+
+registerServerComponent('MyStreamingComponent');
+```
+
+See [Create a React Server Component](./react-server-components/create-without-ssr.md#register-the-react-server-component-page) for the full registration and RSC bundle setup.
 
 ### 3. Add The Component To Your Rails View
 
-Use `stream_react_component_with_async_props`. Fast props go in `props:`; each `emit.call(name, value)` streams one more prop to the browser as soon as Rails has it. Rails still runs the query — it just emits the result when ready.
+Use `stream_react_component_with_async_props`. Fast props go in `props:`; each `emit.call(name, value)` streams one more prop to the browser as soon as Rails has it. The controller still owns the query (see Step 4) — the view just emits the prepared result when ready.
 
 ```erb
 <!-- app/views/example/show.html.erb -->
 
 <%= stream_react_component_with_async_props('MyStreamingComponent',
       props: { greeting: 'Hello, Streaming World!' }) do |emit|
-  # Rails owns the query, authorization, and caching. This streams the `posts`
-  # prop to the browser the moment Rails has it — the shell renders first.
-  emit.call('posts', Post.recent.limit(20).as_json(only: [:id, :title]))
+  # Streams the `posts` prop to the browser the moment Rails has it —
+  # the shell renders first, then this fills the Suspense boundary.
+  emit.call('posts', @posts.as_json(only: [:id, :title]))
 end %>
 
 <footer>
@@ -111,7 +125,7 @@ end %>
 </footer>
 ```
 
-> If every data source is fast, use the simpler `stream_react_component` and pass all props synchronously — React still streams the rendered HTML to the browser as it walks the tree. Reach for async props when one or more sources are slow. See the [sync vs. async props comparison](../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently).
+> If every data source is fast, use the simpler `stream_react_component` and pass all props synchronously — React still streams the rendered HTML to the browser as it walks the tree. Reach for async props when one or more sources are slow. See the [sync vs. async props comparison](../oss/migrating/rsc-data-fetching.md#data-fetching-in-react-on-rails-pro).
 
 ### 4. Render The View Using The `stream_view_containing_react_components` Helper
 
@@ -127,12 +141,13 @@ class ExampleController < ApplicationController
   # but you can include it explicitly if you prefer.
 
   def show
+    @posts = Post.recent.limit(20)
     stream_view_containing_react_components(template: 'example/show')
   end
 end
 ```
 
-> **Note:** `stream_react_component_with_async_props` requires React Server Components — set `config.enable_rsc_support = true` in your React on Rails Pro configuration. It raises `ReactOnRailsPro::Error` otherwise.
+The controller prepares `@posts`; the view's `emit.call` streams it. For one slow source like this, loading it in the controller is fine. When several sources are slow and independent, load them in parallel (e.g. Ruby threads) so no `emit.call` waits on an unrelated query — see [Avoiding Server-Side Waterfalls](../oss/migrating/rsc-data-fetching.md#avoiding-server-side-waterfalls).
 
 ### 5. Test Your Application
 
