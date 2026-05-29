@@ -94,6 +94,8 @@ setup_repo() {
   mkdir -p docs react_on_rails/lib/react_on_rails packages/react-on-rails/src
   mkdir -p packages/react-on-rails-pro-node-renderer/src
   mkdir -p react_on_rails/spec/react_on_rails
+  mkdir -p react_on_rails/app/helpers
+  mkdir -p react_on_rails_pro/app/controllers/react_on_rails_pro/rolling_deploy
   cat > docs/guide.md <<'DOC'
 # Guide
 DOC
@@ -125,6 +127,26 @@ TS
 RSpec.describe "example" do
   it "works" do
     expect(true).to be(true)
+  end
+end
+RUBY
+  cat > react_on_rails/app/helpers/react_on_rails_helper.rb <<'RUBY'
+module ReactOnRails
+  module Helper
+    def react_component
+      "ok"
+    end
+  end
+end
+RUBY
+  cat > react_on_rails_pro/app/controllers/react_on_rails_pro/rolling_deploy/bundles_controller.rb <<'RUBY'
+module ReactOnRailsPro
+  module RollingDeploy
+    class BundlesController
+      def call
+        "ok"
+      end
+    end
   end
 end
 RUBY
@@ -313,6 +335,66 @@ test_spec_comment_only_change_skips_rspec() {
   assert_contains "$out" '"run_ruby_tests": false' "spec comment output"
 }
 
+test_core_app_comment_only_change_skips_heavy_tests_but_keeps_lint() {
+  setup_repo
+  perl -0pi -e 's/    def react_component/    # Document the helper.\n    def react_component/' \
+    react_on_rails/app/helpers/react_on_rails_helper.rb
+  commit_change "core app comment"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"docs_only": false' "core app comment output"
+  assert_contains "$out" '"non_runtime_only": true' "core app comment output"
+  assert_contains "$out" '"run_lint": true' "core app comment output"
+  assert_contains "$out" '"run_ruby_tests": false' "core app comment output"
+}
+
+test_core_app_source_change_remains_runtime_affecting() {
+  setup_repo
+  perl -0pi -e 's/"ok"/"changed"/' react_on_rails/app/helpers/react_on_rails_helper.rb
+  commit_change "core app source"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"non_runtime_only": false' "core app source output"
+  assert_contains "$out" '"run_ruby_tests": true' "core app source output"
+}
+
+# Regression for PR #3474: a comment-only change to a controller under
+# react_on_rails_pro/app/ used to fall through to the uncategorized catch-all,
+# which forced the entire test + benchmark suite to run.
+test_pro_app_comment_only_change_runs_pro_lint_only() {
+  setup_repo
+  perl -0pi -e 's/    class BundlesController/    class BundlesController\n      # Document the controller./' \
+    react_on_rails_pro/app/controllers/react_on_rails_pro/rolling_deploy/bundles_controller.rb
+  commit_change "pro app comment"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"docs_only": false' "pro app comment output"
+  assert_contains "$out" '"non_runtime_only": true' "pro app comment output"
+  assert_contains "$out" '"run_lint": false' "pro app comment output"
+  assert_contains "$out" '"run_pro_lint": true' "pro app comment output"
+  assert_contains "$out" '"run_pro_tests": false' "pro app comment output"
+  assert_contains "$out" '"run_ruby_tests": false' "pro app comment output"
+}
+
+test_pro_app_source_change_runs_pro_tests_only() {
+  setup_repo
+  perl -0pi -e 's/"ok"/"changed"/' \
+    react_on_rails_pro/app/controllers/react_on_rails_pro/rolling_deploy/bundles_controller.rb
+  commit_change "pro app source"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"non_runtime_only": false' "pro app source output"
+  assert_contains "$out" '"run_pro_tests": true' "pro app source output"
+  # Scoped to Pro: a Pro app change must not drag in the core gem suite the way
+  # the old uncategorized catch-all did.
+  assert_contains "$out" '"run_ruby_tests": false' "pro app source output"
+  assert_contains "$out" '"run_js_tests": false' "pro app source output"
+}
+
 test_pro_node_renderer_comment_only_change_runs_pro_lint_only() {
   setup_repo
   perl -0pi -e 's/export function/\/\/ Explains the Pro node renderer fixture.\nexport function/' \
@@ -484,6 +566,10 @@ run_test test_typescript_suppression_comment_remains_runtime_affecting
 run_test test_code_line_starting_with_plus_plus_remains_runtime_affecting
 run_test test_comment_like_template_literal_change_remains_runtime_affecting
 run_test test_spec_comment_only_change_skips_rspec
+run_test test_core_app_comment_only_change_skips_heavy_tests_but_keeps_lint
+run_test test_core_app_source_change_remains_runtime_affecting
+run_test test_pro_app_comment_only_change_runs_pro_lint_only
+run_test test_pro_app_source_change_runs_pro_tests_only
 run_test test_pro_node_renderer_comment_only_change_runs_pro_lint_only
 run_test test_mixed_comment_and_code_change_remains_runtime_affecting
 run_test test_ruby_magic_comment_remains_runtime_affecting

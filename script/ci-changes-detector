@@ -262,8 +262,8 @@ while IFS= read -r file; do
       fi
       ;;
 
-    # Ruby core source code (non-generator lib files)
-    react_on_rails/lib/*.rb|react_on_rails/lib/**/*.rb|Gemfile|Gemfile.lock|rakelib/run_rspec.rake|rakelib/node_package.rake|rakelib/dummy_apps.rake)
+    # Ruby core source code (non-generator lib + app files)
+    react_on_rails/lib/*.rb|react_on_rails/lib/**/*.rb|react_on_rails/app/*.rb|react_on_rails/app/**/*.rb|Gemfile|Gemfile.lock|rakelib/run_rspec.rake|rakelib/node_package.rake|rakelib/dummy_apps.rake)
       DOCS_ONLY=false
       if source_file_comment_only_change "$file"; then
         SOURCE_COMMENT_ONLY_CHANGED=true
@@ -302,8 +302,8 @@ while IFS= read -r file; do
       fi
       ;;
 
-    # React on Rails Pro source code
-    react_on_rails_pro/lib/*|react_on_rails_pro/lib/**/*)
+    # React on Rails Pro source code (lib + app)
+    react_on_rails_pro/lib/*|react_on_rails_pro/lib/**/*|react_on_rails_pro/app/*|react_on_rails_pro/app/**/*)
       DOCS_ONLY=false
       if source_file_comment_only_change "$file"; then
         PRO_SOURCE_COMMENT_ONLY_CHANGED=true
