@@ -4506,7 +4506,7 @@ describe RscGenerator, type: :generator do
           expect(content).to include("fallback keeps warnings usable")
           expect(content).to include("new WebpackError")
           expect(content).to include("mergeChunkPairsInPlace(existing.chunks, chunkPairs)")
-          expect(content).to include("existing` is always a `.slice()` copy")
+          expect(content).to include("first-write path passes a `.slice()` copy")
           expect(content).to include("regression can warn again")
           expect(content).to include("for (const concatenatedModule of module.modules)")
           expect(content).to include("cachedRealPath")
