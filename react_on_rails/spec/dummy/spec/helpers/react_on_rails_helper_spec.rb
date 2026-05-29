@@ -654,6 +654,19 @@ describe ReactOnRailsHelper do
       expect(error).to be_nil
     end
 
+    it "ignores a non-String stack (e.g. an array of frames) instead of producing garbage frames" do
+      json_result = {
+        "renderingError" => {
+          "message" => "boom",
+          "stack" => ["at A (/app/a.js:1:1)"]
+        }
+      }
+
+      error = helper.send(:rendering_error_from_result, json_result)
+
+      expect(error.backtrace).to be_nil
+    end
+
     it "leaves backtrace nil when renderingError has no stack so error reporters can enrich it" do
       json_result = {
         "renderingError" => {

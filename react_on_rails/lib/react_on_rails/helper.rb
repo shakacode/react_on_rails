@@ -742,8 +742,12 @@ module ReactOnRails
     # When the stack has no `at <frame>` lines (e.g. a header-only or non-V8 string) this returns
     # `[]`, leaving the backtrace nil rather than seeding it with unparseable header lines.
     def normalize_js_stack_lines(stack)
-      lines = stack.to_s.lines.map { |line| line.chomp.strip }
-      lines.select { |line| line.start_with?("at ") }
+      # Only V8 string stacks are parseable here. A non-String stack (e.g. an array of frames
+      # from a non-V8 serializer) would otherwise be `to_s`-ed into Ruby array syntax and yield
+      # no usable frames — guard explicitly so the no-backtrace path is intentional, not garbage.
+      return [] unless stack.is_a?(String)
+
+      stack.lines.map { |line| line.chomp.strip }.select { |line| line.start_with?("at ") }
     end
 
     def should_raise_streaming_prerender_error?(chunk_json_result, render_options)
