@@ -159,7 +159,7 @@ Use `stream_react_component_with_async_props` and emit each slow prop from the b
   # Each emit.call streams a prop to the browser the moment Rails has it.
   emit.call("reviews", product.reviews.as_json(only: [:id, :text, :rating]))
   emit.call("recommendations",
-            RecommendationService.for(product).as_json(only: [:id, :name, :price]))
+            product.recommended_products.as_json(only: [:id, :name, :price]))
 end %>
 ```
 
@@ -246,10 +246,10 @@ In the block above, `reviews` is emitted before `recommendations` — the second
 ```erb
 <%= stream_react_component_with_async_props("ProductPage",
       props: { name: product.name, price: product.price }) do |emit|
-  # The block is already running inside an Async reactor, so reuse it with Sync
-  # (this does NOT start another thread). `parent` is the current task; each
-  # `parent.async` starts a child fiber for one query. Sync returns only after
-  # every child finishes — exactly when the stream should close.
+  # The block is already running inside an Async reactor. `Sync` reuses it (no
+  # new thread) and acts as a synchronization barrier: it runs the block with
+  # the current task (`parent`) and returns only after every child started via
+  # `parent.async` has finished — exactly when the stream should close.
   Sync do |parent|
     parent.async do
       # Each concurrent fiber checks out its OWN connection for the duration of
@@ -272,7 +272,7 @@ end %>
 
 Both tasks follow the same shape — wrap each query in its own `with_connection`, then emit. (If a prop comes from an external service over a fiber-aware HTTP client rather than the database, that task skips `with_connection` since it never touches the connection pool.) Each child task emits on its own, so props arrive in whatever order they resolve and React fills each `<Suspense>` boundary as its prop lands — the fastest source paints first and the total time is roughly the slowest source instead of the sum of all of them.
 
-> **When this actually runs in parallel:** the `async` gem parallelizes **I/O-bound** work that yields to the fiber scheduler — most reliably calls to external services through a fiber-aware HTTP client (the renderer already depends on [`async-http`](https://github.com/socketry/async-http)). For ActiveRecord, give each concurrent fiber its own connection with `ActiveRecord::Base.connection_pool.with_connection`, run with fiber-based connection isolation (`config.active_support.isolation_level = :fiber`), and size the pool for the fan-out — otherwise the fibers share one connection and the queries serialize. For CPU-bound work, or a database driver that doesn't cooperate with `Fiber.scheduler`, parallelize with threads instead (see [Avoiding Server-Side Waterfalls](#avoiding-server-side-waterfalls)).
+> **When this actually runs in parallel:** the `async` gem parallelizes **I/O-bound** work that yields to the fiber scheduler — most reliably calls to external services through a fiber-aware HTTP client (the renderer already depends on [`async-http`](https://github.com/socketry/async-http)). For ActiveRecord, give each concurrent fiber its own connection with `ActiveRecord::Base.connection_pool.with_connection`, run with fiber-based connection isolation (`config.active_support.isolation_level = :fiber`, available in Rails 7.1+), and size the pool for the fan-out — otherwise the fibers share one connection and the queries serialize. (On Rails 6.x–7.0 that config key is ignored, so the queries serialize with no visible error.) For CPU-bound work, or a database driver that doesn't cooperate with `Fiber.scheduler`, parallelize with threads instead (see [Avoiding Server-Side Waterfalls](#avoiding-server-side-waterfalls)).
 
 ## Migrating from React Query / TanStack Query
 
