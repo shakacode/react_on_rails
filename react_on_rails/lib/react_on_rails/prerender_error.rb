@@ -99,15 +99,8 @@ module ReactOnRails
       return nil if error_backtrace.nil? || error_backtrace.empty?
       return error_backtrace.join("\n") if Utils.full_text_errors_enabled?
 
-      cleaned = Rails.backtrace_cleaner.clean(error_backtrace)
-      cleaned_text = cleaned.join("\n")
-      # Only advertise FULL_TEXT_ERRORS when cleaning actually dropped frames. JS backtraces
-      # (e.g. `at CommentsToggle (/app/components/Foo.jsx:12:15)`) don't match Rails' default
-      # silencers, so they pass through unchanged and the tip would falsely imply more frames
-      # are hidden.
-      return cleaned_text unless cleaned.length < error_backtrace.length
-
-      "#{cleaned_text}\n#{Rainbow('💡 Tip: Set FULL_TEXT_ERRORS=true to see the full backtrace').yellow}"
+      "#{Rails.backtrace_cleaner.clean(error_backtrace).join("\n")}\n" +
+        Rainbow("💡 Tip: Set FULL_TEXT_ERRORS=true to see the full backtrace").yellow
     end
 
     # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
