@@ -14,13 +14,11 @@
 
 export interface CacheEntry {
   value: Buffer[];
-  tags: string[];
   revalidate: number;
   timestamp: number;
 }
 
 export interface CacheHandler {
-  get(key: string, softTags: string[]): Promise<CacheEntry | null>;
+  get(key: string): Promise<CacheEntry | null>;
   set(key: string, entry: CacheEntry): Promise<void>;
-  revalidateTag(tag: string): Promise<void>;
 }

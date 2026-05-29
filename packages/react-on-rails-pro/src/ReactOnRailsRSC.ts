@@ -15,16 +15,11 @@
 import { createSSRCapability } from 'react-on-rails/@internal/capabilities/ssr';
 import { createProRSCCapability } from './capabilities/proRSC.ts';
 import createReactOnRailsPro from './createReactOnRailsPro.ts';
-import { unstable_revalidateTag as revalidateTagFn } from './cache/index.ts';
 
 const currentGlobal = globalThis.ReactOnRails || null;
 const ReactOnRails = createReactOnRailsPro([createSSRCapability(), createProRSCCapability()], currentGlobal);
 
-// Expose revalidateTag on the global scope so the node renderer can invoke it
-// via IPC across worker VM contexts without requiring a direct module import.
-(globalThis as Record<string, unknown>).__rorpRevalidateTag = revalidateTagFn; // eslint-disable-line no-underscore-dangle -- internal IPC hook
-
 export * from 'react-on-rails/types';
-export { unstable_cache, unstable_revalidateTag, registerCacheHandler } from './cache/index.ts'; // eslint-disable-line camelcase -- matches Next.js API naming convention
+export { unstable_cache, registerCacheHandler } from './cache/index.ts'; // eslint-disable-line camelcase -- matches Next.js API naming convention
 export type { CacheHandler, CacheEntry, UnstableCacheOptions } from './cache/index.ts';
 export default ReactOnRails;

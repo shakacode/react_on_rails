@@ -10,11 +10,7 @@ import { buildConfig, Config, logSanitizedConfig } from './shared/configBuilder.
 import restartWorkers from './master/restartWorkers.js';
 import * as errorReporter from './shared/errorReporter.js';
 import { getLicenseStatus } from './shared/licenseValidator.js';
-import {
-  isWorkerStartupFailureMessage,
-  isRevalidateTagMessage,
-  type WorkerStartupFailureMessage,
-} from './shared/workerMessages.js';
+import { isWorkerStartupFailureMessage, type WorkerStartupFailureMessage } from './shared/workerMessages.js';
 
 const MILLISECONDS_IN_MINUTE = 60000;
 // How often to scan for orphaned upload directories.
@@ -119,17 +115,6 @@ export default function masterRun(runningConfig?: Partial<Config>) {
   };
 
   cluster.on('message', (worker, message) => {
-    // Broadcast cache tag revalidation to all other workers.
-    if (isRevalidateTagMessage(message)) {
-      for (const id of Object.keys(cluster.workers ?? {})) {
-        const w = cluster.workers?.[id];
-        if (w && w.id !== worker.id && !w.isDead()) {
-          w.send(message);
-        }
-      }
-      return;
-    }
-
     // Check the abort flag first to short-circuit the type-guard on every
     // ordinary IPC message once we are already aborting.
     if (isAbortingForStartupFailure || !isWorkerStartupFailureMessage(message)) return;

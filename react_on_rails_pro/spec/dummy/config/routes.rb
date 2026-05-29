@@ -61,7 +61,6 @@ Rails.application.routes.draw do
   get "stream_native_metadata" => "pages#stream_native_metadata", as: :stream_native_metadata
   get "hybrid_metadata_streaming" => "pages#hybrid_metadata_streaming", as: :hybrid_metadata_streaming
   get "rsc_native_metadata" => "pages#rsc_native_metadata", as: :rsc_native_metadata
-  get "rsc_cache_demo" => "pages#rsc_cache_demo", as: :rsc_cache_demo
   rsc_payload_route controller: "pages"
 
   # routes copied over from react on rails

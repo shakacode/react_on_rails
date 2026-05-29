@@ -15,7 +15,6 @@
 /* eslint-disable camelcase -- matches Next.js API naming convention */
 export { unstable_cache } from './unstable_cache.ts';
 export type { UnstableCacheOptions } from './unstable_cache.ts';
-export { unstable_revalidateTag } from './revalidateTag.ts';
 /* eslint-enable camelcase */
 export type { CacheHandler, CacheEntry } from './CacheHandler.ts';
 export { registerCacheHandler } from './cacheHandlerRegistry.ts';

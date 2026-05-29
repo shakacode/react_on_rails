@@ -34,7 +34,3 @@ export function getCacheHandler(kind: string): CacheHandler {
   }
   return handler;
 }
-
-export function getAllHandlers(): CacheHandler[] {
-  return [...handlers.values()];
-}

@@ -24,8 +24,6 @@ import { getServerRenderer } from './manifestLoaderServer.ts';
 export interface UnstableCacheOptions {
   /** Stable identifier for this cached function. Required. */
   id: string;
-  /** Cache tags for targeted invalidation via unstable_revalidateTag. */
-  tags?: string[];
   /** Time in seconds before the cache entry is considered stale. 0 = indefinite. */
   revalidate?: number;
   /** Cache handler kind to use. Defaults to 'default' (in-memory LRU). */
@@ -55,14 +53,14 @@ export function unstable_cache<TArgs extends unknown[]>(
   originalFn: (...args: TArgs) => Promise<ReactNode> | ReactNode,
   options: UnstableCacheOptions,
 ): (...args: TArgs) => Promise<ReactNode> {
-  const { id, tags = [], revalidate = 0, kind = 'default' } = options;
+  const { id, revalidate = 0, kind = 'default' } = options;
 
   return async function cachedFn(...args: TArgs): Promise<ReactNode> {
     const handler = getCacheHandler(kind);
     const cacheKey = buildCacheKey(getBuildId(), id, args);
 
     // --- HIT path ---
-    const entry = await handler.get(cacheKey, tags);
+    const entry = await handler.get(cacheKey);
     if (entry) {
       const replayStream = chunksToNodeStream(entry.value);
       const { createFromNodeStream } = await getClientRenderer();
@@ -96,7 +94,6 @@ export function unstable_cache<TArgs extends unknown[]>(
       .then((chunks) => {
         const newEntry: CacheEntry = {
           value: chunks,
-          tags,
           revalidate,
           timestamp: Date.now(),
         };

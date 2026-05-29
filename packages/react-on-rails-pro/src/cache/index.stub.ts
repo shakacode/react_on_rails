@@ -30,7 +30,6 @@ export type { CacheHandler, CacheEntry };
 
 export interface UnstableCacheOptions {
   id: string;
-  tags?: string[];
   revalidate?: number;
   kind?: string;
 }
@@ -47,11 +46,6 @@ export function unstable_cache<TArgs extends unknown[]>(
   return () => {
     throw new Error(STUB_ERROR);
   };
-}
-
-// eslint-disable-next-line camelcase -- matches Next.js API naming convention
-export function unstable_revalidateTag(tag: string): Promise<void> {
-  throw new Error(STUB_ERROR);
 }
 
 export function registerCacheHandler(kind: string, handler: CacheHandler): void {

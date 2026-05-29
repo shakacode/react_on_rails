@@ -18,21 +18,19 @@ import type { CacheEntry, CacheHandler } from './CacheHandler.ts';
 export class InMemoryLRUCacheHandler implements CacheHandler {
   private cache = new Map<string, CacheEntry>();
 
-  private tagIndex = new Map<string, Set<string>>();
-
   private maxEntries: number;
 
   constructor(maxEntries = 1000) {
     this.maxEntries = maxEntries;
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await, @typescript-eslint/no-unused-vars -- CacheHandler interface is async for remote implementations; softTags reserved for future use
-  async get(key: string, _softTags: string[]): Promise<CacheEntry | null> {
+  // eslint-disable-next-line @typescript-eslint/require-await -- CacheHandler interface is async for remote implementations
+  async get(key: string): Promise<CacheEntry | null> {
     const entry = this.cache.get(key);
     if (!entry) return null;
 
     if (entry.revalidate > 0 && Date.now() - entry.timestamp > entry.revalidate * 1000) {
-      this.deleteEntry(key);
+      this.cache.delete(key);
       return null;
     }
 
@@ -46,53 +44,17 @@ export class InMemoryLRUCacheHandler implements CacheHandler {
   async set(key: string, entry: CacheEntry): Promise<void> {
     // If key already exists, remove it first so re-insert goes to end
     if (this.cache.has(key)) {
-      this.deleteEntry(key);
+      this.cache.delete(key);
     }
 
     // Evict oldest (first) entry if at capacity
     if (this.cache.size >= this.maxEntries) {
       const oldestKey = this.cache.keys().next().value;
       if (oldestKey !== undefined) {
-        this.deleteEntry(oldestKey);
+        this.cache.delete(oldestKey);
       }
     }
 
     this.cache.set(key, entry);
-
-    for (const tag of entry.tags) {
-      let keys = this.tagIndex.get(tag);
-      if (!keys) {
-        keys = new Set();
-        this.tagIndex.set(tag, keys);
-      }
-      keys.add(key);
-    }
-  }
-
-  // eslint-disable-next-line @typescript-eslint/require-await
-  async revalidateTag(tag: string): Promise<void> {
-    const keys = this.tagIndex.get(tag);
-    if (!keys) return;
-
-    for (const key of keys) {
-      this.deleteEntry(key);
-    }
-    this.tagIndex.delete(tag);
-  }
-
-  private deleteEntry(key: string): void {
-    const entry = this.cache.get(key);
-    if (entry) {
-      for (const tag of entry.tags) {
-        const tagKeys = this.tagIndex.get(tag);
-        if (tagKeys) {
-          tagKeys.delete(key);
-          if (tagKeys.size === 0) {
-            this.tagIndex.delete(tag);
-          }
-        }
-      }
-    }
-    this.cache.delete(key);
   }
 }

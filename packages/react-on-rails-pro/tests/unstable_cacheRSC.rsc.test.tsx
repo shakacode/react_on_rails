@@ -4,7 +4,6 @@
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 
-import { unstable_revalidateTag } from '../src/cache/revalidateTag';
 import { setBuildId } from '../src/cache/buildIdProvider';
 import { registerCacheHandler } from '../src/cache/cacheHandlerRegistry';
 import { InMemoryLRUCacheHandler } from '../src/cache/InMemoryLRUCacheHandler';
@@ -112,26 +111,6 @@ describe('unstable_cache', () => {
     expect(String(result3)).toBe('Item #1');
   });
 
-  test('tag invalidation: revalidateTag removes cached entries', async () => {
-    let callCount = 0;
-    const cachedFn = unstable_cache(
-      async () => {
-        callCount++;
-        return `call-${callCount}`;
-      },
-      { id: 'tagged-fn', tags: ['my-tag'] },
-    );
-
-    await cachedFn();
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
-    await unstable_revalidateTag('my-tag');
-
-    const result = await cachedFn();
-    expect(callCount).toBe(2);
-    expect(String(result)).toBe('call-2');
-  });
-
   test('single exit point: HIT and MISS produce same type of result', async () => {
     const cachedFn = unstable_cache(async () => 'consistent-value', { id: 'single-exit' });
 
@@ -181,7 +160,6 @@ describe('unstable_cache', () => {
     const brokenHandler = {
       get: jest.fn().mockResolvedValue(null),
       set: jest.fn().mockRejectedValue(new Error('storage failure')),
-      revalidateTag: jest.fn().mockResolvedValue(undefined),
     };
     registerCacheHandler('broken', brokenHandler);
 
