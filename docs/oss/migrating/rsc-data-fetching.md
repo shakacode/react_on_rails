@@ -193,17 +193,17 @@ export default function ProductPage({
       <p>${price}</p>
 
       <Suspense fallback={<div>Loading reviews…</div>}>
-        <ReviewList reviews={reviewsPromise} />
+        <AsyncReviewList reviews={reviewsPromise} />
       </Suspense>
       <Suspense fallback={<div>Loading recommendations…</div>}>
-        <RecommendationList items={recommendationsPromise} />
+        <AsyncRecommendationList items={recommendationsPromise} />
       </Suspense>
     </div>
   );
 }
 
 // Each async child awaits only the prop it was handed.
-async function ReviewList({ reviews }: { reviews: Promise<Review[]> }) {
+async function AsyncReviewList({ reviews }: { reviews: Promise<Review[]> }) {
   const resolved = await reviews;
   return (
     <ul>
@@ -214,8 +214,8 @@ async function ReviewList({ reviews }: { reviews: Promise<Review[]> }) {
   );
 }
 
-// RecommendationList mirrors ReviewList: it awaits the recommendations Promise.
-async function RecommendationList({ items }: { items: Promise<Product[]> }) {
+// AsyncRecommendationList mirrors AsyncReviewList: it awaits the recommendations Promise.
+async function AsyncRecommendationList({ items }: { items: Promise<Product[]> }) {
   const resolved = await items;
   return (
     <ul>
