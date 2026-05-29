@@ -237,7 +237,7 @@ async function RecommendationList({ items }: { items: Promise<Product[]> }) {
 | What streams            | Rendered HTML, as React walks the tree   | Rendered HTML **plus** each prop independently          |
 | Best for                | All data sources are fast                | One or more data sources are slow                       |
 
-Async props keep Rails as the backend: Rails still owns the queries, authorization, and caching — the `emit` block is ordinary Rails code running in the streaming view helper, not the React component. It just emits each result the moment it has it instead of blocking the whole render on the slowest source. (Don't move these queries into the controller action: the controller runs to completion _before_ the view streams, so doing the work there would resolve everything up front and defeat the progressive streaming.) Requires React Server Components (`config.enable_rsc_support = true`).
+Async props keep Rails as the backend: Rails still owns the queries, authorization, and caching — the `emit` block is ordinary Rails code running in the streaming view helper, not the React component. It just emits each result the moment it has it instead of blocking the whole render on the slowest source. (Referencing controller instance variables like `@product` from the block is fine and normal — the constraint is narrower: don't _pre-resolve_ the slow emit-block queries in the controller action, because it runs to completion before the view streams, so doing that work up front defeats the progressive streaming.) Requires React Server Components (`config.enable_rsc_support = true`).
 
 #### Parallelize the queries with the `async` gem
 
@@ -271,6 +271,8 @@ end %>
 ```
 
 Both tasks follow the same shape — wrap each query in its own `with_connection`, then emit. (If a prop comes from an external service over a fiber-aware HTTP client rather than the database, that task skips `with_connection` since it never touches the connection pool.) Each child task emits on its own, so props arrive in whatever order they resolve and React fills each `<Suspense>` boundary as its prop lands — the fastest source paints first and the total time is roughly the slowest source instead of the sum of all of them.
+
+Calling `emit.call` from concurrent fibers is safe: the reactor is single-threaded and cooperatively scheduled, and each `emit.call` writes one complete NDJSON line in a single operation — so concurrent emits never interleave within a line. Their _order_ can vary (whichever query resolves first emits first), which is fine because each line is a self-contained prop update.
 
 > **When this actually runs in parallel:** the `async` gem parallelizes **I/O-bound** work that yields to the fiber scheduler — most reliably calls to external services through a fiber-aware HTTP client (the renderer already depends on [`async-http`](https://github.com/socketry/async-http)). For ActiveRecord, give each concurrent fiber its own connection with `ActiveRecord::Base.connection_pool.with_connection`, run with fiber-based connection isolation (`config.active_support.isolation_level = :fiber`, available in Rails 7.1+), and size the pool for the fan-out — otherwise the fibers share one connection and the queries serialize. (On Rails 6.x–7.0 that config key is ignored, so the queries serialize with no visible error.) For CPU-bound work, or a database driver that doesn't cooperate with `Fiber.scheduler`, parallelize with threads instead (see [Avoiding Server-Side Waterfalls](#avoiding-server-side-waterfalls)).
 
