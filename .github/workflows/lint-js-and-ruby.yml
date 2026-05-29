@@ -10,9 +10,7 @@ on:
     # Always trigger on main; docs-only detection handles skipping heavy jobs
   pull_request:
     paths-ignore:
-      - '**.md'
       - 'AGENTS_USER_GUIDE.md'
-      - 'docs/**'
       - 'llms.txt'
       - 'llms-full.txt'
       - '.lychee.toml'
@@ -71,6 +69,31 @@ jobs:
         with:
           docs-only: ${{ steps.detect.outputs.docs_only }}
           previous-sha: ${{ github.event.before }}
+
+  docs-format-check:
+    needs: detect-changes
+    if: |
+      github.event_name == 'pull_request' &&
+      needs.detect-changes.outputs.docs_only == 'true'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # No need for history in lint job
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
+          # https://github.com/nodejs/node/issues/56010
+          node-version: '22.11.0'
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+      - name: Install Node modules with pnpm
+        run: pnpm install --frozen-lockfile --ignore-scripts --filter='{.}'
+      - name: Check formatting
+        run: pnpm start format.listDifferent
 
   build:
     needs: detect-changes
