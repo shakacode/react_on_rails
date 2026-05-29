@@ -151,7 +151,7 @@ The current Bencher invocation lives in `.github/workflows/benchmark.yml` inside
       window. Do not re-collect a 30-run window at any widened boundary — each boundary past `0.95` gets the standard
       10-run dwell. Boundary changes alone never trigger a baseline reset (see the Baseline reset exception above).
    2. **Measure.** After the dwell, compute the mean Jaccard overlap across the most recent 5 adjacent qualifying-run
-      pairs at the current boundary, using the overlap method from step 2.
+      pairs at the current boundary, using the overlap method from Tuning Sequence step 2 above.
    3. **Advance.** If mean overlap is below `0.40`, raise the boundary by `0.01` and return to step 1 of this cadence at
       the new value: noise is still dominating, so requiring a wider boundary should help.
    4. **Lock.** If mean overlap is at least `0.40`, stop widening and keep the current boundary; recurring alerts now
@@ -161,25 +161,29 @@ The current Bencher invocation lives in `.github/workflows/benchmark.yml` inside
       runner-environment problem, not a threshold problem.
    6. **Small-sample fallback.** If a dwell window yields fewer than 5 unique alert pairs (so Jaccard is undefined or
       unstable), extend that dwell by 5 more qualifying runs at the same boundary before deciding, mirroring the
-      small-sample caveat in step 2.
+      small-sample caveat in Tuning Sequence step 2. If 5 unique pairs still cannot be formed after the extension, keep
+      collecting in 5-run increments until they can.
 
    Record each boundary value, its dwell run IDs, and the resulting overlap in
    [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169). End to end this is at most 5 boundary values
    (`0.95` through `0.99`); it locks earlier if overlap reaches `0.40` sooner.
 
    **Interaction with the false-positive target and real regressions during tuning:**
-   - The 1-in-20 false-positive target (Acceptance Criteria 4-5) is evaluated only after the hard gate is restored, so it
-     does not gate cadence advancement — the overlap criterion above does. Still, before locking a candidate boundary,
+   - The 1-in-20 false-positive target (Acceptance Criteria 4 and 5) is evaluated only after the hard gate is restored, so
+     it does not gate cadence advancement — the overlap criterion above does. Still, before locking a candidate boundary,
      sanity-check the noisy-alert rate at that setting: if overlap reads at least `0.40` but the noisy-alert rate is still
      far worse than the target (for example, more than 5 noisy alerts per 20 runs), a few chronic flakes are probably
-     dominating the overlap rather than real recurring regressions, so keep widening and record the exception in Issue 3169.
+     dominating the overlap rather than real recurring regressions, so keep widening (up to the `0.99` ceiling in step 5
+     above) and record the exception in Issue 3169. If the boundary is already at `0.99` when this override applies, there
+     is nowhere left to widen: record the exception in Issue 3169 and escalate to step 4 (larger or dedicated runners)
+     rather than locking on chronically noisy alerts.
    - If a real regression is identified mid-cadence (manual recurrence check plus a matching performance-sensitive
      commit), exclude the affected runs — and the runs for the commit that reverts it, which is itself
      performance-sensitive — from the most-recent-5-pairs overlap computation, then continue the cadence. This is the
      same exclusion the false-positive accounting applies to intentional-perf-change commits (Acceptance Criterion 5).
    - Rollback at a locked boundary reuses Acceptance Criterion 5: if the restored hard gate later breaches the 1-in-20
-     target, revert to warning mode and re-enter this cadence at the most recently locked boundary rather than restarting
-     the widening from `0.95`.
+     target, revert to warning mode and re-enter this cadence at the most recently locked boundary (starting a fresh
+     10-run dwell at that boundary) rather than restarting the widening from `0.95`.
 
 4. If shared-runner noise remains high, move benchmark jobs to larger GitHub-hosted runners or dedicated runners before
    restoring the hard gate.
