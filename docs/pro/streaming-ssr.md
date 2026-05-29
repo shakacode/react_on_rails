@@ -30,7 +30,7 @@ Traditional SSR renders the full page on the server, then sends the complete HTM
 
 ## Implementation Steps
 
-> **This example uses async props**, which build on React Server Components. Enable RSC before you start: set `config.enable_rsc_support = true` in your React on Rails Pro configuration (see the [RSC tutorial](./react-server-components/tutorial.md)). Without it, the `async function` server component won't render and `stream_react_component_with_async_props` raises `ReactOnRailsPro::Error`. If all your data is fast and you don't need progressive streaming, you can skip RSC and use the synchronous `stream_react_component` instead (see the note after Step 3).
+> **This example uses async props**, which build on React Server Components. Enable RSC before you start: set `config.enable_rsc_support = true` in your React on Rails Pro configuration (see the [RSC tutorial](./react-server-components/tutorial.md)). Without it, the `async function` server component won't render and `stream_react_component_with_async_props` raises `ReactOnRailsPro::Error`. If all your data is fast and you don't need progressive streaming, you can skip RSC and use the synchronous `stream_react_component` with all props passed at once.
 
 ### 1. Use React 19
 
@@ -86,6 +86,16 @@ export default MyStreamingComponent;
 ```
 
 > **React on Rails note:** Database queries, authentication, authorization, and caching all stay on the Rails side — the controller and view own them. Async props just let Rails emit each result the moment it has it, instead of blocking the whole render on the slowest source. The component never fetches data directly. In TypeScript, type the props with `WithAsyncProps<AsyncProps, SyncProps>` from `react-on-rails-pro`. See [Data Fetching in React on Rails Pro](../oss/migrating/rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) for the prop-based data model this builds on.
+
+> **Handle failures:** if a prop's query rejects, the `await` throws inside the async component and React propagates it up the tree. In production, wrap each `<Suspense>` in an error boundary so a single failed source degrades to a fallback instead of breaking the whole render:
+>
+> ```jsx
+> <ErrorBoundary fallback={<div>Posts unavailable</div>}>
+>   <Suspense fallback={<div>Loading posts...</div>}>
+>     <PostList posts={postsPromise} />
+>   </Suspense>
+> </ErrorBoundary>
+> ```
 
 With `auto_load_bundle` enabled (recommended), `MyStreamingComponent` is registered automatically. Otherwise, register it as a server component — server components use `registerServerComponent`, **not** `ReactOnRails.register`:
 
@@ -151,7 +161,7 @@ The controller just renders — the async prop's query runs in the view's `emit`
 
 #### Loading Multiple Slow Sources in Parallel
 
-When several sources are slow and independent, run them concurrently with the [`async` gem](https://github.com/socketry/async). Pro's streaming stack is already fiber-based, so fan out with fibers from the running reactor rather than introducing a separate Ruby-thread concurrency model. The emit block runs inside an `Async` task — capture it once and spawn one child task per source with `parent.async`, so each prop is emitted the moment its own query resolves:
+When several sources are slow and independent, run them concurrently with the [`async` gem](https://github.com/socketry/async) (already a dependency of React on Rails Pro and loaded by the streaming helper). Pro's streaming stack is fiber-based, so fan out with fibers from the running reactor rather than introducing a separate Ruby-thread concurrency model. The emit block runs inside an `Async` task — capture it with `Async::Task.current` and spawn one child task per source with `parent.async`, so each prop is emitted the moment its own query resolves:
 
 ```erb
 <%= stream_react_component_with_async_props('Dashboard',
@@ -174,7 +184,13 @@ On the React side, give each async prop its own `<Suspense>` boundary (as in Ste
 
 > **Error handling:** an unhandled error in a child task propagates through `wait` and closes the stream, so the remaining props may not be sent. If one source failing shouldn't cut off the others, wrap each task body in a `rescue` and emit a fallback (or skip that prop).
 
-> **Concurrent ActiveRecord needs fiber-aware connections.** Set `config.active_support.isolation_level = :fiber` (Rails 7.0.2+) so each fiber checks out its own pooled connection. Size your connection pool for the total number of DB-using fibers in flight across all concurrent requests — not just this one fan-out — or extra fibers block on connection checkout. Queries only truly overlap on a fiber-scheduler-aware driver such as `pg` (PostgreSQL); blocking drivers like `mysql2` and `sqlite3` serialize on the reactor. Capture request-scoped state (like `current_user.id`) **before** fanning out, since per-fiber isolation does not copy `CurrentAttributes` into child tasks.
+**Requirements and footguns for concurrent async props:**
+
+- **`config.active_support.isolation_level = :fiber`** (Rails 7.0.2+) — without it, fibers share one connection and concurrent queries corrupt each other; with it, each fiber checks out its own pooled connection.
+- **Connection pool size** — must cover the total DB-using fibers in flight across _all_ concurrent requests, not just this one fan-out, or extra fibers block on checkout.
+- **Driver matters** — queries only truly overlap on a fiber-scheduler-aware driver such as `pg` (PostgreSQL). Blocking drivers like `mysql2` and `sqlite3` serialize on the reactor, so the fan-out gives no speedup.
+- **Capture request state before fanning out** — read `current_user.id` (and any other `CurrentAttributes`) into locals _before_ `parent.async`. Per-fiber isolation does not copy `CurrentAttributes` into child tasks, and this fails silently as stale/missing data rather than an error.
+- **Reactor-only** — `Async::Task.current` only works inside the `emit` block (which runs in Pro's reactor). Don't copy this fan-out into a plain controller action, background job, or test that hasn't started an Async reactor — it raises `Async::Error`.
 
 ### 5. Test Your Application
 
