@@ -19,6 +19,9 @@ describe ReactOnRails::TestHelper::WebpackAssetsCompiler do
         expect do
           described_class.new.compile_assets
         end.to output("\nBuilding assets...\nCompleted building assets.\n").to_stdout
+
+        # Assert the compile step actually ran, so the example fails if it is skipped.
+        expect(ReactOnRails::Utils).to have_received(:invoke_and_exit_if_failed)
       end
     end
 
@@ -58,18 +61,20 @@ describe ReactOnRails::TestHelper::WebpackAssetsCompiler do
         end.to output(expected_pattern).to_stderr
       end
 
-      it "suggests rerunning the configured build command without naming a specific bundler" do
-        expected_command = Regexp.escape("Run '#{invalid_command}' manually to compile once")
-        expected_pattern = Regexp.new(
-          "\\A(?=.*#{expected_command})(?!.*bin/shakapacker).*\\z",
-          Regexp::MULTILINE
-        )
-
+      it "suggests rerunning the configured build command" do
         expect do
           described_class.new.compile_assets
         rescue SystemExit
           # No op
-        end.to output(expected_pattern).to_stderr
+        end.to output(include("Run '#{invalid_command}' manually to compile once")).to_stderr
+      end
+
+      it "does not name a specific bundler in the rerun suggestion" do
+        expect do
+          described_class.new.compile_assets
+        rescue SystemExit
+          # No op
+        end.not_to output(include("bin/shakapacker")).to_stderr
       end
     end
   end
