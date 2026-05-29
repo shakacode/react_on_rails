@@ -161,6 +161,12 @@ describe('rscManifestPlugin helper', () => {
       ['/* a block comment */\n"use client";', true],
       // The directive may follow other directives in the prologue.
       ["'use strict';\n'use client';", true],
+      // A trailing line or block comment after the directive is tolerated.
+      ["'use client' // legacy compat", true],
+      ["'use client' // legacy compat\nexport {};", true],
+      ["'use client' /* note */;", true],
+      // A trailing comment on an earlier directive must not break the scan.
+      ["'use strict' // first\n'use client';", true],
       // A leading byte-order mark is ignored.
       ["﻿'use client';", true],
       // Anything other than a string-literal directive ends the prologue.

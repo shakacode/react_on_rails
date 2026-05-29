@@ -203,7 +203,10 @@ const hasUseClientDirective = (source) => {
   let remaining = skipLeadingJavaScriptComments(source.replace(/^\uFEFF/, ''));
 
   while (remaining.length > 0) {
-    const match = remaining.match(/^(['"])(.*?)\1\s*(?:;|\n|$)/);
+    // A directive may carry a trailing line or block comment before its
+    // terminator (e.g. `'use client' // legacy`); consume an optional comment
+    // between the string literal and the `;` / newline / end-of-input.
+    const match = remaining.match(/^(['"])(.*?)\1\s*(?:\/\/[^\n]*|\/\*.*?\*\/)?\s*(?:;|\n|$)/);
     if (!match) return false;
     if (match[2] === 'use client') return true;
 
