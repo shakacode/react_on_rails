@@ -291,7 +291,7 @@ sequenceDiagram
     Note over Renderer: per-request sharedExecutionContext (isolated)
     Browser->>Rails: GET page
     Rails->>Renderer: open incremental-render NDJSON stream<br/>first line: renderingRequest
-    Renderer->>Renderer: render begins; a Server Component awaits getReactOnRailsAsyncProp('users')
+    Renderer->>Renderer: render begins — a Server Component awaits getReactOnRailsAsyncProp('users')
     Renderer-->>Browser: HTML shell + Suspense fallbacks stream out
     loop each prop resolves in Rails (emit.call)
         Rails->>Renderer: NDJSON updateChunk — asyncPropsManager.setProp('users', ...)
