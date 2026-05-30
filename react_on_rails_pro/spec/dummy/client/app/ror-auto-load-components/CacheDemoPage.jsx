@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import { unstable_cache } from 'react-on-rails-pro'; // eslint-disable-line camelcase
+import { unstable_cache } from 'react-on-rails-pro/cache'; // eslint-disable-line camelcase
 
 const formatTimestamp = () => new Date().toISOString();
 
