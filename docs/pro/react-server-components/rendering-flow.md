@@ -69,6 +69,29 @@ Even with CommonJS execution mode enabled, `resolve.fallback` remains the safer 
 
 For `fetch`, `Headers`, `Request`, `Response`, `AbortController`, and `AbortSignal`, see [Node Renderer JavaScript Configuration](../../oss/building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc).
 
+At runtime those three bundles map onto two environments — the Node renderer's VM contexts and the browser — and interact like this:
+
+```mermaid
+flowchart LR
+    subgraph NodeVM["Node Renderer — isolated VM contexts"]
+        direction TB
+        Server["Server bundle<br/>RSCServerRoot"] -- "generateRSCPayload(component, props)<br/>via runOnOtherBundle()" --> RSC["RSC bundle<br/>(react-server condition)"]
+        RSC -- "Flight payload<br/>server components + client refs" --> Server
+        Server --> HTML["HTML + embedded RSC payload"]
+    end
+    HTML -- "single streamed response" --> Browser["Browser"]
+    Browser --> Hydrate["Hydrate from embedded payload"]
+    Hydrate -- "load on demand" --> Chunks["Client bundle chunks"]
+    style NodeVM fill:#e6ffed,stroke:#2da44e,color:#000
+    style Server fill:#e6f0ff,stroke:#2c6ecb,color:#000
+    style RSC fill:#e6f0ff,stroke:#2c6ecb,color:#000
+    style HTML fill:#e6ffed,stroke:#2da44e,color:#000
+    style Browser fill:#fff4e5,stroke:#e0a000,color:#000
+    style Chunks fill:#fff4e5,stroke:#e0a000,color:#000
+```
+
+The sequence below traces the same interaction over time.
+
 ## React Server Component Rendering Flow
 
 When a request is made to a page using React Server Components, the following optimized sequence occurs:

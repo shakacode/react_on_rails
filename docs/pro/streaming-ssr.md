@@ -20,6 +20,24 @@ Traditional SSR renders the full page on the server, then sends the complete HTM
 3. As each `<Suspense>` boundary resolves (e.g., an async data fetch completes), the rendered HTML chunk is streamed to the browser
 4. The browser replaces placeholders with real content — no full-page reload needed
 
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Browser
+    participant Rails
+    participant Renderer as Node Renderer
+    Note over Rails: ActionController::Live (ReactOnRailsPro::Stream)
+    Browser->>Rails: GET page
+    Rails->>Renderer: streaming render request
+    Renderer->>Renderer: renderToPipeableStream() — onShellReady
+    Renderer-->>Rails: HTML shell chunk
+    Rails-->>Browser: shell paints immediately (fast TTFB)
+    loop each Suspense boundary resolves
+        Renderer-->>Rails: length-prefixed HTML chunk
+        Rails-->>Browser: append chunk — progressive paint + selective hydration
+    end
+```
+
 ## Prerequisites
 
 - React on Rails Pro
@@ -252,6 +270,47 @@ For example, with our `MyStreamingComponent`, the sequence is:
 ```
 
 To render more of the page progressively, add an async prop and a `<Suspense>` boundary for each slow section — emit each one from the block as Rails resolves it, and every boundary streams in independently. This keeps the whole page in a single component tree (shared layout, context, and props) rather than splitting it across multiple `stream_react_component` calls.
+
+## Progressive Data with Async Props
+
+Streaming SSR sends HTML as React renders it. **Async props** (a React Server Components feature, so it requires `enable_rsc_support`) go one step further: Rails emits each prop _as its data becomes ready_ and streams the matching Suspense boundary to the browser the moment it resolves.
+
+This is the recommended answer to "my component needs Rails data during render": **Rails owns the data and pushes it in**, preserving your controller / model / authorization / caching layers — the renderer never has to call back into Rails.
+
+> [!NOTE]
+> A Server Component _can_ `fetch` a Rails API directly, but the renderer's VM has no `fetch`, `Headers`, `Request`, or `Response` by default — you must bundle an HTTP client or inject them via `additionalContext` — and doing so bypasses Rails' auth and caching. `'use server'` Server Actions are **not** supported (the renderer has no DB/session/cookie access). Prefer props / async props. See [RSC data fetching patterns](../oss/migrating/rsc-data-fetching.md).
+
+Under the hood, Rails opens a bidirectional HTTP/2 NDJSON stream to the renderer and feeds props in as it resolves them. Each update runs in that request's isolated `sharedExecutionContext` and resolves a Promise, which lets React flush the corresponding HTML:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Rails
+    participant Renderer as Node Renderer
+    participant Browser
+    Note over Renderer: per-request sharedExecutionContext (isolated)
+    Rails->>Renderer: open bidirectional HTTP/2 NDJSON stream<br/>first line: renderingRequest
+    Renderer->>Renderer: render begins; a Server Component awaits an async-prop Promise
+    Renderer-->>Browser: HTML shell + Suspense fallbacks stream out
+    loop each prop resolves in Rails (emit.call)
+        Rails->>Renderer: NDJSON updateChunk — asyncPropsManager.setProp('users', ...)
+        Renderer->>Renderer: resolve Promise — React continues rendering
+        Renderer-->>Browser: flush that boundary's HTML
+    end
+    Rails->>Renderer: close stream (END_STREAM)
+    Renderer->>Renderer: asyncPropsManager.endStream()
+```
+
+The view helper is `stream_react_component_with_async_props`, which yields an emitter:
+
+```erb
+<%= stream_react_component_with_async_props("Dashboard") do |emit|
+      emit.call("users", User.all.to_a)     # streamed as soon as it's ready
+      emit.call("posts", Post.recent.to_a)  # streamed independently
+    end %>
+```
+
+For the full data-fetching guidance — synchronous props, parallelizing independent queries, and React Query / SWR interop — see [RSC data fetching patterns](../oss/migrating/rsc-data-fetching.md).
 
 ## Compression Middleware Compatibility
 

@@ -18,6 +18,30 @@ ExecJS embeds a JavaScript runtime (mini_racer/V8) inside the Ruby process. This
 
 The Pro Node Renderer solves all of these by running a standalone Node.js server that handles rendering requests from Rails over HTTP.
 
+The contrast in one picture — embedded V8 inside each Ruby process vs. a separate, pooled Node service that Rails calls over HTTP/2:
+
+```mermaid
+flowchart LR
+    subgraph Exec["ExecJS — in-process (OSS default)"]
+        direction TB
+        E1["Rails worker process"] --> E2["Embedded V8 runtime pool<br/>(mini_racer)"]
+        E2 --> E3["Render JS <b>in-process</b><br/>blocks the Ruby thread"]
+    end
+    subgraph Node["Node Renderer — out-of-process (Pro)"]
+        direction TB
+        N1["Rails worker process<br/>(thin HTTP client)"] -- "HTTP/2 render request" --> N2["Node Renderer<br/>master process"]
+        N2 --> N3["Worker 1<br/>VM + bundle cache"]
+        N2 --> N4["Worker 2<br/>VM + bundle cache"]
+        N2 --> N5["Worker N<br/>VM + bundle cache"]
+    end
+    style Exec fill:#fff4e5,stroke:#e0a000,color:#000
+    style E3 fill:#ffe5e5,stroke:#d1242f,color:#000
+    style Node fill:#e6f0ff,stroke:#2c6ecb,color:#000
+    style N3 fill:#e6ffed,stroke:#2da44e,color:#000
+    style N4 fill:#e6ffed,stroke:#2da44e,color:#000
+    style N5 fill:#e6ffed,stroke:#2da44e,color:#000
+```
+
 ## Performance Benefits
 
 | Metric               | ExecJS                      | Node Renderer            |
@@ -37,6 +61,33 @@ At [Popmenu](https://www.shakacode.com/recent-work/popmenu/) (a ShakaCode client
 3. The rendered HTML is returned to Rails and inserted into the view
 4. Workers are pooled and can be automatically restarted to mitigate memory leaks
 
+Because rendering runs out-of-process, the renderer scales concurrency across a worker pool instead of blocking the Ruby request cycle. Rails (on an async server such as Puma or Falcon) multiplexes many requests over HTTP/2; the master process forks workers (default: CPU count − 1), auto-restarts crashed ones, and can do scheduled rolling restarts. Each request is rendered in its own per-request `sharedExecutionContext`, so concurrent renders never leak data into one another:
+
+```mermaid
+flowchart TB
+    subgraph Rails["Rails — async server (Puma / Falcon)"]
+        direction LR
+        Req1["request 1"]
+        Req2["request 2"]
+        Req3["request N"]
+    end
+    Req1 -- "HTTP/2" --> Master
+    Req2 -- "HTTP/2 (multiplexed)" --> Master
+    Req3 -- "HTTP/2" --> Master
+    subgraph Renderer["Node Renderer"]
+        Master["master process<br/>forks workers · auto-restarts crashes · rolling restarts"]
+        Master --> WA["worker A — event loop<br/>many concurrent renders / streams<br/>per-request <b>sharedExecutionContext</b> (isolated)"]
+        Master --> WB["worker B — event loop<br/>many concurrent renders / streams<br/>per-request <b>sharedExecutionContext</b> (isolated)"]
+    end
+    style Rails fill:#e6f0ff,stroke:#2c6ecb,color:#000
+    style Renderer fill:#e6ffed,stroke:#2da44e,color:#000
+    style Master fill:#e6f0ff,stroke:#2c6ecb,color:#000
+    style WA fill:#e6ffed,stroke:#2da44e,color:#000
+    style WB fill:#e6ffed,stroke:#2da44e,color:#000
+```
+
+By contrast, ExecJS renders one request per V8 context and blocks the Ruby thread for the duration. For concurrent _streaming_ specifically, see [Streaming SSR](./streaming-ssr.md).
+
 ## Key Features
 
 - **Worker pool** — Configurable number of workers (defaults to CPU count minus 1)
@@ -44,6 +95,31 @@ At [Popmenu](https://www.shakacode.com/recent-work/popmenu/) (a ShakaCode client
 - **Bundle caching** — Server bundles are cached on the Node side for fast re-renders
 - **Shared secret authentication** — Secure communication between Rails and Node
 - **Prerender caching** — Combined with [prerender caching](../oss/building-features/caching.md#level-1-prerender-caching), rendering results are cached across requests
+
+These caches stack, and each layer avoids the cost of the one below it — a prerender-cache hit skips the renderer entirely; a warm VM context skips reloading the bundle; an on-disk bundle skips the cold-start upload:
+
+```mermaid
+flowchart TB
+    Req["SSR render for a component"] --> L1{"L1 · Rails prerender cache<br/>Rails.cache · key = component + your cache_key<br/>+ RoR/Pro versions + bundle hash"}
+    L1 -- "hit" --> Done["Return cached HTML<br/>(renderer never called)"]
+    L1 -- "miss" --> L2
+    subgraph Renderer["Node Renderer"]
+        L2{"L2 · VM execution-context pool<br/>(LRU, MAX_VM_POOL_SIZE)"}
+        L2 -- "hit" --> Exec["Execute in cached VM context"]
+        L2 -- "miss" --> L3{"L3 · on-disk bundle cache<br/>cache/hash/hash.js"}
+        L3 -- "hit" --> Exec
+        L3 -- "miss (cold)" --> Upload["410 → Rails uploads bundle"]
+        Upload --> Exec
+    end
+    Exec --> L4["L4 · request-scoped dedup<br/>React.cache() / async-prop Promise<br/>(one fetch per request)"]
+    L4 --> Browser["L5 · Browser — client chunks<br/>Cache-Control: max-age=1y (immutable, hash-versioned)"]
+    style L1 fill:#e6f0ff,stroke:#2c6ecb,color:#000
+    style Done fill:#e6ffed,stroke:#2da44e,color:#000
+    style Renderer fill:#e6ffed,stroke:#2da44e,color:#000
+    style L3 fill:#fff4e5,stroke:#e0a000,color:#000
+    style Upload fill:#ffe5e5,stroke:#d1242f,color:#000
+    style Browser fill:#e6f0ff,stroke:#2c6ecb,color:#000
+```
 
 ## Getting Started
 
@@ -126,6 +202,26 @@ To rotate the renderer password:
 ## Eliminating Cold-Start Latency in Docker Deployments
 
 When a new container starts, the Node Renderer has an empty bundle cache. The first SSR request triggers a costly 410→retry round-trip where Rails sends the full bundle over HTTP, adding 200ms–1s+ of latency depending on bundle size. In rolling deploys, this affects every new pod.
+
+That round-trip is the difference between a warm and a cold render request:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Rails
+    participant Renderer as Node Renderer worker
+    Rails->>Renderer: POST /bundles/{hash}/render/{digest}<br/>(renderingRequest, no bundle)
+    alt bundle already cached (warm)
+        Renderer-->>Rails: 200 OK + rendered HTML
+    else bundle missing (cold start)
+        Renderer-->>Rails: 410 Gone — send bundle
+        Rails->>Renderer: POST /upload-assets<br/>(server bundle + companion assets)
+        Rails->>Renderer: retry render request
+        Renderer-->>Rails: 200 OK + rendered HTML
+    end
+```
+
+Pre-seeding the cache (below) makes every fresh renderer take the warm path on its very first request.
 
 ### Pre-seeding the bundle cache
 
@@ -300,6 +396,28 @@ Outbound HTTP calls inside your SSR bundle are automatically captured by `HttpIn
 
 **Cache-miss note:** On a cache-miss path `ror.bundle.build_execution_context` appears twice. The first span has `cache.strategy=cache-first` and can end with ERROR status when the VM cache probe misses. The second span has `cache.strategy=cache-miss` for the real VM build after bundle upload or bundle discovery. Scope error alerts to exclude `cache.strategy=cache-first` when that miss is expected.
 
+As a trace, the spans nest under the root `ror.ssr.request`. The upload and `cache-miss` build spans appear only on a cold path; outbound `fetch` calls from your bundle are captured automatically as HTTP child spans; and incremental (async-props) renders add their own stream/chunk spans:
+
+```mermaid
+flowchart TB
+    Root["ror.ssr.request<br/>(root — one per SSR request)"]
+    Root --> BEC1["ror.bundle.build_execution_context<br/>cache.strategy = cache-first<br/>⚠ may end ERROR on a cache miss"]
+    Root -. "cold path only" .-> Up["ror.bundle.upload<br/>bundle.count · bytes.total"]
+    Root -. "cold path only" .-> BEC2["ror.bundle.build_execution_context<br/>cache.strategy = cache-miss"]
+    Root --> Prep["ror.result.prepare<br/>response.bytes"]
+    Prep --> Vm["ror.vm.execute<br/>bundle.timestamp"]
+    Vm -. "auto HttpInstrumentation" .-> Http["outbound HTTP child spans<br/>(fetch from your bundle)"]
+    Root -. "incremental / async-props renders" .-> Inc["ror.incremental.stream"]
+    Inc --> Chunk["ror.incremental.process_chunk<br/>(one per NDJSON update chunk)"]
+    style Root fill:#e6f0ff,stroke:#2c6ecb,color:#000
+    style Prep fill:#e6f0ff,stroke:#2c6ecb,color:#000
+    style Vm fill:#e6ffed,stroke:#2da44e,color:#000
+    style Http fill:#fff4e5,stroke:#e0a000,color:#000
+    style Up fill:#fff4e5,stroke:#e0a000,color:#000
+    style BEC2 fill:#fff4e5,stroke:#e0a000,color:#000
+    style Inc fill:#e6f0ff,stroke:#2c6ecb,color:#000
+```
+
 ### Production defaults
 
 - **Span processor**: `BatchSpanProcessor` in production (`NODE_ENV=production` or `RAILS_ENV=production`), `SimpleSpanProcessor` otherwise. Override with `init({ spanProcessor })`.
@@ -312,6 +430,8 @@ The `renderingRequest` payload and rendered response body are **never** included
 
 ## Further Reading
 
+- [Streaming SSR](./streaming-ssr.md) — Progressive HTML streaming and the async-props data flow (with diagrams)
+- [React Server Components rendering flow](./react-server-components/rendering-flow.md) — How the RSC, server, and client bundles fit together
 - [Rolling-Deploy Adapters](./rolling-deploy-adapters.md) — Protocol spec and reference implementations for `rolling_deploy_adapter`
 - [Node Renderer basics](../oss/building-features/node-renderer/basics.md) — Architecture and core concepts
 - [JavaScript configuration](../oss/building-features/node-renderer/js-configuration.md) — Node-side config options
