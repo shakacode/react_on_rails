@@ -96,30 +96,35 @@ By contrast, ExecJS renders one request per V8 context and blocks the Ruby threa
 - **Shared secret authentication** — Secure communication between Rails and Node
 - **Prerender caching** — Combined with [prerender caching](../oss/building-features/caching.md#level-1-prerender-caching), rendering results are cached across requests
 
-These caches stack, and each layer avoids the cost of the one below it — a prerender-cache hit skips the renderer entirely; a warm VM context skips reloading the bundle; an on-disk bundle skips the cold-start upload:
+React on Rails Pro stacks several caches, each skipping more work than the one below it. The two Rails-side caches differ in **scope**: a [fragment-cache](../oss/building-features/caching.md#level-2-fragment-caching) hit skips even props assembly (the props block never runs), while [prerender caching](../oss/building-features/caching.md#level-1-prerender-caching) still assembles props but skips the JavaScript evaluation. The remaining layers live in the renderer, per request, and the browser:
 
 ```mermaid
 flowchart TB
-    Req["SSR render for a component"] --> L1{"L1 · Rails prerender cache<br/>Rails.cache · key = component + your cache_key<br/>+ RoR/Pro versions + bundle hash"}
-    L1 -- "hit" --> Done["Return cached HTML<br/>(renderer never called)"]
-    L1 -- "miss" --> L2
+    Req["SSR render for a component"] --> L1{"L1 · Rails fragment cache<br/>cached_react_component · you choose the key<br/>hit skips props assembly + serialization + JS eval"}
+    L1 -- "hit" --> Done["Return cached HTML"]
+    L1 -- "miss" --> L2{"L2 · Rails prerender cache<br/>config.prerender_caching · key = bundle hash + MD5(JS incl. props)<br/>hit skips JS eval (props still assembled)"}
+    L2 -- "hit" --> Done
+    L2 -- "miss" --> L3
     subgraph Renderer["Node Renderer"]
-        L2{"L2 · VM execution-context pool<br/>(LRU, MAX_VM_POOL_SIZE)"}
-        L2 -- "hit" --> Exec["Execute in cached VM context"]
-        L2 -- "miss" --> L3{"L3 · on-disk bundle cache<br/>cache/hash/hash.js"}
-        L3 -- "hit" --> Exec
-        L3 -- "miss (cold)" --> Upload["410 → Rails uploads bundle"]
+        L3{"L3 · VM execution-context pool<br/>(LRU, MAX_VM_POOL_SIZE)<br/>reuse a warm bundle context"}
+        L3 -- "hit" --> Exec["Execute SSR in cached VM context"]
+        L3 -- "miss" --> L4{"L4 · on-disk bundle cache<br/>cache/hash/hash.js"}
+        L4 -- "hit" --> Exec
+        L4 -- "miss (cold)" --> Upload["410 → Rails uploads bundle"]
         Upload --> Exec
     end
-    Exec --> L4["L4 · request-scoped dedup<br/>React.cache() / async-prop Promise<br/>(one fetch per request)"]
-    L4 --> Browser["L5 · Browser — client chunks<br/>Cache-Control: max-age=1y (immutable, hash-versioned)"]
+    Exec --> L5["L5 · request-scoped dedup<br/>React.cache() / async-prop Promise<br/>dedupes within one render only — no cross-request reuse"]
+    L5 --> Browser["L6 · Browser — client chunks<br/>Cache-Control: max-age=1y (hydration assets, not server render)"]
     style L1 fill:#e6f0ff,stroke:#2c6ecb,color:#000
+    style L2 fill:#e6f0ff,stroke:#2c6ecb,color:#000
     style Done fill:#e6ffed,stroke:#2da44e,color:#000
     style Renderer fill:#e6ffed,stroke:#2da44e,color:#000
-    style L3 fill:#fff4e5,stroke:#e0a000,color:#000
+    style L4 fill:#fff4e5,stroke:#e0a000,color:#000
     style Upload fill:#ffe5e5,stroke:#d1242f,color:#000
     style Browser fill:#e6f0ff,stroke:#2c6ecb,color:#000
 ```
+
+(Fragment caching subsumes prerender caching: on a fragment-cache hit the prerender cache is never consulted.)
 
 ## Getting Started
 
@@ -432,6 +437,7 @@ The `renderingRequest` payload and rendered response body are **never** included
 
 - [Streaming SSR](./streaming-ssr.md) — Progressive HTML streaming and the async-props data flow (with diagrams)
 - [React Server Components rendering flow](./react-server-components/rendering-flow.md) — How the RSC, server, and client bundles fit together
+- [RSC data fetching patterns](../oss/migrating/rsc-data-fetching.md) — How Rails data reaches components during render (async props vs. direct fetch)
 - [Rolling-Deploy Adapters](./rolling-deploy-adapters.md) — Protocol spec and reference implementations for `rolling_deploy_adapter`
 - [Node Renderer basics](../oss/building-features/node-renderer/basics.md) — Architecture and core concepts
 - [JavaScript configuration](../oss/building-features/node-renderer/js-configuration.md) — Node-side config options

@@ -285,20 +285,21 @@ Under the hood, Rails opens a bidirectional HTTP/2 NDJSON stream to the renderer
 ```mermaid
 sequenceDiagram
     autonumber
+    participant Browser
     participant Rails
     participant Renderer as Node Renderer
-    participant Browser
     Note over Renderer: per-request sharedExecutionContext (isolated)
-    Rails->>Renderer: open bidirectional HTTP/2 NDJSON stream<br/>first line: renderingRequest
-    Renderer->>Renderer: render begins; a Server Component awaits an async-prop Promise
+    Browser->>Rails: GET page
+    Rails->>Renderer: open incremental-render NDJSON stream<br/>first line: renderingRequest
+    Renderer->>Renderer: render begins; a Server Component awaits getReactOnRailsAsyncProp('users')
     Renderer-->>Browser: HTML shell + Suspense fallbacks stream out
     loop each prop resolves in Rails (emit.call)
         Rails->>Renderer: NDJSON updateChunk — asyncPropsManager.setProp('users', ...)
-        Renderer->>Renderer: resolve Promise — React continues rendering
+        Renderer->>Renderer: resolve Promise in sharedExecutionContext — React continues
         Renderer-->>Browser: flush that boundary's HTML
     end
     Rails->>Renderer: close stream (END_STREAM)
-    Renderer->>Renderer: asyncPropsManager.endStream()
+    Renderer->>Renderer: asyncPropsManager.endStream() — any unresolved props reject
 ```
 
 The view helper is `stream_react_component_with_async_props`, which yields an emitter:
@@ -311,6 +312,26 @@ The view helper is `stream_react_component_with_async_props`, which yields an em
 ```
 
 For the full data-fetching guidance — synchronous props, parallelizing independent queries, and React Query / SWR interop — see [RSC data fetching patterns](../oss/migrating/rsc-data-fetching.md).
+
+### The discouraged alternative: direct `fetch` from the renderer
+
+For contrast, a Server Component _can_ reach Rails by calling `fetch` itself. This is a plain **network round-trip** — the renderer's VM has no in-process access to Rails models, sessions, or cookies — and it gives up what async props provide for free, so prefer async props for Rails-owned data:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Renderer as Node Renderer VM
+    participant Rails as Rails API
+    participant DB
+    Note over Renderer: discouraged — see caveats below
+    Renderer->>Rails: fetch('/api/...') — network hop, not in-process access
+    Rails->>DB: query (no shared session/auth context)
+    DB-->>Rails: rows
+    Rails-->>Renderer: JSON
+    Renderer->>Renderer: continue rendering
+```
+
+Caveats: `fetch`, `Headers`, `Request`, `Response`, `AbortController`, and `AbortSignal` are **not** in the VM by default (bundle an HTTP client or inject them via [runtime globals](../oss/building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc)); cookies, auth, session, and CSRF are **not** forwarded automatically; and it bypasses Rails' authorization and caching layers.
 
 ## Compression Middleware Compatibility
 
