@@ -14,8 +14,6 @@
  * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import { BundleManifest } from 'react-on-rails-rsc';
-import { buildServerRenderer } from 'react-on-rails-rsc/server.node';
 import { Readable } from 'stream';
 
 import {
@@ -33,9 +31,9 @@ import {
   StreamingTrackers,
   transformRenderStreamChunksToResultObject,
 } from '../streamingUtils.ts';
-import loadJsonFile from '../loadJsonFile.ts';
-
-let serverRendererPromise: Promise<ReturnType<typeof buildServerRenderer>> | undefined;
+import { setManifestFileNames } from '../cache/manifestLoader.ts';
+import { getServerRenderer } from '../cache/manifestLoaderServer.ts';
+import { setBuildId } from '../cache/buildIdProvider.ts';
 
 const CLIENT_HOOK_NAMES = [
   'useState',
@@ -96,7 +94,18 @@ const streamRenderRSCComponent = (
   const { railsContext } = options;
   assertRailsContextWithServerStreamingCapabilities(railsContext);
 
-  const { reactClientManifestFileName } = railsContext;
+  const { reactClientManifestFileName, reactServerClientManifestFileName } = railsContext;
+
+  // Initialize manifest loader and BUILD_ID on first render request.
+  // These are per-process constants that don't change between requests.
+  setManifestFileNames(reactClientManifestFileName, reactServerClientManifestFileName);
+  const rscPayloadParams = railsContext.serverSideRSCPayloadParameters as
+    | { rscBundleHash?: string }
+    | undefined;
+  if (rscPayloadParams?.rscBundleHash) {
+    setBuildId(rscPayloadParams.rscBundleHash);
+  }
+
   const renderState: StreamRenderState = {
     result: null,
     hasErrors: false,
@@ -119,16 +128,7 @@ const streamRenderRSCComponent = (
   };
 
   const initializeAndRender = async () => {
-    if (!serverRendererPromise) {
-      serverRendererPromise = loadJsonFile<BundleManifest>(reactClientManifestFileName)
-        .then((reactClientManifest) => buildServerRenderer(reactClientManifest))
-        .catch((err: unknown) => {
-          serverRendererPromise = undefined;
-          throw err;
-        });
-    }
-
-    const { renderToPipeableStream } = await serverRendererPromise;
+    const { renderToPipeableStream } = await getServerRenderer();
     const rscStream = renderToPipeableStream(await reactRenderingResult, {
       onError: (err) => {
         const error = convertToError(err);
