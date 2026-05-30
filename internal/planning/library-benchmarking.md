@@ -166,9 +166,12 @@ The current Bencher invocation lives in `.github/workflows/benchmark.yml` inside
    6. **Small-sample fallback.** If a dwell window yields fewer than 5 unique alert pairs (so Jaccard is undefined or
       unstable), extend that dwell by 5 more qualifying runs at the same boundary before deciding, mirroring the
       small-sample caveat in Tuning Sequence step 2. Keep extending in 5-run increments until 5 unique pairs form, but
-      cap the extension at 20 additional qualifying runs beyond the original dwell: if 5 unique pairs still cannot be
-      formed by then, treat the boundary as having hit the Ceiling (step 5) and escalate to step 4, since persistent
-      alert sparsity at a single boundary is itself a runner-environment signal rather than a threshold one.
+      cap the extension at 20 additional qualifying runs beyond the original dwell. If 5 unique pairs still cannot be
+      formed by then, there is too little signal to compute overlap, so decide on the noisy-alert rate instead (the same
+      sanity check used at Lock): if that rate already meets the 1-in-20 target the boundary is simply quiet — lock it;
+      if it is still worse than target, a chronic flake is dominating a sparse set, so apply the noisy-rate override
+      below (widen up to the `0.99` ceiling, then escalate to step 4 once there). Record the small sample in
+      Issue 3169 either way.
 
    Record each boundary value, its dwell run IDs, and the resulting overlap in
    [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169). End to end this is at most 5 boundary values
