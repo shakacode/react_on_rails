@@ -26,8 +26,11 @@ Traditional SSR renders the full page on the server, then sends the complete HTM
 - React 19
 - React on Rails v16.0.0 or higher
 - Node Renderer running (streaming requires Node.js, not ExecJS)
+- For async props (streaming each slow prop independently): React Server Components enabled — `config.enable_rsc_support = true`
 
 ## Implementation Steps
+
+> **This example uses async props**, which build on React Server Components. Enable RSC before you start: set `config.enable_rsc_support = true` in your React on Rails Pro configuration (see the [RSC tutorial](./react-server-components/tutorial.md)). Without it, the `async function` server component won't render and `stream_react_component_with_async_props` raises `ReactOnRailsPro::Error`. If all your data is fast and you don't need progressive streaming, you can skip RSC and use the synchronous [`stream_react_component`](../oss/migrating/rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) with all props passed at once (no `enable_rsc_support` required).
 
 ### 1. Use React 19
 
@@ -44,60 +47,98 @@ Ensure you're using React 19 in your `package.json`:
 
 ### 2. Prepare Your React Components
 
-Create async React components that return a promise. Use the `Suspense` component to render a fallback UI while the component is loading.
+For a Suspense boundary to actually stream — show a fallback first, then swap in real content — something inside it must suspend on a Promise. In React on Rails, that data still comes from Rails: with **async props**, Rails sends the fast props immediately and emits each slow prop as it resolves. React on Rails Pro injects a `getReactOnRailsAsyncProp` helper into the root component's props (alongside the `props:` you pass) — you don't import or create it. Calling it returns a Promise for the named async prop; an async child `await`s that Promise inside a `<Suspense>` boundary.
 
 ```jsx
 // app/javascript/components/MyStreamingComponent.jsx
 import React, { Suspense } from 'react';
 
-const fetchData = async () => {
-  // Simulate API call
-  const response = await fetch('api/endpoint');
-  return response.json();
-};
+// Async Server Component (requires RSC — see callout above). Awaits the
+// streamed `posts` prop, then renders.
+async function PostList({ posts }) {
+  const resolved = await posts;
+  return (
+    <ul>
+      {resolved.map((post) => (
+        <li key={post.id}>{post.title}</li>
+      ))}
+    </ul>
+  );
+}
 
-const MyStreamingComponent = () => {
+const MyStreamingComponent = ({ greeting, getReactOnRailsAsyncProp }) => {
+  // Returns a Promise that resolves when Rails emits the `posts` prop.
+  const postsPromise = getReactOnRailsAsyncProp('posts');
+
   return (
     <>
       <header>
-        <h1>Streaming Server Rendering</h1>
+        <h1>{greeting}</h1>
       </header>
-      <Suspense fallback={<div>Loading...</div>}>
-        <SlowDataComponent />
+      <Suspense fallback={<div>Loading posts...</div>}>
+        <PostList posts={postsPromise} />
       </Suspense>
     </>
   );
 };
 
-const SlowDataComponent = async () => {
-  const data = await fetchData();
-  return <div>{data}</div>;
-};
-
 export default MyStreamingComponent;
 ```
 
-> **Note:** The `async () => { ... }` function component pattern (`SlowDataComponent` above) is a React Server Components feature. If you are using streaming SSR without RSC, use a data-fetching library (such as React Query or SWR) with `<Suspense>` instead. For RSC-based streaming (which does support async components), see the [RSC tutorial](./react-server-components/tutorial.md).
+> **React on Rails note:** Database queries, authentication, authorization, and caching all stay on the Rails side — the controller and view own them. Async props just let Rails emit each result the moment it has it, instead of blocking the whole render on the slowest source. The component never fetches data directly. In TypeScript, type the root component's props with `WithAsyncProps<AsyncProps, SyncProps>` from `react-on-rails-pro`, and type each async child's prop as a `Promise` (e.g. `posts: Promise<Post[]>`) — `getReactOnRailsAsyncProp` returns a Promise, not the resolved value. See [Data Fetching in React on Rails Pro](../oss/migrating/rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) for the prop-based data model this builds on.
 
-```jsx
-// app/javascript/packs/registration.jsx
-import ReactOnRails from 'react-on-rails';
+> **Handle failures:** if a prop's query rejects, the `await` throws inside the async component and React propagates it up the tree. In production, wrap each `<Suspense>` in an error boundary so a single failed source degrades to a fallback instead of breaking the whole render. React does not ship an `ErrorBoundary` — use the [`react-error-boundary`](https://github.com/bvaughn/react-error-boundary) package (or your own class component):
+>
+> ```jsx
+> import { ErrorBoundary } from 'react-error-boundary';
+>
+> <ErrorBoundary fallback={<div>Posts unavailable</div>}>
+>   <Suspense fallback={<div>Loading posts...</div>}>
+>     <PostList posts={postsPromise} />
+>   </Suspense>
+> </ErrorBoundary>;
+> ```
+
+With `auto_load_bundle` enabled (recommended), `MyStreamingComponent` is registered automatically. Otherwise, register it as a server component — server components use `registerServerComponent`, **not** `ReactOnRails.register`:
+
+```js
+// Server bundle — bundles the actual component code
+import registerServerComponent from 'react-on-rails-pro/registerServerComponent/server';
 import MyStreamingComponent from '../components/MyStreamingComponent';
 
-ReactOnRails.register({ MyStreamingComponent });
+registerServerComponent({ MyStreamingComponent });
 ```
 
+```js
+// Client bundle — registers by name; the component code stays out of the client bundle
+import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';
+
+registerServerComponent('MyStreamingComponent');
+```
+
+See [Create a React Server Component](./react-server-components/create-without-ssr.md#register-the-react-server-component-page) for the full registration and RSC bundle setup.
+
 ### 3. Add The Component To Your Rails View
+
+Use `stream_react_component_with_async_props`. Fast props go in `props:`; each `emit.call(name, value)` streams one more prop to the browser as soon as it resolves. Run the slow query **inside the block** — that's what lets the shell render first and the prop stream in afterward. (Loading it in the controller before this helper would block the shell until the query finished, defeating the point of async props.) Keep the block thin: call a model scope or query object, not business logic.
 
 ```erb
 <!-- app/views/example/show.html.erb -->
 
-<%= stream_react_component('MyStreamingComponent', props: { greeting: 'Hello, Streaming World!' }) %>
+<%= stream_react_component_with_async_props('MyStreamingComponent',
+      props: { greeting: 'Hello, Streaming World!' }) do |emit|
+  # Runs in the streaming flow: the shell (greeting + Suspense fallback) is
+  # sent first, then this emits `posts` once the query resolves. Rails still
+  # owns the query, auth, and caching — `Post.recent` is a model scope.
+  emit.call('posts', Post.recent.limit(20).as_json(only: [:id, :title]))
+end %>
 
 <footer>
   <p>Footer content</p>
 </footer>
 ```
+
+> If every data source is fast, use the simpler `stream_react_component` and pass all props synchronously — React still streams the rendered HTML to the browser as it walks the tree. Reach for async props when one or more sources are slow. See [Data Fetching in React on Rails Pro](../oss/migrating/rsc-data-fetching.md#data-fetching-in-react-on-rails-pro).
 
 ### 4. Render The View Using The `stream_view_containing_react_components` Helper
 
@@ -118,6 +159,46 @@ class ExampleController < ApplicationController
 end
 ```
 
+The controller just renders — the async prop's query runs in the view's `emit` block (Step 3) so the shell can stream before the query finishes. The controller still owns request-level concerns: authentication, authorization, and any fast props you pass synchronously.
+
+#### Loading Multiple Slow Sources in Parallel
+
+When several sources are slow and independent, run them concurrently with the [`async` gem](https://github.com/socketry/async) (already a dependency of React on Rails Pro and loaded by the streaming helper). Pro's streaming stack is fiber-based, so fan out with fibers from the running reactor rather than introducing a separate Ruby-thread concurrency model. The emit block runs inside an `Async` task — capture it with `Async::Task.current` and spawn one child task per source with `parent.async`, so each prop is emitted the moment its own query resolves:
+
+```erb
+<%= stream_react_component_with_async_props('Dashboard',
+      props: { title: 'Dashboard' }) do |emit|
+  parent  = Async::Task.current
+  user_id = current_user.id # capture request state before fanning out
+
+  # Each task runs its query concurrently and emits its prop as soon as that
+  # query resolves — the slowest source no longer blocks the others.
+  tasks = [
+    parent.async { emit.call('posts', Post.for_user(user_id).recent.limit(20).as_json(only: [:id, :title])) },
+    parent.async { emit.call('stats', DashboardStats.for(user_id).as_json(only: [:metric, :value])) },
+    parent.async { emit.call('feed',  FeedService.for(user_id).as_json(only: [:id, :title])) },
+  ]
+  tasks.each(&:wait) # block stays open until each task finishes
+end %>
+```
+
+On the React side, give each async prop its own `<Suspense>` boundary (as in Step 2) so each section streams in independently as its query finishes.
+
+> **Error handling — two distinct failure modes:**
+>
+> - An error raised in the task **body before `emit.call`** (e.g. a query raising `ActiveRecord::StatementInvalid`) propagates through `wait` and closes the stream, so the remaining props may not be sent. If one source failing shouldn't cut off the others, wrap each task body in a `rescue` and emit a fallback (or skip that prop).
+> - An error raised **inside `emit.call`** (a non-serializable value, a write failure) may be swallowed by the emitter — logged rather than re-raised — so the task completes normally and `wait` sees nothing, yet the prop is never delivered and its `<Suspense>` boundary never resolves. Pass only JSON-serializable values (e.g. `.as_json(only: [...])`) to `emit.call` to avoid a silently hanging boundary.
+
+**Requirements and footguns for concurrent async props:**
+
+- **`config.active_support.isolation_level = :fiber`** (Rails 7.0.2+) — without it, fibers share one connection and concurrent queries corrupt each other; with it, each fiber checks out its own pooled connection.
+- **Connection pool size** — must cover the total DB-using fibers in flight across _all_ concurrent requests, not just this one fan-out, or extra fibers block on checkout.
+- **Driver matters** — queries only truly overlap on a fiber-scheduler-aware driver such as `pg` (PostgreSQL). Blocking drivers like `mysql2` and `sqlite3` serialize on the reactor, so the fan-out gives no speedup.
+- **Capture request state before fanning out** — read `current_user.id` (and any other `CurrentAttributes`) into locals _before_ `parent.async`. Per-fiber isolation does not copy `CurrentAttributes` into child tasks, and this fails silently as stale/missing data rather than an error.
+- **Reactor-only** — `Async::Task.current` only works inside the `emit` block (which runs in Pro's reactor). Don't copy this fan-out into a plain controller action, background job, or test that hasn't started an Async reactor — it raises `Async::Error`.
+
+> **Note:** Running queries concurrently this way relies on ActiveRecord and your database driver supporting fiber scheduling (non-blocking I/O under a `Fiber.scheduler`). Confirming and configuring that for your stack — adapter choice, gem versions, connection settings — is your responsibility and outside the scope of this guide. If fiber scheduling isn't in place, the queries still run correctly, just serialized rather than in parallel.
+
 ### 5. Test Your Application
 
 You can test your application by running `rails server` and navigating to the appropriate route.
@@ -132,39 +213,36 @@ callers should not use an empty stream as a success signal.
 
 ### 6. What Happens During Streaming
 
-When a user visits the page, they'll experience the following sequence:
+`stream_react_component_with_async_props` uses React's `renderToPipeableStream` to stream the shell first, then streams each async prop as Rails emits it:
 
-1. The initial HTML shell is sent immediately, including:
-   - The page layout
-   - Any static content (like the `<h1>` and footer)
-   - Placeholder content for the React component (typically a loading state)
+1. React renders everything outside the unresolved `<Suspense>` boundaries and streams that shell immediately — the header and footer appear, with the `Loading posts...` fallback in place
+2. When Rails runs `emit.call('posts', ...)`, the resolved value streams to the renderer and the `posts` Promise resolves
+3. The async `PostList` awaits that Promise, renders, and React streams the post-list HTML chunk that replaces the fallback
 
-2. As the React component processes and suspense boundaries resolve:
-   - HTML chunks are streamed to the browser progressively
-   - Each chunk updates a specific part of the page
-   - The browser renders these updates without a full-page reload
+For example, with our `MyStreamingComponent`, the sequence is:
 
-For example, with our `MyStreamingComponent`, the sequence might be:
-
-1. The initial HTML includes the header, footer, and loading state.
+1. The browser receives the shell immediately, including the Suspense fallback:
 
 ```html
 <header>
-  <h1>Streaming Server Rendering</h1>
+  <h1>Hello, Streaming World!</h1>
 </header>
 <template id="s0">
-  <div>Loading...</div>
+  <div>Loading posts...</div>
 </template>
 <footer>
   <p>Footer content</p>
 </footer>
 ```
 
-2. As the component resolves, HTML chunks are streamed to the browser:
+2. Once Rails emits `posts` and `PostList` resolves, its rendered HTML streams to the browser:
 
 ```html
 <template hidden id="b0">
-  <div>[Fetched data]</div>
+  <ul>
+    <li>First Post</li>
+    <li>Second Post</li>
+  </ul>
 </template>
 
 <script>
@@ -172,6 +250,8 @@ For example, with our `MyStreamingComponent`, the sequence might be:
   document.getElementById('s0').replaceChildren(document.getElementById('b0'));
 </script>
 ```
+
+To render more of the page progressively, add an async prop and a `<Suspense>` boundary for each slow section — emit each one from the block as Rails resolves it, and every boundary streams in independently. This keeps the whole page in a single component tree (shared layout, context, and props) rather than splitting it across multiple `stream_react_component` calls.
 
 ## Compression Middleware Compatibility
 
