@@ -150,19 +150,25 @@ The current Bencher invocation lives in `.github/workflows/benchmark.yml` inside
       10-run dwell there; the first advance/lock decision uses overlap from the most recent 5 adjacent pairs within that
       window. Do not re-collect a 30-run window at any widened boundary — each boundary past `0.95` gets the standard
       10-run dwell. Boundary changes alone never trigger a baseline reset (see the Baseline reset exception above).
-   2. **Measure.** After the dwell, compute the mean Jaccard overlap across the most recent 5 adjacent qualifying-run
-      pairs at the current boundary, using the overlap method from Tuning Sequence step 2 above.
+   2. **Measure.** After the dwell, compute the mean Jaccard overlap (the mean of the 5 per-pair Jaccard scores) across
+      the most recent 5 adjacent qualifying-run pairs at the current boundary, using the overlap method from Tuning
+      Sequence step 2 above. This 5-pair mean is intentionally stricter than the entry gate in Tuning Sequence step 2
+      (overlap at least `0.40` for 3 consecutive pairs), so entering this cadence does not guarantee an immediate Lock
+      at `0.95`.
    3. **Advance.** If mean overlap is below `0.40`, raise the boundary by `0.01` and return to step 1 of this cadence at
       the new value: noise is still dominating, so requiring a wider boundary should help.
-   4. **Lock.** If mean overlap is at least `0.40`, stop widening and keep the current boundary; recurring alerts now
-      dominate the set, and widening further risks masking real regressions. Proceed to the Acceptance Criteria.
+   4. **Lock.** If mean overlap is at least `0.40`, stop widening and keep the current boundary _(subject to the
+      noisy-alert rate sanity check in the Interaction section below)_; recurring alerts now dominate the set, and
+      widening further risks masking real regressions. Proceed to the Acceptance Criteria.
    5. **Ceiling.** If the boundary reaches `0.99` and mean overlap is still below `0.40` after the dwell, do not widen
       further; escalate to step 4 (larger or dedicated runners). Noise that survives the widest boundary is a
       runner-environment problem, not a threshold problem.
    6. **Small-sample fallback.** If a dwell window yields fewer than 5 unique alert pairs (so Jaccard is undefined or
       unstable), extend that dwell by 5 more qualifying runs at the same boundary before deciding, mirroring the
-      small-sample caveat in Tuning Sequence step 2. If 5 unique pairs still cannot be formed after the extension, keep
-      collecting in 5-run increments until they can.
+      small-sample caveat in Tuning Sequence step 2. Keep extending in 5-run increments until 5 unique pairs form, but
+      cap the extension at 20 additional qualifying runs beyond the original dwell: if 5 unique pairs still cannot be
+      formed by then, treat the boundary as having hit the Ceiling (step 5) and escalate to step 4, since persistent
+      alert sparsity at a single boundary is itself a runner-environment signal rather than a threshold one.
 
    Record each boundary value, its dwell run IDs, and the resulting overlap in
    [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169). End to end this is at most 5 boundary values
@@ -172,7 +178,8 @@ The current Bencher invocation lives in `.github/workflows/benchmark.yml` inside
    - The 1-in-20 false-positive target (Acceptance Criteria 4 and 5) is evaluated only after the hard gate is restored, so
      it does not gate cadence advancement — the overlap criterion above does. Still, before locking a candidate boundary,
      sanity-check the noisy-alert rate at that setting: if overlap reads at least `0.40` but the noisy-alert rate is still
-     far worse than the target (for example, more than 5 noisy alerts per 20 runs), a few chronic flakes are probably
+     far worse than the target (for example, more than 5 noisy alerts per 20 runs — a rough "clearly dominating"
+     threshold, not a precisely calibrated bound like the `0.40` overlap signal), a few chronic flakes are probably
      dominating the overlap rather than real recurring regressions, so keep widening (up to the `0.99` ceiling in step 5
      above) and record the exception in Issue 3169. If the boundary is already at `0.99` when this override applies, there
      is nowhere left to widen: record the exception in Issue 3169 and escalate to step 4 (larger or dedicated runners)
@@ -183,7 +190,9 @@ The current Bencher invocation lives in `.github/workflows/benchmark.yml` inside
      same exclusion the false-positive accounting applies to intentional-perf-change commits (Acceptance Criterion 5).
    - Rollback at a locked boundary reuses Acceptance Criterion 5: if the restored hard gate later breaches the 1-in-20
      target, revert to warning mode and re-enter this cadence at the most recently locked boundary (starting a fresh
-     10-run dwell at that boundary) rather than restarting the widening from `0.95`.
+     10-run dwell at that boundary) rather than restarting the widening from `0.95`. This re-entry dwell is always the
+     standard 10-run dwell — even when `0.95` itself was the locked boundary, re-entry does not require a new 30-run
+     baseline window.
 
 4. If shared-runner noise remains high, move benchmark jobs to larger GitHub-hosted runners or dedicated runners before
    restoring the hard gate.
