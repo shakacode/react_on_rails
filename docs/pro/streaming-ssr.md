@@ -197,6 +197,8 @@ On the React side, give each async prop its own `<Suspense>` boundary (as in Ste
 - **Capture request state before fanning out** — read `current_user.id` (and any other `CurrentAttributes`) into locals _before_ `parent.async`. Per-fiber isolation does not copy `CurrentAttributes` into child tasks, and this fails silently as stale/missing data rather than an error.
 - **Reactor-only** — `Async::Task.current` only works inside the `emit` block (which runs in Pro's reactor). Don't copy this fan-out into a plain controller action, background job, or test that hasn't started an Async reactor — it raises `Async::Error`.
 
+> **Note:** Running queries concurrently this way relies on ActiveRecord and your database driver supporting fiber scheduling (non-blocking I/O under a `Fiber.scheduler`). Confirming and configuring that for your stack — adapter choice, gem versions, connection settings — is your responsibility and outside the scope of this guide. If fiber scheduling isn't in place, the queries still run correctly, just serialized rather than in parallel.
+
 ### 5. Test Your Application
 
 You can test your application by running `rails server` and navigating to the appropriate route.
