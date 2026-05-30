@@ -245,7 +245,7 @@ GEM
       nio4r (~> 2.0)
     racc (1.8.1)
     rack (3.2.5)
-    rack-proxy (0.7.7)
+    rack-proxy (0.8.2)
       rack
     rack-session (2.1.1)
       base64 (>= 0.1.0)
@@ -304,7 +304,7 @@ GEM
       rubyzip (>= 1.2.2, < 3.0)
       websocket (~> 1.0)
     semantic_range (3.1.1)
-    shakapacker (9.6.1)
+    shakapacker (10.1.0)
       activesupport (>= 5.2)
       package_json
       rack-proxy (>= 0.6.1)
@@ -368,7 +368,7 @@ DEPENDENCIES
   react_on_rails!
   react_on_rails_pro!
   selenium-webdriver
-  shakapacker (= 9.6.1)
+  shakapacker (= 10.1.0)
   sprockets-rails
   sqlite3 (~> 1.4)
   tzinfo-data
