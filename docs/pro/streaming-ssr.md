@@ -273,14 +273,14 @@ To render more of the page progressively, add an async prop and a `<Suspense>` b
 
 ## Progressive Data with Async Props
 
-Streaming SSR sends HTML as React renders it. **Async props** (a React Server Components feature, so it requires `enable_rsc_support`) go one step further: Rails emits each prop _as its data becomes ready_ and streams the matching Suspense boundary to the browser the moment it resolves.
+Streaming SSR sends HTML as React renders it. **Async props** (a React Server Components feature, so it requires `enable_rsc_support`) go one step further: Rails emits each prop _as its data becomes ready_ and forwards the matching Suspense boundary to the browser the moment it resolves.
 
 This is the recommended answer to "my component needs Rails data during render": **Rails owns the data and pushes it in**, preserving your controller / model / authorization / caching layers — the renderer never has to call back into Rails.
 
 > [!NOTE]
 > A Server Component _can_ `fetch` a Rails API directly, but the renderer's VM has no `fetch`, `Headers`, `Request`, or `Response` by default — you must bundle an HTTP client or inject them via `additionalContext` — and doing so bypasses Rails' auth and caching. `'use server'` Server Actions are **not** supported (the renderer has no DB/session/cookie access). Prefer props / async props. See [RSC data fetching patterns](../oss/migrating/rsc-data-fetching.md).
 
-Under the hood, Rails opens a bidirectional HTTP/2 NDJSON stream to the renderer and feeds props in as it resolves them. Each update runs in that request's isolated `sharedExecutionContext` and resolves a Promise, which lets React flush the corresponding HTML:
+Under the hood, Rails opens a bidirectional HTTP/2 NDJSON stream to the renderer and feeds props in as it resolves them. Each update runs in that request's isolated `sharedExecutionContext` and resolves a Promise, which lets React flush the corresponding HTML back to Rails for forwarding to the browser:
 
 ```mermaid
 sequenceDiagram
@@ -292,11 +292,13 @@ sequenceDiagram
     Browser->>Rails: GET page
     Rails->>Renderer: open incremental-render NDJSON stream<br/>first line: renderingRequest
     Renderer->>Renderer: render begins — a Server Component awaits getReactOnRailsAsyncProp('users')
-    Renderer-->>Browser: HTML shell + Suspense fallbacks stream out
+    Renderer-->>Rails: HTML shell + Suspense fallbacks
+    Rails-->>Browser: stream shell + fallbacks
     loop each prop resolves in Rails (emit.call)
         Rails->>Renderer: NDJSON updateChunk — asyncPropsManager.setProp('users', ...)
         Renderer->>Renderer: resolve Promise in sharedExecutionContext — React continues
-        Renderer-->>Browser: flush that boundary's HTML
+        Renderer-->>Rails: flush that boundary's HTML
+        Rails-->>Browser: append boundary HTML
     end
     Rails->>Renderer: close stream (END_STREAM)
     Renderer->>Renderer: asyncPropsManager.endStream() — any unresolved props reject
