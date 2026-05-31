@@ -18,21 +18,21 @@ ExecJS embeds a JavaScript runtime (mini_racer/V8) inside the Ruby process. This
 
 The Pro Node Renderer solves all of these by running a standalone Node.js server that handles rendering requests from Rails over HTTP.
 
-The contrast in one picture — embedded V8 inside each Ruby process vs. a separate, pooled Node service that Rails calls over HTTP/2:
+The contrast in one picture — the old way runs JavaScript inside Rails, while the Node Renderer runs it in a separate service:
 
 ```mermaid
 flowchart LR
-    subgraph Exec["ExecJS — in-process (OSS default)"]
+    subgraph Exec["ExecJS — JavaScript inside Rails"]
         direction TB
-        E1["Rails worker process"] --> E2["Embedded V8 runtime pool<br/>(mini_racer)"]
-        E2 --> E3["Render JS <b>in-process</b><br/>blocks the Ruby thread"]
+        E1["Rails process"] --> E2["JavaScript runtime<br/>inside the same process"]
+        E2 --> E3["Rails waits while<br/>JavaScript renders HTML"]
     end
-    subgraph Node["Node Renderer — out-of-process (Pro)"]
+    subgraph Node["Node Renderer — JavaScript in a separate service"]
         direction TB
-        N1["Rails worker process<br/>(thin HTTP client)"] -- "HTTP/2 render request" --> N2["Node Renderer<br/>master process"]
-        N2 --> N3["Worker 1<br/>VM + bundle cache"]
-        N2 --> N4["Worker 2<br/>VM + bundle cache"]
-        N2 --> N5["Worker N<br/>VM + bundle cache"]
+        N1["Rails process"] -- "render request" --> N2["Node Renderer"]
+        N2 --> N3["Worker 1<br/>renders HTML"]
+        N2 --> N4["Worker 2<br/>renders HTML"]
+        N2 --> N5["Worker N<br/>renders HTML"]
     end
     style Exec fill:#fff4e5,stroke:#e0a000,color:#000
     style E3 fill:#ffe5e5,stroke:#d1242f,color:#000
@@ -65,19 +65,19 @@ Because rendering runs out-of-process, the renderer scales concurrency across a 
 
 ```mermaid
 flowchart TB
-    subgraph Rails["Rails — async server (Puma / Falcon)"]
+    subgraph Rails["Rails receives many page requests"]
         direction LR
-        Req1["request 1"]
-        Req2["request 2"]
-        Req3["… request N"]
+        Req1["page request 1"]
+        Req2["page request 2"]
+        Req3["page request N"]
     end
-    Req1 -- "HTTP/2 (multiplexed)" --> Master
-    Req2 -- "HTTP/2 (multiplexed)" --> Master
-    Req3 -- "HTTP/2 (multiplexed)" --> Master
+    Req1 -- "send render job" --> Master
+    Req2 -- "send render job" --> Master
+    Req3 -- "send render job" --> Master
     subgraph Renderer["Node Renderer"]
-        Master["master process<br/>forks workers · auto-restarts crashes · rolling restarts"]
-        Master --> WA["worker A — event loop<br/>many concurrent renders / streams<br/>per-request <b>sharedExecutionContext</b> (isolated)"]
-        Master --> WB["worker B — event loop<br/>many concurrent renders / streams<br/>per-request <b>sharedExecutionContext</b> (isolated)"]
+        Master["Dispatcher<br/>hands jobs to workers"]
+        Master --> WA["Worker A<br/>renders several pages at once"]
+        Master --> WB["Worker B<br/>renders several pages at once"]
     end
     style Rails fill:#e6f0ff,stroke:#2c6ecb,color:#000
     style Renderer fill:#e6ffed,stroke:#2da44e,color:#000
@@ -100,22 +100,22 @@ React on Rails Pro stacks several caches, each skipping more work than the one b
 
 ```mermaid
 flowchart TB
-    Req["SSR render for a component"] --> L1{"L1 · Rails fragment cache<br/>cached_react_component · you choose the key<br/>hit skips props assembly + serialization + JS eval"}
-    L1 -- "hit" --> Done["Return cached HTML"]
-    L1 -- "miss" --> L2{"L2 · Rails prerender cache<br/>config.prerender_caching · key = bundle hash + MD5(JS incl. props)<br/>hit skips JS eval (props still assembled)"}
-    L2 -- "hit" --> Done
-    L2 -- "miss" --> L3
+    Req["Need HTML for a component"] --> L1{"Does Rails already<br/>have the final HTML?"}
+    L1 -- "yes" --> Done["Return HTML"]
+    L1 -- "no" --> L2{"Does Rails have<br/>a saved render result?"}
+    L2 -- "yes" --> Done
+    L2 -- "no" --> L3
     subgraph Renderer["Node Renderer"]
-        L3{"L3 · VM execution-context pool<br/>(LRU, MAX_VM_POOL_SIZE)<br/>reuse a warm bundle context"}
-        L3 -- "hit" --> Exec["Execute SSR in cached VM context"]
-        L3 -- "miss" --> L4{"L4 · on-disk bundle cache<br/>cache/hash/hash.js"}
-        L4 -- "hit" --> Exec
-        L4 -- "miss (cold)" --> Upload["410 → Rails uploads bundle"]
-        Upload -- "seeds L4 · execute" --> Exec
+        L3{"Is the JS bundle<br/>already warm in memory?"}
+        L3 -- "yes" --> Exec["Run JavaScript<br/>to make HTML"]
+        L3 -- "no" --> L4{"Is the JS bundle<br/>saved on disk?"}
+        L4 -- "yes" --> Exec
+        L4 -- "no" --> Upload["Rails sends<br/>the bundle once"]
+        Upload --> Exec
     end
     Exec --> Done
-    Exec -. "during this render only" .-> L5["L5 · request-scoped dedup<br/>React.cache() / async-prop Promise<br/>dedupes repeated reads — no cross-request reuse"]
-    Browser["Browser hydration"] -. "separate asset requests" .-> L6["L6 · client chunks<br/>Cache-Control: max-age=1y<br/>(hydration assets, not server render)"]
+    Exec -. "during one render" .-> L5["Repeated data reads<br/>share one result"]
+    Browser["Browser starts the page"] -. "later" .-> L6["Browser code chunks<br/>cached by the browser"]
     style L1 fill:#e6f0ff,stroke:#2c6ecb,color:#000
     style L2 fill:#e6f0ff,stroke:#2c6ecb,color:#000
     style Done fill:#e6ffed,stroke:#2da44e,color:#000
@@ -218,15 +218,15 @@ That round-trip is the difference between a warm and a cold render request:
 sequenceDiagram
     autonumber
     participant Rails
-    participant Renderer as Node Renderer worker
-    Rails->>Renderer: POST /bundles/{hash}/render/{digest}<br/>(renderingRequest, no bundle)
-    alt bundle already cached (warm)
-        Renderer-->>Rails: 200 OK + rendered HTML
-    else bundle missing (cold start)
-        Renderer-->>Rails: 410 Gone — send bundle
-        Rails->>Renderer: POST /upload-assets<br/>(server bundle + companion assets)
-        Rails->>Renderer: retry render request
-        Renderer-->>Rails: 200 OK + rendered HTML
+    participant Renderer as Node Renderer
+    Rails->>Renderer: Please render this page
+    alt renderer already has the bundle
+        Renderer-->>Rails: HTML
+    else renderer is missing the bundle
+        Renderer-->>Rails: I need that bundle first
+        Rails->>Renderer: Upload the bundle
+        Rails->>Renderer: Please render again
+        Renderer-->>Rails: HTML
     end
 ```
 
@@ -409,22 +409,16 @@ As a trace, the spans nest under the root `ror.ssr.request`. On the warm path th
 
 ```mermaid
 flowchart TB
-    Root["ror.ssr.request<br/>(root — one per SSR request)"]
-    Root --> BEC1["ror.bundle.build_execution_context<br/>cache.strategy = cache-first<br/>⚠ may end ERROR on a cache miss"]
-    Root -. "cold path only" .-> Up["ror.bundle.upload<br/>bundle.count · bytes.total"]
-    Root -. "cold path only" .-> BEC2["ror.bundle.build_execution_context<br/>cache.strategy = cache-miss"]
-    Root --> Vm["ror.vm.execute<br/>bundle.timestamp"]
-    Vm --> Prep["ror.result.prepare<br/>response.bytes"]
-    Vm -. "auto HttpInstrumentation" .-> Http["outbound HTTP child spans<br/>(fetch from your bundle)"]
-    Root -. "incremental / async-props renders" .-> Inc["ror.incremental.stream"]
-    Inc --> Chunk["ror.incremental.process_chunk<br/>(one per NDJSON update chunk)"]
+    Root["One server-render trace"]
+    Root --> Warm["Warm path<br/>load bundle -> run JavaScript -> prepare result"]
+    Root -. "cold start" .-> Cold["Upload bundle first<br/>then load it"]
+    Warm -. "if JavaScript fetches data" .-> Http["Data-fetch spans"]
+    Root -. "if slow data is streamed" .-> Inc["Streaming-data spans"]
+    Inc --> Chunk["One span for each<br/>incoming data chunk"]
     style Root fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style BEC1 fill:#fff4e5,stroke:#e0a000,color:#000
-    style Prep fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style Vm fill:#e6ffed,stroke:#2da44e,color:#000
+    style Warm fill:#e6ffed,stroke:#2da44e,color:#000
+    style Cold fill:#fff4e5,stroke:#e0a000,color:#000
     style Http fill:#fff4e5,stroke:#e0a000,color:#000
-    style Up fill:#fff4e5,stroke:#e0a000,color:#000
-    style BEC2 fill:#fff4e5,stroke:#e0a000,color:#000
     style Inc fill:#e6f0ff,stroke:#2c6ecb,color:#000
     style Chunk fill:#e6ffed,stroke:#2da44e,color:#000
 ```

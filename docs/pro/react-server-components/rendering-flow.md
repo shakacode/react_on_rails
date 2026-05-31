@@ -69,23 +69,24 @@ Even with CommonJS execution mode enabled, `resolve.fallback` remains the safer 
 
 For `fetch`, `Headers`, `Request`, `Response`, `AbortController`, and `AbortSignal`, see [Node Renderer JavaScript Configuration](../../oss/building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc).
 
-At runtime those three bundles map onto two environments — the Node renderer's VM contexts and the browser — and interact like this:
+Traditional SSR without RSC is the simpler server-bundle-to-HTML path covered in the [Node Renderer](../node-renderer.md) and [Streaming SSR](../streaming-ssr.md) docs. The RSC path adds the RSC bundle and an embedded RSC payload:
 
 ```mermaid
-flowchart LR
-    subgraph NodeVM["Node Renderer — isolated VM contexts"]
+flowchart TB
+    subgraph NodeVM["Node Renderer"]
         direction TB
-        Server["Server bundle<br/>RSCServerRoot"] -- "generateRSCPayload(component, props)<br/>via runOnOtherBundle()" --> RSC["RSC bundle<br/>(react-server condition)"]
-        RSC -- "Flight payload<br/>server components + client refs" --> Server
-        Server --> HTML["HTML + embedded RSC payload"]
+        ServerStart["Server bundle<br/>starts the page"] --> RSC["RSC bundle<br/>builds the Server Component output"]
+        RSC --> Payload["RSC payload<br/>what to show + browser code links"]
+        Payload --> ServerHTML["Server bundle<br/>streams HTML with the payload inside"]
     end
-    HTML -- "streamed response (HTML + RSC payload)" --> Browser["Browser"]
-    Browser --> Hydrate["Hydrate from embedded payload"]
-    Hydrate -- "load on demand" --> Chunks["Client bundle chunks"]
+    ServerHTML --> Browser["Browser<br/>receives one response"]
+    Browser --> Hydrate["React uses the payload<br/>to wake up the page"]
+    Hydrate --> Chunks["Browser code chunks<br/>load as needed"]
     style NodeVM fill:#e6ffed,stroke:#2da44e,color:#000
-    style Server fill:#e6f0ff,stroke:#2c6ecb,color:#000
+    style ServerStart fill:#e6f0ff,stroke:#2c6ecb,color:#000
     style RSC fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style HTML fill:#e6ffed,stroke:#2da44e,color:#000
+    style Payload fill:#e6ffed,stroke:#2da44e,color:#000
+    style ServerHTML fill:#e6f0ff,stroke:#2c6ecb,color:#000
     style Browser fill:#fff4e5,stroke:#e0a000,color:#000
     style Hydrate fill:#fff4e5,stroke:#e0a000,color:#000
     style Chunks fill:#fff4e5,stroke:#e0a000,color:#000
@@ -100,23 +101,22 @@ When a request is made to a page using React Server Components, the following op
 1. Initial Request Processing:
    - The `stream_react_component` helper is called in the view
    - Makes a request to the node renderer
-   - Server bundle's rendering function calls `generateRSCPayload` with the component name and props
-   - This executes the component rendering in the RSC bundle
-   - RSC bundle generates the payload containing server component data and client component references
+   - The server bundle starts the RSC page render with the component name and props
+   - The RSC bundle renders the Server Component tree
+   - The RSC bundle generates the payload containing server component data and client component references
    - The payload is returned to the server bundle
 
-2. Server-Side Rendering with RSC Payload:
-   - The server bundle uses the RSC payload to generate HTML for server components using `RSCServerRoot`
-   - `RSCServerRoot` splits the RSC payload stream into two parts:
-     - One stream for rendering server components as HTML
-     - Another stream for embedding the RSC payload in the response
-   - `RSCPayloadContainer` component embeds the RSC payload within the HTML response
+2. HTML Rendering with RSC Payload:
+   - The server bundle uses the RSC payload to generate HTML for the page
+   - The payload stream is split internally:
+     - One copy renders the Server Component output as HTML
+     - Another copy is embedded in the response for browser hydration
    - HTML and embedded RSC payload are streamed together to the client
 
 3. Client Hydration:
    - Browser displays HTML immediately
    - React runtime uses the embedded RSC payload for hydration
-   - Client components are hydrated progressively without requiring a separate HTTP request
+   - Client components are hydrated progressively without requiring a separate RSC payload request
 
 This approach offers significant advantages:
 
@@ -127,27 +127,28 @@ This approach offers significant advantages:
 ```mermaid
 sequenceDiagram
     participant Browser
-    participant RailsView
-    participant NodeRenderer
-    participant RSCBundle
-    participant ServerBundle
+    participant Rails
+    participant Renderer as Node renderer
+    participant Server as Server bundle
+    participant RSC as RSC bundle
 
-    Note over Browser,ServerBundle: 1. Initial Request
-    Browser->>RailsView: Request page
-    RailsView->>NodeRenderer: stream_react_component
-    NodeRenderer->>ServerBundle: Execute rendering request
-    ServerBundle->>RSCBundle: generateRSCPayload(component, props)
-    RSCBundle-->>ServerBundle: RSC payload with:<br/>- Server components<br/>- Client component refs
-    ServerBundle-->>NodeRenderer: Generate HTML using RSC payload
+    Note over Browser,RSC: 1. Initial Request
+    Browser->>Rails: Request page
+    Rails->>Renderer: Ask renderer to render
+    Renderer->>Server: Start the page render
+    Server->>RSC: Build the Server Component output<br/>(component name + data)
+    RSC-->>Server: RSC payload<br/>(what to show + browser code links)
+    Server-->>Renderer: HTML stream with payload inside
 
-    Note over Browser,ServerBundle: 2. Single Response
-    NodeRenderer-->>Browser: Stream HTML with embedded RSC payload
+    Note over Browser,RSC: 2. Single Response
+    Renderer-->>Rails: Stream HTML with payload inside
+    Rails-->>Browser: Forward streamed response
 
     Note over Browser: 3. Client Hydration
-    Browser->>Browser: Process embedded RSC payload
+    Browser->>Browser: Read the embedded payload
     loop For each client component
-        Browser->>Browser: Fetch component chunk
-        Browser->>Browser: Hydrate component
+        Browser->>Browser: Load needed browser code
+        Browser->>Browser: Make that part interactive
     end
 ```
 

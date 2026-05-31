@@ -26,15 +26,13 @@ sequenceDiagram
     participant Browser
     participant Rails
     participant Renderer as Node Renderer
-    Note over Rails: ActionController::Live (ReactOnRailsPro::Stream)
-    Browser->>Rails: GET page
-    Rails->>Renderer: streaming render request
-    Renderer->>Renderer: renderToPipeableStream() — onShellReady
-    Renderer-->>Rails: HTML shell chunk
-    Rails-->>Browser: shell paints immediately (fast TTFB)
-    loop each Suspense boundary resolves
-        Renderer-->>Rails: length-prefixed HTML chunk
-        Rails-->>Browser: append chunk — progressive paint + selective hydration
+    Browser->>Rails: Ask for a page
+    Rails->>Renderer: Start rendering the page
+    Renderer-->>Rails: First HTML piece
+    Rails-->>Browser: Browser can paint right away
+    loop more page parts become ready
+        Renderer-->>Rails: Next HTML piece
+        Rails-->>Browser: Browser adds it to the page
     end
 ```
 
@@ -63,21 +61,15 @@ sequenceDiagram
     participant Browser
     participant Rails
     participant Renderer as Node Renderer
-    Note over Renderer: per-request sharedExecutionContext (isolated)
-    Browser->>Rails: GET page
-    Rails->>Renderer: open incremental-render NDJSON stream<br/>first line: renderingRequest
-    Renderer->>Renderer: render begins — a Server Component awaits getReactOnRailsAsyncProp('users')
-    Renderer-->>Rails: HTML shell + Suspense fallbacks
-    Rails-->>Browser: stream shell + fallbacks
-    loop each prop resolves in Rails (emit.call)
-        Rails->>Renderer: NDJSON updateChunk — resolve async-prop Promise
-        Renderer->>Renderer: Promise resolves in sharedExecutionContext — React continues
-        Renderer-->>Rails: flush that boundary's HTML
-        Rails-->>Browser: append boundary HTML
+    Browser->>Rails: Ask for a page
+    Rails->>Renderer: Start page with placeholders
+    Renderer-->>Rails: HTML shell + loading states
+    Rails-->>Browser: Browser shows the shell
+    loop each slow data value becomes ready
+        Rails->>Renderer: Send the data value
+        Renderer-->>Rails: HTML for that page section
+        Rails-->>Browser: Browser replaces the loading state
     end
-    Rails->>Renderer: close stream (END_STREAM)
-    Renderer->>Renderer: reject any unresolved async props
-    Rails-->>Browser: remaining Suspense boundaries stay on fallback
 ```
 
 The view helper is `stream_react_component_with_async_props`, which yields an emitter:
@@ -102,15 +94,15 @@ For contrast, a Server Component _can_ reach Rails by calling `fetch` itself. Th
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Renderer as Node Renderer VM
+    participant Renderer as Node Renderer
     participant Rails as Rails API
-    participant Data as Rails data layer
-    Note over Renderer: discouraged — see caveats below
-    Renderer->>Rails: fetch('/api/...') — network hop, not in-process access
-    Rails->>Data: handle request (auth, cache, services, database)
-    Data-->>Rails: JSON-ready data
-    Rails-->>Renderer: JSON
-    Renderer->>Renderer: continue rendering
+    participant Data as Rails data
+    Note over Renderer: Discouraged — usually let Rails pass the data instead
+    Renderer->>Rails: Ask Rails API for data
+    Rails->>Data: Load and authorize data
+    Data-->>Rails: Data
+    Rails-->>Renderer: JSON data
+    Renderer->>Renderer: Continue rendering
 ```
 
 Caveats: `fetch`, `Headers`, `Request`, `Response`, `AbortController`, and `AbortSignal` are **not** in the VM by default (bundle an HTTP client or inject them via [runtime globals](../oss/building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc)); cookies, auth, session, and CSRF are **not** forwarded automatically; and it bypasses Rails' authorization and caching layers.
