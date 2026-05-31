@@ -33,6 +33,10 @@ function concatBytes(a: Uint8Array, b: Uint8Array): Uint8Array {
   return result;
 }
 
+function isBlankSeparatorLine(header: Uint8Array): boolean {
+  return header.length === 0 || header.every((byte) => byte === 0x0d);
+}
+
 export default class LengthPrefixedStreamParser {
   private buf: Uint8Array = new Uint8Array(0);
 
@@ -52,26 +56,28 @@ export default class LengthPrefixedStreamParser {
         if (idx >= 0) {
           const header = this.buf.subarray(0, idx);
           this.buf = this.buf.subarray(idx + 1);
-          const tabIdx = header.indexOf(0x09); // \t
-          if (tabIdx < 0) {
-            throw new Error(
-              `Malformed length-prefixed header: missing tab separator in: ${JSON.stringify(decoder.decode(header))}`,
-            );
+          if (!isBlankSeparatorLine(header)) {
+            const tabIdx = header.indexOf(0x09); // \t
+            if (tabIdx < 0) {
+              throw new Error(
+                `Malformed length-prefixed header: missing tab separator in: ${JSON.stringify(decoder.decode(header))}`,
+              );
+            }
+            const metaStr = decoder.decode(header.subarray(0, tabIdx));
+            try {
+              this.metadata = JSON.parse(metaStr);
+            } catch {
+              throw new Error(
+                `Malformed length-prefixed header: invalid metadata JSON: ${JSON.stringify(metaStr)}`,
+              );
+            }
+            const lenHex = decoder.decode(header.subarray(tabIdx + 1));
+            if (!/^[0-9a-fA-F]+$/.test(lenHex)) {
+              throw new Error(`Invalid content length hex: ${JSON.stringify(lenHex)}`);
+            }
+            this.contentLen = parseInt(lenHex, 16);
+            this.state = 'content';
           }
-          const metaStr = decoder.decode(header.subarray(0, tabIdx));
-          try {
-            this.metadata = JSON.parse(metaStr);
-          } catch {
-            throw new Error(
-              `Malformed length-prefixed header: invalid metadata JSON: ${JSON.stringify(metaStr)}`,
-            );
-          }
-          const lenHex = decoder.decode(header.subarray(tabIdx + 1));
-          if (!/^[0-9a-fA-F]+$/.test(lenHex)) {
-            throw new Error(`Invalid content length hex: ${JSON.stringify(lenHex)}`);
-          }
-          this.contentLen = parseInt(lenHex, 16);
-          this.state = 'content';
         } else {
           canExtract = false;
         }
