@@ -1202,7 +1202,7 @@ module ReactOnRails
           parsed = URI.parse(url)
           return unless parsed.scheme && localhost_hostname?(parsed.hostname)
 
-          URI::Generic.build(scheme: parsed.scheme, host: parsed.hostname, port: renderer_port).to_s
+          URI::Generic.build(scheme: parsed.scheme, host: parsed.host, port: renderer_port).to_s
         rescue URI::Error
           nil
         end

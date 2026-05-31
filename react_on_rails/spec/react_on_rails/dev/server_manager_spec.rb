@@ -511,14 +511,25 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
       it "preserves an explicit IPv4 localhost REACT_RENDERER_URL host in base-port mode" do
         ENV["REACT_RENDERER_URL"] = "http://127.0.0.1:3800"
-        described_class.start(:development)
+        expect { described_class.start(:development) }
+          .to output(%r{Overriding REACT_RENDERER_URL="http://127.0.0.1:3800" with http://127.0.0.1:5002})
+          .to_stderr
         expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://127.0.0.1:5002")
+      end
+
+      it "preserves an explicit IPv6 localhost REACT_RENDERER_URL host in base-port mode" do
+        ENV["REACT_RENDERER_URL"] = "http://[::1]:3800"
+        expect { described_class.start(:development) }
+          .to output(%r{Overriding REACT_RENDERER_URL="http://\[::1\]:3800" with http://\[::1\]:5002})
+          .to_stderr
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://[::1]:5002")
       end
 
       it "warns before overriding an HTTPS localhost REACT_RENDERER_URL on a different port" do
         ENV["REACT_RENDERER_URL"] = "https://localhost:3800"
         expect { described_class.start(:development) }
           .to output(%r{Overriding REACT_RENDERER_URL="https://localhost:3800"}).to_stderr
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("https://localhost:5002")
       end
 
       it "does not warn when REACT_RENDERER_URL already equals the derived URL" do
