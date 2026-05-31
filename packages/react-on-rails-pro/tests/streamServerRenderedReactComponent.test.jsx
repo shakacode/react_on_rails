@@ -4,6 +4,7 @@
 
 import * as React from 'react';
 import * as PropTypes from 'prop-types';
+import sanitizeNonce from 'react-on-rails/@internal/sanitizeNonce';
 import { renderToPipeableStream } from 'react-on-rails/ReactDOMServer';
 import streamServerRenderedReactComponent from '../src/streamServerRenderedReactComponent.ts';
 import * as ComponentRegistry from '../src/ComponentRegistry.ts';
@@ -95,6 +96,7 @@ describe('streamServerRenderedReactComponent', () => {
     throwJsErrors = false,
     throwAsyncError = false,
     componentType = 'reactComponent',
+    railsContext = testingRailsContext,
   } = {}) => {
     switch (componentType) {
       case 'reactComponent':
@@ -135,7 +137,7 @@ describe('streamServerRenderedReactComponent', () => {
       trace: false,
       props: { throwSyncError, throwAsyncError },
       throwJsErrors,
-      railsContext: testingRailsContext,
+      railsContext,
     });
 
     const chunks = [];
@@ -173,7 +175,24 @@ describe('streamServerRenderedReactComponent', () => {
       expect.anything(),
       expect.objectContaining({
         identifierPrefix: 'myDomId',
-        nonce: testingRailsContext.cspNonce,
+        nonce: sanitizeNonce(testingRailsContext.cspNonce),
+      }),
+    );
+  });
+
+  it("omits React's streaming bootstrap nonce option when Rails CSP nonce is absent", async () => {
+    const { renderResult } = setupStreamTest({
+      railsContext: { ...testingRailsContext, cspNonce: undefined },
+    });
+    await new Promise((resolve) => {
+      renderResult.once('end', resolve);
+    });
+
+    expect(renderToPipeableStream).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        identifierPrefix: 'myDomId',
+        nonce: undefined,
       }),
     );
   });
