@@ -37,7 +37,7 @@ This is the portable core. Hold it regardless of which engine runs.
 - Read dependency docs/source/types when a finding depends on external (gem/npm/Rails/React) behavior.
 - Reject unrealistic edge cases, speculative risks, broad rewrites, and fixes that over-complicate the code.
 - Prefer small fixes at the right ownership boundary; no refactor unless it clearly improves the bug class. This matches `AGENTS.md`: never refactor unrelated code.
-- Keep going until the review returns no accepted/actionable findings.
+- Keep going until the review returns no accepted/actionable findings; once it comes back clean, stop. Do not run an extra review just to get nicer "clean" wording or a redundant second opinion.
 - If a review-triggered fix changes code, rerun the focused tests for the changed surface and rerun the review.
 - Security perspective is always included, but it must not cripple legitimate functionality. Report a security finding only when the change creates a concrete, actionable risk or removes an important safety check.
 - Be patient. `codex review` runs an external model and can take several minutes on a large diff. Progress that looks quiet is usually still working; do not kill it before about 5 minutes unless it has clearly errored.
@@ -45,7 +45,6 @@ This is the portable core. Hold it regardless of which engine runs.
 - A gated second-engine pass is appropriate only when the user asks or the diff falls into the
   `AGENTS.md` high-risk / `full-ci` / `benchmark` categories. Run it after the primary review is
   clean, keep it to one extra pass, and verify its findings the same way.
-- Stop as soon as the review comes back clean with no accepted/actionable findings. Do not run an extra review just to get nicer "clean" wording or a redundant second opinion.
 - If you reject a finding as intentional/not worth fixing, add a brief inline code comment only when it documents a real invariant or ownership decision a future reviewer should know.
 - **Do not push just to review.** Push only when the user asked for push/ship/PR. Follow `AGENTS.md` git boundaries (Pro package edits are ask-first; never force-push `main`/`master`).
 
@@ -105,7 +104,7 @@ Use `AGENTS.md` and `/verify` for the actual check set. Before a closeout review
 
 ## Step 3 - Run the structured review
 
-Default to Codex. Pick the command that matches Step 1:
+Default to Codex. Verify it is available first (`command -v codex`); if not, fall back to the Claude review tooling described in the intro. Pick the command that matches Step 1:
 
 ```bash
 # Dirty local patch, including staged, unstaged, and untracked files.
@@ -130,11 +129,11 @@ focus instructions as the review prompt:
 codex review "Focus on SSR/hydration regressions, generated output, and repo workflow correctness."
 ```
 
-For longer instructions, keep them in `.context/` and read from stdin only when the selected review
-engine supports that mode:
+For longer instructions, create a scratch file in `.context/` or substitute your own path, then
+read from stdin only when the selected review engine supports that mode:
 
 ```bash
-codex review - < .context/autoreview-focus.md
+codex review - < .context/autoreview-focus.md   # create this file with your focus instructions first
 ```
 
 Never silently switch the engine the user asked for. If the requested engine hits model
@@ -166,7 +165,7 @@ For each finding the engine returns:
 3. Fix accepted findings with the smallest correct change at the right boundary.
 4. Rerun the **targeted** tests for the changed surface, then rerun the review. Use `/verify`'s
    Scope Guide to pick the narrowest covering tests, e.g.:
-   - Ruby gem: `bundle exec rspec react_on_rails/spec/react_on_rails/path/to/spec.rb` (+ RBS validate if signatures changed)
+   - Ruby gem: `bundle exec rspec react_on_rails/spec/react_on_rails/path/to/spec.rb`; also run `bundle exec rake rbs:validate` if RBS signatures changed
    - Dummy/integration: `cd react_on_rails/spec/dummy && bundle exec rspec spec/path/to/spec.rb`
    - TS package: `pnpm --filter react-on-rails exec jest <relative-test-file>`, plus `pnpm run type-check` / `pnpm run lint` for touched TS
 
