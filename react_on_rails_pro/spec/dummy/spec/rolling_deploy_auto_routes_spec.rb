@@ -39,6 +39,7 @@ RSpec.describe "rolling-deploy auto routes", type: :request do
         ReactOnRailsPro::RollingDeploy::BundlesController.draw_routes(
           self,
           path: path,
+          # Must match ReactOnRailsPro::Engine::ROLLING_DEPLOY_AUTO_ROUTE_PREFIX.
           as_prefix: "react_on_rails_pro_auto_rolling_deploy"
         )
       end
