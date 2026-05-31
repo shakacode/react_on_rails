@@ -29,6 +29,18 @@ source, while others require React on Rails Pro.
 - Note: this repo uses React on Rails Pro. See [OSS vs Pro](./oss-vs-pro.md)
   for evaluation guidance.
 
+### React on Rails + TanStack Starter (Pro)
+
+- Repo: [shakacode/react-on-rails-starter-tanstack](https://github.com/shakacode/react-on-rails-starter-tanstack)
+- Use it when you want the maintained Rails 8 + React on Rails Pro + TanStack
+  Router/Query/Table starter with React Server Components, Rspack, Tailwind, and
+  shadcn/ui.
+- Upstream branch testing: the starter documents how to validate unreleased
+  `react_on_rails` and `react_on_rails_rsc` branches in
+  [Testing Upstream Branches](https://github.com/shakacode/react-on-rails-starter-tanstack/blob/main/docs/12-upstream-branch-testing.md).
+- Note: this repo uses React on Rails Pro. See [OSS vs Pro](./oss-vs-pro.md)
+  for evaluation guidance.
+
 ## In-Repo Reference
 
 ### Spec Dummy App
