@@ -162,7 +162,7 @@ This is a minor release - update your gem and npm package versions, then run `bu
 
 - **Webpacker support completely removed**. Shakapacker >= 6.0 is now required.
 - **Updated runtime requirements**:
-  - Minimum Ruby version: 3.2
+  - Minimum Ruby version: 3.2 (v16 minimum; v17 requires 3.3+)
   - Minimum Node.js version: 20
 - **Install generator now validates prerequisites** and requires at least one JavaScript package manager
 
