@@ -70,6 +70,7 @@ For detailed proof criteria and migration contribution guidance, see
 ### Hacker News RSC Demo
 
 - Repo: [shakacode/react-on-rails-demo-hacker-news-rsc](https://github.com/shakacode/react-on-rails-demo-hacker-news-rsc)
+- Live demo: [hn.reactonrails.com](https://hn.reactonrails.com/)
 - Use it when you want a compact public demo of React on Rails Pro with React
   Server Components on a familiar read-heavy UI.
 
@@ -91,6 +92,9 @@ For detailed proof criteria and migration contribution guidance, see
 
 ## Live Demos
 
+- [hn.reactonrails.com](https://hn.reactonrails.com/) — Hacker News reader
+  showing React on Rails Pro with React 19 and React Server Components on a
+  familiar read-heavy UI.
 - [reactrails.com](https://reactrails.com) — production-style React on Rails app
   you can click through in your browser without any local setup. Backed by the
   legacy [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial)
