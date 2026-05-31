@@ -38,7 +38,7 @@ read_package_version() {
   local package_file="$1"
   local package_name="$2"
 
-  grep "\"$package_name\"" "$package_file" | head -1 | sed -E 's/.*"[~^]?([0-9][^"]*)".*/\1/' || true
+  grep -F "\"$package_name\"" "$package_file" | head -1 | sed -E -n 's/.*"[~^]?([0-9][^"]*)".*/\1/p' || true
 }
 
 read_shakapacker_npm_dependency() {
@@ -201,7 +201,7 @@ show_status() {
   fi
 
   SHAKAPACKER_NPM=""
-  SHAKAPACKER_NPM_PACKAGE=""
+  local SHAKAPACKER_NPM_PACKAGE=""
   local SHAKAPACKER_NPM_DEPENDENCY=""
   if [ -f "$PROJECT_ROOT/react_on_rails/spec/dummy/package.json" ]; then
     SHAKAPACKER_NPM_DEPENDENCY=$(read_shakapacker_npm_dependency "$PROJECT_ROOT/react_on_rails/spec/dummy/package.json")

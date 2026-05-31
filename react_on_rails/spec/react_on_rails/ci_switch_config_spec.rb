@@ -39,6 +39,17 @@ RSpec.describe "bin/ci-switch-config" do
     expect(stdout).to include("Shakapacker (npm, shakapacker): 10.1.0")
   end
 
+  it "ignores non-semver adapter specs instead of reporting the raw package line" do
+    stdout, stderr, status = ci_switch_status(
+      "shakapacker" => "10.1.0",
+      "shakapacker-webpack" => "workspace:~10.1.0"
+    )
+
+    expect(status).to be_success, stderr
+    expect(stdout).to include("Shakapacker (npm, shakapacker): 10.1.0")
+    expect(stdout).not_to include("workspace:~10.1.0")
+  end
+
   def ci_switch_status(dependencies)
     Dir.mktmpdir do |tmpdir|
       fake_script_path = File.join(tmpdir, "bin/ci-switch-config")
