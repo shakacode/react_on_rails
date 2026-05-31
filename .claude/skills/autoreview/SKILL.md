@@ -122,18 +122,18 @@ Prefer explicit target selection over custom focus text. Some Codex CLI versions
 prompt when `--base`, `--uncommitted`, or `--commit` is present. If that happens, keep the explicit
 target command and continue without the prompt rather than accidentally reviewing the wrong diff.
 
-When the intended diff is the only active review target and the installed CLI accepts a prompt, add
-focus instructions as the review prompt:
+When the installed CLI accepts focus text with the selected target flag, keep the same target from
+Step 1 and append the prompt there:
 
 ```bash
-codex review "Focus on SSR/hydration regressions, generated output, and repo workflow correctness."
+codex review --base "origin/$base" "Focus on SSR/hydration regressions, generated output, and repo workflow correctness."
 ```
 
 For longer instructions, create a scratch file in `.context/` or substitute your own path, then
-read from stdin only when the selected review engine supports that mode:
+read from stdin only when the selected review engine supports that mode without dropping the target:
 
 ```bash
-codex review - < .context/autoreview-focus.md   # create this file with your focus instructions first
+codex review --base "origin/$base" - < .context/autoreview-focus.md   # create this file with your focus instructions first
 ```
 
 Never silently switch the engine the user asked for. If the requested engine hits model
