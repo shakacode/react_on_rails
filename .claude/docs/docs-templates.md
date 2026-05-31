@@ -138,7 +138,7 @@ useEffect(() => {
 
 When documenting requirements, use:
 
-- Ruby >= 3.0
+- Ruby >= 3.3
 - Rails >= 6.1
 - Node >= 18
 - Shakapacker >= 6.0 (or Rspack)

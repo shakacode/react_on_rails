@@ -112,7 +112,7 @@ Start with the docs here:
 
 - Ruby on Rails >= 5
 - Shakapacker >= 6.0 (autobundling requires >= 7.0)
-- Ruby >= 3.0
+- Ruby >= 3.3
 - Node.js >= 18
 - A JavaScript package manager such as pnpm, npm, yarn, or bun
 
