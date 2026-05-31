@@ -1162,6 +1162,51 @@ RSpec.describe ReactOnRails::SystemChecker do
       it "can be called without errors" do
         expect { checker.send(:report_webpack_version) }.not_to raise_error
       end
+
+      it "reports rspack instead of webpack when assets_bundler is rspack" do
+        allow(checker).to receive(:configured_assets_bundler).and_return("rspack")
+        allow(checker).to receive(:package_json_path_for).with("Rspack version").and_return("package.json")
+        allow(File).to receive(:read).with("package.json").and_return(
+          {
+            "devDependencies" => {
+              "@rspack/core" => "^1.0.0",
+              "webpack" => "^5.0.0"
+            }
+          }.to_json
+        )
+
+        checker.send(:report_webpack_version)
+
+        info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+        expect(info_messages).to include("📦 Rspack version: ^1.0.0")
+        expect(info_messages).not_to include(a_string_including("Webpack version"))
+      end
+    end
+
+    describe "#additional_build_dependencies" do
+      it "keeps webpack-specific dependency descriptions for webpack apps" do
+        allow(checker).to receive(:configured_assets_bundler).and_return("webpack")
+
+        expect(checker.send(:additional_build_dependencies)).to include(
+          "webpack" => "Webpack bundler",
+          "webpack-dev-server" => "Webpack development server",
+          "css-loader" => "CSS loader for Webpack"
+        )
+      end
+
+      it "uses rspack and neutral loader descriptions for rspack apps" do
+        allow(checker).to receive(:configured_assets_bundler).and_return("rspack")
+
+        dependencies = checker.send(:additional_build_dependencies)
+
+        expect(dependencies).to include(
+          "@rspack/core" => "Rspack bundler",
+          "css-loader" => "CSS loader",
+          "style-loader" => "Style loader"
+        )
+        expect(dependencies).not_to include("webpack", "webpack-dev-server")
+        expect(dependencies.values).not_to include(a_string_including("Webpack"))
+      end
     end
   end
 end

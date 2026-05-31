@@ -480,6 +480,127 @@ module ReactOnRails
           nil
         end
 
+        def configured_assets_bundler
+          config = parsed_shakapacker_config
+          return nil unless config.is_a?(Hash)
+
+          rails_env = ENV["RAILS_ENV"] || ENV["RACK_ENV"] || "development"
+          bundler_from_shakapacker_section(config, rails_env) || bundler_from_shakapacker_section(config, "default")
+        rescue StandardError, ScriptError
+          nil
+        end
+
+        def active_assets_bundler
+          configured_assets_bundler || "webpack"
+        end
+
+        def assets_bundler_label
+          active_assets_bundler.capitalize
+        end
+
+        def dev_server_label
+          active_assets_bundler == "webpack" ? "webpack-dev-server" : "#{assets_bundler_label} dev server"
+        end
+
+        def development_reload_mode_label
+          development_hmr_enabled? ? "HMR" : "Live reload"
+        end
+
+        def development_reload_feature_label
+          development_hmr_enabled? ? "Hot Module Replacement (HMR)" : "Live reload"
+        end
+
+        def development_mode_title
+          development_hmr_enabled? ? "HMR Development mode (default)" : "Live reload development mode (default)"
+        end
+
+        def hmr_procfile_description
+          "#{development_reload_mode_label} development with #{dev_server_label}"
+        end
+
+        def default_procfile_description(default_mode)
+          bundler_aware_dev_server_text(ServerMode.text(default_mode, :procfile_description))
+        end
+
+        def static_procfile_description
+          if active_assets_bundler == "webpack"
+            "Static development with webpack --watch"
+          else
+            "Static development with #{active_assets_bundler} watch"
+          end
+        end
+
+        def bundler_aware_dev_server_text(text)
+          return text if active_assets_bundler == "webpack"
+
+          text
+            .gsub("webpack-dev-server", dev_server_label)
+            .gsub(
+              "Webpack dev server for automatic recompilation",
+              "#{assets_bundler_label} dev server for fast recompilation"
+            )
+            .gsub("Webpack dev server", "#{assets_bundler_label} dev server")
+            .gsub("webpack dev server", "#{active_assets_bundler} dev server")
+        end
+
+        def react_refresh_bundler_plugin_description
+          if active_assets_bundler == "webpack"
+            "webpack plugin"
+          else
+            "#{active_assets_bundler} React Refresh plugin"
+          end
+        end
+
+        def react_refresh_bundler_config_hint
+          if active_assets_bundler == "webpack"
+            "config/webpack/development.js: ReactRefreshWebpackPlugin (enabled when WEBPACK_SERVE=true)"
+          else
+            "config/rspack/development.js: @rspack/plugin-react-refresh / ReactRefreshPlugin " \
+              "(enabled for the dev server)"
+          end
+        end
+
+        def compilation_failed_label
+          if active_assets_bundler == "webpack"
+            "Webpack compilation failed"
+          else
+            "#{assets_bundler_label} compilation failed"
+          end
+        end
+
+        def bundler_from_shakapacker_section(config, section_name)
+          section = config[section_name] || config[section_name.to_sym]
+          return nil unless section.is_a?(Hash)
+
+          normalize_assets_bundler(section["assets_bundler"] || section[:assets_bundler])
+        end
+
+        def normalize_assets_bundler(value)
+          normalized = value.to_s.strip.downcase
+          %w[webpack rspack].include?(normalized) ? normalized : nil
+        end
+
+        def development_hmr_enabled?
+          dev_server = development_dev_server_config
+          return true unless dev_server.key?("hmr") || dev_server.key?(:hmr)
+
+          truthy_config_value?(dev_server["hmr"] || dev_server[:hmr])
+        end
+
+        def development_dev_server_config
+          config = parsed_shakapacker_config
+          return {} unless config.is_a?(Hash)
+
+          default_config = config["default"] || {}
+          development_config = default_config.merge(config["development"] || {})
+          dev_server = development_config["dev_server"] || development_config[:dev_server]
+          dev_server.is_a?(Hash) ? dev_server : {}
+        end
+
+        def truthy_config_value?(value)
+          value == true || value.to_s == "true"
+        end
+
         # Resolves SHAKAPACKER_CONFIG the same way ReactOnRails::Engine does, so this CLI
         # sees the same config file as Rails boot even when invoked from a directory other
         # than the Rails root. Falls back to Dir.pwd when Rails isn't loaded (bin/dev does
@@ -632,7 +753,7 @@ module ReactOnRails
 
         # rubocop:disable Metrics/AbcSize
         def help_customization(default_mode)
-          procfile_description = ServerMode.text(default_mode, :procfile_description)
+          procfile_description = default_procfile_description(default_mode)
           workflow_suffix = Rainbow(ServerMode.text(default_mode, :workflow_suffix)).white
 
           <<~CUSTOMIZATION
@@ -640,7 +761,7 @@ module ReactOnRails
             Each mode uses a specific Procfile that you can customize for your application:
 
             #{Rainbow('•').yellow} #{Rainbow('Procfile.dev').green.bold}                 - #{procfile_description}
-            #{Rainbow('•').yellow} #{Rainbow('Procfile.dev-static-assets').green.bold}   - Static development with webpack --watch
+            #{Rainbow('•').yellow} #{Rainbow('Procfile.dev-static-assets').green.bold}   - #{static_procfile_description}
             #{Rainbow('•').yellow} #{Rainbow('Procfile.dev-prod-assets').green.bold}     - Production-optimized assets (port 3001)
 
             #{Rainbow('Edit these files to customize the development environment for your needs.').white}
@@ -701,7 +822,7 @@ module ReactOnRails
             #{Rainbow('📦 Static development mode').cyan.bold} - #{Rainbow('Procfile.dev-static-assets').green}:
             #{Rainbow('•').yellow} #{Rainbow('No HMR (static assets with auto-recompilation)').white}
             #{Rainbow('•').yellow} #{Rainbow('React on Rails pack generation (via precompile hook or bin/dev)').white}
-            #{Rainbow('•').yellow} #{Rainbow('Webpack watch mode for auto-recompilation').white}
+            #{Rainbow('•').yellow} #{Rainbow("#{assets_bundler_label} watch mode for auto-recompilation").white}
             #{Rainbow('•').yellow} #{Rainbow('CSS extracted to separate files (no FOUC)').white}
             #{Rainbow('•').yellow} #{Rainbow('Development environment (faster builds than production)').white}
             #{Rainbow('•').yellow} #{Rainbow('Source maps for debugging').white}
@@ -710,7 +831,7 @@ module ReactOnRails
 
             #{Rainbow('🏭 Production-assets mode').cyan.bold} - #{Rainbow('Procfile.dev-prod-assets').green}:
             #{Rainbow('•').yellow} #{Rainbow('React on Rails pack generation (via precompile hook or assets:precompile)').white}
-            #{Rainbow('•').yellow} #{Rainbow('Asset precompilation with NODE_ENV=production (webpack optimizations)').white}
+            #{Rainbow('•').yellow} #{Rainbow("Asset precompilation with NODE_ENV=production (#{active_assets_bundler} optimizations)").white}
             #{Rainbow('•').yellow} #{Rainbow('RAILS_ENV=development by default for assets:precompile (avoids credentials)').white}
             #{Rainbow('•').yellow} #{Rainbow('Use --rails-env=production for assets:precompile only (not server processes)').white}
             #{Rainbow('•').yellow} #{Rainbow('Server processes controlled by Procfile.dev-prod-assets environment').white}
@@ -739,12 +860,12 @@ module ReactOnRails
         # so there is only one ServerMode.detect call per help render. Doctor memoizes because
         # it owns instance state on a fresh Doctor instance per invocation.
         def default_dev_server_mode
-          ServerMode.detect(shakapacker_config_path)
+          ServerMode.detect(shakapacker_config_path, fallback: development_hmr_enabled? ? :hmr : :live_reload)
         end
 
         def default_dev_server_detail_lines(mode)
           ServerMode.details(mode).map do |detail|
-            "#{Rainbow('•').yellow} #{Rainbow(detail).white}"
+            "#{Rainbow('•').yellow} #{Rainbow(bundler_aware_dev_server_text(detail)).white}"
           end.join("\n")
         end
 
@@ -756,18 +877,27 @@ module ReactOnRails
             #{Rainbow('React Refresh requires HMR; current default mode is not HMR.').white}
             #{Rainbow('•').yellow} #{Rainbow(ServerMode.text(default_mode, :refresh_guidance)).white}
             #{Rainbow('•').yellow} #{Rainbow(ServerMode.text(default_mode, :refresh_note)).white}
+            #{rspack_react_refresh_config_hint}
           REFRESH
+        end
+
+        def rspack_react_refresh_config_hint
+          return "" if active_assets_bundler == "webpack"
+
+          "#{Rainbow('•').yellow} #{Rainbow(react_refresh_bundler_config_hint).white}"
         end
 
         # Only called when the default dev-server mode is HMR, so the mode is always :hmr here.
         # rubocop:disable Metrics/AbcSize
         def help_hmr_react_refresh_troubleshooting
+          plugin_check = "Check that both babel plugin and #{react_refresh_bundler_plugin_description} are configured:"
+
           <<~REFRESH
             #{Rainbow('⚛️  React Refresh Issues:').yellow.bold}
             #{Rainbow('If you see "$RefreshSig$ is not defined" errors:').white}
-            #{Rainbow('1.').green} #{Rainbow('Check that both babel plugin and webpack plugin are configured:').white}
+            #{Rainbow('1.').green} #{Rainbow(plugin_check).white}
                #{Rainbow('•').yellow} #{Rainbow('babel.config.js: \'react-refresh/babel\' plugin (enabled when WEBPACK_SERVE=true)').white}
-               #{Rainbow('•').yellow} #{Rainbow('config/webpack/development.js: ReactRefreshWebpackPlugin (enabled when WEBPACK_SERVE=true)').white}
+               #{Rainbow('•').yellow} #{Rainbow(react_refresh_bundler_config_hint).white}
             #{Rainbow('2.').green} #{Rainbow(ServerMode.text(:hmr, :refresh_guidance)).white}
             #{Rainbow('3.').green} #{Rainbow('Try restarting the development server:').white} #{Rainbow('bin/dev kill && bin/dev').green.bold}
             #{Rainbow('4.').green} #{Rainbow(ServerMode.text(:hmr, :refresh_note)).white}
@@ -858,7 +988,7 @@ module ReactOnRails
             route: route
           )
 
-          # Precompile assets with production webpack optimizations (includes pack generation automatically)
+          # Precompile assets with production bundler optimizations (includes pack generation automatically)
           env = { "NODE_ENV" => "production" }
 
           # Validate and sanitize rails_env to prevent shell injection
@@ -872,11 +1002,11 @@ module ReactOnRails
 
           argv = ["bundle", "exec", "rails", "assets:precompile"]
 
-          puts "🔨 Precompiling assets with production webpack optimizations..."
+          puts "🔨 Precompiling assets with production #{active_assets_bundler} optimizations..."
           puts ""
 
           puts Rainbow("ℹ️  Asset Precompilation Environment:").blue
-          puts "   • NODE_ENV=production → Webpack optimizations (minification, compression)"
+          puts "   • NODE_ENV=production → #{assets_bundler_label} optimizations (minification, compression)"
           if rails_env
             puts "   • RAILS_ENV=#{rails_env} → Custom Rails environment for assets:precompile only"
             puts "   • Note: RAILS_ENV=production requires credentials, database setup, etc."
@@ -885,7 +1015,7 @@ module ReactOnRails
             puts "   • RAILS_ENV=development → Simpler Rails setup (no credentials needed)"
             puts "   • Use --rails-env=production for assets:precompile step only"
             puts "   • Server processes will use environment from Procfile.dev-prod-assets"
-            puts "   • Gets production webpack bundles without production Rails complexity"
+            puts "   • Gets production #{active_assets_bundler} bundles without production Rails complexity"
           end
           puts ""
 
@@ -931,7 +1061,8 @@ module ReactOnRails
             puts "#{Rainbow('2.').cyan} #{Rainbow('Add --trace for full stack trace:').white}"
             puts "   #{Rainbow("#{command_display} --trace").cyan}"
             puts ""
-            puts "#{Rainbow('3.').cyan} #{Rainbow('Or try with development webpack (faster, less optimized):').white}"
+            puts "#{Rainbow('3.').cyan} #{Rainbow("Or try with development #{active_assets_bundler} " \
+                                                  '(faster, less optimized):').white}"
             puts "   #{Rainbow('NODE_ENV=development bundle exec rails assets:precompile').cyan}"
             puts ""
 
@@ -958,8 +1089,8 @@ module ReactOnRails
 
             if error_content.include?("webpack") || error_content.include?("module") ||
                error_content.include?("compilation")
-              puts "#{Rainbow('•').yellow} #{Rainbow('Webpack compilation:').white.bold} " \
-                   "Check JavaScript/webpack errors above"
+              puts "#{Rainbow('•').yellow} #{Rainbow("#{assets_bundler_label} compilation:").white.bold} " \
+                   "Check JavaScript/#{active_assets_bundler} errors above"
             end
 
             # Always show these general options
@@ -1761,7 +1892,7 @@ module ReactOnRails
 
             #{Rainbow('🚨 General Issues:').yellow.bold}
             #{Rainbow('•').red} #{Rainbow('"Port already in use"').white} #{Rainbow('→ Run:').yellow} #{Rainbow('bin/dev kill').green.bold}
-            #{Rainbow('•').red} #{Rainbow('"Webpack compilation failed"').white} #{Rainbow('→ Check console for specific errors').white}
+            #{Rainbow('•').red} #{Rainbow("\"#{compilation_failed_label}\"").white} #{Rainbow('→ Check console for specific errors').white}
             #{Rainbow('•').red} #{Rainbow('"Process manager not found"').white} #{Rainbow('→ Install:').yellow} #{Rainbow('brew install overmind').green.bold} #{Rainbow('(or').white} #{Rainbow('gem install foreman').green.bold}#{Rainbow(')').white}
             #{Rainbow('•').red} #{Rainbow('"Assets not loading"').white} #{Rainbow('→ Verify Procfile.dev is present and check server logs').white}
 

@@ -1566,6 +1566,41 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       expect { described_class.show_help }.to output(%r{Usage: bin/dev \[command\]}).to_stdout_from_any_process
     end
 
+    it "preserves webpack-specific mode descriptions for webpack apps" do
+      allow(described_class).to receive(:configured_assets_bundler).and_return("webpack")
+
+      expect { described_class.show_help }
+        .to output(/HMR development with webpack-dev-server/).to_stdout_from_any_process
+      expect { described_class.show_help }
+        .to output(/Webpack dev server for fast recompilation/).to_stdout_from_any_process
+      expect { described_class.show_help }
+        .to output(/Webpack watch mode for auto-recompilation/).to_stdout_from_any_process
+    end
+
+    it "uses neutral/rspack mode descriptions for rspack live-reload apps" do
+      allow(described_class).to receive_messages(
+        configured_assets_bundler: "rspack",
+        development_dev_server_config: { "hmr" => false, "live_reload" => true }
+      )
+
+      expect { described_class.show_help }
+        .to output(/Live reload development with Rspack dev server/).to_stdout_from_any_process
+      expect { described_class.show_help }
+        .to output(/Live reload enabled/).to_stdout_from_any_process
+      expect { described_class.show_help }
+        .to output(/Rspack dev server for fast recompilation/).to_stdout_from_any_process
+      expect { described_class.show_help }
+        .to output(%r{@rspack/plugin-react-refresh / ReactRefreshPlugin}).to_stdout_from_any_process
+      expect { described_class.show_help }
+        .to output(/Rspack watch mode for auto-recompilation/).to_stdout_from_any_process
+      expect { described_class.show_help }.not_to output(/webpack-dev-server/).to_stdout_from_any_process
+      expect { described_class.show_help }.not_to output(/ReactRefreshRspackPlugin/).to_stdout_from_any_process
+      expect { described_class.show_help }
+        .not_to output(/Hot Module Replacement \(HMR\) enabled/).to_stdout_from_any_process
+      expect { described_class.show_help }.not_to output(/Webpack watch mode/).to_stdout_from_any_process
+      expect { described_class.show_help }.not_to output(/Webpack compilation failed/).to_stdout_from_any_process
+    end
+
     it "documents test asset workflows" do
       expect { described_class.show_help }.to output(/TEST ASSET WORKFLOWS/).to_stdout_from_any_process
       expect { described_class.show_help }.to output(%r{bin/dev test-watch}).to_stdout_from_any_process

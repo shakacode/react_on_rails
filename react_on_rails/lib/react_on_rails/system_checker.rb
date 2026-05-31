@@ -697,15 +697,26 @@ module ReactOnRails
     end
 
     def additional_build_dependencies
-      {
-        "webpack" => "Webpack bundler",
+      bundler_deps = if active_assets_bundler == "rspack"
+                       {
+                         "@rspack/core" => "Rspack bundler",
+                         "css-loader" => "CSS loader",
+                         "style-loader" => "Style loader"
+                       }
+                     else
+                       {
+                         "webpack" => "Webpack bundler",
+                         "css-loader" => "CSS loader for Webpack",
+                         "style-loader" => "Style loader for Webpack",
+                         "webpack-dev-server" => "Webpack development server"
+                       }
+                     end
+
+      bundler_deps.merge(
         "@babel/core" => "Babel compiler core",
         "@babel/preset-env" => "Babel environment preset",
-        "css-loader" => "CSS loader for Webpack",
-        "style-loader" => "Style loader for Webpack",
-        "mini-css-extract-plugin" => "CSS extraction plugin",
-        "webpack-dev-server" => "Webpack development server"
-      }
+        "mini-css-extract-plugin" => "CSS extraction plugin"
+      )
     end
 
     # rubocop:disable Metrics/CyclomaticComplexity
@@ -835,20 +846,26 @@ module ReactOnRails
     end
 
     def report_webpack_version
-      package_json_path = package_json_path_for("Webpack version")
+      bundler = active_assets_bundler
+      bundler_label = bundler.capitalize
+      package_json_path = package_json_path_for("#{bundler_label} version")
       return unless package_json_path
 
       begin
         package_json = JSON.parse(File.read(package_json_path))
         all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
 
-        webpack_version = all_deps["webpack"]
-        add_info("📦 Webpack version: #{webpack_version}") if webpack_version
+        bundler_version = bundler == "rspack" ? all_deps["@rspack/core"] || all_deps["rspack"] : all_deps["webpack"]
+        add_info("📦 #{bundler_label} version: #{bundler_version}") if bundler_version
       rescue JSON::ParserError
         # Handle JSON parsing errors
       rescue StandardError
         # Handle other file/access errors
       end
+    end
+
+    def active_assets_bundler
+      configured_assets_bundler || "webpack"
     end
   end
   # rubocop:enable Metrics/ClassLength

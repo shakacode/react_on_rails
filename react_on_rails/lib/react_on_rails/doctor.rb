@@ -164,7 +164,7 @@ module ReactOnRails
         ["Configuration Analysis", :check_configuration_details],
         ["bin/dev Launcher Setup", :check_bin_dev_launcher],
         ["Rails Integration", :check_rails],
-        ["Webpack Configuration", :check_webpack],
+        ["Bundler Configuration", :check_webpack],
         ["Testing Setup", :check_testing_setup],
         ["Development Environment", :check_development],
         ["React on Rails Pro Setup", :check_pro_setup],
@@ -286,14 +286,15 @@ module ReactOnRails
 
     def check_procfiles
       default_mode = default_dev_server_mode
+      descriptions = procfile_descriptions
       procfiles = {
         "Procfile.dev" => {
-          description: Dev::ServerMode.text(default_mode, :procfile_description),
+          description: default_procfile_description(default_mode),
           required_for: "bin/dev (default mode)",
           should_contain: ["shakapacker-dev-server", "rails server"]
         },
         "Procfile.dev-static-assets" => {
-          description: "Static development with webpack --watch",
+          description: descriptions[:static],
           required_for: "bin/dev static",
           should_contain: ["shakapacker", "rails server"]
         },
@@ -336,6 +337,23 @@ module ReactOnRails
       else
         checker.add_info("ℹ️  #{filename} not found (needed for #{config[:required_for]})")
       end
+    end
+
+    def procfile_descriptions
+      {
+        hmr: "#{development_reload_mode_label} development with #{dev_server_procfile_label}",
+        static: "Static development with #{static_watch_label}"
+      }
+    end
+
+    def default_procfile_description(default_mode)
+      bundler_aware_dev_server_text(Dev::ServerMode.text(default_mode, :procfile_description))
+    end
+
+    def bundler_aware_dev_server_text(text)
+      return text if active_assets_bundler == "webpack"
+
+      text.gsub("webpack-dev-server", dev_server_procfile_label)
     end
 
     def check_bin_dev_script
@@ -510,7 +528,7 @@ module ReactOnRails
         puts "• Start development with: #{Rainbow('./bin/dev').cyan} (or foreman start -f Procfile.dev)"
       else
         puts "• Start Rails server: bin/rails server"
-        puts "• Start webpack dev server: bin/shakapacker-dev-server (in separate terminal)"
+        puts "• Start #{dev_server_label}: bin/shakapacker-dev-server (in separate terminal)"
       end
 
       # Test suggestions based on what's available
@@ -529,6 +547,81 @@ module ReactOnRails
 
       puts "• Documentation: https://github.com/shakacode/react_on_rails"
       puts
+    end
+
+    def dev_server_label
+      active_assets_bundler == "webpack" ? "webpack dev server" : "#{assets_bundler_label} dev server"
+    end
+
+    def active_assets_bundler
+      configured_assets_bundler || "webpack"
+    end
+
+    def assets_bundler_label
+      active_assets_bundler.capitalize
+    end
+
+    def dev_server_procfile_label
+      active_assets_bundler == "webpack" ? "webpack-dev-server" : "#{assets_bundler_label} dev server"
+    end
+
+    def static_watch_label
+      active_assets_bundler == "webpack" ? "webpack --watch" : "#{active_assets_bundler} watch"
+    end
+
+    def development_reload_mode_label
+      development_hmr_enabled? ? "HMR" : "Live reload"
+    end
+
+    def configured_assets_bundler
+      config = parsed_shakapacker_config
+      return nil unless config
+
+      rails_env = ENV["RAILS_ENV"] || ENV["RACK_ENV"] || "development"
+      bundler_from_shakapacker_section(config, rails_env) || bundler_from_shakapacker_section(config, "default")
+    rescue StandardError, ScriptError
+      nil
+    end
+
+    def parsed_shakapacker_config
+      config_path = shakapacker_config_path
+      return nil unless File.exist?(config_path)
+
+      parse_shakapacker_config(File.read(config_path))
+    rescue StandardError, ScriptError
+      nil
+    end
+
+    def bundler_from_shakapacker_section(config, section_name)
+      section = config[section_name] || config[section_name.to_sym]
+      return nil unless section.is_a?(Hash)
+
+      normalize_assets_bundler(section["assets_bundler"] || section[:assets_bundler])
+    end
+
+    def normalize_assets_bundler(value)
+      normalized = value.to_s.strip.downcase
+      %w[webpack rspack].include?(normalized) ? normalized : nil
+    end
+
+    def development_hmr_enabled?
+      dev_server = development_dev_server_config
+      return true unless dev_server.key?("hmr") || dev_server.key?(:hmr)
+
+      truthy_config_value?(dev_server["hmr"] || dev_server[:hmr])
+    end
+
+    def development_dev_server_config
+      config = parsed_shakapacker_config
+      return {} unless config
+
+      dev_config = (config["default"] || {}).merge(config["development"] || {})
+      dev_server = dev_config["dev_server"] || dev_config[:dev_server]
+      dev_server.is_a?(Hash) ? dev_server : {}
+    end
+
+    def truthy_config_value?(value)
+      value == true || value.to_s == "true"
     end
     # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
