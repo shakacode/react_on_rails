@@ -22,6 +22,12 @@ const collectRecords = (...chunks: string[]) => {
 };
 
 describe('LengthPrefixedStreamParser', () => {
+  it('tolerates leading blank lines before the first record', () => {
+    const records = collectRecords(`\n${toRecord('hello', { index: 0 })}`);
+
+    expect(records).toEqual([{ content: 'hello', metadata: { index: 0 } }]);
+  });
+
   it('parses records separated by blank lines', () => {
     const records = collectRecords(`${toRecord('first', { index: 1 })}\n${toRecord('second', { index: 2 })}`);
 
@@ -68,5 +74,24 @@ describe('LengthPrefixedStreamParser', () => {
     expect(() => {
       parser.feed(encoder.encode(`not-json-or-length\n${toRecord('content')}`), () => {});
     }).toThrow('Malformed length-prefixed header: missing tab separator');
+  });
+
+  it('does not warn when flushing a trailing CR-only separator fragment', () => {
+    const parser = new LengthPrefixedStreamParser();
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const records: Array<{ content: string; metadata: Record<string, unknown> }> = [];
+
+    try {
+      parser.feed(encoder.encode(`${toRecord('hello', { index: 0 })}\r`), (content, metadata) => {
+        records.push({ content: decoder.decode(content), metadata });
+      });
+
+      parser.flush();
+
+      expect(records).toEqual([{ content: 'hello', metadata: { index: 0 } }]);
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 });

@@ -105,7 +105,7 @@ export default class LengthPrefixedStreamParser {
   }
 
   flush(): void {
-    if (this.state === 'header' && this.buf.length === 0) return;
+    if (this.state === 'header' && isBlankSeparatorLine(this.buf)) return;
     console.warn(
       `[react_on_rails] Incomplete length-prefixed stream: ${this.buf.length} bytes remaining in state ${this.state}`,
     );
