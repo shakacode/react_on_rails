@@ -31,7 +31,7 @@ module ReactOnRails
     end
 
     def initialize
-      # Binary encoding so that `index` returns byte positions (not character positions).
+      # Binary buffer keeps content slicing and byte counts protocol-oriented.
       # force_encoding is O(1) (flips a flag, no copy). .b allocates a new object but
       # shares the byte buffer via copy-on-write for strings over ~23 bytes.
       @buf = "".b
@@ -81,7 +81,7 @@ module ReactOnRails
     private
 
     def try_parse_header
-      idx = @buf.index("\n")
+      idx = @buf.byteindex("\n")
       return false unless idx
 
       header = @buf.byteslice(0, idx)

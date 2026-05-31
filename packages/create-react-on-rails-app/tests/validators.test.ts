@@ -40,6 +40,12 @@ describe('validateRuby', () => {
     expect(result.valid).toBe(true);
   });
 
+  it('returns valid for Ruby 4.0+', () => {
+    mockedGetCommandVersion.mockReturnValue('ruby 4.0.0 (2026-01-01 revision abcdef1234)');
+    const result = validateRuby();
+    expect(result.valid).toBe(true);
+  });
+
   it('returns invalid for Ruby 3.2', () => {
     mockedGetCommandVersion.mockReturnValue('ruby 3.2.8 (2025-03-26 revision 2a7b7c6e1c)');
     const result = validateRuby();
