@@ -59,10 +59,11 @@ module ReactOnRailsPro
 
       DEFAULT_ROUTE_PREFIX = "react_on_rails_pro_rolling_deploy"
       SAFE_HASH_PATTERN = ReactOnRailsPro::RollingDeploy::SAFE_HASH_PATTERN
-      # Rails route requirements reject anchor characters and apply segment
-      # constraints to the full segment. Keep this route-safe form in sync with
-      # SAFE_HASH_PATTERN's character rules; the controller still performs the
-      # anchored defense-in-depth validation before any filesystem lookup.
+      # Rails route requirements reject anchor characters, while the route
+      # matcher applies segment constraints to the full segment. Derived from
+      # SAFE_HASH_PATTERN by stripping the \A/\z anchors; the controller still
+      # performs the anchored defense-in-depth validation before any filesystem
+      # lookup.
       ROUTE_HASH_PATTERN = Regexp.new(SAFE_HASH_PATTERN.source.delete_prefix("\\A").delete_suffix("\\z"))
 
       class << self
