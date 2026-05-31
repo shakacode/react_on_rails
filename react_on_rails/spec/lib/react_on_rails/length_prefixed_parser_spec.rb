@@ -13,7 +13,10 @@ RSpec.describe ReactOnRails::LengthPrefixedParser do
 
   def length_prefixed_parts(content, payload_type: "string")
     payload = length_prefixed_payload(content, payload_type: payload_type)
-    header_end = payload.byteindex("\n") + 1
+    newline_idx = payload.byteindex("\n")
+    raise "Test fixture missing newline" unless newline_idx
+
+    header_end = newline_idx + 1
 
     [payload.byteslice(0, header_end), payload.byteslice(header_end, payload.bytesize - header_end)]
   end
