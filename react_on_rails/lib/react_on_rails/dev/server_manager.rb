@@ -13,6 +13,7 @@ require "time"
 require "uri"
 require "yaml"
 require_relative "../packer_utils"
+require_relative "../system_checker"
 require_relative "database_checker"
 require_relative "server_mode"
 require_relative "service_checker"
@@ -552,11 +553,14 @@ module ReactOnRails
         end
 
         def react_refresh_bundler_config_hint
-          if active_assets_bundler == "webpack"
+          case active_assets_bundler
+          when "webpack"
             "config/webpack/development.js: ReactRefreshWebpackPlugin (enabled when WEBPACK_SERVE=true)"
-          else
+          when "rspack"
             "config/rspack/development.js: @rspack/plugin-react-refresh / ReactRefreshPlugin " \
-              "(enabled for the dev server)"
+            "(enabled for the dev server)"
+          else
+            "Check your bundler's React Refresh plugin documentation"
           end
         end
 
@@ -577,7 +581,7 @@ module ReactOnRails
 
         def normalize_assets_bundler(value)
           normalized = value.to_s.strip.downcase
-          %w[webpack rspack].include?(normalized) ? normalized : nil
+          ReactOnRails::SystemChecker::SUPPORTED_ASSETS_BUNDLERS.include?(normalized) ? normalized : nil
         end
 
         def development_hmr_enabled?

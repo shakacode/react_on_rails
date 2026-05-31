@@ -164,7 +164,7 @@ module ReactOnRails
         ["Configuration Analysis", :check_configuration_details],
         ["bin/dev Launcher Setup", :check_bin_dev_launcher],
         ["Rails Integration", :check_rails],
-        ["Bundler Configuration", :check_webpack],
+        ["Bundler Configuration", :check_bundler_configuration],
         ["Testing Setup", :check_testing_setup],
         ["Development Environment", :check_development],
         ["React on Rails Pro Setup", :check_pro_setup],
@@ -223,7 +223,7 @@ module ReactOnRails
       checker.check_react_on_rails_initializer
     end
 
-    def check_webpack
+    def check_bundler_configuration
       checker.check_webpack_configuration
     end
 
@@ -601,7 +601,7 @@ module ReactOnRails
 
     def normalize_assets_bundler(value)
       normalized = value.to_s.strip.downcase
-      %w[webpack rspack].include?(normalized) ? normalized : nil
+      ReactOnRails::SystemChecker::SUPPORTED_ASSETS_BUNDLERS.include?(normalized) ? normalized : nil
     end
 
     def development_hmr_enabled?

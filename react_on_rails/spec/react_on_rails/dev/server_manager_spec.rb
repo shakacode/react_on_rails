@@ -1630,6 +1630,20 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
     end
 
+    it "uses generic React Refresh guidance for future bundlers" do
+      allow(described_class).to receive_messages(
+        configured_assets_bundler: "future",
+        development_dev_server_config: { "hmr" => true }
+      )
+
+      output = capture_stdout { described_class.show_help }
+
+      aggregate_failures do
+        expect(output).to match(/Check your bundler's React Refresh plugin documentation/)
+        expect(output).not_to match(%r{config/rspack/development.js})
+      end
+    end
+
     it "treats live_reload true without hmr as live reload" do
       allow(described_class).to receive_messages(
         configured_assets_bundler: "rspack",
