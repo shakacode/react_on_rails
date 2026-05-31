@@ -97,6 +97,7 @@ const streamRenderReactComponent = (
           streamingTrackers.postSSRHookTracker.notifySSREnd();
         },
         identifierPrefix: domNodeId,
+        nonce: railsContext.cspNonce,
       });
     })
     .catch((e: unknown) => {

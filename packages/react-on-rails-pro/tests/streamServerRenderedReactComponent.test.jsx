@@ -4,10 +4,20 @@
 
 import * as React from 'react';
 import * as PropTypes from 'prop-types';
+import { renderToPipeableStream } from 'react-on-rails/ReactDOMServer';
 import streamServerRenderedReactComponent from '../src/streamServerRenderedReactComponent.ts';
 import * as ComponentRegistry from '../src/ComponentRegistry.ts';
 import ReactOnRails from '../src/ReactOnRails.node.ts';
 import LengthPrefixedStreamParser from '../src/parseLengthPrefixedStream.ts';
+
+jest.mock('react-on-rails/ReactDOMServer', () => {
+  const actual = jest.requireActual('react-on-rails/ReactDOMServer');
+
+  return {
+    ...actual,
+    renderToPipeableStream: jest.fn(actual.renderToPipeableStream),
+  };
+});
 
 const AsyncContent = async ({ throwAsyncError }) => {
   await new Promise((resolve) => {
@@ -48,6 +58,7 @@ describe('streamServerRenderedReactComponent', () => {
     serverSideRSCPayloadParameters: {},
     reactClientManifestFileName: 'clientManifest.json',
     reactServerClientManifestFileName: 'serverClientManifest.json',
+    cspNonce: 'stream-csp-nonce',
     componentSpecificMetadata: {
       renderRequestId: '123',
     },
@@ -55,6 +66,7 @@ describe('streamServerRenderedReactComponent', () => {
 
   beforeEach(() => {
     ComponentRegistry.components().clear();
+    renderToPipeableStream.mockClear();
   });
 
   // Parses a length-prefixed stream chunk: metadata\tcontent_len\ncontent
@@ -149,6 +161,21 @@ describe('streamServerRenderedReactComponent', () => {
     expect(chunks[1].consoleReplayScript).toBe('');
     expect(chunks[1].hasErrors).toBe(false);
     expect(chunks[1].isShellReady).toBe(true);
+  });
+
+  it("passes Rails' CSP nonce to React's streaming bootstrap options", async () => {
+    const { renderResult } = setupStreamTest();
+    await new Promise((resolve) => {
+      renderResult.once('end', resolve);
+    });
+
+    expect(renderToPipeableStream).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        identifierPrefix: 'myDomId',
+        nonce: testingRailsContext.cspNonce,
+      }),
+    );
   });
 
   it('emits an error if there is an error in the shell and throwJsErrors is true', async () => {
