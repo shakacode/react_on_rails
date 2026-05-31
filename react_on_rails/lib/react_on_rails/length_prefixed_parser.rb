@@ -31,8 +31,9 @@ module ReactOnRails
     end
 
     def initialize
-      # Binary encoding so that `index` returns byte positions (not character positions).
-      # Needed because `byteindex` requires Ruby 3.2+ and we support 3.0+.
+      # Binary encoding ensures correct byte-position arithmetic regardless of payload encoding.
+      # Now that Ruby 3.3+ is required, byteindex makes byte semantics explicit instead of
+      # relying on binary-encoded index for positional equivalence.
       # force_encoding is O(1) (flips a flag, no copy). .b allocates a new object but
       # shares the byte buffer via copy-on-write for strings over ~23 bytes.
       @buf = "".b
@@ -82,13 +83,13 @@ module ReactOnRails
     private
 
     def try_parse_header
-      idx = @buf.index("\n")
+      idx = @buf.byteindex("\n".b)
       return false unless idx
 
       header = @buf.byteslice(0, idx)
       @buf = @buf.byteslice(idx + 1, @buf.bytesize - idx - 1)
 
-      tab_idx = header.index("\t")
+      tab_idx = header.byteindex("\t".b)
       unless tab_idx
         header_str = header.force_encoding(Encoding::UTF_8).inspect
         raise ReactOnRails::Error,

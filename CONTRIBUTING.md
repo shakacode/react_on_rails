@@ -620,7 +620,7 @@ Runs all skipped CI checks and enables full CI mode for the PR:
 - Triggers all CI workflows that were skipped due to unchanged code
 - Adds the `full-ci` label to the PR
 - **Persists across future commits** - all subsequent pushes will run the full test suite
-- Runs minimum dependency tests (Ruby 3.2, Node 20, Shakapacker 8.2.0, React 18)
+- Runs minimum dependency tests (Ruby 3.3, Node 20, Shakapacker 8.2.0, React 18)
 
 **When to use:**
 

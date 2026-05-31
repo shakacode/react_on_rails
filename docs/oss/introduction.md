@@ -112,9 +112,9 @@ Read the full **[React on Rails Doctrine](./misc/doctrine.md)** for our design p
 ## System Requirements
 
 - **Rails 7+** (Rails 5.2+ supported)
-- **Ruby 3.0+**
+- **Ruby 3.3+**
 - **Node.js 18+**
-- **Shakapacker 6+** (7+ recommended for React on Rails v16)
+- **Shakapacker 6+** (7+ recommended for React on Rails v17)
 
 ## Need Help?
 
