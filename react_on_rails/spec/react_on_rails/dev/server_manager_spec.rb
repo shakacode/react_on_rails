@@ -1887,6 +1887,33 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     end
   end
 
+  describe ".development_dev_server_config" do
+    it "uses the development dev_server hash as a whole when development overrides it" do
+      allow(described_class).to receive(:parsed_shakapacker_config).and_return(
+        "default" => { "dev_server" => { "hmr" => true, "host" => "0.0.0.0" } },
+        "development" => { "dev_server" => { "port" => 3035 } }
+      )
+
+      aggregate_failures do
+        expect(described_class.send(:development_dev_server_config)).to eq("port" => 3035)
+        expect(described_class.send(:development_hmr_enabled?)).to be(false)
+      end
+    end
+
+    it "normalizes selected dev_server keys to strings" do
+      allow(described_class).to receive(:parsed_shakapacker_config).and_return(
+        "default" => { dev_server: { hmr: true } },
+        "development" => { "dev_server" => { "hmr" => false } }
+      )
+
+      aggregate_failures do
+        expect(described_class.send(:development_dev_server_config)).to include("hmr" => false)
+        expect(described_class.send(:development_dev_server_config)).not_to have_key(:hmr)
+        expect(described_class.send(:development_hmr_enabled?)).to be(false)
+      end
+    end
+  end
+
   describe ".run_test_watch" do
     before do
       allow(described_class).to receive(:puts)

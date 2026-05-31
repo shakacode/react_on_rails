@@ -586,11 +586,10 @@ module ReactOnRails
 
         def development_hmr_enabled?
           dev_server = development_dev_server_config
-          if dev_server.key?("hmr") || dev_server.key?(:hmr)
-            return truthy_config_value?(dev_server["hmr"] || dev_server[:hmr])
-          end
+          return truthy_config_value?(dev_server["hmr"]) if dev_server.key?("hmr")
 
-          return false if truthy_config_value?(dev_server["live_reload"] || dev_server[:live_reload])
+          return false if truthy_config_value?(dev_server["live_reload"])
+          return false if dev_server.any?
 
           # Default to HMR when neither hmr nor live_reload is configured, preserving historical behavior.
           true
@@ -600,10 +599,20 @@ module ReactOnRails
           config = parsed_shakapacker_config
           return {} unless config.is_a?(Hash)
 
-          default_config = config["default"] || {}
-          development_config = default_config.merge(config["development"] || {})
-          dev_server = development_config["dev_server"] || development_config[:dev_server]
-          dev_server.is_a?(Hash) ? dev_server : {}
+          development_config = shakapacker_section(config, "default").merge(shakapacker_section(config, "development"))
+          dev_server_config_for(development_config)
+        end
+
+        def shakapacker_section(config, section_name)
+          section = config[section_name] || config[section_name.to_sym]
+          section.is_a?(Hash) ? section : {}
+        end
+
+        def dev_server_config_for(section)
+          dev_server = section["dev_server"] || section[:dev_server]
+          return {} unless dev_server.is_a?(Hash)
+
+          dev_server.transform_keys(&:to_s)
         end
 
         def truthy_config_value?(value)
@@ -718,7 +727,7 @@ module ReactOnRails
               #{command_label}#{command_padding}#{command_description}
                                   #{Rainbow('→ Uses:').yellow} Procfile.dev
 
-              #{Rainbow('static').green.bold}              #{Rainbow('Start development server with static assets (no HMR, no FOUC)').white}
+              #{Rainbow('static').green.bold}              #{Rainbow('Start development server with static assets (watch mode, no FOUC)').white}
                                   #{Rainbow('→ Uses:').yellow} Procfile.dev-static-assets
 
               #{Rainbow('production-assets').green.bold}   #{Rainbow('Start with production-optimized assets (no HMR)').white}

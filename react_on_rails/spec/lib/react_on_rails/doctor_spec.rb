@@ -106,6 +106,33 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
+  describe "#development_dev_server_config" do
+    it "uses the development dev_server hash as a whole when development overrides it" do
+      allow(doctor).to receive(:parsed_shakapacker_config).and_return(
+        "default" => { "dev_server" => { "hmr" => true, "host" => "0.0.0.0" } },
+        "development" => { "dev_server" => { "port" => 3035 } }
+      )
+
+      aggregate_failures do
+        expect(doctor.send(:development_dev_server_config)).to eq("port" => 3035)
+        expect(doctor.send(:development_hmr_enabled?)).to be(false)
+      end
+    end
+
+    it "normalizes selected dev_server keys to strings" do
+      allow(doctor).to receive(:parsed_shakapacker_config).and_return(
+        "default" => { dev_server: { hmr: true } },
+        "development" => { "dev_server" => { "hmr" => false } }
+      )
+
+      aggregate_failures do
+        expect(doctor.send(:development_dev_server_config)).to include("hmr" => false)
+        expect(doctor.send(:development_dev_server_config)).not_to have_key(:hmr)
+        expect(doctor.send(:development_hmr_enabled?)).to be(false)
+      end
+    end
+  end
+
   describe "#check_procfiles" do
     let(:checker) { doctor.instance_variable_get(:@checker) }
 
@@ -1335,14 +1362,21 @@ RSpec.describe ReactOnRails::Doctor do
         expect(warning_messages).to include(a_string_including("Shared output paths with dev_server.hmr: true"))
       end
 
-      it "does not warn when shared output paths are configured without HMR enabled" do
+      it "does not warn when development overrides the default dev_server without hmr" do
         write_project_file("config/shakapacker.yml", <<~YAML)
+          default: &default
+            source_path: client/app
+            dev_server:
+              hmr: true
+
           development:
+            <<: *default
             public_output_path: packs
             dev_server:
               port: 3035
 
           test:
+            <<: *default
             public_output_path: packs
             compile: false
         YAML
