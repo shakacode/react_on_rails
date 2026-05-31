@@ -111,8 +111,7 @@ flowchart TB
         L3 -- "miss" --> L4{"L4 · on-disk bundle cache<br/>cache/hash/hash.js"}
         L4 -- "hit" --> Exec
         L4 -- "miss (cold)" --> Upload["410 → Rails uploads bundle"]
-        Upload -- "writes bundle" --> L4
-        L4 -- "now cached" --> Exec
+        Upload -- "seeds L4 · execute" --> Exec
     end
     Exec --> Done
     Exec -. "during this render only" .-> L5["L5 · request-scoped dedup<br/>React.cache() / async-prop Promise<br/>dedupes repeated reads — no cross-request reuse"]
