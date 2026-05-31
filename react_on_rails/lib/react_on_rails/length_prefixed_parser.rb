@@ -32,7 +32,6 @@ module ReactOnRails
 
     def initialize
       # Binary encoding so that `index` returns byte positions (not character positions).
-      # Needed because `byteindex` requires Ruby 3.2+ and we support 3.0+.
       # force_encoding is O(1) (flips a flag, no copy). .b allocates a new object but
       # shares the byte buffer via copy-on-write for strings over ~23 bytes.
       @buf = "".b

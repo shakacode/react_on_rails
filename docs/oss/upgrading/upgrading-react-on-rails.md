@@ -42,9 +42,9 @@ install.
 
 Before changing versions, check these first:
 
-1. **Ruby and Node requirements**: React on Rails v16 requires Ruby 3.0+ and Node 18+.
+1. **Ruby and Node requirements**: React on Rails v17 requires Ruby 3.3+ and Node 18+. React on Rails v16 remains the upgrade path for apps that need older Ruby versions.
 2. **Bundler age**: legacy apps may have lockfiles created by Bundler 1.x. Those lockfiles can fail on modern Ruby before the React on Rails upgrade even starts.
-3. **Rails version**: current `react_on_rails` requires Rails 5.2+. Rails 5.1 apps need a Rails upgrade before they can bundle v16.
+3. **Rails version**: current `react_on_rails` requires Rails 5.2+. Rails 5.1 apps need a Rails upgrade before they can bundle v17.
 4. **Asset stack**: if the app still uses `webpacker`, upgrade to `shakapacker` first.
 5. **Version pinning**: use exact gem and npm package versions for React on Rails-related packages. Avoid `^`, `~`, or `*`.
 
@@ -98,6 +98,26 @@ Use a script-based hook with an explicit self-guard. This pattern is reliable ac
 ### CI recommendation
 
 In CI, run precompile preparation explicitly once before webpack compilation or test startup, rather than relying on hook timing in watch-like flows.
+
+## Upgrading to v17 (from v16)
+
+### Breaking Changes
+
+- **Ruby 3.3+ is required.** Upgrade Ruby before moving to React on Rails v17. React on Rails v16 remains the supported line for applications that must stay on Ruby 3.2 or older.
+- **React on Rails Pro already required Ruby 3.3+.** v17 aligns the open-source gem, Pro gem, create-app validator, and CI minimum matrix on the same Ruby floor.
+
+### Migration Steps
+
+1. Upgrade the app to Ruby 3.3 or newer and refresh the Ruby lockfile:
+
+   ```bash
+   ruby -v
+   bundle update react_on_rails
+   bundle install
+   ```
+
+2. If you scaffold apps with `create-react-on-rails-app`, make sure your shell resolves Ruby 3.3+ before running the CLI.
+3. Run your app's test suite and asset build after the Ruby upgrade, then update React on Rails and its matching npm package together.
 
 ## Upgrading to v16.4.0 (from v16.3.x)
 

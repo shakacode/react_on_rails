@@ -2,7 +2,7 @@
 # Switch between CI test configurations locally
 #
 # Usage:
-#   bin/ci-switch-config minimum   # Ruby 3.2, Node 20, minimum deps
+#   bin/ci-switch-config minimum   # Ruby 3.3, Node 20, minimum deps
 #   bin/ci-switch-config latest    # Ruby 3.4, Node 22, latest deps
 #   bin/ci-switch-config status    # Show current configuration
 
@@ -65,7 +65,7 @@ set_ruby_version() {
     rvm|rvm+nvm)
       print_header "Setting Ruby $version with rvm"
       # Check if version exists using rvm list rubies for consistent output
-      # Anchor to start of line to avoid false matches (e.g., 3.2.8 shouldn't match 13.2.8)
+      # Anchor to start of line to avoid false matches (e.g., 3.3.7 shouldn't match 13.3.7)
       # Allow optional leading whitespace and ruby- prefix, no end anchor to allow patch suffixes
       if ! rvm list rubies | grep -qE "^[[:space:]]*(ruby-)?${version}"; then
         print_warning "Ruby $version not installed. Installing..."
@@ -199,7 +199,7 @@ show_status() {
 
   echo ""
   if [[ "${SHAKAPACKER_GEM}" == "8.2.0" ]] && [[ "${REACT_ROOT}" == "18.0.0" ]]; then
-    echo -e "Current config: ${GREEN}minimum${NC} (matches CI: Ruby 3.2, Node 20, minimum deps)"
+    echo -e "Current config: ${GREEN}minimum${NC} (matches CI: Ruby 3.3, Node 20, minimum deps)"
   elif [[ "${SHAKAPACKER_GEM}" == "9.3.0" ]] && [[ "${REACT_ROOT}" =~ 19 ]]; then
     echo -e "Current config: ${GREEN}latest${NC} (matches CI: Ruby 3.4, Node 22, latest deps)"
   else
@@ -211,7 +211,7 @@ switch_to_minimum() {
   local VERSION_MANAGER=$(check_version_manager)
 
   print_header "Switching to MINIMUM configuration"
-  echo "  Target: Ruby 3.2, Node 20, Shakapacker 8.2.0, React 18.0.0"
+  echo "  Target: Ruby 3.3, Node 20, Shakapacker 8.2.0, React 18.0.0"
   echo "  Using version manager: $VERSION_MANAGER"
   echo ""
 
@@ -231,15 +231,15 @@ switch_to_minimum() {
     mise|asdf)
       print_header "Setting runtime versions in .tool-versions"
       cat > "$PROJECT_ROOT/.tool-versions" <<EOF
-ruby 3.2.8
+ruby 3.3.7
 nodejs 20.18.1
 EOF
-      print_success "Created .tool-versions with Ruby 3.2.8 and Node 20.18.1"
+      print_success "Created .tool-versions with Ruby 3.3.7 and Node 20.18.1"
       ;;
     rvm|rvm+nvm)
       print_header "Creating .ruby-version for rvm"
-      echo "3.2.8" > "$PROJECT_ROOT/.ruby-version"
-      print_success "Created .ruby-version with Ruby 3.2.8"
+      echo "3.3.7" > "$PROJECT_ROOT/.ruby-version"
+      print_success "Created .ruby-version with Ruby 3.3.7"
       ;;
   esac
 
@@ -251,7 +251,7 @@ EOF
       ;;
   esac
 
-  set_ruby_version "3.2.8" "$VERSION_MANAGER"
+  set_ruby_version "3.3.7" "$VERSION_MANAGER"
   set_node_version "20.18.1" "$VERSION_MANAGER"
 
   # Run conversion script
@@ -505,7 +505,7 @@ case "${1:-}" in
     echo "Usage: $0 {minimum|latest|status}"
     echo ""
     echo "Commands:"
-    echo "  minimum  - Switch to Ruby 3.2, Node 20, minimum dependencies (Shakapacker 8.2.0, React 18)"
+    echo "  minimum  - Switch to Ruby 3.3, Node 20, minimum dependencies (Shakapacker 8.2.0, React 18)"
     echo "  latest   - Switch to Ruby 3.4, Node 22, latest dependencies (Shakapacker 9.3.0, React 19)"
     echo "  status   - Show current configuration"
     echo ""

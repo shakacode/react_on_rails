@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "set"
-
 module ReactOnRails
   module ConfigPathResolver
     # Keep JS before TS to match generator defaults and to prefer the

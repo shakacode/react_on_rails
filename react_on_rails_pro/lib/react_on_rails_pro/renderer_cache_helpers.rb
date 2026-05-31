@@ -3,7 +3,6 @@
 require "fileutils"
 require "securerandom"
 require "pathname"
-require "set"
 
 require "react_on_rails_pro/error"
 

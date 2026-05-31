@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "set"
-
 module ReactOnRailsPro
   def self.configure
     yield(configuration)
