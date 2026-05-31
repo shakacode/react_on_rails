@@ -25,6 +25,7 @@ describe ReactOnRailsPro::RollingDeploy::BundlesController do
     end
 
     it "keeps the route hash pattern derived from the safe hash pattern without anchors" do
+      expect(described_class::SAFE_HASH_PATTERN.source).to start_with("\\A").and end_with("\\z")
       expect(described_class::ROUTE_HASH_PATTERN.source)
         .to eq(described_class::SAFE_HASH_PATTERN.source.delete_prefix("\\A").delete_suffix("\\z"))
     end

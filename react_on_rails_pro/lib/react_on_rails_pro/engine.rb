@@ -19,7 +19,7 @@ module ReactOnRailsPro
     initializer "react_on_rails_pro.rolling_deploy_routes" do |app|
       app.routes.prepend do
         pro_config = ReactOnRailsPro.configuration
-        mount_path = pro_config.rolling_deploy_mount_path.to_s
+        mount_path = pro_config.rolling_deploy_mount_path
 
         if pro_config.rolling_deploy_http_adapter? && mount_path.present?
           ReactOnRailsPro::RollingDeploy::BundlesController.draw_routes(
