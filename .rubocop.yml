@@ -49,8 +49,9 @@ Layout/LineLength:
 Style/StringLiterals:
   EnforcedStyle: double_quotes
 
+# Temporary v17 deferrals to avoid a mass rewrite on the Ruby 3.3 baseline bump.
+# Tracked for v18: https://github.com/shakacode/react_on_rails/issues/3501
 Style/HashSyntax:
-  # Avoids a mass rewrite on the Ruby 3.3 baseline bump; revisit before the next major version.
   EnforcedShorthandSyntax: never
 
 Style/ArgumentsForwarding:
