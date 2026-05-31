@@ -32,6 +32,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 - **Generator defaults to Rspack for fresh installs**: `rails generate react_on_rails:install` and `create-react-on-rails-app` now default to the Rspack bundler on fresh installs (significantly faster builds via SWC), instead of Webpack. Pass `--no-rspack` (or its alias `--webpack`) to use Webpack. This only affects fresh installs — existing apps that already declare an `assets_bundler` in `config/shakapacker.yml` are left unchanged, an explicit `--rspack`/`--no-rspack`/`--webpack` always wins, and the default falls back to Webpack on Shakapacker versions below 9.0 (where Rspack is unsupported). [PR 3484](https://github.com/shakacode/react_on_rails/pull/3484) by [justin808](https://github.com/justin808).
 
+#### Improved
+
+- **RSC setup verification warns on dynamic plugin options**: `react_on_rails:install --rsc` now warns when `new RSCWebpackPlugin(...)` uses computed options that cannot be statically verified, avoiding misleading missing-`clientReferences` reports for dynamic config. Fixes [Issue 3412](https://github.com/shakacode/react_on_rails/issues/3412). [PR 3505](https://github.com/shakacode/react_on_rails/pull/3505) by [justin808](https://github.com/justin808).
+
 #### Fixed
 
 - **Shakapacker config warnings now report resolved relative paths**: When `SHAKAPACKER_CONFIG` is set to a relative missing path, the Rails boot warning now includes the Rails-root-resolved path that React on Rails actually checked. Fixes [Issue 3436](https://github.com/shakacode/react_on_rails/issues/3436). [PR 3441](https://github.com/shakacode/react_on_rails/pull/3441) by [justin808](https://github.com/justin808).
