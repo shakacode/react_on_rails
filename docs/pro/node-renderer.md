@@ -419,14 +419,14 @@ flowchart TB
     Root -. "incremental / async-props renders" .-> Inc["ror.incremental.stream"]
     Inc --> Chunk["ror.incremental.process_chunk<br/>(one per NDJSON update chunk)"]
     style Root fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style BEC1 fill:#e6f0ff,stroke:#2c6ecb,color:#000
+    style BEC1 fill:#fff4e5,stroke:#e0a000,color:#000
     style Prep fill:#e6f0ff,stroke:#2c6ecb,color:#000
     style Vm fill:#e6ffed,stroke:#2da44e,color:#000
     style Http fill:#fff4e5,stroke:#e0a000,color:#000
     style Up fill:#fff4e5,stroke:#e0a000,color:#000
     style BEC2 fill:#fff4e5,stroke:#e0a000,color:#000
     style Inc fill:#e6f0ff,stroke:#2c6ecb,color:#000
-    style Chunk fill:#e6f0ff,stroke:#2c6ecb,color:#000
+    style Chunk fill:#e6ffed,stroke:#2da44e,color:#000
 ```
 
 ### Production defaults

@@ -87,6 +87,7 @@ flowchart LR
     style RSC fill:#e6f0ff,stroke:#2c6ecb,color:#000
     style HTML fill:#e6ffed,stroke:#2da44e,color:#000
     style Browser fill:#fff4e5,stroke:#e0a000,color:#000
+    style Hydrate fill:#fff4e5,stroke:#e0a000,color:#000
     style Chunks fill:#fff4e5,stroke:#e0a000,color:#000
 ```
 
