@@ -60,7 +60,8 @@ cd spec/dummy
 bundle exec rspec spec/system/integration_spec.rb
 ```
 
-Ruby 3.3 avoids the OpenSSL 3.6 compatibility issue seen with this local Ruby/OpenSSL combination and matches the minimum supported Ruby line more closely.
+Ruby 3.3 does not trigger the SSL errors observed on Ruby 3.4.3 with OpenSSL 3.6. If you still hit SSL
+errors on Ruby 3.3, please open an issue; Ruby 3.3 also matches the minimum supported Ruby line more closely.
 
 ### Alternative Solutions
 

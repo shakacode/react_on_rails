@@ -51,6 +51,8 @@ Style/StringLiterals:
 
 # Temporary v17 deferrals to avoid a mass rewrite on the Ruby 3.3 baseline bump.
 # Tracked for v18: https://github.com/shakacode/react_on_rails/issues/3501
+# Preview the v18 cleanup with:
+#   bundle exec rubocop --only Style/HashSyntax,Style/ArgumentsForwarding,Naming/BlockForwarding --autocorrect
 Style/HashSyntax:
   EnforcedShorthandSyntax: never
 
