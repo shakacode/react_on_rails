@@ -46,7 +46,7 @@ read_shakapacker_npm_dependency() {
   local package_name
   local package_version
 
-  for package_name in shakapacker shakapacker-webpack shakapacker-rspack; do
+  for package_name in shakapacker-webpack shakapacker-rspack shakapacker; do
     package_version=$(read_package_version "$package_file" "$package_name")
     if [ -n "$package_version" ]; then
       echo "$package_name:$package_version"

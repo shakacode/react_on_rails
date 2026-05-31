@@ -51,10 +51,10 @@ namespace :shakapacker do # rubocop:disable Metrics/BlockLength
     package_jsons = Dir.glob(File.join(monorepo_root, "**", "package.json"))
                        .reject { |f| f.include?("node_modules") }
                        .reject { |f| f.include?("gen-examples") }
+    package_names = Regexp.union(%w[shakapacker-webpack shakapacker-rspack shakapacker]).source
 
     package_jsons.each do |path|
       content = File.read(path)
-      package_names = Regexp.union(%w[shakapacker shakapacker-webpack shakapacker-rspack]).source
       # Preserve npm version prefixes (^, ~) if present
       updated = content.gsub(
         /("(?:#{package_names})":\s*")([\^~]?)[\d.]+(?:[a-zA-Z0-9.\-]*)"/
