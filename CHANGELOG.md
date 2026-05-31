@@ -35,6 +35,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 #### Fixed
 
 - **Shakapacker config warnings now report resolved relative paths**: When `SHAKAPACKER_CONFIG` is set to a relative missing path, the Rails boot warning now includes the Rails-root-resolved path that React on Rails actually checked. Fixes [Issue 3436](https://github.com/shakacode/react_on_rails/issues/3436). [PR 3441](https://github.com/shakacode/react_on_rails/pull/3441) by [justin808](https://github.com/justin808).
+- **Base-port renderer URLs preserve localhost-equivalent hosts**: `bin/dev` base-port mode now keeps localhost-equivalent renderer hosts and schemes, such as `127.0.0.1` and `https://localhost`, when deriving `REACT_RENDERER_URL`; remote or invalid hosts still fall back to `http://localhost`. Fixes [Issue 3466](https://github.com/shakacode/react_on_rails/issues/3466). [PR 3506](https://github.com/shakacode/react_on_rails/pull/3506) by [justin808](https://github.com/justin808).
 
 ### [17.0.0.rc.0] - 2026-05-30
 
