@@ -68,6 +68,12 @@ RSpec.describe ReactOnRails::LengthPrefixedParser do
       "#{metadata}\t#{content.bytesize.to_s(16)}\n#{content}"
     end
 
+    def length_prefixed_parts(content)
+      metadata = { "payloadType" => "string", "consoleReplayScript" => "" }.to_json
+
+      ["#{metadata}\t#{content.bytesize.to_s(16)}\n", content]
+    end
+
     it "parses multibyte payloads split across streaming chunks" do
       content = "\u3053\u3093\u306B\u3061\u306F"
       payload = length_prefixed_payload(content).b
@@ -78,6 +84,24 @@ RSpec.describe ReactOnRails::LengthPrefixedParser do
       expect(results).to be_empty
 
       parser.feed(payload.byteslice(10, payload.bytesize - 10)) { |chunk| results << chunk }
+      expect(results).to contain_exactly(
+        include(
+          "consoleReplayScript" => "",
+          "html" => content
+        )
+      )
+    end
+
+    it "waits for a multibyte body after receiving a complete header chunk" do
+      content = "\u4F60\u597D"
+      header, body = length_prefixed_parts(content)
+      parser = described_class.new
+      results = []
+
+      parser.feed(header.b) { |chunk| results << chunk }
+      expect(results).to be_empty
+
+      parser.feed(body.b) { |chunk| results << chunk }
       expect(results).to contain_exactly(
         include(
           "consoleReplayScript" => "",

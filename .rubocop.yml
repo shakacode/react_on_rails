@@ -54,8 +54,7 @@ Style/StringLiterals:
 # Preview the v18 cleanup with:
 #   bundle exec rubocop --only Style/HashSyntax,Style/ArgumentsForwarding,Naming/BlockForwarding --autocorrect
 Style/HashSyntax:
-  # Prohibits shorthand hash values to avoid a mass rewrite in v17; remove for v18 cleanup.
-  EnforcedShorthandSyntax: never
+  EnforcedShorthandSyntax: never # Prohibits shorthand to avoid mass rewrite in v17; remove for v18 cleanup.
 
 Style/ArgumentsForwarding:
   UseAnonymousForwarding: false
