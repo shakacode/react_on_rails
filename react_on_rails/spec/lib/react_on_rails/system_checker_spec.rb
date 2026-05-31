@@ -1173,9 +1173,9 @@ RSpec.describe ReactOnRails::SystemChecker do
       end
     end
 
-    describe "#report_webpack_version" do
+    describe "#report_bundler_version" do
       it "can be called without errors" do
-        expect { checker.send(:report_webpack_version) }.not_to raise_error
+        expect { checker.send(:report_bundler_version) }.not_to raise_error
       end
 
       it "reports rspack instead of webpack when assets_bundler is rspack" do
@@ -1190,7 +1190,7 @@ RSpec.describe ReactOnRails::SystemChecker do
           }.to_json
         )
 
-        checker.send(:report_webpack_version)
+        checker.send(:report_bundler_version)
 
         info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
         expect(info_messages).to include("📦 Rspack version: ^1.0.0")

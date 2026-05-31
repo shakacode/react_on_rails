@@ -592,6 +592,7 @@ module ReactOnRails
 
           return false if truthy_config_value?(dev_server["live_reload"] || dev_server[:live_reload])
 
+          # Default to HMR when neither hmr nor live_reload is configured, preserving historical behavior.
           true
         end
 

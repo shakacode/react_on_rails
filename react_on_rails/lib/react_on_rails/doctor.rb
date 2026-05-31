@@ -550,7 +550,7 @@ module ReactOnRails
     end
 
     def dev_server_label
-      active_assets_bundler == "webpack" ? "webpack dev server" : "#{assets_bundler_label} dev server"
+      active_assets_bundler == "webpack" ? "webpack-dev-server" : "#{assets_bundler_label} dev server"
     end
 
     def active_assets_bundler
@@ -612,6 +612,7 @@ module ReactOnRails
 
       return false if truthy_config_value?(dev_server["live_reload"] || dev_server[:live_reload])
 
+      # Default to HMR when neither hmr nor live_reload is configured, preserving historical behavior.
       true
     end
 

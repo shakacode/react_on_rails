@@ -1590,18 +1590,21 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
   describe ".show_help" do
     it "displays help information" do
-      expect { described_class.show_help }.to output(%r{Usage: bin/dev \[command\]}).to_stdout_from_any_process
+      output = capture_stdout { described_class.show_help }
+
+      expect(output).to match(%r{Usage: bin/dev \[command\]})
     end
 
     it "preserves webpack-specific mode descriptions for webpack apps" do
       allow(described_class).to receive(:configured_assets_bundler).and_return("webpack")
 
-      expect { described_class.show_help }
-        .to output(/HMR development with webpack-dev-server/).to_stdout_from_any_process
-      expect { described_class.show_help }
-        .to output(/Webpack dev server for fast recompilation/).to_stdout_from_any_process
-      expect { described_class.show_help }
-        .to output(/Webpack watch mode for auto-recompilation/).to_stdout_from_any_process
+      output = capture_stdout { described_class.show_help }
+
+      aggregate_failures do
+        expect(output).to match(/HMR development with webpack-dev-server/)
+        expect(output).to match(/Webpack dev server for fast recompilation/)
+        expect(output).to match(/Webpack watch mode for auto-recompilation/)
+      end
     end
 
     it "uses neutral/rspack mode descriptions for rspack live-reload apps" do
@@ -1657,9 +1660,13 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     end
 
     it "documents test asset workflows" do
-      expect { described_class.show_help }.to output(/TEST ASSET WORKFLOWS/).to_stdout_from_any_process
-      expect { described_class.show_help }.to output(%r{bin/dev test-watch}).to_stdout_from_any_process
-      expect { described_class.show_help }.to output(%r{bin/dev static}).to_stdout_from_any_process
+      output = capture_stdout { described_class.show_help }
+
+      aggregate_failures do
+        expect(output).to match(/TEST ASSET WORKFLOWS/)
+        expect(output).to match(%r{bin/dev test-watch})
+        expect(output).to match(%r{bin/dev static})
+      end
     end
 
     context "when Shakapacker config uses live reload instead of HMR" do

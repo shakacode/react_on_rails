@@ -845,7 +845,7 @@ module ReactOnRails
       end
     end
 
-    def report_webpack_version
+    def report_bundler_version
       bundler = active_assets_bundler
       bundler_label = bundler.capitalize
       package_json_path = package_json_path_for("#{bundler_label} version")

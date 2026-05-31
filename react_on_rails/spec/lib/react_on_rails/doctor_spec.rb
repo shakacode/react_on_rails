@@ -50,7 +50,7 @@ RSpec.describe ReactOnRails::Doctor do
         check_webpack_configuration: true,
         report_dependency_versions: true,
         report_shakapacker_version: true,
-        report_webpack_version: true,
+        report_bundler_version: true,
         add_success: true,
         add_warning: true,
         add_info: true,
@@ -95,6 +95,14 @@ RSpec.describe ReactOnRails::Doctor do
       expect(doctor).not_to receive(:puts).with(/Webpack Configuration:/)
 
       doctor.run_diagnosis
+    end
+  end
+
+  describe "#dev_server_label" do
+    it "uses the canonical webpack-dev-server spelling for webpack apps" do
+      allow(doctor).to receive(:configured_assets_bundler).and_return("webpack")
+
+      expect(doctor.send(:dev_server_label)).to eq("webpack-dev-server")
     end
   end
 
