@@ -34,6 +34,27 @@ print_error() {
   echo -e "${RED}✗${NC} $1"
 }
 
+read_package_version() {
+  local package_file="$1"
+  local package_name="$2"
+
+  grep "\"$package_name\"" "$package_file" | head -1 | sed -E 's/.*"([~^]?[0-9][^"]*)".*/\1/' | sed -E 's/^[~^]//' || true
+}
+
+read_shakapacker_npm_dependency() {
+  local package_file="$1"
+  local package_name
+  local package_version
+
+  for package_name in shakapacker shakapacker-webpack shakapacker-rspack; do
+    package_version=$(read_package_version "$package_file" "$package_name")
+    if [ -n "$package_version" ]; then
+      echo "$package_name:$package_version"
+      return
+    fi
+  done
+}
+
 check_version_manager() {
   if command -v mise &> /dev/null; then
     echo "mise"
@@ -180,9 +201,16 @@ show_status() {
   fi
 
   SHAKAPACKER_NPM=""
+  SHAKAPACKER_NPM_PACKAGE=""
   if [ -f "$PROJECT_ROOT/react_on_rails/spec/dummy/package.json" ]; then
-    SHAKAPACKER_NPM=$(grep '"shakapacker"' "$PROJECT_ROOT/react_on_rails/spec/dummy/package.json" | sed -E 's/.*"([0-9.]+)".*/\1/' || echo "")
-    echo "  Shakapacker (npm): ${SHAKAPACKER_NPM:-not found}"
+    SHAKAPACKER_NPM_DEPENDENCY=$(read_shakapacker_npm_dependency "$PROJECT_ROOT/react_on_rails/spec/dummy/package.json")
+    SHAKAPACKER_NPM="${SHAKAPACKER_NPM_DEPENDENCY#*:}"
+    SHAKAPACKER_NPM_PACKAGE="${SHAKAPACKER_NPM_DEPENDENCY%%:*}"
+    if [ -n "$SHAKAPACKER_NPM" ]; then
+      echo "  Shakapacker (npm, $SHAKAPACKER_NPM_PACKAGE): $SHAKAPACKER_NPM"
+    else
+      echo "  Shakapacker (npm): not found"
+    fi
   fi
 
   REACT_ROOT=""
