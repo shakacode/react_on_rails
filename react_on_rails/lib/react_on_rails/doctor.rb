@@ -575,7 +575,7 @@ module ReactOnRails
 
     def configured_assets_bundler
       config = parsed_shakapacker_config
-      return nil unless config
+      return nil unless config.is_a?(Hash)
 
       rails_env = ENV["RAILS_ENV"] || ENV["RACK_ENV"] || "development"
       bundler_from_shakapacker_section(config, rails_env) || bundler_from_shakapacker_section(config, "default")
@@ -606,14 +606,18 @@ module ReactOnRails
 
     def development_hmr_enabled?
       dev_server = development_dev_server_config
-      return true unless dev_server.key?("hmr") || dev_server.key?(:hmr)
+      if dev_server.key?("hmr") || dev_server.key?(:hmr)
+        return truthy_config_value?(dev_server["hmr"] || dev_server[:hmr])
+      end
 
-      truthy_config_value?(dev_server["hmr"] || dev_server[:hmr])
+      return false if truthy_config_value?(dev_server["live_reload"] || dev_server[:live_reload])
+
+      true
     end
 
     def development_dev_server_config
       config = parsed_shakapacker_config
-      return {} unless config
+      return {} unless config.is_a?(Hash)
 
       dev_config = (config["default"] || {}).merge(config["development"] || {})
       dev_server = dev_config["dev_server"] || dev_config[:dev_server]

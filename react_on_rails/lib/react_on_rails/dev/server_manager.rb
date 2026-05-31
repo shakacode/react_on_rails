@@ -582,9 +582,13 @@ module ReactOnRails
 
         def development_hmr_enabled?
           dev_server = development_dev_server_config
-          return true unless dev_server.key?("hmr") || dev_server.key?(:hmr)
+          if dev_server.key?("hmr") || dev_server.key?(:hmr)
+            return truthy_config_value?(dev_server["hmr"] || dev_server[:hmr])
+          end
 
-          truthy_config_value?(dev_server["hmr"] || dev_server[:hmr])
+          return false if truthy_config_value?(dev_server["live_reload"] || dev_server[:live_reload])
+
+          true
         end
 
         def development_dev_server_config
@@ -1087,7 +1091,8 @@ module ReactOnRails
                    "Run #{Rainbow('bundle install && npm install').cyan}"
             end
 
-            if error_content.include?("webpack") || error_content.include?("module") ||
+            if error_content.include?("webpack") || error_content.include?("rspack") ||
+               error_content.include?("module") ||
                error_content.include?("compilation")
               puts "#{Rainbow('•').yellow} #{Rainbow("#{assets_bundler_label} compilation:").white.bold} " \
                    "Check JavaScript/#{active_assets_bundler} errors above"

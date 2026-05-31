@@ -168,6 +168,24 @@ RSpec.describe ReactOnRails::Doctor do
       old_config_path.nil? ? ENV.delete("SHAKAPACKER_CONFIG") : ENV["SHAKAPACKER_CONFIG"] = old_config_path
     end
 
+    it "treats live_reload true without hmr as live reload" do
+      write_project_file("config/shakapacker.yml", <<~YAML)
+        default:
+          assets_bundler: rspack
+        development:
+          dev_server:
+            live_reload: true
+      YAML
+      write_project_file("Procfile.dev", "web: bin/rails server\njs: bin/shakapacker-dev-server\n")
+      write_project_file("Procfile.dev-static-assets", "web: bin/rails server\njs: bin/shakapacker --watch\n")
+
+      doctor.send(:check_procfiles)
+
+      success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+      expect(success_messages).to include(a_string_including("Live reload development with Rspack dev server"))
+      expect(success_messages).not_to include(a_string_including("HMR development with Rspack dev server"))
+    end
+
     it "falls back to webpack labels when shakapacker config cannot be parsed" do
       write_project_file("config/shakapacker.yml", "default:\n  assets_bundler: [rspack\n")
       write_project_file("Procfile.dev", "web: bin/rails server\njs: bin/shakapacker-dev-server\n")

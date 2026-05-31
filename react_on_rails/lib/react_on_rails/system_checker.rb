@@ -626,7 +626,7 @@ module ReactOnRails
 
     def configured_assets_bundler
       config = parsed_shakapacker_config
-      return nil unless config
+      return nil unless config.is_a?(Hash)
 
       rails_env = ENV["RAILS_ENV"] || ENV["RACK_ENV"] || "development"
       bundler_from_shakapacker_section(config, rails_env) || bundler_from_shakapacker_section(config, "default")
@@ -680,7 +680,7 @@ module ReactOnRails
     end
 
     def parsed_shakapacker_config
-      shakapacker_config_path = "config/shakapacker.yml"
+      shakapacker_config_path = ENV["SHAKAPACKER_CONFIG"] || "config/shakapacker.yml"
       return nil unless File.exist?(shakapacker_config_path)
 
       raw_content = File.read(shakapacker_config_path)

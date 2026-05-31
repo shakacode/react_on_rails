@@ -3,6 +3,7 @@
 require_relative "../spec_helper"
 require "react_on_rails/dev/server_manager"
 require "open3"
+require "stringio"
 
 RSpec.describe ReactOnRails::Dev::ServerManager do
   # Suppress stdout/stderr during tests
@@ -68,6 +69,17 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       base_port_ports: nil,
       select_ports!: { rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false }
     )
+    allow(ReactOnRails::Dev::PortSelector).to receive(:find_available_port) { |start_port| start_port }
+  end
+
+  def capture_stdout
+    output = StringIO.new
+    original_stdout = $stdout
+    $stdout = output
+    yield
+    output.string
+  ensure
+    $stdout = original_stdout
   end
 
   describe ".start" do
@@ -211,6 +223,21 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       expect(ReactOnRails::Dev::ProcessManager).to receive(:run_with_process_manager).with("Procfile.dev-prod-assets")
 
       described_class.start(:production_like, nil, verbose: false, rails_env: "staging")
+    end
+
+    it "prints the bundler compilation hint for rspack precompile errors" do
+      allow(described_class).to receive(:configured_assets_bundler).and_return("rspack")
+      allow(ReactOnRails::Dev::ServiceChecker).to receive(:check_services).and_return(true)
+      allow(ReactOnRails::Dev::PortSelector).to receive(:find_available_port).with(3001).and_return(3001)
+      env = { "NODE_ENV" => "production" }
+      argv = ["bundle", "exec", "rails", "assets:precompile"]
+      status_double = instance_double(Process::Status, success?: false)
+      expect(Open3).to receive(:capture3)
+        .with(env, *argv)
+        .and_return(["", "Rspack build failed", status_double])
+
+      expect { described_class.start(:production_like) }
+        .to output(%r{Rspack compilation:.*Check JavaScript/rspack errors above}m).to_stdout_from_any_process
     end
 
     it "rejects invalid rails_env with shell injection characters" do
@@ -1583,22 +1610,36 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         development_dev_server_config: { "hmr" => false, "live_reload" => true }
       )
 
-      expect { described_class.show_help }
-        .to output(/Live reload development with Rspack dev server/).to_stdout_from_any_process
-      expect { described_class.show_help }
-        .to output(/Live reload enabled/).to_stdout_from_any_process
-      expect { described_class.show_help }
-        .to output(/Rspack dev server for fast recompilation/).to_stdout_from_any_process
-      expect { described_class.show_help }
-        .to output(%r{@rspack/plugin-react-refresh / ReactRefreshPlugin}).to_stdout_from_any_process
-      expect { described_class.show_help }
-        .to output(/Rspack watch mode for auto-recompilation/).to_stdout_from_any_process
-      expect { described_class.show_help }.not_to output(/webpack-dev-server/).to_stdout_from_any_process
-      expect { described_class.show_help }.not_to output(/ReactRefreshRspackPlugin/).to_stdout_from_any_process
-      expect { described_class.show_help }
-        .not_to output(/Hot Module Replacement \(HMR\) enabled/).to_stdout_from_any_process
-      expect { described_class.show_help }.not_to output(/Webpack watch mode/).to_stdout_from_any_process
-      expect { described_class.show_help }.not_to output(/Webpack compilation failed/).to_stdout_from_any_process
+      output = capture_stdout { described_class.show_help }
+
+      aggregate_failures do
+        expect(output).to match(/Live reload development with Rspack dev server/)
+        expect(output).to match(/Live reload enabled/)
+        expect(output).to match(/Rspack dev server for fast recompilation/)
+        expect(output).to match(%r{@rspack/plugin-react-refresh / ReactRefreshPlugin})
+        expect(output).to match(/Rspack watch mode for auto-recompilation/)
+        expect(output).to match(/Ensure you're running Live reload mode/)
+        expect(output).to match(/Live reload only works in dev-server mode, not static mode/)
+        expect(output).not_to match(/webpack-dev-server/)
+        expect(output).not_to match(/ReactRefreshRspackPlugin/)
+        expect(output).not_to match(/Hot Module Replacement \(HMR\) enabled/)
+        expect(output).not_to match(/Ensure you're running HMR mode/)
+        expect(output).not_to match(/React Refresh only works in HMR mode/)
+        expect(output).not_to match(/Webpack watch mode/)
+        expect(output).not_to match(/Webpack compilation failed/)
+      end
+    end
+
+    it "treats live_reload true without hmr as live reload" do
+      allow(described_class).to receive_messages(
+        configured_assets_bundler: "rspack",
+        development_dev_server_config: { "live_reload" => true }
+      )
+
+      output = capture_stdout { described_class.show_help }
+
+      expect(output).to match(/Live reload development with Rspack dev server/)
+      expect(output).not_to match(/HMR development with Rspack dev server/)
     end
 
     it "documents test asset workflows" do

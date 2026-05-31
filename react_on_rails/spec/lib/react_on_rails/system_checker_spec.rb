@@ -912,6 +912,21 @@ RSpec.describe ReactOnRails::SystemChecker do
       ensure
         ENV["RAILS_ENV"] = original_rails_env
       end
+
+      it "reads assets_bundler from SHAKAPACKER_CONFIG when set" do
+        original_config_path = ENV.fetch("SHAKAPACKER_CONFIG", nil)
+        ENV["SHAKAPACKER_CONFIG"] = "config/custom_shakapacker.yml"
+
+        allow(File).to receive(:exist?).with("config/custom_shakapacker.yml").and_return(true)
+        allow(File).to receive(:read).with("config/custom_shakapacker.yml").and_return(<<~YAML)
+          default:
+            assets_bundler: rspack
+        YAML
+
+        expect(checker.send(:configured_assets_bundler)).to eq("rspack")
+      ensure
+        original_config_path.nil? ? ENV.delete("SHAKAPACKER_CONFIG") : ENV["SHAKAPACKER_CONFIG"] = original_config_path
+      end
     end
 
     describe "#suggest_webpack_inspection" do
@@ -1206,6 +1221,24 @@ RSpec.describe ReactOnRails::SystemChecker do
         )
         expect(dependencies).not_to include("webpack", "webpack-dev-server")
         expect(dependencies.values).not_to include(a_string_including("Webpack"))
+      end
+
+      it "uses SHAKAPACKER_CONFIG when selecting optional build dependencies" do
+        original_config_path = ENV.fetch("SHAKAPACKER_CONFIG", nil)
+        ENV["SHAKAPACKER_CONFIG"] = "config/custom_shakapacker.yml"
+
+        allow(File).to receive(:exist?).with("config/custom_shakapacker.yml").and_return(true)
+        allow(File).to receive(:read).with("config/custom_shakapacker.yml").and_return(<<~YAML)
+          default:
+            assets_bundler: rspack
+        YAML
+
+        dependencies = checker.send(:additional_build_dependencies)
+
+        expect(dependencies).to include("@rspack/core" => "Rspack bundler")
+        expect(dependencies).not_to include("webpack", "webpack-dev-server")
+      ensure
+        original_config_path.nil? ? ENV.delete("SHAKAPACKER_CONFIG") : ENV["SHAKAPACKER_CONFIG"] = original_config_path
       end
     end
   end
