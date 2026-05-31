@@ -4,7 +4,6 @@
 
 import * as React from 'react';
 import * as PropTypes from 'prop-types';
-import sanitizeNonce from 'react-on-rails/@internal/sanitizeNonce';
 import { renderToPipeableStream } from 'react-on-rails/ReactDOMServer';
 import streamServerRenderedReactComponent from '../src/streamServerRenderedReactComponent.ts';
 import * as ComponentRegistry from '../src/ComponentRegistry.ts';
@@ -175,7 +174,7 @@ describe('streamServerRenderedReactComponent', () => {
       expect.anything(),
       expect.objectContaining({
         identifierPrefix: 'myDomId',
-        nonce: sanitizeNonce(testingRailsContext.cspNonce),
+        nonce: 'stream-csp-nonce',
       }),
     );
   });
