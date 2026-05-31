@@ -3,7 +3,7 @@
 /* eslint-disable no-param-reassign */
 
 const { config } = require('shakapacker');
-const webpack = require('webpack');
+const bundler = config.assets_bundler === 'rspack' ? require('@rspack/core') : require('webpack');
 const commonWebpackConfig = require('./commonWebpackConfig');
 
 const configureServer = () => {
@@ -50,7 +50,7 @@ const configureServer = () => {
   serverWebpackConfig.optimization = {
     minimize: false,
   };
-  serverWebpackConfig.plugins.unshift(new webpack.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
+  serverWebpackConfig.plugins.unshift(new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
 
   // Custom output for the server-bundle that matches the config in
   // config/initializers/react_on_rails.rb
@@ -69,7 +69,9 @@ const configureServer = () => {
   serverWebpackConfig.plugins = serverWebpackConfig.plugins.filter(
     (plugin) =>
       plugin.constructor.name !== 'WebpackAssetsManifest' &&
+      plugin.constructor.name !== 'RspackManifestPlugin' &&
       plugin.constructor.name !== 'MiniCssExtractPlugin' &&
+      plugin.constructor.name !== 'CssExtractRspackPlugin' &&
       plugin.constructor.name !== 'ForkTsCheckerWebpackPlugin',
   );
 

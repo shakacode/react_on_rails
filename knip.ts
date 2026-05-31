@@ -155,6 +155,7 @@ const config: KnipConfig = {
         'config/webpack/{production,development,test}.js',
         // Declaring this as webpack.config instead doesn't work correctly
         'config/webpack/webpack.config.js',
+        'config/rspack/rspack.config.js',
         // SWC configuration for Shakapacker
         'config/swc.config.js',
         // Playwright E2E test configuration and tests
@@ -223,6 +224,8 @@ const config: KnipConfig = {
         'sass-resources-loader',
         'style-loader',
         'url-loader',
+        // Loaded indirectly by Shakapacker when assets_bundler is rspack.
+        'shakapacker-rspack',
       ],
     },
   },

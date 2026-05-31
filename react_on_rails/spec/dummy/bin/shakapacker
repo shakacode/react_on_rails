@@ -3,7 +3,7 @@
 require "pathname"
 require "bundler/setup"
 require "shakapacker"
-require "shakapacker/webpack_runner"
+require "shakapacker/runner"
 
 ENV["RAILS_ENV"] ||= "development"
 ENV["NODE_ENV"]  ||= ENV["RAILS_ENV"]
@@ -11,5 +11,5 @@ ENV["BUNDLE_GEMFILE"] ||= File.expand_path("../../Gemfile", Pathname.new(__FILE_
 
 APP_ROOT = File.expand_path("..", __dir__)
 Dir.chdir(APP_ROOT) do
-  Shakapacker::WebpackRunner.run(ARGV)
+  Shakapacker::Runner.run(ARGV)
 end

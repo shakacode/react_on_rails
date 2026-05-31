@@ -8,6 +8,7 @@ default: &default
   cache_path: tmp/webpacker
   webpack_compile_output: true
   javascript_transpiler: babel
+  assets_bundler: webpack
 
   # Additional paths webpack should lookup modules
   # ['app/assets', 'engine/foo/app/assets']
