@@ -31,6 +31,28 @@ describe('LengthPrefixedStreamParser', () => {
     ]);
   });
 
+  it('parses records separated by CRLF blank lines', () => {
+    const records = collectRecords(
+      `${toRecord('first', { index: 1 })}\r\n${toRecord('second', { index: 2 })}`,
+    );
+
+    expect(records).toEqual([
+      { content: 'first', metadata: { index: 1 } },
+      { content: 'second', metadata: { index: 2 } },
+    ]);
+  });
+
+  it('parses records separated by multiple blank lines', () => {
+    const records = collectRecords(
+      `${toRecord('first', { index: 1 })}\n\n${toRecord('second', { index: 2 })}`,
+    );
+
+    expect(records).toEqual([
+      { content: 'first', metadata: { index: 1 } },
+      { content: 'second', metadata: { index: 2 } },
+    ]);
+  });
+
   it('parses when a blank separator is split across feed calls', () => {
     const records = collectRecords(toRecord('first', { index: 1 }), '\n', toRecord('second', { index: 2 }));
 

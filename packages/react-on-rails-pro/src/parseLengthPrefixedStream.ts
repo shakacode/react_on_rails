@@ -17,6 +17,8 @@
  *
  * Wire format per chunk:
  *   <metadata JSON>\t<content byte length hex>\n<raw content bytes>
+ * Blank separator lines between records are tolerated, including CR-only
+ * separators from CRLF line endings.
  *
  * Handles buffer boundaries: a single feed() call may contain partial
  * headers, partial content, or multiple complete chunks merged together.
@@ -34,7 +36,7 @@ function concatBytes(a: Uint8Array, b: Uint8Array): Uint8Array {
 }
 
 function isBlankSeparatorLine(header: Uint8Array): boolean {
-  return header.length === 0 || header.every((byte) => byte === 0x0d);
+  return header.length === 0 || header.every((byte) => byte === 0x0d); // 0x0d = CR from \r\n endings
 }
 
 export default class LengthPrefixedStreamParser {
