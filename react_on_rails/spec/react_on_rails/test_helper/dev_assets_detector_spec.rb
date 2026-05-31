@@ -4,6 +4,7 @@ require_relative "../spec_helper"
 require "tmpdir"
 require "json"
 require "fileutils"
+require "stringio"
 
 # rubocop:disable RSpec/SubjectStub
 describe ReactOnRails::TestHelper::DevAssetsDetector do
@@ -69,6 +70,16 @@ describe ReactOnRails::TestHelper::DevAssetsDetector do
     path
   end
 
+  def capture_stderr
+    original_stderr = $stderr
+    stream = StringIO.new
+    $stderr = stream
+    yield
+    stream.string
+  ensure
+    $stderr = original_stderr
+  end
+
   describe "#check" do
     subject(:detector) { described_class.new }
 
@@ -122,14 +133,14 @@ describe ReactOnRails::TestHelper::DevAssetsDetector do
       end
 
       it "prints bundler-neutral HMR guidance" do
-        expect do
-          detector.check
-        end.to output(satisfy do |message|
-          message.include?("your bundler's dev server memory") &&
-            message.include?("Set config.build_test_command in initializer") &&
-            !message.include?("webpack-dev-server") &&
-            !message.include?("bin/shakapacker")
-        end).to_stderr
+        output = capture_stderr { detector.check }
+
+        expect(output).to include("your bundler's dev server memory")
+        expect(output).to include(
+          'Set config.build_test_command = "<your-build-command>" in config/initializers/react_on_rails.rb'
+        )
+        expect(output).not_to include("webpack-dev-server")
+        expect(output).not_to include("bin/shakapacker")
       end
 
       context "with build_test_command configured" do

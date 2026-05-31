@@ -1,8 +1,19 @@
 # frozen_string_literal: true
 
 require_relative "../spec_helper"
+require "stringio"
 
 describe ReactOnRails::TestHelper::WebpackAssetsCompiler do
+  def capture_stdout
+    original_stdout = $stdout
+    stream = StringIO.new
+    $stdout = stream
+    yield
+    stream.string
+  ensure
+    $stdout = original_stdout
+  end
+
   describe "#compile_assets" do
     let(:invalid_command) { "false" }
     let(:valid_command) { "true" }
@@ -16,18 +27,14 @@ describe ReactOnRails::TestHelper::WebpackAssetsCompiler do
 
       it "prints bundler-neutral setup guidance" do
         compiler = described_class.new
-        allow(compiler).to receive(:exit!).and_raise(SystemExit)
+        allow(compiler).to receive(:exit!)
 
-        expect do
-          compiler.compile_assets
-        rescue SystemExit
-          nil
-        end.to output(satisfy do |message|
-          message.include?("the command that builds test assets for your bundler") &&
-            message.include?("let your bundler compile test assets automatically") &&
-            !message.include?("bin/shakapacker") &&
-            !message.include?("config/shakapacker.yml")
-        end).to_stdout
+        output = capture_stdout { compiler.compile_assets }
+
+        expect(output).to include("the command that builds test assets for your bundler")
+        expect(output).to include("let your bundler compile test assets automatically")
+        expect(output).not_to include("bin/shakapacker")
+        expect(output).not_to include("config/shakapacker.yml")
 
         expect(compiler).to have_received(:exit!).with(1)
       end

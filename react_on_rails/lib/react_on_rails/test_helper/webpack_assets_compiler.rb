@@ -10,7 +10,7 @@ module ReactOnRails
       def compile_assets
         if ReactOnRails.configuration.build_test_command.blank?
           puts Rainbow(missing_build_test_command_message).red
-          exit!(1)
+          return exit!(1)
         end
 
         puts "\nBuilding assets..."

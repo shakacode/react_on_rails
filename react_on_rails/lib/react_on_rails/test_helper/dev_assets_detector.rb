@@ -7,6 +7,9 @@ require "pathname"
 
 module ReactOnRails
   module TestHelper
+    HMR_MANUAL_COMPILE_INSTRUCTION =
+      'Set config.build_test_command = "<your-build-command>" in config/initializers/react_on_rails.rb'
+
     # Detects whether development build assets can be reused for tests,
     # avoiding redundant compilation when `bin/dev static` is already running.
     #
@@ -162,7 +165,7 @@ module ReactOnRails
 
         self.class.instance_variable_set(HMR_WARNING_PRINTED, true)
         manual_compile_instruction = ReactOnRails.configuration.build_test_command.to_s.strip
-        manual_compile_instruction = "Set config.build_test_command in initializer" if manual_compile_instruction.empty?
+        manual_compile_instruction = HMR_MANUAL_COMPILE_INSTRUCTION if manual_compile_instruction.empty?
 
         warn <<~MSG
 
