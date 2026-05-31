@@ -87,7 +87,7 @@ module ReactOnRails
       header = @buf.byteslice(0, idx)
       @buf = @buf.byteslice(idx + 1, @buf.bytesize - idx - 1)
 
-      tab_idx = header.index("\t")
+      tab_idx = header.byteindex("\t")
       unless tab_idx
         header_str = header.force_encoding(Encoding::UTF_8).inspect
         raise ReactOnRails::Error,
