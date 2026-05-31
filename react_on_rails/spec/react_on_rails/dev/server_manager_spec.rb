@@ -544,6 +544,13 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         expect(ENV.fetch("RENDERER_URL", nil)).to eq("http://localhost:5002")
       end
 
+      it "preserves a legacy localhost-equivalent RENDERER_URL host when REACT_RENDERER_URL is unset" do
+        ENV["RENDERER_URL"] = "http://127.0.0.1:3800"
+        described_class.start(:development)
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://127.0.0.1:5002")
+        expect(ENV.fetch("RENDERER_URL", nil)).to eq("http://127.0.0.1:5002")
+      end
+
       it "warns before overriding a legacy RENDERER_URL on a different port" do
         ENV["RENDERER_URL"] = "http://localhost:3800"
         expect { described_class.start(:development) }

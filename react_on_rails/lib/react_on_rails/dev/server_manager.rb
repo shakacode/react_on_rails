@@ -1192,7 +1192,9 @@ module ReactOnRails
         end
 
         def base_port_renderer_url(renderer_port)
-          local_base_port_renderer_url(ENV.fetch("REACT_RENDERER_URL", nil), renderer_port) ||
+          renderer_url = ENV.fetch("REACT_RENDERER_URL", nil).presence || ENV.fetch("RENDERER_URL", nil)
+
+          local_base_port_renderer_url(renderer_url, renderer_port) ||
             "http://localhost:#{renderer_port}"
         end
 
