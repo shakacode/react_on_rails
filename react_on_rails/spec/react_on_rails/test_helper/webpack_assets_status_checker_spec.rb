@@ -3,8 +3,19 @@
 require_relative File.join("..", "support", "fixtures_helper")
 require_relative "../spec_helper"
 require "fileutils"
+require "stringio"
 
 describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
+  def capture_stdout
+    original_stdout = $stdout
+    stream = StringIO.new
+    $stdout = stream
+    yield
+    stream.string
+  ensure
+    $stdout = original_stdout
+  end
+
   describe "#stale_generated_webpack_files" do
     let(:source_path) { source_path_for(fixture_dirname) }
     let(:generated_assets_full_path) do
@@ -114,13 +125,11 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
         end
 
         it "prints bundler-neutral fallback guidance" do
-          expect do
-            checker.stale_generated_webpack_files
-          end.to output(satisfy do |message|
-            message.include?("which generated asset files are required") &&
-              message.include?("completed asset compilation") &&
-              !message.include?("webpack compilation")
-          end).to_stdout
+          output = capture_stdout { checker.stale_generated_webpack_files }
+
+          expect(output).to include("which generated asset files are required")
+          expect(output).to include("completed asset compilation")
+          expect(output).not_to include("webpack compilation")
         end
       end
 
