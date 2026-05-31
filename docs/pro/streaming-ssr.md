@@ -46,6 +46,70 @@ sequenceDiagram
 - Node Renderer running (streaming requires Node.js, not ExecJS)
 - For async props (streaming each slow prop independently): React Server Components enabled — `config.enable_rsc_support = true`
 
+## Progressive Data with Async Props
+
+Streaming SSR sends HTML as React renders it. **Async props** (a React Server Components feature, so it requires `enable_rsc_support`) go one step further: Rails emits each prop _as its data becomes ready_ and forwards the matching Suspense boundary to the browser the moment it resolves.
+
+This is the recommended answer to "my component needs Rails data during render": **Rails owns the data and pushes it in**, preserving your controller / model / authorization / caching layers — the renderer never has to call back into Rails.
+
+> [!NOTE]
+> A Server Component _can_ `fetch` a Rails API directly, but the renderer's VM has no `fetch`, `Headers`, `Request`, or `Response` by default — you must bundle an HTTP client or inject them via `additionalContext` — and doing so bypasses Rails' auth and caching. `'use server'` Server Actions are **not** supported (the renderer has no DB/session/cookie access). Prefer props / async props. See [RSC data fetching patterns](../oss/migrating/rsc-data-fetching.md).
+
+Under the hood, Rails opens a bidirectional HTTP/2 NDJSON stream to the renderer and feeds props in as it resolves them. Each update runs in that request's isolated `sharedExecutionContext` and resolves a Promise, which lets React flush the corresponding HTML back to Rails for forwarding to the browser:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Browser
+    participant Rails
+    participant Renderer as Node Renderer
+    Note over Renderer: per-request sharedExecutionContext (isolated)
+    Browser->>Rails: GET page
+    Rails->>Renderer: open incremental-render NDJSON stream<br/>first line: renderingRequest
+    Renderer->>Renderer: render begins — a Server Component awaits getReactOnRailsAsyncProp('users')
+    Renderer-->>Rails: HTML shell + Suspense fallbacks
+    Rails-->>Browser: stream shell + fallbacks
+    loop each prop resolves in Rails (emit.call)
+        Rails->>Renderer: NDJSON updateChunk — resolve async-prop Promise
+        Renderer->>Renderer: Promise resolves in sharedExecutionContext — React continues
+        Renderer-->>Rails: flush that boundary's HTML
+        Rails-->>Browser: append boundary HTML
+    end
+    Rails->>Renderer: close stream (END_STREAM)
+    Renderer->>Renderer: reject any unresolved async props
+```
+
+The view helper is `stream_react_component_with_async_props`, which yields an emitter:
+
+```erb
+<%= stream_react_component_with_async_props("Dashboard") do |emit|
+      emit.call("users", User.active.limit(50).as_json(only: [:id, :name]))
+      emit.call("posts", Post.recent.limit(20).as_json(only: [:id, :title]))
+    end %>
+```
+
+For the full data-fetching guidance — synchronous props, parallelizing independent queries, and React Query / SWR interop — see [RSC data fetching patterns](../oss/migrating/rsc-data-fetching.md).
+
+### The discouraged alternative: direct `fetch` from the renderer
+
+For contrast, a Server Component _can_ reach Rails by calling `fetch` itself. This is a plain **network round-trip** — the renderer's VM has no in-process access to Rails models, sessions, or cookies — and it gives up what async props provide for free, so prefer async props for Rails-owned data:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Renderer as Node Renderer VM
+    participant Rails as Rails API
+    participant Data as Rails data layer
+    Note over Renderer: discouraged — see caveats below
+    Renderer->>Rails: fetch('/api/...') — network hop, not in-process access
+    Rails->>Data: handle request (auth, cache, services, database)
+    Data-->>Rails: JSON-ready data
+    Rails-->>Renderer: JSON
+    Renderer->>Renderer: continue rendering
+```
+
+Caveats: `fetch`, `Headers`, `Request`, `Response`, `AbortController`, and `AbortSignal` are **not** in the VM by default (bundle an HTTP client or inject them via [runtime globals](../oss/building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc)); cookies, auth, session, and CSRF are **not** forwarded automatically; and it bypasses Rails' authorization and caching layers.
+
 ## Implementation Steps
 
 > **This example uses async props**, which build on React Server Components. Enable RSC before you start: set `config.enable_rsc_support = true` in your React on Rails Pro configuration (see the [RSC tutorial](./react-server-components/tutorial.md)). Without it, the `async function` server component won't render and `stream_react_component_with_async_props` raises `ReactOnRailsPro::Error`. If all your data is fast and you don't need progressive streaming, you can skip RSC and use the synchronous [`stream_react_component`](../oss/migrating/rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) with all props passed at once (no `enable_rsc_support` required).
@@ -270,70 +334,6 @@ For example, with our `MyStreamingComponent`, the sequence is:
 ```
 
 To render more of the page progressively, add an async prop and a `<Suspense>` boundary for each slow section — emit each one from the block as Rails resolves it, and every boundary streams in independently. This keeps the whole page in a single component tree (shared layout, context, and props) rather than splitting it across multiple `stream_react_component` calls.
-
-## Progressive Data with Async Props
-
-Streaming SSR sends HTML as React renders it. **Async props** (a React Server Components feature, so it requires `enable_rsc_support`) go one step further: Rails emits each prop _as its data becomes ready_ and forwards the matching Suspense boundary to the browser the moment it resolves.
-
-This is the recommended answer to "my component needs Rails data during render": **Rails owns the data and pushes it in**, preserving your controller / model / authorization / caching layers — the renderer never has to call back into Rails.
-
-> [!NOTE]
-> A Server Component _can_ `fetch` a Rails API directly, but the renderer's VM has no `fetch`, `Headers`, `Request`, or `Response` by default — you must bundle an HTTP client or inject them via `additionalContext` — and doing so bypasses Rails' auth and caching. `'use server'` Server Actions are **not** supported (the renderer has no DB/session/cookie access). Prefer props / async props. See [RSC data fetching patterns](../oss/migrating/rsc-data-fetching.md).
-
-Under the hood, Rails opens a bidirectional HTTP/2 NDJSON stream to the renderer and feeds props in as it resolves them. Each update runs in that request's isolated `sharedExecutionContext` and resolves a Promise, which lets React flush the corresponding HTML back to Rails for forwarding to the browser:
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Browser
-    participant Rails
-    participant Renderer as Node Renderer
-    Note over Renderer: per-request sharedExecutionContext (isolated)
-    Browser->>Rails: GET page
-    Rails->>Renderer: open incremental-render NDJSON stream<br/>first line: renderingRequest
-    Renderer->>Renderer: render begins — a Server Component awaits getReactOnRailsAsyncProp('users')
-    Renderer-->>Rails: HTML shell + Suspense fallbacks
-    Rails-->>Browser: stream shell + fallbacks
-    loop each prop resolves in Rails (emit.call)
-        Rails->>Renderer: NDJSON updateChunk — asyncPropsManager.setProp('users', ...)
-        Renderer->>Renderer: resolve Promise in sharedExecutionContext — React continues
-        Renderer-->>Rails: flush that boundary's HTML
-        Rails-->>Browser: append boundary HTML
-    end
-    Rails->>Renderer: close stream (END_STREAM)
-    Renderer->>Renderer: asyncPropsManager.endStream() — any unresolved props reject
-```
-
-The view helper is `stream_react_component_with_async_props`, which yields an emitter:
-
-```erb
-<%= stream_react_component_with_async_props("Dashboard") do |emit|
-      emit.call("users", User.all.to_a)     # streamed as soon as it's ready
-      emit.call("posts", Post.recent.to_a)  # streamed independently
-    end %>
-```
-
-For the full data-fetching guidance — synchronous props, parallelizing independent queries, and React Query / SWR interop — see [RSC data fetching patterns](../oss/migrating/rsc-data-fetching.md).
-
-### The discouraged alternative: direct `fetch` from the renderer
-
-For contrast, a Server Component _can_ reach Rails by calling `fetch` itself. This is a plain **network round-trip** — the renderer's VM has no in-process access to Rails models, sessions, or cookies — and it gives up what async props provide for free, so prefer async props for Rails-owned data:
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Renderer as Node Renderer VM
-    participant Rails as Rails API
-    participant DB
-    Note over Renderer: discouraged — see caveats below
-    Renderer->>Rails: fetch('/api/...') — network hop, not in-process access
-    Rails->>DB: query (no shared session/auth context)
-    DB-->>Rails: rows
-    Rails-->>Renderer: JSON
-    Renderer->>Renderer: continue rendering
-```
-
-Caveats: `fetch`, `Headers`, `Request`, `Response`, `AbortController`, and `AbortSignal` are **not** in the VM by default (bundle an HTTP client or inject them via [runtime globals](../oss/building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc)); cookies, auth, session, and CSRF are **not** forwarded automatically; and it bypasses Rails' authorization and caching layers.
 
 ## Compression Middleware Compatibility
 

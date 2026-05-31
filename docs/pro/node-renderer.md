@@ -96,7 +96,7 @@ By contrast, ExecJS renders one request per V8 context and blocks the Ruby threa
 - **Shared secret authentication** — Secure communication between Rails and Node
 - **Prerender caching** — Combined with [prerender caching](../oss/building-features/caching.md#level-1-prerender-caching), rendering results are cached across requests
 
-React on Rails Pro stacks several caches, each skipping more work than the one below it. The two Rails-side caches differ in **scope**: a [fragment-cache](../oss/building-features/caching.md#level-2-fragment-caching) hit skips even props assembly (the props block never runs), while [prerender caching](../oss/building-features/caching.md#level-1-prerender-caching) still assembles props but skips the JavaScript evaluation. The remaining layers live in the renderer, per request, and the browser:
+React on Rails Pro stacks several caches, each skipping more work than the one below it. The two Rails-side caches differ in **scope**: a [fragment-cache](../oss/building-features/caching.md#level-2-fragment-caching) hit skips even props assembly (the props block never runs), while [prerender caching](../oss/building-features/caching.md#level-1-prerender-caching) still assembles props but skips the JavaScript evaluation. The renderer cache layers sit on the server-side render path; request-scoped deduplication and browser chunk caching are shown as side optimizations because they do not feed into each other:
 
 ```mermaid
 flowchart TB
@@ -113,15 +113,19 @@ flowchart TB
         L4 -- "miss (cold)" --> Upload["410 → Rails uploads bundle"]
         Upload --> Exec
     end
-    Exec --> L5["L5 · request-scoped dedup<br/>React.cache() / async-prop Promise<br/>dedupes within one render only — no cross-request reuse"]
-    L5 --> Browser["L6 · Browser — client chunks<br/>Cache-Control: max-age=1y (hydration assets, not server render)"]
+    Exec --> Done
+    Exec -. "during this render only" .-> L5["L5 · request-scoped dedup<br/>React.cache() / async-prop Promise<br/>dedupes repeated reads — no cross-request reuse"]
+    Browser["Browser hydration"] -. "separate asset requests" .-> L6["L6 · client chunks<br/>Cache-Control: max-age=1y<br/>(hydration assets, not server render)"]
     style L1 fill:#e6f0ff,stroke:#2c6ecb,color:#000
     style L2 fill:#e6f0ff,stroke:#2c6ecb,color:#000
     style Done fill:#e6ffed,stroke:#2da44e,color:#000
     style Renderer fill:#e6ffed,stroke:#2da44e,color:#000
+    style L3 fill:#e6ffed,stroke:#2da44e,color:#000
     style L4 fill:#fff4e5,stroke:#e0a000,color:#000
     style Upload fill:#ffe5e5,stroke:#d1242f,color:#000
     style Browser fill:#e6f0ff,stroke:#2c6ecb,color:#000
+    style L5 fill:#e6f0ff,stroke:#2c6ecb,color:#000
+    style L6 fill:#e6f0ff,stroke:#2c6ecb,color:#000
 ```
 
 (Fragment caching subsumes prerender caching: on a fragment-cache hit the prerender cache is never consulted.)
@@ -409,18 +413,20 @@ flowchart TB
     Root --> BEC1["ror.bundle.build_execution_context<br/>cache.strategy = cache-first<br/>⚠ may end ERROR on a cache miss"]
     Root -. "cold path only" .-> Up["ror.bundle.upload<br/>bundle.count · bytes.total"]
     Root -. "cold path only" .-> BEC2["ror.bundle.build_execution_context<br/>cache.strategy = cache-miss"]
-    Root --> Prep["ror.result.prepare<br/>response.bytes"]
-    Prep --> Vm["ror.vm.execute<br/>bundle.timestamp"]
+    Root --> Vm["ror.vm.execute<br/>bundle.timestamp"]
+    Vm --> Prep["ror.result.prepare<br/>response.bytes"]
     Vm -. "auto HttpInstrumentation" .-> Http["outbound HTTP child spans<br/>(fetch from your bundle)"]
     Root -. "incremental / async-props renders" .-> Inc["ror.incremental.stream"]
     Inc --> Chunk["ror.incremental.process_chunk<br/>(one per NDJSON update chunk)"]
     style Root fill:#e6f0ff,stroke:#2c6ecb,color:#000
+    style BEC1 fill:#e6f0ff,stroke:#2c6ecb,color:#000
     style Prep fill:#e6f0ff,stroke:#2c6ecb,color:#000
     style Vm fill:#e6ffed,stroke:#2da44e,color:#000
     style Http fill:#fff4e5,stroke:#e0a000,color:#000
     style Up fill:#fff4e5,stroke:#e0a000,color:#000
     style BEC2 fill:#fff4e5,stroke:#e0a000,color:#000
     style Inc fill:#e6f0ff,stroke:#2c6ecb,color:#000
+    style Chunk fill:#e6f0ff,stroke:#2c6ecb,color:#000
 ```
 
 ### Production defaults
