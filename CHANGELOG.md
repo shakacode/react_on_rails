@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Breaking Changes
+
+- **Ruby 3.3+ is required for React on Rails v17**: The open-source gem now requires Ruby `>= 3.3.0`, aligning it with React on Rails Pro, `create-react-on-rails-app`, and the CI minimum matrix. React on Rails v16 remains the upgrade path for applications that must stay on Ruby 3.2 or older. [PR 3500](https://github.com/shakacode/react_on_rails/pull/3500) by [justin808](https://github.com/justin808).
+
 ### [17.0.0.rc.0] - 2026-05-30
 
 #### Breaking Changes
