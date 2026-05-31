@@ -104,7 +104,10 @@ Use `AGENTS.md` and `/verify` for the actual check set. Before a closeout review
 
 ## Step 3 - Run the structured review
 
-Default to Codex. Verify it is available first (`command -v codex`); if not, fall back to the Claude review tooling described in the intro. Pick the command that matches Step 1:
+Default to Codex. Verify it is available first (`command -v codex`); if not, fall back to the Claude
+review tooling described in the intro. If neither engine exists in the current environment, stop and
+tell the user which review engines are missing instead of improvising a different review scope. Pick
+the command that matches Step 1:
 
 ```bash
 # Dirty local patch, including staged, unstaged, and untracked files.
@@ -129,11 +132,13 @@ Step 1 and append the prompt there:
 codex review --base "origin/$base" "Focus on SSR/hydration regressions, generated output, and repo workflow correctness."
 ```
 
-For longer instructions, create a scratch file in `.context/` or substitute your own path, then
-read from stdin only when the selected review engine supports that mode without dropping the target:
+For longer instructions, create an ignored scratch file, for example
+`.context/autoreview-focus.md` if your workspace provides `.context/`, or substitute another ignored
+path. Read from stdin only when the selected review engine supports that mode without dropping the
+target:
 
 ```bash
-codex review --base "origin/$base" - < .context/autoreview-focus.md   # create this file with your focus instructions first
+codex review --base "origin/$base" - < .context/autoreview-focus.md   # create this ignored scratch file first
 ```
 
 Never silently switch the engine the user asked for. If the requested engine hits model
@@ -171,6 +176,8 @@ For each finding the engine returns:
 
 Loop Steps 3-4 until the review returns no accepted/actionable findings. Once a rerun comes
 back clean, stop; do not spend another long review cycle on redundant confirmation.
+If the same finding recurs after two fix attempts, or the review starts cycling through speculative
+issues, stop, report the loop, and ask the user whether to continue.
 
 ### Parallel closeout (optional)
 
