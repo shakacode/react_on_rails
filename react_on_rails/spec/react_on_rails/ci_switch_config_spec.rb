@@ -30,6 +30,15 @@ RSpec.describe "bin/ci-switch-config" do
     expect(stdout).to include("Shakapacker (npm, shakapacker-rspack): 10.1.0")
   end
 
+  it "reports core shakapacker when adapter packages are absent" do
+    stdout, stderr, status = ci_switch_status(
+      "shakapacker" => "^10.1.0"
+    )
+
+    expect(status).to be_success, stderr
+    expect(stdout).to include("Shakapacker (npm, shakapacker): 10.1.0")
+  end
+
   def ci_switch_status(dependencies)
     Dir.mktmpdir do |tmpdir|
       fake_script_path = File.join(tmpdir, "bin/ci-switch-config")
