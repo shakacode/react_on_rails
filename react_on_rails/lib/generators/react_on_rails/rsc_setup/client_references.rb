@@ -6,7 +6,8 @@ module ReactOnRails
       module ClientReferences # rubocop:disable Metrics/ModuleLength
         JS_STRING_DELIMITERS = ["'", '"', "`"].freeze
         JS_COMMENT_STATES = %i[line_comment block_comment].freeze
-        JS_COMMENT_START_CHARS = ["/", "*"].freeze
+        # Characters that complete `//` or `/*` after a leading `/`.
+        JS_COMMENT_SECOND_CHARS = ["/", "*"].freeze
         # Known limitation: this list only covers single-character regex preceders. Multi-character
         # JavaScript keywords that legally precede a regex literal (`return`, `typeof`, `void`,
         # `delete`, `throw`, `case`, `in`, `instanceof`) are not represented. A regex like `/\{/`
@@ -259,7 +260,10 @@ module ReactOnRails
           end
         end
 
-        def dynamic_rsc_plugin_options_invocation_count(content)
+        # Counts active `new RSCWebpackPlugin(...)` calls whose first argument is present but
+        # not an object literal. This includes computed options plus static string/template
+        # literals; all are outside the verifier's parseable `{...}` contract.
+        def non_object_literal_rsc_plugin_invocation_count(content)
           count = 0
           search_from = 0
 
@@ -434,8 +438,8 @@ module ReactOnRails
         end
 
         # Skips whitespace and JS line/block comments, preserving strings as the next token.
-        # Dynamic-option verification uses this so `new RSCWebpackPlugin("opts")` warns instead
-        # of having the string skipped as incidental syntax.
+        # Non-object-literal option verification uses this so `new RSCWebpackPlugin("opts")`
+        # warns instead of having the string skipped as incidental syntax.
         def first_js_token_index(content, start_index)
           index = start_index
           state = nil
@@ -451,7 +455,7 @@ module ReactOnRails
               next
             end
 
-            return index unless char.match?(/\s/) || (char == "/" && JS_COMMENT_START_CHARS.include?(next_char))
+            return index unless char.match?(/\s/) || (char == "/" && JS_COMMENT_SECOND_CHARS.include?(next_char))
 
             state, escaped, index = advance_js_scan_state(state, escaped, char, next_char, index)
 
@@ -478,6 +482,9 @@ module ReactOnRails
           index
         end
 
+        # Scans from a string-opening delimiter at `string_start_index` and returns the index
+        # of the matching closing delimiter, not one past it. Returns nil for unterminated
+        # strings. Callers must ensure `content[string_start_index]` is in JS_STRING_DELIMITERS.
         def js_string_end_index(content, string_start_index)
           state = nil
           escaped = false
