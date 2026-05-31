@@ -1148,8 +1148,9 @@ module ReactOnRails
         #
         # Base-port mode is specifically for local, all-in-one dev setups (one
         # machine running Rails + webpack + node renderer together — typically
-        # worktrees or coding-agent sandboxes). The derived renderer URL is
-        # therefore hard-coded to http://localhost:<port>. If you run the node
+        # worktrees or coding-agent sandboxes). The derived renderer URL keeps
+        # an explicit localhost-equivalent scheme/host when present, and
+        # otherwise falls back to http://localhost:<port>. If you run the node
         # renderer on a separate host/container (e.g. Docker `renderer:3800`),
         # do not use base-port mode — set REACT_RENDERER_URL explicitly and
         # rely on the explicit-ports path instead. warn_if_renderer_url_will_be_overridden
@@ -1172,7 +1173,7 @@ module ReactOnRails
           ENV["SHAKAPACKER_DEV_SERVER_PORT"] = selected[:webpack].to_s
           return unless pro_renderer_active?
 
-          derived_url = "http://localhost:#{selected[:renderer]}"
+          derived_url = base_port_renderer_url(selected[:renderer])
           warn_if_renderer_url_will_be_overridden("REACT_RENDERER_URL", derived_url)
           warn_if_port_will_be_overridden("RENDERER_PORT", selected[:renderer])
           ENV["RENDERER_PORT"] = selected[:renderer].to_s
@@ -1188,6 +1189,22 @@ module ReactOnRails
 
           warn_if_renderer_url_will_be_overridden("RENDERER_URL", derived_url)
           ENV["RENDERER_URL"] = derived_url
+        end
+
+        def base_port_renderer_url(renderer_port)
+          local_base_port_renderer_url(ENV.fetch("REACT_RENDERER_URL", nil), renderer_port) ||
+            "http://localhost:#{renderer_port}"
+        end
+
+        def local_base_port_renderer_url(url, renderer_port)
+          return if url.nil? || url.strip.empty?
+
+          parsed = URI.parse(url)
+          return unless parsed.scheme && localhost_hostname?(parsed.hostname)
+
+          URI::Generic.build(scheme: parsed.scheme, host: parsed.hostname, port: renderer_port).to_s
+        rescue URI::Error
+          nil
         end
 
         # Heuristic for "this app has a Pro node renderer to point at": either
