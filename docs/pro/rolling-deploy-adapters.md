@@ -4,7 +4,7 @@ React on Rails Pro pre-seeds the Node Renderer cache so that during a **rolling 
 
 The **built-in HTTP adapter** does this with **no extra infrastructure**: the still-running deployment serves its own bundles over an authenticated endpoint, and the next deploy pulls them. This is the recommended setup for almost everyone.
 
-> **TL;DR** — Set three config values, mount one controller, and in-flight requests for draining bundle versions stop paying the `410 Gone` → re-upload → retry tax. No S3, IAM, or extra gem. **[Jump to setup](#set-up-the-http-adapter).**
+> **TL;DR** — Set three config values, use the auto-mounted controller, and in-flight requests for draining bundle versions stop paying the `410 Gone` → re-upload → retry tax. No S3, IAM, or extra gem. **[Jump to setup](#set-up-the-http-adapter).**
 
 ## The problem
 
@@ -95,28 +95,53 @@ end
 
 - **`rolling_deploy_token`** — the shared bearer token ("password"). Generate one with `SecureRandom.hex(32)` and set the **same** value on both the running server (which authenticates incoming pulls) and the build CI (which sends it). The config validator rejects tokens shorter than 32 bytes.
 - **`rolling_deploy_previous_url`** — the base URL where the previous deployment is reachable **from the build CI**, e.g. `https://app.example.com/react_on_rails_pro/rolling_deploy`. The adapter appends `/manifest` and `/bundles/:hash`. Leave it unset (or empty) to disable discovery on that build.
+- **`rolling_deploy_mount_path`** — the Rails path where the Pro engine auto-mounts the bundle-serving endpoint when the built-in HTTP adapter is configured. Defaults to `/react_on_rails_pro/rolling_deploy`. Set it to a custom path when your previous deployment is reachable elsewhere, or set it to `nil`/blank to opt out of auto-mounting and draw the routes yourself.
 
-### 2. Mount the server endpoint
+### 2. Server endpoint auto-mount
 
-The bundle-serving controller must be routed on the Rails side. Mount it explicitly:
+When `config.rolling_deploy_adapter = ReactOnRailsPro::RollingDeployAdapters::Http`, React on Rails Pro automatically routes the bundle-serving controller at `config.rolling_deploy_mount_path`:
 
-```ruby
-# config/routes.rb
-ReactOnRailsPro::RollingDeploy::BundlesController.draw_routes(
-  self,
-  path: "/react_on_rails_pro/rolling_deploy"
-)
-```
-
-That exposes two authenticated endpoints under the mount path:
+That exposes two authenticated endpoints under the mount path (default `/react_on_rails_pro/rolling_deploy`):
 
 | Endpoint             | Returns                                                                                                                   |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `GET /manifest`      | JSON: `{ hashes: [...], rsc_enabled: true\|false, generated_at: "ISO8601", protocol_version: 1 }` for the current deploy. |
 | `GET /bundles/:hash` | `application/gzip` tarball containing `bundle.js` plus that hash's companion assets.                                      |
 
-> [!IMPORTANT]
-> Engine auto-mount is planned for a follow-up release but is not yet wired — mount the controller explicitly with `draw_routes` as shown. When auto-mount lands and you still need a custom path, keep the explicit `draw_routes` call and pass a distinct `as_prefix:` keyword (e.g. `as_prefix: "my_rolling_deploy"`) to avoid duplicate named-route errors. If the auto-mount's default path suits you, you can remove the explicit call entirely.
+The auto-mounted routes are prepended ahead of application routes, so terminal catch-all routes do not shadow the endpoint. They also use an internal route-helper prefix, so apps that still have an older manual mount at the default path keep booting while you remove the redundant manual route.
+
+### Manual route override
+
+Most apps should use the auto-mount. Draw routes manually only when you need app-controlled routing behavior, such as a secondary endpoint or a wrapper around the built-in controller.
+
+To take over routing completely, opt out of the engine route and draw your own:
+
+```ruby
+# config/initializers/react_on_rails_pro.rb
+ReactOnRailsPro.configure do |config|
+  config.rolling_deploy_adapter = ReactOnRailsPro::RollingDeployAdapters::Http
+  config.rolling_deploy_mount_path = nil
+end
+```
+
+```ruby
+# config/routes.rb
+ReactOnRailsPro::RollingDeploy::BundlesController.draw_routes(
+  self,
+  path: "/internal/rolling-deploy"
+)
+```
+
+To keep the auto-mount and add one or more secondary manual mounts, pass a distinct `as_prefix:` for each manual mount so Rails' named-route registry does not collide:
+
+```ruby
+# config/routes.rb
+ReactOnRailsPro::RollingDeploy::BundlesController.draw_routes(
+  self,
+  path: "/internal/rolling-deploy",
+  as_prefix: "internal_rolling_deploy"
+)
+```
 
 ### Security
 
