@@ -196,6 +196,7 @@ const sidebars: SidebarsConfig = {
         'pro/license-ci-integration',
         'pro/upgrading-to-pro',
         'pro/streaming-ssr',
+        'pro/async-props-database-queries',
         'pro/node-renderer',
         'pro/rolling-deploy-adapters',
         'pro/rolling-deploy-custom-adapters',
