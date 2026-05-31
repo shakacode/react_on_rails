@@ -477,7 +477,7 @@ module ReactOnRails
           return nil unless File.exist?(config_path)
 
           YAML.safe_load(ERB.new(File.read(config_path)).result, aliases: true, permitted_classes: [Symbol])
-        rescue StandardError
+        rescue StandardError, ScriptError
           nil
         end
 
@@ -878,7 +878,7 @@ module ReactOnRails
         # so there is only one ServerMode.detect call per help render. Doctor memoizes because
         # it owns instance state on a fresh Doctor instance per invocation.
         def default_dev_server_mode
-          ServerMode.detect(shakapacker_config_path, fallback: development_hmr_enabled? ? :hmr : :live_reload)
+          ServerMode.detect(shakapacker_config_path)
         end
 
         def default_dev_server_detail_lines(mode)

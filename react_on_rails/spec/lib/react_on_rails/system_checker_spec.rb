@@ -916,9 +916,10 @@ RSpec.describe ReactOnRails::SystemChecker do
       it "reads assets_bundler from SHAKAPACKER_CONFIG when set" do
         original_config_path = ENV.fetch("SHAKAPACKER_CONFIG", nil)
         ENV["SHAKAPACKER_CONFIG"] = "config/custom_shakapacker.yml"
+        config_path = File.expand_path("config/custom_shakapacker.yml", Dir.pwd)
 
-        allow(File).to receive(:exist?).with("config/custom_shakapacker.yml").and_return(true)
-        allow(File).to receive(:read).with("config/custom_shakapacker.yml").and_return(<<~YAML)
+        allow(File).to receive(:exist?).with(config_path).and_return(true)
+        allow(File).to receive(:read).with(config_path).and_return(<<~YAML)
           default:
             assets_bundler: rspack
         YAML
@@ -1226,9 +1227,10 @@ RSpec.describe ReactOnRails::SystemChecker do
       it "uses SHAKAPACKER_CONFIG when selecting optional build dependencies" do
         original_config_path = ENV.fetch("SHAKAPACKER_CONFIG", nil)
         ENV["SHAKAPACKER_CONFIG"] = "config/custom_shakapacker.yml"
+        config_path = File.expand_path("config/custom_shakapacker.yml", Dir.pwd)
 
-        allow(File).to receive(:exist?).with("config/custom_shakapacker.yml").and_return(true)
-        allow(File).to receive(:read).with("config/custom_shakapacker.yml").and_return(<<~YAML)
+        allow(File).to receive(:exist?).with(config_path).and_return(true)
+        allow(File).to receive(:read).with(config_path).and_return(<<~YAML)
           default:
             assets_bundler: rspack
         YAML

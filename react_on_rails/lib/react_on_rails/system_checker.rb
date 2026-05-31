@@ -680,7 +680,7 @@ module ReactOnRails
     end
 
     def parsed_shakapacker_config
-      shakapacker_config_path = ENV["SHAKAPACKER_CONFIG"] || "config/shakapacker.yml"
+      shakapacker_config_path = shakapacker_config_path()
       return nil unless File.exist?(shakapacker_config_path)
 
       raw_content = File.read(shakapacker_config_path)
@@ -689,6 +689,19 @@ module ReactOnRails
       parsed.is_a?(Hash) ? parsed : nil
     rescue StandardError, ScriptError
       nil
+    end
+
+    def shakapacker_config_path
+      env_config_path = ENV.fetch("SHAKAPACKER_CONFIG", nil)
+      return "config/shakapacker.yml" if env_config_path.to_s.empty?
+
+      File.expand_path(env_config_path, shakapacker_config_base_dir)
+    end
+
+    def shakapacker_config_base_dir
+      return Rails.root.to_s if defined?(Rails) && Rails.respond_to?(:root) && Rails.root
+
+      Dir.pwd
     end
 
     def normalize_transpiler_value(transpiler)

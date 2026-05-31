@@ -1610,6 +1610,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     it "uses neutral/rspack mode descriptions for rspack live-reload apps" do
       allow(described_class).to receive_messages(
         configured_assets_bundler: "rspack",
+        default_dev_server_mode: :live_reload,
         development_dev_server_config: { "hmr" => false, "live_reload" => true }
       )
 
@@ -1617,12 +1618,12 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
       aggregate_failures do
         expect(output).to match(/Live reload development with Rspack dev server/)
-        expect(output).to match(/Live reload enabled/)
+        expect(output).to match(/Full-page live reload enabled/)
         expect(output).to match(/Rspack dev server for fast recompilation/)
         expect(output).to match(%r{@rspack/plugin-react-refresh / ReactRefreshPlugin})
         expect(output).to match(/Rspack watch mode for auto-recompilation/)
-        expect(output).to match(/Ensure you're running Live reload mode/)
-        expect(output).to match(/Live reload only works in dev-server mode, not static mode/)
+        expect(output).to match(/React Refresh requires HMR; current default mode is not HMR/)
+        expect(output).to match(/HMR is disabled in your Shakapacker config/)
         expect(output).not_to match(/webpack-dev-server/)
         expect(output).not_to match(/ReactRefreshRspackPlugin/)
         expect(output).not_to match(/Hot Module Replacement \(HMR\) enabled/)
@@ -1650,6 +1651,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     it "treats live_reload true without hmr as live reload" do
       allow(described_class).to receive_messages(
         configured_assets_bundler: "rspack",
+        default_dev_server_mode: :live_reload,
         development_dev_server_config: { "live_reload" => true }
       )
 
@@ -1884,6 +1886,16 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           )
         end
       end
+    end
+  end
+
+  describe ".parsed_shakapacker_config" do
+    it "returns nil for ERB syntax errors" do
+      allow(described_class).to receive(:shakapacker_config_path).and_return("config/shakapacker.yml")
+      allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
+      allow(File).to receive(:read).with("config/shakapacker.yml").and_return("<% raise SyntaxError, 'bad erb' %>")
+
+      expect(described_class.send(:parsed_shakapacker_config)).to be_nil
     end
   end
 

@@ -133,6 +133,34 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
+  describe "#print_next_steps" do
+    around do |example|
+      Dir.mktmpdir do |tmpdir|
+        Dir.chdir(tmpdir) { example.run }
+      end
+    end
+
+    it "uses the configured reload mode for bin/dev next steps" do
+      FileUtils.mkdir_p("bin")
+      FileUtils.touch("bin/dev")
+      File.write("Procfile.dev", "web: bin/rails server\njs: bin/shakapacker-dev-server\n")
+      doctor.instance_variable_set(
+        :@checker,
+        instance_double(ReactOnRails::SystemChecker, errors?: false, warnings?: false, messages: [])
+      )
+      allow(doctor).to receive_messages(
+        default_dev_server_mode: :live_reload,
+        npm_test_script?: false,
+        yarn_test_script?: false
+      )
+      allow(doctor).to receive(:puts)
+
+      expect(doctor).to receive(:puts).with(a_string_including("Start development with live reload:"))
+
+      doctor.send(:print_next_steps)
+    end
+  end
+
   describe "#check_procfiles" do
     let(:checker) { doctor.instance_variable_get(:@checker) }
 
@@ -155,7 +183,7 @@ RSpec.describe ReactOnRails::Doctor do
       doctor.send(:check_procfiles)
 
       success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
-      expect(success_messages).to include(a_string_including("HMR development with webpack-dev-server"))
+      expect(success_messages).to include(a_string_including("Live reload development with webpack-dev-server"))
       expect(success_messages).to include(a_string_including("Static development with webpack --watch"))
     end
 
