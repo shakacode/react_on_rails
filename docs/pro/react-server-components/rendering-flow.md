@@ -79,7 +79,7 @@ flowchart LR
         RSC -- "Flight payload<br/>server components + client refs" --> Server
         Server --> HTML["HTML + embedded RSC payload"]
     end
-    HTML -- "single streamed response" --> Browser["Browser"]
+    HTML -- "streamed response (HTML + RSC payload)" --> Browser["Browser"]
     Browser --> Hydrate["Hydrate from embedded payload"]
     Hydrate -- "load on demand" --> Chunks["Client bundle chunks"]
     style NodeVM fill:#e6ffed,stroke:#2da44e,color:#000

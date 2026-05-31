@@ -83,6 +83,7 @@ The view helper is `stream_react_component_with_async_props`, which yields an em
 
 ```erb
 <%= stream_react_component_with_async_props("Dashboard") do |emit|
+      # Sequential: posts waits for users. For parallel queries, see the fan-out pattern below.
       emit.call("users", User.active.limit(50).as_json(only: [:id, :name]))
       emit.call("posts", Post.recent.limit(20).as_json(only: [:id, :title]))
     end %>

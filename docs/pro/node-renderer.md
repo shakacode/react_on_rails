@@ -69,11 +69,11 @@ flowchart TB
         direction LR
         Req1["request 1"]
         Req2["request 2"]
-        Req3["request N"]
+        Req3["… request N"]
     end
-    Req1 -- "HTTP/2" --> Master
+    Req1 -- "HTTP/2 (multiplexed)" --> Master
     Req2 -- "HTTP/2 (multiplexed)" --> Master
-    Req3 -- "HTTP/2" --> Master
+    Req3 -- "HTTP/2 (multiplexed)" --> Master
     subgraph Renderer["Node Renderer"]
         Master["master process<br/>forks workers · auto-restarts crashes · rolling restarts"]
         Master --> WA["worker A — event loop<br/>many concurrent renders / streams<br/>per-request <b>sharedExecutionContext</b> (isolated)"]
@@ -111,7 +111,8 @@ flowchart TB
         L3 -- "miss" --> L4{"L4 · on-disk bundle cache<br/>cache/hash/hash.js"}
         L4 -- "hit" --> Exec
         L4 -- "miss (cold)" --> Upload["410 → Rails uploads bundle"]
-        Upload --> Exec
+        Upload -- "writes bundle" --> L4
+        L4 -- "now cached" --> Exec
     end
     Exec --> Done
     Exec -. "during this render only" .-> L5["L5 · request-scoped dedup<br/>React.cache() / async-prop Promise<br/>dedupes repeated reads — no cross-request reuse"]
@@ -405,7 +406,7 @@ Outbound HTTP calls inside your SSR bundle are automatically captured by `HttpIn
 
 **Cache-miss note:** On a cache-miss path `ror.bundle.build_execution_context` appears twice. The first span has `cache.strategy=cache-first` and can end with ERROR status when the VM cache probe misses. The second span has `cache.strategy=cache-miss` for the real VM build after bundle upload or bundle discovery. Scope error alerts to exclude `cache.strategy=cache-first` when that miss is expected.
 
-As a trace, the spans nest under the root `ror.ssr.request`. The upload and `cache-miss` build spans appear only on a cold path; outbound `fetch` calls from your bundle are captured automatically as HTTP child spans; and incremental (async-props) renders add their own stream/chunk spans:
+As a trace, the spans nest under the root `ror.ssr.request`. On the warm path the spans fire in order: `ror.bundle.build_execution_context` (`cache-first`) → `ror.vm.execute` → `ror.result.prepare`. Cold-path spans (upload and `cache-miss` build) appear only between the first two; outbound `fetch` calls from your bundle are captured automatically as HTTP child spans; and incremental (async-props) renders add their own stream/chunk spans:
 
 ```mermaid
 flowchart TB
