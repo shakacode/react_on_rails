@@ -7,10 +7,10 @@ require "pathname"
 
 module ReactOnRails
   module TestHelper
-    # Detects whether development webpack assets can be reused for tests,
+    # Detects whether development build assets can be reused for tests,
     # avoiding redundant compilation when `bin/dev static` is already running.
     #
-    # When `bin/dev static` runs webpack in watch mode, it writes compiled assets
+    # When `bin/dev static` runs the bundler in watch mode, it writes compiled assets
     # to the development output directory (e.g., public/packs). If those assets
     # are fresh (newer than all source files) and not HMR artifacts, tests can
     # reuse them instead of running a separate build_test_command.
@@ -77,7 +77,7 @@ module ReactOnRails
           puts <<~MSG
 
             ====> React on Rails: Reusing development assets from #{result[:dev_output_relative]}
-                  (detected fresh static-mode webpack output, skipping test compilation)
+                  (detected fresh static-mode asset output, skipping test compilation)
 
           MSG
         end
@@ -161,16 +161,18 @@ module ReactOnRails
         return if self.class.instance_variable_get(HMR_WARNING_PRINTED)
 
         self.class.instance_variable_set(HMR_WARNING_PRINTED, true)
+        manual_compile_instruction = ReactOnRails.configuration.build_test_command.to_s.strip
+        manual_compile_instruction = "Run build_test_command manually" if manual_compile_instruction.empty?
 
         warn <<~MSG
 
           React on Rails: Development assets use HMR (manifest contains http:// URLs).
-          HMR assets cannot be reused for tests — they exist in webpack-dev-server memory, not on disk.
+          HMR assets cannot be reused for tests — they exist in your bundler's dev server memory, not on disk.
 
           To provide test assets, use one of:
             • bin/dev static       (writes files to disk, auto-reused by tests)
             • bin/dev test-watch   (keeps test assets fresh alongside HMR)
-            • RAILS_ENV=test bin/shakapacker  (compile once manually)
+            • #{manual_compile_instruction}
 
           If using Capybara with run_server = false, HMR works — the browser connects
           to your running dev server directly.
@@ -197,7 +199,7 @@ module ReactOnRails
 
       # HMR manifests contain URLs (http://localhost:3035/packs/...) instead of
       # relative paths (/packs/...). Tests can't use HMR assets because they're
-      # served from webpack-dev-server's memory, not the filesystem.
+      # served from the dev server's memory, not the filesystem.
       def hmr_manifest?(manifest_path)
         manifest = JSON.parse(File.read(manifest_path))
         hmr_url_present?(manifest)

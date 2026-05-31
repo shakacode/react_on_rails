@@ -2,6 +2,7 @@
 
 require_relative File.join("..", "support", "fixtures_helper")
 require_relative "../spec_helper"
+require "fileutils"
 
 describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
   describe "#stale_generated_webpack_files" do
@@ -104,6 +105,25 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
         specify { expect(checker.stale_generated_webpack_files).to eq([]) }
       end
 
+      context "when generated files config is empty" do
+        let(:fixture_dirname) { "assets_exist" }
+        let(:webpack_generated_files) { [] }
+
+        before do
+          touch_files_in_dir(generated_assets_full_path)
+        end
+
+        it "prints bundler-neutral fallback guidance" do
+          expect do
+            checker.stale_generated_webpack_files
+          end.to output(satisfy do |message|
+            message.include?("which generated asset files are required") &&
+              message.include?("completed asset compilation") &&
+              !message.include?("webpack compilation")
+          end).to_stdout
+        end
+      end
+
       context "when compiled assets don't exist" do
         let(:fixture_dirname) { "assets_no_exist" }
 
@@ -149,6 +169,6 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
 
   # Necessary for ensuring file mtimes of fixtures are correct
   def touch_files_in_dir(dir)
-    `touch #{dir}/*`
+    FileUtils.touch(Dir.glob(File.join(dir, "*")))
   end
 end

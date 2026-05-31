@@ -119,6 +119,20 @@ describe ReactOnRails::TestHelper::DevAssetsDetector do
       it "returns nil (HMR assets not usable)" do
         expect(detector.check).to be_nil
       end
+
+      it "prints bundler-neutral HMR guidance" do
+        described_class.remove_instance_variable(described_class::HMR_WARNING_PRINTED) if
+          described_class.instance_variable_defined?(described_class::HMR_WARNING_PRINTED)
+
+        expect do
+          detector.check
+        end.to output(satisfy do |message|
+          message.include?("your bundler's dev server memory") &&
+            message.include?("Run build_test_command manually") &&
+            !message.include?("webpack-dev-server") &&
+            !message.include?("bin/shakapacker")
+        end).to_stderr
+      end
     end
 
     context "when dev assets are stale (source newer than manifest)" do
@@ -260,6 +274,12 @@ describe ReactOnRails::TestHelper::DevAssetsDetector do
 
       it "returns true" do
         expect(described_class.try_activate_dev_assets!).to be true
+      end
+
+      it "prints bundler-neutral reuse guidance" do
+        expect do
+          described_class.try_activate_dev_assets!
+        end.to output(include("detected fresh static-mode asset output")).to_stdout
       end
 
       it "overrides Shakapacker data with dev output path" do

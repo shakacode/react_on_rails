@@ -34,9 +34,9 @@ module ReactOnRails
           or ensure_assets_compiled), but config.build_test_command is not set.
 
           To fix this, either:
-            1. Set config.build_test_command in config/initializers/react_on_rails.rb:
-                 config.build_test_command = "RAILS_ENV=test bin/shakapacker"
-            2. Or remove the TestHelper call and use compile: true in config/shakapacker.yml
+            1. Set config.build_test_command in config/initializers/react_on_rails.rb to
+               the command that builds test assets for your bundler.
+            2. Or remove the TestHelper call and let your bundler compile test assets automatically.
 
           For how dev server modes interact with tests, see:
             #{TESTING_DOCS_URL}

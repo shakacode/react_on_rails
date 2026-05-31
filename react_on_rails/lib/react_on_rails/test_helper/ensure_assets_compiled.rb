@@ -21,8 +21,8 @@ module ReactOnRails
       end
 
       # Several Scenarios:
-      # 1. No webpack watch processes for static assets and files are missing or out of date.
-      # 2. Only webpack watch process for server bundle as we're the hot reloading setup.
+      # 1. No static asset watch process and files are missing or out of date.
+      # 2. Only the HMR process is running for the server bundle.
       # 3. For whatever reason, the watch processes are running, but some clean script removed
       #    the generated bundles.
       # 4. bin/dev static is running with fresh assets → reuse dev output (no compilation).

@@ -7,6 +7,32 @@ describe ReactOnRails::TestHelper::WebpackAssetsCompiler do
     let(:invalid_command) { "false" }
     let(:valid_command) { "true" }
 
+    context "when assets compiler command is not configured" do
+      before do
+        allow(ReactOnRails.configuration)
+          .to receive(:build_test_command)
+          .and_return("")
+      end
+
+      it "prints bundler-neutral setup guidance" do
+        compiler = described_class.new
+        allow(compiler).to receive(:exit!).and_raise(SystemExit)
+
+        expect do
+          compiler.compile_assets
+        rescue SystemExit
+          nil
+        end.to output(satisfy do |message|
+          message.include?("the command that builds test assets for your bundler") &&
+            message.include?("let your bundler compile test assets automatically") &&
+            !message.include?("bin/shakapacker") &&
+            !message.include?("config/shakapacker.yml")
+        end).to_stdout
+
+        expect(compiler).to have_received(:exit!).with(1)
+      end
+    end
+
     context "when assets compiler command succeeds" do
       before do
         allow(ReactOnRails.configuration)
