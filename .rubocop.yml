@@ -32,11 +32,8 @@ AllCops:
     # exclusions here so the root sweep does not fail on files package CI exempts.
     - 'react_on_rails_pro/spec/dummy/db/schema.rb'
     - 'react_on_rails_pro/spec/dummy/db/seeds.rb'
-    - 'react_on_rails/spec/dummy/bin/*'
     - 'react_on_rails/spec/dummy/bin/**/*'
-    - 'react_on_rails_pro/spec/dummy/bin/*'
     - 'react_on_rails_pro/spec/dummy/bin/**/*'
-    - 'react_on_rails_pro/spec/execjs-compatible-dummy/bin/*'
     - 'react_on_rails_pro/spec/execjs-compatible-dummy/bin/**/*'
     - '**/vendor/**/*'
 
@@ -53,6 +50,7 @@ Style/StringLiterals:
   EnforcedStyle: double_quotes
 
 Style/HashSyntax:
+  # Avoids a mass rewrite on the Ruby 3.3 baseline bump; revisit before the next major version.
   EnforcedShorthandSyntax: never
 
 Style/ArgumentsForwarding:

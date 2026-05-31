@@ -47,6 +47,14 @@ describe('validateRuby', () => {
     expect(result.message).toContain('Ruby 3.2');
     expect(result.message).toContain('requires Ruby 3.3+');
   });
+
+  it('returns invalid for Ruby 2.7', () => {
+    mockedGetCommandVersion.mockReturnValue('ruby 2.7.8p225 (2023-03-30 revision 1f4d455848)');
+    const result = validateRuby();
+    expect(result.valid).toBe(false);
+    expect(result.message).toContain('Ruby 2.7');
+    expect(result.message).toContain('requires Ruby 3.3+');
+  });
 });
 
 describe('validateRails', () => {
