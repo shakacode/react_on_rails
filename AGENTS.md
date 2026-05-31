@@ -8,6 +8,7 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
 
 - `AGENTS.md`: canonical entry point for agent instructions and workflow discovery
 - `.claude/commands/`: Claude Code slash commands
+- `.claude/skills/`: Claude Code skills
 - `.agents/workflows/`: shared prompt templates and reusable workflows for Codex, GPT, and other non-Claude tools
 - When the user asks to address PR review comments outside Claude slash commands, follow `.agents/workflows/address-review.md`
 
