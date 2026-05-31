@@ -88,6 +88,8 @@ The view helper is `stream_react_component_with_async_props`, which yields an em
     end %>
 ```
 
+When several slow sources are independent, use the [parallel fan-out pattern below](#loading-multiple-slow-sources-in-parallel) so one query does not block the next.
+
 For the full data-fetching guidance — synchronous props, parallelizing independent queries, and React Query / SWR interop — see [RSC data fetching patterns](../oss/migrating/rsc-data-fetching.md).
 
 ### The discouraged alternative: direct `fetch` from the renderer
