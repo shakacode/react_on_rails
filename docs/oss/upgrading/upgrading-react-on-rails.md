@@ -124,7 +124,12 @@ In CI, run precompile preparation explicitly once before webpack compilation or 
    npm install   # or: yarn install / pnpm install
    ```
 
-4. Run your app's test suite and asset build after the Ruby and package updates.
+4. Run RuboCop, your app's test suite, and asset build after the Ruby and package updates. The Ruby
+   baseline bump can activate cops that were previously inactive:
+
+   ```bash
+   bundle exec rubocop
+   ```
 
 ## Upgrading to v16.4.0 (from v16.3.x)
 

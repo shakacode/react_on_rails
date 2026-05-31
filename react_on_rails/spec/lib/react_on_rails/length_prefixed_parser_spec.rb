@@ -4,14 +4,21 @@ require_relative "../../react_on_rails/spec_helper"
 require_relative "../../../lib/react_on_rails/length_prefixed_parser"
 
 RSpec.describe ReactOnRails::LengthPrefixedParser do
+  def length_prefixed_payload(content, payload_type: "string")
+    raw_content = payload_type == "object" ? content.to_json : content
+    metadata = { "payloadType" => payload_type, "consoleReplayScript" => "" }.to_json
+
+    "#{metadata}\t#{raw_content.bytesize.to_s(16)}\n#{raw_content}"
+  end
+
+  def length_prefixed_parts(content, payload_type: "string")
+    payload = length_prefixed_payload(content, payload_type: payload_type)
+    header_end = payload.byteindex("\n") + 1
+
+    [payload.byteslice(0, header_end), payload.byteslice(header_end, payload.bytesize - header_end)]
+  end
+
   describe ".parse_one_chunk_result" do
-    def length_prefixed_payload(content, payload_type: "string")
-      raw_content = payload_type == "object" ? content.to_json : content
-      metadata = { "payloadType" => payload_type, "consoleReplayScript" => "" }.to_json
-
-      "#{metadata}\t#{raw_content.bytesize.to_s(16)}\n#{raw_content}"
-    end
-
     it "parses ASCII-only string payloads" do
       content = "hello world"
 
@@ -59,21 +66,19 @@ RSpec.describe ReactOnRails::LengthPrefixedParser do
         /Invalid content length/
       )
     end
+
+    it "raises when the input contains more than one chunk" do
+      chunk = length_prefixed_payload("hello")
+      two_chunks = chunk + chunk
+
+      expect { described_class.parse_one_chunk_result(two_chunks) }.to raise_error(
+        ReactOnRails::Error,
+        /expected exactly one length-prefixed chunk but found 2/
+      )
+    end
   end
 
   describe "#feed" do
-    def length_prefixed_payload(content)
-      metadata = { "payloadType" => "string", "consoleReplayScript" => "" }.to_json
-
-      "#{metadata}\t#{content.bytesize.to_s(16)}\n#{content}"
-    end
-
-    def length_prefixed_parts(content)
-      metadata = { "payloadType" => "string", "consoleReplayScript" => "" }.to_json
-
-      ["#{metadata}\t#{content.bytesize.to_s(16)}\n", content]
-    end
-
     it "parses multibyte payloads split across streaming chunks" do
       content = "\u3053\u3093\u306B\u3061\u306F"
       payload = length_prefixed_payload(content).b
