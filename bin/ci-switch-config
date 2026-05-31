@@ -11,6 +11,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+MINIMUM_RUBY_VERSION="3.3.7" # Update when a newer 3.3.x patch is released.
+
 # Color codes for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -231,15 +233,15 @@ switch_to_minimum() {
     mise|asdf)
       print_header "Setting runtime versions in .tool-versions"
       cat > "$PROJECT_ROOT/.tool-versions" <<EOF
-ruby 3.3.7
+ruby ${MINIMUM_RUBY_VERSION}
 nodejs 20.18.1
 EOF
-      print_success "Created .tool-versions with Ruby 3.3.7 and Node 20.18.1"
+      print_success "Created .tool-versions with Ruby $MINIMUM_RUBY_VERSION and Node 20.18.1"
       ;;
     rvm|rvm+nvm)
       print_header "Creating .ruby-version for rvm"
-      echo "3.3.7" > "$PROJECT_ROOT/.ruby-version"
-      print_success "Created .ruby-version with Ruby 3.3.7"
+      echo "$MINIMUM_RUBY_VERSION" > "$PROJECT_ROOT/.ruby-version"
+      print_success "Created .ruby-version with Ruby $MINIMUM_RUBY_VERSION"
       ;;
   esac
 
@@ -251,7 +253,7 @@ EOF
       ;;
   esac
 
-  set_ruby_version "3.3.7" "$VERSION_MANAGER"
+  set_ruby_version "$MINIMUM_RUBY_VERSION" "$VERSION_MANAGER"
   set_node_version "20.18.1" "$VERSION_MANAGER"
 
   # Run conversion script
