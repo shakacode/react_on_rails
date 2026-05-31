@@ -1691,6 +1691,79 @@ describe RscGenerator, type: :generator do
       expect(generator.send(:rsc_plugin_client_references_configured?, content, is_server: false)).to be(true)
     end
 
+    it "counts active dynamic plugin options without counting comments or literal options" do
+      content = <<~JS
+        const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+        // clientConfig.plugins.push(new RSCWebpackPlugin(buildCommentedOptions()));
+        clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+        clientConfig.plugins.push(new RSCWebpackPlugin(buildOptions()));
+        clientConfig.plugins.push(new RSCWebpackPlugin("literalOptions"));
+        clientConfig.plugins.push(new RSCWebpackPlugin(`templateOptions`));
+      JS
+
+      expect(generator.send(:dynamic_rsc_plugin_options_invocation_count, content)).to eq(3)
+    end
+
+    it "warns during verification when client plugin options are dynamic but keeps them out of missing patterns" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          clientConfig.plugins.push(new RSCWebpackPlugin(buildOptions()));
+        JS
+      )
+
+      expect(generator.send(:check_rsc_client_config)).to eq([])
+
+      messages = GeneratorMessages.messages.join("\n")
+      expect(messages).to include("uses dynamic or computed options")
+      expect(messages).to include("cannot verify whether scoped clientReferences are configured")
+      expect(messages).not_to include("generated scoped clientReferences in clientWebpackConfig.js")
+    end
+
+    it "warns only once when verification sees dynamic plugin options in both webpack configs" do
+      simulate_existing_file(
+        "config/webpack/serverWebpackConfig.js",
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          const rscBundle = false;
+          serverWebpackConfig.plugins.push(new RSCWebpackPlugin(serverPluginOptions()));
+        JS
+      )
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          clientConfig.plugins.push(new RSCWebpackPlugin(clientPluginOptions()));
+        JS
+      )
+
+      generator.send(:check_rsc_server_config)
+      generator.send(:check_rsc_client_config)
+
+      dynamic_warnings = GeneratorMessages.messages.grep(/uses dynamic or computed options/)
+      expect(dynamic_warnings.length).to eq(1)
+    end
+
+    it "does not warn during verification for literal options or commented-out dynamic plugin calls" do
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          // clientConfig.plugins.push(new RSCWebpackPlugin(buildOptions()));
+          clientConfig.plugins.push(new RSCWebpackPlugin({
+            isServer: false,
+            clientReferences,
+          }));
+        JS
+      )
+
+      generator.send(:check_rsc_client_config)
+
+      expect(GeneratorMessages.messages.join("\n")).not_to include("uses dynamic or computed options")
+    end
+
     it "treats shorthand clientReferences as a top-level configured option" do
       body = <<~JS
         isServer: false,

@@ -538,6 +538,7 @@ module ReactOnRails
         content = File.read(path)
         missing = []
         if content.include?("RSCWebpackPlugin")
+          warn_dynamic_rsc_plugin_options_for_config(content, "serverWebpackConfig.js")
           unless rsc_plugin_client_references_configured?(content, is_server: true)
             missing << "generated scoped clientReferences in serverWebpackConfig.js"
           end
@@ -555,6 +556,7 @@ module ReactOnRails
         content = File.read(path)
         missing = []
         if content.include?("RSCWebpackPlugin")
+          warn_dynamic_rsc_plugin_options_for_config(content, "clientWebpackConfig.js")
           unless rsc_plugin_client_references_configured?(content, is_server: false)
             missing << "generated scoped clientReferences in clientWebpackConfig.js"
           end
@@ -570,6 +572,24 @@ module ReactOnRails
 
         content = File.read(File.join(destination_root, scob_path))
         content.include?("rscWebpackConfig") ? [] : ["rscWebpackConfig in ServerClientOrBoth.js"]
+      end
+
+      def warn_dynamic_rsc_plugin_options_for_config(content, config_filename)
+        return unless dynamic_rsc_plugin_options_invocation_count(content).positive?
+
+        warn_dynamic_rsc_plugin_options_once(config_filename)
+      end
+
+      def warn_dynamic_rsc_plugin_options_once(config_filename)
+        @dynamic_rsc_plugin_options_warned ||= false
+        return if @dynamic_rsc_plugin_options_warned
+
+        @dynamic_rsc_plugin_options_warned = true
+        GeneratorMessages.add_warning(
+          "RSCWebpackPlugin in #{config_filename} uses dynamic or computed options, so the generator " \
+          "cannot verify whether scoped clientReferences are configured. Please verify this webpack " \
+          "config manually."
+        )
       end
     end
   end
