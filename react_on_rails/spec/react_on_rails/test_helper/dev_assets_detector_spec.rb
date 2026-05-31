@@ -114,6 +114,7 @@ describe ReactOnRails::TestHelper::DevAssetsDetector do
                          "application.js" => "http://localhost:3035/packs/application.js"
                        })
         write_source_file
+        described_class.send(:reset_hmr_warning_state!)
       end
 
       it "returns nil (HMR assets not usable)" do
@@ -121,17 +122,27 @@ describe ReactOnRails::TestHelper::DevAssetsDetector do
       end
 
       it "prints bundler-neutral HMR guidance" do
-        described_class.remove_instance_variable(described_class::HMR_WARNING_PRINTED) if
-          described_class.instance_variable_defined?(described_class::HMR_WARNING_PRINTED)
-
         expect do
           detector.check
         end.to output(satisfy do |message|
           message.include?("your bundler's dev server memory") &&
-            message.include?("Run build_test_command manually") &&
+            message.include?("Set config.build_test_command in initializer") &&
             !message.include?("webpack-dev-server") &&
             !message.include?("bin/shakapacker")
         end).to_stderr
+      end
+
+      context "with build_test_command configured" do
+        before do
+          allow(ReactOnRails.configuration)
+            .to receive(:build_test_command)
+            .and_return("RAILS_ENV=test bin/vite build")
+        end
+
+        it "includes the configured command in HMR guidance" do
+          expect { detector.check }
+            .to output(include("RAILS_ENV=test bin/vite build")).to_stderr
+        end
       end
     end
 
