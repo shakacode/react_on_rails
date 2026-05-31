@@ -58,11 +58,12 @@ module ReactOnRailsPro
       before_action :set_no_store_headers
 
       DEFAULT_ROUTE_PREFIX = "react_on_rails_pro_rolling_deploy"
+      SAFE_HASH_PATTERN = ReactOnRailsPro::RollingDeploy::SAFE_HASH_PATTERN
       # Rails route requirements reject anchor characters and apply segment
       # constraints to the full segment. Keep this route-safe form in sync with
       # SAFE_HASH_PATTERN's character rules; the controller still performs the
       # anchored defense-in-depth validation before any filesystem lookup.
-      ROUTE_HASH_PATTERN = /[A-Za-z0-9_][A-Za-z0-9_.\-]*/
+      ROUTE_HASH_PATTERN = Regexp.new(SAFE_HASH_PATTERN.source.delete_prefix("\\A").delete_suffix("\\z"))
 
       class << self
         # Helper for manual route mounts. The Pro engine uses these same route
@@ -90,8 +91,6 @@ module ReactOnRailsPro
       # path-traversal value through, the controller still rejects it
       # before any disk lookup because the hash must be in the
       # (regex-validated) current-hash set.
-      SAFE_HASH_PATTERN = ReactOnRailsPro::RollingDeploy::SAFE_HASH_PATTERN
-
       # Tarball entry name reserved for the server bundle. Companion assets
       # whose basename collides with this are skipped to keep the receiver
       # from extracting the wrong bytes into the bundle slot.
