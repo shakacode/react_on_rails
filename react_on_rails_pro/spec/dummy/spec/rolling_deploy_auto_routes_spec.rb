@@ -6,7 +6,6 @@ RSpec.describe "rolling-deploy auto routes", type: :request do
   let(:config) { ReactOnRailsPro.configuration }
   let(:default_path) { ReactOnRailsPro::Configuration::DEFAULT_ROLLING_DEPLOY_MOUNT_PATH }
   let(:token) { "a" * 32 }
-  let(:auto_route_prefix) { ReactOnRailsPro::Engine.const_get(:ROLLING_DEPLOY_AUTO_ROUTE_PREFIX, false) }
 
   around do |example|
     original_adapter = config.rolling_deploy_adapter
@@ -21,10 +20,10 @@ RSpec.describe "rolling-deploy auto routes", type: :request do
     Rails.application.reload_routes!
   end
 
-  def configure_rolling_deploy_routes(adapter:, mount_path:)
+  def configure_rolling_deploy_routes(adapter:, mount_path:, rolling_deploy_token: token)
     config.rolling_deploy_adapter = adapter
     config.rolling_deploy_mount_path = mount_path
-    config.rolling_deploy_token = token
+    config.rolling_deploy_token = rolling_deploy_token
     Rails.application.reload_routes!
   end
 
@@ -34,14 +33,13 @@ RSpec.describe "rolling-deploy auto routes", type: :request do
 
   def route_set_with_auto_mount
     path = default_path
-    prefix = auto_route_prefix
 
     ActionDispatch::Routing::RouteSet.new.tap do |routes|
       routes.prepend do
         ReactOnRailsPro::RollingDeploy::BundlesController.draw_routes(
           self,
           path: path,
-          as_prefix: prefix
+          as_prefix: "react_on_rails_pro_auto_rolling_deploy"
         )
       end
     end
@@ -83,7 +81,7 @@ RSpec.describe "rolling-deploy auto routes", type: :request do
       end
     end.not_to raise_error
     expect(routes.named_routes.helper_names).to include(
-      "#{auto_route_prefix}_manifest_path",
+      "react_on_rails_pro_auto_rolling_deploy_manifest_path",
       "react_on_rails_pro_rolling_deploy_manifest_path"
     )
   end
@@ -113,8 +111,23 @@ RSpec.describe "rolling-deploy auto routes", type: :request do
     expect { route_for("#{default_path}/manifest") }.to raise_error(ActionController::RoutingError)
   end
 
+  it "does not route bundle requests with invalid hash segments" do
+    configure_rolling_deploy_routes(
+      adapter: ReactOnRailsPro::RollingDeployAdapters::Http,
+      mount_path: default_path
+    )
+
+    expect(route_for("#{default_path}/bundles/valid_hash-123.js")).to include(
+      controller: "react_on_rails_pro/rolling_deploy/bundles",
+      action: "show",
+      hash: "valid_hash-123.js"
+    )
+    expect { route_for("#{default_path}/bundles/valid!trailing") }
+      .to raise_error(ActionController::RoutingError)
+  end
+
   it "does not mount the routes when the rolling-deploy adapter is nil" do
-    configure_rolling_deploy_routes(adapter: nil, mount_path: default_path)
+    configure_rolling_deploy_routes(adapter: nil, mount_path: default_path, rolling_deploy_token: nil)
 
     expect { route_for("#{default_path}/manifest") }.to raise_error(ActionController::RoutingError)
   end
@@ -126,7 +139,11 @@ RSpec.describe "rolling-deploy auto routes", type: :request do
       def self.upload(_bundle:, _assets: []) = nil
     end
 
-    configure_rolling_deploy_routes(adapter: custom_adapter, mount_path: default_path)
+    configure_rolling_deploy_routes(
+      adapter: custom_adapter,
+      mount_path: default_path,
+      rolling_deploy_token: nil
+    )
 
     expect { route_for("#{default_path}/manifest") }.to raise_error(ActionController::RoutingError)
   end

@@ -58,6 +58,10 @@ module ReactOnRailsPro
       before_action :set_no_store_headers
 
       DEFAULT_ROUTE_PREFIX = "react_on_rails_pro_rolling_deploy"
+      # Rails route requirements reject anchor characters and apply segment
+      # constraints to the full segment. Keep this route-safe form in sync with
+      # SAFE_HASH_PATTERN's character rules; the controller still performs the
+      # anchored defense-in-depth validation before any filesystem lookup.
       ROUTE_HASH_PATTERN = /[A-Za-z0-9_][A-Za-z0-9_.\-]*/
 
       class << self

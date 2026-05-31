@@ -101,6 +101,15 @@ end
 
 When `config.rolling_deploy_adapter = ReactOnRailsPro::RollingDeployAdapters::Http`, React on Rails Pro automatically routes the bundle-serving controller at `config.rolling_deploy_mount_path`:
 
+```ruby
+# config/initializers/react_on_rails_pro.rb
+ReactOnRailsPro.configure do |config|
+  config.rolling_deploy_adapter = ReactOnRailsPro::RollingDeployAdapters::Http
+  config.rolling_deploy_token = ENV.fetch("ROLLING_DEPLOY_TOKEN")
+  # No config/routes.rb entry is required for the default mount path.
+end
+```
+
 That exposes two authenticated endpoints under the mount path (default `/react_on_rails_pro/rolling_deploy`):
 
 | Endpoint             | Returns                                                                                                                   |
@@ -123,6 +132,8 @@ ReactOnRailsPro.configure do |config|
   config.rolling_deploy_mount_path = nil
 end
 ```
+
+Set `config.rolling_deploy_mount_path = ""` instead when your configuration source represents opt-outs as blank strings.
 
 ```ruby
 # config/routes.rb
