@@ -112,12 +112,19 @@ In CI, run precompile preparation explicitly once before webpack compilation or 
 
    ```bash
    ruby -v
-   bundle update react_on_rails
    bundle install
    ```
 
 2. If you scaffold apps with `create-react-on-rails-app`, make sure your shell resolves Ruby 3.3+ before running the CLI.
-3. Run your app's test suite and asset build after the Ruby upgrade, then update React on Rails and its matching npm package together.
+3. Update the `react_on_rails` gem and `react-on-rails` npm package pins to the same v17 release, then install both lockfiles together:
+
+   ```bash
+   bundle update react_on_rails
+   # then run your package manager's install command
+   npm install   # or: yarn install / pnpm install
+   ```
+
+4. Run your app's test suite and asset build after the Ruby and package updates.
 
 ## Upgrading to v16.4.0 (from v16.3.x)
 

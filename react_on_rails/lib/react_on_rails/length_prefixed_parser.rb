@@ -31,7 +31,7 @@ module ReactOnRails
     end
 
     def initialize
-      # Binary buffer keeps content slicing and byte counts protocol-oriented.
+      # Binary encoding ensures byte-position arithmetic is correct regardless of payload encoding.
       # force_encoding is O(1) (flips a flag, no copy). .b allocates a new object but
       # shares the byte buffer via copy-on-write for strings over ~23 bytes.
       @buf = "".b
