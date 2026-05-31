@@ -68,6 +68,20 @@ describe('LengthPrefixedStreamParser', () => {
     ]);
   });
 
+  it('parses when a CRLF blank separator is split across feed calls', () => {
+    const records = collectRecords(
+      toRecord('first', { index: 1 }),
+      '\r',
+      '\n',
+      toRecord('second', { index: 2 }),
+    );
+
+    expect(records).toEqual([
+      { content: 'first', metadata: { index: 1 } },
+      { content: 'second', metadata: { index: 2 } },
+    ]);
+  });
+
   it('still rejects non-empty malformed headers', () => {
     const parser = new LengthPrefixedStreamParser();
 
