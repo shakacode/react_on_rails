@@ -18,7 +18,9 @@ module ReactOnRails
     # This makes `bundle exec rspec` "just work" when `bin/dev static` is running,
     # with no environment variables or extra commands needed.
     class DevAssetsDetector
+      HMR_WARNING_PRINTED = :@hmr_warning_printed
       HMR_HINT = 'Set config.build_test_command = "<your-build-command>" in config/initializers/react_on_rails.rb'
+      private_constant :HMR_WARNING_PRINTED, :HMR_HINT
 
       class << self
         # Attempts to detect and activate development assets for test use.
@@ -156,14 +158,18 @@ module ReactOnRails
         assets_fresh?(manifest_path)
       end
 
-      HMR_WARNING_PRINTED = :@hmr_warning_printed
-
       def print_hmr_warning
         # Only print once per process
         return if self.class.instance_variable_get(HMR_WARNING_PRINTED)
 
         self.class.instance_variable_set(HMR_WARNING_PRINTED, true)
-        manual_compile_instruction = ReactOnRails.configuration.build_test_command.to_s.strip.presence || HMR_HINT
+        manual_compile_command = ReactOnRails.configuration.build_test_command.to_s.strip
+        manual_compile_guidance =
+          if manual_compile_command.empty?
+            "\nNo build_test_command is configured yet. To add one:\n  #{HMR_HINT}\n"
+          else
+            "  • #{manual_compile_command}\n"
+          end
 
         warn <<~MSG
 
@@ -173,7 +179,7 @@ module ReactOnRails
           To provide test assets, use one of:
             • bin/dev static       (writes files to disk, auto-reused by tests)
             • bin/dev test-watch   (keeps test assets fresh alongside HMR)
-            • #{manual_compile_instruction}
+          #{manual_compile_guidance}
 
           If using Capybara with run_server = false, HMR works — the browser connects
           to your running dev server directly.
@@ -191,11 +197,7 @@ module ReactOnRails
       end
 
       def project_root
-        @project_root ||= if defined?(Rails) && Rails.respond_to?(:root) && Rails.root
-                            Rails.root
-                          else
-                            Pathname.new(Dir.pwd)
-                          end
+        @project_root ||= (defined?(Rails) && Rails.respond_to?(:root) && Rails.root) || Pathname.new(Dir.pwd)
       end
 
       # HMR manifests contain URLs (http://localhost:3035/packs/...) instead of
@@ -230,10 +232,7 @@ module ReactOnRails
         # No source files = nothing to compare against, consider fresh
         return true if source_files.empty?
 
-        most_recent_source = source_files.map { |f| File.mtime(f) }.max
-        manifest_mtime = File.mtime(manifest_path)
-
-        manifest_mtime >= most_recent_source
+        File.mtime(manifest_path) >= source_files.map { |f| File.mtime(f) }.max
       end
 
       def make_source_file_list(source_path)

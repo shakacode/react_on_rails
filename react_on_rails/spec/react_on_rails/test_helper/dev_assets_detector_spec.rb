@@ -136,8 +136,12 @@ describe ReactOnRails::TestHelper::DevAssetsDetector do
         output = capture_stderr { detector.check }
 
         expect(output).to include("your bundler's dev server memory")
+        expect(output).to include("No build_test_command is configured yet. To add one:")
         expect(output).to include(
           'Set config.build_test_command = "<your-build-command>" in config/initializers/react_on_rails.rb'
+        )
+        expect(output).not_to include(
+          '• Set config.build_test_command = "<your-build-command>" in config/initializers/react_on_rails.rb'
         )
         expect(output).not_to include("webpack-dev-server")
         expect(output).not_to include("bin/shakapacker")
@@ -151,8 +155,10 @@ describe ReactOnRails::TestHelper::DevAssetsDetector do
         end
 
         it "includes the configured command in HMR guidance" do
-          expect { detector.check }
-            .to output(include("RAILS_ENV=test bin/vite build")).to_stderr
+          output = capture_stderr { detector.check }
+
+          expect(output).to include("• RAILS_ENV=test bin/vite build")
+          expect(output).not_to include("No build_test_command is configured yet")
         end
       end
     end
@@ -380,14 +386,14 @@ describe ReactOnRails::TestHelper::DevAssetsDetector do
     end
 
     it "resets the HMR warning flag before each activation attempt" do
-      described_class.instance_variable_set(described_class::HMR_WARNING_PRINTED, true)
+      described_class.instance_variable_set(:@hmr_warning_printed, true)
       detector = instance_double(described_class)
       allow(described_class).to receive(:new).and_return(detector)
       allow(detector).to receive(:check).and_return(nil)
 
       described_class.try_activate_dev_assets!
 
-      expect(described_class.instance_variable_defined?(described_class::HMR_WARNING_PRINTED)).to be(false)
+      expect(described_class.instance_variable_defined?(:@hmr_warning_printed)).to be(false)
     end
   end
 end
