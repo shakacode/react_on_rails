@@ -166,6 +166,12 @@ jobs:
         env:
           BUNDLE_GEMFILE: ${{ github.workspace }}/react_on_rails/Gemfile
         run: cd react_on_rails && bundle exec rubocop
+      # The benchmarks/ scripts live outside the gem, so the package rubocop run
+      # above doesn't see them. Lint them from the repo root (root .rubocop.yml).
+      - name: Lint benchmark scripts
+        env:
+          BUNDLE_GEMFILE: ${{ github.workspace }}/react_on_rails/Gemfile
+        run: bundle exec rubocop benchmarks
       - name: Validate RBS type signatures
         env:
           BUNDLE_GEMFILE: ${{ github.workspace }}/react_on_rails/Gemfile

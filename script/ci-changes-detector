@@ -68,6 +68,7 @@ LINT_CONFIG_CHANGED=false
 PRO_LINT_CONFIG_CHANGED=false
 RUBY_CORE_CHANGED=false
 RSPEC_CHANGED=false
+BENCHMARKS_CHANGED=false
 SPEC_DUMMY_CHANGED=false
 JS_CHANGED=false
 GENERATORS_CHANGED=false
@@ -282,6 +283,18 @@ while IFS= read -r file; do
       fi
       ;;
 
+    # Benchmark scripts and their specs (stdlib-only Ruby under benchmarks/).
+    # These only need rubocop + the benchmark specs in rspec-package-tests — not
+    # the full dummy/integration/Pro suite the catch-all would otherwise trigger.
+    benchmarks/*|benchmarks/**/*)
+      DOCS_ONLY=false
+      if source_file_comment_only_change "$file"; then
+        SOURCE_COMMENT_ONLY_CHANGED=true
+      else
+        BENCHMARKS_CHANGED=true
+      fi
+      ;;
+
     # JavaScript/TypeScript source (including tests, scripts, and package files)
     package.json|pnpm-lock.yaml|packages/react-on-rails/src/*|packages/react-on-rails/src/**/*|packages/react-on-rails/tests/*|packages/react-on-rails/tests/**/*|packages/react-on-rails/scripts/*|packages/react-on-rails/scripts/**/*|packages/react-on-rails/package.json|packages/react-on-rails/tsconfig.json|.github/workflows/package-js-tests.yml)
       DOCS_ONLY=false
@@ -396,6 +409,7 @@ elif [ "$SOURCE_COMMENT_ONLY_CHANGED" = true ] || [ "$PRO_SOURCE_COMMENT_ONLY_CH
     [ "$PRO_LINT_CONFIG_CHANGED" = false ] &&
     [ "$RUBY_CORE_CHANGED" = false ] &&
     [ "$RSPEC_CHANGED" = false ] &&
+    [ "$BENCHMARKS_CHANGED" = false ] &&
     [ "$SPEC_DUMMY_CHANGED" = false ] &&
     [ "$JS_CHANGED" = false ] &&
     [ "$GENERATORS_CHANGED" = false ] &&
@@ -430,6 +444,7 @@ if [ "$DOCS_ONLY" = true ]; then
     "run_pro_tests:false"
     "run_pro_dummy_tests:false"
     "run_pro_node_renderer_tests:false"
+    "benchmarks_changed:false"
   )
 
   # Output to GITHUB_OUTPUT if in GitHub Actions
@@ -468,6 +483,7 @@ echo "Changed file categories:"
 [ "$RUBY_CORE_CHANGED" = true ] && echo -e "${YELLOW}  • Ruby core source code${NC}"
 [ "$JS_CHANGED" = true ] && echo -e "${YELLOW}  • JavaScript/TypeScript code${NC}"
 [ "$RSPEC_CHANGED" = true ] && echo -e "${YELLOW}  • RSpec tests${NC}"
+[ "$BENCHMARKS_CHANGED" = true ] && echo -e "${YELLOW}  • Benchmark scripts${NC}"
 [ "$SPEC_DUMMY_CHANGED" = true ] && echo -e "${YELLOW}  • Dummy app${NC}"
 [ "$GENERATORS_CHANGED" = true ] && echo -e "${YELLOW}  • Generators${NC}"
 [ "$PRO_JS_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro JavaScript/TypeScript${NC}"
@@ -506,6 +522,14 @@ fi
 
 if [ "$RUBY_CORE_CHANGED" = true ] || [ "$RSPEC_CHANGED" = true ] || [ "$GENERATORS_CHANGED" = true ]; then
   RUN_RUBY_TESTS=true
+fi
+
+# Benchmark scripts live outside the gem: they're linted by rubocop and covered
+# by their own specs in the benchmark workflow (not the gem rspec suite), so they
+# only need lint here. The benchmarks_changed output drives the benchmark
+# workflow's script-validation job.
+if [ "$BENCHMARKS_CHANGED" = true ]; then
+  RUN_LINT=true
 fi
 
 if [ "$JS_CHANGED" = true ]; then
@@ -588,6 +612,7 @@ if [ -n "${GITHUB_OUTPUT:-}" ]; then
     echo "run_pro_tests=$RUN_PRO_TESTS"
     echo "run_pro_dummy_tests=$RUN_PRO_DUMMY_TESTS"
     echo "run_pro_node_renderer_tests=$RUN_PRO_NODE_RENDERER_TESTS"
+    echo "benchmarks_changed=$BENCHMARKS_CHANGED"
   } >> "$GITHUB_OUTPUT"
 fi
 
@@ -606,7 +631,8 @@ if [ "${CI_JSON_OUTPUT:-}" = "1" ]; then
   "run_pro_lint": $RUN_PRO_LINT,
   "run_pro_tests": $RUN_PRO_TESTS,
   "run_pro_dummy_tests": $RUN_PRO_DUMMY_TESTS,
-  "run_pro_node_renderer_tests": $RUN_PRO_NODE_RENDERER_TESTS
+  "run_pro_node_renderer_tests": $RUN_PRO_NODE_RENDERER_TESTS,
+  "benchmarks_changed": $BENCHMARKS_CHANGED
 }
 EOF
 fi

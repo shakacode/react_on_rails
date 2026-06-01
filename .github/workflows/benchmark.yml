@@ -173,6 +173,30 @@ jobs:
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
         shell: bash
+      # Only pay the Bundler setup when benchmarks will run or the scripts
+      # themselves changed; unrelated PRs keep this job stdlib-only and fast.
+      # TODO: when fixing #2214 this should switch to the new root Gemfile.
+      - name: Install libyaml-dev
+        # Must precede any gem install/load: psych links libyaml dynamically. On warm caches the
+        # missing-lib failure is silent; cold runs hit it.
+        if: steps.benchmark-matrices.outputs.run_benchmark_suites == 'true' || steps.detect.outputs.benchmarks_changed == 'true'
+        run: sudo apt-get install -y libyaml-dev
+      - name: Setup Ruby and install gems
+        if: steps.benchmark-matrices.outputs.run_benchmark_suites == 'true' || steps.detect.outputs.benchmarks_changed == 'true'
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: react_on_rails
+          ruby-version: ${{ env.RUBY_VERSION }}
+      # Validate the benchmark scripts (matrix generation, route discovery)
+      # before any benchmark runs: if this logic is wrong, the matrix and routes
+      # feeding the run are wrong, so the results would be invalid. Running it
+      # here (rather than a separate job) reuses this job's checkout/runner and
+      # still gates the benchmark job, which needs detect-changes to succeed.
+      # Run from the repo root: the scripts live outside the gem, but the bundle
+      # set up above (BUNDLE_GEMFILE -> react_on_rails/Gemfile) provides rspec.
+      - name: Run benchmark script specs
+        if: steps.benchmark-matrices.outputs.run_benchmark_suites == 'true' || steps.detect.outputs.benchmarks_changed == 'true'
+        run: bundle exec rspec benchmarks/spec
 
   benchmark:
     needs: detect-changes
