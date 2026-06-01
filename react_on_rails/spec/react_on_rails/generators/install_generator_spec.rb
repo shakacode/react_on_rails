@@ -3060,6 +3060,16 @@ describe InstallGenerator, type: :generator do
 
         expect(install_generator.send(:using_rspack?)).to be true
       end
+
+      # Twin of base_generator_spec's fallback case: InstallGenerator has its own
+      # rspack_bundler_default override (delegating to fresh_install_rspack_default) and is the
+      # primary CLI entry point, so the < 9.0 fallback to Webpack is asserted here too.
+      it "falls back to Webpack when Rspack is unsupported (Shakapacker < 9.0)" do
+        allow(install_generator).to receive_messages(project_declares_assets_bundler?: false,
+                                                     shakapacker_version_9_or_higher?: false)
+
+        expect(install_generator.send(:using_rspack?)).to be false
+      end
     end
   end
 

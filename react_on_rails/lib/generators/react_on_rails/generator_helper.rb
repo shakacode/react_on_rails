@@ -154,7 +154,9 @@ module GeneratorHelper
     choices = []
     choices << options[:rspack] if options.key?(:rspack)
     # --webpack means "use Webpack" (rspack = false); --no-webpack means "use Rspack".
-    choices << !options[:webpack] if options.key?(:webpack)
+    # Name the inverted webpack flag so the rspack-boolean intent reads directly.
+    rspack_via_webpack_flag = !options[:webpack]
+    choices << rspack_via_webpack_flag if options.key?(:webpack)
     return nil if choices.empty?
 
     if choices.uniq.length > 1
