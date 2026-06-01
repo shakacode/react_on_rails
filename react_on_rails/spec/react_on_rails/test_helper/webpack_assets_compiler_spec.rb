@@ -1,11 +1,44 @@
 # frozen_string_literal: true
 
 require_relative "../spec_helper"
+require "stringio"
 
 describe ReactOnRails::TestHelper::WebpackAssetsCompiler do
+  def capture_stdout
+    original_stdout = $stdout
+    stream = StringIO.new
+    $stdout = stream
+    yield
+    stream.string
+  ensure
+    $stdout = original_stdout
+  end
+
   describe "#compile_assets" do
     let(:invalid_command) { "false" }
     let(:valid_command) { "true" }
+
+    context "when assets compiler command is not configured" do
+      before do
+        allow(ReactOnRails.configuration)
+          .to receive(:build_test_command)
+          .and_return("")
+      end
+
+      it "prints bundler-neutral setup guidance" do
+        compiler = described_class.new
+        allow(compiler).to receive(:exit!)
+
+        output = capture_stdout { compiler.compile_assets }
+
+        expect(output).to include("the command that builds test assets for your bundler")
+        expect(output).to include("let your bundler compile test assets automatically")
+        expect(output).not_to include("bin/shakapacker")
+        expect(output).not_to include("config/shakapacker.yml")
+
+        expect(compiler).to have_received(:exit!).with(1)
+      end
+    end
 
     context "when assets compiler command succeeds" do
       before do
