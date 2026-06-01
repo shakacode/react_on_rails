@@ -365,6 +365,86 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       expect(response.body).to eq("rendered")
       expect(response_body.closed).to be(true)
     end
+
+    it "closes an aborted streaming response body before the next pooled stream" do
+      client_disconnected = Class.new(StandardError)
+
+      stub_const(
+        "FakePooledBody",
+        Class.new do
+          attr_reader :closed
+
+          def initialize(chunks, on_close)
+            @chunks = chunks
+            @on_close = on_close
+            @closed = false
+          end
+
+          def each(&block)
+            @chunks.each(&block)
+          end
+
+          def close
+            return if @closed
+
+            @closed = true
+            @on_close.call
+          end
+        end
+      )
+      stub_const(
+        "FakePooledStreamingClient",
+        Class.new do
+          attr_reader :bodies, :requests
+
+          def initialize
+            @bodies = []
+            @requests = []
+            @slot_busy = false
+          end
+
+          def post(_path, headers:, body:)
+            raise ReactOnRailsPro::RendererHttpClient::ConnectionError, "pooled stream still busy" if @slot_busy
+
+            @requests << [headers, body]
+            @slot_busy = true
+            response_body = FakePooledBody.new(["rendered"], -> { @slot_busy = false })
+            @bodies << response_body
+            Struct.new(:status, :body).new(200, response_body)
+          end
+        end
+      )
+
+      async_client = FakePooledStreamingClient.new
+      client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+      allow(client).to receive(:with_client).and_yield(async_client)
+
+      first_response = client.post("/render", json: { renderingRequest: "render()" }, stream: true)
+      aborted_chunks = []
+
+      expect do
+        first_response.each do |chunk|
+          aborted_chunks << chunk
+          raise client_disconnected, "client disconnected" if aborted_chunks.size == 1
+        end
+      end.to raise_error(client_disconnected, "client disconnected")
+      expect(aborted_chunks).to eq(["rendered"])
+      expect(async_client.bodies.first.closed).to be(true)
+
+      second_response = client.post("/render", json: { renderingRequest: "render()" }, stream: true)
+      chunks = []
+      second_response.each { |chunk| chunks << chunk }
+
+      expect(chunks).to eq(["rendered"])
+      expect(async_client.requests.map { |headers, body| [headers["content-type"], body] }).to eq(
+        [
+          ["application/json", { renderingRequest: "render()" }.to_json],
+          ["application/json", { renderingRequest: "render()" }.to_json]
+        ]
+      )
+      expect(async_client.bodies.size).to eq(2)
+      expect(async_client.bodies.last.closed).to be(true)
+    end
   end
 
   describe "#get" do
