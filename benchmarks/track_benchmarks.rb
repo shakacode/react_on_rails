@@ -22,6 +22,12 @@ THRESHOLDS = [
   ["failed_pct", :upper]
 ].freeze
 
+# Bencher exits non-zero both for a performance alert (a real regression) and for
+# operational problems; we tell them apart by grepping stderr for these phrases.
+# They are not a documented API contract, so the CLI is pinned in benchmark.yml and
+# this must be re-verified on upgrade.
+ALERT_PATTERN = /\bAlerts?\b|threshold violation|boundary violation/i
+
 def env!(key)
   ENV.fetch(key) do
     warn "#{key} is required"
@@ -33,17 +39,6 @@ BENCHMARK_JSON = ENV.fetch("BENCHMARK_JSON", "bench_results/benchmark.json")
 REPORT_HTML = ENV.fetch("BENCHER_REPORT_HTML", "bench_results/bencher_report.html")
 CHUNK_PREFIX = "bench_results/bencher_chunk"
 REGRESSION_REPORT_JSON = File.join("bench_results", RegressionReport::FILENAME)
-
-# Check the input file before validating env vars — a missing benchmark.json is the more
-# actionable failure (almost always upstream `bench.rb` didn't produce results).
-unless File.exist?(BENCHMARK_JSON)
-  warn "Benchmark JSON file not found: #{BENCHMARK_JSON}"
-  exit 1
-end
-
-SUITE_NAME = env!("BENCHMARK_SUITE_NAME")
-REPORT_MARKER = env!("BENCHER_REPORT_MARKER")
-env!("BENCHER_API_TOKEN")
 
 def branch_and_start_point_args
   case ENV.fetch("GITHUB_EVENT_NAME")
@@ -127,16 +122,6 @@ def run_bencher(branch, start_point_args)
     File.write(REPORT_HTML, stdout)
   end
   [stderr, status.exitstatus]
-end
-
-def retry_without_start_point_hash?(stderr, exit_code)
-  exit_code != 0 &&
-    stderr.match?(/Head Version.*not found/) &&
-    !stderr.match?(/\bAlerts?\b|threshold violation|boundary violation/i)
-end
-
-def alert?(stderr, exit_code)
-  exit_code != 0 && stderr.match?(/\bAlerts?\b|threshold violation|boundary violation/i)
 end
 
 def append_step_summary(markdown)
@@ -270,50 +255,83 @@ def benchmark_summary
   ].join
 end
 
+def alert?(stderr, exit_code)
+  exit_code != 0 && stderr.match?(ALERT_PATTERN)
+end
+
+# A missing start-point baseline (not an alert): retrying without the start-point
+# hash falls back to the latest baseline. The alert exclusion is load-bearing — a
+# real regression must not be silently re-run against a different baseline.
+def retry_without_start_point_hash?(stderr, exit_code)
+  exit_code != 0 &&
+    stderr.match?(/Head Version.*not found/) &&
+    !stderr.match?(ALERT_PATTERN)
+end
+
 def main_push?
   ENV.fetch("GITHUB_EVENT_NAME") == "push" && ENV.fetch("GITHUB_REF") == "refs/heads/main"
 end
 
-branch, start_point_args = branch_and_start_point_args
-stderr, bencher_exit_code = run_bencher(branch, start_point_args)
-
-if retry_without_start_point_hash?(stderr, bencher_exit_code)
-  retry_args = start_point_args.dup
-  if (hash_arg_index = retry_args.index("--start-point-hash"))
-    retry_args.slice!(hash_arg_index, 2)
-  end
-  puts "Start-point hash not found in Bencher; retrying without --start-point-hash"
-  puts "::warning::Start-point hash not found in Bencher; falling back to latest baseline for comparison"
-  stderr, bencher_exit_code = run_bencher(branch, retry_args)
-end
-
-post_report_to_summary
-replace_pr_comments
-
-if main_push? && bencher_exit_code != 0
-  if alert?(stderr, bencher_exit_code)
-    # Record the regression for the post-matrix report-regressions job rather than
-    # filing the issue here: parallel matrix suites would otherwise race to create
-    # duplicate issues and clobber each other's sections in the shared comment.
-    # Use the un-sharded suite name so that job can combine a suite's shards into a
-    # single section (shard_label keeps their ordering deterministic).
-    File.write(
-      REGRESSION_REPORT_JSON,
-      JSON.generate(
-        suite_name: ENV.fetch("BENCHMARK_SUITE_GROUP", SUITE_NAME),
-        shard_label: ENV.fetch("BENCHMARK_SHARD_LABEL", ""),
-        summary: benchmark_summary
-      )
-    )
-
-    warn "::warning::Bencher flagged a #{SUITE_NAME} regression on main (exit #{bencher_exit_code}). " \
-         "The report-regressions job will file the issue. " \
-         "See the Bencher dashboard and the workflow run: #{Github.run_url}"
+# Only run the benchmark tracking when invoked as a script; `require`-ing the file
+# (e.g. from specs) just loads the helpers above.
+if __FILE__ == $PROGRAM_NAME
+  # Check the input file before validating env vars — a missing benchmark.json is the more
+  # actionable failure (almost always upstream `bench.rb` didn't produce results).
+  unless File.exist?(BENCHMARK_JSON)
+    warn "Benchmark JSON file not found: #{BENCHMARK_JSON}"
     exit 1
-  else
-    warn "::error::Bencher exited #{bencher_exit_code} on main with no regression alert in stderr for #{SUITE_NAME}; " \
-         "this indicates an operational failure (auth/API/network/CLI), not a performance regression. " \
-         "Check the logs above."
-    exit bencher_exit_code
+  end
+
+  SUITE_NAME = env!("BENCHMARK_SUITE_NAME")
+  REPORT_MARKER = env!("BENCHER_REPORT_MARKER")
+  env!("BENCHER_API_TOKEN")
+
+  branch, start_point_args = branch_and_start_point_args
+  stderr, bencher_exit_code = run_bencher(branch, start_point_args)
+
+  if retry_without_start_point_hash?(stderr, bencher_exit_code)
+    retry_args = start_point_args.dup
+    if (hash_arg_index = retry_args.index("--start-point-hash"))
+      retry_args.slice!(hash_arg_index, 2)
+    end
+    puts "Start-point hash not found in Bencher; retrying without --start-point-hash"
+    puts "::warning::Start-point hash not found in Bencher; falling back to latest baseline for comparison"
+    stderr, bencher_exit_code = run_bencher(branch, retry_args)
+  end
+
+  post_report_to_summary
+  replace_pr_comments
+
+  if main_push? && bencher_exit_code != 0
+    if alert?(stderr, bencher_exit_code)
+      # Record the regression for the post-matrix report-regressions job rather than
+      # filing the issue here: parallel matrix suites would otherwise race to create
+      # duplicate issues and clobber each other's sections in the shared comment.
+      # Use the un-sharded suite name so that job can combine a suite's shards into a
+      # single section (shard_label keeps their ordering deterministic).
+      File.write(
+        REGRESSION_REPORT_JSON,
+        JSON.generate(
+          suite_name: ENV.fetch("BENCHMARK_SUITE_GROUP", SUITE_NAME),
+          shard_label: ENV.fetch("BENCHMARK_SHARD_LABEL", ""),
+          summary: benchmark_summary
+        )
+        warn "::warning::Bencher flagged a #{SUITE_NAME} regression on main (exit #{bencher_exit_code}). " \
+             "The report-regressions job will file the issue. " \
+             "See the Bencher dashboard and the workflow run: #{Github.run_url}"
+      rescue StandardError => e # rubocop:disable Metrics/BlockNesting
+        # The suite still fails (exit 1 below), so the regression is surfaced; but the
+        # hand-off payload is gone, so report-regressions can't auto-file the issue.
+        warn "::error::Bencher flagged a #{SUITE_NAME} regression on main but its report payload " \
+             "could not be written (#{e.class}: #{e.message}); the issue will NOT be auto-filed — " \
+             "investigate using GitHub run logs: #{Github.run_url}"
+      end
+      exit 1
+    else
+      warn "::error::Bencher exited #{bencher_exit_code} on main with no regression alert for #{SUITE_NAME}; " \
+           "this indicates an operational failure (auth/API/network/CLI), not a performance regression. " \
+           "Check the logs above."
+      exit bencher_exit_code
+    end
   end
 end
