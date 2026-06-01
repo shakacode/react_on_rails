@@ -7,6 +7,8 @@
 
 require "json"
 
+MIN_ROUTES_FOR_SHARDING = 10
+
 SUITES = [
   {
     id: "core",
@@ -138,8 +140,22 @@ def suite_enabled?(suite, labels)
   suite_selected_by_input?(suite) && suite_requested_by_event?(suite, labels)
 end
 
+def explicit_routes
+  ENV.fetch("BENCHMARK_ROUTES", "").split(",").map(&:strip).reject(&:empty?)
+end
+
+def shard_total_for_suite(suite)
+  configured_shard_total = suite.fetch(:shard_total)
+  explicit_route_count = explicit_routes.length
+
+  return configured_shard_total if explicit_route_count.zero?
+  return 1 if explicit_route_count < MIN_ROUTES_FOR_SHARDING
+
+  [configured_shard_total, explicit_route_count].min
+end
+
 def suite_rows(suite)
-  shard_total = suite.fetch(:shard_total)
+  shard_total = shard_total_for_suite(suite)
   raise "#{suite.fetch(:id)} shard_total must be positive (got #{shard_total})" unless shard_total.positive?
 
   Array.new(shard_total) do |index|
