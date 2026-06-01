@@ -2,10 +2,10 @@ name: Setup benchmark runner
 description: Install common tools and build packages needed by benchmark jobs.
 
 inputs:
-  install-k6:
-    description: Whether to install k6 for Rails benchmark jobs.
+  benchmark-tool:
+    description: Benchmark load tool to install. Supported values are k6, vegeta, and none.
     required: false
-    default: 'true'
+    default: k6
 
 runs:
   using: composite
@@ -30,10 +30,27 @@ runs:
       run: sudo apt-get install -y libyaml-dev
 
     - name: Setup k6
-      if: inputs.install-k6 == 'true'
+      if: inputs.benchmark-tool == 'k6'
       uses: grafana/setup-k6-action@v1
       with:
         k6-version: ${{ env.K6_VERSION }}
+
+    - name: Cache Vegeta binary
+      id: cache-vegeta
+      if: inputs.benchmark-tool == 'vegeta'
+      uses: actions/cache@v5
+      with:
+        path: ~/bin/vegeta
+        key: vegeta-${{ runner.os }}-${{ runner.arch }}-${{ env.VEGETA_VERSION }}
+
+    - name: Install Vegeta
+      if: inputs.benchmark-tool == 'vegeta' && steps.cache-vegeta.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        echo "Installing Vegeta v${VEGETA_VERSION}"
+        wget -q "https://github.com/tsenart/vegeta/releases/download/v${VEGETA_VERSION}/vegeta_${VEGETA_VERSION}_linux_amd64.tar.gz"
+        tar -xzf "vegeta_${VEGETA_VERSION}_linux_amd64.tar.gz"
+        mv vegeta ~/bin/
 
     - name: Setup Ruby
       uses: ruby/setup-ruby@v1
