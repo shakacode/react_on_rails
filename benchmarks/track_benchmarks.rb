@@ -3,6 +3,9 @@
 
 require "open3"
 require "time"
+
+require_relative "lib/regression_issue_reporter"
+
 BOUNDARY = "0.95"
 MAX_SAMPLE = "64"
 BENCHER_URL = "https://bencher.dev/perf/react-on-rails-t8a9ncxo"
@@ -248,83 +251,6 @@ def benchmark_summary
   ].join
 end
 
-def ensure_regression_label
-  system(
-    "gh", "label", "create", "performance-regression",
-    "--description", "Automated: benchmark regression detected on main",
-    "--color", "D93F0B",
-    "--force"
-  )
-end
-
-def existing_regression_issue
-  stdout, status = capture_command(
-    "gh", "issue", "list",
-    "--label", "performance-regression",
-    "--state", "open",
-    "--limit", "1",
-    "--json", "number",
-    "--jq", ".[0].number // empty"
-  )
-  return "" unless status.success?
-
-  stdout.strip
-end
-
-def comment_on_regression_issue(issue_number, summary)
-  commit_short = ENV.fetch("GITHUB_SHA")[0, 7]
-  commit_url = "#{ENV.fetch('GITHUB_SERVER_URL')}/#{ENV.fetch('GITHUB_REPOSITORY')}/commit/#{ENV.fetch('GITHUB_SHA')}"
-  body = <<~MARKDOWN
-    ## New #{SUITE_NAME} regression detected
-
-    **Commit:** [`#{commit_short}`](#{commit_url}) by @#{ENV.fetch('GITHUB_ACTOR')}
-    **Workflow run:** [Run ##{ENV.fetch('GITHUB_RUN_NUMBER')}](#{github_run_url})
-    #{summary}
-
-    > View the full Bencher report in the workflow run summary or on the [Bencher dashboard](#{BENCHER_URL}).
-  MARKDOWN
-
-  system("gh", "issue", "comment", issue_number, "--body", body)
-end
-
-def create_regression_issue(summary)
-  commit_short = ENV.fetch("GITHUB_SHA")[0, 7]
-  commit_url = "#{ENV.fetch('GITHUB_SERVER_URL')}/#{ENV.fetch('GITHUB_REPOSITORY')}/commit/#{ENV.fetch('GITHUB_SHA')}"
-  body = <<~MARKDOWN
-    ## Performance Regression Detected on main
-
-    A statistically significant #{SUITE_NAME} performance regression was detected by
-    [Bencher](#{BENCHER_URL}) using a Student's t-test (95% confidence
-    interval, up to 64 sample history).
-
-    | Detail | Value |
-    |--------|-------|
-    | **Commit** | [`#{commit_short}`](#{commit_url}) |
-    | **Pushed by** | @#{ENV.fetch('GITHUB_ACTOR')} |
-    | **Workflow run** | [Run ##{ENV.fetch('GITHUB_RUN_NUMBER')}](#{github_run_url}) |
-    | **Bencher dashboard** | [View history](#{BENCHER_URL}) |
-    #{summary}
-
-    ### What to do
-
-    1. Check the workflow run for the full Bencher HTML report
-    2. Review the Bencher dashboard to see which metrics regressed
-    3. Investigate the commit; expected trade-off or unintended regression?
-    4. If unintended, open a fix PR and reference this issue
-    5. Close this issue once resolved; subsequent regressions will open a new one
-
-    ---
-    *This issue was created automatically by the benchmark CI workflow.*
-  MARKDOWN
-
-  system(
-    "gh", "issue", "create",
-    "--title", "Performance Regression Detected on main (#{commit_short})",
-    "--label", "performance-regression",
-    "--body", body
-  )
-end
-
 def main_push?
   ENV.fetch("GITHUB_EVENT_NAME") == "push" && ENV.fetch("GITHUB_REF") == "refs/heads/main"
 end
@@ -347,19 +273,18 @@ replace_pr_comments
 
 if main_push? && bencher_exit_code != 0
   if alert?(stderr, bencher_exit_code)
-    ensure_regression_label
     summary = benchmark_summary
-    issue_number = existing_regression_issue
+    issue_number = RegressionIssueReporter.report(
+      suite_name: SUITE_NAME,
+      github_run_url: github_run_url,
+      bencher_url: BENCHER_URL,
+      summary: summary
+    )
 
-    if issue_number.empty?
-      create_regression_issue(summary)
-    else
-      puts "Open regression issue already exists: ##{issue_number}; adding comment"
-      comment_on_regression_issue(issue_number, summary)
-    end
+    exit 1 if issue_number.empty?
 
     puts "::warning::Bencher flagged a #{SUITE_NAME} regression on main (exit #{bencher_exit_code}). " \
-         "See the open regression issue (label: performance-regression), the Bencher dashboard, " \
+         "See regression issue ##{issue_number}, the Bencher dashboard, " \
          "and the workflow run: #{github_run_url}"
   else
     warn "::error::Bencher exited #{bencher_exit_code} on main with no regression alert in stderr for #{SUITE_NAME}; " \
