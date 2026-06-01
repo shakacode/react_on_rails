@@ -91,7 +91,7 @@ bundle exec rspec
 
 ## React Server Components (RSC) Compatibility
 
-### Current Status (2025)
+### Current Status (2026)
 
 Based on research and testing, here are the key findings regarding SWC and React Server Components compatibility:
 
@@ -101,7 +101,7 @@ Based on research and testing, here are the key findings regarding SWC and React
 - The **`'use client'` / `'use server'` boundary transform is performed by the `react-on-rails-rsc` WebpackLoader**, which runs _before_ babel/swc in the loader chain. RSC directive handling does not depend on your transpiler choice — SWC (or Babel) only does ordinary JS/TS transpilation of the RSC, server, and client bundles.
 - Using `swc-loader` to build an RSC app is wired to work (the generated `rscWebpackConfig.js` extracts and chains either `babel-loader` or `swc-loader`) but is not yet verified end-to-end in React on Rails.
 - The **React Compiler's SWC plugin is still experimental**, and SWC plugins in general do not follow semver for compatibility. (React Compiler is optional and independent of RSC.)
-- Next.js recommends SWC 15.3.1+ for optimal SWC-based build performance with RSC.
+- Next.js recommends version 15.3.1+ for optimal SWC-based build performance with RSC.
 
 #### Known Issues
 

@@ -44,7 +44,7 @@ The `RSCWebpackPlugin` is the critical compatibility question. It wraps React's
 - `compilation.chunkGraph` — chunk/module graph traversal
 
 **Why this matters**: The plugin generates `react-client-manifest.json` and
-`react-ssr-manifest.json`, which map client component file paths to their chunk
+`react-server-client-manifest.json`, which map client component file paths to their chunk
 IDs and bundle filenames. Without these manifests, the RSC runtime cannot resolve
 `'use client'` component references during streaming.
 
@@ -82,7 +82,7 @@ To test RSC with Rspack in your project:
 3. Verify configs are in `config/rspack/`
 4. Build all three bundles and check for:
    - `rsc-bundle.js` in the output
-   - `react-client-manifest.json` and `react-ssr-manifest.json` (from the plugin)
+   - `react-client-manifest.json` and `react-server-client-manifest.json` (from the plugin)
    - No webpack/Rspack compilation errors
 
 ## Known Limitations
