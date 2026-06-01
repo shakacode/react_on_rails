@@ -425,11 +425,14 @@ module ReactOnRails
           allow(Rails.logger).to receive(:warn)
         end
 
-        it "logs a warning naming the missing path" do
+        it "logs a warning naming the missing path without a redundant resolved-to clause" do
           described_class.suppress_shakapacker_package_manager_check_if_not_bundler!
 
           expect(Rails.logger).to have_received(:warn)
-            .with(a_string_including("SHAKAPACKER_CONFIG is set to '#{missing_config_path}'"))
+            .with(
+              a_string_including("SHAKAPACKER_CONFIG is set to '#{missing_config_path}'")
+                .and(satisfy("omits the redundant '(resolved to ...)' clause") { |msg| !msg.include?("resolved to") })
+            )
         end
 
         context "when the configured path is relative" do
