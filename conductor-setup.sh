@@ -47,9 +47,9 @@ run_cmd node --version >/dev/null 2>&1 || { echo "❌ Error: Node.js is not inst
 
 # Check Ruby version
 RUBY_VERSION=$(run_cmd ruby -v | awk '{print $2}')
-MIN_RUBY_VERSION="3.0.0"
+MIN_RUBY_VERSION="3.3.0"
 if [[ $(echo -e "$MIN_RUBY_VERSION\n$RUBY_VERSION" | sort -V | head -n1) != "$MIN_RUBY_VERSION" ]]; then
-    echo "❌ Error: Ruby version $RUBY_VERSION is too old. React on Rails requires Ruby >= 3.0.0"
+    echo "❌ Error: Ruby version $RUBY_VERSION is too old. React on Rails requires Ruby >= $MIN_RUBY_VERSION"
     echo "   Please upgrade Ruby using your version manager or system package manager."
     exit 1
 fi
