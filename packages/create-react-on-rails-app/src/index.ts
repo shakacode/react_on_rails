@@ -77,9 +77,14 @@ async function run(appName: string, rawOpts: Record<string, unknown>, command?: 
     template,
     packageManager: packageManager as 'npm' | 'pnpm',
     // Rspack is the default; an explicit --no-rspack or its --webpack alias selects Webpack.
-    // (Footgun: re-adding `.option('--rspack', desc, false)` would default rawOpts.rspack to
-    // false and silently flip the default back to Webpack.)
-    rspack: webpackRequested ? false : rawOpts.rspack !== false,
+    // (rawOpts.rspack ?? true) makes the three inputs explicit: undefined (no flag) -> true,
+    // true (--rspack) -> true, false (--no-rspack) -> false.
+    // Footgun: re-adding `.option('--rspack', desc, false)` would default rawOpts.rspack to
+    // false and silently flip the default back to Webpack.
+    // Note: buildGeneratorArgs always forwards an explicit --rspack/--no-rspack to the Ruby
+    // generator, so the generator's own fresh-install fallback (fresh_install_rspack_default,
+    // which consults the Shakapacker version) is never reached via create-react-on-rails-app.
+    rspack: webpackRequested ? false : (rawOpts.rspack ?? true) === true,
     pro,
     rsc,
   };

@@ -28,6 +28,7 @@ module ReactOnRails
       # GeneratorHelper#using_rspack? tells an explicit choice from "no flag given" (the latter
       # falls back to rspack_bundler_default). Adding `default: false` would make
       # options.key?(:rspack) always true and silently break the fresh-install Rspack default.
+      # (Thor's omit-when-no-default behavior verified against Thor 1.5.0; see Gemfile.lock.)
       class_option :rspack,
                    type: :boolean,
                    desc: "Use Rspack (default) as the bundler; pass --no-rspack to use Webpack"
@@ -36,7 +37,7 @@ module ReactOnRails
       # No `default:` here either — same load-bearing reason as --rspack above.
       class_option :webpack,
                    type: :boolean,
-                   desc: "Use Webpack as the bundler (alias for --no-rspack)"
+                   desc: "Use Webpack as the bundler (alias for --no-rspack; --no-webpack is equivalent to --rspack)"
 
       # --pro
       class_option :pro,
@@ -325,6 +326,8 @@ module ReactOnRails
 
       # Fresh-install context: default to Rspack (when Shakapacker supports it) unless the
       # app already declares a bundler. See GeneratorHelper#fresh_install_rspack_default.
+      # NOTE: InstallGenerator#rspack_bundler_default is an intentional twin of this override
+      # (both generators are independently CLI-invocable); keep the two in sync.
       def rspack_bundler_default
         fresh_install_rspack_default
       end

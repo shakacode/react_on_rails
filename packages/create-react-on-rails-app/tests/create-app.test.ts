@@ -162,14 +162,10 @@ describe('buildGeneratorArgs', () => {
     ]);
   });
 
-  it('adds --no-rspack when rspack is disabled', () => {
-    expect(buildGeneratorArgs({ ...baseOptions, rspack: false })).toEqual([
-      '--new-app',
-      '--no-rspack',
-      '--force',
-      '--ignore-warnings',
-    ]);
-  });
+  // The rspack:false -> --no-rspack mapping is already asserted by the default test above
+  // ('includes ignore-warnings by default'); the rspack:true -> --rspack mapping by
+  // 'adds rspack flag when enabled'. The CLI default-path resolution (no flag -> --rspack)
+  // is covered in index-tty.test.ts ('selects Rspack by default when no bundler flag is passed').
 
   it('adds rsc flag when enabled', () => {
     expect(buildGeneratorArgs({ ...baseOptions, rsc: true })).toEqual([

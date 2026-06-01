@@ -147,6 +147,7 @@ module GeneratorHelper
   # is absent — options.key?(:rspack)/(:webpack) is true only when the user passed that flag.
   # Re-adding `default:` to either class_option would make the key always present and break both
   # the "no flag given" fallback and the conflict detection here.
+  # (Thor's omit-when-no-default behavior verified against Thor 1.5.0; see Gemfile.lock.)
   #
   # Passing contradictory flags (e.g. --rspack --webpack) raises a Thor::Error.
   def explicit_bundler_choice
@@ -374,11 +375,7 @@ module GeneratorHelper
   # `assets_bundler` inside the `default: &default` block, and our generator writes
   # it there too via configure_rspack_in_shakapacker.
   def rspack_configured_in_project?
-    shakapacker_yml_path = File.join(destination_root, "config/shakapacker.yml")
-    return false unless File.exist?(shakapacker_yml_path)
-
-    config = parse_shakapacker_yml(shakapacker_yml_path)
-    config.dig("default", "assets_bundler") == "rspack"
+    shakapacker_assets_bundler_value == "rspack"
   end
 
   # Fresh-install bundler default used by InstallGenerator/BaseGenerator: prefer Rspack
@@ -393,13 +390,19 @@ module GeneratorHelper
 
   # True when config/shakapacker.yml exists and its default: section declares an
   # assets_bundler (i.e., the project has already made an explicit bundler choice).
-  # Same default-section assumption as rspack_configured_in_project?.
   def project_declares_assets_bundler?
-    shakapacker_yml_path = File.join(destination_root, "config/shakapacker.yml")
-    return false unless File.exist?(shakapacker_yml_path)
+    !shakapacker_assets_bundler_value.nil?
+  end
 
-    config = parse_shakapacker_yml(shakapacker_yml_path)
-    !config.dig("default", "assets_bundler").nil?
+  # Single source for the config/shakapacker.yml default-section read shared by
+  # rspack_configured_in_project? and project_declares_assets_bundler?. Returns the
+  # assets_bundler value (e.g. "rspack"), or nil when the file is absent or the key is unset.
+  # Only the default: section is inspected (see rspack_configured_in_project? for the rationale).
+  def shakapacker_assets_bundler_value
+    shakapacker_yml_path = File.join(destination_root, "config/shakapacker.yml")
+    return nil unless File.exist?(shakapacker_yml_path)
+
+    parse_shakapacker_yml(shakapacker_yml_path).dig("default", "assets_bundler")
   end
 end
 # rubocop:enable Metrics/ModuleLength
