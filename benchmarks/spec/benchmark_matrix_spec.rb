@@ -30,7 +30,9 @@ RSpec.describe "benchmark matrix generation" do
       )
 
       expect(rows.size).to eq(1)
-      expect(rows.first).to include(suite_id: "none", benchmark_tool: "none")
+      # suite_id "none" is the only load-bearing field (it drives
+      # run_benchmark_suites); the placeholder is otherwise a real row's shape.
+      expect(rows.first).to include(suite_id: "none")
     end
 
     it "forces the placeholder for non-runtime-only changes regardless of other inputs" do

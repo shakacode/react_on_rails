@@ -70,28 +70,6 @@ SUITES = [
   }
 ].freeze
 
-EMPTY_MATRIX_ROW = {
-  suite_id: "none",
-  suite_name: "No benchmark suite",
-  job_name: "Benchmark suites skipped",
-  shard_index: 0,
-  shard_total: 1,
-  shard_label: "1/1",
-  bencher_suite_name: "No benchmark suite",
-  report_marker: "<!-- BENCHER_REPORT_SKIPPED -->",
-  app_directory: ".",
-  artifact_name_prefix: "benchmark-skipped",
-  artifact_name_suffix: "",
-  benchmark_tool: "none",
-  benchmark_script: "",
-  benchmark_timeout_minutes: 1,
-  pro_env: false,
-  generate_packs: false,
-  server_kind: "none",
-  summary_file: "",
-  summary_title: ""
-}.freeze
-
 # Every app_version any suite accepts. The workflow_dispatch input is constrained
 # to these, but validating guards against a typo or future rename silently
 # selecting no suites (which would skip benchmarks while CI stays green).
@@ -219,6 +197,14 @@ def report_marker(suite, suite_prefix, shard_slug)
   suite[:report_marker] || "<!-- BENCHER_REPORT_#{suite_prefix}_#{shard_slug.upcase.tr('-', '_')} -->"
 end
 
+# No suite selected: emit one row so the matrix `include:` stays non-empty and all
+# rows share keys. Built from a real suite (any will do — its job is gated off via
+# run_benchmark_suites) with the "none" sentinel the gate keys on; the friendlier
+# job_name is all that's user-visible, as the skipped job's label.
+def empty_matrix_row
+  suite_rows(SUITES.first).first.merge(suite_id: "none", job_name: "Benchmark suites skipped")
+end
+
 def build_matrix
   labels = pull_request_labels
   rows = if truthy_env?("BENCHMARK_NON_RUNTIME_ONLY")
@@ -227,7 +213,7 @@ def build_matrix
            SUITES.select { |suite| suite_enabled?(suite, labels) }.flat_map { |suite| suite_rows(suite) }
          end
 
-  { include: rows.empty? ? [EMPTY_MATRIX_ROW] : rows }
+  { include: rows.empty? ? [empty_matrix_row] : rows }
 end
 
 # Only emit when run as a script; `require`-ing the file (e.g. from specs) just
