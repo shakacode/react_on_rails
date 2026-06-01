@@ -219,13 +219,17 @@ def report_marker(suite, suite_prefix, shard_slug)
   suite[:report_marker] || "<!-- BENCHER_REPORT_#{suite_prefix}_#{shard_slug.upcase.tr('-', '_')} -->"
 end
 
-labels = pull_request_labels
-rows = if truthy_env?("BENCHMARK_NON_RUNTIME_ONLY")
-         []
-       else
-         SUITES.select { |suite| suite_enabled?(suite, labels) }.flat_map { |suite| suite_rows(suite) }
-       end
+def build_matrix
+  labels = pull_request_labels
+  rows = if truthy_env?("BENCHMARK_NON_RUNTIME_ONLY")
+           []
+         else
+           SUITES.select { |suite| suite_enabled?(suite, labels) }.flat_map { |suite| suite_rows(suite) }
+         end
 
-matrix = { include: rows.empty? ? [EMPTY_MATRIX_ROW] : rows }
+  { include: rows.empty? ? [EMPTY_MATRIX_ROW] : rows }
+end
 
-puts JSON.generate(matrix)
+# Only emit when run as a script; `require`-ing the file (e.g. from specs) just
+# loads the helpers above without printing.
+puts JSON.generate(build_matrix) if __FILE__ == $PROGRAM_NAME

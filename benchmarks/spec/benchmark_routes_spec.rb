@@ -2,7 +2,7 @@
 
 require_relative "spec_helper"
 require "tmpdir"
-require_relative "../../../benchmarks/lib/benchmark_routes"
+require_relative "../lib/benchmark_routes"
 
 RSpec.describe "benchmark route discovery helpers" do
   describe "#benchmark_routes_from_rails_routes_output" do
