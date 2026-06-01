@@ -122,7 +122,7 @@ bin/ci-switch-config minimum
 
 This will:
 
-1. Create `.tool-versions` with Ruby 3.3.7 and Node 20.18.1
+1. Create `.tool-versions` with the Ruby patch from `MINIMUM_RUBY_VERSION` in `bin/ci-switch-config` and Node 20.18.1
 2. Run `script/convert` to downgrade dependencies:
    - Shakapacker 9.5.0 → 8.2.0
    - React 19.0.0 → 18.0.0

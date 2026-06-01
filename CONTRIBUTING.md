@@ -360,6 +360,8 @@ Run only RuboCop:
 rake lint:rubocop
 ```
 
+For v17, new Ruby code should use long-form hash syntax instead of shorthand; shorthand cleanup is tracked for v18 in [#3501](https://github.com/shakacode/react_on_rails/issues/3501).
+
 Run only ESLint:
 
 ```sh
