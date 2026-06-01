@@ -78,7 +78,7 @@ env:
   REQUEST_TIMEOUT: ${{ github.event.inputs.request_timeout }}
   CONNECTIONS: ${{ github.event.inputs.connections }}
   MAX_CONNECTIONS: ${{ github.event.inputs.connections }}
-  # WEB_CONCURRENCY default is set dynamically to NPROC-1 in "Configure CPU pinning" step
+  # WEB_CONCURRENCY default is set dynamically to NPROC-1 in "Configure benchmark commands" step
   WEB_CONCURRENCY: ${{ github.event.inputs.web_concurrency }}
   RAILS_MAX_THREADS: ${{ github.event.inputs.rails_threads || 3 }}
   RAILS_MIN_THREADS: ${{ github.event.inputs.rails_threads || 3 }}
@@ -187,7 +187,7 @@ jobs:
     # https://bencher.dev/docs/how-to/github-actions/#pull-requests.
     name: ${{ matrix.job_name }}
     if: needs.detect-changes.outputs.run_benchmark_suites == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       issues: write
@@ -206,10 +206,128 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup benchmark runner
-        uses: ./.github/actions/setup-benchmark-runner
+      - name: Install Bencher CLI
+        # Pinned: alert-detection heuristics grep stderr for "Alert[s]",
+        # "threshold violation", and "boundary violation". Those strings
+        # are not a documented API contract, so upgrading the CLI requires
+        # re-verifying that the expected phrases still appear in alert output.
+        uses: bencherdev/bencher@v0.6.2
+
+      - name: Add tools directory to PATH
+        run: |
+          mkdir -p ~/bin
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+
+      - name: Install libyaml-dev
+        # Must precede any gem install/load: psych links libyaml dynamically. On warm caches the
+        # missing-lib failure is silent; cold runs hit it.
+        run: sudo apt-get install -y libyaml-dev
+
+      - name: Setup k6
+        if: matrix.benchmark_tool == 'k6'
+        uses: grafana/setup-k6-action@v1
         with:
-          benchmark-tool: ${{ matrix.benchmark_tool }}
+          k6-version: ${{ env.K6_VERSION }}
+
+      - name: Cache Vegeta binary
+        id: cache-vegeta
+        if: matrix.benchmark_tool == 'vegeta'
+        uses: actions/cache@v5
+        with:
+          path: ~/bin/vegeta
+          key: vegeta-${{ runner.os }}-${{ runner.arch }}-${{ env.VEGETA_VERSION }}
+
+      - name: Install Vegeta
+        if: matrix.benchmark_tool == 'vegeta' && steps.cache-vegeta.outputs.cache-hit != 'true'
+        run: |
+          echo "Installing Vegeta v${VEGETA_VERSION}"
+          wget -q "https://github.com/tsenart/vegeta/releases/download/v${VEGETA_VERSION}/vegeta_${VEGETA_VERSION}_linux_amd64.tar.gz"
+          tar -xzf "vegeta_${VEGETA_VERSION}_linux_amd64.tar.gz"
+          mv vegeta ~/bin/
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
+
+      - name: Get gem home directory
+        id: gem-home
+        run: echo "path=$(gem env home)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache foreman gem
+        id: cache-foreman
+        uses: actions/cache@v5
+        with:
+          path: ${{ steps.gem-home.outputs.path }}
+          key: foreman-gem-${{ runner.os }}-${{ runner.arch }}-ruby-${{ env.RUBY_VERSION }}
+
+      - name: Install foreman
+        if: steps.cache-foreman.outputs.cache-hit != 'true'
+        run: gem install foreman
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          cache: true
+          cache_dependency_path: '**/pnpm-lock.yaml'
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Print system information
+        run: |
+          echo "Linux release: "
+          cat /etc/issue
+          echo "Current user: "
+          whoami
+          echo "Current directory: "
+          pwd
+          echo "Ruby version: "
+          ruby -v
+          echo "Node version: "
+          node -v
+          echo "Pnpm version: "
+          pnpm --version
+          echo "Bundler version: "
+          bundle --version
+
+      - name: Configure benchmark commands
+        run: |
+          NPROC=$(nproc)
+          echo "Available CPUs: $NPROC"
+
+          if [ "$NPROC" -le 1 ]; then
+            SERVER_CMD="bin/prod"
+            BENCH_CMD="ruby"
+          else
+            SERVER_CMD="taskset -c 1-$((NPROC-1)) bin/prod"
+            BENCH_CMD="taskset -c 0 ruby"
+          fi
+
+          echo "SERVER_CMD=$SERVER_CMD" >> "$GITHUB_ENV"
+          echo "BENCH_CMD=$BENCH_CMD" >> "$GITHUB_ENV"
+
+          if [ -z "$WEB_CONCURRENCY" ]; then
+            # Clamp to >=1 so single-CPU runners don't end up with WEB_CONCURRENCY=0 (Puma
+            # would start in single-mode, which the benchmarks aren't tuned for).
+            WEB_CONCURRENCY=$((NPROC > 1 ? NPROC - 1 : 1))
+            echo "WEB_CONCURRENCY=$WEB_CONCURRENCY" >> "$GITHUB_ENV"
+            echo "WEB_CONCURRENCY (auto): $WEB_CONCURRENCY"
+          else
+            echo "WEB_CONCURRENCY (from input): $WEB_CONCURRENCY"
+          fi
+
+          echo "SERVER_CMD: $SERVER_CMD"
+          echo "BENCH_CMD: $BENCH_CMD"
+
+      - name: Install Node modules with pnpm
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace packages
+        run: pnpm run build
 
       - name: Install Ruby Gems for the benchmarked app
         uses: ./.github/actions/setup-bundle
