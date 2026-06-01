@@ -1,7 +1,28 @@
+#!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require_relative "github_cli"
+# Files a single GitHub issue for benchmark regressions detected on main.
+#
+# Each benchmark matrix suite runs in its own parallel job; on a regression it
+# records a regression.json payload (see track_benchmarks.rb) that the workflow
+# uploads as an artifact. This script runs once, after the matrix, reads every
+# payload, and reports them serially through RegressionIssueReporter. Doing it in
+# one process is what makes the dedup/upsert safe: parallel suites reporting
+# directly would create duplicate issues and clobber the shared comment.
+#
+# Usage: ruby benchmarks/report_regressions.rb <artifacts-dir>
 
+require "json"
+
+require_relative "lib/github"
+require_relative "lib/github_cli"
+require_relative "lib/regression_report"
+
+BENCHER_URL = "https://bencher.dev/perf/react-on-rails-t8a9ncxo"
+
+# Creates (or updates) the single per-commit regression issue and upserts one
+# section per suite into a shared comment. Only safe to drive from a single
+# process — see the file header.
 # rubocop:disable Metrics/ClassLength
 class RegressionIssueReporter
   LABEL = "performance-regression"
@@ -21,7 +42,7 @@ class RegressionIssueReporter
     return "" unless ensure_regression_label
 
     issue_number = find_or_create_regression_issue
-    return "" if issue_number.nil? || issue_number.empty?
+    return "" if issue_number.nil?
 
     puts "Posting #{suite_name} regression report to ##{issue_number}"
     return "" unless create_or_update_regression_comment(issue_number, summary)
@@ -44,19 +65,24 @@ class RegressionIssueReporter
   end
 
   def commit_url
-    "#{ENV.fetch('GITHUB_SERVER_URL')}/#{ENV.fetch('GITHUB_REPOSITORY')}/commit/#{ENV.fetch('GITHUB_SHA')}"
+    @commit_url ||= "#{github_server_url}/#{github_repository}/commit/#{github_sha}"
   end
 
   def issue_title
-    "Performance Regression Detected on main (#{commit_short})"
+    @issue_title ||= "Performance Regression Detected on main (#{commit_short})"
   end
 
   def existing_regression_issue
+    # Use the live issues list, not --search: the search index is eventually
+    # consistent and could miss an issue another suite created moments earlier in
+    # this same run, producing duplicates. The exact-title jq match is the real
+    # dedup; the high --limit only guards re-runs whose (older) commit issue has
+    # been pushed down the newest-first list by unrelated regression issues.
     stdout = GithubCli.capture_success(
       "gh", "issue", "list",
       "--label", LABEL,
       "--state", "open",
-      "--limit", "100",
+      "--limit", "500",
       "--json", "number,title",
       "--jq", ".[] | select(.title == env.TITLE) | .number",
       error_message: "Failed to list existing #{LABEL} issues",
@@ -70,20 +96,20 @@ class RegressionIssueReporter
   end
 
   def comment_marker
-    "<!-- BENCHMARK_REGRESSION_REPORT #{ENV.fetch('GITHUB_SHA')} -->"
+    @comment_marker ||= "<!-- BENCHMARK_REGRESSION_REPORT #{github_sha} -->"
   end
 
   def section_start
-    "<!-- BENCHMARK_REGRESSION_SECTION #{suite_name} -->"
+    @section_start ||= "<!-- BENCHMARK_REGRESSION_SECTION #{suite_name} -->"
   end
 
   def section_end
-    "<!-- /BENCHMARK_REGRESSION_SECTION #{suite_name} -->"
+    @section_end ||= "<!-- /BENCHMARK_REGRESSION_SECTION #{suite_name} -->"
   end
 
   def regression_comment_id(issue_number)
     stdout = GithubCli.capture_success(
-      "gh", "api", "repos/#{ENV.fetch('GITHUB_REPOSITORY')}/issues/#{issue_number}/comments",
+      "gh", "api", "repos/#{github_repository}/issues/#{issue_number}/comments",
       "--paginate",
       "--jq", ".[] | select(.body | startswith(env.MARKER)) | .id",
       error_message: "Failed to list comments for regression issue ##{issue_number}",
@@ -98,7 +124,7 @@ class RegressionIssueReporter
 
   def regression_comment_body(comment_id)
     stdout = GithubCli.capture_success(
-      "gh", "api", "repos/#{ENV.fetch('GITHUB_REPOSITORY')}/issues/comments/#{comment_id}",
+      "gh", "api", "repos/#{github_repository}/issues/comments/#{comment_id}",
       "--jq", ".body",
       error_message: "Failed to fetch regression issue comment #{comment_id}"
     )
@@ -110,12 +136,12 @@ class RegressionIssueReporter
   end
 
   def comment_header
-    <<~MARKDOWN
+    @comment_header ||= <<~MARKDOWN
       #{comment_marker}
       ## Benchmark regression reports for #{commit_short}
 
       **Commit:** [`#{commit_short}`](#{commit_url})
-      **Workflow run:** [Run ##{ENV.fetch('GITHUB_RUN_NUMBER')}](#{github_run_url})
+      **Workflow run:** [Run ##{github_run_number}](#{github_run_url})
       **Bencher dashboard:** [View history](#{bencher_url})
 
     MARKDOWN
@@ -162,11 +188,14 @@ class RegressionIssueReporter
     return false if existing_body.nil?
 
     body = upsert_section(existing_body, section)
+    # Send the body over stdin (--input -) rather than as a -f CLI argument: a
+    # sharded suite's combined report can grow past the OS argument-length limit.
     GithubCli.run(
       "gh", "api", "-X", "PATCH",
-      "repos/#{ENV.fetch('GITHUB_REPOSITORY')}/issues/comments/#{comment_id}",
-      "-f", "body=#{body}",
-      error_message: "Failed to update regression report comment #{comment_id}"
+      "repos/#{github_repository}/issues/comments/#{comment_id}",
+      "--input", "-",
+      error_message: "Failed to update regression report comment #{comment_id}",
+      stdin_data: JSON.generate(body: body)
     )
   end
 
@@ -191,13 +220,19 @@ class RegressionIssueReporter
     )
     return nil unless stdout
 
-    number = stdout[%r{/issues/(\d+)\s*\z}, 1]
-    warn "::error::Could not parse issue number from gh output: #{stdout.strip}" unless number
+    # Match anywhere, not anchored to end-of-output: gh may append a trailing line
+    # (e.g. a deprecation notice) after the URL. The issue was created either way,
+    # so a parse miss is a warning, not an error.
+    number = stdout[%r{/issues/(\d+)}, 1]
+    unless number
+      warn "::warning::Created the issue but could not parse its number from gh output " \
+           "(#{stdout.strip.inspect}); its comment section may be missing"
+    end
     number
   end
 
   def issue_body
-    <<~MARKDOWN
+    @issue_body ||= <<~MARKDOWN
       ## Performance Regression Detected on main
 
       Statistically significant benchmark regressions were detected by [Bencher](#{bencher_url})
@@ -206,8 +241,8 @@ class RegressionIssueReporter
       | Detail | Value |
       |--------|-------|
       | **Commit** | [`#{commit_short}`](#{commit_url}) |
-      | **Pushed by** | @#{ENV.fetch('GITHUB_ACTOR')} |
-      | **Workflow run** | [Run ##{ENV.fetch('GITHUB_RUN_NUMBER')}](#{github_run_url}) |
+      | **Pushed by** | @#{github_actor} |
+      | **Workflow run** | [Run ##{github_run_number}](#{github_run_url}) |
       | **Bencher dashboard** | [View history](#{bencher_url}) |
 
       ### What to do
@@ -222,5 +257,90 @@ class RegressionIssueReporter
       *This issue was created automatically by the benchmark CI workflow.*
     MARKDOWN
   end
+
+  def github_actor
+    @github_actor ||= ENV.fetch("GITHUB_ACTOR")
+  end
+
+  def github_repository
+    @github_repository ||= ENV.fetch("GITHUB_REPOSITORY")
+  end
+
+  def github_run_number
+    @github_run_number ||= ENV.fetch("GITHUB_RUN_NUMBER")
+  end
+
+  def github_server_url
+    @github_server_url ||= ENV.fetch("GITHUB_SERVER_URL")
+  end
+
+  def github_sha
+    @github_sha ||= ENV.fetch("GITHUB_SHA")
+  end
 end
 # rubocop:enable Metrics/ClassLength
+
+def regression_payload_paths(artifacts_dir)
+  # Recursive glob so it works regardless of how download-artifact nests each
+  # suite's artifact under the download path.
+  Dir.glob(File.join(artifacts_dir, "**", RegressionReport::FILENAME))
+end
+
+def load_payload(path)
+  JSON.parse(File.read(path))
+rescue StandardError => e
+  # A regression was detected but its report is unreadable/corrupt. Surface it and
+  # let the caller fail rather than silently dropping the suite from the issue.
+  warn "::error::Failed to read regression payload #{path}: #{e.class}: #{e.message}"
+  nil
+end
+
+def report_regressions(artifacts_dir)
+  paths = regression_payload_paths(artifacts_dir)
+
+  if paths.empty?
+    puts "No benchmark regressions were reported by any suite."
+    return true
+  end
+
+  payloads = paths.map { |path| load_payload(path) }
+  readable = payloads.compact
+
+  # One section per suite: a sharded suite emits one payload per shard, so combine
+  # them rather than filing a section per shard. Suites sorted for stable output.
+  by_suite = readable.group_by { |payload| payload.fetch("suite_name") }
+  reported_ok = by_suite.keys.sort.map { |suite_name| report_suite(suite_name, by_suite.fetch(suite_name)) }.all?
+
+  # Fail if any payload was unreadable: a lost report must not pass as success.
+  reported_ok && readable.size == payloads.size
+end
+
+def report_suite(suite_name, payloads)
+  # Order shard summaries by shard number ("2/5" before "10/5"); each already
+  # self-labels with its shard in its headers, so concatenation reads cleanly.
+  summary = payloads
+            .sort_by { |payload| payload.fetch("shard_label", "").split("/").first.to_i }
+            .map { |payload| payload.fetch("summary") }
+            .join("\n")
+  puts "Filing regression report for #{suite_name} (#{payloads.size} shard report(s))"
+
+  issue_number = RegressionIssueReporter.report(
+    suite_name: suite_name,
+    github_run_url: Github.run_url,
+    bencher_url: BENCHER_URL,
+    summary: summary
+  )
+
+  if issue_number.empty?
+    warn "::error::Failed to file regression issue for #{suite_name}"
+    return false
+  end
+
+  puts "Reported #{suite_name} regression to issue ##{issue_number}"
+  true
+end
+
+if __FILE__ == $PROGRAM_NAME
+  artifacts_dir = ARGV.fetch(0, "regression-artifacts")
+  exit 1 unless report_regressions(artifacts_dir)
+end
