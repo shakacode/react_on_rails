@@ -1,9 +1,11 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+require "fileutils"
 require "open3"
 require "time"
 
+require_relative "lib/github_cli"
 require_relative "lib/regression_issue_reporter"
 
 BOUNDARY = "0.95"
@@ -41,12 +43,6 @@ SUITE_NAME = env!("BENCHMARK_SUITE_NAME")
 REPORT_MARKER = env!("BENCHER_REPORT_MARKER")
 env!("BENCHER_API_TOKEN")
 
-def capture_command(*args)
-  stdout, stderr, status = Open3.capture3(*args)
-  warn stderr unless stderr.empty?
-  [stdout, status]
-end
-
 def github_run_url
   "#{ENV.fetch('GITHUB_SERVER_URL')}/#{ENV.fetch('GITHUB_REPOSITORY')}/actions/runs/#{ENV.fetch('GITHUB_RUN_ID')}"
 end
@@ -69,12 +65,15 @@ def branch_and_start_point_args
     branch = ENV.fetch("GITHUB_REF_NAME")
     return [branch, []] if branch == "main"
 
-    stdout, = capture_command(
+    stdout, status = GithubCli.capture(
       "gh", "api", "repos/#{ENV.fetch('GITHUB_REPOSITORY')}/compare/main...#{branch}",
-      "--jq", ".merge_base_commit.sha"
+      "--jq", ".merge_base_commit.sha",
+      error_message: "Failed to resolve merge-base with main for #{branch}"
     )
     start_point_args = ["--start-point", "main", "--start-point-clone-thresholds", "--start-point-reset"]
-    merge_base = stdout.strip
+    # On API failure GithubCli already emits ::error::; fall back to the latest
+    # baseline rather than conflating a failed call with "no merge-base found".
+    merge_base = status.success? ? stdout.strip : ""
 
     if merge_base.empty?
       puts "Could not find merge-base with main via GitHub API, continuing without hash"
@@ -119,8 +118,16 @@ end
 
 def run_bencher(branch, start_point_args)
   stdout, stderr, status = Open3.capture3(*bencher_args(branch, start_point_args))
-  File.write(REPORT_HTML, stdout)
   warn stderr unless stderr.empty?
+  # Bencher prints the HTML report to stdout, including the alert report on a
+  # non-zero "alert" exit (which we still want to publish). An empty stdout means
+  # an operational failure with no report, so clear any stale file rather than
+  # persisting/posting garbage or leaving a previous attempt's report behind.
+  if stdout.empty?
+    FileUtils.rm_f(REPORT_HTML)
+  else
+    File.write(REPORT_HTML, stdout)
+  end
   [stderr, status.exitstatus]
 end
 
@@ -152,7 +159,7 @@ def split_report_for_comments
   return true if system({ "BENCHER_REPORT_MARKER" => REPORT_MARKER },
                         "ruby", "benchmarks/split_html_report.rb", REPORT_HTML, CHUNK_PREFIX)
 
-  warn "Failed to split HTML report; skipping PR comments"
+  warn "::error::Failed to split HTML report for #{SUITE_NAME}; PR comments will not be posted"
   false
 end
 
@@ -160,23 +167,32 @@ def stale_comment_ids(before:)
   # Marker + cutoff are passed via env so the jq filter reads them through `env.X`,
   # avoiding the Ruby-#dump vs jq-string-escape mismatch that interpolated strings invite.
   # The cutoff makes the GC skip comments the current run just posted (same marker).
-  stdout, stderr, status = Open3.capture3(
-    { "MARKER" => REPORT_MARKER, "CUTOFF_TS" => before },
+  stdout, status = GithubCli.capture(
     "gh", "api", "repos/#{ENV.fetch('GITHUB_REPOSITORY')}/issues/#{ENV.fetch('PR_NUMBER')}/comments",
     "--paginate",
-    "--jq", ".[] | select(.body | startswith(env.MARKER)) | select(.created_at < env.CUTOFF_TS) | .id"
+    "--jq", ".[] | select(.body | startswith(env.MARKER)) | select(.created_at < env.CUTOFF_TS) | .id",
+    env: { "MARKER" => REPORT_MARKER, "CUTOFF_TS" => before },
+    error_message: "Failed to list stale #{SUITE_NAME} Bencher report comments"
   )
-  warn stderr unless stderr.empty?
   return [] unless status.success?
 
   stdout.lines.map(&:strip).reject(&:empty?)
 end
 
 def delete_stale_report_comments(before:)
+  failed = 0
   stale_comment_ids(before: before).each do |comment_id|
     puts "Deleting stale #{SUITE_NAME} Bencher report comment #{comment_id}"
-    system("gh", "api", "-X", "DELETE", "repos/#{ENV.fetch('GITHUB_REPOSITORY')}/issues/comments/#{comment_id}")
+    next if GithubCli.run(
+      "gh", "api", "-X", "DELETE", "repos/#{ENV.fetch('GITHUB_REPOSITORY')}/issues/comments/#{comment_id}",
+      error_message: "Failed to delete stale #{SUITE_NAME} Bencher report comment #{comment_id}"
+    )
+
+    failed += 1
   end
+  return if failed.zero?
+
+  warn "::warning::Failed to delete #{failed} stale #{SUITE_NAME} Bencher report comment(s); they may remain visible."
 end
 
 def post_report_comment_chunks
@@ -188,10 +204,12 @@ def post_report_comment_chunks
   any_failed = false
   chunk_files.each do |chunk_file|
     puts "Posting #{chunk_file} (#{File.size(chunk_file)} bytes)..."
-    if system("gh", "pr", "comment", ENV.fetch("PR_NUMBER"), "--body-file", chunk_file)
+    if GithubCli.run(
+      "gh", "pr", "comment", ENV.fetch("PR_NUMBER"), "--body-file", chunk_file,
+      error_message: "Failed to post #{chunk_file}"
+    )
       posted_any = true
     else
-      warn "Failed to post #{chunk_file}"
       any_failed = true
     end
   end
@@ -225,7 +243,10 @@ def replace_pr_comments
 
     View the full report in the job summary: #{github_run_url}
   MARKDOWN
-  system("gh", "pr", "comment", ENV.fetch("PR_NUMBER"), "--body", fallback_body)
+  GithubCli.run(
+    "gh", "pr", "comment", ENV.fetch("PR_NUMBER"), "--body", fallback_body,
+    error_message: "Failed to post fallback #{SUITE_NAME} Bencher report comment"
+  )
 end
 
 def formatted_summary(title, path)

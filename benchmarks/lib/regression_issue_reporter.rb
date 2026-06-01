@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
-require "open3"
+require_relative "github_cli"
 
+# rubocop:disable Metrics/ClassLength
 class RegressionIssueReporter
   LABEL = "performance-regression"
 
@@ -17,15 +18,14 @@ class RegressionIssueReporter
   end
 
   def report(summary)
-    ensure_regression_label
+    return "" unless ensure_regression_label
+
     issue_number = find_or_create_regression_issue
-    if issue_number.empty?
-      warn "::error::Failed to find or create regression issue for #{commit_short}"
-      return ""
-    end
+    return "" if issue_number.nil? || issue_number.empty?
 
     puts "Posting #{suite_name} regression report to ##{issue_number}"
-    create_or_update_regression_comment(issue_number, summary)
+    return "" unless create_or_update_regression_comment(issue_number, summary)
+
     issue_number
   end
 
@@ -34,11 +34,12 @@ class RegressionIssueReporter
   attr_reader :suite_name, :github_run_url, :bencher_url, :commit_short
 
   def ensure_regression_label
-    system(
+    GithubCli.run(
       "gh", "label", "create", LABEL,
       "--description", "Automated: benchmark regression detected on main",
       "--color", "D93F0B",
-      "--force"
+      "--force",
+      error_message: "Failed to create or update #{LABEL} label"
     )
   end
 
@@ -51,17 +52,19 @@ class RegressionIssueReporter
   end
 
   def existing_regression_issue
-    stdout, stderr, status = Open3.capture3(
-      { "TITLE" => issue_title },
+    stdout = GithubCli.capture_success(
       "gh", "issue", "list",
       "--label", LABEL,
       "--state", "open",
       "--limit", "100",
       "--json", "number,title",
-      "--jq", ".[] | select(.title == env.TITLE) | .number"
+      "--jq", ".[] | select(.title == env.TITLE) | .number",
+      error_message: "Failed to list existing #{LABEL} issues",
+      env: { "TITLE" => issue_title }
     )
-    warn stderr unless stderr.empty?
-    return "" unless status.success?
+    # nil signals a `gh` failure (must abort, not create a duplicate); "" means no
+    # matching issue exists yet (caller should create one).
+    return nil unless stdout
 
     stdout.lines.first.to_s.strip
   end
@@ -79,25 +82,29 @@ class RegressionIssueReporter
   end
 
   def regression_comment_id(issue_number)
-    stdout, stderr, status = Open3.capture3(
-      { "MARKER" => comment_marker },
+    stdout = GithubCli.capture_success(
       "gh", "api", "repos/#{ENV.fetch('GITHUB_REPOSITORY')}/issues/#{issue_number}/comments",
       "--paginate",
-      "--jq", ".[] | select(.body | startswith(env.MARKER)) | .id"
+      "--jq", ".[] | select(.body | startswith(env.MARKER)) | .id",
+      error_message: "Failed to list comments for regression issue ##{issue_number}",
+      env: { "MARKER" => comment_marker }
     )
-    warn stderr unless stderr.empty?
-    return "" unless status.success?
+    # nil signals a `gh` failure (must abort, not post a duplicate); "" means no
+    # existing report comment yet (caller should create one).
+    return nil unless stdout
 
     stdout.lines.first.to_s.strip
   end
 
   def regression_comment_body(comment_id)
-    stdout, stderr, status = Open3.capture3(
+    stdout = GithubCli.capture_success(
       "gh", "api", "repos/#{ENV.fetch('GITHUB_REPOSITORY')}/issues/comments/#{comment_id}",
-      "--jq", ".body"
+      "--jq", ".body",
+      error_message: "Failed to fetch regression issue comment #{comment_id}"
     )
-    warn stderr unless stderr.empty?
-    return "" unless status.success?
+    # nil signals a `gh` failure; the caller must abort rather than rewrite the
+    # comment from an empty body (which would drop the header and other suites).
+    return nil unless stdout
 
     stdout
   end
@@ -139,30 +146,58 @@ class RegressionIssueReporter
 
   def create_or_update_regression_comment(issue_number, summary)
     comment_id = regression_comment_id(issue_number)
+    return false if comment_id.nil?
+
     section = comment_section(summary)
 
     if comment_id.empty?
       body = "#{comment_header}#{section}"
-      return system("gh", "issue", "comment", issue_number, "--body", body)
+      return GithubCli.run(
+        "gh", "issue", "comment", issue_number, "--body", body,
+        error_message: "Failed to create regression report comment on issue ##{issue_number}"
+      )
     end
 
-    body = upsert_section(regression_comment_body(comment_id), section)
-    system(
+    existing_body = regression_comment_body(comment_id)
+    return false if existing_body.nil?
+
+    body = upsert_section(existing_body, section)
+    GithubCli.run(
       "gh", "api", "-X", "PATCH",
       "repos/#{ENV.fetch('GITHUB_REPOSITORY')}/issues/comments/#{comment_id}",
-      "-f", "body=#{body}"
+      "-f", "body=#{body}",
+      error_message: "Failed to update regression report comment #{comment_id}"
     )
   end
 
   def find_or_create_regression_issue
     issue_number = existing_regression_issue
+    return nil if issue_number.nil?
     return issue_number unless issue_number.empty?
 
     create_regression_issue
   end
 
   def create_regression_issue
-    body = <<~MARKDOWN
+    # `gh issue create` does not support --json/--jq; it prints the new issue URL
+    # on stdout (e.g. https://github.com/owner/repo/issues/123). Parse the number
+    # so callers get the same bare-number shape as existing_regression_issue.
+    stdout = GithubCli.capture_success(
+      "gh", "issue", "create",
+      "--title", issue_title,
+      "--label", LABEL,
+      "--body", issue_body,
+      error_message: "Failed to create regression issue for #{commit_short}"
+    )
+    return nil unless stdout
+
+    number = stdout[%r{/issues/(\d+)\s*\z}, 1]
+    warn "::error::Could not parse issue number from gh output: #{stdout.strip}" unless number
+    number
+  end
+
+  def issue_body
+    <<~MARKDOWN
       ## Performance Regression Detected on main
 
       Statistically significant benchmark regressions were detected by [Bencher](#{bencher_url})
@@ -186,18 +221,6 @@ class RegressionIssueReporter
       ---
       *This issue was created automatically by the benchmark CI workflow.*
     MARKDOWN
-
-    stdout, stderr, status = Open3.capture3(
-      "gh", "issue", "create",
-      "--title", issue_title,
-      "--label", LABEL,
-      "--body", body,
-      "--json", "number",
-      "--jq", ".number"
-    )
-    warn stderr unless stderr.empty?
-    return "" unless status.success?
-
-    stdout.strip
   end
 end
+# rubocop:enable Metrics/ClassLength
