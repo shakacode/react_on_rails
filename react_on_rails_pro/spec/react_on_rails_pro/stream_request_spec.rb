@@ -110,6 +110,33 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         expect(yielded.first["html"]).to eq("<div>Split</div>")
       end
 
+      it "uses byte lengths for multibyte content split across HTTP chunks" do
+        payload = "Hello \u{1F604} world"
+        full = to_length_prefixed(payload)
+        content_start = full.bytesize - payload.bytesize
+        split_inside_emoji = content_start + "Hello ".bytesize + 1
+        chunk1 = full.byteslice(0, split_inside_emoji)
+        chunk2 = full.byteslice(split_inside_emoji, full.bytesize - split_inside_emoji)
+        response = mock_ok_response(chunk1, chunk2)
+
+        yielded = []
+        request.send(:process_response_chunks, response) { |chunk| yielded << chunk }
+
+        expect(yielded.size).to eq(1)
+        expect(yielded.first["html"]).to eq(payload)
+      end
+
+      it "preserves content that looks like LPP headers" do
+        payload = "first line\n{\"payloadType\":\"string\"}\t00000005\nhello\nlast line"
+        response = mock_ok_response(to_length_prefixed(payload))
+
+        yielded = []
+        request.send(:process_response_chunks, response) { |chunk| yielded << chunk }
+
+        expect(yielded.size).to eq(1)
+        expect(yielded.first["html"]).to eq(payload)
+      end
+
       it "dispatches payloadType 'object' as parsed JSON" do
         json_content = '{"serverHtml":"<div/>","clientProps":{}}'
         metadata = {
