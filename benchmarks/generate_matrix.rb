@@ -77,7 +77,6 @@ EMPTY_MATRIX_ROW = {
   shard_index: 0,
   shard_total: 1,
   shard_label: "1/1",
-  shard_slug: "skipped",
   bencher_suite_name: "No benchmark suite",
   report_marker: "<!-- BENCHER_REPORT_SKIPPED -->",
   app_directory: ".",
@@ -165,15 +164,16 @@ def suite_rows(suite)
     suite_name = suite.fetch(:suite_name)
     suite_prefix = suite.fetch(:suite_prefix)
 
-    suite_row(suite, suite_name, suite_prefix,
+    suite_row(suite, suite_name,
               shard_index: index,
               shard_total: shard_total,
               shard_label: shard_label,
-              shard_slug: shard_slug)
+              report_marker: report_marker(suite, suite_prefix, shard_slug),
+              artifact_name_suffix: artifact_name_suffix(shard_total, shard_slug))
   end
 end
 
-def suite_row(suite, suite_name, suite_prefix, shard_index:, shard_total:, shard_label:, shard_slug:)
+def suite_row(suite, suite_name, shard_index:, shard_total:, shard_label:, report_marker:, artifact_name_suffix:)
   {
     suite_id: suite.fetch(:id),
     suite_name: suite_name,
@@ -181,12 +181,11 @@ def suite_row(suite, suite_name, suite_prefix, shard_index:, shard_total:, shard
     shard_index: shard_index,
     shard_total: shard_total,
     shard_label: shard_label,
-    shard_slug: shard_slug,
     bencher_suite_name: bencher_suite_name(suite_name, shard_total, shard_label),
-    report_marker: report_marker(suite, suite_prefix, shard_slug),
+    report_marker: report_marker,
     app_directory: suite.fetch(:app_directory),
     artifact_name_prefix: suite.fetch(:artifact_name),
-    artifact_name_suffix: artifact_name_suffix(shard_total, shard_slug),
+    artifact_name_suffix: artifact_name_suffix,
     benchmark_tool: suite.fetch(:benchmark_tool),
     benchmark_script: suite.fetch(:benchmark_script),
     benchmark_timeout_minutes: suite.fetch(:benchmark_timeout_minutes),
