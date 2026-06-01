@@ -28,6 +28,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 - **Ruby 3.3+ is required for React on Rails v17**: The open-source gem now requires Ruby `>= 3.3.0`, aligning it with React on Rails Pro, `create-react-on-rails-app`, and the CI minimum matrix. React on Rails v16 remains the upgrade path for applications that must stay on Ruby 3.2 or older. [PR 3500](https://github.com/shakacode/react_on_rails/pull/3500) by [justin808](https://github.com/justin808).
 
+#### Added
+
+- **Ruby 4.0 CI support**: Updated OSS latest-runtime CI coverage, local CI switching guidance, and public compatibility docs to test Ruby 4.0 while keeping Ruby 3.3 as the minimum supported CI lane. [PR 3529](https://github.com/shakacode/react_on_rails/pull/3529) by [justin808](https://github.com/justin808).
+
 #### Fixed
 
 - **Shakapacker config warnings now report resolved relative paths**: When `SHAKAPACKER_CONFIG` is set to a relative missing path, the Rails boot warning now includes the Rails-root-resolved path that React on Rails actually checked. Fixes [Issue 3436](https://github.com/shakacode/react_on_rails/issues/3436). [PR 3441](https://github.com/shakacode/react_on_rails/pull/3441) by [justin808](https://github.com/justin808).
