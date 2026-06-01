@@ -1953,8 +1953,23 @@ module ReactOnRails
       false
     end
 
+    # Resolves SHAKAPACKER_CONFIG the same way ReactOnRails::Engine and Dev::ServerManager do, so
+    # doctor inspects the same config file as Rails boot even when invoked from a directory other
+    # than the Rails root. Without this, a relative SHAKAPACKER_CONFIG would fail to resolve and
+    # dev-server mode detection would silently fall back to HMR labels. Falls back to Dir.pwd when
+    # Rails isn't booted (e.g. in unit specs).
     def shakapacker_config_path
-      ENV["SHAKAPACKER_CONFIG"] || DEFAULT_SHAKAPACKER_CONFIG_PATH
+      env_config_path = ENV.fetch("SHAKAPACKER_CONFIG", nil)
+      base = shakapacker_config_base_dir
+      return File.expand_path(DEFAULT_SHAKAPACKER_CONFIG_PATH, base) if env_config_path.to_s.empty?
+
+      File.expand_path(env_config_path, base)
+    end
+
+    def shakapacker_config_base_dir
+      return Rails.root.to_s if defined?(Rails) && Rails.respond_to?(:root) && Rails.root
+
+      Dir.pwd
     end
 
     def default_dev_server_mode

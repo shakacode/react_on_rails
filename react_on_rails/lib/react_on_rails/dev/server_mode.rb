@@ -32,7 +32,7 @@ module ReactOnRails
           next_step_label: "live reload",
           workflow_suffix: "for live reload",
           shared_output_warning: "Do not combine shared output path with bin/dev (live reload)",
-          refresh_guidance: "HMR is disabled in config/shakapacker.yml; enable dev_server.hmr for React Refresh",
+          refresh_guidance: "HMR is disabled in your Shakapacker config; enable dev_server.hmr for React Refresh",
           refresh_note: "With live reload enabled, changes refresh the page instead of preserving component state"
         },
         development_server: {
@@ -45,7 +45,7 @@ module ReactOnRails
           next_step_label: "the development server",
           workflow_suffix: "for the development server",
           shared_output_warning: "Do not combine shared output path with bin/dev (development server)",
-          refresh_guidance: "Check config/shakapacker.yml has dev_server.hmr: true for React Refresh",
+          refresh_guidance: "Check your Shakapacker config has dev_server.hmr: true for React Refresh",
           refresh_note: "React Refresh requires HMR; other dev-server modes may reload the page"
         }
       }.freeze

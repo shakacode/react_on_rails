@@ -1592,6 +1592,39 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
     end
 
+    context "when Shakapacker config enables HMR explicitly" do
+      include_context "with clean port env"
+
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) { example.run }
+        end
+      end
+
+      before do
+        FileUtils.mkdir_p("config")
+        File.write("config/shakapacker.yml", <<~YAML)
+          development:
+            dev_server:
+              hmr: true
+        YAML
+      end
+
+      # Triangulates the config-driven :hmr path (detect_from_config returns :hmr) against the
+      # baseline specs that exercise the :hmr fallback when no config file is present.
+      it "labels the default command and mode details as HMR" do
+        expected_output = satisfy do |output|
+          output.match?(%r{\(none\) / hmr\s+Start development server with HMR \(default\)}) &&
+            output.include?("HMR Development mode (default)") &&
+            output.include?("Hot Module Replacement (HMR) enabled") &&
+            output.include?("ReactRefreshWebpackPlugin") &&
+            !output.include?("React Refresh requires HMR; current default mode is not HMR.")
+        end
+
+        expect { described_class.show_help }.to output(expected_output).to_stdout_from_any_process
+      end
+    end
+
     context "when Shakapacker config disables both HMR and live reload" do
       include_context "with clean port env"
 

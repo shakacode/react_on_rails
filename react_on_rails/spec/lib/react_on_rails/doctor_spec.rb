@@ -2031,6 +2031,66 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
+  describe "#shakapacker_config_path" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:rails_root) { Pathname.new(Dir.mktmpdir("doctor-rails-root")) }
+
+    around do |example|
+      original_config_path = ENV.fetch("SHAKAPACKER_CONFIG", nil)
+      original_cwd = Dir.pwd
+      ENV.delete("SHAKAPACKER_CONFIG")
+      example.run
+    ensure
+      ENV["SHAKAPACKER_CONFIG"] = original_config_path
+      Dir.chdir(original_cwd)
+      FileUtils.remove_entry(rails_root) if rails_root.exist?
+    end
+
+    before do
+      allow(Rails).to receive(:root).and_return(rails_root)
+    end
+
+    it "defaults to config/shakapacker.yml under Rails.root" do
+      expect(doctor.send(:shakapacker_config_path)).to eq(
+        rails_root.join("config", "shakapacker.yml").to_s
+      )
+    end
+
+    # Regression guard: doctor must resolve SHAKAPACKER_CONFIG the same way Engine/ServerManager do,
+    # so a relative path does not silently fall back to HMR labels when doctor runs from another dir.
+    it "resolves a relative SHAKAPACKER_CONFIG path against Rails.root" do
+      ENV["SHAKAPACKER_CONFIG"] = "config/custom-shakapacker.yml"
+
+      Dir.mktmpdir("doctor-cwd") do |unrelated_cwd|
+        Dir.chdir(unrelated_cwd) do
+          expect(doctor.send(:shakapacker_config_path)).to eq(
+            rails_root.join("config", "custom-shakapacker.yml").to_s
+          )
+        end
+      end
+    end
+
+    it "preserves an absolute SHAKAPACKER_CONFIG path" do
+      config_path = "/tmp/custom-shakapacker.yml"
+      ENV["SHAKAPACKER_CONFIG"] = config_path
+
+      expect(doctor.send(:shakapacker_config_path)).to eq(config_path)
+    end
+
+    it "uses the current working directory for relative config when Rails is not booted" do
+      allow(Rails).to receive(:root).and_return(nil)
+      ENV["SHAKAPACKER_CONFIG"] = "config/custom-shakapacker.yml"
+
+      Dir.mktmpdir("doctor-cwd") do |cwd|
+        Dir.chdir(cwd) do
+          expect(doctor.send(:shakapacker_config_path)).to eq(
+            File.expand_path("config/custom-shakapacker.yml", Dir.pwd)
+          )
+        end
+      end
+    end
+  end
+
   describe "server bundle path Shakapacker integration" do
     let(:doctor) { described_class.new }
     let(:checker) { doctor.instance_variable_get(:@checker) }
