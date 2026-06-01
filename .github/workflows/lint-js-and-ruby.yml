@@ -121,7 +121,7 @@ jobs:
       - name: Setup Ruby
         uses: ./.github/actions/setup-ruby
         with:
-          ruby-version: '3.4'
+          ruby-version: '4.0'
           bundler-version: 2.5.9
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -156,7 +156,7 @@ jobs:
         uses: ./.github/actions/setup-bundle
         with:
           working-directory: react_on_rails
-          ruby-version: '3.4'
+          ruby-version: '4.0'
       - name: Install Node modules with pnpm
         run: pnpm install --frozen-lockfile
 
@@ -178,7 +178,7 @@ jobs:
         uses: ./.github/actions/setup-bundle
         with:
           working-directory: react_on_rails/spec/dummy
-          ruby-version: '3.4'
+          ruby-version: '4.0'
       - name: generate file system-based packs
         run: cd react_on_rails/spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs
       - name: Detect dead code

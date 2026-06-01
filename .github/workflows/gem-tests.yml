@@ -86,10 +86,10 @@ jobs:
              [[ "${{ steps.check-label.outputs.result }}" == "true" ]] || \
              [[ "${{ inputs.force_run }}" == "true" ]]; then
             # Full matrix: test both latest and minimum supported versions × 2 shards
-            echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest","shard":"generators"},{"ruby-version":"3.4","dependency-level":"latest","shard":"unit"},{"ruby-version":"3.3","dependency-level":"minimum","shard":"generators"},{"ruby-version":"3.3","dependency-level":"minimum","shard":"unit"}]}' >> "$GITHUB_OUTPUT"
+            echo 'matrix={"include":[{"ruby-version":"4.0","dependency-level":"latest","shard":"generators"},{"ruby-version":"4.0","dependency-level":"latest","shard":"unit"},{"ruby-version":"3.3","dependency-level":"minimum","shard":"generators"},{"ruby-version":"3.3","dependency-level":"minimum","shard":"unit"}]}' >> "$GITHUB_OUTPUT"
           else
             # PR matrix: test only latest versions for fast feedback × 2 shards
-            echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest","shard":"generators"},{"ruby-version":"3.4","dependency-level":"latest","shard":"unit"}]}' >> "$GITHUB_OUTPUT"
+            echo 'matrix={"include":[{"ruby-version":"4.0","dependency-level":"latest","shard":"generators"},{"ruby-version":"4.0","dependency-level":"latest","shard":"unit"}]}' >> "$GITHUB_OUTPUT"
           fi
       - name: Guard docs-only main pushes
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'

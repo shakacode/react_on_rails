@@ -55,11 +55,11 @@ jobs:
       - name: Setup Ruby
         uses: ./.github/actions/setup-ruby
         with:
-          ruby-version: '3.3'
+          ruby-version: '4.0'
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -86,7 +86,7 @@ jobs:
         uses: ./.github/actions/setup-bundle
         with:
           working-directory: react_on_rails/spec/dummy
-          ruby-version: '3.3'
+          ruby-version: '4.0'
 
       - name: Install Playwright browsers
         working-directory: react_on_rails/spec/dummy

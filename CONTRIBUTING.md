@@ -208,7 +208,7 @@ After checking out the repo and ensuring you have Ruby and Node version managers
 
 ```sh
 # First, verify your versions match the project requirements
-ruby -v  # Should show 3.4.x or version in .ruby-version
+ruby -v  # Should show 4.0.x or version in .ruby-version
 node -v  # Should show 22.x or version in .node-version
 
 # Then run the setup script
@@ -621,6 +621,7 @@ Runs all skipped CI checks and enables full CI mode for the PR:
 - Triggers all CI workflows that were skipped due to unchanged code
 - Adds the `full-ci` label to the PR
 - **Persists across future commits** - all subsequent pushes will run the full test suite
+- Runs latest dependency tests (Ruby 4.0, Node 22, Shakapacker 10.1.0, React 19)
 - Runs minimum dependency tests (Ruby 3.3, Node 20, Shakapacker 8.2.0, React 18)
 
 **When to use:**

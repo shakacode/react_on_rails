@@ -48,9 +48,11 @@ jobs:
         id: detect
         run: |
           if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
-            echo "run_dummy_tests=true" >> "$GITHUB_OUTPUT"
-            echo "docs_only=false" >> "$GITHUB_OUTPUT"
-            echo "non_runtime_only=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "run_dummy_tests=true"
+              echo "docs_only=false"
+              echo "non_runtime_only=false"
+            } >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -86,7 +88,7 @@ jobs:
       - name: Setup Ruby
         uses: ./.github/actions/setup-ruby
         with:
-          ruby-version: '3.4'
+          ruby-version: '4.0'
           bundler-version: 2.5.9
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -121,7 +123,7 @@ jobs:
         uses: ./.github/actions/setup-bundle
         with:
           working-directory: react_on_rails/spec/dummy
-          ruby-version: '3.4'
+          ruby-version: '4.0'
       - name: Build ReScript files
         run: pnpm --filter "react_on_rails" run build:rescript
       - name: Generate file system-based packs

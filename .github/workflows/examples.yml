@@ -96,10 +96,10 @@ jobs:
              [[ "${{ inputs.force_run }}" == "true" ]] || \
              [[ "${{ needs.detect-changes.outputs.has_full_ci_label }}" == "true" ]]; then
             # Full matrix: test both latest and minimum supported versions
-            echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest"},{"ruby-version":"3.3","dependency-level":"minimum"}]}' >> "$GITHUB_OUTPUT"
+            echo 'matrix={"include":[{"ruby-version":"4.0","dependency-level":"latest"},{"ruby-version":"3.3","dependency-level":"minimum"}]}' >> "$GITHUB_OUTPUT"
           else
             # PR matrix: test only latest versions for fast feedback
-            echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest"}]}' >> "$GITHUB_OUTPUT"
+            echo 'matrix={"include":[{"ruby-version":"4.0","dependency-level":"latest"}]}' >> "$GITHUB_OUTPUT"
           fi
 
   examples:

@@ -3,7 +3,7 @@
 #
 # Usage:
 #   bin/ci-switch-config minimum   # Ruby 3.3, Node 20, minimum deps
-#   bin/ci-switch-config latest    # Ruby 3.4, Node 22, latest deps
+#   bin/ci-switch-config latest    # Ruby 4.0, Node 22, latest deps
 #   bin/ci-switch-config status    # Show current configuration
 
 set -euo pipefail
@@ -202,8 +202,8 @@ show_status() {
   echo ""
   if [[ "${SHAKAPACKER_GEM}" == "8.2.0" ]] && [[ "${REACT_ROOT}" == "18.0.0" ]]; then
     echo -e "Current config: ${GREEN}minimum${NC} (matches CI: Ruby 3.3, Node 20, minimum deps)"
-  elif [[ "${SHAKAPACKER_GEM}" == "9.3.0" ]] && [[ "${REACT_ROOT}" =~ 19 ]]; then
-    echo -e "Current config: ${GREEN}latest${NC} (matches CI: Ruby 3.4, Node 22, latest deps)"
+  elif [[ "${SHAKAPACKER_GEM}" == "10.1.0" ]] && [[ "${REACT_ROOT}" =~ 19 ]]; then
+    echo -e "Current config: ${GREEN}latest${NC} (matches CI: Ruby 4.0, Node 22, latest deps)"
   else
     echo -e "Current config: ${YELLOW}unknown/mixed${NC}"
   fi
@@ -355,7 +355,7 @@ restore_to_latest() {
   local VERSION_MANAGER=$(check_version_manager)
 
   print_header "Restoring to LATEST configuration"
-  echo "  Target: Ruby 3.4, Node 22, Shakapacker 9.3.0, React 19.0.0"
+  echo "  Target: Ruby 4.0, Node 22, Shakapacker 10.1.0, React 19.0.0"
   echo "  Using version manager: $VERSION_MANAGER"
   echo ""
 
@@ -375,15 +375,15 @@ restore_to_latest() {
     mise|asdf)
       print_header "Setting runtime versions in .tool-versions"
       cat > "$PROJECT_ROOT/.tool-versions" <<EOF
-ruby 3.4.3
+ruby 4.0.5
 nodejs 22.12.0
 EOF
-      print_success "Created .tool-versions with Ruby 3.4.3 and Node 22.12.0"
+      print_success "Created .tool-versions with Ruby 4.0.5 and Node 22.12.0"
       ;;
     rvm|rvm+nvm)
       print_header "Creating .ruby-version for rvm"
-      echo "3.4.3" > "$PROJECT_ROOT/.ruby-version"
-      print_success "Created .ruby-version with Ruby 3.4.3"
+      echo "4.0.5" > "$PROJECT_ROOT/.ruby-version"
+      print_success "Created .ruby-version with Ruby 4.0.5"
       ;;
   esac
 
@@ -395,7 +395,7 @@ EOF
       ;;
   esac
 
-  set_ruby_version "3.4.3" "$VERSION_MANAGER"
+  set_ruby_version "4.0.5" "$VERSION_MANAGER"
   set_node_version "22.12.0" "$VERSION_MANAGER"
 
   # Restore files from git
@@ -508,7 +508,7 @@ case "${1:-}" in
     echo ""
     echo "Commands:"
     echo "  minimum  - Switch to Ruby 3.3, Node 20, minimum dependencies (Shakapacker 8.2.0, React 18)"
-    echo "  latest   - Switch to Ruby 3.4, Node 22, latest dependencies (Shakapacker 9.3.0, React 19)"
+    echo "  latest   - Switch to Ruby 4.0, Node 22, latest dependencies (Shakapacker 10.1.0, React 19)"
     echo "  status   - Show current configuration"
     echo ""
     echo "Examples:"
