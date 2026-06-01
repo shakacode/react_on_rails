@@ -95,12 +95,13 @@ bundle exec rspec
 
 Based on research and testing, here are the key findings regarding SWC and React Server Components compatibility:
 
-#### ⚠️ Experimental Status
+#### ⚠️ SWC and RSC: Babel is the tested path
 
-- **SWC support for React Server Components is EXPERIMENTAL and UNSTABLE**
-- The React Compiler's SWC plugin is still experimental as of 2025
-- SWC plugins in general do not follow semver for compatibility
-- Next.js recommends version 15.3.1+ for optimal SWC-based build performance with RSC
+- **Babel is the tested, reference transpiler for RSC in React on Rails.** The React on Rails Pro dummy app builds RSC with Babel, so it has the most coverage.
+- The **`'use client'` / `'use server'` boundary transform is performed by the `react-on-rails-rsc` WebpackLoader**, which runs _before_ babel/swc in the loader chain. RSC directive handling does not depend on your transpiler choice — SWC (or Babel) only does ordinary JS/TS transpilation of the RSC, server, and client bundles.
+- Using `swc-loader` to build an RSC app is wired to work (the generated `rscWebpackConfig.js` extracts and chains either `babel-loader` or `swc-loader`) but is not yet verified end-to-end in React on Rails.
+- The **React Compiler's SWC plugin is still experimental**, and SWC plugins in general do not follow semver for compatibility. (React Compiler is optional and independent of RSC.)
+- Next.js recommends SWC 15.3.1+ for optimal SWC-based build performance with RSC.
 
 #### Known Issues
 
@@ -122,7 +123,7 @@ Based on research and testing, here are the key findings regarding SWC and React
 
 #### For React Server Components
 
-- ⚠️ **Use with caution** - RSC support in SWC is experimental
+- ⚠️ **Use with caution** - SWC-based RSC builds are not yet the verified path in React on Rails
 - 📝 **Document your configuration** carefully if using RSC with SWC
 - 🧪 **Extensive testing required** before production deployment
 - 🔄 **Monitor updates** to SWC and React Compiler for stability improvements
@@ -262,7 +263,7 @@ Test coverage includes:
 
 The standard React on Rails dummy app (`react_on_rails/spec/dummy`) successfully uses SWC, demonstrating its compatibility with core React on Rails features.
 
-**For projects using React Server Components**: ⚠️ **Stay with Babel for now** - The React on Rails Pro dummy app continues using Babel due to RSC's experimental status with SWC. Consider staying with Babel until SWC RSC support stabilizes, or conduct extensive testing before production deployment.
+**For projects using React Server Components**: ⚠️ **Stay with Babel for now** - The React on Rails Pro dummy app builds RSC with Babel, which is the tested transpiler path. SWC-based RSC builds are wired to work but are not yet verified end-to-end, and the React Compiler's SWC plugin remains experimental. Stay with Babel, or conduct extensive testing before production deployment.
 
 ## References
 
