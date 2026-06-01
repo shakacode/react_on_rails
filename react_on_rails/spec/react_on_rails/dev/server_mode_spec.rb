@@ -236,6 +236,26 @@ RSpec.describe ReactOnRails::Dev::ServerMode do
       expect(described_class.detect("config/shakapacker.yml")).to eq(:live_reload)
     end
 
+    it "warns and uses the live reload default when dev_server is not a mapping" do
+      write_shakapacker_config(<<~YAML)
+        development:
+          dev_server: true
+      YAML
+
+      expect { described_class.detect("config/shakapacker.yml") }
+        .to output(/dev_server in the Shakapacker development config is not a mapping/).to_stderr
+    end
+
+    it "does not warn when dev_server is explicitly disabled with false" do
+      write_shakapacker_config(<<~YAML)
+        development:
+          dev_server: false
+      YAML
+
+      expect { expect(described_class.detect("config/shakapacker.yml")).to eq(:live_reload) }
+        .not_to output.to_stderr
+    end
+
     it "warns when Shakapacker config parsing fails" do
       write_shakapacker_config(<<~YAML)
         development:

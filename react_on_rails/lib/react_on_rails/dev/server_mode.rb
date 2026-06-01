@@ -138,7 +138,22 @@ module ReactOnRails
           return {} unless environment_config.is_a?(Hash)
 
           dev_server = environment_config["dev_server"]
-          dev_server.is_a?(Hash) ? dev_server : {}
+          return dev_server if dev_server.is_a?(Hash)
+
+          warn_unless_blank_dev_server(dev_server)
+          {}
+        end
+
+        # nil/false read as "no dev server", matching Shakapacker, which treats a blank dev_server as
+        # absent. Any other non-mapping value (e.g. `dev_server: true`) is a misconfiguration worth
+        # surfacing before falling back to Shakapacker's live-reload default.
+        def warn_unless_blank_dev_server(dev_server)
+          return if dev_server.nil? || dev_server == false
+
+          warn(
+            "[ReactOnRails] dev_server in the Shakapacker development config is not a mapping " \
+            "(got #{dev_server.class}); ignoring it for dev-server mode detection"
+          )
         end
 
         def detect_from_dev_server_config(dev_server)
