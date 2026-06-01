@@ -91,9 +91,6 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       non_runtime_only: ${{ steps.detect.outputs.non_runtime_only }}
-      run_core_benchmarks: ${{ steps.benchmark-outputs.outputs.run_core_benchmarks }}
-      run_pro_benchmarks: ${{ steps.benchmark-outputs.outputs.run_pro_benchmarks }}
-      run_pro_node_renderer_benchmarks: ${{ steps.benchmark-outputs.outputs.run_pro_node_renderer_benchmarks }}
       run_benchmark_suites: ${{ steps.benchmark-matrices.outputs.run_benchmark_suites }}
       benchmark_matrix: ${{ steps.benchmark-matrices.outputs.benchmark_matrix }}
     steps:
@@ -437,16 +434,23 @@ jobs:
 
       - name: Execute benchmark suite
         timeout-minutes: ${{ matrix.benchmark_timeout_minutes }}
+        # Route matrix values through env so the shell treats them as data, not code
+        # (GitHub Actions injection hardening), even though they come from our own
+        # generate_matrix.rb.
+        env:
+          SUITE_NAME: ${{ matrix.suite_name }}
+          PRO_ENV: ${{ matrix.pro_env }}
+          BENCHMARK_SCRIPT: ${{ matrix.benchmark_script }}
         run: |
           set -e
-          echo "🏃 Running ${{ matrix.suite_name }} benchmark suite..."
+          echo "🏃 Running $SUITE_NAME benchmark suite..."
 
-          if [ "${{ matrix.pro_env }}" = "true" ]; then
-            if ! PRO=true $BENCH_CMD "${{ matrix.benchmark_script }}"; then
+          if [ "$PRO_ENV" = "true" ]; then
+            if ! PRO=true $BENCH_CMD "$BENCHMARK_SCRIPT"; then
               echo "❌ ERROR: Benchmark execution failed"
               exit 1
             fi
-          elif ! $BENCH_CMD "${{ matrix.benchmark_script }}"; then
+          elif ! $BENCH_CMD "$BENCHMARK_SCRIPT"; then
             echo "❌ ERROR: Benchmark execution failed"
             exit 1
           fi
@@ -501,12 +505,21 @@ jobs:
 
       - name: Benchmark workflow summary
         if: always()
+        # Route context/matrix values through env so the shell treats them as data,
+        # not code (GitHub Actions injection hardening; ref_name can be attacker-set).
+        env:
+          SUITE_NAME: ${{ matrix.suite_name }}
+          SHARD_LABEL: ${{ matrix.shard_label }}
+          JOB_STATUS: ${{ job.status }}
+          RUN_NUMBER: ${{ github.run_number }}
+          ACTOR: ${{ github.actor }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
           echo "📋 Benchmark Workflow Summary"
           echo "===================================="
-          echo "Suite: ${{ matrix.suite_name }}"
-          echo "Shard: ${{ matrix.shard_label }}"
-          echo "Status: ${{ job.status }}"
-          echo "Run number: ${{ github.run_number }}"
-          echo "Triggered by: ${{ github.actor }}"
-          echo "Branch: ${{ github.ref_name }}"
+          echo "Suite: $SUITE_NAME"
+          echo "Shard: $SHARD_LABEL"
+          echo "Status: $JOB_STATUS"
+          echo "Run number: $RUN_NUMBER"
+          echo "Triggered by: $ACTOR"
+          echo "Branch: $REF_NAME"
