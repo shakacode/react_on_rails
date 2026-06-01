@@ -186,6 +186,13 @@ module ReactOnRailsPro
                 Rails.logger.warn(
                   "#{LOG_PREFIX} bundles/#{bundle_hash} returned HTTP #{streaming_response.code}; skipping this hash."
                 )
+                # Drain the error body (capped) so Net::HTTP can finish the
+                # response cleanly. If the body itself exceeds the cap,
+                # `drain_response_body` raises and `fetch`'s rescue logs a second
+                # "fetch(...) failed" warning alongside the "skipping this hash"
+                # line above. Both lines are expected for an oversized error
+                # body — the pair signals "non-2xx, and the body was too large
+                # to drain," not a separate failure.
                 drain_response_body(streaming_response)
                 next
               end
@@ -206,22 +213,28 @@ module ReactOnRailsPro
           each_capped_body_chunk(response, context: "bundle body") { |chunk| io.write(chunk) }
         end
 
+        # Reads and discards a non-success body solely to enforce the
+        # compressed-byte cap. No block is passed, so `each_capped_body_chunk`
+        # counts bytes without writing them anywhere.
         def drain_response_body(response)
-          each_capped_body_chunk(response, context: "non-success response body") { |_chunk| nil }
+          each_capped_body_chunk(response, context: "non-success response body")
         end
 
         def each_capped_body_chunk(response, context:)
           bytes = 0
           response.read_body do |chunk|
             bytes += chunk.bytesize
-            # Raise before `yield chunk`: the offending chunk is counted but never
-            # written/drained, so the Tempfile never sees more than COMPRESSED_BODY_CAP bytes.
+            # Strictly greater-than (`>`, not `>=`): exactly COMPRESSED_BODY_CAP
+            # bytes are allowed through, so the cap is an exclusive ceiling. The
+            # raise fires before `yield chunk`, so the offending chunk is counted
+            # but never written/drained — the Tempfile never sees more than
+            # COMPRESSED_BODY_CAP bytes.
             if bytes > COMPRESSED_BODY_CAP
               raise ReactOnRailsPro::Error,
                     "#{context} exceeded compressed body cap " \
                     "(#{compressed_body_cap_label}); aborting download"
             end
-            yield chunk
+            yield chunk if block_given?
           end
         end
 
