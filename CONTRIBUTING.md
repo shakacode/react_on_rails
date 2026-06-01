@@ -1,14 +1,13 @@
 # Tips for Contributors
 
-**🏗️ Important: Monorepo Merger in Progress**
+**🏗️ Monorepo structure**
 
-We are currently working on merging the `react_on_rails` and `react_on_rails_pro` repositories into a unified monorepo. This will provide better development experience while maintaining separate package identities and licensing. See [internal/planning/MONOREPO_MERGER_PLAN.md](./internal/planning/MONOREPO_MERGER_PLAN.md) for details.
+This repository is a monorepo containing both the MIT-licensed core (the `react_on_rails` gem and the `react-on-rails` npm package) and the Pro packages (the `react_on_rails_pro` gem and the `react-on-rails-pro` and `react-on-rails-pro-node-renderer` npm packages). License boundaries are directory-based — see [LICENSE.md](./LICENSE.md) for the authoritative list of which directories use which license.
 
-During this transition:
+When contributing:
 
-- Continue contributing to the current structure
-- License compliance remains critical - ensure no Pro code enters MIT-licensed areas
-- Major structural changes may be coordinated with the merger plan
+- License compliance is critical — never add Pro code to MIT-licensed directories.
+- Follow the existing directory layout for the package you are changing.
 
 ---
 
