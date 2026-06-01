@@ -2,15 +2,16 @@
 # frozen_string_literal: true
 
 require "fileutils"
+require "json"
 require "open3"
 require "time"
 
+require_relative "lib/github"
 require_relative "lib/github_cli"
-require_relative "lib/regression_issue_reporter"
+require_relative "lib/regression_report"
 
 BOUNDARY = "0.95"
 MAX_SAMPLE = "64"
-BENCHER_URL = "https://bencher.dev/perf/react-on-rails-t8a9ncxo"
 # Threshold direction: :lower for "regression = drop" measures (rps),
 # :upper for "regression = climb" measures (latency, failure rate).
 THRESHOLDS = [
@@ -31,6 +32,7 @@ end
 BENCHMARK_JSON = ENV.fetch("BENCHMARK_JSON", "bench_results/benchmark.json")
 REPORT_HTML = ENV.fetch("BENCHER_REPORT_HTML", "bench_results/bencher_report.html")
 CHUNK_PREFIX = "bench_results/bencher_chunk"
+REGRESSION_REPORT_JSON = File.join("bench_results", RegressionReport::FILENAME)
 
 # Check the input file before validating env vars — a missing benchmark.json is the more
 # actionable failure (almost always upstream `bench.rb` didn't produce results).
@@ -42,10 +44,6 @@ end
 SUITE_NAME = env!("BENCHMARK_SUITE_NAME")
 REPORT_MARKER = env!("BENCHER_REPORT_MARKER")
 env!("BENCHER_API_TOKEN")
-
-def github_run_url
-  "#{ENV.fetch('GITHUB_SERVER_URL')}/#{ENV.fetch('GITHUB_REPOSITORY')}/actions/runs/#{ENV.fetch('GITHUB_RUN_ID')}"
-end
 
 def branch_and_start_point_args
   case ENV.fetch("GITHUB_EVENT_NAME")
@@ -241,7 +239,7 @@ def replace_pr_comments
     #{REPORT_MARKER}
     **#{SUITE_NAME} Bencher report chunks were too large to post as PR comments.**
 
-    View the full report in the job summary: #{github_run_url}
+    View the full report in the job summary: #{Github.run_url}
   MARKDOWN
   GithubCli.run(
     "gh", "pr", "comment", ENV.fetch("PR_NUMBER"), "--body", fallback_body,
@@ -294,19 +292,24 @@ replace_pr_comments
 
 if main_push? && bencher_exit_code != 0
   if alert?(stderr, bencher_exit_code)
-    summary = benchmark_summary
-    issue_number = RegressionIssueReporter.report(
-      suite_name: SUITE_NAME,
-      github_run_url: github_run_url,
-      bencher_url: BENCHER_URL,
-      summary: summary
+    # Record the regression for the post-matrix report-regressions job rather than
+    # filing the issue here: parallel matrix suites would otherwise race to create
+    # duplicate issues and clobber each other's sections in the shared comment.
+    # Use the un-sharded suite name so that job can combine a suite's shards into a
+    # single section (shard_label keeps their ordering deterministic).
+    File.write(
+      REGRESSION_REPORT_JSON,
+      JSON.generate(
+        suite_name: ENV.fetch("BENCHMARK_SUITE_GROUP", SUITE_NAME),
+        shard_label: ENV.fetch("BENCHMARK_SHARD_LABEL", ""),
+        summary: benchmark_summary
+      )
     )
 
-    exit 1 if issue_number.empty?
-
-    puts "::warning::Bencher flagged a #{SUITE_NAME} regression on main (exit #{bencher_exit_code}). " \
-         "See regression issue ##{issue_number}, the Bencher dashboard, " \
-         "and the workflow run: #{github_run_url}"
+    warn "::warning::Bencher flagged a #{SUITE_NAME} regression on main (exit #{bencher_exit_code}). " \
+         "The report-regressions job will file the issue. " \
+         "See the Bencher dashboard and the workflow run: #{Github.run_url}"
+    exit 1
   else
     warn "::error::Bencher exited #{bencher_exit_code} on main with no regression alert in stderr for #{SUITE_NAME}; " \
          "this indicates an operational failure (auth/API/network/CLI), not a performance regression. " \

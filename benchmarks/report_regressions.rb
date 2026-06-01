@@ -1,7 +1,28 @@
+#!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require_relative "github_cli"
+# Files a single GitHub issue for benchmark regressions detected on main.
+#
+# Each benchmark matrix suite runs in its own parallel job; on a regression it
+# records a regression.json payload (see track_benchmarks.rb) that the workflow
+# uploads as an artifact. This script runs once, after the matrix, reads every
+# payload, and reports them serially through RegressionIssueReporter. Doing it in
+# one process is what makes the dedup/upsert safe: parallel suites reporting
+# directly would create duplicate issues and clobber the shared comment.
+#
+# Usage: ruby benchmarks/report_regressions.rb <artifacts-dir>
 
+require "json"
+
+require_relative "lib/github"
+require_relative "lib/github_cli"
+require_relative "lib/regression_report"
+
+BENCHER_URL = "https://bencher.dev/perf/react-on-rails-t8a9ncxo"
+
+# Creates (or updates) the single per-commit regression issue and upserts one
+# section per suite into a shared comment. Only safe to drive from a single
+# process — see the file header.
 # rubocop:disable Metrics/ClassLength
 class RegressionIssueReporter
   LABEL = "performance-regression"
@@ -224,3 +245,53 @@ class RegressionIssueReporter
   end
 end
 # rubocop:enable Metrics/ClassLength
+
+def load_payloads(artifacts_dir)
+  # Recursive glob so it works regardless of how download-artifact nests each
+  # suite's artifact under the download path.
+  Dir.glob(File.join(artifacts_dir, "**", RegressionReport::FILENAME)).map { |path| JSON.parse(File.read(path)) }
+end
+
+def report_regressions(artifacts_dir)
+  payloads = load_payloads(artifacts_dir)
+
+  if payloads.empty?
+    puts "No benchmark regressions were reported by any suite."
+    return true
+  end
+
+  # One section per suite: a sharded suite emits one payload per shard, so combine
+  # them rather than filing a section per shard. Suites sorted for stable output.
+  by_suite = payloads.group_by { |payload| payload.fetch("suite_name") }
+  by_suite.keys.sort.map { |suite_name| report_suite(suite_name, by_suite.fetch(suite_name)) }.all?
+end
+
+def report_suite(suite_name, payloads)
+  # Order shard summaries by shard number ("2/5" before "10/5"); each already
+  # self-labels with its shard in its headers, so concatenation reads cleanly.
+  summary = payloads
+            .sort_by { |payload| payload.fetch("shard_label", "").split("/").first.to_i }
+            .map { |payload| payload.fetch("summary") }
+            .join("\n")
+  puts "Filing regression report for #{suite_name} (#{payloads.size} shard report(s))"
+
+  issue_number = RegressionIssueReporter.report(
+    suite_name: suite_name,
+    github_run_url: Github.run_url,
+    bencher_url: BENCHER_URL,
+    summary: summary
+  )
+
+  if issue_number.empty?
+    warn "::error::Failed to file regression issue for #{suite_name}"
+    return false
+  end
+
+  puts "Reported #{suite_name} regression to issue ##{issue_number}"
+  true
+end
+
+if __FILE__ == $PROGRAM_NAME
+  artifacts_dir = ARGV.fetch(0, "regression-artifacts")
+  exit 1 unless report_regressions(artifacts_dir)
+end

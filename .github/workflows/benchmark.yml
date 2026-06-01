@@ -482,10 +482,25 @@ jobs:
           BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
           BENCHER_REPORT_MARKER: ${{ matrix.report_marker }}
           BENCHMARK_SUITE_NAME: ${{ matrix.bencher_suite_name }}
+          # Un-sharded name so report-regressions can combine a suite's shards.
+          BENCHMARK_SUITE_GROUP: ${{ matrix.suite_name }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
           PR_NUMBER: ${{ github.event.pull_request.number || '' }}
         run: ruby benchmarks/track_benchmarks.rb
+
+      # On a main-push regression, track_benchmarks.rb writes regression.json and
+      # exits non-zero (failing this suite). Upload it on always() so the single
+      # report-regressions job can file one issue serially after the matrix; the
+      # main "Upload benchmark results" step runs before Bencher, so it can't.
+      - name: Upload regression report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: regression-${{ matrix.artifact_name_prefix }}-${{ github.run_number }}${{ matrix.artifact_name_suffix }}
+          path: bench_results/regression.json
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Benchmark workflow summary
         if: always()
@@ -498,3 +513,39 @@ jobs:
           echo "Run number: ${{ github.run_number }}"
           echo "Triggered by: ${{ github.actor }}"
           echo "Branch: ${{ github.ref_name }}"
+
+  # Files a single GitHub issue for any benchmark regressions detected on main.
+  # Runs once after the whole matrix (always(), since a regression fails its suite)
+  # so reporting is serialized: parallel matrix suites doing this themselves would
+  # create duplicate issues and clobber each other's sections in the shared comment.
+  # No-ops when no suite uploaded a regression report (the common, healthy case).
+  report-regressions:
+    needs: [detect-changes, benchmark]
+    # always() so it still runs when a suite fails (a regression fails its suite);
+    # gated to main pushes that actually ran benchmark suites so it doesn't spin up
+    # a no-op job on labeled PRs or benchmark-less main pushes.
+    if: >-
+      always()
+      && github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && needs.detect-changes.outputs.run_benchmark_suites == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Download regression reports
+        uses: actions/download-artifact@v7
+        with:
+          path: regression-artifacts
+          pattern: regression-*
+      # Stdlib-only script, so the runner's system Ruby is enough (no Bundler/Rails boot).
+      - name: File regression issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ruby benchmarks/report_regressions.rb regression-artifacts
