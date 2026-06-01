@@ -153,6 +153,7 @@ jobs:
         env:
           BENCHMARK_APP_VERSION: ${{ github.event.inputs.app_version || 'both' }}
           BENCHMARK_EVENT_NAME: ${{ github.event_name }}
+          BENCHMARK_ROUTES: ${{ github.event.inputs.routes || '' }}
           BENCHMARK_NON_RUNTIME_ONLY: ${{ steps.detect.outputs.non_runtime_only }}
           BENCHMARK_PULL_REQUEST_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name || '' }}
           BENCHMARK_PULL_REQUEST_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
