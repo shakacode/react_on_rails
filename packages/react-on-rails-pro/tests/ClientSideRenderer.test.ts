@@ -157,7 +157,7 @@ describe('ClientSideRenderer', () => {
     );
     expect(mockReactHydrateOrRender).toHaveBeenCalledTimes(1);
     const wrappedElement = mockReactHydrateOrRender.mock.calls[0][1] as React.ReactElement;
-    expect(mockReactHydrateOrRender.mock.calls[0][3]).toBeUndefined();
+    expect(mockReactHydrateOrRender.mock.calls[0][3]).toEqual({ identifierPrefix: 'dom-id-123' });
     expect(wrappedElement.type).toBe(DefaultProviderMarker);
     expect(wrappedElement.props).toEqual(
       expect.objectContaining({

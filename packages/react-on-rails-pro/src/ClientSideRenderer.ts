@@ -153,14 +153,16 @@ You should return a React.Component always for the client side entry point.`);
             railsContext,
             domNodeId,
           );
-          const hydrateOptions =
-            shouldHydrate && wrappedByDefaultRSCProvider
+          let renderOptions: Parameters<typeof reactHydrateOrRender>[3];
+          if (wrappedByDefaultRSCProvider) {
+            renderOptions = shouldHydrate
               ? {
                   ...(this.ssrIdentifierPrefix ? { identifierPrefix: this.ssrIdentifierPrefix } : {}),
                   onRecoverableError: handleRecoverableError,
                 }
-              : undefined;
-          const rootOrElement = reactHydrateOrRender(domNode, reactElement, shouldHydrate, hydrateOptions);
+              : { identifierPrefix: domNodeId };
+          }
+          const rootOrElement = reactHydrateOrRender(domNode, reactElement, shouldHydrate, renderOptions);
           this.state = 'rendered';
           if (supportsRootApi) {
             this.root = rootOrElement as Root;

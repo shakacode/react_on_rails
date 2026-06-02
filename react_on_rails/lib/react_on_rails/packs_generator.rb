@@ -688,17 +688,29 @@ module ReactOnRails
 
       # Check component packs
       component_files.each do |file|
-        path = generated_pack_path(file)
-        return true if !File.exist?(path) || File.mtime(path).to_i < most_recent_mtime
+        return true if generated_component_pack_stale?(file, most_recent_mtime)
       end
 
       # Check store packs
       store_files.each do |file|
-        path = generated_store_pack_path(file)
-        return true if !File.exist?(path) || File.mtime(path).to_i < most_recent_mtime
+        return true if generated_store_pack_stale?(file, most_recent_mtime)
       end
 
       false
+    end
+
+    def generated_component_pack_stale?(file, most_recent_mtime)
+      path = generated_pack_path(file)
+      return true if !File.exist?(path) || File.mtime(path).to_i < most_recent_mtime
+
+      File.read(path) != pack_file_contents(file)
+    end
+
+    def generated_store_pack_stale?(file, most_recent_mtime)
+      path = generated_store_pack_path(file)
+      return true if !File.exist?(path) || File.mtime(path).to_i < most_recent_mtime
+
+      File.read(path) != store_pack_file_contents(file)
     end
   end
   # rubocop:enable Metrics/ClassLength

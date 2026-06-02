@@ -321,6 +321,28 @@ module ReactOnRails
         end
       end
 
+      it "regenerates client packs when generated contents no longer match the current template" do
+        described_class.instance.generate_packs_if_stale
+        component_name = "ReactClientComponent"
+        component_pack = "#{generated_directory}/#{component_name}.js"
+        component_source =
+          "#{packer_source_path}/components/#{components_directory}/ror_components/#{component_name}.jsx"
+        stale_pack_content = File.read(component_pack)
+                                 .delete_prefix("import 'react-on-rails-pro/registerDefaultRSCProvider/client';\n")
+        fresh_mtime = File.mtime(component_source) + 60
+        File.write(component_pack, stale_pack_content)
+        File.utime(fresh_mtime, fresh_mtime, component_pack)
+
+        ENV["REACT_ON_RAILS_VERBOSE"] = "true"
+        expect do
+          described_class.instance.generate_packs_if_stale
+        end.to output(GENERATED_PACKS_CONSOLE_OUTPUT_REGEX).to_stdout
+        expect(File.read(component_pack))
+          .to include("import 'react-on-rails-pro/registerDefaultRSCProvider/client';")
+      ensure
+        ENV.delete("REACT_ON_RAILS_VERBOSE")
+      end
+
       context "when RSC support is disabled" do
         before do
           allow(ReactOnRailsPro::Utils).to receive(:rsc_support_enabled?).and_return(false)

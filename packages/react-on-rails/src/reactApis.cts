@@ -72,9 +72,13 @@ export const reactHydrate: HydrateOrRenderType = supportsRootApi
   ? (domNode, reactElement, options) => reactDomClient!.hydrateRoot(domNode, reactElement, options)
   : (domNode, reactElement) => legacyReactDOM.hydrate(reactElement, domNode);
 
-export function reactRender(domNode: Element, reactElement: ReactElement): RenderReturnType {
+export function reactRender(
+  domNode: Element,
+  reactElement: ReactElement,
+  options?: ReactHydrateOptions,
+): RenderReturnType {
   if (supportsRootApi) {
-    const root = reactDomClient!.createRoot(domNode);
+    const root = reactDomClient!.createRoot(domNode, options);
     root.render(reactElement);
     return root;
   }

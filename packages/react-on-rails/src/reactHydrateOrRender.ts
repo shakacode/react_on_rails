@@ -9,5 +9,7 @@ export default function reactHydrateOrRender(
   hydrate: boolean,
   hydrateOptions?: ReactHydrateOptions,
 ): RenderReturnType {
-  return hydrate ? reactHydrate(domNode, reactElement, hydrateOptions) : reactRender(domNode, reactElement);
+  return hydrate
+    ? reactHydrate(domNode, reactElement, hydrateOptions)
+    : reactRender(domNode, reactElement, hydrateOptions);
 }
