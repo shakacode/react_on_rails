@@ -15,6 +15,15 @@ RSpec.describe "Ruby version support" do
     expect(gemspec.required_ruby_version).to be_satisfied_by(Gem::Version.new("4.0.0"))
   end
 
+  it "uses a Ruby 4-compatible Bundler version in OSS lockfiles" do
+    ["react_on_rails/Gemfile.lock", "react_on_rails/spec/dummy/Gemfile.lock"].each do |path|
+      lockfile = read_repo_file(path)
+      bundler_version = lockfile.match(/\nBUNDLED WITH\n\s+(\S+)/)[1]
+
+      expect(Gem::Version.new(bundler_version)).to be >= Gem::Version.new("4.0.0")
+    end
+  end
+
   it "tests Ruby 4.0 as the latest OSS CI runtime while keeping Ruby 3.3 as the minimum" do
     expect(read_repo_file(".github/workflows/gem-tests.yml")).to include(
       '"ruby-version":"4.0","dependency-level":"latest"',
