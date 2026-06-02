@@ -98,7 +98,7 @@ describe('LengthPrefixedStreamParser', () => {
   it('uses byte lengths for multibyte content split across feed calls', () => {
     const content = 'Hello \u{1f604} world';
     const frame = encoder.encode(toRecord(content, { index: 1 }));
-    const contentStart = frame.length - encoder.encode(content).length;
+    const contentStart = frame.indexOf(0x0a) + 1;
     const splitInsideEmoji = contentStart + encoder.encode('Hello ').length + 1;
 
     const records = collectByteRecords(frame.subarray(0, splitInsideEmoji), frame.subarray(splitInsideEmoji));

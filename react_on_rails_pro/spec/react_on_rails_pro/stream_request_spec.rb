@@ -113,7 +113,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       it "uses byte lengths for multibyte content split across HTTP chunks" do
         payload = "Hello \u{1F604} world"
         full = to_length_prefixed(payload)
-        content_start = full.bytesize - payload.bytesize
+        content_start = full.byteindex("\n") + 1
         split_inside_emoji = content_start + "Hello ".bytesize + 1
         chunk1 = full.byteslice(0, split_inside_emoji)
         chunk2 = full.byteslice(split_inside_emoji, full.bytesize - split_inside_emoji)
