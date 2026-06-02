@@ -59,7 +59,7 @@ Requires the controller to use `stream_view_containing_react_components`.
 
 Async-props variant of `stream_react_component`. Use this when the view has synchronous props plus slower values that should stream to React behind Suspense boundaries.
 
-Use this helper for RSC Server Components with RSC support enabled. For non-RSC streaming SSR, use `stream_react_component`.
+Use this helper for RSC Server Components with `config.enable_rsc_support = true`. For non-RSC streaming SSR, use `stream_react_component`.
 
 Requires the controller to use `stream_view_containing_react_components`, same as `stream_react_component`.
 
@@ -75,7 +75,7 @@ end %>
 ```
 
 > [!IMPORTANT]
-> `stream_react_component_with_async_props` always forces `prerender: true`; passing `prerender: false` has no effect. The emitter block runs normal Ruby code sequentially, so `emit.call` does **not** parallelize slow queries by itself. For independent slow data sources, start the work concurrently before emitting values; see [Avoiding Server-Side Waterfalls](../migrating/rsc-data-fetching.md#avoiding-server-side-waterfalls).
+> `stream_react_component_with_async_props` requires `config.enable_rsc_support = true` and always forces `prerender: true`; passing `prerender: false` has no effect. The emitter block runs normal Ruby code sequentially, so `emit.call` does **not** parallelize slow queries by itself. For independent slow data sources, start the work concurrently before emitting values; see [Avoiding Server-Side Waterfalls](../migrating/rsc-data-fetching.md#avoiding-server-side-waterfalls).
 
 ### `cached_stream_react_component(component_name, options = {}, &block)`
 

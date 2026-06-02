@@ -111,7 +111,7 @@ end %>
 > [!IMPORTANT]
 > The emitter block runs normal Ruby code sequentially, so `emit.call` does **not** parallelize slow queries by itself. For independent slow data sources, start the work concurrently before emitting values; see [Avoiding Server-Side Waterfalls](#avoiding-server-side-waterfalls).
 
-> **See also:** [React on Rails Pro streaming SSR](../../pro/streaming-ssr.md) for setup instructions and configuration options.
+**See also:** [React on Rails Pro streaming SSR](../../pro/streaming-ssr.md) for setup instructions and configuration options.
 
 **React component for synchronous props (Server Component):**
 
@@ -251,7 +251,7 @@ On the React side, the component receives a `getReactOnRailsAsyncProp` helper al
 
 ```tsx
 import { Suspense } from 'react';
-import { WithAsyncProps } from 'react-on-rails-pro';
+import type { WithAsyncProps } from 'react-on-rails-pro';
 
 type Review = { id: number; text: string; rating: number };
 type Product = { id: number; name: string; price: number };
@@ -277,18 +277,18 @@ export default function ProductPage({
       <p>${price}</p>
 
       <Suspense fallback={<div>Loading reviews…</div>}>
-        <AsyncReviewList reviews={reviewsPromise} />
+        <AsyncReviewList reviewsPromise={reviewsPromise} />
       </Suspense>
       <Suspense fallback={<div>Loading recommendations…</div>}>
-        <AsyncRecommendationList items={recommendationsPromise} />
+        <AsyncRecommendationList itemsPromise={recommendationsPromise} />
       </Suspense>
     </div>
   );
 }
 
 // Each async child awaits only the prop it was handed.
-async function AsyncReviewList({ reviews }: { reviews: Promise<Review[]> }) {
-  const resolved = await reviews;
+async function AsyncReviewList({ reviewsPromise }: { reviewsPromise: Promise<Review[]> }) {
+  const resolved = await reviewsPromise;
   return (
     <ul>
       {resolved.map((r) => (
@@ -299,8 +299,8 @@ async function AsyncReviewList({ reviews }: { reviews: Promise<Review[]> }) {
 }
 
 // AsyncRecommendationList mirrors AsyncReviewList: it awaits the recommendations Promise.
-async function AsyncRecommendationList({ items }: { items: Promise<Product[]> }) {
-  const resolved = await items;
+async function AsyncRecommendationList({ itemsPromise }: { itemsPromise: Promise<Product[]> }) {
+  const resolved = await itemsPromise;
   return (
     <ul>
       {resolved.map((p) => (
