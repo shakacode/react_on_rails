@@ -16,7 +16,8 @@ RSpec.describe "Ruby version support" do
     workflow = YAML.safe_load(read_repo_file(path), aliases: true)
 
     workflow.fetch("jobs").values.flat_map do |job|
-      Array(job["steps"]).filter_map do |step|
+      # Jobs that call reusable workflows with `uses:` do not have their own steps.
+      Array(job["steps"] || []).filter_map do |step|
         next unless ruby_setup_actions.include?(step["uses"])
 
         step.dig("with", "ruby-version")
@@ -59,8 +60,13 @@ RSpec.describe "Ruby version support" do
       '"ruby-version":"3.3","node-version":"20","dependency-level":"minimum"'
     )
 
-    expect(workflow_ruby_versions(".github/workflows/lint-js-and-ruby.yml")).to match_array(%w[4.0 4.0 4.0])
-    expect(workflow_ruby_versions(".github/workflows/precompile-check.yml")).to match_array(%w[4.0 4.0])
+    lint_ruby_versions = workflow_ruby_versions(".github/workflows/lint-js-and-ruby.yml")
+    precompile_ruby_versions = workflow_ruby_versions(".github/workflows/precompile-check.yml")
+
+    expect(lint_ruby_versions).to all(eq("4.0"))
+    expect(lint_ruby_versions).not_to be_empty
+    expect(precompile_ruby_versions).to all(eq("4.0"))
+    expect(precompile_ruby_versions).not_to be_empty
   end
 
   it "documents and switches to Ruby 4.0 for the latest local CI configuration" do
@@ -73,12 +79,15 @@ RSpec.describe "Ruby version support" do
     expect(ci_switch_config).to include(
       "Target: Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, Shakapacker $LATEST_SHAKAPACKER_VERSION"
     )
+    expect(ci_switch_config).to include("matches CI: Ruby $MINIMUM_RUBY_MINOR_VERSION, Node 20, minimum deps")
     expect(ci_switch_config).to include("matches CI: Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, latest deps")
     expect(ci_switch_config).to include("Switch to Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, latest dependencies")
+    expect(ci_switch_config).to include('MINIMUM_RUBY_MINOR_VERSION="${MINIMUM_RUBY_VERSION%.*}"')
     expect(ci_switch_config).to include('LATEST_RUBY_VERSION="4.0.5"')
     expect(ci_switch_config).to include('LATEST_SHAKAPACKER_VERSION="10.1.0"')
+    expect(ci_switch_config).to include('LATEST_REACT_MAJOR_VERSION="19"')
     expect(ci_switch_config).to match(/set_ruby_version "\$LATEST_RUBY_VERSION"/)
-    expect(ci_switch_config).to include('[[ "${REACT_ROOT}" =~ ^\^?19(\.|$) ]]')
+    expect(ci_switch_config).to include('[[ "${REACT_ROOT}" =~ ^\^?${LATEST_REACT_MAJOR_VERSION}(\.|$) ]]')
     expect(ci_switch_config).to include("bundle config set --local path vendor/bundle")
     expect(ci_switch_config).not_to include("bundle install --path")
 
