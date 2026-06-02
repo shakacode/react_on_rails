@@ -1,9 +1,12 @@
 # frozen_string_literal: true
 
 require "json"
+require_relative "shakapacker_precompile_hook_helper"
 
 # rubocop:disable Metrics/ModuleLength
 module GeneratorHelper
+  include ReactOnRails::Generators::ShakapackerPrecompileHookHelper
+
   def package_json
     # Lazy load package_json gem only when actually needed for dependency management
 
@@ -336,26 +339,6 @@ module GeneratorHelper
 
     # Fresh install: SWC is recommended default for Shakapacker 9.3.0+
     shakapacker_version_9_3_or_higher?
-  end
-
-  def parse_shakapacker_yml(path)
-    parse_shakapacker_yml_content(File.read(path))
-  rescue StandardError
-    {}
-  end
-
-  def parse_shakapacker_yml_content(content)
-    require "yaml"
-
-    YAML.safe_load(content, permitted_classes: [Symbol], aliases: true)
-  rescue ArgumentError
-    begin
-      YAML.safe_load(content, permitted_classes: [Symbol])
-    rescue StandardError
-      {}
-    end
-  rescue StandardError
-    {}
   end
 
   # Check if Shakapacker 9.3.0 or higher is available

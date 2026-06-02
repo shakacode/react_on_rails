@@ -203,6 +203,31 @@ RSpec.describe GeneratorHelper, type: :generator do
     end
   end
 
+  describe "#parse_shakapacker_yml_content" do
+    let(:aliased_config) do
+      <<~YAML
+        default: &default
+          precompile_hook: bin/shakapacker-precompile-hook
+
+        test:
+          <<: *default
+      YAML
+    end
+
+    it "fails closed instead of parsing aliased configs without alias support" do
+      allow(YAML).to receive(:safe_load) do |_content, aliases: false, **_kwargs|
+        raise ArgumentError, "unknown keyword: :aliases" if aliases
+
+        {
+          "default" => { "precompile_hook" => "bin/shakapacker-precompile-hook" },
+          "test" => { "precompile_hook" => "bin/shakapacker-precompile-hook" }
+        }
+      end
+
+      expect(parse_shakapacker_yml_content(aliased_config)).to eq({})
+    end
+  end
+
   describe "Pro/RSC flag helpers" do
     it "treats --rsc as implying Pro" do
       allow(self).to receive(:options).and_return({ rsc: true, pro: false })

@@ -100,15 +100,46 @@ module ReactOnRails
       def parse_shakapacker_yml_content(content)
         require "yaml"
 
-        YAML.safe_load(content, permitted_classes: [Symbol], aliases: true)
-      rescue ArgumentError
-        begin
-          YAML.safe_load(content, permitted_classes: [Symbol])
-        rescue StandardError
-          {}
-        end
+        return YAML.safe_load(content, permitted_classes: [Symbol], aliases: true) if yaml_safe_load_supports_aliases?
+        return {} if yaml_content_uses_aliases?(content)
+
+        YAML.safe_load(content, permitted_classes: [Symbol])
+      rescue ArgumentError => e
+        return {} if yaml_alias_keyword_error?(e) && yaml_content_uses_aliases?(content)
+        return YAML.safe_load(content, permitted_classes: [Symbol]) if yaml_alias_keyword_error?(e)
+
+        {}
       rescue StandardError
         {}
+      end
+
+      def yaml_safe_load_supports_aliases?
+        YAML.method(:safe_load).parameters.any? do |type, name|
+          type == :keyrest || (type == :key && name == :aliases)
+        end
+      rescue StandardError
+        false
+      end
+
+      def yaml_alias_keyword_error?(error)
+        error.message.include?("aliases")
+      end
+
+      def yaml_content_uses_aliases?(content)
+        require "psych"
+
+        yaml_node_uses_aliases?(Psych.parse_stream(content))
+      rescue StandardError
+        true
+      end
+
+      def yaml_node_uses_aliases?(node)
+        return false unless node
+        return true if node.respond_to?(:anchor) && node.anchor
+        return true if defined?(Psych::Nodes::Alias) && node.is_a?(Psych::Nodes::Alias)
+        return false unless node.respond_to?(:children)
+
+        node.children.any? { |child| yaml_node_uses_aliases?(child) }
       end
 
       def shakapacker_supports_precompile_hook?
