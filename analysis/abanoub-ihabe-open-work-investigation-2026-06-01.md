@@ -1,10 +1,14 @@
-# Abanoub and Ihabe Open Work Investigation (2026-06-01)
+# AbanoubGhadban and ihabadham Open Work Investigation (2026-06-01)
 
 Research-only snapshot for open React on Rails issues and PRs authored by
 AbanoubGhadban or ihabadham. This intentionally avoids changing contributor PR
 branches. Where an issue already has an open PR, the recommendation is to use
 this document as the `[INVESTIGATION]` sidecar rather than pushing code into the
 existing work.
+
+Last refreshed on 2026-06-02. Re-check mergeability, review comments, and CI
+before acting on any recommendation below; PR conflicts and branch bases are
+expected to drift quickly.
 
 ## Highest-Signal Sequence
 
@@ -37,15 +41,15 @@ existing work.
 
 ## Existing PR Coverage
 
-| Issue or PR                                                      | Coverage                                                                                                                       | Current state                                                                          | Recommended action                                                           |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| [#3101](https://github.com/shakacode/react_on_rails/issues/3101) | [#3318](https://github.com/shakacode/react_on_rails/pull/3318), [#3394](https://github.com/shakacode/react_on_rails/pull/3394) | #3318 approved but conflicting; #3394 approved and clean only against the stacked base | Rebase #3318 first, merge, then retarget/rebase #3394 onto `main`            |
-| [#2524](https://github.com/shakacode/react_on_rails/issues/2524) | [#3267](https://github.com/shakacode/react_on_rails/pull/3267)                                                                 | Approved but conflicting; helper implementation now exists on `main`                   | Rebase and de-duplicate docs, then merge if still net-new                    |
-| [#3106](https://github.com/shakacode/react_on_rails/issues/3106) | [#3215](https://github.com/shakacode/react_on_rails/pull/3215)                                                                 | Approved but stale/conflicting                                                         | Park unless needed for demo/prospect; rebase after #3318/#3394               |
-| [#3209](https://github.com/shakacode/react_on_rails/issues/3209) | [#3210](https://github.com/shakacode/react_on_rails/pull/3210)                                                                 | Draft, conflicting, review required                                                    | Rebase and undraft only if cleanup is in current release scope               |
-| [#3244](https://github.com/shakacode/react_on_rails/issues/3244) | [#3245](https://github.com/shakacode/react_on_rails/pull/3245)                                                                 | Draft, conflicting, failing lint/markdown checks                                       | Preserve as research; rewrite acceptance around PPR + RSC composition        |
-| [#3313](https://github.com/shakacode/react_on_rails/issues/3313) | [#3349](https://github.com/shakacode/react_on_rails/pull/3349)                                                                 | Approved, but conclusion is stale because `main` now requires Ruby >= 3.3              | Refresh the decision record before merge                                     |
-| [#2265](https://github.com/shakacode/react_on_rails/pull/2265)   | Async props docs work                                                                                                          | Approved but conflicting; mixes docs, runtime, node-renderer, and Pro changes          | Split into docs-only work under `docs/pro/` plus separate implementation PRs |
+| Issue or PR                                                      | Coverage                                                                                                                       | Current state                                                                                                     | Recommended action                                                           |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| [#3101](https://github.com/shakacode/react_on_rails/issues/3101) | [#3318](https://github.com/shakacode/react_on_rails/pull/3318), [#3394](https://github.com/shakacode/react_on_rails/pull/3394) | #3318 approved with green CI but conflicting in a Pro streaming test; #3394 approved and clean only on #3318 base | Rebase #3318 first, merge, then retarget/rebase #3394 onto `main`            |
+| [#2524](https://github.com/shakacode/react_on_rails/issues/2524) | [#3267](https://github.com/shakacode/react_on_rails/pull/3267)                                                                 | Approved but conflicting; helper implementation now exists on `main`                                              | Rebase and de-duplicate docs, then merge if still net-new                    |
+| [#3106](https://github.com/shakacode/react_on_rails/issues/3106) | [#3215](https://github.com/shakacode/react_on_rails/pull/3215)                                                                 | Approved but stale/conflicting                                                                                    | Park unless needed for demo/prospect; rebase after #3318/#3394               |
+| [#3209](https://github.com/shakacode/react_on_rails/issues/3209) | [#3210](https://github.com/shakacode/react_on_rails/pull/3210)                                                                 | Draft, conflicting, review required                                                                               | Rebase and undraft only if cleanup is in current release scope               |
+| [#3244](https://github.com/shakacode/react_on_rails/issues/3244) | [#3245](https://github.com/shakacode/react_on_rails/pull/3245)                                                                 | Draft, conflicting, failing lint/markdown checks                                                                  | Preserve as research; rewrite acceptance around PPR + RSC composition        |
+| [#3313](https://github.com/shakacode/react_on_rails/issues/3313) | [#3349](https://github.com/shakacode/react_on_rails/pull/3349)                                                                 | Approved, but conclusion is stale because `main` now requires Ruby >= 3.3                                         | Refresh the decision record before merge                                     |
+| [#2265](https://github.com/shakacode/react_on_rails/pull/2265)   | Async props docs work                                                                                                          | Approved but conflicting; mixes docs, runtime, node-renderer, and Pro changes                                     | Split into docs-only work under `docs/pro/` plus separate implementation PRs |
 
 ## Open Issues Without a Direct PR
 
@@ -68,12 +72,18 @@ existing work.
 
 ## Comment Drafts
 
+Post these drafts on the referenced PRs/issues before acting on their
+recommendations, especially where contributor branches would be rebased,
+retargeted, closed, or split.
+
 ### #3318
 
 ```md
 Readiness note: this is still the first PR to land for #3101. It is approved and the checks look good, but GitHub currently reports it as conflicting against `main`.
 
-Recommended next step: rebase/resolve #3318 first, then rerun the focused Pro package tests and the `rsc_route_ssr_false` E2E. The main visible conflict is in `docs/pro/react-server-components/inside-client-components.md`, where current `main` changed the same RSC docs that this PR extends.
+Recommended next step: rebase/resolve #3318 first, then rerun the focused Pro package tests and the `rsc_route_ssr_false` E2E. The current visible conflict is in `packages/react-on-rails-pro/tests/streamServerRenderedReactComponent.test.jsx`, where current `main` added CSP nonce coverage for streamed RSC rendering.
+
+While the branch is open, consider the one test-quality cleanup called out in review: replace the bare `catch {}` in `deferredRouteSsr.test.tsx` with an assertion-friendly pattern or a short comment explaining the intentionally ignored error.
 
 After this lands, #3394 can be retargeted/rebased onto `main`.
 ```
