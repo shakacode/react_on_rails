@@ -215,6 +215,7 @@ RSpec.describe GeneratorHelper, type: :generator do
     end
 
     it "fails closed instead of parsing aliased configs without alias support" do
+      allow(self).to receive(:yaml_safe_load_supports_aliases?).and_return(true)
       allow(YAML).to receive(:safe_load) do |_content, aliases: false, **_kwargs|
         raise ArgumentError, "unknown keyword: :aliases" if aliases
 
