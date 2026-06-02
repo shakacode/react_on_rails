@@ -302,6 +302,7 @@ module ReactOnRails
 
       # Report versions
       report_dependency_versions(package_json)
+      report_bundler_version
     end
 
     # Rails integration validation
@@ -666,8 +667,9 @@ module ReactOnRails
     def detected_javascript_transpiler
       config = parsed_shakapacker_config
       unless config
-        if File.exist?("config/shakapacker.yml")
-          add_info("ℹ️  Unable to parse config/shakapacker.yml — defaulting to Babel assumption")
+        shakapacker_config_path = shakapacker_config_path()
+        if File.exist?(shakapacker_config_path)
+          add_info("ℹ️  Unable to parse #{shakapacker_config_path} — defaulting to Babel assumption")
         end
         return nil
       end
@@ -693,7 +695,7 @@ module ReactOnRails
 
     def shakapacker_config_path
       env_config_path = ENV.fetch("SHAKAPACKER_CONFIG", nil)
-      return "config/shakapacker.yml" if env_config_path.to_s.empty?
+      return File.expand_path("config/shakapacker.yml", shakapacker_config_base_dir) if env_config_path.to_s.empty?
 
       File.expand_path(env_config_path, shakapacker_config_base_dir)
     end

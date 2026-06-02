@@ -4,6 +4,8 @@ require_relative "../../react_on_rails/spec_helper"
 require_relative "../../../lib/react_on_rails/system_checker"
 RSpec.describe ReactOnRails::SystemChecker do
   let(:checker) { described_class.new }
+  let(:rails_root) { Pathname.new("/tmp/myapp") }
+  let(:default_shakapacker_config_path) { rails_root.join("config/shakapacker.yml").to_s }
 
   describe "#initialize" do
     it "initializes with empty messages" do
@@ -612,6 +614,7 @@ RSpec.describe ReactOnRails::SystemChecker do
     end
 
     before do
+      allow(Rails).to receive(:root).and_return(rails_root)
       allow(File).to receive(:exist?).and_call_original
       allow(checker).to receive(:resolved_package_json_path).and_return("package.json")
       allow(File).to receive(:exist?).with("package.json").and_return(true)
@@ -620,8 +623,8 @@ RSpec.describe ReactOnRails::SystemChecker do
 
     context "when shakapacker javascript_transpiler is swc" do
       before do
-        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
-        allow(File).to receive(:read).with("config/shakapacker.yml").and_return(<<~YAML)
+        allow(File).to receive(:exist?).with(default_shakapacker_config_path).and_return(true)
+        allow(File).to receive(:read).with(default_shakapacker_config_path).and_return(<<~YAML)
           default:
             javascript_transpiler: swc
         YAML
@@ -637,8 +640,8 @@ RSpec.describe ReactOnRails::SystemChecker do
 
     context "when shakapacker javascript_transpiler is babel" do
       before do
-        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
-        allow(File).to receive(:read).with("config/shakapacker.yml").and_return(<<~YAML)
+        allow(File).to receive(:exist?).with(default_shakapacker_config_path).and_return(true)
+        allow(File).to receive(:read).with(default_shakapacker_config_path).and_return(<<~YAML)
           default:
             javascript_transpiler: babel
         YAML
@@ -654,7 +657,7 @@ RSpec.describe ReactOnRails::SystemChecker do
 
     context "when shakapacker.yml does not exist" do
       before do
-        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(false)
+        allow(File).to receive(:exist?).with(default_shakapacker_config_path).and_return(false)
       end
 
       it "defaults to requiring @babel/preset-react" do
@@ -667,8 +670,8 @@ RSpec.describe ReactOnRails::SystemChecker do
 
     context "when shakapacker.yml has non-hash YAML content" do
       before do
-        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
-        allow(File).to receive(:read).with("config/shakapacker.yml").and_return("- item1\n- item2")
+        allow(File).to receive(:exist?).with(default_shakapacker_config_path).and_return(true)
+        allow(File).to receive(:read).with(default_shakapacker_config_path).and_return("- item1\n- item2")
       end
 
       it "does not crash and defaults to requiring @babel/preset-react" do
@@ -681,8 +684,8 @@ RSpec.describe ReactOnRails::SystemChecker do
 
     context "when shakapacker.yml has broken ERB" do
       before do
-        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
-        allow(File).to receive(:read).with("config/shakapacker.yml").and_return("<%= 1 + %>")
+        allow(File).to receive(:exist?).with(default_shakapacker_config_path).and_return(true)
+        allow(File).to receive(:read).with(default_shakapacker_config_path).and_return("<%= 1 + %>")
       end
 
       it "does not crash and adds a fallback info message" do
@@ -698,6 +701,23 @@ RSpec.describe ReactOnRails::SystemChecker do
           msg[:type] == :warning && msg[:content].include?("@babel/preset-react")
         end).to be true
       end
+    end
+
+    it "reports the active bundler version during standard dependency checks" do
+      allow(checker).to receive(:configured_assets_bundler).and_return("rspack")
+      allow(File).to receive(:read).with("package.json").and_return(
+        base_package_json.merge(
+          "devDependencies" => {
+            "@rspack/core" => "^1.0.0"
+          }
+        ).to_json
+      )
+
+      checker.check_react_dependencies
+
+      expect(checker.messages.any? do |msg|
+        msg[:type] == :info && msg[:content].include?("Rspack version: ^1.0.0")
+      end).to be true
     end
   end
 
@@ -779,6 +799,7 @@ RSpec.describe ReactOnRails::SystemChecker do
 
     describe "#detect_bundler_config_path" do
       before do
+        allow(Rails).to receive(:root).and_return(rails_root)
         allow(File).to receive_messages(exist?: false, file?: false)
       end
 
@@ -798,8 +819,9 @@ RSpec.describe ReactOnRails::SystemChecker do
       it "prefers the bundler configured in shakapacker.yml when both bundlers exist" do
         allow(File).to receive(:file?).with("config/rspack/rspack.config.ts").and_return(true)
         allow(File).to receive(:file?).with("config/webpack/webpack.config.ts").and_return(true)
-        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
-        allow(File).to receive(:read).with("config/shakapacker.yml").and_return("default:\n  assets_bundler: rspack\n")
+        allow(File).to receive(:exist?).with(default_shakapacker_config_path).and_return(true)
+        allow(File).to receive(:read).with(default_shakapacker_config_path)
+                                     .and_return("default:\n  assets_bundler: rspack\n")
 
         expect(checker.send(:detect_bundler_config_path)).to eq("config/rspack/rspack.config.ts")
         expect(checker.messages.any? do |msg|
@@ -815,8 +837,9 @@ RSpec.describe ReactOnRails::SystemChecker do
         allow(checker).to receive(:bundler_config_directory)
           .with("config/custom/missing.config.js")
           .and_return("config/custom")
-        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
-        allow(File).to receive(:read).with("config/shakapacker.yml").and_return("default:\n  assets_bundler: rspack\n")
+        allow(File).to receive(:exist?).with(default_shakapacker_config_path).and_return(true)
+        allow(File).to receive(:read).with(default_shakapacker_config_path)
+                                     .and_return("default:\n  assets_bundler: rspack\n")
 
         expect(checker.send(:detect_bundler_config_path)).to eq("config/custom/rspack.config.js")
         expect(checker.messages.any? do |msg|
@@ -827,7 +850,7 @@ RSpec.describe ReactOnRails::SystemChecker do
       it "warns and defaults to webpack when both bundlers exist and config is ambiguous" do
         allow(File).to receive(:file?).with("config/rspack/rspack.config.ts").and_return(true)
         allow(File).to receive(:file?).with("config/webpack/webpack.config.ts").and_return(true)
-        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(false)
+        allow(File).to receive(:exist?).with(default_shakapacker_config_path).and_return(false)
 
         expect(checker.send(:detect_bundler_config_path)).to eq("config/webpack/webpack.config.ts")
         expect(checker.messages.any? { |msg| msg[:content].include?("defaulting to webpack") }).to be true
@@ -883,11 +906,12 @@ RSpec.describe ReactOnRails::SystemChecker do
 
     describe "#configured_assets_bundler" do
       before do
-        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
+        allow(Rails).to receive(:root).and_return(rails_root)
+        allow(File).to receive(:exist?).with(default_shakapacker_config_path).and_return(true)
       end
 
       it "parses ERB-backed assets_bundler values from shakapacker.yml" do
-        allow(File).to receive(:read).with("config/shakapacker.yml").and_return(<<~YAML)
+        allow(File).to receive(:read).with(default_shakapacker_config_path).and_return(<<~YAML)
           default: &default
             assets_bundler: <%= "webpack" %> # inline comment
           development:
@@ -898,7 +922,7 @@ RSpec.describe ReactOnRails::SystemChecker do
       end
 
       it "prefers the current Rails environment over the default config" do
-        allow(File).to receive(:read).with("config/shakapacker.yml").and_return(<<~YAML)
+        allow(File).to receive(:read).with(default_shakapacker_config_path).and_return(<<~YAML)
           default:
             assets_bundler: webpack
           test:
@@ -914,9 +938,10 @@ RSpec.describe ReactOnRails::SystemChecker do
       end
 
       it "reads assets_bundler from SHAKAPACKER_CONFIG when set" do
+        allow(Rails).to receive(:root).and_return(rails_root)
         original_config_path = ENV.fetch("SHAKAPACKER_CONFIG", nil)
         ENV["SHAKAPACKER_CONFIG"] = "config/custom_shakapacker.yml"
-        config_path = File.expand_path("config/custom_shakapacker.yml", Dir.pwd)
+        config_path = rails_root.join("config/custom_shakapacker.yml").to_s
 
         allow(File).to receive(:exist?).with(config_path).and_return(true)
         allow(File).to receive(:read).with(config_path).and_return(<<~YAML)
@@ -925,6 +950,19 @@ RSpec.describe ReactOnRails::SystemChecker do
         YAML
 
         expect(checker.send(:configured_assets_bundler)).to eq("rspack")
+      ensure
+        original_config_path.nil? ? ENV.delete("SHAKAPACKER_CONFIG") : ENV["SHAKAPACKER_CONFIG"] = original_config_path
+      end
+    end
+
+    describe "#shakapacker_config_path" do
+      it "resolves the default config path against Rails.root" do
+        allow(Rails).to receive(:root).and_return(rails_root)
+
+        original_config_path = ENV.fetch("SHAKAPACKER_CONFIG", nil)
+        ENV.delete("SHAKAPACKER_CONFIG")
+
+        expect(checker.send(:shakapacker_config_path)).to eq(rails_root.join("config/shakapacker.yml").to_s)
       ensure
         original_config_path.nil? ? ENV.delete("SHAKAPACKER_CONFIG") : ENV["SHAKAPACKER_CONFIG"] = original_config_path
       end
@@ -1225,9 +1263,10 @@ RSpec.describe ReactOnRails::SystemChecker do
       end
 
       it "uses SHAKAPACKER_CONFIG when selecting optional build dependencies" do
+        allow(Rails).to receive(:root).and_return(rails_root)
         original_config_path = ENV.fetch("SHAKAPACKER_CONFIG", nil)
         ENV["SHAKAPACKER_CONFIG"] = "config/custom_shakapacker.yml"
-        config_path = File.expand_path("config/custom_shakapacker.yml", Dir.pwd)
+        config_path = rails_root.join("config/custom_shakapacker.yml").to_s
 
         allow(File).to receive(:exist?).with(config_path).and_return(true)
         allow(File).to receive(:read).with(config_path).and_return(<<~YAML)

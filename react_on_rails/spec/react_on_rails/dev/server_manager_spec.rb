@@ -1908,7 +1908,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
       aggregate_failures do
         expect(described_class.send(:development_dev_server_config)).to eq("port" => 3035)
-        expect(described_class.send(:development_hmr_enabled?)).to be(false)
+        expect(described_class.send(:development_hmr_enabled?)).to be(true)
       end
     end
 

@@ -589,7 +589,6 @@ module ReactOnRails
           return truthy_config_value?(dev_server["hmr"]) if dev_server.key?("hmr")
 
           return false if truthy_config_value?(dev_server["live_reload"])
-          return false if dev_server.any?
 
           # Default to HMR when neither hmr nor live_reload is configured, preserving historical behavior.
           true
