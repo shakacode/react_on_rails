@@ -10,16 +10,24 @@ require_relative "lib/github"
 require_relative "lib/github_cli"
 require_relative "lib/regression_report"
 
-BOUNDARY = "0.95"
 MAX_SAMPLE = "64"
-# Threshold direction: :lower for "regression = drop" measures (rps),
-# :upper for "regression = climb" measures (latency, failure rate).
+# Per-measure t-test boundaries (the confidence level Bencher uses for its
+# prediction interval). Tuned from a sweep of recent main-branch reports so fewer
+# than 1/20 commits raise a false regression across all benchmarks: rps and p50
+# individually need ~0.9995 / ~0.9999 to clear that bar. failed_pct stays at 0.95
+# because healthy runs sit at ~0 with near-zero variance, so its boundary rarely
+# matters.
+# Bencher's t-test threshold is a prediction interval, so each one-sided boundary B
+# gives a per-test false-positive rate of ~(1 - B):
+# https://bencher.dev/docs/explanation/thresholds/
+# Direction: :lower for "regression = drop" measures (rps), :upper for
+# "regression = climb" measures (latency, failure rate).
+# p90/p99/max are intentionally NOT tracked: their tail noise can't meet the 1/20
+# target at any usable boundary. p90 stays in the summary table for visibility only.
 THRESHOLDS = [
-  ["rps", :lower],
-  ["p50_latency", :upper],
-  ["p90_latency", :upper],
-  ["p99_latency", :upper],
-  ["failed_pct", :upper]
+  ["rps", :lower, "0.9995"],
+  ["p50_latency", :upper, "0.9999"],
+  ["failed_pct", :upper, "0.95"]
 ].freeze
 
 # Bencher exits non-zero both for a performance alert (a real regression) and for
@@ -82,8 +90,9 @@ def branch_and_start_point_args
   end
 end
 
-def threshold_args(measure, direction)
-  lower, upper = direction == :lower ? [BOUNDARY, "_"] : ["_", BOUNDARY]
+def threshold_args(measure, direction, boundary)
+  # "_" is Bencher's sentinel for "no boundary on this side".
+  lower, upper = direction == :lower ? [boundary, "_"] : ["_", boundary]
   [
     "--threshold-measure", measure,
     "--threshold-test", "t_test",
@@ -105,7 +114,7 @@ def bencher_args(branch, start_point_args)
     "--err",
     "--quiet",
     "--format", "html",
-    *THRESHOLDS.flat_map { |measure, direction| threshold_args(measure, direction) }
+    *THRESHOLDS.flat_map { |measure, direction, boundary| threshold_args(measure, direction, boundary) }
   ]
 end
 

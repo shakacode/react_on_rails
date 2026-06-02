@@ -19,9 +19,9 @@ rescue StandardError => e
   raise "Failed to read #{tool_name} results: #{e.message}"
 end
 
-# Create failure metrics array for summary
+# Create failure metrics array for summary (rps, p50, p90 + status message)
 def failure_metrics(error)
-  ["FAILED", "FAILED", "FAILED", "FAILED", "FAILED", error.message]
+  ["FAILED", "FAILED", "FAILED", error.message]
 end
 
 # Append a line to the summary file
