@@ -267,9 +267,10 @@ jobs:
       - name: Install Vegeta
         if: matrix.benchmark_tool == 'vegeta' && steps.cache-vegeta.outputs.cache-hit != 'true'
         run: |
-          echo "Installing Vegeta v${VEGETA_VERSION}"
-          wget -q "https://github.com/tsenart/vegeta/releases/download/v${VEGETA_VERSION}/vegeta_${VEGETA_VERSION}_linux_amd64.tar.gz"
-          tar -xzf "vegeta_${VEGETA_VERSION}_linux_amd64.tar.gz"
+          ARCH=$(dpkg --print-architecture)
+          echo "Installing Vegeta v${VEGETA_VERSION} (${ARCH})"
+          wget -q "https://github.com/tsenart/vegeta/releases/download/v${VEGETA_VERSION}/vegeta_${VEGETA_VERSION}_linux_${ARCH}.tar.gz"
+          tar -xzf "vegeta_${VEGETA_VERSION}_linux_${ARCH}.tar.gz"
           mv vegeta ~/bin/
 
       - name: Setup Ruby
