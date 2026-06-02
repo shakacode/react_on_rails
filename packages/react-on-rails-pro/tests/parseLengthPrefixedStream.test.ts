@@ -21,6 +21,19 @@ const collectRecords = (...chunks: string[]) => {
   return records;
 };
 
+const collectByteRecords = (...chunks: Uint8Array[]) => {
+  const parser = new LengthPrefixedStreamParser();
+  const records: Array<{ content: string; metadata: Record<string, unknown> }> = [];
+
+  chunks.forEach((chunk) => {
+    parser.feed(chunk, (content, metadata) => {
+      records.push({ content: decoder.decode(content), metadata });
+    });
+  });
+
+  return records;
+};
+
 describe('LengthPrefixedStreamParser', () => {
   it('tolerates leading blank lines before the first record', () => {
     const records = collectRecords(`\n${toRecord('hello', { index: 0 })}`);
@@ -75,6 +88,33 @@ describe('LengthPrefixedStreamParser', () => {
       '\n',
       toRecord('second', { index: 2 }),
     );
+
+    expect(records).toEqual([
+      { content: 'first', metadata: { index: 1 } },
+      { content: 'second', metadata: { index: 2 } },
+    ]);
+  });
+
+  it('uses byte lengths for multibyte content split across feed calls', () => {
+    const content = 'Hello \u{1f604} world';
+    const frame = encoder.encode(toRecord(content, { index: 1 }));
+    const contentStart = frame.indexOf(0x0a) + 1;
+    const splitInsideEmoji = contentStart + encoder.encode('Hello ').length + 1;
+
+    const records = collectByteRecords(frame.subarray(0, splitInsideEmoji), frame.subarray(splitInsideEmoji));
+
+    expect(records).toEqual([{ content, metadata: { index: 1 } }]);
+  });
+
+  it('preserves content that looks like length-prefixed headers', () => {
+    const content = 'first line\n{"payloadType":"string"}\t00000005\nhello\nlast line';
+    const records = collectRecords(toRecord(content, { index: 1 }));
+
+    expect(records).toEqual([{ content, metadata: { index: 1 } }]);
+  });
+
+  it('parses adjacent records without requiring separator lines', () => {
+    const records = collectRecords(`${toRecord('first', { index: 1 })}${toRecord('second', { index: 2 })}`);
 
     expect(records).toEqual([
       { content: 'first', metadata: { index: 1 } },

@@ -155,9 +155,10 @@ export function buildGeneratorArgs(options: CliOptions): string[] {
     args.push('--typescript');
   }
 
-  if (options.rspack) {
-    args.push('--rspack');
-  }
+  // Always forward an explicit --rspack / --no-rspack so the generator never falls back to
+  // its own default. This keeps create-app's resolved choice authoritative regardless of what
+  // the generator's fresh-install default happens to be (now, or if it changes again later).
+  args.push(options.rspack ? '--rspack' : '--no-rspack');
 
   // --rsc supersedes --pro because RSC mode already requires Pro and the generator accepts a single mode flag.
   if (options.pro && !options.rsc) {

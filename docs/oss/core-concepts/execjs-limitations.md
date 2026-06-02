@@ -51,6 +51,8 @@ async function UserProfile({ userId }) {
 }
 ```
 
+> **React on Rails note:** Even on the React on Rails Pro Node renderer, fetching application data from the component bypasses the Rails controller path where authorization, caching, tenancy, and instrumentation usually live. Prefer Rails-prepared props, or Pro streamed async props, for request-specific data.
+
 **Workaround:** Pass all required data as props from Rails rather than fetching it client-side during rendering:
 
 ```ruby

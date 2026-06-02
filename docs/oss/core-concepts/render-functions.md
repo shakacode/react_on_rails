@@ -145,6 +145,8 @@ const MyComponent = (props, _railsContext) => {
 
 This and other promise options below are only available in React on Rails Pro with the Node renderer.
 
+> **React on Rails note:** Async render functions should still receive application data from Rails props whenever possible. Keep authorization, database access, and cache-aware loading in Rails, then pass the prepared data through `react_component`, `react_component_hash`, or Pro streamed async props. See [RSC data fetching](../migrating/rsc-data-fetching.md) for the same Rails-first data boundary applied to RSC.
+
 ```jsx
 const MyComponent = async (props, _railsContext) => {
   const data = await fetchData();

@@ -41,11 +41,22 @@ module ReactOnRails
                    desc: "Generate TypeScript files and install TypeScript dependencies. Default: false",
                    aliases: "-T"
 
-      # --rspack
+      # --rspack / --no-rspack (Rspack is the default on fresh installs; --no-rspack selects Webpack)
+      # IMPORTANT: do NOT add a `default:` here. The absence of a default is load-bearing — Thor
+      # only includes :rspack in the options hash when the flag is explicitly passed, which is how
+      # GeneratorHelper#using_rspack? tells an explicit choice from "no flag given" (the latter
+      # falls back to rspack_bundler_default). Adding `default: false` would make
+      # options.key?(:rspack) always true and silently break the fresh-install Rspack default.
+      # (Thor's omit-when-no-default behavior verified against Thor 1.5.0; see Gemfile.lock.)
       class_option :rspack,
                    type: :boolean,
-                   default: false,
-                   desc: "Use Rspack instead of Webpack as the bundler. Default: false"
+                   desc: "Use Rspack (default) as the bundler; pass --no-rspack to use Webpack"
+
+      # --webpack: friendly alias for --no-rspack (reconciled in GeneratorHelper#explicit_bundler_choice).
+      # No `default:` here either — same load-bearing reason as --rspack above.
+      class_option :webpack,
+                   type: :boolean,
+                   desc: "Use Webpack as the bundler (alias for --no-rspack; --no-webpack is equivalent to --rspack)"
 
       # --ignore-warnings
       class_option :ignore_warnings,
@@ -196,6 +207,14 @@ module ReactOnRails
 
       private
 
+      # Fresh-install context: default to Rspack (when Shakapacker supports it) unless the
+      # app already declares a bundler. See GeneratorHelper#fresh_install_rspack_default.
+      # NOTE: BaseGenerator#rspack_bundler_default is an intentional twin of this override
+      # (both generators are independently CLI-invocable); keep the two in sync.
+      def rspack_bundler_default
+        fresh_install_rspack_default
+      end
+
       def invoke_generators
         ensure_shakapacker_installed
         if options.typescript?
@@ -206,7 +225,7 @@ module ReactOnRails
         # `invoke` instantiates child generators with a fresh options hash, so
         # --pretend/--force/--skip must be forwarded explicitly at each boundary.
         invoke "react_on_rails:base", [],
-               { typescript: options.typescript?, redux: options.redux?, rspack: options.rspack?,
+               { typescript: options.typescript?, redux: options.redux?, rspack: using_rspack?,
                  pro: use_pro?, rsc: use_rsc?, new_app: options.new_app?,
                  shakapacker_just_installed: shakapacker_just_installed?,
                  force: options[:force], skip: options[:skip], pretend: options[:pretend] }
@@ -690,7 +709,10 @@ module ReactOnRails
         flags = []
         flags << "--redux" if options.redux?
         flags << "--typescript" if options.typescript?
-        flags << "--rspack" if options.rspack?
+        # Echo the resolved bundler choice (normalized to --rspack/--no-rspack, so a --webpack
+        # alias re-runs as --no-rspack) only when the user passed one explicitly. An unset choice
+        # re-resolves to the fresh-install default on re-run, so we don't pin it here.
+        flags << (using_rspack? ? "--rspack" : "--no-rspack") if bundler_flag_given?
 
         if options.rsc?
           flags << "--rsc"
@@ -838,11 +860,14 @@ module ReactOnRails
 
         seed_package_manager_in_package_json_from_lockfile!
 
-        # Then run the shakapacker installer
-        # Use options.rspack? directly (not using_rspack?): shakapacker.yml doesn't exist yet at this
-        # point, so using_rspack? would fall back to rspack_configured_in_project? which returns false,
-        # causing Shakapacker to install webpack configs into config/webpack/ instead of rspack.
-        shakapacker_install_env = options.rspack? ? { "SHAKAPACKER_ASSETS_BUNDLER" => "rspack" } : {}
+        # Then run the shakapacker installer.
+        # Resolve the bundler via using_rspack?. shakapacker.yml doesn't exist yet at this point,
+        # so the fresh-install default applies: an unset --rspack flag resolves to Rspack when
+        # Shakapacker supports it (shakapacker_version_9_or_higher? is optimistically true on a
+        # brand-new install where Shakapacker isn't loaded yet). An explicit --no-rspack still
+        # selects Webpack. using_rspack? memoizes, so the rest of the run (e.g.
+        # configure_rspack_in_shakapacker) stays consistent with this decision.
+        shakapacker_install_env = using_rspack? ? { "SHAKAPACKER_ASSETS_BUNDLER" => "rspack" } : {}
         success = Bundler.with_unbundled_env do
           system(shakapacker_install_env, "bundle exec rails shakapacker:install")
         end

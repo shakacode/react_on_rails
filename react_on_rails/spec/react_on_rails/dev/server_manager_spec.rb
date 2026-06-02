@@ -1542,6 +1542,120 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       expect { described_class.show_help }.to output(%r{bin/dev static}).to_stdout_from_any_process
     end
 
+    context "when Shakapacker config uses live reload instead of HMR" do
+      include_context "with clean port env"
+
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) { example.run }
+        end
+      end
+
+      before do
+        FileUtils.mkdir_p("config")
+        File.write("config/shakapacker.yml", <<~YAML)
+          development:
+            dev_server:
+              hmr: false
+              live_reload: true
+        YAML
+      end
+
+      it "labels the default command and mode details as live reload" do
+        expected_output = satisfy do |output|
+          output.match?(/\(none\)\s+Start development server with live reload \(default\)/) &&
+            !output.match?(/HMR Development mode \(default\)|Hot Module Replacement \(HMR\) enabled/) &&
+            !output.match?(%r{\(none\) / hmr\s+Start development server with live reload \(default\)}) &&
+            !output.include?("ReactRefreshWebpackPlugin") &&
+            output.include?("React Refresh requires HMR; current default mode is not HMR.")
+        end
+
+        expect { described_class.show_help }.to output(expected_output).to_stdout_from_any_process
+      end
+
+      it "detects the default dev-server mode once per help render" do
+        expect(ReactOnRails::Dev::ServerMode)
+          .to receive(:detect).once.with(File.expand_path("config/shakapacker.yml", Dir.pwd)).and_return(:live_reload)
+
+        expect { described_class.show_help }
+          .to output(/Live reload development mode \(default\)/).to_stdout_from_any_process
+      end
+
+      it "passes the resolved Shakapacker config path into ServerMode" do
+        allow(described_class)
+          .to receive(:shakapacker_config_path).and_return("/tmp/app/config/custom-shakapacker.yml")
+        expect(ReactOnRails::Dev::ServerMode)
+          .to receive(:detect).with("/tmp/app/config/custom-shakapacker.yml").and_return(:live_reload)
+
+        expect { described_class.show_help }
+          .to output(/Live reload development mode \(default\)/).to_stdout_from_any_process
+      end
+    end
+
+    context "when Shakapacker config enables HMR explicitly" do
+      include_context "with clean port env"
+
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) { example.run }
+        end
+      end
+
+      before do
+        FileUtils.mkdir_p("config")
+        File.write("config/shakapacker.yml", <<~YAML)
+          development:
+            dev_server:
+              hmr: true
+        YAML
+      end
+
+      # Triangulates the config-driven :hmr path (detect_from_config returns :hmr) against the
+      # baseline specs that exercise the :hmr fallback when no config file is present.
+      it "labels the default command and mode details as HMR" do
+        expected_output = satisfy do |output|
+          output.match?(%r{\(none\) / hmr\s+Start development server with HMR \(default\)}) &&
+            output.include?("HMR Development mode (default)") &&
+            output.include?("Hot Module Replacement (HMR) enabled") &&
+            output.include?("ReactRefreshWebpackPlugin") &&
+            !output.include?("React Refresh requires HMR; current default mode is not HMR.")
+        end
+
+        expect { described_class.show_help }.to output(expected_output).to_stdout_from_any_process
+      end
+    end
+
+    context "when Shakapacker config disables both HMR and live reload" do
+      include_context "with clean port env"
+
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) { example.run }
+        end
+      end
+
+      before do
+        FileUtils.mkdir_p("config")
+        File.write("config/shakapacker.yml", <<~YAML)
+          development:
+            dev_server:
+              live_reload: false
+        YAML
+      end
+
+      it "labels the default command and mode details as the development server" do
+        expected_output = satisfy do |output|
+          output.match?(/\(none\)\s+Start development server \(default\)/) &&
+            output.include?("Development server mode (default)") &&
+            !output.match?(/HMR Development mode \(default\)|Hot Module Replacement \(HMR\) enabled/) &&
+            !output.include?("ReactRefreshWebpackPlugin") &&
+            output.include?("React Refresh requires HMR; current default mode is not HMR.")
+        end
+
+        expect { described_class.show_help }.to output(expected_output).to_stdout_from_any_process
+      end
+    end
+
     context "when base-port mode is active" do
       include_context "with clean port env"
 
