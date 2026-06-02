@@ -25,6 +25,7 @@ import {
   useCallback,
   useContext,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
   useRef,
   type ReactNode,
@@ -157,10 +158,12 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr' | '
   ({ componentName, componentProps }, ref) => {
     const { getComponent, refetchComponent } = useRSC();
 
-    // Always read the latest props in `refetch`, even when a descendant
+    // Read the latest committed props in `refetch`, even when a descendant
     // captured the handle at an earlier render.
     const latestPropsRef = useRef({ componentName, componentProps });
-    latestPropsRef.current = { componentName, componentProps };
+    useLayoutEffect(() => {
+      latestPropsRef.current = { componentName, componentProps };
+    }, [componentName, componentProps]);
 
     const refetch = useCallback((): Promise<ReactNode> => {
       const { componentName: n, componentProps: p } = latestPropsRef.current;

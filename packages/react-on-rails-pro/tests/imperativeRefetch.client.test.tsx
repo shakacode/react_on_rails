@@ -169,6 +169,60 @@ type GetServerComponentArgs = {
     });
   });
 
+  it('2b. refetch uses committed props while a transition to new props is suspended', async () => {
+    const pending = setupDeferredFetcher();
+    const ref = React.createRef<RSCRouteHandle>();
+
+    const RouteSwitcher: React.FC = () => {
+      const [id, setId] = React.useState(1);
+      const [, startTransition] = React.useTransition();
+
+      return (
+        <TestHarness>
+          <button
+            type="button"
+            data-testid="start-transition"
+            onClick={() => startTransition(() => setId(2))}
+          >
+            start-transition
+          </button>
+          <button type="button" data-testid="refetch" onClick={() => void ref.current!.refetch()}>
+            refetch
+          </button>
+          <RSCRoute ref={ref} componentName="UserCard" componentProps={{ id }} />
+        </TestHarness>
+      );
+    };
+
+    let result!: ReturnType<typeof render>;
+    await act(async () => {
+      result = render(<RouteSwitcher />);
+    });
+    await act(async () => {
+      pending[0].resolve(<div data-testid="card">v1</div>);
+    });
+    expect(screen.getByTestId('card')).toHaveTextContent('v1');
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('start-transition'));
+    });
+    expect(getServerComponent).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId('card')).toHaveTextContent('v1');
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('refetch'));
+    });
+
+    const lastCall = getServerComponent.mock.calls.at(-1)![0];
+    expect(lastCall).toEqual({
+      componentName: 'UserCard',
+      componentProps: { id: 1 },
+      enforceRefetch: true,
+    });
+
+    result.unmount();
+  });
+
   it('3. useCurrentRSCRoute() from a descendant calls refetch with the parent route name and props', async () => {
     const InlineButton: React.FC = () => {
       const { refetch } = useCurrentRSCRoute();
