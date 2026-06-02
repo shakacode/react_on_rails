@@ -13,13 +13,38 @@ Use this feature when a `'use client'` component needs to render server componen
 
 ## How it works
 
-When React on Rails Pro encounters `<RSCRoute componentName="Dashboard" componentProps={{ user }} />` inside a client component, it does **not** look up a client-side implementation of `Dashboard`. Instead, it references the server component by name and relies on the framework to deliver its RSC payload:
+When React on Rails Pro encounters `<RSCRoute componentName="Dashboard" componentProps={{ userId: 42 }} />` inside a client component, it does **not** look up a client-side implementation of `Dashboard`. Instead, it references the server component by name and relies on the framework to deliver its RSC payload. By default, `RSCRoute` uses `ssr={true}`, so it participates in server-side rendering for the initial request:
 
 1. **During server-side rendering**, the server renders `Dashboard` alongside the client component tree and embeds its RSC payload directly in the HTML response. When the browser hydrates, `RSCRoute` reads the embedded payload — no extra HTTP request.
 2. **During client-side navigation**, when `RSCRoute` appears in the tree for the first time (e.g., the user navigates to a new route), the client fetches the RSC payload from the server over HTTP and renders it.
 3. **When props change**, a new HTTP request is made for each unique combination of `componentName` and props. Identical combinations are cached (see [Performance and caching behavior](#performance-and-caching-behavior)).
 
 For this to work, the client component tree must be wrapped with `wrapServerComponentRenderer`, which provides the context `RSCRoute` relies on internally. You never need to create an `RSCProvider` yourself — wrapping with `wrapServerComponentRenderer` (or using `registerServerComponent` directly) sets it up automatically.
+
+### Deferring initial server rendering with `ssr={false}`
+
+For lower-priority server component routes, pass `ssr={false}` to skip that route during the initial server render:
+
+```tsx
+<RSCRoute componentName="Recommendations" componentProps={{ userId }} ssr={false} />
+```
+
+Use this for below-the-fold, collapsed, or secondary content that does not need to be fully rendered in the initial HTML. During streaming SSR, the route intentionally bails out before generating or embedding that route's RSC payload. If the route is inside a scoped `Suspense` boundary, React emits that boundary's fallback HTML and retries the route on the client. On the client, the route uses the same `RSCProvider` path as any other `RSCRoute`: provider cache lookup, payload fetch or embedded-payload reuse when available, `PromiseWrapper`, `ServerComponentFetchError`, and the existing retry patterns all still apply.
+
+The tradeoff is that the deferred content appears later. The browser must resolve the RSC payload during hydration or client rendering, so users will see the nearest `Suspense` fallback until the server component appears. Place `Suspense` close to the deferred route so the loading UI is scoped to that route instead of replacing a large part of the page.
+
+```tsx
+import { Suspense } from 'react';
+import RSCRoute from 'react-on-rails-pro/RSCRoute';
+
+export default function Sidebar({ userId }) {
+  return (
+    <Suspense fallback={<div>Loading recommendations…</div>}>
+      <RSCRoute componentName="Recommendations" componentProps={{ userId }} ssr={false} />
+    </Suspense>
+  );
+}
+```
 
 ## Walkthrough: A router with server component routes
 
@@ -229,7 +254,9 @@ Understanding how RSC payloads are fetched and cached is critical to using this 
 
 ### Server-side rendering (initial page load)
 
-When the page is server-rendered, the RSC payloads for all `RSCRoute` components on that page are generated during SSR and embedded directly in the HTML response. When the browser hydrates, `RSCRoute` reads the embedded payload — **no extra network round-trip**.
+When the page is server-rendered, the RSC payloads for `RSCRoute` components are generated during SSR and embedded directly in the HTML response by default. When the browser hydrates, `RSCRoute` reads the embedded payload — **no extra network round-trip**.
+
+If a route uses `ssr={false}`, that route is skipped during the initial server render and does not generate an embedded payload for that request. A scoped `Suspense` boundary can still render fallback HTML in the streamed response. On the client retry, the route resolves through the existing provider path and may reuse an equivalent cached payload from the same provider when one already exists; otherwise, it fetches the payload over HTTP.
 
 ### Client-side navigation
 
@@ -366,7 +393,7 @@ export default function AdminLayout() {
 
 ### `Suspense` for loading states
 
-Wrap `RSCRoute` in `Suspense` to show a loading indicator while the RSC payload is being fetched. This is relevant for client-side navigation — during SSR, the payload is already embedded in the HTML.
+Wrap `RSCRoute` in `Suspense` to show a loading indicator while the RSC payload is being fetched during client-side navigation:
 
 ```tsx
 'use client';
@@ -381,6 +408,8 @@ export default function Page({ user }) {
   );
 }
 ```
+
+This same scoped `Suspense` pattern is important for `ssr={false}` routes during the initial streaming response. With default `ssr={true}`, the payload is already embedded during SSR. With `ssr={false}`, React on Rails Pro skips the route's server payload work, streams the nearest `Suspense` fallback, and retries the route on the client.
 
 ### Conditional rendering
 
@@ -412,7 +441,7 @@ Unless noted otherwise, each API below is a default export — use default-impor
 
 | API                                    | Import                                                                                       | Export type | Purpose                                                                                                                                                                                                                         |
 | -------------------------------------- | -------------------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `RSCRoute`                             | `react-on-rails-pro/RSCRoute`                                                                | Default     | Renders a server component inside a client component. Props: `componentName: string`, `componentProps: object`.                                                                                                                 |
+| `RSCRoute`                             | `react-on-rails-pro/RSCRoute`                                                                | Default     | Renders a server component inside a client component. Props: `componentName: string`, `componentProps: object`, `ssr?: boolean` (defaults to `true`; use `false` to defer initial server rendering for this route).             |
 | `wrapServerComponentRenderer` (client) | `react-on-rails-pro/wrapServerComponentRenderer/client`                                      | Default     | Wraps a `'use client'` component for client-side hydration. Provides the context `RSCRoute` needs internally. The wrapped result must be registered with `ReactOnRails.register` unless you use auto-bundling.                  |
 | `wrapServerComponentRenderer` (server) | `react-on-rails-pro/wrapServerComponentRenderer/server`                                      | Default     | Same as above, for server-side rendering. The wrapped function receives `railsContext` as its second argument.                                                                                                                  |
 | `registerServerComponent` (client)     | `react-on-rails-pro/registerServerComponent/client`                                          | Default     | Registers server component placeholders in the client bundle. Takes names as strings: `registerServerComponent('A', 'B')`. The client fetches the RSC payload from the server or uses the payload already embedded in the HTML. |
@@ -427,6 +456,8 @@ Unless noted otherwise, each API below is a default export — use default-impor
 This error occurs when using `react_component` with `prerender: true` (or the default prerender setting). The server-side `wrapServerComponentRenderer` requires streaming capabilities that only `stream_react_component` provides. Either switch to `stream_react_component`, or if you don't need SSR, use `react_component` with `prerender: false` — RSCRoute will fetch the RSC payload over HTTP on the client side.
 
 **Empty content where the server component should appear**
+
+If the route uses `ssr={false}` without a nearby `Suspense` boundary, the supported streaming wrapper's root `Suspense fallback={null}` may produce an empty area until the route resolves on the client. Add a scoped `Suspense` boundary around the route if you want loading UI in the streamed HTML while the deferred payload is pending.
 
 Check the browser's network tab — is the request to your RSC payload endpoint (derived from `rsc_payload_generation_url_path` config, default `/rsc_payload/:componentName`) succeeding? If not:
 

@@ -19,6 +19,7 @@
 import * as React from 'react';
 import { Component, use, type ReactNode } from 'react';
 import { useRSC } from './RSCProvider.tsx';
+import { RSCRouteSSRFalseBailoutError } from './RSCRouteSSRFalseBailoutError.ts';
 import { ServerComponentFetchError } from './ServerComponentFetchError.ts';
 
 /**
@@ -55,9 +56,13 @@ class RSCRouteErrorBoundary extends Component<
  * RSCRoute provides a bridge between client and server components, allowing server components
  * to be directly rendered inside client components. This component:
  *
- * 1. During initial SSR - Uses the RSC payload to render the server component and embeds the payload in the page
+ * 1. By default during initial SSR - Uses the RSC payload to render the server component and embeds the payload in the page
  * 2. During hydration - Uses the embedded RSC payload already in the page
  * 3. During client navigation - Fetches the RSC payload via HTTP
+ *
+ * Pass ssr={false} to skip rendering route content during streaming server rendering. When wrapped
+ * in Suspense, React renders the nearest fallback in the server HTML and retries this route on the
+ * client through the same RSC provider path used by the default ssr={true} mode.
  *
  * @example
  * ```tsx
@@ -74,6 +79,7 @@ class RSCRouteErrorBoundary extends Component<
 export type RSCRouteProps = {
   componentName: string;
   componentProps: unknown;
+  ssr?: boolean;
 };
 
 const PromiseWrapper = ({ promise }: { promise: Promise<ReactNode> }) => {
@@ -89,7 +95,7 @@ const PromiseWrapper = ({ promise }: { promise: Promise<ReactNode> }) => {
   return promiseResult;
 };
 
-const RSCRoute = ({ componentName, componentProps }: RSCRouteProps): ReactNode => {
+const RSCRouteContent = ({ componentName, componentProps }: Omit<RSCRouteProps, 'ssr'>): ReactNode => {
   const { getComponent } = useRSC();
   const componentPromise = getComponent(componentName, componentProps);
   return (
@@ -97,6 +103,14 @@ const RSCRoute = ({ componentName, componentProps }: RSCRouteProps): ReactNode =
       <PromiseWrapper promise={componentPromise} />
     </RSCRouteErrorBoundary>
   );
+};
+
+const RSCRoute = ({ componentName, componentProps, ssr = true }: RSCRouteProps): ReactNode => {
+  if (!ssr && typeof window === 'undefined') {
+    throw new RSCRouteSSRFalseBailoutError(componentName);
+  }
+
+  return <RSCRouteContent componentName={componentName} componentProps={componentProps} />;
 };
 
 export default RSCRoute;

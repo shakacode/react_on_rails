@@ -3,6 +3,11 @@ import { Readable } from 'stream';
 import { ReadableStream, ReadableStreamDefaultReader } from 'stream/web';
 import { jest } from '@jest/globals';
 
+// React's act() requires this flag in unit-test-like environments.
+// React Testing Library sets it when imported, but package-level tests that use
+// React/ReactDOM directly also need it before rendering with createRoot.
+global.IS_REACT_ACT_ENVIRONMENT = true;
+
 // If jsdom environment is set and TextEncoder is not defined, then define TextEncoder and TextDecoder
 // The current version of jsdom does not support TextEncoder and TextDecoder
 // The following code will tell us when jsdom supports TextEncoder and TextDecoder

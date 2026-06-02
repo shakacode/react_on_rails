@@ -1,8 +1,8 @@
 # Plan: `RSCRoute ssr={false}`
 
 Status: **implementation plan** for [issue #3101](https://github.com/shakacode/react_on_rails/issues/3101).
-This plan targets the full implementation for the issue. The phases describe implementation order and review
-boundaries, not optional roadmap items.
+Phase 1 is implemented. This plan targets the full implementation for the issue. The phases describe
+implementation modes and review boundaries, not optional roadmap items.
 
 ## Summary
 
@@ -13,8 +13,9 @@ Add an optional `ssr` prop to `RSCRoute`:
 ```
 
 `ssr` defaults to `true`, preserving current behavior. When `ssr={false}`, the route does not generate
-or embed that instance's RSC payload during the initial Rails server render. Instead, the browser resolves
-the same server component after the React tree has mounted, using the existing client RSC payload path.
+or embed that instance's RSC payload during the initial Rails server render. Phase 1 resolves the same
+server component after the React tree has mounted. Phase 2 resolves through React's Suspense retry path
+while preserving the same payload-skipping invariant.
 
 The feature gives applications a per-route way to defer lower-priority server component content. It reduces
 initial server work and initial HTML size for those routes without changing server component registration,
@@ -41,8 +42,9 @@ the rest of the RSC runtime behavior once the browser takes over.
 - Preserve current behavior when `ssr` is omitted or set to `true`.
 - For `ssr={false}`, avoid calling the server-side RSC payload path during the initial server render.
 - Avoid embedding payload chunks for skipped server-rendered instances.
-- Keep the first browser hydration output consistent with the server output.
-- After mount, use the existing provider path for payload resolution, cache reuse, error wrapping, and retry.
+- Keep hydration consistent with the server output.
+- Use the existing provider path for payload resolution, cache reuse, error wrapping, and retry. Phase 1 enters
+  that path after mount; Phase 2 enters it through React's Suspense retry path.
 - Support pages that mix immediately server-rendered `RSCRoute` instances with deferred instances.
 - Document when to use the prop and the tradeoff it introduces.
 
@@ -65,8 +67,8 @@ the Rails helper term `prerender`, which already has broader meaning in React on
 
 The default is `true` so existing applications keep the same behavior without code changes.
 
-No new loading prop is needed. When users want loading UI, they can place `RSCRoute` under a `Suspense`
-boundary:
+No new loading prop is needed. `Suspense` owns loading UI. `RSCRoute` owns payload timing. When users want
+loading UI, they place the deferred route under a scoped `Suspense` boundary:
 
 ```tsx
 <Suspense fallback={<Spinner />}>
@@ -74,8 +76,8 @@ boundary:
 </Suspense>
 ```
 
-Phase 1 preserves client-side loading UI after mount. Phase 2 adds server-rendered Suspense fallback HTML for
-deferred routes.
+Phase 1 preserves client-side loading UI after mount. Phase 2 renders that scoped Suspense fallback in the
+server HTML.
 
 ## Behavioral contract
 
@@ -93,7 +95,8 @@ The key invariant is narrow and intentional:
 > An `ssr={false}` instance must not initiate server-side RSC payload generation during the initial server render.
 
 That invariant does not require a duplicate browser HTTP request when an equivalent result already exists in
-the provider cache.
+the provider cache. Phase 2 preserves this invariant while changing the server HTML when a scoped Suspense
+boundary covers the deferred route: the route content is still skipped, but React can emit the boundary fallback.
 
 ## Existing source paths
 
@@ -118,10 +121,11 @@ The implementation reuses the current RSC runtime paths:
 The feature extends `RSCRoute`'s timing and keeps the existing provider/client/server implementations as the
 main data path.
 
-## Render timing design
+## Phase 1 render timing design
 
-The route needs a server-and-hydration phase where `ssr={false}` returns no content before provider-dependent
-work runs. It also needs a browser-mounted phase where the existing RSC provider path is allowed to run.
+Phase 1 uses a mount-gated timing model. The route needs a server-and-hydration phase where
+`ssr={false}` returns no content before provider-dependent work runs. It also needs a browser-mounted phase where
+the existing RSC provider path is allowed to run.
 
 React's [`hydrateRoot`](https://react.dev/reference/react-dom/client/hydrateRoot) documentation expects the
 initial client output during hydration to match the server-rendered HTML. React also documents a two-pass
@@ -135,6 +139,9 @@ pattern for intentional client/server differences using state set in an
 
 This avoids a hydration mismatch while still allowing the browser to fetch the deferred payload immediately
 after mount.
+
+Phase 2 keeps the same payload-skipping invariant but changes the timing model: server rendering uses a
+classified Suspense bailout, and client rendering enters the provider path through React's Suspense retry path.
 
 ## Component structure
 
@@ -213,12 +220,15 @@ Example:
 </>
 ```
 
-Expected behavior:
+Phase 1 expected behavior:
 
 - `HeaderStats` follows the current server-rendered path and can embed its payload.
 - `Recommendations` returns no content during server render and first hydration render.
 - After mount, `Recommendations` resolves through the existing provider path.
 - The two routes do not require a separate global coordinator.
+
+In Phase 2, a scoped `Suspense` boundary around `Recommendations` can render fallback HTML during server
+rendering while preserving the same sibling shell and payload-skipping invariant.
 
 ## Suspense behavior
 
@@ -226,17 +236,33 @@ Phase 1 focuses on the core behavior: skip server payload generation, keep hydra
 existing client RSC path after mount.
 
 React supports server-rendering [`Suspense`](https://react.dev/reference/react/Suspense) fallback by treating a
-server-side throw under `Suspense` as an intentional server bailout and retrying on the client. React on Rails
-Pro currently treats server renderer errors as render errors. Supporting server-rendered fallback HTML for this
-specific opt-out requires classifying that bailout separately from real render failures.
+server-side throw under `Suspense` as an intentional server bailout and retrying on the client. Phase 2 uses that
+model for `RSCRoute ssr={false}` during streaming SSR.
 
-Phase 2 replaces the Phase 1 server-side `return null` behavior for deferred routes covered by a Suspense
-boundary. Instead of returning no HTML for that route, the server triggers a classified intentional bailout so
-React can emit the Suspense fallback without treating the render as a real SSR failure. The payload-skipping
-invariant remains the same: the deferred RSC payload is not generated during SSR.
+In Phase 2, a deferred route throws a classified intentional bailout on the server before provider-dependent RSC
+work runs. React emits the nearest Suspense fallback into the server HTML and retries the route on the client.
+React on Rails Pro classifies only that intentional bailout as non-fatal in stream error handling; real render
+failures keep the existing error behavior.
 
-This does not block client-side loading UI in Phase 1. Users can still wrap the deferred route in `Suspense`,
-and the loading UI appears while the route resolves after mount.
+`RSCRoute` does not add a fallback prop and does not wrap itself in an internal `Suspense` boundary. The nearest
+Suspense boundary controls loading UI. A scoped user boundary preserves the surrounding shell and renders the
+intended fallback:
+
+```tsx
+<Header />
+<Suspense fallback={<RecommendationsSkeleton />}>
+  <RSCRoute componentName="Recommendations" componentProps={{ userId }} ssr={false} />
+</Suspense>
+<Footer />
+```
+
+If no nearer boundary exists in the supported wrapped streaming path, the existing root-level framework boundary
+with `fallback={null}` is the nearest boundary and catches the bailout. That preserves payload skipping, but it
+can hide the rendered root and provides no meaningful loading UI. The documented pattern is to place `Suspense`
+close to each deferred route.
+
+React still reports this documented retry path through client `onRecoverableError`. Phase 2 should not broadly
+suppress client recoverable errors; the intentional-bailout classification belongs on the server stream path.
 
 ## Support without manual RSC renderer wrapping
 
@@ -312,8 +338,10 @@ review boundaries; they do not mean every later phase is a small additive patch 
 
 ### Phase 2: server-rendered Suspense fallback HTML
 
-- Add a classified server bailout path for `ssr={false}` under `Suspense`.
-- Render the user's Suspense fallback HTML during server rendering for deferred routes.
+- Add a classified server bailout path for `ssr={false}` during streaming SSR.
+- Trigger the bailout before `useRSC()`, provider cache key generation, or server RSC payload generation.
+- Render the nearest Suspense fallback HTML for deferred routes. Scoped user boundaries provide the intended UI.
+- Do not add a `fallback` prop or an internal `Suspense` boundary to `RSCRoute`.
 - Keep intentional fallback rendering separate from real SSR failures in stream error handling.
 - Retry the deferred route on the client through the existing RSC provider path.
 
@@ -338,7 +366,7 @@ review boundaries; they do not mean every later phase is a small additive patch 
 
 The tests prove behavior rather than exact implementation shape.
 
-Recommended coverage:
+Phase 1 coverage:
 
 1. `ssr={false}` renders no server output for that route and does not call the injected server component loader.
 2. `ssr={false}` can return before RSC context is required during the skipped server render.
@@ -352,21 +380,32 @@ Recommended coverage:
 8. A guard test confirms circular props do not break the skipped server render because the route exits before
    provider key generation.
 
+Phase 2 adds focused streaming coverage:
+
+1. A scoped Suspense boundary around `RSCRoute ssr={false}` renders its fallback in server HTML while preserving
+   sibling shell content.
+2. The intentional bailout does not call the server RSC payload generator and does not embed a deferred payload.
+3. Stream metadata does not mark the classified bailout as a render error, including the `throwJsErrors` path.
+4. Real render failures still set error metadata and emit errors according to the existing stream rules.
+5. Client retry enters the existing provider path; recoverable hydration reporting is not broadly suppressed.
+
 Avoid tests that require a separate HTTP request when the provider cache already has an equivalent component
 result. Cache reuse is part of the current provider behavior.
 
 ## Acceptance criteria mapping
 
-| Issue requirement                          | Plan response                                                                    |
-| ------------------------------------------ | -------------------------------------------------------------------------------- |
-| New `ssr` prop                             | Add `ssr?: boolean` to `RSCRouteProps`, defaulting to `true`.                    |
-| `ssr={false}` skips SSR payload generation | Return before server-side provider work and assert no server loader call.        |
-| Client fetches after mount                 | Use mounted state to enter the existing provider path after hydration.           |
-| No embedded payload for deferred route     | Avoid calling `railsContext.getRSCPayloadStream(...)` for that route during SSR. |
-| Default behavior unchanged                 | Treat omitted `ssr` and `ssr={true}` as current behavior.                        |
-| Mixed pages                                | Make the decision per route instance and preserve provider cache semantics.      |
-| Error boundary compatibility               | Keep the existing `PromiseWrapper` and `RSCRouteErrorBoundary` path.             |
-| Docs update                                | Update `docs/pro/react-server-components/inside-client-components.md`.           |
+| Issue requirement                          | Plan response                                                                      |
+| ------------------------------------------ | ---------------------------------------------------------------------------------- |
+| New `ssr` prop                             | Add `ssr?: boolean` to `RSCRouteProps`, defaulting to `true`.                      |
+| `ssr={false}` skips SSR payload generation | Return before server-side provider work and assert no server loader call.          |
+| Phase 1 client resolution                  | Use mounted state to enter the existing provider path after hydration.             |
+| Phase 2 client resolution                  | Use React's Suspense retry path to enter the existing provider path.               |
+| No embedded payload for deferred route     | Avoid calling `railsContext.getRSCPayloadStream(...)` for that route during SSR.   |
+| Default behavior unchanged                 | Treat omitted `ssr` and `ssr={true}` as current behavior.                          |
+| Mixed pages                                | Make the decision per route instance and preserve provider cache semantics.        |
+| Error boundary compatibility               | Keep the existing `PromiseWrapper` and `RSCRouteErrorBoundary` path.               |
+| Docs update                                | Update `docs/pro/react-server-components/inside-client-components.md`.             |
+| Suspense loading UI                        | Keep loading UI owned by scoped React `Suspense` boundaries; add no fallback prop. |
 
 ## Documentation plan
 
@@ -377,6 +416,7 @@ Update `docs/pro/react-server-components/inside-client-components.md` with:
 - The tradeoff: reduced initial server work and HTML payload size, plus a browser round trip before the component
   appears.
 - A `Suspense` example for loading UI.
+- Guidance to place `Suspense` close to the deferred route; broad boundaries produce broad fallback regions.
 - A note that existing error boundary and retry patterns still apply when the route uses the existing RSC provider
   path.
 
@@ -384,11 +424,12 @@ Update `docs/pro/react-server-components/inside-client-components.md` with:
 
 Phase 1 establishes the core contract: `RSCRoute ssr={false}` skips server payload generation, keeps hydration
 stable, resolves through the existing provider path after mount, preserves error/retry behavior, and documents
-the prop.
+the prop. Phase 2 keeps the provider path and changes the timing through React's Suspense retry path.
 
 Phases 2-4 preserve the payload-skipping goal while changing or expanding specific mechanics:
 
-- Phase 2 adds server-rendered Suspense fallback HTML through classified intentional server bailout handling.
+- Phase 2 adds server-rendered Suspense fallback HTML through classified intentional server bailout handling,
+  with loading UI controlled by the nearest scoped Suspense boundary.
 - Phase 3 adds automatic root-level RSC provider setup for `RSCRoute ssr={false}` in trees that do not
   explicitly call `wrapServerComponentRenderer`.
 - Phase 4 adds non-streaming Rails helper support by delaying server-capability checks until server RSC payload

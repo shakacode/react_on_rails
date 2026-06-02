@@ -24,6 +24,7 @@ import {
   StreamableComponentResult,
 } from 'react-on-rails/types';
 import injectRSCPayload from './injectRSCPayload.ts';
+import { isRSCRouteSSRFalseBailoutError } from './RSCRouteSSRFalseBailoutError.ts';
 import {
   streamServerRenderedComponent,
   StreamingTrackers,
@@ -45,8 +46,11 @@ const streamRenderReactComponent = (
 
   const { readableStream, pipeToTransform, writeChunk, emitError, endStream } =
     transformRenderStreamChunksToResultObject(renderState);
+  let sawRSCRouteSSRFalseBailout = false;
+  let sawUnexpectedRenderError = false;
 
   const reportError = (error: Error) => {
+    sawUnexpectedRenderError = true;
     renderState.hasErrors = true;
     renderState.error = error;
 
@@ -92,10 +96,22 @@ const streamRenderReactComponent = (
           );
         },
         onError(e) {
-          reportError(convertToError(e));
+          const error = convertToError(e);
+          if (isRSCRouteSSRFalseBailoutError(error)) {
+            sawRSCRouteSSRFalseBailout = true;
+            return error.digest;
+          }
+
+          reportError(error);
+          return undefined;
         },
         onAllReady() {
-          streamingTrackers.postSSRHookTracker.notifySSREnd();
+          // React 19 can call onAllReady more than once when nested Suspense boundaries switch to
+          // client rendering after a server error. Keep the existing duplicate warning for unexpected
+          // errors, but silence it when the only error was the expected RSCRoute ssr=false bailout.
+          streamingTrackers.postSSRHookTracker.notifySSREnd({
+            suppressDuplicateWarning: sawRSCRouteSSRFalseBailout && !sawUnexpectedRenderError,
+          });
         },
         identifierPrefix: domNodeId,
         nonce: sanitizeNonce(railsContext.cspNonce),

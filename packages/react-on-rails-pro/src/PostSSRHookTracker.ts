@@ -14,6 +14,10 @@
 
 type PostSSRHook = () => void;
 
+type NotifySSREndOptions = {
+  suppressDuplicateWarning?: boolean;
+};
+
 /**
  * Post-SSR Hook Tracker - manages post-SSR hooks for a single request.
  *
@@ -51,12 +55,13 @@ class PostSSRHookTracker {
   /**
    * Notifies all registered hooks that SSR has ended and clears the hook list.
    * This should be called exactly once when server-side rendering is complete.
-   *
-   * @throws Error if called multiple times
+   * If called multiple times, only warns; hooks never run more than once.
    */
-  notifySSREnd(): void {
+  notifySSREnd({ suppressDuplicateWarning = false }: NotifySSREndOptions = {}): void {
     if (this.hasSSREnded) {
-      console.warn('notifySSREnd() called multiple times. This may indicate a bug in the SSR lifecycle.');
+      if (!suppressDuplicateWarning) {
+        console.warn('notifySSREnd() called multiple times. This may indicate a bug in the SSR lifecycle.');
+      }
       return;
     }
 
