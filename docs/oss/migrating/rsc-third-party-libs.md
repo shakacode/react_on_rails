@@ -242,12 +242,12 @@ All major date libraries work in Server Components since they are pure utility f
 
 ## Data Fetching Libraries
 
-| Library                          | RSC Pattern                                                                                        | Notes                                                                                                |
-| -------------------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| **React on Rails Pro streaming** | Recommended for React on Rails. Rails streams components via `stream_react_component`.             | See [Data Fetching Migration](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) for details. |
-| **TanStack Query**               | Prefetch on server with `queryClient.prefetchQuery()`, hydrate on client with `HydrationBoundary`. | See [Data Fetching Migration](rsc-data-fetching.md) for details.                                     |
-| **Apollo Client**                | Server-side queries in Server Components, `ApolloProvider` for client queries.                     | Requires `'use client'` wrapper for provider.                                                        |
-| **SWR**                          | Client-only hooks. Use `fallbackData` pattern: fetch in Server Component, pass as props.           | See [Data Fetching Migration](rsc-data-fetching.md) for details.                                     |
+| Library                          | RSC Pattern                                                                                                                                                 | Notes                                                                                                |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| **React on Rails Pro streaming** | Recommended for React on Rails. Rails streams components via `stream_react_component`, or slow emitted props via `stream_react_component_with_async_props`. | See [Data Fetching Migration](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) for details. |
+| **TanStack Query**               | Prefetch on server with `queryClient.prefetchQuery()`, hydrate on client with `HydrationBoundary`.                                                          | See [Data Fetching Migration](rsc-data-fetching.md) for details.                                     |
+| **Apollo Client**                | Server-side queries in Server Components, `ApolloProvider` for client queries.                                                                              | Requires `'use client'` wrapper for provider.                                                        |
+| **SWR**                          | Client-only hooks. Use `fallbackData` pattern: fetch in Server Component, pass as props.                                                                    | See [Data Fetching Migration](rsc-data-fetching.md) for details.                                     |
 
 ## Internationalization
 
