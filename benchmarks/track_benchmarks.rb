@@ -309,12 +309,14 @@ if __FILE__ == $PROGRAM_NAME
       # duplicate issues and clobber each other's sections in the shared comment.
       # Use the un-sharded suite name so that job can combine a suite's shards into a
       # single section (shard_label keeps their ordering deterministic).
-      File.write(
-        REGRESSION_REPORT_JSON,
-        JSON.generate(
-          suite_name: ENV.fetch("BENCHMARK_SUITE_GROUP", SUITE_NAME),
-          shard_label: ENV.fetch("BENCHMARK_SHARD_LABEL", ""),
-          summary: benchmark_summary
+      begin
+        File.write(
+          REGRESSION_REPORT_JSON,
+          JSON.generate(
+            RegressionReport::SUITE_NAME => ENV.fetch("BENCHMARK_SUITE_GROUP", SUITE_NAME),
+            RegressionReport::SHARD_LABEL => ENV.fetch("BENCHMARK_SHARD_LABEL", ""),
+            RegressionReport::SUMMARY => benchmark_summary
+          )
         )
         warn "::warning::Bencher flagged a #{SUITE_NAME} regression on main (exit #{bencher_exit_code}). " \
              "The report-regressions job will file the issue. " \

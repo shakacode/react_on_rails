@@ -308,7 +308,7 @@ def report_regressions(artifacts_dir)
 
   # One section per suite: a sharded suite emits one payload per shard, so combine
   # them rather than filing a section per shard. Suites sorted for stable output.
-  by_suite = readable.group_by { |payload| payload.fetch("suite_name") }
+  by_suite = readable.group_by { |payload| payload.fetch(RegressionReport::SUITE_NAME) }
   reported_ok = by_suite.keys.sort.map { |suite_name| report_suite(suite_name, by_suite.fetch(suite_name)) }.all?
 
   # Fail if any payload was unreadable: a lost report must not pass as success.
@@ -319,8 +319,8 @@ def report_suite(suite_name, payloads)
   # Order shard summaries by shard number ("2/5" before "10/5"); each already
   # self-labels with its shard in its headers, so concatenation reads cleanly.
   summary = payloads
-            .sort_by { |payload| payload.fetch("shard_label", "").split("/").first.to_i }
-            .map { |payload| payload.fetch("summary") }
+            .sort_by { |payload| payload.fetch(RegressionReport::SHARD_LABEL, "").split("/").first.to_i }
+            .map { |payload| payload.fetch(RegressionReport::SUMMARY) }
             .join("\n")
   puts "Filing regression report for #{suite_name} (#{payloads.size} shard report(s))"
 
