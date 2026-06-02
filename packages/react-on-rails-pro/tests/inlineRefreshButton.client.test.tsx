@@ -5,8 +5,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
 import { createRSCProvider } from '../src/RSCProvider.tsx';
-import RSCRoute from '../src/RSCRoute.tsx';
-import { useCurrentRSCRoute } from '../src/RSCRoute.tsx';
+import RSCRoute, { useCurrentRSCRoute } from '../src/RSCRoute.tsx';
 import { getNodeVersion } from './testUtils';
 
 type InlineRefreshButtonProps = {

@@ -14,6 +14,26 @@ type GetServerComponentArgs = {
   enforceRefetch?: boolean;
 };
 
+class TestErrorBoundary extends React.Component<
+  { children: React.ReactNode; fallback?: React.ReactNode },
+  { error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode; fallback?: React.ReactNode }) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  render() {
+    const { children, fallback = null } = this.props;
+    const { error } = this.state;
+    return error ? fallback : children;
+  }
+}
+
 (getNodeVersion() >= 18 ? describe : describe.skip)('imperative refetch API', () => {
   let getServerComponent: jest.Mock<Promise<React.ReactNode>, [GetServerComponentArgs]>;
   let RSCProvider: React.FC<{ children: React.ReactNode }>;
@@ -29,14 +49,14 @@ type GetServerComponentArgs = {
    * deferred to a microtask so React's use() always sees a pending promise
    * first (matches the production path).
    */
-  const setupSequencedFetcher = (payloads: React.ReactNode[]) => {
+  const setupSequencedFetcher = (payloads: Array<React.ReactNode | Error>) => {
     let i = 0;
     getServerComponent = jest.fn(async (..._args: [GetServerComponentArgs]) => {
       const payload = payloads[i] ?? payloads[payloads.length - 1];
       i += 1;
       // Defer one microtask so `use()` always observes pending first.
       await Promise.resolve();
-      return payload;
+      return payload as React.ReactNode;
     });
     RSCProvider = createRSCProvider({ getServerComponent });
   };
@@ -129,6 +149,32 @@ type GetServerComponentArgs = {
       componentProps: { id: 1 },
       enforceRefetch: true,
     });
+  });
+
+  it('1b. ref.current.refetch() rejects when the RSC payload resolves to an Error', async () => {
+    setupSequencedFetcher([<div data-testid="card">Card v1</div>, new Error('RSC payload failed')]);
+    const ref = React.createRef<RSCRouteHandle>();
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    try {
+      await renderInAct(
+        <TestHarness>
+          <TestErrorBoundary fallback={<div data-testid="route-error">Route failed</div>}>
+            <RSCRoute ref={ref} componentName="UserCard" componentProps={{ id: 1 }} />
+          </TestErrorBoundary>
+        </TestHarness>,
+      );
+
+      expect(screen.getByTestId('card')).toHaveTextContent('Card v1');
+
+      await act(async () => {
+        await expect(ref.current!.refetch()).rejects.toThrow('RSC payload failed');
+      });
+
+      await waitFor(() => expect(screen.getByTestId('route-error')).toBeInTheDocument());
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 
   it('2. captured refetch reflects latest props after a re-render', async () => {

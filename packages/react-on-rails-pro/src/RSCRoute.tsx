@@ -67,7 +67,8 @@ class RSCRouteErrorBoundary extends Component<
  *
  * `refetch()` re-fetches the server component using the RSCRoute's currently
  * rendered `componentName` and `componentProps`. It resolves with the new
- * rendered ReactNode and rejects if the fetch fails.
+ * rendered ReactNode and rejects if the fetch fails or the RSC payload resolves
+ * to an Error object.
  *
  * Behavior caveats:
  * - **Concurrent refetches:** only the most-recent cache write wins; earlier
@@ -126,6 +127,14 @@ const PromiseWrapper = ({ promise }: { promise: Promise<ReactNode> }) => {
   return promiseResult;
 };
 
+const rejectErrorPayload = (promise: Promise<ReactNode>): Promise<ReactNode> =>
+  promise.then((payload) => {
+    if (payload instanceof Error) {
+      throw payload;
+    }
+    return payload;
+  });
+
 const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
   ({ componentName, componentProps }, ref) => {
     const { getComponent, refetchComponent } = useRSC();
@@ -143,7 +152,7 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
       // version inside startTransition. That re-renders every <RSCRoute>
       // (including this one) as a transition commit, so old content stays
       // visible while the new promise streams in.
-      return refetchComponent(n, p);
+      return rejectErrorPayload(refetchComponent(n, p));
     }, [refetchComponent]);
 
     const handle = useMemo<RSCRouteHandle>(() => ({ refetch }), [refetch]);
