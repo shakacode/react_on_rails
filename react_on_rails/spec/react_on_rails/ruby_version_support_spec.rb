@@ -12,6 +12,8 @@ RSpec.describe "Ruby version support" do
   it "allows Ruby 4 in the gemspec" do
     gemspec = Gem::Specification.load(File.join(repo_root, "react_on_rails/react_on_rails.gemspec"))
 
+    expect(gemspec.required_ruby_version).to be_satisfied_by(Gem::Version.new("3.3.0"))
+    expect(gemspec.required_ruby_version).not_to be_satisfied_by(Gem::Version.new("3.2.9"))
     expect(gemspec.required_ruby_version).to be_satisfied_by(Gem::Version.new("4.0.0"))
   end
 
@@ -39,6 +41,7 @@ RSpec.describe "Ruby version support" do
     )
 
     lint_workflow = read_repo_file(".github/workflows/lint-js-and-ruby.yml")
+    # Counts intentionally cover every Ruby setup in these single-lane workflows.
     expect(lint_workflow.scan("ruby-version: '4.0'").count).to eq(3)
 
     precompile_workflow = read_repo_file(".github/workflows/precompile-check.yml")
@@ -51,11 +54,22 @@ RSpec.describe "Ruby version support" do
     expect(read_repo_file(".github/read-me.md")).to include("Only latest dependency versions (Ruby 4.0, Node 22)")
 
     ci_switch_config = read_repo_file("bin/ci-switch-config")
+    # $LATEST_RUBY_MINOR_VERSION is a shell variable name, not Ruby interpolation.
     expect(ci_switch_config).to include(
       "Target: Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, Shakapacker 10.1.0"
     )
     expect(ci_switch_config).to include('LATEST_RUBY_VERSION="4.0.5"')
-    expect(ci_switch_config).to include('set_ruby_version "$LATEST_RUBY_VERSION"')
+    expect(ci_switch_config).to match(/set_ruby_version "\$LATEST_RUBY_VERSION"/)
+    expect(ci_switch_config).to include('[[ "${REACT_ROOT}" =~ ^\^?19(\.|$) ]]')
+    expect(ci_switch_config).to include("bundle config set --local path vendor/bundle")
+    expect(ci_switch_config).not_to include("bundle install --path")
+
+    ci_rerun_failures = read_repo_file("bin/ci-rerun-failures")
+    latest_job_description = [
+      'JOB_VERSION_MAP["dummy-app-integration-tests (4.0, 22, latest)"]=',
+      '"Ruby 4.0, Node 22, Shakapacker 10.1.0, React 19"'
+    ].join
+    expect(ci_rerun_failures).to include(latest_job_description)
 
     switching_guide = read_repo_file("SWITCHING_CI_CONFIGS.md")
     expect(switching_guide).to include("Switch back to latest dependencies (Ruby 4.0, Node 22)")
@@ -64,6 +78,7 @@ RSpec.describe "Ruby version support" do
     expect(read_repo_file(".claude/docs/replicating-ci-failures.md")).to include(
       "Ruby 4.0, Node 22, Shakapacker 10.1.0, React 19"
     )
+    # Exact table spacing is intentional: keeps the Markdown column padding in sync.
     expect(read_repo_file("internal/contributor-info/ci-optimization.md")).to include(
       "| Ruby versions | 3.3, 4.0        | 4.0 only"
     )
