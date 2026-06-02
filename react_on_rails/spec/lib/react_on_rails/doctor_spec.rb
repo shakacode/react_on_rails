@@ -131,6 +131,14 @@ RSpec.describe ReactOnRails::Doctor do
         expect(doctor.send(:development_hmr_enabled?)).to be(false)
       end
     end
+
+    it "treats hmr only mode as HMR" do
+      allow(doctor).to receive(:parsed_shakapacker_config).and_return(
+        "development" => { "dev_server" => { "hmr" => "only" } }
+      )
+
+      expect(doctor.send(:development_hmr_enabled?)).to be(true)
+    end
   end
 
   describe "#print_next_steps" do

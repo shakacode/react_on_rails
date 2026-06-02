@@ -606,12 +606,16 @@ module ReactOnRails
 
     def development_hmr_enabled?
       dev_server = development_dev_server_config
-      return truthy_config_value?(dev_server["hmr"]) if dev_server.key?("hmr")
+      return hmr_config_value?(dev_server["hmr"]) if dev_server.key?("hmr")
 
       return false if truthy_config_value?(dev_server["live_reload"])
 
       # Default to HMR when neither hmr nor live_reload is configured, preserving historical behavior.
       true
+    end
+
+    def hmr_config_value?(value)
+      value.to_s.strip.casecmp?("only") || truthy_config_value?(value)
     end
 
     def development_dev_server_config

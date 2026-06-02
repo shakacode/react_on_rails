@@ -1924,6 +1924,14 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         expect(described_class.send(:development_hmr_enabled?)).to be(false)
       end
     end
+
+    it "treats hmr only mode as HMR" do
+      allow(described_class).to receive(:parsed_shakapacker_config).and_return(
+        "development" => { "dev_server" => { "hmr" => "only" } }
+      )
+
+      expect(described_class.send(:development_hmr_enabled?)).to be(true)
+    end
   end
 
   describe ".run_test_watch" do
