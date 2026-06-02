@@ -1,10 +1,26 @@
 # frozen_string_literal: true
 
+require "yaml"
+
 RSpec.describe "Ruby version support" do
+  # From spec/react_on_rails/ up through spec/ and react_on_rails/ to the repo root.
   let(:repo_root) { File.expand_path("../../..", __dir__) }
+  let(:ruby_setup_actions) { ["./.github/actions/setup-ruby", "./.github/actions/setup-bundle"] }
 
   def read_repo_file(path)
     File.read(File.join(repo_root, path))
+  end
+
+  def workflow_ruby_versions(path)
+    workflow = YAML.safe_load(read_repo_file(path), aliases: true)
+
+    workflow.fetch("jobs").values.flat_map do |job|
+      Array(job["steps"]).filter_map do |step|
+        next unless ruby_setup_actions.include?(step["uses"])
+
+        step.fetch("with").fetch("ruby-version")
+      end
+    end
   end
 
   # These literal checks intentionally make future version bumps update the CI matrix,
@@ -40,12 +56,8 @@ RSpec.describe "Ruby version support" do
       '"ruby-version":"3.3","node-version":"20","dependency-level":"minimum"'
     )
 
-    lint_workflow = read_repo_file(".github/workflows/lint-js-and-ruby.yml")
-    # Counts intentionally cover every Ruby setup in these single-lane workflows.
-    expect(lint_workflow.scan("ruby-version: '4.0'").count).to eq(3)
-
-    precompile_workflow = read_repo_file(".github/workflows/precompile-check.yml")
-    expect(precompile_workflow.scan("ruby-version: '4.0'").count).to eq(2)
+    expect(workflow_ruby_versions(".github/workflows/lint-js-and-ruby.yml")).to eq(%w[4.0 4.0 4.0])
+    expect(workflow_ruby_versions(".github/workflows/precompile-check.yml")).to eq(%w[4.0 4.0])
   end
 
   it "documents and switches to Ruby 4.0 for the latest local CI configuration" do
