@@ -26,7 +26,7 @@ Gem::Specification.new do |s|
 
   s.files = Dir.chdir(__dir__) do
     `git ls-files -z`.split("\x0").reject do |f|
-      f.match(%r{^(spec|tmp)/})
+      f.match(%r{^(spec|tmp|spike)/})
     end
   end
   s.bindir        = "exe"

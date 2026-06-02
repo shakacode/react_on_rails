@@ -55,6 +55,7 @@ jobs:
       - name: Setup Ruby
         uses: ./.github/actions/setup-ruby
         with:
+          # Keep the single E2E lane on the minimum runtime; matrix workflows cover latest.
           ruby-version: '3.3'
 
       - uses: actions/setup-node@v4

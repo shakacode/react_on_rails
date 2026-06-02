@@ -368,7 +368,7 @@ export default function Stats({ stats }) {
 }
 ```
 
-Rails loads all data as props before rendering begins. `stream_react_component` then streams the rendered HTML to the browser as React processes the component tree — no client-side fetching or loading states needed.
+Rails loads all data as props before rendering begins. `stream_react_component` then streams the rendered HTML to the browser as React processes the component tree — no client-side fetching or loading states needed. For slow Rails data that should not block the initial shell, use `stream_react_component_with_async_props`; see [Data Fetching in React on Rails Pro](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro).
 
 ## Pattern 5: Server Data to Interactive Client Components
 

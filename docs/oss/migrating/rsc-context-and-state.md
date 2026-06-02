@@ -164,7 +164,7 @@ function ReviewList({ reviews }) {
 }
 ```
 
-All data is loaded in Rails before rendering begins. `stream_react_component` then streams the rendered HTML to the browser via React's `renderToPipeableStream`.
+All data is loaded in Rails before rendering begins. `stream_react_component` then streams the rendered HTML to the browser via React's `renderToPipeableStream`. For slow Rails data that should not block the initial shell, use `stream_react_component_with_async_props` instead; see [Data Fetching in React on Rails Pro](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro).
 
 > **Note:** `React.cache()` is only available in React Server Component environments. It is not available in client components or non-RSC server rendering (e.g., `renderToString`).
 
@@ -272,13 +272,13 @@ Zustand and Jotai follow the same pattern as Redux: keep all store access in Cli
 
 RSC reduces the need for global state libraries because data fetching moves to the server:
 
-| Use Case                                                        | Recommended Approach                                                                                |
-| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| Server data (read-only display)                                 | Rails controller props → Server Component renders directly                                          |
-| Server data (slow, shouldn't block the shell)                   | [Streaming](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) with `stream_react_component` |
-| Server data (with client cache/revalidation)                    | TanStack Query with prefetch + hydrate                                                              |
-| Client UI state (modals, forms, selections)                     | `useState` / Context in Client Components                                                           |
-| Complex client state (undo/redo, shared across many components) | Redux Toolkit in Client Components                                                                  |
+| Use Case                                                        | Recommended Approach                                                                                                   |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Server data (read-only display)                                 | Rails controller props → Server Component renders directly                                                             |
+| Server data (slow, shouldn't block the shell)                   | [Async props](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) with `stream_react_component_with_async_props` |
+| Server data (with client cache/revalidation)                    | TanStack Query with prefetch + hydrate                                                                                 |
+| Client UI state (modals, forms, selections)                     | `useState` / Context in Client Components                                                                              |
+| Complex client state (undo/redo, shared across many components) | Redux Toolkit in Client Components                                                                                     |
 
 ## Specific Provider Patterns
 

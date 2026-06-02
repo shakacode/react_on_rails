@@ -6,11 +6,13 @@ require "erb"
 require_relative "generator_messages"
 require_relative "generator_helper"
 require_relative "js_dependency_manager"
+require_relative "shakapacker_precompile_hook_helper"
 module ReactOnRails
   module Generators
     class BaseGenerator < Rails::Generators::Base
       include GeneratorHelper
       include JsDependencyManager
+      include ShakapackerPrecompileHookHelper
 
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("templates", __dir__))
@@ -330,6 +332,10 @@ module ReactOnRails
       # (both generators are independently CLI-invocable); keep the two in sync.
       def rspack_bundler_default
         fresh_install_rspack_default
+      end
+
+      def generated_build_test_command
+        shakapacker_build_command(env: "RAILS_ENV=test NODE_ENV=test", environment: "test")
       end
 
       def generate_new_app_home_page?

@@ -149,9 +149,15 @@ describe('RSCRoute deferred SSR behavior', () => {
           <RSCRoute componentName="DeferredRoute" componentProps={{ id: 1 }} {...props} />
         </RSCProvider>,
       );
-    } catch {
-      // renderToString may throw once PromiseWrapper consumes the unresolved RSC promise.
+    } catch (error) {
+      // renderToString throws synchronously when PromiseWrapper consumes the unresolved RSC promise.
       // The provider call happens before that point and is the behavior this test asserts.
+      if (
+        !(error instanceof Error) ||
+        !error.message.includes('A component suspended while responding to synchronous input')
+      ) {
+        throw error;
+      }
     }
 
     expect(getServerComponent).toHaveBeenCalledTimes(1);

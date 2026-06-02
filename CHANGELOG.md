@@ -28,14 +28,24 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 - **Ruby 3.3+ is required for React on Rails v17**: The open-source gem now requires Ruby `>= 3.3.0`, aligning it with React on Rails Pro, `create-react-on-rails-app`, and the CI minimum matrix. React on Rails v16 remains the upgrade path for applications that must stay on Ruby 3.2 or older. [PR 3500](https://github.com/shakacode/react_on_rails/pull/3500) by [justin808](https://github.com/justin808).
 
+#### Added
+
+- **Ruby 4.0 CI support**: Updated OSS latest-runtime CI coverage, local CI switching guidance, and public compatibility docs to test Ruby 4.0 while keeping Ruby 3.3 as the minimum supported CI lane. [PR 3529](https://github.com/shakacode/react_on_rails/pull/3529) by [justin808](https://github.com/justin808).
+
 #### Changed
 
 - **Generator defaults to Rspack for fresh installs**: `rails generate react_on_rails:install` and `create-react-on-rails-app` now default to the Rspack bundler on fresh installs (significantly faster builds via SWC), instead of Webpack. Pass `--no-rspack` (or its alias `--webpack`) to use Webpack. This only affects fresh installs — existing apps that already declare an `assets_bundler` in `config/shakapacker.yml` are left unchanged, an explicit `--rspack`/`--no-rspack`/`--webpack` always wins, and the default falls back to Webpack on Shakapacker versions below 9.0 (where Rspack is unsupported). [PR 3484](https://github.com/shakacode/react_on_rails/pull/3484) by [justin808](https://github.com/justin808).
+
+#### Improved
+
+- **RSC setup verification warns on dynamic plugin options**: `react_on_rails:install --rsc` now warns when `new RSCWebpackPlugin(...)` uses computed options that cannot be statically verified, avoiding misleading missing-`clientReferences` reports for dynamic config. Fixes [Issue 3412](https://github.com/shakacode/react_on_rails/issues/3412). [PR 3505](https://github.com/shakacode/react_on_rails/pull/3505) by [justin808](https://github.com/justin808).
+- **Rspack-aware diagnostics and dev-server help**: Doctor, system checker, and `bin/dev --help` output now label Rspack apps as Rspack instead of webpack while preserving webpack wording for default apps. Fixes [Issue 3388](https://github.com/shakacode/react_on_rails/issues/3388). [PR 3508](https://github.com/shakacode/react_on_rails/pull/3508) by [justin808](https://github.com/justin808).
 
 #### Fixed
 
 - **Shakapacker config warnings now report resolved relative paths**: When `SHAKAPACKER_CONFIG` is set to a relative missing path, the Rails boot warning now includes the Rails-root-resolved path that React on Rails actually checked. Fixes [Issue 3436](https://github.com/shakacode/react_on_rails/issues/3436). [PR 3441](https://github.com/shakacode/react_on_rails/pull/3441) by [justin808](https://github.com/justin808).
 - **Base-port renderer URLs preserve localhost-equivalent hosts**: `bin/dev` base-port mode now keeps localhost-equivalent renderer hosts and schemes, such as `127.0.0.1` and `https://localhost`, when deriving `REACT_RENDERER_URL`; remote or invalid hosts still fall back to `http://localhost:<port>`. Fixes [Issue 3466](https://github.com/shakacode/react_on_rails/issues/3466). [PR 3506](https://github.com/shakacode/react_on_rails/pull/3506) by [justin808](https://github.com/justin808).
+- **[Pro]** **Streamed RSC rendering now propagates CSP nonces**: React on Rails Pro now passes the Rails CSP nonce to React's streamed RSC renderer options so streamed script output can satisfy strict content security policies. Fixes [Issue 3491](https://github.com/shakacode/react_on_rails/issues/3491). [PR 3507](https://github.com/shakacode/react_on_rails/pull/3507) by [justin808](https://github.com/justin808).
 
 ### [17.0.0.rc.0] - 2026-05-30
 

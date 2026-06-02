@@ -96,6 +96,7 @@ setup_repo() {
   mkdir -p react_on_rails/spec/react_on_rails
   mkdir -p react_on_rails/app/helpers
   mkdir -p react_on_rails_pro/app/controllers/react_on_rails_pro/rolling_deploy
+  mkdir -p benchmarks/lib
   cat > docs/guide.md <<'DOC'
 # Guide
 DOC
@@ -136,6 +137,13 @@ module ReactOnRails
     def react_component
       "ok"
     end
+  end
+end
+RUBY
+  cat > benchmarks/lib/sample.rb <<'RUBY'
+module BenchmarkSample
+  def self.call
+    "ok"
   end
 end
 RUBY
@@ -553,6 +561,48 @@ test_core_js_changes_request_e2e() {
   assert_contains "$out" '"run_e2e_tests": true' "core js output"
 }
 
+test_benchmark_source_change_lints_and_flags_benchmarks_only() {
+  setup_repo
+  write_file_change "benchmarks/generate_matrix.rb"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"benchmarks_changed": true' "benchmark source output"
+  assert_contains "$out" '"run_lint": true' "benchmark source output"
+  # Benchmark scripts have no coverage in the gem suite, dummy app, or Pro stack.
+  assert_contains "$out" '"run_ruby_tests": false' "benchmark source output"
+  assert_contains "$out" '"run_dummy_tests": false' "benchmark source output"
+  assert_contains "$out" '"run_e2e_tests": false' "benchmark source output"
+  assert_contains "$out" '"run_pro_tests": false' "benchmark source output"
+}
+
+test_benchmark_comment_only_change_is_non_runtime_but_keeps_lint() {
+  setup_repo
+  perl -0pi -e 's/module BenchmarkSample/# Describe the sample.\nmodule BenchmarkSample/' \
+    benchmarks/lib/sample.rb
+  commit_change "benchmark comment"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"non_runtime_only": true' "benchmark comment output"
+  assert_contains "$out" '"run_lint": true' "benchmark comment output"
+  assert_contains "$out" '"benchmarks_changed": false' "benchmark comment output"
+  assert_contains "$out" '"run_ruby_tests": false' "benchmark comment output"
+}
+
+test_empty_diff_skips_everything() {
+  setup_repo
+  git commit --allow-empty -m "no file changes" >/dev/null
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"non_runtime_only": true' "empty diff output"
+  assert_contains "$out" '"run_lint": false' "empty diff output"
+  assert_contains "$out" '"run_ruby_tests": false' "empty diff output"
+  assert_contains "$out" '"benchmarks_changed": false' "empty diff output"
+}
+
+run_test test_empty_diff_skips_everything
 run_test test_docs_changes_are_non_runtime_only
 run_test test_ruby_comment_only_change_skips_heavy_tests_but_keeps_lint
 run_test test_ruby_block_comment_only_change_skips_heavy_tests_but_keeps_lint
@@ -584,6 +634,8 @@ run_test test_generator_only_changes_do_not_request_e2e
 run_test test_dummy_app_changes_request_e2e
 run_test test_core_ruby_changes_request_e2e
 run_test test_core_js_changes_request_e2e
+run_test test_benchmark_source_change_lints_and_flags_benchmarks_only
+run_test test_benchmark_comment_only_change_is_non_runtime_but_keeps_lint
 
 echo
 echo "CI changes detector tests: $TESTS_RUN run, $TESTS_FAILED failed"

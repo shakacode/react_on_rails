@@ -1,11 +1,17 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+require "fileutils"
+require "json"
 require "open3"
 require "time"
+
+require_relative "lib/github"
+require_relative "lib/github_cli"
+require_relative "lib/regression_report"
+
 BOUNDARY = "0.95"
 MAX_SAMPLE = "64"
-BENCHER_URL = "https://bencher.dev/perf/react-on-rails-t8a9ncxo"
 # Threshold direction: :lower for "regression = drop" measures (rps),
 # :upper for "regression = climb" measures (latency, failure rate).
 THRESHOLDS = [
@@ -15,6 +21,12 @@ THRESHOLDS = [
   ["p99_latency", :upper],
   ["failed_pct", :upper]
 ].freeze
+
+# Bencher exits non-zero both for a performance alert (a real regression) and for
+# operational problems; we tell them apart by grepping stderr for these phrases.
+# They are not a documented API contract, so the CLI is pinned in benchmark.yml and
+# this must be re-verified on upgrade.
+ALERT_PATTERN = /\bAlerts?\b|threshold violation|boundary violation/i
 
 def env!(key)
   ENV.fetch(key) do
@@ -26,27 +38,7 @@ end
 BENCHMARK_JSON = ENV.fetch("BENCHMARK_JSON", "bench_results/benchmark.json")
 REPORT_HTML = ENV.fetch("BENCHER_REPORT_HTML", "bench_results/bencher_report.html")
 CHUNK_PREFIX = "bench_results/bencher_chunk"
-
-# Check the input file before validating env vars — a missing benchmark.json is the more
-# actionable failure (almost always upstream `bench.rb` didn't produce results).
-unless File.exist?(BENCHMARK_JSON)
-  warn "Benchmark JSON file not found: #{BENCHMARK_JSON}"
-  exit 1
-end
-
-SUITE_NAME = env!("BENCHMARK_SUITE_NAME")
-REPORT_MARKER = env!("BENCHER_REPORT_MARKER")
-env!("BENCHER_API_TOKEN")
-
-def capture_command(*args)
-  stdout, stderr, status = Open3.capture3(*args)
-  warn stderr unless stderr.empty?
-  [stdout, status]
-end
-
-def github_run_url
-  "#{ENV.fetch('GITHUB_SERVER_URL')}/#{ENV.fetch('GITHUB_REPOSITORY')}/actions/runs/#{ENV.fetch('GITHUB_RUN_ID')}"
-end
+REGRESSION_REPORT_JSON = File.join("bench_results", RegressionReport::FILENAME)
 
 def branch_and_start_point_args
   case ENV.fetch("GITHUB_EVENT_NAME")
@@ -66,12 +58,15 @@ def branch_and_start_point_args
     branch = ENV.fetch("GITHUB_REF_NAME")
     return [branch, []] if branch == "main"
 
-    stdout, = capture_command(
+    stdout, status = GithubCli.capture(
       "gh", "api", "repos/#{ENV.fetch('GITHUB_REPOSITORY')}/compare/main...#{branch}",
-      "--jq", ".merge_base_commit.sha"
+      "--jq", ".merge_base_commit.sha",
+      error_message: "Failed to resolve merge-base with main for #{branch}"
     )
     start_point_args = ["--start-point", "main", "--start-point-clone-thresholds", "--start-point-reset"]
-    merge_base = stdout.strip
+    # On API failure GithubCli already emits ::error::; fall back to the latest
+    # baseline rather than conflating a failed call with "no merge-base found".
+    merge_base = status.success? ? stdout.strip : ""
 
     if merge_base.empty?
       puts "Could not find merge-base with main via GitHub API, continuing without hash"
@@ -116,19 +111,17 @@ end
 
 def run_bencher(branch, start_point_args)
   stdout, stderr, status = Open3.capture3(*bencher_args(branch, start_point_args))
-  File.write(REPORT_HTML, stdout)
   warn stderr unless stderr.empty?
+  # Bencher prints the HTML report to stdout, including the alert report on a
+  # non-zero "alert" exit (which we still want to publish). An empty stdout means
+  # an operational failure with no report, so clear any stale file rather than
+  # persisting/posting garbage or leaving a previous attempt's report behind.
+  if stdout.empty?
+    FileUtils.rm_f(REPORT_HTML)
+  else
+    File.write(REPORT_HTML, stdout)
+  end
   [stderr, status.exitstatus]
-end
-
-def retry_without_start_point_hash?(stderr, exit_code)
-  exit_code != 0 &&
-    stderr.match?(/Head Version.*not found/) &&
-    !stderr.match?(/\bAlerts?\b|threshold violation|boundary violation/i)
-end
-
-def alert?(stderr, exit_code)
-  exit_code != 0 && stderr.match?(/\bAlerts?\b|threshold violation|boundary violation/i)
 end
 
 def append_step_summary(markdown)
@@ -149,7 +142,7 @@ def split_report_for_comments
   return true if system({ "BENCHER_REPORT_MARKER" => REPORT_MARKER },
                         "ruby", "benchmarks/split_html_report.rb", REPORT_HTML, CHUNK_PREFIX)
 
-  warn "Failed to split HTML report; skipping PR comments"
+  warn "::error::Failed to split HTML report for #{SUITE_NAME}; PR comments will not be posted"
   false
 end
 
@@ -157,23 +150,32 @@ def stale_comment_ids(before:)
   # Marker + cutoff are passed via env so the jq filter reads them through `env.X`,
   # avoiding the Ruby-#dump vs jq-string-escape mismatch that interpolated strings invite.
   # The cutoff makes the GC skip comments the current run just posted (same marker).
-  stdout, stderr, status = Open3.capture3(
-    { "MARKER" => REPORT_MARKER, "CUTOFF_TS" => before },
+  stdout, status = GithubCli.capture(
     "gh", "api", "repos/#{ENV.fetch('GITHUB_REPOSITORY')}/issues/#{ENV.fetch('PR_NUMBER')}/comments",
     "--paginate",
-    "--jq", ".[] | select(.body | startswith(env.MARKER)) | select(.created_at < env.CUTOFF_TS) | .id"
+    "--jq", ".[] | select(.body | startswith(env.MARKER)) | select(.created_at < env.CUTOFF_TS) | .id",
+    env: { "MARKER" => REPORT_MARKER, "CUTOFF_TS" => before },
+    error_message: "Failed to list stale #{SUITE_NAME} Bencher report comments"
   )
-  warn stderr unless stderr.empty?
   return [] unless status.success?
 
   stdout.lines.map(&:strip).reject(&:empty?)
 end
 
 def delete_stale_report_comments(before:)
+  failed = 0
   stale_comment_ids(before: before).each do |comment_id|
     puts "Deleting stale #{SUITE_NAME} Bencher report comment #{comment_id}"
-    system("gh", "api", "-X", "DELETE", "repos/#{ENV.fetch('GITHUB_REPOSITORY')}/issues/comments/#{comment_id}")
+    next if GithubCli.run(
+      "gh", "api", "-X", "DELETE", "repos/#{ENV.fetch('GITHUB_REPOSITORY')}/issues/comments/#{comment_id}",
+      error_message: "Failed to delete stale #{SUITE_NAME} Bencher report comment #{comment_id}"
+    )
+
+    failed += 1
   end
+  return if failed.zero?
+
+  warn "::warning::Failed to delete #{failed} stale #{SUITE_NAME} Bencher report comment(s); they may remain visible."
 end
 
 def post_report_comment_chunks
@@ -185,10 +187,12 @@ def post_report_comment_chunks
   any_failed = false
   chunk_files.each do |chunk_file|
     puts "Posting #{chunk_file} (#{File.size(chunk_file)} bytes)..."
-    if system("gh", "pr", "comment", ENV.fetch("PR_NUMBER"), "--body-file", chunk_file)
+    if GithubCli.run(
+      "gh", "pr", "comment", ENV.fetch("PR_NUMBER"), "--body-file", chunk_file,
+      error_message: "Failed to post #{chunk_file}"
+    )
       posted_any = true
     else
-      warn "Failed to post #{chunk_file}"
       any_failed = true
     end
   end
@@ -220,9 +224,12 @@ def replace_pr_comments
     #{REPORT_MARKER}
     **#{SUITE_NAME} Bencher report chunks were too large to post as PR comments.**
 
-    View the full report in the job summary: #{github_run_url}
+    View the full report in the job summary: #{Github.run_url}
   MARKDOWN
-  system("gh", "pr", "comment", ENV.fetch("PR_NUMBER"), "--body", fallback_body)
+  GithubCli.run(
+    "gh", "pr", "comment", ENV.fetch("PR_NUMBER"), "--body", fallback_body,
+    error_message: "Failed to post fallback #{SUITE_NAME} Bencher report comment"
+  )
 end
 
 def formatted_summary(title, path)
@@ -248,123 +255,85 @@ def benchmark_summary
   ].join
 end
 
-def ensure_regression_label
-  system(
-    "gh", "label", "create", "performance-regression",
-    "--description", "Automated: benchmark regression detected on main",
-    "--color", "D93F0B",
-    "--force"
-  )
+def alert?(stderr, exit_code)
+  exit_code != 0 && stderr.match?(ALERT_PATTERN)
 end
 
-def existing_regression_issue
-  stdout, status = capture_command(
-    "gh", "issue", "list",
-    "--label", "performance-regression",
-    "--state", "open",
-    "--limit", "1",
-    "--json", "number",
-    "--jq", ".[0].number // empty"
-  )
-  return "" unless status.success?
-
-  stdout.strip
-end
-
-def comment_on_regression_issue(issue_number, summary)
-  commit_short = ENV.fetch("GITHUB_SHA")[0, 7]
-  commit_url = "#{ENV.fetch('GITHUB_SERVER_URL')}/#{ENV.fetch('GITHUB_REPOSITORY')}/commit/#{ENV.fetch('GITHUB_SHA')}"
-  body = <<~MARKDOWN
-    ## New #{SUITE_NAME} regression detected
-
-    **Commit:** [`#{commit_short}`](#{commit_url}) by @#{ENV.fetch('GITHUB_ACTOR')}
-    **Workflow run:** [Run ##{ENV.fetch('GITHUB_RUN_NUMBER')}](#{github_run_url})
-    #{summary}
-
-    > View the full Bencher report in the workflow run summary or on the [Bencher dashboard](#{BENCHER_URL}).
-  MARKDOWN
-
-  system("gh", "issue", "comment", issue_number, "--body", body)
-end
-
-def create_regression_issue(summary)
-  commit_short = ENV.fetch("GITHUB_SHA")[0, 7]
-  commit_url = "#{ENV.fetch('GITHUB_SERVER_URL')}/#{ENV.fetch('GITHUB_REPOSITORY')}/commit/#{ENV.fetch('GITHUB_SHA')}"
-  body = <<~MARKDOWN
-    ## Performance Regression Detected on main
-
-    A statistically significant #{SUITE_NAME} performance regression was detected by
-    [Bencher](#{BENCHER_URL}) using a Student's t-test (95% confidence
-    interval, up to 64 sample history).
-
-    | Detail | Value |
-    |--------|-------|
-    | **Commit** | [`#{commit_short}`](#{commit_url}) |
-    | **Pushed by** | @#{ENV.fetch('GITHUB_ACTOR')} |
-    | **Workflow run** | [Run ##{ENV.fetch('GITHUB_RUN_NUMBER')}](#{github_run_url}) |
-    | **Bencher dashboard** | [View history](#{BENCHER_URL}) |
-    #{summary}
-
-    ### What to do
-
-    1. Check the workflow run for the full Bencher HTML report
-    2. Review the Bencher dashboard to see which metrics regressed
-    3. Investigate the commit; expected trade-off or unintended regression?
-    4. If unintended, open a fix PR and reference this issue
-    5. Close this issue once resolved; subsequent regressions will open a new one
-
-    ---
-    *This issue was created automatically by the benchmark CI workflow.*
-  MARKDOWN
-
-  system(
-    "gh", "issue", "create",
-    "--title", "Performance Regression Detected on main (#{commit_short})",
-    "--label", "performance-regression",
-    "--body", body
-  )
+# A missing start-point baseline (not an alert): retrying without the start-point
+# hash falls back to the latest baseline. The alert exclusion is load-bearing — a
+# real regression must not be silently re-run against a different baseline.
+def retry_without_start_point_hash?(stderr, exit_code)
+  exit_code != 0 &&
+    stderr.match?(/Head Version.*not found/) &&
+    !stderr.match?(ALERT_PATTERN)
 end
 
 def main_push?
   ENV.fetch("GITHUB_EVENT_NAME") == "push" && ENV.fetch("GITHUB_REF") == "refs/heads/main"
 end
 
-branch, start_point_args = branch_and_start_point_args
-stderr, bencher_exit_code = run_bencher(branch, start_point_args)
-
-if retry_without_start_point_hash?(stderr, bencher_exit_code)
-  retry_args = start_point_args.dup
-  if (hash_arg_index = retry_args.index("--start-point-hash"))
-    retry_args.slice!(hash_arg_index, 2)
+# Only run the benchmark tracking when invoked as a script; `require`-ing the file
+# (e.g. from specs) just loads the helpers above.
+if __FILE__ == $PROGRAM_NAME
+  # Check the input file before validating env vars — a missing benchmark.json is the more
+  # actionable failure (almost always upstream `bench.rb` didn't produce results).
+  unless File.exist?(BENCHMARK_JSON)
+    warn "Benchmark JSON file not found: #{BENCHMARK_JSON}"
+    exit 1
   end
-  puts "Start-point hash not found in Bencher; retrying without --start-point-hash"
-  puts "::warning::Start-point hash not found in Bencher; falling back to latest baseline for comparison"
-  stderr, bencher_exit_code = run_bencher(branch, retry_args)
-end
 
-post_report_to_summary
-replace_pr_comments
+  SUITE_NAME = env!("BENCHMARK_SUITE_NAME")
+  REPORT_MARKER = env!("BENCHER_REPORT_MARKER")
+  env!("BENCHER_API_TOKEN")
 
-if main_push? && bencher_exit_code != 0
-  if alert?(stderr, bencher_exit_code)
-    ensure_regression_label
-    summary = benchmark_summary
-    issue_number = existing_regression_issue
+  branch, start_point_args = branch_and_start_point_args
+  stderr, bencher_exit_code = run_bencher(branch, start_point_args)
 
-    if issue_number.empty?
-      create_regression_issue(summary)
-    else
-      puts "Open regression issue already exists: ##{issue_number}; adding comment"
-      comment_on_regression_issue(issue_number, summary)
+  if retry_without_start_point_hash?(stderr, bencher_exit_code)
+    retry_args = start_point_args.dup
+    if (hash_arg_index = retry_args.index("--start-point-hash"))
+      retry_args.slice!(hash_arg_index, 2)
     end
+    puts "Start-point hash not found in Bencher; retrying without --start-point-hash"
+    puts "::warning::Start-point hash not found in Bencher; falling back to latest baseline for comparison"
+    stderr, bencher_exit_code = run_bencher(branch, retry_args)
+  end
 
-    puts "::warning::Bencher flagged a #{SUITE_NAME} regression on main (exit #{bencher_exit_code}). " \
-         "See the open regression issue (label: performance-regression), the Bencher dashboard, " \
-         "and the workflow run: #{github_run_url}"
-  else
-    warn "::error::Bencher exited #{bencher_exit_code} on main with no regression alert in stderr for #{SUITE_NAME}; " \
-         "this indicates an operational failure (auth/API/network/CLI), not a performance regression. " \
-         "Check the logs above."
-    exit bencher_exit_code
+  post_report_to_summary
+  replace_pr_comments
+
+  if main_push? && bencher_exit_code != 0
+    if alert?(stderr, bencher_exit_code)
+      # Record the regression for the post-matrix report-regressions job rather than
+      # filing the issue here: parallel matrix suites would otherwise race to create
+      # duplicate issues and clobber each other's sections in the shared comment.
+      # Use the un-sharded suite name so that job can combine a suite's shards into a
+      # single section (shard_label keeps their ordering deterministic).
+      begin
+        File.write(
+          REGRESSION_REPORT_JSON,
+          JSON.generate(
+            RegressionReport::SUITE_NAME => ENV.fetch("BENCHMARK_SUITE_GROUP", SUITE_NAME),
+            RegressionReport::SHARD_LABEL => ENV.fetch("BENCHMARK_SHARD_LABEL", ""),
+            RegressionReport::SUMMARY => benchmark_summary
+          )
+        )
+        warn "::warning::Bencher flagged a #{SUITE_NAME} regression on main (exit #{bencher_exit_code}). " \
+             "The report-regressions job will file the issue. " \
+             "See the Bencher dashboard and the workflow run: #{Github.run_url}"
+      rescue StandardError => e # rubocop:disable Metrics/BlockNesting
+        # The suite still fails (exit 1 below), so the regression is surfaced; but the
+        # hand-off payload is gone, so report-regressions can't auto-file the issue.
+        warn "::error::Bencher flagged a #{SUITE_NAME} regression on main but its report payload " \
+             "could not be written (#{e.class}: #{e.message}); the issue will NOT be auto-filed — " \
+             "investigate using GitHub run logs: #{Github.run_url}"
+      end
+      exit 1
+    else
+      warn "::error::Bencher exited #{bencher_exit_code} on main with no regression alert for #{SUITE_NAME}; " \
+           "this indicates an operational failure (auth/API/network/CLI), not a performance regression. " \
+           "Check the logs above."
+      exit bencher_exit_code
+    end
   end
 end

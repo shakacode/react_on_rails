@@ -14,6 +14,7 @@
 
 import { Readable } from 'stream';
 
+import sanitizeNonce from 'react-on-rails/@internal/sanitizeNonce';
 import { renderToPipeableStream } from 'react-on-rails/ReactDOMServer';
 import { convertToError } from 'react-on-rails/serverRenderUtils';
 import {
@@ -113,6 +114,7 @@ const streamRenderReactComponent = (
           });
         },
         identifierPrefix: domNodeId,
+        nonce: sanitizeNonce(railsContext.cspNonce),
       });
     })
     .catch((e: unknown) => {

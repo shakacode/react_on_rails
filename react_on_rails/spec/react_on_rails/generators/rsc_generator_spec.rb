@@ -1691,6 +1691,83 @@ describe RscGenerator, type: :generator do
       expect(generator.send(:rsc_plugin_client_references_configured?, content, is_server: false)).to be(true)
     end
 
+    it "counts active non-object-literal plugin options without counting comments or object options" do
+      content = <<~JS
+        const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+        // clientConfig.plugins.push(new RSCWebpackPlugin(buildCommentedOptions()));
+        clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+        clientConfig.plugins.push(new RSCWebpackPlugin());
+        clientConfig.plugins.push(new RSCWebpackPlugin(buildOptions()));
+        clientConfig.plugins.push(new RSCWebpackPlugin("literalOptions"));
+        clientConfig.plugins.push(new RSCWebpackPlugin(`templateOptions`));
+      JS
+
+      expect(generator.send(:non_object_literal_rsc_plugin_invocation_count, content)).to eq(3)
+    end
+
+    it "warns during verification when client plugin options are not object literals" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          clientConfig.plugins.push(new RSCWebpackPlugin(buildOptions()));
+        JS
+      )
+
+      expect(generator.send(:check_rsc_client_config)).to eq([])
+
+      messages = GeneratorMessages.messages.join("\n")
+      expect(messages).to include("use non-object-literal options")
+      expect(messages).to include("cannot verify whether scoped clientReferences are configured")
+      expect(messages).not_to include("generated scoped clientReferences in clientWebpackConfig.js")
+    end
+
+    it "warns only once without naming only the first config when both webpack configs use non-object options" do
+      simulate_existing_file(
+        "config/webpack/serverWebpackConfig.js",
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          const rscBundle = false;
+          serverWebpackConfig.plugins.push(new RSCWebpackPlugin(serverPluginOptions()));
+        JS
+      )
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          clientConfig.plugins.push(new RSCWebpackPlugin(clientPluginOptions()));
+        JS
+      )
+
+      generator.send(:check_rsc_server_config)
+      generator.send(:check_rsc_client_config)
+
+      non_object_warnings = GeneratorMessages.messages.grep(/use non-object-literal options/)
+      expect(non_object_warnings.length).to eq(1)
+      expect(non_object_warnings.first).to include("one or more webpack configs")
+      expect(non_object_warnings.first).not_to include("serverWebpackConfig.js")
+      expect(non_object_warnings.first).not_to include("clientWebpackConfig.js")
+    end
+
+    it "does not warn during verification for object options or commented-out non-object plugin calls" do
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          // clientConfig.plugins.push(new RSCWebpackPlugin(buildOptions()));
+          clientConfig.plugins.push(new RSCWebpackPlugin({
+            isServer: false,
+            clientReferences,
+          }));
+        JS
+      )
+
+      generator.send(:check_rsc_client_config)
+
+      expect(GeneratorMessages.messages.join("\n")).not_to include("use non-object-literal options")
+    end
+
     it "treats shorthand clientReferences as a top-level configured option" do
       body = <<~JS
         isServer: false,
