@@ -6,6 +6,8 @@ module ReactOnRails
       module ClientReferences # rubocop:disable Metrics/ModuleLength
         JS_STRING_DELIMITERS = ["'", '"', "`"].freeze
         JS_COMMENT_STATES = %i[line_comment block_comment].freeze
+        # Characters that complete `//` or `/*` after a leading `/`.
+        JS_COMMENT_SECOND_CHARS = ["/", "*"].freeze
         # Known limitation: this list only covers single-character regex preceders. Multi-character
         # JavaScript keywords that legally precede a regex literal (`return`, `typeof`, `void`,
         # `delete`, `throw`, `case`, `in`, `instanceof`) are not represented. A regex like `/\{/`
@@ -243,9 +245,9 @@ module ReactOnRails
           # No parseable `isServer: <bool>` section means this file's plugin call sits outside
           # what the generator's scanner can match (e.g. options are computed at runtime, or the
           # plugin is invoked without an options object). Verification callers intentionally
-          # under-report here: warning about "missing scoped clientReferences" when there's no
-          # section to inspect would only surface noise for dynamic invocations like
-          # `RSCWebpackPlugin(buildOptions())`, where the user has nothing actionable to do.
+          # keep these out of the missing-pattern list because there is no literal section to
+          # classify as broken. They warn separately for dynamic invocations so users can verify
+          # those configs manually.
           return true if sections.empty?
 
           sections.all? do |section|
@@ -256,6 +258,30 @@ module ReactOnRails
               rsc_plugin_body_has_top_level_key?(body, "clientReferences")
             end
           end
+        end
+
+        # Counts active `new RSCWebpackPlugin(...)` calls whose first argument is present but
+        # not an object literal. This includes computed options plus static string/template
+        # literals; all are outside the verifier's parseable `{...}` contract.
+        def non_object_literal_rsc_plugin_invocation_count(content)
+          count = 0
+          search_from = 0
+
+          while (match = content.match(RSC_PLUGIN_INVOCATION_REGEX, search_from))
+            call_start = match.begin(0)
+            after_open_paren = match.end(0)
+            unless js_code_position?(content, call_start)
+              search_from = after_open_paren
+              next
+            end
+
+            options_start = first_js_token_index(content, after_open_paren)
+            options_start_char = options_start ? content[options_start] : nil
+            count += 1 if options_start_char && options_start_char != "{" && options_start_char != ")"
+            search_from = after_open_paren
+          end
+
+          count
         end
 
         def rsc_plugin_defines_client_references?(content, is_server:)
@@ -411,11 +437,10 @@ module ReactOnRails
           false
         end
 
-        # Skips whitespace, JS line/block comments, and leading string literals so callers see the
-        # next structural character. Without comment skipping, configurations like
-        # `new RSCWebpackPlugin( /* opts */ {` would land on `/` and be rejected as "no plugin
-        # options" even though the options object is present.
-        def first_significant_js_index(content, start_index)
+        # Skips whitespace and JS line/block comments, preserving strings as the next token.
+        # Non-object-literal option verification uses this so `new RSCWebpackPlugin("opts")`
+        # warns instead of having the string skipped as incidental syntax.
+        def first_js_token_index(content, start_index)
           index = start_index
           state = nil
           escaped = false
@@ -423,16 +448,55 @@ module ReactOnRails
           while index < content.length
             char = content[index]
             next_char = content[index + 1]
-            prev_state = state
-            state, escaped, index = advance_js_scan_state(state, escaped, char, next_char, index)
-            # Exiting a block comment leaves `char` as `*` and `index` pointing at the closing
-            # `/`; advance past it so the next iteration evaluates the first character after `*/`.
-            if state || prev_state == :block_comment
+
+            if state
+              state, escaped, index = advance_js_scan_state(state, escaped, char, next_char, index)
               index += 1
               next
             end
 
-            return index unless char.match?(/\s/) || JS_STRING_DELIMITERS.include?(prev_state)
+            return index unless char.match?(/\s/) || (char == "/" && JS_COMMENT_SECOND_CHARS.include?(next_char))
+
+            state, escaped, index = advance_js_scan_state(state, escaped, char, next_char, index)
+
+            index += 1
+          end
+
+          nil
+        end
+
+        # Skips whitespace, JS line/block comments, and leading string literals so callers see the
+        # next structural character. Without comment skipping, configurations like
+        # `new RSCWebpackPlugin( /* opts */ {` would land on `/` and be rejected as "no plugin
+        # options" even though the options object is present.
+        def first_significant_js_index(content, start_index)
+          index = first_js_token_index(content, start_index)
+
+          while index && JS_STRING_DELIMITERS.include?(content[index])
+            string_end = js_string_end_index(content, index)
+            return nil unless string_end
+
+            index = first_js_token_index(content, string_end + 1)
+          end
+
+          index
+        end
+
+        # Scans from a string-opening delimiter at `string_start_index` and returns the index
+        # of the matching closing delimiter, not one past it. Returns nil for unterminated
+        # strings. Callers must ensure `content[string_start_index]` is in JS_STRING_DELIMITERS.
+        def js_string_end_index(content, string_start_index)
+          state = nil
+          escaped = false
+          index = string_start_index
+
+          while index < content.length
+            char = content[index]
+            next_char = content[index + 1]
+            previous_state = state
+            state, escaped, index = advance_js_scan_state(state, escaped, char, next_char, index)
+
+            return index if previous_state && state.nil?
 
             index += 1
           end
