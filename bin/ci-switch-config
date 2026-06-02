@@ -13,10 +13,12 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 MINIMUM_RUBY_VERSION="3.3.7" # Update when a newer 3.3.x patch is released.
 MINIMUM_RUBY_MINOR_VERSION="${MINIMUM_RUBY_VERSION%.*}"
+MINIMUM_NODE_VERSION="20.18.1" # Update when minimum CI moves to a newer Node patch.
 MINIMUM_REACT_VERSION="18.0.0" # Update when minimum CI moves to a newer React version.
 MINIMUM_REACT_MAJOR_VERSION="${MINIMUM_REACT_VERSION%%.*}"
 LATEST_RUBY_VERSION="4.0.5" # Update when a newer 4.0.x patch is released.
 LATEST_RUBY_MINOR_VERSION="${LATEST_RUBY_VERSION%.*}"
+LATEST_NODE_VERSION="22.12.0" # Update when latest CI moves to a newer Node patch.
 LATEST_SHAKAPACKER_VERSION="10.1.0" # Update when latest CI moves to a newer Shakapacker.
 LATEST_REACT_VERSION="19.0.0" # Update when latest CI moves to a newer React version.
 LATEST_REACT_MAJOR_VERSION="${LATEST_REACT_VERSION%%.*}"
@@ -164,9 +166,11 @@ set_node_version() {
 }
 
 install_bundle_to_vendor() {
+  local bundle_dir="${1:-$PWD}"
+  local lockfile="$bundle_dir/Gemfile.lock"
   local bundler_version=""
 
-  if [ -f Gemfile.lock ]; then
+  if [ -f "$lockfile" ]; then
     bundler_version=$(awk '
       /^BUNDLED WITH$/ {
         getline
@@ -174,21 +178,25 @@ install_bundle_to_vendor() {
         print
         exit
       }
-    ' Gemfile.lock)
+    ' "$lockfile")
   fi
 
-  if [ -n "$bundler_version" ]; then
-    if ! gem list bundler -i -v "$bundler_version" > /dev/null 2>&1; then
-      print_header "Installing Bundler $bundler_version"
-      gem install bundler -v "$bundler_version"
+  (
+    cd "$bundle_dir"
+
+    if [ -n "$bundler_version" ]; then
+      if ! gem list bundler -i -v "$bundler_version" > /dev/null 2>&1; then
+        print_header "Installing Bundler $bundler_version"
+        gem install bundler -v "$bundler_version"
+      fi
+
+      bundle "_${bundler_version}_" config set --local path vendor/bundle
+      bundle "_${bundler_version}_" install
+    else
+      bundle config set --local path vendor/bundle
+      bundle install
     fi
-
-    bundle "_${bundler_version}_" config set --local path vendor/bundle
-    bundle "_${bundler_version}_" install
-  else
-    bundle config set --local path vendor/bundle
-    bundle install
-  fi
+  )
 }
 
 show_status() {
@@ -270,9 +278,9 @@ switch_to_minimum() {
       print_header "Setting runtime versions in .tool-versions"
       cat > "$PROJECT_ROOT/.tool-versions" <<EOF
 ruby ${MINIMUM_RUBY_VERSION}
-nodejs 20.18.1
+nodejs ${MINIMUM_NODE_VERSION}
 EOF
-      print_success "Created .tool-versions with Ruby $MINIMUM_RUBY_VERSION and Node 20.18.1"
+      print_success "Created .tool-versions with Ruby $MINIMUM_RUBY_VERSION and Node $MINIMUM_NODE_VERSION"
       ;;
     rvm|rvm+nvm)
       print_header "Creating .ruby-version for rvm"
@@ -284,13 +292,13 @@ EOF
   case "$VERSION_MANAGER" in
     nvm|rvm+nvm)
       print_header "Creating .nvmrc for nvm"
-      echo "20.18.1" > "$PROJECT_ROOT/.nvmrc"
-      print_success "Created .nvmrc with Node 20.18.1"
+      echo "$MINIMUM_NODE_VERSION" > "$PROJECT_ROOT/.nvmrc"
+      print_success "Created .nvmrc with Node $MINIMUM_NODE_VERSION"
       ;;
   esac
 
   set_ruby_version "$MINIMUM_RUBY_VERSION" "$VERSION_MANAGER"
-  set_node_version "20.18.1" "$VERSION_MANAGER"
+  set_node_version "$MINIMUM_NODE_VERSION" "$VERSION_MANAGER"
 
   # Run conversion script
   # NOTE: This executes 'ruby' before the version manager reloads in your current shell.
@@ -320,7 +328,7 @@ EOF
   fi
 
   pnpm install --no-frozen-lockfile
-  install_bundle_to_vendor
+  install_bundle_to_vendor "$PWD"
 
   print_success "Dependencies installed"
 
@@ -412,9 +420,9 @@ restore_to_latest() {
       print_header "Setting runtime versions in .tool-versions"
       cat > "$PROJECT_ROOT/.tool-versions" <<EOF
 ruby ${LATEST_RUBY_VERSION}
-nodejs 22.12.0
+nodejs ${LATEST_NODE_VERSION}
 EOF
-      print_success "Created .tool-versions with Ruby $LATEST_RUBY_VERSION and Node 22.12.0"
+      print_success "Created .tool-versions with Ruby $LATEST_RUBY_VERSION and Node $LATEST_NODE_VERSION"
       ;;
     rvm|rvm+nvm)
       print_header "Creating .ruby-version for rvm"
@@ -426,13 +434,13 @@ EOF
   case "$VERSION_MANAGER" in
     nvm|rvm+nvm)
       print_header "Creating .nvmrc for nvm"
-      echo "22.12.0" > "$PROJECT_ROOT/.nvmrc"
-      print_success "Created .nvmrc with Node 22.12.0"
+      echo "$LATEST_NODE_VERSION" > "$PROJECT_ROOT/.nvmrc"
+      print_success "Created .nvmrc with Node $LATEST_NODE_VERSION"
       ;;
   esac
 
   set_ruby_version "$LATEST_RUBY_VERSION" "$VERSION_MANAGER"
-  set_node_version "22.12.0" "$VERSION_MANAGER"
+  set_node_version "$LATEST_NODE_VERSION" "$VERSION_MANAGER"
 
   # Restore files from git
   print_header "Restoring dependency files from git"
@@ -461,7 +469,7 @@ EOF
   fi
 
   pnpm install --frozen-lockfile
-  install_bundle_to_vendor
+  install_bundle_to_vendor "$PWD"
 
   print_success "Dependencies installed"
 
