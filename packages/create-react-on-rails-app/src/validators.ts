@@ -3,7 +3,7 @@ import { getCommandVersion } from './utils.js';
 
 const MIN_NODE_VERSION = 18;
 const MIN_RUBY_MAJOR = 3;
-const MIN_RUBY_MINOR = 0;
+const MIN_RUBY_MINOR = 3;
 const MIN_RAILS_MAJOR = 7;
 const MIN_RAILS_MINOR = 0;
 
@@ -31,7 +31,7 @@ export function validateRuby(): ValidationResult {
       valid: false,
       message:
         'Ruby is not installed or not found in PATH.\n\n' +
-        'React on Rails requires Ruby 3.0+.\n\n' +
+        `React on Rails requires Ruby ${MIN_RUBY_MAJOR}.${MIN_RUBY_MINOR}+.\n\n` +
         'Popular installation options:\n' +
         '  - mise:   https://mise.jdx.dev/ (recommended)\n' +
         '  - rbenv:  https://github.com/rbenv/rbenv\n' +

@@ -98,7 +98,7 @@ After completion, you get:
 The CLI checks for these before starting:
 
 - **Node.js 18+**
-- **Ruby 3.0+**
+- **Ruby 3.3+**
 - **Rails 7.0+** (`gem install rails`)
 - **git**
 - **npm or pnpm**

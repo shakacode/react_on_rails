@@ -228,7 +228,9 @@ import React from 'react';
 import moment from 'moment';
 import lodash from 'lodash';
 
-// Server components can use Node.js modules, access the server files, make database queries, etc.
+// Server components can use Node.js modules and server-only libraries (here, the `os` module).
+// Note: the Node renderer has no Rails models or database connection — database access lives in
+// your Rails controller, which passes the results to the component as props (see note below).
 import os from 'os';
 
 // This async component demonstrates server-side functionality
@@ -301,6 +303,8 @@ async function ReactServerComponent() {
 
 export default ReactServerComponent;
 ```
+
+> **React on Rails note:** This demo uses the `os` module to show that server-only code stays on the server and never ships to the client. Real application data is different: in React on Rails, Rails is the backend, so your controller loads the data (with its authorization and caching) and passes it to the component as props via `stream_react_component` — the component should not reach into a database or call `fetch` itself. See [RSC Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md), and [async props](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently) for streaming slow data.
 
 ## Create a React Server Component Page
 

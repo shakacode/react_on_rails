@@ -44,13 +44,13 @@ bundle exec rake run_rspec:gem
 
 ❌ **System tests** - May fail with SSL errors on Ruby 3.4.3 + OpenSSL 3.6
 
-### Solution: Use Ruby 3.2 (Recommended)
+### Solution: Use Ruby 3.3 (Recommended)
 
-The easiest fix is to switch to Ruby 3.2, which CI also uses:
+The easiest fix is to switch to Ruby 3.3, which the minimum-dependency CI jobs also use:
 
 ```bash
 # If using mise/rtx
-mise use ruby@3.2
+mise use ruby@3.3
 
 # Then reinstall dependencies
 bundle install
@@ -60,7 +60,8 @@ cd spec/dummy
 bundle exec rspec spec/system/integration_spec.rb
 ```
 
-Ruby 3.2 doesn't have the OpenSSL 3.6 compatibility issues and matches the CI environment more closely.
+Ruby 3.3 does not trigger the SSL errors observed on Ruby 3.4.3 with OpenSSL 3.6. If you still hit SSL
+errors on Ruby 3.3, please open an issue; Ruby 3.3 also matches the minimum supported Ruby line more closely.
 
 ### Alternative Solutions
 

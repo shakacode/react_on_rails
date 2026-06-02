@@ -596,5 +596,47 @@ RSpec.describe "update_changelog.rake helper methods" do
         expect(version).to eq("16.4.0.rc.0")
       end
     end
+
+    it "warns when the active prerelease base only has tags under a different channel" do
+      Dir.mktmpdir do |repo_dir|
+        init_git_repo!(repo_dir)
+        run_git!("tag", "v16.3.0", chdir: repo_dir)
+        run_git!("tag", "v16.4.0.beta.0", chdir: repo_dir)
+
+        changelog = <<~CHANGELOG
+          ### [Unreleased]
+
+          ### [16.4.0.beta.0] - 2026-03-01
+          #### Added
+          - Feature from beta.0
+        CHANGELOG
+
+        expect do
+          version = compute_auto_version(changelog, "rc", repo_dir)
+          expect(version).to eq("16.4.0.rc.0")
+        end.to output(/WARNING: active prerelease base 16\.4\.0 was found via a different channel/).to_stderr
+      end
+    end
+
+    it "does not warn when the active prerelease base has same-channel tags" do
+      Dir.mktmpdir do |repo_dir|
+        init_git_repo!(repo_dir)
+        run_git!("tag", "v16.3.0", chdir: repo_dir)
+        run_git!("tag", "v16.4.0.rc.0", chdir: repo_dir)
+
+        changelog = <<~CHANGELOG
+          ### [Unreleased]
+
+          ### [16.4.0.rc.0] - 2026-03-01
+          #### Added
+          - Feature from rc.0
+        CHANGELOG
+
+        expect do
+          version = compute_auto_version(changelog, "rc", repo_dir)
+          expect(version).to eq("16.4.0.rc.1")
+        end.not_to output(/different channel/).to_stderr
+      end
+    end
   end
 end

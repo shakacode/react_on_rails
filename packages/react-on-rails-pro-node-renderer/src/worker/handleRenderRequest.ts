@@ -7,7 +7,7 @@
 
 import cluster from 'cluster';
 import path from 'path';
-import { mkdir } from 'fs/promises';
+import { mkdir, stat } from 'fs/promises';
 import { lock, unlock } from '../shared/locks.js';
 import fileExistsAsync from '../shared/fileExistsAsync.js';
 import log from '../shared/log.js';
@@ -29,6 +29,21 @@ import { getConfig } from '../shared/configBuilder.js';
 import { subSpan, type TracingContext } from '../shared/tracing.js';
 import { buildExecutionContext, ExecutionContext, VMContextNotFoundError } from './vm.js';
 
+export async function sumUploadedBytes(assets: Asset[]): Promise<number> {
+  const sizes = await Promise.all(
+    assets.map(async (asset) => {
+      try {
+        return (await stat(asset.savedFilePath)).size;
+      } catch {
+        // Best-effort: a missing source means we record what we can rather than
+        // failing the request just to get a span attribute.
+        return 0;
+      }
+    }),
+  );
+  return sizes.reduce((total, size) => total + size, 0);
+}
+
 export type ProvidedNewBundle = {
   timestamp: string | number;
   bundle: Asset;
@@ -36,13 +51,18 @@ export type ProvidedNewBundle = {
 
 async function prepareResult(
   renderingRequest: string,
+  bundleTimestamp: string | number,
   bundleFilePathPerTimestamp: string,
   executionContext: ExecutionContext,
 ): Promise<ResponseResult> {
-  return subSpan({ name: 'ror.result.prepare' }, async () => {
+  return subSpan({ name: 'ror.result.prepare' }, async (resultSpan) => {
     try {
-      const result = await subSpan({ name: 'ror.vm.execute' }, () =>
-        executionContext.runInVM(renderingRequest, bundleFilePathPerTimestamp, cluster),
+      const result = await subSpan(
+        {
+          name: 'ror.vm.execute',
+          attributes: { 'bundle.timestamp': String(bundleTimestamp) },
+        },
+        (_controller) => executionContext.runInVM(renderingRequest, bundleFilePathPerTimestamp, cluster),
       );
 
       let exceptionMessage = null;
@@ -64,11 +84,17 @@ async function prepareResult(
       }
 
       if (isReadableStream(result)) {
+        // Stream length is unknown until consumed; omit response.bytes rather
+        // than buffer the stream to compute it.
         return {
           headers: { 'Cache-Control': 'public, max-age=31536000' },
           status: 200,
           stream: result,
         };
+      }
+
+      if (typeof result === 'string') {
+        resultSpan.setAttributes({ 'response.bytes': Buffer.byteLength(result, 'utf8') });
       }
 
       return {
@@ -251,7 +277,12 @@ export async function handleRenderRequest({
         () => buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ false),
       );
       return {
-        response: await prepareResult(renderingRequest, entryBundleFilePath, executionContext),
+        response: await prepareResult(
+          renderingRequest,
+          bundleTimestamp,
+          entryBundleFilePath,
+          executionContext,
+        ),
         executionContext,
       };
     } catch (e) {
@@ -264,12 +295,20 @@ export async function handleRenderRequest({
 
     // If gem has posted updated bundle:
     if (providedNewBundles && providedNewBundles.length > 0) {
+      // Stat upload sources before they're moved by handleNewBundlesProvided.
+      // bytes.total reflects source file sizes at upload time, not compressed
+      // wire bytes.
+      const bytesTotal = await sumUploadedBytes([
+        ...providedNewBundles.map((b) => b.bundle),
+        ...(assetsToCopy ?? []),
+      ]);
       const result = await subSpan(
         {
           name: 'ror.bundle.upload',
           attributes: {
             'bundle.count': providedNewBundles.length,
             'assets.count': assetsToCopy?.length ?? 0,
+            'bytes.total': bytesTotal,
           },
         },
         () => handleNewBundlesProvided({ renderingRequest }, providedNewBundles, assetsToCopy),
@@ -304,7 +343,7 @@ export async function handleRenderRequest({
       () => buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ true),
     );
     return {
-      response: await prepareResult(renderingRequest, entryBundleFilePath, executionContext),
+      response: await prepareResult(renderingRequest, bundleTimestamp, entryBundleFilePath, executionContext),
       executionContext,
     };
   } catch (error) {

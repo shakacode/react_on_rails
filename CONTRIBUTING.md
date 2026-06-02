@@ -1,14 +1,13 @@
 # Tips for Contributors
 
-**🏗️ Important: Monorepo Merger in Progress**
+**🏗️ Monorepo structure**
 
-We are currently working on merging the `react_on_rails` and `react_on_rails_pro` repositories into a unified monorepo. This will provide better development experience while maintaining separate package identities and licensing. See [internal/planning/MONOREPO_MERGER_PLAN.md](./internal/planning/MONOREPO_MERGER_PLAN.md) for details.
+This repository is a monorepo containing both the MIT-licensed core (the `react_on_rails` gem and the `react-on-rails` npm package) and the Pro packages (the `react_on_rails_pro` gem and the `react-on-rails-pro` and `react-on-rails-pro-node-renderer` npm packages). License boundaries are directory-based — see [LICENSE.md](./LICENSE.md) for the authoritative list of which directories use which license.
 
-During this transition:
+When contributing:
 
-- Continue contributing to the current structure
-- License compliance remains critical - ensure no Pro code enters MIT-licensed areas
-- Major structural changes may be coordinated with the merger plan
+- License compliance is critical — never add Pro code to MIT-licensed directories.
+- Follow the existing directory layout for the package you are changing.
 
 ---
 
@@ -255,6 +254,16 @@ pnpm install
 
 You can also run `bin/console` for an interactive prompt that will allow you to experiment.
 
+### Lockfile Platforms
+
+When committing any `Gemfile.lock`, ensure it includes the Linux platform used by CI.
+If you generated or refreshed a lockfile on macOS or another non-Linux platform and `x86_64-linux` is missing from the
+`PLATFORMS` section, the lint workflow will fail. Run this in the directory that owns that lockfile before committing:
+
+```sh
+bundle lock --add-platform x86_64-linux
+```
+
 ### Local Node Package
 
 Note, the example and dummy apps will use your local `packages/react-on-rails` folder as the `react-on-rails` node package. This will also be done automatically for you via the `rake examples:gen_all` rake task.
@@ -351,6 +360,8 @@ Run only RuboCop:
 rake lint:rubocop
 ```
 
+For v17, new Ruby code should use long-form hash syntax instead of shorthand; shorthand cleanup is tracked for v18 in [#3501](https://github.com/shakacode/react_on_rails/issues/3501).
+
 Run only ESLint:
 
 ```sh
@@ -432,7 +443,7 @@ If you run `rspec` at the top level, you'll see this message: `require': cannot 
 
 If you run tests with `COVERAGE=true`, you can view the SimpleCov report at `coverage/index.html`.
 
-Turbolinks 5 is included in the test app, unless "DISABLE_TURBOLINKS" is set to YES in the environment.
+The Turbolinks 5 gem is always bundled in the test app. Setting `DISABLE_TURBOLINKS=TRUE` in the environment suppresses the `require_asset` call in `react_on_rails/spec/dummy/app/assets/javascripts/application_non_webpack.js.erb`, so Turbolinks does not load at runtime — but the gem itself stays in the bundle to keep the gemset consistent with `Gemfile.lock`.
 
 Run `rake -T` or `rake -D` to see testing options.
 
@@ -459,7 +470,7 @@ After updating the source files above, regenerate lock files by running `bundle 
 
 - `react_on_rails/` and `react_on_rails/spec/dummy/` (OSS)
 - `react_on_rails_pro/` and `react_on_rails_pro/spec/dummy/` and `react_on_rails_pro/spec/execjs-compatible-dummy/` (Pro)
-- Root `Gemfile.lock` and `pnpm-lock.yaml`
+- `react_on_rails/Gemfile.lock` and root `pnpm-lock.yaml`
 
 **Example apps (handled automatically):**
 
@@ -610,7 +621,7 @@ Runs all skipped CI checks and enables full CI mode for the PR:
 - Triggers all CI workflows that were skipped due to unchanged code
 - Adds the `full-ci` label to the PR
 - **Persists across future commits** - all subsequent pushes will run the full test suite
-- Runs minimum dependency tests (Ruby 3.2, Node 20, Shakapacker 8.2.0, React 18)
+- Runs minimum dependency tests (Ruby 3.3, Node 20, Shakapacker 8.2.0, React 18)
 
 **When to use:**
 

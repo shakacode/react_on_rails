@@ -17,6 +17,8 @@ module ReactOnRailsPro
 
     CONNECTION_ERRORS: Array[Class]
 
+    SCHEDULER_CLIENTS_KEY: Symbol
+
     class ConnectTimeoutWrapper
       def initialize: (connect_timeout: Numeric?, ?read_timeout: Numeric?) -> void
 

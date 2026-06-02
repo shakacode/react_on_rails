@@ -7,7 +7,7 @@ on:
   push:
     branches:
       - 'main'
-    # Always trigger on main; docs-only detection handles skipping heavy jobs
+    # Always trigger on main; non-runtime detection handles skipping heavy jobs
   pull_request:
     paths-ignore:
       - '**.md'
@@ -31,6 +31,9 @@ defaults:
   run:
     working-directory: react_on_rails_pro
 
+env:
+  RUBY_VERSION: 3.3.7
+
 jobs:
   detect-changes:
     # Skip Dependabot PRs — they can't access the Pro license secret.
@@ -42,6 +45,7 @@ jobs:
     runs-on: ubuntu-22.04
     outputs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
+      non_runtime_only: ${{ steps.detect.outputs.non_runtime_only }}
       run_pro_lint: ${{ steps.detect.outputs.run_pro_lint }}
       run_pro_tests: ${{ steps.detect.outputs.run_pro_tests }}
       has_full_ci_label: ${{ steps.check-label.outputs.result }}
@@ -59,9 +63,12 @@ jobs:
         run: |
           # If force_run is true OR full-ci label is present, run everything
           if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
-            echo "run_pro_lint=true" >> "$GITHUB_OUTPUT"
-            echo "run_pro_tests=true" >> "$GITHUB_OUTPUT"
-            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "run_pro_lint=true"
+              echo "run_pro_tests=true"
+              echo "docs_only=false"
+              echo "non_runtime_only=false"
+            } >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -96,24 +103,24 @@ jobs:
           persist-credentials: false
 
       - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ./.github/actions/setup-ruby
         with:
-          ruby-version: 3.3.7
-          bundler: 2.5.4
+          ruby-version: ${{ env.RUBY_VERSION }}
+          bundler-version: 2.5.4
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
+          # Pin to 22.12.0 (Shakapacker 10.1 floor) to avoid V8 bug in 22.21.0
           # https://github.com/nodejs/node/issues/56010
-          node-version: '22.11.0'
+          node-version: '22.12.0'
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
       - name: Get pnpm store directory
         shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
 
       - name: Setup pnpm cache
         uses: actions/cache@v4
@@ -133,25 +140,11 @@ jobs:
           echo "pnpm version: "; pnpm --version
           echo "Bundler version: "; bundle --version
 
-      - name: Cache Pro package Ruby gems
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails_pro/vendor/bundle
-          key: v4-pro-package-gem-cache-${{ hashFiles('react_on_rails_pro/react_on_rails_pro.gemspec') }}
-
-      - name: Cache Pro dummy app Ruby gems
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails_pro/spec/dummy/vendor/bundle
-          key: v4-pro-dummy-app-gem-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
-
       - name: Install Ruby Gems for Pro package
-        run: |
-          gem install bundler -v "2.5.4"
-          echo "Bundler version: "; bundle --version
-          bundle config set --local path 'vendor/bundle'
-          bundle config set --local disable_checksum_validation true
-          bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: react_on_rails_pro
+          ruby-version: ${{ env.RUBY_VERSION }}
 
       - name: Install Node modules with pnpm
         working-directory: .
@@ -161,10 +154,10 @@ jobs:
         run: node script/check-react-major-version.mjs react_on_rails_pro/spec/execjs-compatible-dummy 18
 
       - name: Install Ruby Gems for Pro dummy app
-        run: |
-          cd spec/dummy
-          bundle lock --add-platform 'x86_64-linux'
-          bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: react_on_rails_pro/spec/dummy
+          ruby-version: ${{ env.RUBY_VERSION }}
 
       - name: Generate file-system based entrypoints
         run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
@@ -173,10 +166,16 @@ jobs:
         working-directory: .
         run: pnpm --filter react-on-rails-pro build
 
+      # These steps need the Pro package Gemfile (which carries rubocop/rbs),
+      # so pin it via absolute path — robust to changes in defaults.run.
       - name: Lint Ruby
+        env:
+          BUNDLE_GEMFILE: ${{ github.workspace }}/react_on_rails_pro/Gemfile
         run: bundle exec rubocop --ignore-parent-exclusion
 
       - name: Validate RBS type signatures
+        env:
+          BUNDLE_GEMFILE: ${{ github.workspace }}/react_on_rails_pro/Gemfile
         run: bundle exec rake rbs:validate
 
       - name: Check TypeScript
@@ -190,7 +189,7 @@ jobs:
       !(
         github.event_name == 'push' &&
         github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.docs_only == 'true'
+        needs.detect-changes.outputs.non_runtime_only == 'true'
       ) && (
         github.ref == 'refs/heads/main' ||
         github.event_name == 'workflow_dispatch' ||
@@ -205,24 +204,24 @@ jobs:
           persist-credentials: false
 
       - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ./.github/actions/setup-ruby
         with:
-          ruby-version: 3.3.7
-          bundler: 2.5.4
+          ruby-version: ${{ env.RUBY_VERSION }}
+          bundler-version: 2.5.4
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
+          # Pin to 22.12.0 (Shakapacker 10.1 floor) to avoid V8 bug in 22.21.0
           # https://github.com/nodejs/node/issues/56010
-          node-version: '22.11.0'
+          node-version: '22.12.0'
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
       - name: Get pnpm store directory
         shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
 
       - name: Setup pnpm cache
         uses: actions/cache@v4
@@ -241,12 +240,6 @@ jobs:
           echo "Node version: "; node -v
           echo "pnpm version: "; pnpm --version
           echo "Bundler version: "; bundle --version
-
-      - name: Cache Pro dummy app Ruby gems
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails_pro/spec/dummy/vendor/bundle
-          key: v4-pro-dummy-app-gem-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
 
       - name: Install Node modules with pnpm
         working-directory: .
@@ -263,11 +256,10 @@ jobs:
         run: node script/check-react-major-version.mjs react_on_rails_pro/spec/execjs-compatible-dummy 18
 
       - name: Install Ruby Gems for Pro dummy app
-        run: |
-          gem install bundler -v "2.5.4"
-          cd spec/dummy
-          bundle lock --add-platform 'x86_64-linux'
-          bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: react_on_rails_pro/spec/dummy
+          ruby-version: ${{ env.RUBY_VERSION }}
 
       - name: Generate file-system based entrypoints
         run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
@@ -297,7 +289,7 @@ jobs:
       !(
         github.event_name == 'push' &&
         github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.docs_only == 'true'
+        needs.detect-changes.outputs.non_runtime_only == 'true'
       ) && (
         github.ref == 'refs/heads/main' ||
         github.event_name == 'workflow_dispatch' ||
@@ -325,16 +317,16 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
+          # Pin to 22.12.0 (Shakapacker 10.1 floor) to avoid V8 bug in 22.21.0
           # https://github.com/nodejs/node/issues/56010
-          node-version: '22.11.0'
+          node-version: '22.12.0'
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
       - name: Get pnpm store directory
         shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
 
       - name: Setup pnpm cache
         uses: actions/cache@v4
@@ -397,7 +389,7 @@ jobs:
       !(
         github.event_name == 'push' &&
         github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.docs_only == 'true'
+        needs.detect-changes.outputs.non_runtime_only == 'true'
       ) && (
         github.ref == 'refs/heads/main' ||
         github.event_name == 'workflow_dispatch' ||
@@ -415,10 +407,10 @@ jobs:
           persist-credentials: false
 
       - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ./.github/actions/setup-ruby
         with:
           ruby-version: ${{ matrix.ruby-version }}
-          bundler: 2.5.4
+          bundler-version: 2.5.4
 
       - name: Print system information
         run: |
@@ -428,19 +420,11 @@ jobs:
           echo "Ruby version: "; ruby -v
           echo "Bundler version: "; bundle --version
 
-      - name: Cache Pro package Ruby gems
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails_pro/vendor/bundle
-          key: v4-pro-package-gem-cache-ruby${{ matrix.ruby-version }}-${{ hashFiles('react_on_rails_pro/react_on_rails_pro.gemspec') }}
-
       - name: Install Ruby Gems for Pro package
-        run: |
-          gem install bundler -v "2.5.4"
-          echo "Bundler version: "; bundle --version
-          bundle config set --local path 'vendor/bundle'
-          bundle config set --local disable_checksum_validation true
-          bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: react_on_rails_pro
+          ruby-version: ${{ matrix.ruby-version }}
 
       - name: Run RSpec tests for Pro package
         run: bundle exec rspec spec/react_on_rails_pro

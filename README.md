@@ -46,10 +46,14 @@ React on Rails is maintained by [ShakaCode](https://www.shakacode.com).
 - [Compare with alternatives](https://reactonrails.com/docs/getting-started/comparison-with-alternatives/)
 - [Changelog](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md)
 
-Older docs and code: [v14](https://github.com/shakacode/react_on_rails/tree/14.0.0),
+These docs are for React on Rails 17. Historical docs and code are available for
+[v15](https://github.com/shakacode/react_on_rails/tree/15.0.0/docs)
+([code](https://github.com/shakacode/react_on_rails/tree/15.0.0)),
+[v14](https://github.com/shakacode/react_on_rails/tree/14.0.0),
 [v13](https://github.com/shakacode/react_on_rails/tree/13.4.0),
 [v12](https://github.com/shakacode/react_on_rails/tree/12.6.0), and
-[v11](https://github.com/shakacode/react_on_rails/tree/11.3.0).
+[v11](https://github.com/shakacode/react_on_rails/tree/11.3.0). Version 15.0.0
+was retracted, so use the v15 links only when maintaining older applications.
 
 ## Install in 30 Seconds
 
@@ -112,7 +116,7 @@ Start with the docs here:
 
 - Ruby on Rails >= 5
 - Shakapacker >= 6.0 (autobundling requires >= 7.0)
-- Ruby >= 3.0
+- Ruby >= 3.3
 - Node.js >= 18
 - A JavaScript package manager such as pnpm, npm, yarn, or bun
 

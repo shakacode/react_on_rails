@@ -1,0 +1,49 @@
+name: Setup Bundler dependencies
+description: >
+  Setup Ruby, cache, and install gems for a Bundler project. On Linux,
+  ensure libyaml-dev is already present or install it before calling this action.
+
+inputs:
+  working-directory:
+    description: Directory containing the Gemfile.
+    required: true
+  ruby-version:
+    description: Ruby version used by the job.
+    required: true
+  frozen:
+    description: Whether to run Bundler in frozen mode.
+    required: false
+    default: 'true'
+  bundler-version:
+    description: Bundler version selector. Use Gemfile.lock, default, latest, none, or x.y.z.
+    required: false
+    default: Gemfile.lock
+  cache-version:
+    description: Arbitrary cache-version value passed through to ruby/setup-ruby.
+    required: false
+    default: '0'
+
+runs:
+  using: composite
+  steps:
+    - name: Verify Gemfile.lock exists
+      shell: bash
+      run: |
+        lockfile="${{ inputs.working-directory }}/Gemfile.lock"
+        if ! git ls-files --error-unmatch "$lockfile" >/dev/null; then
+          echo "::error file=$lockfile::setup-bundle requires a committed Gemfile.lock in the working directory."
+          exit 1
+        fi
+
+    - name: Setup Ruby and install cached gems
+      uses: ruby/setup-ruby@v1
+      env:
+        BUNDLE_FROZEN: ${{ inputs.frozen }}
+        BUNDLE_RETRY: '3'
+        BUNDLE_JOBS: '4'
+      with:
+        ruby-version: ${{ inputs.ruby-version }}
+        working-directory: ${{ inputs.working-directory }}
+        bundler: ${{ inputs.bundler-version }}
+        bundler-cache: true
+        cache-version: ${{ inputs.cache-version }}

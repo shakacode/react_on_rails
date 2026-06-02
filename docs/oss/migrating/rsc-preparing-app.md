@@ -265,7 +265,11 @@ module.exports = {
 };
 ```
 
-> **`clientReferences`**: If omitted, the plugin defaults to scanning the entire project root recursively (`{ directory: ".", recursive: true, include: /\.(js|ts|jsx|tsx)$/ }`), which works but is slow on large codebases. Setting `directory` to your app's source directory (e.g., `'./client/app'`) limits the scan to only the files that could contain `'use client'` directives.
+> **`clientReferences`**: Always point this at your application source directory. If omitted, the plugin defaults to scanning the entire project root recursively (`{ directory: ".", recursive: true, include: /\.(js|ts|jsx|tsx)$/ }`). That can accidentally discover vendored gem templates under paths such as `vendor/bundle` in CI and make webpack compile files that are not part of your app. Setting `directory` to your app's source directory (e.g., `'./client/app'`) limits the scan to only the files that could contain `'use client'` directives.
+
+> **Generator note (CommonJS only):** The `rails generate react_on_rails:rsc` migration only rewrites webpack configs that use CommonJS (`require`-style) imports. If your config has been converted to ESM (`import`/`export`) syntax, the generator emits an "expected webpack import anchor was not found" warning and you must add `clientReferences` manually as shown above.
+
+> **Upgrade note for apps already on RSC:** `verify_rsc_webpack_transforms` (and the `rails generate react_on_rails:rsc` doctor check) now requires that `RSCWebpackPlugin` be invoked with `clientReferences: rscClientReferences` pointing at `resolve(config.source_path)`. Existing apps that have the plugin without a scoped `clientReferences` option were previously passing verification and will now report `"generated scoped clientReferences in {client,server}WebpackConfig.js"` as a missing transform. To remediate, either (a) re-run `rails generate react_on_rails:rsc` and accept the in-place migration, or (b) manually add the helper and option as shown above — declare `const rscClientReferences = { directory: resolve(config.source_path), recursive: true, include: /\.(js|mjs|cjs|ts|mts|cts|jsx|tsx)$/ };` at module scope and pass `clientReferences: rscClientReferences` into every `RSCWebpackPlugin` invocation.
 
 ### 4c. Add RSCWebpackPlugin to the client webpack config
 
@@ -338,7 +342,7 @@ rails: rails s -p 3000
 webpack-dev-server: HMR=true bin/shakapacker-dev-server
 rails-server-assets: HMR=true SERVER_BUNDLE_ONLY=true bin/shakapacker --watch
 rails-rsc-assets: HMR=true RSC_BUNDLE_ONLY=true bin/shakapacker --watch
-node-renderer: node renderer/node-renderer.js
+node-renderer: RENDERER_PORT=${RENDERER_PORT:-3800} node renderer/node-renderer.js
 ```
 
 > **For full webpack configuration details**, including the technical background on how the RSC loader, plugin, and manifests work together, see [How React Server Components Work](../../pro/react-server-components/how-react-server-components-work.md).

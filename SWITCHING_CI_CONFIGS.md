@@ -8,7 +8,7 @@ This guide explains how to switch between different CI test configurations local
 # Check your current configuration
 bin/ci-switch-config status
 
-# Switch to minimum dependencies (Ruby 3.2, Node 20)
+# Switch to minimum dependencies (Ruby 3.3, Node 20)
 bin/ci-switch-config minimum
 
 # Switch back to latest dependencies (Ruby 3.4, Node 22)
@@ -30,7 +30,7 @@ The project runs tests against two configurations:
 
 ### Minimum (Compatibility Testing)
 
-- **Ruby**: 3.2
+- **Ruby**: 3.3
 - **Node**: 20
 - **Shakapacker**: 8.2.0
 - **React**: 18.0.0
@@ -41,7 +41,7 @@ The project runs tests against two configurations:
 
 **Switch to minimum when:**
 
-- CI fails on `dummy-app-integration-tests (3.2, 20, minimum)` but passes on latest
+- CI fails on `dummy-app-integration-tests (3.3, 20, minimum)` but passes on latest
 - You're debugging compatibility with older dependencies
 - You want to verify minimum version support before releasing
 
@@ -122,7 +122,7 @@ bin/ci-switch-config minimum
 
 This will:
 
-1. Create `.tool-versions` with Ruby 3.2.8 and Node 20.18.1
+1. Create `.tool-versions` with the Ruby patch from `MINIMUM_RUBY_VERSION` in `bin/ci-switch-config` and Node 20.18.1
 2. Run `script/convert` to downgrade dependencies:
    - Shakapacker 9.5.0 → 8.2.0
    - React 19.0.0 → 18.0.0
@@ -210,7 +210,7 @@ bin/ci-switch-config minimum
 cd <project-root>
 
 # 4. Verify versions changed
-ruby --version  # Should show 3.2.x
+ruby --version  # Should show 3.3.x
 node --version  # Should show v20.x
 
 # 5. Build and test
@@ -280,8 +280,8 @@ asdf reshim nodejs
 
 ```bash
 # Install and use specific Ruby version
-rvm install 3.2.8   # or 3.4.3
-rvm use 3.2.8
+rvm install 3.3.7   # or 3.4.3
+rvm use 3.3.7
 
 # Install and use specific Node version
 nvm install 20.18.1  # or 22.12.0

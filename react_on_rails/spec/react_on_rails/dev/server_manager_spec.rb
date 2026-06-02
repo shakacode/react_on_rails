@@ -497,16 +497,39 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           .to output(%r{Overriding REACT_RENDERER_URL="http://renderer.internal:3800"}).to_stderr
       end
 
+      it "rewrites a remote REACT_RENDERER_URL to the standard localhost derived URL" do
+        ENV["REACT_RENDERER_URL"] = "http://renderer.internal:3800"
+        described_class.start(:development)
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://localhost:5002")
+      end
+
       it "warns before overriding a localhost REACT_RENDERER_URL on a different port" do
         ENV["REACT_RENDERER_URL"] = "http://localhost:3800"
         expect { described_class.start(:development) }
           .to output(%r{Overriding REACT_RENDERER_URL="http://localhost:3800" with http://localhost:5002}).to_stderr
       end
 
+      it "preserves an explicit IPv4 localhost REACT_RENDERER_URL host in base-port mode" do
+        ENV["REACT_RENDERER_URL"] = "http://127.0.0.1:3800"
+        expect { described_class.start(:development) }
+          .to output(%r{Overriding REACT_RENDERER_URL="http://127.0.0.1:3800" with http://127.0.0.1:5002})
+          .to_stderr
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://127.0.0.1:5002")
+      end
+
+      it "preserves an explicit IPv6 localhost REACT_RENDERER_URL host in base-port mode" do
+        ENV["REACT_RENDERER_URL"] = "http://[::1]:3800"
+        expect { described_class.start(:development) }
+          .to output(%r{Overriding REACT_RENDERER_URL="http://\[::1\]:3800" with http://\[::1\]:5002})
+          .to_stderr
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://[::1]:5002")
+      end
+
       it "warns before overriding an HTTPS localhost REACT_RENDERER_URL on a different port" do
         ENV["REACT_RENDERER_URL"] = "https://localhost:3800"
         expect { described_class.start(:development) }
           .to output(%r{Overriding REACT_RENDERER_URL="https://localhost:3800"}).to_stderr
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("https://localhost:5002")
       end
 
       it "does not warn when REACT_RENDERER_URL already equals the derived URL" do
@@ -519,6 +542,13 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         ENV["RENDERER_URL"] = "http://localhost:3800"
         described_class.start(:development)
         expect(ENV.fetch("RENDERER_URL", nil)).to eq("http://localhost:5002")
+      end
+
+      it "preserves a legacy localhost-equivalent RENDERER_URL host when REACT_RENDERER_URL is unset" do
+        ENV["RENDERER_URL"] = "http://127.0.0.1:3800"
+        described_class.start(:development)
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://127.0.0.1:5002")
+        expect(ENV.fetch("RENDERER_URL", nil)).to eq("http://127.0.0.1:5002")
       end
 
       it "warns before overriding a legacy RENDERER_URL on a different port" do
@@ -1542,6 +1572,120 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       expect { described_class.show_help }.to output(%r{bin/dev static}).to_stdout_from_any_process
     end
 
+    context "when Shakapacker config uses live reload instead of HMR" do
+      include_context "with clean port env"
+
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) { example.run }
+        end
+      end
+
+      before do
+        FileUtils.mkdir_p("config")
+        File.write("config/shakapacker.yml", <<~YAML)
+          development:
+            dev_server:
+              hmr: false
+              live_reload: true
+        YAML
+      end
+
+      it "labels the default command and mode details as live reload" do
+        expected_output = satisfy do |output|
+          output.match?(/\(none\)\s+Start development server with live reload \(default\)/) &&
+            !output.match?(/HMR Development mode \(default\)|Hot Module Replacement \(HMR\) enabled/) &&
+            !output.match?(%r{\(none\) / hmr\s+Start development server with live reload \(default\)}) &&
+            !output.include?("ReactRefreshWebpackPlugin") &&
+            output.include?("React Refresh requires HMR; current default mode is not HMR.")
+        end
+
+        expect { described_class.show_help }.to output(expected_output).to_stdout_from_any_process
+      end
+
+      it "detects the default dev-server mode once per help render" do
+        expect(ReactOnRails::Dev::ServerMode)
+          .to receive(:detect).once.with(File.expand_path("config/shakapacker.yml", Dir.pwd)).and_return(:live_reload)
+
+        expect { described_class.show_help }
+          .to output(/Live reload development mode \(default\)/).to_stdout_from_any_process
+      end
+
+      it "passes the resolved Shakapacker config path into ServerMode" do
+        allow(described_class)
+          .to receive(:shakapacker_config_path).and_return("/tmp/app/config/custom-shakapacker.yml")
+        expect(ReactOnRails::Dev::ServerMode)
+          .to receive(:detect).with("/tmp/app/config/custom-shakapacker.yml").and_return(:live_reload)
+
+        expect { described_class.show_help }
+          .to output(/Live reload development mode \(default\)/).to_stdout_from_any_process
+      end
+    end
+
+    context "when Shakapacker config enables HMR explicitly" do
+      include_context "with clean port env"
+
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) { example.run }
+        end
+      end
+
+      before do
+        FileUtils.mkdir_p("config")
+        File.write("config/shakapacker.yml", <<~YAML)
+          development:
+            dev_server:
+              hmr: true
+        YAML
+      end
+
+      # Triangulates the config-driven :hmr path (detect_from_config returns :hmr) against the
+      # baseline specs that exercise the :hmr fallback when no config file is present.
+      it "labels the default command and mode details as HMR" do
+        expected_output = satisfy do |output|
+          output.match?(%r{\(none\) / hmr\s+Start development server with HMR \(default\)}) &&
+            output.include?("HMR Development mode (default)") &&
+            output.include?("Hot Module Replacement (HMR) enabled") &&
+            output.include?("ReactRefreshWebpackPlugin") &&
+            !output.include?("React Refresh requires HMR; current default mode is not HMR.")
+        end
+
+        expect { described_class.show_help }.to output(expected_output).to_stdout_from_any_process
+      end
+    end
+
+    context "when Shakapacker config disables both HMR and live reload" do
+      include_context "with clean port env"
+
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) { example.run }
+        end
+      end
+
+      before do
+        FileUtils.mkdir_p("config")
+        File.write("config/shakapacker.yml", <<~YAML)
+          development:
+            dev_server:
+              live_reload: false
+        YAML
+      end
+
+      it "labels the default command and mode details as the development server" do
+        expected_output = satisfy do |output|
+          output.match?(/\(none\)\s+Start development server \(default\)/) &&
+            output.include?("Development server mode (default)") &&
+            !output.match?(/HMR Development mode \(default\)|Hot Module Replacement \(HMR\) enabled/) &&
+            !output.include?("ReactRefreshWebpackPlugin") &&
+            output.include?("React Refresh requires HMR; current default mode is not HMR.")
+        end
+
+        expect { described_class.show_help }.to output(expected_output).to_stdout_from_any_process
+      end
+    end
+
     context "when base-port mode is active" do
       include_context "with clean port env"
 
@@ -1566,6 +1710,82 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       it "advertises 3001 for production-assets mode" do
         expect { described_class.show_help }
           .to output(%r{Production-assets.*Access at.*http://localhost:3001/<route>}m).to_stdout_from_any_process
+      end
+    end
+  end
+
+  describe ".shakapacker_config_base_dir" do
+    it "uses Rails.root when Rails is loaded" do
+      rails_root = Pathname.new("/tmp/rails-root")
+      allow(Rails).to receive(:root).and_return(rails_root)
+
+      expect(described_class.send(:shakapacker_config_base_dir)).to eq(rails_root.to_s)
+    end
+
+    it "falls back to the current working directory when Rails is not loaded" do
+      Dir.mktmpdir("react-on-rails-cwd") do |cwd|
+        Dir.chdir(cwd) do
+          hide_const("Rails")
+
+          expect(described_class.send(:shakapacker_config_base_dir)).to eq(Dir.pwd)
+        end
+      end
+    end
+  end
+
+  describe ".shakapacker_config_path" do
+    let(:rails_root) { Pathname.new(Dir.mktmpdir("react-on-rails-root")) }
+
+    around do |example|
+      original_config_path = ENV.fetch("SHAKAPACKER_CONFIG", nil)
+      original_cwd = Dir.pwd
+      ENV.delete("SHAKAPACKER_CONFIG")
+      example.run
+    ensure
+      ENV["SHAKAPACKER_CONFIG"] = original_config_path
+      Dir.chdir(original_cwd)
+      FileUtils.remove_entry(rails_root) if rails_root.exist?
+    end
+
+    before do
+      allow(Rails).to receive(:root).and_return(rails_root)
+    end
+
+    it "defaults to config/shakapacker.yml under Rails.root" do
+      expect(described_class.send(:shakapacker_config_path)).to eq(
+        rails_root.join("config", "shakapacker.yml").to_s
+      )
+    end
+
+    it "resolves a relative SHAKAPACKER_CONFIG path against Rails.root" do
+      ENV["SHAKAPACKER_CONFIG"] = "config/custom-shakapacker.yml"
+
+      Dir.mktmpdir("react-on-rails-cwd") do |unrelated_cwd|
+        Dir.chdir(unrelated_cwd) do
+          expect(described_class.send(:shakapacker_config_path)).to eq(
+            rails_root.join("config", "custom-shakapacker.yml").to_s
+          )
+        end
+      end
+    end
+
+    it "preserves an absolute SHAKAPACKER_CONFIG path" do
+      config_path = "/tmp/custom-shakapacker.yml"
+      ENV["SHAKAPACKER_CONFIG"] = config_path
+
+      expect(described_class.send(:shakapacker_config_path)).to eq(config_path)
+    end
+
+    it "uses the current working directory for relative config when Rails is not loaded" do
+      hide_const("Rails")
+      ENV["SHAKAPACKER_CONFIG"] = "config/custom-shakapacker.yml"
+
+      Dir.mktmpdir("react-on-rails-cwd") do |cwd|
+        Dir.chdir(cwd) do
+          expect(described_class.send(:shakapacker_config_path)).to eq(
+            File.expand_path("config/custom-shakapacker.yml", Dir.pwd)
+          )
+        end
       end
     end
   end

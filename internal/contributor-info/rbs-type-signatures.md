@@ -72,7 +72,7 @@ When adding new public methods or classes to the gem, please also add correspond
 
 ## Compatibility
 
-- Ruby >= 3.0 (RBS is included in Ruby 3.0+)
+- Ruby >= 3.3 (RBS ships with Ruby, so no extra gem install is needed)
 - RBS gem >= 2.0
 
 ## Resources

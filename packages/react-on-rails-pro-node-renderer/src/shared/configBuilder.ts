@@ -50,19 +50,23 @@ export interface Config {
   // See docs/oss/building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc.
   // This option is required to equal `true` if you want to use loadable components.
   // Setting this value to false causes the NodeRenderer to behave like ExecJS.
+  // SECURITY: When `supportModules: true`, the renderer also wraps the bundle and injects the
+  // host `require` regardless of `additionalContext`. See the detailed `additionalContext`
+  // security note below.
   supportModules: boolean;
   // additionalContext enables you to specify additional NodeJS objects (usually from
   // https://nodejs.org/api/globals.html) to add to the VM context in addition to our supportModules defaults.
   // Object shorthand notation may be used, but is not required.
   // Example: { URL, URLSearchParams, Crypto }
-  // NOTE: Any plain object value (including an empty `{}`) puts the renderer into CommonJS
-  // execution mode, wrapping the bundle and granting it access to the host's `require`
-  // (e.g. `require('fs')`, `require('child_process')`). An empty `{}` is treated the same
-  // as any other plain object -- it opts into CommonJS mode even though it adds no globals.
-  // Use only with trusted bundle sources.
+  // SECURITY: Any plain object value (including an empty `{}`) puts the renderer into CommonJS
+  // execution mode. The bundle is wrapped via `module.wrap()` and receives the host process's
+  // unrestricted `require`, granting full access to Node.js built-ins such as `fs`,
+  // `child_process`, and `os`. This disables VM sandboxing for the bundle, even when no globals
+  // are added. Only use with fully trusted, first-party bundle sources.
   // To keep the VM sandboxed without `require`, set BOTH `additionalContext: null` AND
-  // `supportModules: false`. When `supportModules: true`, the renderer wraps the bundle and
-  // injects the host `require` regardless of `additionalContext`.
+  // `supportModules: false`.
+  // SECURITY: When `supportModules: true`, the renderer also wraps the bundle and injects the
+  // host `require` regardless of `additionalContext`.
   // Mechanically, "wrapping" means the renderer passes the bundle source through `module.wrap()`
   // (the standard CommonJS `(function (exports, require, module, __filename, __dirname) { ... })`
   // wrapper) and then invokes the wrapped function with the host `require`. See the `buildVM`
@@ -307,34 +311,55 @@ export function logSanitizedConfig() {
   });
 }
 
+const KNOWN_WEAK_PASSWORDS = new Set(
+  ['devPassword', 'myPassword1', 'password', 'changeme', 'admin', 'secret', 'test', 'renderer'].map((p) =>
+    p.toLowerCase(),
+  ),
+);
+
+const MIN_PASSWORD_LENGTH = 16;
+
 function validatePasswordForProduction(aConfig: Config): string | null {
-  // Only a truthy password satisfies the production-like requirement. Null, undefined, and empty strings are
-  // all treated as missing passwords.
-  if (aConfig.password) return null;
+  const isProductionLike = !runtimeEnvsAllowDevelopmentDefaults();
 
-  // Require all present runtime envs to be development/test; fail closed otherwise.
-  // If either env indicates a production-like value, or neither env is set, password is required.
-  // This preserves a fail-closed invariant across the renderer startup path and the Ruby-side checks.
-  const allowMissingPassword = runtimeEnvsAllowDevelopmentDefaults();
-  if (allowMissingPassword) return null;
+  if (!aConfig.password || aConfig.password.trim() === '') {
+    if (isProductionLike) {
+      return (
+        'RENDERER_PASSWORD must be set in production-like environments ' +
+        `(NODE_ENV: "${env.NODE_ENV ?? '(not set)'}", RAILS_ENV: "${env.RAILS_ENV ?? '(not set)'}").` +
+        '\n\n' +
+        'In development and test environments, the renderer password is optional and no authentication\n' +
+        'is required. In all other environments, you must explicitly configure a password to secure\n' +
+        'communication between Rails and the Node Renderer.\n\n' +
+        'To fix this, set the RENDERER_PASSWORD environment variable:\n\n' +
+        '  export RENDERER_PASSWORD="your-secure-password"\n\n' +
+        'Or pass it in the config object:\n\n' +
+        '  reactOnRailsProNodeRenderer({ password: process.env.RENDERER_PASSWORD });\n\n' +
+        'Environment matrix:\n' +
+        '  development — password optional (no authentication)\n' +
+        '  test        — password optional (no authentication)\n' +
+        '  (neither set) — treated as production-like; RENDERER_PASSWORD required\n' +
+        '  all other environments (staging, production, qa, preview, etc.) — RENDERER_PASSWORD required'
+      );
+    }
+    return null;
+  }
 
-  return (
-    'RENDERER_PASSWORD must be set in production-like environments ' +
-    `(NODE_ENV: "${env.NODE_ENV ?? '(not set)'}", RAILS_ENV: "${env.RAILS_ENV ?? '(not set)'}").` +
-    '\n\n' +
-    'In development and test environments, the renderer password is optional and no authentication\n' +
-    'is required. In all other environments, you must explicitly configure a password to secure\n' +
-    'communication between Rails and the Node Renderer.\n\n' +
-    'To fix this, set the RENDERER_PASSWORD environment variable:\n\n' +
-    '  export RENDERER_PASSWORD="your-secure-password"\n\n' +
-    'Or pass it in the config object:\n\n' +
-    '  reactOnRailsProNodeRenderer({ password: process.env.RENDERER_PASSWORD });\n\n' +
-    'Environment matrix:\n' +
-    '  development — password optional (no authentication)\n' +
-    '  test        — password optional (no authentication)\n' +
-    '  (neither set) — treated as production-like; RENDERER_PASSWORD required\n' +
-    '  all other environments (staging, production, qa, preview, etc.) — RENDERER_PASSWORD required'
-  );
+  if (KNOWN_WEAK_PASSWORDS.has(aConfig.password.toLowerCase())) {
+    // Don't log the literal value — even a known-default value is the user's
+    // *current* live credential until they rotate it.
+    log.warn(
+      'RENDERER_PASSWORD matches a known-default value. ' +
+        `Set RENDERER_PASSWORD to a random value of at least ${MIN_PASSWORD_LENGTH} characters.`,
+    );
+  } else if (aConfig.password.length < MIN_PASSWORD_LENGTH) {
+    log.warn(
+      `RENDERER_PASSWORD is shorter than ${MIN_PASSWORD_LENGTH} characters (current length: ${aConfig.password.length}). ` +
+        'Consider using a stronger password.',
+    );
+  }
+
+  return null;
 }
 
 /**

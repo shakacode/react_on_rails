@@ -140,9 +140,144 @@ function ReviewList({ reviews }: { reviews: Review[] }) {
 4. No client-side fetching, loading states, or error handling needed
 5. The component renders with zero JavaScript cost as a Server Component
 
-> **HTML streaming vs. progressive data streaming:** With synchronous props, all data is loaded in Rails before rendering begins. The streaming here is _HTML streaming_ — React sends rendered HTML to the browser as it processes the component tree, rather than waiting for the entire page to finish rendering. For progressive data streaming where slow data sources resolve independently via Suspense boundaries, see [Streaming SSR](../../pro/streaming-ssr.md) (React on Rails Pro).
+> **HTML streaming vs. progressive data streaming:** With synchronous props, all data is loaded in Rails before rendering begins. The streaming here is _HTML streaming_ — React sends rendered HTML to the browser as it processes the component tree, rather than waiting for the entire page to finish rendering. For progressive data streaming where slow data sources resolve independently via Suspense boundaries, see [Async props](#async-props-stream-each-slow-prop-independently) below; for the underlying SSR setup (Rack middleware, streaming controller), see [Streaming SSR](../../pro/streaming-ssr.md).
 >
 > **More details:** For setup instructions and configuration options, see the [React on Rails Pro RSC documentation](../../pro/react-server-components/tutorial.md).
+
+### Async Props: Stream Each Slow Prop Independently {#async-props-stream-each-slow-prop-independently}
+
+The synchronous example above loads every prop in the controller before React starts rendering. When one data source is slow (a recommendations service, an expensive aggregate), it holds up the whole render. **Async props** let Rails send the fast props immediately and stream each slow prop to the browser as it resolves, so React shows the shell and fills in each `<Suspense>` boundary independently.
+
+Use `stream_react_component_with_async_props` and emit each slow prop from the block. The fast props go in `props:`; each `emit.call(name, value)` streams one more prop as soon as Rails has it:
+
+> [!NOTE]
+> **Prerequisites:** the controller must `include ReactOnRailsPro::Stream` and render the view via `stream_view_containing_react_components`, and `config.enable_rsc_support = true` must be set in your React on Rails initializer. Without these you'll get a confusing `NoMethodError` rather than a clear "missing setup" message.
+
+```erb
+<%= stream_react_component_with_async_props("ProductPage",
+      props: { name: product.name, price: product.price }) do |emit|
+  # Each emit.call streams a prop to the browser the moment Rails has it.
+  emit.call("reviews", product.reviews.as_json(only: [:id, :text, :rating]))
+  emit.call("recommendations",
+            product.recommended_products.as_json(only: [:id, :name, :price]))
+end %>
+```
+
+On the React side, the component receives a `getReactOnRailsAsyncProp` helper alongside its synchronous props. Calling it returns a Promise for that prop; wrap the consumer in `<Suspense>` so React streams it in when Rails emits it:
+
+```tsx
+import { Suspense } from 'react';
+import { WithAsyncProps } from 'react-on-rails-pro';
+
+type Review = { id: number; text: string; rating: number };
+type Product = { id: number; name: string; price: number };
+
+type SyncProps = { name: string; price: number };
+
+// AsyncProps lists the *resolved* prop types. WithAsyncProps wraps each in a
+// Promise at the call site, so getReactOnRailsAsyncProp('reviews') returns
+// Promise<Review[]> — which is then forwarded to an async child that awaits it.
+type AsyncProps = { reviews: Review[]; recommendations: Product[] };
+
+export default function ProductPage({
+  name,
+  price,
+  getReactOnRailsAsyncProp,
+}: WithAsyncProps<AsyncProps, SyncProps>) {
+  const reviewsPromise = getReactOnRailsAsyncProp('reviews');
+  const recommendationsPromise = getReactOnRailsAsyncProp('recommendations');
+
+  return (
+    <div>
+      <h1>{name}</h1>
+      <p>${price}</p>
+
+      <Suspense fallback={<div>Loading reviews…</div>}>
+        <AsyncReviewList reviews={reviewsPromise} />
+      </Suspense>
+      <Suspense fallback={<div>Loading recommendations…</div>}>
+        <AsyncRecommendationList items={recommendationsPromise} />
+      </Suspense>
+    </div>
+  );
+}
+
+// Each async child awaits only the prop it was handed.
+async function AsyncReviewList({ reviews }: { reviews: Promise<Review[]> }) {
+  const resolved = await reviews;
+  return (
+    <ul>
+      {resolved.map((r) => (
+        <li key={r.id}>{r.text}</li>
+      ))}
+    </ul>
+  );
+}
+
+// AsyncRecommendationList mirrors AsyncReviewList: it awaits the recommendations Promise.
+async function AsyncRecommendationList({ items }: { items: Promise<Product[]> }) {
+  const resolved = await items;
+  return (
+    <ul>
+      {resolved.map((p) => (
+        <li key={p.id}>{p.name}</li>
+      ))}
+    </ul>
+  );
+}
+```
+
+> **Production note:** Wrap each `<Suspense>` in an `<ErrorBoundary>` so that if an async-prop stream rejects (e.g. a Rails-side exception while emitting), the boundary degrades to a fallback instead of crashing the whole page. See the [error-handling pattern](../../pro/react-server-components/inside-client-components.md#error-handling) for a reusable boundary.
+
+**Sync props vs. async props — which to use:**
+
+|                         | Sync props (`stream_react_component`)    | Async props (`stream_react_component_with_async_props`) |
+| ----------------------- | ---------------------------------------- | ------------------------------------------------------- |
+| When Rails has the data | All props loaded before rendering begins | Fast props now; each slow prop streamed as it resolves  |
+| What streams            | Rendered HTML, as React walks the tree   | Rendered HTML **plus** each prop independently          |
+| Best for                | All data sources are fast                | One or more data sources are slow                       |
+
+Async props keep Rails as the backend: Rails still owns the queries, authorization, and caching — the `emit` block is ordinary Rails code running in the streaming view helper, not the React component. It just emits each result the moment it has it instead of blocking the whole render on the slowest source. (Referencing controller instance variables like `@product` from the block is fine and normal — the constraint is narrower: don't _pre-resolve_ the slow emit-block queries in the controller action, because it runs to completion before the view streams, so doing that work up front defeats the progressive streaming.) Requires React Server Components (`config.enable_rsc_support = true`).
+
+#### Parallelize the queries with the `async` gem
+
+In the block above, `reviews` is emitted before `recommendations` — the second query doesn't start until the first `emit.call` returns, so their times add up. The block already runs inside an [`async`](https://github.com/socketry/async) reactor (the same one the Pro renderer uses for its HTTP/2 stream), so you can fan the independent queries out into concurrent tasks and emit each prop the moment its own query resolves:
+
+```erb
+<%= stream_react_component_with_async_props("ProductPage",
+      props: { name: product.name, price: product.price }) do |emit|
+  # The block is already running inside an Async reactor. `Sync` reuses it (or
+  # starts one if none exists — either way no new OS thread) and acts as a
+  # synchronization barrier: it runs the block with the current task (`parent`)
+  # and returns only after every child started via `parent.async` has finished
+  # — exactly when the stream should close.
+  Sync do |parent|
+    parent.async do
+      # Each concurrent fiber checks out its OWN connection for the duration of
+      # its query, then releases it before emitting (see the note below).
+      reviews = ActiveRecord::Base.connection_pool.with_connection do
+        product.reviews.as_json(only: [:id, :text, :rating])
+      end
+      emit.call("reviews", reviews)
+    end
+
+    parent.async do
+      recommendations = ActiveRecord::Base.connection_pool.with_connection do
+        product.recommended_products.as_json(only: [:id, :name, :price])
+      end
+      emit.call("recommendations", recommendations)
+    end
+  end
+end %>
+```
+
+Both tasks follow the same shape — wrap each query in its own `with_connection`, then emit. (If a prop comes from an external service over a fiber-aware HTTP client rather than the database, that task skips `with_connection` since it never touches the connection pool.) Each child task emits on its own, so props arrive in whatever order they resolve and React fills each `<Suspense>` boundary as its prop lands — the fastest source paints first and the total time is roughly the slowest source instead of the sum of all of them.
+
+Calling `emit.call` from concurrent fibers is safe: the reactor is single-threaded and cooperatively scheduled, and each `emit.call` writes one complete NDJSON line in a single operation — so concurrent emits never interleave within a line. Their _order_ can vary (whichever query resolves first emits first), which is fine because each line is a self-contained prop update.
+
+> **When this actually runs in parallel:** the `async` gem parallelizes **I/O-bound** work that yields to the fiber scheduler — most reliably calls to external services through a fiber-aware HTTP client (the renderer already depends on [`async-http`](https://github.com/socketry/async-http)). For ActiveRecord, give each concurrent fiber its own connection with `ActiveRecord::Base.connection_pool.with_connection`, run with fiber-based connection isolation (`config.active_support.isolation_level = :fiber`, Rails 7.1+), and size the pool for the fan-out — otherwise the fibers share one connection and the queries serialize. (On Rails 6.x–7.0 the connection pool ignores fiber identity, so the queries serialize with no visible error — or worse, corrupt results under concurrent load.) For CPU-bound work, or a database driver that doesn't cooperate with `Fiber.scheduler`, parallelize with threads instead (see [Avoiding Server-Side Waterfalls](#avoiding-server-side-waterfalls)).
+>
+> See [Database Queries in Async Props Blocks](../../pro/async-props-database-queries.md) for the complete configuration guide covering isolation level, pool sizing, driver compatibility, connection lifecycle (`with_connection` vs `lease_connection`), `CurrentAttributes` behavior, and troubleshooting. If fiber scheduling isn't configured, queries fall back to running sequentially — but with multiple async-props components on one page, the default `isolation_level = :thread` can cause silent connection corruption rather than graceful serialization.
 
 ## Migrating from React Query / TanStack Query
 

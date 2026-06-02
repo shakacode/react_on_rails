@@ -1,5 +1,11 @@
 # Rolling-Deploy Adapters
 
+React on Rails Pro pre-seeds the Node Renderer cache so that during a **rolling deploy** — when the old and new versions of your app briefly run side by side — the renderer never has to cold-start a bundle in the middle of a request.
+
+The **built-in HTTP adapter** does this with **no extra infrastructure**: the still-running deployment serves its own bundles over an authenticated endpoint, and the next deploy pulls them. This is the recommended setup for almost everyone.
+
+> **TL;DR** — Set three config values, mount one controller, and in-flight requests for draining bundle versions stop paying the `410 Gone` → re-upload → retry tax. No S3, IAM, or extra gem. **[Jump to setup](#set-up-the-http-adapter).**
+
 ## The problem
 
 During a rolling deploy:
@@ -10,350 +16,149 @@ During a rolling deploy:
 
 Pre-seeding the current hash (`def`) eliminates the 410→retry only for the new bundle. Requests referencing `abc` still hit a cold cache on new renderers, producing 410 retries per request until the renderer has cached that bundle via upload.
 
-The **`rolling_deploy_adapter`** protocol lets your application fetch previously-deployed bundles (and their companion assets) from an artifact store during the next build, so new renderer instances start warm for every in-flight bundle hash.
+```mermaid
+flowchart TB
+    Traffic(["Incoming traffic"]) --> LB["Load Balancer"]
+    LB --> Old["Old Rails — draining<br/>bundle hash <b>abc</b>"]
+    LB --> New["New Rails<br/>bundle hash <b>def</b>"]
+    Old -- "SSR request · hash = abc" --> R
+    New -- "SSR request · hash = def" --> R
+    R["New Node Renderer pool<br/>(cold start: cache seeded with<br/>current hash <b>def</b> only)"]
+    R -- "def" --> Hit["✅ Cache HIT<br/>fast SSR"]
+    R -- "abc" --> Miss["❌ Cache MISS → <b>410 Gone</b><br/>Rails re-uploads abc, then retries<br/>— once per request, until warm"]
+    style Old fill:#fff4e5,stroke:#e0a000,color:#000
+    style New fill:#e6ffed,stroke:#2da44e,color:#000
+    style Hit fill:#e6ffed,stroke:#2da44e,color:#000
+    style Miss fill:#ffe5e5,stroke:#d1242f,color:#000
+```
 
-## The loadable-stats wrinkle
+The cold path is bounded and self-healing, but it is not free. On a cache miss the renderer can't serve the request on its own: it returns `410 Gone`, Rails ships the bundle over to the renderer, and only then does the request render. That extra renderer ↔ Rails round-trip — a network hop plus the bundle transfer — adds latency to **every** request that touches a cold bundle, and it repeats per request until that bundle is cached, so a deploy shows up as a latency and error-rate spike. The whole point of a rolling-deploy adapter is to **avoid these cache misses entirely** so no request ever pays that cost during a deploy.
 
-Each bundle hash has **companion assets** built in lockstep:
+## The solution
 
-- `loadable-stats.json` — maps chunk IDs → asset URLs.
-- `react-client-manifest.json`, `react-server-client-manifest.json` (when RSC enabled) — map component IDs → chunk paths.
+A **rolling-deploy adapter** makes new renderer instances start warm for **every** in-flight bundle hash — not just the current one — so draining `abc` requests hit the cache instead of triggering a 410.
 
-If the renderer handles a request for bundle `abc` but reads the **new** build's manifests, it emits HTML referencing chunk URLs that the old deployment's asset pipeline never produced → client-side hydration breakage, chunk 404s.
+```mermaid
+flowchart TB
+    Traffic(["Incoming traffic"]) --> LB["Load Balancer"]
+    LB --> Old["Old Rails — draining<br/>bundle hash <b>abc</b>"]
+    LB --> New["New Rails<br/>bundle hash <b>def</b>"]
+    Old -- "SSR request · hash = abc" --> R
+    New -- "SSR request · hash = def" --> R
+    R["New Node Renderer pool<br/>pre-seeded with <b>abc</b> AND <b>def</b><br/>via rolling_deploy_adapter"]
+    R -- "def" --> H1["✅ Cache HIT"]
+    R -- "abc" --> H2["✅ Cache HIT — no 410, no retry"]
+    style Old fill:#fff4e5,stroke:#e0a000,color:#000
+    style New fill:#e6ffed,stroke:#2da44e,color:#000
+    style R fill:#e6f0ff,stroke:#2c6ecb,color:#000
+    style H1 fill:#e6ffed,stroke:#2da44e,color:#000
+    style H2 fill:#e6ffed,stroke:#2da44e,color:#000
+```
 
-**Therefore: each seeded bundle hash must carry its own companion assets.** The adapter's `fetch(hash)` method returns bundle + assets together so the caller can't forget.
+The built-in HTTP adapter is the simplest way to get there, and it's covered next. If your build can't reach the previous deployment, or you'd rather keep bundles in your own store, you can [write a custom adapter](./rolling-deploy-custom-adapters.md) instead.
 
-## Protocol
+## Set up the HTTP adapter
 
-Each **bundle hash** is a single cache entry. A deploy that has both a server bundle and an RSC bundle contributes **two** hashes — `server_bundle_hash` and `rsc_bundle_hash`. The protocol is opaque about which kind of bundle a hash represents; the adapter just stores and retrieves files keyed by hash.
+> Introduced as a scaffold in PR [#3379](https://github.com/shakacode/react_on_rails/pull/3379) — part 1 of a multi-PR series. A hard HTTPS gate, streaming download, and additional hardening land in follow-ups; see [Security](#security) below.
 
-When RSC is enabled, publication calls `upload` once for the server bundle hash and once for the RSC bundle hash. Both calls receive the same companion `assets:` list from that build (`loadable-stats.json` plus RSC manifests). Store those files with each hash; do not filter the assets by bundle type, because `fetch(hash)` must return a complete local cache entry for whichever hash is requested.
+The currently-deployed Rails server already has every bundle and companion asset on disk. The HTTP adapter has the **next** deploy's build pull those files directly from the **previous** deploy over an authenticated HTTP endpoint — `upload` is a deliberate no-op because the running server _is_ the store:
 
-Your adapter must define three class methods:
+```mermaid
+flowchart LR
+    subgraph Build["Next deploy · build CI"]
+        Http["RollingDeployAdapters::Http<br/>previous_bundle_hashes + fetch"]
+    end
+    subgraph Server["Previous deploy · still-running Rails"]
+        Ctrl["BundlesController<br/>GET /manifest<br/>GET /bundles/:hash"]
+        Disk[("Bundles + companion assets<br/>already on local disk")]
+    end
+    Http -- "GET /manifest · Bearer TOKEN" --> Ctrl
+    Http -- "GET /bundles/abc · Bearer TOKEN" --> Ctrl
+    Disk -- "reads from disk" --> Ctrl
+    Ctrl -- "gzipped tarball:<br/>bundle.js + companion assets" --> Http
+    Http -- "extract + stage" --> Cache["New renderer cache<br/>{cache}/abc/abc.js"]
+    style Server fill:#fff4e5,stroke:#e0a000,color:#000
+    style Build fill:#e6f0ff,stroke:#2c6ecb,color:#000
+    style Cache fill:#e6ffed,stroke:#2da44e,color:#000
+```
+
+### 1. Configure the adapter
 
 ```ruby
-module MyRollingDeployAdapter
-  # Discovery. Called during pre-seeding to determine which historical
-  # hashes to fetch. Typically hits the running deployment's /_health
-  # endpoint or reads a manifest file in the artifact store.
-  #
-  # When RSC is enabled, this should return BOTH the server and RSC
-  # hashes for each deploy you want to seed — the stager treats every
-  # hash as an independent cache entry at <cache>/<hash>/<hash>.js.
-  #
-  # @return [Array<String>] ordered list of recent bundle hashes.
-  # @return [] to disable previous-bundle seeding on this build.
-  def self.previous_bundle_hashes
-    # ...
-  end
-
-  # Retrieval. Given a bundle hash, fetch the bundle file + its
-  # companion assets to local disk and return their paths.
-  #
-  # @return [Hash, nil] Hash with keys :bundle (String path to the
-  #   bundle file, required) and :assets (Array<String> of companion
-  #   asset paths like loadable-stats.json / RSC manifests). Return
-  #   only paths that exist on local disk. When RSC support is enabled,
-  #   react-client-manifest.json and react-server-client-manifest.json
-  #   are required companion assets; hashes missing them are skipped so
-  #   the runtime 410-retry path remains the safe fallback. Return nil
-  #   if the bundle is unavailable — pre-seeding logs a warning and continues.
-  #
-  # Fetch is wrapped in Timeout.timeout(30s) to protect pre-seeding
-  # from hanging on slow external stores. The hard budget is
-  # ReactOnRailsPro::RollingDeployCacheStager::FETCH_TIMEOUT_SECONDS.
-  def self.fetch(bundle_hash)
-    # ...
-  end
-
-  # Publication. Called automatically after assets:precompile in
-  # production-like environments when the adapter is configured.
-  # Uploads one bundle + its companion assets keyed by that bundle's
-  # hash. When RSC is enabled, upload is called twice per deploy:
-  # once with server_bundle_hash, once with rsc_bundle_hash.
-  # Errors are warned per-hash, not raised. Each upload is wrapped in
-  # Timeout.timeout(120s), so keep adapter network work comfortably
-  # inside that per-hash budget. The hard budget is
-  # ReactOnRailsPro::AssetsPrecompile::UPLOAD_TIMEOUT_SECONDS.
-  #
-  # Splat-style signatures (`def self.upload(*args)`,
-  # `def self.upload(hash, **opts)`) also pass signature validation, but
-  # the runtime call passes `bundle:` / `assets:` as keyword arguments —
-  # so `args` collects keywords as `args.last` (a Hash) under Ruby 3, and
-  # `opts` is `{ bundle: ..., assets: ... }`. Prefer the explicit form
-  # below unless you have a specific reason to use a splat.
-  def self.upload(bundle_hash, bundle:, assets:)
-    # ...
-  end
-end
-
 # config/initializers/react_on_rails_pro.rb
 ReactOnRailsPro.configure do |config|
-  config.rolling_deploy_adapter = MyRollingDeployAdapter
+  config.rolling_deploy_adapter      = ReactOnRailsPro::RollingDeployAdapters::Http
+  config.rolling_deploy_token        = ENV.fetch("ROLLING_DEPLOY_TOKEN")    # shared secret, ≥ 32 bytes
+  config.rolling_deploy_previous_url = ENV["ROLLING_DEPLOY_PREVIOUS_URL"]   # base URL of the still-running deployment
 end
 ```
 
-## Env-var override
+- **`rolling_deploy_token`** — the shared bearer token ("password"). Generate one with `SecureRandom.hex(32)` and set the **same** value on both the running server (which authenticates incoming pulls) and the build CI (which sends it). The config validator rejects tokens shorter than 32 bytes.
+- **`rolling_deploy_previous_url`** — the base URL where the previous deployment is reachable **from the build CI**, e.g. `https://app.example.com/react_on_rails_pro/rolling_deploy`. The adapter appends `/manifest` and `/bundles/:hash`. Leave it unset (or empty) to disable discovery on that build.
 
-For CI and testing, set `PREVIOUS_BUNDLE_HASHES` as a comma-separated list to skip `previous_bundle_hashes` discovery:
+### 2. Mount the server endpoint
 
-```bash
-PREVIOUS_BUNDLE_HASHES=abc123,def456 rake react_on_rails_pro:pre_seed_renderer_cache
-```
-
-This runs the adapter's `fetch(hash)` for each listed hash but skips discovery. The adapter is still required to fetch the actual bundle files; setting the env var without configuring `config.rolling_deploy_adapter` produces a warning and skips seeding.
-
-## When `upload` runs
-
-`assets:precompile` invokes `upload` for the current build's bundle hashes whenever an adapter is configured **and** `Rails.env` is anything other than `development` or `test`. That includes `staging`, `production`, custom envs like `qa` or `preview`, and any other non-dev/non-test value.
-
-In practice this means a `staging` deploy hits the same artifact store as production — it must have the same credentials and write access. This is intentional: a `staging`-→-`staging` rolling deploy needs the previous staging hash seeded, and a `staging`-→-`production` promotion benefits from staging having warmed the store. If you need to keep `staging` out of the artifact store entirely, set `config.rolling_deploy_adapter = nil` in a `staging`-specific initializer rather than relying on env-based skipping at the gem level.
-
-## Edge cases and error handling
-
-| Scenario                                                                | Behavior                                                                                                                                                        |
-| ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Adapter not configured                                                  | No-op. Only the current hash is staged.                                                                                                                         |
-| `previous_bundle_hashes` returns `[]`                                   | Log "No previous bundle hashes to seed" and continue.                                                                                                           |
-| `previous_bundle_hashes` raises                                         | Warn, skip previous-hash seeding, continue. Current-hash staging unaffected.                                                                                    |
-| `fetch(hash)` returns `nil`                                             | Warn, skip that hash. Runtime 410-retry remains the fallback.                                                                                                   |
-| `fetch(hash)` raises                                                    | Warn, skip that hash. Runtime 410-retry remains the fallback.                                                                                                   |
-| `fetch(hash)` omits required RSC assets                                 | Warn, skip that hash. Runtime 410-retry remains the fallback.                                                                                                   |
-| `fetch(hash)` returns any asset path that doesn't exist or isn't a file | Warn, skip that hash (strict: applies to non-required assets too — adapters must return only paths that exist on disk). Runtime 410-retry remains the fallback. |
-| Returned hash matches current hash                                      | Deduplicated — not refetched.                                                                                                                                   |
-| `upload` raises in `assets:precompile`                                  | Warn but don't fail precompile. Next deploy degrades, not this one.                                                                                             |
-
-## Local temp directory cleanup
-
-The reference implementations below stage `fetch` results into `tmp/rolling-deploy/<hash>/` and never delete them. The stager either copies (`mode: :copy`) or symlinks (`mode: :symlink`) those files into the renderer cache, so cleanup must happen outside `fetch`:
-
-- In `:copy` mode (Docker/image builds), the stager copies files into the cache before returning, so the temp dir can be removed at the end of the deploy.
-- In `:symlink` mode (same-filesystem deploys), the staged symlinks point _into_ `tmp/rolling-deploy/<hash>/`. Removing the temp files breaks the symlinks and causes the renderer to 410. Keep the temp dir alive for the lifetime of the deploy, or replace symlinks with copies before sweeping.
-
-A simple cleanup strategy: a periodic task that removes `tmp/rolling-deploy/<hash>/` directories older than your longest expected deploy duration. Adapter authors should add this — the stager doesn't know about adapter-private temp paths and so cannot clean them up itself.
-
-## Reference implementations
-
-These are copy-pasteable starting points. Adapt to your infrastructure.
-
-### S3
-
-Stores each bundle + its companion assets under `s3://<bucket>/bundles/<hash>/bundle.js` + `s3://<bucket>/bundles/<hash>/<asset>`. A manifest file at `bundles/_manifest.json` tracks the rolling list of recent hashes.
-
-> [!NOTE]
-> The manifest update is a read-modify-write cycle with no native concurrency guard. Concurrent deploys can lose entries (last writer wins). For strict safety, use S3 conditional writes (`If-Match` with ETag) or a small coordination layer (e.g., a deploy-level mutex, or a database row with optimistic locking). The pattern below is intentionally simple and sufficient when deploys are serialized.
->
-> Each `upload` call performs one extra S3 round-trip to read the manifest before writing it back. With RSC enabled, `upload` is called twice per deploy (once for `server_bundle_hash`, once for `rsc_bundle_hash`), so a single deploy issues **2× `GetObject` + 2× `PutObject` against the manifest key alone**. Operators on high-frequency staging pipelines should account for this cost. Batching the manifest update once per deploy is a reasonable optimization when many bundles upload in a single precompile.
+The bundle-serving controller must be routed on the Rails side. Mount it explicitly:
 
 ```ruby
-require "aws-sdk-s3"
-require "fileutils"
-require "json"
-
-class S3RollingDeployAdapter
-  # Lazy accessors — env vars are read when first used, not at require time.
-  # This avoids KeyError at class-load when the bucket isn't configured
-  # in dev/test/CI environments that don't use the adapter.
-  def self.bucket
-    ENV.fetch("ROLLING_DEPLOY_BUCKET")
-  end
-
-  PREFIX = "bundles"
-  MANIFEST_KEY = "#{PREFIX}/_manifest.json".freeze
-  RETENTION = 6 # keep last ~3 deploys' worth (2 hashes per deploy when RSC is enabled)
-
-  def self.previous_bundle_hashes
-    resp = s3.get_object(bucket: bucket, key: MANIFEST_KEY)
-    JSON.parse(resp.body.read).fetch("hashes", []).last(RETENTION)
-  rescue Aws::S3::Errors::NoSuchKey
-    []
-  end
-
-  def self.fetch(hash)
-    dir = Rails.root.join("tmp/rolling-deploy", hash)
-    FileUtils.mkdir_p(dir)
-    {
-      bundle: download_to(dir, "bundle.js", hash),
-      assets: %w[loadable-stats.json react-client-manifest.json react-server-client-manifest.json]
-              .map { |name| download_optional(dir, name, hash) }
-              .compact
-    }
-  rescue Aws::S3::Errors::NoSuchKey
-    nil
-  end
-
-  def self.upload(hash, bundle:, assets:)
-    put("#{PREFIX}/#{hash}/bundle.js", bundle)
-    assets.each { |path| put("#{PREFIX}/#{hash}/#{File.basename(path)}", path) }
-    update_manifest!(hash)
-  end
-
-  # -- helpers (private by convention) --
-
-  S3_CLIENT_MUTEX = Mutex.new
-  private_constant :S3_CLIENT_MUTEX
-
-  # Thread-safe memoization. Without the mutex, concurrent callers (e.g. parallel
-  # Sidekiq workers running precompile hooks) could each create a separate client;
-  # only the last survives, and the earlier ones are silently discarded after use.
-  def self.s3
-    S3_CLIENT_MUTEX.synchronize { @s3 ||= Aws::S3::Client.new }
-  end
-
-  def self.download_to(dir, name, hash)
-    path = dir.join(name).to_s
-    s3.get_object(bucket: bucket, key: "#{PREFIX}/#{hash}/#{name}", response_target: path)
-    path
-  end
-
-  def self.download_optional(dir, name, hash)
-    download_to(dir, name, hash)
-  rescue Aws::S3::Errors::NoSuchKey
-    nil
-  end
-
-  def self.put(key, path)
-    File.open(path, "rb") { |body| s3.put_object(bucket: bucket, key: key, body: body) }
-  end
-
-  def self.update_manifest!(hash)
-    # WARNING: This simple read-modify-write update assumes serialized deploys.
-    # Use conditional writes or external coordination if deploys can overlap.
-    hashes = previous_bundle_hashes
-    hashes << hash unless hashes.include?(hash)
-    # Write and read both trim to RETENTION so the persisted manifest matches
-    # what discovery returns. If you want a soft buffer of historical entries,
-    # increase RETENTION rather than diverging these two trim lengths.
-    s3.put_object(
-      bucket: bucket,
-      key: MANIFEST_KEY,
-      body: JSON.generate(hashes: hashes.last(RETENTION))
-    )
-  end
-end
+# config/routes.rb
+ReactOnRailsPro::RollingDeploy::BundlesController.draw_routes(
+  self,
+  path: "/react_on_rails_pro/rolling_deploy"
+)
 ```
 
-### Control Plane
+That exposes two authenticated endpoints under the mount path:
 
-Uses `cpln` CLI to pull the previous deployment's image layer and extract cache contents. `upload` is a no-op — the image itself is the artifact.
+| Endpoint             | Returns                                                                                                                   |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `GET /manifest`      | JSON: `{ hashes: [...], rsc_enabled: true\|false, generated_at: "ISO8601", protocol_version: 1 }` for the current deploy. |
+| `GET /bundles/:hash` | `application/gzip` tarball containing `bundle.js` plus that hash's companion assets.                                      |
 
-The deploy pipeline is expected to set two env vars on the running workload: `REACT_ON_RAILS_BUNDLE_HASH` (server bundle hash) and, when RSC is enabled, `REACT_ON_RAILS_RSC_BUNDLE_HASH`. Both are returned from `previous_bundle_hashes` so the stager can seed each independently.
+> [!IMPORTANT]
+> Engine auto-mount is planned for a follow-up release but is not yet wired — mount the controller explicitly with `draw_routes` as shown. When auto-mount lands and you still need a custom path, keep the explicit `draw_routes` call and pass a distinct `as_prefix:` keyword (e.g. `as_prefix: "my_rolling_deploy"`) to avoid duplicate named-route errors. If the auto-mount's default path suits you, you can remove the explicit call entirely.
 
-Uses `Open3.capture2e` with array-form arguments rather than shell interpolation to avoid injection via env-var contents.
+### Security
 
-```ruby
-require "json"
-require "open3"
-require "fileutils"
+- **Bearer-token auth** on every request (`Authorization: Bearer <token>`), constant-time compare, with a uniform `401` for missing/malformed/wrong tokens so callers can't distinguish failure modes.
+- The `:hash` parameter is matched against an **allowlist** of the current deployment's real bundle hashes — anything else returns `404` before touching the filesystem.
+- Responses carry `Cache-Control: no-store`, `Pragma: no-cache`, and `X-Content-Type-Options: nosniff`.
+- Tarball extraction is **path-traversal-proofed**, accepts regular files only, and enforces a 200 MB uncompressed cap (zip-bomb guard).
 
-class ControlPlaneRollingDeployAdapter
-  # Lazy accessors — see S3 adapter note on KeyError at require time.
-  def self.gvc
-    ENV.fetch("CPLN_GVC")
-  end
+> [!WARNING]
+> **Use HTTPS in production.** The token is a bearer credential. Over plain HTTP to a non-loopback host the adapter logs a warning that the token is being sent over an unencrypted connection; a hard HTTPS gate is planned for a follow-up release. Until then, ensure `rolling_deploy_previous_url` always uses `https://` in production environments.
 
-  def self.workload
-    ENV.fetch("CPLN_RAILS_WORKLOAD")
-  end
+### Companion assets are handled automatically
 
-  # Customize this to match your Control Plane image naming convention.
-  # Default assumes images are named "<gvc>/app-<bundle-hash>".
-  def self.image_name(hash)
-    "#{gvc}/app-#{hash}"
-  end
+Each bundle hash ships with the companion assets built alongside it — `loadable-stats.json`, plus `react-client-manifest.json` and `react-server-client-manifest.json` when RSC is enabled. They map chunk and component IDs to the exact asset URLs that hash's build produced, so serving a draining hash with the **wrong** build's manifests would break client-side hydration. The HTTP adapter packs each hash's companions into the same tarball, so this stays correct with no work on your part. (Custom adapters must return them explicitly — see [Companion assets](./rolling-deploy-custom-adapters.md#companion-assets).)
 
-  def self.previous_bundle_hashes
-    output, status = Open3.capture2e("cpln", "workload", "get", workload, "--gvc", gvc, "-o", "json")
-    return [] unless status.success?
+## Deploy the renderer before Rails
 
-    env = JSON.parse(output).dig("spec", "containers", 0, "env") || []
-    %w[REACT_ON_RAILS_BUNDLE_HASH REACT_ON_RAILS_RSC_BUNDLE_HASH]
-      .map { |name| env.find { |e| e["name"] == name }&.dig("value") }
-      .compact
-  end
+> [!IMPORTANT]
+> During a rolling deploy, the new Node Renderer must be live and cache-warm **before** the new Rails server starts serving traffic. If Rails goes first, the adapter's warm-cache guarantee doesn't hold for that window — you get exactly the 410 storm it's meant to prevent.
 
-  def self.fetch(hash)
-    tmp = Rails.root.join("tmp/rolling-deploy", hash).to_s
-    FileUtils.mkdir_p(tmp)
-    _out, status = Open3.capture2e("cpln", "image", "pull", image_name(hash), "--output", tmp)
-    return nil unless status.success?
+Pre-seeding warms the **renderer's** cache. Rails renders nothing itself; it sends SSR requests to the renderer. So a warm cache only helps if the new renderer is already up and serving when the new Rails (bundle `def`) starts sending it traffic:
 
-    # Assumes the image layer contains exactly one .js file. If your build
-    # produces multiple .js artifacts (e.g. RSC enabled adds a server +
-    # rsc bundle, or you ship source maps), filter by a known filename
-    # convention instead — e.g. `Dir[File.join(tmp, "server-bundle*.js")]`
-    # or hard-coded `File.join(tmp, "server-bundle.js")`. Returning nil
-    # here causes the seeder to skip this hash and fall back to runtime
-    # 410-retry, which is a graceful but cold path.
-    bundles = Dir[File.join(tmp, "*.js")].sort
-    return nil unless bundles.one?
+- New Rails (`def`) can only be served warm by a renderer that has `def` cached — and that's the **new** renderer instances.
+- Draining old Rails (`abc`) is served warm by either fleet, because the new renderer was pre-seeded with `abc` too.
 
-    bundle = bundles.first
+If the new Rails goes live first, its `def` requests hit renderers that don't have `def` yet → 410 → re-upload → retry, per request, until the new renderer catches up. Roll the renderer out first and that never happens.
 
-    # Explicit allowlist — don't sweep up unrelated JSON files that may be
-    # bundled in the image layer (lock files, health-check payloads, etc.).
-    asset_names = %w[loadable-stats.json react-client-manifest.json react-server-client-manifest.json]
-    assets = asset_names.map { |name| File.join(tmp, name) }.select { |path| File.exist?(path) }
+### On Control Plane (and other multi-workload platforms)
 
-    { bundle: bundle, assets: assets }
-  end
+Rails and the Node Renderer are **separate workloads** with independent deploy lifecycles, readiness checks, and warmup periods. Deploying both at once does **not** guarantee the renderer wins the race — the two can have different warmup/readiness settings, so Rails may begin taking traffic before the renderer's new revision is ready.
 
-  def self.upload(_hash, bundle:, assets:)
-    # No-op: the Docker image IS the artifact. The next build pulls
-    # via `cpln image pull`.
-  end
-end
-```
+Make the ordering explicit in your pipeline rather than relying on timing:
 
-### Filesystem (testing / volume-mounted deploys)
+1. Deploy/promote the **Node Renderer** workload (new image, cache pre-seeded during its build).
+2. Wait until its new revision is **live and healthy** — readiness passing and all new renderer instances up.
+3. Only then deploy/promote the **Rails** workload.
 
-Reads/writes a local directory specified by `ROLLING_DEPLOY_DIR`. Useful for local experimentation and as the reference test fixture.
+The invariant to enforce is **renderer-ready-before-Rails-live**: gate the Rails workload's release on the renderer workload's release completing (sequence them as separate steps in your deploy pipeline), and/or tune the renderer's readiness probe and Rails' startup so Rails does not accept traffic until the renderer reports ready. The exact wiring depends on your deploy tooling.
 
-```ruby
-require "fileutils"
-require "json"
+## Verify your setup with `react_on_rails:doctor`
 
-class FilesystemRollingDeployAdapter
-  RETENTION = 6 # keep last ~3 deploys' worth (2 hashes per deploy when RSC is enabled)
-
-  def self.root
-    Pathname.new(ENV.fetch("ROLLING_DEPLOY_DIR"))
-  end
-
-  def self.previous_bundle_hashes
-    manifest = root.join("_manifest.json")
-    return [] unless manifest.exist?
-
-    JSON.parse(manifest.read).fetch("hashes", [])
-  end
-
-  def self.fetch(hash)
-    dir = root.join(hash)
-    return nil unless dir.directory?
-
-    bundle = dir.join("bundle.js")
-    return nil unless bundle.file?
-
-    asset_names = %w[loadable-stats.json react-client-manifest.json react-server-client-manifest.json]
-
-    { bundle: bundle.to_s,
-      assets: asset_names.map { |name| dir.join(name).to_s }.select { |path| File.exist?(path) } }
-  end
-
-  def self.upload(hash, bundle:, assets:)
-    dir = root.join(hash)
-    FileUtils.mkdir_p(dir)
-    FileUtils.cp(bundle, dir.join("bundle.js"))
-    assets.each { |p| FileUtils.cp(p, dir.join(File.basename(p))) }
-    hashes = ((previous_bundle_hashes - [hash]) + [hash]).last(RETENTION)
-    root.join("_manifest.json").write(JSON.generate(hashes: hashes))
-  end
-end
-```
-
-## Verifying your adapter with `react_on_rails:doctor`
-
-`react_on_rails:doctor` probes a configured `rolling_deploy_adapter` and reports:
+`react_on_rails:doctor` probes the configured `rolling_deploy_adapter` and reports:
 
 - ✅ Whether it responds to all three required methods.
 - ✅ Whether `previous_bundle_hashes` returns successfully within 10 seconds, and how many hashes it returned.
@@ -362,6 +167,18 @@ end
 - ℹ️ Whether `PREVIOUS_BUNDLE_HASHES` env override is set.
 
 Doctor never calls `fetch` or `upload` — those have side effects.
+
+## Need your own artifact store?
+
+The HTTP adapter assumes the previous deployment is still running and reachable from your build. Reach for a **custom adapter** instead when:
+
+- Builds run where they can't reach the running app (isolated CI, different VPC).
+- The previous deployment may already be torn down by the time the next one builds.
+- You want bundle artifacts to persist independently of any deployment's lifetime (for example, in S3).
+
+The protocol is small — three class methods — and ships with copy-pasteable S3, Control Plane, and Filesystem reference implementations.
+
+→ **[Custom rolling-deploy adapters](./rolling-deploy-custom-adapters.md)**
 
 ## Relationship to `remote_bundle_cache_adapter`
 

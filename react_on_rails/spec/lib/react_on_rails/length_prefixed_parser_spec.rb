@@ -1,0 +1,121 @@
+# frozen_string_literal: true
+
+require_relative "../../react_on_rails/spec_helper"
+require_relative "../../../lib/react_on_rails/length_prefixed_parser"
+
+RSpec.describe ReactOnRails::LengthPrefixedParser do
+  def length_prefixed_payload(content, payload_type: "string")
+    raw_content = payload_type == "object" ? content.to_json : content
+    metadata = { "payloadType" => payload_type, "consoleReplayScript" => "" }.to_json
+
+    "#{metadata}\t#{raw_content.bytesize.to_s(16)}\n#{raw_content}"
+  end
+
+  def length_prefixed_parts(content, payload_type: "string")
+    payload = length_prefixed_payload(content, payload_type: payload_type)
+    newline_idx = payload.byteindex("\n")
+    raise "Test fixture missing newline" unless newline_idx
+
+    header_end = newline_idx + 1
+
+    [payload.byteslice(0, header_end), payload.byteslice(header_end, payload.bytesize - header_end)]
+  end
+
+  describe ".parse_one_chunk_result" do
+    it "parses ASCII-only string payloads" do
+      content = "hello world"
+
+      expect(described_class.parse_one_chunk_result(length_prefixed_payload(content))).to include(
+        "consoleReplayScript" => "",
+        "html" => content
+      )
+    end
+
+    it "uses byte lengths for multibyte string payloads" do
+      content = "caf\u00E9"
+
+      expect(described_class.parse_one_chunk_result(length_prefixed_payload(content))).to include(
+        "consoleReplayScript" => "",
+        "html" => content
+      )
+    end
+
+    it "parses object payloads by JSON-decoding the content" do
+      content = { "error" => "boom" }
+
+      payload = length_prefixed_payload(content, payload_type: "object")
+
+      expect(described_class.parse_one_chunk_result(payload)).to include(
+        "consoleReplayScript" => "",
+        "html" => content
+      )
+    end
+
+    it "raises on a missing tab separator in the header" do
+      bad_payload = "{\"payloadType\":\"string\"}\n<content>"
+
+      expect { described_class.parse_one_chunk_result(bad_payload) }.to raise_error(
+        ReactOnRails::Error,
+        /missing tab/
+      )
+    end
+
+    it "raises on an invalid hex length" do
+      metadata = { "payloadType" => "string" }.to_json
+      bad_payload = "#{metadata}\tZZZZ\ncontent"
+
+      expect { described_class.parse_one_chunk_result(bad_payload) }.to raise_error(
+        ReactOnRails::Error,
+        /Invalid content length/
+      )
+    end
+
+    it "raises when the input contains more than one chunk" do
+      chunk = length_prefixed_payload("hello")
+      two_chunks = chunk + chunk
+
+      expect { described_class.parse_one_chunk_result(two_chunks) }.to raise_error(
+        ReactOnRails::Error,
+        /expected exactly one length-prefixed chunk but found 2/
+      )
+    end
+  end
+
+  describe "#feed" do
+    it "parses multibyte payloads split across streaming chunks" do
+      content = "\u3053\u3093\u306B\u3061\u306F"
+      payload = length_prefixed_payload(content).b
+      parser = described_class.new
+      results = []
+
+      parser.feed(payload.byteslice(0, 10)) { |chunk| results << chunk }
+      expect(results).to be_empty
+
+      parser.feed(payload.byteslice(10, payload.bytesize - 10)) { |chunk| results << chunk }
+      expect(results).to contain_exactly(
+        include(
+          "consoleReplayScript" => "",
+          "html" => content
+        )
+      )
+    end
+
+    it "waits for a multibyte body after receiving a complete header chunk" do
+      content = "\u4F60\u597D"
+      header, body = length_prefixed_parts(content)
+      parser = described_class.new
+      results = []
+
+      parser.feed(header.b) { |chunk| results << chunk }
+      expect(results).to be_empty
+
+      parser.feed(body.b) { |chunk| results << chunk }
+      expect(results).to contain_exactly(
+        include(
+          "consoleReplayScript" => "",
+          "html" => content
+        )
+      )
+    end
+  end
+end

@@ -4,6 +4,7 @@
  */
 import packageJson from '../shared/packageJson.js';
 import log from '../shared/log.js';
+import { sanitizeBodyKeys } from '../shared/sensitiveKeys.js';
 
 const NODE_ENV = process.env.NODE_ENV || 'production';
 
@@ -51,7 +52,7 @@ export function checkProtocolVersion(body: RequestBody) {
       data: `Unsupported renderer protocol version ${
         reqProtocolVersion
           ? `request protocol ${reqProtocolVersion}`
-          : `MISSING with body ${JSON.stringify(body)}`
+          : `MISSING (received fields: ${sanitizeBodyKeys(body).join(', ') || '(none)'})`
       } does not match installed renderer protocol ${packageJson.protocolVersion} for version ${packageJson.version}.
 Update either the renderer or the Rails server`,
     };

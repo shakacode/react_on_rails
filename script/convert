@@ -64,15 +64,19 @@ gsub_file_content("../react_on_rails/spec/dummy/package.json", /"react-dom": "[^
 
 # Switch from @dr.pogodin/react-helmet (React 19+) to react-helmet-async (React 18 compatible)
 # Both have the same HelmetProvider API, but different package names
-gsub_file_content("../react_on_rails/spec/dummy/package.json", /"@dr\.pogodin\/react-helmet": "[^"]*",/, '"react-helmet-async": "^1.3.0",')
+gsub_file_content(
+  "../react_on_rails/spec/dummy/package.json",
+  %r{"@dr\.pogodin/react-helmet": "[^"]*",},
+  '"react-helmet-async": "^1.3.0",'
+)
 # Update import statements in all client files
 Dir.glob(File.expand_path("../react_on_rails/spec/dummy/client/**/*.{js,jsx,ts,tsx}", __dir__)).each do |file|
   content = File.binread(file)
-  if content.include?("@dr.pogodin/react-helmet")
-    content.gsub!(%r{from ['"]@dr\.pogodin/react-helmet['"]}, 'from "react-helmet-async"')
-    content.gsub!(%r{['"]@dr\.pogodin/react-helmet['"]}, '"react-helmet-async"')
-    File.binwrite(file, content)
-  end
+  next unless content.include?("@dr.pogodin/react-helmet")
+
+  content.gsub!(%r{from ['"]@dr\.pogodin/react-helmet['"]}, 'from "react-helmet-async"')
+  content.gsub!(%r{['"]@dr\.pogodin/react-helmet['"]}, '"react-helmet-async"')
+  File.binwrite(file, content)
 end
 
 # Pro package: Skip RSC tests on React 18 since RSC requires React 19

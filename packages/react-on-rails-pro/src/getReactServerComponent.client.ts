@@ -18,6 +18,11 @@ import { RailsContext } from 'react-on-rails/types';
 import { createRSCPayloadKey, fetch, wrapInNewPromise, extractErrorMessage } from './utils.ts';
 import sanitizeNonce from 'react-on-rails/@internal/sanitizeNonce';
 import LengthPrefixedStreamParser from './parseLengthPrefixedStream.ts';
+import {
+  buildRSCStreamDiagnosticError,
+  mergeRSCStreamDiagnosticError,
+  RSC_STREAM_DIAGNOSTIC_ERROR_NAME,
+} from './rscDiagnostics.ts';
 
 declare global {
   interface Window {
@@ -56,7 +61,18 @@ const replayConsole = (consoleReplayScript: string, nonce?: string) => {
  *
  * Extracts raw Flight data for React, replays console from metadata.
  */
-const createFromFetch = async (fetchPromise: Promise<Response>, cspNonce?: string) => {
+const createFromFetch = async (
+  fetchPromise: Promise<Response>,
+  {
+    componentName,
+    cspNonce,
+    source,
+  }: {
+    componentName: string;
+    cspNonce?: string;
+    source: string;
+  },
+) => {
   const response = await fetchPromise;
   const { body } = response;
   if (!body) {
@@ -65,6 +81,13 @@ const createFromFetch = async (fetchPromise: Promise<Response>, cspNonce?: strin
 
   const nonce = sanitizeNonce(cspNonce);
   const parser = new LengthPrefixedStreamParser();
+  let rscDiagnosticError: Error | undefined;
+  const reportDiagnosticError = (metadata: Record<string, unknown>) => {
+    const diagnosticError = buildRSCStreamDiagnosticError(metadata, { componentName, source });
+    if (diagnosticError && !rscDiagnosticError) {
+      rscDiagnosticError = diagnosticError;
+    }
+  };
 
   const transformedStream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -77,6 +100,7 @@ const createFromFetch = async (fetchPromise: Promise<Response>, cspNonce?: strin
           done = readResult.done;
           if (readResult.value) {
             parser.feed(readResult.value, (content, metadata) => {
+              reportDiagnosticError(metadata);
               controller.enqueue(content);
               const consoleScript = (metadata.consoleReplayScript as string) ?? '';
               if (consoleScript) {
@@ -94,7 +118,14 @@ const createFromFetch = async (fetchPromise: Promise<Response>, cspNonce?: strin
   });
 
   const renderPromise = createFromReadableStream<React.ReactNode>(transformedStream);
-  return wrapInNewPromise(renderPromise);
+  // `rscDiagnosticError` is set before the matching chunk is enqueued: the parser callback
+  // records it first, then enqueues the content in the ReadableStream `start` callback above.
+  // React can only read a chunk after it has been enqueued, so by the time `renderPromise`
+  // rejects the diagnostic — if the stream carried one — is already set; it is never undefined
+  // purely because of timing.
+  return wrapInNewPromise(renderPromise).catch((error: unknown) => {
+    throw mergeRSCStreamDiagnosticError(error, rscDiagnosticError);
+  });
 };
 
 /**
@@ -132,12 +163,24 @@ const fetchRSC = ({
     const propsString = JSON.stringify(componentProps);
     const strippedUrlPath = rscPayloadGenerationUrlPath.replace(/^\/|\/$/g, '');
     const encodedParams = new URLSearchParams({ props: propsString }).toString();
-    const fetchUrl = `/${strippedUrlPath}/${componentName}?${encodedParams}`;
+    const sourcePath = `/${strippedUrlPath}/${componentName}`;
+    const fetchUrl = `${sourcePath}?${encodedParams}`;
 
-    return createFromFetch(fetch(fetchUrl), railsContext.cspNonce).catch((error: unknown) => {
-      throw new Error(
+    return createFromFetch(fetch(fetchUrl), {
+      componentName,
+      cspNonce: railsContext.cspNonce,
+      // Keep `source` query-string free so serialized props aren't echoed into error messages
+      // or attached error-monitoring events. The outer wrapper below retains `fetchUrl` for reproducibility.
+      source: sourcePath,
+    }).catch((error: unknown) => {
+      // RSC stream diagnostic errors already carry component/source context — preserve them
+      // (including .cause and the merged stack) instead of flattening to a plain Error.
+      if (error instanceof Error && error.name === RSC_STREAM_DIAGNOSTIC_ERROR_NAME) throw error;
+      const wrapper: Error & { cause?: unknown } = new Error(
         `Failed to fetch RSC payload for component "${componentName}" from "${fetchUrl}": ${extractErrorMessage(error)}`,
       );
+      wrapper.cause = error;
+      throw wrapper;
     });
   } catch (error: unknown) {
     // Handle JSON.stringify errors or other synchronous errors
@@ -194,12 +237,24 @@ const createRSCStreamFromArray = (payloads: string[]) => {
  * the payload is already embedded in the page.
  *
  * @param payloads - Array of raw Flight data strings from the global array
+ * @param componentName - Name of the server component, used for error context
  * @returns A Promise resolving to the rendered React element
  */
-const createFromPreloadedPayloads = (payloads: string[]) => {
+const createFromPreloadedPayloads = (payloads: string[], componentName: string) => {
   const stream = createRSCStreamFromArray(payloads);
   const renderPromise = createFromReadableStream<React.ReactNode>(stream);
-  return wrapInNewPromise(renderPromise);
+  return wrapInNewPromise(renderPromise).catch((error: unknown) => {
+    // Preloaded payloads carry only raw Flight data — the server consumes the length-prefixed
+    // `renderingError` metadata during injection (see injectRSCPayload), so there is no RSC
+    // bundle diagnostic to merge here. Still, name the failing component (and preserve the
+    // original error as `cause`) so a hydration failure is attributable instead of surfacing a
+    // bare React error.
+    const wrapper: Error & { cause?: unknown } = new Error(
+      `Failed to hydrate preloaded RSC payload for component "${componentName}": ${extractErrorMessage(error)}`,
+    );
+    wrapper.cause = error;
+    throw wrapper;
+  });
 };
 
 /**
@@ -241,7 +296,7 @@ const getReactServerComponent =
       const rscPayloadKey = createRSCPayloadKey(componentName, componentProps, domNodeId);
       const payloads = window.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey];
       if (payloads) {
-        return createFromPreloadedPayloads(payloads);
+        return createFromPreloadedPayloads(payloads, componentName);
       }
     }
     return fetchRSC({ componentName, componentProps, railsContext });

@@ -1,6 +1,6 @@
 {
   "name": "react-on-rails-workspace",
-  "version": "16.7.0-rc.2",
+  "version": "17.0.0-rc.0",
   "description": "react-on-rails monorepo workspace manager",
   "private": true,
   "type": "module",
@@ -154,6 +154,18 @@
       "picomatch@<2.3.2": ">=2.3.2 <3",
       "picomatch@>=4.0.0 <4.0.4": ">=4.0.4 <5",
       "yaml@>=1.0.0 <1.10.3": ">=1.10.3 <2"
-    }
+    },
+    "// for onlyBuiltDependencies": [
+      "pnpm 10 blocks lifecycle scripts by default. Allowlist packages we trust.",
+      "When adding native or compiled dependencies, run pnpm ignored-builds and add trusted packages here.",
+      "protobufjs: intentionally NOT listed - its postinstall is a version-scheme warning, not a build step.",
+      "@swc/core: postinstall verifies the platform-specific native binary loads.",
+      "unrs-resolver: napi-postinstall check, used by eslint-import-resolver-typescript.",
+      "protobufjs: intentionally omitted; its postinstall reports version-scheme warnings, not a build step."
+    ],
+    "onlyBuiltDependencies": [
+      "@swc/core",
+      "unrs-resolver"
+    ]
   }
 }

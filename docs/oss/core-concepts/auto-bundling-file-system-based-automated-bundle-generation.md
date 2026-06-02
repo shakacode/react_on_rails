@@ -928,7 +928,7 @@ See [When to use `.client` / `.server` variants with RSC](#when-to-use-client--s
 
 - Migrate to a single file — delete the `.client.jsx` file, since server components do not run on the client side at all
 - Adjust the `.server.jsx` variant (or rename it to drop the `.server` suffix) to properly use RSC capabilities: async data fetching, streaming with Suspense, direct access to server-only resources
-- If the component uses a render function pattern (`export default (props, railsContext) => { ... }`), convert it to a plain React component (`export default function Component(props) { ... }`) or an async component (`export default async function Component(props) { ... }`)
+- If the component uses a render function pattern (`export default (props, railsContext) => { ... }`), convert it to a plain React component (`export default function Component(props) { ... }`) or an async component (`export default async function Component(props) { ... }`). Keep Rails-owned data loading in the controller and pass prepared data as props; see [RSC data fetching](../migrating/rsc-data-fetching.md).
 - Remove the `'use client'` directive if present — server components must not have it
 
 **Related**: [GitHub issue #2509](https://github.com/shakacode/react_on_rails/issues/2509), [How to use different files for client and server rendering](../building-features/how-to-use-different-files-for-client-and-server-rendering.md)

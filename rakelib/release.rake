@@ -148,6 +148,10 @@ def verify_gh_auth(monorepo_root:)
 end
 
 def run_release_preflight_checks!(monorepo_root:, dry_run:)
+  # The main-CI status check (`validate_main_ci_status!`) is intentionally
+  # NOT in this function — it runs inside `with_release_checkout` (after
+  # `git pull --rebase` but before tagging) so it still fires under
+  # `dry_run: true` and surfaces the warning operators need to see.
   return if dry_run
 
   puts "\n#{'=' * 80}"
@@ -288,6 +292,312 @@ def version_policy_override_enabled?(override_flag)
   ReactOnRails::Utils.object_to_boolean(override_flag) ||
     ReactOnRails::Utils.object_to_boolean(ENV.fetch("RELEASE_VERSION_POLICY_OVERRIDE", nil))
 end
+
+def ci_status_override_enabled?(override_flag)
+  ReactOnRails::Utils.object_to_boolean(override_flag) ||
+    ReactOnRails::Utils.object_to_boolean(ENV.fetch("RELEASE_CI_STATUS_OVERRIDE", nil))
+end
+
+# Statuses considered "incomplete" — anything not yet a finalized conclusion.
+CI_INCOMPLETE_STATUSES = %w[in_progress queued waiting requested pending].freeze
+# Conclusions considered acceptable. `skipped`/`neutral` are not failures (e.g. docs-only
+# paths-ignore skips, or workflows that intentionally short-circuit).
+CI_PASSING_CONCLUSIONS = %w[success skipped neutral].freeze
+
+# rubocop:disable Metrics/MethodLength
+def fetch_main_ci_checks(monorepo_root:, allow_override: false, dry_run: false)
+  fetch_output, fetch_status = Open3.capture2e(
+    "git", "-C", monorepo_root, "fetch", "origin", "main", "--quiet"
+  )
+  unless fetch_status.success?
+    handle_main_ci_status_violation!(
+      message: "❌ Unable to fetch origin/main for CI status check.\n\n#{fetch_output}",
+      allow_override: allow_override,
+      dry_run: dry_run
+    )
+    return nil
+  end
+
+  sha_output, sha_status = Open3.capture2e("git", "-C", monorepo_root, "rev-parse", "origin/main")
+  unless sha_status.success?
+    handle_main_ci_status_violation!(
+      message: "❌ Unable to resolve origin/main HEAD.\n\n#{sha_output}",
+      allow_override: allow_override,
+      dry_run: dry_run
+    )
+    return nil
+  end
+  sha = sha_output.strip
+
+  repo_slug = github_repo_slug(monorepo_root)
+  api_path = "repos/#{repo_slug}/commits/#{sha}/check-runs"
+
+  # `--paginate --jq '.check_runs[]'` flattens paginated responses into JSONL.
+  # Each non-empty line is one check_run object. We invoke `gh` directly here
+  # (rather than via `capture_gh_output`) so that a missing binary routes
+  # through `handle_main_ci_status_violation!` — same as a git fetch failure —
+  # instead of aborting unconditionally. This keeps `dry_run` / `allow_override`
+  # symmetric across every fetch step.
+  begin
+    output, status = Open3.capture2e(
+      "gh", "api", "--paginate", "--jq", ".check_runs[]", api_path
+    )
+  rescue Errno::ENOENT
+    handle_main_ci_status_violation!(
+      message: "❌ GitHub CLI (`gh`) is not installed. Install it from https://cli.github.com/ and retry.",
+      allow_override: allow_override,
+      dry_run: dry_run
+    )
+    return nil
+  end
+
+  unless status.success?
+    handle_main_ci_status_violation!(
+      message: "❌ Unable to query GitHub Checks API for #{sha}.\n\n#{output}",
+      allow_override: allow_override,
+      dry_run: dry_run
+    )
+    return nil
+  end
+
+  begin
+    check_runs = output.lines.reject { |line| line.strip.empty? }.map do |line|
+      JSON.parse(line)
+    end
+  rescue JSON::ParserError => e
+    handle_main_ci_status_violation!(
+      message: "❌ Failed to parse check_runs response from gh: #{e.message}\n\nOutput:\n#{output}",
+      allow_override: allow_override,
+      dry_run: dry_run
+    )
+    return nil
+  end
+
+  { sha: sha, repo_slug: repo_slug, check_runs: check_runs }
+end
+# rubocop:enable Metrics/MethodLength
+
+def required_check_names_for_main(monorepo_root:, repo_slug: nil)
+  repo_slug ||= github_repo_slug(monorepo_root)
+  api_path = "repos/#{repo_slug}/branches/main/protection/required_status_checks"
+  # Combine the legacy `contexts` list (older protection rules) with the newer
+  # `checks[].context` list. Branch protection set up via the `checks` API
+  # leaves `contexts` as `[]`, so reading only `contexts` would yield an empty
+  # array and trip the `:no_required_checks` abort path even when CI is green.
+  jq_query = "(.contexts // []) + (.checks // [] | map(.context)) | unique"
+  # Precondition: `fetch_main_ci_checks` already verified `gh` is installed
+  # before `validate_main_ci_status!` calls this helper. The remaining failure
+  # mode here is "branch protection unknown", which returns nil so the caller
+  # fail-safes to evaluating every visible check_run.
+  output, status = capture_gh_output("api", "--jq", jq_query, api_path)
+  # If branch protection isn't configured, isn't queryable with current token scope, or the
+  # endpoint returns 404, fall through to nil so the caller treats all checks as required
+  # (fail-safe).
+  return nil unless status.success?
+
+  begin
+    parsed = JSON.parse(output)
+    return nil unless parsed.is_a?(Array)
+
+    # Empty array (no required names parseable) is treated the same as "no
+    # branch protection visible" — fail-safe to evaluating every check run.
+    parsed.empty? ? nil : parsed
+  rescue JSON::ParserError
+    nil
+  end
+end
+
+def format_main_ci_status_violation(kind:, short_sha:, runs:) # rubocop:disable Metrics/CyclomaticComplexity
+  header = case kind
+           when :in_progress
+             "⏳ CI is still in progress on origin/main (commit #{short_sha})."
+           when :no_checks
+             "❌ No CI check runs visible on origin/main (commit #{short_sha}). " \
+             "CI may not have started yet, or the GitHub Checks API is unavailable."
+           when :no_required_checks
+             "❌ No required CI check runs found on origin/main (commit #{short_sha})."
+           when :missing_required_checks
+             "❌ Some required CI checks are missing on origin/main (commit #{short_sha}). " \
+             "Branch protection would refuse this merge."
+           when :failed
+             "❌ CI on origin/main is not healthy (commit #{short_sha})."
+           when :unknown_status
+             "❌ Check run(s) with unrecognized status on origin/main (commit #{short_sha})."
+           else
+             raise ArgumentError, "Unknown CI violation kind: #{kind.inspect}"
+           end
+  return header if runs.nil? || runs.empty?
+
+  lines = runs.map do |run|
+    icon = kind == :in_progress ? "⏳" : "❌"
+    detail = kind == :in_progress ? (run["status"] || "in_progress") : (run["conclusion"] || "incomplete")
+    "  #{icon} #{detail}: #{run['name']}\n      #{run['html_url']}"
+  end
+  "#{header}\n\n#{lines.join("\n")}"
+end
+
+def handle_main_ci_status_violation!(message:, allow_override:, dry_run:)
+  if dry_run
+    puts message.lines.map { |line| "⚠️ DRY RUN: #{line}" }.join
+    puts "⚠️ DRY RUN: Real release would block. Use RELEASE_CI_STATUS_OVERRIDE=true to bypass."
+    return
+  end
+
+  if allow_override
+    puts "⚠️ CI STATUS OVERRIDE enabled — proceeding despite the following:"
+    puts message.lines.map { |line| "  #{line}" }.join
+    return
+  end
+
+  abort <<~ERROR
+    #{message}
+
+    To override (use only if the failures are known-unrelated to this release):
+      RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake release[...]
+      # or pass override_ci_status as the 4th positional argument:
+      bundle exec rake "release[VERSION,false,false,true]"
+  ERROR
+end
+
+# rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dry_run:)
+  puts "\nChecking CI status on origin/main..."
+
+  data = fetch_main_ci_checks(monorepo_root: monorepo_root, allow_override: allow_override, dry_run: dry_run)
+  # `fetch_main_ci_checks` returns nil when it surfaced a violation through
+  # `handle_main_ci_status_violation!` (dry-run or override path). In that case
+  # the warning has already been printed and we should not continue.
+  return if data.nil?
+
+  sha = data[:sha]
+  short_sha = sha[0, 8]
+  repo_slug = data[:repo_slug]
+  check_runs = data[:check_runs]
+
+  if check_runs.empty?
+    handle_main_ci_status_violation!(
+      message: format_main_ci_status_violation(kind: :no_checks, short_sha: short_sha, runs: nil),
+      allow_override: allow_override,
+      dry_run: dry_run
+    )
+    return
+  end
+
+  # Collapse multiple runs per (check_suite_id, name) to the most recent
+  # attempt (highest check_run id). The key intentionally includes
+  # check_suite_id so we only collapse *true* reruns (same workflow run,
+  # same job name) and not unrelated workflows that happen to share a job
+  # name. For example, this repo has multiple workflows that each define a
+  # `detect-changes` job; without the suite_id in the key, a passing run
+  # from one workflow could mask a failing run from another. `id` is
+  # monotonically increasing per check run, so `max_by { id }` reliably
+  # selects the latest attempt within a suite.
+  # When `check_suite` is absent (rare — third-party integrations that don't
+  # attach to a suite), fall back to the run's own `id` for the group key so
+  # each nil-suite run sits in its own group and is never collapsed with
+  # another. The GitHub Actions Checks API always populates `check_suite`,
+  # so this only matters for external check integrations.
+  check_runs = check_runs
+               .group_by { |run| [run.dig("check_suite", "id") || run["id"], run["name"]] }
+               .map { |_key, runs| runs.max_by { |run| run["id"].to_i } }
+
+  # Always query branch-protection required checks (when configured) so the
+  # missing-required-check gate applies to both stable and prerelease.
+  # `evaluated` then differs by mode:
+  #   - prerelease: only the required subset (narrower filter; non-required failures are advisory)
+  #   - stable:     every check_run on the commit (broader filter; any failure blocks)
+  required_args = { monorepo_root: monorepo_root }
+  required_args[:repo_slug] = repo_slug if repo_slug
+  required_names = required_check_names_for_main(**required_args)
+  evaluated = if is_prerelease && required_names
+                check_runs.select { |run| required_names.include?(run["name"]) }
+              else
+                check_runs
+              end
+
+  # When branch protection lists required checks, treat any missing required
+  # check as blocking — for stable AND prerelease. Branch protection would
+  # refuse the merge in this state, so a release that ignored the gap would
+  # ship against a commit GitHub itself considers unverified.
+  # `:no_required_checks` covers the all-missing case (typically: CI hasn't
+  # started yet); `:missing_required_checks` covers the partial case (some
+  # required workflows ran, others never registered — usually a renamed or
+  # deleted workflow that branch protection still requires).
+  unless required_names.nil?
+    observed_names = check_runs.map { |run| run["name"] }
+    missing_names = required_names - observed_names
+    if missing_names.length == required_names.length
+      handle_main_ci_status_violation!(
+        message: format_main_ci_status_violation(kind: :no_required_checks, short_sha: short_sha, runs: nil) +
+                 "\nRequired: #{required_names.join(', ')}",
+        allow_override: allow_override,
+        dry_run: dry_run
+      )
+      return
+    elsif missing_names.any?
+      handle_main_ci_status_violation!(
+        message: format_main_ci_status_violation(kind: :missing_required_checks, short_sha: short_sha, runs: nil) +
+                 "\nRequired: #{required_names.join(', ')}\nMissing: #{missing_names.join(', ')}",
+        allow_override: allow_override,
+        dry_run: dry_run
+      )
+      return
+    end
+  end
+
+  # Report failures before in-progress runs. If both are present, the operator
+  # needs to know about the failure right away — telling them to "wait or
+  # override" would just make them wait and re-run before seeing the real
+  # blocker.
+  failed = evaluated.select do |run|
+    run["status"] == "completed" && !CI_PASSING_CONCLUSIONS.include?(run["conclusion"])
+  end
+  if failed.any?
+    handle_main_ci_status_violation!(
+      message: format_main_ci_status_violation(kind: :failed, short_sha: short_sha, runs: failed),
+      allow_override: allow_override,
+      dry_run: dry_run
+    )
+    return
+  end
+
+  in_progress = evaluated.select { |run| CI_INCOMPLETE_STATUSES.include?(run["status"]) }
+  if in_progress.any?
+    handle_main_ci_status_violation!(
+      message: format_main_ci_status_violation(kind: :in_progress, short_sha: short_sha, runs: in_progress),
+      allow_override: allow_override,
+      dry_run: dry_run
+    )
+    return
+  end
+
+  # Catch any run whose status falls outside both the "completed" and
+  # `CI_INCOMPLETE_STATUSES` buckets — e.g. a new GitHub status value we
+  # don't yet know about, or a `nil` from a malformed response. Treat the
+  # ambiguity as a failure rather than letting it slip through as green;
+  # the release gate is supposed to be the last-line check.
+  unknown = evaluated.reject do |run|
+    run["status"] == "completed" || CI_INCOMPLETE_STATUSES.include?(run["status"])
+  end
+  if unknown.any?
+    handle_main_ci_status_violation!(
+      message: format_main_ci_status_violation(kind: :unknown_status, short_sha: short_sha, runs: unknown),
+      allow_override: allow_override,
+      dry_run: dry_run
+    )
+    return
+  end
+
+  # Only label the count "required" when `evaluated` was actually filtered to
+  # the required subset (prerelease + branch protection visible). On stable
+  # releases we keep evaluating every check_run, so the count includes
+  # non-required runs and labelling them "required" would misrepresent the
+  # gate.
+  qualifier = is_prerelease && required_names ? "required " : ""
+  noun = evaluated.length == 1 ? "check" : "checks"
+  puts "✓ Main CI is healthy on #{short_sha} (#{evaluated.length} #{qualifier}#{noun})"
+end
+# rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
 def handle_version_policy_violation!(message:, allow_override:)
   if allow_override
@@ -670,14 +980,35 @@ def replace_workspace_protocol_dependencies_for_publish!(package_json, package_v
   changed
 end
 
+def write_publishable_package_json(package_json_path, package_json)
+  tmp = Tempfile.create(["package-json-", ".json"], File.dirname(package_json_path))
+  tmp_path = tmp.path
+  renamed = false
+
+  begin
+    tmp.write("#{JSON.pretty_generate(package_json)}\n")
+    tmp.chmod(File.stat(package_json_path).mode & 0o777)
+    tmp.close
+    File.rename(tmp_path, package_json_path)
+    renamed = true
+  ensure
+    tmp.close unless tmp.closed?
+    File.unlink(tmp_path) if !renamed && File.exist?(tmp_path)
+  end
+end
+
 def with_publishable_package_json(dir, package_version)
   package_json_path = File.join(dir, "package.json")
   changed = false
   original_content = File.read(package_json_path)
   package_json = JSON.parse(original_content)
 
-  changed = replace_workspace_protocol_dependencies_for_publish!(package_json, package_version)
-  File.write(package_json_path, "#{JSON.pretty_generate(package_json)}\n") if changed
+  if replace_workspace_protocol_dependencies_for_publish!(package_json, package_version)
+    write_publishable_package_json(package_json_path, package_json)
+    # Only flip `changed` after the atomic same-directory rename succeeds so the `ensure`
+    # restore runs only after package.json was actually replaced.
+    changed = true
+  end
 
   yield
 ensure
@@ -717,10 +1048,10 @@ def fetch_npm_package_metadata_with_retries(package_ref, registry_url:, attempts
 
     last_output = output
     last_status = status
-    next if attempt == attempts - 1
-
-    puts "npm did not return #{package_ref} yet; retrying in #{retry_delay_seconds} seconds..."
-    sleep retry_delay_seconds
+    unless attempt == attempts - 1
+      puts "npm did not return #{package_ref} yet; retrying in #{retry_delay_seconds} seconds..."
+      sleep retry_delay_seconds
+    end
   end
 
   [last_output, last_status]
@@ -859,12 +1190,22 @@ This will update and release:
   - empty (auto): use latest CHANGELOG.md version if newer, else patch bump
 2nd argument: Dry run (true/false, default: false)
 3rd argument: Override version policy checks (true/false, default: false)
+4th argument: Override main-branch CI status check (true/false, default: false)
+
+Main-branch CI policy:
+  Before releasing, the script checks CI status on origin/main HEAD.
+  - Stable releases require every check run on the commit to have succeeded.
+  - Pre-releases require only the GitHub-branch-protection-required checks
+    to have succeeded.
+  In-progress checks block the release until they finish, or until you
+  explicitly override via the 4th argument or RELEASE_CI_STATUS_OVERRIDE=true.
 
 Environment variables:
   VERBOSE=1                    # Enable verbose logging (shows all output)
   NPM_OTP=<code>               # Provide NPM one-time password (reused for all NPM publishes)
   RUBYGEMS_OTP=<code>          # Provide RubyGems one-time password (reused for both gems)
   RELEASE_VERSION_POLICY_OVERRIDE=true # Override release version policy checks
+  RELEASE_CI_STATUS_OVERRIDE=true      # Override main-branch CI status check
   GEM_RELEASE_MAX_RETRIES=<n>  # Override max retry attempts (default: 3)
 
 Examples:
@@ -877,7 +1218,7 @@ Examples:
   rake release[patch,true]                      # Dry run
   VERBOSE=1 rake release[patch]                 # Release with verbose logging
   NPM_OTP=123456 RUBYGEMS_OTP=789012 rake release[patch]  # Skip OTP prompts")
-task :release, %i[version dry_run override_version_policy] do |_t, args|
+task :release, %i[version dry_run override_version_policy override_ci_status] do |_t, args|
   monorepo_root = current_monorepo_root
 
   args_hash = args.to_hash
@@ -885,6 +1226,7 @@ task :release, %i[version dry_run override_version_policy] do |_t, args|
   is_dry_run = ReactOnRails::Utils.object_to_boolean(args_hash[:dry_run])
   is_verbose = ENV["VERBOSE"] == "1"
   allow_version_policy_override = version_policy_override_enabled?(args_hash[:override_version_policy])
+  allow_ci_status_override = ci_status_override_enabled?(args_hash[:override_ci_status])
   npm_otp = ENV.fetch("NPM_OTP", nil)
   rubygems_otp = ENV.fetch("RUBYGEMS_OTP", nil)
 
@@ -932,6 +1274,13 @@ task :release, %i[version dry_run override_version_policy] do |_t, args|
           rake release[#{resolved_target_gem_version.sub(/(\d+\.\d+\.\d+)/, '\\1.beta.1')}]
       ERROR
     end
+
+    validate_main_ci_status!(
+      monorepo_root: release_root,
+      is_prerelease: is_prerelease,
+      allow_override: allow_ci_status_override,
+      dry_run: is_dry_run
+    )
 
     validate_release_version_policy!(
       monorepo_root: release_root,

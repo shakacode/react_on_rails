@@ -2,18 +2,22 @@
 
 eval_gemfile File.expand_path("../Gemfile.shared_dev_dependencies", __dir__)
 
-gem "shakapacker", "9.6.1"
+gem "shakapacker", "10.1.0"
 gem "bootsnap", require: false
 gem "rails", "~> 7.1.0"
 
-gem "sqlite3", "~> 1.6"
+gem "sqlite3", "~> 2.0"
 gem "sass-rails", "~> 6.0"
 gem "uglifier"
 gem "jquery-rails"
 gem "puma", "~> 6.0"
 
 # Turbolinks makes following links in your web application faster. Read more: https://github.com/rails/turbolinks
-gem "turbolinks" if ENV["DISABLE_TURBOLINKS"].nil? || ENV["DISABLE_TURBOLINKS"].strip.empty?
+# Declared unconditionally so the gemset always matches Gemfile.lock. DISABLE_TURBOLINKS
+# toggles Turbolinks at the application layer (the require_asset in
+# spec/dummy/app/assets/javascripts/application_non_webpack.js.erb), not gem inclusion.
+# A conditional declaration broke `bundle install --frozen` in CI (see AGENTS.md).
+gem "turbolinks"
 
 # Build JSON APIs with ease. Read more: https://github.com/rails/jbuilder
 gem "jbuilder"

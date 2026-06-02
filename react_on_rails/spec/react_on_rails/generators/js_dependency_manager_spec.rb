@@ -228,6 +228,16 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect(package_json.dig("dependencies", "react-on-rails-pro")).to eq("16.7.0-rc.1")
     end
 
+    it "formats the package.json pin fallback warning with name@version package specs" do
+      warning = instance.send(
+        :package_json_pin_fallback_warning,
+        [["react", "18.0.0"], ["react-dom", "18.0.0"]]
+      )
+
+      expect(warning).to include("react@18.0.0, react-dom@18.0.0")
+      expect(warning).to include("Wrote the following version pins to package.json")
+    end
+
     it "does not write unversioned dependencies to package.json when package-manager install fails" do
       File.write("package.json", "#{JSON.pretty_generate({ 'dependencies' => {} })}\n")
       instance.add_npm_dependencies_result = false

@@ -2,6 +2,8 @@
 
 require_relative "generator_messages"
 require_relative "demo_page_config"
+require_relative "rsc_setup/client_references"
+require_relative "rsc_setup/layouts"
 
 module ReactOnRails
   module Generators
@@ -24,6 +26,8 @@ module ReactOnRails
     #
     module RscSetup # rubocop:disable Metrics/ModuleLength
       include DemoPageConfig
+      include ClientReferences
+      include Layouts
 
       DEFAULT_LAYOUT_NAME = "react_on_rails_default"
       LEGACY_LAYOUT_NAME = "hello_world"
@@ -379,15 +383,22 @@ module ReactOnRails
 
         content = File.read(full_path)
 
-        # Skip if RSCWebpackPlugin is already configured
-        return if content.include?("RSCWebpackPlugin")
+        if rsc_plugin_invocation_in_js_code?(content)
+          update_existing_rsc_webpack_config(config_path, content, is_server: true)
+          return
+        end
 
         # Add RSCWebpackPlugin import after bundler require
-        gsub_file(
+        return unless rsc_client_references_setup_anchor_available?(
           config_path,
-          %r{(const bundler = config\.assets_bundler.*\n.*require\('@rspack/core'\).*\n.*: require\('webpack'\);)},
-          "\\1\nconst { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');"
+          content,
+          is_server: true,
+          plugin_pending: true
         )
+
+        existing_imports_content = content_through_rsc_setup_anchor(content, is_server: true)
+        setup_status = prepare_rsc_plugin_imports(config_path, content, existing_imports_content, is_server: true)
+        return if setup_status == :failed
 
         # Add rscBundle parameter to configureServer function
         gsub_file(
@@ -398,16 +409,20 @@ module ReactOnRails
         )
 
         # Add RSCWebpackPlugin to plugins before LimitChunkCountPlugin (matches template ordering)
+        client_references_option = setup_status == :scoped ? ", clientReferences: rscClientReferences" : ""
         rsc_plugin_code = "// Add RSC plugin for server bundle (handles client component references)\n  " \
                           "// Skip for RSC bundle - it doesn't need RSCWebpackPlugin\n  " \
                           "if (!rscBundle) {\n    " \
-                          "serverWebpackConfig.plugins.push(new RSCWebpackPlugin({ isServer: true }));\n  " \
+                          "serverWebpackConfig.plugins.push(\n      " \
+                          "new RSCWebpackPlugin({ isServer: true#{client_references_option} }),\n    " \
+                          ");\n  " \
                           "}"
         gsub_file(
           config_path,
           /(serverWebpackConfig\.plugins\.unshift\(new bundler\.optimize\.LimitChunkCountPlugin.*\);)/,
           "#{rsc_plugin_code}\n  \\1"
         )
+        rollback_incomplete_new_rsc_plugin_setup(config_path, content, is_server: true)
       end
 
       def update_client_webpack_config_for_rsc
@@ -418,23 +433,83 @@ module ReactOnRails
 
         content = File.read(full_path)
 
-        # Skip if RSCWebpackPlugin is already configured
-        return if content.include?("RSCWebpackPlugin")
+        if rsc_plugin_invocation_in_js_code?(content)
+          update_existing_rsc_webpack_config(config_path, content, is_server: false)
+          return
+        end
 
         # Add RSCWebpackPlugin import after commonWebpackConfig import
-        gsub_file(
+        return unless rsc_client_references_setup_anchor_available?(
           config_path,
-          %r{(const commonWebpackConfig = require\('\./commonWebpackConfig'\);)},
-          "\\1\nconst { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');"
+          content,
+          is_server: false,
+          plugin_pending: true
         )
 
+        existing_imports_content = content_through_rsc_setup_anchor(content, is_server: false)
+        setup_status = prepare_rsc_plugin_imports(config_path, content, existing_imports_content, is_server: false)
+        return if setup_status == :failed
+
         # Add RSCWebpackPlugin to client config before return statement
+        client_references_option = setup_status == :scoped ? ", clientReferences: rscClientReferences" : ""
         rsc_plugin_code = "  // Add React Server Components plugin for client bundle\n  " \
-                          "clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));"
+                          "clientConfig.plugins.push(\n    " \
+                          "new RSCWebpackPlugin({ isServer: false#{client_references_option} }),\n  " \
+                          ");"
         gsub_file(
           config_path,
           /^( *return clientConfig;)$/,
           "#{rsc_plugin_code}\n\n\\1"
+        )
+        rollback_incomplete_new_rsc_plugin_setup(config_path, content, is_server: false)
+      end
+
+      def rollback_incomplete_new_rsc_plugin_setup(config_path, original_content, is_server:)
+        return if options[:pretend] || options[:skip]
+
+        full_path = File.join(destination_root, config_path)
+        current_content = File.read(full_path)
+        return if new_rsc_plugin_setup_complete?(current_content, is_server: is_server)
+        return if current_content == original_content
+
+        say_status(:revert, config_path, :yellow)
+        File.write(full_path, original_content)
+        warn_incomplete_new_rsc_plugin_setup(config_path, is_server: is_server)
+      end
+
+      def new_rsc_plugin_setup_complete?(content, is_server:)
+        return false unless rsc_plugin_invocation_in_js_code?(content)
+        # Client path intentionally only requires the plugin invocation, not the scoped helper.
+        # The `:unscoped` degraded path (taken when scoping is blocked) writes the plugin
+        # without `rscClientReferences`, and this guard must not trigger the rollback in that
+        # case. The server path keeps the stricter check below because the `rscBundle`
+        # signature change is the marker of a complete server-side rewrite.
+        return true unless is_server
+
+        rsc_server_signature_in_js_code?(content)
+      end
+
+      # Returns true when the file contains a real `new RSCWebpackPlugin(` invocation in actual JS
+      # code — not inside a comment or string literal. Reuses `RSC_PLUGIN_INVOCATION_REGEX` from
+      # the ClientReferences module so the routing check and the option-section partition match
+      # the same set of invocations (including whitespace/newline variants).
+      def rsc_plugin_invocation_in_js_code?(content)
+        content
+          .to_enum(:scan, RSC_PLUGIN_INVOCATION_REGEX)
+          .any? { js_code_position?(content, Regexp.last_match.begin(0)) }
+      end
+
+      def rsc_server_signature_in_js_code?(content)
+        content
+          .to_enum(:scan, /configureServer\s*=\s*\(\s*rscBundle\s*=\s*false\s*\)/)
+          .any? { js_code_position?(content, Regexp.last_match.begin(0)) }
+      end
+
+      def warn_incomplete_new_rsc_plugin_setup(config_path, is_server:)
+        insertion_point = is_server ? "server webpack insertion points" : "client webpack return statement"
+        GeneratorMessages.add_warning(
+          "Could not finish adding RSCWebpackPlugin to #{config_path}: expected #{insertion_point} was not found. " \
+          "Reverted partial RSC setup; please add RSCWebpackPlugin and clientReferences manually."
         )
       end
 
@@ -462,7 +537,13 @@ module ReactOnRails
 
         content = File.read(path)
         missing = []
-        missing << "RSCWebpackPlugin in serverWebpackConfig.js" unless content.include?("RSCWebpackPlugin")
+        if content.include?("RSCWebpackPlugin")
+          unless rsc_plugin_client_references_configured?(content, is_server: true)
+            missing << "generated scoped clientReferences in serverWebpackConfig.js"
+          end
+        else
+          missing << "RSCWebpackPlugin in serverWebpackConfig.js"
+        end
         missing << "rscBundle parameter in serverWebpackConfig.js" unless content.include?("rscBundle")
         missing
       end
@@ -472,7 +553,15 @@ module ReactOnRails
         return [] unless File.exist?(path)
 
         content = File.read(path)
-        content.include?("RSCWebpackPlugin") ? [] : ["RSCWebpackPlugin in clientWebpackConfig.js"]
+        missing = []
+        if content.include?("RSCWebpackPlugin")
+          unless rsc_plugin_client_references_configured?(content, is_server: false)
+            missing << "generated scoped clientReferences in clientWebpackConfig.js"
+          end
+        else
+          missing << "RSCWebpackPlugin in clientWebpackConfig.js"
+        end
+        missing
       end
 
       def check_rsc_scob_config
@@ -481,224 +570,6 @@ module ReactOnRails
 
         content = File.read(File.join(destination_root, scob_path))
         content.include?("rscWebpackConfig") ? [] : ["rscWebpackConfig in ServerClientOrBoth.js"]
-      end
-
-      def resolve_hello_server_layout_name
-        classification_by_layout = candidate_layout_names.to_h do |layout_name|
-          [layout_name, classify_hello_server_layout(layout_name)]
-        end
-
-        reusable_layout_name = find_reusable_hello_server_layout_name(classification_by_layout)
-        return reusable_layout_name if reusable_layout_name
-
-        create_new_hello_server_layout(
-          skipped_layout_paths: skipped_existing_layout_paths(classification_by_layout)
-        )
-      end
-
-      def find_reusable_hello_server_layout_name(classification_by_layout)
-        declared_layout_name = hello_world_controller_layout_name
-
-        if reusable_layout_classification?(classification_by_layout[declared_layout_name])
-          announce_reused_hello_server_layout(declared_layout_name, classification_by_layout[declared_layout_name])
-          return declared_layout_name
-        end
-
-        preferred_layout_name = first_layout_name_with_classification(
-          classification_by_layout,
-          :canonical,
-          excluding: declared_layout_name
-        )
-        return preferred_layout_name if preferred_layout_name
-
-        first_layout_name_with_reusable_classification(
-          classification_by_layout,
-          excluding: declared_layout_name
-        )
-      end
-
-      def first_layout_name_with_classification(classification_by_layout, expected_classification, excluding: nil)
-        classification_by_layout.each do |layout_name, classification|
-          next if layout_name == excluding
-          next unless classification == expected_classification
-
-          announce_reused_hello_server_layout(layout_name, classification)
-          return layout_name
-        end
-
-        nil
-      end
-
-      def first_layout_name_with_reusable_classification(classification_by_layout, excluding: nil)
-        classification_by_layout.each do |layout_name, classification|
-          next if layout_name == excluding
-          next unless reusable_layout_classification?(classification)
-
-          announce_reused_hello_server_layout(layout_name, classification)
-          return layout_name
-        end
-
-        nil
-      end
-
-      def announce_reused_hello_server_layout(layout_name, classification)
-        message = +"ℹ️  Reusing existing #{layout_name} layout for HelloServerController"
-        message << " (new generated layouts use empty pack tags by default)" if classification == :reusable
-        say message, :yellow
-      end
-
-      def candidate_layout_names
-        [
-          hello_world_controller_layout_name,
-          DEFAULT_LAYOUT_NAME,
-          LEGACY_LAYOUT_NAME,
-          *existing_rsc_layout_names
-        ].compact.uniq
-      end
-
-      def hello_world_controller_layout_name
-        return @hello_world_controller_layout_name if defined?(@hello_world_controller_layout_name)
-
-        controller_path = File.join(destination_root, "app/controllers/hello_world_controller.rb")
-        @hello_world_controller_layout_name = if File.exist?(controller_path)
-                                                extract_declared_layout_name(File.read(controller_path))
-                                              end
-      end
-
-      def extract_declared_layout_name(controller_content)
-        match = controller_content.match(/^\s*layout(?:\s+|\s*\(\s*)(?:"([^"]+)"|'([^']+)')(?=\s*(?:\)|,|#|$))/)
-        match&.captures&.compact&.first
-      end
-
-      def existing_rsc_layout_names
-        Dir.glob(File.join(destination_root, "app/views/layouts/react_on_rails_rsc*.html.erb"))
-           .map { |path| File.basename(path, ".html.erb") }
-           .select { |layout_name| generated_rsc_layout_name?(layout_name) }
-      end
-
-      def generated_rsc_layout_name?(layout_name)
-        layout_name.match?(RSC_GENERATED_LAYOUT_NAME_PATTERN)
-      end
-
-      def classify_hello_server_layout(layout_name)
-        layout_path = layout_destination_path(layout_name)
-        full_path = File.join(destination_root, layout_path)
-        return :missing unless File.exist?(full_path)
-
-        layout_content = File.read(full_path)
-        return :missing_pack_tags unless layout_has_required_pack_tags?(layout_content)
-
-        return :canonical if layout_uses_canonical_pack_tags?(layout_content)
-
-        :reusable
-      end
-
-      def skipped_existing_layout_paths(classification_by_layout)
-        classification_by_layout.filter_map do |layout_name, classification|
-          layout_path = layout_destination_path(layout_name)
-          full_path = File.join(destination_root, layout_path)
-
-          next unless File.exist?(full_path)
-          next if reusable_layout_classification?(classification)
-
-          layout_path
-        end
-      end
-
-      def layout_destination_path(layout_name)
-        "app/views/layouts/#{layout_name}.html.erb"
-      end
-
-      def layout_has_required_pack_tags?(layout_content)
-        pack_tag_present?(layout_content, "javascript_pack_tag") &&
-          pack_tag_present?(layout_content, "stylesheet_pack_tag")
-      end
-
-      def layout_uses_canonical_pack_tags?(layout_content)
-        pack_tag_without_names?(layout_content, "javascript_pack_tag") &&
-          pack_tag_without_names?(layout_content, "stylesheet_pack_tag")
-      end
-
-      def reusable_layout_classification?(classification)
-        %i[canonical reusable].include?(classification)
-      end
-
-      def pack_tag_present?(layout_content, helper_name)
-        pack_tag_arguments(layout_content, helper_name).any?
-      end
-
-      def pack_tag_without_names?(layout_content, helper_name)
-        arguments = pack_tag_arguments(layout_content, helper_name)
-        arguments.any? && arguments.all? do |pack_tag_arguments|
-          pack_tag_arguments_without_names?(pack_tag_arguments)
-        end
-      end
-
-      def pack_tag_arguments(layout_content, helper_name)
-        arguments_pattern = '\s*(?:\((?:(?!%>).)*?\)|(?:(?!%>).)*?)'
-        pattern = /<%=\s*#{Regexp.escape(helper_name)}(?=\s|\(|%>)(?<arguments>#{arguments_pattern})?\s*%>/m
-
-        arguments = []
-        layout_content.scan(pattern) do
-          arguments << Regexp.last_match[:arguments]
-        end
-
-        arguments
-      end
-
-      def pack_tag_arguments_without_names?(arguments)
-        normalized_arguments = strip_wrapping_parentheses(arguments.to_s.strip)
-        return true if normalized_arguments.empty?
-
-        normalized_arguments.match?(/\A(?:\*\*[A-Za-z_]\w*|[a-z_]\w*\s*:.*)\z/m)
-      end
-
-      def strip_wrapping_parentheses(arguments)
-        return arguments unless arguments.start_with?("(") && arguments.end_with?(")")
-
-        arguments[1...-1].strip
-      end
-
-      def create_new_hello_server_layout(skipped_layout_paths: [])
-        layout_name = next_available_hello_server_layout_name
-        layout_path = layout_destination_path(layout_name)
-
-        announce_skipped_layout_fallback(skipped_layout_paths, layout_path) if skipped_layout_paths.any?
-
-        say "📝 Creating #{layout_path} for HelloServerController...", :yellow
-        empty_directory("app/views/layouts")
-        copy_file("templates/base/base/app/views/layouts/react_on_rails_default.html.erb", layout_path)
-        say "✅ Created #{layout_path}", :green
-
-        layout_name
-      end
-
-      def announce_skipped_layout_fallback(skipped_layout_paths, new_layout_path)
-        skipped_paths = skipped_layout_paths.map { |path| "  - #{path}" }.join("\n")
-
-        say <<~MSG, :yellow
-          ℹ️  Found existing layout file(s) in your app that were not reused for HelloServerController:
-          #{skipped_paths}
-
-          Those file(s) do not include both `stylesheet_pack_tag` and `javascript_pack_tag`, so the generator
-          will create #{new_layout_path} instead of overwriting them.
-          New generated layouts use empty pack tags by default.
-        MSG
-      end
-
-      def next_available_hello_server_layout_name
-        default_layout_path = File.join(destination_root, layout_destination_path(DEFAULT_LAYOUT_NAME))
-        return DEFAULT_LAYOUT_NAME unless File.exist?(default_layout_path)
-
-        fallback_layout_path = File.join(destination_root, layout_destination_path(RSC_FALLBACK_LAYOUT_NAME))
-        return RSC_FALLBACK_LAYOUT_NAME unless File.exist?(fallback_layout_path)
-
-        (2..MAX_LAYOUT_NAME_ATTEMPTS).each do |suffix|
-          layout_name = "#{RSC_FALLBACK_LAYOUT_NAME}_#{suffix}"
-          return layout_name unless File.exist?(File.join(destination_root, layout_destination_path(layout_name)))
-        end
-
-        raise "Could not find an available RSC layout name after #{MAX_LAYOUT_NAME_ATTEMPTS} attempts."
       end
     end
   end

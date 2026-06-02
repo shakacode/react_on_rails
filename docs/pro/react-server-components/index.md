@@ -31,9 +31,9 @@ Combined with streaming SSR, RSC sends the initial HTML shell immediately while 
 
 React's selective hydration allows client components to become interactive independently as their code loads, rather than waiting for the entire page's JavaScript to execute. Components that users interact with get priority hydration.
 
-### Direct Data Access
+### Server-Prepared Data, No Client Fetching
 
-Server components can access databases, file systems, and internal APIs directly without exposing endpoints to the client. This simplifies data fetching and eliminates the need for client-side data fetching libraries in many cases.
+In React on Rails, Rails is the backend: your controller owns database access, authorization, and caching, then passes data to the component tree as props (or streams slow data as [async props](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently)). Server components render from that data without exposing API endpoints to the client or shipping client-side data-fetching libraries. Unlike Next.js-style RSC, components don't fetch their own data — see [RSC Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md).
 
 ### Real-World Results
 

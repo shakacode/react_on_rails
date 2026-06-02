@@ -1241,6 +1241,30 @@ describe('worker', () => {
       );
 
       expect(res.payload).toContain('Unsupported renderer protocol version MISSING');
+      expect(res.payload).not.toContain('my_password');
+    });
+
+    test('412 response does not leak sensitive request body values', async () => {
+      const app = createWorkerApp();
+
+      const payload = {
+        gemVersion,
+        password: 'super_secret_password_value',
+        renderingRequest: 'ReactOnRails.dummy',
+        dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP)],
+      };
+
+      const res = await callIncrementalRender(
+        app,
+        BUNDLE_TIMESTAMP,
+        'd41d8cd98f00b204e9800998ecf8427e',
+        payload,
+        412,
+      );
+
+      expect(res.payload).toContain('Unsupported renderer protocol version MISSING');
+      expect(res.payload).not.toContain('super_secret_password_value');
+      expect(res.payload).toContain('received fields:');
     });
 
     test('succeeds when gem version is missing', async () => {

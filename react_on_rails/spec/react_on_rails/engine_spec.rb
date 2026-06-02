@@ -1,6 +1,11 @@
 # frozen_string_literal: true
 
+require "fileutils"
+require "json"
+require "open3"
+require "rbconfig"
 require_relative "spec_helper"
+require "tmpdir"
 
 module ReactOnRails
   RSpec.describe Engine do
@@ -162,6 +167,374 @@ module ReactOnRails
 
         it "returns true" do
           expect(described_class.package_json_missing?).to be true
+        end
+      end
+    end
+
+    describe ".shakapacker_configured_as_bundler?" do
+      let(:app_root) { Pathname.new(Dir.mktmpdir("react-on-rails-root")) }
+
+      before do
+        allow(Rails).to receive(:root).and_return(app_root)
+      end
+
+      after do
+        FileUtils.remove_entry(app_root)
+      end
+
+      context "when config/shakapacker.yml exists" do
+        it "returns true" do
+          FileUtils.mkdir_p(app_root.join("config"))
+          File.write(app_root.join("config", "shakapacker.yml"), "default: {}\n")
+
+          expect(described_class.shakapacker_configured_as_bundler?).to be true
+        end
+      end
+
+      context "when config/shakapacker.yml does not exist" do
+        it "returns false" do
+          expect(described_class.shakapacker_configured_as_bundler?).to be false
+        end
+      end
+
+      context "when SHAKAPACKER_CONFIG points to an existing config file" do
+        around do |example|
+          original_config_path = ENV.fetch("SHAKAPACKER_CONFIG", nil)
+          ENV["SHAKAPACKER_CONFIG"] = app_root.join("custom", "shakapacker.yml").to_s
+          example.run
+        ensure
+          ENV["SHAKAPACKER_CONFIG"] = original_config_path
+        end
+
+        it "returns true without requiring config/shakapacker.yml" do
+          FileUtils.mkdir_p(app_root.join("custom"))
+          File.write(app_root.join("custom", "shakapacker.yml"), "default: {}\n")
+
+          expect(described_class.shakapacker_configured_as_bundler?).to be true
+        end
+      end
+
+      context "when SHAKAPACKER_CONFIG is a relative path" do
+        around do |example|
+          original_config_path = ENV.fetch("SHAKAPACKER_CONFIG", nil)
+          original_cwd = Dir.pwd
+          ENV["SHAKAPACKER_CONFIG"] = "config/custom-shakapacker.yml"
+          example.run
+        ensure
+          ENV["SHAKAPACKER_CONFIG"] = original_config_path
+          Dir.chdir(original_cwd)
+        end
+
+        it "resolves the path against Rails.root, not the process working directory" do
+          FileUtils.mkdir_p(app_root.join("config"))
+          File.write(app_root.join("config", "custom-shakapacker.yml"), "default: {}\n")
+
+          Dir.mktmpdir("react-on-rails-cwd") do |unrelated_cwd|
+            Dir.chdir(unrelated_cwd)
+
+            expect(described_class.shakapacker_configured_as_bundler?).to be true
+          end
+        end
+      end
+
+      it "does not call Shakapacker.config while checking for the config file" do
+        expect(::Shakapacker).not_to receive(:config)
+        expect(described_class.shakapacker_configured_as_bundler?).to be false
+      end
+
+      context "when Shakapacker is not defined" do
+        before { hide_const("Shakapacker") }
+
+        it "returns false when config/shakapacker.yml is absent" do
+          expect(described_class.shakapacker_configured_as_bundler?).to be false
+        end
+      end
+    end
+
+    describe ".suppress_shakapacker_package_manager_check_if_not_bundler!" do
+      # Skip these examples if ::Shakapacker::Utils::Manager isn't currently defined.
+      # Other specs in the suite stub_const("Shakapacker", ...) with a bare module that
+      # lacks the Utils namespace; in normal flow RSpec restores the constant after each
+      # example, so this branch is only hit when something has leaked.
+      before do
+        skip "Shakapacker::Utils::Manager is unavailable in this scope" unless defined?(::Shakapacker::Utils::Manager)
+        allow(Rails.logger).to receive(:info)
+      end
+
+      # Snapshot and restore the singleton method so the patch never leaks between examples,
+      # regardless of suite ordering or whether earlier tests already replaced it. Also reset
+      # Engine's idempotency flag so each example re-installs the wrapper from a clean state.
+      around do |example|
+        singleton = nil
+        snapshot = nil
+        if defined?(::Shakapacker::Utils::Manager)
+          singleton = ::Shakapacker::Utils::Manager.singleton_class
+          had_override = singleton_defines_package_manager_check?(singleton)
+          snapshot = ::Shakapacker::Utils::Manager.method(:error_unless_package_manager_is_obvious!) if had_override
+        end
+        described_class.instance_variable_set(:@shakapacker_guard_suppressed, nil)
+        example.run
+      ensure
+        described_class.instance_variable_set(:@shakapacker_guard_suppressed, nil)
+        if singleton
+          if singleton_defines_package_manager_check?(singleton)
+            singleton.send(:remove_method, :error_unless_package_manager_is_obvious!)
+          end
+          if snapshot
+            ::Shakapacker::Utils::Manager.define_singleton_method(:error_unless_package_manager_is_obvious!,
+                                                                  snapshot)
+          end
+        end
+      end
+
+      def singleton_defines_package_manager_check?(singleton)
+        singleton.instance_methods(false).include?(:error_unless_package_manager_is_obvious!) ||
+          singleton.private_instance_methods(false).include?(:error_unless_package_manager_is_obvious!)
+      end
+
+      context "when Shakapacker is the configured bundler" do
+        before do
+          allow(described_class).to receive(:shakapacker_configured_as_bundler?).and_return(true)
+        end
+
+        it "does not change Shakapacker::Utils::Manager.error_unless_package_manager_is_obvious!" do
+          method_name = :error_unless_package_manager_is_obvious!
+          before_location = ::Shakapacker::Utils::Manager.method(method_name).source_location
+          described_class.suppress_shakapacker_package_manager_check_if_not_bundler!
+          after_location = ::Shakapacker::Utils::Manager.method(method_name).source_location
+          expect(after_location).to eq before_location
+        end
+      end
+
+      context "when Shakapacker is not the configured bundler" do
+        before do
+          allow(described_class).to receive(:shakapacker_configured_as_bundler?).and_return(false)
+        end
+
+        it "skips the original guard while Shakapacker remains unconfigured" do
+          ::Shakapacker::Utils::Manager.define_singleton_method(:error_unless_package_manager_is_obvious!) do
+            raise "original guard"
+          end
+
+          described_class.suppress_shakapacker_package_manager_check_if_not_bundler!
+
+          expect { ::Shakapacker::Utils::Manager.error_unless_package_manager_is_obvious! }.not_to raise_error
+        end
+
+        it "replaces the method with one defined in engine.rb" do
+          described_class.suppress_shakapacker_package_manager_check_if_not_bundler!
+          source_path, = ::Shakapacker::Utils::Manager.method(:error_unless_package_manager_is_obvious!).source_location
+          expect(source_path).to end_with("/lib/react_on_rails/engine.rb")
+        end
+
+        it "logs an informational message" do
+          described_class.suppress_shakapacker_package_manager_check_if_not_bundler!
+          expect(Rails.logger).to have_received(:info)
+            .with(a_string_including("skipping Shakapacker packageManager check"))
+        end
+
+        it "does not require a Rails logger" do
+          allow(Rails).to receive(:logger).and_return(nil)
+
+          expect { described_class.suppress_shakapacker_package_manager_check_if_not_bundler! }.not_to raise_error
+        end
+      end
+
+      context "when Shakapacker becomes configured after the patch is installed" do
+        before do
+          allow(described_class).to receive(:shakapacker_configured_as_bundler?).and_return(false, true)
+        end
+
+        it "delegates back to Shakapacker's original package-manager guard" do
+          ::Shakapacker::Utils::Manager.define_singleton_method(:error_unless_package_manager_is_obvious!) do
+            raise "original guard"
+          end
+
+          described_class.suppress_shakapacker_package_manager_check_if_not_bundler!
+
+          expect { ::Shakapacker::Utils::Manager.error_unless_package_manager_is_obvious! }
+            .to raise_error(RuntimeError, "original guard")
+        end
+      end
+    end
+
+    describe ".suppress_shakapacker_package_manager_check_if_not_bundler! with missing Shakapacker internals" do
+      # Reset the idempotency flag so tests that observe a single install attempt are not
+      # short-circuited by state left over from an earlier example.
+      before { described_class.instance_variable_set(:@shakapacker_guard_suppressed, nil) }
+      after { described_class.instance_variable_set(:@shakapacker_guard_suppressed, nil) }
+
+      context "when Shakapacker is not defined at all" do
+        before do
+          hide_const("Shakapacker")
+          allow(Rails.logger).to receive(:warn)
+        end
+
+        it "does not log a diagnostic warning" do
+          described_class.suppress_shakapacker_package_manager_check_if_not_bundler!
+
+          expect(Rails.logger).not_to have_received(:warn)
+        end
+      end
+
+      context "when Shakapacker::Utils::Manager is not defined" do
+        before do
+          stub_const("Shakapacker", Module.new)
+          allow(described_class).to receive(:shakapacker_configured_as_bundler?).and_return(false)
+          allow(Rails.logger).to receive(:warn)
+        end
+
+        it "logs a diagnostic warning" do
+          described_class.suppress_shakapacker_package_manager_check_if_not_bundler!
+
+          expect(Rails.logger).to have_received(:warn)
+            .with(a_string_including("Shakapacker::Utils::Manager is not defined"))
+        end
+      end
+
+      context "when Shakapacker::Utils::Manager is defined but does not respond to the guard method" do
+        before do
+          stub_const("Shakapacker", Module.new)
+          stub_const("Shakapacker::Utils", Module.new)
+          stub_const("Shakapacker::Utils::Manager", Module.new)
+          allow(described_class).to receive(:shakapacker_configured_as_bundler?).and_return(false)
+          allow(Rails.logger).to receive(:warn)
+        end
+
+        it "logs a diagnostic warning naming the missing method" do
+          described_class.suppress_shakapacker_package_manager_check_if_not_bundler!
+
+          expect(Rails.logger).to have_received(:warn)
+            .with(a_string_including("does not define error_unless_package_manager_is_obvious!"))
+        end
+      end
+
+      context "when SHAKAPACKER_CONFIG is set to a missing file" do
+        let(:missing_config_path) { "/nonexistent/path/shakapacker.yml" }
+
+        around do |example|
+          original_config_path = ENV.fetch("SHAKAPACKER_CONFIG", nil)
+          ENV["SHAKAPACKER_CONFIG"] = missing_config_path
+          example.run
+        ensure
+          ENV["SHAKAPACKER_CONFIG"] = original_config_path
+        end
+
+        before do
+          stub_const("Shakapacker", Module.new)
+          allow(Rails.logger).to receive(:warn)
+        end
+
+        it "logs a warning naming the missing path without a redundant resolved-to clause" do
+          described_class.suppress_shakapacker_package_manager_check_if_not_bundler!
+
+          expect(Rails.logger).to have_received(:warn)
+            .with(
+              a_string_including("SHAKAPACKER_CONFIG is set to '#{missing_config_path}'")
+                .and(satisfy("omits the redundant '(resolved to ...)' clause") { |msg| !msg.include?("resolved to") })
+            )
+        end
+
+        context "when the configured path is relative" do
+          let(:app_root) { Pathname.new(Dir.mktmpdir("react-on-rails-root")) }
+          let(:missing_config_path) { "config/custom-shakapacker.yml" }
+          let(:resolved_config_path) { app_root.join(missing_config_path) }
+
+          before do
+            allow(Rails).to receive(:root).and_return(app_root)
+          end
+
+          after do
+            FileUtils.remove_entry(app_root)
+          end
+
+          it "names the raw env value and the Rails-root-resolved path" do
+            described_class.suppress_shakapacker_package_manager_check_if_not_bundler!
+
+            expect(Rails.logger).to have_received(:warn)
+              .with(
+                a_string_including("SHAKAPACKER_CONFIG is set to '#{missing_config_path}'")
+                  .and(a_string_including("resolved to '#{resolved_config_path}'"))
+              )
+          end
+        end
+      end
+    end
+
+    describe "Shakapacker package-manager suppression initializer" do
+      subject(:initializer) do
+        described_class.initializers.find { |i| i.name == "react_on_rails.suppress_shakapacker_package_manager_check" }
+      end
+
+      it "is registered" do
+        expect(initializer).not_to be_nil
+      end
+
+      it "runs before shakapacker.manager_checker" do
+        expect(initializer.before).to eq "shakapacker.manager_checker"
+      end
+
+      it "delegates to suppress_shakapacker_package_manager_check_if_not_bundler!" do
+        expect(described_class).to receive(:suppress_shakapacker_package_manager_check_if_not_bundler!)
+        initializer.run
+      end
+    end
+
+    describe "booting Rails without config/shakapacker.yml" do
+      let(:lib_path) { File.expand_path("../../lib", __dir__) }
+      let(:npm_version) { ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(ReactOnRails::VERSION) }
+      let(:boot_script_path) { File.expand_path("fixtures/vite_only_boot_app.rb", __dir__) }
+
+      def write_vite_only_package_files(app_root, npm_version)
+        FileUtils.mkdir_p(File.join(app_root, "config"))
+        File.write(
+          File.join(app_root, "package.json"),
+          JSON.pretty_generate(
+            "private" => true,
+            "dependencies" => {
+              "react-on-rails" => npm_version
+            }
+          )
+        )
+        File.write(
+          File.join(app_root, "pnpm-lock.yaml"),
+          <<~YAML
+            lockfileVersion: '9.0'
+            packages: {}
+          YAML
+        )
+      end
+
+      it "boots a Vite/client-only style app without Shakapacker package-manager guard failure" do
+        Dir.mktmpdir("react-on-rails-vite-only") do |app_root|
+          write_vite_only_package_files(app_root, npm_version)
+
+          stdout, stderr, status = Open3.capture3(
+            {
+              "APP_ROOT" => app_root,
+              "RAILS_ENV" => "test",
+              # Skip version validation so this test isolates the Shakapacker guard
+              # fix. The temp app has no node_modules, and we don't want a VersionChecker
+              # exit to masquerade as a Shakapacker boot failure.
+              "REACT_ON_RAILS_SKIP_VALIDATION" => "true"
+            },
+            RbConfig.ruby,
+            boot_script_path,
+            lib_path,
+            app_root
+          )
+
+          expect(status).to be_success, <<~MSG
+            Expected a Rails app with no config/shakapacker.yml, no packageManager field,
+            and a pnpm lockfile to boot after requiring react_on_rails.
+
+            stdout:
+            #{stdout}
+
+            stderr:
+            #{stderr}
+          MSG
+          expect(stdout).to include("booted")
         end
       end
     end

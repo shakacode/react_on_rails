@@ -211,6 +211,8 @@ function Page() {
 }
 ```
 
+> **React on Rails note:** The `await fetch('/api/slow')` above is shown only to illustrate how an async component serializes to the Flight wire format below. In a real React on Rails app, don't fetch inside the component — Rails prepares the data and passes it as a prop. For a slow source like this, stream it with [async props](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently), which produce the same `$@` / `$L` references you see here. See [RSC Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md).
+
 The server starts streaming immediately, it doesn't wait for SlowData to finish:
 
 ```rsc

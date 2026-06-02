@@ -1330,22 +1330,28 @@ describe InstallGenerator, type: :generator do
   end
 
   context "with --pro" do
-    before(:all) { run_generator_test_with_args(%w[--pro], package_json: true) }
+    # Pin to --no-rspack so this context keeps exercising the Webpack Pro transforms.
+    # Rspack is the default now and is covered by the "with --pro --rspack" context.
+    before(:all) { run_generator_test_with_args(%w[--pro --no-rspack], package_json: true) }
 
     include_examples "base_generator", application_js: true
     include_examples "no_redux_generator"
 
-    it "creates Pro initializer with NodeRenderer configuration" do
+    it "creates Pro initializer and node-renderer.js with matching random passwords" do
+      ruby_password = nil
       assert_file "config/initializers/react_on_rails_pro.rb" do |content|
         expect(content).to include("ReactOnRailsPro.configure")
         expect(content).to include('config.server_renderer = "NodeRenderer"')
         expect(content).to include("config.renderer_url")
         expect(content).to include("config.renderer_password")
         expect(content).to include("config.ssr_timeout")
+        expect(content).not_to include("devPassword")
+        password_match = content.match(/ENV\.fetch\("RENDERER_PASSWORD",\s*"([^"]+)"\)/)
+        expect(password_match).not_to be_nil
+        expect(password_match[1].length).to eq(64)
+        ruby_password = password_match[1]
       end
-    end
 
-    it "creates node-renderer.js bootstrap file" do
       assert_file "renderer/node-renderer.js" do |content|
         expect(content).to include("reactOnRailsProNodeRenderer")
         expect(content).to include("require('react-on-rails-pro-node-renderer')")
@@ -1355,14 +1361,21 @@ describe InstallGenerator, type: :generator do
         expect(content).to include("const configuredWorkersCount =")
         expect(content).to include("workersCount:")
         expect(content).to include("if (env.CI && configuredWorkersCount == null)")
+        expect(content).not_to include("devPassword")
+        password_match = content.match(/RENDERER_PASSWORD\s*\?\?\s*'([^']+)'/)
+        expect(password_match).not_to be_nil
+        expect(password_match[1].length).to eq(64)
+        expect(password_match[1]).to eq(ruby_password)
       end
     end
 
-    it "adds node-renderer process to Procfile.dev" do
-      assert_file "Procfile.dev" do |content|
-        expect(content).to include("node-renderer:")
-        expect(content).to include("RENDERER_PORT=${RENDERER_PORT:-3800}")
-        expect(content).to include("node renderer/node-renderer.js")
+    it "adds node-renderer process to every bin/dev Procfile that can serve SSR pages" do
+      %w[Procfile.dev Procfile.dev-static-assets Procfile.dev-prod-assets].each do |procfile|
+        assert_file procfile do |content|
+          expect(content).to include("node-renderer:")
+          expect(content).to include("RENDERER_PORT=${RENDERER_PORT:-3800}")
+          expect(content).to include("node renderer/node-renderer.js")
+        end
       end
     end
 
@@ -1538,6 +1551,17 @@ describe InstallGenerator, type: :generator do
         expect(content).not_to include("reactOnRailsProNodeRenderer")
       end
     end
+
+    # Regression: a new Pro initializer must not embed a fresh random literal
+    # password when the existing Node renderer file already contains its own
+    # literal — Rails and Node would otherwise disagree.
+    it "creates the Pro initializer with env-only password (no literal) so it cannot mismatch the existing renderer" do
+      assert_file "config/initializers/react_on_rails_pro.rb" do |content|
+        expect(content).to include("ReactOnRailsPro.configure")
+        expect(content).to include('config.renderer_password = ENV["RENDERER_PASSWORD"]')
+        expect(content).not_to match(/ENV\.fetch\("RENDERER_PASSWORD",\s*"[^"]+"\)/)
+      end
+    end
   end
 
   context "when Procfile.dev already contains node-renderer" do
@@ -1547,13 +1571,15 @@ describe InstallGenerator, type: :generator do
       allow(install_generator).to receive(:destination_root).and_return("/fake/path")
       allow(File).to receive(:exist?).and_call_original
       allow(File).to receive(:exist?).with("/fake/path/Procfile.dev").and_return(true)
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev-static-assets").and_return(false)
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev-prod-assets").and_return(false)
       allow(File).to receive(:read).with("/fake/path/Procfile.dev")
                                    .and_return("rails: bundle exec rails s\nnode-renderer: existing config\n")
     end
 
-    specify "add_pro_to_procfile does not append duplicate entry" do
+    specify "add_pro_to_procfiles does not append duplicate entry" do
       expect(install_generator).not_to receive(:append_to_file)
-      install_generator.send(:add_pro_to_procfile)
+      install_generator.send(:add_pro_to_procfiles)
     end
   end
 
@@ -1564,18 +1590,67 @@ describe InstallGenerator, type: :generator do
       allow(install_generator).to receive(:destination_root).and_return("/fake/path")
       allow(File).to receive(:exist?).and_call_original
       allow(File).to receive(:exist?).with("/fake/path/Procfile.dev").and_return(true)
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev-static-assets").and_return(false)
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev-prod-assets").and_return(false)
       allow(File).to receive(:read).with("/fake/path/Procfile.dev")
                                    .and_return("rails: bundle exec rails s\ndev-server: bin/shakapacker\n")
     end
 
-    specify "add_pro_to_procfile appends node-renderer entry" do
+    specify "add_pro_to_procfiles appends node-renderer entry" do
       expect(install_generator).to receive(:append_to_file).with("Procfile.dev", include("node-renderer:"))
-      install_generator.send(:add_pro_to_procfile)
+      install_generator.send(:add_pro_to_procfiles)
+    end
+  end
+
+  context "when Procfile.dev contains an unrelated renderer process" do
+    let(:install_generator) { described_class.new([], { pro: true }) }
+
+    before do
+      allow(install_generator).to receive(:destination_root).and_return("/fake/path")
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev").and_return(true)
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev-static-assets").and_return(false)
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev-prod-assets").and_return(false)
+      allow(File).to receive(:read).with("/fake/path/Procfile.dev")
+                                   .and_return("rails: bundle exec rails s\nrenderer: vite\n")
+    end
+
+    specify "add_pro_to_procfiles still appends node-renderer alongside" do
+      expect(install_generator).to receive(:append_to_file).with("Procfile.dev", include("node-renderer:"))
+      install_generator.send(:add_pro_to_procfiles)
+    end
+  end
+
+  context "when Procfile.dev has a node-renderer entry that is missing RENDERER_PORT" do
+    let(:install_generator) { described_class.new([], { pro: true }) }
+
+    before do
+      allow(install_generator).to receive(:destination_root).and_return("/fake/path")
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev").and_return(true)
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev-static-assets").and_return(false)
+      allow(File).to receive(:exist?).with("/fake/path/Procfile.dev-prod-assets").and_return(false)
+      allow(File).to receive(:read).with("/fake/path/Procfile.dev")
+                                   .and_return("rails: bundle exec rails s\n" \
+                                               "node-renderer: node renderer/node-renderer.js\n")
+    end
+
+    specify "add_pro_to_procfiles surfaces an update-it-manually warning so the doctor agrees" do
+      # The doctor's PROCESS_WITH_RENDERER_PORT_REGEX warns when an entry is missing
+      # RENDERER_PORT, so the generator must not silently treat this as "already correct".
+      expect(install_generator).not_to receive(:append_to_file)
+      expect(install_generator).to receive(:say).with(
+        a_string_matching(/has a renderer entry that doesn't reference/), :yellow
+      )
+      allow(install_generator).to receive(:say)
+      install_generator.send(:add_pro_to_procfiles)
     end
   end
 
   context "with --rsc" do
-    before(:all) { run_generator_test_with_args(%w[--rsc], package_json: true) }
+    # Pin to --no-rspack so this context keeps exercising the Webpack RSC transforms.
+    # Rspack is the default now and is covered by the "with --rsc --rspack" context.
+    before(:all) { run_generator_test_with_args(%w[--rsc --no-rspack], package_json: true) }
 
     include_examples "rsc_common_files"
     include_examples "scaffold_ci_and_scripts"
@@ -1622,6 +1697,8 @@ describe InstallGenerator, type: :generator do
       assert_file "config/webpack/serverWebpackConfig.js" do |content|
         expect(content).to include("RSCWebpackPlugin")
         expect(content).to include("react-on-rails-rsc/WebpackPlugin")
+        expect(content).to include("clientReferences: rscClientReferences")
+        expect(content).to include("directory: resolve(config.source_path)")
       end
     end
 
@@ -1838,6 +1915,8 @@ describe InstallGenerator, type: :generator do
         assert_file "config/rspack/serverWebpackConfig.js" do |content|
           expect(content).to include("RSCWebpackPlugin")
           expect(content).to include("react-on-rails-rsc/WebpackPlugin")
+          expect(content).to include("clientReferences: rscClientReferences")
+          expect(content).to include("directory: resolve(config.source_path)")
         end
       end
 
@@ -1845,6 +1924,8 @@ describe InstallGenerator, type: :generator do
         assert_file "config/rspack/clientWebpackConfig.js" do |content|
           expect(content).to include("RSCWebpackPlugin")
           expect(content).to include("react-on-rails-rsc/WebpackPlugin")
+          expect(content).to include("clientReferences: rscClientReferences")
+          expect(content).to include("directory: resolve(config.source_path)")
         end
       end
 
@@ -2318,6 +2399,14 @@ describe InstallGenerator, type: :generator do
       expect(command).to eq("rails generate react_on_rails:install --pro")
     end
 
+    specify "recovery_install_command normalizes the --webpack alias to --no-rspack" do
+      install_generator = described_class.new([], { webpack: true })
+
+      command = install_generator.send(:recovery_install_command)
+
+      expect(command).to eq("rails generate react_on_rails:install --no-rspack")
+    end
+
     specify "shakapacker install error preserves original install flags" do
       install_generator = described_class.new([], { redux: true, typescript: true, ignore_warnings: true })
 
@@ -2752,7 +2841,7 @@ describe InstallGenerator, type: :generator do
     let(:destination) { File.expand_path("../dummy-for-generators", __dir__) }
 
     context "when using webpack" do
-      let(:generator) { BaseGenerator.new([], {}, { destination_root: destination }) }
+      let(:generator) { BaseGenerator.new([], { rspack: false }, { destination_root: destination }) }
 
       it "returns .ts path when TypeScript config exists" do
         allow(File).to receive(:exist?).and_call_original
@@ -2899,6 +2988,16 @@ describe InstallGenerator, type: :generator do
   end
 
   describe "#using_rspack?" do
+    # Regression guard for the load-bearing Thor invariant: --rspack must declare NO static
+    # default. If a `default:` is ever added, Thor always includes :rspack in the options hash,
+    # so options.key?(:rspack) is always true and the fresh-install Rspack default silently
+    # breaks (every unflagged CLI run would fall back to Webpack). Verified empirically against
+    # Thor 1.5.0: a no-default boolean option is absent from the options hash unless its flag is
+    # passed on the CLI, whereas a `default:`-bearing option (e.g. --typescript) is always present.
+    it "declares --rspack without a static default so the fresh-install default applies" do
+      expect(described_class.class_options[:rspack].default).to be_nil
+    end
+
     context "when --rspack option is provided" do
       let(:install_generator) { described_class.new([], { rspack: true }) }
 
@@ -2907,13 +3006,68 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    context "when --rspack is false (default)" do
+    context "when --no-rspack is passed" do
+      let(:install_generator) { described_class.new([], { rspack: false }) }
+
+      # --rspack declares no default, so options.key?(:rspack) is true only when the flag
+      # is explicitly passed. --no-rspack sets it to false, selecting Webpack.
+      it "returns false" do
+        expect(install_generator.send(:using_rspack?)).to be false
+      end
+    end
+
+    context "when --webpack is passed (alias for --no-rspack)" do
+      let(:install_generator) { described_class.new([], { webpack: true }) }
+
+      it "returns false" do
+        expect(install_generator.send(:using_rspack?)).to be false
+      end
+    end
+
+    context "when --no-webpack is passed" do
+      let(:install_generator) { described_class.new([], { webpack: false }) }
+
+      it "returns true" do
+        expect(install_generator.send(:using_rspack?)).to be true
+      end
+    end
+
+    context "when --rspack and --webpack contradict each other" do
+      let(:install_generator) { described_class.new([], { rspack: true, webpack: true }) }
+
+      it "raises a Thor::Error" do
+        expect { install_generator.send(:using_rspack?) }
+          .to raise_error(Thor::Error, /Conflicting bundler flags/)
+      end
+    end
+
+    context "when --no-rspack and --webpack agree (both Webpack)" do
+      let(:install_generator) { described_class.new([], { rspack: false, webpack: true }) }
+
+      it "returns false without raising" do
+        expect(install_generator.send(:using_rspack?)).to be false
+      end
+    end
+
+    context "when no bundler flag is passed (fresh install)" do
       let(:install_generator) { described_class.new }
 
-      # InstallGenerator declares --rspack with default: false, so options[:rspack]
-      # is false (not nil). using_rspack? returns false via the first branch without
-      # reaching the YAML fallback (rspack_configured_in_project?).
-      it "returns false" do
+      # With no flag and no existing bundler choice, the default resolves to Rspack when
+      # Shakapacker supports it (Rspack landed in 9.0).
+      it "defaults to Rspack" do
+        allow(install_generator).to receive_messages(project_declares_assets_bundler?: false,
+                                                     shakapacker_version_9_or_higher?: true)
+
+        expect(install_generator.send(:using_rspack?)).to be true
+      end
+
+      # Twin of base_generator_spec's fallback case: InstallGenerator has its own
+      # rspack_bundler_default override (delegating to fresh_install_rspack_default) and is the
+      # primary CLI entry point, so the < 9.0 fallback to Webpack is asserted here too.
+      it "falls back to Webpack when Rspack is unsupported (Shakapacker < 9.0)" do
+        allow(install_generator).to receive_messages(project_declares_assets_bundler?: false,
+                                                     shakapacker_version_9_or_higher?: false)
+
         expect(install_generator.send(:using_rspack?)).to be false
       end
     end
@@ -2934,8 +3088,8 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    context "without --rspack" do
-      let(:install_generator) { described_class.new }
+    context "with --no-rspack" do
+      let(:install_generator) { described_class.new([], { rspack: false }) }
 
       it "returns path unchanged" do
         expect(install_generator.send(:destination_config_path, "config/webpack/serverWebpackConfig.js"))
@@ -2948,7 +3102,9 @@ describe InstallGenerator, type: :generator do
   # Bundler subprocess commands must run in unbundled environment to prevent
   # BUNDLE_GEMFILE inheritance from parent process
   describe "bundler environment isolation" do
-    let(:install_generator) { described_class.new }
+    # Pin to Webpack (--no-rspack) so shakapacker:install runs with an empty env hash here;
+    # the SHAKAPACKER_ASSETS_BUNDLER=rspack env is covered by the dedicated example below.
+    let(:install_generator) { described_class.new([], { rspack: false }) }
 
     it "clears BUNDLE_GEMFILE when running bundle add" do
       allow(install_generator).to receive(:shakapacker_in_gemfile?).and_return(false)
