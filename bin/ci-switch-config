@@ -16,7 +16,8 @@ MINIMUM_RUBY_MINOR_VERSION="${MINIMUM_RUBY_VERSION%.*}"
 LATEST_RUBY_VERSION="4.0.5" # Update when a newer 4.0.x patch is released.
 LATEST_RUBY_MINOR_VERSION="${LATEST_RUBY_VERSION%.*}"
 LATEST_SHAKAPACKER_VERSION="10.1.0" # Update when latest CI moves to a newer Shakapacker.
-LATEST_REACT_MAJOR_VERSION="19" # Update when latest CI moves to a newer React major version.
+LATEST_REACT_VERSION="19.0.0" # Update when latest CI moves to a newer React version.
+LATEST_REACT_MAJOR_VERSION="${LATEST_REACT_VERSION%%.*}"
 
 # Color codes for output
 RED='\033[0;31m'
@@ -365,7 +366,7 @@ restore_to_latest() {
   local VERSION_MANAGER=$(check_version_manager)
 
   print_header "Restoring to LATEST configuration"
-  echo "  Target: Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, Shakapacker $LATEST_SHAKAPACKER_VERSION, React $LATEST_REACT_MAJOR_VERSION.0.0"
+  echo "  Target: Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, Shakapacker $LATEST_SHAKAPACKER_VERSION, React $LATEST_REACT_VERSION"
   echo "  Using version manager: $VERSION_MANAGER"
   echo ""
 

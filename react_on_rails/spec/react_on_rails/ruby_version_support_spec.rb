@@ -12,6 +12,8 @@ RSpec.describe "Ruby version support" do
     File.read(File.join(repo_root, path))
   end
 
+  # Only use this helper on workflows that hardcode `ruby-version` in steps. Matrix-driven
+  # workflows store the unexpanded `${{ matrix.ruby-version }}` expression in that field.
   def workflow_ruby_versions(path)
     workflow = YAML.safe_load(read_repo_file(path), aliases: true)
 
@@ -85,7 +87,8 @@ RSpec.describe "Ruby version support" do
     expect(ci_switch_config).to include('MINIMUM_RUBY_MINOR_VERSION="${MINIMUM_RUBY_VERSION%.*}"')
     expect(ci_switch_config).to include('LATEST_RUBY_VERSION="4.0.5"')
     expect(ci_switch_config).to include('LATEST_SHAKAPACKER_VERSION="10.1.0"')
-    expect(ci_switch_config).to include('LATEST_REACT_MAJOR_VERSION="19"')
+    expect(ci_switch_config).to include('LATEST_REACT_VERSION="19.0.0"')
+    expect(ci_switch_config).to include('LATEST_REACT_MAJOR_VERSION="${LATEST_REACT_VERSION%%.*}"')
     expect(ci_switch_config).to match(/set_ruby_version "\$LATEST_RUBY_VERSION"/)
     expect(ci_switch_config).to include('[[ "${REACT_ROOT}" =~ ^\^?${LATEST_REACT_MAJOR_VERSION}(\.|$) ]]')
     expect(ci_switch_config).to include("bundle config set --local path vendor/bundle")
