@@ -605,6 +605,106 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "when shakapacker.yml has a commented generated hook placeholder and test does not merge defaults" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+
+      simulate_existing_file("config/shakapacker.yml", <<~YAML)
+        default: &default
+          source_path: app/javascript
+          source_entry_path: packs
+          public_output_path: packs
+          # precompile_hook: ~
+
+        test:
+          compile: true
+      YAML
+      simulate_existing_file("bin/shakapacker", "")
+      simulate_existing_file("bin/shakapacker-dev-server", "")
+      simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+
+      base_generator = ReactOnRails::Generators::BaseGenerator.new([], {}, destination_root: destination_root)
+      generator = described_class.new([], {}, destination_root: destination_root)
+      Dir.chdir(destination_root) do
+        base_generator.send(:copy_base_files)
+        generator.send(:add_package_json_scripts)
+        generator.send(:add_ci_workflow)
+      end
+    end
+
+    it "does not add the generated hook to test build commands before the environment inherits it" do
+      assert_file "config/initializers/react_on_rails.rb" do |content|
+        expect(content).to include('config.build_test_command = "RAILS_ENV=test NODE_ENV=test bin/shakapacker"')
+        expect(content).not_to include("bin/shakapacker-precompile-hook")
+      end
+
+      assert_file "package.json" do |content|
+        scripts = JSON.parse(content).fetch("scripts")
+        expect(scripts["build:test"]).to eq("RAILS_ENV=test NODE_ENV=test bin/shakapacker")
+      end
+
+      assert_file ".github/workflows/ci.yml" do |content|
+        expect(content).to include("bin/shakapacker")
+        expect(content).not_to include("bin/shakapacker-precompile-hook")
+        expect(content).not_to include("SHAKAPACKER_SKIP_PRECOMPILE_HOOK")
+      end
+    end
+  end
+
+  context "when shakapacker.yml has a commented generated hook placeholder and test merges defaults" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+
+      simulate_existing_file("config/shakapacker.yml", <<~YAML)
+        default: &default
+          source_path: app/javascript
+          source_entry_path: packs
+          public_output_path: packs
+          # precompile_hook: ~
+
+        test:
+          <<: *default
+          compile: true
+      YAML
+      simulate_existing_file("bin/shakapacker", "")
+      simulate_existing_file("bin/shakapacker-dev-server", "")
+      simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+
+      generator = described_class.new([], {}, destination_root: destination_root)
+      Dir.chdir(destination_root) do
+        generator.send(:add_package_json_scripts)
+        generator.send(:add_ci_workflow)
+      end
+    end
+
+    it "uses the generated hook for scripts and CI before shakapacker.yml is rewritten" do
+      assert_file "package.json" do |content|
+        scripts = JSON.parse(content).fetch("scripts")
+        expect(scripts["build:test"]).to eq(
+          "RAILS_ENV=test NODE_ENV=test bin/shakapacker-precompile-hook && " \
+          "SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true RAILS_ENV=test NODE_ENV=test bin/shakapacker"
+        )
+      end
+
+      assert_file ".github/workflows/ci.yml" do |content|
+        expect(content).to include("bin/shakapacker-precompile-hook")
+        expect(content).to include("SHAKAPACKER_SKIP_PRECOMPILE_HOOK")
+      end
+    end
+  end
+
   context "when shakapacker.yml already has private_output_path key without a value" do
     before(:all) do
       prepare_destination

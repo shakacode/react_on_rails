@@ -169,6 +169,46 @@ describe GeneratorMessages do
     end
   end
 
+  it "does not assume a commented generated hook placeholder applies to test when test does not merge defaults" do
+    Dir.mktmpdir do |app_root|
+      FileUtils.mkdir_p(File.join(app_root, "config"))
+      File.write(File.join(app_root, "config/shakapacker.yml"), <<~YAML)
+        default: &default
+          # precompile_hook: ~
+
+        test:
+          compile: true
+      YAML
+
+      message = described_class.send(:build_ci_section, app_root: app_root, ci_workflow_generated: true)
+
+      expect(message).to include("RAILS_ENV=test NODE_ENV=test bin/shakapacker")
+      expect(message).not_to include("bin/shakapacker-precompile-hook")
+      expect(message).not_to include("SHAKAPACKER_SKIP_PRECOMPILE_HOOK")
+    end
+  end
+
+  it "uses the generated hook placeholder in the manual CI build command when test merges defaults" do
+    Dir.mktmpdir do |app_root|
+      FileUtils.mkdir_p(File.join(app_root, "config"))
+      File.write(File.join(app_root, "config/shakapacker.yml"), <<~YAML)
+        default: &default
+          # precompile_hook: ~
+
+        test:
+          <<: *default
+          compile: true
+      YAML
+
+      message = described_class.send(:build_ci_section, app_root: app_root, ci_workflow_generated: true)
+
+      expect(message).to include(
+        "RAILS_ENV=test NODE_ENV=test bin/shakapacker-precompile-hook && " \
+        "SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true RAILS_ENV=test NODE_ENV=test bin/shakapacker"
+      )
+    end
+  end
+
   describe ".detect_package_manager" do
     include_context "with clean REACT_ON_RAILS_PACKAGE_MANAGER env"
 

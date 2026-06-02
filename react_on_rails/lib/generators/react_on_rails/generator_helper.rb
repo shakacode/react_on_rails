@@ -339,21 +339,22 @@ module GeneratorHelper
   end
 
   def parse_shakapacker_yml(path)
+    parse_shakapacker_yml_content(File.read(path))
+  rescue StandardError
+    {}
+  end
+
+  def parse_shakapacker_yml_content(content)
     require "yaml"
-    # Use safe_load_file for security (defense-in-depth, even though this is user's own config)
-    # permitted_classes: [Symbol] allows symbol keys which shakapacker.yml may use
-    # aliases: true allows YAML anchors (&default, *default) commonly used in Rails configs
-    YAML.safe_load_file(path, permitted_classes: [Symbol], aliases: true)
+
+    YAML.safe_load(content, permitted_classes: [Symbol], aliases: true)
   rescue ArgumentError
-    # Older Psych versions don't support all parameters - try without aliases
     begin
-      YAML.safe_load_file(path, permitted_classes: [Symbol])
-    rescue ArgumentError
-      # Very old Psych - fall back to safe_load with File.read
-      YAML.safe_load(File.read(path), permitted_classes: [Symbol]) # rubocop:disable Style/YAMLFileRead
+      YAML.safe_load(content, permitted_classes: [Symbol])
+    rescue StandardError
+      {}
     end
   rescue StandardError
-    # If we can't parse the file, return empty config
     {}
   end
 

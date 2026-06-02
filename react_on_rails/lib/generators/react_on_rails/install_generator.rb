@@ -9,6 +9,7 @@ require_relative "generator_messages"
 require_relative "js_dependency_manager"
 require_relative "pro_setup"
 require_relative "rsc_setup"
+require_relative "shakapacker_precompile_hook_helper"
 # Load-path require: git_utils lives under react_on_rails/lib, not relative to this generator directory.
 require "react_on_rails/git_utils"
 
@@ -23,6 +24,7 @@ module ReactOnRails
       include JsDependencyManager
       include ProSetup
       include RscSetup
+      include ShakapackerPrecompileHookHelper
 
       # fetch USAGE file for details generator description
       source_root(File.expand_path(__dir__))
@@ -98,7 +100,6 @@ module ReactOnRails
 
       # Removed: --skip-shakapacker-install (Shakapacker is now a required dependency)
 
-      SHAKAPACKER_YML_PATH = "config/shakapacker.yml"
       HELLO_WORLD_ROUTE = "hello_world"
       HELLO_SERVER_ROUTE = "hello_server"
       # Matches the stock `bin/dev` written by Rails 8.x. Rails 7.1 commonly
@@ -157,8 +158,6 @@ module ReactOnRails
       # renovate: datasource=github-releases depName=pnpm/pnpm extractVersion=^v(?<version>.+)$ allowedVersions=<11
       CI_PNPM_FALLBACK_VERSION = "10.33.4"
       private_constant :CI_PNPM_FALLBACK_VERSION
-      DEFAULT_PRECOMPILE_HOOK_COMMAND = "bin/shakapacker-precompile-hook"
-      private_constant :DEFAULT_PRECOMPILE_HOOK_COMMAND
 
       # Main generator entry point
       #
@@ -353,64 +352,6 @@ module ReactOnRails
         GeneratorMessages.add_warning("⚠️  Could not parse package.json to add scripts: #{e.message}")
       rescue Errno::EACCES, Errno::ENOENT => e
         GeneratorMessages.add_warning("⚠️  Failed to add build scripts to package.json: #{e.message}")
-      end
-
-      def shakapacker_build_command(env:, environment: "production")
-        hook_command = shakapacker_precompile_hook_command(environment: environment)
-        shakapacker_command = "#{env} bin/shakapacker"
-        return shakapacker_command unless hook_command
-
-        "#{env} #{hook_command} && SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true #{shakapacker_command}"
-      end
-
-      def shakapacker_precompile_hook_command(environment:)
-        shakapacker_config_path = File.join(destination_root, SHAKAPACKER_YML_PATH)
-        return DEFAULT_PRECOMPILE_HOOK_COMMAND unless File.exist?(shakapacker_config_path)
-
-        config = parse_shakapacker_yml(shakapacker_config_path)
-        hook_command = normalize_precompile_hook(effective_precompile_hook(config, environment))
-
-        # Custom hooks stay inside Shakapacker so direct commands don't double-run on older supported versions.
-        generated_precompile_hook?(hook_command) ? hook_command : nil
-      end
-
-      def effective_precompile_hook(config, environment)
-        environment_section = shakapacker_config_section(config, environment)
-        unless shakapacker_config_key?(config, environment)
-          environment_section = shakapacker_config_section(config, "production")
-        end
-
-        shakapacker_config_value(environment_section, "precompile_hook")
-      end
-
-      def shakapacker_config_section(config, section)
-        return {} unless config.respond_to?(:fetch)
-
-        section_config = config.fetch(section, config.fetch(section.to_sym, {}))
-        section_config.respond_to?(:key?) ? section_config : {}
-      end
-
-      def shakapacker_config_key?(section, key)
-        return false unless section.respond_to?(:key?)
-
-        section.key?(key) || section.key?(key.to_sym)
-      end
-
-      def shakapacker_config_value(section, key)
-        return section[key] if section.key?(key)
-        return section[key.to_sym] if section.key?(key.to_sym)
-
-        nil
-      end
-
-      def normalize_precompile_hook(hook)
-        return nil if hook.nil? || hook == false || hook.to_s.empty?
-
-        hook.to_s.strip
-      end
-
-      def generated_precompile_hook?(hook_command)
-        hook_command == DEFAULT_PRECOMPILE_HOOK_COMMAND
       end
 
       # Inserts new entries into the existing "scripts" object without rewriting the rest of
