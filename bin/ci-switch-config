@@ -164,8 +164,31 @@ set_node_version() {
 }
 
 install_bundle_to_vendor() {
-  bundle config set --local path vendor/bundle
-  bundle install
+  local bundler_version=""
+
+  if [ -f Gemfile.lock ]; then
+    bundler_version=$(awk '
+      /^BUNDLED WITH$/ {
+        getline
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", $0)
+        print
+        exit
+      }
+    ' Gemfile.lock)
+  fi
+
+  if [ -n "$bundler_version" ]; then
+    if ! gem list bundler -i -v "$bundler_version" > /dev/null 2>&1; then
+      print_header "Installing Bundler $bundler_version"
+      gem install bundler -v "$bundler_version"
+    fi
+
+    bundle "_${bundler_version}_" config set --local path vendor/bundle
+    bundle "_${bundler_version}_" install
+  else
+    bundle config set --local path vendor/bundle
+    bundle install
+  fi
 }
 
 show_status() {
@@ -520,8 +543,8 @@ case "${1:-}" in
     echo "Usage: $0 {minimum|latest|status}"
     echo ""
     echo "Commands:"
-    echo "  minimum  - Switch to Ruby $MINIMUM_RUBY_MINOR_VERSION, Node 20, minimum dependencies (Shakapacker 8.2.0, React 18)"
-    echo "  latest   - Switch to Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, latest dependencies (Shakapacker $LATEST_SHAKAPACKER_VERSION, React $LATEST_REACT_MAJOR_VERSION)"
+    echo "  minimum  - Switch to Ruby $MINIMUM_RUBY_MINOR_VERSION, Node 20, minimum dependencies (Shakapacker 8.2.0, React $MINIMUM_REACT_VERSION)"
+    echo "  latest   - Switch to Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, latest dependencies (Shakapacker $LATEST_SHAKAPACKER_VERSION, React $LATEST_REACT_VERSION)"
     echo "  status   - Show current configuration"
     echo ""
     echo "Examples:"

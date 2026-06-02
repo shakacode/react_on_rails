@@ -84,6 +84,10 @@ RSpec.describe "Ruby version support" do
     expect(ci_switch_config).to include("matches CI: Ruby $MINIMUM_RUBY_MINOR_VERSION, Node 20, minimum deps")
     expect(ci_switch_config).to include("matches CI: Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, latest deps")
     expect(ci_switch_config).to include("Switch to Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, latest dependencies")
+    expect(ci_switch_config).to include(
+      "latest   - Switch to Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, latest dependencies " \
+      "(Shakapacker $LATEST_SHAKAPACKER_VERSION, React $LATEST_REACT_VERSION)"
+    )
     expect(ci_switch_config).to include('MINIMUM_RUBY_MINOR_VERSION="${MINIMUM_RUBY_VERSION%.*}"')
     expect(ci_switch_config).to include('MINIMUM_REACT_VERSION="18.0.0"')
     expect(ci_switch_config).to include('MINIMUM_REACT_MAJOR_VERSION="${MINIMUM_REACT_VERSION%%.*}"')
@@ -95,6 +99,9 @@ RSpec.describe "Ruby version support" do
     expect(ci_switch_config).to include('[[ "${REACT_ROOT}" =~ ^\^?${MINIMUM_REACT_MAJOR_VERSION}(\.|$) ]]')
     expect(ci_switch_config).to include('[[ "${REACT_ROOT}" =~ ^\^?${LATEST_REACT_MAJOR_VERSION}(\.|$) ]]')
     expect(ci_switch_config).to include("bundle config set --local path vendor/bundle")
+    expect(ci_switch_config).to include('gem list bundler -i -v "$bundler_version"')
+    expect(ci_switch_config).to include('gem install bundler -v "$bundler_version"')
+    expect(ci_switch_config).to include('bundle "_${bundler_version}_" install')
     expect(ci_switch_config).not_to include("bundle install --path")
 
     ci_rerun_failures = read_repo_file("bin/ci-rerun-failures")
