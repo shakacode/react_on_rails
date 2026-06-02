@@ -12,6 +12,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 MINIMUM_RUBY_VERSION="3.3.7" # Update when a newer 3.3.x patch is released.
+LATEST_RUBY_VERSION="4.0.5" # Update when a newer 4.0.x patch is released.
+LATEST_RUBY_MINOR_VERSION="${LATEST_RUBY_VERSION%.*}"
 
 # Color codes for output
 RED='\033[0;31m'
@@ -355,7 +357,7 @@ restore_to_latest() {
   local VERSION_MANAGER=$(check_version_manager)
 
   print_header "Restoring to LATEST configuration"
-  echo "  Target: Ruby 4.0, Node 22, Shakapacker 10.1.0, React 19.0.0"
+  echo "  Target: Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, Shakapacker 10.1.0, React 19.0.0"
   echo "  Using version manager: $VERSION_MANAGER"
   echo ""
 
@@ -375,15 +377,15 @@ restore_to_latest() {
     mise|asdf)
       print_header "Setting runtime versions in .tool-versions"
       cat > "$PROJECT_ROOT/.tool-versions" <<EOF
-ruby 4.0.5
+ruby ${LATEST_RUBY_VERSION}
 nodejs 22.12.0
 EOF
-      print_success "Created .tool-versions with Ruby 4.0.5 and Node 22.12.0"
+      print_success "Created .tool-versions with Ruby $LATEST_RUBY_VERSION and Node 22.12.0"
       ;;
     rvm|rvm+nvm)
       print_header "Creating .ruby-version for rvm"
-      echo "4.0.5" > "$PROJECT_ROOT/.ruby-version"
-      print_success "Created .ruby-version with Ruby 4.0.5"
+      echo "$LATEST_RUBY_VERSION" > "$PROJECT_ROOT/.ruby-version"
+      print_success "Created .ruby-version with Ruby $LATEST_RUBY_VERSION"
       ;;
   esac
 
@@ -395,7 +397,7 @@ EOF
       ;;
   esac
 
-  set_ruby_version "4.0.5" "$VERSION_MANAGER"
+  set_ruby_version "$LATEST_RUBY_VERSION" "$VERSION_MANAGER"
   set_node_version "22.12.0" "$VERSION_MANAGER"
 
   # Restore files from git

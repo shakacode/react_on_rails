@@ -7,6 +7,8 @@ RSpec.describe "Ruby version support" do
     File.read(File.join(repo_root, path))
   end
 
+  # These literal checks intentionally make future version bumps update the CI matrix,
+  # helper scripts, and docs together.
   it "allows Ruby 4 in the gemspec" do
     gemspec = Gem::Specification.load(File.join(repo_root, "react_on_rails/react_on_rails.gemspec"))
 
@@ -34,12 +36,21 @@ RSpec.describe "Ruby version support" do
     expect(read_repo_file(".github/read-me.md")).to include("Only latest dependency versions (Ruby 4.0, Node 22)")
 
     ci_switch_config = read_repo_file("bin/ci-switch-config")
-    expect(ci_switch_config).to include("Target: Ruby 4.0, Node 22, Shakapacker 10.1.0")
-    expect(ci_switch_config).to include("ruby 4.0.5")
-    expect(ci_switch_config).to include('set_ruby_version "4.0.5"')
+    expect(ci_switch_config).to include(
+      "Target: Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, Shakapacker 10.1.0"
+    )
+    expect(ci_switch_config).to include('LATEST_RUBY_VERSION="4.0.5"')
+    expect(ci_switch_config).to include('set_ruby_version "$LATEST_RUBY_VERSION"')
 
     switching_guide = read_repo_file("SWITCHING_CI_CONFIGS.md")
     expect(switching_guide).to include("Switch back to latest dependencies (Ruby 4.0, Node 22)")
     expect(switching_guide).to include("Create `.tool-versions` with Ruby 4.0.5 and Node 22.12.0")
+
+    expect(read_repo_file(".claude/docs/replicating-ci-failures.md")).to include(
+      "Ruby 4.0, Node 22, Shakapacker 10.1.0, React 19"
+    )
+    expect(read_repo_file("internal/contributor-info/ci-optimization.md")).to include(
+      "| Ruby versions | 3.3, 4.0        | 4.0 only"
+    )
   end
 end

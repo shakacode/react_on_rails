@@ -124,7 +124,6 @@ jobs:
         uses: ./.github/actions/setup-ruby
         with:
           ruby-version: ${{ matrix.ruby-version }}
-          bundler-version: 2.5.9
       - name: Print system information
         run: |
           echo "Linux release: "; cat /etc/issue

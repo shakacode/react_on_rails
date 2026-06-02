@@ -55,11 +55,12 @@ jobs:
       - name: Setup Ruby
         uses: ./.github/actions/setup-ruby
         with:
-          ruby-version: '4.0'
+          # Keep the single E2E lane on the minimum runtime; matrix workflows cover latest.
+          ruby-version: '3.3'
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '20'
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -86,7 +87,7 @@ jobs:
         uses: ./.github/actions/setup-bundle
         with:
           working-directory: react_on_rails/spec/dummy
-          ruby-version: '4.0'
+          ruby-version: '3.3'
 
       - name: Install Playwright browsers
         working-directory: react_on_rails/spec/dummy
