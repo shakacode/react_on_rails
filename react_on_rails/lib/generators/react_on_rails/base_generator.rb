@@ -113,8 +113,11 @@ module ReactOnRails
         %w[webpack.config.js]).freeze
       DOCS_REFERENCE_MESSAGE = "// The source code including full typescript support is available at:"
       TEMPLATE_RENDER_FAILED = Object.new.freeze # unique sentinel compared by identity via .equal?
+      SHAKAPACKER_YML_PATH = "config/shakapacker.yml"
+      DEFAULT_PRECOMPILE_HOOK_COMMAND = "bin/shakapacker-precompile-hook"
       private_constant :MANAGED_WEBPACK_FILE_TEMPLATES, :REMOVABLE_WEBPACK_FILES, :TemplateRenderContext,
-                       :DOCS_REFERENCE_MESSAGE, :TEMPLATE_RENDER_FAILED
+                       :DOCS_REFERENCE_MESSAGE, :TEMPLATE_RENDER_FAILED, :SHAKAPACKER_YML_PATH,
+                       :DEFAULT_PRECOMPILE_HOOK_COMMAND
 
       def add_root_route
         return unless options.new_app?
@@ -330,6 +333,93 @@ module ReactOnRails
       # (both generators are independently CLI-invocable); keep the two in sync.
       def rspack_bundler_default
         fresh_install_rspack_default
+      end
+
+      def generated_build_test_command
+        shakapacker_build_command(env: "RAILS_ENV=test NODE_ENV=test", environment: "test")
+      end
+
+      def shakapacker_build_command(env:, environment:)
+        hook_command = shakapacker_precompile_hook_command(environment: environment)
+        shakapacker_command = "#{env} bin/shakapacker"
+        return shakapacker_command unless hook_command
+
+        "#{env} #{hook_command} && SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true #{shakapacker_command}"
+      end
+
+      def shakapacker_precompile_hook_command(environment:)
+        shakapacker_config_path = File.join(destination_root, SHAKAPACKER_YML_PATH)
+        return DEFAULT_PRECOMPILE_HOOK_COMMAND unless File.exist?(shakapacker_config_path)
+        return DEFAULT_PRECOMPILE_HOOK_COMMAND if generated_precompile_hook_will_be_configured?(shakapacker_config_path)
+
+        config = parse_shakapacker_yml(shakapacker_config_path)
+        hook_command = normalize_precompile_hook(effective_precompile_hook(config, environment))
+
+        generated_precompile_hook?(hook_command) ? hook_command : nil
+      end
+
+      def generated_precompile_hook_will_be_configured?(shakapacker_config_path)
+        return false unless ReactOnRails::PackerUtils.shakapacker_version_requirement_met?("9.0.0")
+
+        content = File.read(shakapacker_config_path)
+        return false if content.match?(/^\s+precompile_hook:\s*['"][^'"]+['"]/)
+
+        content.match?(/^(\s*)#\s*precompile_hook:\s*~\s*$/)
+      rescue StandardError
+        false
+      end
+
+      def effective_precompile_hook(config, environment)
+        environment_section = shakapacker_config_section(config, environment)
+        unless shakapacker_config_key?(config, environment)
+          environment_section = shakapacker_config_section(config, "production")
+        end
+
+        shakapacker_config_value(environment_section, "precompile_hook")
+      end
+
+      def shakapacker_config_section(config, section)
+        return {} unless config.respond_to?(:fetch)
+
+        section_config = config.fetch(section, config.fetch(section.to_sym, {}))
+        section_config.respond_to?(:key?) ? section_config : {}
+      end
+
+      def shakapacker_config_key?(section, key)
+        return false unless section.respond_to?(:key?)
+
+        section.key?(key) || section.key?(key.to_sym)
+      end
+
+      def shakapacker_config_value(section, key)
+        return section[key] if section.key?(key)
+        return section[key.to_sym] if section.key?(key.to_sym)
+
+        nil
+      end
+
+      def normalize_precompile_hook(hook)
+        return nil if hook.nil? || hook == false || hook.to_s.empty?
+
+        hook.to_s.strip
+      end
+
+      def generated_precompile_hook?(hook_command)
+        hook_command == DEFAULT_PRECOMPILE_HOOK_COMMAND
+      end
+
+      def parse_shakapacker_yml(path)
+        require "yaml"
+
+        YAML.safe_load_file(path, permitted_classes: [Symbol], aliases: true)
+      rescue ArgumentError
+        begin
+          YAML.safe_load_file(path, permitted_classes: [Symbol])
+        rescue ArgumentError
+          YAML.safe_load(File.read(path), permitted_classes: [Symbol]) # rubocop:disable Style/YAMLFileRead
+        end
+      rescue StandardError
+        {}
       end
 
       def generate_new_app_home_page?

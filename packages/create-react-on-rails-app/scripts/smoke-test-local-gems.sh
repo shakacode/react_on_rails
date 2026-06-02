@@ -144,6 +144,46 @@ expect_git_history() {
   fi
 }
 
+verify_rails_route() {
+  local app_dir="$1"
+  local route_path="$2"
+  local expected_text="$3"
+
+  echo "Verifying $(basename "$app_dir") renders $route_path..."
+  (
+    cd "$app_dir"
+    SMOKE_ROUTE_PATH="$route_path" SMOKE_EXPECTED_TEXT="$expected_text" \
+      RAILS_ENV=test NODE_ENV=test bin/rails runner '
+        path = ENV.fetch("SMOKE_ROUTE_PATH")
+        expected_text = ENV.fetch("SMOKE_EXPECTED_TEXT")
+        session = ActionDispatch::Integration::Session.new(Rails.application)
+        session.host!("localhost")
+        session.get(path)
+
+        unless session.response.status == 200
+          warn "Expected #{path} to render 200, got #{session.response.status}"
+          warn session.response.body[0, 1000]
+          exit 1
+        end
+
+        unless session.response.body.include?(expected_text)
+          warn "Expected #{path} response to include #{expected_text.inspect}"
+          warn session.response.body[0, 1000]
+          exit 1
+        end
+      '
+  )
+}
+
+verify_generated_app_runtime() {
+  local app_dir="$1"
+
+  echo "Building test bundles for $(basename "$app_dir")..."
+  (cd "$app_dir" && "${PNPM_CMD[@]}" run build:test >/dev/null)
+  verify_rails_route "$app_dir" "/" "OSS vs Pro"
+  verify_rails_route "$app_dir" "/hello_world" "Say hello to:"
+}
+
 echo "Verifying generated files..."
 grep -q "gem \"react_on_rails\"" "$APP_TS_DIR/Gemfile"
 grep -q "path: \"$RUBY_GEM_DIR\"" "$APP_TS_DIR/Gemfile"
@@ -204,6 +244,10 @@ expect_git_history "$APP_RSPACK_DIR" \
   "Add react_on_rails gem" \
   "Install React on Rails with TypeScript and Rspack" \
   "Normalize the generated app for pnpm"
+
+verify_generated_app_runtime "$APP_TS_DIR"
+verify_generated_app_runtime "$APP_JS_DIR"
+verify_generated_app_runtime "$APP_RSPACK_DIR"
 
 if [[ "$SMOKE_SCOPE" == "full" ]]; then
 grep -q "gem \"react_on_rails\"" "$APP_PRO_DIR/Gemfile"

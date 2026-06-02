@@ -21,6 +21,7 @@ The script:
 2. Generates TypeScript, JavaScript, and Rspack OSS apps using local `react_on_rails`
 3. Generates Pro and RSC apps using local `react_on_rails` + local `react_on_rails_pro`
 4. Verifies key outputs (`Gemfile` path gems, routes, demo files, package manager normalization, and git history)
+5. Builds test bundles and renders the generated OSS `/` and `/hello_world` routes
 
 It prints the temp directory path so you can inspect generated apps.
 
@@ -33,7 +34,7 @@ to verify Pro or RSC output:
 CREATE_ROR_SMOKE_SCOPE=oss packages/create-react-on-rails-app/scripts/smoke-test-local-gems.sh
 ```
 
-The OSS scope does not require `react_on_rails_pro`. It generates and verifies:
+The OSS scope does not require `react_on_rails_pro`. It generates, builds test bundles, and verifies:
 
 1. TypeScript + Webpack
 2. JavaScript + Webpack

@@ -157,6 +157,8 @@ module ReactOnRails
       # renovate: datasource=github-releases depName=pnpm/pnpm extractVersion=^v(?<version>.+)$ allowedVersions=<11
       CI_PNPM_FALLBACK_VERSION = "10.33.4"
       private_constant :CI_PNPM_FALLBACK_VERSION
+      DEFAULT_PRECOMPILE_HOOK_COMMAND = "bin/shakapacker-precompile-hook"
+      private_constant :DEFAULT_PRECOMPILE_HOOK_COMMAND
 
       # Main generator entry point
       #
@@ -315,18 +317,19 @@ module ReactOnRails
                  { package_manager: package_manager, has_lockfile: has_lockfile,
                    pnpm_version_declared: pnpm_version_declared,
                    pnpm_fallback_version: CI_PNPM_FALLBACK_VERSION,
-                   has_active_record: has_active_record, has_rspec: has_rspec })
+                   has_active_record: has_active_record, has_rspec: has_rspec,
+                   precompile_hook_command: shakapacker_precompile_hook_command(environment: "test") })
         @ci_workflow_generated = true
       end
 
-      # NODE_ENV=production ensures Shakapacker emits a minified production bundle;
-      # without it the default is "development" which produces an unminified dev bundle
-      # and is almost never what `npm run build` is expected to do.
-      DEFAULT_PACKAGE_JSON_SCRIPTS = {
-        "build" => "NODE_ENV=production bin/shakapacker",
-        "build:test" => "RAILS_ENV=test NODE_ENV=test bin/shakapacker"
-      }.freeze
-      private_constant :DEFAULT_PACKAGE_JSON_SCRIPTS
+      # RAILS_ENV=production runs the hook with production Rails config, while
+      # NODE_ENV=production makes Shakapacker emit a minified production bundle.
+      def default_package_json_scripts
+        {
+          "build" => shakapacker_build_command(env: "RAILS_ENV=production NODE_ENV=production"),
+          "build:test" => shakapacker_build_command(env: "RAILS_ENV=test NODE_ENV=test", environment: "test")
+        }
+      end
 
       def add_package_json_scripts
         return if options[:pretend]
@@ -336,7 +339,7 @@ module ReactOnRails
 
         original_text = File.read(package_json_path)
         existing_scripts = JSON.parse(original_text)["scripts"] || {}
-        scripts_to_add = DEFAULT_PACKAGE_JSON_SCRIPTS.reject { |key, _| existing_scripts.key?(key) }
+        scripts_to_add = default_package_json_scripts.reject { |key, _| existing_scripts.key?(key) }
 
         if scripts_to_add.empty?
           say_status :skip, "build scripts already present in package.json", :yellow
@@ -350,6 +353,64 @@ module ReactOnRails
         GeneratorMessages.add_warning("⚠️  Could not parse package.json to add scripts: #{e.message}")
       rescue Errno::EACCES, Errno::ENOENT => e
         GeneratorMessages.add_warning("⚠️  Failed to add build scripts to package.json: #{e.message}")
+      end
+
+      def shakapacker_build_command(env:, environment: "production")
+        hook_command = shakapacker_precompile_hook_command(environment: environment)
+        shakapacker_command = "#{env} bin/shakapacker"
+        return shakapacker_command unless hook_command
+
+        "#{env} #{hook_command} && SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true #{shakapacker_command}"
+      end
+
+      def shakapacker_precompile_hook_command(environment:)
+        shakapacker_config_path = File.join(destination_root, SHAKAPACKER_YML_PATH)
+        return DEFAULT_PRECOMPILE_HOOK_COMMAND unless File.exist?(shakapacker_config_path)
+
+        config = parse_shakapacker_yml(shakapacker_config_path)
+        hook_command = normalize_precompile_hook(effective_precompile_hook(config, environment))
+
+        # Custom hooks stay inside Shakapacker so direct commands don't double-run on older supported versions.
+        generated_precompile_hook?(hook_command) ? hook_command : nil
+      end
+
+      def effective_precompile_hook(config, environment)
+        environment_section = shakapacker_config_section(config, environment)
+        unless shakapacker_config_key?(config, environment)
+          environment_section = shakapacker_config_section(config, "production")
+        end
+
+        shakapacker_config_value(environment_section, "precompile_hook")
+      end
+
+      def shakapacker_config_section(config, section)
+        return {} unless config.respond_to?(:fetch)
+
+        section_config = config.fetch(section, config.fetch(section.to_sym, {}))
+        section_config.respond_to?(:key?) ? section_config : {}
+      end
+
+      def shakapacker_config_key?(section, key)
+        return false unless section.respond_to?(:key?)
+
+        section.key?(key) || section.key?(key.to_sym)
+      end
+
+      def shakapacker_config_value(section, key)
+        return section[key] if section.key?(key)
+        return section[key.to_sym] if section.key?(key.to_sym)
+
+        nil
+      end
+
+      def normalize_precompile_hook(hook)
+        return nil if hook.nil? || hook == false || hook.to_s.empty?
+
+        hook.to_s.strip
+      end
+
+      def generated_precompile_hook?(hook_command)
+        hook_command == DEFAULT_PRECOMPILE_HOOK_COMMAND
       end
 
       # Inserts new entries into the existing "scripts" object without rewriting the rest of
