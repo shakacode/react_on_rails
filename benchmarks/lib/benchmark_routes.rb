@@ -2,6 +2,17 @@
 
 require "open3"
 
+# Routes that exist only to demonstrate mistakes / anti-patterns (linked from the
+# dummy apps' sidebar as "Improperly defined…" / "Incorrectly …"). They are meant
+# to error (and hard-500 in the Pro suite), so they are demos, not performance
+# workloads — keep auto-discovery from sweeping them into the suite.
+# Explicitly-requested routes (ROUTES=) are honored regardless.
+NON_BENCHMARK_ROUTES = %w[
+  /react_helmet_broken
+  /context_function_return_jsx
+  /pure_component_wrapped_in_function
+].freeze
+
 def route_has_required_params?(path)
   path_without_optional = path.gsub(/\([^)]*\)/, "")
   path_without_optional.include?(":")
@@ -96,5 +107,8 @@ def benchmark_route_from_rails_output(route)
   return if route_has_required_params?(path)
   return if path.include?("_for_testing")
 
-  normalize_route_path(strip_optional_params(path))
+  normalized = normalize_route_path(strip_optional_params(path))
+  return if NON_BENCHMARK_ROUTES.include?(normalized)
+
+  normalized
 end
