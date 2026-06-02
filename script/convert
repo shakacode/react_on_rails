@@ -79,12 +79,30 @@ Dir.glob(File.expand_path("../react_on_rails/spec/dummy/client/**/*.{js,jsx,ts,t
   File.binwrite(file, content)
 end
 
-# Pro package: Skip RSC tests on React 18 since RSC requires React 19
+# Pro package: Skip RSC tests on React 18 since RSC requires React 19.
+# The minimum dependency conversion also removes testing-library packages above,
+# so exclude RSC/client tests that need React.use or testing-library helpers.
+minimum_pro_non_rsc_ignored_tests = %w[
+  RSC
+  stream
+  registerServerComponent
+  serverRenderReactComponent
+  SuspenseHydration
+  deferredRouteSsr
+  imperativeRefetch[.]client[.]test
+  inlineRefreshButton[.]client[.]test
+  wrapServerComponentRenderer[.]client[.]test
+].join("|")
+minimum_pro_non_rsc_script = [
+  '"test:non-rsc": "jest tests --testPathIgnorePatterns=\".*(',
+  minimum_pro_non_rsc_ignored_tests,
+  ').*\"",'
+].join
+
 gsub_file_content(
   "../packages/react-on-rails-pro/package.json",
   /"test:non-rsc": "(?:\\"|[^"])*",/,
-  '"test:non-rsc": "jest tests --testPathIgnorePatterns=\".*(RSC|stream|' \
-  'registerServerComponent|serverRenderReactComponent|SuspenseHydration).*\"",'
+  minimum_pro_non_rsc_script
 )
 # test:rsc script now automatically detects React version and skips on React 18
 # No override needed - the script checks React version and exits cleanly if < 19
