@@ -93,10 +93,10 @@ jobs:
              [[ "${{ inputs.force_run }}" == "true" ]] || \
              [[ "${{ needs.detect-changes.outputs.has_full_ci_label }}" == "true" ]]; then
             # Full matrix: test both latest and minimum supported versions
-            echo 'matrix={"include":[{"ruby-version":"3.4","node-version":"22","dependency-level":"latest"},{"ruby-version":"3.3","node-version":"20","dependency-level":"minimum"}]}' >> "$GITHUB_OUTPUT"
+            echo 'matrix={"include":[{"ruby-version":"4.0","node-version":"22","dependency-level":"latest"},{"ruby-version":"3.3","node-version":"20","dependency-level":"minimum"}]}' >> "$GITHUB_OUTPUT"
           else
             # PR matrix: test only latest versions for fast feedback
-            echo 'matrix={"include":[{"ruby-version":"3.4","node-version":"22","dependency-level":"latest"}]}' >> "$GITHUB_OUTPUT"
+            echo 'matrix={"include":[{"ruby-version":"4.0","node-version":"22","dependency-level":"latest"}]}' >> "$GITHUB_OUTPUT"
           fi
 
   build-dummy-app-webpack-test-bundles:
@@ -125,7 +125,6 @@ jobs:
         uses: ./.github/actions/setup-ruby
         with:
           ruby-version: ${{ matrix.ruby-version }}
-          bundler-version: 2.5.9
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -208,7 +207,6 @@ jobs:
         uses: ./.github/actions/setup-ruby
         with:
           ruby-version: ${{ matrix.ruby-version }}
-          bundler-version: 2.5.9
       - name: Setup Node
         uses: actions/setup-node@v4
         with:

@@ -11,7 +11,7 @@ bin/ci-switch-config status
 # Switch to minimum dependencies (Ruby 3.3, Node 20)
 bin/ci-switch-config minimum
 
-# Switch back to latest dependencies (Ruby 3.4, Node 22)
+# Switch back to latest dependencies (Ruby 4.0, Node 22)
 bin/ci-switch-config latest
 ```
 
@@ -21,9 +21,9 @@ The project runs tests against two configurations:
 
 ### Latest (Default Development)
 
-- **Ruby**: 3.4
+- **Ruby**: 4.0
 - **Node**: 22
-- **Shakapacker**: 9.5.0
+- **Shakapacker**: 10.1.0
 - **React**: 19.0.0
 - **Dependencies**: Latest versions with `--frozen-lockfile`
 - **When it runs**: Always on PRs and master
@@ -99,6 +99,7 @@ curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
 
 - If you only have rvm (no nvm) or only nvm (no rvm), the script will detect this and provide helpful error messages guiding you to install the missing manager or switch to mise/asdf.
 - **Do not mix version managers** (e.g., don't install both mise and rvm). The script prioritizes mise > asdf > rvm+nvm, so mise/asdf will always take precedence. Using multiple managers can cause confusion about which versions are active.
+- The OSS lockfiles use Bundler 4, including when testing the Ruby 3.3 minimum lane. `bin/ci-switch-config` installs the locked Bundler version for local dummy-app bundling; if you run Bundler manually on Ruby 3.3, install the lockfile version first with `gem install bundler -v 4.0.10`.
 
 ## Detailed Usage
 
@@ -124,7 +125,7 @@ This will:
 
 1. Create `.tool-versions` with the Ruby patch from `MINIMUM_RUBY_VERSION` in `bin/ci-switch-config` and Node 20.18.1
 2. Run `script/convert` to downgrade dependencies:
-   - Shakapacker 9.5.0 → 8.2.0
+   - Shakapacker 10.1.0 → 8.2.0
    - React 19.0.0 → 18.0.0
    - Remove ESLint and other packages incompatible with Node 20
 3. Clean `node_modules` and `pnpm-lock.yaml`
@@ -157,7 +158,7 @@ bin/ci-switch-config latest
 
 This will:
 
-1. Create `.tool-versions` with Ruby 3.4.3 and Node 22.12.0
+1. Create `.tool-versions` with Ruby 4.0.5 and Node 22.12.0
 2. Restore files from git (reverting changes made by `script/convert`)
 3. Clean `node_modules` and `pnpm-lock.yaml`
 4. Reinstall dependencies with `--frozen-lockfile`
@@ -280,7 +281,7 @@ asdf reshim nodejs
 
 ```bash
 # Install and use specific Ruby version
-rvm install 3.3.7   # or 3.4.3
+rvm install 3.3.7   # or 4.0.5
 rvm use 3.3.7
 
 # Install and use specific Node version
