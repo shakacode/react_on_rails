@@ -22,11 +22,22 @@ module ReactOnRails
                    desc: "Install Redux package and Redux version of Hello World Example",
                    aliases: "-R"
 
-      # --rspack
+      # --rspack / --no-rspack (Rspack is the default on fresh installs; --no-rspack selects Webpack)
+      # IMPORTANT: do NOT add a `default:` here. The absence of a default is load-bearing — Thor
+      # only includes :rspack in the options hash when the flag is explicitly passed, which is how
+      # GeneratorHelper#using_rspack? tells an explicit choice from "no flag given" (the latter
+      # falls back to rspack_bundler_default). Adding `default: false` would make
+      # options.key?(:rspack) always true and silently break the fresh-install Rspack default.
+      # (Thor's omit-when-no-default behavior verified against Thor 1.5.0; see Gemfile.lock.)
       class_option :rspack,
                    type: :boolean,
-                   default: false,
-                   desc: "Use Rspack instead of Webpack as the bundler"
+                   desc: "Use Rspack (default) as the bundler; pass --no-rspack to use Webpack"
+
+      # --webpack: friendly alias for --no-rspack (reconciled in GeneratorHelper#explicit_bundler_choice).
+      # No `default:` here either — same load-bearing reason as --rspack above.
+      class_option :webpack,
+                   type: :boolean,
+                   desc: "Use Webpack as the bundler (alias for --no-rspack; --no-webpack is equivalent to --rspack)"
 
       # --pro
       class_option :pro,
@@ -312,6 +323,14 @@ module ReactOnRails
       STR
 
       private
+
+      # Fresh-install context: default to Rspack (when Shakapacker supports it) unless the
+      # app already declares a bundler. See GeneratorHelper#fresh_install_rspack_default.
+      # NOTE: InstallGenerator#rspack_bundler_default is an intentional twin of this override
+      # (both generators are independently CLI-invocable); keep the two in sync.
+      def rspack_bundler_default
+        fresh_install_rspack_default
+      end
 
       def generate_new_app_home_page?
         options.new_app? && new_app_root_route_added?

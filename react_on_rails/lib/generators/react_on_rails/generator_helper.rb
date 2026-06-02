@@ -2,6 +2,7 @@
 
 require "json"
 
+# rubocop:disable Metrics/ModuleLength
 module GeneratorHelper
   def package_json
     # Lazy load package_json gem only when actually needed for dependency management
@@ -128,11 +129,57 @@ module GeneratorHelper
   def using_rspack?
     return @using_rspack if defined?(@using_rspack)
 
-    # options.key?(:rspack) is true when the generator declares --rspack (e.g. InstallGenerator),
-    # false when it does not (e.g. RscGenerator, ProGenerator). Using .key? rather than .nil?
-    # check on the value makes the intent explicit and avoids relying on Thor returning nil for
-    # undeclared options.
-    @using_rspack = options.key?(:rspack) ? options[:rspack] : rspack_configured_in_project?
+    # An explicit bundler flag always wins. When none was passed (or the generator doesn't
+    # declare the flags, e.g. RscGenerator/ProGenerator), fall back to the bundler default,
+    # which each generator defines for its own context.
+    explicit = explicit_bundler_choice
+    @using_rspack = explicit.nil? ? rspack_bundler_default : explicit
+  end
+
+  # Resolve the explicit bundler flags into a single choice.
+  #
+  # --rspack selects Rspack; --no-rspack and --webpack select Webpack (--webpack is a friendly
+  # alias for --no-rspack, and the auto-generated --no-webpack mirrors --rspack). Returns true
+  # for Rspack, false for Webpack, or nil when no bundler flag was passed (so the caller falls
+  # back to rspack_bundler_default).
+  #
+  # IMPORTANT: this relies on Thor NOT including a nil-defaulted option in the hash when the flag
+  # is absent — options.key?(:rspack)/(:webpack) is true only when the user passed that flag.
+  # Re-adding `default:` to either class_option would make the key always present and break both
+  # the "no flag given" fallback and the conflict detection here.
+  # (Thor's omit-when-no-default behavior verified against Thor 1.5.0; see Gemfile.lock.)
+  #
+  # Passing contradictory flags (e.g. --rspack --webpack) raises a Thor::Error.
+  def explicit_bundler_choice
+    choices = []
+    choices << options[:rspack] if options.key?(:rspack)
+    # --webpack means "use Webpack" (rspack = false); --no-webpack means "use Rspack".
+    # Name the inverted webpack flag so the rspack-boolean intent reads directly.
+    rspack_via_webpack_flag = !options[:webpack]
+    choices << rspack_via_webpack_flag if options.key?(:webpack)
+    return nil if choices.empty?
+
+    if choices.uniq.length > 1
+      raise Thor::Error,
+            "Conflicting bundler flags: pass either Rspack (--rspack) or Webpack " \
+            "(--webpack / --no-rspack), not both."
+    end
+
+    choices.first
+  end
+
+  # True when the user passed any explicit bundler flag
+  # (--rspack/--no-rspack/--webpack/--no-webpack).
+  def bundler_flag_given?
+    options.key?(:rspack) || options.key?(:webpack)
+  end
+
+  # Bundler to use when no explicit bundler flag was passed.
+  # Default (standalone generators like RscGenerator/ProGenerator): respect the existing
+  # project's shakapacker.yml and never impose a bundler. InstallGenerator/BaseGenerator
+  # override this to default fresh installs to Rspack.
+  def rspack_bundler_default
+    rspack_configured_in_project?
   end
 
   # Remap a config path from config/webpack/ to config/rspack/ when using rspack.
@@ -330,10 +377,34 @@ module GeneratorHelper
   # `assets_bundler` inside the `default: &default` block, and our generator writes
   # it there too via configure_rspack_in_shakapacker.
   def rspack_configured_in_project?
-    shakapacker_yml_path = File.join(destination_root, "config/shakapacker.yml")
-    return false unless File.exist?(shakapacker_yml_path)
+    shakapacker_assets_bundler_value == "rspack"
+  end
 
-    config = parse_shakapacker_yml(shakapacker_yml_path)
-    config.dig("default", "assets_bundler") == "rspack"
+  # Fresh-install bundler default used by InstallGenerator/BaseGenerator: prefer Rspack
+  # when Shakapacker supports it (Rspack landed in Shakapacker 9.0), but never override an
+  # existing app's explicit assets_bundler choice. On a brand-new install where Shakapacker
+  # isn't loaded yet, shakapacker_version_9_or_higher? optimistically returns true.
+  def fresh_install_rspack_default
+    return rspack_configured_in_project? if project_declares_assets_bundler?
+
+    shakapacker_version_9_or_higher?
+  end
+
+  # True when config/shakapacker.yml exists and its default: section declares an
+  # assets_bundler (i.e., the project has already made an explicit bundler choice).
+  def project_declares_assets_bundler?
+    !shakapacker_assets_bundler_value.nil?
+  end
+
+  # Single source for the config/shakapacker.yml default-section read shared by
+  # rspack_configured_in_project? and project_declares_assets_bundler?. Returns the
+  # assets_bundler value (e.g. "rspack"), or nil when the file is absent or the key is unset.
+  # Only the default: section is inspected (see rspack_configured_in_project? for the rationale).
+  def shakapacker_assets_bundler_value
+    shakapacker_yml_path = File.join(destination_root, "config/shakapacker.yml")
+    return nil unless File.exist?(shakapacker_yml_path)
+
+    parse_shakapacker_yml(shakapacker_yml_path).dig("default", "assets_bundler")
   end
 end
+# rubocop:enable Metrics/ModuleLength

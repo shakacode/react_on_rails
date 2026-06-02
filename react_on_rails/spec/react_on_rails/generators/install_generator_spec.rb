@@ -1330,7 +1330,9 @@ describe InstallGenerator, type: :generator do
   end
 
   context "with --pro" do
-    before(:all) { run_generator_test_with_args(%w[--pro], package_json: true) }
+    # Pin to --no-rspack so this context keeps exercising the Webpack Pro transforms.
+    # Rspack is the default now and is covered by the "with --pro --rspack" context.
+    before(:all) { run_generator_test_with_args(%w[--pro --no-rspack], package_json: true) }
 
     include_examples "base_generator", application_js: true
     include_examples "no_redux_generator"
@@ -1646,7 +1648,9 @@ describe InstallGenerator, type: :generator do
   end
 
   context "with --rsc" do
-    before(:all) { run_generator_test_with_args(%w[--rsc], package_json: true) }
+    # Pin to --no-rspack so this context keeps exercising the Webpack RSC transforms.
+    # Rspack is the default now and is covered by the "with --rsc --rspack" context.
+    before(:all) { run_generator_test_with_args(%w[--rsc --no-rspack], package_json: true) }
 
     include_examples "rsc_common_files"
     include_examples "scaffold_ci_and_scripts"
@@ -2395,6 +2399,14 @@ describe InstallGenerator, type: :generator do
       expect(command).to eq("rails generate react_on_rails:install --pro")
     end
 
+    specify "recovery_install_command normalizes the --webpack alias to --no-rspack" do
+      install_generator = described_class.new([], { webpack: true })
+
+      command = install_generator.send(:recovery_install_command)
+
+      expect(command).to eq("rails generate react_on_rails:install --no-rspack")
+    end
+
     specify "shakapacker install error preserves original install flags" do
       install_generator = described_class.new([], { redux: true, typescript: true, ignore_warnings: true })
 
@@ -2829,7 +2841,7 @@ describe InstallGenerator, type: :generator do
     let(:destination) { File.expand_path("../dummy-for-generators", __dir__) }
 
     context "when using webpack" do
-      let(:generator) { BaseGenerator.new([], {}, { destination_root: destination }) }
+      let(:generator) { BaseGenerator.new([], { rspack: false }, { destination_root: destination }) }
 
       it "returns .ts path when TypeScript config exists" do
         allow(File).to receive(:exist?).and_call_original
@@ -2976,6 +2988,16 @@ describe InstallGenerator, type: :generator do
   end
 
   describe "#using_rspack?" do
+    # Regression guard for the load-bearing Thor invariant: --rspack must declare NO static
+    # default. If a `default:` is ever added, Thor always includes :rspack in the options hash,
+    # so options.key?(:rspack) is always true and the fresh-install Rspack default silently
+    # breaks (every unflagged CLI run would fall back to Webpack). Verified empirically against
+    # Thor 1.5.0: a no-default boolean option is absent from the options hash unless its flag is
+    # passed on the CLI, whereas a `default:`-bearing option (e.g. --typescript) is always present.
+    it "declares --rspack without a static default so the fresh-install default applies" do
+      expect(described_class.class_options[:rspack].default).to be_nil
+    end
+
     context "when --rspack option is provided" do
       let(:install_generator) { described_class.new([], { rspack: true }) }
 
@@ -2984,13 +3006,68 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    context "when --rspack is false (default)" do
+    context "when --no-rspack is passed" do
+      let(:install_generator) { described_class.new([], { rspack: false }) }
+
+      # --rspack declares no default, so options.key?(:rspack) is true only when the flag
+      # is explicitly passed. --no-rspack sets it to false, selecting Webpack.
+      it "returns false" do
+        expect(install_generator.send(:using_rspack?)).to be false
+      end
+    end
+
+    context "when --webpack is passed (alias for --no-rspack)" do
+      let(:install_generator) { described_class.new([], { webpack: true }) }
+
+      it "returns false" do
+        expect(install_generator.send(:using_rspack?)).to be false
+      end
+    end
+
+    context "when --no-webpack is passed" do
+      let(:install_generator) { described_class.new([], { webpack: false }) }
+
+      it "returns true" do
+        expect(install_generator.send(:using_rspack?)).to be true
+      end
+    end
+
+    context "when --rspack and --webpack contradict each other" do
+      let(:install_generator) { described_class.new([], { rspack: true, webpack: true }) }
+
+      it "raises a Thor::Error" do
+        expect { install_generator.send(:using_rspack?) }
+          .to raise_error(Thor::Error, /Conflicting bundler flags/)
+      end
+    end
+
+    context "when --no-rspack and --webpack agree (both Webpack)" do
+      let(:install_generator) { described_class.new([], { rspack: false, webpack: true }) }
+
+      it "returns false without raising" do
+        expect(install_generator.send(:using_rspack?)).to be false
+      end
+    end
+
+    context "when no bundler flag is passed (fresh install)" do
       let(:install_generator) { described_class.new }
 
-      # InstallGenerator declares --rspack with default: false, so options[:rspack]
-      # is false (not nil). using_rspack? returns false via the first branch without
-      # reaching the YAML fallback (rspack_configured_in_project?).
-      it "returns false" do
+      # With no flag and no existing bundler choice, the default resolves to Rspack when
+      # Shakapacker supports it (Rspack landed in 9.0).
+      it "defaults to Rspack" do
+        allow(install_generator).to receive_messages(project_declares_assets_bundler?: false,
+                                                     shakapacker_version_9_or_higher?: true)
+
+        expect(install_generator.send(:using_rspack?)).to be true
+      end
+
+      # Twin of base_generator_spec's fallback case: InstallGenerator has its own
+      # rspack_bundler_default override (delegating to fresh_install_rspack_default) and is the
+      # primary CLI entry point, so the < 9.0 fallback to Webpack is asserted here too.
+      it "falls back to Webpack when Rspack is unsupported (Shakapacker < 9.0)" do
+        allow(install_generator).to receive_messages(project_declares_assets_bundler?: false,
+                                                     shakapacker_version_9_or_higher?: false)
+
         expect(install_generator.send(:using_rspack?)).to be false
       end
     end
@@ -3011,8 +3088,8 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    context "without --rspack" do
-      let(:install_generator) { described_class.new }
+    context "with --no-rspack" do
+      let(:install_generator) { described_class.new([], { rspack: false }) }
 
       it "returns path unchanged" do
         expect(install_generator.send(:destination_config_path, "config/webpack/serverWebpackConfig.js"))
@@ -3025,7 +3102,9 @@ describe InstallGenerator, type: :generator do
   # Bundler subprocess commands must run in unbundled environment to prevent
   # BUNDLE_GEMFILE inheritance from parent process
   describe "bundler environment isolation" do
-    let(:install_generator) { described_class.new }
+    # Pin to Webpack (--no-rspack) so shakapacker:install runs with an empty env hash here;
+    # the SHAKAPACKER_ASSETS_BUNDLER=rspack env is covered by the dedicated example below.
+    let(:install_generator) { described_class.new([], { rspack: false }) }
 
     it "clears BUNDLE_GEMFILE when running bundle add" do
       allow(install_generator).to receive(:shakapacker_in_gemfile?).and_return(false)
