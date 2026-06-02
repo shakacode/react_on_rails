@@ -156,6 +156,7 @@ function ReviewList({ reviews }: { reviews: Review[] }) {
 **React component for async props (Server Component):**
 
 Use this version with the `stream_react_component_with_async_props` ERB helper above. Keep the registered component name as `ProductPage`; the props shape changes so `reviews` comes from `getReactOnRailsAsyncProp`. `WithAsyncProps<AsyncProps, SyncProps>` combines the props passed directly through `props:` with a typed accessor for the keys emitted from Rails.
+This first async-props snippet is intentionally single-prop so it mirrors the synchronous example; the full two-prop version appears in [Async Props](#async-props-stream-each-slow-prop-independently).
 
 ```tsx
 import { Suspense } from 'react';
