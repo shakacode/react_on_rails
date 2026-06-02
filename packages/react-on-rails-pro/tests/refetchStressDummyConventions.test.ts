@@ -6,11 +6,21 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 const repoRoot = path.resolve(__dirname, '../../..');
+const proPackageJsonPath = path.join(repoRoot, 'packages/react-on-rails-pro/package.json');
 const dummyClientRoot = path.join(repoRoot, 'react_on_rails_pro/spec/dummy/client/app');
 const componentsRoot = path.join(dummyClientRoot, 'components');
 const autoLoadRoot = path.join(dummyClientRoot, 'ror-auto-load-components');
 
 describe('refetch stress dummy app conventions', () => {
+  it('publishes declaration paths for Pro subpath imports used by the dummy app', () => {
+    const proPackageJson = JSON.parse(fs.readFileSync(proPackageJsonPath, 'utf8'));
+
+    expect(proPackageJson.exports['./RSCRoute']).toEqual({
+      types: './lib/RSCRoute.d.ts',
+      default: './lib/RSCRoute.js',
+    });
+  });
+
   it('keeps client-only helpers behind .client.tsx file suffixes', () => {
     expect(fs.existsSync(path.join(componentsRoot, 'RefetchStressPage.client.tsx'))).toBe(true);
     expect(fs.existsSync(path.join(componentsRoot, 'InlineRefreshButton.client.tsx'))).toBe(true);

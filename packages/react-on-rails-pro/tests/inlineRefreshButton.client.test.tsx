@@ -87,7 +87,7 @@ const createDeferred = <T,>(): Deferred<T> => {
     });
 
     expect(screen.getByTestId('inline-refresh')).toBeDisabled();
-    expect(screen.getByTestId('inline-refresh')).toHaveTextContent('Refreshing');
+    expect(screen.getByTestId('inline-refresh')).toHaveTextContent('Refreshing…');
 
     await act(async () => {
       pending[1].resolve(<NeverSettles />);
@@ -96,6 +96,6 @@ const createDeferred = <T,>(): Deferred<T> => {
 
     expect(screen.getByTestId('card')).toHaveTextContent('v1');
     expect(screen.getByTestId('inline-refresh')).toBeDisabled();
-    expect(screen.getByTestId('inline-refresh')).toHaveTextContent('Refreshing');
+    expect(screen.getByTestId('inline-refresh')).toHaveTextContent('Refreshing…');
   });
 });

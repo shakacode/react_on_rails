@@ -59,7 +59,10 @@
       "react-server": "./lib/cache/index.js",
       "default": "./lib/cache/index.stub.js"
     },
-    "./RSCRoute": "./lib/RSCRoute.js",
+    "./RSCRoute": {
+      "types": "./lib/RSCRoute.d.ts",
+      "default": "./lib/RSCRoute.js"
+    },
     "./RSCProvider": "./lib/RSCProvider.js",
     "./ServerComponentFetchError": "./lib/ServerComponentFetchError.js"
   },
