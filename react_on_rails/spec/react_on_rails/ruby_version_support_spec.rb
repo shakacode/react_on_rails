@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "yaml"
+require_relative "spec_helper"
 
 RSpec.describe "Ruby version support" do
   # From spec/react_on_rails/ up through spec/ and react_on_rails/ to the repo root.
@@ -18,7 +19,7 @@ RSpec.describe "Ruby version support" do
       Array(job["steps"]).filter_map do |step|
         next unless ruby_setup_actions.include?(step["uses"])
 
-        step.fetch("with").fetch("ruby-version")
+        step.dig("with", "ruby-version")
       end
     end
   end
@@ -36,7 +37,9 @@ RSpec.describe "Ruby version support" do
   it "uses a Ruby 4-compatible Bundler version in OSS lockfiles" do
     ["react_on_rails/Gemfile.lock", "react_on_rails/spec/dummy/Gemfile.lock"].each do |path|
       lockfile = read_repo_file(path)
-      bundler_version = lockfile.match(/\nBUNDLED WITH\n\s+(\S+)/)[1]
+      match = lockfile.match(/\nBUNDLED WITH\n\s+(\S+)/)
+      expect(match).not_to be_nil, "BUNDLED WITH stanza not found in #{path}"
+      bundler_version = match[1]
 
       expect(Gem::Version.new(bundler_version)).to be >= Gem::Version.new("4.0.0")
     end
@@ -56,8 +59,8 @@ RSpec.describe "Ruby version support" do
       '"ruby-version":"3.3","node-version":"20","dependency-level":"minimum"'
     )
 
-    expect(workflow_ruby_versions(".github/workflows/lint-js-and-ruby.yml")).to eq(%w[4.0 4.0 4.0])
-    expect(workflow_ruby_versions(".github/workflows/precompile-check.yml")).to eq(%w[4.0 4.0])
+    expect(workflow_ruby_versions(".github/workflows/lint-js-and-ruby.yml")).to match_array(%w[4.0 4.0 4.0])
+    expect(workflow_ruby_versions(".github/workflows/precompile-check.yml")).to match_array(%w[4.0 4.0])
   end
 
   it "documents and switches to Ruby 4.0 for the latest local CI configuration" do
