@@ -261,6 +261,7 @@ module ReactOnRails
           CONTENT
 
           expect(pack_content).to eq(expected_content)
+          expect(pack_content).not_to include("registerDefaultRSCProvider")
         end
       end
 
@@ -273,9 +274,12 @@ module ReactOnRails
           component_name = "ReactClientComponentWithClientAndServer"
           component_pack = "#{generated_directory}/#{component_name}.js"
           pack_content = File.read(component_pack)
+          expect(pack_content).to include("import 'react-on-rails-pro/registerDefaultRSCProvider/client';")
           expect(pack_content).to include("import ReactOnRails from 'react-on-rails-pro/client';")
           expect(pack_content).to include("ReactOnRails.register({#{component_name}});")
           expect(pack_content).not_to include("registerServerComponent")
+          expect(pack_content.index("registerDefaultRSCProvider/client"))
+            .to be < pack_content.index("react-on-rails-pro/client")
         end
       end
 
@@ -295,6 +299,7 @@ module ReactOnRails
           CONTENT
 
           expect(pack_content).to eq(expected_content)
+          expect(pack_content).not_to include("registerDefaultRSCProvider")
         end
       end
 
@@ -307,10 +312,62 @@ module ReactOnRails
           component_name = "ReactClientComponent"
           component_pack = "#{generated_directory}/#{component_name}.js"
           pack_content = File.read(component_pack)
+          expect(pack_content).to include("import 'react-on-rails-pro/registerDefaultRSCProvider/client';")
           expect(pack_content).to include("import ReactOnRails from 'react-on-rails-pro/client';")
           expect(pack_content).to include("ReactOnRails.register({#{component_name}});")
           expect(pack_content).not_to include("registerServerComponent")
+          expect(pack_content.index("registerDefaultRSCProvider/client"))
+            .to be < pack_content.index("react-on-rails-pro/client")
         end
+      end
+
+      it "regenerates client packs when generated contents no longer match the current template" do
+        described_class.instance.generate_packs_if_stale
+        component_name = "ReactClientComponent"
+        component_pack = "#{generated_directory}/#{component_name}.js"
+        component_source =
+          "#{packer_source_path}/components/#{components_directory}/ror_components/#{component_name}.jsx"
+        stale_pack_content = File.read(component_pack)
+                                 .delete_prefix("import 'react-on-rails-pro/registerDefaultRSCProvider/client';\n")
+        fresh_mtime = File.mtime(component_source) + 60
+        File.write(component_pack, stale_pack_content)
+        File.utime(fresh_mtime, fresh_mtime, component_pack)
+
+        ENV["REACT_ON_RAILS_VERBOSE"] = "true"
+        expect do
+          described_class.instance.generate_packs_if_stale
+        end.to output(GENERATED_PACKS_CONSOLE_OUTPUT_REGEX).to_stdout
+        expect(File.read(component_pack))
+          .to include("import 'react-on-rails-pro/registerDefaultRSCProvider/client';")
+      ensure
+        ENV.delete("REACT_ON_RAILS_VERBOSE")
+      end
+
+      it "checks generated pack contents without emitting likely-client warnings" do
+        described_class.instance.generate_packs_if_stale
+        component_name = "ReactServerComponent"
+        component_pack = "#{generated_directory}/#{component_name}.js"
+        component_source =
+          "#{packer_source_path}/components/#{components_directory}/ror_components/#{component_name}.jsx"
+        original_source = File.read(component_source)
+        stale_pack_content = File.read(component_pack).sub("registerServerComponent", "staleRegisterServerComponent")
+
+        File.write(component_source, <<~JS)
+          export default function #{component_name}() {
+            useState(false);
+            return null;
+          }
+        JS
+
+        fresh_mtime = File.mtime(component_source) + 60
+        File.write(component_pack, stale_pack_content)
+        File.utime(fresh_mtime, fresh_mtime, component_pack)
+
+        expect do
+          expect(described_class.instance.send(:stale_or_missing_packs?)).to be(true)
+        end.not_to output(/WARNING.*#{component_name}/).to_stdout
+      ensure
+        File.write(component_source, original_source) if original_source
       end
 
       context "when RSC support is disabled" do
@@ -326,6 +383,7 @@ module ReactOnRails
           expect(pack_content).to include("import ReactOnRails from 'react-on-rails-pro/client';")
           expect(pack_content).to include("ReactOnRails.register({#{component_name}});")
           expect(pack_content).not_to include("registerServerComponent")
+          expect(pack_content).not_to include("registerDefaultRSCProvider")
         end
       end
 
@@ -342,6 +400,7 @@ module ReactOnRails
           expect(pack_content).to include("import ReactOnRails from 'react-on-rails/client';")
           expect(pack_content).to include("ReactOnRails.register({#{component_name}});")
           expect(pack_content).not_to include("registerServerComponent")
+          expect(pack_content).not_to include("registerDefaultRSCProvider")
         end
       end
 

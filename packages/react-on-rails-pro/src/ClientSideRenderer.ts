@@ -23,6 +23,8 @@ import { isServerRenderHash } from 'react-on-rails/isServerRenderResult';
 import { supportsHydrate, supportsRootApi, unmountComponentAtNode } from 'react-on-rails/reactApis';
 import reactHydrateOrRender from 'react-on-rails/reactHydrateOrRender';
 import { debugTurbolinks } from 'react-on-rails/turbolinksUtils';
+import { maybeWrapWithDefaultRSCProviderWithStatus } from './defaultRSCProviderRegistry.ts';
+import handleRecoverableError from './handleRecoverableError.client.ts';
 
 import * as StoreRegistry from './StoreRegistry.ts';
 import * as ComponentRegistry from './ComponentRegistry.ts';
@@ -56,8 +58,14 @@ async function delegateToRenderer(
 
 const getDomId = (domIdOrElement: string | Element): string =>
   typeof domIdOrElement === 'string' ? domIdOrElement : domIdOrElement.getAttribute('data-dom-id') || '';
+
+const getSsrIdentifierPrefix = (el: Element): string | undefined =>
+  el.getAttribute('data-ssr-identifier-prefix') || undefined;
+
 class ComponentRenderer {
   private domNodeId: string;
+
+  private ssrIdentifierPrefix?: string;
 
   private state: 'unmounted' | 'rendering' | 'rendered';
 
@@ -74,6 +82,8 @@ class ComponentRenderer {
         ? document.querySelector(`[data-dom-id="${CSS.escape(domId)}"]`)
         : domIdOrElement;
     if (!el) return;
+
+    this.ssrIdentifierPrefix = getSsrIdentifierPrefix(el);
 
     const storeDependencies = el.getAttribute('data-store-dependencies');
     const storeDependenciesArray = storeDependencies ? (JSON.parse(storeDependencies) as string[]) : [];
@@ -138,11 +148,21 @@ class ComponentRenderer {
 You returned a server side type of react-router error: ${JSON.stringify(reactElementOrRouterResult)}
 You should return a React.Component always for the client side entry point.`);
         } else {
-          const rootOrElement = reactHydrateOrRender(
-            domNode,
+          const { reactElement, wrappedByDefaultRSCProvider } = maybeWrapWithDefaultRSCProviderWithStatus(
             reactElementOrRouterResult as ReactElement,
-            shouldHydrate,
+            railsContext,
+            domNodeId,
           );
+          let renderOptions: Parameters<typeof reactHydrateOrRender>[3];
+          if (wrappedByDefaultRSCProvider) {
+            renderOptions = shouldHydrate
+              ? {
+                  ...(this.ssrIdentifierPrefix ? { identifierPrefix: this.ssrIdentifierPrefix } : {}),
+                  onRecoverableError: handleRecoverableError,
+                }
+              : { identifierPrefix: domNodeId };
+          }
+          const rootOrElement = reactHydrateOrRender(domNode, reactElement, shouldHydrate, renderOptions);
           this.state = 'rendered';
           if (supportsRootApi) {
             this.root = rootOrElement as Root;

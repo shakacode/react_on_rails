@@ -243,12 +243,12 @@ module ReactOnRails
       ).yellow
     end
 
-    def pack_file_contents(file_path)
+    def pack_file_contents(file_path, warn: true)
       registered_component_name = component_name(file_path)
       load_server_components = ReactOnRails::Utils.rsc_support_enabled?
 
       if load_server_components && !client_entrypoint?(file_path)
-        warn_if_likely_client_component(file_path, registered_component_name)
+        warn_if_likely_client_component(file_path, registered_component_name) if warn
 
         return <<~FILE_CONTENT.strip
           import registerServerComponent from '#{react_on_rails_npm_package}/registerServerComponent/client';
@@ -258,9 +258,14 @@ module ReactOnRails
       end
 
       relative_component_path = relative_component_path_from_generated_pack(file_path)
+      default_rsc_provider_import = if load_server_components
+                                      "import '#{react_on_rails_npm_package}/registerDefaultRSCProvider/client';\n"
+                                    else
+                                      ""
+                                    end
 
       <<~FILE_CONTENT.strip
-        import ReactOnRails from '#{react_on_rails_npm_package}/client';
+        #{default_rsc_provider_import}import ReactOnRails from '#{react_on_rails_npm_package}/client';
         import #{registered_component_name} from '#{relative_component_path}';
 
         ReactOnRails.register({#{registered_component_name}});
@@ -683,17 +688,29 @@ module ReactOnRails
 
       # Check component packs
       component_files.each do |file|
-        path = generated_pack_path(file)
-        return true if !File.exist?(path) || File.mtime(path).to_i < most_recent_mtime
+        return true if generated_component_pack_stale?(file, most_recent_mtime)
       end
 
       # Check store packs
       store_files.each do |file|
-        path = generated_store_pack_path(file)
-        return true if !File.exist?(path) || File.mtime(path).to_i < most_recent_mtime
+        return true if generated_store_pack_stale?(file, most_recent_mtime)
       end
 
       false
+    end
+
+    def generated_component_pack_stale?(file, most_recent_mtime)
+      path = generated_pack_path(file)
+      return true if !File.exist?(path) || File.mtime(path).to_i < most_recent_mtime
+
+      File.read(path) != pack_file_contents(file, warn: false)
+    end
+
+    def generated_store_pack_stale?(file, most_recent_mtime)
+      path = generated_store_pack_path(file)
+      return true if !File.exist?(path) || File.mtime(path).to_i < most_recent_mtime
+
+      File.read(path) != store_pack_file_contents(file)
     end
   end
   # rubocop:enable Metrics/ClassLength

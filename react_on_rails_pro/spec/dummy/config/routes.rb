@@ -53,6 +53,10 @@ Rails.application.routes.draw do
       as: :async_on_server_sync_on_client_client_render
   get "server_router/(*all)" => "pages#server_router", as: :server_router
   get "server_router_client_render/(*all)" => "pages#server_router_client_render", as: :server_router_client_render
+  get "unwrapped_rsc_route_client_render" => "pages#unwrapped_rsc_route_client_render",
+      as: :unwrapped_rsc_route_client_render
+  get "unwrapped_rsc_route_stream_render" => "pages#unwrapped_rsc_route_stream_render",
+      as: :unwrapped_rsc_route_stream_render
   get "async_render_function_returns_string" => "pages#async_render_function_returns_string"
   get "async_render_function_returns_component" => "pages#async_render_function_returns_component"
   get "tanstack_router_async(/*all)" => "tanstack_router#index", as: :tanstack_router_async

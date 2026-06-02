@@ -1132,7 +1132,8 @@ describe ReactOnRailsHelper do
         dom_id: "HelloWorld-react-component-0",
         react_component_name: "HelloWorld",
         trace: false,
-        store_dependencies: nil
+        store_dependencies: nil,
+        html_streaming?: false
       )
     end
 

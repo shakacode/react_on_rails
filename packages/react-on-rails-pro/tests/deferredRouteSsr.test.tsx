@@ -3,6 +3,12 @@ import * as React from 'react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
+import type { RailsContext } from 'react-on-rails/types';
+import {
+  clearDefaultRSCProviderFactory,
+  maybeWrapWithDefaultRSCProviderWithStatus,
+  setDefaultRSCProviderFactory,
+} from '../src/defaultRSCProviderRegistry.ts';
 import { createRSCProvider, useRSC } from '../src/RSCProvider.tsx';
 import {
   isRSCRouteSSRFalseBailoutError,
@@ -335,6 +341,142 @@ describe('RSCRoute deferred SSR behavior', () => {
       expect(container.textContent).toContain('Recovered deferred route');
       expect(container.textContent).not.toContain('Retry deferred route');
     } finally {
+      const mountedRoot = root;
+      try {
+        if (mountedRoot) {
+          await act(async () => {
+            mountedRoot.unmount();
+            await Promise.resolve();
+          });
+        }
+        container.remove();
+      } finally {
+        consoleErrorSpy.mockRestore();
+      }
+    }
+  });
+
+  it('dedupes identical deferred routes under the same default provider', async () => {
+    const sharedPayloadPromise = new Promise<React.ReactNode>(() => undefined);
+    const getServerComponent = jest.fn(() => sharedPayloadPromise);
+    setDefaultRSCProviderFactory(({ reactElement }) => {
+      const RSCProvider = createRSCProvider({ getServerComponent });
+      return <RSCProvider>{reactElement}</RSCProvider>;
+    });
+    const railsContext = { rscPayloadGenerationUrlPath: '/rsc_payload' } as RailsContext;
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    let root: Root | undefined;
+
+    try {
+      root = createRoot(container);
+      const defaultProviderRoot = maybeWrapWithDefaultRSCProviderWithStatus(
+        <>
+          <React.Suspense fallback={<div data-testid="first-deferred-fallback">Loading first route...</div>}>
+            <RSCRoute componentName="DeferredRoute" componentProps={{ id: 1 }} ssr={false} />
+          </React.Suspense>
+          <React.Suspense
+            fallback={<div data-testid="second-deferred-fallback">Loading second route...</div>}
+          >
+            <RSCRoute componentName="DeferredRoute" componentProps={{ id: 1 }} ssr={false} />
+          </React.Suspense>
+        </>,
+        railsContext,
+        'default-provider-dedupe-dom-id',
+      ).reactElement;
+
+      await act(async () => {
+        root?.render(defaultProviderRoot);
+        await Promise.resolve();
+      });
+
+      expect(container.querySelector('[data-testid="first-deferred-fallback"]')).not.toBeNull();
+      expect(container.querySelector('[data-testid="second-deferred-fallback"]')).not.toBeNull();
+      expect(getServerComponent).toHaveBeenCalledTimes(1);
+      expect(getServerComponent).toHaveBeenCalledWith({
+        componentName: 'DeferredRoute',
+        componentProps: { id: 1 },
+      });
+    } finally {
+      clearDefaultRSCProviderFactory();
+      const mountedRoot = root;
+      if (mountedRoot) {
+        await act(async () => {
+          mountedRoot.unmount();
+          await Promise.resolve();
+        });
+      }
+      container.remove();
+    }
+  });
+
+  it('keeps default-provider roots above error boundary retry fallbacks', async () => {
+    let rejectPayload: ((error: Error) => void) | undefined;
+    const payloadPromise = new Promise<React.ReactNode>((_resolve, reject) => {
+      rejectPayload = reject;
+    });
+    let requestCount = 0;
+    const getServerComponent = jest.fn((): Promise<React.ReactNode> => {
+      requestCount += 1;
+      return requestCount === 1
+        ? payloadPromise
+        : Promise.resolve(<div>Recovered default-provider route</div>);
+    });
+    setDefaultRSCProviderFactory(({ reactElement }) => {
+      const RSCProvider = createRSCProvider({ getServerComponent });
+      return <RSCProvider>{reactElement}</RSCProvider>;
+    });
+    const railsContext = { rscPayloadGenerationUrlPath: '/rsc_payload' } as RailsContext;
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    let root: Root | undefined;
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    try {
+      root = createRoot(container);
+      const defaultProviderRoot = maybeWrapWithDefaultRSCProviderWithStatus(
+        <TestErrorBoundary fallback={(fallbackProps) => <RetryFallback {...fallbackProps} />}>
+          <React.Suspense fallback={<div>Loading default-provider route...</div>}>
+            <RSCRoute componentName="DeferredRoute" componentProps={{ id: 1 }} ssr={false} />
+          </React.Suspense>
+        </TestErrorBoundary>,
+        railsContext,
+        'default-provider-dom-id',
+      ).reactElement;
+
+      await act(async () => {
+        root?.render(defaultProviderRoot);
+        await Promise.resolve();
+      });
+
+      expect(getServerComponent).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        rejectPayload?.(new Error('payload failed before default-provider retry'));
+        await payloadPromise.catch(() => undefined);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      const retryButton = container.querySelector('button');
+      expect(retryButton?.textContent).toBe('Retry deferred route');
+
+      await act(async () => {
+        retryButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(getServerComponent).toHaveBeenCalledTimes(2);
+      expect(getServerComponent).toHaveBeenNthCalledWith(2, {
+        componentName: 'DeferredRoute',
+        componentProps: { id: 1 },
+        enforceRefetch: true,
+      });
+      expect(container.textContent).toContain('Recovered default-provider route');
+      expect(container.textContent).not.toContain('Retry deferred route');
+    } finally {
+      clearDefaultRSCProviderFactory();
       const mountedRoot = root;
       try {
         if (mountedRoot) {

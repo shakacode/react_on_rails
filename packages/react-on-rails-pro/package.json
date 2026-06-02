@@ -45,6 +45,7 @@
       "default": "./lib/tanstack-router.js"
     },
     "./registerServerComponent/client": "./lib/registerServerComponent/client.js",
+    "./registerDefaultRSCProvider/client": "./lib/registerDefaultRSCProvider.client.js",
     "./registerServerComponent/server": {
       "react-server": "./lib/registerServerComponent/server.rsc.js",
       "default": "./lib/registerServerComponent/server.js"

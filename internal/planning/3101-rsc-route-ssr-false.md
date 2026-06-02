@@ -261,26 +261,35 @@ with `fallback={null}` is the nearest boundary and catches the bailout. That pre
 can hide the rendered root and provides no meaningful loading UI. The documented pattern is to place `Suspense`
 close to each deferred route.
 
-React still reports this documented retry path through client `onRecoverableError`. Phase 2 should not broadly
-suppress client recoverable errors; the intentional-bailout classification belongs on the server stream path.
+React reports this documented retry path through client `onRecoverableError`. Phase 2 does not broadly suppress
+recoverable errors. The server stream path returns the intentional bailout digest, and the client suppresses only
+recoverable errors carrying that digest.
 
 ## Support without manual RSC renderer wrapping
 
-Phase 3 adds support for `RSCRoute ssr={false}` in trees that do not explicitly call
-`wrapServerComponentRenderer`. The direction is to reuse the existing provider machinery rather than adding a
-second route-local fetch runtime.
+Phase 3 adds support for auto-bundled roots that only defer `RSCRoute` payloads with `ssr={false}` without
+explicitly calling `wrapServerComponentRenderer`. This includes roots rendered through `react_component(...,
+prerender: false)` and deferred-only roots rendered through `stream_react_component`.
 
-A complete design for this support needs the provider above the application subtree, not inside `RSCRoute`, so
-parent error-boundary fallback UIs can still call `useRSC().refetchComponent(...)`. A provider nested inside
-`RSCRoute` disappears when a parent error boundary replaces the failing route with its fallback UI.
+The implementation reuses the existing provider machinery rather than adding a second route-local fetch runtime.
+The provider must sit above the application subtree, not inside `RSCRoute`, so parent error-boundary fallback UIs
+can still call `useRSC().refetchComponent(...)`. A provider nested inside `RSCRoute` disappears when a parent error
+boundary replaces the failing route with its fallback UI.
 
-The root-provider phase adds an internal root-level provider on the client path where React on Rails Pro has the
-DOM node id and `railsContext` needed to construct the existing client `getReactServerComponent` function. This
-phase does not add a Suspense boundary only on the client; a client-only Suspense boundary changes the hydration
-tree.
+The provider registration must also happen before the application root renders. Registering it as an `RSCRoute`
+module side effect is too late for lazy-loaded routes, because the root can render before the chunk that imports
+`RSCRoute` is evaluated. Phase 3 therefore registers the default provider from auto-bundled generated client packs
+when RSC support is enabled. The generated pack imports the registration module before importing
+`react-on-rails-pro/client` and registering the root component.
 
-Phase 1 still structures `RSCRoute` so skipped server renders return before `useRSC()`. That keeps the component
-compatible with the root-provider phase without forcing broad renderer changes into the initial implementation.
+The client renderer then wraps ordinary non-renderer roots with the registered provider when the current
+`railsContext` includes the RSC payload endpoint. Existing renderer roots still delegate to their renderer first,
+so roots that already use `wrapServerComponentRenderer` are not double-wrapped.
+
+Manual client entrypoints that bypass generated packs are outside this automatic path. They can import the same
+registration module explicitly before registering their root. Making that path fully automatic would require a
+broader safe client-entrypoint change, because importing client provider code from the wrong Pro entrypoint can
+pollute the RSC build.
 
 ## Support inside non-streaming Rails helper paths
 
@@ -288,19 +297,66 @@ Issue #3101 also calls out components rendered through `react_component` rather 
 There are two separate cases.
 
 When `react_component` is used with `prerender: false`, the root is already client-rendered. In that mode, no
-server RSC payload is generated during the initial response. Phase 1 keeps `ssr={false}` semantics consistent
-across render modes: the route still waits until after mount before entering the RSC provider path. This adds a
-brief blank first render in client-only roots, but avoids adding a render-mode-specific branch before the core
-feature is in place.
+server RSC payload is generated during the initial response. Phase 3 adds the automatic provider path for
+auto-bundled roots that only defer `RSCRoute` payloads, so `RSCRoute ssr={false}` can resolve through the existing
+provider runtime without a manual renderer wrapper.
 
 When `react_component` is used with `prerender: true`, the current server-side RSC renderer helper validates
 streaming capabilities before the child component tree renders. That means an `RSCRoute ssr={false}` cannot by
 itself make this path work, because the outer renderer fails before `RSCRoute` gets a chance to return no
 content.
 
-Supporting that mode requires a contained change that delays the streaming-capability check until server RSC
-payload generation is actually requested, while preserving the existing descriptive error for true
-server-rendered RSC usage. That belongs to the non-streaming helper phase, not Phase 1.
+### Phase 4 investigation: `react_component(..., prerender: true)`
+
+Question: can deferred `RSCRoute ssr={false}` work cleanly inside the non-streaming
+`react_component(..., prerender: true)` helper, not only inside `stream_react_component` or client-rendered
+`react_component(..., prerender: false)` roots?
+
+Phase 4 investigated this mode and is deferred.
+
+The important distinction is functional support versus clean support. An unwrapped
+`react_component(..., prerender: true)` root with only `RSCRoute ssr={false}` can already render the surrounding
+HTML, show the nearest Suspense fallback, hydrate, fetch the RSC payload in the browser, and eventually show the
+server component. A wrapped root can also reach that behavior if the early streaming-capability assertion is
+delayed. The unresolved problem is not basic rendering; it is safely identifying the intentional `ssr={false}`
+server bailout during hydration so React's expected recoverable error can be suppressed without hiding real server
+render errors.
+
+Key findings:
+
+- `react_component(..., prerender: true)` uses React's `renderToString` path.
+- React documents `renderToString` as having limited Suspense support. When a component suspends, the output
+  contains fallback HTML immediately rather than waiting for the content.
+- `renderToString` has no public `onError` option and internally uses a no-op error handler.
+- Development output may include a Suspense error message, but not the bailout digest.
+- Production output uses a generic Suspense fallback marker with no message or digest.
+- React static prerender APIs can serialize an `onError` digest. For example, a renderer using static prerender
+  could return the `RSCRoute ssr={false}` bailout digest from `onError`, React would write that digest into the
+  Suspense boundary marker, and the browser could suppress only that known bailout. That is the clean signal
+  `renderToString` does not provide.
+
+A naive fix that only delays the `wrapServerComponentRenderer/server` streaming-capability check is not safe. It
+lets deferred-only `ssr={false}` render fallback HTML, but if an `ssr={true}` route attempts real server RSC
+payload generation under Suspense, React can catch the thrown unsupported-helper error and emit fallback/client
+retry markers instead of preserving the existing descriptive failure. That would weaken the current clear error
+for unsupported server RSC rendering through `react_component(..., prerender: true)`.
+
+Decision: do not implement non-streaming `react_component(..., prerender: true)` support in this PR stack. Clean
+support requires one of:
+
+1. a wrapper-only special case: inside `wrapServerComponentRenderer/server`, use React static prerender only when
+   the normal streaming capabilities are missing and the tree is deferred-only. That would clean up wrapped
+   `react_component(..., prerender: true)` roots, but unwrapped roots would still render with `renderToString` and
+   keep the noisy recoverable error; or
+2. a broader Pro render-pipeline change: teach the non-streaming Pro server-render path to use React static
+   prerender for eligible RSC/Suspense roots, so both wrapped and unwrapped `react_component(..., prerender: true)`
+   cases can get the same classified bailout signal.
+
+Both are larger than the contained `ssr={false}` route behavior and default-provider work here. The supported
+paths remain:
+
+- `stream_react_component` for server-rendered RSC payloads and streamed Suspense fallback HTML;
+- `react_component(..., prerender: false)` for client-deferred RSC roots that fetch after the browser renders.
 
 ## Implementation phases
 
@@ -347,18 +403,32 @@ review boundaries; they do not mean every later phase is a small additive patch 
 
 ### Phase 3: automatic root-level RSC provider
 
-- Make `RSCRoute ssr={false}` work in trees that do not explicitly call `wrapServerComponentRenderer`.
-- Wrap the root with the existing RSC provider machinery when the client renderer has the DOM node id and
-  `railsContext` needed to construct `getReactServerComponent`.
+- Make `RSCRoute ssr={false}` work in auto-bundled deferred-only roots that do not explicitly call
+  `wrapServerComponentRenderer`.
+- Add an internal default-provider registry that can wrap a root with the existing `RSCProvider` machinery.
+- Apply the default provider in `ClientSideRenderer` only after renderer delegation fails, so manually wrapped
+  renderer roots keep their current path and are not double-wrapped.
+- Register the default provider from generated client component packs when RSC support is enabled. The generated
+  import must run before `react-on-rails-pro/client` registers or renders the root.
+- Export the registration module as `react-on-rails-pro/registerDefaultRSCProvider/client` so generated packs and
+  manual entrypoints can use the same setup path.
+- Lazy-import `getReactServerComponent.client` from the provider's `getServerComponent` function, so the browser
+  RSC runtime is loaded only when a deferred route actually fetches payload data.
 - Keep the provider above user error boundaries so retry UIs can call `useRSC().refetchComponent(...)`.
 - Do not add a Suspense boundary only on the client, because that changes the hydration tree unless the server
   rendered the matching boundary.
+- Treat fully manual client entrypoints that bypass generated packs as an explicit-import boundary for this phase.
 
 ### Phase 4: non-streaming Rails helper support
 
-- Support the `react_component(..., prerender: true)` path for deferred-only RSC usage by delaying
-  server-capability checks until server RSC payload generation is requested.
-- Preserve the existing descriptive error when true server-rendered RSC usage requires streaming capabilities.
+- Deferred after investigation. Clean support for `react_component(..., prerender: true)` and deferred-only RSC
+  usage requires more than delaying server-capability checks.
+- Preserve the existing descriptive error when true server-rendered RSC usage requires streaming capabilities; do
+  not let Suspense hide that unsupported-helper error behind a client retry marker.
+- Avoid broad recoverable-error suppression for `renderToString`, because production output does not carry the
+  classified bailout digest.
+- Consider a follow-up design around React static prerender or a broader Pro render-pipeline change for eligible
+  non-streaming RSC/Suspense roots.
 - Keep `react_component(..., prerender: false)` on the client-rendered path, where no server RSC payload is
   generated during the initial response.
 
@@ -389,23 +459,41 @@ Phase 2 adds focused streaming coverage:
 4. Real render failures still set error metadata and emit errors according to the existing stream rules.
 5. Client retry enters the existing provider path; recoverable hydration reporting is not broadly suppressed.
 
+Phase 3 adds focused root-provider coverage:
+
+1. Generated client component packs import the default provider registration module before `react-on-rails-pro/client`
+   when RSC support is enabled.
+2. Generated client component packs do not import the registration module when RSC support is disabled.
+3. Ordinary non-renderer roots are wrapped with the default provider when the factory is registered and the current
+   `railsContext` includes the RSC payload endpoint.
+4. Renderer roots still delegate to their renderer and are not wrapped by the default provider path.
+5. An auto-bundled `react_component(..., prerender: false)` root can render a lazy-loaded `RSCRoute ssr={false}`
+   without a manual `wrapServerComponentRenderer` call.
+6. An auto-bundled deferred-only `stream_react_component` root can stream the scoped `Suspense` fallback, avoid
+   the deferred payload during SSR, and hydrate without logging the classified bailout as a recoverable error.
+7. The no-manual-wrapper client path still uses the existing provider behavior for fetch failures and
+   `useRSC().refetchComponent(...)` retry.
+8. A normal page that does not render RSC content does not request `/rsc_payload/...` or load the client RSC fetch
+   runtime.
+
 Avoid tests that require a separate HTTP request when the provider cache already has an equivalent component
 result. Cache reuse is part of the current provider behavior.
 
 ## Acceptance criteria mapping
 
-| Issue requirement                          | Plan response                                                                      |
-| ------------------------------------------ | ---------------------------------------------------------------------------------- |
-| New `ssr` prop                             | Add `ssr?: boolean` to `RSCRouteProps`, defaulting to `true`.                      |
-| `ssr={false}` skips SSR payload generation | Return before server-side provider work and assert no server loader call.          |
-| Phase 1 client resolution                  | Use mounted state to enter the existing provider path after hydration.             |
-| Phase 2 client resolution                  | Use React's Suspense retry path to enter the existing provider path.               |
-| No embedded payload for deferred route     | Avoid calling `railsContext.getRSCPayloadStream(...)` for that route during SSR.   |
-| Default behavior unchanged                 | Treat omitted `ssr` and `ssr={true}` as current behavior.                          |
-| Mixed pages                                | Make the decision per route instance and preserve provider cache semantics.        |
-| Error boundary compatibility               | Keep the existing `PromiseWrapper` and `RSCRouteErrorBoundary` path.               |
-| Docs update                                | Update `docs/pro/react-server-components/inside-client-components.md`.             |
-| Suspense loading UI                        | Keep loading UI owned by scoped React `Suspense` boundaries; add no fallback prop. |
+| Issue requirement                          | Plan response                                                                        |
+| ------------------------------------------ | ------------------------------------------------------------------------------------ |
+| New `ssr` prop                             | Add `ssr?: boolean` to `RSCRouteProps`, defaulting to `true`.                        |
+| `ssr={false}` skips SSR payload generation | Return before server-side provider work and assert no server loader call.            |
+| Phase 1 client resolution                  | Use mounted state to enter the existing provider path after hydration.               |
+| Phase 2 client resolution                  | Use React's Suspense retry path to enter the existing provider path.                 |
+| No embedded payload for deferred route     | Avoid calling `railsContext.getRSCPayloadStream(...)` for that route during SSR.     |
+| Default behavior unchanged                 | Treat omitted `ssr` and `ssr={true}` as current behavior.                            |
+| Mixed pages                                | Make the decision per route instance and preserve provider cache semantics.          |
+| Error boundary compatibility               | Keep the existing `PromiseWrapper` and `RSCRouteErrorBoundary` path.                 |
+| Deferred-only auto-bundled roots           | Register a default provider from generated client packs and wrap non-renderer roots. |
+| Docs update                                | Update `docs/pro/react-server-components/inside-client-components.md`.               |
+| Suspense loading UI                        | Keep loading UI owned by scoped React `Suspense` boundaries; add no fallback prop.   |
 
 ## Documentation plan
 
@@ -430,10 +518,10 @@ Phases 2-4 preserve the payload-skipping goal while changing or expanding specif
 
 - Phase 2 adds server-rendered Suspense fallback HTML through classified intentional server bailout handling,
   with loading UI controlled by the nearest scoped Suspense boundary.
-- Phase 3 adds automatic root-level RSC provider setup for `RSCRoute ssr={false}` in trees that do not
-  explicitly call `wrapServerComponentRenderer`.
-- Phase 4 adds non-streaming Rails helper support by delaying server-capability checks until server RSC payload
-  generation is requested.
+- Phase 3 adds automatic root-level RSC provider setup for auto-bundled deferred-only roots that contain
+  `RSCRoute ssr={false}` and do not explicitly call `wrapServerComponentRenderer`.
+- Phase 4 was investigated and deferred. Clean `react_component(..., prerender: true)` support for RSC/Suspense
+  roots needs a separate render-pipeline design, not just delayed server-capability checks.
 
-All phases are part of the target implementation for issue #3101. They are separated to keep the review and test
-surface understandable while preserving a single end-to-end design.
+The implemented phases are separated to keep the review and test surface understandable while preserving a single
+end-to-end design.

@@ -326,6 +326,7 @@ describe ReactOnRailsProHelper do
           data-component-name="TestingStreamableComponent"
           data-trace="true"
           data-dom-id="TestingStreamableComponent-react-component-0"
+          data-ssr-identifier-prefix="TestingStreamableComponent-react-component-0"
         >{"helloWorldData":{"name":"Mr. Server Side Rendering"}}</script>
       SCRIPT
     end
