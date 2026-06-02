@@ -99,6 +99,7 @@ curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
 
 - If you only have rvm (no nvm) or only nvm (no rvm), the script will detect this and provide helpful error messages guiding you to install the missing manager or switch to mise/asdf.
 - **Do not mix version managers** (e.g., don't install both mise and rvm). The script prioritizes mise > asdf > rvm+nvm, so mise/asdf will always take precedence. Using multiple managers can cause confusion about which versions are active.
+- The OSS lockfiles use Bundler 4, including when testing the Ruby 3.3 minimum lane. `bin/ci-switch-config` installs the locked Bundler version for local dummy-app bundling; if you run Bundler manually on Ruby 3.3, install the lockfile version first with `gem install bundler -v 4.0.10`.
 
 ## Detailed Usage
 
