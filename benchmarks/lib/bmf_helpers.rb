@@ -37,7 +37,7 @@ class BmfCollector
     @results << {
       name: "#{@prefix}#{name}#{@suffix}",
       rps: rps,
-      p50: p50,
+      p50: p50.is_a?(Numeric) ? p50 : nil,
       failed_pct: calculate_failed_percentage(status)
     }
   end

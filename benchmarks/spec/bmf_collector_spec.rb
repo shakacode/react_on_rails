@@ -31,6 +31,15 @@ RSpec.describe BmfCollector do
 
       expect(collector.to_bmf).to be_empty
     end
+
+    it "omits p50_latency when p50 is not numeric" do
+      collector = described_class.new
+      collector.add(name: "/partial", rps: 100.0, p50: "MISSING", status: "200=100")
+
+      entry = collector.to_bmf.fetch("/partial")
+      expect(entry).to include("rps" => { "value" => 100.0 })
+      expect(entry).not_to have_key("p50_latency")
+    end
   end
 
   describe "failed_pct" do
