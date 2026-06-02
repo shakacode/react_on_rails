@@ -341,8 +341,27 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
           ReactOnRailsPro.configure do |config|
             config.renderer_url = invalid_url
           end
-        end.to raise_error(ReactOnRailsPro::Error,
-                           /Unparseable ReactOnRailsPro.config.renderer_url #{invalid_url} /)
+        end.to raise_error(ReactOnRailsPro::Error, /renderer_url is not a parseable URI/)
+      end
+
+      it "does not leak the password through the URI error when render_url is unparseable" do
+        sensitive_password = "an#@!invalidpassword"
+        invalid_url = "https://:#{sensitive_password}@server.com:123"
+
+        error = nil
+        begin
+          ReactOnRailsPro.configure do |config|
+            config.renderer_url = invalid_url
+          end
+        rescue ReactOnRailsPro::Error => e
+          error = e
+        end
+
+        expect(error).to be_a(ReactOnRailsPro::Error)
+        # The error must not reproduce the unparseable URL or the underlying
+        # URI::InvalidURIError message — either could carry the literal password.
+        expect(error.message).not_to include(sensitive_password)
+        expect(error.message).not_to include("server.com")
       end
     end
 
@@ -464,7 +483,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
 
         it "does not raise when password comes from RENDERER_PASSWORD env var in production" do
           allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
-          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return("secure-password")
+          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return("secure-password!!")
 
           expect do
             ReactOnRailsPro.configure do |config|
@@ -473,7 +492,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
             end
           end.not_to raise_error
 
-          expect(ReactOnRailsPro.configuration.renderer_password).to eq("secure-password")
+          expect(ReactOnRailsPro.configuration.renderer_password).to eq("secure-password!!")
         end
 
         it "does not raise when password is explicitly set in production" do
@@ -482,7 +501,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
           expect do
             ReactOnRailsPro.configure do |config|
               config.server_renderer = "NodeRenderer"
-              config.renderer_password = "secure-password"
+              config.renderer_password = "secure-password!!"
             end
           end.not_to raise_error
         end
@@ -493,14 +512,14 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
           expect do
             ReactOnRailsPro.configure do |config|
               config.server_renderer = "NodeRenderer"
-              config.renderer_url = "https://:secure-password@localhost:3800"
+              config.renderer_url = "https://:secure-password-val@localhost:3800"
             end
           end.not_to raise_error
         end
 
         it "resolves from ENV when renderer_password is blank in production" do
           allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
-          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return("secure-password")
+          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return("secure-password!!")
 
           expect do
             ReactOnRailsPro.configure do |config|
@@ -510,7 +529,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
             end
           end.not_to raise_error
 
-          expect(ReactOnRailsPro.configuration.renderer_password).to eq("secure-password")
+          expect(ReactOnRailsPro.configuration.renderer_password).to eq("secure-password!!")
         end
 
         it "resolves from URL when renderer_password is blank and URL has embedded password" do
@@ -525,6 +544,37 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
           end.not_to raise_error
 
           expect(ReactOnRailsPro.configuration.renderer_password).to eq("url-password")
+        end
+
+        it "strips the password from renderer_url after extracting it, so it can't leak via logs" do
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
+
+          ReactOnRailsPro.configure do |config|
+            config.server_renderer = "NodeRenderer"
+            config.renderer_url = "https://:url-password@localhost:3800"
+          end
+
+          # Password is extracted for use (sent in the request body)…
+          expect(ReactOnRailsPro.configuration.renderer_password).to eq("url-password")
+          # …but the stored URL no longer contains it.
+          expect(ReactOnRailsPro.configuration.renderer_url).to eq("https://localhost:3800")
+          expect(ReactOnRailsPro.configuration.renderer_url).not_to include("url-password")
+        end
+
+        it "strips userinfo from renderer_url even when the password came from config (not the URL)" do
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
+
+          ReactOnRailsPro.configure do |config|
+            config.server_renderer = "NodeRenderer"
+            config.renderer_password = "explicit-config-password"
+            config.renderer_url = "https://:url-password@localhost:3800"
+          end
+
+          # Explicit config password wins for resolution…
+          expect(ReactOnRailsPro.configuration.renderer_password).to eq("explicit-config-password")
+          # …and the URL's embedded credential is still stripped from the stored value.
+          expect(ReactOnRailsPro.configuration.renderer_url).to eq("https://localhost:3800")
+          expect(ReactOnRailsPro.configuration.renderer_url).not_to include("url-password")
         end
       end
 
@@ -606,6 +656,88 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
             ReactOnRailsPro.configure do |config|
               config.server_renderer = "ExecJS"
               config.renderer_url = "https://localhost:3800"
+            end
+          end.not_to raise_error
+        end
+      end
+
+      context "with weak password warnings" do
+        before do
+          allow(ENV).to receive(:[]).and_call_original
+          allow(ENV).to receive(:fetch).and_call_original
+          allow(ENV).to receive(:fetch).with("NODE_ENV", nil).and_return(nil)
+        end
+
+        it "warns for known-weak default in production" do
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
+          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return(nil)
+
+          # The warning must match the phrase but must NOT echo the literal password.
+          expect(Rails.logger).to receive(:warn) do |msg|
+            expect(msg).to match(/known-default value/)
+            expect(msg).not_to include("devPassword")
+          end
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_password = "devPassword"
+            end
+          end.not_to raise_error
+        end
+
+        it "warns for case-insensitive weak password match" do
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
+          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return(nil)
+
+          expect(Rails.logger).to receive(:warn).with(/known-default value/)
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_password = "DEVPASSWORD"
+            end
+          end.not_to raise_error
+        end
+
+        it "warns when password is too short" do
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
+          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return(nil)
+
+          expect(Rails.logger).to receive(:warn).with(/shorter than/)
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_password = "short"
+            end
+          end.not_to raise_error
+        end
+
+        it "warns for weak password in development" do
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("development")
+          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return(nil)
+
+          expect(Rails.logger).to receive(:warn).with(/known-default value/)
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_password = "devPassword"
+            end
+          end.not_to raise_error
+        end
+
+        it "does not warn for strong password" do
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
+          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return(nil)
+
+          expect(Rails.logger).not_to receive(:warn)
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_password = "a-very-secure-random-password-here"
             end
           end.not_to raise_error
         end
@@ -725,13 +857,8 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
         expect(ReactOnRailsPro.configuration.renderer_http_pool_size).to eq(10)
       end
 
-      it "warns when configured because async-http changed the setting semantics" do
-        expect(Rails.logger).to receive(:warn).with(
-          "[ReactOnRailsPro] config.renderer_http_pool_size currently has no effect. " \
-          "The async-http adapter creates a new client per request, so the pool limit " \
-          "is never reached. This setting is kept for forward-compatibility with " \
-          "planned persistent connection support (see issue #3283)."
-        )
+      it "accepts custom values without warning (setting is now effective with scheduler)" do
+        expect(Rails.logger).not_to receive(:warn)
 
         ReactOnRailsPro.configure do |config|
           config.renderer_http_pool_size = 20
@@ -740,40 +867,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
         expect(ReactOnRailsPro.configuration.renderer_http_pool_size).to eq(20)
       end
 
-      it "does not warn for the default value assigned during configuration initialization" do
-        expect(Rails.logger).not_to receive(:warn).with(
-          "[ReactOnRailsPro] config.renderer_http_pool_size currently has no effect. " \
-          "The async-http adapter creates a new client per request, so the pool limit " \
-          "is never reached. This setting is kept for forward-compatibility with " \
-          "planned persistent connection support (see issue #3283)."
-        )
-
-        expect(ReactOnRailsPro.configuration.renderer_http_pool_size).to eq(10)
-      end
-
-      it "does not warn when explicitly configured with the default value" do
-        expect(Rails.logger).not_to receive(:warn).with(
-          "[ReactOnRailsPro] config.renderer_http_pool_size currently has no effect. " \
-          "The async-http adapter creates a new client per request, so the pool limit " \
-          "is never reached. This setting is kept for forward-compatibility with " \
-          "planned persistent connection support (see issue #3283)."
-        )
-
-        ReactOnRailsPro.configure do |config|
-          config.renderer_http_pool_size = 10
-        end
-
-        expect(ReactOnRailsPro.configuration.renderer_http_pool_size).to eq(10)
-      end
-
-      it "does not warn when explicitly cleared" do
-        expect(Rails.logger).not_to receive(:warn).with(
-          "[ReactOnRailsPro] config.renderer_http_pool_size currently has no effect. " \
-          "The async-http adapter creates a new client per request, so the pool limit " \
-          "is never reached. This setting is kept for forward-compatibility with " \
-          "planned persistent connection support (see issue #3283)."
-        )
-
+      it "accepts nil to clear the value" do
         ReactOnRailsPro.configure do |config|
           config.renderer_http_pool_size = nil
         end
@@ -819,10 +913,10 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
         expect(ReactOnRailsPro.configuration.renderer_http_keep_alive_timeout).to eq(30)
       end
 
-      it "accepts positive numbers" do
+      it "accepts positive numbers and warns about deprecation" do
         expect(Rails.logger).to receive(:warn).with(
-          "[ReactOnRailsPro] config.renderer_http_keep_alive_timeout is deprecated and has no effect " \
-          "with the async-http adapter because clients are scoped per request."
+          "[ReactOnRailsPro] config.renderer_http_keep_alive_timeout is deprecated. " \
+          "Connection lifecycle is managed automatically by the async-http adapter."
         )
 
         ReactOnRailsPro.configure do |config|

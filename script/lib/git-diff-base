@@ -3,6 +3,10 @@
 # Shared helpers for scripts that need a reliable merge-base in shallow clones.
 # Source this file from bash scripts; do not execute it directly.
 #
+# Tests: bash script/lib/git-diff-base-test.bash (self-contained; no extra
+# dependencies beyond bash + git). CI runs the same harness via
+# .github/workflows/git-diff-base-tests.yml.
+#
 # Tuning knobs:
 # - GIT_DIFF_BASE_FETCH_DEPTH: initial fetch size, and first deepen size before doubling (default 50).
 # - GIT_DIFF_BASE_MAX_ATTEMPTS: exponential deepen attempts before falling back to --unshallow
@@ -11,6 +15,17 @@
 # - GIT_DIFF_BASE_UNSHALLOW_TIMEOUT_SECONDS: maximum seconds for the --unshallow fallback when the
 #   system timeout command is available (default 300; set 0 to disable the guard).
 # - GIT_DIFF_BASE_DEBUG: set to any non-empty value to show git merge-base stderr output.
+#
+# Deepen-vs-unshallow rationale:
+# - Typical PRs diverge by tens to a few hundred commits, so the first few doubling rounds
+#   (50 → 100 → 200 → 400) usually resolve the merge base in under a second of network work.
+# - Falling back to --unshallow earlier (e.g., after 1–2 attempts) would pay the full-history
+#   cost on every long-lived branch, even when one more cheap deepen would have sufficed.
+# - Capping the deepen loop at 8 attempts (12,750 commits per branch) gives the bounded loop
+#   a real chance to resolve very stale branches while still bounding the per-CI-run cost; the
+#   --unshallow fallback only fires when both branches are genuinely far apart.
+# - Each deepen attempt emits a single-line progress message to stderr so a slow CI run is not
+#   opaque between the initial fetch and the eventual unshallow.
 #
 # git_diff_base_resolve accepts a third argument selecting the initial-fetch policy:
 # - strict (default): abort immediately if the first base-branch fetch fails in a shallow clone.
@@ -443,6 +458,12 @@ git_diff_base_resolve() {
     while [ "$deepen_attempts" -lt "$max_attempts" ] && [ "$is_shallow" = true ]; do
       deepen_attempts=$((deepen_attempts + 1))
       fetched=false
+
+      # Single-line per-attempt breadcrumb so operators see progress between
+      # the initial fetch and the eventual --unshallow fallback. Keeps the
+      # noise low (one line per round) while preserving the full git fetch
+      # diagnostics that follow.
+      echo "Deepening shallow history (attempt $deepen_attempts/$max_attempts, fetching $deepen_depth more commits)" >&2
 
       # A successful deepen on either side can reveal the common ancestor, even
       # when the other branch fetch fails. Stop early only when every attempted

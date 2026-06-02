@@ -311,7 +311,7 @@ subject(:method_result) { instance.method_name(arg) }
 ### Dependencies
 
 - Shakapacker >= 6.0 required (v16+ drops Webpacker support)
-- Ruby >= 3.0
+- Ruby >= 3.3
 - Node.js >= 18 (tested: 18-22)
 - Rails >= 5.2
 

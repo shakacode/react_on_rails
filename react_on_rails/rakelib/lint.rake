@@ -37,7 +37,7 @@ namespace :lint do # rubocop:disable Metrics/BlockLength
   private
 
   def stylelint_command
-    "pnpm run stylelint \"spec/dummy/app/assets/stylesheets/**/*.scss\" \"spec/dummy/client/**/*.scss\""
+    "pnpm run lint:scss"
   end
 
   def stylelint_fix_command

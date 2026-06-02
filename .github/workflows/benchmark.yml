@@ -51,7 +51,7 @@ on:
   push:
     branches:
       - main
-    # Always trigger on main; docs-only detection handles skipping heavy jobs
+    # Always trigger on main; non-runtime detection handles skipping heavy jobs
   pull_request:
     types: [opened, synchronize, reopened, labeled]
     paths-ignore:
@@ -69,14 +69,8 @@ concurrency:
 
 env:
   RUBY_VERSION: '3.3.7'
-  BUNDLER_VERSION: '2.5.4'
   K6_VERSION: '2.0.0'
   VEGETA_VERSION: '12.13.0'
-  # Determine which apps/benchmarks to run (default is 'both' for all triggers)
-  RUN_CORE: ${{ contains(fromJSON('["both", "core_only"]'), github.event.inputs.app_version || 'both') && 'true' || '' }}
-  RUN_PRO: ${{ (github.event.inputs.app_version || 'both') != 'core_only' && 'true' || '' }}
-  RUN_PRO_RAILS: ${{ contains(fromJSON('["both", "pro_only", "pro_rails_only"]'), github.event.inputs.app_version || 'both') && 'true' || '' }}
-  RUN_PRO_NODE_RENDERER: ${{ contains(fromJSON('["both", "pro_only", "pro_node_renderer_only"]'), github.event.inputs.app_version || 'both') && 'true' || '' }}
   # Benchmark parameters (defaults in bench.rb unless overridden here for CI)
   ROUTES: ${{ github.event.inputs.routes }}
   RATE: ${{ github.event.inputs.rate || 'max' }}
@@ -84,7 +78,7 @@ env:
   REQUEST_TIMEOUT: ${{ github.event.inputs.request_timeout }}
   CONNECTIONS: ${{ github.event.inputs.connections }}
   MAX_CONNECTIONS: ${{ github.event.inputs.connections }}
-  # WEB_CONCURRENCY default is set dynamically to NPROC-1 in "Configure CPU pinning" step
+  # WEB_CONCURRENCY default is set dynamically to NPROC-1 in "Configure benchmark commands" step
   WEB_CONCURRENCY: ${{ github.event.inputs.web_concurrency }}
   RAILS_MAX_THREADS: ${{ github.event.inputs.rails_threads || 3 }}
   RAILS_MIN_THREADS: ${{ github.event.inputs.rails_threads || 3 }}
@@ -94,11 +88,13 @@ jobs:
     permissions:
       contents: read
       actions: read
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     outputs:
-      docs_only: ${{ steps.detect.outputs.docs_only }}
+      non_runtime_only: ${{ steps.detect.outputs.non_runtime_only }}
+      run_benchmark_suites: ${{ steps.benchmark-matrices.outputs.run_benchmark_suites }}
+      benchmark_matrix: ${{ steps.benchmark-matrices.outputs.benchmark_matrix }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 50
           persist-credentials: false
@@ -114,28 +110,111 @@ jobs:
         with:
           docs-only: ${{ steps.detect.outputs.docs_only }}
           previous-sha: ${{ github.event.before }}
+      - name: Set benchmark outputs
+        id: benchmark-outputs
+        if: steps.detect.outputs.non_runtime_only != 'true'
+        run: |
+          RUN_CORE_BENCHMARKS=false
+          RUN_PRO_BENCHMARKS=false
+          RUN_PRO_NODE_RENDERER_BENCHMARKS=false
+
+          if [ "${{ steps.detect.outputs.run_ruby_tests }}" = "true" ] ||
+             [ "${{ steps.detect.outputs.run_js_tests }}" = "true" ] ||
+             [ "${{ steps.detect.outputs.run_dummy_tests }}" = "true" ]; then
+            RUN_CORE_BENCHMARKS=true
+            RUN_PRO_BENCHMARKS=true
+          fi
+
+          if [ "${{ steps.detect.outputs.run_pro_tests }}" = "true" ] ||
+             [ "${{ steps.detect.outputs.run_pro_dummy_tests }}" = "true" ]; then
+            RUN_PRO_BENCHMARKS=true
+          fi
+
+          if [ "${{ steps.detect.outputs.run_pro_node_renderer_tests }}" = "true" ]; then
+            RUN_PRO_BENCHMARKS=true
+            RUN_PRO_NODE_RENDERER_BENCHMARKS=true
+          fi
+
+          echo "run_core_benchmarks=$RUN_CORE_BENCHMARKS" >> "$GITHUB_OUTPUT"
+          echo "run_pro_benchmarks=$RUN_PRO_BENCHMARKS" >> "$GITHUB_OUTPUT"
+          echo "run_pro_node_renderer_benchmarks=$RUN_PRO_NODE_RENDERER_BENCHMARKS" >> "$GITHUB_OUTPUT"
+        shell: bash
+      - name: Set benchmark matrices
+        id: benchmark-matrices
+        # Always runs. GitHub Actions evaluates `strategy.matrix` for downstream jobs at
+        # workflow-construction time, before their `if:` gates — so an empty output would
+        # crash `fromJSON('')` even when the consuming job is otherwise skipped.
+        # Bump shard totals in benchmarks/generate_matrix.rb when a suite's route set
+        # outgrows its current shard count.
+        # The script is stdlib-only, so the runner's system Ruby is enough (no Bundler/Rails boot).
+        env:
+          BENCHMARK_APP_VERSION: ${{ github.event.inputs.app_version || 'both' }}
+          BENCHMARK_EVENT_NAME: ${{ github.event_name }}
+          BENCHMARK_ROUTES: ${{ github.event.inputs.routes || '' }}
+          BENCHMARK_NON_RUNTIME_ONLY: ${{ steps.detect.outputs.non_runtime_only }}
+          BENCHMARK_PULL_REQUEST_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name || '' }}
+          BENCHMARK_PULL_REQUEST_LABELS: ${{ github.event_name == 'pull_request' && toJSON(github.event.pull_request.labels.*.name) || '[]' }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RUN_CORE_BENCHMARKS: ${{ steps.benchmark-outputs.outputs.run_core_benchmarks || 'false' }}
+          RUN_PRO_BENCHMARKS: ${{ steps.benchmark-outputs.outputs.run_pro_benchmarks || 'false' }}
+          RUN_PRO_NODE_RENDERER_BENCHMARKS: ${{ steps.benchmark-outputs.outputs.run_pro_node_renderer_benchmarks || 'false' }}
+        run: |
+          BENCHMARK_MATRIX=$(ruby benchmarks/generate_matrix.rb)
+          export BENCHMARK_MATRIX
+          RUN_BENCHMARK_SUITES=$(ruby -rjson -e 'puts JSON.parse(ENV.fetch("BENCHMARK_MATRIX")).fetch("include").any? { |row| row.fetch("suite_id") != "none" }')
+
+          {
+            echo "run_benchmark_suites=$RUN_BENCHMARK_SUITES"
+            echo "benchmark_matrix<<EOF"
+            echo "$BENCHMARK_MATRIX"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+        shell: bash
+      # Only pay the Bundler setup when benchmarks will run or the scripts
+      # themselves changed; unrelated PRs keep this job stdlib-only and fast.
+      # TODO: when fixing #2214 this should switch to the new root Gemfile.
+      - name: Install libyaml-dev
+        # Must precede any gem install/load: psych links libyaml dynamically. On warm caches the
+        # missing-lib failure is silent; cold runs hit it.
+        if: steps.benchmark-matrices.outputs.run_benchmark_suites == 'true' || steps.detect.outputs.benchmarks_changed == 'true'
+        run: sudo apt-get install -y libyaml-dev
+      - name: Setup Ruby
+        if: steps.benchmark-matrices.outputs.run_benchmark_suites == 'true' || steps.detect.outputs.benchmarks_changed == 'true'
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
+      # The benchmark specs only need rspec, which the root Gemfile provides (it
+      # delegates to react_on_rails/Gemfile). The setup-bundle action can't manage
+      # it because there is no committed root Gemfile.lock yet, so install manually.
+      # TODO(#2214): once a root Gemfile.lock is committed, replace this step with
+      # the setup-bundle action (working-directory: ".") and delete it.
+      - name: Install gems for benchmark specs
+        if: steps.benchmark-matrices.outputs.run_benchmark_suites == 'true' || steps.detect.outputs.benchmarks_changed == 'true'
+        run: bundle install --jobs 4 --retry 3
+      # Validate the benchmark scripts (matrix generation, route discovery) before
+      # any benchmark runs: if this logic is wrong, the matrix and routes feeding
+      # the run are wrong, so the results would be invalid. Running it here (rather
+      # than a separate job) reuses this job's checkout/runner and still gates the
+      # benchmark job, which needs detect-changes to succeed.
+      - name: Run benchmark script specs
+        if: steps.benchmark-matrices.outputs.run_benchmark_suites == 'true' || steps.detect.outputs.benchmarks_changed == 'true'
+        run: bundle exec rspec benchmarks/spec
 
   benchmark:
     needs: detect-changes
-    # Run on: push to main, workflow_dispatch, or PRs with 'benchmark' label.
-    # The 'full-ci' label is intentionally excluded — it controls test workflows,
-    # not benchmarks. Use the dedicated 'benchmark' label to trigger perf runs on PRs.
-    # See https://bencher.dev/docs/how-to/github-actions/#pull-requests for the extra pull_request condition
-    # Skip docs-only pushes to main to avoid wasting CI resources on non-code changes.
-    if: |
-      !(
-        github.event_name == 'push' &&
-        github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.docs_only == 'true'
-      ) && (
-        github.event_name == 'push' ||
-        github.event_name == 'workflow_dispatch' ||
-        (
-          github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository &&
-          contains(github.event.pull_request.labels.*.name, 'benchmark')
-        )
-      )
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.detect-changes.outputs.benchmark_matrix) }}
+    # Which events/labels actually select suites is decided in
+    # benchmarks/generate_matrix.rb (suite_requested_by_event? / suite_selected_by_input?):
+    # push to main, workflow_dispatch, relevant test-impact changes, or same-repo PRs
+    # with suite-specific benchmark labels. The 'full-ci' label is intentionally
+    # excluded — it controls test workflows, not benchmarks. This job just runs
+    # whatever non-empty matrix that produces; the same-repo PR gating follows
+    # https://bencher.dev/docs/how-to/github-actions/#pull-requests.
+    name: ${{ matrix.job_name }}
+    if: needs.detect-changes.outputs.run_benchmark_suites == 'true'
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       issues: write
@@ -144,125 +223,126 @@ jobs:
     env:
       SECRET_KEY_BASE: 'dummy-secret-key-for-ci-testing-not-used-in-production'
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+      BENCHMARK_SHARD_INDEX: ${{ matrix.shard_index }}
+      BENCHMARK_TOTAL_SHARDS: ${{ matrix.shard_total }}
+      BENCHMARK_SHARD_LABEL: ${{ matrix.shard_label }}
 
     steps:
-      # ============================================
-      # STEP 1: CHECKOUT CODE
-      # ============================================
       - name: Checkout repository
-        uses: actions/checkout@v4
-
-      # ============================================
-      # STEP 2: INSTALL BENCHMARKING TOOLS
-      # ============================================
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Install Bencher CLI
-        # Pinned: step 7a's alert-detection heuristic greps stderr for
-        # "Alert[s]" / "threshold violation" / "boundary violation". Those strings
+        # Pinned: alert-detection heuristics grep stderr for "Alert[s]",
+        # "threshold violation", and "boundary violation". Those strings
         # are not a documented API contract, so upgrading the CLI requires
         # re-verifying that the expected phrases still appear in alert output.
-        # Expected stderr phrases at v0.6.2: "🚨 N Alerts", "Alert detected".
         uses: bencherdev/bencher@v0.6.2
 
       - name: Add tools directory to PATH
         run: |
           mkdir -p ~/bin
-          echo "$HOME/bin" >> $GITHUB_PATH
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+
+      - name: Install libyaml-dev
+        # Must precede any gem install/load: psych links libyaml dynamically. On warm caches the
+        # missing-lib failure is silent; cold runs hit it.
+        run: sudo apt-get install -y libyaml-dev
+
+      - name: Setup k6
+        if: matrix.benchmark_tool == 'k6'
+        uses: grafana/setup-k6-action@v1
+        with:
+          k6-version: ${{ env.K6_VERSION }}
 
       - name: Cache Vegeta binary
         id: cache-vegeta
-        if: env.RUN_PRO
-        uses: actions/cache@v4
+        if: matrix.benchmark_tool == 'vegeta'
+        uses: actions/cache@v5
         with:
           path: ~/bin/vegeta
           key: vegeta-${{ runner.os }}-${{ runner.arch }}-${{ env.VEGETA_VERSION }}
 
       - name: Install Vegeta
-        if: env.RUN_PRO && steps.cache-vegeta.outputs.cache-hit != 'true'
+        if: matrix.benchmark_tool == 'vegeta' && steps.cache-vegeta.outputs.cache-hit != 'true'
         run: |
-          echo "📦 Installing Vegeta v${VEGETA_VERSION}"
-
-          # Download and extract vegeta binary
-          wget -q https://github.com/tsenart/vegeta/releases/download/v${VEGETA_VERSION}/vegeta_${VEGETA_VERSION}_linux_amd64.tar.gz
-          tar -xzf vegeta_${VEGETA_VERSION}_linux_amd64.tar.gz
-
-          # Store in cache directory
+          ARCH=$(dpkg --print-architecture)
+          echo "Installing Vegeta v${VEGETA_VERSION} (${ARCH})"
+          wget -q "https://github.com/tsenart/vegeta/releases/download/v${VEGETA_VERSION}/vegeta_${VEGETA_VERSION}_linux_${ARCH}.tar.gz"
+          tar -xzf "vegeta_${VEGETA_VERSION}_linux_${ARCH}.tar.gz"
           mv vegeta ~/bin/
-
-      - name: Setup k6
-        uses: grafana/setup-k6-action@v1
-        with:
-          k6-version: ${{ env.K6_VERSION }}
-
-      # ============================================
-      # STEP 3: START APPLICATION SERVER
-      # ============================================
 
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ env.RUBY_VERSION }}
-          bundler: ${{ env.BUNDLER_VERSION }}
 
       - name: Get gem home directory
-        run: echo "GEM_HOME_PATH=$(gem env home)" >> $GITHUB_ENV
+        id: gem-home
+        run: echo "path=$(gem env home)" >> "$GITHUB_OUTPUT"
 
       - name: Cache foreman gem
         id: cache-foreman
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
-          path: ${{ env.GEM_HOME_PATH }}
-          key: foreman-gem-${{ runner.os }}-ruby-${{ env.RUBY_VERSION }}
+          path: ${{ steps.gem-home.outputs.path }}
+          key: foreman-gem-${{ runner.os }}-${{ runner.arch }}-ruby-${{ env.RUBY_VERSION }}
 
       - name: Install foreman
         if: steps.cache-foreman.outputs.cache-hit != 'true'
         run: gem install foreman
 
-      - name: Fix dependency for libyaml-dev
-        run: sudo apt install libyaml-dev -y
-
-      # Follow https://github.com/pnpm/action-setup?tab=readme-ov-file#use-cache-to-reduce-installation-time
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           cache: true
           cache_dependency_path: '**/pnpm-lock.yaml'
           run_install: false
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
 
       - name: Print system information
         run: |
-          echo "Linux release: "; cat /etc/issue
-          echo "Current user: "; whoami
-          echo "Current directory: "; pwd
-          echo "Ruby version: "; ruby -v
-          echo "Node version: "; node -v
-          echo "Pnpm version: "; pnpm --version
-          echo "Bundler version: "; bundle --version
+          echo "Linux release: "
+          cat /etc/issue
+          echo "Current user: "
+          whoami
+          echo "Current directory: "
+          pwd
+          echo "Ruby version: "
+          ruby -v
+          echo "Node version: "
+          node -v
+          echo "Pnpm version: "
+          pnpm --version
+          echo "Bundler version: "
+          bundle --version
 
-      - name: Configure CPU pinning and process priority
+      - name: Configure benchmark commands
         run: |
-          # CPU pinning: server gets CPUs 1-(nproc-1), benchmark script gets CPU 0
-          # This avoids contention and improves consistency on GitHub Actions runners
           NPROC=$(nproc)
           echo "Available CPUs: $NPROC"
 
-          # Server: high priority (-20), pinned to CPUs 1+
-          # Benchmark: elevated priority (-10), pinned to CPU 0
-          SERVER_CMD="nice -n -20 taskset -c 1-$((NPROC-1)) bin/prod"
-          BENCH_CMD="nice -n -10 taskset -c 0 ruby"
+          if [ "$NPROC" -le 1 ]; then
+            SERVER_CMD="bin/prod"
+            BENCH_CMD="ruby"
+          else
+            SERVER_CMD="taskset -c 1-$((NPROC-1)) bin/prod"
+            BENCH_CMD="taskset -c 0 ruby"
+          fi
 
-          echo "SERVER_CMD=$SERVER_CMD" >> $GITHUB_ENV
-          echo "BENCH_CMD=$BENCH_CMD" >> $GITHUB_ENV
+          echo "SERVER_CMD=$SERVER_CMD" >> "$GITHUB_ENV"
+          echo "BENCH_CMD=$BENCH_CMD" >> "$GITHUB_ENV"
 
-          # Set Puma workers to match available server CPUs (only if not explicitly set)
           if [ -z "$WEB_CONCURRENCY" ]; then
-            WEB_CONCURRENCY=$((NPROC-1))
-            echo "WEB_CONCURRENCY=$WEB_CONCURRENCY" >> $GITHUB_ENV
+            # Clamp to >=1 so single-CPU runners don't end up with WEB_CONCURRENCY=0 (Puma
+            # would start in single-mode, which the benchmarks aren't tuned for).
+            WEB_CONCURRENCY=$((NPROC > 1 ? NPROC - 1 : 1))
+            echo "WEB_CONCURRENCY=$WEB_CONCURRENCY" >> "$GITHUB_ENV"
             echo "WEB_CONCURRENCY (auto): $WEB_CONCURRENCY"
           else
             echo "WEB_CONCURRENCY (from input): $WEB_CONCURRENCY"
@@ -277,27 +357,22 @@ jobs:
       - name: Build workspace packages
         run: pnpm run build
 
-      - name: Save Core dummy app ruby gems to cache
-        if: env.RUN_CORE
-        uses: actions/cache@v4
+      - name: Install Ruby Gems for the benchmarked app
+        uses: ./.github/actions/setup-bundle
         with:
-          path: react_on_rails/spec/dummy/vendor/bundle
-          key: v4-core-dummy-app-gem-cache-${{ hashFiles('react_on_rails/spec/dummy/Gemfile.lock') }}
+          working-directory: ${{ matrix.app_directory }}
+          ruby-version: ${{ env.RUBY_VERSION }}
 
-      - name: Install Ruby Gems for Core dummy app
-        if: env.RUN_CORE
-        run: |
-          cd react_on_rails/spec/dummy
-          bundle config set path vendor/bundle
-          bundle config set frozen true
-          bundle _${BUNDLER_VERSION}_ install --jobs=4 --retry=3
+      - name: Generate file-system based entrypoints for Pro
+        if: matrix.generate_packs == 'true'
+        working-directory: ${{ matrix.app_directory }}
+        run: bundle exec rake react_on_rails:generate_packs
 
-      - name: Prepare Core production assets
-        if: env.RUN_CORE
+      - name: Prepare production assets
+        working-directory: ${{ matrix.app_directory }}
         run: |
-          set -e  # Exit on any error
-          echo "🔨 Building production assets..."
-          cd react_on_rails/spec/dummy
+          set -e
+          echo "🔨 Building ${{ matrix.suite_name }} production assets..."
 
           if ! bin/prod-assets; then
             echo "❌ ERROR: Failed to build production assets"
@@ -306,17 +381,45 @@ jobs:
 
           echo "✅ Production assets built successfully"
 
-      - name: Start Core production server
-        if: env.RUN_CORE
+      - name: Start Pro node renderer
+        if: matrix.server_kind == 'node-renderer'
+        working-directory: ${{ matrix.app_directory }}
+        env:
+          RAILS_ENV: production
+          NODE_ENV: production
+          RENDERER_LOG_LEVEL: error
+          RENDERER_PORT: 3800
         run: |
-          set -e  # Exit on any error
-          echo "🚀 Starting production server..."
-          cd react_on_rails/spec/dummy
+          set -e
+          echo "🔧 Pre-seeding node renderer bundle cache..."
+          bundle exec rake react_on_rails_pro:pre_seed_renderer_cache MODE=symlink
 
+          echo "🚀 Starting ${{ matrix.suite_name }} node renderer..."
+          node renderer/node-renderer.js &
+          echo "Node renderer started in background"
+
+          echo "⏳ Waiting for node renderer to be ready..."
+          for i in {1..30}; do
+            if ruby -e "require 'socket'; TCPSocket.new('localhost', 3800).close"; then
+              echo "✅ Node renderer is ready and listening"
+              exit 0
+            fi
+            echo "  Attempt $i/30: Node renderer not ready yet..."
+            sleep 1
+          done
+
+          echo "❌ ERROR: Node renderer failed to start within 30 seconds"
+          exit 1
+
+      - name: Start Rails production server
+        if: matrix.server_kind == 'rails'
+        working-directory: ${{ matrix.app_directory }}
+        run: |
+          set -e
+          echo "🚀 Starting ${{ matrix.suite_name }} production server..."
           $SERVER_CMD &
           echo "Server started in background"
 
-          # Wait for server to be ready (max 30 seconds)
           echo "⏳ Waiting for server to be ready..."
           for i in {1..30}; do
             if curl -fsS http://localhost:3001 > /dev/null; then
@@ -330,192 +433,51 @@ jobs:
           echo "❌ ERROR: Server failed to start within 30 seconds"
           exit 1
 
-      # ============================================
-      # STEP 4: RUN CORE BENCHMARKS
-      # ============================================
-
-      - name: Execute Core benchmark suite
-        if: env.RUN_CORE
-        timeout-minutes: 120
+      - name: Execute benchmark suite
+        timeout-minutes: ${{ matrix.benchmark_timeout_minutes }}
+        # Route matrix values through env so the shell treats them as data, not code
+        # (GitHub Actions injection hardening), even though they come from our own
+        # generate_matrix.rb.
+        env:
+          SUITE_NAME: ${{ matrix.suite_name }}
+          PRO_ENV: ${{ matrix.pro_env }}
+          BENCHMARK_SCRIPT: ${{ matrix.benchmark_script }}
         run: |
-          set -e  # Exit on any error
-          echo "🏃 Running Core benchmark suite..."
+          set -e
+          echo "🏃 Running $SUITE_NAME benchmark suite..."
 
-          if ! $BENCH_CMD benchmarks/bench.rb; then
+          if [ "$PRO_ENV" = "true" ]; then
+            if ! PRO=true $BENCH_CMD "$BENCHMARK_SCRIPT"; then
+              echo "❌ ERROR: Benchmark execution failed"
+              exit 1
+            fi
+          elif ! $BENCH_CMD "$BENCHMARK_SCRIPT"; then
             echo "❌ ERROR: Benchmark execution failed"
             exit 1
           fi
 
           echo "✅ Benchmark suite completed successfully"
 
-      - name: Validate Core benchmark results
-        if: env.RUN_CORE
+      - name: Validate benchmark results
+        env:
+          SUITE_NAME: ${{ matrix.suite_name }}
+          SUMMARY_FILE: ${{ matrix.summary_file }}
+          SUMMARY_TITLE: ${{ matrix.summary_title }}
         run: |
           set -e
-          echo "🔍 Validating benchmark results..."
+          echo "🔍 Validating $SUITE_NAME benchmark results..."
 
-          if [ ! -f "bench_results/summary.txt" ]; then
+          if [ ! -f "$SUMMARY_FILE" ]; then
             echo "❌ ERROR: benchmark summary file not found"
             exit 1
           fi
-
-          echo "✅ Benchmark results found"
+          echo "📊 $SUMMARY_TITLE:"
+          column -t -s $'\t' "$SUMMARY_FILE"
           echo ""
-          echo "📊 Summary:"
-          column -t -s $'\t' "bench_results/summary.txt"
-          echo ""
-          echo "Generated files:"
-          ls -lh bench_results/
 
-      - name: Upload Core benchmark results
-        uses: actions/upload-artifact@v4
-        if: env.RUN_CORE && always()
-        with:
-          name: benchmark-core-results-${{ github.run_number }}
-          path: bench_results/
-          retention-days: 30
-          if-no-files-found: warn
-
-      - name: Stop Core production server
-        # RUN_PRO because we only need to stop it to run the Pro server
-        if: env.RUN_CORE && env.RUN_PRO && always()
-        run: |
-          echo "🛑 Stopping Core production server..."
-          # Kill all server-related processes (safe in isolated CI environment)
-          pkill -9 -f "ruby|node|foreman|overmind|puma" || true
-
-          # Wait for port 3001 to be free
-          echo "⏳ Waiting for port 3001 to be free..."
-          for _ in {1..10}; do
-            if ! lsof -ti:3001 > /dev/null 2>&1; then
-              echo "✅ Port 3001 is now free"
-              exit 0
-            fi
-            sleep 1
-          done
-
-          echo "❌ ERROR: Port 3001 is still in use after 10 seconds"
-          echo "Processes using port 3001:"
-          lsof -i:3001 || true
-          exit 1
-
-      # ============================================
-      # STEP 5: SETUP PRO APPLICATION SERVER
-      # ============================================
-
-      - name: Cache Pro dummy app Ruby gems
-        if: env.RUN_PRO
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails_pro/spec/dummy/vendor/bundle
-          key: v4-pro-dummy-app-gem-cache-${{ hashFiles('react_on_rails_pro/spec/dummy/Gemfile.lock') }}
-
-      - name: Install Ruby Gems for Pro dummy app
-        if: env.RUN_PRO
-        run: |
-          cd react_on_rails_pro/spec/dummy
-          bundle config set path vendor/bundle
-          bundle config set frozen true
-          bundle _${BUNDLER_VERSION}_ install --jobs=4 --retry=3
-
-      - name: Generate file-system based entrypoints for Pro
-        if: env.RUN_PRO
-        run: cd react_on_rails_pro/spec/dummy && bundle exec rake react_on_rails:generate_packs
-
-      - name: Prepare Pro production assets
-        if: env.RUN_PRO
-        run: |
-          set -e
-          echo "🔨 Building Pro production assets..."
-          cd react_on_rails_pro/spec/dummy
-
-          if ! bin/prod-assets; then
-            echo "❌ ERROR: Failed to build production assets"
+          if [ ! -f "bench_results/benchmark.json" ]; then
+            echo "❌ ERROR: benchmark JSON file not found"
             exit 1
-          fi
-
-          echo "✅ Production assets built successfully"
-
-      - name: Start Pro production server
-        if: env.RUN_PRO
-        run: |
-          set -e
-          echo "🚀 Starting Pro production server..."
-          cd react_on_rails_pro/spec/dummy
-
-          $SERVER_CMD &
-          echo "Server started in background"
-
-          # Wait for server to be ready (max 30 seconds)
-          echo "⏳ Waiting for server to be ready..."
-          for i in {1..30}; do
-            if curl -fsS http://localhost:3001 > /dev/null; then
-              echo "✅ Server is ready and responding"
-              exit 0
-            fi
-            echo "  Attempt $i/30: Server not ready yet..."
-            sleep 1
-          done
-
-          echo "❌ ERROR: Server failed to start within 30 seconds"
-          exit 1
-
-      # ============================================
-      # STEP 6: RUN PRO BENCHMARKS
-      # ============================================
-
-      - name: Execute Pro benchmark suite
-        if: env.RUN_PRO_RAILS
-        timeout-minutes: 120
-        run: |
-          set -e
-          echo "🏃 Running Pro benchmark suite..."
-
-          if ! PRO=true $BENCH_CMD benchmarks/bench.rb; then
-            echo "❌ ERROR: Benchmark execution failed"
-            exit 1
-          fi
-
-          echo "✅ Benchmark suite completed successfully"
-
-      - name: Execute Pro Node Renderer benchmark suite
-        if: env.RUN_PRO_NODE_RENDERER
-        timeout-minutes: 30
-        run: |
-          set -e
-          echo "🏃 Running Pro Node Renderer benchmark suite..."
-
-          if ! $BENCH_CMD benchmarks/bench-node-renderer.rb; then
-            echo "❌ ERROR: Node Renderer benchmark execution failed"
-            exit 1
-          fi
-
-          echo "✅ Node Renderer benchmark suite completed successfully"
-
-      - name: Validate Pro benchmark results
-        if: env.RUN_PRO
-        run: |
-          set -e
-          echo "🔍 Validating benchmark results..."
-
-          if [ "$RUN_PRO_RAILS" = "true" ]; then
-            if [ ! -f "bench_results/summary.txt" ]; then
-              echo "❌ ERROR: Rails benchmark summary file not found"
-              exit 1
-            fi
-            echo "📊 Rails Benchmark Summary:"
-            column -t -s $'\t' "bench_results/summary.txt"
-            echo ""
-          fi
-
-          if [ "$RUN_PRO_NODE_RENDERER" = "true" ]; then
-            if [ ! -f "bench_results/node_renderer_summary.txt" ]; then
-              echo "❌ ERROR: Node Renderer benchmark summary file not found"
-              exit 1
-            fi
-            echo "📊 Node Renderer Benchmark Summary:"
-            column -t -s $'\t' "bench_results/node_renderer_summary.txt"
-            echo ""
           fi
 
           echo "✅ Benchmark results validated"
@@ -523,356 +485,93 @@ jobs:
           echo "Generated files:"
           ls -lh bench_results/
 
-      - name: Upload Pro benchmark results
-        uses: actions/upload-artifact@v4
-        if: env.RUN_PRO && always()
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v7
+        if: always()
         with:
-          name: benchmark-pro-results-${{ github.run_number }}
+          name: ${{ matrix.artifact_name_prefix }}-${{ github.run_number }}${{ matrix.artifact_name_suffix }}
           path: bench_results/
           retention-days: 30
           if-no-files-found: warn
 
-      # ============================================
-      # STEP 7: STORE BENCHMARK DATA
-      # ============================================
-      # See: https://bencher.dev/docs/how-to/track-benchmarks/ and
-      #      https://bencher.dev/docs/how-to/github-actions/
-      #
-      # Threshold configuration using Student's t-test:
-      #   Uses historical data to detect statistically significant regressions
-      #   rather than a fixed percentage. The boundary value (0.95) is the
-      #   confidence interval — an alert fires when a new metric falls outside
-      #   the 95% CI of the historical distribution.
-      #   - rps: Lower Boundary (higher is better)
-      #   - p50/p90/p99_latency_ms: Upper Boundary (lower is better)
-      #   - failed_pct: Upper Boundary (lower is better)
-      #
-      #   max-sample-size limits historical data to the most recent 64 runs
-      #   to keep the baseline relevant as performance evolves.
-
       - name: Track benchmarks with Bencher
         env:
+          BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
+          BENCHER_REPORT_MARKER: ${{ matrix.report_marker }}
+          BENCHMARK_SUITE_NAME: ${{ matrix.bencher_suite_name }}
+          # Un-sharded name so report-regressions can combine a suite's shards.
+          BENCHMARK_SUITE_GROUP: ${{ matrix.suite_name }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Confidence interval for t-test (0.95 = 95% CI)
-          BOUNDARY=0.95
-          MAX_SAMPLE=64
+          GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+          PR_NUMBER: ${{ github.event.pull_request.number || '' }}
+        run: ruby benchmarks/track_benchmarks.rb
 
-          # Set branch and start-point based on event type.
-          # Main pushes don't need --start-point because main IS the base
-          # branch — new reports compare against main's own history.
-          # Feature branches (PRs, dispatch) use --start-point to inherit
-          # historical data and thresholds from main.
-          if [ "${{ github.event_name }}" = "push" ]; then
-            BRANCH="main"
-            START_POINT_ARGS=""
-          elif [ "${{ github.event_name }}" = "pull_request" ]; then
-            BRANCH="$GITHUB_HEAD_REF"
-            START_POINT_ARGS="--start-point $GITHUB_BASE_REF --start-point-hash ${{ github.event.pull_request.base.sha }} --start-point-clone-thresholds --start-point-reset"
-          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            BRANCH="${{ github.ref_name }}"
-            if [ "$BRANCH" = "main" ]; then
-              START_POINT_ARGS=""
-            else
-              # Get merge-base from GitHub API (avoids needing deep fetch)
-              # See: https://stackoverflow.com/a/74710919
-              START_POINT_HASH=$(gh api "repos/${{ github.repository }}/compare/main...$BRANCH" --jq '.merge_base_commit.sha' || true)
-              if [ -n "$START_POINT_HASH" ]; then
-                echo "Found merge-base via API: $START_POINT_HASH"
-                START_POINT_ARGS="--start-point main --start-point-hash $START_POINT_HASH --start-point-clone-thresholds --start-point-reset"
-              else
-                echo "⚠️ Could not find merge-base with main via GitHub API, continuing without hash"
-                START_POINT_ARGS="--start-point main --start-point-clone-thresholds --start-point-reset"
-              fi
-            fi
-          else
-            echo "❌ ERROR: Unexpected event type: ${{ github.event_name }}"
-            exit 1
-          fi
-
-          # Wrap bencher run in a function so we can retry with different
-          # start-point args if the pinned hash isn't found in Bencher.
-          run_bencher() {
-            local sp_args="$1"
-            # Intentional word-splitting: sp_args contains multiple flags
-            # (e.g. "--start-point main --start-point-hash abc123") that must
-            # be split into separate argv entries.
-            # shellcheck disable=SC2086
-            bencher run \
-              --project react-on-rails-t8a9ncxo \
-              --token '${{ secrets.BENCHER_API_TOKEN }}' \
-              --branch "$BRANCH" \
-              $sp_args \
-              --testbed github-actions \
-              --adapter json \
-              --file bench_results/benchmark.json \
-              --err \
-              --quiet \
-              --format html \
-              --threshold-measure rps \
-              --threshold-test t_test \
-              --threshold-max-sample-size $MAX_SAMPLE \
-              --threshold-lower-boundary $BOUNDARY \
-              --threshold-upper-boundary _ \
-              --threshold-measure p50_latency \
-              --threshold-test t_test \
-              --threshold-max-sample-size $MAX_SAMPLE \
-              --threshold-lower-boundary _ \
-              --threshold-upper-boundary $BOUNDARY \
-              --threshold-measure p90_latency \
-              --threshold-test t_test \
-              --threshold-max-sample-size $MAX_SAMPLE \
-              --threshold-lower-boundary _ \
-              --threshold-upper-boundary $BOUNDARY \
-              --threshold-measure p99_latency \
-              --threshold-test t_test \
-              --threshold-max-sample-size $MAX_SAMPLE \
-              --threshold-lower-boundary _ \
-              --threshold-upper-boundary $BOUNDARY \
-              --threshold-measure failed_pct \
-              --threshold-test t_test \
-              --threshold-max-sample-size $MAX_SAMPLE \
-              --threshold-lower-boundary _ \
-              --threshold-upper-boundary $BOUNDARY
-          }
-
-          # Run bencher and capture HTML output (stdout) while letting stderr
-          # go to a file so we can inspect failure reasons.
-          BENCHER_STDERR=$(mktemp)
-          trap 'rm -f "$BENCHER_STDERR"' EXIT
-          set +e
-          run_bencher "$START_POINT_ARGS" > bench_results/bencher_report.html 2>"$BENCHER_STDERR"
-          BENCHER_EXIT_CODE=$?
-          set -e
-
-          # Print stderr for visibility in logs
-          cat "$BENCHER_STDERR" >&2
-
-          # If bencher failed because the start-point hash doesn't exist in
-          # Bencher (e.g., the base commit was a docs-only change skipped by
-          # paths-ignore), retry without --start-point-hash so the report
-          # still gets stored using the latest available baseline.
-          #
-          # Bencher emits: 'Head Version (..., Some(GitHash("<sha>"))) not found'
-          # when the pinned hash isn't in its DB. A single combined pattern
-          # avoids false-positive matches across unrelated lines.
-          if [ $BENCHER_EXIT_CODE -ne 0 ] && grep -q "Head Version.*not found" "$BENCHER_STDERR" && ! grep -qiE "alert|threshold violation|boundary violation" "$BENCHER_STDERR"; then
-            RETRY_ARGS=$(echo "$START_POINT_ARGS" | sed 's/--start-point-hash [^ ]*//')
-            if [ "$RETRY_ARGS" != "$START_POINT_ARGS" ]; then
-              echo ""
-              echo "⚠️ Start-point hash not found in Bencher — retrying without --start-point-hash (will use latest baseline)"
-              echo "::warning::Start-point hash not found in Bencher — falling back to latest baseline for comparison"
-              set +e
-              run_bencher "$RETRY_ARGS" > bench_results/bencher_report.html 2>"$BENCHER_STDERR"
-              BENCHER_EXIT_CODE=$?
-              set -e
-              cat "$BENCHER_STDERR" >&2
-            fi
-          fi
-
-          # Distinguish regression alerts from operational failures (auth/API/network/CLI)
-          # so that main can warn-only on the former while still failing hard on the latter.
-          # Match Bencher's actual alert output (e.g., "🚨 2 Alerts", "Alert detected") via
-          # a word-bounded, case-insensitive "Alert[s]". The word boundary (\b) already
-          # prevents matching lowercase "alerts" inside URL paths (e.g., "/v0/.../alerts"),
-          # so the case-insensitive flag adds robustness against future CLI wording changes
-          # (e.g., lowercase "1 alert") without reintroducing the URL-path false positive.
-          BENCHER_HAS_ALERT=0
-          if [ $BENCHER_EXIT_CODE -ne 0 ] && \
-             { grep -qiE "\bAlerts?\b" "$BENCHER_STDERR" || \
-               grep -qiE "threshold violation|boundary violation" "$BENCHER_STDERR"; }; then
-            BENCHER_HAS_ALERT=1
-          fi
-          # Cleanup is also handled by the `trap 'rm -f "$BENCHER_STDERR"' EXIT` above,
-          # so we don't need an explicit rm here.
-
-          # Export exit code and alert flag early so downstream steps (7b/7c/7d) always
-          # see them, even if the post-processing below (step summary, PR comments) fails.
-          echo "BENCHER_EXIT_CODE=$BENCHER_EXIT_CODE" >> "$GITHUB_ENV"
-          echo "BENCHER_HAS_ALERT=$BENCHER_HAS_ALERT" >> "$GITHUB_ENV"
-
-          # Post report to job summary and PR comment(s) if there's HTML output
-          if [ -s bench_results/bencher_report.html ]; then
-            echo "📊 Adding Bencher report to job summary..."
-            cat bench_results/bencher_report.html >> "$GITHUB_STEP_SUMMARY"
-
-            if [ "${{ github.event_name }}" = "pull_request" ]; then
-              echo "📝 Splitting HTML report for PR comments..."
-              ruby benchmarks/split_html_report.rb bench_results/bencher_report.html bench_results/bencher_chunk
-
-              # Delete old Bencher report comments (identified by marker)
-              echo "🗑️ Deleting old Bencher report comments..."
-              gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
-                --paginate --jq '.[] | select(.body | contains("<!-- BENCHER_REPORT -->")) | .id' | \
-              while read -r comment_id; do
-                echo "Deleting comment $comment_id"
-                gh api -X DELETE "repos/${{ github.repository }}/issues/comments/$comment_id"
-              done
-
-              # Post each chunk as a separate comment
-              COMMENT_FAILED=false
-              for chunk_file in bench_results/bencher_chunk*.html; do
-                if [ -f "$chunk_file" ]; then
-                  echo "Posting $chunk_file ($(wc -c < "$chunk_file") bytes)..."
-                  if ! gh pr comment ${{ github.event.pull_request.number }} --body-file "$chunk_file"; then
-                    echo "⚠️ Failed to post $chunk_file"
-                    COMMENT_FAILED=true
-                  fi
-                fi
-              done
-
-              # If any chunk failed to post, add a fallback comment
-              if [ "$COMMENT_FAILED" = "true" ]; then
-                echo "⚠️ Some chunks failed to post, adding fallback comment..."
-                FALLBACK_BODY="<!-- BENCHER_REPORT -->"
-                FALLBACK_BODY="${FALLBACK_BODY}"$'\n'"⚠️ **Bencher report chunks were too large to post as PR comments.**"
-                FALLBACK_BODY="${FALLBACK_BODY}"$'\n'$'\n'"View the full report in the [job summary](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})."
-                gh pr comment ${{ github.event.pull_request.number }} --body "$FALLBACK_BODY" || true
-              fi
-            fi
-          else
-            echo "✅ No alerts - no Bencher report to post"
-          fi
-
-      # ============================================
-      # STEP 7b: ALERT ON MAIN REGRESSION
-      # ============================================
-      - name: Create GitHub Issue for main regression
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.BENCHER_EXIT_CODE != '0' && env.BENCHER_HAS_ALERT == '1'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          LABEL="performance-regression"
-          COMMIT_SHA="${{ github.sha }}"
-          COMMIT_SHORT="${COMMIT_SHA:0:7}"
-          COMMIT_URL="${{ github.server_url }}/${{ github.repository }}/commit/${COMMIT_SHA}"
-          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          BENCHER_URL="https://bencher.dev/perf/react-on-rails-t8a9ncxo"
-          ACTOR="${{ github.actor }}"
-
-          # Ensure the label exists (idempotent)
-          gh label create "$LABEL" \
-            --description "Automated: benchmark regression detected on main" \
-            --color "D93F0B" \
-            --force 2>/dev/null || true
-
-          # Check for an existing open issue to avoid duplicates
-          EXISTING_ISSUE=$(gh issue list \
-            --label "$LABEL" \
-            --state open \
-            --limit 1 \
-            --json number \
-            --jq '.[0].number // empty')
-
-          # Build the benchmark summary snippet (defensive: don't let column failure block alerting)
-          SUMMARY=""
-          if [ -f bench_results/summary.txt ]; then
-            FORMATTED=$(column -t -s $'\t' "bench_results/summary.txt" 2>/dev/null) || FORMATTED=$(cat "bench_results/summary.txt")
-            SUMMARY=$(printf '\n### Benchmark Summary\n\n```\n%s\n```' "$FORMATTED")
-          fi
-
-          if [ -n "$EXISTING_ISSUE" ]; then
-            echo "Open regression issue already exists: #${EXISTING_ISSUE} — adding comment"
-
-            if ! gh issue comment "$EXISTING_ISSUE" --body "$(cat <<EOF
-          ## New regression detected
-
-          **Commit:** [\`${COMMIT_SHORT}\`](${COMMIT_URL}) by @${ACTOR}
-          **Workflow run:** [Run #${{ github.run_number }}](${RUN_URL})
-          ${SUMMARY}
-
-          > View the full Bencher report in the [workflow run summary](${RUN_URL}) or on the [Bencher dashboard](${BENCHER_URL}).
-          EOF
-          )"; then
-              echo "::warning::Failed to comment on regression issue #${EXISTING_ISSUE}"
-            fi
-          else
-            echo "No open regression issue found — creating one"
-
-            if ! gh issue create \
-              --title "Performance Regression Detected on main (${COMMIT_SHORT})" \
-              --label "$LABEL" \
-              --body "$(cat <<EOF
-          ## Performance Regression Detected on main
-
-          A statistically significant performance regression was detected by
-          [Bencher](${BENCHER_URL}) using a Student's t-test (95% confidence
-          interval, up to 64 sample history).
-
-          | Detail | Value |
-          |--------|-------|
-          | **Commit** | [\`${COMMIT_SHORT}\`](${COMMIT_URL}) |
-          | **Pushed by** | @${ACTOR} |
-          | **Workflow run** | [Run #${{ github.run_number }}](${RUN_URL}) |
-          | **Bencher dashboard** | [View history](${BENCHER_URL}) |
-          ${SUMMARY}
-
-          ### What to do
-
-          1. Check the [workflow run](${RUN_URL}) for the full Bencher HTML report
-          2. Review the [Bencher dashboard](${BENCHER_URL}) to see which metrics regressed
-          3. Investigate the commit — expected trade-off or unintended regression?
-          4. If unintended, open a fix PR and reference this issue
-          5. Close this issue once resolved — subsequent regressions will open a new one
-
-          ---
-          *This issue was created automatically by the benchmark CI workflow.*
-          EOF
-          )"; then
-              echo "::warning::Failed to create regression issue — check GitHub API permissions"
-            fi
-          fi
-
-      # ============================================
-      # STEP 7c: WARN ON MAIN REGRESSION
-      # ============================================
-      # Regressions are surfaced via the Bencher dashboard, the auto-opened tracking
-      # issue (Step 7b), and the job-summary report. Do not fail the workflow on regression
-      # alerts: single-run alerts on GitHub-hosted runners are dominated by environmental
-      # noise (alert sets across consecutive runs have ~0 overlap), so blocking main
-      # produces churn without signal. Re-enable a hard gate once thresholds/sample-size
-      # tolerate that noise. Operational errors (auth/API/network/CLI) are handled in
-      # step 7d and still fail the workflow.
-      - name: Warn if Bencher detected regression on main
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.BENCHER_EXIT_CODE != '0' && env.BENCHER_HAS_ALERT == '1'
-        env:
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          echo "::warning::Bencher flagged a regression on main (exit ${BENCHER_EXIT_CODE:-1}). See the open regression issue (label: performance-regression), the Bencher dashboard, and the workflow run: ${RUN_URL}"
-
-      # ============================================
-      # STEP 7d: FAIL ON NON-REGRESSION BENCHER ERRORS
-      # ============================================
-      # If bencher exited non-zero but stderr did not contain regression alert
-      # indicators, this is an operational failure (auth/API/network/CLI) rather than
-      # a performance signal. These should still fail the workflow on main so a broken
-      # benchmark pipeline (missing uploads, bad credentials, Bencher outage, etc.) is
-      # not silently hidden behind a warning annotation.
-      - name: Fail on non-regression Bencher error on main
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.BENCHER_EXIT_CODE != '0' && env.BENCHER_HAS_ALERT != '1'
-        run: |
-          echo "::error::Bencher exited ${BENCHER_EXIT_CODE:-1} on main with no regression alert in stderr — this indicates an operational failure (auth/API/network/CLI), not a performance regression. Check the logs above."
-          # Preserve the original Bencher exit code in CI logs for diagnostic context.
-          exit "${BENCHER_EXIT_CODE:-1}"
-
-      # ============================================
-      # STEP 8: WORKFLOW COMPLETION
-      # ============================================
-      - name: Workflow summary
+      # On a main-push regression, track_benchmarks.rb writes regression.json and
+      # exits non-zero (failing this suite). Upload it on always() so the single
+      # report-regressions job can file one issue serially after the matrix; the
+      # main "Upload benchmark results" step runs before Bencher, so it can't.
+      - name: Upload regression report
         if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: regression-${{ matrix.artifact_name_prefix }}-${{ github.run_number }}${{ matrix.artifact_name_suffix }}
+          path: bench_results/regression.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Benchmark workflow summary
+        if: always()
+        # Route context/matrix values through env so the shell treats them as data,
+        # not code (GitHub Actions injection hardening; ref_name can be attacker-set).
+        env:
+          SUITE_NAME: ${{ matrix.suite_name }}
+          SHARD_LABEL: ${{ matrix.shard_label }}
+          JOB_STATUS: ${{ job.status }}
+          RUN_NUMBER: ${{ github.run_number }}
+          ACTOR: ${{ github.actor }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
           echo "📋 Benchmark Workflow Summary"
           echo "===================================="
-          echo "Status: ${{ job.status }}"
-          echo "Run number: ${{ github.run_number }}"
-          echo "Triggered by: ${{ github.actor }}"
-          echo "Branch: ${{ github.ref_name }}"
-          echo "Run Core: ${{ env.RUN_CORE || 'false' }}"
-          echo "Run Pro Rails: ${{ env.RUN_PRO_RAILS || 'false' }}"
-          echo "Run Pro Node Renderer: ${{ env.RUN_PRO_NODE_RENDERER || 'false' }}"
-          echo ""
-          if [ "${{ job.status }}" == "success" ]; then
-            echo "✅ All steps completed successfully"
-          else
-            echo "❌ Workflow encountered errors - check logs above"
-          fi
+          echo "Suite: $SUITE_NAME"
+          echo "Shard: $SHARD_LABEL"
+          echo "Status: $JOB_STATUS"
+          echo "Run number: $RUN_NUMBER"
+          echo "Triggered by: $ACTOR"
+          echo "Branch: $REF_NAME"
+
+  # Files a single GitHub issue for any benchmark regressions detected on main.
+  # Runs once after the whole matrix (always(), since a regression fails its suite)
+  # so reporting is serialized: parallel matrix suites doing this themselves would
+  # create duplicate issues and clobber each other's sections in the shared comment.
+  # No-ops when no suite uploaded a regression report (the common, healthy case).
+  report-regressions:
+    needs: [detect-changes, benchmark]
+    # always() so it still runs when a suite fails (a regression fails its suite);
+    # gated to main pushes that actually ran benchmark suites so it doesn't spin up
+    # a no-op job on labeled PRs or benchmark-less main pushes.
+    if: >-
+      always()
+      && github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && needs.detect-changes.outputs.run_benchmark_suites == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Download regression reports
+        uses: actions/download-artifact@v7
+        with:
+          path: regression-artifacts
+          pattern: regression-*
+      # Stdlib-only script, so the runner's system Ruby is enough (no Bundler/Rails boot).
+      - name: File regression issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ruby benchmarks/report_regressions.rb regression-artifacts

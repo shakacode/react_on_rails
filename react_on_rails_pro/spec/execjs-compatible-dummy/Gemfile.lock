@@ -1,7 +1,7 @@
 PATH
   remote: ../../..
   specs:
-    react_on_rails (16.7.0.rc.2)
+    react_on_rails (17.0.0.rc.0)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -12,16 +12,15 @@ PATH
 PATH
   remote: ../..
   specs:
-    react_on_rails_pro (16.7.0.rc.2)
+    react_on_rails_pro (17.0.0.rc.0)
       addressable
       async (>= 2.29)
       async-http (~> 0.95)
-      connection_pool
       execjs (~> 2.9)
       io-endpoint (~> 0.17.0)
-      jwt (>= 3.2.0)
+      jwt (>= 2.5, < 4)
       rainbow
-      react_on_rails (= 16.7.0.rc.2)
+      react_on_rails (= 17.0.0.rc.0)
 
 GEM
   remote: https://rubygems.org/
@@ -246,7 +245,7 @@ GEM
       nio4r (~> 2.0)
     racc (1.8.1)
     rack (3.2.5)
-    rack-proxy (0.7.7)
+    rack-proxy (0.8.2)
       rack
     rack-session (2.1.1)
       base64 (>= 0.1.0)
@@ -305,7 +304,7 @@ GEM
       rubyzip (>= 1.2.2, < 3.0)
       websocket (~> 1.0)
     semantic_range (3.1.1)
-    shakapacker (9.6.1)
+    shakapacker (10.1.0)
       activesupport (>= 5.2)
       package_json
       rack-proxy (>= 0.6.1)
@@ -369,7 +368,7 @@ DEPENDENCIES
   react_on_rails!
   react_on_rails_pro!
   selenium-webdriver
-  shakapacker (= 9.6.1)
+  shakapacker (= 10.1.0)
   sprockets-rails
   sqlite3 (~> 1.4)
   tzinfo-data

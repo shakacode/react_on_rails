@@ -7,7 +7,7 @@ on:
   push:
     branches:
       - 'main'
-    # Always trigger on main; docs-only detection handles skipping heavy jobs
+    # Always trigger on main; non-runtime detection handles skipping heavy jobs
   pull_request:
     paths-ignore:
       - '**.md'
@@ -33,6 +33,7 @@ jobs:
     runs-on: ubuntu-22.04
     outputs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
+      non_runtime_only: ${{ steps.detect.outputs.non_runtime_only }}
       run_dummy_tests: ${{ steps.detect.outputs.run_dummy_tests }}
       has_full_ci_label: ${{ steps.check-label.outputs.result }}
     steps:
@@ -47,8 +48,11 @@ jobs:
         id: detect
         run: |
           if [ "${{ inputs.force_run }}" = "true" ] || [ "${{ steps.check-label.outputs.result }}" = "true" ]; then
-            echo "run_dummy_tests=true" >> "$GITHUB_OUTPUT"
-            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "run_dummy_tests=true"
+              echo "docs_only=false"
+              echo "non_runtime_only=false"
+            } >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -64,13 +68,13 @@ jobs:
 
   precompile-check:
     needs: detect-changes
-    # Skip only if: main push AND docs-only changes
+    # Skip only if: main push AND non-runtime-only changes
     # Otherwise run if: on main OR workflow_dispatch OR dummy tests needed
     if: |
       !(
         github.event_name == 'push' &&
         github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.docs_only == 'true'
+        needs.detect-changes.outputs.non_runtime_only == 'true'
       ) && (
         github.ref == 'refs/heads/main' ||
         github.event_name == 'workflow_dispatch' ||
@@ -82,13 +86,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ./.github/actions/setup-ruby
         with:
-          ruby-version: '3.4'
-          bundler: 2.5.9
-      # libyaml-dev is needed for psych v5
-      - name: Fix dependency for libyaml-dev
-        run: sudo apt install libyaml-dev
+          ruby-version: '4.0'
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -118,18 +118,11 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build workspace packages
         run: pnpm run build
-      - name: Save dummy app ruby gems to cache
-        uses: actions/cache@v4
-        with:
-          path: react_on_rails/spec/dummy/vendor/bundle
-          key: dummy-app-gem-cache-${{ hashFiles('react_on_rails/spec/dummy/Gemfile.lock') }}-precompile
       - name: Install Ruby Gems for dummy app
-        run: |
-          cd react_on_rails/spec/dummy
-          bundle lock --add-platform 'x86_64-linux'
-          if ! bundle check --path=vendor/bundle; then
-            bundle _2.5.9_ install --path=vendor/bundle --jobs=4 --retry=3
-          fi
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: react_on_rails/spec/dummy
+          ruby-version: '4.0'
       - name: Build ReScript files
         run: pnpm --filter "react_on_rails" run build:rescript
       - name: Generate file system-based packs

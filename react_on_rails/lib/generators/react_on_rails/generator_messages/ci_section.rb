@@ -1,9 +1,12 @@
 # frozen_string_literal: true
 
 require "rainbow"
+require_relative "../shakapacker_precompile_hook_helper"
 
 module GeneratorMessages
   module CiSection
+    include ReactOnRails::Generators::ShakapackerPrecompileHookHelper
+
     private
 
     def build_ci_section(app_root: Dir.pwd, ci_workflow_generated: false)
@@ -25,6 +28,11 @@ module GeneratorMessages
                         else
                           ""
                         end
+      manual_build_command = shakapacker_build_command(
+        env: "RAILS_ENV=test NODE_ENV=test",
+        app_root: app_root,
+        environment: "test"
+      )
 
       <<~CI
 
@@ -35,7 +43,7 @@ module GeneratorMessages
         #{ci_status}
 
         To build bundles manually before tests:
-        #{Rainbow('RAILS_ENV=test NODE_ENV=test bin/shakapacker').cyan}#{build_test_hint}
+        #{Rainbow(manual_build_command).cyan}#{build_test_hint}
       CI
     end
   end

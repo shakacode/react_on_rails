@@ -3,8 +3,16 @@
 /* eslint-disable no-param-reassign */
 
 const { config } = require('shakapacker');
-const webpack = require('webpack');
 const commonWebpackConfig = require('./commonWebpackConfig');
+
+const usingRspack = config.assets_bundler === 'rspack';
+const bundler = usingRspack ? require('@rspack/core') : require('webpack');
+const { RspackManifestPlugin } = usingRspack ? require('rspack-manifest-plugin') : {};
+
+const isRspackClientOnlyPlugin = (plugin) =>
+  usingRspack &&
+  ((RspackManifestPlugin && plugin instanceof RspackManifestPlugin) ||
+    (bundler.CssExtractRspackPlugin && plugin instanceof bundler.CssExtractRspackPlugin));
 
 const configureServer = () => {
   // We need to use "merge" because the clientConfigObject, EVEN after running
@@ -50,7 +58,7 @@ const configureServer = () => {
   serverWebpackConfig.optimization = {
     minimize: false,
   };
-  serverWebpackConfig.plugins.unshift(new webpack.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
+  serverWebpackConfig.plugins.unshift(new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
 
   // Custom output for the server-bundle that matches the config in
   // config/initializers/react_on_rails.rb
@@ -68,6 +76,7 @@ const configureServer = () => {
   // And no need for the MiniCssExtractPlugin
   serverWebpackConfig.plugins = serverWebpackConfig.plugins.filter(
     (plugin) =>
+      !isRspackClientOnlyPlugin(plugin) &&
       plugin.constructor.name !== 'WebpackAssetsManifest' &&
       plugin.constructor.name !== 'MiniCssExtractPlugin' &&
       plugin.constructor.name !== 'ForkTsCheckerWebpackPlugin',

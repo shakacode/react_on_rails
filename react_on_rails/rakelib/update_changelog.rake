@@ -419,11 +419,18 @@ def next_active_prerelease_version(changelog, mode, monorepo_root)
 
   indices = prerelease_indices_from_tags(monorepo_root, active_base, mode)
   next_index = indices.empty? ? 0 : indices.max + 1
-  if indices.empty? && !prerelease_indices_from_tags(monorepo_root, active_base, nil).empty?
+  if indices.empty? && other_prerelease_channel_present?(monorepo_root, active_base, mode)
     warn "WARNING: active prerelease base #{active_base} was found via a different channel. " \
          "Verify the computed version is correct."
   end
   "#{active_base}.#{mode}.#{next_index}"
+end
+
+def other_prerelease_channel_present?(monorepo_root, base_version, mode)
+  other_channels = %w[test beta alpha rc pre].reject { |channel| channel == mode }
+  other_channels.any? do |channel|
+    !prerelease_indices_from_tags(monorepo_root, base_version, channel).empty?
+  end
 end
 
 def compute_auto_version(changelog, mode, monorepo_root, changelog_for_bump: nil)

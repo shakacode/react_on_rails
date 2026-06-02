@@ -1,113 +1,63 @@
 # Directory Licensing Documentation
 
-This document outlines the current and post-merger directory licensing structure for React on Rails projects.
+This document outlines the directory-based licensing structure of the React on Rails monorepo. [LICENSE.md](../LICENSE.md) is the authoritative source for which directories use which license.
 
-## Current Structure (Pre-Merger)
+## Directory Structure
 
-### react_on_rails Repository - MIT Licensed
-
-All directories in the `react_on_rails` repository are MIT licensed:
-
-```text
-react_on_rails/
-├── lib/react_on_rails/           # Core Ruby code (MIT)
-├── node_package/src/             # Core JS/TS code (MIT)
-│   └── pro/                      # Pro features with license validation (Pro licensed)
-├── spec/                         # Core tests (MIT)
-├── docs/                         # Documentation (MIT)
-├── .github/                      # GitHub workflows (MIT)
-└── [all other directories]       # MIT
-```
-
-**Exception:** The `node_package/src/pro/` directory contains Pro implementation code licensed under the React on Rails Pro License. This code is included in the package but requires a valid Pro license to use.
-
-**Important Distinction:**
-
-- **MIT-licensed interface files** (outside `pro/` directories) can be freely modified under MIT terms
-- **Using those modifications to access Pro features** without a license violates the Pro License
-- **Pro-licensed files** (inside `pro/` directories) require a Pro license to use in any way
-
-### react_on_rails_pro Repository - Pro Licensed
-
-All directories in the `react_on_rails_pro` repository are Pro licensed:
-
-```text
-react_on_rails_pro/
-├── lib/react_on_rails_pro/       # Pro Ruby code
-├── packages/node-renderer/       # Pro Node.js renderer
-├── spec/                         # Pro tests
-├── .circleci/                    # CircleCI config
-└── [all other directories]       # Pro licensed
-```
-
-## Post-Merger Structure (Target)
-
-After the monorepo merger, the unified repository will have clear directory-based licensing:
+The repository is a monorepo containing two Ruby gems and three NPM packages under two licenses.
 
 ### MIT Licensed Directories
 
 ```text
 react_on_rails/ (monorepo root)
-├── lib/react_on_rails/           # Core Ruby code (including specs)
-├── packages/react-on-rails/      # Core NPM package (including tests)
-├── spec/                         # Monorepo-level integration tests
-│   └── dummy/                    # Rails dummy app for testing
-├── docs/                         # Shared documentation
-├── tools/                        # Shared development tools
-├── .github/                      # Unified GitHub workflows
-└── [shared config files]         # Build configs, etc.
+├── react_on_rails/                  # Core Ruby gem (including lib/, spec/, sig/)
+├── packages/react-on-rails/         # Core NPM package (including tests)
+├── docs/                            # Documentation
+├── .github/                         # GitHub workflows
+└── [all other directories]          # MIT unless listed as Pro below
 ```
 
 ### Pro Licensed Directories
 
 ```text
 react_on_rails/ (monorepo root)
-├── lib/react_on_rails_pro/       # Pro Ruby code (including specs)
-├── packages/react-on-rails-pro/  # Pro NPM package (including tests)
-└── packages/react-on-rails-pro-node-renderer/  # Pro Node renderer (including tests)
+├── react_on_rails_pro/                          # Pro Ruby gem (including specs)
+├── packages/react-on-rails-pro/                 # Pro NPM package (including tests)
+└── packages/react-on-rails-pro-node-renderer/   # Pro Node renderer (including tests)
 ```
+
+**Important Distinction:**
+
+- **MIT-licensed interface files** (outside the Pro-licensed directories) can be freely modified under MIT terms
+- **Using those modifications to access Pro features** without a license violates the Pro License
+- **Pro-licensed files** require a Pro license to use in any way
 
 ## License Compliance Rules
 
 ### File-Level Compliance
 
-1. **Repository-Level Licensing**: Files inherit their license from the directory they're located in
-2. **No Mixed Directories**: Each directory is either entirely MIT or entirely Pro - no mixed licensing within a directory
-3. **Clear Boundaries**: The `LICENSE.md` file explicitly lists which directories fall under which license
+1. **Directory-Based Licensing**: Files inherit their license from the directory they are located in
+2. **No Mixed Directories**: Each directory is either entirely MIT or entirely Pro — no mixed licensing within a directory
+3. **Clear Boundaries**: [LICENSE.md](../LICENSE.md) explicitly lists which directories fall under which license
 
 ### Package-Level Compliance
 
 1. **Gemspec Files**:
-   - `react_on_rails.gemspec`: `s.license = "MIT"`
-   - `react_on_rails_pro.gemspec`: `s.license = "UNLICENSED"`
+   - `react_on_rails/react_on_rails.gemspec`: `s.license = "MIT"`
+   - `react_on_rails_pro/react_on_rails_pro.gemspec`: `s.license = "UNLICENSED"`
 
 2. **Package.json Files**:
-   - `packages/react-on-rails/package.json`: `"license": "MIT"`
+   - `packages/react-on-rails/package.json`: `"license": "SEE LICENSE IN LICENSE.md"` (MIT)
    - `packages/react-on-rails-pro/package.json`: `"license": "UNLICENSED"`
    - `packages/react-on-rails-pro-node-renderer/package.json`: `"license": "UNLICENSED"`
 
 ### Critical Compliance Points
 
-1. **Never Move Pro Code to MIT Directories**: During the merger, strict verification ensures no Pro-licensed code accidentally ends up in MIT-licensed directories
+1. **Never Move Pro Code to MIT Directories**: No Pro-licensed code may end up in MIT-licensed directories.
 
-2. **Update LICENSE.md Immediately**: Whenever directories are moved or created, `LICENSE.md` must be updated to reflect the new structure
+2. **Update LICENSE.md Immediately**: Whenever directories are moved or created, `LICENSE.md` must be updated to reflect the new structure. It is the source of truth for directory licensing.
 
-3. **Automated Verification**: CI checks will verify:
-   - All Pro directories are listed in LICENSE.md
-   - Package.json and gemspec files have correct license fields
-   - No orphaned or unlisted directories exist
-
-## Migration Phases and License Updates
-
-The monorepo merger plan includes specific license compliance checkpoints at each phase:
-
-- **Phase 1**: Update license references and documentation
-- **Phase 2**: Establish dual CI with clear directory boundaries
-- **Phase 3-4**: Reorganize directories while maintaining license compliance
-- **Phase 5-6**: Finalize structure and add automated license checking
-- **Phase 7**: Complete documentation and verification
-
-Each phase includes mandatory license compliance verification before proceeding to the next phase.
+3. **Keep License Fields Accurate**: Each package's `package.json` and gemspec must declare the correct license for its directory.
 
 ## Developer Guidelines
 
@@ -128,10 +78,10 @@ Each phase includes mandatory license compliance verification before proceeding 
 ### When Contributing
 
 1. Core features (MIT): Open for all contributors
-2. Pro features: Contributions become part of Pro offering
+2. Pro features: Contributions become part of the Pro offering
 3. Shared tooling/docs (MIT): Benefits both packages
 4. License compliance: Never compromise on proper licensing
 
 ---
 
-_This document is maintained as part of the React on Rails monorepo merger plan. For implementation details, see [MONOREPO_MERGER_PLAN.md](../internal/planning/MONOREPO_MERGER_PLAN.md)_
+_For licensing questions, see [LICENSING_FAQ.md](./LICENSING_FAQ.md) and [LICENSE.md](../LICENSE.md)._

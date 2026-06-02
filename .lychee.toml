@@ -145,6 +145,7 @@ exclude = [
 # Exclude paths (regex patterns)
 exclude_path = [
   'docs/planning/',           # Contains placeholder links
+  'internal/history/',        # Archived historical snapshots; internal links intentionally frozen
   '.*/node_modules/.*',       # Dependencies
   '.*/spec/.*',               # Test fixtures
   'SUMMARY.md',               # GitBook TOC with old doc structure links (kept for redirects)

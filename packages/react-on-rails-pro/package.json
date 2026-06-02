@@ -1,6 +1,6 @@
 {
   "name": "react-on-rails-pro",
-  "version": "16.7.0-rc.2",
+  "version": "17.0.0-rc.0",
   "description": "React on Rails Pro package with React Server Components support",
   "main": "lib/ReactOnRails.full.js",
   "type": "module",
@@ -55,6 +55,10 @@
       "react-server": "./lib/wrapServerComponentRenderer/server.rsc.js",
       "default": "./lib/wrapServerComponentRenderer/server.js"
     },
+    "./cache": {
+      "react-server": "./lib/cache/index.js",
+      "default": "./lib/cache/index.stub.js"
+    },
     "./RSCRoute": "./lib/RSCRoute.js",
     "./RSCProvider": "./lib/RSCProvider.js",
     "./ServerComponentFetchError": "./lib/ServerComponentFetchError.js"
@@ -86,6 +90,8 @@
   },
   "homepage": "https://reactonrails.com/docs/pro/",
   "devDependencies": {
+    "@tanstack/react-router": "1.163.3",
+    "@tanstack/store": "0.9.1",
     "@types/mock-fs": "^4.13.4",
     "mock-fs": "^5.5.0",
     "react": "^19.0.3",

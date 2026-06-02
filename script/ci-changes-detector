@@ -2,6 +2,12 @@
 # CI Changes Detector
 # Analyzes git changes to determine which CI jobs need to run
 # Usage: script/ci-changes-detector [base-ref]
+#
+# Tests: bash script/ci-changes-detector-test.bash
+#
+# Diff-base logic lives in script/lib/git-diff-base. Run its self-contained
+# tests with: bash script/lib/git-diff-base-test.bash
+# CI invokes the same harness via .github/workflows/git-diff-base-tests.yml.
 
 set -euo pipefail
 
@@ -52,8 +58,11 @@ if [ -z "${CI:-}" ] && [ "$CURRENT_REF" = "HEAD" ]; then
 fi
 
 if [ -z "$CHANGED_FILES" ]; then
+  # Don't exit here: with no files the loop below sets nothing, DOCS_ONLY stays
+  # true, and the docs-only output block emits the full flag set (non_runtime_only
+  # =true, every run_* false, benchmarks_changed=false). Exiting would instead
+  # leave every output blank.
   echo "No changes detected between $BASE_REF and $CURRENT_REF"
-  exit 0
 fi
 
 # Initialize flags
@@ -62,6 +71,7 @@ LINT_CONFIG_CHANGED=false
 PRO_LINT_CONFIG_CHANGED=false
 RUBY_CORE_CHANGED=false
 RSPEC_CHANGED=false
+BENCHMARKS_CHANGED=false
 SPEC_DUMMY_CHANGED=false
 JS_CHANGED=false
 GENERATORS_CHANGED=false
@@ -71,9 +81,173 @@ PRO_JS_CHANGED=false
 PRO_DUMMY_CHANGED=false
 PRO_NODE_RENDERER_CHANGED=false
 UNCATEGORIZED_CHANGED=false
+SOURCE_COMMENT_ONLY_CHANGED=false
+PRO_SOURCE_COMMENT_ONLY_CHANGED=false
+
+comment_line_is_runtime_directive() {
+  local line="$1"
+  local trimmed="${line#"${line%%[![:space:]]*}"}"
+
+  case "$trimmed" in
+    '#!'*)
+      return 0
+      ;;
+  esac
+
+  local comment_body="$trimmed"
+  # NOTE: `/*` is quoted so the pattern strips the literal two-char prefix
+  # rather than `/` plus a zero-length glob (which is what `${var#/*}` does).
+  case "$comment_body" in
+    '//'*) comment_body="${comment_body#//}" ;;
+    '#'* ) comment_body="${comment_body#\#}" ;;
+    '/*'*) comment_body="${comment_body#'/*'}" ;;
+    '*'*) comment_body="${comment_body#\*}" ;;
+  esac
+  # Strip remaining leading `*` characters (handles `/**` JSDoc openers and
+  # continuation lines like ` ** @param`).
+  while [ "${comment_body#\*}" != "$comment_body" ]; do
+    comment_body="${comment_body#\*}"
+  done
+  comment_body="${comment_body#"${comment_body%%[![:space:]]*}"}"
+
+  case "$comment_body" in
+    frozen_string_literal:*|encoding:*|coding:*|shareable_constant_value:*|\
+    webpackChunkName:*|webpackMode:*|webpackPrefetch:*|webpackPreload:*|\
+    webpackInclude:*|webpackExclude:*|webpackIgnore:*|webpackExports:*|webpackFetchPriority:*|\
+    @vite-ignore*|@jsxImportSource*|@jsx*|@babel*|'#'__PURE__*|@__PURE__*|\
+    @ts-ignore*|@ts-expect-error*|@ts-nocheck*|@ts-check*|\
+    sourceMappingURL*|@preserve*|@license*)
+      return 0
+      ;;
+  esac
+
+  return 1
+}
+
+diff_line_is_comment_or_blank() {
+  local line="$1"
+  local in_block_comment="${2:-false}"
+  local in_ruby_block_comment="${3:-false}"
+  local trimmed="${line#"${line%%[![:space:]]*}"}"
+
+  [ -z "$trimmed" ] && return 0
+
+  if comment_line_is_runtime_directive "$trimmed"; then
+    return 1
+  fi
+
+  local after_close after_trimmed
+  if [ "$in_block_comment" = true ]; then
+    case "$trimmed" in
+      *'*/'*)
+        # Block closes on this line — require no executable code after `*/`.
+        after_close="${trimmed##*'*/'}"
+        after_trimmed="${after_close#"${after_close%%[![:space:]]*}"}"
+        [ -z "$after_trimmed" ] && return 0
+        return 1
+        ;;
+      *) return 0 ;;
+    esac
+  fi
+  [ "$in_ruby_block_comment" = true ] && return 0
+
+  case "$trimmed" in
+    '#'*|'//'*) return 0 ;;
+    '/*'*)
+      # Single-line `/* ... */` is comment-only only when nothing follows the
+      # close. Lines like `/* istanbul ignore next */ exports.foo = bar` must
+      # not be classified as comment-only.
+      case "$trimmed" in
+        *'*/'*)
+          after_close="${trimmed##*'*/'}"
+          after_trimmed="${after_close#"${after_close%%[![:space:]]*}"}"
+          [ -z "$after_trimmed" ] && return 0
+          return 1
+          ;;
+        *) return 0 ;;
+      esac
+      ;;
+    '=begin'*) return 0 ;;
+  esac
+
+  return 1
+}
+
+source_file_has_multiline_string_construct() {
+  local file="$1"
+  local content
+
+  content="$(git show "$CURRENT_REF:$file" 2>/dev/null || cat "$file" 2>/dev/null || true)"
+
+  case "$file" in
+    *.rb|Gemfile|*.rake)
+      grep -Eq "<<[-~]?[[:space:]]*['\"]?[A-Za-z_][A-Za-z0-9_]*" <<< "$content"
+      ;;
+    *.js|*.jsx|*.ts|*.tsx)
+      grep -q '`' <<< "$content"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+source_file_comment_only_change() {
+  local file="$1"
+  local diff_output
+
+  if source_file_has_multiline_string_construct "$file"; then
+    return 1
+  fi
+
+  diff_output="$(git diff --no-ext-diff --unified=0 "$MERGE_BASE" "$CURRENT_REF" -- "$file")"
+  case "$diff_output" in
+    *$'\nnew file mode '*|*$'\ndeleted file mode '*|*$'\nrename from '*|*$'\nrename to '*|\
+    *$'\ncopy from '*|*$'\ncopy to '*|*$'\n--- /dev/null'*|*$'\n+++ /dev/null'*)
+      return 1
+      ;;
+  esac
+
+  local changed_line saw_changed_line=false in_block_comment=false in_ruby_block_comment=false
+  while IFS= read -r changed_line; do
+    case "$changed_line" in
+      '@@ '*)
+        [ "$in_block_comment" = true ] && return 1
+        [ "$in_ruby_block_comment" = true ] && return 1
+        ;;
+      '+++ '*|'--- '*) continue ;;
+      '+'*|'-'*)
+        saw_changed_line=true
+        if ! diff_line_is_comment_or_blank "${changed_line:1}" "$in_block_comment" "$in_ruby_block_comment"; then
+          return 1
+        fi
+        case "${changed_line:1}" in
+          *'/*'*)
+            case "${changed_line:1}" in
+              *'*/'*) ;;
+              *) in_block_comment=true ;;
+            esac
+            ;;
+          *'*/'*) [ "$in_block_comment" = true ] && in_block_comment=false ;;
+        esac
+        case "${changed_line:1}" in
+          '=begin'*) in_ruby_block_comment=true ;;
+          '=end'*) in_ruby_block_comment=false ;;
+        esac
+        ;;
+    esac
+  done <<< "$diff_output"
+
+  [ "$in_block_comment" = true ] && return 1
+  [ "$in_ruby_block_comment" = true ] && return 1
+  [ "$saw_changed_line" = true ]
+}
 
 # Analyze each changed file
 while IFS= read -r file; do
+  # A here-string yields a single empty line for empty input, so skip blank lines —
+  # otherwise an empty diff would fall into the catch-all below and trigger every job.
+  [ -z "$file" ] && continue
   # *.md and docs/* intentionally overlap (docs/foo.md matches both); *.md wins
   # because it comes first. Several later branches (generators, Ruby core,
   # specs) also pair top-level and **/* globs for clarity even though * matches
@@ -88,61 +262,114 @@ while IFS= read -r file; do
     # Generators (MUST be before Ruby source code to avoid being caught by lib/**/*.rb)
     react_on_rails/lib/generators/*|react_on_rails/lib/generators/**/*|react_on_rails/spec/react_on_rails/generators/*|react_on_rails/spec/react_on_rails/generators/**/*|rakelib/example_type.rb|rakelib/examples_config.yml|rakelib/shakapacker_examples.rake|.github/workflows/examples.yml)
       DOCS_ONLY=false
-      GENERATORS_CHANGED=true
+      if source_file_comment_only_change "$file"; then
+        SOURCE_COMMENT_ONLY_CHANGED=true
+      else
+        GENERATORS_CHANGED=true
+      fi
       ;;
 
-    # Ruby core source code (non-generator lib files)
-    react_on_rails/lib/*.rb|react_on_rails/lib/**/*.rb|Gemfile|Gemfile.lock|rakelib/run_rspec.rake|rakelib/node_package.rake|rakelib/dummy_apps.rake)
+    # Ruby core source code (non-generator lib + app files)
+    react_on_rails/lib/*.rb|react_on_rails/lib/**/*.rb|react_on_rails/app/*.rb|react_on_rails/app/**/*.rb|Gemfile|Gemfile.lock|rakelib/run_rspec.rake|rakelib/node_package.rake|rakelib/dummy_apps.rake)
       DOCS_ONLY=false
-      RUBY_CORE_CHANGED=true
+      if source_file_comment_only_change "$file"; then
+        SOURCE_COMMENT_ONLY_CHANGED=true
+      else
+        RUBY_CORE_CHANGED=true
+      fi
       ;;
 
     # Ruby gem-specific specs (MUST be after Generators since this pattern catches ALL specs including generator specs)
     react_on_rails/spec/react_on_rails/*|react_on_rails/spec/react_on_rails/**/*|.github/workflows/gem-tests.yml)
       DOCS_ONLY=false
-      RSPEC_CHANGED=true
+      if source_file_comment_only_change "$file"; then
+        SOURCE_COMMENT_ONLY_CHANGED=true
+      else
+        RSPEC_CHANGED=true
+      fi
+      ;;
+
+    # Benchmark scripts (stdlib-only Ruby under benchmarks/) and their specs.
+    # These only need rubocop here; their specs run in the benchmark workflow's
+    # script-validation step (not the gem rspec suite), and they don't need the
+    # full dummy/integration/Pro suite the catch-all would otherwise trigger.
+    benchmarks/*|benchmarks/**/*)
+      DOCS_ONLY=false
+      if source_file_comment_only_change "$file"; then
+        SOURCE_COMMENT_ONLY_CHANGED=true
+      else
+        BENCHMARKS_CHANGED=true
+      fi
       ;;
 
     # JavaScript/TypeScript source (including tests, scripts, and package files)
     package.json|pnpm-lock.yaml|packages/react-on-rails/src/*|packages/react-on-rails/src/**/*|packages/react-on-rails/tests/*|packages/react-on-rails/tests/**/*|packages/react-on-rails/scripts/*|packages/react-on-rails/scripts/**/*|packages/react-on-rails/package.json|packages/react-on-rails/tsconfig.json|.github/workflows/package-js-tests.yml)
       DOCS_ONLY=false
-      JS_CHANGED=true
+      if source_file_comment_only_change "$file"; then
+        SOURCE_COMMENT_ONLY_CHANGED=true
+      else
+        JS_CHANGED=true
+      fi
       ;;
 
     # Dummy app
     react_on_rails/spec/dummy/*|react_on_rails/spec/dummy/**/*|.github/workflows/integration-tests.yml)
       DOCS_ONLY=false
-      SPEC_DUMMY_CHANGED=true
+      if source_file_comment_only_change "$file"; then
+        SOURCE_COMMENT_ONLY_CHANGED=true
+      else
+        SPEC_DUMMY_CHANGED=true
+      fi
       ;;
 
-    # React on Rails Pro source code
-    react_on_rails_pro/lib/*|react_on_rails_pro/lib/**/*)
+    # React on Rails Pro source code (lib + app)
+    react_on_rails_pro/lib/*|react_on_rails_pro/lib/**/*|react_on_rails_pro/app/*|react_on_rails_pro/app/**/*)
       DOCS_ONLY=false
-      PRO_RUBY_CORE_CHANGED=true
+      if source_file_comment_only_change "$file"; then
+        PRO_SOURCE_COMMENT_ONLY_CHANGED=true
+      else
+        PRO_RUBY_CORE_CHANGED=true
+      fi
       ;;
 
     # JavaScript/TypeScript Pro source (including tests, scripts, and package files)
     packages/react-on-rails-pro/src/*|packages/react-on-rails-pro/src/**/*|packages/react-on-rails-pro/tests/*|packages/react-on-rails-pro/tests/**/*|packages/react-on-rails-pro/scripts/*|packages/react-on-rails-pro/scripts/**/*|packages/react-on-rails-pro/package.json|packages/react-on-rails-pro/tsconfig.json)
       DOCS_ONLY=false
-      PRO_JS_CHANGED=true
+      if source_file_comment_only_change "$file"; then
+        PRO_SOURCE_COMMENT_ONLY_CHANGED=true
+      else
+        PRO_JS_CHANGED=true
+      fi
       ;;
 
     # Ruby Pro gem-specific specs
     react_on_rails_pro/spec/react_on_rails/*|react_on_rails_pro/spec/react_on_rails/**/*|.github/workflows/pro-gem-tests.yml)
       DOCS_ONLY=false
-      PRO_RSPEC_CHANGED=true
+      if source_file_comment_only_change "$file"; then
+        PRO_SOURCE_COMMENT_ONLY_CHANGED=true
+      else
+        PRO_RSPEC_CHANGED=true
+      fi
       ;;
 
     # React on Rails Pro package / dummy app
     react_on_rails_pro/spec/dummy/*|react_on_rails_pro/spec/dummy/**/*|react_on_rails_pro/spec/execjs-compatible-dummy/*|react_on_rails_pro/spec/execjs-compatible-dummy/**/*|.github/workflows/pro-integration-tests.yml)
       DOCS_ONLY=false
-      PRO_DUMMY_CHANGED=true
+      if source_file_comment_only_change "$file"; then
+        PRO_SOURCE_COMMENT_ONLY_CHANGED=true
+      else
+        PRO_DUMMY_CHANGED=true
+      fi
       ;;
 
     # React on Rails Pro Node Renderer package (JS/TS source, tests, configs)
     packages/react-on-rails-pro-node-renderer/src/*|packages/react-on-rails-pro-node-renderer/src/**/*|packages/react-on-rails-pro-node-renderer/tests/*|packages/react-on-rails-pro-node-renderer/tests/**/*|packages/react-on-rails-pro-node-renderer/scripts/*|packages/react-on-rails-pro-node-renderer/scripts/**/*|packages/react-on-rails-pro-node-renderer/package.json|packages/react-on-rails-pro-node-renderer/tsconfig.json|.github/workflows/node-renderer-tests.yml)
       DOCS_ONLY=false
-      PRO_NODE_RENDERER_CHANGED=true
+      if source_file_comment_only_change "$file"; then
+        PRO_SOURCE_COMMENT_ONLY_CHANGED=true
+      else
+        PRO_NODE_RENDERER_CHANGED=true
+      fi
       ;;
 
     # Lint/format configuration
@@ -159,7 +386,7 @@ while IFS= read -r file; do
 
     # CI infrastructure files (scripts, workflows, CI configs)
     # Changes to CI infrastructure should trigger tests to validate the changes work
-    script/*|script/**/*|bin/*|bin/**/*|.github/workflows/*|.github/actions/*|.github/actions/**/*|lefthook.yml)
+    script/*|script/**/*|bin/*|bin/**/*|.github/workflows/*|.github/actions/*|.github/actions/**/*|.lefthook.yml)
       DOCS_ONLY=false
       RUBY_CORE_CHANGED=true  # Trigger all tests for CI infrastructure changes
       JS_CHANGED=true
@@ -181,6 +408,28 @@ while IFS= read -r file; do
   esac
 done <<< "$CHANGED_FILES"
 
+NON_RUNTIME_ONLY=false
+if [ "$DOCS_ONLY" = true ]; then
+  NON_RUNTIME_ONLY=true
+elif [ "$SOURCE_COMMENT_ONLY_CHANGED" = true ] || [ "$PRO_SOURCE_COMMENT_ONLY_CHANGED" = true ]; then
+  if [ "$LINT_CONFIG_CHANGED" = false ] &&
+    [ "$PRO_LINT_CONFIG_CHANGED" = false ] &&
+    [ "$RUBY_CORE_CHANGED" = false ] &&
+    [ "$RSPEC_CHANGED" = false ] &&
+    [ "$BENCHMARKS_CHANGED" = false ] &&
+    [ "$SPEC_DUMMY_CHANGED" = false ] &&
+    [ "$JS_CHANGED" = false ] &&
+    [ "$GENERATORS_CHANGED" = false ] &&
+    [ "$PRO_RUBY_CORE_CHANGED" = false ] &&
+    [ "$PRO_RSPEC_CHANGED" = false ] &&
+    [ "$PRO_JS_CHANGED" = false ] &&
+    [ "$PRO_DUMMY_CHANGED" = false ] &&
+    [ "$PRO_NODE_RENDERER_CHANGED" = false ] &&
+    [ "$UNCATEGORIZED_CHANGED" = false ]; then
+    NON_RUNTIME_ONLY=true
+  fi
+fi
+
 # Output results
 echo "=== CI Changes Analysis ==="
 echo "Base: $BASE_REF | Current: $CURRENT_REF | Merge base: $MERGE_BASE"
@@ -191,15 +440,18 @@ if [ "$DOCS_ONLY" = true ]; then
   # Format: "flag_name:value" pairs
   CI_FLAGS=(
     "docs_only:true"
+    "non_runtime_only:true"
     "run_lint:false"
     "run_ruby_tests:false"
     "run_js_tests:false"
     "run_dummy_tests:false"
     "run_generators:false"
+    "run_e2e_tests:false"
     "run_pro_lint:false"
     "run_pro_tests:false"
     "run_pro_dummy_tests:false"
     "run_pro_node_renderer_tests:false"
+    "benchmarks_changed:false"
   )
 
   # Output to GITHUB_OUTPUT if in GitHub Actions
@@ -238,6 +490,7 @@ echo "Changed file categories:"
 [ "$RUBY_CORE_CHANGED" = true ] && echo -e "${YELLOW}  • Ruby core source code${NC}"
 [ "$JS_CHANGED" = true ] && echo -e "${YELLOW}  • JavaScript/TypeScript code${NC}"
 [ "$RSPEC_CHANGED" = true ] && echo -e "${YELLOW}  • RSpec tests${NC}"
+[ "$BENCHMARKS_CHANGED" = true ] && echo -e "${YELLOW}  • Benchmark scripts${NC}"
 [ "$SPEC_DUMMY_CHANGED" = true ] && echo -e "${YELLOW}  • Dummy app${NC}"
 [ "$GENERATORS_CHANGED" = true ] && echo -e "${YELLOW}  • Generators${NC}"
 [ "$PRO_JS_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro JavaScript/TypeScript${NC}"
@@ -247,6 +500,8 @@ echo "Changed file categories:"
 [ "$PRO_NODE_RENDERER_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro Node Renderer package${NC}"
 [ "$LINT_CONFIG_CHANGED" = true ] && echo -e "${YELLOW}  • Lint/format configuration${NC}"
 [ "$PRO_LINT_CONFIG_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro lint configuration${NC}"
+[ "$SOURCE_COMMENT_ONLY_CHANGED" = true ] && echo -e "${YELLOW}  • Source comments only${NC}"
+[ "$PRO_SOURCE_COMMENT_ONLY_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro source comments only${NC}"
 [ "$UNCATEGORIZED_CHANGED" = true ] && echo -e "${YELLOW}  • Uncategorized changes (running full suite for safety)${NC}"
 
 echo ""
@@ -258,6 +513,7 @@ RUN_RUBY_TESTS=false
 RUN_JS_TESTS=false
 RUN_DUMMY_TESTS=false
 RUN_GENERATORS=false
+RUN_E2E_TESTS=false
 RUN_PRO_LINT=false
 RUN_PRO_TESTS=false
 RUN_PRO_DUMMY_TESTS=false
@@ -267,8 +523,20 @@ if [ "$LINT_CONFIG_CHANGED" = true ] || [ "$RUBY_CORE_CHANGED" = true ] || [ "$J
   RUN_LINT=true
 fi
 
+if [ "$SOURCE_COMMENT_ONLY_CHANGED" = true ]; then
+  RUN_LINT=true
+fi
+
 if [ "$RUBY_CORE_CHANGED" = true ] || [ "$RSPEC_CHANGED" = true ] || [ "$GENERATORS_CHANGED" = true ]; then
   RUN_RUBY_TESTS=true
+fi
+
+# Benchmark scripts live outside the gem: they're linted by rubocop and covered
+# by their own specs in the benchmark workflow (not the gem rspec suite), so they
+# only need lint here. The benchmarks_changed output drives the benchmark
+# workflow's script-validation step.
+if [ "$BENCHMARKS_CHANGED" = true ]; then
+  RUN_LINT=true
 fi
 
 if [ "$JS_CHANGED" = true ]; then
@@ -279,6 +547,12 @@ if [ "$SPEC_DUMMY_CHANGED" = true ] || [ "$RUBY_CORE_CHANGED" = true ] || [ "$JS
   RUN_DUMMY_TESTS=true
 fi
 
+if [ "$RUN_DUMMY_TESTS" = true ]; then
+  # E2E tests exercise the dummy app integration stack, so pure gem-spec or
+  # generator-only changes do not trigger them unless another dummy trigger does.
+  RUN_E2E_TESTS=true
+fi
+
 # JS changes trigger generator tests because generators do a full build
 # which catches TypeScript compilation errors (see issue #2205)
 if [ "$GENERATORS_CHANGED" = true ] || [ "$JS_CHANGED" = true ]; then
@@ -286,6 +560,10 @@ if [ "$GENERATORS_CHANGED" = true ] || [ "$JS_CHANGED" = true ]; then
 fi
 
 if [ "$PRO_LINT_CONFIG_CHANGED" = true ] || [ "$PRO_RUBY_CORE_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ] || [ "$PRO_DUMMY_CHANGED" = true ] || [ "$RUBY_CORE_CHANGED" = true ] || [ "$PRO_NODE_RENDERER_CHANGED" = true ]; then
+  RUN_PRO_LINT=true
+fi
+
+if [ "$PRO_SOURCE_COMMENT_ONLY_CHANGED" = true ]; then
   RUN_PRO_LINT=true
 fi
 
@@ -308,6 +586,7 @@ if [ "$UNCATEGORIZED_CHANGED" = true ]; then
   RUN_JS_TESTS=true
   RUN_DUMMY_TESTS=true
   RUN_GENERATORS=true
+  RUN_E2E_TESTS=true
   RUN_PRO_LINT=true
   RUN_PRO_TESTS=true
   RUN_PRO_DUMMY_TESTS=true
@@ -319,6 +598,7 @@ fi
 [ "$RUN_JS_TESTS" = true ] && echo "  ✓ JS unit tests"
 [ "$RUN_DUMMY_TESTS" = true ] && echo "  ✓ Dummy app integration tests"
 [ "$RUN_GENERATORS" = true ] && echo "  ✓ Generator tests"
+[ "$RUN_E2E_TESTS" = true ] && echo "  ✓ Playwright E2E tests"
 [ "$RUN_PRO_LINT" = true ] && echo "  ✓ React on Rails Pro Lint (Ruby + RBS + TypeScript)"
 [ "$RUN_PRO_TESTS" = true ] && echo "  ✓ React on Rails Pro RSpec unit tests (Ruby + JS)"
 [ "$RUN_PRO_DUMMY_TESTS" = true ] && echo "  ✓ React on Rails Pro Dummy app integration tests"
@@ -328,15 +608,18 @@ fi
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
   {
     echo "docs_only=$DOCS_ONLY"
+    echo "non_runtime_only=$NON_RUNTIME_ONLY"
     echo "run_lint=$RUN_LINT"
     echo "run_ruby_tests=$RUN_RUBY_TESTS"
     echo "run_js_tests=$RUN_JS_TESTS"
     echo "run_dummy_tests=$RUN_DUMMY_TESTS"
     echo "run_generators=$RUN_GENERATORS"
+    echo "run_e2e_tests=$RUN_E2E_TESTS"
     echo "run_pro_lint=$RUN_PRO_LINT"
     echo "run_pro_tests=$RUN_PRO_TESTS"
     echo "run_pro_dummy_tests=$RUN_PRO_DUMMY_TESTS"
     echo "run_pro_node_renderer_tests=$RUN_PRO_NODE_RENDERER_TESTS"
+    echo "benchmarks_changed=$BENCHMARKS_CHANGED"
   } >> "$GITHUB_OUTPUT"
 fi
 
@@ -345,15 +628,18 @@ if [ "${CI_JSON_OUTPUT:-}" = "1" ]; then
   cat << EOF
 {
   "docs_only": $DOCS_ONLY,
+  "non_runtime_only": $NON_RUNTIME_ONLY,
   "run_lint": $RUN_LINT,
   "run_ruby_tests": $RUN_RUBY_TESTS,
   "run_js_tests": $RUN_JS_TESTS,
   "run_dummy_tests": $RUN_DUMMY_TESTS,
   "run_generators": $RUN_GENERATORS,
+  "run_e2e_tests": $RUN_E2E_TESTS,
   "run_pro_lint": $RUN_PRO_LINT,
   "run_pro_tests": $RUN_PRO_TESTS,
   "run_pro_dummy_tests": $RUN_PRO_DUMMY_TESTS,
-  "run_pro_node_renderer_tests": $RUN_PRO_NODE_RENDERER_TESTS
+  "run_pro_node_renderer_tests": $RUN_PRO_NODE_RENDERER_TESTS,
+  "benchmarks_changed": $BENCHMARKS_CHANGED
 }
 EOF
 fi

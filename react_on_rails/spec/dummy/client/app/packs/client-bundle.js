@@ -11,6 +11,8 @@ import ManualRenderComponent from '../startup/ManualRenderComponent';
 import SharedReduxStore from '../stores/SharedReduxStore';
 import { wrapRegisteredComponentsWithStrictMode } from '../strictModeSupport';
 
+const useStrictMode = process.env.NODE_ENV !== 'production';
+
 const STRICT_MODE_PATCHED = '__reactOnRailsDummyStrictModePatched';
 
 // Scope: this patch only affects `ReactOnRails.register` calls that share this bundle's
@@ -27,7 +29,7 @@ const STRICT_MODE_PATCHED = '__reactOnRailsDummyStrictModePatched';
 // webpack compilation (e.g., a standalone bundle config) would get its own unpatched module
 // instance. When adding a pack like that, either fold it into this compilation or duplicate
 // this `STRICT_MODE_PATCHED` block at the top of the new pack before any `register` calls.
-if (!ReactOnRails[STRICT_MODE_PATCHED]) {
+if (useStrictMode && !ReactOnRails[STRICT_MODE_PATCHED]) {
   const originalRegister = ReactOnRails.register.bind(ReactOnRails);
 
   ReactOnRails.register = (components) =>

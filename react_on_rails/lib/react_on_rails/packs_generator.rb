@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "fileutils"
-require "set"
 
 module ReactOnRails
   # rubocop:disable Metrics/ClassLength

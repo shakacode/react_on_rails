@@ -8,6 +8,7 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
 
 - `AGENTS.md`: canonical entry point for agent instructions and workflow discovery
 - `.claude/commands/`: Claude Code slash commands
+- `.claude/skills/`: Claude Code skills
 - `.agents/workflows/`: shared prompt templates and reusable workflows for Codex, GPT, and other non-Claude tools
 - When the user asks to address PR review comments outside Claude slash commands, follow `.agents/workflows/address-review.md`
 
@@ -157,6 +158,12 @@ expect { evaluate(sanitized_content) }.not_to raise_error
 
 Prettier handles all formatting. Never manually format — run `rake autofix` instead.
 
+### GitHub Actions
+
+For GitHub Actions jobs that install Ruby gems, prefer `.github/actions/setup-bundle` over hand-written `actions/cache` plus `bundle install` steps.
+The action validates a committed `Gemfile.lock`, configures the bundle path and Bundler version for later `bundle exec` steps,
+restores/saves the gem cache, and supports non-frozen installs via `frozen: 'false'` for minimum-dependency jobs.
+
 ## Git Workflow
 
 **Branch naming**: `type/descriptive-name` (e.g., `fix/ssr-hydration-mismatch`)
@@ -166,6 +173,16 @@ Prettier handles all formatting. Never manually format — run `rake autofix` in
 **PR creation**: Use `gh pr create` with a clear title, summary, and test plan.
 
 ## Review Workflow
+
+### PR CI Labels
+
+Agents should recommend PR labels based on change complexity and risk. The goal is to keep low-risk PRs mergeable on fast, path-relevant CI while still escalating high-risk PRs (HPRs) before merge.
+
+- **Default: no CI-expansion label.** For docs-only changes, focused tests, small isolated fixes, and refactors with no cross-package behavior change, rely on the standard path-based CI selection and local verification.
+- **Use `full-ci`** (or ask a maintainer to comment `/run-skipped-ci`) when the PR is high-risk or broad: CI workflow/detector changes, dependency or lockfile updates, package manager/Ruby/Node version changes, release/build/package publishing logic, generator output, dummy app boot/build behavior, SSR or hydration behavior, cross-cutting core Ruby changes, Pro/core boundary changes, or changes where skipped suites would leave a credible regression path.
+- **Use `benchmark`** for performance-sensitive changes: server rendering paths, Node renderer, caching, bundle generation, asset serving/precompile behavior, concurrency/pooling, or anything expected to affect throughput, latency, memory, or bundle size. `full-ci` does not trigger benchmarks; use both labels when a PR is both high-risk and performance-sensitive.
+- **Remove `full-ci` when no longer needed** with `/stop-run-skipped-ci` if the PR returns to a low-risk state after splitting or reverting broad changes.
+- In PR descriptions and handoffs, state the recommended label decision explicitly: `Labels: none`, `Labels: full-ci`, `Labels: benchmark`, or `Labels: full-ci, benchmark`, with one sentence explaining why.
 
 For small, focused PRs (roughly 5 files changed or fewer and one clear purpose):
 
@@ -200,7 +217,6 @@ For small, focused PRs (roughly 5 files changed or fewer and one clear purpose):
 - Destructive git operations: `reset --hard` on a branch with work, branch deletion, or force-push that drops/squashes commits, republishes a conflicted rebase, or runs when the remote has commits you don't have locally. (Force-push after a clean rebase — no conflicts, all commits preserved — is OK without asking.)
 - Changes to CI workflows (`.github/workflows/`)
 - Changes to build configuration (`package.json` scripts, webpack config)
-- Modifying the Pro package (`react_on_rails_pro/`)
 
 ### Never
 
@@ -209,6 +225,32 @@ For small, focused PRs (roughly 5 files changed or fewer and one clear purpose):
 - Commit `package-lock.json`, `yarn.lock`, or other non-pnpm lock files
 - Add files to the `docs/` root — OSS docs go in `docs/oss/` subdirectories (`getting-started/`, `core-concepts/`, `building-features/`, `configuration/`, `api-reference/`, `deployment/`, `migrating/`, `upgrading/`, `misc/`); Pro docs go in `docs/pro/`
 - Force push to `main` or `master`
+- Reintroduce conditional gem declarations like `gem "turbolinks" if ENV["DISABLE_TURBOLINKS"].nil?` in `react_on_rails/Gemfile.development_dependencies` — conditional inclusion diverges from the lockfile and breaks `bundle install --frozen` in CI. See the comment in that Gemfile for the full explanation.
+
+## Main branch health
+
+The `main` branch must stay green. CI failures on `main` block releases:
+`rake release` refuses to publish over a red `main` unless you explicitly
+override (via `RELEASE_CI_STATUS_OVERRIDE=true` or the 4th positional arg).
+Stable releases require every check to pass; pre-releases require only the
+GitHub-branch-protection-required checks.
+
+Claude Code sessions get `main`'s CI status injected at session start (and
+again before `gh pr create` / pushing to `main`) via
+`.claude/hooks/main-ci-status.sh`. Read it.
+
+If `main` is red:
+
+1. **Decide whether the failure is related to your work.** If yes, your job
+   is to fix it (or revert) before adding new commits on top.
+2. **If unrelated, decide whether your work is safe to merge on top.** PRs
+   that add risk on top of a known-broken `main` should usually wait.
+3. **If you're the one merging a PR**, check `main` post-merge within 30
+   minutes (see `.claude/docs/main-health-monitoring.md`).
+
+**Never silently override the release CI gate.** If you set
+`RELEASE_CI_STATUS_OVERRIDE=true`, document in the PR / release notes why
+the red checks are unrelated to the release.
 
 ## Key Concept: File Suffixes vs. RSC Directive
 

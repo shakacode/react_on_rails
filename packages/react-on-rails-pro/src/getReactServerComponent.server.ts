@@ -17,6 +17,7 @@ import { buildClientRenderer } from 'react-on-rails-rsc/client.node';
 import type { RailsContextWithServerStreamingCapabilities } from 'react-on-rails/types';
 import transformRSCStream from './transformRSCNodeStream.ts';
 import loadJsonFile from './loadJsonFile.ts';
+import { mergeRSCStreamDiagnosticError } from './rscDiagnostics.ts';
 
 type GetReactServerComponentOnServerProps = {
   componentName: string;
@@ -29,6 +30,7 @@ const createFromReactOnRailsNodeStream = async (
   stream: NodeJS.ReadableStream,
   reactServerManifestFileName: string,
   reactClientManifestFileName: string,
+  componentName: string,
 ) => {
   if (!clientRendererPromise) {
     clientRendererPromise = Promise.all([
@@ -45,8 +47,26 @@ const createFromReactOnRailsNodeStream = async (
   }
 
   const { createFromNodeStream } = await clientRendererPromise;
-  const transformedStream = transformRSCStream(stream);
-  return createFromNodeStream<React.ReactNode>(transformedStream);
+  let rscDiagnosticError: Error | undefined;
+  const transformedStream = transformRSCStream(stream, {
+    componentName,
+    onDiagnosticError(error) {
+      rscDiagnosticError = error;
+    },
+  });
+
+  // Note: this try/catch enriches any error that rejects `createFromNodeStream` — stream read
+  // failures, malformed Flight data, or synchronous render errors. It does NOT catch errors
+  // React surfaces through its error-boundary / Suspense mechanism during the deferred render
+  // phase (e.g. when a Suspense boundary resolves a lazy element); those never reject this
+  // promise. In that case `rscDiagnosticError` (a local that goes out of scope when this
+  // function returns) is discarded and the caller sees only the generic React error. Enriching
+  // the deferred-render path is tracked in #3475.
+  try {
+    return await createFromNodeStream<React.ReactNode>(transformedStream);
+  } catch (error: unknown) {
+    throw mergeRSCStreamDiagnosticError(error, rscDiagnosticError);
+  }
 };
 
 /**
@@ -89,6 +109,7 @@ const getReactServerComponent =
       rscPayloadStream,
       railsContext.reactServerClientManifestFileName,
       railsContext.reactClientManifestFileName,
+      componentName,
     );
   };
 

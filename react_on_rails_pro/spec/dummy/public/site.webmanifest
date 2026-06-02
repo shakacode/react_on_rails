@@ -1,0 +1,23 @@
+{
+  "name": "React on Rails Pro Demo",
+  "short_name": "ROR Pro",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "start_url": "/",
+  "scope": "/",
+  "theme_color": "#0B1118",
+  "background_color": "#0B1118",
+  "display": "standalone"
+}

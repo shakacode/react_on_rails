@@ -68,7 +68,7 @@ ReactOnRailsPro.configure do |config|
   config.throw_js_errors = true
 
   # You may provide a password and/or a port that will be sent to renderer for simple authentication.
-  # `https://:<password>@url:<port>`. For example: https://:myPassword1@renderer:3800. Don't forget
+  # `https://:<password>@url:<port>`. For example: https://:YOUR_SECURE_PASSWORD@renderer:3800. Don't forget
   # the leading `:` before the password. Your password must also not contain certain characters that
   # would break calling URI(config.renderer_url). This includes: `@`, `#`, '/'.
   # **Note:** Don't forget to set up **SSL** connection (https) otherwise password will useless

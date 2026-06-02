@@ -17,6 +17,8 @@
  *
  * Wire format per chunk:
  *   <metadata JSON>\t<content byte length hex>\n<raw content bytes>
+ * Blank separator lines between records are tolerated, including CR-only
+ * separators from CRLF line endings.
  *
  * Handles buffer boundaries: a single feed() call may contain partial
  * headers, partial content, or multiple complete chunks merged together.
@@ -31,6 +33,10 @@ function concatBytes(a: Uint8Array, b: Uint8Array): Uint8Array {
   result.set(a);
   result.set(b, a.length);
   return result;
+}
+
+function isBlankSeparatorLine(header: Uint8Array): boolean {
+  return header.length === 0 || header.every((byte) => byte === 0x0d); // 0x0d = CR from \r\n endings
 }
 
 export default class LengthPrefixedStreamParser {
@@ -52,26 +58,28 @@ export default class LengthPrefixedStreamParser {
         if (idx >= 0) {
           const header = this.buf.subarray(0, idx);
           this.buf = this.buf.subarray(idx + 1);
-          const tabIdx = header.indexOf(0x09); // \t
-          if (tabIdx < 0) {
-            throw new Error(
-              `Malformed length-prefixed header: missing tab separator in: ${JSON.stringify(decoder.decode(header))}`,
-            );
+          if (!isBlankSeparatorLine(header)) {
+            const tabIdx = header.indexOf(0x09); // \t
+            if (tabIdx < 0) {
+              throw new Error(
+                `Malformed length-prefixed header: missing tab separator in: ${JSON.stringify(decoder.decode(header))}`,
+              );
+            }
+            const metaStr = decoder.decode(header.subarray(0, tabIdx));
+            try {
+              this.metadata = JSON.parse(metaStr);
+            } catch {
+              throw new Error(
+                `Malformed length-prefixed header: invalid metadata JSON: ${JSON.stringify(metaStr)}`,
+              );
+            }
+            const lenHex = decoder.decode(header.subarray(tabIdx + 1));
+            if (!/^[0-9a-fA-F]+$/.test(lenHex)) {
+              throw new Error(`Invalid content length hex: ${JSON.stringify(lenHex)}`);
+            }
+            this.contentLen = parseInt(lenHex, 16);
+            this.state = 'content';
           }
-          const metaStr = decoder.decode(header.subarray(0, tabIdx));
-          try {
-            this.metadata = JSON.parse(metaStr);
-          } catch {
-            throw new Error(
-              `Malformed length-prefixed header: invalid metadata JSON: ${JSON.stringify(metaStr)}`,
-            );
-          }
-          const lenHex = decoder.decode(header.subarray(tabIdx + 1));
-          if (!/^[0-9a-fA-F]+$/.test(lenHex)) {
-            throw new Error(`Invalid content length hex: ${JSON.stringify(lenHex)}`);
-          }
-          this.contentLen = parseInt(lenHex, 16);
-          this.state = 'content';
         } else {
           canExtract = false;
         }
@@ -97,7 +105,9 @@ export default class LengthPrefixedStreamParser {
   }
 
   flush(): void {
-    if (this.state === 'header' && this.buf.length === 0) return;
+    // A stream can end after the CR half of a CRLF separator; all-CR buffers
+    // are blank separator fragments, not incomplete payload data.
+    if (this.state === 'header' && isBlankSeparatorLine(this.buf)) return;
     console.warn(
       `[react_on_rails] Incomplete length-prefixed stream: ${this.buf.length} bytes remaining in state ${this.state}`,
     );

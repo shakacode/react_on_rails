@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "set"
 require_relative "spec_helper"
 require_relative "../../lib/react_on_rails_pro/assets_precompile"
 

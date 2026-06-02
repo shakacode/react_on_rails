@@ -83,7 +83,7 @@ jobs:
             Triggers all CI workflows that were skipped due to unchanged code.
 
             **What it does:**
-            - Runs tests across all supported versions (Ruby 3.2-3.4, Node 20-22, Shakapacker 8-9, React 18-19)
+            - Runs tests across all supported versions (Ruby 3.3-4.0, Node 20-22, Shakapacker 8-10, React 18-19)
             - Adds the \\\`full-ci\\\` label to persist full testing on future commits
             - Triggers: Main tests, Generator tests, and React on Rails Pro tests
 
@@ -154,8 +154,8 @@ jobs:
 
             **Switch between CI configurations:**
             \\\`\\\`\\\`bash
-            bin/ci-switch-config minimum  # Test with Ruby 3.2, Node 20, etc.
-            bin/ci-switch-config latest   # Return to Ruby 3.4, Node 22, etc.
+            bin/ci-switch-config minimum  # Test with Ruby 3.3, Node 20, etc.
+            bin/ci-switch-config latest   # Return to Ruby 4.0, Node 22, etc.
             \\\`\\\`\\\`
 
             ---

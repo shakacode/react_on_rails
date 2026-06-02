@@ -5,10 +5,22 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../" && pwd)"
 CLI_BIN="$ROOT_DIR/packages/create-react-on-rails-app/bin/create-react-on-rails-app.js"
 RUBY_GEM_DIR="$ROOT_DIR/react_on_rails"
 RUBY_PRO_GEM_DIR="$ROOT_DIR/react_on_rails_pro"
+SMOKE_SCOPE="${CREATE_ROR_SMOKE_SCOPE:-full}"
 
-if [[ ! -d "$RUBY_PRO_GEM_DIR" ]]; then
-  echo "react_on_rails_pro not found at $RUBY_PRO_GEM_DIR. Check out the Pro gem before running RSC smoke tests." >&2
-  exit 1
+case "$SMOKE_SCOPE" in
+  full | oss) ;;
+  *)
+    echo "Unsupported CREATE_ROR_SMOKE_SCOPE=$SMOKE_SCOPE. Use 'full' or 'oss'." >&2
+    exit 1
+    ;;
+esac
+
+if [[ "$SMOKE_SCOPE" == "full" ]]; then
+  if [[ ! -d "$RUBY_PRO_GEM_DIR" ]]; then
+    echo "react_on_rails_pro not found at $RUBY_PRO_GEM_DIR. Check out the Pro gem before running RSC smoke tests." >&2
+    echo "Set CREATE_ROR_SMOKE_SCOPE=oss to run only OSS generated-app smoke tests." >&2
+    exit 1
+  fi
 fi
 
 if ! command -v rails >/dev/null 2>&1; then
@@ -60,37 +72,44 @@ trap cleanup_on_error ERR
 
 export CI=true
 export REACT_ON_RAILS_GEM_PATH="$RUBY_GEM_DIR"
-export REACT_ON_RAILS_PRO_GEM_PATH="$RUBY_PRO_GEM_DIR"
+if [[ "$SMOKE_SCOPE" == "full" ]]; then
+  export REACT_ON_RAILS_PRO_GEM_PATH="$RUBY_PRO_GEM_DIR"
+fi
 
 echo "Workdir: $WORKDIR"
-echo "Generating TypeScript app: $APP_TS"
-(cd "$WORKDIR" && node "$CLI_BIN" "$APP_TS" --package-manager pnpm)
+echo "Smoke scope: $SMOKE_SCOPE"
+echo "Generating TypeScript Webpack app: $APP_TS"
+(cd "$WORKDIR" && node "$CLI_BIN" "$APP_TS" --standard --webpack --package-manager pnpm)
 
-echo "Generating JavaScript app: $APP_JS"
-(cd "$WORKDIR" && node "$CLI_BIN" "$APP_JS" --template javascript --package-manager pnpm)
+echo "Generating JavaScript Webpack app: $APP_JS"
+(cd "$WORKDIR" && node "$CLI_BIN" "$APP_JS" --standard --template javascript --webpack --package-manager pnpm)
 
 echo "Generating Rspack app: $APP_RSPACK"
-(cd "$WORKDIR" && node "$CLI_BIN" "$APP_RSPACK" --rspack --package-manager pnpm)
+(cd "$WORKDIR" && node "$CLI_BIN" "$APP_RSPACK" --standard --rspack --package-manager pnpm)
 
-echo "Generating Pro app: $APP_PRO"
-(cd "$WORKDIR" && node "$CLI_BIN" "$APP_PRO" --pro --package-manager pnpm)
+if [[ "$SMOKE_SCOPE" == "full" ]]; then
+  echo "Generating Pro Webpack app: $APP_PRO"
+  (cd "$WORKDIR" && node "$CLI_BIN" "$APP_PRO" --pro --webpack --package-manager pnpm)
 
-echo "Generating JavaScript RSC app with local Pro gem: $APP_RSC_JS"
-(cd "$WORKDIR" && node "$CLI_BIN" "$APP_RSC_JS" --rsc --template javascript --package-manager pnpm)
+  echo "Generating JavaScript RSC Webpack app with local Pro gem: $APP_RSC_JS"
+  (cd "$WORKDIR" && node "$CLI_BIN" "$APP_RSC_JS" --rsc --template javascript --webpack --package-manager pnpm)
 
-echo "Generating TypeScript RSC app with local Pro gem: $APP_RSC_TS"
-(cd "$WORKDIR" && node "$CLI_BIN" "$APP_RSC_TS" --rsc --template typescript --package-manager pnpm)
+  echo "Generating TypeScript RSC Webpack app with local Pro gem: $APP_RSC_TS"
+  (cd "$WORKDIR" && node "$CLI_BIN" "$APP_RSC_TS" --rsc --template typescript --webpack --package-manager pnpm)
 
-echo "Generating Rspack + RSC app with local Pro gem: $APP_RSC_RSPACK"
-(cd "$WORKDIR" && node "$CLI_BIN" "$APP_RSC_RSPACK" --rspack --rsc --package-manager pnpm)
+  echo "Generating Rspack + RSC app with local Pro gem: $APP_RSC_RSPACK"
+  (cd "$WORKDIR" && node "$CLI_BIN" "$APP_RSC_RSPACK" --rspack --rsc --package-manager pnpm)
+fi
 
 APP_TS_DIR="$WORKDIR/$APP_TS"
 APP_JS_DIR="$WORKDIR/$APP_JS"
 APP_RSPACK_DIR="$WORKDIR/$APP_RSPACK"
-APP_PRO_DIR="$WORKDIR/$APP_PRO"
-APP_RSC_JS_DIR="$WORKDIR/$APP_RSC_JS"
-APP_RSC_TS_DIR="$WORKDIR/$APP_RSC_TS"
-APP_RSC_RSPACK_DIR="$WORKDIR/$APP_RSC_RSPACK"
+if [[ "$SMOKE_SCOPE" == "full" ]]; then
+  APP_PRO_DIR="$WORKDIR/$APP_PRO"
+  APP_RSC_JS_DIR="$WORKDIR/$APP_RSC_JS"
+  APP_RSC_TS_DIR="$WORKDIR/$APP_RSC_TS"
+  APP_RSC_RSPACK_DIR="$WORKDIR/$APP_RSC_RSPACK"
+fi
 
 expect_git_history() {
   local app_dir="$1"
@@ -123,6 +142,46 @@ expect_git_history() {
     echo "node_modules/ should not be tracked in $app_dir" >&2
     return 1
   fi
+}
+
+verify_rails_route() {
+  local app_dir="$1"
+  local route_path="$2"
+  local expected_text="$3"
+
+  echo "Verifying $(basename "$app_dir") renders $route_path..."
+  (
+    cd "$app_dir"
+    SMOKE_ROUTE_PATH="$route_path" SMOKE_EXPECTED_TEXT="$expected_text" \
+      RAILS_ENV=test NODE_ENV=test bin/rails runner '
+        path = ENV.fetch("SMOKE_ROUTE_PATH")
+        expected_text = ENV.fetch("SMOKE_EXPECTED_TEXT")
+        session = ActionDispatch::Integration::Session.new(Rails.application)
+        session.host!("localhost")
+        session.get(path)
+
+        unless session.response.status == 200
+          warn "Expected #{path} to render 200, got #{session.response.status}"
+          warn session.response.body[0, 1000]
+          exit 1
+        end
+
+        unless session.response.body.include?(expected_text)
+          warn "Expected #{path} response to include #{expected_text.inspect}"
+          warn session.response.body[0, 1000]
+          exit 1
+        end
+      '
+  )
+}
+
+verify_generated_app_runtime() {
+  local app_dir="$1"
+
+  echo "Building test bundles for $(basename "$app_dir")..."
+  (cd "$app_dir" && "${PNPM_CMD[@]}" run build:test >/dev/null)
+  verify_rails_route "$app_dir" "/" "OSS vs Pro"
+  verify_rails_route "$app_dir" "/hello_world" "Say hello to:"
 }
 
 echo "Verifying generated files..."
@@ -186,6 +245,11 @@ expect_git_history "$APP_RSPACK_DIR" \
   "Install React on Rails with TypeScript and Rspack" \
   "Normalize the generated app for pnpm"
 
+verify_generated_app_runtime "$APP_TS_DIR"
+verify_generated_app_runtime "$APP_JS_DIR"
+verify_generated_app_runtime "$APP_RSPACK_DIR"
+
+if [[ "$SMOKE_SCOPE" == "full" ]]; then
 grep -q "gem \"react_on_rails\"" "$APP_PRO_DIR/Gemfile"
 grep -q "path: \"$RUBY_GEM_DIR\"" "$APP_PRO_DIR/Gemfile"
 grep -q "gem \"react_on_rails_pro\"" "$APP_PRO_DIR/Gemfile"
@@ -270,6 +334,7 @@ expect_git_history "$APP_RSC_RSPACK_DIR" \
   "Add react_on_rails_pro gem" \
   "Install React Server Components with TypeScript and Rspack" \
   "Normalize the generated app for pnpm"
+fi
 
 echo "Smoke test passed."
 if [[ "${KEEP_WORKDIR:-0}" == "1" ]]; then

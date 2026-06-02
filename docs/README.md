@@ -1,5 +1,10 @@
 # Documentation Guide
 
+> **Current docs:** This documentation is for React on Rails 17. For historical v15 material, see the
+> [React on Rails 15.0.0 docs](https://github.com/shakacode/react_on_rails/tree/15.0.0/docs) and
+> [React on Rails 15.0.0 code](https://github.com/shakacode/react_on_rails/tree/15.0.0). Version 15.0.0 was
+> retracted, so use these links only when maintaining older applications.
+
 React on Rails is one product with two tiers: open source for Rails + React integration, and Pro when you need higher SSR throughput, deeper RSC support, or maintainer-backed help.
 
 ## Choose the path that matches your app
@@ -44,6 +49,7 @@ Start at [React on Rails Pro](./pro/react-on-rails-pro.md) for the canonical Pro
 - [React Server Components](./pro/react-server-components/index.md) - RSC overview and public demo evidence
 - [Streaming SSR](./pro/streaming-ssr.md) - Progressive server rendering
 - [Node Renderer](./pro/node-renderer.md) - Dedicated Node.js rendering server
+- [Pro Review App Security](./pro/deployment/review-app-security.md) - Safe review-app defaults for public repositories
 - [Fragment Caching](./pro/fragment-caching.md) - Cache rendered components
 - [Upgrading to Pro](./pro/upgrading-to-pro.md) - Switch from OSS to Pro in three steps
 - [Node Renderer: Container Deployment](./oss/building-features/node-renderer/container-deployment.md) (Pro) - Sidecar vs. separate workloads, memory tuning, troubleshooting

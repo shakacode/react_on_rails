@@ -8,4 +8,7 @@
 import ReactOnRails from 'react-on-rails-pro/ReactOnRails.node';
 import { enableStrictModeForReactOnRails } from './strictModeSupport';
 
-export default enableStrictModeForReactOnRails(ReactOnRails);
+const useStrictMode = process.env.NODE_ENV !== 'production';
+
+// Outer guard for clarity; enableStrictModeForReactOnRails also no-ops in production.
+export default useStrictMode ? enableStrictModeForReactOnRails(ReactOnRails) : ReactOnRails;

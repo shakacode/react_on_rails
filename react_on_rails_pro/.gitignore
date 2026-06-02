@@ -6,7 +6,6 @@
 /pkg/
 /spec/reports/
 *.gem
-/vendor/
 tmp
 
 **/spec/examples.txt

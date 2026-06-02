@@ -20,4 +20,6 @@ const currentGlobal = globalThis.ReactOnRails || null;
 const ReactOnRails = createReactOnRailsPro([createSSRCapability(), createProRSCCapability()], currentGlobal);
 
 export * from 'react-on-rails/types';
+export { unstable_cache, registerCacheHandler } from './cache/index.ts'; // eslint-disable-line camelcase -- matches Next.js API naming convention
+export type { CacheHandler, CacheEntry, UnstableCacheOptions } from './cache/index.ts';
 export default ReactOnRails;

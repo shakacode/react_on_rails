@@ -20,4 +20,14 @@ shared_examples "pro_common_files" do
       expect(content).to include("RENDERER_PORT=${RENDERER_PORT:-3800}")
     end
   end
+
+  it "adds node-renderer process to every bin/dev Procfile that can serve SSR pages" do
+    %w[Procfile.dev Procfile.dev-static-assets Procfile.dev-prod-assets].each do |procfile|
+      assert_file procfile do |content|
+        expect(content).to include("node-renderer:")
+        expect(content).to include("RENDERER_PORT=${RENDERER_PORT:-3800}")
+        expect(content).to include("node renderer/node-renderer.js")
+      end
+    end
+  end
 end

@@ -34,9 +34,11 @@ shared_examples "scaffold_ci_and_scripts" do
     end
   end
 
-  it "CI workflow uses bin/shakapacker for bundle build" do
+  it "CI workflow runs the auto-bundle hook before building JS bundles" do
     assert_file ".github/workflows/ci.yml" do |content|
-      expect(content).to include("bin/shakapacker")
+      expect(content).to match(
+        %r{bin/shakapacker-precompile-hook\s*\n\s*SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true bin/shakapacker}
+      )
       expect(content).to include("RAILS_ENV: test")
       expect(content).to include("NODE_ENV: test")
     end
@@ -55,9 +57,15 @@ shared_examples "scaffold_ci_and_scripts" do
       scripts = package_json["scripts"] || {}
       expect(scripts).to include("build")
       expect(scripts).to include("build:test")
-      expect(scripts["build"]).to include("bin/shakapacker")
+      expect(scripts["build"]).to eq(
+        "RAILS_ENV=production NODE_ENV=production bin/shakapacker-precompile-hook && " \
+        "SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true RAILS_ENV=production NODE_ENV=production bin/shakapacker"
+      )
+      expect(scripts["build:test"]).to eq(
+        "RAILS_ENV=test NODE_ENV=test bin/shakapacker-precompile-hook && " \
+        "SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true RAILS_ENV=test NODE_ENV=test bin/shakapacker"
+      )
       expect(scripts["build:test"]).to include("RAILS_ENV=test")
-      expect(scripts["build:test"]).to include("bin/shakapacker")
     end
   end
 end

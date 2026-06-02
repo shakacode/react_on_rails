@@ -265,6 +265,10 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     stream_view_containing_react_components(template: "/pages/rsc_native_metadata")
   end
 
+  def cache_demo
+    stream_view_containing_react_components(template: "/pages/cache_demo")
+  end
+
   # Demo page showing 10 async components rendering concurrently
   # Each component delays 1 second - sequential would take ~10s, concurrent takes ~1s
   def async_components_demo

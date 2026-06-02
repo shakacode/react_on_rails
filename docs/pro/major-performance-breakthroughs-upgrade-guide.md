@@ -31,6 +31,8 @@ Server Components execute on the server and stream HTML to the client—no serve
 Please note that only the first of these directly compares performance of equivalent applications with and without React Server Components.
 Other migrations may include React or other dependency upgrades and so on.
 
+> **React on Rails note:** These benefits carry over to React on Rails Pro, but the data-delivery model differs from the Next.js case studies above. In React on Rails, Rails owns database queries, authentication, and caching; components receive data as props rather than fetching it directly. See [RSC Migration: Data Fetching Patterns](../oss/migrating/rsc-data-fetching.md#data-fetching-in-react-on-rails-pro).
+
 ## 🌊 SSR Streaming
 
 SSR Streaming sends HTML to the browser in chunks as it's generated, enabling progressive rendering:

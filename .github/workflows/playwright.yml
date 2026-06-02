@@ -10,7 +10,7 @@ concurrency:
 on:
   push:
     branches: [main]
-    # Always trigger on main; docs-only detection handles skipping heavy jobs
+    # Always trigger on main; non-runtime detection handles skipping heavy jobs
   workflow_dispatch:
 
 jobs:
@@ -21,6 +21,7 @@ jobs:
     runs-on: ubuntu-22.04
     outputs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
+      non_runtime_only: ${{ steps.detect.outputs.non_runtime_only }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -46,15 +47,16 @@ jobs:
       github.event_name == 'workflow_dispatch' || !(
         github.event_name == 'push' &&
         github.ref == 'refs/heads/main' &&
-        needs.detect-changes.outputs.docs_only == 'true'
+        needs.detect-changes.outputs.non_runtime_only == 'true'
       )
     steps:
       - uses: actions/checkout@v4
 
-      - uses: ruby/setup-ruby@v1
+      - name: Setup Ruby
+        uses: ./.github/actions/setup-ruby
         with:
+          # Keep the single E2E lane on the minimum runtime; matrix workflows cover latest.
           ruby-version: '3.3'
-          bundler-cache: true
 
       - uses: actions/setup-node@v4
         with:
@@ -65,7 +67,7 @@ jobs:
 
       - name: Get pnpm store directory
         shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
 
       - name: Setup pnpm cache
         uses: actions/cache@v4
@@ -76,14 +78,16 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Build workspace packages
         run: pnpm run build
 
       - name: Install dummy app Ruby dependencies
-        working-directory: react_on_rails/spec/dummy
-        run: bundle install
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: react_on_rails/spec/dummy
+          ruby-version: '3.3'
 
       - name: Install Playwright browsers
         working-directory: react_on_rails/spec/dummy

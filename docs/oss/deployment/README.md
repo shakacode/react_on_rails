@@ -7,6 +7,7 @@
 
 - [Docker Deployment](./docker-deployment.md) — Containerized deployments with Kamal, Kubernetes, and Control Plane
 - [Heroku Deployment](./heroku-deployment.md) — PaaS deployment on Heroku
+- [Review App Security](./review-app-security.md) — Safe review-app defaults for public repositories and fork PRs
 
 ## Troubleshooting
 
