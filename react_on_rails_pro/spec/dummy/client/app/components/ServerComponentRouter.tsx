@@ -5,7 +5,7 @@ import RSCRoute from 'react-on-rails-pro/RSCRoute';
 import EchoProps from './EchoProps';
 import { ErrorBoundary } from './ErrorBoundary';
 import ServerComponentWithRetry from './ServerComponentWithRetry';
-import RefetchStressPage from './RefetchStressPage';
+import RefetchStressPage from './RefetchStressPage.client';
 
 export default function App({ basePath = '/server_router', ...props }: { basePath?: string }) {
   return (

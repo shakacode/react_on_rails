@@ -1,5 +1,5 @@
 import React from 'react';
-import InlineRefreshButton from '../components/InlineRefreshButton';
+import InlineRefreshButton from '../components/InlineRefreshButton.client';
 
 /**
  * A server component used by the RefetchStressPage example. Returns content

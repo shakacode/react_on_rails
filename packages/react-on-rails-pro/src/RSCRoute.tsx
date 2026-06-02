@@ -29,7 +29,6 @@ import {
   useMemo,
   useRef,
   type ReactNode,
-  type Ref,
 } from 'react';
 import { useRSC } from './RSCProvider.tsx';
 import { RSCRouteSSRFalseBailoutError } from './RSCRouteSSRFalseBailoutError.ts';
@@ -64,32 +63,6 @@ class RSCRouteErrorBoundary extends Component<
 }
 
 /**
- * Renders a React Server Component inside a React Client Component.
- *
- * RSCRoute provides a bridge between client and server components, allowing server components
- * to be directly rendered inside client components. This component:
- *
- * 1. By default during initial SSR - Uses the RSC payload to render the server component and embeds the payload in the page
- * 2. During hydration - Uses the embedded RSC payload already in the page
- * 3. During client navigation - Fetches the RSC payload via HTTP
- *
- * Pass ssr={false} to skip rendering route content during streaming server rendering. When wrapped
- * in Suspense, React renders the nearest fallback in the server HTML and retries this route on the
- * client through the same RSC provider path used by the default ssr={true} mode.
- *
- * @example
- * ```tsx
- * <RSCRoute componentName="MyServerComponent" componentProps={{ user }} />
- * ```
- *
- * @important Only use for server components whose props change rarely. Frequent prop changes
- * will cause network requests for each change, impacting performance.
- *
- * @important This component expects that the component tree that contains it is wrapped using
- * wrapServerComponentRenderer from 'react-on-rails/wrapServerComponentRenderer/client' for client-side
- * rendering or 'react-on-rails/wrapServerComponentRenderer/server' for server-side rendering.
- */
-/**
  * Imperative handle exposed by `<RSCRoute>` via `ref`.
  *
  * `refetch()` re-fetches the server component using the RSCRoute's currently
@@ -113,7 +86,6 @@ export type RSCRouteProps = {
   componentName: string;
   componentProps: unknown;
   ssr?: boolean;
-  ref?: Ref<RSCRouteHandle>;
 };
 
 const CurrentRSCRouteContext = createContext<RSCRouteHandle | null>(null);
@@ -135,7 +107,7 @@ const CurrentRSCRouteContext = createContext<RSCRouteHandle | null>(null);
  */
 export function useCurrentRSCRoute(): RSCRouteHandle {
   const handle = useContext(CurrentRSCRouteContext);
-  if (!handle) {
+  if (handle === null) {
     throw new Error('useCurrentRSCRoute must be used inside an <RSCRoute>');
   }
   return handle;
@@ -154,7 +126,7 @@ const PromiseWrapper = ({ promise }: { promise: Promise<ReactNode> }) => {
   return promiseResult;
 };
 
-const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr' | 'ref'>>(
+const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
   ({ componentName, componentProps }, ref) => {
     const { getComponent, refetchComponent } = useRSC();
 
@@ -190,7 +162,33 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr' | '
 
 RSCRouteContent.displayName = 'RSCRouteContent';
 
-const RSCRoute = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ref'>>(
+/**
+ * Renders a React Server Component inside a React Client Component.
+ *
+ * RSCRoute provides a bridge between client and server components, allowing server components
+ * to be directly rendered inside client components. This component:
+ *
+ * 1. By default during initial SSR - Uses the RSC payload to render the server component and embeds the payload in the page
+ * 2. During hydration - Uses the embedded RSC payload already in the page
+ * 3. During client navigation - Fetches the RSC payload via HTTP
+ *
+ * Pass ssr={false} to skip rendering route content during streaming server rendering. When wrapped
+ * in Suspense, React renders the nearest fallback in the server HTML and retries this route on the
+ * client through the same RSC provider path used by the default ssr={true} mode.
+ *
+ * @example
+ * ```tsx
+ * <RSCRoute componentName="MyServerComponent" componentProps={{ user }} />
+ * ```
+ *
+ * @important Only use for server components whose props change rarely. Frequent prop changes
+ * will cause network requests for each change, impacting performance.
+ *
+ * @important This component expects that the component tree that contains it is wrapped using
+ * wrapServerComponentRenderer from 'react-on-rails/wrapServerComponentRenderer/client' for client-side
+ * rendering or 'react-on-rails/wrapServerComponentRenderer/server' for server-side rendering.
+ */
+const RSCRoute = forwardRef<RSCRouteHandle, RSCRouteProps>(
   ({ componentName, componentProps, ssr = true }, ref): ReactNode => {
     if (!ssr && typeof window === 'undefined') {
       throw new RSCRouteSSRFalseBailoutError(componentName);

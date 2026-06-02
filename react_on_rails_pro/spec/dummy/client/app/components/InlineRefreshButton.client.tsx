@@ -10,22 +10,18 @@ type Props = {
 
 const InlineRefreshButton: React.FC<Props> = ({ label = 'Refresh from inside', testId }) => {
   const { refetch } = useCurrentRSCRoute();
-  const [pending, setPending] = React.useState(false);
+  const [isPending, startTransition] = React.useTransition();
 
-  const handleClick = () => {
-    setPending(true);
-    refetch()
-      .catch((err: unknown) => {
+  const handleClick = () =>
+    startTransition(() => {
+      void refetch().catch((err: unknown) => {
         console.error('InlineRefreshButton refetch failed', err);
-      })
-      .finally(() => {
-        setPending(false);
       });
-  };
+    });
 
   return (
-    <button type="button" data-testid={testId} disabled={pending} onClick={handleClick}>
-      {pending ? 'Refreshing…' : label}
+    <button type="button" data-testid={testId} disabled={isPending} onClick={handleClick}>
+      {isPending ? 'Refreshing…' : label}
     </button>
   );
 };

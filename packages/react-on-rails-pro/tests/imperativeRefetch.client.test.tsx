@@ -122,6 +122,7 @@ type GetServerComponentArgs = {
       await ref.current!.refetch();
     });
 
+    await waitFor(() => expect(screen.getByTestId('card')).toHaveTextContent('Card v2'));
     expect(getServerComponent).toHaveBeenCalledTimes(2);
     expect(getServerComponent).toHaveBeenLastCalledWith({
       componentName: 'UserCard',

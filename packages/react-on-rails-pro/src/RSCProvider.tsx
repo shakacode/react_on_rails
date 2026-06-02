@@ -97,9 +97,10 @@ export const createRSCProvider = ({
       [startTransition],
     );
 
-    // `versions` is intentionally listed in deps so the value identity
-    // changes on each refetch — that is what propagates the re-render to
-    // every useRSC() consumer.
+    // `versions` is intentionally listed in deps so the value identity changes
+    // on each refetch. Trade-off: every useRSC() consumer re-renders on any
+    // refetch, even when its cache key is unaffected. Each extra render is a
+    // cache hit, but use a per-key subscription if this becomes a bottleneck.
     const contextValue = useMemo(
       () => ({ getComponent, refetchComponent }),
       // eslint-disable-next-line react-hooks/exhaustive-deps

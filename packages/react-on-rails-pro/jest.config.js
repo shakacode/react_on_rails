@@ -45,6 +45,8 @@ export default {
         }
       : isReactServerEnv
         ? {
+            // React 19 exposes react-server entry points as *.react-server.js.
+            // If React changes this layout, verify with a failing RSC test.
             '^react$': `${reactPackageRoot}/react.react-server.js`,
             '^react/jsx-runtime$': `${reactPackageRoot}/jsx-runtime.react-server.js`,
             '^react/jsx-dev-runtime$': `${reactPackageRoot}/jsx-dev-runtime.react-server.js`,
