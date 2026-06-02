@@ -69,11 +69,12 @@ RSpec.describe "Ruby version support" do
     expect(read_repo_file(".github/read-me.md")).to include("Only latest dependency versions (Ruby 4.0, Node 22)")
 
     ci_switch_config = read_repo_file("bin/ci-switch-config")
-    # $LATEST_RUBY_MINOR_VERSION is a shell variable name, not Ruby interpolation.
+    # These are shell variable names, not Ruby interpolation.
     expect(ci_switch_config).to include(
-      "Target: Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, Shakapacker 10.1.0"
+      "Target: Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, Shakapacker $LATEST_SHAKAPACKER_VERSION"
     )
     expect(ci_switch_config).to include('LATEST_RUBY_VERSION="4.0.5"')
+    expect(ci_switch_config).to include('LATEST_SHAKAPACKER_VERSION="10.1.0"')
     expect(ci_switch_config).to match(/set_ruby_version "\$LATEST_RUBY_VERSION"/)
     expect(ci_switch_config).to include('[[ "${REACT_ROOT}" =~ ^\^?19(\.|$) ]]')
     expect(ci_switch_config).to include("bundle config set --local path vendor/bundle")
