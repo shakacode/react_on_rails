@@ -180,6 +180,8 @@ module ReactOnRailsPro
       self.rolling_deploy_adapter = rolling_deploy_adapter
       self.rolling_deploy_token = rolling_deploy_token
       self.rolling_deploy_previous_url = rolling_deploy_previous_url
+      # Constructor nil/blank means "use the default"; configure-block assignment
+      # can still set nil/blank later to opt out of the engine auto-mount.
       self.rolling_deploy_mount_path = rolling_deploy_mount_path.presence || DEFAULT_ROLLING_DEPLOY_MOUNT_PATH
       self.ssr_pre_hook_js = ssr_pre_hook_js
       self.assets_to_copy = assets_to_copy

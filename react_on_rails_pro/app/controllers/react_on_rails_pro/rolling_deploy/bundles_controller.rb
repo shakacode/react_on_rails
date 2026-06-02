@@ -13,11 +13,12 @@ module ReactOnRailsPro
     # ReactOnRailsPro::RollingDeployAdapters::Http adapter on the next
     # deploy's build CI consumes both endpoints.
     #
-    # Mount this in your application's routes with `draw_routes` so the Http
-    # adapter on the next deploy can reach it. (Engine auto-mount keyed on
-    # `config.rolling_deploy_adapter` is planned for a follow-up but is not
-    # wired yet, so an explicit mount is currently required.) You can also use
-    # a custom mount path or layer your own auth middleware:
+    # When `config.rolling_deploy_adapter` is the built-in Http adapter, the
+    # Pro engine auto-mounts this controller at
+    # `config.rolling_deploy_mount_path` (default:
+    # `/react_on_rails_pro/rolling_deploy`). Set the mount path to nil or blank
+    # to opt out of the auto-mount. Use `draw_routes` only when you need a
+    # manual mount, such as a secondary path or app-specific routing wrapper:
     #
     #   # config/routes.rb
     #   ReactOnRailsPro::RollingDeploy::BundlesController.draw_routes(
@@ -25,10 +26,11 @@ module ReactOnRailsPro
     #     path: "/internal/rolling-deploy"
     #   )
     #
-    # Callers that mount the controller more than once (for example, a future
-    # engine auto-mount plus a user-controlled secondary path) must pass a
-    # distinct `as_prefix:` per call so Rails' named-route registry doesn't
-    # raise `ArgumentError: Invalid route name, already in use`.
+    # The engine auto-mount uses an internal route-helper prefix so existing
+    # manual mounts that use the default prefix keep booting during upgrades.
+    # Multiple manual mounts still need distinct `as_prefix:` values so Rails'
+    # named-route registry doesn't raise `ArgumentError: Invalid route name,
+    # already in use`.
     #
     # Security:
     #   * Bearer-token auth via `Authorization: Bearer <token>`, constant-time
@@ -56,10 +58,19 @@ module ReactOnRailsPro
       before_action :set_no_store_headers
 
       DEFAULT_ROUTE_PREFIX = "react_on_rails_pro_rolling_deploy"
+      SAFE_HASH_PATTERN = ReactOnRailsPro::RollingDeploy::SAFE_HASH_PATTERN
+      # Rails route requirements reject anchor characters, while the route
+      # matcher applies segment constraints to the full segment. Derived from
+      # SAFE_HASH_PATTERN by stripping the \A/\z anchors; the controller still
+      # performs the anchored defense-in-depth validation before any filesystem
+      # lookup.
+      ROUTE_HASH_PATTERN = Regexp.new(SAFE_HASH_PATTERN.source.delete_prefix("\\A").delete_suffix("\\z"))
 
       class << self
-        # Helper for mounting the controller in your application's routes. A
-        # planned engine auto-mount will reuse these same route definitions.
+        # Helper for manual route mounts. The Pro engine uses these same route
+        # definitions for the default auto-mount when the built-in Http adapter
+        # is configured, with an internal `as_prefix:` to avoid collisions with
+        # existing manual mounts.
         #
         # `as_prefix:` controls the generated named-route helpers
         # (`<prefix>_manifest`, `<prefix>_bundle`). Callers that mount the
@@ -72,7 +83,7 @@ module ReactOnRailsPro
                      as: :"#{as_prefix}_manifest")
           mapper.get("#{path}/bundles/:hash",
                      to: "react_on_rails_pro/rolling_deploy/bundles#show",
-                     constraints: { hash: SAFE_HASH_PATTERN },
+                     constraints: { hash: ROUTE_HASH_PATTERN },
                      as: :"#{as_prefix}_bundle")
         end
       end
@@ -81,8 +92,6 @@ module ReactOnRailsPro
       # path-traversal value through, the controller still rejects it
       # before any disk lookup because the hash must be in the
       # (regex-validated) current-hash set.
-      SAFE_HASH_PATTERN = ReactOnRailsPro::RollingDeploy::SAFE_HASH_PATTERN
-
       # Tarball entry name reserved for the server bundle. Companion assets
       # whose basename collides with this are skipped to keep the receiver
       # from extracting the wrong bytes into the bundle slot.

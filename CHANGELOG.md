@@ -31,6 +31,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 #### Added
 
 - **Ruby 4.0 CI support**: Updated OSS latest-runtime CI coverage, local CI switching guidance, and public compatibility docs to test Ruby 4.0 while keeping Ruby 3.3 as the minimum supported CI lane. [PR 3529](https://github.com/shakacode/react_on_rails/pull/3529) by [justin808](https://github.com/justin808).
+- **[Pro]** **HTTP rolling-deploy endpoint auto-mount**: Configuring `config.rolling_deploy_adapter = ReactOnRailsPro::RollingDeployAdapters::Http` now automatically mounts `ReactOnRailsPro::RollingDeploy::BundlesController` at `config.rolling_deploy_mount_path` (default `/react_on_rails_pro/rolling_deploy`). Set the mount path to `nil` or blank to opt out and keep a manual `draw_routes` mount; apps that previously mounted the default route manually should remove that route or give secondary manual mounts a distinct `as_prefix:` to avoid duplicate named-route errors. Fixes [Issue 3476](https://github.com/shakacode/react_on_rails/issues/3476). [PR 3504](https://github.com/shakacode/react_on_rails/pull/3504) by [justin808](https://github.com/justin808).
 
 #### Changed
 

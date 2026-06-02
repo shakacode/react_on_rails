@@ -20,6 +20,33 @@ describe ReactOnRailsPro::RollingDeploy::BundlesController do
   describe ".draw_routes" do
     let(:mapper) { instance_spy(ActionDispatch::Routing::Mapper) }
 
+    def route_hash_pattern_matches_segment?(hash)
+      Regexp.new("\\A(?:#{described_class::ROUTE_HASH_PATTERN.source})\\z").match?(hash)
+    end
+
+    it "keeps the route hash pattern derived from the safe hash pattern without anchors" do
+      expect(described_class::SAFE_HASH_PATTERN.source).to start_with("\\A").and end_with("\\z")
+      expect(described_class::ROUTE_HASH_PATTERN.source)
+        .to eq(described_class::SAFE_HASH_PATTERN.source.delete_prefix("\\A").delete_suffix("\\z"))
+    end
+
+    {
+      "abc123" => true,
+      "_hash" => true,
+      "hash-with.dots" => true,
+      "valid_hash-123.js" => true,
+      "" => false,
+      ".starts_with_dot" => false,
+      "-starts-with-dash" => false,
+      "has!bang" => false,
+      "../traversal" => false,
+      "slash/path" => false
+    }.each do |hash, expected|
+      it "#{expected ? 'accepts' : 'rejects'} hash segment #{hash.inspect}" do
+        expect(route_hash_pattern_matches_segment?(hash)).to eq(expected)
+      end
+    end
+
     it "uses the default route helper prefix" do
       described_class.draw_routes(mapper, path: "/rolling")
 
