@@ -211,7 +211,7 @@ show_status() {
   if [[ "${SHAKAPACKER_GEM}" == "8.2.0" ]] && [[ "${REACT_ROOT}" == "18.0.0" ]]; then
     echo -e "Current config: ${GREEN}minimum${NC} (matches CI: Ruby 3.3, Node 20, minimum deps)"
   elif [[ "${SHAKAPACKER_GEM}" == "$LATEST_SHAKAPACKER_VERSION" ]] && [[ "${REACT_ROOT}" =~ ^\^?19(\.|$) ]]; then
-    echo -e "Current config: ${GREEN}latest${NC} (matches CI: Ruby 4.0, Node 22, latest deps)"
+    echo -e "Current config: ${GREEN}latest${NC} (matches CI: Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, latest deps)"
   else
     echo -e "Current config: ${YELLOW}unknown/mixed${NC} (run 'bin/ci-switch-config latest' or 'minimum' to align with CI)"
   fi
@@ -516,7 +516,7 @@ case "${1:-}" in
     echo ""
     echo "Commands:"
     echo "  minimum  - Switch to Ruby 3.3, Node 20, minimum dependencies (Shakapacker 8.2.0, React 18)"
-    echo "  latest   - Switch to Ruby 4.0, Node 22, latest dependencies (Shakapacker $LATEST_SHAKAPACKER_VERSION, React 19)"
+    echo "  latest   - Switch to Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, latest dependencies (Shakapacker $LATEST_SHAKAPACKER_VERSION, React 19)"
     echo "  status   - Show current configuration"
     echo ""
     echo "Examples:"

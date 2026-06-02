@@ -73,6 +73,8 @@ RSpec.describe "Ruby version support" do
     expect(ci_switch_config).to include(
       "Target: Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, Shakapacker $LATEST_SHAKAPACKER_VERSION"
     )
+    expect(ci_switch_config).to include("matches CI: Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, latest deps")
+    expect(ci_switch_config).to include("Switch to Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, latest dependencies")
     expect(ci_switch_config).to include('LATEST_RUBY_VERSION="4.0.5"')
     expect(ci_switch_config).to include('LATEST_SHAKAPACKER_VERSION="10.1.0"')
     expect(ci_switch_config).to match(/set_ruby_version "\$LATEST_RUBY_VERSION"/)
