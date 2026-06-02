@@ -1,6 +1,7 @@
 const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
 const LoadablePlugin = require('@loadable/webpack-plugin');
 const commonWebpackConfig = require('./commonWebpackConfig');
+const rscManifestClientReferences = require('./rscManifestClientReferences');
 
 const isHMR = process.env.HMR;
 
@@ -16,10 +17,7 @@ const configureClient = () => {
   clientConfig.plugins.push(
     new RSCWebpackPlugin({
       isServer: false,
-      // Limit client reference discovery to the app source directory to prevent
-      // the plugin from traversing into node_modules/ (which with pnpm workspace
-      // symlinks exposes .tsx source files that lack a configured loader)
-      clientReferences: [{ directory: './client/app', recursive: true, include: /\.(js|ts|jsx|tsx)$/ }],
+      clientReferences: rscManifestClientReferences(),
     }),
   );
 

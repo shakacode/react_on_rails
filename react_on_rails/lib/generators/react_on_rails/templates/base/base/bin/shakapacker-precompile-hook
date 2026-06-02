@@ -23,11 +23,36 @@ exit 0 if ENV["SHAKAPACKER_SKIP_PRECOMPILE_HOOK"] == "true"
 # and doesn't need package version validation since it's part of the build itself
 ENV["REACT_ON_RAILS_SKIP_VALIDATION"] = "true"
 
+require "pathname"
 require_relative "../config/environment"
+
+def generate_rsc_manifest_client_references_if_needed
+  return if ENV["RSC_REFERENCE_DISCOVERY_BUILD"] == "true"
+  return unless defined?(ReactOnRailsPro)
+  return unless ReactOnRailsPro::Utils.rsc_support_enabled?
+
+  registration_entry = Rails.root.join(
+    Pathname(ReactOnRails::PackerUtils.packer_source_entry_path).parent,
+    "generated/server-component-registration-entry.js"
+  )
+  return unless File.exist?(registration_entry)
+
+  puts Rainbow("🔎 Generating RSC manifest client references...").cyan
+
+  env = {
+    "SHAKAPACKER_SKIP_PRECOMPILE_HOOK" => "true",
+    "RSC_REFERENCE_DISCOVERY_BUILD" => "true",
+    "RSC_BUNDLE_ONLY" => "true"
+  }
+
+  system(env, "bin/shakapacker", exception: true)
+  puts Rainbow("✅ RSC manifest client references generated successfully").green
+end
 
 begin
   puts Rainbow("🔄 Running React on Rails precompile hook...").cyan
   ReactOnRails::PacksGenerator.instance.generate_packs_if_stale
+  generate_rsc_manifest_client_references_if_needed
 rescue StandardError => e
   warn Rainbow("❌ Error in precompile hook: #{e.message}").red
   warn e.backtrace.first(5).join("\n")

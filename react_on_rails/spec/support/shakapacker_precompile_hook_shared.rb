@@ -16,6 +16,8 @@
 require "fileutils"
 require "json"
 
+EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_SEGMENTS = %w[/node_modules/ /public/ /tmp/].freeze
+
 # Find Rails root by walking upward looking for config/environment.rb
 def find_rails_root
   dir = Dir.pwd
@@ -123,10 +125,53 @@ rescue StandardError => e
   exit 1
 end
 
+def rsc_manifest_registration_entry_path?(path)
+  EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_SEGMENTS.none? { |segment| path.include?(segment) }
+end
+
+def rsc_manifest_registration_entry(rails_root)
+  Dir.glob(File.join(rails_root, "**", "generated", "server-component-registration-entry.js")).find do |path|
+    rsc_manifest_registration_entry_path?(path)
+  end
+end
+
+# Generate RSC manifest client references if a server component registration entry exists.
+def generate_rsc_manifest_client_references_if_needed
+  return if ENV["RSC_REFERENCE_DISCOVERY_BUILD"] == "true"
+
+  rails_root = find_rails_root
+  return unless rails_root
+
+  registration_entry = rsc_manifest_registration_entry(rails_root)
+  return unless registration_entry
+
+  shakapacker_bin = File.join(rails_root, "bin", "shakapacker")
+  return unless File.exist?(shakapacker_bin)
+
+  puts "🔎 Generating RSC manifest client references..."
+
+  env = {
+    "SHAKAPACKER_SKIP_PRECOMPILE_HOOK" => "true",
+    "RSC_REFERENCE_DISCOVERY_BUILD" => "true",
+    "RSC_BUNDLE_ONLY" => "true"
+  }
+
+  Dir.chdir(rails_root) do
+    system(env, shakapacker_bin, exception: true)
+    puts "✅ RSC manifest client references generated successfully"
+  end
+rescue Errno::ENOENT => e
+  warn "⚠️  Warning: #{e.message}"
+rescue StandardError => e
+  warn "❌ RSC manifest client reference generation failed: #{e.message}"
+  exit 1
+end
+
 # Main execution (only if run directly, not when required)
 def run_precompile_tasks
   build_rescript_if_needed
   generate_packs_if_needed
+  generate_rsc_manifest_client_references_if_needed
 end
 
 run_precompile_tasks if __FILE__ == $PROGRAM_NAME

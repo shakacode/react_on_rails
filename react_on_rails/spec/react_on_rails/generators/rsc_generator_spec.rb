@@ -1647,6 +1647,25 @@ describe RscGenerator, type: :generator do
       expect(generator.send(:scoped_rsc_client_references_defined?, content)).to be(false)
     end
 
+    it "detects generated manifest client references with a scoped fallback" do
+      content = <<~JS
+        const fallbackRscClientReferences = {
+          directory: resolve(config.source_path),
+          recursive: true,
+          include: /.(js|ts|jsx|tsx)$/,
+        };
+
+        const rscClientReferences = (() => {
+          const configuredRefsJson = process.env.RSC_MANIFEST_CLIENT_REFERENCES_JSON;
+          const refsJson = configuredRefsJson || resolve('ssr-generated/rsc-client-references.json');
+          return fallbackRscClientReferences;
+        })();
+      JS
+
+      expect(generator.send(:rsc_client_references_defined?, content)).to be(true)
+      expect(generator.send(:scoped_rsc_client_references_defined?, content)).to be(true)
+    end
+
     it "detects a module-scope let rscClientReferences declaration" do
       content = <<~JS
         let rscClientReferences = {
@@ -1864,7 +1883,8 @@ describe RscGenerator, type: :generator do
       generator.send(:update_existing_rsc_webpack_config, config_path, content, is_server: false)
 
       migrated_content = File.binread(File.join(destination_root, config_path))
-      expect(migrated_content).to include("const rscClientReferences = {\r\n")
+      expect(migrated_content).to include("const fallbackRscClientReferences = {\r\n")
+      expect(migrated_content).to include("const rscClientReferences = (() => {\r\n")
       expect(migrated_content).to include("      isServer: false,\r\n      clientReferences: rscClientReferences,")
       expect(migrated_content).not_to match(/(?<!\r)\n/)
     end
@@ -2836,7 +2856,8 @@ describe RscGenerator, type: :generator do
 
     it "injects the missing scoped helper instead of warning that all plugins already define clientReferences" do
       assert_file "config/webpack/clientWebpackConfig.js" do |content|
-        expect(content).to include("const rscClientReferences = {")
+        expect(content).to include("const fallbackRscClientReferences = {")
+        expect(content).to include("const rscClientReferences = (() => {")
         expect(content).to include("directory: resolve(config.source_path)")
         expect(content).to include("clientReferences: rscClientReferences")
       end
@@ -2895,7 +2916,8 @@ describe RscGenerator, type: :generator do
 
     it "injects the missing scoped helper without touching the custom clientReferences" do
       assert_file "config/webpack/clientWebpackConfig.js" do |content|
-        expect(content).to include("const rscClientReferences = {")
+        expect(content).to include("const fallbackRscClientReferences = {")
+        expect(content).to include("const rscClientReferences = (() => {")
         expect(content).to include("directory: resolve(config.source_path)")
         expect(content.scan("clientReferences: customClientReferences").length).to eq(1)
         expect(content.scan("clientReferences: rscClientReferences").length).to eq(1)

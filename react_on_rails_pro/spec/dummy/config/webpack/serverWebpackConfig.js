@@ -3,6 +3,7 @@ const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
 const webpack = require('webpack');
 const path = require('path');
 const commonWebpackConfig = require('./commonWebpackConfig');
+const rscManifestClientReferences = require('./rscManifestClientReferences');
 
 function extractLoader(rule, loaderName) {
   if (!Array.isArray(rule.use)) return null;
@@ -84,10 +85,7 @@ const configureServer = (rscBundle = false) => {
     serverWebpackConfig.plugins.push(
       new RSCWebpackPlugin({
         isServer: true,
-        // Limit client reference discovery to the app source directory to prevent
-        // the plugin from traversing into node_modules/ (which with pnpm workspace
-        // symlinks exposes .tsx source files that lack a configured loader)
-        clientReferences: [{ directory: './client/app', recursive: true, include: /\.(js|ts|jsx|tsx)$/ }],
+        clientReferences: rscManifestClientReferences(),
       }),
     );
   }

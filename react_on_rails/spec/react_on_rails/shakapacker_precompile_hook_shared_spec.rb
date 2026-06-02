@@ -10,10 +10,12 @@ RSpec.describe "Shakapacker precompile hook shared script" do
   it "exposes run_precompile_tasks for load-based callers" do
     allow(self).to receive(:build_rescript_if_needed)
     allow(self).to receive(:generate_packs_if_needed)
+    allow(self).to receive(:generate_rsc_manifest_client_references_if_needed)
 
     run_precompile_tasks
 
     expect(self).to have_received(:build_rescript_if_needed)
     expect(self).to have_received(:generate_packs_if_needed)
+    expect(self).to have_received(:generate_rsc_manifest_client_references_if_needed)
   end
 end

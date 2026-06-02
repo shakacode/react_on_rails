@@ -27,11 +27,41 @@ module ReactOnRails
 
         def rsc_client_references_js
           <<~'JS'.chomp
-            const rscClientReferences = {
+            const fallbackRscClientReferences = {
               directory: resolve(config.source_path),
               recursive: true,
               include: /\.(js|mjs|cjs|ts|mts|cts|jsx|tsx)$/,
             };
+
+            const rscClientReferences = (() => {
+              const { existsSync, readFileSync } = require('fs');
+              const configuredRefsJson = process.env.RSC_MANIFEST_CLIENT_REFERENCES_JSON;
+              const refsJson = configuredRefsJson || resolve('ssr-generated/rsc-client-references.json');
+              const serverComponentRegistrationEntry = resolve(
+                config.source_path,
+                config.source_entry_path,
+                '../generated/server-component-registration-entry.js',
+              );
+
+              if (!configuredRefsJson && !existsSync(refsJson)) {
+                if (process.env.RSC_REFERENCE_DISCOVERY_BUILD === 'true' || process.env.RSC_BUNDLE_ONLY === 'true') {
+                  return fallbackRscClientReferences;
+                }
+
+                if (existsSync(serverComponentRegistrationEntry)) {
+                  throw new Error(`Missing ${refsJson}. Run bin/shakapacker-precompile-hook before bin/shakapacker.`);
+                }
+
+                return fallbackRscClientReferences;
+              }
+
+              const payload = JSON.parse(readFileSync(refsJson, 'utf8'));
+              if (!Array.isArray(payload.refs)) {
+                throw new Error(`Expected ${refsJson} to contain a refs array`);
+              }
+
+              return payload.refs;
+            })();
           JS
         end
 
@@ -1149,13 +1179,30 @@ module ReactOnRails
         end
 
         def scoped_rsc_client_references_defined?(content)
+          object_literal_rsc_client_references_defined?(content) ||
+            generated_rsc_client_references_defined?(content)
+        end
+
+        def object_literal_rsc_client_references_defined?(content)
           # Locate the actual module-scope `const|let|var rscClientReferences = { ... }` site and
           # check the `directory:` key against the object literal body with comments stripped.
           # Running the regex against the raw file would treat a stale, commented-out
           # `// directory: resolve(config.source_path)` (e.g. left over from a prior failed
           # migration) as a real scoped declaration and silently short-circuit
           # `ensure_rsc_client_references_setup`, leaving the plugin unscoped without any warning.
-          decl_pattern = /^[ \t]*(?:const|let|var)\s+rscClientReferences\s*=\s*\{/
+          scoped_object_literal_defined?(content, "rscClientReferences")
+        end
+
+        def generated_rsc_client_references_defined?(content)
+          return false unless rsc_client_references_defined?(content)
+          return false unless content.include?("RSC_MANIFEST_CLIENT_REFERENCES_JSON")
+          return false unless content.include?("rsc-client-references.json")
+
+          scoped_object_literal_defined?(content, "fallbackRscClientReferences")
+        end
+
+        def scoped_object_literal_defined?(content, variable_name)
+          decl_pattern = /^[ \t]*(?:const|let|var)\s+#{Regexp.escape(variable_name)}\s*=\s*\{/
           content.to_enum(:scan, decl_pattern).any? do
             match = Regexp.last_match
             next false unless js_top_level_position?(content, match.begin(0))

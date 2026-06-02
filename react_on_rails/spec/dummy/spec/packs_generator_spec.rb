@@ -433,6 +433,26 @@ module ReactOnRails
 
           expect(generated_server_bundle_content.strip).to eq(expected_content.strip)
         end
+
+        it "creates a server component registration entry for RSC reference discovery" do
+          generated_entry_path = File.join(
+            Pathname(packer_source_entry_path).parent,
+            "generated/server-component-registration-entry.js"
+          )
+          generated_entry_content = File.read(generated_entry_path)
+          expected_content = <<~CONTENT.strip
+            import ReactServerComponent from '../components/ReactServerComponents/ror_components/ReactServerComponent.jsx';
+            import ReactServerComponentWithClientAndServer from '../components/ReactServerComponents/ror_components/ReactServerComponentWithClientAndServer.server.jsx';
+
+            import registerServerComponent from 'react-on-rails-pro/registerServerComponent/server';
+            registerServerComponent({ReactServerComponent,
+            ReactServerComponentWithClientAndServer});
+          CONTENT
+
+          expect(generated_entry_content.strip).to eq(expected_content.strip)
+          expect(generated_entry_content).not_to include("ReactOnRails.register")
+          expect(generated_entry_content).not_to include("ReactClientComponent")
+        end
       end
     end
 
