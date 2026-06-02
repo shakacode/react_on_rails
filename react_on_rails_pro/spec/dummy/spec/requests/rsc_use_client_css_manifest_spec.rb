@@ -7,8 +7,6 @@ RSpec.describe "RSC use-client CSS manifest regression" do
   let(:probe_key_fragment) { "RSCPostsPage/UseClientCssProbe.jsx" }
 
   it "records CSS assets for use-client components rendered by an RSC page" do
-    pending("react-on-rails-rsc PR #35 or its successor should publish client-reference css metadata")
-
     expect(File).to exist(manifest_path)
 
     manifest = JSON.parse(File.read(manifest_path))
