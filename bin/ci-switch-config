@@ -13,6 +13,8 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 MINIMUM_RUBY_VERSION="3.3.7" # Update when a newer 3.3.x patch is released.
 MINIMUM_RUBY_MINOR_VERSION="${MINIMUM_RUBY_VERSION%.*}"
+MINIMUM_REACT_VERSION="18.0.0" # Update when minimum CI moves to a newer React version.
+MINIMUM_REACT_MAJOR_VERSION="${MINIMUM_REACT_VERSION%%.*}"
 LATEST_RUBY_VERSION="4.0.5" # Update when a newer 4.0.x patch is released.
 LATEST_RUBY_MINOR_VERSION="${LATEST_RUBY_VERSION%.*}"
 LATEST_SHAKAPACKER_VERSION="10.1.0" # Update when latest CI moves to a newer Shakapacker.
@@ -211,7 +213,7 @@ show_status() {
   fi
 
   echo ""
-  if [[ "${SHAKAPACKER_GEM}" == "8.2.0" ]] && [[ "${REACT_ROOT}" == "18.0.0" ]]; then
+  if [[ "${SHAKAPACKER_GEM}" == "8.2.0" ]] && [[ "${REACT_ROOT}" =~ ^\^?${MINIMUM_REACT_MAJOR_VERSION}(\.|$) ]]; then
     echo -e "Current config: ${GREEN}minimum${NC} (matches CI: Ruby $MINIMUM_RUBY_MINOR_VERSION, Node 20, minimum deps)"
   elif [[ "${SHAKAPACKER_GEM}" == "$LATEST_SHAKAPACKER_VERSION" ]] && [[ "${REACT_ROOT}" =~ ^\^?${LATEST_REACT_MAJOR_VERSION}(\.|$) ]]; then
     echo -e "Current config: ${GREEN}latest${NC} (matches CI: Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, latest deps)"
@@ -224,7 +226,7 @@ switch_to_minimum() {
   local VERSION_MANAGER=$(check_version_manager)
 
   print_header "Switching to MINIMUM configuration"
-  echo "  Target: Ruby $MINIMUM_RUBY_MINOR_VERSION, Node 20, Shakapacker 8.2.0, React 18.0.0"
+  echo "  Target: Ruby $MINIMUM_RUBY_MINOR_VERSION, Node 20, Shakapacker 8.2.0, React $MINIMUM_REACT_VERSION"
   echo "  Using version manager: $VERSION_MANAGER"
   echo ""
 
