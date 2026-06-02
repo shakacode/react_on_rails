@@ -72,5 +72,5 @@ Steps:
 - Open the React on Rails docs PR first.
 - Open the Control Plane Flow docs PR next.
 - Patch downstream demo/starter repositories after Control Plane Flow wording is settled.
-- For each docs-only PR, run the repo's markdown formatting/check command when available. For workflow wrapper changes,
+- For each docs-only PR, run the repo's Markdown formatting/check command when available. For workflow wrapper changes,
   run the repo's generated GitHub Actions test command if present, such as `bin/test-cpflow-github-flow`.

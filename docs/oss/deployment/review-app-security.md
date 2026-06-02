@@ -15,15 +15,15 @@ from a pull request. In public repositories, treat review-app deployment as exec
 GitHub does not pass repository secrets to ordinary `pull_request` workflows from forks, except for `GITHUB_TOKEN`.
 That default protects secrets from untrusted fork code. A maintainer-triggered deployment workflow can reintroduce risk
 if it checks out and builds the pull request with deployment credentials available. GitHub's
-[secure use reference](https://docs.github.com/en/enterprise-cloud@latest/actions/reference/security/secure-use)
+[secure use reference](https://docs.github.com/en/actions/reference/security/secure-use)
 warns against combining privileged workflow triggers with untrusted code checkout.
 
 Heroku uses the same conservative boundary for public repositories: Review apps run pull request code in disposable apps,
 and Heroku does not automatically create review apps for public-repository pull requests sent from forks for security and
 billing reasons. See Heroku's
-[Review Apps documentation](https://devcenter.heroku.com/articles/review-apps-new).
+[Review Apps documentation](https://devcenter.heroku.com/articles/github-integration-review-apps).
 
-## Secrets And Runtime Environment
+## Secrets and Runtime Environment
 
 Assume that any environment variable available to a deployed review app can be read by the pull request code. Secret
 storage protects values at rest and in configuration, but it does not protect a secret after the value is injected into a
