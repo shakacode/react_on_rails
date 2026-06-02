@@ -51,6 +51,8 @@ namespace :shakapacker do # rubocop:disable Metrics/BlockLength
     package_jsons = Dir.glob(File.join(monorepo_root, "**", "package.json"))
                        .reject { |f| f.include?("node_modules") }
                        .reject { |f| f.include?("gen-examples") }
+    # Adapter package names must come before bare shakapacker so the full adapter
+    # name is matched before the shorter core package prefix.
     package_names = "shakapacker-webpack|shakapacker-rspack|shakapacker"
 
     package_jsons.each do |path|

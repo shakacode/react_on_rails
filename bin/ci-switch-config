@@ -200,7 +200,7 @@ show_status() {
     echo "  Shakapacker (gem): ${SHAKAPACKER_GEM:-not found}"
   fi
 
-  SHAKAPACKER_NPM=""
+  local SHAKAPACKER_NPM=""
   local SHAKAPACKER_NPM_PACKAGE=""
   local SHAKAPACKER_NPM_DEPENDENCY=""
   if [ -f "$PROJECT_ROOT/react_on_rails/spec/dummy/package.json" ]; then

@@ -30,6 +30,17 @@ RSpec.describe "bin/ci-switch-config" do
     expect(stdout).to include("Shakapacker (npm, shakapacker-rspack): 10.1.0")
   end
 
+  it "prefers shakapacker-webpack when both adapter packages are present" do
+    stdout, stderr, status = ci_switch_status(
+      "shakapacker" => "10.1.0",
+      "shakapacker-webpack" => "~10.1.0",
+      "shakapacker-rspack" => "^10.1.0"
+    )
+
+    expect(status).to be_success, stderr
+    expect(stdout).to include("Shakapacker (npm, shakapacker-webpack): 10.1.0")
+  end
+
   it "reports core shakapacker when adapter packages are absent" do
     stdout, stderr, status = ci_switch_status(
       "shakapacker" => "^10.1.0"
@@ -62,7 +73,7 @@ RSpec.describe "bin/ci-switch-config" do
 
       File.write(package_json_path, JSON.pretty_generate("dependencies" => dependencies))
 
-      return Open3.capture3(fake_script_path, "status", chdir: tmpdir)
+      Open3.capture3(fake_script_path, "status", chdir: tmpdir)
     end
   end
 end
