@@ -309,8 +309,8 @@ non_rsc_tests.each do |test_case|
   rps, p50, p90, status = run_vegeta_benchmark(test_case, non_rsc_bundle)
   add_to_summary(test_case[:name], "non-RSC", rps, p50, p90, status)
 
-  # Add to BMF collector for Bencher output
-  bmf_collector.add(name: "#{test_case[:name]} (non-RSC)", rps: rps, p50: p50, p90: p90, status: status)
+  # Add to BMF collector for Bencher output (p90 stays in the summary table only)
+  bmf_collector.add(name: "#{test_case[:name]} (non-RSC)", rps: rps, p50: p50, status: status)
 end
 
 # Run RSC benchmarks
@@ -324,8 +324,8 @@ rsc_tests.each do |test_case|
   rps, p50, p90, status = run_vegeta_benchmark(test_case, rsc_bundle)
   add_to_summary(test_case[:name], "RSC", rps, p50, p90, status)
 
-  # Add to BMF collector for Bencher output
-  bmf_collector.add(name: "#{test_case[:name]} (RSC)", rps: rps, p50: p50, p90: p90, status: status)
+  # Add to BMF collector for Bencher output (p90 stays in the summary table only)
+  bmf_collector.add(name: "#{test_case[:name]} (RSC)", rps: rps, p50: p50, status: status)
 end
 
 # Display summary
