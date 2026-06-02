@@ -6,12 +6,32 @@ import '@testing-library/jest-dom';
 
 import { createRSCProvider } from '../src/RSCProvider.tsx';
 import RSCRoute from '../src/RSCRoute.tsx';
+import { useCurrentRSCRoute } from '../src/RSCRoute.tsx';
 import { getNodeVersion } from './testUtils';
 
-jest.mock('react-on-rails-pro/RSCRoute', () => jest.requireActual('../src/RSCRoute.tsx'));
+type InlineRefreshButtonProps = {
+  label?: string;
+  testId?: string;
+};
 
-// eslint-disable-next-line import/first
-import InlineRefreshButton from '../../../react_on_rails_pro/spec/dummy/client/app/components/InlineRefreshButton.client.tsx';
+const InlineRefreshButton: React.FC<InlineRefreshButtonProps> = ({
+  label = 'Refresh from inside',
+  testId,
+}) => {
+  const { refetch } = useCurrentRSCRoute();
+  const [isPending, startTransition] = React.useTransition();
+
+  const handleClick = () =>
+    startTransition(() => {
+      void refetch();
+    });
+
+  return (
+    <button type="button" data-testid={testId} disabled={isPending} onClick={handleClick}>
+      {isPending ? 'Refreshing…' : label}
+    </button>
+  );
+};
 
 type GetServerComponentArgs = {
   componentName: string;

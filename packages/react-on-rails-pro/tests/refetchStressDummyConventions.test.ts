@@ -37,5 +37,12 @@ describe('refetch stress dummy app conventions', () => {
     expect(serverComponentSource).toContain(
       "import InlineRefreshButton from '../components/InlineRefreshButton.client';",
     );
+
+    const inlineRefreshSource = fs.readFileSync(
+      path.join(componentsRoot, 'InlineRefreshButton.client.tsx'),
+      'utf8',
+    );
+    expect(inlineRefreshSource).toContain('React.useTransition()');
+    expect(inlineRefreshSource).toContain("isPending ? 'Refreshing…' : label");
   });
 });
