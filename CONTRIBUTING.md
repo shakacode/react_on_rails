@@ -208,7 +208,7 @@ After checking out the repo and ensuring you have Ruby and Node version managers
 
 ```sh
 # First, verify your versions match the project requirements
-ruby -v  # Should show 4.0.x or version in .ruby-version
+ruby -v  # Should show 4.0.x (latest), 3.3.x (minimum), or version in .ruby-version
 node -v  # Should show 22.x or version in .node-version
 
 # Then run the setup script

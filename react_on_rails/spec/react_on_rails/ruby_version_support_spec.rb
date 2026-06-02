@@ -37,6 +37,12 @@ RSpec.describe "Ruby version support" do
       '"ruby-version":"4.0","node-version":"22","dependency-level":"latest"',
       '"ruby-version":"3.3","node-version":"20","dependency-level":"minimum"'
     )
+
+    lint_workflow = read_repo_file(".github/workflows/lint-js-and-ruby.yml")
+    expect(lint_workflow.scan("ruby-version: '4.0'").count).to eq(3)
+
+    precompile_workflow = read_repo_file(".github/workflows/precompile-check.yml")
+    expect(precompile_workflow.scan("ruby-version: '4.0'").count).to eq(2)
   end
 
   it "documents and switches to Ruby 4.0 for the latest local CI configuration" do
