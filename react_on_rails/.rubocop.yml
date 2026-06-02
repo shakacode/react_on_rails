@@ -11,6 +11,7 @@ AllCops:
 
   Exclude:
     - 'spec/dummy/bin/*'
+    - 'spike/**/*'  # Exploratory spike code outside lib/ — not part of the production surface
 
 Naming/FileName:
   Exclude:
