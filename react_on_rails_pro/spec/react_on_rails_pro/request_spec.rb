@@ -338,6 +338,7 @@ describe ReactOnRailsPro::Request do
     let(:js_code) { "console.log('incremental rendering');" }
     let(:async_props_block) { proc { |_emitter| } }
     let(:mock_output) { instance_double(Protocol::HTTP::Body::Writable::Output) }
+    let(:output_writes) { [] }
 
     before do
       allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool).to receive_messages(
@@ -345,7 +346,7 @@ describe ReactOnRailsPro::Request do
         rsc_bundle_hash: "rsc_bundle.js"
       )
 
-      allow(mock_output).to receive(:<<)
+      allow(mock_output).to receive(:<<) { |payload| output_writes << payload }
       allow(mock_output).to receive(:close)
 
       bidi_response = mock_response(status: 200, chunks: [to_length_prefixed("chunk")])
@@ -440,6 +441,39 @@ describe ReactOnRailsPro::Request do
 
       stream.each_chunk(&:itself)
 
+      expect(mock_output).to have_received(:close)
+    end
+
+    it "sends an async-props failure update chunk before closing when the async props block raises" do
+      pending(
+        "Known issue #3300: Ruby async-props failures should reach the renderer through an updateChunk"
+      )
+
+      test_async_props_block = proc do |_emitter|
+        raise StandardError, "books async prop failed"
+      end
+
+      stream = described_class.render_code_with_incremental_updates(
+        "/render-incremental",
+        js_code,
+        async_props_block: test_async_props_block
+      )
+
+      expect do
+        stream.each_chunk(&:itself)
+      end.to raise_error(StandardError, "books async prop failed")
+
+      renderer_updates = output_writes.filter_map do |payload|
+        parsed = JSON.parse(payload.chomp)
+        parsed if parsed["bundleTimestamp"] && parsed["updateChunk"]
+      end
+
+      failure_update = renderer_updates.find { |update| update["updateChunk"].include?("books async prop failed") }
+
+      expect(failure_update).not_to be_nil
+      expect(failure_update["bundleTimestamp"]).to eq("rsc_bundle.js")
+      expect(failure_update["updateChunk"]).to include("asyncPropsManager")
+      expect(failure_update["updateChunk"]).to include("StandardError")
       expect(mock_output).to have_received(:close)
     end
   end
