@@ -1,0 +1,131 @@
+# frozen_string_literal: true
+
+require "yaml"
+require_relative "spec_helper"
+
+RSpec.describe "Ruby version support" do
+  # From spec/react_on_rails/ up through spec/ and react_on_rails/ to the repo root.
+  let(:repo_root) { File.expand_path("../../..", __dir__) }
+  let(:ruby_setup_actions) { ["./.github/actions/setup-ruby", "./.github/actions/setup-bundle"] }
+
+  def read_repo_file(path)
+    File.read(File.join(repo_root, path))
+  end
+
+  # Only use this helper on workflows that hardcode `ruby-version` in steps. Matrix-driven
+  # workflows store the unexpanded `${{ matrix.ruby-version }}` expression in that field.
+  def workflow_ruby_versions(path)
+    workflow = YAML.safe_load(read_repo_file(path), aliases: true)
+
+    workflow.fetch("jobs").values.flat_map do |job|
+      # Jobs that call reusable workflows with `uses:` do not have their own steps.
+      Array(job["steps"] || []).filter_map do |step|
+        next unless ruby_setup_actions.include?(step["uses"])
+
+        step.dig("with", "ruby-version")
+      end
+    end
+  end
+
+  # These literal checks intentionally make future version bumps update the CI matrix,
+  # helper scripts, and docs together.
+  it "allows Ruby 4 in the gemspec" do
+    gemspec = Gem::Specification.load(File.join(repo_root, "react_on_rails/react_on_rails.gemspec"))
+
+    expect(gemspec.required_ruby_version).to be_satisfied_by(Gem::Version.new("3.3.0"))
+    expect(gemspec.required_ruby_version).not_to be_satisfied_by(Gem::Version.new("3.2.9"))
+    expect(gemspec.required_ruby_version).to be_satisfied_by(Gem::Version.new("4.0.0"))
+  end
+
+  it "uses a Ruby 4-compatible Bundler version in OSS lockfiles" do
+    ["react_on_rails/Gemfile.lock", "react_on_rails/spec/dummy/Gemfile.lock"].each do |path|
+      lockfile = read_repo_file(path)
+      match = lockfile.match(/\nBUNDLED WITH\n\s+(\S+)/)
+      expect(match).not_to be_nil, "BUNDLED WITH stanza not found in #{path}"
+      bundler_version = match[1]
+
+      expect(Gem::Version.new(bundler_version)).to be >= Gem::Version.new("4.0.0")
+    end
+  end
+
+  it "tests Ruby 4.0 as the latest OSS CI runtime while keeping Ruby 3.3 as the minimum" do
+    expect(read_repo_file(".github/workflows/gem-tests.yml")).to include(
+      '"ruby-version":"4.0","dependency-level":"latest"',
+      '"ruby-version":"3.3","dependency-level":"minimum"'
+    )
+    expect(read_repo_file(".github/workflows/examples.yml")).to include(
+      '"ruby-version":"4.0","dependency-level":"latest"',
+      '"ruby-version":"3.3","dependency-level":"minimum"'
+    )
+    expect(read_repo_file(".github/workflows/integration-tests.yml")).to include(
+      '"ruby-version":"4.0","node-version":"22","dependency-level":"latest"',
+      '"ruby-version":"3.3","node-version":"20","dependency-level":"minimum"'
+    )
+
+    lint_ruby_versions = workflow_ruby_versions(".github/workflows/lint-js-and-ruby.yml")
+    precompile_ruby_versions = workflow_ruby_versions(".github/workflows/precompile-check.yml")
+
+    expect(lint_ruby_versions).to all(eq("4.0"))
+    expect(lint_ruby_versions).not_to be_empty
+    expect(precompile_ruby_versions).to all(eq("4.0"))
+    expect(precompile_ruby_versions).not_to be_empty
+  end
+
+  it "documents and switches to Ruby 4.0 for the latest local CI configuration" do
+    expect(read_repo_file("README.md")).to include("Ruby >= 3.3 (CI tested: 3.3 - 4.0)")
+    expect(read_repo_file("README.md")).to include("CI tested: 8.2.0 - 10.1.0")
+    expect(read_repo_file(".github/read-me.md")).to include("Only latest dependency versions (Ruby 4.0, Node 22)")
+
+    ci_switch_config = read_repo_file("bin/ci-switch-config")
+    # These are shell variable names, not Ruby interpolation.
+    expect(ci_switch_config).to include(
+      "Target: Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, Shakapacker $LATEST_SHAKAPACKER_VERSION"
+    )
+    expect(ci_switch_config).to include("matches CI: Ruby $MINIMUM_RUBY_MINOR_VERSION, Node 20, minimum deps")
+    expect(ci_switch_config).to include("matches CI: Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, latest deps")
+    expect(ci_switch_config).to include("Switch to Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, latest dependencies")
+    expect(ci_switch_config).to include(
+      "latest   - Switch to Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, latest dependencies " \
+      "(Shakapacker $LATEST_SHAKAPACKER_VERSION, React $LATEST_REACT_VERSION)"
+    )
+    expect(ci_switch_config).to include('MINIMUM_RUBY_MINOR_VERSION="${MINIMUM_RUBY_VERSION%.*}"')
+    expect(ci_switch_config).to include('MINIMUM_NODE_VERSION="20.18.1"')
+    expect(ci_switch_config).to include('MINIMUM_REACT_VERSION="18.0.0"')
+    expect(ci_switch_config).to include('MINIMUM_REACT_MAJOR_VERSION="${MINIMUM_REACT_VERSION%%.*}"')
+    expect(ci_switch_config).to include('LATEST_RUBY_VERSION="4.0.5"')
+    expect(ci_switch_config).to include('LATEST_NODE_VERSION="22.12.0"')
+    expect(ci_switch_config).to include('LATEST_SHAKAPACKER_VERSION="10.1.0"')
+    expect(ci_switch_config).to include('LATEST_REACT_VERSION="19.0.0"')
+    expect(ci_switch_config).to include('LATEST_REACT_MAJOR_VERSION="${LATEST_REACT_VERSION%%.*}"')
+    expect(ci_switch_config).to match(/set_ruby_version "\$LATEST_RUBY_VERSION"/)
+    expect(ci_switch_config).to match(/set_node_version "\$LATEST_NODE_VERSION"/)
+    expect(ci_switch_config).to include('[[ "${REACT_ROOT}" =~ ^\^?${MINIMUM_REACT_MAJOR_VERSION}(\.|$) ]]')
+    expect(ci_switch_config).to include('[[ "${REACT_ROOT}" =~ ^\^?${LATEST_REACT_MAJOR_VERSION}(\.|$) ]]')
+    expect(ci_switch_config).to include('local lockfile="$bundle_dir/Gemfile.lock"')
+    expect(ci_switch_config).to include("bundle config set --local path vendor/bundle")
+    expect(ci_switch_config).to include('gem list bundler -i -v "$bundler_version"')
+    expect(ci_switch_config).to include('gem install bundler -v "$bundler_version"')
+    expect(ci_switch_config).to include('bundle "_${bundler_version}_" install')
+    expect(ci_switch_config).to include('install_bundle_to_vendor "$PWD"')
+    expect(ci_switch_config).not_to include("bundle install --path")
+
+    ci_rerun_failures = read_repo_file("bin/ci-rerun-failures")
+    latest_job_description = [
+      'JOB_VERSION_MAP["dummy-app-integration-tests (4.0, 22, latest)"]=',
+      '"Ruby 4.0, Node 22, Shakapacker 10.1.0, React 19"'
+    ].join
+    expect(ci_rerun_failures).to include(latest_job_description)
+
+    switching_guide = read_repo_file("SWITCHING_CI_CONFIGS.md")
+    expect(switching_guide).to include("Switch back to latest dependencies (Ruby 4.0, Node 22)")
+    expect(switching_guide).to include("Create `.tool-versions` with Ruby 4.0.5 and Node 22.12.0")
+
+    expect(read_repo_file(".claude/docs/replicating-ci-failures.md")).to include(
+      "Ruby 4.0, Node 22, Shakapacker 10.1.0, React 19"
+    )
+    # Exact table spacing is intentional: keeps the Markdown column padding in sync.
+    expect(read_repo_file("internal/contributor-info/ci-optimization.md")).to include(
+      "| Ruby versions | 3.3, 4.0        | 4.0 only"
+    )
+  end
+end

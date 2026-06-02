@@ -31,7 +31,7 @@ The bot will:
 
 By default, PRs run a subset of CI jobs to provide fast feedback:
 
-- Only latest dependency versions (Ruby 3.4, Node 22)
+- Only latest dependency versions (Ruby 4.0, Node 22)
 - Skips example generator tests
 - Skips some Pro package tests
 

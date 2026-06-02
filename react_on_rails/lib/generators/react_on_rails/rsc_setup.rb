@@ -538,6 +538,7 @@ module ReactOnRails
         content = File.read(path)
         missing = []
         if content.include?("RSCWebpackPlugin")
+          warn_non_object_literal_rsc_plugin_options_for_config(content)
           unless rsc_plugin_client_references_configured?(content, is_server: true)
             missing << "generated scoped clientReferences in serverWebpackConfig.js"
           end
@@ -555,6 +556,7 @@ module ReactOnRails
         content = File.read(path)
         missing = []
         if content.include?("RSCWebpackPlugin")
+          warn_non_object_literal_rsc_plugin_options_for_config(content)
           unless rsc_plugin_client_references_configured?(content, is_server: false)
             missing << "generated scoped clientReferences in clientWebpackConfig.js"
           end
@@ -570,6 +572,23 @@ module ReactOnRails
 
         content = File.read(File.join(destination_root, scob_path))
         content.include?("rscWebpackConfig") ? [] : ["rscWebpackConfig in ServerClientOrBoth.js"]
+      end
+
+      def warn_non_object_literal_rsc_plugin_options_for_config(content)
+        return unless non_object_literal_rsc_plugin_invocation_count(content).positive?
+
+        warn_non_object_literal_rsc_plugin_options_once
+      end
+
+      def warn_non_object_literal_rsc_plugin_options_once
+        return if @non_object_literal_rsc_plugin_options_warned
+
+        @non_object_literal_rsc_plugin_options_warned = true
+        GeneratorMessages.add_warning(
+          "RSCWebpackPlugin calls use non-object-literal options in one or more webpack configs, " \
+          "so the generator cannot verify whether scoped clientReferences are configured. " \
+          "Please verify your webpack configs manually."
+        )
       end
     end
   end

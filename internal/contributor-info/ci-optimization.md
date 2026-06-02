@@ -57,7 +57,7 @@ On PRs, we run a reduced test matrix for faster feedback:
 
 | Environment   | Main Branch     | Pull Requests |
 | ------------- | --------------- | ------------- |
-| Ruby versions | 3.3, 3.4        | 3.4 only      |
+| Ruby versions | 3.3, 4.0        | 4.0 only      |
 | Node versions | 20, 22          | 22 only       |
 | Dependencies  | minimum, latest | latest only   |
 
@@ -71,7 +71,7 @@ On PRs, we run a reduced test matrix for faster feedback:
 
 ```yaml
 matrix:
-  ruby-version: ${{ github.ref == 'refs/heads/main' && fromJSON('["3.3", "3.4"]') || fromJSON('["3.4"]') }}
+  ruby-version: ${{ github.ref == 'refs/heads/main' && fromJSON('["3.3", "4.0"]') || fromJSON('["4.0"]') }}
   node-version: ${{ github.ref == 'refs/heads/main' && fromJSON('["20", "22"]') || fromJSON('["22"]') }}
 ```
 

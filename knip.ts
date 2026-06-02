@@ -204,6 +204,8 @@ const config: KnipConfig = {
         'mini-css-extract-plugin',
         // Webpack config merge helper is used in the dummy app config, but not detected reliably by Knip.
         'webpack-merge',
+        // Shakapacker adapter package is selected by the dummy app's package/config tooling, not imported directly.
+        'shakapacker-webpack',
         // Used by dynamically registered dummy app components, which are intentionally ignored above.
         '@dr.pogodin/react-helmet',
         'create-react-class',
