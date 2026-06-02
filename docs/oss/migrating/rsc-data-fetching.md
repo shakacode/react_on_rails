@@ -236,7 +236,7 @@ The synchronous example above loads every prop in the controller before React st
 Use `stream_react_component_with_async_props` and emit each slow prop from the block. The fast props go in `props:`; each `emit.call(name, value)` streams one more prop as soon as Rails has it:
 
 > [!NOTE]
-> **Prerequisites:** the controller must `include ReactOnRailsPro::Stream` and render the view via `stream_view_containing_react_components`, and `config.enable_rsc_support = true` must be set in your React on Rails initializer. Without these you'll get a confusing `NoMethodError` rather than a clear "missing setup" message.
+> **Prerequisites:** the controller must `include ReactOnRailsPro::Stream` and render the view via `stream_view_containing_react_components`, and `config.enable_rsc_support = true` must be set in your React on Rails initializer. If either prerequisite is missing, the helpers raise explicit setup errors: `stream_react_component_with_async_props` raises `ReactOnRailsPro::Error` when `config.enable_rsc_support` is false, and `consumer_stream_async` raises `ReactOnRails::Error` when `stream_view_containing_react_components` was not called.
 
 ```erb
 <%= stream_react_component_with_async_props("ProductPage",
