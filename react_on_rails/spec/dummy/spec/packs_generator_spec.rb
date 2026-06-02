@@ -343,6 +343,33 @@ module ReactOnRails
         ENV.delete("REACT_ON_RAILS_VERBOSE")
       end
 
+      it "checks generated pack contents without emitting likely-client warnings" do
+        described_class.instance.generate_packs_if_stale
+        component_name = "ReactServerComponent"
+        component_pack = "#{generated_directory}/#{component_name}.js"
+        component_source =
+          "#{packer_source_path}/components/#{components_directory}/ror_components/#{component_name}.jsx"
+        original_source = File.read(component_source)
+        stale_pack_content = File.read(component_pack).sub("registerServerComponent", "staleRegisterServerComponent")
+
+        File.write(component_source, <<~JS)
+          export default function #{component_name}() {
+            useState(false);
+            return null;
+          }
+        JS
+
+        fresh_mtime = File.mtime(component_source) + 60
+        File.write(component_pack, stale_pack_content)
+        File.utime(fresh_mtime, fresh_mtime, component_pack)
+
+        expect do
+          expect(described_class.instance.send(:stale_or_missing_packs?)).to be(true)
+        end.not_to output(/WARNING.*#{component_name}/).to_stdout
+      ensure
+        File.write(component_source, original_source) if original_source
+      end
+
       context "when RSC support is disabled" do
         before do
           allow(ReactOnRailsPro::Utils).to receive(:rsc_support_enabled?).and_return(false)
