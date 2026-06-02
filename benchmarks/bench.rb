@@ -153,8 +153,8 @@ routes.each do |route|
   rps, p50, p90, status = run_k6_benchmark(target, route_name)
   add_to_summary(route, rps, p50, p90, status)
 
-  # Add to BMF collector for Bencher output
-  bmf_collector.add(name: route, rps: rps, p50: p50, p90: p90, status: status)
+  # Add to BMF collector for Bencher output (p90 stays in the summary table only)
+  bmf_collector.add(name: route, rps: rps, p50: p50, status: status)
 end
 
 puts "\nSummary saved to #{SUMMARY_TXT}"
