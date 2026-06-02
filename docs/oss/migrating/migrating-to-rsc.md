@@ -5,7 +5,7 @@ This guide covers the React-side challenges of migrating an existing React on Ra
 > [!NOTE]
 > **Summary for AI agents:** Use this page when the user has an existing React on Rails app and wants to adopt RSC. This covers the React-side migration (component restructuring, state, data fetching). For the initial RSC setup, see the [RSC tutorial](../../pro/react-server-components/tutorial.md). RSC requires Pro with the Node renderer.
 
-> **React on Rails Pro required:** RSC support requires [React on Rails Pro](../../pro/react-on-rails-pro.md) 4+ with the node renderer. The Pro gem provides the streaming view helpers (`stream_react_component`, `rsc_payload_react_component`), the RSC webpack plugin and loader, and the `registerServerComponent` API. For setup, see the [RSC tutorial](../../pro/react-server-components/tutorial.md). For upgrade steps, see the [performance breakthroughs guide](../../pro/major-performance-breakthroughs-upgrade-guide.md).
+> **React on Rails Pro required:** RSC support requires [React on Rails Pro](../../pro/react-on-rails-pro.md) 4+ with the node renderer. The Pro gem provides the streaming view helpers (`stream_react_component`, `stream_react_component_with_async_props`, `rsc_payload_react_component`, and `rsc_payload_react_component_with_async_props`), the RSC webpack plugin and loader, and the `registerServerComponent` API. For setup, see the [RSC tutorial](../../pro/react-server-components/tutorial.md). For upgrade steps, see the [performance breakthroughs guide](../../pro/major-performance-breakthroughs-upgrade-guide.md).
 
 ## Why Migrate?
 
@@ -121,13 +121,13 @@ How to optimize RSC Flight payload size for better performance. Covers:
 
 Before diving into the React patterns, understand how RSC maps to React on Rails' architecture.
 
-**Multiple component roots.** Unlike single-page apps with one `App.jsx` root, React on Rails renders independent component trees from ERB views. Each `react_component` or `stream_react_component` call is a separate root. You migrate **per-component**, not per-app.
+**Multiple component roots.** Unlike single-page apps with one `App.jsx` root, React on Rails renders independent component trees from ERB views. Each `react_component`, `stream_react_component`, or `stream_react_component_with_async_props` call is a separate root. You migrate **per-component**, not per-app.
 
 **Three API changes per component.** Each component you migrate touches three layers:
 
 | Layer           | Before                               | After                                                                                                                                                                                               |
 | --------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ERB view helper | `react_component("Product", ...)`    | `stream_react_component("Product", ...)`                                                                                                                                                            |
+| ERB view helper | `react_component("Product", ...)`    | `stream_react_component("Product", ...)` or `stream_react_component_with_async_props("Product", ...)` when Rails emits async props                                                                  |
 | JS registration | `ReactOnRails.register({ Product })` | `registerServerComponent` (signature varies per bundle — see [details](../core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md#the-two-registerservercomponent-signatures)) |
 | Controller      | Standard Rails controller            | Add `include ReactOnRailsPro::Stream`                                                                                                                                                               |
 
@@ -145,7 +145,7 @@ Tailored for React on Rails' multi-root architecture:
 
 1. **[Prepare your app](rsc-preparing-app.md)** -- set up the RSC infrastructure, add `'use client'` to all component entry points, and switch to streaming rendering. The app works identically -- nothing changes yet.
 2. **Pick a component and push the boundary down** -- move `'use client'` from the root component to its interactive children, letting parent components become Server Components.
-3. **Adopt advanced patterns** -- add Suspense boundaries, [`stream_react_component`](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) for streaming SSR, and server-side data fetching.
+3. **Adopt advanced patterns** -- add Suspense boundaries, [`stream_react_component`](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) for streaming SSR, `stream_react_component_with_async_props` for progressively emitted Rails data, and server-side data fetching.
 4. **[Keep route policy in Rails](rsc-http-response-patterns.md)** -- for each route, decide redirects, status codes, and cache headers before streaming commits the response.
 5. **Repeat for each registered component** -- migrate components one at a time, in any order.
 

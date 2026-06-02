@@ -585,7 +585,7 @@ end
                posts: Post.where(user_id: current_user.id).limit(10).as_json }) %>
 ```
 
-See [Data Fetching Migration](rsc-data-fetching.md#avoiding-server-side-waterfalls) for detailed patterns.
+See [Data Fetching Migration](rsc-data-fetching.md#avoiding-server-side-waterfalls) for detailed patterns, including `stream_react_component_with_async_props` when slow Rails props should resolve behind Suspense boundaries.
 
 ### Missing Suspense Boundaries
 
