@@ -1,6 +1,14 @@
 const { config } = require('shakapacker');
-const bundler = config.assets_bundler === 'rspack' ? require('@rspack/core') : require('webpack');
 const commonWebpackConfig = require('./commonWebpackConfig');
+
+const usingRspack = config.assets_bundler === 'rspack';
+const bundler = usingRspack ? require('@rspack/core') : require('webpack');
+const { RspackManifestPlugin } = usingRspack ? require('rspack-manifest-plugin') : {};
+
+const isRspackClientOnlyPlugin = (plugin) =>
+  usingRspack &&
+  ((RspackManifestPlugin && plugin instanceof RspackManifestPlugin) ||
+    (bundler.CssExtractRspackPlugin && plugin instanceof bundler.CssExtractRspackPlugin));
 
 const configureServer = () => {
   // We need to use "merge" because the clientConfigObject, EVEN after running
@@ -65,10 +73,9 @@ const configureServer = () => {
   // And no need for the MiniCssExtractPlugin
   serverWebpackConfig.plugins = serverWebpackConfig.plugins.filter(
     (plugin) =>
+      !isRspackClientOnlyPlugin(plugin) &&
       plugin.constructor.name !== 'WebpackAssetsManifest' &&
-      plugin.constructor.name !== 'RspackManifestPlugin' &&
       plugin.constructor.name !== 'MiniCssExtractPlugin' &&
-      plugin.constructor.name !== 'CssExtractRspackPlugin' &&
       plugin.constructor.name !== 'ForkTsCheckerWebpackPlugin',
   );
 
