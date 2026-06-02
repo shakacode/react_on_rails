@@ -198,9 +198,7 @@ One of the biggest advantages of React 19 native metadata over react-helmet is *
 Metadata can be rendered inside async components within Suspense boundaries. When the async component resolves, React streams the metadata to the client and updates `<head>`:
 
 ```jsx
-const UserProfile = async ({ userId }) => {
-  const user = await fetchUser(userId);
-
+const UserProfile = async ({ user }) => {
   return (
     <>
       <title>{`${user.name}'s Profile | My App`}</title>
@@ -211,7 +209,7 @@ const UserProfile = async ({ userId }) => {
   );
 };
 
-const ProfilePage = ({ userId }) => (
+const ProfilePage = ({ user }) => (
   <div>
     {/* Initial metadata shown while loading */}
     <title>Loading Profile... | My App</title>
@@ -219,11 +217,20 @@ const ProfilePage = ({ userId }) => (
 
     <Suspense fallback={<ProfileSkeleton />}>
       {/* Updated metadata streamed when resolved */}
-      <UserProfile userId={userId} />
+      <UserProfile user={user} />
     </Suspense>
   </div>
 );
 ```
+
+```erb
+<%# Rails view - controller prepares @user and passes it as props %>
+<%= stream_react_component("ProfilePage",
+                           props: { user: @user.as_json(only: %i[name bio]) },
+                           prerender: true) %>
+```
+
+> **React on Rails note:** Keep authorization, database access, and cache-aware data loading in Rails. Pass the prepared data as props, or use streamed async props for Pro RSC flows, rather than fetching from inside the React component. See [RSC data fetching](../migrating/rsc-data-fetching.md).
 
 The initial `<title>` ("Loading Profile...") appears immediately. When `UserProfile` resolves, React replaces it with the user-specific title.
 
@@ -235,32 +242,42 @@ Native metadata works in React Server Components too. Since RSC components run e
 // NativeMetadataRSCApp.jsx (no 'use client' directive — this is a Server Component)
 import React, { Suspense } from 'react';
 
-const AsyncContent = async ({ slug }) => {
-  const article = await fetchArticle(slug);
-
+const AsyncContent = async ({ article }) => {
   return (
     <>
       <title>{article.title}</title>
       <meta name="description" content={article.excerpt} />
       <meta property="og:title" content={article.title} />
-      <meta property="og:image" content={article.coverImage} />
+      <meta property="og:image" content={article.cover_image} />
       <article>{article.body}</article>
     </>
   );
 };
 
-const ArticlePage = ({ slug }) => (
+const ArticlePage = ({ article }) => (
   <div>
     <title>Loading...</title>
-    <link rel="canonical" href={`https://example.com/articles/${slug}`} />
+    <link rel="canonical" href={article.canonical_url} />
     <Suspense fallback={<ArticleSkeleton />}>
-      <AsyncContent slug={slug} />
+      <AsyncContent article={article} />
     </Suspense>
   </div>
 );
 
 export default ArticlePage;
 ```
+
+```erb
+<%# Rails view - controller prepares @article and passes it as props %>
+<%= stream_react_component("ArticlePage",
+                           props: { article: @article.as_json(
+                             only: %i[title excerpt cover_image body],
+                             methods: %i[canonical_url]
+                           ) },
+                           prerender: true) %>
+```
+
+> **React on Rails note:** RSC server components still run as part of a Rails-rendered request. Prefer Rails-prepared props for app data so Rails authorization, tenancy, caching, and instrumentation stay in one place. See [RSC data fetching](../migrating/rsc-data-fetching.md).
 
 ## Hybrid Approach: Rails-Side + React-Side Metadata
 
