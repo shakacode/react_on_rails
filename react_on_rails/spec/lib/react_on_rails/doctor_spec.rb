@@ -107,7 +107,7 @@ RSpec.describe ReactOnRails::Doctor do
   end
 
   describe "#development_dev_server_config" do
-    it "uses the development dev_server hash as a whole when development overrides it" do
+    it "defaults to HMR when development dev_server override omits mode keys" do
       allow(doctor).to receive(:parsed_shakapacker_config).and_return(
         "default" => { "dev_server" => { "hmr" => true, "host" => "0.0.0.0" } },
         "development" => { "dev_server" => { "port" => 3035 } }
@@ -115,7 +115,7 @@ RSpec.describe ReactOnRails::Doctor do
 
       aggregate_failures do
         expect(doctor.send(:development_dev_server_config)).to eq("port" => 3035)
-        expect(doctor.send(:development_hmr_enabled?)).to be(false)
+        expect(doctor.send(:development_hmr_enabled?)).to be(true)
       end
     end
 
