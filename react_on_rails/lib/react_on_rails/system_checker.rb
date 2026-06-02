@@ -723,15 +723,14 @@ module ReactOnRails
                          "webpack" => "Webpack bundler",
                          "css-loader" => "CSS loader for Webpack",
                          "style-loader" => "Style loader for Webpack",
-                         "webpack-dev-server" => "Webpack development server"
+                         "webpack-dev-server" => "Webpack development server",
+                         "mini-css-extract-plugin" => "CSS extraction plugin for Webpack"
                        }
                      end
 
       bundler_deps.merge(
         "@babel/core" => "Babel compiler core",
-        "@babel/preset-env" => "Babel environment preset",
-        # rspack bundles CSS natively, so this webpack-only CSS extractor stays in the shared set.
-        "mini-css-extract-plugin" => "CSS extraction plugin"
+        "@babel/preset-env" => "Babel environment preset"
       )
     end
 

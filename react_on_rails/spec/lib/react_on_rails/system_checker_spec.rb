@@ -1258,6 +1258,7 @@ RSpec.describe ReactOnRails::SystemChecker do
           "css-loader" => "CSS loader",
           "style-loader" => "Style loader"
         )
+        expect(dependencies).not_to include("mini-css-extract-plugin")
         expect(dependencies).not_to include("webpack", "webpack-dev-server")
         expect(dependencies.values).not_to include(a_string_including("Webpack"))
       end
