@@ -9,6 +9,7 @@ require_relative "generator_messages"
 require_relative "js_dependency_manager"
 require_relative "pro_setup"
 require_relative "rsc_setup"
+require_relative "shakapacker_precompile_hook_helper"
 # Load-path require: git_utils lives under react_on_rails/lib, not relative to this generator directory.
 require "react_on_rails/git_utils"
 
@@ -23,6 +24,7 @@ module ReactOnRails
       include JsDependencyManager
       include ProSetup
       include RscSetup
+      include ShakapackerPrecompileHookHelper
 
       # fetch USAGE file for details generator description
       source_root(File.expand_path(__dir__))
@@ -98,7 +100,6 @@ module ReactOnRails
 
       # Removed: --skip-shakapacker-install (Shakapacker is now a required dependency)
 
-      SHAKAPACKER_YML_PATH = "config/shakapacker.yml"
       HELLO_WORLD_ROUTE = "hello_world"
       HELLO_SERVER_ROUTE = "hello_server"
       # Matches the stock `bin/dev` written by Rails 8.x. Rails 7.1 commonly
@@ -315,18 +316,19 @@ module ReactOnRails
                  { package_manager: package_manager, has_lockfile: has_lockfile,
                    pnpm_version_declared: pnpm_version_declared,
                    pnpm_fallback_version: CI_PNPM_FALLBACK_VERSION,
-                   has_active_record: has_active_record, has_rspec: has_rspec })
+                   has_active_record: has_active_record, has_rspec: has_rspec,
+                   precompile_hook_command: shakapacker_precompile_hook_command(environment: "test") })
         @ci_workflow_generated = true
       end
 
-      # NODE_ENV=production ensures Shakapacker emits a minified production bundle;
-      # without it the default is "development" which produces an unminified dev bundle
-      # and is almost never what `npm run build` is expected to do.
-      DEFAULT_PACKAGE_JSON_SCRIPTS = {
-        "build" => "NODE_ENV=production bin/shakapacker",
-        "build:test" => "RAILS_ENV=test NODE_ENV=test bin/shakapacker"
-      }.freeze
-      private_constant :DEFAULT_PACKAGE_JSON_SCRIPTS
+      # RAILS_ENV=production runs the hook with production Rails config, while
+      # NODE_ENV=production makes Shakapacker emit a minified production bundle.
+      def default_package_json_scripts
+        {
+          "build" => shakapacker_build_command(env: "RAILS_ENV=production NODE_ENV=production"),
+          "build:test" => shakapacker_build_command(env: "RAILS_ENV=test NODE_ENV=test", environment: "test")
+        }
+      end
 
       def add_package_json_scripts
         return if options[:pretend]
@@ -336,7 +338,7 @@ module ReactOnRails
 
         original_text = File.read(package_json_path)
         existing_scripts = JSON.parse(original_text)["scripts"] || {}
-        scripts_to_add = DEFAULT_PACKAGE_JSON_SCRIPTS.reject { |key, _| existing_scripts.key?(key) }
+        scripts_to_add = default_package_json_scripts.reject { |key, _| existing_scripts.key?(key) }
 
         if scripts_to_add.empty?
           say_status :skip, "build scripts already present in package.json", :yellow
