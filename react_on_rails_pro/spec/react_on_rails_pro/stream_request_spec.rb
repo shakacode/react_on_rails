@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "spec_helper"
+require "timeout"
 require "react_on_rails_pro/stream_request"
 require "react_on_rails_pro/renderer_http_client"
 
@@ -249,6 +250,31 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       stream.each_chunk(&:itself)
 
       expect(task_waited).to be true
+    end
+
+    it "stops async tasks when the downstream consumer aborts after receiving a chunk" do
+      task_stopped = false
+      response = mock_ok_response(to_length_prefixed("chunk"))
+
+      stream = described_class.create do |_send_bundle, tasks|
+        tasks.push(
+          Async::Task.current.async do
+            sleep
+          ensure
+            task_stopped = true
+          end
+        )
+        response
+      end
+      abort_after_first_chunk = proc { |_chunk| raise "client disconnected" }
+
+      expect do
+        Timeout.timeout(5) do
+          stream.each_chunk(&abort_after_first_chunk)
+        end
+      end.to raise_error(RuntimeError, "client disconnected")
+
+      expect(task_stopped).to be true
     end
   end
 
