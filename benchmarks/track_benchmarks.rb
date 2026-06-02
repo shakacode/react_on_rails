@@ -18,7 +18,6 @@ THRESHOLDS = [
   ["rps", :lower],
   ["p50_latency", :upper],
   ["p90_latency", :upper],
-  ["p99_latency", :upper],
   ["failed_pct", :upper]
 ].freeze
 

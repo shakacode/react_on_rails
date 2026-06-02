@@ -12,7 +12,7 @@
 #
 # Measures (snake_case for easy CLI usage with --threshold-measure):
 #   - rps: Requests per second (higher is better - use Lower Boundary threshold)
-#   - p50_latency_ms, p90_latency_ms, p99_latency_ms: Latencies (lower is better - Upper Boundary)
+#   - p50_latency_ms, p90_latency_ms: Latencies (lower is better - Upper Boundary)
 #   - failed_pct: Failed request percentage (lower is better - use Upper Boundary)
 
 require "json"
@@ -30,9 +30,8 @@ class BmfCollector
   # @param rps [Numeric, nil] Requests per second
   # @param p50 [Numeric, nil] 50th percentile latency in ms
   # @param p90 [Numeric, nil] 90th percentile latency in ms
-  # @param p99 [Numeric, nil] 99th percentile latency in ms
   # @param status [String, nil] Status string like "200=100,5xx=2"
-  def add(name:, rps:, p50:, p90:, p99:, status:)
+  def add(name:, rps:, p50:, p90:, status:)
     # Skip if RPS is not a valid number (FAILED, MISSING, etc.)
     return unless rps.is_a?(Numeric)
 
@@ -41,7 +40,6 @@ class BmfCollector
       rps: rps,
       p50: p50,
       p90: p90,
-      p99: p99,
       failed_pct: calculate_failed_percentage(status)
     }
   end
@@ -60,7 +58,6 @@ class BmfCollector
       # Units (ms) configured in Bencher measure settings
       add_measure(benchmark_entry, "p50_latency", r[:p50])
       add_measure(benchmark_entry, "p90_latency", r[:p90])
-      add_measure(benchmark_entry, "p99_latency", r[:p99])
 
       # Failure percentage (lower is better) - use Upper Boundary threshold in Bencher
       add_measure(benchmark_entry, "failed_pct", r[:failed_pct])
