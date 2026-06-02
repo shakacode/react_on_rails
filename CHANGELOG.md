@@ -39,6 +39,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 #### Improved
 
 - **RSC setup verification warns on dynamic plugin options**: `react_on_rails:install --rsc` now warns when `new RSCWebpackPlugin(...)` uses computed options that cannot be statically verified, avoiding misleading missing-`clientReferences` reports for dynamic config. Fixes [Issue 3412](https://github.com/shakacode/react_on_rails/issues/3412). [PR 3505](https://github.com/shakacode/react_on_rails/pull/3505) by [justin808](https://github.com/justin808).
+- **Rspack-aware diagnostics and dev-server help**: Doctor, system checker, and `bin/dev --help` output now label Rspack apps as Rspack instead of webpack while preserving webpack wording for default apps. Fixes [Issue 3388](https://github.com/shakacode/react_on_rails/issues/3388). [PR 3508](https://github.com/shakacode/react_on_rails/pull/3508) by [justin808](https://github.com/justin808).
 
 #### Fixed
 

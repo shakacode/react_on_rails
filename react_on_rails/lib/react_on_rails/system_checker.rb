@@ -302,6 +302,7 @@ module ReactOnRails
 
       # Report versions
       report_dependency_versions(package_json)
+      report_bundler_version
     end
 
     # Rails integration validation
@@ -626,7 +627,7 @@ module ReactOnRails
 
     def configured_assets_bundler
       config = parsed_shakapacker_config
-      return nil unless config
+      return nil unless config.is_a?(Hash)
 
       rails_env = ENV["RAILS_ENV"] || ENV["RACK_ENV"] || "development"
       bundler_from_shakapacker_section(config, rails_env) || bundler_from_shakapacker_section(config, "default")
@@ -666,8 +667,9 @@ module ReactOnRails
     def detected_javascript_transpiler
       config = parsed_shakapacker_config
       unless config
-        if File.exist?("config/shakapacker.yml")
-          add_info("ℹ️  Unable to parse config/shakapacker.yml — defaulting to Babel assumption")
+        shakapacker_config_path = shakapacker_config_path()
+        if File.exist?(shakapacker_config_path)
+          add_info("ℹ️  Unable to parse #{shakapacker_config_path} — defaulting to Babel assumption")
         end
         return nil
       end
@@ -680,7 +682,7 @@ module ReactOnRails
     end
 
     def parsed_shakapacker_config
-      shakapacker_config_path = "config/shakapacker.yml"
+      shakapacker_config_path = shakapacker_config_path()
       return nil unless File.exist?(shakapacker_config_path)
 
       raw_content = File.read(shakapacker_config_path)
@@ -691,21 +693,45 @@ module ReactOnRails
       nil
     end
 
+    def shakapacker_config_path
+      env_config_path = ENV.fetch("SHAKAPACKER_CONFIG", nil)
+      return File.expand_path("config/shakapacker.yml", shakapacker_config_base_dir) if env_config_path.to_s.empty?
+
+      File.expand_path(env_config_path, shakapacker_config_base_dir)
+    end
+
+    def shakapacker_config_base_dir
+      return Rails.root.to_s if defined?(Rails) && Rails.respond_to?(:root) && Rails.root
+
+      Dir.pwd
+    end
+
     def normalize_transpiler_value(transpiler)
       normalized = transpiler.to_s.strip.downcase
       normalized.empty? ? nil : normalized
     end
 
     def additional_build_dependencies
-      {
-        "webpack" => "Webpack bundler",
+      bundler_deps = if active_assets_bundler == "rspack"
+                       {
+                         "@rspack/core" => "Rspack bundler",
+                         "css-loader" => "CSS loader",
+                         "style-loader" => "Style loader"
+                       }
+                     else
+                       {
+                         "webpack" => "Webpack bundler",
+                         "css-loader" => "CSS loader for Webpack",
+                         "style-loader" => "Style loader for Webpack",
+                         "webpack-dev-server" => "Webpack development server",
+                         "mini-css-extract-plugin" => "CSS extraction plugin for Webpack"
+                       }
+                     end
+
+      bundler_deps.merge(
         "@babel/core" => "Babel compiler core",
-        "@babel/preset-env" => "Babel environment preset",
-        "css-loader" => "CSS loader for Webpack",
-        "style-loader" => "Style loader for Webpack",
-        "mini-css-extract-plugin" => "CSS extraction plugin",
-        "webpack-dev-server" => "Webpack development server"
-      }
+        "@babel/preset-env" => "Babel environment preset"
+      )
     end
 
     # rubocop:disable Metrics/CyclomaticComplexity
@@ -834,21 +860,27 @@ module ReactOnRails
       end
     end
 
-    def report_webpack_version
-      package_json_path = package_json_path_for("Webpack version")
+    def report_bundler_version
+      bundler = active_assets_bundler
+      bundler_label = bundler.capitalize
+      package_json_path = package_json_path_for("#{bundler_label} version")
       return unless package_json_path
 
       begin
         package_json = JSON.parse(File.read(package_json_path))
         all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
 
-        webpack_version = all_deps["webpack"]
-        add_info("📦 Webpack version: #{webpack_version}") if webpack_version
+        bundler_version = bundler == "rspack" ? all_deps["@rspack/core"] || all_deps["rspack"] : all_deps["webpack"]
+        add_info("📦 #{bundler_label} version: #{bundler_version}") if bundler_version
       rescue JSON::ParserError
         # Handle JSON parsing errors
       rescue StandardError
         # Handle other file/access errors
       end
+    end
+
+    def active_assets_bundler
+      configured_assets_bundler || "webpack"
     end
   end
   # rubocop:enable Metrics/ClassLength

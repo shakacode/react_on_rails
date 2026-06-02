@@ -3,6 +3,7 @@
 require_relative "../spec_helper"
 require "react_on_rails/dev/server_manager"
 require "open3"
+require "stringio"
 
 RSpec.describe ReactOnRails::Dev::ServerManager do
   # Suppress stdout/stderr during tests
@@ -68,6 +69,17 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       base_port_ports: nil,
       select_ports!: { rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false }
     )
+    allow(ReactOnRails::Dev::PortSelector).to receive(:find_available_port) { |start_port| start_port }
+  end
+
+  def capture_stdout
+    output = StringIO.new
+    original_stdout = $stdout
+    $stdout = output
+    yield
+    output.string
+  ensure
+    $stdout = original_stdout
   end
 
   describe ".start" do
@@ -211,6 +223,21 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       expect(ReactOnRails::Dev::ProcessManager).to receive(:run_with_process_manager).with("Procfile.dev-prod-assets")
 
       described_class.start(:production_like, nil, verbose: false, rails_env: "staging")
+    end
+
+    it "prints the bundler compilation hint for rspack precompile errors" do
+      allow(described_class).to receive(:configured_assets_bundler).and_return("rspack")
+      allow(ReactOnRails::Dev::ServiceChecker).to receive(:check_services).and_return(true)
+      allow(ReactOnRails::Dev::PortSelector).to receive(:find_available_port).with(3001).and_return(3001)
+      env = { "NODE_ENV" => "production" }
+      argv = ["bundle", "exec", "rails", "assets:precompile"]
+      status_double = instance_double(Process::Status, success?: false)
+      expect(Open3).to receive(:capture3)
+        .with(env, *argv)
+        .and_return(["", "Rspack build failed", status_double])
+
+      expect { described_class.start(:production_like) }
+        .to output(%r{Rspack compilation:.*Check JavaScript/rspack errors above}m).to_stdout_from_any_process
     end
 
     it "rejects invalid rails_env with shell injection characters" do
@@ -1563,13 +1590,85 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
   describe ".show_help" do
     it "displays help information" do
-      expect { described_class.show_help }.to output(%r{Usage: bin/dev \[command\]}).to_stdout_from_any_process
+      output = capture_stdout { described_class.show_help }
+
+      expect(output).to match(%r{Usage: bin/dev \[command\]})
+    end
+
+    it "preserves webpack-specific mode descriptions for webpack apps" do
+      allow(described_class).to receive(:configured_assets_bundler).and_return("webpack")
+
+      output = capture_stdout { described_class.show_help }
+
+      aggregate_failures do
+        expect(output).to match(/HMR development with webpack-dev-server/)
+        expect(output).to match(/Webpack dev server for fast recompilation/)
+        expect(output).to match(/Webpack watch mode for auto-recompilation/)
+      end
+    end
+
+    it "uses neutral/rspack mode descriptions for rspack live-reload apps" do
+      allow(described_class).to receive_messages(
+        configured_assets_bundler: "rspack",
+        default_dev_server_mode: :live_reload,
+        development_dev_server_config: { "hmr" => false, "live_reload" => true }
+      )
+
+      output = capture_stdout { described_class.show_help }
+
+      aggregate_failures do
+        expect(output).to match(/Live reload development with Rspack dev server/)
+        expect(output).to match(/Full-page live reload enabled/)
+        expect(output).to match(/Rspack dev server for fast recompilation/)
+        expect(output).to match(%r{@rspack/plugin-react-refresh / ReactRefreshPlugin})
+        expect(output).to match(/Rspack watch mode for auto-recompilation/)
+        expect(output).to match(/React Refresh requires HMR; current default mode is not HMR/)
+        expect(output).to match(/HMR is disabled in your Shakapacker config/)
+        expect(output).not_to match(/webpack-dev-server/)
+        expect(output).not_to match(/ReactRefreshRspackPlugin/)
+        expect(output).not_to match(/Hot Module Replacement \(HMR\) enabled/)
+        expect(output).not_to match(/Ensure you're running HMR mode/)
+        expect(output).not_to match(/React Refresh only works in HMR mode/)
+        expect(output).not_to match(/Webpack watch mode/)
+        expect(output).not_to match(/Webpack compilation failed/)
+      end
+    end
+
+    it "uses generic React Refresh guidance for future bundlers" do
+      allow(described_class).to receive_messages(
+        configured_assets_bundler: "future",
+        development_dev_server_config: { "hmr" => true }
+      )
+
+      output = capture_stdout { described_class.show_help }
+
+      aggregate_failures do
+        expect(output).to match(/Check your bundler's React Refresh plugin documentation/)
+        expect(output).not_to match(%r{config/rspack/development.js})
+      end
+    end
+
+    it "treats live_reload true without hmr as live reload" do
+      allow(described_class).to receive_messages(
+        configured_assets_bundler: "rspack",
+        default_dev_server_mode: :live_reload,
+        development_dev_server_config: { "live_reload" => true }
+      )
+
+      output = capture_stdout { described_class.show_help }
+
+      expect(output).to match(/Live reload development with Rspack dev server/)
+      expect(output).not_to match(/HMR development with Rspack dev server/)
     end
 
     it "documents test asset workflows" do
-      expect { described_class.show_help }.to output(/TEST ASSET WORKFLOWS/).to_stdout_from_any_process
-      expect { described_class.show_help }.to output(%r{bin/dev test-watch}).to_stdout_from_any_process
-      expect { described_class.show_help }.to output(%r{bin/dev static}).to_stdout_from_any_process
+      output = capture_stdout { described_class.show_help }
+
+      aggregate_failures do
+        expect(output).to match(/TEST ASSET WORKFLOWS/)
+        expect(output).to match(%r{bin/dev test-watch})
+        expect(output).to match(%r{bin/dev static})
+      end
     end
 
     context "when Shakapacker config uses live reload instead of HMR" do
@@ -1787,6 +1886,51 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           )
         end
       end
+    end
+  end
+
+  describe ".parsed_shakapacker_config" do
+    it "returns nil for ERB syntax errors" do
+      allow(described_class).to receive(:shakapacker_config_path).and_return("config/shakapacker.yml")
+      allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
+      allow(File).to receive(:read).with("config/shakapacker.yml").and_return("<% raise SyntaxError, 'bad erb' %>")
+
+      expect(described_class.send(:parsed_shakapacker_config)).to be_nil
+    end
+  end
+
+  describe ".development_dev_server_config" do
+    it "uses the development dev_server hash as a whole when development overrides it" do
+      allow(described_class).to receive(:parsed_shakapacker_config).and_return(
+        "default" => { "dev_server" => { "hmr" => true, "host" => "0.0.0.0" } },
+        "development" => { "dev_server" => { "port" => 3035 } }
+      )
+
+      aggregate_failures do
+        expect(described_class.send(:development_dev_server_config)).to eq("port" => 3035)
+        expect(described_class.send(:development_hmr_enabled?)).to be(true)
+      end
+    end
+
+    it "normalizes selected dev_server keys to strings" do
+      allow(described_class).to receive(:parsed_shakapacker_config).and_return(
+        "default" => { dev_server: { hmr: true } },
+        "development" => { "dev_server" => { "hmr" => false } }
+      )
+
+      aggregate_failures do
+        expect(described_class.send(:development_dev_server_config)).to include("hmr" => false)
+        expect(described_class.send(:development_dev_server_config)).not_to have_key(:hmr)
+        expect(described_class.send(:development_hmr_enabled?)).to be(false)
+      end
+    end
+
+    it "treats hmr only mode as HMR" do
+      allow(described_class).to receive(:parsed_shakapacker_config).and_return(
+        "development" => { "dev_server" => { "hmr" => "only" } }
+      )
+
+      expect(described_class.send(:development_hmr_enabled?)).to be(true)
     end
   end
 

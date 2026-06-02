@@ -50,7 +50,7 @@ RSpec.describe ReactOnRails::Doctor do
         check_webpack_configuration: true,
         report_dependency_versions: true,
         report_shakapacker_version: true,
-        report_webpack_version: true,
+        report_bundler_version: true,
         add_success: true,
         add_warning: true,
         add_info: true,
@@ -81,6 +81,192 @@ RSpec.describe ReactOnRails::Doctor do
       expect(checker).to receive(:check_webpack_configuration)
 
       doctor.run_diagnosis
+    end
+
+    it "uses a neutral bundler configuration section header" do
+      checker = doctor.instance_variable_get(:@checker)
+      messages = []
+      allow(checker).to receive(:messages).and_return(messages)
+      allow(checker).to receive(:check_webpack_configuration) do
+        messages << { type: :success, content: "Bundler config checked" }
+      end
+
+      expect(doctor).to receive(:puts).with(/Bundler Configuration:/)
+      expect(doctor).not_to receive(:puts).with(/Webpack Configuration:/)
+
+      doctor.run_diagnosis
+    end
+  end
+
+  describe "#dev_server_label" do
+    it "uses the canonical webpack-dev-server spelling for webpack apps" do
+      allow(doctor).to receive(:configured_assets_bundler).and_return("webpack")
+
+      expect(doctor.send(:dev_server_label)).to eq("webpack-dev-server")
+    end
+  end
+
+  describe "#development_dev_server_config" do
+    it "defaults to HMR when development dev_server override omits mode keys" do
+      allow(doctor).to receive(:parsed_shakapacker_config).and_return(
+        "default" => { "dev_server" => { "hmr" => true, "host" => "0.0.0.0" } },
+        "development" => { "dev_server" => { "port" => 3035 } }
+      )
+
+      aggregate_failures do
+        expect(doctor.send(:development_dev_server_config)).to eq("port" => 3035)
+        expect(doctor.send(:development_hmr_enabled?)).to be(true)
+      end
+    end
+
+    it "normalizes selected dev_server keys to strings" do
+      allow(doctor).to receive(:parsed_shakapacker_config).and_return(
+        "default" => { dev_server: { hmr: true } },
+        "development" => { "dev_server" => { "hmr" => false } }
+      )
+
+      aggregate_failures do
+        expect(doctor.send(:development_dev_server_config)).to include("hmr" => false)
+        expect(doctor.send(:development_dev_server_config)).not_to have_key(:hmr)
+        expect(doctor.send(:development_hmr_enabled?)).to be(false)
+      end
+    end
+
+    it "treats hmr only mode as HMR" do
+      allow(doctor).to receive(:parsed_shakapacker_config).and_return(
+        "development" => { "dev_server" => { "hmr" => "only" } }
+      )
+
+      expect(doctor.send(:development_hmr_enabled?)).to be(true)
+    end
+  end
+
+  describe "#print_next_steps" do
+    around do |example|
+      Dir.mktmpdir do |tmpdir|
+        Dir.chdir(tmpdir) { example.run }
+      end
+    end
+
+    it "uses the configured reload mode for bin/dev next steps" do
+      FileUtils.mkdir_p("bin")
+      FileUtils.touch("bin/dev")
+      File.write("Procfile.dev", "web: bin/rails server\njs: bin/shakapacker-dev-server\n")
+      doctor.instance_variable_set(
+        :@checker,
+        instance_double(ReactOnRails::SystemChecker, errors?: false, warnings?: false, messages: [])
+      )
+      allow(doctor).to receive_messages(
+        default_dev_server_mode: :live_reload,
+        npm_test_script?: false,
+        yarn_test_script?: false
+      )
+      allow(doctor).to receive(:puts)
+
+      expect(doctor).to receive(:puts).with(a_string_including("Start development with live reload:"))
+
+      doctor.send(:print_next_steps)
+    end
+  end
+
+  describe "#check_procfiles" do
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    around do |example|
+      Dir.mktmpdir do |tmpdir|
+        Dir.chdir(tmpdir) { example.run }
+      end
+    end
+
+    def write_project_file(path, content)
+      FileUtils.mkdir_p(File.dirname(path))
+      File.write(path, content)
+    end
+
+    it "preserves webpack-specific Procfile descriptions for webpack apps" do
+      write_project_file("config/shakapacker.yml", "default:\n  assets_bundler: webpack\n")
+      write_project_file("Procfile.dev", "web: bin/rails server\njs: bin/shakapacker-dev-server\n")
+      write_project_file("Procfile.dev-static-assets", "web: bin/rails server\njs: bin/shakapacker --watch\n")
+
+      doctor.send(:check_procfiles)
+
+      success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+      expect(success_messages).to include(a_string_including("Live reload development with webpack-dev-server"))
+      expect(success_messages).to include(a_string_including("Static development with webpack --watch"))
+    end
+
+    it "uses neutral/rspack Procfile descriptions for rspack live-reload apps" do
+      write_project_file("config/shakapacker.yml", <<~YAML)
+        default:
+          assets_bundler: rspack
+        development:
+          dev_server:
+            hmr: false
+            live_reload: true
+      YAML
+      write_project_file("Procfile.dev", "web: bin/rails server\njs: bin/shakapacker-dev-server\n")
+      write_project_file("Procfile.dev-static-assets", "web: bin/rails server\njs: bin/shakapacker --watch\n")
+
+      doctor.send(:check_procfiles)
+
+      success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+      expect(success_messages).to include(a_string_including("Live reload development with Rspack dev server"))
+      expect(success_messages).to include(a_string_including("Static development with rspack watch"))
+      expect(success_messages).not_to include(a_string_including("webpack-dev-server"))
+      expect(success_messages).not_to include(a_string_including("webpack --watch"))
+    end
+
+    it "detects rspack Procfile descriptions from a custom SHAKAPACKER_CONFIG path" do
+      old_config_path = ENV.fetch("SHAKAPACKER_CONFIG", nil)
+      ENV["SHAKAPACKER_CONFIG"] = "config/custom_shakapacker.yml"
+
+      write_project_file("config/shakapacker.yml", "default:\n  assets_bundler: webpack\n")
+      write_project_file("config/custom_shakapacker.yml", <<~YAML)
+        default:
+          assets_bundler: rspack
+        development:
+          dev_server:
+            hmr: false
+      YAML
+      write_project_file("Procfile.dev", "web: bin/rails server\njs: bin/shakapacker-dev-server\n")
+      write_project_file("Procfile.dev-static-assets", "web: bin/rails server\njs: bin/shakapacker --watch\n")
+
+      doctor.send(:check_procfiles)
+
+      success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+      expect(success_messages).to include(a_string_including("Live reload development with Rspack dev server"))
+    ensure
+      old_config_path.nil? ? ENV.delete("SHAKAPACKER_CONFIG") : ENV["SHAKAPACKER_CONFIG"] = old_config_path
+    end
+
+    it "treats live_reload true without hmr as live reload" do
+      write_project_file("config/shakapacker.yml", <<~YAML)
+        default:
+          assets_bundler: rspack
+        development:
+          dev_server:
+            live_reload: true
+      YAML
+      write_project_file("Procfile.dev", "web: bin/rails server\njs: bin/shakapacker-dev-server\n")
+      write_project_file("Procfile.dev-static-assets", "web: bin/rails server\njs: bin/shakapacker --watch\n")
+
+      doctor.send(:check_procfiles)
+
+      success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+      expect(success_messages).to include(a_string_including("Live reload development with Rspack dev server"))
+      expect(success_messages).not_to include(a_string_including("HMR development with Rspack dev server"))
+    end
+
+    it "falls back to webpack labels when shakapacker config cannot be parsed" do
+      write_project_file("config/shakapacker.yml", "default:\n  assets_bundler: [rspack\n")
+      write_project_file("Procfile.dev", "web: bin/rails server\njs: bin/shakapacker-dev-server\n")
+      write_project_file("Procfile.dev-static-assets", "web: bin/rails server\njs: bin/shakapacker --watch\n")
+
+      expect { doctor.send(:check_procfiles) }.not_to raise_error
+
+      success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+      expect(success_messages).to include(a_string_including("HMR development with webpack-dev-server"))
+      expect(success_messages).to include(a_string_including("Static development with webpack --watch"))
     end
   end
 
@@ -1212,14 +1398,21 @@ RSpec.describe ReactOnRails::Doctor do
         expect(warning_messages).to include(a_string_including("Shared output paths with dev_server.hmr: true"))
       end
 
-      it "does not warn when shared output paths are configured without HMR enabled" do
+      it "does not warn when development overrides the default dev_server without hmr" do
         write_project_file("config/shakapacker.yml", <<~YAML)
+          default: &default
+            source_path: client/app
+            dev_server:
+              hmr: true
+
           development:
+            <<: *default
             public_output_path: packs
             dev_server:
               port: 3035
 
           test:
+            <<: *default
             public_output_path: packs
             compile: false
         YAML
