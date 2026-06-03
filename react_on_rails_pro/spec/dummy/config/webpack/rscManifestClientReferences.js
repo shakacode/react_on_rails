@@ -14,9 +14,10 @@ const { config } = require('shakapacker');
 //   - fallback ordering:  configured JSON -> default JSON -> (discovery/bundle-only build -> broad
 //     fallback) -> (registration entry present -> throw the precompile-hook hint) -> broad fallback
 //   - precompile hint:    "Run bin/shakapacker-precompile-hook before bin/shakapacker."
-// Both sides are pinned by contract tests (this file: tests/rsc-manifest-client-references.test.js;
-// the generator: spec/react_on_rails/generators/rsc_generator_spec.rb), so drift on either side
-// fails CI. The fallback `directory`/`include` below is intentionally app-specific.
+// Both sides are pinned by contract tests so drift on either side fails CI: this resolver by the
+// dummy-root tests/rsc-manifest-client-references.test.js (run by the Pro `package-js-tests` CI
+// job), and the generator by react_on_rails/spec/react_on_rails/generators/rsc_generator_spec.rb.
+// The fallback `directory`/`include` below is intentionally app-specific.
 const DEFAULT_CLIENT_REFERENCES = [
   { directory: './client/app', recursive: true, include: /\.(js|mjs|cjs|ts|mts|cts|jsx|tsx)$/ },
 ];

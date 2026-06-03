@@ -66,6 +66,26 @@ module ReactOnRails
       end
     end
 
+    context "when computing the nonentrypoints directory path" do
+      it "is a pure accessor that does not create the directory as a side effect" do
+        generator = described_class.instance
+        nonentrypoints_dir = generator.send(:generated_nonentrypoints_directory_path)
+        FileUtils.rm_rf(nonentrypoints_dir)
+
+        # The path accessor must not touch the filesystem; the mkdir lives in
+        # ensure_nonentrypoints_directory!, called only before writes. This locks the behavior so
+        # read-only callers (staleness checks, cleanup enumeration) never create the directory.
+        expect(generator.send(:generated_nonentrypoints_directory_path)).to eq(nonentrypoints_dir)
+        expect(Dir.exist?(nonentrypoints_dir)).to be(false)
+
+        # ensure_nonentrypoints_directory! is the only thing that creates it.
+        generator.send(:ensure_nonentrypoints_directory!)
+        expect(Dir.exist?(nonentrypoints_dir)).to be(true)
+
+        FileUtils.rm_rf(nonentrypoints_dir)
+      end
+    end
+
     context "when component with common file only" do
       let(:component_name) { "ComponentWithCommonOnly" }
       let(:component_pack) { "#{generated_directory}/#{component_name}.js" }

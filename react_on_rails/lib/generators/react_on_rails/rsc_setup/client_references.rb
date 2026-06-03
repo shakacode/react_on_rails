@@ -1202,8 +1202,9 @@ module ReactOnRails
           # test — while adding no safety: `scoped_object_literal_defined?` already requires a
           # real, module-scope `fallbackRscClientReferences` object literal with
           # `directory: resolve(config.source_path)` (the generator-specific signature), and the
-          # `rsc_client_references_defined?` precondition rejects commented-out blocks via its
-          # top-level-position regex.
+          # `rsc_client_references_defined?` precondition rejects commented-out declarations — its
+          # `^[ \t]*(?:const|let|var)` anchor skips `//`-prefixed lines, and `js_top_level_position?`
+          # rejects declarations buried inside `/* ... */` blocks.
           return false unless rsc_client_references_defined?(content)
 
           scoped_object_literal_defined?(content, "fallbackRscClientReferences")

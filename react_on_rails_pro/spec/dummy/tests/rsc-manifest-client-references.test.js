@@ -66,7 +66,7 @@ describe('rscManifestClientReferences (Pro dummy) mirrors the generator resoluti
     expect(() => rscManifestClientReferences()).toThrow(/to contain a refs array/);
   });
 
-  it('falls back to a broad scan during a discovery/bundle-only build with no manifest', () => {
+  it('falls back to a broad scan during a discovery build with no manifest', () => {
     process.env.RSC_REFERENCE_DISCOVERY_BUILD = 'true';
     fs.existsSync.mockReturnValue(false);
 
@@ -76,6 +76,24 @@ describe('rscManifestClientReferences (Pro dummy) mirrors the generator resoluti
     // Locks the include extensions in lockstep with the generator template.
     expect(refs[0].include.test('Foo.mjs')).toBe(true);
     expect(refs[0].include.test('Foo.cts')).toBe(true);
+  });
+
+  it('falls back to a broad scan during a bundle-only build with no manifest', () => {
+    process.env.RSC_BUNDLE_ONLY = 'true';
+    fs.existsSync.mockReturnValue(false);
+
+    const refs = rscManifestClientReferences();
+    expect(Array.isArray(refs)).toBe(true);
+    expect(refs[0]).toMatchObject({ directory: './client/app', recursive: true });
+  });
+
+  it('lets a missing configured override file throw loudly rather than silently falling back', () => {
+    process.env.RSC_MANIFEST_CLIENT_REFERENCES_JSON = 'tmp/does-not-exist.json';
+    fs.readFileSync.mockImplementation(() => {
+      throw Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' });
+    });
+
+    expect(() => rscManifestClientReferences()).toThrow(/ENOENT/);
   });
 
   it('throws the precompile-hook hint when the registration entry exists but the manifest is missing', () => {

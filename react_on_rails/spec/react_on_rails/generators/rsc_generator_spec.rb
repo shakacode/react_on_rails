@@ -2905,7 +2905,8 @@ describe RscGenerator, type: :generator do
     it "emits the manifest resolution contract that the Pro dummy mirrors" do
       # Keep these tokens in lockstep with the Pro dummy's hand-written mirror at
       # react_on_rails_pro/spec/dummy/config/webpack/rscManifestClientReferences.js (pinned by
-      # tests/rsc-manifest-client-references.test.js). Drift on either side fails CI.
+      # react_on_rails_pro/spec/dummy/tests/rsc-manifest-client-references.test.js). Drift on either
+      # side fails CI.
       assert_file "config/webpack/clientWebpackConfig.js" do |content|
         expect(content).to include("process.env.RSC_MANIFEST_CLIENT_REFERENCES_JSON")
         expect(content).to include("ssr-generated/rsc-client-references.json")
