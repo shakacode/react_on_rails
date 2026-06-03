@@ -29,53 +29,11 @@ def shard_benchmark_routes(routes, shard_index, total_shards)
   end
 end
 
-all_routes = benchmark_routes_for_app(APP_DIR, ROUTES)
-
-raise "No routes to benchmark" if all_routes.empty?
-
-validate_positive_integer(BENCHMARK_TOTAL_SHARDS, "BENCHMARK_TOTAL_SHARDS")
-raise "BENCHMARK_SHARD_INDEX must be between 0 and #{BENCHMARK_TOTAL_SHARDS - 1} (got: #{BENCHMARK_SHARD_INDEX})" unless
-  BENCHMARK_SHARD_INDEX.between?(0, BENCHMARK_TOTAL_SHARDS - 1)
-
-routes = shard_benchmark_routes(all_routes, BENCHMARK_SHARD_INDEX, BENCHMARK_TOTAL_SHARDS)
-raise "No routes assigned to shard #{BENCHMARK_SHARD_INDEX + 1}/#{BENCHMARK_TOTAL_SHARDS}" if routes.empty?
-
-validate_benchmark_config!
-
-# Check required tools are installed
-check_required_tools(%w[k6 column tee])
-
-puts <<~PARAMS
-  Benchmark parameters:
-    - APP_DIR: #{APP_DIR}
-    - ROUTES: #{ROUTES || 'auto-detect from Rails'}
-    - BASE_URL: #{BASE_URL}
-    - BENCHMARK_SHARD_INDEX: #{BENCHMARK_SHARD_INDEX}
-    - BENCHMARK_TOTAL_SHARDS: #{BENCHMARK_TOTAL_SHARDS}
-    - ROUTES_IN_SHARD: #{routes.length}/#{all_routes.length}
-    - RATE: #{RATE}
-    - DURATION: #{DURATION}
-    - REQUEST_TIMEOUT: #{REQUEST_TIMEOUT}
-    - CONNECTIONS: #{CONNECTIONS}
-    - MAX_CONNECTIONS: #{MAX_CONNECTIONS}
-    - WEB_CONCURRENCY: #{ENV['WEB_CONCURRENCY'] || 'unset'}
-    - RAILS_MAX_THREADS: #{ENV['RAILS_MAX_THREADS'] || 'unset'}
-    - RAILS_MIN_THREADS: #{ENV['RAILS_MIN_THREADS'] || 'unset'}
-PARAMS
-
-# Wait for the server to be ready
-test_uri = URI.parse("http://#{BASE_URL}#{routes.first}")
-wait_for_server(test_uri)
-puts "Server is ready!"
-
-FileUtils.mkdir_p(OUTDIR)
-
-# Initialize BMF collector for Bencher output (suffix used for Core/Pro distinction)
-bmf_collector = BmfCollector.new(suffix: BMF_SUFFIX)
-
 # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
-# Benchmark a single route with k6
+# Benchmark a single route with k6. Returns [rps, p50, p90, status] on success
+# and RAISES on any k6/parse failure so the suite can record the failure and
+# exit non-zero instead of shipping fabricated metrics to Bencher.
 def run_k6_benchmark(target, route_name)
   puts "\n===> k6: #{route_name}"
 
@@ -120,19 +78,14 @@ def run_k6_benchmark(target, route_name)
   k6_status = k6_status_parts.empty? ? "MISSING" : k6_status_parts.join(",")
 
   [k6_rps, k6_p50, k6_p90, k6_status]
-rescue StandardError => e
-  puts "Error: #{e.message}"
-  failure_metrics(e)
 end
 
 # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
-# Initialize summary file
-File.write(SUMMARY_TXT, "")
-add_to_summary("Route", "RPS", "p50(ms)", "p90(ms)", "Status")
-
-# Run benchmarks for each route
-routes.each do |route|
+# Benchmark a single route end-to-end (warm-up + k6). Returns
+# [rps, p50, p90, status] on success and RAISES on failure (delegated to
+# run_k6_benchmark) so the suite can record it.
+def benchmark_route(route)
   separator = "=" * 80
   puts "\n#{separator}"
   puts "Benchmarking route: #{route}"
@@ -149,15 +102,93 @@ routes.each do |route|
   end
   puts "Warm-up complete for #{route}"
 
-  route_name = sanitize_route_name(route)
-  rps, p50, p90, status = run_k6_benchmark(target, route_name)
-  add_to_summary(route, rps, p50, p90, status)
-
-  # Add to BMF collector for Bencher output (p90 stays in the summary table only)
-  bmf_collector.add(name: route, rps: rps, p50: p50, status: status)
+  run_k6_benchmark(target, sanitize_route_name(route))
 end
 
-puts "\nSummary saved to #{SUMMARY_TXT}"
-system("column", "-t", "-s", "\t", SUMMARY_TXT)
+# Run every route, collecting per-route failures instead of aborting the whole
+# suite on the first one. A failed route is recorded as FAILED in the
+# human-readable summary but is NOT added to the BMF collector, so fabricated
+# metrics never ship to Bencher. Returns the routes that failed (caller exits
+# non-zero when any failed). `runner` is injected so the failure-collection
+# control flow can be unit-tested without a live server or k6.
+def run_benchmark_suite(routes, bmf_collector, runner: method(:benchmark_route))
+  failed_routes = []
 
-bmf_collector.write_bmf_json(BENCHMARK_JSON)
+  routes.each do |route|
+    rps, p50, p90, status = runner.call(route)
+    add_to_summary(route, rps, p50, p90, status)
+    # Add to BMF collector for Bencher output (p90 stays in the summary table only)
+    bmf_collector.add(name: route, rps: rps, p50: p50, status: status)
+  rescue StandardError => e
+    warn "::error::k6 benchmark failed for route #{route}: #{e.message}"
+    failed_routes << route
+    add_to_summary(route, *failure_metrics(e))
+  end
+
+  failed_routes
+end
+
+if __FILE__ == $PROGRAM_NAME
+  all_routes = benchmark_routes_for_app(APP_DIR, ROUTES)
+
+  raise "No routes to benchmark" if all_routes.empty?
+
+  validate_positive_integer(BENCHMARK_TOTAL_SHARDS, "BENCHMARK_TOTAL_SHARDS")
+  unless BENCHMARK_SHARD_INDEX.between?(0, BENCHMARK_TOTAL_SHARDS - 1)
+    raise "BENCHMARK_SHARD_INDEX must be between 0 and #{BENCHMARK_TOTAL_SHARDS - 1} " \
+          "(got: #{BENCHMARK_SHARD_INDEX})"
+  end
+
+  routes = shard_benchmark_routes(all_routes, BENCHMARK_SHARD_INDEX, BENCHMARK_TOTAL_SHARDS)
+  raise "No routes assigned to shard #{BENCHMARK_SHARD_INDEX + 1}/#{BENCHMARK_TOTAL_SHARDS}" if routes.empty?
+
+  validate_benchmark_config!
+
+  # Check required tools are installed
+  check_required_tools(%w[k6 column tee])
+
+  puts <<~PARAMS
+    Benchmark parameters:
+      - APP_DIR: #{APP_DIR}
+      - ROUTES: #{ROUTES || 'auto-detect from Rails'}
+      - BASE_URL: #{BASE_URL}
+      - BENCHMARK_SHARD_INDEX: #{BENCHMARK_SHARD_INDEX}
+      - BENCHMARK_TOTAL_SHARDS: #{BENCHMARK_TOTAL_SHARDS}
+      - ROUTES_IN_SHARD: #{routes.length}/#{all_routes.length}
+      - RATE: #{RATE}
+      - DURATION: #{DURATION}
+      - REQUEST_TIMEOUT: #{REQUEST_TIMEOUT}
+      - CONNECTIONS: #{CONNECTIONS}
+      - MAX_CONNECTIONS: #{MAX_CONNECTIONS}
+      - WEB_CONCURRENCY: #{ENV['WEB_CONCURRENCY'] || 'unset'}
+      - RAILS_MAX_THREADS: #{ENV['RAILS_MAX_THREADS'] || 'unset'}
+      - RAILS_MIN_THREADS: #{ENV['RAILS_MIN_THREADS'] || 'unset'}
+  PARAMS
+
+  # Wait for the server to be ready
+  test_uri = URI.parse("http://#{BASE_URL}#{routes.first}")
+  wait_for_server(test_uri)
+  puts "Server is ready!"
+
+  FileUtils.mkdir_p(OUTDIR)
+
+  # Initialize BMF collector for Bencher output (suffix used for Core/Pro distinction)
+  bmf_collector = BmfCollector.new(suffix: BMF_SUFFIX)
+
+  # Initialize summary file
+  File.write(SUMMARY_TXT, "")
+  add_to_summary("Route", "RPS", "p50(ms)", "p90(ms)", "Status")
+
+  failed_routes = run_benchmark_suite(routes, bmf_collector)
+
+  puts "\nSummary saved to #{SUMMARY_TXT}"
+  system("column", "-t", "-s", "\t", SUMMARY_TXT)
+
+  bmf_collector.write_bmf_json(BENCHMARK_JSON)
+
+  unless failed_routes.empty?
+    warn "::error::#{failed_routes.length} of #{routes.length} benchmark route(s) failed: " \
+         "#{failed_routes.join(', ')}"
+    exit 1
+  end
+end
