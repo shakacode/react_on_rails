@@ -99,6 +99,65 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#prompt_for_otp" do
+    it "normalizes a submitted OTP" do
+      allow($stdin).to receive(:gets).and_return(" 123456 \n")
+      expect { expect(prompt_for_otp("RubyGems")).to eq("123456") }.to output(/Enter OTP code for RubyGems/).to_stdout
+    end
+
+    it "aborts when no OTP is entered and blanks are not allowed" do
+      allow($stdin).to receive(:gets).and_return("\n")
+      expect { prompt_for_otp("RubyGems") }.to raise_error(SystemExit, /No OTP provided/)
+    end
+
+    it "returns nil when blank input is allowed instead of aborting" do
+      allow($stdin).to receive(:gets).and_return("\n")
+      expect(prompt_for_otp("RubyGems", allow_blank: true)).to be_nil
+    end
+
+    it "includes the hint in the prompt when provided" do
+      allow($stdin).to receive(:gets).and_return("123456\n")
+      expect { prompt_for_otp("RubyGems", hint: "press Enter to skip") }
+        .to output(/Enter OTP code for RubyGems \(press Enter to skip\)/).to_stdout
+    end
+  end
+
+  describe "#resolve_rubygems_otp_for_publish" do
+    it "returns the provided OTP without prompting" do
+      expect(self).not_to receive(:prompt_for_otp)
+      expect { expect(resolve_rubygems_otp_for_publish("123456")).to eq("123456") }
+        .to output(/Using provided RubyGems OTP/).to_stdout
+    end
+
+    it "prompts once for the OTP when none is provided and stdin is a TTY" do
+      allow($stdin).to receive(:tty?).and_return(true)
+      allow(self).to receive(:prompt_for_otp)
+        .with("RubyGems", allow_blank: true, hint: "press Enter to be prompted per gem")
+        .and_return("654321")
+
+      expect { expect(resolve_rubygems_otp_for_publish(nil)).to eq("654321") }
+        .to output(/reused for both gems/).to_stdout
+    end
+
+    it "returns nil without prompting when stdin is not a TTY" do
+      allow($stdin).to receive(:tty?).and_return(false)
+      expect(self).not_to receive(:prompt_for_otp)
+
+      expect { expect(resolve_rubygems_otp_for_publish(nil)).to be_nil }
+        .to output(/Set RUBYGEMS_OTP environment variable/).to_stdout
+    end
+
+    it "returns nil when the operator submits a blank OTP (legacy per-gem prompting)" do
+      allow($stdin).to receive(:tty?).and_return(true)
+      allow(self).to receive(:prompt_for_otp)
+        .with("RubyGems", allow_blank: true, hint: "press Enter to be prompted per gem")
+        .and_return(nil)
+
+      expect { expect(resolve_rubygems_otp_for_publish(nil)).to be_nil }
+        .to output(/reused for both gems/).to_stdout
+    end
+  end
+
   describe "#expected_bump_type_from_changelog_section" do
     it "returns major for breaking changes" do
       section = <<~MARKDOWN
