@@ -16,6 +16,8 @@
 
 import { Readable } from 'stream';
 
+import * as React from 'react';
+
 import {
   RSCRenderParams,
   assertRailsContextWithServerStreamingCapabilities,
@@ -31,9 +33,36 @@ import {
   StreamingTrackers,
   transformRenderStreamChunksToResultObject,
 } from '../streamingUtils.ts';
-import { setManifestFileNames } from '../cache/manifestLoader.ts';
+import { setManifestFileNames, getRscCssHrefs } from '../cache/manifestLoader.ts';
 import { getServerRenderer } from '../cache/manifestLoaderServer.ts';
 import { setBuildId } from '../cache/buildIdProvider.ts';
+
+// Precedence group for RSC-emitted stylesheet <link>s. React 19 hoists links
+// that share a precedence into <head> together and blocks tree commit until they
+// load, which is what prevents CSS FOUC on 'use client' boundaries (#3211).
+const RSC_CSS_PRECEDENCE = 'ror-rsc';
+
+/**
+ * Wrap the rendered RSC tree with `<link rel="stylesheet" precedence>` for every
+ * stylesheet imported behind a `'use client'` boundary. Emitting the links
+ * inside the RSC payload means React hoists/dedupes them into `<head>` on both
+ * the initial SSR stream and on client-side navigation (the same payload decodes
+ * identically), so no CSR-specific handling is needed.
+ */
+const wrapWithRscCssLinks = (renderedTree: React.ReactNode, cssHrefs: readonly string[]): React.ReactNode => {
+  if (cssHrefs.length === 0) {
+    return renderedTree;
+  }
+
+  return React.createElement(
+    React.Fragment,
+    null,
+    ...cssHrefs.map((href) =>
+      React.createElement('link', { key: href, rel: 'stylesheet', href, precedence: RSC_CSS_PRECEDENCE }),
+    ),
+    renderedTree,
+  );
+};
 
 const CLIENT_HOOK_NAMES = [
   'useState',
@@ -129,7 +158,8 @@ const streamRenderRSCComponent = (
 
   const initializeAndRender = async () => {
     const { renderToPipeableStream } = await getServerRenderer();
-    const rscStream = renderToPipeableStream(await reactRenderingResult, {
+    const [renderedTree, cssHrefs] = await Promise.all([reactRenderingResult, getRscCssHrefs()]);
+    const rscStream = renderToPipeableStream(wrapWithRscCssLinks(renderedTree, cssHrefs), {
       onError: (err) => {
         const error = convertToError(err);
         reportError(error);
