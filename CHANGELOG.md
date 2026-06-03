@@ -28,6 +28,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 - **[Pro]** **Widened the `react-on-rails-rsc` peer-dependency range to the full React 19 line**: `react-on-rails-pro` now declares `react-on-rails-rsc` as `>= 19.0.2 < 20.0.0` (previously `>= 19.0.2 <= 19.2.3`), so future `react-on-rails-rsc` patch and minor releases on the React 19 line no longer trigger a peer-dependency warning. The `react` / `react-dom` peers stay at `>= 16`: React 18 support is retained, and the React-19-only RSC path is gated through the optional `react-on-rails-rsc` peer rather than by raising the React baseline. Resolves [Issue 3486](https://github.com/shakacode/react_on_rails/issues/3486). [PR 3580](https://github.com/shakacode/react_on_rails/pull/3580) by [justin808](https://github.com/justin808).
 
+#### Fixed
+
+- **[Pro]** **RSC CSS no longer flashes unstyled (FOUC) behind `'use client'` boundaries**: CSS imported by a `'use client'` boundary in a true React Server Component tree is now preloaded instead of loading only as a side effect of the JS chunk evaluating. The RSC client manifest now records each client reference's `.css` siblings (via a `pnpm` patch to `react-on-rails-rsc` until the upstream fix is published), and the Pro RSC renderer emits `<link rel="stylesheet" precedence="ror-rsc">` for them inside the RSC payload so React 19 hoists the stylesheets into `<head>` and blocks paint until they load — on both server render and client-side navigation. Fixes [Issue 3211](https://github.com/shakacode/react_on_rails/issues/3211). [PR 3587](https://github.com/shakacode/react_on_rails/pull/3587) by [justin808](https://github.com/justin808).
+
 ### [17.0.0.rc.1] - 2026-06-02
 
 #### Breaking Changes
