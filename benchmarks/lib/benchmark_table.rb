@@ -76,6 +76,10 @@ class BenchmarkTable
   def render_value(value)
     return "—" if value.nil?
 
+    # Escape only the pipe, which would otherwise break the table column structure.
+    # Cell values are controlled CI output (route paths, test names, status strings
+    # like "200=900,5xx=10"), not untrusted input, so other Markdown metacharacters
+    # don't need escaping here.
     value.to_s.gsub("|", "\\|")
   end
 end
