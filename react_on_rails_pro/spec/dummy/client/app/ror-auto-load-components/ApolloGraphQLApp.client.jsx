@@ -28,5 +28,9 @@ export default (_props, _railsContext, domNodeId) => {
       <ApolloGraphQL />
     </ApolloProvider>,
   );
-  hydrateRoot(el, App);
+  const root = hydrateRoot(el, App);
+
+  // Return a teardown so React on Rails unmounts this root on Turbo/Turbolinks navigation
+  // (page unload) or same-id node replacement instead of leaking it.
+  return () => root.unmount();
 };

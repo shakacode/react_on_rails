@@ -20,5 +20,9 @@ export default (_props: unknown, _railsContext: RailsContext, domNodeId: string)
   const ssrComputationCache = window.__SSR_COMPUTATION_CACHE;
   setSSRCache(ssrComputationCache);
   const App = wrapElementInStrictMode(<ApolloGraphQL />);
-  hydrateRoot(el, App);
+  const root = hydrateRoot(el, App);
+
+  // Return a teardown so React on Rails unmounts this root on Turbo/Turbolinks navigation
+  // (page unload) or same-id node replacement instead of leaking it.
+  return () => root.unmount();
 };

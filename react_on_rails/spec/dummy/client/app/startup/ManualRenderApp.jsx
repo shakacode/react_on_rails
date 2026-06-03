@@ -11,10 +11,15 @@ export default (props, _railsContext, domNodeId) => {
   );
 
   const domNode = document.getElementById(domNodeId);
+  let root;
   if (props.prerender) {
-    ReactDOMClient.hydrateRoot(domNode, reactElement);
+    root = ReactDOMClient.hydrateRoot(domNode, reactElement);
   } else {
-    const root = ReactDOMClient.createRoot(domNode);
+    root = ReactDOMClient.createRoot(domNode);
     root.render(reactElement);
   }
+
+  // Return a teardown so React on Rails unmounts this root on Turbo/Turbolinks navigation
+  // (page unload) or same-id node replacement instead of leaking it.
+  return () => root.unmount();
 };

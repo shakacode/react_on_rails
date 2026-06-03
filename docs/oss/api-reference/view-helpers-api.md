@@ -106,6 +106,45 @@ Why would you want to take over mounting yourself? One use case is code splittin
 > [!IMPORTANT]
 > **Renderer functions are strictly client-only.** There is no DOM on the server, so a renderer function cannot produce SSR output. React on Rails detects renderer functions at registration time and will throw a descriptive error like `Detected a renderer while server rendering component 'X'. See https://reactonrails.com/docs/core-concepts/render-functions for more information.` if you attempt to use one with `react_component(... prerender: true)`, `react_component_hash` (which forces prerendering), or `stream_react_component` (which is server-streaming only). For rendering that needs to run on the server, use a regular render function instead.
 
+#### Cleaning up on Turbo/Turbolinks navigation (optional teardown)
+
+Because a renderer function owns the React root it creates, React on Rails cannot unmount that root for you the way it does for the components it mounts itself. With [Turbo](https://turbo.hotwired.dev/) or Turbolinks, the page swaps without a full reload, so a renderer that never unmounts leaks its root (and any subscriptions or timers it holds) on every navigation.
+
+To opt in to cleanup, **return a teardown callback** — `() => void | Promise<void>`, or a promise resolving to one — from the renderer. React on Rails stores it and runs it when the mount is torn down: on Turbo/Turbolinks navigation (page unload) or when the same `domNodeId` node is replaced. Returning nothing keeps the previous (leaky) behavior, so existing renderers are unaffected.
+
+```jsx
+import ReactDOMClient from 'react-dom/client';
+
+// Renderer function: 3 params, mounts itself, returns a teardown.
+const MyRenderer = (props, _railsContext, domNodeId) => {
+  const domNode = document.getElementById(domNodeId);
+  const root = domNode.innerHTML
+    ? ReactDOMClient.hydrateRoot(domNode, <MyComponent {...props} />)
+    : ReactDOMClient.createRoot(domNode);
+  if (!domNode.innerHTML) {
+    root.render(<MyComponent {...props} />);
+  }
+
+  // Unmounted automatically on the next Turbo navigation (or same-id node replacement).
+  return () => root.unmount();
+};
+```
+
+Under the React 16/17 legacy API there is no root handle, so unmount by container node instead:
+
+```jsx
+import ReactDOM from 'react-dom';
+
+const MyLegacyRenderer = (props, _railsContext, domNodeId) => {
+  const domNode = document.getElementById(domNodeId);
+  ReactDOM.render(<MyComponent {...props} />, domNode);
+  return () => ReactDOM.unmountComponentAtNode(domNode);
+};
+```
+
+> [!NOTE]
+> Synchronous teardowns are always honored. An **async** teardown is best-effort in the open-source package: if a navigation or node replacement happens before the renderer resolves its teardown, that still-pending teardown may be dropped. React on Rails Pro's client renderer awaits the renderer and handles this race reliably.
+
 ---
 
 ### React Router

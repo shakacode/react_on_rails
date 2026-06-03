@@ -27,6 +27,8 @@ export default (props, railsContext, domNodeId) => {
   // eslint-disable-next-line no-param-reassign
   delete props.prerender;
 
+  const domNode = document.getElementById(domNodeId);
+
   const combinedReducer = combineReducers(reducers);
   const combinedProps = composeInitialState(props, railsContext);
 
@@ -39,6 +41,8 @@ export default (props, railsContext, domNodeId) => {
 
   // Provider uses this.props.children, so we're not typical React syntax.
   // This allows redux to add additional props to the HelloWorldContainer.
+  // The React 16/17 API re-renders into the same container idempotently, so hot reload reuses the
+  // existing tree (no separate root to unmount first).
   const renderApp = (Komponent) => {
     const element = wrapElementInStrictMode(
       <Provider store={store}>
@@ -46,7 +50,7 @@ export default (props, railsContext, domNodeId) => {
       </Provider>,
     );
 
-    render(element, document.getElementById(domNodeId));
+    render(element, domNode);
   };
 
   renderApp(HelloWorldContainer);
@@ -57,4 +61,9 @@ export default (props, railsContext, domNodeId) => {
       renderApp(HelloWorldContainer);
     });
   }
+
+  // Return a teardown so React on Rails unmounts this tree on Turbo/Turbolinks navigation
+  // (page unload) or same-id node replacement instead of leaking it. The React 16/17 API unmounts
+  // by container node rather than via a root handle.
+  return () => ReactDOM.unmountComponentAtNode(domNode);
 };

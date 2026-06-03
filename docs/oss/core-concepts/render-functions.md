@@ -38,14 +38,16 @@ const HelloHash = (props) => {
 };
 HelloHash.renderFunction = true;
 
-// Renderer Function — 3 params, handles hydration itself, CLIENT ONLY
-const LazyHydrate = (props, railsContext, domNodeId) => {
+// Renderer Function — 3 params, handles hydration itself, CLIENT ONLY.
+// Optionally return a teardown (or a promise resolving to one); React on Rails runs it on
+// Turbo/Turbolinks navigation (or same-id node replacement) so the root is unmounted, not leaked.
+const LazyHydrate = (props, railsContext, domNodeId) =>
   // whenVisible is a hypothetical helper that resolves when the element scrolls into view
   whenVisible(domNodeId).then(() => {
-    const root = document.getElementById(domNodeId);
-    ReactDOM.hydrateRoot(root, <HelloMessage {...props} />);
+    const domNode = document.getElementById(domNodeId);
+    const root = ReactDOM.hydrateRoot(domNode, <HelloMessage {...props} />);
+    return () => root.unmount();
   });
-};
 
 ReactOnRails.register({ HelloMessage, HelloWithContext, HelloHash, LazyHydrate });
 ```

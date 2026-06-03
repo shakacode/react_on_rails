@@ -21,14 +21,18 @@ import { wrapElementInStrictMode } from '../strictModeSupport';
  *
  */
 export default (props, railsContext, domNodeId) => {
-  const render = props.prerender
-    ? ReactDOMClient.hydrateRoot
-    : (domNode, element) => {
-        const root = ReactDOMClient.createRoot(domNode);
-        root.render(element);
-      };
+  const { prerender } = props;
   // eslint-disable-next-line no-param-reassign
   delete props.prerender;
+
+  const hydrateOrRender = (domNode, element) => {
+    if (prerender) {
+      return ReactDOMClient.hydrateRoot(domNode, element);
+    }
+    const newRoot = ReactDOMClient.createRoot(domNode);
+    newRoot.render(element);
+    return newRoot;
+  };
 
   const combinedReducer = combineReducers(reducers);
   const combinedProps = composeInitialState(props, railsContext);
@@ -40,6 +44,10 @@ export default (props, railsContext, domNodeId) => {
   // renderApp is a function required for hot reloading. see
   // https://github.com/retroalgic/react-on-rails-hot-minimal/blob/master/client/src/entry.js
 
+  // Track the current root so we can unmount it on Turbo navigation (via the returned teardown) and
+  // before re-mounting on hot reload (so we never leak a root or call createRoot twice on one node).
+  let root;
+
   // Provider uses this.props.children, so we're not typical React syntax.
   // This allows redux to add additional props to the HelloWorldContainer.
   const renderApp = (Komponent) => {
@@ -49,7 +57,10 @@ export default (props, railsContext, domNodeId) => {
       </Provider>,
     );
 
-    render(document.getElementById(domNodeId), element);
+    if (root) {
+      root.unmount();
+    }
+    root = hydrateOrRender(document.getElementById(domNodeId), element);
   };
 
   renderApp(HelloWorldContainer);
@@ -60,4 +71,10 @@ export default (props, railsContext, domNodeId) => {
       renderApp(HelloWorldContainer);
     });
   }
+
+  return () => {
+    if (root) {
+      root.unmount();
+    }
+  };
 };

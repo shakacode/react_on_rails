@@ -24,5 +24,9 @@ export default (props, _railsContext, domNodeId) => {
     </div>,
   );
 
-  hydrateOrRender(document.getElementById(domNodeId), reactElement, prerender);
+  const root = hydrateOrRender(document.getElementById(domNodeId), reactElement, prerender);
+
+  // Return a teardown so React on Rails unmounts this root on Turbo/Turbolinks navigation
+  // (page unload) or same-id node replacement instead of leaking it.
+  return () => root.unmount();
 };
