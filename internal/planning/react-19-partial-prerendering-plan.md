@@ -2,14 +2,15 @@
 
 ## Purpose
 
-Track the work needed for [Issue 2182](https://github.com/shakacode/react_on_rails/issues/2182): verify React 19.2.x
-support and decide how React on Rails should expose any partial pre-rendering workflow that becomes practical for Rails
-apps.
+Plan the work requested in [Issue 2182](https://github.com/shakacode/react_on_rails/issues/2182) (the originating
+issue, now closed): verify React 19.2.x support and decide how React on Rails should expose any partial pre-rendering
+workflow that becomes practical for Rails apps. Active follow-up is tracked in
+[Issue 3255](https://github.com/shakacode/react_on_rails/issues/3255).
 
 This is a planning document. It does not change package versions, build configuration, or Pro package code.
 
-**Status**: Draft | **Created**: 2026-04-30 | **Last updated**: 2026-06-02 | **Tracks**:
-[Issue 2182](https://github.com/shakacode/react_on_rails/issues/2182) and
+**Status**: Draft | **Created**: 2026-04-30 | **Last updated**: 2026-06-03 | **Originated from**:
+[Issue 2182](https://github.com/shakacode/react_on_rails/issues/2182) (closed) | **Active tracking**:
 [Issue 3255](https://github.com/shakacode/react_on_rails/issues/3255)
 
 ## Current Repository Signal
@@ -144,7 +145,8 @@ Use a dedicated branch for the actual version verification work:
 
 - [ ] Confirm docs that mention explicit React versions are either updated or intentionally left on older minimum-version
       examples.
-- [ ] Fill the secondary reviewer placeholders in the Open Questions section before opening the first implementation PR.
+- [ ] Confirm the secondary and backup reviewers named in the Resolved Decisions section are still available before
+      opening the first implementation PR.
 
 If any verification step fails, capture the exact command and failure in a comment on
 [Issue 3255](https://github.com/shakacode/react_on_rails/issues/3255), then apply this default decision rule
@@ -209,20 +211,21 @@ existing stable React 19 plus existing Pro helpers (`stream_react_component`, `c
 — RSC with `"use cache"`, per [`ppr-implementation-plan.md`](./ppr-implementation-plan.md) — is the longer-term path,
 tracked in [Issue 3571](https://github.com/shakacode/react_on_rails/issues/3571).
 
-**Secondary reviewer (SSR-vs-RSC)**: Abanoub Ghadban (fallback: @justin808)
+**Secondary reviewer (SSR-vs-RSC)**: Abanoub Ghadban (@AbanoubGhadban) (fallback: @justin808)
 
-**Backup reviewer (benchmarks)**: Abanoub Ghadban (fallback: @justin808)
+**Backup reviewer (benchmarks)**: Abanoub Ghadban (@AbanoubGhadban) (fallback: @justin808)
 
 1. **First example — SSR strategy (the prerequisite decision).** Use traditional **streaming SSR with Suspense** (Pro
    `stream_react_component`), not RSC and not both-in-one. RSC PPR becomes Example 2 under Track B
    ([Issue 3571](https://github.com/shakacode/react_on_rails/issues/3571)). Rationale: it ships on stable React 19 and
    existing Pro helpers as docs plus one dummy-app route, rather than blocking on the multi-month Track B toolchain.
 2. **Static-shell caching layer.** Layered, defaulting to the **Rails fragment cache** for the first example via the
-   existing `cached_stream_react_component` (`cache_key` + `expires_in`); dynamic holes stream per request and are never
-   cached. Tier 2 (HTTP caching headers such as `Cache-Control: public, s-maxage, stale-while-revalidate`) applies only
-   to fully static routes with no live holes. Tier 3 (CDN edge cache of shell + postponed state with an origin resume
-   protocol) is split into [Issue 3572](https://github.com/shakacode/react_on_rails/issues/3572). Non-goal for v1:
-   HTTP/CDN-caching a streamed response that still has live per-request holes.
+   existing `cached_stream_react_component` (`cache_key` + `cache_options[:expires_in]`); dynamic holes stream per
+   request and are never cached. Tier 2 (HTTP caching headers such as
+   `Cache-Control: public, s-maxage, stale-while-revalidate`) applies only to fully static routes with no live
+   holes. Tier 3 (CDN edge cache of shell + postponed state with an origin resume protocol) is split into
+   [Issue 3572](https://github.com/shakacode/react_on_rails/issues/3572). Non-goal for v1: HTTP/CDN-caching a
+   streamed response that still has live per-request holes.
 3. **Who renders the shell vs. where it is cached.** Both, composed — these are orthogonal axes. The **Node Renderer
    renders** the shell via `stream_react_component`; the **Rails fragment cache stores** it via
    `cached_stream_react_component`, so the shell is rendered once and replayed without re-invoking the renderer. Track B
