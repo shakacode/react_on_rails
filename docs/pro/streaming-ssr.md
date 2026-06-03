@@ -19,7 +19,11 @@ With traditional SSR the first paint waits for the slowest query; with streaming
 flowchart LR
     subgraph TRAD["Traditional SSR — paint waits for all data"]
         direction LR
-        t0([Request]) --> t1["Fetch users<br/>~800 ms"] --> t2["Fetch posts<br/>~600 ms"] --> t3["Render HTML<br/>~200 ms"] --> t4(["First paint<br/>~1600 ms"])
+        t0([Request]) --> t1["Fetch users<br/>~800 ms"]
+        t0 --> t2["Fetch posts<br/>~600 ms"]
+        t1 --> t3["Render HTML<br/>~200 ms"]
+        t2 --> t3
+        t3 --> t4(["First paint<br/>~1000 ms"])
     end
     subgraph STREAM["Streaming SSR + async props — paint first, data streams in"]
         direction LR
@@ -29,7 +33,7 @@ flowchart LR
     end
 ```
 
-_Timings are illustrative, not benchmarks — the point is **when** the first paint happens: at the end of the chain for traditional SSR, but right after the shell for streaming._
+_Timings are illustrative, not benchmarks — the point is **when** the first paint happens: only after all data is ready for traditional SSR, but right after the shell for streaming._
 
 ## How It Works
 
@@ -354,8 +358,8 @@ Extending the example with a second slow section (`users`), the page fills in st
 
 ```mermaid
 flowchart LR
-    A["Stage 1 · shell (~50 ms)<br/>──────────<br/>Header ✓<br/>Users …loading<br/>Posts …loading<br/><br/>visible now · interactive as JS loads"] --> B["Stage 2 · users fill in<br/>──────────<br/>Header ✓<br/>Users ✓<br/>Posts …loading"]
-    B --> C["Stage 3 · complete<br/>──────────<br/>Header ✓<br/>Users ✓<br/>Posts ✓"]
+    A["Stage 1 · shell (~50 ms)<br/><br/>Header ✓<br/>Users …loading<br/>Posts …loading<br/><br/>visible now · interactive as JS loads"] --> B["Stage 2 · users fill in<br/><br/>Header ✓<br/>Users ✓<br/>Posts …loading"]
+    B --> C["Stage 3 · complete<br/><br/>Header ✓<br/>Users ✓<br/>Posts ✓"]
 ```
 
 ## Compression Middleware Compatibility
