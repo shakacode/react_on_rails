@@ -350,11 +350,11 @@ For example, with our `MyStreamingComponent`, the sequence is:
 
 To render more of the page progressively, add an async prop and a `<Suspense>` boundary for each slow section — emit each one from the block as Rails resolves it, and every boundary streams in independently. This keeps the whole page in a single component tree (shared layout, context, and props) rather than splitting it across multiple `stream_react_component` calls.
 
-From the browser's perspective, the page fills in stage by stage — interactive from the first paint, with each `<Suspense>` boundary swapping its fallback for real content as its prop arrives:
+Extending the example with a second slow section (`users`), the page fills in stage by stage from the browser's perspective — visible from the first paint and interactive as each part hydrates, with each `<Suspense>` boundary swapping its fallback for real content as its prop arrives:
 
 ```mermaid
 flowchart LR
-    A["Stage 1 · shell (~50 ms)<br/>──────────<br/>Header ✓<br/>Users …loading<br/>Posts …loading<br/><br/>page already interactive"] --> B["Stage 2 · users arrive<br/>──────────<br/>Header ✓<br/>Users ✓<br/>Posts …loading"]
+    A["Stage 1 · shell (~50 ms)<br/>──────────<br/>Header ✓<br/>Users …loading<br/>Posts …loading<br/><br/>visible now · interactive as JS loads"] --> B["Stage 2 · users fill in<br/>──────────<br/>Header ✓<br/>Users ✓<br/>Posts …loading"]
     B --> C["Stage 3 · complete<br/>──────────<br/>Header ✓<br/>Users ✓<br/>Posts ✓"]
 ```
 
