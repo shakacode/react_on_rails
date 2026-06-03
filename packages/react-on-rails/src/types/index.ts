@@ -227,6 +227,7 @@ export type {
   AuthenticityHeaders,
   RenderFunction,
   RendererTeardown,
+  RendererResult,
   RenderFunctionResult,
   Store,
   StoreGenerator,

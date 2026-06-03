@@ -312,15 +312,10 @@ describe('ClientSideRenderer', () => {
   it('runs the teardown returned by a renderer when the component is unmounted', async () => {
     const teardown = jest.fn();
     const TestRenderer: RenderFunction = (
-      props?: Record<string, unknown>,
-      railsContext?: RailsContext,
-      domNodeId?: string,
-    ) => {
-      void props;
-      void railsContext;
-      void domNodeId;
-      return teardown;
-    };
+      _props?: Record<string, unknown>,
+      _railsContext?: RailsContext,
+      _domNodeId?: string,
+    ) => teardown;
     ComponentRegistry.register({ TestComponent: TestRenderer });
     const componentSpec = setupTestComponentDom('dom-id-teardown');
     addRailsContext();
@@ -407,5 +402,43 @@ describe('ClientSideRenderer', () => {
     await renderPromise;
 
     expect(teardown).toHaveBeenCalledTimes(1);
+  });
+
+  it('logs (and does not reject) when a raced async renderer teardown throws synchronously', async () => {
+    // Same race as above, but the resolved teardown throws synchronously. render() must guard the
+    // call (like unmount() does) so the throw is logged rather than escaping render()'s outer catch,
+    // which would reject renderPromise with a misleading "encountered an error while rendering" error
+    // after the component is already unmounted.
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const teardownError = new Error('teardown boom');
+    const teardown = jest.fn(() => {
+      throw teardownError;
+    });
+    let resolveRenderer!: (value: () => void) => void;
+    const rendererPromise = new Promise<() => void>((resolve) => {
+      resolveRenderer = resolve;
+    });
+    const TestRenderer: RenderFunction = (
+      _props?: Record<string, unknown>,
+      _railsContext?: RailsContext,
+      _domNodeId?: string,
+    ) => rendererPromise;
+    ComponentRegistry.register({ TestComponent: TestRenderer });
+    const componentSpec = setupTestComponentDom('dom-id-teardown-race-throws');
+    addRailsContext();
+
+    const renderPromise = renderOrHydrateComponent(componentSpec);
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+
+    unmountAll();
+    resolveRenderer(teardown);
+
+    // The synchronous throw is caught and logged, so renderPromise resolves rather than rejecting.
+    await expect(renderPromise).resolves.toBeUndefined();
+    expect(teardown).toHaveBeenCalledTimes(1);
+    expect(consoleErrorSpy).toHaveBeenCalledWith('Error in renderer teardown:', teardownError);
+    consoleErrorSpy.mockRestore();
   });
 });

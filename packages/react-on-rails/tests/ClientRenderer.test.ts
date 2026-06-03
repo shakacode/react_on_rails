@@ -286,7 +286,9 @@ describe('ClientRenderer', () => {
       expect(() => unmountAllComponents()).not.toThrow();
       expect(throwingTeardown).toHaveBeenCalledTimes(1);
       expect(okTeardown).toHaveBeenCalledTimes(1);
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error unmounting component:', expect.any(Error));
+      // Renderer-owned teardown failures use the renderer label so they are greppable alongside the
+      // async-rejection path, regardless of whether the teardown threw synchronously or rejected.
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error in renderer teardown:', expect.any(Error));
 
       consoleErrorSpy.mockRestore();
     });
@@ -295,6 +297,7 @@ describe('ClientRenderer', () => {
       // Documents the core best-effort limitation (Pro handles this race): the first mount's async
       // teardown resolves only after the same-id node has been replaced, so it must NOT be attached
       // to or run against the new mount.
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       const resolvers: Array<(teardown: () => void) => void> = [];
       const renderer = jest.fn();
       const AsyncRenderer: RenderFunction = (_props, _railsContext, _domNodeId) => {
@@ -322,9 +325,37 @@ describe('ClientRenderer', () => {
       resolvers[0](staleTeardown);
       await Promise.resolve();
 
-      // The stale teardown was not attached to the replaced mount, so cleanup never runs it.
+      // The stale teardown was not attached to the replaced mount, so cleanup never runs it. The
+      // drop is logged (not silent) so the documented limitation is diagnosable.
       unmountAllComponents();
       expect(staleTeardown).not.toHaveBeenCalled();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('resolved after its mount was removed'),
+      );
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('drops and logs an async teardown when unmount races the renderer resolving', async () => {
+      // Complements the happy-path async test above: here unmountAllComponents() fires BEFORE the
+      // renderer's promise resolves, which is the actual race the core package cannot win (Pro does).
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const teardown = jest.fn();
+      const TestRenderer: RenderFunction = (_props, _railsContext, _domNodeId) => Promise.resolve(teardown);
+      ComponentRegistry.register({ TestRenderer });
+      setupRendererDom('renderer-async-race');
+
+      renderComponent('renderer-async-race');
+      // Unmount before the renderer's promise resolves, so the tracked entry is cleared first.
+      unmountAllComponents();
+
+      // Let the renderer's promise resolve; the teardown can no longer attach to the cleared entry.
+      await Promise.resolve();
+
+      expect(teardown).not.toHaveBeenCalled();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('resolved after its mount was removed'),
+      );
+      consoleErrorSpy.mockRestore();
     });
 
     it('logs (and does not rethrow) when an async renderer rejects before returning a teardown', async () => {

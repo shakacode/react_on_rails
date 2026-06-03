@@ -40,6 +40,11 @@ const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 /**
  * Invokes a renderer teardown, swallowing async rejections so a failing teardown cannot produce an
  * unhandled promise rejection. Synchronous throws propagate to the caller's try/catch.
+ *
+ * Intentionally duplicated from the OSS `react-on-rails` ClientRenderer rather than imported: it is a
+ * tiny self-contained helper that the OSS module does not export, so duplicating keeps the Pro client
+ * renderer decoupled from OSS internals (no reliance on a non-public export) instead of widening the
+ * OSS public API just to share it.
  */
 function invokeRendererTeardown(teardown: RendererTeardown | undefined): void {
   if (!teardown) return;
@@ -158,8 +163,16 @@ class ComponentRenderer {
           // @ts-expect-error The state can change while awaiting delegateToRenderer
           if (this.state === 'unmounted') {
             // unmount() ran while the renderer was resolving and could not see the teardown yet, so
-            // run it now to avoid leaking the renderer's mount.
-            invokeRendererTeardown(delegation.teardown);
+            // run it now to avoid leaking the renderer's mount. Guard it like unmount() does (below)
+            // so a synchronously-throwing teardown is logged here rather than escaping to render()'s
+            // outer catch, which would rethrow it as a misleading "encountered an error while
+            // rendering" rejection even though the component is already unmounted.
+            try {
+              invokeRendererTeardown(delegation.teardown);
+            } catch (teardownError: unknown) {
+              const error = teardownError instanceof Error ? teardownError : new Error('Unknown error');
+              console.error('Error in renderer teardown:', error);
+            }
           } else {
             this.rendererTeardown = delegation.teardown;
             this.state = 'rendered';

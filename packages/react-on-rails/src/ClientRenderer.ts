@@ -119,8 +119,9 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
  * Known limitation (core package): if the mount is unmounted or its node is replaced *before* an
  * async renderer resolves its teardown, the still-pending teardown is dropped and that one mount
  * leaks — the resolved teardown is discarded because the entry is no longer the active mount for
- * this id (the `renderedRoots.get(domNodeId) === entry` guard below). Synchronous teardowns are
- * unaffected. The Pro client renderer (`react-on-rails-pro`) awaits the renderer and re-checks the
+ * this id (the `renderedRoots.get(domNodeId) === entry` guard below). The drop is logged via
+ * `console.error` so it is diagnosable rather than silent. Synchronous teardowns are unaffected.
+ * The Pro client renderer (`react-on-rails-pro`) awaits the renderer and re-checks the
  * unmount state, so it runs the teardown even when a navigation races the resolve; prefer Pro if you
  * depend on async renderer teardowns surviving fast navigations.
  */
@@ -133,10 +134,19 @@ function trackRendererMount(domNodeId: string, domNode: Element, result: unknown
   } else if (result && typeof (result as Promise<unknown>).then === 'function') {
     (result as Promise<unknown>)
       .then((resolved) => {
-        // Only attach if this exact entry is still the active mount for this id (it may have been
-        // replaced or unmounted while the renderer was resolving).
-        if (typeof resolved === 'function' && renderedRoots.get(domNodeId) === entry) {
+        if (typeof resolved !== 'function') return;
+        // Only attach if this exact entry is still the active mount for this id.
+        if (renderedRoots.get(domNodeId) === entry) {
           entry.teardown = resolved as RendererTeardown;
+        } else {
+          // The mount was unmounted or its node replaced before this async teardown resolved, so the
+          // entry is no longer the active mount and the teardown can't be attached — it is dropped
+          // and that one mount may leak on cleanup. Log it (rather than dropping silently) so the
+          // documented limitation above is diagnosable in production. Pro avoids this race entirely.
+          console.error(
+            `Renderer teardown for dom node "${domNodeId}" resolved after its mount was removed; ` +
+              'the teardown was dropped and that mount may leak on cleanup.',
+          );
         }
       })
       .catch((error: unknown) => {
@@ -283,14 +293,17 @@ export function reactOnRailsComponentLoaded(domId: string): Promise<void> {
 /**
  * Unmount all rendered React components, run all renderer-function teardowns, and clear roots.
  * This should be called on page unload to prevent memory leaks. Exported for testing.
- * @private
+ * @internal
  */
 export function unmountAllComponents(): void {
   renderedRoots.forEach((entry) => {
     try {
       teardownEntry(entry);
     } catch (error) {
-      console.error('Error unmounting component:', error);
+      // Use the same label as the async-rejection path so renderer-teardown failures are greppable
+      // whether the teardown threw synchronously (here) or rejected (invokeRendererTeardown).
+      const label = entry.kind === 'renderer' ? 'Error in renderer teardown:' : 'Error unmounting component:';
+      console.error(label, error);
     }
   });
   renderedRoots.clear();
