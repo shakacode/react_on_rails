@@ -101,7 +101,7 @@ jobs:
             echo 'matrix={"include":[{"ruby-version":"4.0","node-version":"22","dependency-level":"latest","bundler":"webpack"},{"ruby-version":"4.0","node-version":"22","dependency-level":"latest","bundler":"rspack"}]}' >> "$GITHUB_OUTPUT"
           fi
 
-  build-dummy-app-webpack-test-bundles:
+  build-dummy-app-test-bundles:
     needs: [detect-changes, setup-integration-matrix]
     # Skip only if: main push AND non-runtime-only changes
     # Otherwise run if: on main OR workflow_dispatch OR dummy tests needed
@@ -176,17 +176,30 @@ jobs:
         run: |
           rm -rf react_on_rails/spec/dummy/public/webpack/test
           pnpm --filter "react_on_rails" run build:rescript
-          cd react_on_rails/spec/dummy && RAILS_ENV="test" NODE_ENV="test" SHAKAPACKER_ASSETS_BUNDLER="${{ matrix.bundler }}" bin/shakapacker
+          cd react_on_rails/spec/dummy && RAILS_ENV="test" NODE_ENV="test" SHAKAPACKER_ASSETS_BUNDLER="${{ matrix.bundler }}" bin/shakapacker 2>&1 | tee "$RUNNER_TEMP/shakapacker-build.log"
+      - name: Verify test bundles were built with ${{ matrix.bundler }}
+        # Guard against a silent bundler fallback. Shakapacker logs
+        # "[Shakapacker] Completed <bundler> build" off the same condition that selects the bundler
+        # binary, so this confirms the rspack leg actually compiled with rspack (and the webpack leg
+        # with webpack) rather than silently using the other bundler and still going green. Refs #3481.
+        env:
+          EXPECTED_BUNDLER: ${{ matrix.bundler }}
+        run: |
+          if ! grep -qF "[Shakapacker] Completed ${EXPECTED_BUNDLER} build" "$RUNNER_TEMP/shakapacker-build.log"; then
+            echo "::error::Expected a '${EXPECTED_BUNDLER}' build, but Shakapacker did not report completing one. The leg may have silently used a different bundler."
+            exit 1
+          fi
+          echo "Confirmed: dummy test bundles built with ${EXPECTED_BUNDLER}."
       - id: get-sha
         run: echo "sha=\"$(git rev-parse HEAD)\"" >> "$GITHUB_OUTPUT"
-      - name: Save test Webpack bundles to cache (for build number checksum used by RSpec job)
+      - name: Save test bundles to cache (for build number checksum used by RSpec job)
         uses: actions/cache/save@v4
         with:
           path: react_on_rails/spec/dummy/public/webpack
-          key: dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}-${{ matrix.bundler }}
+          key: dummy-app-bundle-${{ steps.get-sha.outputs.sha }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}-${{ matrix.bundler }}
 
   dummy-app-integration-tests:
-    needs: [detect-changes, setup-integration-matrix, build-dummy-app-webpack-test-bundles]
+    needs: [detect-changes, setup-integration-matrix, build-dummy-app-test-bundles]
     # Run on main, workflow_dispatch, OR when tests needed on PR
     if: |
       !(
@@ -239,11 +252,11 @@ jobs:
         run: script/convert
       - id: get-sha
         run: echo "sha=\"$(git rev-parse HEAD)\"" >> "$GITHUB_OUTPUT"
-      - name: Save test Webpack bundles to cache (for build number checksum used by RSpec job)
+      - name: Save test bundles to cache (for build number checksum used by RSpec job)
         uses: actions/cache@v4
         with:
           path: react_on_rails/spec/dummy/public/webpack
-          key: dummy-app-webpack-bundle-${{ steps.get-sha.outputs.sha }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}-${{ matrix.bundler }}
+          key: dummy-app-bundle-${{ steps.get-sha.outputs.sha }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}-${{ matrix.bundler }}
       - name: Install Node modules with pnpm
         # minimum config changes package.json (shakapacker version), so can't use frozen lockfile
         run: pnpm install ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '--no-frozen-lockfile' }}
@@ -288,7 +301,7 @@ jobs:
       - run: cd react_on_rails/spec/dummy && bundle info shakapacker
       - name: Set packer version environment variable
         run: |
-          echo "CI_DEPENDENCY_LEVEL=ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}" >> "$GITHUB_ENV"
+          echo "CI_DEPENDENCY_LEVEL=ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}-${{ matrix.bundler }}" >> "$GITHUB_ENV"
       - name: Main CI
         run: cd react_on_rails && bundle exec rake run_rspec:all_dummy
       - name: Store test results
