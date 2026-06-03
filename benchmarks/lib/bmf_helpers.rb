@@ -30,7 +30,9 @@ class BmfCollector
   # @param rps [Numeric, nil] Requests per second
   # @param p50 [Numeric, nil] 50th percentile latency in ms
   # @param status [String, nil] Status string like "200=100,5xx=2"
-  def add(name:, rps:, p50:, status:)
+  # @param p90 [Numeric, nil] 90th percentile latency in ms (summary-only; not sent
+  #   to Bencher, but retained for the display sidecar so the table can show it)
+  def add(name:, rps:, p50:, status:, p90: nil)
     # Skip if RPS is not a valid number (FAILED, MISSING, etc.)
     return unless rps.is_a?(Numeric)
 
@@ -38,6 +40,8 @@ class BmfCollector
       name: "#{@prefix}#{name}#{@suffix}",
       rps: rps,
       p50: p50.is_a?(Numeric) ? p50 : nil,
+      p90: p90.is_a?(Numeric) ? p90 : nil,
+      status: status,
       failed_pct: calculate_failed_percentage(status)
     }
   end
@@ -91,6 +95,40 @@ class BmfCollector
 
     File.write(output_path, JSON.pretty_generate(bmf_json))
     puts "Wrote #{bmf_json.length} total benchmarks to #{output_path}"
+    true
+  end
+
+  # Rows for the Markdown summary table, joined with the Bencher report by name in
+  # track_benchmarks.rb. Mirrors exactly the rows #add accepted (its numeric-rps
+  # guard), so the set lines up with what the BMF/report can contain. p90 and the
+  # raw status string are summary-only — they are absent from to_bmf.
+  def display_rows
+    @results.map do |r|
+      { "name" => r[:name], "rps" => r[:rps], "p50" => r[:p50], "p90" => r[:p90], "status" => r[:status] }
+    end
+  end
+
+  # Write the display sidecar (a JSON array of display_rows). Supports append: to
+  # match write_bmf_json, so a job that runs more than one bench script keeps every
+  # suite's rows (defensive; the current matrix runs one script per job).
+  def write_display_json(output_path, append: false)
+    rows = display_rows
+    if rows.empty?
+      warn "WARNING: No valid benchmark results for the display sidecar"
+      return false
+    end
+
+    if append && File.exist?(output_path)
+      begin
+        existing = JSON.parse(File.read(output_path))
+        rows = existing + rows if existing.is_a?(Array)
+      rescue JSON::ParserError => e
+        warn "WARNING: Existing #{output_path} contains invalid JSON (#{e.message}), overwriting"
+      end
+    end
+
+    File.write(output_path, JSON.pretty_generate(rows))
+    puts "Wrote #{rows.length} display rows to #{output_path}"
     true
   end
 
