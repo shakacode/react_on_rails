@@ -75,8 +75,9 @@ RSpec.describe "benchmark route discovery helpers" do
     it "resets on the route separator so field-order changes don't misclassify routes" do
       # The parser must key off the `--[ Route N ]--` separator (the real block
       # delimiter), not assume Controller#Action is the last field of every block.
-      # Here URI is emitted after Controller#Action; a separator-keyed parser still
-      # captures both routes correctly.
+      # Here URI is emitted after Controller#Action; a Controller#Action-keyed flush
+      # would read the URI before it's set and crash, whereas a separator-keyed
+      # parser captures both routes correctly.
       routes_output = <<~TEXT
         --[ Route 1 ]-------------------------------------------------------------------
         Prefix            | client_side_hello_world
@@ -106,6 +107,31 @@ RSpec.describe "benchmark route discovery helpers" do
 
       expect(benchmark_routes_from_rails_routes_output(routes_output)).to eq([])
     end
+
+    it "skips an incomplete block missing Controller#Action instead of crashing" do
+      # A separator/end-of-block flush runs on every accumulated block, so a GET
+      # block that never emitted a Controller#Action line (e.g. a future
+      # `rails routes` format change) must be skipped rather than raise.
+      routes_output = <<~TEXT
+        --[ Route 1 ]-------------------------------------------------------------------
+        Prefix            | mystery
+        Verb              | GET
+        URI               | /mystery(.:format)
+      TEXT
+
+      expect(benchmark_routes_from_rails_routes_output(routes_output)).to eq([])
+    end
+
+    it "skips an incomplete block missing URI instead of crashing" do
+      routes_output = <<~TEXT
+        --[ Route 1 ]-------------------------------------------------------------------
+        Prefix            | mystery
+        Verb              | GET
+        Controller#Action | pages#mystery
+      TEXT
+
+      expect(benchmark_routes_from_rails_routes_output(routes_output)).to eq([])
+    end
   end
 
   describe "#route_has_required_params?" do
@@ -123,6 +149,12 @@ RSpec.describe "benchmark route discovery helpers" do
 
     it "ignores an optional glob segment" do
       expect(route_has_required_params?("/react_router(/*all)(.:format)")).to be(false)
+    end
+
+    it "detects a required glob even when an optional glob is also present" do
+      # Optional parens are stripped before glob detection, so an optional glob
+      # must not mask a sibling required one.
+      expect(route_has_required_params?("/a(/*opt)/b/*req(.:format)")).to be(true)
     end
   end
 

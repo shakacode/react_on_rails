@@ -108,11 +108,16 @@ def normalize_route_path(route)
 end
 
 def benchmark_route_from_rails_output(route)
+  # Flushes now key off the `--[ Route N ]--` separator, so this runs on every
+  # accumulated block regardless of which fields it captured. Guard the keys a
+  # benchmarkable route needs (controller_action, uri) so an incomplete block —
+  # e.g. one missing a field under a future `rails routes` format change — is
+  # skipped, not turned into a NoMethodError that aborts the whole run.
   return unless route[:verb] == "GET"
-  return unless benchmark_controller_action?(route[:controller_action])
+  return unless route[:controller_action] && benchmark_controller_action?(route[:controller_action])
 
   path = route[:uri]
-  return if route_has_required_params?(path)
+  return if path.nil? || route_has_required_params?(path)
   return if path.include?("_for_testing")
 
   normalized = normalize_route_path(strip_optional_params(path))
