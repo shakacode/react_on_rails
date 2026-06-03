@@ -132,7 +132,9 @@ def run_benchmark_suite(routes, bmf_collector, runner: method(:benchmark_route))
     # Add to BMF collector for Bencher output (p90 stays in the summary table only)
     bmf_collector.add(name: route, rps: rps, p50: p50, status: status)
   rescue StandardError => e
-    warn "::error::k6 benchmark failed for route #{route}: #{e.message}"
+    # ::error:: must go to stdout — GitHub Actions only parses workflow commands
+    # from stdout, not stderr, so writing here is what renders the UI annotation.
+    $stdout.puts "::error::k6 benchmark failed for route #{route}: #{e.message}"
     failed_routes << route
     add_to_summary(route, *failure_metrics(e))
   end
@@ -196,11 +198,15 @@ if __FILE__ == $PROGRAM_NAME
   puts "\nSummary saved to #{SUMMARY_TXT}"
   system("column", "-t", "-s", "\t", SUMMARY_TXT)
 
-  bmf_collector.write_bmf_json(BENCHMARK_JSON)
-
-  unless failed_routes.empty?
-    warn "::error::#{failed_routes.length} of #{routes.length} benchmark route(s) failed: " \
-         "#{failed_routes.join(', ')}"
+  # Write the Bencher payload only on a fully green run. Guarding the write here
+  # (rather than writing unconditionally before exit) makes the "never upload a
+  # partial-success payload" invariant self-enforcing instead of relying on the
+  # downstream Bencher step having no `if: always()`.
+  if failed_routes.empty?
+    bmf_collector.write_bmf_json(BENCHMARK_JSON)
+  else
+    $stdout.puts "::error::#{failed_routes.length} of #{routes.length} benchmark route(s) failed: " \
+                 "#{failed_routes.join(', ')}"
     exit 1
   end
 end

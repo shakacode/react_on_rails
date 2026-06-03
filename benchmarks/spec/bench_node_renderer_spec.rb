@@ -54,8 +54,9 @@ RSpec.describe "bench-node-renderer" do
       end
 
       failed = nil
+      # ::error:: annotations go to stdout so GitHub Actions renders them.
       expect { failed = run_vegeta_suite(test_cases, "bundleX", "RSC", collector, runner: runner) }
-        .to output(/::error::.*react_ssr/).to_stderr
+        .to output(/::error::.*react_ssr/).to_stdout
 
       expect(failed).to eq(["react_ssr (RSC)"])
       # The test after the failure still ran (no early abort).
@@ -66,8 +67,10 @@ RSpec.describe "bench-node-renderer" do
       runner = ->(_test_case, _bundle) { raise "Vegeta attack failed" }
 
       failed = nil
+      # Pin both tests' ::error:: annotations (in order) on stdout rather than
+      # accepting any output, so a dropped or reformatted annotation is caught.
       expect { failed = run_vegeta_suite(test_cases, "bundleX", "non-RSC", collector, runner: runner) }
-        .to output.to_stderr
+        .to output(/::error::.*simple_eval.*::error::.*react_ssr/m).to_stdout
 
       expect(failed).to eq(["simple_eval (non-RSC)", "react_ssr (non-RSC)"])
       expect(collector.added).to be_empty

@@ -253,7 +253,9 @@ def run_vegeta_suite(test_cases, bundle, label, bmf_collector, runner: method(:r
       # Add to BMF collector for Bencher output (p90 stays in the summary table only)
       bmf_collector.add(name: test_label, rps: rps, p50: p50, status: status)
     rescue StandardError => e
-      warn "::error::Vegeta benchmark failed for #{test_label}: #{e.message}"
+      # ::error:: must go to stdout — GitHub Actions only parses workflow commands
+      # from stdout, not stderr, so writing here is what renders the UI annotation.
+      $stdout.puts "::error::Vegeta benchmark failed for #{test_label}: #{e.message}"
       failed << test_label
       add_to_summary(test_case[:name], label, *failure_metrics(e))
     end
@@ -311,6 +313,16 @@ if __FILE__ == $PROGRAM_NAME
     non_rsc_tests = []
   end
 
+  # Fail fast if bundle discovery/categorization left nothing to benchmark.
+  # Otherwise failed_tests stays empty and the script exits 0 after producing
+  # only an empty summary — turning a broken discovery run into a false green,
+  # exactly the silent-success class this script is meant to prevent. Mirrors
+  # bench.rb's `raise "No routes to benchmark"` guard.
+  if rsc_tests.empty? && non_rsc_tests.empty?
+    raise "No benchmarkable test cases found for the discovered bundles " \
+          "(RSC bundle: #{rsc_bundle || 'none'}, non-RSC bundle: #{non_rsc_bundle || 'none'})"
+  end
+
   # Print parameters
   print_params(
     "BASE_URL" => BASE_URL,
@@ -342,11 +354,15 @@ if __FILE__ == $PROGRAM_NAME
   # Display summary
   display_summary(SUMMARY_TXT)
 
-  # Write BMF JSON for Bencher (append to existing Pro results)
-  bmf_collector.write_bmf_json(BENCHMARK_JSON, append: true)
-
-  unless failed_tests.empty?
-    warn "::error::#{failed_tests.length} node renderer benchmark(s) failed: #{failed_tests.join(', ')}"
+  # Write the Bencher payload only on a fully green run. Guarding the write here
+  # (rather than writing unconditionally before exit) makes the "never upload a
+  # partial-success payload" invariant self-enforcing instead of relying on the
+  # downstream Bencher step having no `if: always()`.
+  if failed_tests.empty?
+    # Append to existing Pro results.
+    bmf_collector.write_bmf_json(BENCHMARK_JSON, append: true)
+  else
+    $stdout.puts "::error::#{failed_tests.length} node renderer benchmark(s) failed: #{failed_tests.join(', ')}"
     exit 1
   end
 end

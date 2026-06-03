@@ -55,8 +55,9 @@ RSpec.describe "bench" do
       end
 
       failed = nil
+      # ::error:: annotations go to stdout so GitHub Actions renders them.
       expect { failed = run_benchmark_suite(%w[/a /bad /c], collector, runner: runner) }
-        .to output(%r{::error::.*/bad}).to_stderr
+        .to output(%r{::error::.*/bad}).to_stdout
 
       expect(failed).to eq(["/bad"])
       # The routes after the failure still ran (no early abort).
@@ -72,9 +73,10 @@ RSpec.describe "bench" do
 
       failed = nil
       # Pin both routes' ::error:: annotations (in order) rather than accepting
-      # any stderr output, so a dropped or reformatted annotation is caught.
+      # any stdout, so a dropped or reformatted annotation is caught. They go to
+      # stdout so GitHub Actions renders them.
       expect { failed = run_benchmark_suite(%w[/x /y], collector, runner: runner) }
-        .to output(%r{::error::.*/x.*::error::.*/y}m).to_stderr
+        .to output(%r{::error::.*/x.*::error::.*/y}m).to_stdout
 
       expect(failed).to eq(%w[/x /y])
       expect(collector.added).to be_empty
