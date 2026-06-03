@@ -173,19 +173,33 @@ jobs:
       - name: Smoke check generated pack entrypoints
         run: test -s react_on_rails/spec/dummy/client/app/generated/server-bundle-generated.js
       - name: Build test bundles for dummy app
+        # shell: bash gives `bash -eo pipefail`; set -o pipefail is explicit belt-and-suspenders.
+        # Without pipefail the `tee` below masks a nonzero bin/shakapacker exit, letting a broken build
+        # pass this step (the next step's grep matches even on a failed build, since Shakapacker logs
+        # "Completed <bundler> build" before it exits non-zero). Fail fast here instead. Refs #3481.
+        shell: bash
         run: |
+          set -o pipefail
           rm -rf react_on_rails/spec/dummy/public/webpack/test
           pnpm --filter "react_on_rails" run build:rescript
           cd react_on_rails/spec/dummy && RAILS_ENV="test" NODE_ENV="test" SHAKAPACKER_ASSETS_BUNDLER="${{ matrix.bundler }}" bin/shakapacker 2>&1 | tee "$RUNNER_TEMP/shakapacker-build.log"
       - name: Verify test bundles were built with ${{ matrix.bundler }}
-        # Guard against a silent bundler fallback. Shakapacker logs
-        # "[Shakapacker] Completed <bundler> build" off the same condition that selects the bundler
-        # binary, so this confirms the rspack leg actually compiled with rspack (and the webpack leg
-        # with webpack) rather than silently using the other bundler and still going green. Refs #3481.
+        # Guard against a silent bundler fallback. Both Shakapacker's bundler-binary selection and its
+        # "[Shakapacker] Completed <bundler> build" log line resolve through config.rspack?, which is
+        # driven by the SHAKAPACKER_ASSETS_BUNDLER env var set in the build step above. Matching the log
+        # therefore confirms the rspack leg actually compiled with rspack (and the webpack leg with
+        # webpack) rather than silently falling back to the other bundler and still going green.
+        # (The build step's set -o pipefail handles the compile-failed case; this guards selection.)
+        # Refs #3481.
         env:
           EXPECTED_BUNDLER: ${{ matrix.bundler }}
         run: |
-          if ! grep -qF "[Shakapacker] Completed ${EXPECTED_BUNDLER} build" "$RUNNER_TEMP/shakapacker-build.log"; then
+          log="$RUNNER_TEMP/shakapacker-build.log"
+          if [ ! -s "$log" ]; then
+            echo "::error::Build log $log is missing or empty - the build step did not produce a log."
+            exit 1
+          fi
+          if ! grep -qF "[Shakapacker] Completed ${EXPECTED_BUNDLER} build" "$log"; then
             echo "::error::Expected a '${EXPECTED_BUNDLER}' build, but Shakapacker did not report completing one. The leg may have silently used a different bundler."
             exit 1
           fi
@@ -195,6 +209,8 @@ jobs:
       - name: Save test bundles to cache (for build number checksum used by RSpec job)
         uses: actions/cache/save@v4
         with:
+          # Both bundlers emit into public/webpack in this app (shakapacker.yml public_output_path),
+          # so this path is correct on the rspack leg too despite the "webpack" directory name.
           path: react_on_rails/spec/dummy/public/webpack
           key: dummy-app-bundle-${{ steps.get-sha.outputs.sha }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}-${{ matrix.bundler }}
 
@@ -255,6 +271,8 @@ jobs:
       - name: Save test bundles to cache (for build number checksum used by RSpec job)
         uses: actions/cache@v4
         with:
+          # Both bundlers emit into public/webpack in this app (shakapacker.yml public_output_path),
+          # so this path is correct on the rspack leg too despite the "webpack" directory name.
           path: react_on_rails/spec/dummy/public/webpack
           key: dummy-app-bundle-${{ steps.get-sha.outputs.sha }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}-${{ matrix.bundler }}
       - name: Install Node modules with pnpm
