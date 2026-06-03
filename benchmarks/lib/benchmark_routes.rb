@@ -15,8 +15,7 @@ NON_BENCHMARK_ROUTES = %w[
 
 def route_has_required_params?(path)
   path_without_optional = path.gsub(/\([^)]*\)/, "")
-  # `:id` dynamic segments and `*splat` globs left outside the optional parens are
-  # required params, so the route can't be benchmarked as a literal URL.
+  # `:id` / `*splat` segments outside the optional parens are required, so the route isn't a literal URL.
   path_without_optional.include?(":") || path_without_optional.match?(/\*[A-Za-z_]/)
 end
 
@@ -108,11 +107,7 @@ def normalize_route_path(route)
 end
 
 def benchmark_route_from_rails_output(route)
-  # Flushes now key off the `--[ Route N ]--` separator, so this runs on every
-  # accumulated block regardless of which fields it captured. Guard the keys a
-  # benchmarkable route needs (controller_action, uri) so an incomplete block —
-  # e.g. one missing a field under a future `rails routes` format change — is
-  # skipped, not turned into a NoMethodError that aborts the whole run.
+  # Guard required keys: separator-triggered flushes run on every block, so incomplete ones skip rather than raise.
   return unless route[:verb] == "GET"
   return unless route[:controller_action] && benchmark_controller_action?(route[:controller_action])
 
