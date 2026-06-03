@@ -252,6 +252,22 @@ RSpec.describe GeneratorHelper, type: :generator do
     end
   end
 
+  describe "RSC plugin helpers" do
+    it "scaffolds the native RSCRspackPlugin when using rspack" do
+      allow(self).to receive(:using_rspack?).and_return(true)
+
+      expect(rsc_plugin_class_name).to eq("RSCRspackPlugin")
+      expect(rsc_plugin_import_path).to eq("react-on-rails-rsc/RspackPlugin")
+    end
+
+    it "scaffolds the RSCWebpackPlugin when not using rspack" do
+      allow(self).to receive(:using_rspack?).and_return(false)
+
+      expect(rsc_plugin_class_name).to eq("RSCWebpackPlugin")
+      expect(rsc_plugin_import_path).to eq("react-on-rails-rsc/WebpackPlugin")
+    end
+  end
+
   describe "#using_swc?" do
     let(:shakapacker_yml_path) { File.join(destination_root, "config/shakapacker.yml") }
 

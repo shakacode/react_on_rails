@@ -1745,7 +1745,7 @@ describe RscGenerator, type: :generator do
 
       non_object_warnings = GeneratorMessages.messages.grep(/use non-object-literal options/)
       expect(non_object_warnings.length).to eq(1)
-      expect(non_object_warnings.first).to include("one or more webpack configs")
+      expect(non_object_warnings.first).to include("one or more bundler configs")
       expect(non_object_warnings.first).not_to include("serverWebpackConfig.js")
       expect(non_object_warnings.first).not_to include("clientWebpackConfig.js")
     end
@@ -3539,13 +3539,16 @@ describe RscGenerator, type: :generator do
     end
 
     describe "RSC webpack config transforms in config/rspack/" do
-      it "adds RSCWebpackPlugin to serverWebpackConfig" do
+      it "adds the native RSCRspackPlugin to serverWebpackConfig" do
         assert_file "config/rspack/serverWebpackConfig.js" do |content|
-          expect(content).to include("RSCWebpackPlugin")
-          expect(content).to include("react-on-rails-rsc/WebpackPlugin")
+          expect(content).to include("RSCRspackPlugin")
+          expect(content).to include("react-on-rails-rsc/RspackPlugin")
           expect(content).to include("clientReferences: rscClientReferences")
           expect(content).to include("directory: resolve(config.source_path)")
           expect(content).to include("isServer: true")
+          # Rspack projects get the native plugin, not the webpack one.
+          expect(content).not_to include("RSCWebpackPlugin")
+          expect(content).not_to include("react-on-rails-rsc/WebpackPlugin")
         end
       end
 
@@ -3555,12 +3558,15 @@ describe RscGenerator, type: :generator do
         end
       end
 
-      it "adds RSCWebpackPlugin to clientWebpackConfig" do
+      it "adds the native RSCRspackPlugin to clientWebpackConfig" do
         assert_file "config/rspack/clientWebpackConfig.js" do |content|
-          expect(content).to include("RSCWebpackPlugin")
+          expect(content).to include("RSCRspackPlugin")
+          expect(content).to include("react-on-rails-rsc/RspackPlugin")
           expect(content).to include("clientReferences: rscClientReferences")
           expect(content).to include("directory: resolve(config.source_path)")
           expect(content).to include("isServer: false")
+          expect(content).not_to include("RSCWebpackPlugin")
+          expect(content).not_to include("react-on-rails-rsc/WebpackPlugin")
         end
       end
 
@@ -3600,10 +3606,11 @@ describe RscGenerator, type: :generator do
         end
       end
 
-      it "rscWebpackConfig.js passes true to skip RSCWebpackPlugin in RSC bundle" do
+      it "rscWebpackConfig.js passes true to skip the RSC plugin in RSC bundle" do
         assert_file "config/rspack/rscWebpackConfig.js" do |content|
           expect(content).to include("serverWebpackConfig(true)")
-          expect(content).not_to match(/new\s+RSCWebpackPlugin/)
+          # The RSC bundle must not include either bundler's manifest plugin.
+          expect(content).not_to match(/new\s+RSC(?:Webpack|Rspack)Plugin/)
         end
       end
 
@@ -3630,7 +3637,7 @@ describe RscGenerator, type: :generator do
         end
       end
 
-      it "serverWebpackConfig.js conditionally skips RSCWebpackPlugin when rscBundle is true" do
+      it "serverWebpackConfig.js conditionally skips the RSC plugin when rscBundle is true" do
         assert_file "config/rspack/serverWebpackConfig.js" do |content|
           expect(content).to include("if (!rscBundle)")
           expect(content).to include("clientReferences: rscClientReferences")

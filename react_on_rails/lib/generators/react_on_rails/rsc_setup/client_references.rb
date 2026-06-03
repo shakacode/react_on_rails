@@ -18,10 +18,12 @@ module ReactOnRails
         # back safely rather than producing a wrong rewrite.
         REGEX_LITERAL_PRECEDERS = ["(", "{", "[", "=", ":", ",", ";", "!", "?", "&", "|", "+", "-", "*", "~", "^",
                                    "<", ">"].freeze
-        # Matches `new RSCWebpackPlugin(` allowing whitespace/newlines between `new`, the class
-        # name, and the open paren. Shared by the partition scanner and the routing checks so
-        # both detect the same set of invocations.
-        RSC_PLUGIN_INVOCATION_REGEX = /new\s+RSCWebpackPlugin\s*\(/
+        # Matches `new RSCWebpackPlugin(` or `new RSCRspackPlugin(`, allowing whitespace/newlines
+        # between `new`, the class name, and the open paren. Both bundler plugin names are matched
+        # so detection and idempotency stay correct whether the config was scaffolded for webpack
+        # (`RSCWebpackPlugin`) or rspack (`RSCRspackPlugin`). Shared by the partition scanner and
+        # the routing checks so both detect the same set of invocations.
+        RSC_PLUGIN_INVOCATION_REGEX = /new\s+RSC(?:Webpack|Rspack)Plugin\s*\(/
 
         private
 
@@ -173,7 +175,7 @@ module ReactOnRails
           if rsc_plugin_defines_client_references?(content, is_server: is_server)
             GeneratorMessages.add_warning(
               "Skipped scoped clientReferences migration for #{config_path} because all matching " \
-              "RSCWebpackPlugin instances already define clientReferences (some may already be " \
+              "#{rsc_plugin_class_name} instances already define clientReferences (some may already be " \
               "correctly scoped to rscClientReferences). Please verify manually."
             )
             return false
@@ -185,13 +187,13 @@ module ReactOnRails
 
         def warn_unparseable_rsc_plugin_sections(config_path, count)
           GeneratorMessages.add_warning(
-            "Skipped scoped clientReferences migration for #{config_path}: #{count} RSCWebpackPlugin " \
+            "Skipped scoped clientReferences migration for #{config_path}: #{count} #{rsc_plugin_class_name} " \
             "options block(s) contain characters this lightweight scanner cannot parse safely " \
             "(most often a regex literal with an unmatched `{` or `}`, e.g. `/\\{/` or `/[{]/`, " \
             "or a regex literal after a keyword context such as `return` or `typeof`). " \
-            "All RSCWebpackPlugin calls in the file must be parseable for auto-migration to proceed, " \
+            "All #{rsc_plugin_class_name} calls in the file must be parseable for auto-migration to proceed, " \
             "including calls targeting the other bundle. " \
-            "Please add `clientReferences: rscClientReferences` manually to any RSCWebpackPlugin " \
+            "Please add `clientReferences: rscClientReferences` manually to any #{rsc_plugin_class_name} " \
             "that is missing it."
           )
         end
@@ -1106,14 +1108,17 @@ module ReactOnRails
 
         # Unlike `shakapacker_config_import_statement` / `path_resolve_import_statement` which check
         # `existing_imports_content` (the slice up through the anchor that they piggy-back on), this
-        # helper checks the FULL file content. A user's existing `RSCWebpackPlugin` import can sit
-        # below the anchor (e.g. a partially-edited or previously-failed migration), so dedup must
-        # see the whole file or it will inject a duplicate `const { RSCWebpackPlugin } = require(...)`
-        # and webpack will fail to load with `Identifier 'RSCWebpackPlugin' has already been declared`.
+        # helper checks the FULL file content. A user's existing plugin import can sit below the
+        # anchor (e.g. a partially-edited or previously-failed migration), so dedup must see the
+        # whole file or it will inject a duplicate `const { <plugin> } = require(...)` and the
+        # bundler will fail to load with `Identifier '<plugin>' has already been declared`.
+        # The plugin class name and import path follow the active bundler
+        # (`RSCRspackPlugin`/`react-on-rails-rsc/RspackPlugin` for rspack, the webpack pair
+        # otherwise) via {#rsc_plugin_class_name} / {#rsc_plugin_import_path}.
         def rsc_webpack_plugin_import_statement(content)
-          return if commonjs_named_imported?(content, "react-on-rails-rsc/WebpackPlugin", "RSCWebpackPlugin")
+          return if commonjs_named_imported?(content, rsc_plugin_import_path, rsc_plugin_class_name)
 
-          "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');"
+          "const { #{rsc_plugin_class_name} } = require('#{rsc_plugin_import_path}');"
         end
 
         def rsc_client_references_setup_import_pattern(is_server:)
@@ -1202,11 +1207,13 @@ module ReactOnRails
 
           manual_action =
             if plugin_pending
-              "RSCWebpackPlugin will be added without scoped clientReferences; please add clientReferences manually."
-            elsif content.include?("RSCWebpackPlugin")
+              "#{rsc_plugin_class_name} will be added without scoped clientReferences; " \
+                "please add clientReferences manually."
+            elsif content.include?(rsc_plugin_class_name)
               "Please add clientReferences manually."
             else
-              "RSCWebpackPlugin was not added to #{config_path}; please add the plugin and clientReferences manually."
+              "#{rsc_plugin_class_name} was not added to #{config_path}; " \
+                "please add the plugin and clientReferences manually."
             end
 
           GeneratorMessages.add_warning(
@@ -1338,7 +1345,8 @@ module ReactOnRails
 
         def manual_rsc_plugin_action(config_path, plugin_pending:)
           if plugin_pending
-            "RSCWebpackPlugin was not added to #{config_path}; please add the plugin and clientReferences manually."
+            "#{rsc_plugin_class_name} was not added to #{config_path}; " \
+              "please add the plugin and clientReferences manually."
           else
             "Please add clientReferences manually."
           end
@@ -1353,9 +1361,10 @@ module ReactOnRails
 
         def warn_missing_rsc_plugin_target(config_path, is_server:)
           GeneratorMessages.add_warning(
-            "Could not update RSCWebpackPlugin in #{config_path}: no plugin options with isServer: #{is_server} " \
-            "could be rewritten. Please add clientReferences manually. Dynamic or computed plugin options cannot be " \
-            "verified automatically, so verify this file manually after adding clientReferences."
+            "Could not update #{rsc_plugin_class_name} in #{config_path}: no plugin options with " \
+            "isServer: #{is_server} could be rewritten. Please add clientReferences manually. Dynamic or " \
+            "computed plugin options cannot be verified automatically, so verify this file manually after " \
+            "adding clientReferences."
           )
         end
 

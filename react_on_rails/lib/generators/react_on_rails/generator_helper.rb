@@ -197,6 +197,26 @@ module GeneratorHelper
     path.sub(%r{\Aconfig/webpack/}, "config/rspack/")
   end
 
+  # RSC client-manifest plugin class name for the active bundler.
+  # Rspack uses the native `RSCRspackPlugin`; webpack uses `RSCWebpackPlugin`.
+  # Both expose the same `{ isServer, clientReferences }` API and emit the same
+  # manifest schema, so only the import path and class name differ.
+  # Shared by the base webpack-config templates and the standalone RSC migration
+  # so both paths scaffold the bundler-correct plugin from one source of truth.
+  #
+  # @return [String] "RSCRspackPlugin" when rspack, "RSCWebpackPlugin" otherwise
+  def rsc_plugin_class_name
+    using_rspack? ? "RSCRspackPlugin" : "RSCWebpackPlugin"
+  end
+
+  # `react-on-rails-rsc` subpath that exports {#rsc_plugin_class_name}.
+  #
+  # @return [String] "react-on-rails-rsc/RspackPlugin" when rspack,
+  #   "react-on-rails-rsc/WebpackPlugin" otherwise
+  def rsc_plugin_import_path
+    using_rspack? ? "react-on-rails-rsc/RspackPlugin" : "react-on-rails-rsc/WebpackPlugin"
+  end
+
   # Detect the installed React version from package.json
   # Uses VERSION_PARTS_REGEX pattern from VersionChecker for consistency
   #

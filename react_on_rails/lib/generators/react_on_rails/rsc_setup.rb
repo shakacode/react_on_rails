@@ -388,7 +388,7 @@ module ReactOnRails
           return
         end
 
-        # Add RSCWebpackPlugin import after bundler require
+        # Add the RSC plugin import after bundler require
         return unless rsc_client_references_setup_anchor_available?(
           config_path,
           content,
@@ -404,17 +404,17 @@ module ReactOnRails
         gsub_file(
           config_path,
           /^const configureServer = \(\) => \{/,
-          "// rscBundle parameter: when true, skips RSCWebpackPlugin (RSC bundle doesn't need it)\n" \
+          "// rscBundle parameter: when true, skips #{rsc_plugin_class_name} (RSC bundle doesn't need it)\n" \
           "const configureServer = (rscBundle = false) => {"
         )
 
-        # Add RSCWebpackPlugin to plugins before LimitChunkCountPlugin (matches template ordering)
+        # Add the RSC plugin to plugins before LimitChunkCountPlugin (matches template ordering)
         client_references_option = setup_status == :scoped ? ", clientReferences: rscClientReferences" : ""
         rsc_plugin_code = "// Add RSC plugin for server bundle (handles client component references)\n  " \
-                          "// Skip for RSC bundle - it doesn't need RSCWebpackPlugin\n  " \
+                          "// Skip for RSC bundle - it doesn't need #{rsc_plugin_class_name}\n  " \
                           "if (!rscBundle) {\n    " \
                           "serverWebpackConfig.plugins.push(\n      " \
-                          "new RSCWebpackPlugin({ isServer: true#{client_references_option} }),\n    " \
+                          "new #{rsc_plugin_class_name}({ isServer: true#{client_references_option} }),\n    " \
                           ");\n  " \
                           "}"
         gsub_file(
@@ -438,7 +438,7 @@ module ReactOnRails
           return
         end
 
-        # Add RSCWebpackPlugin import after commonWebpackConfig import
+        # Add the RSC plugin import after commonWebpackConfig import
         return unless rsc_client_references_setup_anchor_available?(
           config_path,
           content,
@@ -450,11 +450,11 @@ module ReactOnRails
         setup_status = prepare_rsc_plugin_imports(config_path, content, existing_imports_content, is_server: false)
         return if setup_status == :failed
 
-        # Add RSCWebpackPlugin to client config before return statement
+        # Add the RSC plugin to client config before return statement
         client_references_option = setup_status == :scoped ? ", clientReferences: rscClientReferences" : ""
         rsc_plugin_code = "  // Add React Server Components plugin for client bundle\n  " \
                           "clientConfig.plugins.push(\n    " \
-                          "new RSCWebpackPlugin({ isServer: false#{client_references_option} }),\n  " \
+                          "new #{rsc_plugin_class_name}({ isServer: false#{client_references_option} }),\n  " \
                           ");"
         gsub_file(
           config_path,
@@ -508,8 +508,9 @@ module ReactOnRails
       def warn_incomplete_new_rsc_plugin_setup(config_path, is_server:)
         insertion_point = is_server ? "server webpack insertion points" : "client webpack return statement"
         GeneratorMessages.add_warning(
-          "Could not finish adding RSCWebpackPlugin to #{config_path}: expected #{insertion_point} was not found. " \
-          "Reverted partial RSC setup; please add RSCWebpackPlugin and clientReferences manually."
+          "Could not finish adding #{rsc_plugin_class_name} to #{config_path}: expected #{insertion_point} " \
+          "was not found. Reverted partial RSC setup; please add #{rsc_plugin_class_name} and " \
+          "clientReferences manually."
         )
       end
 
@@ -537,13 +538,13 @@ module ReactOnRails
 
         content = File.read(path)
         missing = []
-        if content.include?("RSCWebpackPlugin")
+        if content.include?(rsc_plugin_class_name)
           warn_non_object_literal_rsc_plugin_options_for_config(content)
           unless rsc_plugin_client_references_configured?(content, is_server: true)
             missing << "generated scoped clientReferences in serverWebpackConfig.js"
           end
         else
-          missing << "RSCWebpackPlugin in serverWebpackConfig.js"
+          missing << "#{rsc_plugin_class_name} in serverWebpackConfig.js"
         end
         missing << "rscBundle parameter in serverWebpackConfig.js" unless content.include?("rscBundle")
         missing
@@ -555,13 +556,13 @@ module ReactOnRails
 
         content = File.read(path)
         missing = []
-        if content.include?("RSCWebpackPlugin")
+        if content.include?(rsc_plugin_class_name)
           warn_non_object_literal_rsc_plugin_options_for_config(content)
           unless rsc_plugin_client_references_configured?(content, is_server: false)
             missing << "generated scoped clientReferences in clientWebpackConfig.js"
           end
         else
-          missing << "RSCWebpackPlugin in clientWebpackConfig.js"
+          missing << "#{rsc_plugin_class_name} in clientWebpackConfig.js"
         end
         missing
       end
@@ -585,9 +586,9 @@ module ReactOnRails
 
         @non_object_literal_rsc_plugin_options_warned = true
         GeneratorMessages.add_warning(
-          "RSCWebpackPlugin calls use non-object-literal options in one or more webpack configs, " \
+          "#{rsc_plugin_class_name} calls use non-object-literal options in one or more bundler configs, " \
           "so the generator cannot verify whether scoped clientReferences are configured. " \
-          "Please verify your webpack configs manually."
+          "Please verify your bundler configs manually."
         )
       end
     end
