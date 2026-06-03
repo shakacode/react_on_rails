@@ -66,12 +66,43 @@ def unbundled_sh_in_dir_for_release(dir, *shell_commands)
   end
 end
 
-def prompt_for_otp(service_name)
-  print "\n🔑 Enter OTP code for #{service_name}: "
+def prompt_for_otp(service_name, allow_blank: false, hint: nil)
+  print "\n🔑 Enter OTP code for #{service_name}#{hint ? " (#{hint})" : ''}: "
   $stdout.flush
   otp = $stdin.gets&.strip
-  abort "\n❌ No OTP provided. Aborting." if otp.nil? || otp.empty?
+  if otp.nil? || otp.empty?
+    return nil if allow_blank
+
+    abort "\n❌ No OTP provided. Aborting."
+  end
   normalize_otp_code(otp, service_name: service_name)
+end
+
+# Resolve the RubyGems OTP to reuse for BOTH gem pushes (react_on_rails and
+# react_on_rails_pro). When the operator does not supply RUBYGEMS_OTP, prompt
+# once here and capture the code so it can be forwarded to both pushes via
+# GEM_HOST_OTP_CODE. Without this up-front prompt, `gem push` prompts separately
+# for each gem — the code typed into that subprocess is never captured by this
+# script, so the operator ends up entering an OTP twice. RubyGems accepts the
+# same TOTP for both pushes within its validity window; if it expires between
+# gems, publish_gem_with_retry prompts for a fresh code.
+def resolve_rubygems_otp_for_publish(provided_otp)
+  normalized = normalize_otp_code(provided_otp, service_name: "RubyGems")
+  if normalized
+    puts "Using provided RubyGems OTP for gem publications..."
+    return normalized
+  end
+
+  unless $stdin.tty?
+    puts "\nNOTE: You will be prompted for RubyGems OTP code if needed."
+    puts "TIP: Set RUBYGEMS_OTP environment variable to provide OTP upfront."
+    return nil
+  end
+
+  # Pressing Enter without a code falls back to legacy per-gem prompting handled
+  # by `gem push` itself (e.g. accounts without RubyGems 2FA enabled).
+  puts "\nThe same RubyGems OTP is reused for both gems (react_on_rails and react_on_rails_pro)."
+  prompt_for_otp("RubyGems", allow_blank: true, hint: "press Enter to be prompted per gem")
 end
 
 def normalize_otp_code(otp, service_name:)
@@ -1441,13 +1472,7 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       puts "Publishing PUBLIC Ruby gems..."
       puts "=" * 80
 
-      current_rubygems_otp = rubygems_otp
-      if current_rubygems_otp
-        puts "Using provided RubyGems OTP for gem publications..."
-      else
-        puts "\nNOTE: You will be prompted for RubyGems OTP code if needed."
-        puts "TIP: Set RUBYGEMS_OTP environment variable to provide OTP upfront."
-      end
+      current_rubygems_otp = resolve_rubygems_otp_for_publish(rubygems_otp)
 
       current_rubygems_otp = publish_gem_with_retry(
         release_paths_hash[:gem_root],
