@@ -3,7 +3,8 @@
  */
 
 import * as React from 'react';
-import { renderComponent, reactOnRailsComponentLoaded } from '../src/ClientRenderer.ts';
+import { renderComponent, reactOnRailsComponentLoaded, unmountAllComponents } from '../src/ClientRenderer.ts';
+import type { RenderFunction } from '../src/types/index.ts';
 import ComponentRegistry from '../src/ComponentRegistry.ts';
 import StoreRegistry from '../src/StoreRegistry.ts';
 
@@ -122,10 +123,13 @@ describe('ClientRenderer', () => {
       // Test with non-existent DOM ID
       expect(() => renderComponent('non-existent-component')).not.toThrow();
     });
+  });
 
-    it('handles renderer functions correctly', () => {
-      expect.hasAssertions();
-      // Setup Rails context
+  // Issue #3209: renderer functions (the 3-arg `(props, railsContext, domNodeId)` form) own their
+  // own mount. They may return a teardown callback so React on Rails can clean the mount up on
+  // page unload (Turbo/Turbolinks navigation) or when the same dom-id node is replaced.
+  describe('renderer functions (issue #3209: teardown cleanup)', () => {
+    const setupRailsContext = () => {
       const railsContextElement = document.createElement('div');
       railsContextElement.id = 'js-react-on-rails-context';
       railsContextElement.textContent = JSON.stringify({
@@ -147,29 +151,119 @@ describe('ClientRenderer', () => {
         componentRegistryTimeout: 0,
       });
       document.body.appendChild(railsContextElement);
+    };
 
-      // Create a mock renderer function
-      const mockRenderer = jest.fn();
-      ComponentRegistry.register({ MockRenderer: mockRenderer });
-
-      // Setup DOM element
+    const setupRendererDom = (domId: string): HTMLElement => {
       const componentElement = document.createElement('div');
       componentElement.className = 'js-react-on-rails-component';
-      componentElement.setAttribute('data-component-name', 'MockRenderer');
-      componentElement.setAttribute('data-dom-id', 'test-renderer');
+      componentElement.setAttribute('data-component-name', 'TestRenderer');
+      componentElement.setAttribute('data-dom-id', domId);
       componentElement.textContent = JSON.stringify({ test: 'data' });
       document.body.appendChild(componentElement);
 
       const targetNode = document.createElement('div');
-      targetNode.id = 'test-renderer';
+      targetNode.id = domId;
       document.body.appendChild(targetNode);
+      return targetNode;
+    };
 
-      renderComponent('test-renderer');
+    beforeEach(() => {
+      // Clear roots tracked by earlier tests so teardown assertions below are isolated.
+      unmountAllComponents();
+      setupRailsContext();
+    });
 
-      // The renderer should be called since it has 3 parameters (making it a renderer)
-      // Note: This test depends on the mock function being detected as a renderer
-      // which requires the function to have length === 3
-      expect(true).toBe(true); // Test passes if no error
+    it('invokes the renderer with props, railsContext, and domNodeId', () => {
+      const renderer = jest.fn();
+      // A 3-argument function is classified as a renderer by ComponentRegistry. The `RenderFunction`
+      // annotation strips the parameter optionality at compile time only, so the arrow keeps its
+      // runtime arity of 3.
+      const TestRenderer: RenderFunction = (props, railsContext, domNodeId) => {
+        renderer(props, railsContext, domNodeId);
+      };
+      ComponentRegistry.register({ TestRenderer });
+      setupRendererDom('renderer-invoke');
+
+      renderComponent('renderer-invoke');
+
+      expect(renderer).toHaveBeenCalledTimes(1);
+      expect(renderer).toHaveBeenCalledWith(
+        { test: 'data' },
+        expect.objectContaining({ railsEnv: 'test' }),
+        'renderer-invoke',
+      );
+    });
+
+    it('runs the returned teardown on page unload (unmountAllComponents)', () => {
+      const teardown = jest.fn();
+      const renderer = jest.fn();
+      const TestRenderer: RenderFunction = (props, railsContext, domNodeId) => {
+        renderer(props, railsContext, domNodeId);
+        return teardown;
+      };
+      ComponentRegistry.register({ TestRenderer });
+      setupRendererDom('renderer-unload');
+
+      renderComponent('renderer-unload');
+      expect(renderer).toHaveBeenCalledTimes(1);
+      expect(teardown).not.toHaveBeenCalled();
+
+      // Simulate Turbo/Turbolinks page unload.
+      unmountAllComponents();
+      expect(teardown).toHaveBeenCalledTimes(1);
+    });
+
+    it('runs the previous teardown when the same dom id node is replaced', () => {
+      const teardown = jest.fn();
+      const renderer = jest.fn();
+      const TestRenderer: RenderFunction = (props, railsContext, domNodeId) => {
+        renderer(props, railsContext, domNodeId);
+        return teardown;
+      };
+      ComponentRegistry.register({ TestRenderer });
+      const targetNode1 = setupRendererDom('renderer-replace');
+
+      renderComponent('renderer-replace');
+      expect(renderer).toHaveBeenCalledTimes(1);
+      expect(teardown).not.toHaveBeenCalled();
+
+      // Replace the dom node (e.g. async HTML injection) and re-render the same id.
+      targetNode1.remove();
+      const targetNode2 = document.createElement('div');
+      targetNode2.id = 'renderer-replace';
+      document.body.appendChild(targetNode2);
+
+      renderComponent('renderer-replace');
+
+      // The previous mount's teardown ran, and the renderer mounted into the new node.
+      expect(teardown).toHaveBeenCalledTimes(1);
+      expect(renderer).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not throw on unmount when the renderer returns nothing', () => {
+      // Intentionally returns nothing (legacy renderer that does not opt into cleanup). Three
+      // parameters keep its runtime arity at 3 so it is still classified as a renderer.
+      const TestRenderer: RenderFunction = (_props, _railsContext, _domNodeId) => {};
+      ComponentRegistry.register({ TestRenderer });
+      setupRendererDom('renderer-void');
+
+      renderComponent('renderer-void');
+
+      expect(() => unmountAllComponents()).not.toThrow();
+    });
+
+    it('runs a teardown returned asynchronously by the renderer', async () => {
+      const teardown = jest.fn();
+      const TestRenderer: RenderFunction = (_props, _railsContext, _domNodeId) => Promise.resolve(teardown);
+      ComponentRegistry.register({ TestRenderer });
+      setupRendererDom('renderer-async');
+
+      renderComponent('renderer-async');
+      // Let the renderer's promise resolve so the teardown is captured.
+      await Promise.resolve();
+
+      unmountAllComponents();
+      expect(teardown).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -1,5 +1,11 @@
 import type { ReactElement } from 'react';
-import type { RegisteredComponent, RailsContext, RenderReturnType } from './types/index.ts';
+import type {
+  RegisteredComponent,
+  RailsContext,
+  RenderFunction,
+  RendererTeardown,
+  RenderReturnType,
+} from './types/index.ts';
 import ComponentRegistry from './ComponentRegistry.ts';
 import StoreRegistry from './StoreRegistry.ts';
 import createReactOutput from './createReactOutput.ts';
@@ -11,8 +17,50 @@ import { supportsRootApi, unmountComponentAtNode } from './reactApis.cts';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 
+// An entry in `renderedRoots`. We track two kinds of mounts so both can be cleaned up on page
+// unload or same-id node replacement:
+// - `react`: a React root (or legacy backing instance) that ReactOnRails created itself.
+// - `renderer`: a user renderer function (3-arg form) that owns its own mount; cleanup runs the
+//   optional teardown it returned (undefined when the renderer opted out).
+type RenderedEntry =
+  | { kind: 'react'; root: RenderReturnType; domNode: Element }
+  | { kind: 'renderer'; teardown?: RendererTeardown; domNode: Element };
+
 // Track all rendered roots for cleanup
-const renderedRoots = new Map<string, { root: RenderReturnType; domNode: Element }>();
+const renderedRoots = new Map<string, RenderedEntry>();
+
+/**
+ * Invokes a renderer teardown, swallowing async rejections so a failing teardown cannot produce an
+ * unhandled promise rejection. Synchronous throws propagate to the caller's try/catch.
+ */
+function invokeRendererTeardown(teardown: RendererTeardown | undefined): void {
+  if (!teardown) return;
+  const maybePromise = teardown();
+  if (maybePromise && typeof maybePromise.catch === 'function') {
+    maybePromise.catch((error: unknown) => {
+      console.error('Error in renderer teardown:', error);
+    });
+  }
+}
+
+/**
+ * Tears down a single tracked entry: runs the renderer's teardown, or unmounts the React root.
+ * Synchronous errors are not caught here; callers wrap this in try/catch so one failure does not
+ * abort cleanup of the remaining entries.
+ */
+function teardownEntry(entry: RenderedEntry): void {
+  if (entry.kind === 'renderer') {
+    invokeRendererTeardown(entry.teardown);
+    return;
+  }
+  if (supportsRootApi && entry.root && typeof entry.root === 'object' && 'unmount' in entry.root) {
+    // React 18+ Root API
+    entry.root.unmount();
+  } else {
+    // React 16-17 legacy API
+    unmountComponentAtNode(entry.domNode);
+  }
+}
 
 function initializeStore(el: Element, railsContext: RailsContext): void {
   const name = el.getAttribute(REACT_ON_RAILS_STORE_ATTRIBUTE) || '';
@@ -33,13 +81,15 @@ function domNodeIdForEl(el: Element): string {
   return el.getAttribute('data-dom-id') || '';
 }
 
+type DelegationResult = { delegated: false } | { delegated: true; result: unknown };
+
 function delegateToRenderer(
   componentObj: RegisteredComponent,
   props: Record<string, unknown>,
   railsContext: RailsContext,
   domNodeId: string,
   trace: boolean,
-): boolean {
+): DelegationResult {
   const { name, component, isRenderer } = componentObj;
 
   if (isRenderer) {
@@ -52,16 +102,40 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
       );
     }
 
-    // Call the renderer function with the expected signature
-    (component as (props: Record<string, unknown>, railsContext: RailsContext, domNodeId: string) => void)(
-      props,
-      railsContext,
-      domNodeId,
-    );
-    return true;
+    // Call the renderer function with the expected signature. It may return a teardown callback
+    // (or a promise resolving to one) so we can clean up its mount later.
+    const result = (component as RenderFunction)(props, railsContext, domNodeId);
+    return { delegated: true, result };
   }
 
-  return false;
+  return { delegated: false };
+}
+
+/**
+ * Records a renderer-function mount and captures its optional teardown. The renderer may return the
+ * teardown synchronously, or a promise resolving to one (async renderers). The entry is stored
+ * immediately so the replaced-node path can find it even before an async teardown resolves.
+ */
+function trackRendererMount(domNodeId: string, domNode: Element, result: unknown): void {
+  const entry: RenderedEntry = { kind: 'renderer', domNode, teardown: undefined };
+  renderedRoots.set(domNodeId, entry);
+
+  if (typeof result === 'function') {
+    entry.teardown = result as RendererTeardown;
+  } else if (result && typeof (result as Promise<unknown>).then === 'function') {
+    (result as Promise<unknown>)
+      .then((resolved) => {
+        // Only attach if this exact entry is still the active mount for this id (it may have been
+        // replaced or unmounted while the renderer was resolving).
+        if (typeof resolved === 'function' && renderedRoots.get(domNodeId) === entry) {
+          entry.teardown = resolved as RendererTeardown;
+        }
+      })
+      .catch(() => {
+        // The renderer's own promise rejection is the renderer's responsibility; we only wanted the
+        // teardown. Swallow to avoid an unhandled rejection originating from tracking.
+      });
+  }
 }
 
 /**
@@ -93,18 +167,10 @@ function renderElement(el: Element, railsContext: RailsContext): void {
           }
           return;
         }
-        // DOM node was replaced (e.g., via async HTML injection) - clean up the old root
+        // DOM node was replaced (e.g., via async HTML injection) - clean up the old root or run
+        // the old renderer's teardown.
         try {
-          if (
-            supportsRootApi &&
-            existing.root &&
-            typeof existing.root === 'object' &&
-            'unmount' in existing.root
-          ) {
-            existing.root.unmount();
-          } else {
-            unmountComponentAtNode(existing.domNode);
-          }
+          teardownEntry(existing);
         } catch (unmountError) {
           // Ignore unmount errors for replaced nodes
           if (trace) {
@@ -115,7 +181,11 @@ function renderElement(el: Element, railsContext: RailsContext): void {
       }
 
       const componentObj = ComponentRegistry.get(name);
-      if (delegateToRenderer(componentObj, props, railsContext, domNodeId, trace)) {
+      const delegation = delegateToRenderer(componentObj, props, railsContext, domNodeId, trace);
+      if (delegation.delegated) {
+        // The renderer owns its own mount; record it (with any teardown it returned) so it gets
+        // cleaned up on page unload or same-id node replacement.
+        trackRendererMount(domNodeId, domNode, delegation.result);
         return;
       }
 
@@ -140,7 +210,7 @@ You should return a React.Component always for the client side entry point.`);
       } else {
         const root = reactHydrateOrRender(domNode, reactElementOrRouterResult as ReactElement, shouldHydrate);
         // Track the root for cleanup
-        renderedRoots.set(domNodeId, { root, domNode });
+        renderedRoots.set(domNodeId, { kind: 'react', root, domNode });
       }
     }
   } catch (e: unknown) {
@@ -201,19 +271,14 @@ export function reactOnRailsComponentLoaded(domId: string): Promise<void> {
 }
 
 /**
- * Unmount all rendered React components and clear roots.
- * This should be called on page unload to prevent memory leaks.
+ * Unmount all rendered React components, run all renderer-function teardowns, and clear roots.
+ * This should be called on page unload to prevent memory leaks. Exported for testing.
+ * @private
  */
-function unmountAllComponents(): void {
-  renderedRoots.forEach(({ root, domNode }) => {
+export function unmountAllComponents(): void {
+  renderedRoots.forEach((entry) => {
     try {
-      if (supportsRootApi && root && typeof root === 'object' && 'unmount' in root) {
-        // React 18+ Root API
-        root.unmount();
-      } else {
-        // React 16-17 legacy API
-        unmountComponentAtNode(domNode);
-      }
+      teardownEntry(entry);
     } catch (error) {
       console.error('Error unmounting component:', error);
     }

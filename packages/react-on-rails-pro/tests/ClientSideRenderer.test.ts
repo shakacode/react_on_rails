@@ -306,4 +306,70 @@ describe('ClientSideRenderer', () => {
     expect(defaultProviderFactory).not.toHaveBeenCalled();
     expect(mockReactHydrateOrRender).not.toHaveBeenCalled();
   });
+
+  // Issue #3209: a renderer function (3-arg form) owns its own mount and may return a teardown
+  // callback so React on Rails can clean it up on unmount (Turbo navigation / node replacement).
+  it('runs the teardown returned by a renderer when the component is unmounted', async () => {
+    const teardown = jest.fn();
+    const TestRenderer: RenderFunction = (
+      props?: Record<string, unknown>,
+      railsContext?: RailsContext,
+      domNodeId?: string,
+    ) => {
+      void props;
+      void railsContext;
+      void domNodeId;
+      return teardown;
+    };
+    ComponentRegistry.register({ TestComponent: TestRenderer });
+    const componentSpec = setupTestComponentDom('dom-id-teardown');
+    addRailsContext();
+
+    await renderOrHydrateComponent(componentSpec);
+    expect(teardown).not.toHaveBeenCalled();
+
+    // Simulate Turbo/Turbolinks page unload.
+    unmountAll();
+    expect(teardown).toHaveBeenCalledTimes(1);
+
+    // A second unmount must not call the teardown again.
+    unmountAll();
+    expect(teardown).toHaveBeenCalledTimes(1);
+    expect(mockReactHydrateOrRender).not.toHaveBeenCalled();
+  });
+
+  it('runs a teardown returned asynchronously by a renderer on unmount', async () => {
+    const teardown = jest.fn();
+    const TestRenderer: RenderFunction = (
+      _props?: Record<string, unknown>,
+      _railsContext?: RailsContext,
+      _domNodeId?: string,
+    ) => Promise.resolve(teardown);
+    ComponentRegistry.register({ TestComponent: TestRenderer });
+    const componentSpec = setupTestComponentDom('dom-id-teardown-async');
+    addRailsContext();
+
+    await renderOrHydrateComponent(componentSpec);
+    expect(teardown).not.toHaveBeenCalled();
+
+    unmountAll();
+    expect(teardown).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not throw on unmount when the renderer returns nothing', async () => {
+    const TestRenderer: RenderFunction = (
+      _props?: Record<string, unknown>,
+      _railsContext?: RailsContext,
+      _domNodeId?: string,
+    ) => {
+      // Legacy renderer that does not opt into cleanup.
+    };
+    ComponentRegistry.register({ TestComponent: TestRenderer });
+    const componentSpec = setupTestComponentDom('dom-id-teardown-none');
+    addRailsContext();
+
+    await renderOrHydrateComponent(componentSpec);
+
+    expect(() => unmountAll()).not.toThrow();
+  });
 });

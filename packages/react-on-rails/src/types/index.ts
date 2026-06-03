@@ -147,6 +147,25 @@ type RenderFunctionAsyncResult = Promise<
 
 type RenderFunctionResult = RenderFunctionSyncResult | RenderFunctionAsyncResult;
 
+/**
+ * Optional cleanup callback that a renderer function (the 3-argument form
+ * `(props, railsContext, domNodeId) => …`) may return. React on Rails invokes it when the mount is
+ * torn down — on Turbo/Turbolinks navigation (page unload) or when the same `domNodeId` node is
+ * replaced — so renderer-managed React roots, event listeners, and subscriptions are released
+ * instead of leaked. May be synchronous or asynchronous.
+ *
+ * @see RenderFunction
+ */
+type RendererTeardown = () => void | Promise<void>;
+
+/**
+ * What the 3-argument renderer form may return: nothing, or a {@link RendererTeardown} (sync or
+ * async). Renderer functions own their DOM rendering/hydration, so unlike server-side
+ * render-functions they do not return a component or HTML.
+ */
+// eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- renderer functions may return nothing
+type RendererResult = void | RendererTeardown | Promise<void | RendererTeardown>;
+
 type StreamableComponentResult = ReactElement | Promise<ReactElement | string>;
 
 type AsyncPropsManager = {
@@ -178,9 +197,16 @@ type AsyncPropsManager = {
  * // Option 2: Using renderFunction property
  * const anotherRenderFunction = (props) => { ... };
  * anotherRenderFunction.renderFunction = true;
+ *
+ * @remarks
+ * The 3-argument "renderer" form `(props, railsContext, domNodeId)` owns its own DOM
+ * rendering/hydration and may optionally return a {@link RendererTeardown} (or a promise resolving
+ * to one) so React on Rails can clean the mount up on Turbo/Turbolinks navigation or same-id node
+ * replacement. Returning nothing keeps the previous (leaky) behavior, so existing renderers are
+ * unaffected.
  */
 interface RenderFunction {
-  (props?: any, railsContext?: RailsContext, domNodeId?: string): RenderFunctionResult;
+  (props?: any, railsContext?: RailsContext, domNodeId?: string): RenderFunctionResult | RendererResult;
   // We allow specifying that the function is RenderFunction and not a React Function Component
   // by setting this property
   renderFunction?: true;
@@ -195,6 +221,7 @@ export type {
   ReactComponent,
   AuthenticityHeaders,
   RenderFunction,
+  RendererTeardown,
   RenderFunctionResult,
   Store,
   StoreGenerator,

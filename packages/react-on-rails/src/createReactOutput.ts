@@ -1,5 +1,11 @@
 import { createElement, isValidElement, type ReactElement } from 'react';
-import type { CreateParams, ReactComponent, RenderFunction, CreateReactOutputResult } from './types/index.ts';
+import type {
+  CreateParams,
+  ReactComponent,
+  RenderFunction,
+  RenderFunctionResult,
+  CreateReactOutputResult,
+} from './types/index.ts';
 import { isServerRenderHash, isPromise } from './isServerRenderResult.ts';
 
 function createReactElementFromRenderFunctionResult(
@@ -66,7 +72,11 @@ export default function createReactOutput({
     if (trace) {
       console.log(`${name} is a renderFunction`);
     }
-    const renderFunctionResult = (component as RenderFunction)(props, railsContext);
+    // createReactOutput only handles the server-side / 2-argument render-function form, which
+    // returns a component or server-render hash. The 3-argument renderer form (which may return a
+    // RendererTeardown) is delegated earlier in the client renderers and never reaches here, so we
+    // narrow back to RenderFunctionResult to exclude the renderer-only return shapes.
+    const renderFunctionResult = (component as RenderFunction)(props, railsContext) as RenderFunctionResult;
     if (isServerRenderHash(renderFunctionResult)) {
       // We just return at this point, because calling function knows how to handle this case and
       // we can't call React.createElement with this type of Object.

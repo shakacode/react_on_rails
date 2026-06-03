@@ -24,7 +24,7 @@
 import 'react-on-rails-rsc/client.browser';
 import * as React from 'react';
 import * as ReactDOMClient from 'react-dom/client';
-import { ReactComponentOrRenderFunction, RenderFunction } from 'react-on-rails/types';
+import { ReactComponent, ReactComponentOrRenderFunction, RenderFunction } from 'react-on-rails/types';
 import isRenderFunction from 'react-on-rails/isRenderFunction';
 import { ensureReactUseAvailable } from 'react-on-rails/reactApis';
 import { createRSCProvider } from '../RSCProvider.tsx';
@@ -61,8 +61,10 @@ const wrapServerComponentRenderer = (
   }
 
   const wrapper: RenderFunction = async (props, railsContext, domNodeId) => {
+    // When componentOrRenderFunction is a render function, it resolves to the component to mount
+    // (not a renderer teardown), so narrow back to ReactComponent.
     const Component = isRenderFunction(componentOrRenderFunction)
-      ? await componentOrRenderFunction(props, railsContext, domNodeId)
+      ? ((await componentOrRenderFunction(props, railsContext, domNodeId)) as ReactComponent)
       : componentOrRenderFunction;
 
     if (typeof Component !== 'function') {
@@ -90,7 +92,7 @@ const wrapServerComponentRenderer = (
       getServerComponent: getReactServerComponent(domNodeId, railsContext),
     });
 
-    const root = (
+    const rootElement = (
       <RSCProvider>
         <React.Suspense fallback={null}>
           <Component {...props} />
@@ -98,18 +100,21 @@ const wrapServerComponentRenderer = (
       </RSCProvider>
     );
 
+    let reactRoot: ReactDOMClient.Root;
     if (domNode.innerHTML) {
-      ReactDOMClient.hydrateRoot(domNode, root, {
+      reactRoot = ReactDOMClient.hydrateRoot(domNode, rootElement, {
         identifierPrefix: domNodeId,
         onRecoverableError: handleRecoverableError,
       });
     } else {
-      ReactDOMClient.createRoot(domNode, { identifierPrefix: domNodeId }).render(root);
+      reactRoot = ReactDOMClient.createRoot(domNode, { identifierPrefix: domNodeId });
+      reactRoot.render(rootElement);
     }
-    // Added only to satisfy the return type of RenderFunction
-    // However, the returned value of renderFunction is not used in ReactOnRails
-    // TODO: fix this behavior
-    return '';
+
+    // Return a teardown so React on Rails unmounts this root on Turbo/Turbolinks navigation or
+    // same-id node replacement instead of leaking it. This closes the leak for every
+    // registerServerComponent user.
+    return () => reactRoot.unmount();
   };
 
   return wrapper;

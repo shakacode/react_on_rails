@@ -15,7 +15,13 @@
 /* eslint-disable max-classes-per-file */
 
 import type { ReactElement } from 'react';
-import type { RailsContext, RegisteredComponent, RenderFunction, Root } from 'react-on-rails/types';
+import type {
+  RailsContext,
+  RegisteredComponent,
+  RenderFunction,
+  RendererTeardown,
+  Root,
+} from 'react-on-rails/types';
 
 import { getRailsContext, resetRailsContext } from 'react-on-rails/context';
 import createReactOutput from 'react-on-rails/createReactOutput';
@@ -31,13 +37,29 @@ import * as ComponentRegistry from './ComponentRegistry.ts';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 
+/**
+ * Invokes a renderer teardown, swallowing async rejections so a failing teardown cannot produce an
+ * unhandled promise rejection. Synchronous throws propagate to the caller's try/catch.
+ */
+function invokeRendererTeardown(teardown: RendererTeardown | undefined): void {
+  if (!teardown) return;
+  const maybePromise = teardown();
+  if (maybePromise && typeof maybePromise.catch === 'function') {
+    maybePromise.catch((error: unknown) => {
+      console.error('Error in renderer teardown:', error);
+    });
+  }
+}
+
+type DelegationResult = { delegated: false } | { delegated: true; teardown?: RendererTeardown };
+
 async function delegateToRenderer(
   componentObj: RegisteredComponent,
   props: Record<string, unknown>,
   railsContext: RailsContext,
   domNodeId: string,
   trace: boolean,
-): Promise<boolean> {
+): Promise<DelegationResult> {
   const { name, component, isRenderer } = componentObj;
 
   if (isRenderer) {
@@ -49,11 +71,16 @@ async function delegateToRenderer(
       );
     }
 
-    await (component as RenderFunction)(props, railsContext, domNodeId);
-    return true;
+    // The renderer owns its own mount and may return a teardown callback so we can clean it up on
+    // unmount (Turbo navigation or same-id node replacement).
+    const result = await (component as RenderFunction)(props, railsContext, domNodeId);
+    return {
+      delegated: true,
+      teardown: typeof result === 'function' ? (result as RendererTeardown) : undefined,
+    };
   }
 
-  return false;
+  return { delegated: false };
 }
 
 const getDomId = (domIdOrElement: string | Element): string =>
@@ -70,6 +97,9 @@ class ComponentRenderer {
   private state: 'unmounted' | 'rendering' | 'rendered';
 
   private root?: Root;
+
+  // Set when this mount was delegated to a renderer function that returned a teardown callback.
+  private rendererTeardown?: RendererTeardown;
 
   private renderPromise?: Promise<void>;
 
@@ -123,11 +153,21 @@ class ComponentRenderer {
           return;
         }
 
-        if (
-          (await delegateToRenderer(componentObj, props, railsContext, domNodeId, trace)) ||
+        const delegation = await delegateToRenderer(componentObj, props, railsContext, domNodeId, trace);
+        if (delegation.delegated) {
           // @ts-expect-error The state can change while awaiting delegateToRenderer
-          this.state === 'unmounted'
-        ) {
+          if (this.state === 'unmounted') {
+            // unmount() ran while the renderer was resolving and could not see the teardown yet, so
+            // run it now to avoid leaking the renderer's mount.
+            invokeRendererTeardown(delegation.teardown);
+          } else {
+            this.rendererTeardown = delegation.teardown;
+            this.state = 'rendered';
+          }
+          return;
+        }
+        // @ts-expect-error The state can change while awaiting delegateToRenderer
+        if (this.state === 'unmounted') {
           return;
         }
 
@@ -183,6 +223,20 @@ You should return a React.Component always for the client side entry point.`);
       return;
     }
     this.state = 'unmounted';
+
+    if (this.rendererTeardown) {
+      // This mount was owned by a renderer function; run its teardown instead of unmounting a
+      // React root we never created.
+      const { rendererTeardown } = this;
+      this.rendererTeardown = undefined;
+      try {
+        invokeRendererTeardown(rendererTeardown);
+      } catch (e: unknown) {
+        const error = e instanceof Error ? e : new Error('Unknown error');
+        console.error('Error in renderer teardown:', error);
+      }
+      return;
+    }
 
     if (supportsRootApi) {
       this.root?.unmount();
