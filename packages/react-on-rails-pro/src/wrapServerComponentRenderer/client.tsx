@@ -111,9 +111,9 @@ const wrapServerComponentRenderer = (
       reactRoot.render(rootElement);
     }
 
-    // Return a teardown so React on Rails unmounts this root on Turbo/Turbolinks navigation or
-    // same-id node replacement instead of leaking it. This closes the leak for every
-    // registerServerComponent user.
+    // Return a teardown so React on Rails unmounts this root on Turbo/Turbolinks navigation
+    // (page unload) instead of leaking it. This closes the leak for every registerServerComponent
+    // user.
     return () => reactRoot.unmount();
   };
 

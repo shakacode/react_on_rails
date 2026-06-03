@@ -372,4 +372,40 @@ describe('ClientSideRenderer', () => {
 
     expect(() => unmountAll()).not.toThrow();
   });
+
+  it('runs the teardown when unmount races an async renderer still resolving (issue #3209)', async () => {
+    // Unlike the core renderer, Pro awaits the renderer and re-checks unmount state, so a teardown
+    // that resolves after a Turbo navigation has already unmounted the mount is still run, not
+    // leaked.
+    const teardown = jest.fn();
+    let resolveRenderer!: (value: () => void) => void;
+    const rendererPromise = new Promise<() => void>((resolve) => {
+      resolveRenderer = resolve;
+    });
+    const TestRenderer: RenderFunction = (
+      _props?: Record<string, unknown>,
+      _railsContext?: RailsContext,
+      _domNodeId?: string,
+    ) => rendererPromise;
+    ComponentRegistry.register({ TestComponent: TestRenderer });
+    const componentSpec = setupTestComponentDom('dom-id-teardown-race');
+    addRailsContext();
+
+    // Start rendering but do not await — the renderer's promise is still pending, so render() is
+    // parked awaiting it.
+    const renderPromise = renderOrHydrateComponent(componentSpec);
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+
+    // Simulate a Turbo/Turbolinks navigation unmounting the mount before the renderer resolves.
+    unmountAll();
+    expect(teardown).not.toHaveBeenCalled();
+
+    // The renderer finally resolves; unmount() could not see the teardown, so render() runs it now.
+    resolveRenderer(teardown);
+    await renderPromise;
+
+    expect(teardown).toHaveBeenCalledTimes(1);
+  });
 });

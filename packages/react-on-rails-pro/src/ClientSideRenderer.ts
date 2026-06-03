@@ -72,7 +72,7 @@ async function delegateToRenderer(
     }
 
     // The renderer owns its own mount and may return a teardown callback so we can clean it up on
-    // unmount (Turbo navigation or same-id node replacement).
+    // unmount (Turbo/Turbolinks navigation / page unload).
     const result = await (component as RenderFunction)(props, railsContext, domNodeId);
     return {
       delegated: true,

@@ -153,10 +153,10 @@ describe('ClientRenderer', () => {
       document.body.appendChild(railsContextElement);
     };
 
-    const setupRendererDom = (domId: string): HTMLElement => {
+    const setupRendererDom = (domId: string, componentName = 'TestRenderer'): HTMLElement => {
       const componentElement = document.createElement('div');
       componentElement.className = 'js-react-on-rails-component';
-      componentElement.setAttribute('data-component-name', 'TestRenderer');
+      componentElement.setAttribute('data-component-name', componentName);
       componentElement.setAttribute('data-dom-id', domId);
       componentElement.textContent = JSON.stringify({ test: 'data' });
       document.body.appendChild(componentElement);
@@ -264,6 +264,89 @@ describe('ClientRenderer', () => {
 
       unmountAllComponents();
       expect(teardown).toHaveBeenCalledTimes(1);
+    });
+
+    it('continues running other teardowns when one teardown throws on unmount', () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const throwingTeardown = jest.fn(() => {
+        throw new Error('teardown boom');
+      });
+      const okTeardown = jest.fn();
+      const ThrowingRenderer: RenderFunction = (_props, _railsContext, _domNodeId) => throwingTeardown;
+      const OkRenderer: RenderFunction = (_props, _railsContext, _domNodeId) => okTeardown;
+      ComponentRegistry.register({ ThrowingRenderer, OkRenderer });
+      // Insertion order matters: the throwing teardown runs first, so we prove cleanup of the
+      // later-registered entry still happens.
+      setupRendererDom('renderer-throws', 'ThrowingRenderer');
+      setupRendererDom('renderer-ok', 'OkRenderer');
+
+      renderComponent('renderer-throws');
+      renderComponent('renderer-ok');
+
+      expect(() => unmountAllComponents()).not.toThrow();
+      expect(throwingTeardown).toHaveBeenCalledTimes(1);
+      expect(okTeardown).toHaveBeenCalledTimes(1);
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error unmounting component:', expect.any(Error));
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('drops a still-pending async teardown when the node is replaced before it resolves', async () => {
+      // Documents the core best-effort limitation (Pro handles this race): the first mount's async
+      // teardown resolves only after the same-id node has been replaced, so it must NOT be attached
+      // to or run against the new mount.
+      const resolvers: Array<(teardown: () => void) => void> = [];
+      const renderer = jest.fn();
+      const AsyncRenderer: RenderFunction = (_props, _railsContext, _domNodeId) => {
+        renderer();
+        return new Promise<() => void>((resolve) => {
+          resolvers.push(resolve);
+        });
+      };
+      ComponentRegistry.register({ AsyncRenderer });
+      const node1 = setupRendererDom('renderer-stale', 'AsyncRenderer');
+
+      renderComponent('renderer-stale');
+      expect(renderer).toHaveBeenCalledTimes(1);
+
+      // Replace the node and re-render the same id before the first renderer resolves.
+      node1.remove();
+      const node2 = document.createElement('div');
+      node2.id = 'renderer-stale';
+      document.body.appendChild(node2);
+      renderComponent('renderer-stale');
+      expect(renderer).toHaveBeenCalledTimes(2);
+
+      // The first (now-stale) renderer finally resolves its teardown.
+      const staleTeardown = jest.fn();
+      resolvers[0](staleTeardown);
+      await Promise.resolve();
+
+      // The stale teardown was not attached to the replaced mount, so cleanup never runs it.
+      unmountAllComponents();
+      expect(staleTeardown).not.toHaveBeenCalled();
+    });
+
+    it('logs (and does not rethrow) when an async renderer rejects before returning a teardown', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const rejection = new Error('renderer rejected');
+      const RejectingRenderer: RenderFunction = (_props, _railsContext, _domNodeId) =>
+        Promise.reject<() => void>(rejection);
+      ComponentRegistry.register({ RejectingRenderer });
+      setupRendererDom('renderer-reject', 'RejectingRenderer');
+
+      expect(() => renderComponent('renderer-reject')).not.toThrow();
+
+      // Flush microtasks so the tracking .catch runs.
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error resolving renderer teardown; mount may leak on cleanup:',
+        rejection,
+      );
+      consoleErrorSpy.mockRestore();
     });
   });
 

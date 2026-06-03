@@ -204,6 +204,11 @@ type AsyncPropsManager = {
  * to one) so React on Rails can clean the mount up on Turbo/Turbolinks navigation or same-id node
  * replacement. Returning nothing keeps the previous (leaky) behavior, so existing renderers are
  * unaffected.
+ *
+ * Synchronous teardowns are always honored. An *async* teardown is best-effort in this open-source
+ * package: if a navigation or node replacement happens before the renderer resolves its teardown,
+ * that still-pending teardown may be dropped. React on Rails Pro's client renderer handles this
+ * race reliably.
  */
 interface RenderFunction {
   (props?: any, railsContext?: RailsContext, domNodeId?: string): RenderFunctionResult | RendererResult;

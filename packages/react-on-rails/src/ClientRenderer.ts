@@ -115,6 +115,14 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
  * Records a renderer-function mount and captures its optional teardown. The renderer may return the
  * teardown synchronously, or a promise resolving to one (async renderers). The entry is stored
  * immediately so the replaced-node path can find it even before an async teardown resolves.
+ *
+ * Known limitation (core package): if the mount is unmounted or its node is replaced *before* an
+ * async renderer resolves its teardown, the still-pending teardown is dropped and that one mount
+ * leaks — the resolved teardown is discarded because the entry is no longer the active mount for
+ * this id (the `renderedRoots.get(domNodeId) === entry` guard below). Synchronous teardowns are
+ * unaffected. The Pro client renderer (`react-on-rails-pro`) awaits the renderer and re-checks the
+ * unmount state, so it runs the teardown even when a navigation races the resolve; prefer Pro if you
+ * depend on async renderer teardowns surviving fast navigations.
  */
 function trackRendererMount(domNodeId: string, domNode: Element, result: unknown): void {
   const entry: RenderedEntry = { kind: 'renderer', domNode, teardown: undefined };
@@ -131,9 +139,11 @@ function trackRendererMount(domNodeId: string, domNode: Element, result: unknown
           entry.teardown = resolved as RendererTeardown;
         }
       })
-      .catch(() => {
-        // The renderer's own promise rejection is the renderer's responsibility; we only wanted the
-        // teardown. Swallow to avoid an unhandled rejection originating from tracking.
+      .catch((error: unknown) => {
+        // The renderer's render promise rejected, so no teardown was captured and this mount will
+        // leak on cleanup. Log it (rather than letting it surface as an unhandled rejection) so the
+        // dropped teardown is diagnosable, mirroring invokeRendererTeardown above.
+        console.error('Error resolving renderer teardown; mount may leak on cleanup:', error);
       });
   }
 }
