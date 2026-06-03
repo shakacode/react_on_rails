@@ -71,6 +71,59 @@ RSpec.describe "benchmark route discovery helpers" do
 
       expect(benchmark_routes_from_rails_routes_output(routes_output)).to eq(["/server_side_hello_world"])
     end
+
+    it "resets on the route separator so field-order changes don't misclassify routes" do
+      # The parser must key off the `--[ Route N ]--` separator (the real block
+      # delimiter), not assume Controller#Action is the last field of every block.
+      # Here URI is emitted after Controller#Action; a separator-keyed parser still
+      # captures both routes correctly.
+      routes_output = <<~TEXT
+        --[ Route 1 ]-------------------------------------------------------------------
+        Prefix            | client_side_hello_world
+        Verb              | GET
+        Controller#Action | pages#client_side_hello_world
+        URI               | /client_side_hello_world(.:format)
+        --[ Route 2 ]-------------------------------------------------------------------
+        Prefix            | server_side_hello_world
+        Verb              | GET
+        Controller#Action | pages#server_side_hello_world
+        URI               | /server_side_hello_world(.:format)
+      TEXT
+
+      expect(benchmark_routes_from_rails_routes_output(routes_output)).to eq(
+        ["/client_side_hello_world", "/server_side_hello_world"]
+      )
+    end
+
+    it "skips routes with a required glob segment" do
+      routes_output = <<~TEXT
+        --[ Route 1 ]-------------------------------------------------------------------
+        Prefix            | legacy_catch_all
+        Verb              | GET
+        URI               | /legacy/*path(.:format)
+        Controller#Action | pages#legacy
+      TEXT
+
+      expect(benchmark_routes_from_rails_routes_output(routes_output)).to eq([])
+    end
+  end
+
+  describe "#route_has_required_params?" do
+    it "treats a dynamic segment as a required param" do
+      expect(route_has_required_params?("/users/:id(.:format)")).to be(true)
+    end
+
+    it "ignores optional segments" do
+      expect(route_has_required_params?("/users(/:id)(.:format)")).to be(false)
+    end
+
+    it "treats a required glob segment as a required param" do
+      expect(route_has_required_params?("/legacy/*path")).to be(true)
+    end
+
+    it "ignores an optional glob segment" do
+      expect(route_has_required_params?("/react_router(/*all)(.:format)")).to be(false)
+    end
   end
 
   describe "#benchmark_routes_for_app" do

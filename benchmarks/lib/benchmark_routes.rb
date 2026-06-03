@@ -15,7 +15,9 @@ NON_BENCHMARK_ROUTES = %w[
 
 def route_has_required_params?(path)
   path_without_optional = path.gsub(/\([^)]*\)/, "")
-  path_without_optional.include?(":")
+  # `:id` dynamic segments and `*splat` globs left outside the optional parens are
+  # required params, so the route can't be benchmarked as a literal URL.
+  path_without_optional.include?(":") || path_without_optional.match?(/\*[A-Za-z_]/)
 end
 
 def strip_optional_params(route)
@@ -59,6 +61,12 @@ def benchmark_routes_from_rails_routes_output(routes_output)
     stripped = line.strip
 
     case stripped
+    when /\A-+\[ Route \d+ \]/
+      # The separator is the real block delimiter, so flush the route accumulated
+      # so far here rather than keying off Controller#Action being the last field.
+      route = benchmark_route_from_rails_output(current_route)
+      routes << route if route
+      current_route = {}
     when /\APrefix\s+\|\s*(.*)\z/
       current_route[:prefix] = Regexp.last_match(1)
     when /\AVerb\s+\|\s*(.*)\z/
@@ -67,12 +75,12 @@ def benchmark_routes_from_rails_routes_output(routes_output)
       current_route[:uri] = Regexp.last_match(1)
     when /\AController#Action\s+\|\s*(.*)\z/
       current_route[:controller_action] = Regexp.last_match(1)
-
-      route = benchmark_route_from_rails_output(current_route)
-      routes << route if route
-      current_route = {}
     end
   end
+
+  # Flush the final block: there is no trailing separator after the last route.
+  route = benchmark_route_from_rails_output(current_route)
+  routes << route if route
 
   routes
 end
