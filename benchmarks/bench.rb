@@ -134,7 +134,10 @@ def run_benchmark_suite(routes, bmf_collector, runner: method(:benchmark_route))
   rescue StandardError => e
     # ::error:: must go to stdout — GitHub Actions only parses workflow commands
     # from stdout, not stderr, so writing here is what renders the UI annotation.
-    $stdout.puts "::error::k6 benchmark failed for route #{route}: #{e.message}"
+    # The rescue also covers warm-up failures (not just k6), so the label is
+    # neutral, and newlines are collapsed so a multiline message can't truncate
+    # the annotation (Actions treats a newline as the command terminator).
+    $stdout.puts "::error::Benchmark failed for route #{route}: #{e.message.to_s.tr("\n", ' ')}"
     failed_routes << route
     add_to_summary(route, *failure_metrics(e))
   end

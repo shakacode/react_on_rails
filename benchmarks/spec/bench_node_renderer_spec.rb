@@ -47,8 +47,10 @@ RSpec.describe "bench-node-renderer" do
     end
 
     it "continues past a failing test and returns every test that failed" do
+      # simple_eval is first in test_cases, so failing it proves the suite keeps
+      # going and still records react_ssr (which runs after the failure).
       runner = lambda do |test_case, _bundle|
-        raise "Vegeta attack failed for #{test_case[:name]}" if test_case[:name] == "react_ssr"
+        raise "Vegeta attack failed for #{test_case[:name]}" if test_case[:name] == "simple_eval"
 
         [100.0, 1.0, 2.0, "200=10"]
       end
@@ -56,11 +58,11 @@ RSpec.describe "bench-node-renderer" do
       failed = nil
       # ::error:: annotations go to stdout so GitHub Actions renders them.
       expect { failed = run_vegeta_suite(test_cases, "bundleX", "RSC", collector, runner: runner) }
-        .to output(/::error::.*react_ssr/).to_stdout
+        .to output(/::error::.*simple_eval/).to_stdout
 
-      expect(failed).to eq(["react_ssr (RSC)"])
-      # The test after the failure still ran (no early abort).
-      expect(collector.added.map { |m| m[:name] }).to eq(["simple_eval (RSC)"])
+      expect(failed).to eq(["simple_eval (RSC)"])
+      # The test after the failure (react_ssr) still ran and was recorded — no early abort.
+      expect(collector.added.map { |m| m[:name] }).to eq(["react_ssr (RSC)"])
     end
 
     it "keeps fabricated metrics out of the Bencher payload for failed tests" do

@@ -6,6 +6,7 @@
 
 require "English"
 require "open3"
+require "shellwords"
 require "socket"
 require_relative "lib/benchmark_config"
 require_relative "lib/benchmark_helpers"
@@ -192,15 +193,18 @@ def run_vegeta_benchmark(test_case, bundle_timestamp)
     end
 
   # Run Vegeta attack with h2c
+  # All paths are Shellwords.escape'd for parity with the k6 command in bench.rb,
+  # so an OUTDIR (or test name) containing spaces/special chars can't break the
+  # shell command.
   vegeta_cmd = [
     "vegeta", "attack",
-    "-targets=#{targets_file}",
+    "-targets=#{Shellwords.escape(targets_file)}",
     *vegeta_args,
     "-duration=#{DURATION}",
     "-timeout=#{REQUEST_TIMEOUT}",
     "-h2c", # HTTP/2 Cleartext (required for node renderer)
     "-max-body=0",
-    "> #{vegeta_bin}"
+    "> #{Shellwords.escape(vegeta_bin)}"
   ].join(" ")
 
   raise "Vegeta attack failed for #{name}" unless system(vegeta_cmd)
@@ -208,12 +212,16 @@ def run_vegeta_benchmark(test_case, bundle_timestamp)
   # Generate text report (display and save). Run through bash with pipefail so a
   # non-zero `vegeta report` exit is not masked by tee's (always-zero) status;
   # the default /bin/sh on Linux CI is dash, which has no `set -o pipefail`.
-  unless system("bash", "-c", "set -o pipefail; vegeta report #{vegeta_bin} | tee #{vegeta_txt}")
+  unless system("bash", "-c",
+                "set -o pipefail; vegeta report #{Shellwords.escape(vegeta_bin)} | " \
+                "tee #{Shellwords.escape(vegeta_txt)}")
     raise "Vegeta text report failed"
   end
 
   # Generate JSON report
-  raise "Vegeta JSON report failed" unless system("vegeta report -type=json #{vegeta_bin} > #{vegeta_json}")
+  unless system("vegeta report -type=json #{Shellwords.escape(vegeta_bin)} > #{Shellwords.escape(vegeta_json)}")
+    raise "Vegeta JSON report failed"
+  end
 
   # Delete the large binary file to save disk space
   FileUtils.rm_f(vegeta_bin)
@@ -255,7 +263,9 @@ def run_vegeta_suite(test_cases, bundle, label, bmf_collector, runner: method(:r
     rescue StandardError => e
       # ::error:: must go to stdout — GitHub Actions only parses workflow commands
       # from stdout, not stderr, so writing here is what renders the UI annotation.
-      $stdout.puts "::error::Vegeta benchmark failed for #{test_label}: #{e.message}"
+      # Newlines are collapsed so a multiline message can't truncate the
+      # annotation (Actions treats a newline as the command terminator).
+      $stdout.puts "::error::Vegeta benchmark failed for #{test_label}: #{e.message.to_s.tr("\n", ' ')}"
       failed << test_label
       add_to_summary(test_case[:name], label, *failure_metrics(e))
     end
