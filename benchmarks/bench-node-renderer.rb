@@ -258,8 +258,9 @@ def run_vegeta_suite(test_cases, bundle, label, bmf_collector, runner: method(:r
     begin
       rps, p50, p90, status = runner.call(test_case, bundle)
       add_to_summary(test_case[:name], label, rps, p50, p90, status)
-      # Add to BMF collector for Bencher output (p90 stays in the summary table only)
-      bmf_collector.add(name: test_label, rps: rps, p50: p50, status: status)
+      # Add to BMF collector for Bencher output. p90 is retained for the display
+      # sidecar (the summary table) only — it is never sent to Bencher as a measure.
+      bmf_collector.add(name: test_label, rps: rps, p50: p50, p90: p90, status: status)
     rescue StandardError => e
       # ::error:: must go to stdout — GitHub Actions only parses workflow commands
       # from stdout, not stderr, so writing here is what renders the UI annotation.
@@ -371,6 +372,8 @@ if __FILE__ == $PROGRAM_NAME
   if failed_tests.empty?
     # Append to existing Pro results.
     bmf_collector.write_bmf_json(BENCHMARK_JSON, append: true)
+    # Display sidecar (summary table data) — append to match the BMF.
+    bmf_collector.write_display_json(DISPLAY_JSON, append: true)
   else
     $stdout.puts "::error::#{failed_tests.length} node renderer benchmark(s) failed: #{failed_tests.join(', ')}"
     exit 1

@@ -21,8 +21,8 @@ RSpec.describe "bench-node-renderer" do
           @added = []
         end
 
-        def add(name:, rps:, p50:, status:)
-          @added << { name: name, rps: rps, p50: p50, status: status }
+        def add(name:, rps:, p50:, status:, p90: nil)
+          @added << { name: name, rps: rps, p50: p50, p90: p90, status: status }
         end
       end.new
     end
