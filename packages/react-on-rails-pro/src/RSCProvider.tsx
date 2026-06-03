@@ -15,7 +15,16 @@
 'use client';
 
 import * as React from 'react';
-import { createContext, useContext, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+  type ReactNode,
+} from 'react';
 import type { ClientGetReactServerComponentProps } from './getReactServerComponent.client.ts';
 import { createRSCPayloadKey } from './utils.ts';
 
@@ -51,33 +60,53 @@ export const createRSCProvider = ({
 }: {
   getServerComponent: (props: ClientGetReactServerComponentProps) => Promise<ReactNode>;
 }) => {
-  const fetchRSCPromises: Record<string, Promise<ReactNode>> = {};
-
-  const getComponent = (componentName: string, componentProps: unknown) => {
-    const key = createRSCPayloadKey(componentName, componentProps);
-    if (key in fetchRSCPromises) {
-      return fetchRSCPromises[key];
-    }
-
-    const promise = getServerComponent({ componentName, componentProps });
-    fetchRSCPromises[key] = promise;
-    return promise;
-  };
-
-  const refetchComponent = (componentName: string, componentProps: unknown) => {
-    const key = createRSCPayloadKey(componentName, componentProps);
-    const promise = getServerComponent({
-      componentName,
-      componentProps,
-      enforceRefetch: true,
-    });
-    fetchRSCPromises[key] = promise;
-    return promise;
-  };
-
-  const contextValue = { getComponent, refetchComponent };
-
   return ({ children }: { children: ReactNode }) => {
+    const fetchRSCPromisesRef = useRef<Record<string, Promise<ReactNode>>>({});
+    // `versions` is a per-cache-key counter held in React state. Bumping it on
+    // refetch (inside startTransition) is what makes <RSCRoute> consumers re-
+    // render with the new promise from the cache while React keeps the old
+    // tree visible until the new payload resolves.
+    const [versions, setVersions] = useState<Record<string, number>>({});
+    const [, startTransition] = useTransition();
+
+    const getComponent = useCallback((componentName: string, componentProps: unknown) => {
+      const key = createRSCPayloadKey(componentName, componentProps);
+      if (key in fetchRSCPromisesRef.current) {
+        return fetchRSCPromisesRef.current[key];
+      }
+
+      const promise = getServerComponent({ componentName, componentProps });
+      fetchRSCPromisesRef.current[key] = promise;
+      return promise;
+    }, []);
+
+    const refetchComponent = useCallback(
+      (componentName: string, componentProps: unknown) => {
+        const key = createRSCPayloadKey(componentName, componentProps);
+        const promise = getServerComponent({
+          componentName,
+          componentProps,
+          enforceRefetch: true,
+        });
+        fetchRSCPromisesRef.current[key] = promise;
+        startTransition(() => {
+          setVersions((v) => ({ ...v, [key]: (v[key] ?? 0) + 1 }));
+        });
+        return promise;
+      },
+      [startTransition],
+    );
+
+    // `versions` is intentionally listed in deps so the value identity changes
+    // on each refetch. Trade-off: every useRSC() consumer re-renders on any
+    // refetch, even when its cache key is unaffected. Each extra render is a
+    // cache hit, but use a per-key subscription if this becomes a bottleneck.
+    const contextValue = useMemo(
+      () => ({ getComponent, refetchComponent }),
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [getComponent, refetchComponent, versions],
+    );
+
     return <RSCContext.Provider value={contextValue}>{children}</RSCContext.Provider>;
   };
 };
