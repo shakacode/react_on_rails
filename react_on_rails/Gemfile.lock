@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    react_on_rails (17.0.0.rc.0)
+    react_on_rails (17.0.0.rc.1)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -487,4 +487,4 @@ DEPENDENCIES
   webdrivers (= 5.3.0)
 
 BUNDLED WITH
-   4.0.10
+  4.0.10
