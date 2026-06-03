@@ -153,7 +153,9 @@ end
 
 # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
-# Run Vegeta benchmark for a single test case
+# Run Vegeta benchmark for a single test case. Returns [rps, p50, p90, status]
+# on success and RAISES on any Vegeta/parse failure so the suite can record the
+# failure and exit non-zero instead of shipping fabricated metrics to Bencher.
 def run_vegeta_benchmark(test_case, bundle_timestamp)
   name = test_case[:name]
   request = test_case[:request]
@@ -220,116 +222,127 @@ def run_vegeta_benchmark(test_case, bundle_timestamp)
   vegeta_status = vegeta_data["status_codes"]&.map { |k, v| "#{k}=#{v}" }&.join(",") || "MISSING"
 
   [vegeta_rps, vegeta_p50, vegeta_p90, vegeta_status]
-rescue StandardError => e
-  puts "Error: #{e.message}"
-  failure_metrics(e)
 end
 
 # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
+# Run a batch of test cases against a bundle, collecting per-test failures
+# instead of aborting on the first. A failed test is recorded as FAILED in the
+# human-readable summary but is NOT added to the BMF collector, so fabricated
+# metrics never ship to Bencher. Returns the labels of tests that failed (caller
+# exits non-zero when any failed). `runner` is injected so the failure-collection
+# control flow can be unit-tested without a live node renderer or Vegeta.
+def run_vegeta_suite(test_cases, bundle, label, bmf_collector, runner: method(:run_vegeta_benchmark))
+  failed = []
+
+  test_cases.each do |test_case|
+    print_separator
+    puts "Benchmarking (#{label}): #{test_case[:name]}"
+    puts "  Bundle: #{bundle}"
+    puts "  Request: #{test_case[:request]}"
+    print_separator
+
+    test_label = "#{test_case[:name]} (#{label})"
+    begin
+      rps, p50, p90, status = runner.call(test_case, bundle)
+      add_to_summary(test_case[:name], label, rps, p50, p90, status)
+      # Add to BMF collector for Bencher output (p90 stays in the summary table only)
+      bmf_collector.add(name: test_label, rps: rps, p50: p50, status: status)
+    rescue StandardError => e
+      warn "::error::Vegeta benchmark failed for #{test_label}: #{e.message}"
+      failed << test_label
+      add_to_summary(test_case[:name], label, *failure_metrics(e))
+    end
+  end
+
+  failed
+end
+
 # Main execution
 
-validate_benchmark_config!
+if __FILE__ == $PROGRAM_NAME
+  validate_benchmark_config!
 
-# Check required tools
-check_required_tools(%w[vegeta curl column tee])
+  # Check required tools
+  check_required_tools(%w[vegeta curl column tee])
 
-# Wait for node renderer to be ready
-# Note: Node renderer only speaks HTTP/2, but we can still check with a simple GET
-# that will fail - we just check it doesn't refuse connection
-puts "\nWaiting for node renderer at #{BASE_URL}..."
-base_uri = URI.parse("http://#{BASE_URL}")
-start_time = Time.now
-timeout_sec = 60
-loop do
-  # Try a simple TCP connection to check if server is up
-  Socket.tcp(base_uri.host, base_uri.port, connect_timeout: 5, &:close)
-  puts "  Node renderer is accepting connections"
-  break
-rescue StandardError => e
-  elapsed = Time.now - start_time
-  puts "  Attempt at #{elapsed.round(2)}s: #{e.message}"
-  raise "Node renderer at #{BASE_URL} not responding within #{timeout_sec}s" if elapsed > timeout_sec
+  # Wait for node renderer to be ready
+  # Note: Node renderer only speaks HTTP/2, but we can still check with a simple GET
+  # that will fail - we just check it doesn't refuse connection
+  puts "\nWaiting for node renderer at #{BASE_URL}..."
+  base_uri = URI.parse("http://#{BASE_URL}")
+  start_time = Time.now
+  timeout_sec = 60
+  loop do
+    # Try a simple TCP connection to check if server is up
+    Socket.tcp(base_uri.host, base_uri.port, connect_timeout: 5, &:close)
+    puts "  Node renderer is accepting connections"
+    break
+  rescue StandardError => e
+    elapsed = Time.now - start_time
+    puts "  Attempt at #{elapsed.round(2)}s: #{e.message}"
+    raise "Node renderer at #{BASE_URL} not responding within #{timeout_sec}s" if elapsed > timeout_sec
 
-  sleep 1
+    sleep 1
+  end
+
+  # Find and categorize bundles
+  puts "\nDiscovering and categorizing bundles..."
+  all_bundles = find_all_production_bundles
+  puts "Found #{all_bundles.length} production bundle(s)"
+  rsc_bundle, non_rsc_bundle = categorize_bundles(all_bundles)
+
+  rsc_tests = TEST_CASES.select { |tc| tc[:rsc] }
+  non_rsc_tests = TEST_CASES.reject { |tc| tc[:rsc] }
+
+  if rsc_tests.any? && rsc_bundle.nil?
+    skipped = rsc_tests.map { |tc| tc[:name] }.join(", ")
+    puts "Warning: RSC tests requested but no RSC bundle found, skipping: #{skipped}"
+    rsc_tests = []
+  end
+
+  if non_rsc_tests.any? && non_rsc_bundle.nil?
+    skipped = non_rsc_tests.map { |tc| tc[:name] }.join(", ")
+    puts "Warning: Non-RSC tests requested but no non-RSC bundle found, skipping: #{skipped}"
+    non_rsc_tests = []
+  end
+
+  # Print parameters
+  print_params(
+    "BASE_URL" => BASE_URL,
+    "RSC_BUNDLE" => rsc_bundle || "none",
+    "NON_RSC_BUNDLE" => non_rsc_bundle || "none",
+    "RATE" => RATE,
+    "DURATION" => DURATION,
+    "REQUEST_TIMEOUT" => REQUEST_TIMEOUT,
+    "CONNECTIONS" => CONNECTIONS,
+    "MAX_CONNECTIONS" => MAX_CONNECTIONS,
+    "RSC_TESTS" => rsc_tests.map { |tc| tc[:name] }.join(", ").then { |s| s.empty? ? "none" : s },
+    "NON_RSC_TESTS" => non_rsc_tests.map { |tc| tc[:name] }.join(", ").then { |s| s.empty? ? "none" : s }
+  )
+
+  # Create output directory
+  FileUtils.mkdir_p(OUTDIR)
+
+  # Initialize BMF collector for Bencher output
+  bmf_collector = BmfCollector.new(prefix: BMF_PREFIX)
+
+  # Initialize summary file
+  File.write(SUMMARY_TXT, "")
+  add_to_summary("Test", "Bundle", "RPS", "p50(ms)", "p90(ms)", "Status")
+
+  failed_tests = []
+  failed_tests.concat(run_vegeta_suite(non_rsc_tests, non_rsc_bundle, "non-RSC", bmf_collector))
+  failed_tests.concat(run_vegeta_suite(rsc_tests, rsc_bundle, "RSC", bmf_collector))
+
+  # Display summary
+  display_summary(SUMMARY_TXT)
+
+  # Write BMF JSON for Bencher (append to existing Pro results)
+  bmf_collector.write_bmf_json(BENCHMARK_JSON, append: true)
+
+  unless failed_tests.empty?
+    warn "::error::#{failed_tests.length} node renderer benchmark(s) failed: #{failed_tests.join(', ')}"
+    exit 1
+  end
 end
-
-# Find and categorize bundles
-puts "\nDiscovering and categorizing bundles..."
-all_bundles = find_all_production_bundles
-puts "Found #{all_bundles.length} production bundle(s)"
-rsc_bundle, non_rsc_bundle = categorize_bundles(all_bundles)
-
-rsc_tests = TEST_CASES.select { |tc| tc[:rsc] }
-non_rsc_tests = TEST_CASES.reject { |tc| tc[:rsc] }
-
-if rsc_tests.any? && rsc_bundle.nil?
-  puts "Warning: RSC tests requested but no RSC bundle found, skipping: #{rsc_tests.map { |tc| tc[:name] }.join(', ')}"
-  rsc_tests = []
-end
-
-if non_rsc_tests.any? && non_rsc_bundle.nil?
-  skipped = non_rsc_tests.map { |tc| tc[:name] }.join(", ")
-  puts "Warning: Non-RSC tests requested but no non-RSC bundle found, skipping: #{skipped}"
-  non_rsc_tests = []
-end
-
-# Print parameters
-print_params(
-  "BASE_URL" => BASE_URL,
-  "RSC_BUNDLE" => rsc_bundle || "none",
-  "NON_RSC_BUNDLE" => non_rsc_bundle || "none",
-  "RATE" => RATE,
-  "DURATION" => DURATION,
-  "REQUEST_TIMEOUT" => REQUEST_TIMEOUT,
-  "CONNECTIONS" => CONNECTIONS,
-  "MAX_CONNECTIONS" => MAX_CONNECTIONS,
-  "RSC_TESTS" => rsc_tests.map { |tc| tc[:name] }.join(", ").then { |s| s.empty? ? "none" : s },
-  "NON_RSC_TESTS" => non_rsc_tests.map { |tc| tc[:name] }.join(", ").then { |s| s.empty? ? "none" : s }
-)
-
-# Create output directory
-FileUtils.mkdir_p(OUTDIR)
-
-# Initialize BMF collector for Bencher output
-bmf_collector = BmfCollector.new(prefix: BMF_PREFIX)
-
-# Initialize summary file
-File.write(SUMMARY_TXT, "")
-add_to_summary("Test", "Bundle", "RPS", "p50(ms)", "p90(ms)", "Status")
-
-# Run non-RSC benchmarks
-non_rsc_tests.each do |test_case|
-  print_separator
-  puts "Benchmarking (non-RSC): #{test_case[:name]}"
-  puts "  Bundle: #{non_rsc_bundle}"
-  puts "  Request: #{test_case[:request]}"
-  print_separator
-
-  rps, p50, p90, status = run_vegeta_benchmark(test_case, non_rsc_bundle)
-  add_to_summary(test_case[:name], "non-RSC", rps, p50, p90, status)
-
-  # Add to BMF collector for Bencher output (p90 stays in the summary table only)
-  bmf_collector.add(name: "#{test_case[:name]} (non-RSC)", rps: rps, p50: p50, status: status)
-end
-
-# Run RSC benchmarks
-rsc_tests.each do |test_case|
-  print_separator
-  puts "Benchmarking (RSC): #{test_case[:name]}"
-  puts "  Bundle: #{rsc_bundle}"
-  puts "  Request: #{test_case[:request]}"
-  print_separator
-
-  rps, p50, p90, status = run_vegeta_benchmark(test_case, rsc_bundle)
-  add_to_summary(test_case[:name], "RSC", rps, p50, p90, status)
-
-  # Add to BMF collector for Bencher output (p90 stays in the summary table only)
-  bmf_collector.add(name: "#{test_case[:name]} (RSC)", rps: rps, p50: p50, status: status)
-end
-
-# Display summary
-display_summary(SUMMARY_TXT)
-
-# Write BMF JSON for Bencher (append to existing Pro results)
-bmf_collector.write_bmf_json(BENCHMARK_JSON, append: true)
