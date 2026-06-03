@@ -6,7 +6,10 @@ const DEFAULT_CLIENT_REFERENCES = [
   { directory: './client/app', recursive: true, include: /\.(js|ts|jsx|tsx)$/ },
 ];
 
-const DEFAULT_REFERENCES_JSON = path.resolve(__dirname, '../../ssr-generated/rsc-client-references.json');
+// Resolve relative to process.cwd() (the Rails root at webpack build time), matching the
+// generated template's `resolve('ssr-generated/rsc-client-references.json')` convention rather
+// than coupling to this file's location in the tree.
+const DEFAULT_REFERENCES_JSON = path.resolve('ssr-generated/rsc-client-references.json');
 const SERVER_COMPONENT_REGISTRATION_ENTRY = path.resolve(
   config.source_path,
   config.source_entry_path,

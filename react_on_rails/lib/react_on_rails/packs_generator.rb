@@ -300,6 +300,7 @@ module ReactOnRails
     end
 
     def create_server_pack(verbose: false)
+      ensure_nonentrypoints_directory! unless ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint
       File.write(generated_server_bundle_file_path, generated_server_pack_file_content)
 
       add_generated_pack_to_server_bundle
@@ -309,6 +310,7 @@ module ReactOnRails
     def create_server_component_registration_entry(verbose: false)
       return if server_component_registration_entries.empty?
 
+      ensure_nonentrypoints_directory!
       File.write(server_component_registration_entry_file_path, server_component_registration_entry_content)
       return unless verbose
 
@@ -380,7 +382,8 @@ module ReactOnRails
     end
 
     def server_component_registration_entry_content
-      imports = server_component_registration_entries.map do |name, component_path|
+      entries = server_component_registration_entries
+      imports = entries.map do |name, component_path|
         "import #{name} from '#{relative_path(server_component_registration_entry_file_path, component_path)}';"
       end
 
@@ -388,7 +391,7 @@ module ReactOnRails
         #{imports.join("\n")}
 
         import registerServerComponent from '#{react_on_rails_npm_package}/registerServerComponent/server';
-        registerServerComponent({#{server_component_registration_entries.keys.join(",\n")}});
+        registerServerComponent({#{entries.keys.join(",\n")}});
       FILE_CONTENT
     end
 
@@ -430,10 +433,16 @@ module ReactOnRails
 
     def generated_nonentrypoints_directory_path
       source_entrypoint_parent = Pathname(ReactOnRails::PackerUtils.packer_source_entry_path).parent
-      generated_nonentrypoints_path = "#{source_entrypoint_parent}/generated"
+      "#{source_entrypoint_parent}/generated"
+    end
 
-      FileUtils.mkdir_p(generated_nonentrypoints_path)
-      generated_nonentrypoints_path
+    # Creates the generated nonentrypoints directory. Kept separate from
+    # `generated_nonentrypoints_directory_path` so that read-only callers (staleness
+    # checks, cleanup enumeration in `build_expected_files_set`) can compute the path
+    # without the side effect of creating the directory. Call this only before writing
+    # a file into that directory.
+    def ensure_nonentrypoints_directory!
+      FileUtils.mkdir_p(generated_nonentrypoints_directory_path)
     end
 
     def clean_non_generated_files_with_feedback(verbose: false)

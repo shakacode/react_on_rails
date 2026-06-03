@@ -1666,6 +1666,42 @@ describe RscGenerator, type: :generator do
       expect(generator.send(:scoped_rsc_client_references_defined?, content)).to be(true)
     end
 
+    it "detects the generated manifest fallback even when the env-var/JSON marker strings change" do
+      # Detection is structural (the module-scope `fallbackRscClientReferences` literal), not
+      # coupled to the `RSC_MANIFEST_CLIENT_REFERENCES_JSON` / `rsc-client-references.json`
+      # template strings. Renaming those internals must not silently break re-run detection.
+      content = <<~JS
+        const fallbackRscClientReferences = {
+          directory: resolve(config.source_path),
+          recursive: true,
+          include: /.(js|ts|jsx|tsx)$/,
+        };
+
+        const rscClientReferences = (() => {
+          const configuredRefsJson = process.env.SOME_RENAMED_ENV_VAR;
+          const refsJson = configuredRefsJson || resolve('ssr-generated/renamed-refs.json');
+          return fallbackRscClientReferences;
+        })();
+      JS
+
+      expect(generator.send(:scoped_rsc_client_references_defined?, content)).to be(true)
+    end
+
+    it "does not detect a fully commented-out generated manifest block" do
+      content = <<~JS
+        // const fallbackRscClientReferences = {
+        //   directory: resolve(config.source_path),
+        // };
+        //
+        // const rscClientReferences = (() => {
+        //   return fallbackRscClientReferences;
+        // })();
+      JS
+
+      expect(generator.send(:rsc_client_references_defined?, content)).to be(false)
+      expect(generator.send(:scoped_rsc_client_references_defined?, content)).to be(false)
+    end
+
     it "detects a module-scope let rscClientReferences declaration" do
       content = <<~JS
         let rscClientReferences = {

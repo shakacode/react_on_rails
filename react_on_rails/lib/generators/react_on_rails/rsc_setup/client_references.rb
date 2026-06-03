@@ -1194,9 +1194,17 @@ module ReactOnRails
         end
 
         def generated_rsc_client_references_defined?(content)
+          # Detect the generated `const rscClientReferences = (() => { ... })()` form
+          # structurally rather than by substring-matching template internals such as the
+          # `RSC_MANIFEST_CLIENT_REFERENCES_JSON` env-var name or the `rsc-client-references.json`
+          # filename. Those `content.include?` guards would couple detection to implementation
+          # details — renaming either string would silently break detection without a failing
+          # test — while adding no safety: `scoped_object_literal_defined?` already requires a
+          # real, module-scope `fallbackRscClientReferences` object literal with
+          # `directory: resolve(config.source_path)` (the generator-specific signature), and the
+          # `rsc_client_references_defined?` precondition rejects commented-out blocks via its
+          # top-level-position regex.
           return false unless rsc_client_references_defined?(content)
-          return false unless content.include?("RSC_MANIFEST_CLIENT_REFERENCES_JSON")
-          return false unless content.include?("rsc-client-references.json")
 
           scoped_object_literal_defined?(content, "fallbackRscClientReferences")
         end
