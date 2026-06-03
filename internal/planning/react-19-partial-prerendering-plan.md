@@ -6,7 +6,9 @@ Track the work needed for [Issue 2182](https://github.com/shakacode/react_on_rai
 support and decide how React on Rails should expose any partial pre-rendering workflow that becomes practical for Rails
 apps.
 
-This is a planning document. It does not change package versions, build configuration, or Pro package code.
+This is a planning document for [Issue 2182](https://github.com/shakacode/react_on_rails/issues/2182). The one package
+change it has driven — the `react-on-rails-rsc` peer-ceiling widening — is captured in the Decision Record below; beyond
+that it does not change build configuration or Pro package code.
 
 **Status**: Draft | **Created**: 2026-04-30 | **Last updated**: 2026-06-03 | **Tracks**:
 [Issue 2182](https://github.com/shakacode/react_on_rails/issues/2182) and
