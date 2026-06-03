@@ -2,13 +2,27 @@ const fs = require('fs');
 const path = require('path');
 const { config } = require('shakapacker');
 
+// Resolves the RSC client-reference manifest for the client and server webpack builds.
+//
+// This intentionally mirrors the resolution contract the react_on_rails RSC setup generator emits
+// inline (`rsc_client_references_js` in
+// react_on_rails/lib/generators/react_on_rails/rsc_setup/client_references.rb). The shared contract
+// that must stay in sync on both sides:
+//   - override env var:   RSC_MANIFEST_CLIENT_REFERENCES_JSON
+//   - default manifest:   ssr-generated/rsc-client-references.json (resolved against the Rails root)
+//   - manifest shape:     { refs: [...] }, else throw "... to contain a refs array"
+//   - fallback ordering:  configured JSON -> default JSON -> (discovery/bundle-only build -> broad
+//     fallback) -> (registration entry present -> throw the precompile-hook hint) -> broad fallback
+//   - precompile hint:    "Run bin/shakapacker-precompile-hook before bin/shakapacker."
+// Both sides are pinned by contract tests (this file: tests/rsc-manifest-client-references.test.js;
+// the generator: spec/react_on_rails/generators/rsc_generator_spec.rb), so drift on either side
+// fails CI. The fallback `directory`/`include` below is intentionally app-specific.
 const DEFAULT_CLIENT_REFERENCES = [
-  { directory: './client/app', recursive: true, include: /\.(js|ts|jsx|tsx)$/ },
+  { directory: './client/app', recursive: true, include: /\.(js|mjs|cjs|ts|mts|cts|jsx|tsx)$/ },
 ];
 
-// Resolve relative to process.cwd() (the Rails root at webpack build time), matching the
-// generated template's `resolve('ssr-generated/rsc-client-references.json')` convention rather
-// than coupling to this file's location in the tree.
+// cwd-relative (the Rails root at webpack build time), matching the generated template's
+// `resolve('ssr-generated/rsc-client-references.json')` rather than coupling to this file's location.
 const DEFAULT_REFERENCES_JSON = path.resolve('ssr-generated/rsc-client-references.json');
 const SERVER_COMPONENT_REGISTRATION_ENTRY = path.resolve(
   config.source_path,

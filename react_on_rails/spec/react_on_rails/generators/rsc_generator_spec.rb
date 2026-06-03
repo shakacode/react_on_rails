@@ -2901,6 +2901,21 @@ describe RscGenerator, type: :generator do
       expect(GeneratorMessages.messages.join("\n"))
         .not_to include("all matching RSCWebpackPlugin instances already define clientReferences")
     end
+
+    it "emits the manifest resolution contract that the Pro dummy mirrors" do
+      # Keep these tokens in lockstep with the Pro dummy's hand-written mirror at
+      # react_on_rails_pro/spec/dummy/config/webpack/rscManifestClientReferences.js (pinned by
+      # tests/rsc-manifest-client-references.test.js). Drift on either side fails CI.
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content).to include("process.env.RSC_MANIFEST_CLIENT_REFERENCES_JSON")
+        expect(content).to include("ssr-generated/rsc-client-references.json")
+        expect(content).to include("RSC_REFERENCE_DISCOVERY_BUILD")
+        expect(content).to include("RSC_BUNDLE_ONLY")
+        expect(content).to include("Run bin/shakapacker-precompile-hook before bin/shakapacker.")
+        expect(content).to include("Array.isArray(payload.refs)")
+        expect(content).to include("to contain a refs array")
+      end
+    end
   end
 
   context "when an existing client RSC webpack config mixes custom and scoped client references" do
