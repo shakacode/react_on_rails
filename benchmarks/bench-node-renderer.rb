@@ -205,8 +205,12 @@ def run_vegeta_benchmark(test_case, bundle_timestamp)
 
   raise "Vegeta attack failed for #{name}" unless system(vegeta_cmd)
 
-  # Generate text report (display and save)
-  raise "Vegeta text report failed" unless system("vegeta report #{vegeta_bin} | tee #{vegeta_txt}")
+  # Generate text report (display and save). Run through bash with pipefail so a
+  # non-zero `vegeta report` exit is not masked by tee's (always-zero) status;
+  # the default /bin/sh on Linux CI is dash, which has no `set -o pipefail`.
+  unless system("bash", "-c", "set -o pipefail; vegeta report #{vegeta_bin} | tee #{vegeta_txt}")
+    raise "Vegeta text report failed"
+  end
 
   # Generate JSON report
   raise "Vegeta JSON report failed" unless system("vegeta report -type=json #{vegeta_bin} > #{vegeta_json}")
@@ -264,7 +268,7 @@ if __FILE__ == $PROGRAM_NAME
   validate_benchmark_config!
 
   # Check required tools
-  check_required_tools(%w[vegeta curl column tee])
+  check_required_tools(%w[vegeta curl column tee bash])
 
   # Wait for node renderer to be ready
   # Note: Node renderer only speaks HTTP/2, but we can still check with a simple GET

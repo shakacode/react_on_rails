@@ -41,6 +41,12 @@ def run_k6_benchmark(target, route_name)
   k6_summary_json = "#{OUTDIR}/#{route_name}_k6_summary.json"
   k6_txt = "#{OUTDIR}/#{route_name}_k6.txt"
 
+  # Drop any summary file left by a previous run for this route. k6 only writes
+  # the export on a clean finish, so without this a crashed/killed k6 could
+  # leave a stale file that parses into fabricated metrics even though this run
+  # failed (the pipefail guard below catches the non-zero exit).
+  FileUtils.rm_f(k6_summary_json)
+
   # Build k6 command with environment variables
   k6_env_vars = [
     "-e TARGET_URL=#{Shellwords.escape(target)}",
@@ -52,8 +58,14 @@ def run_k6_benchmark(target, route_name)
   ].join(" ")
 
   k6_command = "k6 run #{k6_env_vars} --summary-export=#{Shellwords.escape(k6_summary_json)} " \
-               "--summary-trend-stats 'med,p(90)' #{k6_script}"
-  raise "k6 benchmark failed" unless system("#{k6_command} | tee #{Shellwords.escape(k6_txt)}")
+               "--summary-trend-stats 'med,p(90)' #{Shellwords.escape(k6_script)}"
+  # Run through bash with pipefail so a non-zero k6 exit is not masked by tee's
+  # (always-zero) exit status. The default /bin/sh on Linux CI is dash, which
+  # has no `set -o pipefail`, so invoke bash explicitly. Without this a k6
+  # failure would slip past the rescue and ship fabricated metrics to Bencher.
+  unless system("bash", "-c", "set -o pipefail; #{k6_command} | tee #{Shellwords.escape(k6_txt)}")
+    raise "k6 benchmark failed"
+  end
 
   k6_data = parse_json_file(k6_summary_json, "k6")
   k6_rps = k6_data.dig("metrics", "iterations", "rate")&.round(2) || "MISSING"
@@ -145,7 +157,7 @@ if __FILE__ == $PROGRAM_NAME
   validate_benchmark_config!
 
   # Check required tools are installed
-  check_required_tools(%w[k6 column tee])
+  check_required_tools(%w[k6 column tee bash])
 
   puts <<~PARAMS
     Benchmark parameters:

@@ -30,6 +30,11 @@ RSpec.describe "bench" do
     before do
       # The human-readable summary file is a side effect covered by the workflow's
       # validate step; keep these specs focused on failure collection + payload.
+      #
+      # add_to_summary is a top-level `def`, which Ruby defines as a private
+      # method on Object. run_benchmark_suite calls it with an implicit receiver,
+      # so `self` resolves to this RSpec example instance — the same object the
+      # before/it blocks run on — and this stub intercepts the call.
       allow(self).to receive(:add_to_summary)
     end
 
@@ -56,17 +61,46 @@ RSpec.describe "bench" do
       expect(failed).to eq(["/bad"])
       # The routes after the failure still ran (no early abort).
       expect(collector.added.map { |m| m[:name] }).to eq(%w[/a /c])
+      # The failed route is recorded in the summary with FAILED placeholders and
+      # the error message — never numeric (fabricated) metrics.
+      expect(self).to have_received(:add_to_summary)
+        .with("/bad", "FAILED", "FAILED", "FAILED", "k6 benchmark failed")
     end
 
     it "keeps fabricated metrics out of the Bencher payload for failed routes" do
       runner = ->(_route) { raise "k6 benchmark failed" }
 
       failed = nil
+      # Pin both routes' ::error:: annotations (in order) rather than accepting
+      # any stderr output, so a dropped or reformatted annotation is caught.
       expect { failed = run_benchmark_suite(%w[/x /y], collector, runner: runner) }
-        .to output.to_stderr
+        .to output(%r{::error::.*/x.*::error::.*/y}m).to_stderr
 
       expect(failed).to eq(%w[/x /y])
       expect(collector.added).to be_empty
+    end
+  end
+
+  describe "#run_k6_benchmark" do
+    # Regression for #3459: the k6 summary command is piped through `tee`, whose
+    # always-zero exit status would otherwise mask a non-zero k6 exit. The
+    # pipeline must run under pipefail (via bash) and any stale summary file from
+    # a prior run must be removed first, so a k6 failure can never be parsed into
+    # fabricated Bencher metrics.
+    it "removes stale summaries, runs under pipefail, and raises without parsing on failure" do
+      allow(FileUtils).to receive(:rm_f)
+      # Model a failing k6 pipeline: with pipefail the bash invocation returns
+      # non-zero even though tee succeeds.
+      allow(self).to receive(:system).and_return(false)
+      allow(self).to receive(:parse_json_file)
+
+      expect { run_k6_benchmark("http://localhost:3001/x", "x") }
+        .to raise_error(/k6 benchmark failed/)
+
+      expect(FileUtils).to have_received(:rm_f).with(/_k6_summary\.json\z/)
+      expect(self).to have_received(:system)
+        .with("bash", "-c", a_string_matching(/\Aset -o pipefail; k6 run .* \| tee /))
+      expect(self).not_to have_received(:parse_json_file)
     end
   end
 end
