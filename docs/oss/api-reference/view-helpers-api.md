@@ -110,7 +110,7 @@ Why would you want to take over mounting yourself? One use case is code splittin
 
 Because a renderer function owns the React root it creates, React on Rails cannot unmount that root for you the way it does for the components it mounts itself. With [Turbo](https://turbo.hotwired.dev/) or Turbolinks, the page swaps without a full reload, so a renderer that never unmounts leaks its root (and any subscriptions or timers it holds) on every navigation.
 
-To opt in to cleanup, **return a teardown callback** — `() => void | Promise<void>`, or a promise resolving to one — from the renderer. React on Rails stores it and runs it when the mount is torn down: on Turbo/Turbolinks navigation (page unload) or when the same `domNodeId` node is replaced. Returning nothing keeps the previous (leaky) behavior, so existing renderers are unaffected.
+To opt in to cleanup, **return a teardown callback** — `() => void | Promise<void>`, or a promise resolving to one — from the renderer. React on Rails stores it and runs it when the mount is torn down: on Turbo/Turbolinks navigation (when the framework swaps in the next page) or when the same `domNodeId` node is replaced. Returning nothing keeps the previous (leaky) behavior, so existing renderers are unaffected.
 
 ```jsx
 import ReactDOMClient from 'react-dom/client';
@@ -122,20 +122,18 @@ const MyRenderer = (props, _railsContext, domNodeId) => {
     throw new Error(`Missing DOM element with id: ${domNodeId}`);
   }
 
-  // props.prerender is the Rails-set flag indicating the markup was server-rendered, so it must be
-  // hydrated rather than freshly rendered. This mirrors the in-tree renderers in spec/dummy.
-  let root;
-  if (props.prerender) {
-    root = ReactDOMClient.hydrateRoot(domNode, <MyComponent {...props} />);
-  } else {
-    root = ReactDOMClient.createRoot(domNode);
-    root.render(<MyComponent {...props} />);
-  }
+  // Renderer functions are client-only (see the note above), so the container holds no
+  // server-rendered markup — create a fresh root and render into it.
+  const root = ReactDOMClient.createRoot(domNode);
+  root.render(<MyComponent {...props} />);
 
   // Unmounted automatically on the next Turbo navigation (or same-id node replacement).
   return () => root.unmount();
 };
 ```
+
+> [!NOTE]
+> **Hydrating server-rendered markup?** `prerender` is not a prop React on Rails injects — the top-level `prerender:` render option only controls server rendering and is rejected for renderer functions (see the note above). If you render a component on the server with a **separate server bundle** (a server/client split) and want the client renderer to hydrate that markup, pass your own flag in the component's `props` and branch on it — e.g. `props: { ...props, prerender: true }`, as the `spec/dummy` renderers do — calling `ReactDOMClient.hydrateRoot(domNode, …)` instead of `createRoot`.
 
 Under the React 16/17 legacy API there is no root handle, so unmount by container node instead:
 
@@ -154,7 +152,7 @@ const MyLegacyRenderer = (props, _railsContext, domNodeId) => {
 ```
 
 > [!NOTE]
-> Synchronous teardowns are always honored. An **async** teardown is best-effort in the open-source package: if a navigation or node replacement happens before the renderer resolves its teardown, that still-pending teardown may be dropped (React on Rails logs a `console.error` when this happens, so the dropped teardown is diagnosable rather than silent). React on Rails Pro's client renderer awaits the renderer and handles this race reliably.
+> Synchronous teardowns are always honored. An **async** teardown is best-effort in the open-source package: if a navigation or node replacement happens before the renderer resolves its teardown, that still-pending teardown may be dropped. React on Rails logs a `console.error` when this happens — search for `resolved after its mount was removed` (the teardown was dropped) or `Error resolving renderer teardown` (the render promise rejected) — so the dropped teardown is diagnosable rather than silent. React on Rails Pro's client renderer awaits the renderer and handles this race reliably.
 
 ---
 
