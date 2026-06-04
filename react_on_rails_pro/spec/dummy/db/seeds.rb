@@ -1,48 +1,66 @@
 # frozen_string_literal: true
 
-# This file should contain all the record creation needed to seed the database with its default values.
-# The data can then be loaded with the rake db:seed (or created alongside the db with db:setup).
+# Seed data for the dummy app. The benchmark suite's `/posts_page` route renders
+# these records, and they are handy for local development too.
 #
-# Examples:
-#
-#   cities = City.create([{ name: 'Chicago' }, { name: 'Copenhagen' }])
-#   Mayor.create(name: 'Emanuel', city: cities.first)
+# This file is intentionally deterministic and free of the `faker` gem: it must
+# run under `RAILS_ENV=production` in CI (via `rails db:prepare`), where the
+# development/test-only `faker` gem is not loaded. Deterministic data also keeps
+# benchmark runs reproducible from one CI run to the next.
 
-# Clear existing data
+USER_COUNT = 10
+POSTS_PER_USER = 3..7
+COMMENTS_PER_POST = 2..5
+
+LOREM = %w[
+  lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor
+  incididunt ut labore et dolore magna aliqua enim ad minim veniam quis nostrud
+  exercitation ullamco laboris nisi aliquip ex ea commodo consequat duis aute
+  irure reprehenderit voluptate velit esse cillum fugiat nulla pariatur
+].freeze
+
+lorem_words = lambda do |count, offset|
+  Array.new(count) { |i| LOREM[(offset + i) % LOREM.size] }
+end
+lorem_sentence = ->(word_count, offset) { "#{lorem_words.call(word_count, offset).join(' ').capitalize}." }
+lorem_paragraph = lambda do |sentence_count, offset|
+  Array.new(sentence_count) { |i| lorem_sentence.call(6 + ((offset + i) % 6), offset + (i * 7)) }.join(" ")
+end
+
 puts "Clearing existing data..."
 Comment.delete_all
 Post.delete_all
 User.delete_all
 
-# Create Users
 puts "Creating users..."
-10.times do
-  User.create!(
-    name: Faker::Name.name,
-    email: Faker::Internet.unique.email
-  )
+users = Array.new(USER_COUNT) do |i|
+  User.create!(name: "User #{i + 1}", email: "user-#{i + 1}@example.com")
 end
 
-# Create Posts
 puts "Creating posts..."
-User.all.each do |user|
-  rand(3..7).times do
-    user.posts.create!(
-      title: Faker::Lorem.sentence(word_count: 3),
-      body: Faker::Lorem.paragraphs(number: 3).join("\n\n")
+posts = []
+users.each_with_index do |user, user_index|
+  post_count = POSTS_PER_USER.first + (user_index % POSTS_PER_USER.size)
+  post_count.times do |post_index|
+    seed = (user_index * 11) + post_index
+    posts << user.posts.create!(
+      title: lorem_sentence.call(3, seed),
+      body: Array.new(3) { |p| lorem_paragraph.call(4, seed + p) }.join("\n\n")
     )
   end
 end
 
-# Create Comments
 puts "Creating comments..."
-Post.all.each do |post|
-  rand(2..5).times do
+posts.each_with_index do |post, post_index|
+  comment_count = COMMENTS_PER_POST.first + (post_index % COMMENTS_PER_POST.size)
+  comment_count.times do |comment_index|
+    seed = (post_index * 7) + comment_index
     post.comments.create!(
-      user: User.all.sample,
-      body: Faker::Lorem.paragraph
+      user: users[seed % users.size],
+      body: lorem_paragraph.call(2, seed)
     )
   end
 end
 
-puts "Seed data created successfully!"
+puts "Seed data created successfully! " \
+     "(#{User.count} users, #{Post.count} posts, #{Comment.count} comments)"

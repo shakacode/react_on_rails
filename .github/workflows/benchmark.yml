@@ -387,6 +387,24 @@ jobs:
 
           echo "✅ Production assets built successfully"
 
+      - name: Prepare and seed benchmark database
+        # The Pro Rails suite serves DB-backed routes (e.g. /posts_page). Without
+        # a migrated + seeded database those routes 500 on every request (the
+        # `posts` table does not exist), so the benchmark must create and seed it
+        # before the server starts. `db:prepare` creates the database, loads the
+        # schema, and runs db/seeds.rb (which is deterministic and faker-free so
+        # it works under RAILS_ENV=production).
+        if: matrix.server_kind == 'rails' && matrix.pro_env == 'true'
+        working-directory: ${{ matrix.app_directory }}
+        env:
+          RAILS_ENV: production
+          NODE_ENV: production
+        run: |
+          set -e
+          echo "🌱 Preparing and seeding ${{ matrix.suite_name }} benchmark database..."
+          bundle exec rails db:prepare
+          echo "✅ Database prepared and seeded"
+
       - name: Start Pro node renderer
         if: matrix.server_kind == 'node-renderer'
         working-directory: ${{ matrix.app_directory }}
