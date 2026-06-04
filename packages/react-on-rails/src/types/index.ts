@@ -163,6 +163,10 @@ type RendererTeardown = () => void | Promise<void>;
  * What the 3-argument renderer form may return: nothing, or a {@link RendererTeardown} (sync or
  * async). Renderer functions own their DOM rendering/hydration, so unlike server-side
  * render-functions they do not return a component or HTML.
+ *
+ * Consumers discriminate this union at runtime by `typeof result === 'function'` (a teardown) vs.
+ * a thenable (an async renderer, awaited/adopted before re-checking) vs. anything else (no
+ * teardown). The `void` arm is therefore treated as "no teardown," same as `undefined`.
  */
 // `void` (not `undefined`) is required for the opt-out case: a renderer that returns nothing has
 // type `(...) => void`, and that stays assignable to `RenderFunction` only while `void` is part of
@@ -175,11 +179,13 @@ type RendererResult = void | RendererTeardown | Promise<void | RendererTeardown>
 /**
  * The precise call signature of the 3-argument "renderer" form `(props, railsContext, domNodeId) =>
  * …`. A renderer owns its own mount and returns a {@link RendererResult} (nothing, a teardown, or a
- * promise resolving to one). The client renderers cast a registered component to this — rather than
- * the public {@link RenderFunction}, whose single signature has optional params and a union return
- * type spanning both the renderer and server render-function shapes — to narrow the call result to
- * RendererResult with no value-level cast. Shared by the core and Pro client renderers so the two
- * cannot drift.
+ * promise resolving to one). The client renderers assert a registered component to this shape —
+ * rather than the public {@link RenderFunction}, whose single signature has optional params and a
+ * union return type spanning both the renderer and server render-function shapes — so the call
+ * result reads as a RendererResult directly. Because `RenderFunction` is not assignable to
+ * `RendererFunction`, `as RendererFunction` is a widening assertion guarded by the runtime
+ * `isRenderer` invariant, not a sound narrowing. Shared by the core and Pro client renderers so the
+ * two cannot drift.
  */
 type RendererFunction = (
   props?: Record<string, unknown>,

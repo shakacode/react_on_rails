@@ -99,6 +99,10 @@ function domNodeIdForEl(el: Element): string {
   return el.getAttribute('data-dom-id') || '';
 }
 
+// Result of attempting renderer delegation. Core carries the raw RendererResult (which may still be
+// a pending promise) because renderElement is synchronous and defers async-teardown handling to
+// trackRendererMount. The Pro renderer has its own DelegationResult that instead pre-resolves to a
+// teardown (it can await the renderer); the two intentionally differ and are not meant to be unified.
 type DelegationResult = { delegated: false } | { delegated: true; result: RendererResult };
 
 function delegateToRenderer(
@@ -121,11 +125,13 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
     }
 
     // Call the renderer function with the expected signature. A renderer owns its own mount and
-    // returns a RendererResult: nothing, a teardown callback, or a promise resolving to one. We cast
-    // to the shared `RendererFunction` (the precise 3-arg shape) rather than the public
-    // `RenderFunction`, whose single signature has optional params and a union return type covering
-    // both the renderer and server render-function shapes; here `isRenderer` is known true, so the
-    // result is a RendererResult with no further cast.
+    // returns a RendererResult: nothing, a teardown callback, or a promise resolving to one.
+    // `component` is typed as the public `RenderFunction` (optional params, a return union spanning
+    // both the renderer and server render-function shapes), which is NOT assignable to the narrower
+    // `RendererFunction`. So `as RendererFunction` is a deliberate widening assertion, not a sound
+    // narrowing — it is justified by the runtime `isRenderer` invariant (the registry only sets it
+    // for a 3-arg render function), which the type system cannot express. Asserting the precise
+    // shape here lets us read the call result as a RendererResult without a second cast.
     const result = (component as RendererFunction)(props, railsContext, domNodeId);
     return { delegated: true, result };
   }
@@ -141,11 +147,12 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
  * Known limitation (core package): if the mount is unmounted or its node is replaced *before* an
  * async renderer resolves its teardown, the still-pending teardown is dropped and that one mount
  * leaks — the resolved teardown is discarded because the entry is no longer the active mount for
- * this id (the `renderedRoots.get(domNodeId) === entry` guard below). The drop is logged via
- * `console.error` so it is diagnosable rather than silent. Synchronous teardowns are unaffected.
- * The Pro client renderer (`react-on-rails-pro`) awaits the renderer and re-checks the
- * unmount state, so it runs the teardown even when a navigation races the resolve; prefer Pro if you
- * depend on async renderer teardowns surviving fast navigations.
+ * this id (the `renderedRoots.get(domNodeId) === entry` guard below). The drop is an expected,
+ * documented outcome rather than a failure, so it is surfaced via `console.warn` (not `console.error`)
+ * so it is diagnosable rather than silent. Synchronous teardowns are unaffected. The Pro client
+ * renderer (`react-on-rails-pro`) awaits the renderer and re-checks the unmount state, so it runs the
+ * teardown even when a navigation races the resolve; prefer Pro if you depend on async renderer
+ * teardowns surviving fast navigations.
  */
 function trackRendererMount(domNodeId: string, domNode: Element, result: RendererResult): void {
   const entry: RenderedEntry = { kind: 'renderer', domNode, teardown: undefined };
@@ -163,9 +170,10 @@ function trackRendererMount(domNodeId: string, domNode: Element, result: Rendere
         } else {
           // The mount was unmounted or its node replaced before this async teardown resolved, so the
           // entry is no longer the active mount and the teardown can't be attached — it is dropped
-          // and that one mount may leak on cleanup. Log it (rather than dropping silently) so the
-          // documented limitation above is diagnosable in production. Pro avoids this race entirely.
-          console.error(
+          // and that one mount may leak on cleanup. This is the expected, documented best-effort
+          // limitation (not a failure), so warn (rather than dropping silently or erroring) to keep
+          // it diagnosable in production. Pro avoids this race entirely.
+          console.warn(
             `Renderer teardown for dom node "${domNodeId}" resolved after its mount was removed; ` +
               'the teardown was dropped and that mount may leak on cleanup.',
           );

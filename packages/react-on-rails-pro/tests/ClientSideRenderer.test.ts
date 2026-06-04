@@ -501,4 +501,53 @@ describe('ClientSideRenderer', () => {
     );
     consoleErrorSpy.mockRestore();
   });
+
+  // Symmetry with the core suite's React-root cleanup test: a normal (non-renderer) component mounts
+  // a React root that React on Rails owns, so page unload must unmount that root. The default
+  // reactHydrateOrRender mock returns undefined, so inject a root whose unmount we can assert on —
+  // otherwise a regression dropping `this.root.unmount()` for non-renderer mounts would go unnoticed.
+  it('unmounts the framework-created React root on page unload (non-renderer mount)', async () => {
+    const rootUnmount = jest.fn();
+    mockReactHydrateOrRender.mockReturnValueOnce({ render: jest.fn(), unmount: rootUnmount });
+    ComponentRegistry.register({
+      TestComponent: ({ greeting }: { greeting: string }) => React.createElement('div', null, greeting),
+    });
+    const componentSpec = setupTestComponentDom('dom-id-root-unmount');
+    addRailsContext();
+
+    await renderOrHydrateComponent(componentSpec);
+    expect(mockReactHydrateOrRender).toHaveBeenCalledTimes(1);
+    expect(rootUnmount).not.toHaveBeenCalled();
+
+    unmountAll();
+    expect(rootUnmount).toHaveBeenCalledTimes(1);
+  });
+
+  // Complements the no-teardown renderer test: a renderer that opts out of cleanup still owns its own
+  // mount, so unmount() must take the renderer-owned path and NOT unmount a React root (it never
+  // created one). With the default mock, a non-renderer mount would set `this.root`; a renderer mount
+  // must leave it unset, so no root-unmount can fire here.
+  it('does not unmount a React root for a renderer mount that returns no teardown', async () => {
+    const rootUnmount = jest.fn();
+    // If the renderer path were mistaken for a React-root mount, this root would be captured and
+    // unmounted on page unload. It must not be, because renderers are delegated before any root is
+    // created.
+    mockReactHydrateOrRender.mockReturnValue({ render: jest.fn(), unmount: rootUnmount });
+    const TestRenderer: RenderFunction = (
+      _props?: Record<string, unknown>,
+      _railsContext?: RailsContext,
+      _domNodeId?: string,
+    ) => {
+      // Legacy renderer that does not opt into cleanup.
+    };
+    ComponentRegistry.register({ TestComponent: TestRenderer });
+    const componentSpec = setupTestComponentDom('dom-id-renderer-no-root');
+    addRailsContext();
+
+    await renderOrHydrateComponent(componentSpec);
+    expect(mockReactHydrateOrRender).not.toHaveBeenCalled();
+
+    expect(() => unmountAll()).not.toThrow();
+    expect(rootUnmount).not.toHaveBeenCalled();
+  });
 });

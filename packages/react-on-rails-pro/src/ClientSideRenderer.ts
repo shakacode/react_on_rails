@@ -63,6 +63,10 @@ function invokeRendererTeardown(teardown: RendererTeardown | undefined, domNodeI
   }
 }
 
+// Result of attempting renderer delegation. Pro awaits the renderer inside delegateToRenderer, so it
+// pre-resolves to an optional teardown. The core renderer has its own DelegationResult that instead
+// carries the raw (possibly still-pending) RendererResult because it cannot await; the two
+// intentionally differ and are not meant to be unified.
 type DelegationResult = { delegated: false } | { delegated: true; teardown?: RendererTeardown };
 
 async function delegateToRenderer(
@@ -84,8 +88,11 @@ async function delegateToRenderer(
     }
 
     // The renderer owns its own mount and may return a teardown callback so we can clean it up on
-    // unmount (Turbo/Turbolinks navigation). `result` is `void | RendererTeardown`, so a `function`
-    // check narrows to the teardown with no cast.
+    // unmount (Turbo/Turbolinks navigation). `component` is the public `RenderFunction`, which is
+    // not assignable to the narrower `RendererFunction`, so `as RendererFunction` is a widening
+    // assertion guarded by the runtime `isRenderer` invariant (not a sound narrowing). The awaited
+    // `result` is then `void | RendererTeardown`, so a `typeof === 'function'` check picks out the
+    // teardown with no further cast.
     const result = await (component as RendererFunction)(props, railsContext, domNodeId);
     return {
       delegated: true,
@@ -111,7 +118,14 @@ class ComponentRenderer {
 
   private root?: Root;
 
-  // Set when this mount was delegated to a renderer function that returned a teardown callback.
+  // True once this mount was delegated to a renderer function (3-arg form), which owns its own
+  // React root. Tracked separately from `rendererTeardown` because a renderer may own the mount yet
+  // return no teardown: in that case unmount() must still skip the React-root cleanup below (we
+  // never created that root), matching the core client renderer rather than calling
+  // unmountComponentAtNode on a node the renderer owns.
+  private rendererOwnedMount = false;
+
+  // Set when a renderer-owned mount returned a teardown callback; run on unmount.
   private rendererTeardown?: RendererTeardown;
 
   private renderPromise?: Promise<void>;
@@ -178,10 +192,10 @@ class ComponentRenderer {
             try {
               invokeRendererTeardown(delegation.teardown, domNodeId);
             } catch (teardownError: unknown) {
-              const error = teardownError instanceof Error ? teardownError : new Error('Unknown error');
-              console.error(`Error in renderer teardown for dom node "${domNodeId}":`, error);
+              console.error(`Error in renderer teardown for dom node "${domNodeId}":`, teardownError);
             }
           } else {
+            this.rendererOwnedMount = true;
             this.rendererTeardown = delegation.teardown;
             this.state = 'rendered';
           }
@@ -245,16 +259,19 @@ You should return a React.Component always for the client side entry point.`);
     }
     this.state = 'unmounted';
 
-    if (this.rendererTeardown) {
-      // This mount was owned by a renderer function; run its teardown instead of unmounting a
-      // React root we never created.
+    if (this.rendererOwnedMount) {
+      // This mount was owned by a renderer function (3-arg form), so React on Rails never created a
+      // React root for it. Run the teardown the renderer returned (if any) instead of unmounting a
+      // root we don't own; a renderer that returned no teardown is a no-op here. This deliberately
+      // skips the React-root / unmountComponentAtNode path below so we never touch a node the
+      // renderer owns, matching the core client renderer.
       const { rendererTeardown } = this;
+      this.rendererOwnedMount = false;
       this.rendererTeardown = undefined;
       try {
         invokeRendererTeardown(rendererTeardown, this.domNodeId);
       } catch (e: unknown) {
-        const error = e instanceof Error ? e : new Error('Unknown error');
-        console.error(`Error in renderer teardown for dom node "${this.domNodeId}":`, error);
+        console.error(`Error in renderer teardown for dom node "${this.domNodeId}":`, e);
       }
       return;
     }

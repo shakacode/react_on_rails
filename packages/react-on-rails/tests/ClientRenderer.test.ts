@@ -329,7 +329,7 @@ describe('ClientRenderer', () => {
       // Documents the core best-effort limitation (Pro handles this race): the first mount's async
       // teardown resolves only after the same-id node has been replaced, so it must NOT be attached
       // to or run against the new mount.
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
       const resolvers: Array<(teardown: () => void) => void> = [];
       const renderer = jest.fn();
       const AsyncRenderer: RenderFunction = (_props, _railsContext, _domNodeId) => {
@@ -358,19 +358,20 @@ describe('ClientRenderer', () => {
       await Promise.resolve();
 
       // The stale teardown was not attached to the replaced mount, so cleanup never runs it. The
-      // drop is logged (not silent) so the documented limitation is diagnosable.
+      // drop is a documented best-effort limitation, surfaced via console.warn (not console.error)
+      // so it stays diagnosable.
       unmountAllComponents();
       expect(staleTeardown).not.toHaveBeenCalled();
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
         expect.stringContaining('resolved after its mount was removed'),
       );
-      consoleErrorSpy.mockRestore();
+      consoleWarnSpy.mockRestore();
     });
 
-    it('drops and logs an async teardown when unmount races the renderer resolving', async () => {
+    it('drops and warns about an async teardown when unmount races the renderer resolving', async () => {
       // Complements the happy-path async test above: here unmountAllComponents() fires BEFORE the
       // renderer's promise resolves, which is the actual race the core package cannot win (Pro does).
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
       const teardown = jest.fn();
       const TestRenderer: RenderFunction = (_props, _railsContext, _domNodeId) => Promise.resolve(teardown);
       ComponentRegistry.register({ TestRenderer });
@@ -384,10 +385,10 @@ describe('ClientRenderer', () => {
       await Promise.resolve();
 
       expect(teardown).not.toHaveBeenCalled();
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
         expect.stringContaining('resolved after its mount was removed'),
       );
-      consoleErrorSpy.mockRestore();
+      consoleWarnSpy.mockRestore();
     });
 
     it('logs (and does not rethrow) when an async renderer rejects before returning a teardown', async () => {
@@ -412,6 +413,67 @@ describe('ClientRenderer', () => {
         rejection,
       );
       consoleErrorSpy.mockRestore();
+    });
+
+    it('logs the failure but still re-renders when the previous teardown throws on node replacement', () => {
+      // Covers the replaced-node catch in renderElement: a teardown that throws synchronously during
+      // replacement is logged with the renderer label, and the new node is still rendered.
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const renderer = jest.fn();
+      const throwingTeardown = jest.fn(() => {
+        throw new Error('teardown boom');
+      });
+      const TestRenderer: RenderFunction = (_props, _railsContext, _domNodeId) => {
+        renderer();
+        return throwingTeardown;
+      };
+      ComponentRegistry.register({ TestRenderer });
+      const targetNode1 = setupRendererDom('renderer-replace-throws');
+
+      renderComponent('renderer-replace-throws');
+      expect(renderer).toHaveBeenCalledTimes(1);
+
+      // Replace the node and re-render the same id; the old teardown throws during cleanup.
+      targetNode1.remove();
+      const targetNode2 = document.createElement('div');
+      targetNode2.id = 'renderer-replace-throws';
+      document.body.appendChild(targetNode2);
+
+      expect(() => renderComponent('renderer-replace-throws')).not.toThrow();
+
+      expect(throwingTeardown).toHaveBeenCalledTimes(1);
+      // The new node was still rendered despite the cleanup failure.
+      expect(renderer).toHaveBeenCalledTimes(2);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error in renderer teardown for dom node "renderer-replace-throws":',
+        expect.any(Error),
+      );
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('captures a teardown returned via a non-native thenable', async () => {
+      // Exercises the isThenable branch with a thenable that is NOT a native Promise — the case the
+      // `Promise.resolve(result).then(...)` wrap exists for (a custom thenable may lack the chaining
+      // helpers a native Promise has). Cast the thenable to Promise so it satisfies RendererResult;
+      // at runtime trackRendererMount detects it via isThenable and adopts it with Promise.resolve.
+      const teardown = jest.fn();
+      const TestRenderer: RenderFunction = (_props, _railsContext, _domNodeId) =>
+        ({
+          then(onFulfilled: (value: () => void) => void) {
+            onFulfilled(teardown);
+          },
+        }) as unknown as Promise<() => void>;
+      ComponentRegistry.register({ TestRenderer });
+      setupRendererDom('renderer-thenable');
+
+      renderComponent('renderer-thenable');
+      // Flush microtasks so Promise.resolve(thenable) adopts the thenable and captures the teardown.
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+
+      unmountAllComponents();
+      expect(teardown).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -611,6 +673,47 @@ describe('ClientRenderer', () => {
 
       unmountAllComponents();
       expect(rootUnmount).toHaveBeenCalledTimes(1);
+    });
+
+    it('unmounts the previous React root when the same dom id node is replaced', () => {
+      // The renderer suite covers teardown-on-replacement; this covers the `kind: 'react'` arm of
+      // teardownEntry on the replacement path. The default reactHydrateOrRender mock returns
+      // undefined, so inject a root with an unmount spy — otherwise a regression dropping the
+      // old-root unmount on replacement (re-introducing the original leak for React-root mounts)
+      // would pass unnoticed.
+      const TestComponent: React.FC<{ message: string }> = ({ message }) =>
+        React.createElement('div', null, `Hello, ${message}!`);
+      ComponentRegistry.register({ TestComponent });
+
+      const componentElement = document.createElement('div');
+      componentElement.className = 'js-react-on-rails-component';
+      componentElement.setAttribute('data-component-name', 'TestComponent');
+      componentElement.setAttribute('data-dom-id', 'root-replace');
+      componentElement.textContent = JSON.stringify({ message: 'World' });
+      document.body.appendChild(componentElement);
+
+      const targetNode1 = document.createElement('div');
+      targetNode1.id = 'root-replace';
+      document.body.appendChild(targetNode1);
+
+      const rootUnmount = jest.fn();
+      const mockHydrateOrRender = require('../src/reactHydrateOrRender.ts').default as jest.Mock;
+      mockHydrateOrRender.mockReturnValue({ render: jest.fn(), unmount: rootUnmount });
+
+      renderComponent('root-replace');
+      expect(rootUnmount).not.toHaveBeenCalled();
+
+      // Replace the dom node (e.g. async HTML injection) and re-render the same id.
+      targetNode1.remove();
+      const targetNode2 = document.createElement('div');
+      targetNode2.id = 'root-replace';
+      document.body.appendChild(targetNode2);
+
+      renderComponent('root-replace');
+
+      // The old root was unmounted during replacement, and a new root was created for the new node.
+      expect(rootUnmount).toHaveBeenCalledTimes(1);
+      expect(mockHydrateOrRender).toHaveBeenCalledTimes(2);
     });
   });
 });
