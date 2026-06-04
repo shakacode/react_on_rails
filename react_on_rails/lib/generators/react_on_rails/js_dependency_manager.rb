@@ -149,7 +149,7 @@ module ReactOnRails
       # exported from 19.0.5 onward. This RC is backward-compatible for webpack projects (it still
       # exports `react-on-rails-rsc/WebpackPlugin`). Bump to the stable "19.0.5" once it is published
       # (tracked in https://github.com/shakacode/react_on_rails/issues/3488).
-      RSC_PACKAGE_VERSION_PIN = "19.0.5-rc.5"
+      RSC_PACKAGE_VERSION_PIN = "19.0.5-rc.6"
 
       private
 
