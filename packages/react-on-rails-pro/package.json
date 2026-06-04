@@ -69,6 +69,7 @@
   "dependencies": {
     "react-on-rails": "workspace:*"
   },
+  "//": "TODO: Remove the react-on-rails-rsc prerelease peer OR-clause and restore a caret devDependency after 19.0.5 stable ships.",
   "peerDependencies": {
     "react": ">= 16",
     "react-dom": ">= 16",
