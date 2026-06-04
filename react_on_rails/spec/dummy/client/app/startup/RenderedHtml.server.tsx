@@ -1,7 +1,9 @@
 // Top level component for simple client side only rendering
 import React from 'react';
 import { renderToString } from 'react-dom/server';
-import EchoProps from '../components/EchoProps';
+import type { RailsContext, RenderFunction, ServerRenderResult } from 'react-on-rails/types';
+
+import EchoProps, { type EchoPropsProps } from '../components/EchoProps';
 
 /*
  *  Export a function that takes the props and returns an object with { renderedHtml }
@@ -13,7 +15,14 @@ import EchoProps from '../components/EchoProps';
  *  And the use of renderToString would probably be done with React Router v4
  *
  */
-export default (props, _railsContext) => {
-  const renderedHtml = renderToString(<EchoProps {...props} />);
+const RenderedHtml = (
+  props: EchoPropsProps | undefined,
+  _railsContext?: RailsContext,
+): ServerRenderResult => {
+  const renderedHtml = renderToString(<EchoProps {...(props ?? {})} />);
   return { renderedHtml };
 };
+
+const renderFunction: RenderFunction = RenderedHtml;
+
+export default renderFunction;
