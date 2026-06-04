@@ -2917,6 +2917,10 @@ describe RscGenerator, type: :generator do
         expect(content).to include("to contain a refs array")
         # The configured override is path-resolved on both sides (mirror parity).
         expect(content).to include("resolve(configuredRefsJson)")
+        # A configured override that does not exist throws a clear error (mirror parity).
+        expect(content).to include("RSC_MANIFEST_CLIENT_REFERENCES_JSON is set but the file does not exist")
+        # Malformed manifest JSON is re-thrown with the file path (mirror parity).
+        expect(content).to include("Failed to parse RSC client references manifest")
         # Best-effort staleness warning: manifest older than the registration entry -> console.warn.
         expect(content).to include("statSync")
         expect(content).to include("may be stale")

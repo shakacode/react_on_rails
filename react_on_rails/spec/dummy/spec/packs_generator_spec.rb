@@ -476,8 +476,7 @@ module ReactOnRails
             import ReactServerComponentWithClientAndServer from '../components/ReactServerComponents/ror_components/ReactServerComponentWithClientAndServer.server.jsx';
 
             import registerServerComponent from 'react-on-rails-pro/registerServerComponent/server';
-            registerServerComponent({ReactServerComponent,
-            ReactServerComponentWithClientAndServer});
+            registerServerComponent({ ReactServerComponent, ReactServerComponentWithClientAndServer });
           CONTENT
 
           expect(generated_entry_content.strip).to eq(expected_content.strip)

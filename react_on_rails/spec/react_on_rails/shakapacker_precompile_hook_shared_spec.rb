@@ -28,21 +28,21 @@ RSpec.describe "Shakapacker precompile hook shared script" do
     expect(self).to have_received(:generate_rsc_manifest_client_references_if_needed)
   end
 
-  describe "rsc_manifest_registration_entry_path?" do
+  describe "valid_rsc_registration_entry_path?" do
     it "rejects registration entries under node_modules, public, or tmp" do
-      expect(rsc_manifest_registration_entry_path?(
+      expect(valid_rsc_registration_entry_path?(
                "/app/node_modules/pkg/client/generated/server-component-registration-entry.js"
              )).to be(false)
-      expect(rsc_manifest_registration_entry_path?(
+      expect(valid_rsc_registration_entry_path?(
                "/app/public/packs/generated/server-component-registration-entry.js"
              )).to be(false)
-      expect(rsc_manifest_registration_entry_path?(
+      expect(valid_rsc_registration_entry_path?(
                "/app/tmp/cache/generated/server-component-registration-entry.js"
              )).to be(false)
     end
 
     it "accepts a registration entry under the app source tree" do
-      expect(rsc_manifest_registration_entry_path?(
+      expect(valid_rsc_registration_entry_path?(
                "/app/client/app/generated/server-component-registration-entry.js"
              )).to be(true)
     end

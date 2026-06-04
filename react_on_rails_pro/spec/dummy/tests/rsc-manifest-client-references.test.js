@@ -46,6 +46,7 @@ describe('rscManifestClientReferences (Pro dummy) mirrors the generator resoluti
 
   it('reads the RSC_MANIFEST_CLIENT_REFERENCES_JSON override when set', () => {
     process.env.RSC_MANIFEST_CLIENT_REFERENCES_JSON = 'tmp/custom-refs.json';
+    fs.existsSync.mockReturnValue(true);
     fs.readFileSync.mockReturnValue(JSON.stringify({ refs: ['client/app/A.jsx'] }));
 
     expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx']);
@@ -65,6 +66,13 @@ describe('rscManifestClientReferences (Pro dummy) mirrors the generator resoluti
     fs.readFileSync.mockReturnValue(JSON.stringify({ notRefs: true }));
 
     expect(() => rscManifestClientReferences()).toThrow(/to contain a refs array/);
+  });
+
+  it('throws with the manifest path when the manifest JSON is malformed', () => {
+    fs.existsSync.mockImplementation((p) => p === DEFAULT_MANIFEST);
+    fs.readFileSync.mockReturnValue('{ not valid json');
+
+    expect(() => rscManifestClientReferences()).toThrow(/Failed to parse RSC client references manifest/);
   });
 
   it('falls back to a broad scan during a discovery build with no manifest', () => {
@@ -88,13 +96,13 @@ describe('rscManifestClientReferences (Pro dummy) mirrors the generator resoluti
     expect(refs[0]).toMatchObject({ directory: './client/app', recursive: true });
   });
 
-  it('lets a missing configured override file throw loudly rather than silently falling back', () => {
+  it('throws a clear error when the configured override file does not exist', () => {
     process.env.RSC_MANIFEST_CLIENT_REFERENCES_JSON = 'tmp/does-not-exist.json';
-    fs.readFileSync.mockImplementation(() => {
-      throw Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' });
-    });
+    fs.existsSync.mockReturnValue(false);
 
-    expect(() => rscManifestClientReferences()).toThrow(/ENOENT/);
+    expect(() => rscManifestClientReferences()).toThrow(
+      /RSC_MANIFEST_CLIENT_REFERENCES_JSON is set but the file does not exist/,
+    );
   });
 
   it('throws the precompile-hook hint when the registration entry exists but the manifest is missing', () => {

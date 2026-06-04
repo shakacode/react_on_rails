@@ -129,13 +129,13 @@ rescue StandardError => e
   exit 1
 end
 
-def rsc_manifest_registration_entry_path?(path)
+def valid_rsc_registration_entry_path?(path)
   EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_SEGMENTS.none? { |segment| path.include?(segment) }
 end
 
 def rsc_manifest_registration_entry(rails_root)
   Dir.glob(File.join(rails_root, "**", "generated", "server-component-registration-entry.js")).find do |path|
-    rsc_manifest_registration_entry_path?(path)
+    valid_rsc_registration_entry_path?(path)
   end
 end
 

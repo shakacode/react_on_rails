@@ -378,7 +378,14 @@ module ReactOnRails
     end
 
     def server_component_registration_entries
-      components_for_server_registration.slice(*server_component_names_for_registration)
+      return {} unless ReactOnRails::Utils.rsc_support_enabled?
+
+      # Compute the component map once. Calling server_component_names_for_registration here would
+      # re-run components_for_server_registration (and its un-memoized Dir.glob scans) a second time;
+      # this method runs on the per-request dev staleness check, so the duplicate scan is wasteful.
+      components = components_for_server_registration
+      server_component_names = components.keys.reject { |name| client_entrypoint?(components[name]) }
+      components.slice(*server_component_names)
     end
 
     def server_component_registration_entry_content
@@ -391,7 +398,7 @@ module ReactOnRails
         #{imports.join("\n")}
 
         import registerServerComponent from '#{react_on_rails_npm_package}/registerServerComponent/server';
-        registerServerComponent({#{entries.keys.join(",\n")}});
+        registerServerComponent({ #{entries.keys.join(', ')} });
       FILE_CONTENT
     end
 

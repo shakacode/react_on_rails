@@ -54,7 +54,12 @@ module ReactOnRails
               );
 
               const readManifestReferences = (refsJson) => {
-                const payload = JSON.parse(readFileSync(refsJson, 'utf8'));
+                let payload;
+                try {
+                  payload = JSON.parse(readFileSync(refsJson, 'utf8'));
+                } catch (err) {
+                  throw new Error(`Failed to parse RSC client references manifest ${refsJson}: ${err.message}`);
+                }
                 if (!Array.isArray(payload.refs)) {
                   throw new Error(`Expected ${refsJson} to contain a refs array`);
                 }
@@ -63,7 +68,13 @@ module ReactOnRails
               };
 
               if (configuredRefsJson) {
-                return readManifestReferences(resolve(configuredRefsJson));
+                const resolvedRefsJson = resolve(configuredRefsJson);
+                if (!existsSync(resolvedRefsJson)) {
+                  throw new Error(
+                    `RSC_MANIFEST_CLIENT_REFERENCES_JSON is set but the file does not exist: ${resolvedRefsJson}`,
+                  );
+                }
+                return readManifestReferences(resolvedRefsJson);
               }
 
               if (existsSync(defaultRefsJson)) {

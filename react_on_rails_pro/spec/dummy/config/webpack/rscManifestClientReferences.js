@@ -8,9 +8,11 @@ const { config } = require('shakapacker');
 // setup generator emits inline (`rsc_client_references_js` in
 // react_on_rails/lib/generators/react_on_rails/rsc_setup/client_references.rb). The shared contract
 // that must stay in sync on both sides:
-//   - override env var:   RSC_MANIFEST_CLIENT_REFERENCES_JSON (path.resolve'd, then read)
+//   - override env var:   RSC_MANIFEST_CLIENT_REFERENCES_JSON (path.resolve'd; must exist, else throw
+//     "... is set but the file does not exist", then read)
 //   - default manifest:   ssr-generated/rsc-client-references.json (resolved against the Rails root)
 //   - manifest shape:     { refs: [...] }, else throw "... to contain a refs array"
+//   - parse errors:       malformed JSON re-thrown as "Failed to parse RSC client references manifest ..."
 //   - fallback ordering:  configured JSON -> default JSON -> (discovery/bundle-only build -> broad
 //     fallback) -> (registration entry present -> throw the precompile-hook hint) -> broad fallback
 //   - staleness warning:  default manifest older than the registration entry -> console.warn (non-fatal)
@@ -42,7 +44,12 @@ const SERVER_COMPONENT_REGISTRATION_ENTRY = path.resolve(
 );
 
 function readManifestReferences(refsJson) {
-  const payload = JSON.parse(fs.readFileSync(refsJson, 'utf8'));
+  let payload;
+  try {
+    payload = JSON.parse(fs.readFileSync(refsJson, 'utf8'));
+  } catch (err) {
+    throw new Error(`Failed to parse RSC client references manifest ${refsJson}: ${err.message}`);
+  }
   if (!Array.isArray(payload.refs)) {
     throw new Error(`Expected ${refsJson} to contain a refs array`);
   }
@@ -70,7 +77,13 @@ function warnIfManifestStale() {
 function rscManifestClientReferences() {
   const configuredRefsJson = process.env.RSC_MANIFEST_CLIENT_REFERENCES_JSON;
   if (configuredRefsJson) {
-    return readManifestReferences(path.resolve(configuredRefsJson));
+    const resolvedRefsJson = path.resolve(configuredRefsJson);
+    if (!fs.existsSync(resolvedRefsJson)) {
+      throw new Error(
+        `RSC_MANIFEST_CLIENT_REFERENCES_JSON is set but the file does not exist: ${resolvedRefsJson}`,
+      );
+    }
+    return readManifestReferences(resolvedRefsJson);
   }
 
   if (fs.existsSync(DEFAULT_REFERENCES_JSON)) {
