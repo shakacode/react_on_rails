@@ -15,9 +15,11 @@ RSpec.describe "RSC use-client CSS manifest regression" do
 
     expect(metadata).to be_present, "Expected #{probe_key_fragment} in #{manifest_path}"
 
-    # The patched react-server-dom-webpack plugin records the CSS sibling chunk of
-    # each 'use client' module so the renderer can preload it (see #3211). Without
-    # the patch this raises KeyError because only JS chunks were tracked.
+    # The generated RSCManifestCssPlugin records the JS and CSS sibling chunks of
+    # each 'use client' module so the renderer can load and preload them (see
+    # #3211). Without the helper, CSS-first chunks can be skipped by the upstream
+    # manifest scan.
+    expect(metadata.fetch("chunks")).to include(a_string_matching(/\.js(?:\?|$)/))
     expect(metadata.fetch("css")).to include(a_string_matching(/\.css(?:\?|$)/))
   end
 end

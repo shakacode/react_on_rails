@@ -5,6 +5,7 @@ const commonWebpackConfig = require('./commonWebpackConfig');
 const { config } = require('shakapacker');
 const { resolve } = require('path');
 const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+const RSCManifestCssPlugin = require('./rscManifestCssPlugin');
 
 const rscClientReferences = {
   directory: resolve(config.source_path),
@@ -26,6 +27,7 @@ const configureClient = () => {
   // Add React Server Components plugin for client bundle
   clientConfig.plugins.push(
     new RSCWebpackPlugin({ isServer: false, clientReferences: rscClientReferences }),
+    new RSCManifestCssPlugin(),
   );
 
 <% end -%>

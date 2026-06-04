@@ -54,6 +54,7 @@ module ReactOnRails
         create_rsc_webpack_config
         update_webpack_configs_for_rsc
         add_rsc_to_procfile
+        create_rsc_manifest_css_plugin
         create_hello_server_component
         create_hello_server_controller
         create_hello_server_view
@@ -164,6 +165,19 @@ module ReactOnRails
         template(rsc_template_path, webpack_config_path)
 
         say "✅ Created #{webpack_config_path}", :green
+      end
+
+      def create_rsc_manifest_css_plugin
+        plugin_path = destination_config_path("config/webpack/rscManifestCssPlugin.js")
+
+        if File.exist?(File.join(destination_root, plugin_path))
+          say "ℹ️  #{plugin_path} already exists, skipping", :yellow
+          return
+        end
+
+        say "📝 Creating RSC manifest CSS helper...", :yellow
+        copy_file("templates/rsc/base/config/webpack/rscManifestCssPlugin.js", plugin_path)
+        say "✅ Created #{plugin_path}", :green
       end
 
       def add_rsc_to_procfile
@@ -435,6 +449,7 @@ module ReactOnRails
 
         if rsc_plugin_invocation_in_js_code?(content)
           update_existing_rsc_webpack_config(config_path, content, is_server: false)
+          ensure_rsc_manifest_css_plugin_in_client_config(config_path)
           return
         end
 
@@ -454,7 +469,8 @@ module ReactOnRails
         client_references_option = setup_status == :scoped ? ", clientReferences: rscClientReferences" : ""
         rsc_plugin_code = "  // Add React Server Components plugin for client bundle\n  " \
                           "clientConfig.plugins.push(\n    " \
-                          "new RSCWebpackPlugin({ isServer: false#{client_references_option} }),\n  " \
+                          "new RSCWebpackPlugin({ isServer: false#{client_references_option} }),\n    " \
+                          "#{rsc_manifest_css_plugin_invocation(content)},\n  " \
                           ");"
         gsub_file(
           config_path,
@@ -462,6 +478,165 @@ module ReactOnRails
           "#{rsc_plugin_code}\n\n\\1"
         )
         rollback_incomplete_new_rsc_plugin_setup(config_path, content, is_server: false)
+      end
+
+      def ensure_rsc_manifest_css_plugin_in_client_config(config_path)
+        full_path = File.join(destination_root, config_path)
+        return unless File.exist?(full_path)
+
+        original_content = File.read(full_path)
+        updated_content = add_rsc_manifest_css_plugin_import(config_path, original_content)
+        return unless updated_content
+
+        updated_content = add_rsc_manifest_css_plugin_push(config_path, updated_content)
+        return unless updated_content
+        return if updated_content == original_content
+
+        write_rsc_manifest_css_plugin_config(config_path, updated_content)
+      end
+
+      def add_rsc_manifest_css_plugin_import(config_path, content)
+        return content if rsc_manifest_css_plugin_imported?(content)
+
+        import_line = "const RSCManifestCssPlugin = require('./rscManifestCssPlugin');"
+        line_ending = js_line_ending(content)
+        updated_content = insert_after_rsc_webpack_plugin_import(content, import_line, line_ending)
+        return updated_content if updated_content
+
+        updated_content = insert_after_client_webpack_anchor(content, import_line, line_ending)
+        return updated_content if updated_content
+
+        warn_missing_rsc_manifest_css_plugin_anchor(config_path, "import")
+        nil
+      end
+
+      def insert_after_rsc_webpack_plugin_import(content, import_line, line_ending)
+        pattern = Regexp.new(
+          "^[ \\t]*const\\s+\\{\\s*RSCWebpackPlugin\\s*\\}\\s*=\\s*" \
+          "require\\(['\"]react-on-rails-rsc/WebpackPlugin['\"]\\);[ \\t]*$"
+        )
+        import_match = first_js_code_match(content, pattern)
+        return unless import_match
+
+        updated_content = content.dup
+        updated_content[import_match.begin(0)...import_match.end(0)] = "#{import_match[0]}#{line_ending}#{import_line}"
+        updated_content
+      end
+
+      def insert_after_client_webpack_anchor(content, import_line, line_ending)
+        anchor_match = rsc_client_references_setup_anchor_match(content, is_server: false)
+        return unless anchor_match
+
+        updated_content = content.dup
+        updated_content[anchor_match.begin(0)...anchor_match.end(0)] = "#{anchor_match[0]}#{line_ending}#{import_line}"
+        updated_content
+      end
+
+      def add_rsc_manifest_css_plugin_push(config_path, content)
+        return content if rsc_manifest_css_plugin_invocation_in_js_code?(content)
+
+        return_match = first_js_code_match(content, /^[ \t]*return clientConfig;[ \t]*$/)
+        unless return_match
+          warn_missing_rsc_manifest_css_plugin_anchor(config_path, "plugin")
+          return nil
+        end
+
+        indent = return_match[0][/\A[ \t]*/]
+        line_ending = js_line_ending(content)
+        plugin_invocation = rsc_manifest_css_plugin_invocation(content)
+        plugin_push = "#{indent}clientConfig.plugins.push(#{plugin_invocation});#{line_ending}" \
+                      "#{line_ending}#{return_match[0]}"
+        updated_content = content.dup
+        updated_content[return_match.begin(0)...return_match.end(0)] = plugin_push
+        updated_content
+      end
+
+      def rsc_manifest_css_plugin_invocation(content)
+        filename = rsc_manifest_css_plugin_client_manifest_filename(content)
+        return "new RSCManifestCssPlugin()" unless filename
+
+        "new RSCManifestCssPlugin({ clientManifestFilename: #{filename.inspect} })"
+      end
+
+      def rsc_manifest_css_plugin_client_manifest_filename(content)
+        filenames = rsc_plugin_option_sections(content, is_server: false)
+                    .filter_map do |section|
+                      rsc_plugin_body_string_option(section.fetch(:body), "clientManifestFilename")
+                    end
+                    .uniq
+        return filenames.first if filenames.length == 1
+
+        warn_multiple_rsc_manifest_css_plugin_filenames(filenames) if filenames.length > 1
+        nil
+      end
+
+      def rsc_plugin_body_string_option(body, key)
+        pattern = /
+          (?:\b#{Regexp.escape(key)}\b|(['"`])#{Regexp.escape(key)}\1)
+          \s*:\s*
+          (['"`])([^'"`]+)\2
+        /x
+        search_from = 0
+
+        while (match = pattern.match(body, search_from))
+          previous_char = previous_significant_js_char(body, match.begin(0))
+          return match[3] if (previous_char.nil? || previous_char == ",") &&
+                             js_top_level_position?(body, match.begin(0))
+
+          search_from = match.end(0)
+        end
+
+        nil
+      end
+
+      def warn_multiple_rsc_manifest_css_plugin_filenames(filenames)
+        GeneratorMessages.add_warning(
+          "Could not infer a single RSCManifestCssPlugin clientManifestFilename because client webpack " \
+          "config has multiple RSCWebpackPlugin clientManifestFilename values: #{filenames.join(', ')}. " \
+          "Please pass the matching filename to RSCManifestCssPlugin manually."
+        )
+      end
+
+      def write_rsc_manifest_css_plugin_config(config_path, content)
+        if options[:pretend]
+          say_status(:pretend, "Would inject RSCManifestCssPlugin into #{config_path}", :yellow)
+          return true
+        end
+
+        if options[:skip]
+          say_status(:skip, config_path, :yellow)
+          return true
+        end
+
+        File.write(File.join(destination_root, config_path), content)
+        say_status(:insert, config_path, :green)
+        true
+      end
+
+      def rsc_manifest_css_plugin_invocation_in_js_code?(content)
+        content
+          .to_enum(:scan, /new\s+RSCManifestCssPlugin\s*\(/)
+          .any? { js_code_position?(content, Regexp.last_match.begin(0)) }
+      end
+
+      def first_js_code_match(content, pattern)
+        search_from = 0
+
+        while (match = pattern.match(content, search_from))
+          return match if js_code_position?(content, match.begin(0))
+
+          search_from = match.end(0)
+        end
+
+        nil
+      end
+
+      def warn_missing_rsc_manifest_css_plugin_anchor(config_path, target)
+        GeneratorMessages.add_warning(
+          "Could not add RSCManifestCssPlugin #{target} to #{config_path}: expected client webpack " \
+          "config anchor was not found. Please add config/webpack/rscManifestCssPlugin.js and " \
+          "`new RSCManifestCssPlugin()` manually after RSCWebpackPlugin."
+        )
       end
 
       def rollback_incomplete_new_rsc_plugin_setup(config_path, original_content, is_server:)
@@ -484,7 +659,7 @@ module ReactOnRails
         # without `rscClientReferences`, and this guard must not trigger the rollback in that
         # case. The server path keeps the stricter check below because the `rscBundle`
         # signature change is the marker of a complete server-side rewrite.
-        return true unless is_server
+        return rsc_manifest_css_plugin_invocation_in_js_code?(content) unless is_server
 
         rsc_server_signature_in_js_code?(content)
       end
@@ -562,6 +737,9 @@ module ReactOnRails
           end
         else
           missing << "RSCWebpackPlugin in clientWebpackConfig.js"
+        end
+        unless rsc_manifest_css_plugin_invocation_in_js_code?(content)
+          missing << "RSCManifestCssPlugin in clientWebpackConfig.js"
         end
         missing
       end

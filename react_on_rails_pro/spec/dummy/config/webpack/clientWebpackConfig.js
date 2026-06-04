@@ -1,6 +1,7 @@
 const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
 const LoadablePlugin = require('@loadable/webpack-plugin');
 const commonWebpackConfig = require('./commonWebpackConfig');
+const RSCManifestCssPlugin = require('./rscManifestCssPlugin');
 
 const isHMR = process.env.HMR;
 
@@ -21,6 +22,7 @@ const configureClient = () => {
       // symlinks exposes .tsx source files that lack a configured loader)
       clientReferences: [{ directory: './client/app', recursive: true, include: /\.(js|ts|jsx|tsx)$/ }],
     }),
+    new RSCManifestCssPlugin(),
   );
 
   if (!isHMR) {

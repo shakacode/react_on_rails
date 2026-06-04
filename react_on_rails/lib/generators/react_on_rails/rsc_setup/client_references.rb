@@ -44,6 +44,7 @@ module ReactOnRails
                 shakapacker_config_import_statement(existing_imports_content),
                 path_resolve_import_statement(existing_imports_content),
                 rsc_webpack_plugin_import_statement(content),
+                rsc_manifest_css_plugin_import_statement(content),
                 "",
                 rsc_client_references_js
               ]
@@ -831,12 +832,12 @@ module ReactOnRails
 
         def inject_rsc_webpack_plugin_import(config_path, content, is_server:)
           replace_rsc_client_references_setup_anchor(config_path, content, is_server: is_server) do |anchor|
+            imports = [anchor, rsc_webpack_plugin_import_statement(content)]
+            imports << rsc_manifest_css_plugin_import_statement(content) unless is_server
+
             join_rsc_client_references_setup(
               content,
-              [
-                anchor,
-                rsc_webpack_plugin_import_statement(content)
-              ]
+              imports
             )
           end
         end
@@ -1114,6 +1115,25 @@ module ReactOnRails
           return if commonjs_named_imported?(content, "react-on-rails-rsc/WebpackPlugin", "RSCWebpackPlugin")
 
           "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');"
+        end
+
+        def rsc_manifest_css_plugin_import_statement(content)
+          return if rsc_manifest_css_plugin_imported?(content)
+
+          "const RSCManifestCssPlugin = require('./rscManifestCssPlugin');"
+        end
+
+        def rsc_manifest_css_plugin_imported?(content)
+          content_without_comments = rsc_plugin_options_without_comments(content)
+          pattern = %r{
+            ^[ \t]*
+            (?:const|let|var)\s+RSCManifestCssPlugin\s*=\s*
+            require\(['"]\./rscManifestCssPlugin['"]\);?
+          }x
+
+          content_without_comments.to_enum(:scan, pattern).any? do
+            js_top_level_position?(content_without_comments, Regexp.last_match.begin(0))
+          end
         end
 
         def rsc_client_references_setup_import_pattern(is_server:)

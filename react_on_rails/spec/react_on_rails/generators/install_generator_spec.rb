@@ -1917,6 +1917,19 @@ describe InstallGenerator, type: :generator do
       end
     end
 
+    it "adds the RSC manifest CSS helper to the generated client webpack config" do
+      assert_file "config/webpack/rscManifestCssPlugin.js" do |content|
+        expect(content).to include("class RSCManifestCssPlugin")
+        expect(content).to include("react-client-manifest.json")
+        expect(content).to include("entry.css")
+      end
+
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content).to include("const RSCManifestCssPlugin = require('./rscManifestCssPlugin')")
+        expect(content).to include("new RSCManifestCssPlugin()")
+      end
+    end
+
     it "serverWebpackConfig has rscBundle parameter" do
       assert_file "config/webpack/serverWebpackConfig.js" do |content|
         expect(content).to match(/configureServer\s*=\s*\(rscBundle\s*=\s*false\)/)
