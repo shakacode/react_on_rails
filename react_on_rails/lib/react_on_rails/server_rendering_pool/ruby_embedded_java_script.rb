@@ -8,6 +8,37 @@ module ReactOnRails
   module ServerRenderingPool
     # rubocop:disable Metrics/ClassLength
     class RubyEmbeddedJavaScript
+      # Error classes that signal Rails could not reach the renderer process (e.g. the
+      # Pro Node renderer configured via REACT_RENDERER_URL) rather than the renderer
+      # evaluating the bundle and the bundle itself failing. See issue #3604.
+      RENDERER_CONNECTION_ERROR_CLASSES = [
+        SocketError,
+        Errno::ECONNREFUSED,
+        Errno::ECONNRESET,
+        Errno::EHOSTUNREACH,
+        Errno::ENETUNREACH,
+        Errno::ETIMEDOUT,
+        Errno::EPIPE,
+        Errno::EPERM
+      ].freeze
+
+      # Matches connection-failure signatures in error messages, covering both raw
+      # Errno messages and the Pro renderer client's wrapped errors. Used in addition
+      # to the class check above so localized Errno messages and re-wrapped errors are
+      # still classified as connectivity problems.
+      RENDERER_CONNECTION_ERROR_REGEX = /
+        ECONNREFUSED | ECONNRESET | EHOSTUNREACH | ENETUNREACH | ETIMEDOUT | EPIPE | EPERM
+        | connect\(2\)\sfor
+        | Connection\srefused
+        | Connection\sreset
+        | Connection\stimed\sout
+        | No\sroute\sto\shost
+        | Network\sis\sunreachable
+        | Operation\snot\spermitted
+        | Failed\sto\sopen\sTCP\sconnection
+        | Connection\serror\son\srenderer\srequest
+      /xi
+
       class << self
         def reset_pool
           @js_context_pool = ConnectionPool.new(
@@ -65,18 +96,12 @@ module ReactOnRails
                        js_evaluator.eval_js(js_code, render_options)
                      end
           rescue StandardError => err
-            msg = <<~MSG
-              Error evaluating server bundle. Check your webpack configuration.
-              ===============================================================
-              Caught error:
-              #{err.message}
-              ===============================================================
-            MSG
-
-            if err.message.include?("ReferenceError: self is not defined")
-              msg << "\nError indicates that you may have code-splitting incorrectly enabled.\n"
-            end
-            msg << "\n#{Utils.default_troubleshooting_section}\n"
+            msg = if renderer_connection_error?(err)
+                    renderer_connection_error_message(err)
+                  else
+                    server_bundle_evaluation_error_message(err)
+                  end
+            msg = "#{msg}\n#{Utils.default_troubleshooting_section}\n"
             raise ReactOnRails::Error, msg, err.backtrace
           end
 
@@ -216,6 +241,73 @@ module ReactOnRails
         end
 
         private
+
+        # Distinguishes "Rails could not reach the renderer" from "the renderer evaluated
+        # the bundle and the bundle failed". See issue #3604.
+        def renderer_connection_error?(err)
+          RENDERER_CONNECTION_ERROR_CLASSES.any? { |klass| err.is_a?(klass) } ||
+            err.message.to_s.match?(RENDERER_CONNECTION_ERROR_REGEX)
+        end
+
+        def renderer_connection_error_message(err)
+          target = renderer_target_from_error(err.message)
+          configured_url = ENV.fetch("REACT_RENDERER_URL", nil)
+          configured_line = if configured_url
+                              "REACT_RENDERER_URL is currently \"#{configured_url}\" — confirm it matches the " \
+                                "renderer's host and port (RENDERER_HOST / RENDERER_PORT)"
+                            else
+                              "REACT_RENDERER_URL matches the renderer's host and port (RENDERER_HOST / RENDERER_PORT)"
+                            end
+
+          <<~MSG
+            React on Rails could not connect to the Node renderer#{" at #{target}" if target}.
+            ===============================================================
+            Caught error:
+            #{err.message}
+            ===============================================================
+            This is a renderer connection failure, not a webpack/server-bundle evaluation error.
+            The bundle was not evaluated because the renderer could not be reached.
+
+            Check, in order:
+            - the renderer process is running and listening#{" on #{target}" if target}
+            - #{configured_line}
+            - CI keeps the renderer process alive for the duration of the test step
+            - localhost vs 127.0.0.1 vs IPv6 (::1) differences between Rails and the renderer
+
+            Only after confirming renderer connectivity should you investigate bundle
+            registration or webpack configuration.
+          MSG
+        end
+
+        def server_bundle_evaluation_error_message(err)
+          msg = <<~MSG
+            Error evaluating server bundle. Check your webpack configuration.
+            ===============================================================
+            Caught error:
+            #{err.message}
+            ===============================================================
+          MSG
+
+          if err.message.include?("ReferenceError: self is not defined")
+            msg << "\nError indicates that you may have code-splitting incorrectly enabled.\n"
+          end
+          msg
+        end
+
+        # Best-effort extraction of the host/port (or URL) Rails attempted to reach, so the
+        # connection error can name the actual target. Falls back to REACT_RENDERER_URL.
+        def renderer_target_from_error(message)
+          message = message.to_s
+          [
+            /connect\(2\) for (?<target>[^\s,)]+)/,
+            /TCP connection to (?<target>[^\s,)]+)/,
+            %r{(?<target>https?://[^\s,"')]+)}
+          ].each do |regex|
+            match = message.match(regex)
+            return match[:target].delete('"') if match
+          end
+          ENV.fetch("REACT_RENDERER_URL", nil)
+        end
 
         def file_url_to_string(url)
           response = Net::HTTP.get_response(URI.parse(url))
