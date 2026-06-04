@@ -30,10 +30,10 @@ jobs:
           SKIP_FILE=".bundle-size-skip-branch"
           SKIP_BRANCH=$(grep -v '^[[:space:]]*#' "$SKIP_FILE" 2>/dev/null | grep -v '^[[:space:]]*$' | tr -d '[:space:]' || echo "")
           if [ "$SKIP_BRANCH" = "$BRANCH" ]; then
-            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "::notice::Branch '$BRANCH' is set to skip size check"
           else
-            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
   check-bundle-size:
@@ -54,7 +54,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 10.33.4
 
       # 1. Get PR's size-limit config first (base branch may not have it)
       - name: Checkout PR branch for config
