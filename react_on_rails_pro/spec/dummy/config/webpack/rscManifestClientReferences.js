@@ -62,15 +62,21 @@ function readManifestReferences(refsJson) {
 // is best-effort — it cannot detect a new 'use client' file reached by an unchanged server
 // component (that is the `--watch` snapshot limitation documented above).
 function warnIfManifestStale() {
-  if (
-    fs.existsSync(SERVER_COMPONENT_REGISTRATION_ENTRY) &&
-    fs.statSync(SERVER_COMPONENT_REGISTRATION_ENTRY).mtimeMs > fs.statSync(DEFAULT_REFERENCES_JSON).mtimeMs
-  ) {
-    console.warn(
-      `[react_on_rails] ${DEFAULT_REFERENCES_JSON} is older than the server component ` +
-        'registration entry; RSC client references may be stale. ' +
-        'Re-run bin/shakapacker-precompile-hook.',
-    );
+  // Best-effort: statSync can race a file removed between the existsSync guard and here, so swallow
+  // that rather than crash the build over a warning.
+  try {
+    if (
+      fs.existsSync(SERVER_COMPONENT_REGISTRATION_ENTRY) &&
+      fs.statSync(SERVER_COMPONENT_REGISTRATION_ENTRY).mtimeMs > fs.statSync(DEFAULT_REFERENCES_JSON).mtimeMs
+    ) {
+      console.warn(
+        `[react_on_rails] ${DEFAULT_REFERENCES_JSON} is older than the server component ` +
+          'registration entry; RSC client references may be stale. ' +
+          'Re-run bin/shakapacker-precompile-hook.',
+      );
+    }
+  } catch {
+    // manifest or registration entry vanished between existsSync and statSync — skip the warning
   }
 }
 

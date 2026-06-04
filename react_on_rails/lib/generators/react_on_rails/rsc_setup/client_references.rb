@@ -44,6 +44,9 @@ module ReactOnRails
             // The resolution cascade below is mirrored, branch for branch, by the Pro dummy's
             // hand-written rscManifestClientReferences.js and pinned on both sides by contract tests.
             const rscClientReferences = (() => {
+              // fs is required here, not at the top of the generated config: the path helpers
+              // (resolve/dirname) and config are already in scope from the surrounding webpack
+              // config, so only fs is pulled in to keep this injected snippet self-contained.
               const { existsSync, readFileSync, statSync } = require('fs');
               const configuredRefsJson = process.env.RSC_MANIFEST_CLIENT_REFERENCES_JSON;
               const defaultRefsJson = resolve('ssr-generated/rsc-client-references.json');
@@ -78,15 +81,21 @@ module ReactOnRails
               }
 
               if (existsSync(defaultRefsJson)) {
-                if (
-                  existsSync(serverComponentRegistrationEntry) &&
-                  statSync(serverComponentRegistrationEntry).mtimeMs > statSync(defaultRefsJson).mtimeMs
-                ) {
-                  console.warn(
-                    `[react_on_rails] ${defaultRefsJson} is older than the server component ` +
-                      'registration entry; RSC client references may be stale. ' +
-                      'Re-run bin/shakapacker-precompile-hook.',
-                  );
+                // Best-effort staleness check: statSync can race a file removed between the
+                // existsSync guard and here, so swallow that rather than crash the build over a warning.
+                try {
+                  if (
+                    existsSync(serverComponentRegistrationEntry) &&
+                    statSync(serverComponentRegistrationEntry).mtimeMs > statSync(defaultRefsJson).mtimeMs
+                  ) {
+                    console.warn(
+                      `[react_on_rails] ${defaultRefsJson} is older than the server component ` +
+                        'registration entry; RSC client references may be stale. ' +
+                        'Re-run bin/shakapacker-precompile-hook.',
+                    );
+                  }
+                } catch {
+                  // manifest or registration entry vanished between existsSync and statSync — skip the warning
                 }
 
                 return readManifestReferences(defaultRefsJson);

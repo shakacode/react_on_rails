@@ -8,7 +8,8 @@ RSpec.describe "Shakapacker precompile hook shared script" do
   end
 
   def with_env(overrides)
-    original = overrides.transform_values { |_| nil }
+    # Initialize before any ENV operation that could raise, so the ensure block can always iterate.
+    original = {}
     overrides.each_key { |key| original[key] = ENV.fetch(key, nil) }
     overrides.each { |key, value| ENV[key] = value }
     yield
