@@ -44,8 +44,8 @@ export default (props, railsContext, domNodeId) => {
   // renderApp is a function required for hot reloading. see
   // https://github.com/retroalgic/react-on-rails-hot-minimal/blob/master/client/src/entry.js
 
-  // Track the current root so we can unmount it on Turbo navigation (via the returned teardown) and
-  // before re-mounting on hot reload (so we never leak a root or call createRoot twice on one node).
+  // Track the current root so we can unmount it on Turbo navigation (via the returned teardown)
+  // and re-render it in place on hot reload (rather than leaking a root or re-hydrating an emptied node).
   let root;
 
   // Provider uses this.props.children, so we're not typical React syntax.
@@ -58,9 +58,12 @@ export default (props, railsContext, domNodeId) => {
     );
 
     if (root) {
-      root.unmount();
+      // HMR: re-render in place. Re-creating the root would unmount the DOM node and then call
+      // hydrateRoot on an emptied node (hydration mismatch) whenever prerender was true.
+      root.render(element);
+    } else {
+      root = hydrateOrRender(document.getElementById(domNodeId), element);
     }
-    root = hydrateOrRender(document.getElementById(domNodeId), element);
   };
 
   renderApp(HelloWorldContainer);
@@ -72,9 +75,5 @@ export default (props, railsContext, domNodeId) => {
     });
   }
 
-  return () => {
-    if (root) {
-      root.unmount();
-    }
-  };
+  return () => root.unmount();
 };

@@ -122,8 +122,10 @@ const MyRenderer = (props, _railsContext, domNodeId) => {
     throw new Error(`Missing DOM element with id: ${domNodeId}`);
   }
 
+  // props.prerender is the Rails-set flag indicating the markup was server-rendered, so it must be
+  // hydrated rather than freshly rendered. This mirrors the in-tree renderers in spec/dummy.
   let root;
-  if (domNode.innerHTML) {
+  if (props.prerender) {
     root = ReactDOMClient.hydrateRoot(domNode, <MyComponent {...props} />);
   } else {
     root = ReactDOMClient.createRoot(domNode);
