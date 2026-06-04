@@ -38,8 +38,7 @@ class HelloWorld extends React.Component<HelloWorldProps, HelloWorldState> {
 
   render() {
     console.log(
-      'HelloWorld demonstrating a call to console.log in ' +
-        'spec/dummy/client/app/components/HelloWorld.jsx:18',
+      'HelloWorld demonstrating a call to console.log in spec/dummy/client/app/startup/HelloWorld.tsx',
     );
 
     const { name } = this.state;

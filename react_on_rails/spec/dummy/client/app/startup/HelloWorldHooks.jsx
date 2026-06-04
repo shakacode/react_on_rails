@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import css from '../components/HelloWorld.module.scss';
 
-// TODO: make more like the HelloWorld.jsx
+// TODO: make more like the HelloWorld.tsx
 function HelloWorldHooks({ helloWorldData }) {
   const [name, setName] = useState(helloWorldData.name);
   return (
