@@ -22,7 +22,7 @@ test.describe('RSC use-client CSS (#3211 FOUC fix)', () => {
     expect(ssrHtml).toMatch(
       /<link(?=[^>]*\brel="preload")(?=[^>]*\bas="style")(?=[^>]*\bhref="[^"]*\.css")[^>]*>/,
     );
-    expect(ssrHtml).toMatch(/\["[^"]*\.css","ror-rsc"\]/);
+    expect(ssrHtml).toMatch(/\[\s*"[^"]*\.css"\s*,\s*"ror-rsc"\s*\]/);
 
     await page.goto(CSS_PROBE_PATH, { waitUntil: 'commit' });
 

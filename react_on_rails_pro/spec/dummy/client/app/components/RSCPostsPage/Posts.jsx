@@ -5,7 +5,7 @@ import Post from './Post';
 const Posts = async ({ artificialDelay, postsCount = 2, fetchPosts, fetchComments, fetchUser }) => {
   const requestedPostsCount = Number(postsCount);
   if (Number.isFinite(requestedPostsCount) && requestedPostsCount <= 0) {
-    return <div />;
+    return null;
   }
 
   await new Promise((resolve) => {
