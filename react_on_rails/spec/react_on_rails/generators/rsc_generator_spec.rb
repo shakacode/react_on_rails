@@ -3657,6 +3657,70 @@ describe RscGenerator, type: :generator do
     end
   end
 
+  # Rspack analogue of the webpack "already imports/invokes RSCWebpackPlugin" dedup contexts above.
+  # Exercises the Rspack branch of RSC_PLUGIN_INVOCATION_REGEX (/new\s+RSC(?:Webpack|Rspack)Plugin\s*\(/):
+  # if that regex regressed to webpack-only, the generator would not detect the existing
+  # `new RSCRspackPlugin(` call, would route to the add-plugin path, and inject a duplicate import —
+  # producing `Identifier 'RSCRspackPlugin' has already been declared` at build time.
+  context "when an existing rspack client config already imports and invokes RSCRspackPlugin" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      # Sets up the rspack shakapacker.yml so rspack_configured_in_project? is true,
+      # then overrides the client config with one that already has the native plugin.
+      simulate_rspack_pro_webpack_files
+      simulate_existing_file(
+        "config/rspack/clientWebpackConfig.js",
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCRspackPlugin } = require('react-on-rails-rsc/RspackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            delete clientConfig.entry['server-bundle'];
+
+            clientConfig.plugins.push(
+              new RSCRspackPlugin ({ isServer: false })
+            );
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "detects the existing native plugin and routes to the update path rather than duplicating the import" do
+      assert_file "config/rspack/clientWebpackConfig.js" do |content|
+        expect(content.scan(%r{require\(['"]react-on-rails-rsc/RspackPlugin['"]\)}).length).to eq(1)
+        expect(content.scan(/new\s+RSCRspackPlugin\s*\(/).length).to eq(1)
+        # The webpack plugin must never leak into an rspack config.
+        expect(content).not_to include("RSCWebpackPlugin")
+        expect(content).not_to include("react-on-rails-rsc/WebpackPlugin")
+      end
+    end
+
+    it "injects scoped clientReferences into the existing native plugin call" do
+      assert_file "config/rspack/clientWebpackConfig.js" do |content|
+        expect(content).to include("clientReferences: rscClientReferences")
+        expect(content).to include("const rscClientReferences")
+        expect(content).to include("directory: resolve(config.source_path)")
+      end
+    end
+  end
+
   # Rspack + legacy Pro variant — same as the legacy webpack exports context below,
   # but with Pro configs in config/rspack/ and rspack shakapacker.yml.
   # Verifies that the backward-compatible rscWebpackConfig.js is created in the

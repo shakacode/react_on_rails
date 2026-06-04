@@ -306,8 +306,8 @@ module ReactOnRails
       #
       # Updates:
       # - ServerClientOrBoth.js: RSC imports, rscConfig, RSC_BUNDLE_ONLY handling
-      # - serverWebpackConfig.js: RSCWebpackPlugin import, rscBundle param, plugin
-      # - clientWebpackConfig.js: RSCWebpackPlugin import, plugin
+      # - serverWebpackConfig.js: RSC plugin import (RSCRspackPlugin/RSCWebpackPlugin), rscBundle param, plugin
+      # - clientWebpackConfig.js: RSC plugin import (RSCRspackPlugin/RSCWebpackPlugin), plugin
       def update_webpack_configs_for_rsc
         say "📝 Updating webpack configs for RSC...", :yellow
 
@@ -489,10 +489,11 @@ module ReactOnRails
         rsc_server_signature_in_js_code?(content)
       end
 
-      # Returns true when the file contains a real `new RSCWebpackPlugin(` invocation in actual JS
-      # code — not inside a comment or string literal. Reuses `RSC_PLUGIN_INVOCATION_REGEX` from
-      # the ClientReferences module so the routing check and the option-section partition match
-      # the same set of invocations (including whitespace/newline variants).
+      # Returns true when the file contains a real `new RSCWebpackPlugin(` / `new RSCRspackPlugin(`
+      # invocation in actual JS code — not inside a comment or string literal. Reuses
+      # `RSC_PLUGIN_INVOCATION_REGEX` from the ClientReferences module (which matches both bundler
+      # plugin names) so the routing check and the option-section partition match the same set of
+      # invocations (including whitespace/newline variants).
       def rsc_plugin_invocation_in_js_code?(content)
         content
           .to_enum(:scan, RSC_PLUGIN_INVOCATION_REGEX)
