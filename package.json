@@ -1,6 +1,6 @@
 {
   "name": "react-on-rails-workspace",
-  "version": "16.6.0",
+  "version": "17.0.0-rc.1",
   "description": "react-on-rails monorepo workspace manager",
   "private": true,
   "type": "module",
@@ -38,7 +38,7 @@
     "@testing-library/react": "^16.2.0",
     "@tsconfig/node14": "^14.1.2",
     "@types/jest": "^29.5.14",
-    "@types/k6": "^1.4.0",
+    "@types/k6": "^2.0.0",
     "@types/node": "^20.17.16",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
@@ -118,7 +118,7 @@
     "url": "https://github.com/shakacode/react_on_rails/issues"
   },
   "homepage": "https://github.com/shakacode/react_on_rails#readme",
-  "packageManager": "pnpm@9.14.2",
+  "packageManager": "pnpm@10.33.4+sha512.1c67b3b359b2d408119ba1ed289f34b8fc3c6873412bec6fd264fbdc82489e510fcbecb9ce9d22dae7f3b76269d8441046014bdca53b9979cd7a561ad631b800",
   "pnpm": {
     "// for overrides": [
       "Generated via pnpm audit --fix, with manual caps added to prevent major version jumps.",
@@ -154,6 +154,18 @@
       "picomatch@<2.3.2": ">=2.3.2 <3",
       "picomatch@>=4.0.0 <4.0.4": ">=4.0.4 <5",
       "yaml@>=1.0.0 <1.10.3": ">=1.10.3 <2"
-    }
+    },
+    "// for onlyBuiltDependencies": [
+      "pnpm 10 blocks lifecycle scripts by default. Allowlist packages we trust.",
+      "When adding native or compiled dependencies, run pnpm ignored-builds and add trusted packages here.",
+      "protobufjs: intentionally NOT listed - its postinstall is a version-scheme warning, not a build step.",
+      "@swc/core: postinstall verifies the platform-specific native binary loads.",
+      "unrs-resolver: napi-postinstall check, used by eslint-import-resolver-typescript.",
+      "protobufjs: intentionally omitted; its postinstall reports version-scheme warnings, not a build step."
+    ],
+    "onlyBuiltDependencies": [
+      "@swc/core",
+      "unrs-resolver"
+    ]
   }
 }

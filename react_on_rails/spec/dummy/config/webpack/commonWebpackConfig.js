@@ -1,9 +1,13 @@
 // Common configuration applying to client and server configuration
-const { generateWebpackConfig, merge } = require('shakapacker');
+const { config, generateWebpackConfig, merge } = require('shakapacker');
 
-const baseClientWebpackConfig = generateWebpackConfig();
+const usingRspack = config.assets_bundler === 'rspack';
+const generateBundlerConfig = usingRspack
+  ? require('shakapacker/rspack').generateRspackConfig
+  : generateWebpackConfig;
+const bundler = usingRspack ? require('@rspack/core') : require('webpack');
 
-const webpack = require('webpack');
+const baseClientWebpackConfig = generateBundlerConfig();
 
 const aliasConfig = require('./alias');
 
@@ -65,7 +69,7 @@ const jqueryUjsLoader = {
 };
 
 baseClientWebpackConfig.plugins.push(
-  new webpack.ProvidePlugin({
+  new bundler.ProvidePlugin({
     $: 'jquery',
     jQuery: 'jquery',
     process: 'process/browser',

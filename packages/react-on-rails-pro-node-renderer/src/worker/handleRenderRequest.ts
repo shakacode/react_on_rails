@@ -7,7 +7,7 @@
 
 import cluster from 'cluster';
 import path from 'path';
-import { mkdir } from 'fs/promises';
+import { mkdir, stat } from 'fs/promises';
 import { lock, unlock } from '../shared/locks.js';
 import fileExistsAsync from '../shared/fileExistsAsync.js';
 import log from '../shared/log.js';
@@ -26,8 +26,23 @@ import {
   validateBundlesExist,
 } from '../shared/utils.js';
 import { getConfig } from '../shared/configBuilder.js';
-import type { TracingContext } from '../shared/tracing.js';
+import { subSpan, type TracingContext } from '../shared/tracing.js';
 import { buildExecutionContext, ExecutionContext, VMContextNotFoundError } from './vm.js';
+
+export async function sumUploadedBytes(assets: Asset[]): Promise<number> {
+  const sizes = await Promise.all(
+    assets.map(async (asset) => {
+      try {
+        return (await stat(asset.savedFilePath)).size;
+      } catch {
+        // Best-effort: a missing source means we record what we can rather than
+        // failing the request just to get a span attribute.
+        return 0;
+      }
+    }),
+  );
+  return sizes.reduce((total, size) => total + size, 0);
+}
 
 export type ProvidedNewBundle = {
   timestamp: string | number;
@@ -36,51 +51,66 @@ export type ProvidedNewBundle = {
 
 async function prepareResult(
   renderingRequest: string,
+  bundleTimestamp: string | number,
   bundleFilePathPerTimestamp: string,
   executionContext: ExecutionContext,
 ): Promise<ResponseResult> {
-  try {
-    const result = await executionContext.runInVM(renderingRequest, bundleFilePathPerTimestamp, cluster);
-
-    let exceptionMessage = null;
-    if (!result) {
-      const error = new Error(
-        'INVALID NIL or NULL result for rendering. Ensure renderingRequest is a valid string and returns a value.',
+  return subSpan({ name: 'ror.result.prepare' }, async (resultSpan) => {
+    try {
+      const result = await subSpan(
+        {
+          name: 'ror.vm.execute',
+          attributes: { 'bundle.timestamp': String(bundleTimestamp) },
+        },
+        (_controller) => executionContext.runInVM(renderingRequest, bundleFilePathPerTimestamp, cluster),
       );
-      exceptionMessage = formatExceptionMessage(
-        { renderingRequest },
-        error,
-        'INVALID result for prepareResult',
-      );
-    } else if (isErrorRenderResult(result)) {
-      ({ exceptionMessage } = result);
-    }
 
-    if (exceptionMessage) {
-      return errorResponseResult(exceptionMessage);
-    }
+      let exceptionMessage = null;
+      if (!result) {
+        const error = new Error(
+          'INVALID NIL or NULL result for rendering. Ensure renderingRequest is a valid string and returns a value.',
+        );
+        exceptionMessage = formatExceptionMessage(
+          { renderingRequest },
+          error,
+          'INVALID result for prepareResult',
+        );
+      } else if (isErrorRenderResult(result)) {
+        ({ exceptionMessage } = result);
+      }
 
-    if (isReadableStream(result)) {
+      if (exceptionMessage) {
+        return errorResponseResult(exceptionMessage);
+      }
+
+      if (isReadableStream(result)) {
+        // Stream length is unknown until consumed; omit response.bytes rather
+        // than buffer the stream to compute it.
+        return {
+          headers: { 'Cache-Control': 'public, max-age=31536000' },
+          status: 200,
+          stream: result,
+        };
+      }
+
+      if (typeof result === 'string') {
+        resultSpan.setAttributes({ 'response.bytes': Buffer.byteLength(result, 'utf8') });
+      }
+
       return {
         headers: { 'Cache-Control': 'public, max-age=31536000' },
         status: 200,
-        stream: result,
+        data: result,
       };
+    } catch (err) {
+      const exceptionMessage = formatExceptionMessage(
+        { renderingRequest },
+        err,
+        'Unknown error calling runInVM',
+      );
+      return errorResponseResult(exceptionMessage);
     }
-
-    return {
-      headers: { 'Cache-Control': 'public, max-age=31536000' },
-      status: 200,
-      data: result,
-    };
-  } catch (err) {
-    const exceptionMessage = formatExceptionMessage(
-      { renderingRequest },
-      err,
-      'Unknown error calling runInVM',
-    );
-    return errorResponseResult(exceptionMessage);
-  }
+  });
 }
 
 /**
@@ -235,9 +265,24 @@ export async function handleRenderRequest({
     }
 
     try {
-      const executionContext = await buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ false);
+      const executionContext = await subSpan(
+        {
+          name: 'ror.bundle.build_execution_context',
+          attributes: {
+            'bundle.timestamp': String(bundleTimestamp),
+            'bundle.paths.count': allBundleFilePaths.length,
+            'cache.strategy': 'cache-first',
+          },
+        },
+        () => buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ false),
+      );
       return {
-        response: await prepareResult(renderingRequest, entryBundleFilePath, executionContext),
+        response: await prepareResult(
+          renderingRequest,
+          bundleTimestamp,
+          entryBundleFilePath,
+          executionContext,
+        ),
         executionContext,
       };
     } catch (e) {
@@ -250,7 +295,24 @@ export async function handleRenderRequest({
 
     // If gem has posted updated bundle:
     if (providedNewBundles && providedNewBundles.length > 0) {
-      const result = await handleNewBundlesProvided({ renderingRequest }, providedNewBundles, assetsToCopy);
+      // Stat upload sources before they're moved by handleNewBundlesProvided.
+      // bytes.total reflects source file sizes at upload time, not compressed
+      // wire bytes.
+      const bytesTotal = await sumUploadedBytes([
+        ...providedNewBundles.map((b) => b.bundle),
+        ...(assetsToCopy ?? []),
+      ]);
+      const result = await subSpan(
+        {
+          name: 'ror.bundle.upload',
+          attributes: {
+            'bundle.count': providedNewBundles.length,
+            'assets.count': assetsToCopy?.length ?? 0,
+            'bytes.total': bytesTotal,
+          },
+        },
+        () => handleNewBundlesProvided({ renderingRequest }, providedNewBundles, assetsToCopy),
+      );
       if (result) {
         return { response: result };
       }
@@ -269,9 +331,19 @@ export async function handleRenderRequest({
       entryBundleFilePath,
       workerIdLabel(),
     );
-    const executionContext = await buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ true);
+    const executionContext = await subSpan(
+      {
+        name: 'ror.bundle.build_execution_context',
+        attributes: {
+          'bundle.timestamp': String(bundleTimestamp),
+          'bundle.paths.count': allBundleFilePaths.length,
+          'cache.strategy': 'cache-miss',
+        },
+      },
+      () => buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ true),
+    );
     return {
-      response: await prepareResult(renderingRequest, entryBundleFilePath, executionContext),
+      response: await prepareResult(renderingRequest, bundleTimestamp, entryBundleFilePath, executionContext),
       executionContext,
     };
   } catch (error) {

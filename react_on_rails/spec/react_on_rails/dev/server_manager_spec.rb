@@ -3,6 +3,7 @@
 require_relative "../spec_helper"
 require "react_on_rails/dev/server_manager"
 require "open3"
+require "stringio"
 
 RSpec.describe ReactOnRails::Dev::ServerManager do
   # Suppress stdout/stderr during tests
@@ -68,6 +69,17 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       base_port_ports: nil,
       select_ports!: { rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false }
     )
+    allow(ReactOnRails::Dev::PortSelector).to receive(:find_available_port) { |start_port| start_port }
+  end
+
+  def capture_stdout
+    output = StringIO.new
+    original_stdout = $stdout
+    $stdout = output
+    yield
+    output.string
+  ensure
+    $stdout = original_stdout
   end
 
   describe ".start" do
@@ -211,6 +223,21 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       expect(ReactOnRails::Dev::ProcessManager).to receive(:run_with_process_manager).with("Procfile.dev-prod-assets")
 
       described_class.start(:production_like, nil, verbose: false, rails_env: "staging")
+    end
+
+    it "prints the bundler compilation hint for rspack precompile errors" do
+      allow(described_class).to receive(:configured_assets_bundler).and_return("rspack")
+      allow(ReactOnRails::Dev::ServiceChecker).to receive(:check_services).and_return(true)
+      allow(ReactOnRails::Dev::PortSelector).to receive(:find_available_port).with(3001).and_return(3001)
+      env = { "NODE_ENV" => "production" }
+      argv = ["bundle", "exec", "rails", "assets:precompile"]
+      status_double = instance_double(Process::Status, success?: false)
+      expect(Open3).to receive(:capture3)
+        .with(env, *argv)
+        .and_return(["", "Rspack build failed", status_double])
+
+      expect { described_class.start(:production_like) }
+        .to output(%r{Rspack compilation:.*Check JavaScript/rspack errors above}m).to_stdout_from_any_process
     end
 
     it "rejects invalid rails_env with shell injection characters" do
@@ -497,16 +524,39 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           .to output(%r{Overriding REACT_RENDERER_URL="http://renderer.internal:3800"}).to_stderr
       end
 
+      it "rewrites a remote REACT_RENDERER_URL to the standard localhost derived URL" do
+        ENV["REACT_RENDERER_URL"] = "http://renderer.internal:3800"
+        described_class.start(:development)
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://localhost:5002")
+      end
+
       it "warns before overriding a localhost REACT_RENDERER_URL on a different port" do
         ENV["REACT_RENDERER_URL"] = "http://localhost:3800"
         expect { described_class.start(:development) }
           .to output(%r{Overriding REACT_RENDERER_URL="http://localhost:3800" with http://localhost:5002}).to_stderr
       end
 
+      it "preserves an explicit IPv4 localhost REACT_RENDERER_URL host in base-port mode" do
+        ENV["REACT_RENDERER_URL"] = "http://127.0.0.1:3800"
+        expect { described_class.start(:development) }
+          .to output(%r{Overriding REACT_RENDERER_URL="http://127.0.0.1:3800" with http://127.0.0.1:5002})
+          .to_stderr
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://127.0.0.1:5002")
+      end
+
+      it "preserves an explicit IPv6 localhost REACT_RENDERER_URL host in base-port mode" do
+        ENV["REACT_RENDERER_URL"] = "http://[::1]:3800"
+        expect { described_class.start(:development) }
+          .to output(%r{Overriding REACT_RENDERER_URL="http://\[::1\]:3800" with http://\[::1\]:5002})
+          .to_stderr
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://[::1]:5002")
+      end
+
       it "warns before overriding an HTTPS localhost REACT_RENDERER_URL on a different port" do
         ENV["REACT_RENDERER_URL"] = "https://localhost:3800"
         expect { described_class.start(:development) }
           .to output(%r{Overriding REACT_RENDERER_URL="https://localhost:3800"}).to_stderr
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("https://localhost:5002")
       end
 
       it "does not warn when REACT_RENDERER_URL already equals the derived URL" do
@@ -519,6 +569,13 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         ENV["RENDERER_URL"] = "http://localhost:3800"
         described_class.start(:development)
         expect(ENV.fetch("RENDERER_URL", nil)).to eq("http://localhost:5002")
+      end
+
+      it "preserves a legacy localhost-equivalent RENDERER_URL host when REACT_RENDERER_URL is unset" do
+        ENV["RENDERER_URL"] = "http://127.0.0.1:3800"
+        described_class.start(:development)
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://127.0.0.1:5002")
+        expect(ENV.fetch("RENDERER_URL", nil)).to eq("http://127.0.0.1:5002")
       end
 
       it "warns before overriding a legacy RENDERER_URL on a different port" do
@@ -1196,10 +1253,43 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       described_class.kill_processes
     end
 
+    # Regression: previously kill_processes used `||` which short-circuited
+    # subsequent cleanup steps as soon as one returned truthy. A successful
+    # pattern-based kill would leave stale port-bound processes and socket/pid
+    # files behind. All three cleanup helpers must always run.
+    it "runs port kills and socket cleanup even when pattern-based kill found processes" do
+      # The catch-all must be defined FIRST. RSpec uses the most-recently-defined
+      # matching stub regardless of specificity (`any_args` does not yield to a
+      # narrower matcher automatically), so the specific "rails" stub below wins
+      # because it is defined last. Reversing the order would cause
+      # `kill_running_processes` to always return false, missing the regression
+      # path this test covers (the old `||` short-circuit would have skipped the
+      # remaining cleanup steps once pattern-based kill returned truthy).
+      allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
+      allow(Open3).to receive(:capture2).with("pgrep", "-f", "rails", err: File::NULL).and_return(["1234", nil])
+      allow(Process).to receive(:pid).and_return(9999)
+      allow(Process).to receive(:kill)
+
+      expect(Open3).to receive(:capture2).with("lsof", "-ti", ":3000", err: File::NULL).and_return(["", nil])
+      expect(Open3).to receive(:capture2).with("lsof", "-ti", ":3001", err: File::NULL).and_return(["", nil])
+
+      socket = ".overmind.sock"
+      allow(Dir).to receive(:glob).with("tmp/sockets/overmind*.sock").and_return([])
+      allow(File).to receive(:exist?).with(socket).and_return(true)
+      allow(File).to receive(:exist?).with("tmp/pids/server.pid").and_return(false)
+      expect(File).to receive(:delete).with(socket)
+
+      described_class.kill_processes
+    end
+
     it "targets base-port-derived ports when REACT_ON_RAILS_BASE_PORT is active" do
       # Without base-port awareness, `bin/dev kill` in a worktree running on
       # 5000/5001/5002 would fall back to killing stale processes on 3000/3001
-      # instead — the actual ports would be left untouched.
+      # instead — the actual ports would be left untouched. RENDERER_PORT is
+      # set so `pro_renderer_active?` returns true via `renderer_env_signal?`
+      # (the Pro gem isn't loaded in the open-source spec suite), exercising
+      # the base+2 inclusion path.
+      ENV["RENDERER_PORT"] = "5002"
       allow(ReactOnRails::Dev::PortSelector)
         .to receive(:base_port_hash)
         .and_return({ rails: 5000, webpack: 5001, renderer: 5002, base_port_mode: true })
@@ -1227,6 +1317,28 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       allow(Open3).to receive(:capture2).with("lsof", "-ti", ":5000", err: File::NULL).and_return(["", nil])
       allow(Open3).to receive(:capture2).with("lsof", "-ti", ":5001", err: File::NULL).and_return(["", nil])
       expect(Open3).not_to receive(:capture2).with("lsof", "-ti", ":5002", err: File::NULL)
+
+      described_class.kill_processes
+    end
+
+    it "includes the base-port-derived renderer port when Pro gem is loaded even without renderer env vars" do
+      # bin/dev kill is usually invoked from a fresh shell where RENDERER_PORT
+      # and REACT_RENDERER_URL aren't carried over. The Pro renderer runs as
+      # `node renderer/node-renderer.js` (see react_on_rails_pro Procfile.dev),
+      # which the development_processes pattern (`node.*react[-_]on[-_]rails`)
+      # does not match — so port-based killing is the only reliable path to
+      # reap a stale renderer on base+2. In base-port mode the user owns the
+      # port range, so the conservative env-var gate isn't needed.
+      allow(ReactOnRails::Dev::PortSelector)
+        .to receive(:base_port_hash)
+        .and_return({ rails: 5000, webpack: 5001, renderer: 5002, base_port_mode: true })
+      allow(described_class).to receive(:pro_renderer_active?).and_return(true)
+      # No pattern-based processes so kill_port_processes runs.
+      allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
+
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":5000", err: File::NULL).and_return(["", nil])
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":5001", err: File::NULL).and_return(["", nil])
+      expect(Open3).to receive(:capture2).with("lsof", "-ti", ":5002", err: File::NULL).and_return(["", nil])
 
       described_class.kill_processes
     end
@@ -1478,13 +1590,199 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
   describe ".show_help" do
     it "displays help information" do
-      expect { described_class.show_help }.to output(%r{Usage: bin/dev \[command\]}).to_stdout_from_any_process
+      output = capture_stdout { described_class.show_help }
+
+      expect(output).to match(%r{Usage: bin/dev \[command\]})
+    end
+
+    it "preserves webpack-specific mode descriptions for webpack apps" do
+      allow(described_class).to receive(:configured_assets_bundler).and_return("webpack")
+
+      output = capture_stdout { described_class.show_help }
+
+      aggregate_failures do
+        expect(output).to match(/HMR development with webpack-dev-server/)
+        expect(output).to match(/Webpack dev server for fast recompilation/)
+        expect(output).to match(/Webpack watch mode for auto-recompilation/)
+      end
+    end
+
+    it "uses neutral/rspack mode descriptions for rspack live-reload apps" do
+      allow(described_class).to receive_messages(
+        configured_assets_bundler: "rspack",
+        default_dev_server_mode: :live_reload,
+        development_dev_server_config: { "hmr" => false, "live_reload" => true }
+      )
+
+      output = capture_stdout { described_class.show_help }
+
+      aggregate_failures do
+        expect(output).to match(/Live reload development with Rspack dev server/)
+        expect(output).to match(/Full-page live reload enabled/)
+        expect(output).to match(/Rspack dev server for fast recompilation/)
+        expect(output).to match(%r{@rspack/plugin-react-refresh / ReactRefreshPlugin})
+        expect(output).to match(/Rspack watch mode for auto-recompilation/)
+        expect(output).to match(/React Refresh requires HMR; current default mode is not HMR/)
+        expect(output).to match(/HMR is disabled in your Shakapacker config/)
+        expect(output).not_to match(/webpack-dev-server/)
+        expect(output).not_to match(/ReactRefreshRspackPlugin/)
+        expect(output).not_to match(/Hot Module Replacement \(HMR\) enabled/)
+        expect(output).not_to match(/Ensure you're running HMR mode/)
+        expect(output).not_to match(/React Refresh only works in HMR mode/)
+        expect(output).not_to match(/Webpack watch mode/)
+        expect(output).not_to match(/Webpack compilation failed/)
+      end
+    end
+
+    it "uses generic React Refresh guidance for future bundlers" do
+      allow(described_class).to receive_messages(
+        configured_assets_bundler: "future",
+        development_dev_server_config: { "hmr" => true }
+      )
+
+      output = capture_stdout { described_class.show_help }
+
+      aggregate_failures do
+        expect(output).to match(/Check your bundler's React Refresh plugin documentation/)
+        expect(output).not_to match(%r{config/rspack/development.js})
+      end
+    end
+
+    it "treats live_reload true without hmr as live reload" do
+      allow(described_class).to receive_messages(
+        configured_assets_bundler: "rspack",
+        default_dev_server_mode: :live_reload,
+        development_dev_server_config: { "live_reload" => true }
+      )
+
+      output = capture_stdout { described_class.show_help }
+
+      expect(output).to match(/Live reload development with Rspack dev server/)
+      expect(output).not_to match(/HMR development with Rspack dev server/)
     end
 
     it "documents test asset workflows" do
-      expect { described_class.show_help }.to output(/TEST ASSET WORKFLOWS/).to_stdout_from_any_process
-      expect { described_class.show_help }.to output(%r{bin/dev test-watch}).to_stdout_from_any_process
-      expect { described_class.show_help }.to output(%r{bin/dev static}).to_stdout_from_any_process
+      output = capture_stdout { described_class.show_help }
+
+      aggregate_failures do
+        expect(output).to match(/TEST ASSET WORKFLOWS/)
+        expect(output).to match(%r{bin/dev test-watch})
+        expect(output).to match(%r{bin/dev static})
+      end
+    end
+
+    context "when Shakapacker config uses live reload instead of HMR" do
+      include_context "with clean port env"
+
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) { example.run }
+        end
+      end
+
+      before do
+        FileUtils.mkdir_p("config")
+        File.write("config/shakapacker.yml", <<~YAML)
+          development:
+            dev_server:
+              hmr: false
+              live_reload: true
+        YAML
+      end
+
+      it "labels the default command and mode details as live reload" do
+        expected_output = satisfy do |output|
+          output.match?(/\(none\)\s+Start development server with live reload \(default\)/) &&
+            !output.match?(/HMR Development mode \(default\)|Hot Module Replacement \(HMR\) enabled/) &&
+            !output.match?(%r{\(none\) / hmr\s+Start development server with live reload \(default\)}) &&
+            !output.include?("ReactRefreshWebpackPlugin") &&
+            output.include?("React Refresh requires HMR; current default mode is not HMR.")
+        end
+
+        expect { described_class.show_help }.to output(expected_output).to_stdout_from_any_process
+      end
+
+      it "detects the default dev-server mode once per help render" do
+        expect(ReactOnRails::Dev::ServerMode)
+          .to receive(:detect).once.with(File.expand_path("config/shakapacker.yml", Dir.pwd)).and_return(:live_reload)
+
+        expect { described_class.show_help }
+          .to output(/Live reload development mode \(default\)/).to_stdout_from_any_process
+      end
+
+      it "passes the resolved Shakapacker config path into ServerMode" do
+        allow(described_class)
+          .to receive(:shakapacker_config_path).and_return("/tmp/app/config/custom-shakapacker.yml")
+        expect(ReactOnRails::Dev::ServerMode)
+          .to receive(:detect).with("/tmp/app/config/custom-shakapacker.yml").and_return(:live_reload)
+
+        expect { described_class.show_help }
+          .to output(/Live reload development mode \(default\)/).to_stdout_from_any_process
+      end
+    end
+
+    context "when Shakapacker config enables HMR explicitly" do
+      include_context "with clean port env"
+
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) { example.run }
+        end
+      end
+
+      before do
+        FileUtils.mkdir_p("config")
+        File.write("config/shakapacker.yml", <<~YAML)
+          development:
+            dev_server:
+              hmr: true
+        YAML
+      end
+
+      # Triangulates the config-driven :hmr path (detect_from_config returns :hmr) against the
+      # baseline specs that exercise the :hmr fallback when no config file is present.
+      it "labels the default command and mode details as HMR" do
+        expected_output = satisfy do |output|
+          output.match?(%r{\(none\) / hmr\s+Start development server with HMR \(default\)}) &&
+            output.include?("HMR Development mode (default)") &&
+            output.include?("Hot Module Replacement (HMR) enabled") &&
+            output.include?("ReactRefreshWebpackPlugin") &&
+            !output.include?("React Refresh requires HMR; current default mode is not HMR.")
+        end
+
+        expect { described_class.show_help }.to output(expected_output).to_stdout_from_any_process
+      end
+    end
+
+    context "when Shakapacker config disables both HMR and live reload" do
+      include_context "with clean port env"
+
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) { example.run }
+        end
+      end
+
+      before do
+        FileUtils.mkdir_p("config")
+        File.write("config/shakapacker.yml", <<~YAML)
+          development:
+            dev_server:
+              live_reload: false
+        YAML
+      end
+
+      it "labels the default command and mode details as the development server" do
+        expected_output = satisfy do |output|
+          output.match?(/\(none\)\s+Start development server \(default\)/) &&
+            output.include?("Development server mode (default)") &&
+            !output.match?(/HMR Development mode \(default\)|Hot Module Replacement \(HMR\) enabled/) &&
+            !output.include?("ReactRefreshWebpackPlugin") &&
+            output.include?("React Refresh requires HMR; current default mode is not HMR.")
+        end
+
+        expect { described_class.show_help }.to output(expected_output).to_stdout_from_any_process
+      end
     end
 
     context "when base-port mode is active" do
@@ -1512,6 +1810,127 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         expect { described_class.show_help }
           .to output(%r{Production-assets.*Access at.*http://localhost:3001/<route>}m).to_stdout_from_any_process
       end
+    end
+  end
+
+  describe ".shakapacker_config_base_dir" do
+    it "uses Rails.root when Rails is loaded" do
+      rails_root = Pathname.new("/tmp/rails-root")
+      allow(Rails).to receive(:root).and_return(rails_root)
+
+      expect(described_class.send(:shakapacker_config_base_dir)).to eq(rails_root.to_s)
+    end
+
+    it "falls back to the current working directory when Rails is not loaded" do
+      Dir.mktmpdir("react-on-rails-cwd") do |cwd|
+        Dir.chdir(cwd) do
+          hide_const("Rails")
+
+          expect(described_class.send(:shakapacker_config_base_dir)).to eq(Dir.pwd)
+        end
+      end
+    end
+  end
+
+  describe ".shakapacker_config_path" do
+    let(:rails_root) { Pathname.new(Dir.mktmpdir("react-on-rails-root")) }
+
+    around do |example|
+      original_config_path = ENV.fetch("SHAKAPACKER_CONFIG", nil)
+      original_cwd = Dir.pwd
+      ENV.delete("SHAKAPACKER_CONFIG")
+      example.run
+    ensure
+      ENV["SHAKAPACKER_CONFIG"] = original_config_path
+      Dir.chdir(original_cwd)
+      FileUtils.remove_entry(rails_root) if rails_root.exist?
+    end
+
+    before do
+      allow(Rails).to receive(:root).and_return(rails_root)
+    end
+
+    it "defaults to config/shakapacker.yml under Rails.root" do
+      expect(described_class.send(:shakapacker_config_path)).to eq(
+        rails_root.join("config", "shakapacker.yml").to_s
+      )
+    end
+
+    it "resolves a relative SHAKAPACKER_CONFIG path against Rails.root" do
+      ENV["SHAKAPACKER_CONFIG"] = "config/custom-shakapacker.yml"
+
+      Dir.mktmpdir("react-on-rails-cwd") do |unrelated_cwd|
+        Dir.chdir(unrelated_cwd) do
+          expect(described_class.send(:shakapacker_config_path)).to eq(
+            rails_root.join("config", "custom-shakapacker.yml").to_s
+          )
+        end
+      end
+    end
+
+    it "preserves an absolute SHAKAPACKER_CONFIG path" do
+      config_path = "/tmp/custom-shakapacker.yml"
+      ENV["SHAKAPACKER_CONFIG"] = config_path
+
+      expect(described_class.send(:shakapacker_config_path)).to eq(config_path)
+    end
+
+    it "uses the current working directory for relative config when Rails is not loaded" do
+      hide_const("Rails")
+      ENV["SHAKAPACKER_CONFIG"] = "config/custom-shakapacker.yml"
+
+      Dir.mktmpdir("react-on-rails-cwd") do |cwd|
+        Dir.chdir(cwd) do
+          expect(described_class.send(:shakapacker_config_path)).to eq(
+            File.expand_path("config/custom-shakapacker.yml", Dir.pwd)
+          )
+        end
+      end
+    end
+  end
+
+  describe ".parsed_shakapacker_config" do
+    it "returns nil for ERB syntax errors" do
+      allow(described_class).to receive(:shakapacker_config_path).and_return("config/shakapacker.yml")
+      allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
+      allow(File).to receive(:read).with("config/shakapacker.yml").and_return("<% raise SyntaxError, 'bad erb' %>")
+
+      expect(described_class.send(:parsed_shakapacker_config)).to be_nil
+    end
+  end
+
+  describe ".development_dev_server_config" do
+    it "uses the development dev_server hash as a whole when development overrides it" do
+      allow(described_class).to receive(:parsed_shakapacker_config).and_return(
+        "default" => { "dev_server" => { "hmr" => true, "host" => "0.0.0.0" } },
+        "development" => { "dev_server" => { "port" => 3035 } }
+      )
+
+      aggregate_failures do
+        expect(described_class.send(:development_dev_server_config)).to eq("port" => 3035)
+        expect(described_class.send(:development_hmr_enabled?)).to be(true)
+      end
+    end
+
+    it "normalizes selected dev_server keys to strings" do
+      allow(described_class).to receive(:parsed_shakapacker_config).and_return(
+        "default" => { dev_server: { hmr: true } },
+        "development" => { "dev_server" => { "hmr" => false } }
+      )
+
+      aggregate_failures do
+        expect(described_class.send(:development_dev_server_config)).to include("hmr" => false)
+        expect(described_class.send(:development_dev_server_config)).not_to have_key(:hmr)
+        expect(described_class.send(:development_hmr_enabled?)).to be(false)
+      end
+    end
+
+    it "treats hmr only mode as HMR" do
+      allow(described_class).to receive(:parsed_shakapacker_config).and_return(
+        "development" => { "dev_server" => { "hmr" => "only" } }
+      )
+
+      expect(described_class.send(:development_hmr_enabled?)).to be(true)
     end
   end
 

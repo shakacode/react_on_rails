@@ -53,7 +53,7 @@ reactOnRailsProNodeRenderer({
 ReactOnRailsPro.configure do |config|
   config.server_renderer = "NodeRenderer"
   config.renderer_url = ENV.fetch("REACT_RENDERER_URL", "http://localhost:3800")
-  config.renderer_password = ENV.fetch("RENDERER_PASSWORD", "devPassword")
+  config.renderer_password = ENV["RENDERER_PASSWORD"]
 end
 ```
 

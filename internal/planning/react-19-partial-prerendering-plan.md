@@ -7,11 +7,36 @@ issue, now closed): verify React 19.2.x support and decide how React on Rails sh
 workflow that becomes practical for Rails apps. Active follow-up is tracked in
 [Issue 3255](https://github.com/shakacode/react_on_rails/issues/3255).
 
-This is a planning document. It does not change package versions, build configuration, or Pro package code.
+This is a planning document for [Issue 2182](https://github.com/shakacode/react_on_rails/issues/2182). The one package
+change it has driven — the `react-on-rails-rsc` peer-ceiling widening — is captured in the Decision Record below; beyond
+that it does not change build configuration or Pro package code.
 
 **Status**: Draft | **Created**: 2026-04-30 | **Last updated**: 2026-06-03 | **Originated from**:
 [Issue 2182](https://github.com/shakacode/react_on_rails/issues/2182) (closed) | **Active tracking**:
 [Issue 3255](https://github.com/shakacode/react_on_rails/issues/3255)
+
+## Decision Record — React Version Support Range ([Issue 3486](https://github.com/shakacode/react_on_rails/issues/3486))
+
+Resolved 2026-06-03 by @justin808. This closes the two package-range questions split out of
+[Issue 3255](https://github.com/shakacode/react_on_rails/issues/3255) and tracked in
+[Issue 3486](https://github.com/shakacode/react_on_rails/issues/3486).
+
+1. **Minimum supported React version — keep React 18 (and 16/17) support.** The OSS `react-on-rails` and Pro
+   `react-on-rails-pro` `react` / `react-dom` peer ranges stay at `>= 16`. React on Rails v17 is a Ruby-baseline release
+   (Ruby 3.3+ required), not a React-baseline release, and v17 actively ships features for React 16/17 consumers (the
+   `react-on-rails/webpackHelpers` `reactDomClientWarning` export). The React 19 baseline that RSC requires is expressed
+   where it belongs — at the RSC boundary, through the **optional** `react-on-rails-rsc` peer dependency — so non-RSC
+   SSR/streaming users are not forced off React 18. The `packages/react-on-rails/src/ReactDOMServer.cts` React 16/17 shim
+   therefore stays; its removal remains gated on a future, explicitly-signed-off baseline bump.
+
+2. **`react-on-rails-rsc` peer ceiling — widen to `>= 19.0.2 < 20.0.0`.** The previous `<= 19.2.3` upper bound was a
+   precautionary verified-patch ceiling, not a recorded API incompatibility. No specific API risk was found, so per the
+   issue default the ceiling widens to the full React 19 line. This stops the peer from rejecting a future `19.2.4` patch
+   or `19.3.x` minor release of `react-on-rails-rsc`.
+
+The `react` / `react-dom` peers (`>= 16`) and the `react-on-rails-rsc` peer (`>= 19.0.2 < 20.0.0`) are intentionally
+**not** identical: the RSC peer is optional and only constrains the React-19-only RSC path. This is the resolved, recorded
+outcome for the Open Questions at the end of this document.
 
 ## Current Repository Signal
 
@@ -25,19 +50,18 @@ and `app>react-dom`; verification should
 confirm whether that workspace stays on React 18 during this work. That means the first implementation step is
 verification, not necessarily a broad package-range change.
 
-Note: `packages/react-on-rails-pro/package.json` already sets the `react-on-rails-rsc` peer dependency ceiling to
-`>= 19.0.2 <= 19.2.3` (space means AND; both comparators must be satisfied). These 19.x version numbers apply to the
+Note: `packages/react-on-rails-pro/package.json` now sets the `react-on-rails-rsc` peer dependency ceiling to
+`>= 19.0.2 < 20.0.0` (resolved by the [Issue 3486](https://github.com/shakacode/react_on_rails/issues/3486) decision
+recorded above; widened from the earlier precautionary `<= 19.2.3` ceiling). These 19.x version numbers apply to the
 `react-on-rails-rsc` package, not to React itself: `react-on-rails-rsc`'s major and minor numbers track the React
-release line it targets, so a constraint such as `<= 19.2.3` here is a constraint on the RSC integration package, not on
-the React peer dependency. The `<= 19.2.3` upper bound is a precautionary
-verified-patch ceiling from the current planning pass, not a recorded React API incompatibility. Verification should decide
-whether this ceiling should be widened alongside any React 19.2.x range update. Because a hard upper bound would reject a
-future `19.2.4` patch or `19.3.x` minor release, the decision must either widen the stable React 19 range to
-`>= 19.0.2 < 20.0.0` or document the specific API risk that requires a tight pin. Pre-release React versions should remain
-outside the recommended range unless the verification record explicitly tests them. If verification finds no specific API
-risk, the default outcome is to widen the range to `>= 19.0.2 < 20.0.0`. The same decision must also audit the Pro package
-`react` and `react-dom` peer dependency ranges, currently `>= 16`, so all three peer ranges stay aligned with the minimum
-React version decision. **Owner**: @justin808 | **Target**: before any package-range change is merged (see Open Questions).
+release line it targets, so this range constrains the RSC integration package, not the React peer dependency. The earlier
+`<= 19.2.3` upper bound was a precautionary verified-patch ceiling from the planning pass, not a recorded React API
+incompatibility; verification found no specific API risk, so the ceiling was widened to the full React 19 line per the
+issue default. A future `19.2.4` patch or `19.3.x` minor release of `react-on-rails-rsc` is now accepted. Pre-release
+React versions should remain outside the recommended range unless the verification record explicitly tests them. The Pro
+package `react` and `react-dom` peer dependency ranges stay at `>= 16`: React 18 support is retained, and the React 19
+baseline that RSC requires is expressed through the optional `react-on-rails-rsc` peer rather than by tightening the
+`react` / `react-dom` peers. **Owner**: @justin808 | **Status**: resolved 2026-06-03 (see Decision Record above).
 
 ## React 19.2.x Verification Checklist
 
@@ -63,7 +87,7 @@ Use a dedicated branch for the actual version verification work:
       `pnpm --filter react-on-rails-pro list --depth=0 react-on-rails-rsc` output in the verification record, such as a
       comment on Issue 3255, so the tested React 19.2.x patch version is auditable. Also verify that the resolved
       `react-on-rails-rsc` version satisfies both the root `^19.0.4` range and the
-      `packages/react-on-rails-pro/package.json` peer dependency ceiling `>= 19.0.2 <= 19.2.3`; a mismatch means the ceiling
+      `packages/react-on-rails-pro/package.json` peer dependency ceiling `>= 19.0.2 < 20.0.0`; a mismatch means the ceiling
       must be widened before workspace installs stay consistent across OSS and Pro.
 - [ ] Run package checks. Type checking catches breaking API changes — `@types/react` shifts such as removal of the
       implicit `children` prop from `React.FC` and a stricter `useRef` return type, plus `react-dom/server` changes such
@@ -255,9 +279,10 @@ issue's five-question scope. Track each one to an explicit decision before the i
   Confirm whether Turbo page visits re-request the full response instead of reusing a cached shell, and whether
   `stream_react_component` can flush into a Turbo Stream frame.
   **Owner**: @justin808 | **Target**: before any implementation PR is opened
-- Should the minimum supported React version retain React 18.x compatibility or move to React 19.x only?
-  **Owner**: @justin808 | **Target**: before any package-range change is merged
-- Should the `react-on-rails-pro` peer dependency ceiling for `react-on-rails-rsc` stay at `<= 19.2.3` or widen with the
-  React 19.2.x verification work? If it stays tight, what specific API risk justifies rejecting future React 19.x patch
-  or minor releases? Default to widening to `< 20.0.0` when verification finds no specific API risk.
-  **Owner**: @justin808 | **Target**: before any package-range change is merged
+- ~~Should the minimum supported React version retain React 18.x compatibility or move to React 19.x only?~~
+  **Owner**: @justin808 | **Resolved** 2026-06-03 ([Issue 3486](https://github.com/shakacode/react_on_rails/issues/3486)):
+  retain React 18.x (peers stay `>= 16`). See the Decision Record at the top of this document.
+- ~~Should the `react-on-rails-pro` peer dependency ceiling for `react-on-rails-rsc` stay at `<= 19.2.3` or widen with the
+  React 19.2.x verification work?~~
+  **Owner**: @justin808 | **Resolved** 2026-06-03 ([Issue 3486](https://github.com/shakacode/react_on_rails/issues/3486)):
+  widened to `>= 19.0.2 < 20.0.0` (no specific API risk found). See the Decision Record at the top of this document.

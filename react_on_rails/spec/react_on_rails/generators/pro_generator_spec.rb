@@ -81,7 +81,8 @@ describe ProGenerator, type: :generator do
     specify "missing_pro_gem? returns false and bypasses bundle add to let swap handle the Gemfile" do
       expect(generator.send(:missing_pro_gem?, force: true)).to be false
       expect(Process).not_to have_received(:spawn)
-      expect(generator.send(:pro_gem_installed?)).to be true
+      expect(generator.send(:pro_gem_install_deferred?)).to be true
+      expect(generator.send(:pro_gem_installed?)).to be false
     end
 
     specify "missing_pro_gem? also defers for parenthesized declarations with leading comments" do
@@ -97,7 +98,8 @@ describe ProGenerator, type: :generator do
 
       expect(generator.send(:missing_pro_gem?, force: true)).to be false
       expect(Process).not_to have_received(:spawn)
-      expect(generator.send(:pro_gem_installed?)).to be true
+      expect(generator.send(:pro_gem_install_deferred?)).to be true
+      expect(generator.send(:pro_gem_installed?)).to be false
     end
   end
 
@@ -1610,8 +1612,10 @@ describe ProGenerator, type: :generator do
       simulate_npm_files(package_json: true)
       # Simulate base React on Rails installed
       simulate_existing_file("config/initializers/react_on_rails.rb", "ReactOnRails.configure {}")
-      # Simulate Procfile.dev exists for appending
+      # Simulate generated bin/dev Procfiles exist for appending
       simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_existing_file("Procfile.dev-static-assets", "web: bin/rails server\njs: bin/shakapacker-watch --watch\n")
+      simulate_existing_file("Procfile.dev-prod-assets", "rails: bundle exec rails s\n")
       # Simulate base webpack configs (what base install generates without --pro)
       simulate_base_webpack_files
       # Mock Pro gem as installed
@@ -1716,6 +1720,26 @@ describe ProGenerator, type: :generator do
     end
   end
 
+  context "when creating the Node Renderer migration hint for a legacy renderer" do
+    let(:generator) { described_class.new }
+
+    before do
+      prepare_destination
+      allow(generator).to receive(:destination_root).and_return(destination_root)
+      allow(generator).to receive(:say)
+      simulate_existing_file("client/node-renderer.js", "// customized legacy renderer\n")
+      allow(ReactOnRails::NodeRendererProcfile).to receive(:command_for)
+        .with("Procfile.dev")
+        .and_return("node-renderer: CUSTOM_SHARED_COMMAND")
+    end
+
+    it "uses the shared default Procfile command" do
+      generator.send(:create_node_renderer)
+
+      expect(generator).to have_received(:say).with("      node-renderer: CUSTOM_SHARED_COMMAND", :yellow)
+    end
+  end
+
   context "when renderer/node-renderer.js already exists but Procfile.dev lacks node-renderer entry" do
     let(:existing_renderer_content) { "// existing renderer\n" }
 
@@ -1745,7 +1769,7 @@ describe ProGenerator, type: :generator do
     it "adds the node-renderer entry to Procfile.dev" do
       expect(File.read(File.join(destination_root, "Procfile.dev")))
         .to include(
-          "node-renderer: RENDERER_LOG_LEVEL=debug " \
+          "node-renderer: RENDERER_LOG_LEVEL=${RENDERER_LOG_LEVEL:-debug} " \
           "RENDERER_PORT=${RENDERER_PORT:-3800} node renderer/node-renderer.js"
         )
     end
@@ -1880,7 +1904,7 @@ describe ProGenerator, type: :generator do
       expect(procfile.scan(/^[ \t]*node-renderer:/).size).to eq(1)
       expect(procfile)
         .to include(
-          "node-renderer: RENDERER_LOG_LEVEL=debug " \
+          "node-renderer: RENDERER_LOG_LEVEL=${RENDERER_LOG_LEVEL:-debug} " \
           "RENDERER_PORT=${RENDERER_PORT:-3800} node renderer/node-renderer.js"
         )
     end
@@ -1919,6 +1943,50 @@ describe ProGenerator, type: :generator do
 
     it "leaves the stale legacy Procfile entry untouched" do
       expect(File.read(File.join(destination_root, "Procfile.dev"))).to eq(stale_procfile)
+    end
+  end
+
+  context "when legacy client/node-renderer.js exists and every Procfile variant still launches it" do
+    let(:legacy_renderer_content) { "// customized legacy renderer\n" }
+    let(:stale_line) do
+      "node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node client/node-renderer.js\n"
+    end
+    let(:stale_dev_procfile) { "rails: bin/rails s\n#{stale_line}" }
+    let(:stale_static_procfile) { "web: bin/rails s\n#{stale_line}" }
+    let(:stale_prod_procfile) { "rails: bin/rails s\n#{stale_line}" }
+
+    before do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails_pro"
+      RUBY
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails.rb", "ReactOnRails.configure {}")
+      simulate_existing_file("Procfile.dev", stale_dev_procfile)
+      simulate_existing_file("Procfile.dev-static-assets", stale_static_procfile)
+      simulate_existing_file("Procfile.dev-prod-assets", stale_prod_procfile)
+      simulate_base_webpack_files
+      simulate_existing_file("client/node-renderer.js", legacy_renderer_content)
+      allow(Gem).to receive(:loaded_specs).and_return({ "react_on_rails_pro" => double })
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "warns per stale Procfile variant so users see each line that needs updating" do
+      joined = GeneratorMessages.messages.join("\n")
+      expect(joined).to include("Procfile.dev still launches the legacy client/node-renderer.js")
+      expect(joined).to include("Procfile.dev-static-assets still launches the legacy client/node-renderer.js")
+      expect(joined).to include("Procfile.dev-prod-assets still launches the legacy client/node-renderer.js")
+    end
+
+    it "leaves every stale legacy Procfile entry untouched" do
+      expect(File.read(File.join(destination_root, "Procfile.dev"))).to eq(stale_dev_procfile)
+      expect(File.read(File.join(destination_root, "Procfile.dev-static-assets"))).to eq(stale_static_procfile)
+      expect(File.read(File.join(destination_root, "Procfile.dev-prod-assets"))).to eq(stale_prod_procfile)
     end
   end
 
@@ -1990,7 +2058,7 @@ describe ProGenerator, type: :generator do
       procfile = File.read(File.join(destination_root, "Procfile.dev"))
       expect(procfile)
         .to include(
-          "node-renderer: RENDERER_LOG_LEVEL=debug " \
+          "node-renderer: RENDERER_LOG_LEVEL=${RENDERER_LOG_LEVEL:-debug} " \
           "RENDERER_PORT=${RENDERER_PORT:-3800} node renderer/node-renderer.js"
         )
       expect(procfile.scan(/^node-renderer:/).size).to eq(1)

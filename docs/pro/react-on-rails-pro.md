@@ -15,6 +15,8 @@ React on Rails Pro is the advanced rendering and performance tier for React on R
 - [Installation](./installation.md) - Fresh install or manual setup
 - [Upgrade from OSS to Pro](./upgrading-to-pro.md) - Three-step upgrade path
 - [Configuration](../oss/configuration/configuration-pro.md) - Pro-specific runtime settings
+- [License CI Integration](./license-ci-integration.md) - Gate deploys, monitor expirations, parse JSON output
+- [Pro Review App Security](./deployment/review-app-security.md) - Safe review-app defaults for public repositories
 - [Troubleshooting](./troubleshooting.md) - Common setup and runtime issues
 
 ## Route Map
@@ -51,9 +53,17 @@ The fastest way to understand how the Pro feature set fits together is to inspec
 
 It demonstrates the Node renderer, caching, and SSR-oriented workflows in a real Rails app.
 
+## Explore the Public RSC Demo
+
+Use the public LocalHub demo when you want an inspectable React on Rails Pro + RSC marketplace surface. The
+[React Server Components index](./react-server-components/index.md#live-demo-and-evidence) keeps the demo, evidence
+dashboard, Lighthouse artifacts, and source repository links in one place.
+
 ## References
 
 - [Installation](./installation.md)
+- [License CI Integration](./license-ci-integration.md)
+- [Pro Review App Security](./deployment/review-app-security.md)
 - [Upgrade from OSS to Pro](./upgrading-to-pro.md)
 - [Pricing and sign up](https://pro.reactonrails.com/)
 - [Node Renderer](./node-renderer.md)

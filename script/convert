@@ -64,23 +64,45 @@ gsub_file_content("../react_on_rails/spec/dummy/package.json", /"react-dom": "[^
 
 # Switch from @dr.pogodin/react-helmet (React 19+) to react-helmet-async (React 18 compatible)
 # Both have the same HelmetProvider API, but different package names
-gsub_file_content("../react_on_rails/spec/dummy/package.json", /"@dr\.pogodin\/react-helmet": "[^"]*",/, '"react-helmet-async": "^1.3.0",')
+gsub_file_content(
+  "../react_on_rails/spec/dummy/package.json",
+  %r{"@dr\.pogodin/react-helmet": "[^"]*",},
+  '"react-helmet-async": "^1.3.0",'
+)
 # Update import statements in all client files
 Dir.glob(File.expand_path("../react_on_rails/spec/dummy/client/**/*.{js,jsx,ts,tsx}", __dir__)).each do |file|
   content = File.binread(file)
-  if content.include?("@dr.pogodin/react-helmet")
-    content.gsub!(%r{from ['"]@dr\.pogodin/react-helmet['"]}, 'from "react-helmet-async"')
-    content.gsub!(%r{['"]@dr\.pogodin/react-helmet['"]}, '"react-helmet-async"')
-    File.binwrite(file, content)
-  end
+  next unless content.include?("@dr.pogodin/react-helmet")
+
+  content.gsub!(%r{from ['"]@dr\.pogodin/react-helmet['"]}, 'from "react-helmet-async"')
+  content.gsub!(%r{['"]@dr\.pogodin/react-helmet['"]}, '"react-helmet-async"')
+  File.binwrite(file, content)
 end
 
-# Pro package: Skip RSC tests on React 18 since RSC requires React 19
+# Pro package: Skip RSC tests on React 18 since RSC requires React 19.
+# The minimum dependency conversion also removes testing-library packages above,
+# so exclude RSC/client tests that need React.use or testing-library helpers.
+minimum_pro_non_rsc_ignored_tests = %w[
+  RSC
+  stream
+  registerServerComponent
+  serverRenderReactComponent
+  SuspenseHydration
+  deferredRouteSsr
+  imperativeRefetch[.]client[.]test
+  inlineRefreshButton[.]client[.]test
+  wrapServerComponentRenderer[.]client[.]test
+].join("|")
+minimum_pro_non_rsc_script = [
+  '"test:non-rsc": "jest tests --testPathIgnorePatterns=\".*(',
+  minimum_pro_non_rsc_ignored_tests,
+  ').*\"",'
+].join
+
 gsub_file_content(
   "../packages/react-on-rails-pro/package.json",
   /"test:non-rsc": "(?:\\"|[^"])*",/,
-  '"test:non-rsc": "jest tests --testPathIgnorePatterns=\".*(RSC|stream|' \
-  'registerServerComponent|serverRenderReactComponent|SuspenseHydration).*\"",'
+  minimum_pro_non_rsc_script
 )
 # test:rsc script now automatically detects React version and skips on React 18
 # No override needed - the script checks React version and exits cleanly if < 19

@@ -4,10 +4,23 @@
 
 import * as React from 'react';
 import * as PropTypes from 'prop-types';
+import { renderToPipeableStream } from 'react-on-rails/ReactDOMServer';
 import streamServerRenderedReactComponent from '../src/streamServerRenderedReactComponent.ts';
 import * as ComponentRegistry from '../src/ComponentRegistry.ts';
 import ReactOnRails from '../src/ReactOnRails.node.ts';
 import LengthPrefixedStreamParser from '../src/parseLengthPrefixedStream.ts';
+import wrapServerComponentRenderer from '../src/wrapServerComponentRenderer/server.tsx';
+import RSCRoute from '../src/RSCRoute.tsx';
+import { RSC_ROUTE_SSR_FALSE_BAILOUT_DIGEST } from '../src/RSCRouteSSRFalseBailoutError.ts';
+
+jest.mock('react-on-rails/ReactDOMServer', () => {
+  const actual = jest.requireActual('react-on-rails/ReactDOMServer');
+
+  return {
+    ...actual,
+    renderToPipeableStream: jest.fn(actual.renderToPipeableStream),
+  };
+});
 
 const AsyncContent = async ({ throwAsyncError }) => {
   await new Promise((resolve) => {
@@ -43,18 +56,57 @@ TestComponentForStreaming.propTypes = {
   throwAsyncError: PropTypes.bool,
 };
 
+const RSCBailoutStreamingShell = () => (
+  <main>
+    <h1>Shell before skipped route</h1>
+    <React.Suspense fallback={<aside>Loading skipped route...</aside>}>
+      <RSCRoute componentName="SkippedServerRoute" componentProps={{ id: 1 }} ssr={false} />
+    </React.Suspense>
+    <footer>Shell after skipped route</footer>
+  </main>
+);
+
+const NestedSuspenseServerError = () => {
+  throw new Error('Unexpected nested Suspense failure');
+};
+
+const UnexpectedNestedSuspenseErrorShell = () => (
+  <main>
+    <h1>Shell before errored boundary</h1>
+    <React.Suspense fallback={<aside>Loading errored boundary...</aside>}>
+      <NestedSuspenseServerError />
+    </React.Suspense>
+    <footer>Shell after errored boundary</footer>
+  </main>
+);
+
+const MixedRSCRouteBailoutAndNestedSuspenseErrorShell = () => (
+  <main>
+    <h1>Shell before mixed boundaries</h1>
+    <React.Suspense fallback={<aside>Loading skipped route...</aside>}>
+      <RSCRoute componentName="SkippedServerRoute" componentProps={{ id: 1 }} ssr={false} />
+    </React.Suspense>
+    <React.Suspense fallback={<aside>Loading errored boundary...</aside>}>
+      <NestedSuspenseServerError />
+    </React.Suspense>
+    <footer>Shell after mixed boundaries</footer>
+  </main>
+);
+
 describe('streamServerRenderedReactComponent', () => {
   const testingRailsContext = {
     serverSideRSCPayloadParameters: {},
     reactClientManifestFileName: 'clientManifest.json',
     reactServerClientManifestFileName: 'serverClientManifest.json',
+    cspNonce: 'stream-csp-nonce',
     componentSpecificMetadata: {
       renderRequestId: '123',
     },
   };
 
   beforeEach(() => {
-    ComponentRegistry.components().clear();
+    ComponentRegistry.clear();
+    renderToPipeableStream.mockClear();
   });
 
   // Parses a length-prefixed stream chunk: metadata\tcontent_len\ncontent
@@ -78,11 +130,30 @@ describe('streamServerRenderedReactComponent', () => {
     return parsed;
   };
 
+  const collectStreamResult = async (renderResult) => {
+    const chunks = [];
+    const errors = [];
+
+    renderResult.on('data', (chunk) => {
+      chunks.push(expectStreamChunk(chunk));
+    });
+    renderResult.on('error', (error) => {
+      errors.push(error);
+    });
+
+    await new Promise((resolve) => {
+      renderResult.once('end', resolve);
+    });
+
+    return { chunks, errors };
+  };
+
   const setupStreamTest = ({
     throwSyncError = false,
     throwJsErrors = false,
     throwAsyncError = false,
     componentType = 'reactComponent',
+    railsContext = testingRailsContext,
   } = {}) => {
     switch (componentType) {
       case 'reactComponent':
@@ -123,7 +194,7 @@ describe('streamServerRenderedReactComponent', () => {
       trace: false,
       props: { throwSyncError, throwAsyncError },
       throwJsErrors,
-      railsContext: testingRailsContext,
+      railsContext,
     });
 
     const chunks = [];
@@ -133,6 +204,177 @@ describe('streamServerRenderedReactComponent', () => {
 
     return { renderResult, chunks };
   };
+
+  const setupRSCRouteSSRFalseStreamTest = ({ throwJsErrors = false, onPostSSRHook } = {}) => {
+    const generateRSCPayload = jest.fn();
+    const renderFunction = (_props, railsContext) => {
+      if (onPostSSRHook) {
+        railsContext.addPostSSRHook(onPostSSRHook);
+      }
+
+      return RSCBailoutStreamingShell;
+    };
+
+    ReactOnRails.register({
+      RSCBailoutStreamingShell: wrapServerComponentRenderer(renderFunction, 'RSCBailoutStreamingShell'),
+    });
+
+    const renderResult = streamServerRenderedReactComponent({
+      name: 'RSCBailoutStreamingShell',
+      domNodeId: 'rscBailoutDomId',
+      trace: false,
+      throwJsErrors,
+      railsContext: testingRailsContext,
+      generateRSCPayload,
+    });
+
+    return { renderResult, generateRSCPayload };
+  };
+
+  const setupUnexpectedNestedSuspenseErrorStreamTest = ({ onPostSSRHook } = {}) => {
+    const renderFunction = (_props, railsContext) => {
+      if (onPostSSRHook) {
+        railsContext.addPostSSRHook(onPostSSRHook);
+      }
+
+      return UnexpectedNestedSuspenseErrorShell;
+    };
+
+    ReactOnRails.register({
+      UnexpectedNestedSuspenseErrorShell: wrapServerComponentRenderer(
+        renderFunction,
+        'UnexpectedNestedSuspenseErrorShell',
+      ),
+    });
+
+    return streamServerRenderedReactComponent({
+      name: 'UnexpectedNestedSuspenseErrorShell',
+      domNodeId: 'unexpectedNestedSuspenseErrorDomId',
+      trace: false,
+      throwJsErrors: false,
+      railsContext: testingRailsContext,
+      generateRSCPayload: jest.fn(),
+    });
+  };
+
+  const setupMixedRSCRouteBailoutAndNestedSuspenseErrorStreamTest = ({ onPostSSRHook } = {}) => {
+    const generateRSCPayload = jest.fn();
+    const renderFunction = (_props, railsContext) => {
+      if (onPostSSRHook) {
+        railsContext.addPostSSRHook(onPostSSRHook);
+      }
+
+      return MixedRSCRouteBailoutAndNestedSuspenseErrorShell;
+    };
+
+    ReactOnRails.register({
+      MixedRSCRouteBailoutAndNestedSuspenseErrorShell: wrapServerComponentRenderer(
+        renderFunction,
+        'MixedRSCRouteBailoutAndNestedSuspenseErrorShell',
+      ),
+    });
+
+    const renderResult = streamServerRenderedReactComponent({
+      name: 'MixedRSCRouteBailoutAndNestedSuspenseErrorShell',
+      domNodeId: 'mixedRSCRouteBailoutAndNestedSuspenseErrorDomId',
+      trace: false,
+      throwJsErrors: false,
+      railsContext: testingRailsContext,
+      generateRSCPayload,
+    });
+
+    return { renderResult, generateRSCPayload };
+  };
+
+  it('renders the nearest Suspense fallback for RSCRoute ssr=false without generating an RSC payload', async () => {
+    const { renderResult, generateRSCPayload } = setupRSCRouteSSRFalseStreamTest();
+    const { chunks, errors } = await collectStreamResult(renderResult);
+    const html = chunks.map((chunk) => chunk.html).join('');
+
+    expect(errors).toHaveLength(0);
+    expect(generateRSCPayload).not.toHaveBeenCalled();
+    expect(html).toContain('Shell before skipped route');
+    expect(html).toContain('Loading skipped route...');
+    expect(html).toContain('Shell after skipped route');
+    expect(html).toContain(`data-dgst="${RSC_ROUTE_SSR_FALSE_BAILOUT_DIGEST}"`);
+    expect(html).not.toContain('REACT_ON_RAILS_RSC_PAYLOADS');
+    expect(chunks.length).toBeGreaterThan(0);
+    expect(chunks.every((chunk) => chunk.hasErrors === false)).toBe(true);
+    expect(chunks.every((chunk) => chunk.isShellReady === true)).toBe(true);
+  });
+
+  it('does not emit a stream error for the classified RSCRoute ssr=false bailout when throwJsErrors is true', async () => {
+    const { renderResult, generateRSCPayload } = setupRSCRouteSSRFalseStreamTest({ throwJsErrors: true });
+    const { chunks, errors } = await collectStreamResult(renderResult);
+    const html = chunks.map((chunk) => chunk.html).join('');
+
+    expect(errors).toHaveLength(0);
+    expect(generateRSCPayload).not.toHaveBeenCalled();
+    expect(html).toContain('Loading skipped route...');
+    expect(chunks.length).toBeGreaterThan(0);
+    expect(chunks.every((chunk) => chunk.hasErrors === false)).toBe(true);
+  });
+
+  it('runs post-SSR hooks once for the classified RSCRoute ssr=false bailout path', async () => {
+    const onPostSSRHook = jest.fn();
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const { renderResult } = setupRSCRouteSSRFalseStreamTest({ onPostSSRHook });
+
+    try {
+      await collectStreamResult(renderResult);
+
+      expect(onPostSSRHook).toHaveBeenCalledTimes(1);
+      expect(consoleWarnSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('notifySSREnd() called multiple times'),
+      );
+    } finally {
+      consoleWarnSpy.mockRestore();
+    }
+  });
+
+  it('preserves the duplicate notifySSREnd warning for unexpected nested Suspense errors', async () => {
+    const onPostSSRHook = jest.fn();
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const renderResult = setupUnexpectedNestedSuspenseErrorStreamTest({ onPostSSRHook });
+
+    try {
+      const { chunks, errors } = await collectStreamResult(renderResult);
+
+      expect(errors).toHaveLength(0);
+      expect(onPostSSRHook).toHaveBeenCalledTimes(1);
+      expect(chunks.some((chunk) => chunk.hasErrors)).toBe(true);
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('notifySSREnd() called multiple times'),
+      );
+    } finally {
+      consoleWarnSpy.mockRestore();
+    }
+  });
+
+  it('preserves the duplicate notifySSREnd warning when a real error occurs with an RSCRoute ssr=false bailout', async () => {
+    const onPostSSRHook = jest.fn();
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const { renderResult, generateRSCPayload } = setupMixedRSCRouteBailoutAndNestedSuspenseErrorStreamTest({
+      onPostSSRHook,
+    });
+
+    try {
+      const { chunks, errors } = await collectStreamResult(renderResult);
+      const html = chunks.map((chunk) => chunk.html).join('');
+
+      expect(errors).toHaveLength(0);
+      expect(generateRSCPayload).not.toHaveBeenCalled();
+      expect(onPostSSRHook).toHaveBeenCalledTimes(1);
+      expect(html).toContain('Loading skipped route...');
+      expect(html).toContain('Loading errored boundary...');
+      expect(chunks.some((chunk) => chunk.hasErrors)).toBe(true);
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('notifySSREnd() called multiple times'),
+      );
+    } finally {
+      consoleWarnSpy.mockRestore();
+    }
+  });
 
   it('streamServerRenderedReactComponent streams the rendered component', async () => {
     const { renderResult, chunks } = setupStreamTest();
@@ -149,6 +391,38 @@ describe('streamServerRenderedReactComponent', () => {
     expect(chunks[1].consoleReplayScript).toBe('');
     expect(chunks[1].hasErrors).toBe(false);
     expect(chunks[1].isShellReady).toBe(true);
+  });
+
+  it("passes Rails' CSP nonce to React's streaming bootstrap options", async () => {
+    const { renderResult } = setupStreamTest();
+    await new Promise((resolve) => {
+      renderResult.once('end', resolve);
+    });
+
+    expect(renderToPipeableStream).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        identifierPrefix: 'myDomId',
+        nonce: 'stream-csp-nonce',
+      }),
+    );
+  });
+
+  it("omits React's streaming bootstrap nonce option when Rails CSP nonce is absent", async () => {
+    const { renderResult } = setupStreamTest({
+      railsContext: { ...testingRailsContext, cspNonce: undefined },
+    });
+    await new Promise((resolve) => {
+      renderResult.once('end', resolve);
+    });
+
+    expect(renderToPipeableStream).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        identifierPrefix: 'myDomId',
+        nonce: undefined,
+      }),
+    );
   });
 
   it('emits an error if there is an error in the shell and throwJsErrors is true', async () => {

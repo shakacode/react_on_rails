@@ -4,7 +4,7 @@ _See also [Examples and migration references](./examples-and-references.md) for 
 
 ---
 
-_Updated for Ruby 3.0+, Rails 7, React on Rails v16, and Shakapacker v7_
+_Updated for Ruby 3.3+, Rails 7, React on Rails v17, and Shakapacker v7_
 
 This tutorial guides you through setting up a new or existing Rails app with **React on Rails**, demonstrating Rails + React + Redux + Server Rendering.
 
@@ -48,7 +48,7 @@ By the time you read this, the latest may have changed. Be sure to check the ver
 
 Trying out **React on Rails** is super easy, so long as you have the basic prerequisites.
 
-- **Ruby:** We support all active Ruby versions but recommend using the latest stable Ruby version. Solutions like [rvm](https://rvm.io) or [rbenv](https://github.com/rbenv/rbenv) make it easy to have multiple Ruby versions on your machine.
+- **Ruby:** We support Ruby 3.3+ and recommend using the latest stable Ruby version. Solutions like [rvm](https://rvm.io) or [rbenv](https://github.com/rbenv/rbenv) make it easy to have multiple Ruby versions on your machine.
 - **Rails:** This tutorial targets Rails 7.0+. React on Rails supports Rails 6 and later, but some tutorial steps may differ for Rails 6.
 - **Node.js:** We support all [active Node versions](https://github.com/nodejs/release#release-schedule) but recommend using the latest LTS release of Nodejs for the longest support. Older inactive node versions might still work but is not guaranteed. We also recommend using [nvm](https://github.com/nvm-sh/nvm/) to ease using different node versions in different projects.
 - **Node Package manager:** You can use [npm](https://npmjs.com/), Yarn ([Classic](https://classic.yarnpkg.com/) or [Berry](https://yarnpkg.com/)), or [pnpm](https://pnpm.io/).

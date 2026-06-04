@@ -1,14 +1,13 @@
 # Tips for Contributors
 
-**🏗️ Important: Monorepo Merger in Progress**
+**🏗️ Monorepo structure**
 
-We are currently working on merging the `react_on_rails` and `react_on_rails_pro` repositories into a unified monorepo. This will provide better development experience while maintaining separate package identities and licensing. See [internal/planning/MONOREPO_MERGER_PLAN_REF.md](./internal/planning/MONOREPO_MERGER_PLAN_REF.md) for details.
+This repository is a monorepo containing both the MIT-licensed core (the `react_on_rails` gem and the `react-on-rails` npm package) and the Pro packages (the `react_on_rails_pro` gem and the `react-on-rails-pro` and `react-on-rails-pro-node-renderer` npm packages). License boundaries are directory-based — see [LICENSE.md](./LICENSE.md) for the authoritative list of which directories use which license.
 
-During this transition:
+When contributing:
 
-- Continue contributing to the current structure
-- License compliance remains critical - ensure no Pro code enters MIT-licensed areas
-- Major structural changes may be coordinated with the merger plan
+- License compliance is critical — never add Pro code to MIT-licensed directories.
+- Follow the existing directory layout for the package you are changing.
 
 ---
 
@@ -209,7 +208,7 @@ After checking out the repo and ensuring you have Ruby and Node version managers
 
 ```sh
 # First, verify your versions match the project requirements
-ruby -v  # Should show 3.4.x or version in .ruby-version
+ruby -v  # Should show 4.0.x (latest), 3.3.x (minimum), or version in .ruby-version
 node -v  # Should show 22.x or version in .node-version
 
 # Then run the setup script
@@ -254,6 +253,16 @@ pnpm install
 ```
 
 You can also run `bin/console` for an interactive prompt that will allow you to experiment.
+
+### Lockfile Platforms
+
+When committing any `Gemfile.lock`, ensure it includes the Linux platform used by CI.
+If you generated or refreshed a lockfile on macOS or another non-Linux platform and `x86_64-linux` is missing from the
+`PLATFORMS` section, the lint workflow will fail. Run this in the directory that owns that lockfile before committing:
+
+```sh
+bundle lock --add-platform x86_64-linux
+```
 
 ### Local Node Package
 
@@ -351,6 +360,8 @@ Run only RuboCop:
 rake lint:rubocop
 ```
 
+For v17, new Ruby code should use long-form hash syntax instead of shorthand; shorthand cleanup is tracked for v18 in [#3501](https://github.com/shakacode/react_on_rails/issues/3501).
+
 Run only ESLint:
 
 ```sh
@@ -432,7 +443,7 @@ If you run `rspec` at the top level, you'll see this message: `require': cannot 
 
 If you run tests with `COVERAGE=true`, you can view the SimpleCov report at `coverage/index.html`.
 
-Turbolinks 5 is included in the test app, unless "DISABLE_TURBOLINKS" is set to YES in the environment.
+The Turbolinks 5 gem is always bundled in the test app. Setting `DISABLE_TURBOLINKS=TRUE` in the environment suppresses the `require_asset` call in `react_on_rails/spec/dummy/app/assets/javascripts/application_non_webpack.js.erb`, so Turbolinks does not load at runtime — but the gem itself stays in the bundle to keep the gemset consistent with `Gemfile.lock`.
 
 Run `rake -T` or `rake -D` to see testing options.
 
@@ -459,11 +470,38 @@ After updating the source files above, regenerate lock files by running `bundle 
 
 - `react_on_rails/` and `react_on_rails/spec/dummy/` (OSS)
 - `react_on_rails_pro/` and `react_on_rails_pro/spec/dummy/` and `react_on_rails_pro/spec/execjs-compatible-dummy/` (Pro)
-- Root `Gemfile.lock` and `pnpm-lock.yaml`
+- `react_on_rails/Gemfile.lock` and root `pnpm-lock.yaml`
 
 **Example apps (handled automatically):**
 
 The CI-generated example apps (under `gen-examples/`) automatically resolve the shakapacker version via the gem dependency. The `pin_shakapacker_npm_version` helper in `react_on_rails/rakelib/shakapacker_examples.rake` ensures the npm version matches the gem.
+
+## Updating the pnpm Fallback Version for Scaffolded CI
+
+The `react_on_rails:install` generator scaffolds a GitHub Actions workflow that uses `pnpm/action-setup@v4`. When the target app declares `packageManager: pnpm@…` in its `package.json`, the scaffold reads the pin from there. When it does not (e.g., existing Shakapacker apps that only have `pnpm-lock.yaml`), the scaffold has to supply an explicit `version:` to the action — otherwise the workflow fails before installing dependencies.
+
+That fallback comes from `CI_PNPM_FALLBACK_VERSION` in [`react_on_rails/lib/generators/react_on_rails/install_generator.rb`](./react_on_rails/lib/generators/react_on_rails/install_generator.rb).
+
+**When to bump:**
+
+- Whenever Renovate updates the repo's own root `package.json` `packageManager` pin to a newer pnpm version. The spec `keeps the fallback pin tied to a version-specific pnpm release note` (in `react_on_rails/spec/react_on_rails/generators/install_generator_spec.rb`) fails when `CI_PNPM_FALLBACK_VERSION` drifts from the `packageManager` version in `package.json`; treat that failure as the signal to update the fallback version and release-note URL in the same PR.
+- Review pnpm release PRs from Renovate, at minimum on every pnpm **major** release and ideally on each minor as well. A new major may change the lockfile format, in which case projects scaffolded without `packageManager` will fail with the older pinned pnpm. Renovate may open separate PRs for `package.json` and `CI_PNPM_FALLBACK_VERSION`; merge the constant-bump PR first or batch both updates into one PR to keep CI green.
+
+**What to update together (single commit):**
+
+1. The `CI_PNPM_FALLBACK_VERSION` constant value in `install_generator.rb`
+2. The `https://github.com/pnpm/pnpm/releases/tag/v<version>` URL in the comment above the constant
+3. The root `package.json` `packageManager` field when bumping manually; for Renovate PRs, verify the existing `packageManager` bump matches the fallback version. The spec catches drift between these values.
+4. Re-run `pnpm install` in the repo root so the root `pnpm-lock.yaml` matches
+
+**Verification:**
+
+```sh
+bundle exec rspec react_on_rails/spec/react_on_rails/generators/install_generator_spec.rb \
+  -e "keeps the fallback pin tied to a version-specific pnpm release note"
+```
+
+Users who want exact reproducibility in their generated CI can commit a `packageManager: pnpm@<version>` field to their own `package.json`; the generator then omits the fallback `version:` entirely.
 
 ## CI Testing and Optimization
 
@@ -583,7 +621,8 @@ Runs all skipped CI checks and enables full CI mode for the PR:
 - Triggers all CI workflows that were skipped due to unchanged code
 - Adds the `full-ci` label to the PR
 - **Persists across future commits** - all subsequent pushes will run the full test suite
-- Runs minimum dependency tests (Ruby 3.2, Node 20, Shakapacker 8.2.0, React 18)
+- Runs latest dependency tests (Ruby 4.0, Node 22, Shakapacker 10.1.0, React 19)
+- Runs minimum dependency tests (Ruby 3.3, Node 20, Shakapacker 8.2.0, React 18)
 
 **When to use:**
 

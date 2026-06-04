@@ -31,7 +31,7 @@ The bot will:
 
 By default, PRs run a subset of CI jobs to provide fast feedback:
 
-- Only latest dependency versions (Ruby 3.4, Node 22)
+- Only latest dependency versions (Ruby 4.0, Node 22)
 - Skips example generator tests
 - Skips some Pro package tests
 
@@ -79,8 +79,7 @@ For more details, see [GitHub's documentation on issue_comment events](https://d
 - **`examples.yml`** - Generator tests for example apps
 - **`playwright.yml`** - Playwright E2E tests
 - **`pro-integration-tests.yml`** - Pro package integration tests
-- **`pro-package-tests.yml`** - Pro package unit tests
-- **`pro-lint.yml`** - Pro package linting
+- **`pro-test-package-and-gem.yml`** - Pro package unit tests and Pro Ruby/RBS/TypeScript linting
 
 ### Utility Workflows
 

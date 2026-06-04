@@ -139,3 +139,60 @@ describe('TTY detection branching in run()', () => {
     expect(process.exit).toHaveBeenCalledWith(1);
   });
 });
+
+describe('bundler flag resolution in run()', () => {
+  const originalArgv = process.argv;
+  const originalStdinIsTTY = process.stdin.isTTY;
+  const originalStdoutIsTTY = process.stdout.isTTY;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setupMocks();
+    // Non-interactive so no mode prompt fires; standard mode is used automatically.
+    Object.defineProperty(process.stdin, 'isTTY', { value: undefined, writable: true });
+    Object.defineProperty(process.stdout, 'isTTY', { value: undefined, writable: true });
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, writable: true });
+    Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, writable: true });
+    jest.restoreAllMocks();
+  });
+
+  it('selects Rspack by default when no bundler flag is passed', async () => {
+    process.argv = ['node', 'create-react-on-rails-app', 'my-app'];
+
+    await loadIndex();
+
+    expect(mockedCreateApp).toHaveBeenCalledWith('my-app', expect.objectContaining({ rspack: true }));
+  });
+
+  it('selects Webpack when --webpack is passed (alias for --no-rspack)', async () => {
+    process.argv = ['node', 'create-react-on-rails-app', 'my-app', '--webpack'];
+
+    await loadIndex();
+
+    expect(mockedCreateApp).toHaveBeenCalledWith('my-app', expect.objectContaining({ rspack: false }));
+  });
+
+  it('accepts --no-rspack and --webpack together (both select Webpack)', async () => {
+    process.argv = ['node', 'create-react-on-rails-app', 'my-app', '--no-rspack', '--webpack'];
+
+    await loadIndex();
+
+    expect(mockedLogError).not.toHaveBeenCalled();
+    expect(mockedCreateApp).toHaveBeenCalledWith('my-app', expect.objectContaining({ rspack: false }));
+  });
+
+  it('exits with error when --rspack and --webpack are combined', async () => {
+    process.argv = ['node', 'create-react-on-rails-app', 'my-app', '--rspack', '--webpack'];
+
+    await loadIndex();
+
+    expect(mockedLogError).toHaveBeenCalledWith(
+      'Conflicting bundler flags: pass either --rspack or --webpack (alias for --no-rspack), not both.',
+    );
+    expect(process.exit).toHaveBeenCalledWith(1);
+  });
+});

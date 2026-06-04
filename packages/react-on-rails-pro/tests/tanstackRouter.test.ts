@@ -1,10 +1,15 @@
 import * as React from 'react';
-import { createRoot } from 'react-dom/client';
-import { renderToString } from 'react-dom/server';
 import {
-  createTanStackRouterRenderFunction,
-  serverRenderTanStackAppAsync,
-} from '../src/tanstack-router/index.ts';
+  RouterProvider as ActualRouterProvider,
+  createMemoryHistory as createActualMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter as createActualRouter,
+} from '@tanstack/react-router';
+import { batch as tanstackStoreBatch, createAtom } from '@tanstack/store';
+import { createRoot, hydrateRoot } from 'react-dom/client';
+import { renderToString } from 'react-dom/server';
+import { createTanStackRouterRenderFunction, serverRenderTanStackAppAsync } from '../src/tanstack-router.ts';
 import type { RailsContext, ServerRenderResult } from 'react-on-rails/types';
 import type { TanStackRouter } from '../src/tanstack-router/types.ts';
 
@@ -55,6 +60,24 @@ function buildRouter(): TanStackRouter {
   };
 }
 
+function buildActualTanStackRouter(): TanStackRouter {
+  const RootLayout = () => React.createElement('div', null, React.createElement('main'));
+  const ProductsPage = () => React.createElement('h1', null, 'Products');
+  const rootRoute = createRootRoute({ component: RootLayout });
+  const productsRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/products',
+    loader: () => ({ products: ['hammer'] }),
+    component: ProductsPage,
+  });
+  const routeTree = rootRoute.addChildren([productsRoute]);
+
+  return createActualRouter({
+    routeTree,
+    history: createActualMemoryHistory({ initialEntries: ['/products'] }),
+  }) as unknown as TanStackRouter;
+}
+
 async function compatAct(callback: () => void | Promise<void>): Promise<void> {
   // React 19 exports act on the React object; React 18 exports it from react-dom/test-utils
   const actFn =
@@ -66,6 +89,78 @@ async function compatAct(callback: () => void | Promise<void>): Promise<void> {
     throw new Error('act is not available — React 18 (react-dom/test-utils) or React 19+ is required');
   }
   await actFn(callback);
+}
+
+// `@tanstack/react-router`'s SSR helpers reference `globalThis.Response` (a Fetch
+// API global that jest's jsdom environment does not always polyfill). Tests that
+// exercise the real router in Node must stub it for the duration of the test
+// and restore it afterwards, otherwise other tests inherit the stub.
+async function withResponsePolyfill<T>(fn: () => Promise<T>): Promise<T> {
+  const originalResponse = globalThis.Response;
+  if (typeof originalResponse === 'undefined') {
+    globalThis.Response = class Response {} as typeof Response;
+  }
+  try {
+    return await fn();
+  } finally {
+    if (typeof originalResponse === 'undefined') {
+      delete (globalThis as { Response?: typeof Response }).Response;
+    } else {
+      globalThis.Response = originalResponse;
+    }
+  }
+}
+
+function buildStoresHydrationHarness({
+  useBatch = false,
+  includeLegacyStore = false,
+}: { useBatch?: boolean; includeLegacyStore?: boolean } = {}) {
+  const router = buildRouter();
+  if (!includeLegacyStore) {
+    delete router.__store;
+  }
+  router.matchRoutes = jest.fn().mockReturnValue([{ id: '/products', status: 'pending', updatedAt: 0 }]);
+
+  const storeState = {
+    status: createAtom<'idle' | 'pending'>('pending'),
+    resolvedLocation: createAtom<unknown>(null),
+    matches: createAtom<unknown[]>([]),
+  };
+  const stores = {
+    status: storeState.status,
+    resolvedLocation: storeState.resolvedLocation,
+    setMatches: (matches: unknown[]) => storeState.matches.set(matches),
+  };
+  const batch = useBatch ? jest.fn((callback: () => void) => tanstackStoreBatch(callback)) : undefined;
+  router.stores = stores;
+  if (batch) {
+    router.batch = batch;
+  }
+
+  const renderFn = createTanStackRouterRenderFunction(
+    { createRouter: () => router },
+    {
+      RouterProvider: (_: { router: TanStackRouter }) => React.createElement('div'),
+      createMemoryHistory: jest.fn(),
+      createBrowserHistory: jest.fn().mockReturnValue({
+        location: { pathname: '/products', search: '', hash: '', href: '/products', state: null },
+      }),
+    },
+  );
+
+  const props = {
+    __tanstackRouterDehydratedState: {
+      url: '/products',
+      dehydratedRouter: null,
+      ssrRouter: {
+        manifest: undefined,
+        lastMatchId: '\u0000products',
+        matches: [{ i: '\u0000products', l: { products: ['hammer'] }, s: 'success', u: 456 }],
+      },
+    },
+  };
+
+  return { router, storeState, batch, renderFn, props };
 }
 
 describe('tanstack-router integration (Pro)', () => {
@@ -210,6 +305,206 @@ describe('tanstack-router integration (Pro)', () => {
 
     expect(typeof result).toBe('function');
   });
+
+  it('hydrates an actual TanStack Router instance through the installed private internals', () => {
+    const router = buildActualTanStackRouter();
+    // buildActualTanStackRouter always exposes matchRoutes; a missing function
+    // would mean an upstream contract break, so assert before use rather than
+    // letting `?.` produce a downstream TypeError on `.find()`.
+    expect(typeof router.matchRoutes).toBe('function');
+    const rawMatches = router.matchRoutes!(router.state.location) as Array<{
+      id: string;
+      routeId: string;
+    }>;
+    const productsMatch = rawMatches.find((match) => match.routeId === '/products');
+    expect(productsMatch).toBeDefined();
+    const dehydratedProductsMatchId = productsMatch?.id.split('/').join('\0');
+
+    const renderFn = createTanStackRouterRenderFunction(
+      { createRouter: () => router },
+      {
+        RouterProvider: ActualRouterProvider as React.ComponentType<{ router: TanStackRouter }>,
+        createMemoryHistory: ({ initialEntries }) => createActualMemoryHistory({ initialEntries }),
+        createBrowserHistory: () => createActualMemoryHistory({ initialEntries: ['/products'] }),
+      },
+    );
+
+    const props = {
+      __tanstackRouterDehydratedState: {
+        url: '/products',
+        dehydratedRouter: null,
+        ssrRouter: {
+          manifest: undefined,
+          lastMatchId: dehydratedProductsMatchId,
+          matches: [
+            {
+              i: dehydratedProductsMatchId as string,
+              l: { products: ['hammer'] },
+              s: 'success',
+              ssr: true,
+              u: 456,
+            },
+          ],
+        },
+      },
+    };
+    const result = renderFn(props, {
+      serverSide: false,
+      pathname: '/products',
+      search: '',
+    } as unknown as RailsContext);
+
+    renderToString(React.createElement(result as React.ComponentType<Record<string, unknown>>, props));
+
+    expect(router.state.status).toBe('idle');
+    expect(router.state.resolvedLocation).toEqual(router.state.location);
+    expect(router.state.matches).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: productsMatch?.id,
+          loaderData: { products: ['hammer'] },
+          status: 'success',
+        }),
+      ]),
+    );
+  });
+
+  it('round-trips actual TanStack Router SSR match data through the public entrypoint', () =>
+    withResponsePolyfill(async () => {
+      const serverRouter = buildActualTanStackRouter();
+      const serverResult = await serverRenderTanStackAppAsync(
+        { createRouter: () => serverRouter },
+        { initial: 'prop' },
+        {
+          serverSide: true,
+          pathname: '/products',
+          search: '',
+        } as unknown as RailsContext & { serverSide: true },
+        ActualRouterProvider as React.ComponentType<{ router: TanStackRouter }>,
+        ({ initialEntries }) => createActualMemoryHistory({ initialEntries }),
+      );
+
+      expect(serverResult.dehydratedState.ssrRouter?.matches).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            l: { products: ['hammer'] },
+            s: 'success',
+          }),
+        ]),
+      );
+
+      const clientRouter = buildActualTanStackRouter();
+      const renderFn = createTanStackRouterRenderFunction(
+        { createRouter: () => clientRouter },
+        {
+          RouterProvider: ActualRouterProvider as React.ComponentType<{ router: TanStackRouter }>,
+          createMemoryHistory: ({ initialEntries }) => createActualMemoryHistory({ initialEntries }),
+          createBrowserHistory: () => createActualMemoryHistory({ initialEntries: ['/products'] }),
+        },
+      );
+
+      const props = { __tanstackRouterDehydratedState: serverResult.dehydratedState };
+      const result = renderFn(props, {
+        serverSide: false,
+        pathname: '/products',
+        search: '',
+      } as unknown as RailsContext);
+
+      renderToString(React.createElement(result as React.ComponentType<Record<string, unknown>>, props));
+
+      expect(clientRouter.state.status).toBe('idle');
+      expect(clientRouter.state.matches).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            loaderData: { products: ['hammer'] },
+            status: 'success',
+          }),
+        ]),
+      );
+    }));
+
+  it('hydrates server-rendered HTML from actual router loader state without recoverable hydration errors', () =>
+    withResponsePolyfill(async () => {
+      // This narrow provider intentionally reads the first-render router state.
+      // Minimal stub: TanStack Router only checks `typeof Response !== 'undefined'` for
+      // its SSR helpers. If a future release constructs Response instances, this stub
+      // will need to be replaced with a more complete polyfill.
+      globalThis.Response = class Response {} as typeof Response;
+      // hydration test verifies that SSR-injected state is present before the
+      // first client render, which is the hydration contract this adapter owns.
+      // Using ActualRouterProvider here exercises TanStack's subscription layer
+      // instead and can fail in this package test environment due to nested React.
+      const serverRouter = buildActualTanStackRouter();
+      const RouterStateProvider = ({ router }: { router: TanStackRouter }) => {
+        const productsMatch = router.state.matches.find((match) => {
+          const loaderData = (match as { loaderData?: { products?: unknown } }).loaderData;
+          return Array.isArray(loaderData?.products);
+        }) as { loaderData?: { products?: string[] } } | undefined;
+        const products = productsMatch?.loaderData?.products ?? [];
+
+        return React.createElement('main', null, `Products: ${products.join(', ')}`);
+      };
+      const serverResult = await serverRenderTanStackAppAsync(
+        { createRouter: () => serverRouter },
+        {},
+        {
+          serverSide: true,
+          pathname: '/products',
+          search: '',
+        } as unknown as RailsContext & { serverSide: true },
+        RouterStateProvider,
+        ({ initialEntries }) => createActualMemoryHistory({ initialEntries }),
+      );
+      const serverHtml = renderToString(serverResult.appElement);
+      expect(serverHtml).toContain('Products: hammer');
+
+      const clientRouter = buildActualTanStackRouter();
+      const renderFn = createTanStackRouterRenderFunction(
+        { createRouter: () => clientRouter },
+        {
+          RouterProvider: RouterStateProvider,
+          createMemoryHistory: ({ initialEntries }) => createActualMemoryHistory({ initialEntries }),
+          createBrowserHistory: () => createActualMemoryHistory({ initialEntries: ['/products'] }),
+        },
+      );
+      const props = { __tanstackRouterDehydratedState: serverResult.dehydratedState };
+      const clientApp = renderFn(props, {
+        serverSide: false,
+        pathname: '/products',
+        search: '',
+      } as unknown as RailsContext);
+      const container = document.createElement('div');
+      container.innerHTML = serverHtml;
+      document.body.appendChild(container);
+      const recoverableErrors: unknown[] = [];
+      let root: ReturnType<typeof hydrateRoot> | undefined;
+
+      try {
+        await compatAct(async () => {
+          root = hydrateRoot(
+            container,
+            React.createElement(clientApp as React.ComponentType<Record<string, unknown>>, props),
+            {
+              onRecoverableError: (error) => {
+                recoverableErrors.push(error);
+              },
+            },
+          );
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+
+        expect(container.textContent).toContain('Products: hammer');
+        expect(recoverableErrors).toEqual([]);
+      } finally {
+        if (root) {
+          await compatAct(async () => {
+            root?.unmount();
+          });
+        }
+        container.remove();
+      }
+    }));
 
   it('renders RouterProvider (not RouterClient) on client hydration with SSR match data', () => {
     // Regression test: the old code used RouterClient when ssrRouter data existed.
@@ -451,6 +746,79 @@ describe('tanstack-router integration (Pro)', () => {
     expect(matches[1].status).toBe('success');
   });
 
+  it('injects SSR match data through router.stores when router.__store is unavailable', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { router, storeState, renderFn, props } = buildStoresHydrationHarness();
+      const result = renderFn(props, {
+        serverSide: false,
+        pathname: '/products',
+        search: '',
+      } as unknown as RailsContext);
+
+      renderToString(React.createElement(result as React.ComponentType<Record<string, unknown>>, props));
+
+      expect(storeState.status.get()).toBe('idle');
+      expect(storeState.resolvedLocation.get()).toBe(router.state.location);
+      expect(storeState.matches.get()).toEqual([
+        expect.objectContaining({
+          id: '/products',
+          loaderData: { products: ['hammer'] },
+          status: 'success',
+        }),
+      ]);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('router.batch is unavailable'));
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('batches router.stores hydration when router.batch is available', () => {
+    const { router, storeState, batch, renderFn, props } = buildStoresHydrationHarness({ useBatch: true });
+    const result = renderFn(props, {
+      serverSide: false,
+      pathname: '/products',
+      search: '',
+    } as unknown as RailsContext);
+
+    renderToString(React.createElement(result as React.ComponentType<Record<string, unknown>>, props));
+
+    expect(batch).toHaveBeenCalledTimes(1);
+    expect(storeState.status.get()).toBe('idle');
+    expect(storeState.resolvedLocation.get()).toBe(router.state.location);
+    expect(storeState.matches.get()).toEqual([
+      expect.objectContaining({
+        id: '/products',
+        loaderData: { products: ['hammer'] },
+        status: 'success',
+      }),
+    ]);
+  });
+
+  it('uses legacy __store.setState when both legacy and stores APIs are present', () => {
+    const { router, storeState, renderFn, props } = buildStoresHydrationHarness({ includeLegacyStore: true });
+    const legacyStore = router.__store;
+    const result = renderFn(props, {
+      serverSide: false,
+      pathname: '/products',
+      search: '',
+    } as unknown as RailsContext);
+
+    renderToString(React.createElement(result as React.ComponentType<Record<string, unknown>>, props));
+
+    expect(legacyStore?.setState).toHaveBeenCalledTimes(1);
+    expect(storeState.status.get()).toBe('pending');
+    expect(storeState.resolvedLocation.get()).toBeNull();
+    expect(storeState.matches.get()).toEqual([]);
+    expect(router.state.matches).toEqual([
+      expect.objectContaining({
+        id: '/products',
+        loaderData: { products: ['hammer'] },
+        status: 'success',
+      }),
+    ]);
+  });
+
   it('does not pass __tanstackRouterDehydratedState through AppWrapper props', () => {
     const router = buildRouter();
     const observedProps: Array<Record<string, unknown>> = [];
@@ -641,7 +1009,9 @@ describe('tanstack-router integration (Pro)', () => {
 
     expect(() =>
       renderToString(React.createElement(result as React.ComponentType<Record<string, unknown>>, props)),
-    ).toThrow(/router\.matchRoutes\(\) and router\.__store are required/);
+    ).toThrow(
+      /router\.matchRoutes\(\) and router\.__store\.setState\(\) or router\.stores\.setMatches\(\) are required/,
+    );
   });
 
   it('runs router.options.hydrate callback with dehydratedData on the SSR hydration path', () => {
@@ -1101,10 +1471,77 @@ describe('tanstack-router integration (Pro)', () => {
 
     await compatAct(async () => {
       root.unmount();
+      await Promise.resolve();
     });
 
     expect(router.ssr).toBeUndefined();
     expect(cancelLoad).toHaveBeenCalledTimes(1);
+  });
+
+  it('warns if the temporary router.ssr flag is cleared before the post-hydration effect', async () => {
+    const router = buildRouter();
+    router.options = { hydrate: undefined };
+    const originalNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'development';
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const options = {
+      createRouter: () => router,
+    };
+    const deps = {
+      RouterProvider: ({ router: providerRouter }: { router: TanStackRouter }) => {
+        // Intentional render-phase mutation for test isolation: simulate TanStack
+        // Router clearing the private flag before our post-hydration effect.
+        providerRouter.ssr = undefined;
+        return React.createElement('div');
+      },
+      createMemoryHistory: jest.fn(),
+      createBrowserHistory: jest.fn().mockReturnValue({
+        location: {
+          pathname: '/products',
+          search: '?category=tools',
+          hash: '',
+          href: '/products?category=tools',
+          state: null,
+        },
+      }),
+    };
+
+    const renderFn = createTanStackRouterRenderFunction(options, deps);
+    const props = {
+      __tanstackRouterDehydratedState: {
+        url: '/products?category=tools',
+        dehydratedRouter: { matches: [{ id: 'products' }] },
+      },
+    };
+    const clientApp = renderFn(props, {
+      serverSide: false,
+      pathname: '/products',
+      search: '?category=tools',
+    } as unknown as RailsContext);
+    const container = document.createElement('div');
+    const root = createRoot(container);
+
+    try {
+      await compatAct(async () => {
+        root.render(React.createElement(clientApp as React.ComponentType<Record<string, unknown>>, props));
+        await Promise.resolve();
+      });
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        'react-on-rails-pro/tanstack-router: router.ssr was unexpectedly ' +
+          'cleared between render-phase init and the post-hydration effect. ' +
+          'TanStack Router\'s private "ssr" API may have changed — verify ' +
+          '@tanstack/react-router is within the supported range ' +
+          '(>=1.139.0 <2.0.0).',
+      );
+    } finally {
+      process.env.NODE_ENV = originalNodeEnv;
+      warnSpy.mockRestore();
+      await compatAct(() => {
+        root.unmount();
+      });
+    }
   });
 
   it('preserves user-provided router.ssr after post-hydration load settles', async () => {
@@ -1363,5 +1800,435 @@ describe('tanstack-router integration (Pro)', () => {
         ],
       },
     });
+  });
+
+  it('waits for the matched route chunk preload promise before triggering post-hydration router.load', async () => {
+    // Regression test for the Suspense-gate removal: with the gate gone,
+    // RouterProvider renders directly during hydration. The chunk-preload
+    // behavior must still be preserved by awaiting routeChunkPreloadPromiseRef
+    // inside runPostHydrationLoad before calling router.load(); otherwise
+    // post-hydration navigation could race ahead of matched lazy chunks.
+    const router = buildRouter();
+    const productsRoute = { id: '/products' };
+    let resolveChunk: (() => void) | undefined;
+    const loadRouteChunk = jest.fn().mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveChunk = resolve;
+        }),
+    );
+    (router.matchRoutes as jest.Mock).mockReturnValue([
+      { id: '/products', routeId: '/products', status: 'pending', updatedAt: 0, loaderData: undefined },
+    ]);
+    router.looseRoutesById = { '/products': productsRoute };
+    router.loadRouteChunk = loadRouteChunk;
+    // No user-defined hydrate callback — isolate the chunk-preload await path.
+    router.options = { hydrate: undefined };
+
+    const renderFn = createTanStackRouterRenderFunction(
+      { createRouter: () => router },
+      {
+        RouterProvider: (_: { router: TanStackRouter }) => React.createElement('div'),
+        createMemoryHistory: jest.fn(),
+        createBrowserHistory: jest.fn().mockReturnValue({
+          location: {
+            pathname: '/products',
+            search: '?category=tools',
+            hash: '',
+            href: '/products?category=tools',
+            state: null,
+          },
+        }),
+      },
+    );
+    const props = {
+      __tanstackRouterDehydratedState: {
+        url: '/products?category=tools',
+        dehydratedRouter: { matches: [{ id: 'products' }] },
+      },
+    };
+    const clientApp = renderFn(props, {
+      serverSide: false,
+      pathname: '/products',
+      search: '?category=tools',
+    } as unknown as RailsContext);
+    const container = document.createElement('div');
+    const root = createRoot(container);
+
+    try {
+      await compatAct(async () => {
+        root.render(React.createElement(clientApp as React.ComponentType<Record<string, unknown>>, props));
+        await Promise.resolve();
+      });
+
+      // Chunk preload kicked off during render-phase init, but the post-hydration
+      // load must remain blocked until the preload promise settles.
+      expect(loadRouteChunk).toHaveBeenCalledTimes(1);
+      expect(loadRouteChunk).toHaveBeenCalledWith(productsRoute);
+      expect(router.load).not.toHaveBeenCalled();
+
+      if (!resolveChunk) {
+        throw new Error('Expected loadRouteChunk to be invoked during render-phase init.');
+      }
+      const settleChunk = resolveChunk;
+
+      await compatAct(async () => {
+        settleChunk();
+        // Use a macrotask boundary so all queued microtasks (the preload
+        // promise's .then plus every await hop in runPostHydrationLoad) fully
+        // drain before we assert. Counting individual ticks is fragile:
+        // adding or removing a single await in runPostHydrationLoad would
+        // silently break the assertion below.
+        await new Promise((r) => {
+          setTimeout(r, 0);
+        });
+      });
+
+      expect(router.load).toHaveBeenCalledTimes(1);
+    } finally {
+      resolveChunk?.();
+      await compatAct(() => {
+        root.unmount();
+      });
+    }
+  });
+
+  it('continues post-hydration router.load after matched route chunk preload rejects', async () => {
+    const router = buildRouter();
+    const productsRoute = { id: '/products' };
+    let resolveChunk: (() => void) | undefined;
+    let rejectChunk: ((reason?: unknown) => void) | undefined;
+    const chunkError = new Error('chunk failed');
+    const loadRouteChunk = jest.fn().mockImplementation(
+      () =>
+        new Promise<void>((resolve, reject) => {
+          resolveChunk = resolve;
+          rejectChunk = reject;
+        }),
+    );
+    (router.matchRoutes as jest.Mock).mockReturnValue([
+      { id: '/products', routeId: '/products', status: 'pending', updatedAt: 0, loaderData: undefined },
+    ]);
+    router.looseRoutesById = { '/products': productsRoute };
+    router.loadRouteChunk = loadRouteChunk;
+    router.options = { hydrate: undefined };
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const renderFn = createTanStackRouterRenderFunction(
+      { createRouter: () => router },
+      {
+        RouterProvider: (_: { router: TanStackRouter }) => React.createElement('div'),
+        createMemoryHistory: jest.fn(),
+        createBrowserHistory: jest.fn().mockReturnValue({
+          location: {
+            pathname: '/products',
+            search: '?category=tools',
+            hash: '',
+            href: '/products?category=tools',
+            state: null,
+          },
+        }),
+      },
+    );
+    const props = {
+      __tanstackRouterDehydratedState: {
+        url: '/products?category=tools',
+        dehydratedRouter: { matches: [{ id: 'products' }] },
+      },
+    };
+    const clientApp = renderFn(props, {
+      serverSide: false,
+      pathname: '/products',
+      search: '?category=tools',
+    } as unknown as RailsContext);
+    const container = document.createElement('div');
+    const root = createRoot(container);
+
+    try {
+      await compatAct(async () => {
+        root.render(React.createElement(clientApp as React.ComponentType<Record<string, unknown>>, props));
+        await Promise.resolve();
+      });
+
+      expect(loadRouteChunk).toHaveBeenCalledTimes(1);
+      expect(loadRouteChunk).toHaveBeenCalledWith(productsRoute);
+      expect(router.load).not.toHaveBeenCalled();
+
+      if (!rejectChunk) {
+        throw new Error('Expected loadRouteChunk to be invoked during render-phase init.');
+      }
+      const rejectLoadedChunk = rejectChunk;
+
+      await compatAct(async () => {
+        rejectLoadedChunk(chunkError);
+        await new Promise((r) => {
+          setTimeout(r, 0);
+        });
+      });
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        'react-on-rails-pro/tanstack-router: Error preloading matched route chunks:',
+        chunkError,
+      );
+      expect(router.load).toHaveBeenCalledTimes(1);
+    } finally {
+      resolveChunk?.();
+      errorSpy.mockRestore();
+      await compatAct(() => {
+        root.unmount();
+      });
+    }
+  });
+
+  it('does not double-call loadRouteChunk when StrictMode replays hydration effects', async () => {
+    const router = buildRouter();
+    const productsRoute = { id: '/products' };
+    const resolveChunks: Array<() => void> = [];
+    const loadRouteChunk = jest.fn().mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveChunks.push(resolve);
+        }),
+    );
+    (router.matchRoutes as jest.Mock).mockReturnValue([
+      { id: '/products', routeId: '/products', status: 'pending', updatedAt: 0, loaderData: undefined },
+    ]);
+    router.looseRoutesById = { '/products': productsRoute };
+    router.loadRouteChunk = loadRouteChunk;
+    router.options = { hydrate: undefined };
+
+    const renderFn = createTanStackRouterRenderFunction(
+      { createRouter: () => router },
+      {
+        RouterProvider: (_: { router: TanStackRouter }) => React.createElement('div'),
+        createMemoryHistory: jest.fn(),
+        createBrowserHistory: jest.fn().mockReturnValue({
+          location: {
+            pathname: '/products',
+            search: '?category=tools',
+            hash: '',
+            href: '/products?category=tools',
+            state: null,
+          },
+        }),
+      },
+    );
+    const props = {
+      __tanstackRouterDehydratedState: {
+        url: '/products?category=tools',
+        dehydratedRouter: { matches: [{ id: 'products' }] },
+      },
+    };
+    const Client = renderFn(props, {
+      serverSide: false,
+      pathname: '/products',
+      search: '?category=tools',
+    } as unknown as RailsContext) as React.ComponentType<Record<string, unknown>>;
+    const container = document.createElement('div');
+    const root = createRoot(container);
+
+    await compatAct(async () => {
+      root.render(React.createElement(React.StrictMode, null, React.createElement(Client, props)));
+      await Promise.resolve();
+    });
+
+    // Render-phase init runs once per RouterProvider mount and is guarded by
+    // routerRef so a discarded StrictMode render does not kick off an extra
+    // preload. Pinning the count catches a future regression where the
+    // preload fires unexpectedly often.
+    expect(loadRouteChunk).toHaveBeenCalledTimes(1);
+    expect(loadRouteChunk).toHaveBeenCalledWith(productsRoute);
+    expect(router.load).not.toHaveBeenCalled();
+    expect(router.ssr).toEqual({ manifest: undefined });
+
+    await compatAct(async () => {
+      expect(resolveChunks).toHaveLength(1);
+      resolveChunks.forEach((resolve) => resolve());
+      await new Promise((r) => {
+        setTimeout(r, 0);
+      });
+    });
+
+    expect(router.load).toHaveBeenCalledTimes(1);
+    expect(router.ssr).toBeUndefined();
+
+    await compatAct(async () => {
+      root.unmount();
+    });
+  });
+
+  it('does not warn about cleared router.ssr after full remount of a cached router', async () => {
+    // Regression test for the WeakMap cache: after a full unmount+remount of
+    // the same router instance, the cached didSetSsrFlag must reflect the
+    // post-hydration clear — otherwise the dev sanity-check below at
+    // clientHydrate.ts:361 would falsely warn that router.ssr "was unexpectedly
+    // cleared" on the second mount even though we cleared it correctly.
+    const router = buildRouter();
+    const productsRoute = { id: '/products' };
+    const loadRouteChunk = jest.fn().mockResolvedValue(undefined);
+    (router.matchRoutes as jest.Mock).mockReturnValue([
+      { id: '/products', routeId: '/products', status: 'pending', updatedAt: 0, loaderData: undefined },
+    ]);
+    router.looseRoutesById = { '/products': productsRoute };
+    router.loadRouteChunk = loadRouteChunk;
+    router.options = { hydrate: undefined };
+
+    const originalNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'development';
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const renderFn = createTanStackRouterRenderFunction(
+      { createRouter: () => router },
+      {
+        RouterProvider: (_: { router: TanStackRouter }) => React.createElement('div'),
+        createMemoryHistory: jest.fn(),
+        createBrowserHistory: jest.fn().mockReturnValue({
+          location: {
+            pathname: '/products',
+            search: '?category=tools',
+            hash: '',
+            href: '/products?category=tools',
+            state: null,
+          },
+        }),
+      },
+    );
+    const props = {
+      __tanstackRouterDehydratedState: {
+        url: '/products?category=tools',
+        dehydratedRouter: { matches: [{ id: 'products' }] },
+      },
+    };
+    const Client = renderFn(props, {
+      serverSide: false,
+      pathname: '/products',
+      search: '?category=tools',
+    } as unknown as RailsContext) as React.ComponentType<Record<string, unknown>>;
+
+    try {
+      // First mount: render-phase init runs, post-hydration effect clears router.ssr.
+      const container1 = document.createElement('div');
+      const root1 = createRoot(container1);
+      await compatAct(async () => {
+        root1.render(React.createElement(Client, props));
+        await new Promise((r) => {
+          setTimeout(r, 0);
+        });
+      });
+      expect(router.ssr).toBeUndefined();
+      await compatAct(async () => {
+        root1.unmount();
+      });
+
+      // Second mount of the same cached router. The render-phase guard hits
+      // the WeakMap and restores didSetSsrFlag from the cache. If the cache
+      // had been left stale at didSetSsrFlag=true, the dev sanity check would
+      // fire here because router.ssr is already null on the cached router.
+      warnSpy.mockClear();
+      const container2 = document.createElement('div');
+      const root2 = createRoot(container2);
+      await compatAct(async () => {
+        root2.render(React.createElement(Client, props));
+        await new Promise((r) => {
+          setTimeout(r, 0);
+        });
+      });
+
+      expect(warnSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('router.ssr was unexpectedly cleared'),
+      );
+
+      await compatAct(async () => {
+        root2.unmount();
+      });
+    } finally {
+      process.env.NODE_ENV = originalNodeEnv;
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('renders RouterProvider directly without an enclosing Suspense boundary during hydration', () => {
+    // Regression test for the Suspense-gate removal: both the server tree
+    // (serverRender.ts's `buildAppElement`) and the client hydration tree
+    // emit AppWrapper > RouterProvider with no Suspense wrapper. A Suspense
+    // wrapper on either side would emit `<!--$-->`/`<!--/$-->` markers in
+    // the server HTML and require a matching boundary on the client; an
+    // asymmetric boundary causes a hydration mismatch and React bails to a
+    // full client-side re-render.
+    const router = buildRouter();
+    const renderFn = createTanStackRouterRenderFunction(
+      { createRouter: () => router },
+      {
+        RouterProvider: (_: { router: TanStackRouter }) =>
+          React.createElement('div', { 'data-testid': 'provider' }),
+        createMemoryHistory: jest.fn(),
+        createBrowserHistory: jest.fn().mockReturnValue({
+          location: {
+            pathname: '/products',
+            search: '?category=tools',
+            hash: '',
+            href: '/products?category=tools',
+            state: null,
+          },
+        }),
+      },
+    );
+    const props = {
+      __tanstackRouterDehydratedState: {
+        url: '/products?category=tools',
+        dehydratedRouter: { matches: [{ id: 'products' }] },
+        ssrRouter: {
+          manifest: undefined,
+          lastMatchId: '\u0000products',
+          matches: [{ i: '\u0000products', l: { products: ['hammer'] }, s: 'success', ssr: true, u: 123 }],
+        },
+      },
+    };
+    const Client = renderFn(props, {
+      serverSide: false,
+      pathname: '/products',
+      search: '?category=tools',
+    } as unknown as RailsContext) as React.ComponentType<Record<string, unknown>>;
+
+    // The fix's strongest guarantee: the rendered HTML must be exactly the
+    // mock RouterProvider's output. With a Suspense wrapper (the bug),
+    // react-dom/server emits <!--$-->/<!--/$--> markers around the children
+    // even when the boundary does not actually suspend, so this equality
+    // assertion catches any wrapping Suspense boundary.
+    const html = renderToString(React.createElement(Client, props));
+    expect(html).toBe('<div data-testid="provider"></div>');
+  });
+
+  it('throws if RouterProvider suspends during server render', async () => {
+    const router = buildRouter();
+
+    const result = await serverRenderTanStackAppAsync(
+      { createRouter: () => router },
+      { initial: 'prop' },
+      {
+        serverSide: true,
+        pathname: '/products',
+        search: '',
+      } as unknown as RailsContext & { serverSide: true },
+      (_props: { router: TanStackRouter }) => {
+        throw Promise.resolve();
+      },
+      jest.fn().mockReturnValue({
+        location: {
+          pathname: '/products',
+          search: '',
+          hash: '',
+          href: '/products',
+          state: null,
+        },
+      }),
+    );
+
+    // React's legacy `renderToString` produces its own "component suspended
+    // while responding to synchronous input" error when RouterProvider
+    // suspends during SSR. The server tree no longer wraps RouterProvider in
+    // <Suspense> (doing so would break hydration parity in React 19), so the
+    // built-in React error is the loud throw we rely on here.
+    expect(() => renderToString(result.appElement)).toThrow(/component suspended/);
   });
 });

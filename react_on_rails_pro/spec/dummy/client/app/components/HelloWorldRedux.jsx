@@ -21,7 +21,7 @@ export default class HelloWorldRedux extends React.Component {
 
   handleChange() {
     const name = this.nameDomRef.value;
-    // eslint-disable-next-line react/destructuring-assignment
+
     this.props.actions.updateName(name);
   }
 

@@ -2,7 +2,6 @@ import PropTypes from 'prop-types';
 import React, { useState } from 'react';
 
 function HelloWorld(props) {
-  // eslint-disable-next-line react/destructuring-assignment
   const [name, setName] = useState(props.name);
 
   return (

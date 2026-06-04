@@ -16,11 +16,14 @@ Pro-specific guidance. See root CLAUDE.md for general project rules.
 
 ### Linting
 
-Pro has its **own** ESLint and Prettier configs (separate from root): `eslint.config.mjs`, `.prettierrc`, `.prettierignore`.
+Pro uses the root ESLint and Prettier configs. Run JS/TS lint and formatting from the repo root.
 
-- Pro ESLint: `cd react_on_rails_pro && pnpm run eslint .`
-- Pro Prettier check: `cd react_on_rails_pro && pnpm run prettier --check .`
-- CI runs both root and Pro linting separately
+- JS/TS lint: `pnpm run eslint --report-unused-disable-directives`
+- Prettier check: `pnpm start format.listDifferent`
+- Pro Ruby lint: `cd react_on_rails_pro && bundle exec rubocop --ignore-parent-exclusion`
+- Pro RBS validation: `cd react_on_rails_pro && bundle exec rake rbs:validate`
+- Pro TypeScript check: `pnpm run nps check-typescript`
+- CI runs unified ESLint/Prettier in `lint-js-and-ruby.yml`; Pro Ruby/RBS/TypeScript checks run in the `pro-lint` job in `pro-test-package-and-gem.yml`
 
 ### Building
 
@@ -91,8 +94,7 @@ Order matters. If the base package isn't published first, the chain breaks.
 GitHub Actions workflows for Pro (at repo root `.github/workflows/`):
 
 - `pro-integration-tests.yml` — Pro dummy app integration tests
-- `pro-lint.yml` — Pro-specific linting
-- `pro-test-package-and-gem.yml` — Pro gem + JS package tests
+- `pro-test-package-and-gem.yml` — Pro gem + JS package tests, plus Pro Ruby/RBS/TypeScript linting
 
 ## Key Differences from Open-Source
 
@@ -102,5 +104,4 @@ GitHub Actions workflows for Pro (at repo root `.github/workflows/`):
 | SSR                | ExecJS or basic Node   | Dedicated node renderer process                                     |
 | Server bundles     | Public                 | Private (`ssr-generated/`, `enforce_private_server_bundles = true`) |
 | Transpiler         | SWC                    | Babel (needed for advanced transforms)                              |
-| Lint/format config | Root configs           | Own ESLint + Prettier configs                                       |
 | Test commands      | `rake run_rspec:dummy` | Separate Pro commands (see above)                                   |

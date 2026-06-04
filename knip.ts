@@ -37,6 +37,10 @@ const config: KnipConfig = {
         // This is an optional peer dependency because users without RSC don't need it
         // but Knip doesn't like such dependencies to be referenced directly in code
         'react-on-rails-rsc',
+        // Optional peer dependency: only apps using the TanStack Router adapter need it.
+        // It is pinned as a devDependency in packages/react-on-rails-pro for tests,
+        // but Knip still flags optional peers referenced in code.
+        '@tanstack/react-router',
         // SWC transpiler dependencies used by Shakapacker in dummy apps
         '@swc/core',
         'swc-loader',
@@ -86,10 +90,20 @@ const config: KnipConfig = {
         // Test helper utilities
         'tests/helper.ts',
         'tests/httpRequestUtils.ts',
+        'src/testUtils/opentelemetry.ts',
       ],
       ignoreDependencies: [
         // Optional dependencies used in integrations
         '@honeybadger-io/js',
+        '@fastify/otel',
+        '@opentelemetry/api',
+        '@opentelemetry/exporter-trace-otlp-http',
+        '@opentelemetry/instrumentation',
+        '@opentelemetry/instrumentation-http',
+        '@opentelemetry/resources',
+        '@opentelemetry/sdk-trace-base',
+        '@opentelemetry/sdk-trace-node',
+        '@opentelemetry/semantic-conventions',
         '@sentry/*',
         // Jest reporter used in CI
         'jest-junit',
@@ -120,6 +134,8 @@ const config: KnipConfig = {
         // Jest setup and test utilities - not detected by Jest plugin in workspace setup
         'tests/jest.setup.js',
         'tests/utils/removeRSCStackFromAllChunks.ts',
+        // Test fixtures referenced dynamically (e.g. via webpack NormalModuleReplacementPlugin)
+        'tests/fixtures/**',
         // Build output directories that should be ignored
         'lib/**',
         // Pro features exported for external consumption
@@ -139,6 +155,7 @@ const config: KnipConfig = {
         'config/webpack/{production,development,test}.js',
         // Declaring this as webpack.config instead doesn't work correctly
         'config/webpack/webpack.config.js',
+        'config/rspack/rspack.config.js',
         // SWC configuration for Shakapacker
         'config/swc.config.js',
         // Playwright E2E test configuration and tests
@@ -188,6 +205,13 @@ const config: KnipConfig = {
         'mini-css-extract-plugin',
         // Webpack config merge helper is used in the dummy app config, but not detected reliably by Knip.
         'webpack-merge',
+        // Shakapacker adapter package is selected by the dummy app's package/config tooling, not imported directly.
+        'shakapacker-webpack',
+        // Used by dynamically registered dummy app components, which are intentionally ignored above.
+        '@dr.pogodin/react-helmet',
+        'create-react-class',
+        'react-redux',
+        'react-router-dom',
         // This one is weird. It's long-deprecated and shouldn't be necessary.
         // Probably need to update the Webpack config.
         'node-libs-browser',
@@ -200,8 +224,15 @@ const config: KnipConfig = {
         'sass-resources-loader',
         'style-loader',
         'url-loader',
+        // Loaded indirectly by Shakapacker when assets_bundler is rspack.
+        'shakapacker-rspack',
       ],
     },
+  },
+  ignoreIssues: {
+    'packages/react-on-rails-pro-node-renderer/src/shared/tracing.ts': ['exports'],
+    'packages/react-on-rails-pro-node-renderer/src/worker/fastifyConfig.ts': ['exports'],
+    'packages/react-on-rails-pro-node-renderer/src/worker/shutdownHooks.ts': ['exports'],
   },
   ignoreExportsUsedInFile: true,
 };

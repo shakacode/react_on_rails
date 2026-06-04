@@ -14,15 +14,17 @@ import log, { sharedLoggerOptions } from './shared/log.js';
 import packageJson from './shared/packageJson.js';
 import { buildConfig, Config, getConfig } from './shared/configBuilder.js';
 import fileExistsAsync from './shared/fileExistsAsync.js';
-import type { FastifyInstance, FastifyReply } from './worker/types.js';
+import type { FastifyReply } from './worker/types.js';
 import { performRequestPrechecks } from './worker/requestPrechecks.js';
 import { type AuthBody, authenticate } from './worker/authHandler.js';
 import {
   handleRenderRequest,
   type ProvidedNewBundle,
   handleNewBundlesProvided,
+  sumUploadedBytes,
 } from './worker/handleRenderRequest.js';
 import handleGracefulShutdown from './worker/handleGracefulShutdown.js';
+import { SENSITIVE_REQUEST_BODY_KEYS } from './shared/sensitiveKeys.js';
 import { handleStartupListenError } from './worker/startupErrorHandler.js';
 import {
   handleIncrementalRenderRequest,
@@ -40,7 +42,10 @@ import {
   Asset,
   getAssetPath,
 } from './shared/utils.js';
-import { startSsrRequestOptions, trace } from './shared/tracing.js';
+import { startSsrRequestOptions, subSpan, trace, type TracingContext } from './shared/tracing.js';
+import { applyFastifyConfigFunctions } from './worker/fastifyConfig.js';
+
+export { configureFastify, type FastifyConfigFunction } from './worker/fastifyConfig.js';
 
 // Uncomment the below for testing timeouts:
 // import { delay } from './shared/utils.js';
@@ -60,20 +65,6 @@ declare module 'fastify' {
   interface FastifyRequest {
     uploadDir: string;
   }
-}
-
-export type FastifyConfigFunction = (app: FastifyInstance) => void;
-
-const fastifyConfigFunctions: FastifyConfigFunction[] = [];
-
-/**
- * Configures Fastify instance before starting the server.
- * @param configFunction The configuring function. Normally it will be something like `(app) => { app.register(...); }`
- *  or `(app) => { app.addHook(...); }` to report data from Fastify to an external service.
- *  Note that we call `await app.ready()` in our code, so you don't need to `await` the results.
- */
-export function configureFastify(configFunction: FastifyConfigFunction) {
-  fastifyConfigFunctions.push(configFunction);
 }
 
 function setHeaders(headers: ResponseResult['headers'], res: FastifyReply) {
@@ -159,23 +150,6 @@ const errorCode = (error: unknown): string | undefined => {
 
 const isValidRenderingRequest = (value: unknown): value is string =>
   typeof value === 'string' && value.length > 0;
-
-const SENSITIVE_REQUEST_BODY_KEYS = new Set([
-  'password',
-  'token',
-  'secret',
-  'api_key',
-  'api-key',
-  'apikey',
-  'authorization',
-  'auth_token',
-  'auth-token',
-  'authtoken',
-  'access_token',
-  'accesstoken',
-  'bearer',
-  'credentials',
-]);
 
 const invalidRenderingRequestMessage = (body: Record<string, unknown>) => {
   const { renderingRequest } = body;
@@ -393,86 +367,95 @@ export default function run(config: Partial<Config>) {
     // Track whether we've already started sending a response (streaming or otherwise)
     // If true, we can't send an error response on failure - headers are already sent
     let responseStarted = false;
+    let incrementalTracingContext: TracingContext | undefined;
 
     try {
-      // Handle the incremental render stream
-      await handleIncrementalRenderStream({
-        request: req,
-        onRenderRequestReceived: async (obj: unknown) => {
-          // Build a temporary FastifyRequest shape for protocol/auth check
-          const tempReqBody = typeof obj === 'object' && obj !== null ? (obj as Record<string, unknown>) : {};
+      await trace(
+        async (context) => {
+          incrementalTracingContext = context;
+          // Handle the incremental render stream
+          await handleIncrementalRenderStream({
+            request: req,
+            onRenderRequestReceived: async (obj: unknown) => {
+              // Build a temporary FastifyRequest shape for protocol/auth check
+              const tempReqBody =
+                typeof obj === 'object' && obj !== null ? (obj as Record<string, unknown>) : {};
 
-          // Perform request prechecks
-          const precheckResult = performRequestPrechecks(tempReqBody);
-          if (precheckResult) {
-            return {
-              response: precheckResult,
-              shouldContinue: false,
-            };
-          }
+              // Perform request prechecks
+              const precheckResult = performRequestPrechecks(tempReqBody);
+              if (precheckResult) {
+                return {
+                  response: precheckResult,
+                  shouldContinue: false,
+                };
+              }
 
-          // Extract data for incremental render request
-          const dependencyBundleTimestamps = extractBodyArrayField(
-            tempReqBody as WithBodyArrayField<Record<string, unknown>, 'dependencyBundleTimestamps'>,
-            'dependencyBundleTimestamps',
-          );
+              // Extract data for incremental render request
+              const dependencyBundleTimestamps = extractBodyArrayField(
+                tempReqBody as WithBodyArrayField<Record<string, unknown>, 'dependencyBundleTimestamps'>,
+                'dependencyBundleTimestamps',
+              );
 
-          const initial: IncrementalRenderInitialRequest = {
-            firstRequestChunk: obj,
-            bundleTimestamp,
-            dependencyBundleTimestamps,
-          };
+              const initial: IncrementalRenderInitialRequest = {
+                firstRequestChunk: obj,
+                bundleTimestamp,
+                dependencyBundleTimestamps,
+              };
 
-          try {
-            const { response, sink } = await handleIncrementalRenderRequest(initial);
-            incrementalSink = sink;
+              try {
+                const { response, sink } = await handleIncrementalRenderRequest(initial);
+                incrementalSink = sink;
 
-            return {
-              response,
-              shouldContinue: !!incrementalSink,
-            };
-          } catch (err) {
-            const errorResponse = errorResponseResult(
-              formatExceptionMessage(
-                { label: 'IncrementalRender', content: '' },
-                err,
-                'Error while handling incremental render request',
-              ),
-            );
-            return {
-              response: errorResponse,
-              shouldContinue: false,
-            };
-          }
+                return {
+                  response,
+                  shouldContinue: !!incrementalSink,
+                };
+              } catch (err) {
+                const errorResponse = errorResponseResult(
+                  formatExceptionMessage(
+                    { label: 'IncrementalRender', content: '' },
+                    err,
+                    'Error while handling incremental render request',
+                  ),
+                  context,
+                );
+                return {
+                  response: errorResponse,
+                  shouldContinue: false,
+                };
+              }
+            },
+
+            onUpdateReceived: async (obj: unknown) => {
+              if (!incrementalSink) {
+                log.error({ msg: 'Unexpected update chunk received after rendering was aborted', obj });
+                return;
+              }
+
+              try {
+                await incrementalSink.add(obj);
+              } catch (err) {
+                // Log error but don't stop processing
+                log.error({ err, msg: 'Error processing update chunk' });
+              }
+            },
+
+            onResponseStart: async (response: ResponseResult) => {
+              responseStarted = true;
+              await setResponse(response, res);
+            },
+
+            onRequestEnded: () => {
+              if (!incrementalSink) {
+                return;
+              }
+
+              incrementalSink.handleRequestClosed();
+            },
+          });
         },
-
-        onUpdateReceived: async (obj: unknown) => {
-          if (!incrementalSink) {
-            log.error({ msg: 'Unexpected update chunk received after rendering was aborted', obj });
-            return;
-          }
-
-          try {
-            await incrementalSink.add(obj);
-          } catch (err) {
-            // Log error but don't stop processing
-            log.error({ err, msg: 'Error processing update chunk' });
-          }
-        },
-
-        onResponseStart: async (response: ResponseResult) => {
-          responseStarted = true;
-          await setResponse(response, res);
-        },
-
-        onRequestEnded: () => {
-          if (!incrementalSink) {
-            return;
-          }
-
-          incrementalSink.handleRequestClosed();
-        },
-      });
+        startSsrRequestOptions({ renderingRequest: 'ReactOnRails.incrementalRender' }),
+      );
     } catch (err) {
       // If an error occurred during stream processing, send error response
       const errorMessage = formatExceptionMessage(
@@ -507,7 +490,7 @@ export default function run(config: Partial<Config>) {
         }
       } else {
         // Response hasn't started yet, we can send an error response
-        const errorResponse = errorResponseResult(errorMessage);
+        const errorResponse = errorResponseResult(errorMessage, incrementalTracingContext);
         await setResponse(errorResponse, res);
       }
     }
@@ -547,10 +530,25 @@ export default function run(config: Partial<Config>) {
       // endpoint so that concurrent /upload-assets and render requests
       // targeting the same bundle directory are mutually exclusive.
       // See https://github.com/shakacode/react_on_rails/issues/2463
-      const result = await handleNewBundlesProvided(
-        { label: 'Request:', content: taskDescription },
-        providedNewBundles,
-        assetsToCopy,
+      const bytesTotal = await sumUploadedBytes([
+        ...providedNewBundles.map((b) => b.bundle),
+        ...(assetsToCopy ?? []),
+      ]);
+      const result = await subSpan(
+        {
+          name: 'ror.bundle.upload',
+          attributes: {
+            'bundle.count': providedNewBundles.length,
+            'assets.count': assetsToCopy.length,
+            'bytes.total': bytesTotal,
+          },
+        },
+        () =>
+          handleNewBundlesProvided(
+            { label: 'Request:', content: taskDescription },
+            providedNewBundles,
+            assetsToCopy,
+          ),
       );
       if (result) {
         await setResponse(result, res);
@@ -644,9 +642,9 @@ export default function run(config: Partial<Config>) {
     });
   }
 
-  fastifyConfigFunctions.forEach((configFunction) => {
-    configFunction(app);
-  });
+  // Integration hooks registered before the worker loads are applied here, immediately after
+  // listen() is scheduled and before Fastify finishes booting.
+  applyFastifyConfigFunctions(app);
 
   return app;
 }

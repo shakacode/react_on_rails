@@ -151,6 +151,7 @@ const sidebars: SidebarsConfig = {
       items: [
         'deployment/docker-deployment',
         'deployment/heroku-deployment',
+        'deployment/review-app-security',
         'deployment/server-rendering-tips',
         'deployment/troubleshooting',
         'deployment/troubleshooting-build-errors',
@@ -193,9 +194,14 @@ const sidebars: SidebarsConfig = {
       link: { type: 'doc', id: 'pro/react-on-rails-pro' },
       items: [
         'pro/installation',
+        'pro/license-ci-integration',
+        'pro/deployment/review-app-security',
         'pro/upgrading-to-pro',
         'pro/streaming-ssr',
+        'pro/async-props-database-queries',
         'pro/node-renderer',
+        'pro/rolling-deploy-adapters',
+        'pro/rolling-deploy-custom-adapters',
         'pro/fragment-caching',
         'pro/js-memory-leaks',
         'pro/profiling-server-side-rendering-code',

@@ -196,6 +196,14 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     stream_view_containing_react_components(template: "/pages/server_router")
   end
 
+  def unwrapped_rsc_route_client_render
+    render "/pages/unwrapped_rsc_route_client_render"
+  end
+
+  def unwrapped_rsc_route_stream_render
+    stream_view_containing_react_components(template: "/pages/unwrapped_rsc_route_stream_render")
+  end
+
   def server_side_hello_world_hooks
     stream_view_containing_react_components(template: "/pages/server_side_hello_world_hooks")
   end
@@ -255,6 +263,10 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
 
   def rsc_native_metadata
     stream_view_containing_react_components(template: "/pages/rsc_native_metadata")
+  end
+
+  def cache_demo
+    stream_view_containing_react_components(template: "/pages/cache_demo")
   end
 
   # Demo page showing 10 async components rendering concurrently

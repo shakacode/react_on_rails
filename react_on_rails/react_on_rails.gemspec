@@ -26,14 +26,14 @@ Gem::Specification.new do |s|
 
   s.files = Dir.chdir(__dir__) do
     `git ls-files -z`.split("\x0").reject do |f|
-      f.match(%r{^(spec|tmp)/})
+      f.match(%r{^(spec|tmp|spike)/})
     end
   end
   s.bindir        = "exe"
   s.executables   = s.files.grep(%r{^exe/}) { |f| File.basename(f) }
   s.require_paths = ["lib"]
 
-  s.required_ruby_version = ">= 3.0.0"
+  s.required_ruby_version = ">= 3.3.0"
 
   s.add_dependency "addressable"
   s.add_dependency "connection_pool"

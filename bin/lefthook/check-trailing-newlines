@@ -18,6 +18,10 @@ fi
 
 for file in $files; do
   if [ -f "$file" ] && [ -s "$file" ]; then
+    if ! grep -Iq . "$file"; then
+      continue
+    fi
+
     if ! tail -c 1 "$file" | grep -q '^$'; then
       echo "🔧 Adding trailing newline to: $file"
       echo >> "$file"

@@ -33,12 +33,12 @@ ReactOnRails.register({ MyComponent });
 ### React Server Components (Pro-exclusive)
 
 ```javascript
-import { RSCRoute } from 'react-on-rails-pro/RSCRoute';
+import RSCRoute from 'react-on-rails-pro/RSCRoute';
 import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';
-import { wrapServerComponentRenderer } from 'react-on-rails-pro/wrapServerComponentRenderer/client';
+import wrapServerComponentRenderer from 'react-on-rails-pro/wrapServerComponentRenderer/client';
 
 // Register a server component for client-side hydration
-registerServerComponent({ MyServerComponent });
+registerServerComponent('MyServerComponent');
 ```
 
 ## Package Relationship
@@ -97,4 +97,4 @@ See the [full installation guide](https://reactonrails.com/docs/pro/installation
 
 ## License
 
-Commercial software. No license required for evaluation, development, testing, or CI/CD. A paid license is required for production deployments. Contact [justin@shakacode.com](mailto:justin@shakacode.com) for licensing.
+Commercial software. No license required for evaluation, development, testing, or CI/CD. A paid license is required for production deployments. Contact [ShakaCode](https://pro.reactonrails.com/contact) for licensing.

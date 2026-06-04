@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "async"
-require "async/barrier"
 
 module ReactOnRailsPro
   class StreamDecorator
@@ -14,6 +13,18 @@ module ReactOnRailsPro
       # The position parameter is used by actions that add content to the beginning or end of the stream
       @actions = [] # List to store all actions
       @rescue_blocks = []
+    end
+
+    def http_status
+      return @component.http_status if @component.respond_to?(:http_status)
+
+      nil
+    end
+
+    def http_status_recorded?
+      return @component.http_status_recorded? if @component.respond_to?(:http_status_recorded?)
+
+      false
     end
 
     # Add a prepend action
@@ -86,8 +97,19 @@ module ReactOnRailsPro
   end
 
   class StreamRequest
-    def initialize(&request_block)
+    def http_status
+      @status
+    end
+
+    def http_status_recorded?
+      @status_recorded
+    end
+
+    def initialize(first_chunk_warn_callback: nil, &request_block)
       @request_executor = request_block
+      @first_chunk_warn_callback = first_chunk_warn_callback
+      @status = nil
+      @status_recorded = false
     end
 
     private_class_method :new
@@ -95,82 +117,133 @@ module ReactOnRailsPro
     def each_chunk(&block)
       return enum_for(:each_chunk) unless block
 
-      Sync do
-        barrier = Async::Barrier.new
-
-        send_bundle = false
-        error_body = +""
-        loop do
-          stream_response = @request_executor.call(send_bundle, barrier)
-
-          # The Node renderer always emits the length-prefixed wire format
-          # (`<metadata JSON>\t<content byte length hex>\n<raw content bytes>`)
-          # for every response chunk — both the one-shot streaming path and the
-          # incremental-rendering path. We check the status code inside the loop
-          # block because calling `status` outside of it blocks until the full
-          # response has been received. See the `status` spec in
-          # `spec/react_on_rails_pro/stream_spec.rb` for more details.
-          process_response_chunks(stream_response, error_body, &block)
-          break
-        rescue HTTPX::HTTPError => e
-          send_bundle = handle_http_error(e, error_body, send_bundle)
-        rescue HTTPX::ReadTimeoutError => e
-          raise ReactOnRailsPro::Error, "Time out error while server side render streaming a component.\n" \
-                                        "Original error:\n#{e}\n#{e.backtrace}"
-        end
-
-        barrier.wait
-      end
+      Sync { consume_with_bundle_reupload(&block) }
     end
 
-    # Method to start the decoration
-    def self.create(&request_block)
-      StreamDecorator.new(new(&request_block))
+    def self.create(first_chunk_warn_callback: nil, &request_block)
+      StreamDecorator.new(new(first_chunk_warn_callback: first_chunk_warn_callback, &request_block))
     end
 
     private
 
-    def process_response_chunks(stream_response, error_body, &block)
-      parser = ReactOnRails::LengthPrefixedParser.new
-      stream_response.each do |chunk|
-        stream_response.instance_variable_set(:@react_on_rails_received_first_chunk, true)
+    def consume_with_bundle_reupload(&block)
+      send_bundle = false
+      tasks = []
+      available_retries = ReactOnRailsPro.configuration.renderer_request_retry_limit
 
-        if response_has_error_status?(stream_response)
-          error_body << chunk
-          next
+      begin
+        loop do
+          # Pre-call reset guards transport failures that happen before a response object
+          # exists; process_response_chunks resets again so parsing state belongs to that
+          # response attempt.
+          reset_response_status
+          @received_first_chunk = false
+          stream_response = @request_executor.call(send_bundle, tasks)
+
+          process_response_chunks(stream_response, &block)
+          break
+        rescue ReactOnRailsPro::RendererHttpClient::HTTPError => e
+          stop_tasks(tasks) if retrying_with_bundle_upload?(e, send_bundle)
+          send_bundle = handle_http_error(e, send_bundle)
+        rescue ReactOnRailsPro::RendererHttpClient::TimeoutError,
+               ReactOnRailsPro::RendererHttpClient::ConnectionError => e
+          raise_or_retry_streaming_transport_error(e, available_retries)
+          available_retries -= 1
+          stop_tasks(tasks)
+        end
+
+        tasks.each(&:wait)
+      ensure
+        tasks.each(&:stop)
+      end
+    end
+
+    def process_response_chunks(stream_response, &block)
+      parser = ReactOnRails::LengthPrefixedParser.new
+      # This repeats the pre-call reset in each_chunk intentionally: once a
+      # response object exists, parsing state belongs to this response attempt.
+      reset_response_status
+      request_start_time = Time.now
+
+      stream_response.each do |chunk|
+        record_status(stream_response) unless @status_recorded
+        next if stream_response.error?
+
+        unless @received_first_chunk
+          @received_first_chunk = true
+          @first_chunk_warn_callback&.call(Time.now - request_start_time)
         end
 
         parser.feed(chunk, &block)
       end
+      record_status(stream_response) unless @status_recorded
       parser.flush
+    rescue ReactOnRailsPro::RendererHttpClient::HTTPError => e
+      record_status(e.response)
+      raise
+    rescue ReactOnRailsPro::RendererHttpClient::Error
+      record_status(stream_response)
+      raise
     end
 
-    def response_has_error_status?(response)
-      return true if response.is_a?(HTTPX::ErrorResponse)
-
-      response.status >= 400
-    rescue NoMethodError
-      # HTTPX::StreamResponse can fail to delegate #status for non-streaming errors.
-      true
+    # Retrying after first chunk would duplicate content in the page.
+    def raise_or_retry_streaming_transport_error(error, available_retries)
+      error_type = error.is_a?(ReactOnRailsPro::RendererHttpClient::TimeoutError) ? "Time out" : "Connection"
+      if @received_first_chunk || available_retries.zero?
+        raise ReactOnRailsPro::Error, "#{error_type} error while server side render streaming a component.\n" \
+                                      "Original error:\n#{error}\n#{error.backtrace}"
+      end
+      Rails.logger.info do
+        "[ReactOnRailsPro] Streaming #{error_type.downcase} error before receiving first chunk. " \
+          "Retrying #{available_retries} more times..."
+      end
     end
 
-    def handle_http_error(error, error_body, send_bundle)
+    def stop_tasks(tasks)
+      tasks.each(&:stop)
+      tasks.each(&:wait)
+      tasks.clear
+    end
+
+    def retrying_with_bundle_upload?(error, send_bundle)
+      !send_bundle && error.response.status == ReactOnRailsPro::STATUS_SEND_BUNDLE
+    end
+
+    def handle_http_error(error, send_bundle)
       response = error.response
-      case response.status
-      when ReactOnRailsPro::STATUS_SEND_BUNDLE
-        # To prevent infinite loop
-        ReactOnRailsPro::Error.raise_duplicate_bundle_upload_error if send_bundle
+      record_status(response)
+      status = response.status
+      body = response.body
 
+      case status
+      when ReactOnRailsPro::STATUS_SEND_BUNDLE
+        ReactOnRailsPro::Error.raise_duplicate_bundle_upload_error if send_bundle
         true
       when ReactOnRailsPro::STATUS_BAD_REQUEST
         raise ReactOnRailsPro::Error,
-              "Renderer rejected malformed request or hit an unhandled VM error: " \
-              "#{response.status}:\n#{error_body}"
+              "Renderer rejected malformed request or hit an unhandled VM error: #{status}:\n#{body}"
       when ReactOnRailsPro::STATUS_INCOMPATIBLE
-        raise ReactOnRailsPro::Error, error_body
+        raise ReactOnRailsPro::Error, body
       else
-        raise ReactOnRailsPro::Error, "Unexpected response code from renderer: #{response.status}:\n#{error_body}"
+        raise ReactOnRailsPro::Error, "Unexpected response code from renderer: #{status}:\n#{body}"
       end
+    end
+
+    def reset_response_status
+      @status = nil
+      @status_recorded = false
+    end
+
+    def record_status(response)
+      return if @status_recorded || !response.respond_to?(:status)
+
+      status = response.status
+      # Leave nil status unrecorded so a later call can retry after a lazy
+      # transport response has populated its metadata.
+      return if status.nil?
+
+      @status = status
+      @status_recorded = true
     end
   end
 end

@@ -10,7 +10,7 @@ coverage/
 /spec/reports/
 /tmp/
 *.gem
-/vendor/
+**/vendor/bundle/
 
 # Root-level spec directory (should not exist with monorepo structure)
 /spec/
@@ -52,7 +52,6 @@ yalc.lock
 *.tsbuildinfo
 
 # Dummy app
-/spec/dummy/vendor/bundle
 react_on_rails/spec/dummy/db/*.sqlite3*
 react_on_rails/spec/dummy/log/**/*
 !react_on_rails/spec/dummy/log/.keep
@@ -88,6 +87,7 @@ ssr-generated
 # Claude Code local settings
 .claude/settings.local.json
 .claude/napkin.md
+.claude/.main-ci-status.cache*
 .Codex/napkin.md
 
 # AI assistant internal files

@@ -501,10 +501,141 @@ RSpec.describe "update_changelog.rake helper methods" do
           - Feature from RC
         CHANGELOG
 
-        prepared_changelog = prepare_changelog_for_auto_version(changelog, repo_dir)
-        version = compute_auto_version(changelog, "rc", repo_dir, changelog_for_bump: prepared_changelog)
+        # No v16.4.0.rc.0 git tag exists, so prerelease_indices_from_tags
+        # returns [] → next_index 0. The task would skip re-insertion because
+        # the header already exists in the changelog, which is the correct
+        # behaviour for an untagged draft.
+        version = compute_auto_version(changelog, "rc", repo_dir)
 
         expect(version).to eq("16.4.0.rc.0")
+      end
+    end
+
+    it "increments rc index from existing rc tag of the same base version" do
+      Dir.mktmpdir do |repo_dir|
+        init_git_repo!(repo_dir)
+        run_git!("tag", "v16.3.0", chdir: repo_dir)
+        run_git!("tag", "v16.4.0.rc.0", chdir: repo_dir)
+
+        changelog = <<~CHANGELOG
+          ### [Unreleased]
+
+          ### [16.4.0.rc.0] - 2026-03-01
+          #### Added
+          - Feature from rc.0
+        CHANGELOG
+
+        version = compute_auto_version(changelog, "rc", repo_dir)
+
+        expect(version).to eq("16.4.0.rc.1")
+      end
+    end
+
+    it "increments beta index from existing beta tag of the same base version" do
+      # Mirrors the rc.1 increment test for the beta channel, since both modes
+      # share the early-return code path in compute_auto_version.
+      Dir.mktmpdir do |repo_dir|
+        init_git_repo!(repo_dir)
+        run_git!("tag", "v16.3.0", chdir: repo_dir)
+        run_git!("tag", "v16.4.0.beta.0", chdir: repo_dir)
+
+        changelog = <<~CHANGELOG
+          ### [Unreleased]
+
+          ### [16.4.0.beta.0] - 2026-03-01
+          #### Added
+          - Feature from beta.0
+        CHANGELOG
+
+        version = compute_auto_version(changelog, "beta", repo_dir)
+
+        expect(version).to eq("16.4.0.beta.1")
+      end
+    end
+
+    it "reuses the active prerelease base even when Unreleased entries would suggest a different bump" do
+      # When rc.0 is tagged based on a minor bump (16.3.0 -> 16.4.0), a subsequent
+      # rc.1 must stay on the same 16.4.0 base even if Unreleased only contains a
+      # bug fix (which would naively suggest a patch bump to 16.3.1.rc.0).
+      Dir.mktmpdir do |repo_dir|
+        init_git_repo!(repo_dir)
+        run_git!("tag", "v16.3.0", chdir: repo_dir)
+        run_git!("tag", "v16.4.0.rc.0", chdir: repo_dir)
+
+        changelog = <<~CHANGELOG
+          ### [Unreleased]
+
+          #### Fixed
+          - A patch-level fix added since rc.0
+
+          ### [16.4.0.rc.0] - 2026-03-01
+          #### Added
+          - Feature from rc.0
+        CHANGELOG
+
+        version = compute_auto_version(changelog, "rc", repo_dir)
+
+        expect(version).to eq("16.4.0.rc.1")
+      end
+    end
+
+    it "falls through to stable-bump inference for rc mode when no active prerelease base exists" do
+      Dir.mktmpdir do |repo_dir|
+        init_git_repo!(repo_dir)
+        run_git!("tag", "v16.3.0", chdir: repo_dir)
+
+        changelog = <<~CHANGELOG
+          ### [Unreleased]
+
+          #### Added
+          - A new feature for the next minor release
+        CHANGELOG
+
+        version = compute_auto_version(changelog, "rc", repo_dir)
+
+        expect(version).to eq("16.4.0.rc.0")
+      end
+    end
+
+    it "warns when the active prerelease base only has tags under a different channel" do
+      Dir.mktmpdir do |repo_dir|
+        init_git_repo!(repo_dir)
+        run_git!("tag", "v16.3.0", chdir: repo_dir)
+        run_git!("tag", "v16.4.0.beta.0", chdir: repo_dir)
+
+        changelog = <<~CHANGELOG
+          ### [Unreleased]
+
+          ### [16.4.0.beta.0] - 2026-03-01
+          #### Added
+          - Feature from beta.0
+        CHANGELOG
+
+        expect do
+          version = compute_auto_version(changelog, "rc", repo_dir)
+          expect(version).to eq("16.4.0.rc.0")
+        end.to output(/WARNING: active prerelease base 16\.4\.0 was found via a different channel/).to_stderr
+      end
+    end
+
+    it "does not warn when the active prerelease base has same-channel tags" do
+      Dir.mktmpdir do |repo_dir|
+        init_git_repo!(repo_dir)
+        run_git!("tag", "v16.3.0", chdir: repo_dir)
+        run_git!("tag", "v16.4.0.rc.0", chdir: repo_dir)
+
+        changelog = <<~CHANGELOG
+          ### [Unreleased]
+
+          ### [16.4.0.rc.0] - 2026-03-01
+          #### Added
+          - Feature from rc.0
+        CHANGELOG
+
+        expect do
+          version = compute_auto_version(changelog, "rc", repo_dir)
+          expect(version).to eq("16.4.0.rc.1")
+        end.not_to output(/different channel/).to_stderr
       end
     end
   end

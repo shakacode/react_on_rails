@@ -84,6 +84,228 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
       end
     end
 
+    describe ".rolling_deploy_adapter" do
+      it "throws if upload does not accept bundle and assets keyword arguments" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash); end
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /upload\(bundle_hash, bundle:, assets:\)/)
+      end
+
+      it "accepts the documented upload signature" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, bundle:, assets:) = [bundle, assets]
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.not_to raise_error
+      end
+
+      it "accepts optional extra upload keyword arguments" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, bundle:, assets:, region: nil) = [bundle, assets, region]
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.not_to raise_error
+      end
+
+      it "rejects adapters that require extra upload keyword arguments" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, bundle:, assets:, region:) = [bundle, assets, region]
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /upload\(bundle_hash, bundle:, assets:\)/)
+      end
+
+      it "accepts adapters that capture upload keywords in an options hash" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, _options = {}); end
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.not_to raise_error
+      end
+
+      it "accepts adapters that capture upload keywords with a positional splat" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, *_args); end
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.not_to raise_error
+      end
+
+      it "accepts adapters that capture upload keywords with a keyword splat" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, **_kwargs); end
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.not_to raise_error
+      end
+
+      it "rejects options-hash adapters that require extra keyword arguments" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, _options = {}, region:) = region
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /upload\(bundle_hash, bundle:, assets:\)/)
+      end
+
+      it "rejects options-hash adapters with explicit keywords that do not capture upload keywords" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, _options = {}, region: nil) = region
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /upload\(bundle_hash, bundle:, assets:\)/)
+      end
+
+      it "rejects positional splat adapters with explicit keywords that do not capture upload keywords" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, *_args, region: nil) = region
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /upload\(bundle_hash, bundle:, assets:\)/)
+      end
+
+      it "rejects adapters that require the options hash positional argument" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, _options); end
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /upload\(bundle_hash, bundle:, assets:\)/)
+      end
+
+      # Regression: `accepts_bundle_hash_argument?` rejects signatures that have
+      # zero positional parameters even when the required upload keywords are
+      # present. A plausible mistake is to swap the positional `bundle_hash` for
+      # a `bundle_hash:` keyword; the adapter would still raise at upload time
+      # because the stager passes `bundle_hash` positionally.
+      it "rejects kwarg-only upload signatures with no positional bundle_hash" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(bundle:, assets:) = [bundle, assets]
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /upload\(bundle_hash, bundle:, assets:\)/)
+      end
+
+      it "rejects adapters that require extra positional upload arguments" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, _options, _extra); end
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /upload\(bundle_hash, bundle:, assets:\)/)
+      end
+
+      it "rejects extra required positional upload arguments even when required keywords are present" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, _region, bundle:, assets:) = [bundle, assets]
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /upload\(bundle_hash, bundle:, assets:\)/)
+      end
+
+      # Regression: `**nil` (the `:nokey` parameter kind) explicitly forbids
+      # keyword arguments. Without an explicit guard the options-hash branch
+      # would treat `(hash, opts = {}, **nil)` as compatible because it has one
+      # required and one optional positional, but the runtime call shape
+      # `upload(hash, bundle: ..., assets: ...)` raises ArgumentError.
+      it "rejects upload signatures that explicitly forbid keywords with **nil" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, _options = {}, **nil); end
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /upload\(bundle_hash, bundle:, assets:\)/)
+      end
+    end
+
     describe ".renderer_url" do
       it "is the renderer_url if provided" do
         url = "http://something.com:1234"
@@ -119,8 +341,27 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
           ReactOnRailsPro.configure do |config|
             config.renderer_url = invalid_url
           end
-        end.to raise_error(ReactOnRailsPro::Error,
-                           /Unparseable ReactOnRailsPro.config.renderer_url #{invalid_url} /)
+        end.to raise_error(ReactOnRailsPro::Error, /renderer_url is not a parseable URI/)
+      end
+
+      it "does not leak the password through the URI error when render_url is unparseable" do
+        sensitive_password = "an#@!invalidpassword"
+        invalid_url = "https://:#{sensitive_password}@server.com:123"
+
+        error = nil
+        begin
+          ReactOnRailsPro.configure do |config|
+            config.renderer_url = invalid_url
+          end
+        rescue ReactOnRailsPro::Error => e
+          error = e
+        end
+
+        expect(error).to be_a(ReactOnRailsPro::Error)
+        # The error must not reproduce the unparseable URL or the underlying
+        # URI::InvalidURIError message — either could carry the literal password.
+        expect(error.message).not_to include(sensitive_password)
+        expect(error.message).not_to include("server.com")
       end
     end
 
@@ -242,7 +483,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
 
         it "does not raise when password comes from RENDERER_PASSWORD env var in production" do
           allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
-          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return("secure-password")
+          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return("secure-password!!")
 
           expect do
             ReactOnRailsPro.configure do |config|
@@ -251,7 +492,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
             end
           end.not_to raise_error
 
-          expect(ReactOnRailsPro.configuration.renderer_password).to eq("secure-password")
+          expect(ReactOnRailsPro.configuration.renderer_password).to eq("secure-password!!")
         end
 
         it "does not raise when password is explicitly set in production" do
@@ -260,7 +501,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
           expect do
             ReactOnRailsPro.configure do |config|
               config.server_renderer = "NodeRenderer"
-              config.renderer_password = "secure-password"
+              config.renderer_password = "secure-password!!"
             end
           end.not_to raise_error
         end
@@ -271,14 +512,14 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
           expect do
             ReactOnRailsPro.configure do |config|
               config.server_renderer = "NodeRenderer"
-              config.renderer_url = "https://:secure-password@localhost:3800"
+              config.renderer_url = "https://:secure-password-val@localhost:3800"
             end
           end.not_to raise_error
         end
 
         it "resolves from ENV when renderer_password is blank in production" do
           allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
-          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return("secure-password")
+          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return("secure-password!!")
 
           expect do
             ReactOnRailsPro.configure do |config|
@@ -288,7 +529,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
             end
           end.not_to raise_error
 
-          expect(ReactOnRailsPro.configuration.renderer_password).to eq("secure-password")
+          expect(ReactOnRailsPro.configuration.renderer_password).to eq("secure-password!!")
         end
 
         it "resolves from URL when renderer_password is blank and URL has embedded password" do
@@ -303,6 +544,37 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
           end.not_to raise_error
 
           expect(ReactOnRailsPro.configuration.renderer_password).to eq("url-password")
+        end
+
+        it "strips the password from renderer_url after extracting it, so it can't leak via logs" do
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
+
+          ReactOnRailsPro.configure do |config|
+            config.server_renderer = "NodeRenderer"
+            config.renderer_url = "https://:url-password@localhost:3800"
+          end
+
+          # Password is extracted for use (sent in the request body)…
+          expect(ReactOnRailsPro.configuration.renderer_password).to eq("url-password")
+          # …but the stored URL no longer contains it.
+          expect(ReactOnRailsPro.configuration.renderer_url).to eq("https://localhost:3800")
+          expect(ReactOnRailsPro.configuration.renderer_url).not_to include("url-password")
+        end
+
+        it "strips userinfo from renderer_url even when the password came from config (not the URL)" do
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
+
+          ReactOnRailsPro.configure do |config|
+            config.server_renderer = "NodeRenderer"
+            config.renderer_password = "explicit-config-password"
+            config.renderer_url = "https://:url-password@localhost:3800"
+          end
+
+          # Explicit config password wins for resolution…
+          expect(ReactOnRailsPro.configuration.renderer_password).to eq("explicit-config-password")
+          # …and the URL's embedded credential is still stripped from the stored value.
+          expect(ReactOnRailsPro.configuration.renderer_url).to eq("https://localhost:3800")
+          expect(ReactOnRailsPro.configuration.renderer_url).not_to include("url-password")
         end
       end
 
@@ -384,6 +656,88 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
             ReactOnRailsPro.configure do |config|
               config.server_renderer = "ExecJS"
               config.renderer_url = "https://localhost:3800"
+            end
+          end.not_to raise_error
+        end
+      end
+
+      context "with weak password warnings" do
+        before do
+          allow(ENV).to receive(:[]).and_call_original
+          allow(ENV).to receive(:fetch).and_call_original
+          allow(ENV).to receive(:fetch).with("NODE_ENV", nil).and_return(nil)
+        end
+
+        it "warns for known-weak default in production" do
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
+          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return(nil)
+
+          # The warning must match the phrase but must NOT echo the literal password.
+          expect(Rails.logger).to receive(:warn) do |msg|
+            expect(msg).to match(/known-default value/)
+            expect(msg).not_to include("devPassword")
+          end
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_password = "devPassword"
+            end
+          end.not_to raise_error
+        end
+
+        it "warns for case-insensitive weak password match" do
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
+          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return(nil)
+
+          expect(Rails.logger).to receive(:warn).with(/known-default value/)
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_password = "DEVPASSWORD"
+            end
+          end.not_to raise_error
+        end
+
+        it "warns when password is too short" do
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
+          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return(nil)
+
+          expect(Rails.logger).to receive(:warn).with(/shorter than/)
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_password = "short"
+            end
+          end.not_to raise_error
+        end
+
+        it "warns for weak password in development" do
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("development")
+          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return(nil)
+
+          expect(Rails.logger).to receive(:warn).with(/known-default value/)
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_password = "devPassword"
+            end
+          end.not_to raise_error
+        end
+
+        it "does not warn for strong password" do
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
+          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return(nil)
+
+          expect(Rails.logger).not_to receive(:warn)
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_password = "a-very-secure-random-password-here"
             end
           end.not_to raise_error
         end
@@ -496,6 +850,62 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
       end
     end
 
+    describe ".renderer_http_pool_size" do
+      it "defaults to 10" do
+        ReactOnRailsPro.configure {} # rubocop:disable Lint/EmptyBlock
+
+        expect(ReactOnRailsPro.configuration.renderer_http_pool_size).to eq(10)
+      end
+
+      it "accepts custom values without warning (setting is now effective with scheduler)" do
+        expect(Rails.logger).not_to receive(:warn)
+
+        ReactOnRailsPro.configure do |config|
+          config.renderer_http_pool_size = 20
+        end
+
+        expect(ReactOnRailsPro.configuration.renderer_http_pool_size).to eq(20)
+      end
+
+      it "accepts nil to clear the value" do
+        ReactOnRailsPro.configure do |config|
+          config.renderer_http_pool_size = nil
+        end
+
+        expect(ReactOnRailsPro.configuration.renderer_http_pool_size).to be_nil
+      end
+
+      it "raises error for zero" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.renderer_http_pool_size = 0
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /must be a positive integer or nil/)
+      end
+
+      it "raises error for negative numbers" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.renderer_http_pool_size = -1
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /must be a positive integer or nil/)
+      end
+
+      it "raises error for non-integer values" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.renderer_http_pool_size = 5.5
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /must be a positive integer or nil/)
+      end
+
+      it "validates constructor values before storing them" do
+        expect do
+          described_class.new(renderer_http_pool_size: 0)
+        end.to raise_error(ReactOnRailsPro::Error, /must be a positive integer or nil/)
+      end
+    end
+
     describe ".renderer_http_keep_alive_timeout" do
       it "defaults to 30" do
         ReactOnRailsPro.configure {} # rubocop:disable Lint/EmptyBlock
@@ -503,12 +913,22 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
         expect(ReactOnRailsPro.configuration.renderer_http_keep_alive_timeout).to eq(30)
       end
 
-      it "accepts positive numbers" do
+      it "accepts positive numbers and warns about deprecation" do
+        expect(Rails.logger).to receive(:warn).with(
+          "[ReactOnRailsPro] config.renderer_http_keep_alive_timeout is deprecated. " \
+          "Connection lifecycle is managed automatically by the async-http adapter."
+        )
+
         ReactOnRailsPro.configure do |config|
           config.renderer_http_keep_alive_timeout = 60
         end
 
         expect(ReactOnRailsPro.configuration.renderer_http_keep_alive_timeout).to eq(60)
+      end
+
+      it "does not warn for the default value assigned during configuration initialization" do
+        expect(Rails.logger).not_to receive(:warn).with(/renderer_http_keep_alive_timeout/)
+        expect(ReactOnRailsPro.configuration.renderer_http_keep_alive_timeout).to eq(30)
       end
 
       it "accepts nil" do

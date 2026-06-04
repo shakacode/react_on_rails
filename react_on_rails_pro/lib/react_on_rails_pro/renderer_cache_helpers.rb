@@ -2,7 +2,7 @@
 
 require "fileutils"
 require "securerandom"
-require "set"
+require "pathname"
 
 require "react_on_rails_pro/error"
 
@@ -11,6 +11,8 @@ module ReactOnRailsPro
   # PreSeedRendererCache (copies files for Docker images) and
   # PrepareNodeRenderBundles (symlinks for same-filesystem workflows).
   module RendererCacheHelpers
+    LOADABLE_STATS_ASSET_NAME = "loadable-stats.json"
+
     module_function
 
     def collect_assets_with_required_paths
@@ -20,16 +22,43 @@ module ReactOnRailsPro
       # are required, so resolve them separately and fail loudly if either
       # resolves to nil rather than letting `.compact` swallow the gap.
       assets = Array(config.assets_to_copy).compact
-      rsc_manifests = []
+      loadable_stats_path = loadable_stats_asset_path
+      assets << loadable_stats_path if loadable_stats_path
 
       if config.enable_rsc_support
         rsc_manifests = rsc_manifest_paths
         assets.concat(rsc_manifests)
+      else
+        rsc_manifests = []
       end
 
       unique = assets.uniq(&:to_s)
       warn_on_duplicate_basenames(unique)
       [unique, required_rsc_asset_paths(rsc_manifests)]
+    end
+
+    # Convenience for callers that only need the asset list and intentionally
+    # discard the rsc_required_paths Set returned by
+    # collect_assets_with_required_paths. If you need to enforce required-RSC
+    # availability (raising loudly when a required manifest is missing), use
+    # collect_assets_with_required_paths and pass both into each_stageable_asset
+    # — `nil`-or-empty here would silently skip the required-paths check.
+    def collect_assets
+      collect_assets_with_required_paths.first
+    end
+
+    def required_rsc_asset_basenames
+      required_rsc_asset_paths_for_current_config.map { |path| File.basename(path) }
+    end
+
+    # No-arg companion to `required_rsc_asset_paths` for callers (rolling-deploy
+    # adapter publication, payload validation) that don't already hold the
+    # resolved manifest list. Centralising the rsc_manifest_paths lookup avoids
+    # call-site drift if the manifest sources change.
+    def required_rsc_asset_paths_for_current_config
+      return Set.new unless ReactOnRailsPro.configuration.enable_rsc_support
+
+      required_rsc_asset_paths(rsc_manifest_paths)
     end
 
     def rsc_manifest_paths
@@ -58,6 +87,17 @@ module ReactOnRailsPro
 
       warn "[ReactOnRailsPro] Duplicate asset basenames in assets_to_copy / RSC manifests: " \
            "#{duplicates.join(', ')}. Only the last entry per basename will be staged."
+    end
+
+    def loadable_stats_asset_path
+      path = ReactOnRails::PackerUtils.asset_uri_from_packer(LOADABLE_STATS_ASSET_NAME)
+      File.exist?(path.to_s) ? path : nil
+    rescue KeyError, TypeError, Errno::ENOENT
+      # Narrow to errors PackerUtils.asset_uri_from_packer can plausibly raise
+      # (missing manifest key, nil path, manifest file absent). Unexpected bugs
+      # like NoMethodError or NameError should surface so operators can see them
+      # rather than being silently swallowed.
+      nil
     end
 
     # Required assets are matched by expanded path rather than basename so a
@@ -106,11 +146,7 @@ module ReactOnRailsPro
       File.rename(tmp_file, dest)
       puts "[ReactOnRailsPro] #{log_prefix}: #{src} -> #{dest}"
     ensure
-      # Ruby pre-initializes `tmp_file` to nil at parse time, so the local exists even
-      # when an exception (e.g. from FileUtils.mkdir_p) fires before the assignment on
-      # line 104 runs — the `if tmp_file` guard turns that case into a no-op without
-      # raising NameError. On success, File.rename has already moved the temp file
-      # away; on a failure after assignment, rm_f cleans up the orphaned temp file.
+      # Clean up the temp file on failure; rm_f is harmless after a successful rename.
       FileUtils.rm_f(tmp_file) if tmp_file
     end
 
@@ -168,6 +204,47 @@ module ReactOnRailsPro
 
       raise ReactOnRailsPro::Error,
             "Bundle hash for #{path} is nil or blank; cannot stage renderer cache."
+    end
+
+    def make_relative_symlink(source, destination, log_prefix:)
+      destination_dir = Pathname.new(destination).dirname
+      FileUtils.mkdir_p(destination_dir)
+
+      source_path = realpath_for_symlink_source(source)
+      destination_dir_real = realpath_for_symlink_destination(destination_dir)
+      relative_source_path = source_path.relative_path_from(destination_dir_real)
+      tmp_link = "#{destination}.tmp-#{Process.pid}-#{SecureRandom.hex(6)}"
+
+      File.symlink(relative_source_path.to_s, tmp_link)
+      File.rename(tmp_link, destination)
+      puts "[ReactOnRailsPro] #{log_prefix}: #{relative_source_path} -> #{destination}"
+    ensure
+      FileUtils.rm_f(tmp_link) if tmp_link
+    end
+
+    def stage_file(src, dest, mode, log_prefix:)
+      if mode == :copy
+        copy_file_atomically(src, dest, log_prefix: log_prefix)
+      else
+        make_relative_symlink(src, dest, log_prefix: log_prefix)
+      end
+    end
+
+    def realpath_for_symlink_source(source)
+      Pathname.new(source).realpath
+    rescue Errno::ENOENT
+      raise ReactOnRailsPro::Error,
+            "Cannot resolve real path for symlink source #{source} — " \
+            "it does not exist or is a dangling symlink. " \
+            "Rebuild your bundles before staging the renderer cache."
+    end
+
+    def realpath_for_symlink_destination(destination_dir)
+      destination_dir.realpath
+    rescue Errno::ENOENT
+      raise ReactOnRailsPro::Error,
+            "Cannot resolve real path for symlink destination dir #{destination_dir} — " \
+            "it may have been removed after mkdir_p (race with an external cleanup)."
     end
 
     # Resolves bundle sources as [path, hash] pairs so callers can iterate

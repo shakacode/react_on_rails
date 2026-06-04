@@ -11,10 +11,10 @@ This guide will have you rendering React components in your Rails app as quickly
 
 Before starting, make sure you have:
 
-- **🚨 React on Rails 16.4.0+** (this guide)
-- **🚨 Shakapacker 6+** (7+ recommended for React on Rails 16)
+- **🚨 React on Rails 17.0.0+** (this guide)
+- **🚨 Shakapacker 6+** (7+ recommended for React on Rails 17)
 - **Rails 7+** application (Rails 5.2+ supported)
-- **Ruby 3.0+** (required)
+- **Ruby 3.3+** (required)
 - **Node.js 18+** and a package manager (**npm**, **pnpm**, **Yarn**, or **bun**)
 - **Foreman or Overmind** (for running `bin/dev`)
 - **Basic familiarity** with React and Rails

@@ -151,7 +151,6 @@ export function listenToRequestData(requestId: string): RequestListener {
     // Create new promise that loops until value is found
     const promise = (async () => {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         while (true) {
           // Check if value already available
           if (valuesMap.has(key)) {

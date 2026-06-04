@@ -27,24 +27,39 @@ describe('validateRuby', () => {
     expect(result.message).toContain('Ruby is not installed');
   });
 
-  it('returns valid for Ruby 3.0+', () => {
+  it('returns valid for Ruby 3.3+', () => {
     mockedGetCommandVersion.mockReturnValue('ruby 3.3.4 (2024-07-09 revision be1089c8ec) [arm64-darwin23]');
     const result = validateRuby();
     expect(result.valid).toBe(true);
     expect(result.message).toContain('ruby 3.3.4');
   });
 
-  it('returns valid for Ruby 3.0.0', () => {
-    mockedGetCommandVersion.mockReturnValue('ruby 3.0.0 (2020-12-25 revision 95aff21468)');
+  it('returns valid for Ruby 3.3.0', () => {
+    mockedGetCommandVersion.mockReturnValue('ruby 3.3.0 (2023-12-25 revision 5124f9ac75)');
     const result = validateRuby();
     expect(result.valid).toBe(true);
   });
 
+  it('returns valid for Ruby 4.0+', () => {
+    mockedGetCommandVersion.mockReturnValue('ruby 4.0.0 (2026-01-01 revision abcdef1234)');
+    const result = validateRuby();
+    expect(result.valid).toBe(true);
+  });
+
+  it('returns invalid for Ruby 3.2', () => {
+    mockedGetCommandVersion.mockReturnValue('ruby 3.2.8 (2025-03-26 revision 2a7b7c6e1c)');
+    const result = validateRuby();
+    expect(result.valid).toBe(false);
+    expect(result.message).toContain('Ruby 3.2');
+    expect(result.message).toContain('requires Ruby 3.3+');
+  });
+
   it('returns invalid for Ruby 2.7', () => {
-    mockedGetCommandVersion.mockReturnValue('ruby 2.7.8 (2023-03-30 revision 1f4d455848)');
+    mockedGetCommandVersion.mockReturnValue('ruby 2.7.8p225 (2023-03-30 revision 1f4d455848)');
     const result = validateRuby();
     expect(result.valid).toBe(false);
     expect(result.message).toContain('Ruby 2.7');
+    expect(result.message).toContain('requires Ruby 3.3+');
   });
 });
 

@@ -217,11 +217,9 @@ def run_vegeta_benchmark(test_case, bundle_timestamp)
   vegeta_rps = vegeta_data["throughput"]&.round(2) || "MISSING"
   vegeta_p50 = vegeta_data.dig("latencies", "50th")&./(1_000_000.0)&.round(2) || "MISSING"
   vegeta_p90 = vegeta_data.dig("latencies", "90th")&./(1_000_000.0)&.round(2) || "MISSING"
-  vegeta_p99 = vegeta_data.dig("latencies", "99th")&./(1_000_000.0)&.round(2) || "MISSING"
-  vegeta_max = vegeta_data.dig("latencies", "max")&./(1_000_000.0)&.round(2) || "MISSING"
   vegeta_status = vegeta_data["status_codes"]&.map { |k, v| "#{k}=#{v}" }&.join(",") || "MISSING"
 
-  [vegeta_rps, vegeta_p50, vegeta_p90, vegeta_p99, vegeta_max, vegeta_status]
+  [vegeta_rps, vegeta_p50, vegeta_p90, vegeta_status]
 rescue StandardError => e
   puts "Error: #{e.message}"
   failure_metrics(e)
@@ -298,7 +296,7 @@ bmf_collector = BmfCollector.new(prefix: BMF_PREFIX)
 
 # Initialize summary file
 File.write(SUMMARY_TXT, "")
-add_to_summary("Test", "Bundle", "RPS", "p50(ms)", "p90(ms)", "p99(ms)", "max(ms)", "Status")
+add_to_summary("Test", "Bundle", "RPS", "p50(ms)", "p90(ms)", "Status")
 
 # Run non-RSC benchmarks
 non_rsc_tests.each do |test_case|
@@ -308,11 +306,11 @@ non_rsc_tests.each do |test_case|
   puts "  Request: #{test_case[:request]}"
   print_separator
 
-  rps, p50, p90, p99, max_latency, status = run_vegeta_benchmark(test_case, non_rsc_bundle)
-  add_to_summary(test_case[:name], "non-RSC", rps, p50, p90, p99, max_latency, status)
+  rps, p50, p90, status = run_vegeta_benchmark(test_case, non_rsc_bundle)
+  add_to_summary(test_case[:name], "non-RSC", rps, p50, p90, status)
 
-  # Add to BMF collector for Bencher output
-  bmf_collector.add(name: "#{test_case[:name]} (non-RSC)", rps: rps, p50: p50, p90: p90, p99: p99, status: status)
+  # Add to BMF collector for Bencher output (p90 stays in the summary table only)
+  bmf_collector.add(name: "#{test_case[:name]} (non-RSC)", rps: rps, p50: p50, status: status)
 end
 
 # Run RSC benchmarks
@@ -323,11 +321,11 @@ rsc_tests.each do |test_case|
   puts "  Request: #{test_case[:request]}"
   print_separator
 
-  rps, p50, p90, p99, max_latency, status = run_vegeta_benchmark(test_case, rsc_bundle)
-  add_to_summary(test_case[:name], "RSC", rps, p50, p90, p99, max_latency, status)
+  rps, p50, p90, status = run_vegeta_benchmark(test_case, rsc_bundle)
+  add_to_summary(test_case[:name], "RSC", rps, p50, p90, status)
 
-  # Add to BMF collector for Bencher output
-  bmf_collector.add(name: "#{test_case[:name]} (RSC)", rps: rps, p50: p50, p90: p90, p99: p99, status: status)
+  # Add to BMF collector for Bencher output (p90 stays in the summary table only)
+  bmf_collector.add(name: "#{test_case[:name]} (RSC)", rps: rps, p50: p50, status: status)
 end
 
 # Display summary

@@ -1,7 +1,8 @@
 import type { ResponseResult } from '../shared/utils';
 import { handleRenderRequest } from './handleRenderRequest';
 import log from '../shared/log';
-import { getRequestBundleFilePath } from '../shared/utils';
+import { getRequestBundleFilePath, isErrorRenderResult } from '../shared/utils';
+import { subSpan } from '../shared/tracing.js';
 
 export type IncrementalRenderSink = {
   /** Called for every subsequent NDJSON object after the first one */
@@ -14,6 +15,13 @@ export type UpdateChunk = {
   updateChunk: string;
 };
 
+class InvalidIncrementalRenderChunkError extends Error {
+  constructor() {
+    super('Invalid incremental render chunk received, missing properties');
+    this.name = 'InvalidIncrementalRenderChunkError';
+  }
+}
+
 function assertIsUpdateChunk(value: unknown): asserts value is UpdateChunk {
   if (
     typeof value !== 'object' ||
@@ -23,7 +31,7 @@ function assertIsUpdateChunk(value: unknown): asserts value is UpdateChunk {
     (typeof value.bundleTimestamp !== 'string' && typeof value.bundleTimestamp !== 'number') ||
     typeof value.updateChunk !== 'string'
   ) {
-    throw new Error('Invalid incremental render chunk received, missing properties');
+    throw new InvalidIncrementalRenderChunkError();
   }
 }
 
@@ -98,6 +106,8 @@ export async function handleIncrementalRenderRequest(
 
   try {
     // Call handleRenderRequest internally to handle all validation and VM execution
+    // handleRenderRequest is called directly without a TracingContext from worker.ts's
+    // trace() wrapper, so there is no tracingContext to forward for its error path.
     const { response, executionContext } = await handleRenderRequest({
       renderingRequest,
       bundleTimestamp,
@@ -119,12 +129,19 @@ export async function handleIncrementalRenderRequest(
         add: async (chunk: unknown) => {
           try {
             assertIsUpdateChunk(chunk);
-            const bundlePath = getRequestBundleFilePath(chunk.bundleTimestamp);
-            await executionContext.runInVM(chunk.updateChunk, bundlePath).catch((err: unknown) => {
-              log.error({ msg: 'Error running incremental render chunk', err, chunk });
+            await subSpan({ name: 'ror.incremental.process_chunk' }, async () => {
+              const bundlePath = getRequestBundleFilePath(chunk.bundleTimestamp);
+              const result = await executionContext.runInVM(chunk.updateChunk, bundlePath);
+              if (isErrorRenderResult(result)) {
+                throw new Error(result.exceptionMessage);
+              }
             });
           } catch (err) {
-            log.error({ msg: 'Invalid incremental render chunk', err, chunk });
+            if (err instanceof InvalidIncrementalRenderChunkError) {
+              log.error({ msg: 'Invalid incremental render chunk', err, chunk });
+            } else {
+              log.error({ msg: 'Error running incremental render chunk', err, chunk });
+            }
           }
         },
         handleRequestClosed: () => {

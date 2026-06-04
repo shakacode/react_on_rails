@@ -7,6 +7,7 @@ default: &default
 
   # Using SWC for faster JavaScript transpilation (20x faster than Babel)
   javascript_transpiler: swc
+  assets_bundler: webpack
 
   cache_path: tmp/cache/shakapacker
   webpack_compile_output: false

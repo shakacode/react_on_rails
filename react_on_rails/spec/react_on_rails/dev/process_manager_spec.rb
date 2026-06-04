@@ -193,6 +193,7 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
       allow(ENV).to receive(:fetch).with("SHAKAPACKER_DEV_SERVER_PORT", nil).and_return("3036")
       allow(ENV).to receive(:fetch).with("RENDERER_PORT", nil).and_return(nil)
       allow(ENV).to receive(:fetch).with("REACT_RENDERER_URL", nil).and_return(nil)
+      allow(ENV).to receive(:fetch).with("RENDERER_URL", nil).and_return(nil)
       allow(ENV).to receive(:fetch).with("SHAKAPACKER_SKIP_PRECOMPILE_HOOK", nil).and_return(nil)
 
       expect(described_class).to receive(:with_unbundled_context).and_yield
@@ -200,6 +201,7 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
         .with(
           { "PORT" => "3001", "SHAKAPACKER_DEV_SERVER_PORT" => "3036",
             "RENDERER_PORT" => nil, "REACT_RENDERER_URL" => nil,
+            "RENDERER_URL" => nil,
             "SHAKAPACKER_SKIP_PRECOMPILE_HOOK" => nil },
           "foreman", "start", "-f", "Procfile.dev"
         )
@@ -213,6 +215,7 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
       allow(ENV).to receive(:fetch).with("SHAKAPACKER_DEV_SERVER_PORT", nil).and_return(nil)
       allow(ENV).to receive(:fetch).with("RENDERER_PORT", nil).and_return(nil)
       allow(ENV).to receive(:fetch).with("REACT_RENDERER_URL", nil).and_return(nil)
+      allow(ENV).to receive(:fetch).with("RENDERER_URL", nil).and_return(nil)
       allow(ENV).to receive(:fetch).with("SHAKAPACKER_SKIP_PRECOMPILE_HOOK", nil).and_return(nil)
 
       expect(described_class).to receive(:with_unbundled_context).and_yield
@@ -220,6 +223,7 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
         .with(
           { "PORT" => "3001", "SHAKAPACKER_DEV_SERVER_PORT" => nil,
             "RENDERER_PORT" => nil, "REACT_RENDERER_URL" => nil,
+            "RENDERER_URL" => nil,
             "SHAKAPACKER_SKIP_PRECOMPILE_HOOK" => nil },
           "foreman", "start", "-f", "Procfile.dev"
         )
@@ -359,6 +363,18 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
       expect(result["PORT"]).to eq("4200")
       expect(result["RENDERER_PORT"]).to eq("3800")
       expect(result["SHAKAPACKER_SKIP_PRECOMPILE_HOOK"]).to eq("true")
+    end
+
+    # Pro users mid-migration may still set the legacy RENDERER_URL alongside
+    # REACT_RENDERER_URL. apply_base_port_env rewrites both to the derived URL,
+    # so both must survive with_unbundled_env or foreman/overmind children will
+    # route SSR to the pre-Bundler (stale) renderer port.
+    it "forwards the legacy RENDERER_URL so mid-migration Pro users keep the derived URL" do
+      ENV["RENDERER_URL"] = "http://localhost:5002"
+      ENV["REACT_RENDERER_URL"] = "http://localhost:5002"
+      result = described_class.send(:preserve_runtime_env_vars)
+      expect(result["RENDERER_URL"]).to eq("http://localhost:5002")
+      expect(result["REACT_RENDERER_URL"]).to eq("http://localhost:5002")
     end
   end
 end

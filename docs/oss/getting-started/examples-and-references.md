@@ -29,6 +29,18 @@ source, while others require React on Rails Pro.
 - Note: this repo uses React on Rails Pro. See [OSS vs Pro](./oss-vs-pro.md)
   for evaluation guidance.
 
+### React on Rails + TanStack Starter (Pro)
+
+- Repo: [shakacode/react-on-rails-starter-tanstack](https://github.com/shakacode/react-on-rails-starter-tanstack)
+- Use it when you want the maintained Rails 8 + React on Rails Pro + TanStack
+  Router/Query/Table starter with React Server Components, Rspack, Tailwind, and
+  shadcn/ui.
+- Upstream branch testing: the starter documents how to validate unreleased
+  `react_on_rails` and `react_on_rails_rsc` branches in
+  [Testing Upstream Branches](https://github.com/shakacode/react-on-rails-starter-tanstack/blob/main/docs/12-upstream-branch-testing.md).
+- Note: this repo uses React on Rails Pro. See [OSS vs Pro](./oss-vs-pro.md)
+  for evaluation guidance.
+
 ## In-Repo Reference
 
 ### Spec Dummy App
@@ -58,12 +70,15 @@ For detailed proof criteria and migration contribution guidance, see
 ### Hacker News RSC Demo
 
 - Repo: [shakacode/react-on-rails-demo-hacker-news-rsc](https://github.com/shakacode/react-on-rails-demo-hacker-news-rsc)
+- Live demo: [hn.reactonrails.com](https://hn.reactonrails.com/)
 - Use it when you want a compact public demo of React on Rails Pro with React
   Server Components on a familiar read-heavy UI.
 
 ### Marketplace RSC Performance Demo
 
 - Repo: [shakacode/react-on-rails-demo-marketplace-rsc](https://github.com/shakacode/react-on-rails-demo-marketplace-rsc)
+- Live demo & evidence: see the [Live Demo and Evidence](../../pro/react-server-components/index.md#live-demo-and-evidence)
+  section for Lighthouse reports, bundle-size breakdowns, and the demo itself.
 - Use it when you want a public performance-oriented RSC demo showing the shape
   of the user-visible win on a marketplace-style surface.
 
@@ -77,6 +92,9 @@ For detailed proof criteria and migration contribution guidance, see
 
 ## Live Demos
 
+- [hn.reactonrails.com](https://hn.reactonrails.com/) — Hacker News reader
+  showing React on Rails Pro with React 19 and React Server Components on a
+  familiar read-heavy UI.
 - [reactrails.com](https://reactrails.com) — production-style React on Rails app
   you can click through in your browser without any local setup. Backed by the
   legacy [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial)

@@ -3,13 +3,16 @@
 require "json"
 require "erb"
 require "stringio"
+require "timeout"
 require "yaml"
 require_relative "utils"
 require_relative "config_path_resolver"
+require_relative "dev/server_mode"
 require_relative "version_syntax_converter"
 require_relative "version_synchronizer"
 require_relative "system_checker"
 require_relative "pro_migration"
+require_relative "node_renderer_procfile"
 
 begin
   require "rainbow"
@@ -58,14 +61,17 @@ module ReactOnRails
     DEFAULT_SHAKAPACKER_CONFIG_PATH = "config/shakapacker.yml"
     SERVER_BUNDLE_SOURCE_EXTENSIONS = %w[.js .jsx .ts .tsx .mjs .cjs].freeze
     CUSTOM_LAUNCHER_INDICATOR_FILES = %w[dev].freeze
+    RAILS_SERVER_COMMAND_REGEX = %r{\b(?:(?:bin/)?rails\s+(?:server|s)|puma|unicorn|rackup|passenger\s+start)\b}
 
     # Deprecated-renderer-cache scan (used by check_deprecated_renderer_cache_task):
     # look for references to the old pre_stage_bundle_for_node_renderer task in
     # common deploy-script locations so users on older Procfile/Dockerfile entries
     # get a migration nudge before the task is removed.
     DEPRECATED_RENDERER_CACHE_TASK = "pre_stage_bundle_for_node_renderer"
-    # Intentionally a fixed list, not a glob (for example, config/deploy/*.rb).
-    # CI manifests and directory globs need a separate bounded scan to avoid surprising IO.
+    # Fixed allowlist of single-file deploy-script paths. Each entry is a literal
+    # path that may host a deploy hook referencing the deprecated task. Directory
+    # globs (e.g., per-stage Capistrano files or per-workflow GitHub Actions YAML)
+    # live in RENDERER_CACHE_DEPLOY_SCRIPT_GLOBS so they stay bounded.
     RENDERER_CACHE_DEPLOY_SCRIPT_PATHS = [
       "Procfile",
       "Procfile.dev",
@@ -86,10 +92,28 @@ module ReactOnRails
       "config/deploy/production.rb",
       "config/deploy/staging.rb",
       ".kamal/deploy.yml",
-      "scripts/deploy.sh"
+      "scripts/deploy.sh",
+      ".circleci/config.yml",
+      ".gitlab-ci.yml",
+      "bitbucket-pipelines.yml",
+      "Jenkinsfile"
+    ].freeze
+    # Bounded glob allowlist for deploy manifests that live in a known directory
+    # but use per-environment or per-workflow filenames. Each pattern matches
+    # only one directory level (no `**`) so the scan never recurses into the
+    # project tree, and the expansion is capped by
+    # RENDERER_CACHE_DEPLOY_SCRIPT_GLOB_MAX_MATCHES.
+    RENDERER_CACHE_DEPLOY_SCRIPT_GLOBS = [
+      ".github/workflows/*.yml",
+      ".github/workflows/*.yaml",
+      "config/deploy/*.rb"
     ].freeze
     # Per-file safety gate to bound IO during the scan, not a meaningful size limit.
     RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES = 1_048_576
+    # Defense-in-depth cap on how many files a single glob may contribute.
+    # Realistic repos have a handful of workflow / deploy-stage files; far more
+    # than this is a sign of an unexpectedly broad pattern, not legitimate config.
+    RENDERER_CACHE_DEPLOY_SCRIPT_GLOB_MAX_MATCHES = 100
 
     def initialize(verbose: false, fix: false)
       @verbose = verbose
@@ -140,7 +164,7 @@ module ReactOnRails
         ["Configuration Analysis", :check_configuration_details],
         ["bin/dev Launcher Setup", :check_bin_dev_launcher],
         ["Rails Integration", :check_rails],
-        ["Webpack Configuration", :check_webpack],
+        ["Bundler Configuration", :check_bundler_configuration],
         ["Testing Setup", :check_testing_setup],
         ["Development Environment", :check_development],
         ["React on Rails Pro Setup", :check_pro_setup],
@@ -199,7 +223,7 @@ module ReactOnRails
       checker.check_react_on_rails_initializer
     end
 
-    def check_webpack
+    def check_bundler_configuration
       checker.check_webpack_configuration
     end
 
@@ -261,14 +285,16 @@ module ReactOnRails
     end
 
     def check_procfiles
+      default_mode = default_dev_server_mode
+      descriptions = procfile_descriptions
       procfiles = {
         "Procfile.dev" => {
-          description: "HMR development with webpack-dev-server",
-          required_for: "bin/dev (default/hmr mode)",
+          description: default_procfile_description(default_mode),
+          required_for: "bin/dev (default mode)",
           should_contain: ["shakapacker-dev-server", "rails server"]
         },
         "Procfile.dev-static-assets" => {
-          description: "Static development with webpack --watch",
+          description: descriptions[:static],
           required_for: "bin/dev static",
           should_contain: ["shakapacker", "rails server"]
         },
@@ -301,13 +327,33 @@ module ReactOnRails
         # Only check for critical missing components, not optional suggestions
         content = File.read(filename)
         if filename == "Procfile.dev" && !content.include?("shakapacker-dev-server")
-          checker.add_warning("  ⚠️  Missing shakapacker-dev-server for HMR development")
+          procfile_description = config[:description]
+          checker.add_warning(
+            "  ⚠️  #{procfile_description} (Procfile.dev) requires shakapacker-dev-server"
+          )
         elsif filename == "Procfile.dev-static-assets" && !content.include?("shakapacker")
           checker.add_warning("  ⚠️  Missing shakapacker for static asset compilation")
         end
       else
         checker.add_info("ℹ️  #{filename} not found (needed for #{config[:required_for]})")
       end
+    end
+
+    def procfile_descriptions
+      {
+        hmr: "#{development_reload_mode_label} development with #{dev_server_procfile_label}",
+        static: "Static development with #{static_watch_label}"
+      }
+    end
+
+    def default_procfile_description(default_mode)
+      bundler_aware_dev_server_text(Dev::ServerMode.text(default_mode, :procfile_description))
+    end
+
+    def bundler_aware_dev_server_text(text)
+      return text if active_assets_bundler == "webpack"
+
+      text.gsub("webpack-dev-server", dev_server_procfile_label)
     end
 
     def check_bin_dev_script
@@ -318,7 +364,7 @@ module ReactOnRails
       else
         checker.add_warning(<<~MSG.strip)
           ⚠️  bin/dev script missing
-          This script provides an enhanced development workflow with HMR, static, and production modes.
+          This script provides an enhanced development workflow with development-server, static, and production modes.
           Run 'rails generate react_on_rails:install' to generate the script.
         MSG
       end
@@ -431,7 +477,7 @@ module ReactOnRails
         unless File.exist?("bin/dev") && File.read("bin/dev").include?("ReactOnRails::Dev::ServerManager")
           puts "• #{Rainbow('Upgrade to enhanced bin/dev script').yellow}:"
           puts "  - Run #{Rainbow('rails generate react_on_rails:install').cyan} for latest development tools"
-          puts "  - Provides HMR, static, and production-like asset modes"
+          puts "  - Provides development-server, static, and production-like asset modes"
           puts "  - Better error handling and debugging capabilities"
         end
 
@@ -473,7 +519,8 @@ module ReactOnRails
 
       # Enhanced contextual suggestions based on what exists
       if File.exist?("bin/dev") && File.exist?("Procfile.dev")
-        puts "• Start development with HMR: #{Rainbow('./bin/dev').cyan}"
+        puts "• Start development with #{Dev::ServerMode.text(default_dev_server_mode, :next_step_label)}: " \
+             "#{Rainbow('./bin/dev').cyan}"
         puts "• Try static mode: #{Rainbow('./bin/dev static').cyan}"
         puts "• Test production assets: #{Rainbow('./bin/dev prod').cyan}"
         puts "• See all options: #{Rainbow('./bin/dev help').cyan}"
@@ -481,7 +528,7 @@ module ReactOnRails
         puts "• Start development with: #{Rainbow('./bin/dev').cyan} (or foreman start -f Procfile.dev)"
       else
         puts "• Start Rails server: bin/rails server"
-        puts "• Start webpack dev server: bin/shakapacker-dev-server (in separate terminal)"
+        puts "• Start #{dev_server_label}: bin/shakapacker-dev-server (in separate terminal)"
       end
 
       # Test suggestions based on what's available
@@ -501,6 +548,99 @@ module ReactOnRails
       puts "• Documentation: https://github.com/shakacode/react_on_rails"
       puts
     end
+
+    def dev_server_label
+      active_assets_bundler == "webpack" ? "webpack-dev-server" : "#{assets_bundler_label} dev server"
+    end
+
+    def active_assets_bundler
+      configured_assets_bundler || "webpack"
+    end
+
+    def assets_bundler_label
+      active_assets_bundler.capitalize
+    end
+
+    def dev_server_procfile_label
+      dev_server_label
+    end
+
+    def static_watch_label
+      active_assets_bundler == "webpack" ? "webpack --watch" : "#{active_assets_bundler} watch"
+    end
+
+    def development_reload_mode_label
+      development_hmr_enabled? ? "HMR" : "Live reload"
+    end
+
+    def configured_assets_bundler
+      config = parsed_shakapacker_config
+      return nil unless config.is_a?(Hash)
+
+      rails_env = ENV["RAILS_ENV"] || ENV["RACK_ENV"] || "development"
+      bundler_from_shakapacker_section(config, rails_env) || bundler_from_shakapacker_section(config, "default")
+    rescue StandardError, ScriptError
+      nil
+    end
+
+    def parsed_shakapacker_config
+      config_path = shakapacker_config_path
+      return nil unless File.exist?(config_path)
+
+      parse_shakapacker_config(File.read(config_path))
+    rescue StandardError, ScriptError
+      nil
+    end
+
+    def bundler_from_shakapacker_section(config, section_name)
+      section = config[section_name] || config[section_name.to_sym]
+      return nil unless section.is_a?(Hash)
+
+      normalize_assets_bundler(section["assets_bundler"] || section[:assets_bundler])
+    end
+
+    def normalize_assets_bundler(value)
+      normalized = value.to_s.strip.downcase
+      ReactOnRails::SystemChecker::SUPPORTED_ASSETS_BUNDLERS.include?(normalized) ? normalized : nil
+    end
+
+    def development_hmr_enabled?
+      dev_server = development_dev_server_config
+      return hmr_config_value?(dev_server["hmr"]) if dev_server.key?("hmr")
+
+      return false if truthy_config_value?(dev_server["live_reload"])
+
+      # Default to HMR when neither hmr nor live_reload is configured, preserving historical behavior.
+      true
+    end
+
+    def hmr_config_value?(value)
+      value.to_s.strip.casecmp?("only") || truthy_config_value?(value)
+    end
+
+    def development_dev_server_config
+      config = parsed_shakapacker_config
+      return {} unless config.is_a?(Hash)
+
+      development_config = shakapacker_section(config, "default").merge(shakapacker_section(config, "development"))
+      dev_server_config_for(development_config)
+    end
+
+    def shakapacker_section(config, section_name)
+      section = config[section_name] || config[section_name.to_sym]
+      section.is_a?(Hash) ? section : {}
+    end
+
+    def dev_server_config_for(section)
+      dev_server = section["dev_server"] || section[:dev_server]
+      return {} unless dev_server.is_a?(Hash)
+
+      dev_server.transform_keys(&:to_s)
+    end
+
+    def truthy_config_value?(value)
+      value == true || value.to_s == "true"
+    end
     # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
     def print_test_workflow_next_steps
@@ -508,7 +648,8 @@ module ReactOnRails
       when :shared
         puts "• Shared test/dev output path detected: use static workflow only"
         puts "  - Start app with: ./bin/dev static"
-        puts "  - Avoid ./bin/dev (HMR) with shared output paths"
+        puts "  - Avoid ./bin/dev (#{Dev::ServerMode.text(default_dev_server_mode, :next_step_label)}) " \
+             "with shared output paths"
         puts "  - Start test watcher with: ./bin/dev test-watch --test-watch-mode=client-only"
       when :separate
         puts "• Recommended default: keep test output path separate from development"
@@ -1493,8 +1634,10 @@ module ReactOnRails
     end
 
     def check_launcher_procfiles
+      # Keep these launcher filenames aligned with NodeRendererProcfile::DEFAULT_COMMANDS.
+      default_mode = default_dev_server_mode
       procfiles = {
-        "Procfile.dev" => "HMR development (bin/dev default)",
+        "Procfile.dev" => Dev::ServerMode.text(default_mode, :launcher_description),
         "Procfile.dev-static-assets" => "Static development (bin/dev static)",
         "Procfile.dev-prod-assets" => "Production assets (bin/dev prod)"
       }
@@ -1515,6 +1658,61 @@ module ReactOnRails
       else
         checker.add_info("  💡 Run: rails generate react_on_rails:install")
       end
+
+      check_node_renderer_launcher_procfiles(NodeRendererProcfile::DEFAULT_COMMANDS.keys)
+    end
+
+    def check_node_renderer_launcher_procfiles(procfiles)
+      return unless resolved_pro_server_renderer == "NodeRenderer"
+
+      procfiles.each do |filename|
+        next unless File.exist?(filename)
+
+        content = File.read(filename)
+        next unless procfile_serves_rails_pages?(content)
+        next if procfile_starts_node_renderer_on_renderer_port?(content)
+
+        checker.add_warning(<<~MSG.strip)
+          ⚠️  #{filename} can serve SSR pages but does not start the Node Renderer on RENDERER_PORT.
+
+          Add a process such as:
+            #{node_renderer_procfile_command(filename)}
+        MSG
+      end
+    end
+
+    def procfile_serves_rails_pages?(content)
+      active_procfile_lines(content).any? { |line| line.match?(RAILS_SERVER_COMMAND_REGEX) }
+    end
+
+    def procfile_starts_node_renderer_on_renderer_port?(content)
+      active_procfile_lines(content).any? do |line|
+        line.match?(NodeRendererProcfile::PROCESS_WITH_RENDERER_PORT_REGEX)
+      end
+    end
+
+    def active_procfile_lines(content)
+      content.each_line.grep_v(/^\s*#/).map { |line| line.sub(/#.*/, "") }
+    end
+
+    def node_renderer_procfile_command(filename)
+      # When the app still has only the legacy client/node-renderer.js (Pro
+      # setup intentionally skips Procfile rewrites in that case), suggesting
+      # renderer/node-renderer.js would point at a non-existent file. Mirror
+      # the legacy path back so the doctor's hint stays runnable.
+      if legacy_node_renderer_only?
+        NodeRendererProcfile.command_for(
+          filename,
+          renderer_script: NodeRendererProcfile::LEGACY_RENDERER_SCRIPT_PATH
+        )
+      else
+        NodeRendererProcfile.command_for(filename)
+      end
+    end
+
+    def legacy_node_renderer_only?
+      File.exist?(NodeRendererProcfile::LEGACY_RENDERER_SCRIPT_PATH) &&
+        !File.exist?(NodeRendererProcfile::NEW_RENDERER_SCRIPT_PATH)
     end
 
     def detected_custom_launcher_paths
@@ -1866,8 +2064,27 @@ module ReactOnRails
       false
     end
 
+    # Resolves SHAKAPACKER_CONFIG the same way ReactOnRails::Engine and Dev::ServerManager do, so
+    # doctor inspects the same config file as Rails boot even when invoked from a directory other
+    # than the Rails root. Without this, a relative SHAKAPACKER_CONFIG would fail to resolve and
+    # dev-server mode detection would silently fall back to HMR labels. Falls back to Dir.pwd when
+    # Rails isn't booted (e.g. in unit specs).
     def shakapacker_config_path
-      ENV["SHAKAPACKER_CONFIG"] || DEFAULT_SHAKAPACKER_CONFIG_PATH
+      env_config_path = ENV.fetch("SHAKAPACKER_CONFIG", nil)
+      base = shakapacker_config_base_dir
+      return File.expand_path(DEFAULT_SHAKAPACKER_CONFIG_PATH, base) if env_config_path.to_s.empty?
+
+      File.expand_path(env_config_path, base)
+    end
+
+    def shakapacker_config_base_dir
+      return Rails.root.to_s if defined?(Rails) && Rails.respond_to?(:root) && Rails.root
+
+      Dir.pwd
+    end
+
+    def default_dev_server_mode
+      @default_dev_server_mode ||= Dev::ServerMode.detect(shakapacker_config_path)
     end
 
     def check_test_public_output_path_workflow(shakapacker_content, shakapacker_config = nil)
@@ -1888,7 +2105,9 @@ module ReactOnRails
         @test_output_path_strategy = :shared
         checker.add_warning("  ⚠️  test and development share public_output_path '#{test_output_path}'")
         checker.add_info("  💡 Shared output is an advanced workflow meant for bin/dev static")
-        checker.add_info("  💡 Do not use shared output with bin/dev (HMR): manifests can collide")
+        checker.add_info(
+          "  💡 #{Dev::ServerMode.text(default_dev_server_mode, :shared_output_warning)} because manifests can collide"
+        )
         add_shared_output_path_procfile_guidance
       else
         @test_output_path_strategy = :separate
@@ -1898,23 +2117,27 @@ module ReactOnRails
     end
 
     def add_shared_output_path_procfile_guidance
-      return unless hmr_procfile_configured?
+      return unless procfile_dev_uses_dev_server?
+
+      procfile_dev_label = Dev::ServerMode.text(default_dev_server_mode, :procfile_dev_label)
 
       if static_procfile_available?
         checker.add_warning(
-          "  ⚠️  HMR Procfile.dev is present. Shared output path is high-risk unless you run bin/dev static."
+          "  ⚠️  #{procfile_dev_label} is present. Shared output path is high-risk " \
+          "unless you run bin/dev static."
         )
         checker.add_info("  💡 Use: ./bin/dev static")
         checker.add_info("  💡 For test watch in this setup: ./bin/dev test-watch --test-watch-mode=client-only")
       else
         checker.add_error(
-          "  🚫 Shared output path + HMR Procfile.dev detected, but Procfile.dev-static-assets is missing"
+          "  🚫 Shared output path + #{procfile_dev_label} detected, " \
+          "but Procfile.dev-static-assets is missing"
         )
         checker.add_info("  💡 Fix: separate test/development public_output_path values, or add static Procfile support")
       end
     end
 
-    def hmr_procfile_configured?
+    def procfile_dev_uses_dev_server?
       return false unless File.exist?("Procfile.dev")
 
       File.read("Procfile.dev").include?("shakapacker-dev-server")
@@ -1997,17 +2220,7 @@ module ReactOnRails
     end
 
     def hmr_enabled_in_shakapacker?
-      shakapacker_yml = shakapacker_config_path
-      return false unless File.exist?(shakapacker_yml)
-
-      shakapacker_config = parse_shakapacker_config(File.read(shakapacker_yml))
-      return false unless shakapacker_config.is_a?(Hash)
-
-      dev_config = (shakapacker_config["default"] || {}).merge(shakapacker_config["development"] || {})
-      dev_server = dev_config["dev_server"]
-      return false unless dev_server.is_a?(Hash)
-
-      dev_server["hmr"].to_s == "true"
+      Dev::ServerMode.hmr_enabled?(shakapacker_config_path)
     end
 
     # Returns true if Capybara is configured but NOT in external server mode.
@@ -2108,7 +2321,8 @@ module ReactOnRails
       return unless @test_output_path_strategy == :shared
 
       checker.add_info(
-        "  💡 With shared output paths, only use bin/dev static (not HMR) when running Capybara tests"
+        "  💡 With shared output paths, only use bin/dev static " \
+        "(not #{Dev::ServerMode.text(default_dev_server_mode, :next_step_label)}) when running Capybara tests"
       )
     end
 
@@ -2121,7 +2335,8 @@ module ReactOnRails
         "  💡 Tests require bin/dev (or another server) to be running at the configured app_host"
       )
       checker.add_info(
-        "  💡 Both bin/dev (HMR) and bin/dev static work in this mode"
+        "  💡 Both bin/dev (#{Dev::ServerMode.text(default_dev_server_mode, :next_step_label)}) " \
+        "and bin/dev static work in this mode"
       )
     end
 
@@ -2129,7 +2344,8 @@ module ReactOnRails
       return unless capybara_configured?
 
       checker.add_info(
-        "  💡 Capybara starts its own server — HMR assets won't work. Use bin/dev static or precompile."
+        "  💡 Capybara starts its own server — dev-server assets won't work. " \
+        "Use bin/dev static or precompile."
       )
     end
 
@@ -2751,6 +2967,7 @@ module ReactOnRails
       check_pro_renderer_mode
       check_base_package_references
       check_deprecated_renderer_cache_task
+      check_rolling_deploy_adapter
     end
 
     def check_pro_initializer_existence
@@ -2795,22 +3012,15 @@ module ReactOnRails
       # migration nudge.
       # Per-file rescue so a transient failure on one path (e.g. Errno::EACCES)
       # does not abort the whole scan and silently skip the rest. The outer
-      # rescue catches anything that escapes the per-file guard.
-      matches = RENDERER_CACHE_DEPLOY_SCRIPT_PATHS.select do |path|
-        full_path = Rails.root.join(path)
+      # rescue catches anything that escapes the per-file guard. Globs are
+      # expanded under their own rescue so a failure expanding one pattern
+      # cannot stop other patterns or fixed paths from being scanned.
+      candidate_paths = (
+        RENDERER_CACHE_DEPLOY_SCRIPT_PATHS + expand_renderer_cache_deploy_script_globs
+      ).uniq
 
-        begin
-          next false unless full_path.file?
-          # Skip files larger than 1 MB; deploy scripts should be tiny.
-          next false if full_path.size > RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES
-
-          deploy_script_references_deprecated_task?(full_path)
-        rescue StandardError => e
-          checker.add_warning(
-            "⚠️  Could not scan #{path} for deprecated renderer-cache task references: #{e.message}"
-          )
-          false
-        end
+      matches = candidate_paths.select do |path|
+        deploy_script_path_references_deprecated_task?(path)
       end
 
       return if matches.empty?
@@ -2826,17 +3036,61 @@ module ReactOnRails
       checker.add_warning("⚠️  Could not complete scan for deprecated renderer-cache task references: #{e.message}")
     end
 
-    def deploy_script_references_deprecated_task?(full_path)
-      # Only `#` comments matter for the scanned file types: Procfile, Dockerfile*,
-      # and bin/* scripts all use `#`. None use `//`, so we don't filter it.
-      # The trailing-comment strip requires whitespace before `#`, so a fragment
-      # like `task#name` stays intact while `cmd # was: <deprecated>` is filtered.
+    def deploy_script_references_deprecated_task?(full_path, path)
+      comment_prefixes = renderer_cache_deploy_script_comment_prefixes(path)
+
+      # The trailing-comment strip requires whitespace before the comment marker,
+      # so fragments like `task#name` stay intact while `cmd # was: <deprecated>`
+      # and Jenkinsfile `cmd // was: <deprecated>` comments are filtered.
       full_path.binread.each_line.any? do |line|
         stripped = line.lstrip
-        next false if stripped.start_with?("#")
+        next false if comment_prefixes.any? { |prefix| stripped.start_with?(prefix) }
 
-        without_inline_comment = stripped.sub(/ +#.*/, "")
+        without_inline_comment = comment_prefixes.reduce(stripped) do |content, prefix|
+          content.sub(/ +#{Regexp.escape(prefix)}.*/, "")
+        end
         without_inline_comment.include?(DEPRECATED_RENDERER_CACHE_TASK)
+      end
+    end
+
+    def renderer_cache_deploy_script_comment_prefixes(path)
+      return ["#", "//"] if path == "Jenkinsfile"
+
+      ["#"]
+    end
+
+    def deploy_script_path_references_deprecated_task?(path)
+      full_path = Rails.root.join(path)
+
+      return false unless full_path.file?
+      # Skip files larger than RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES;
+      # deploy scripts and CI manifests should be tiny.
+      return false if full_path.size > RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES
+
+      deploy_script_references_deprecated_task?(full_path, path)
+    rescue StandardError => e
+      checker.add_warning(
+        "⚠️  Could not scan #{path} for deprecated renderer-cache task references: #{e.message}"
+      )
+      false
+    end
+
+    def expand_renderer_cache_deploy_script_globs
+      # File::FNM_PATHNAME stops `*` from crossing slashes even though none of
+      # the patterns use `**`. base: scopes the expansion to the project root
+      # and yields paths relative to it. Each pattern is rescued individually
+      # so a permission error on one glob (e.g. an unreadable .github/) does
+      # not silence the rest.
+      root = Rails.root.to_s
+      RENDERER_CACHE_DEPLOY_SCRIPT_GLOBS.flat_map do |pattern|
+        Dir.glob(pattern, File::FNM_PATHNAME, base: root)
+           .sort
+           .first(RENDERER_CACHE_DEPLOY_SCRIPT_GLOB_MAX_MATCHES)
+      rescue StandardError => e
+        checker.add_warning(
+          "⚠️  Could not expand renderer-cache deploy-script glob #{pattern}: #{e.message}"
+        )
+        []
       end
     end
 
@@ -2872,6 +3126,150 @@ module ReactOnRails
         # default to symlink (correct for local dev + same-filesystem deploys); call out the
         # copy alternative for users driving production container builds via Compose.
         "rake react_on_rails_pro:pre_seed_renderer_cache MODE=symlink # use MODE=copy for Docker/container image builds"
+      end
+    end
+
+    # ── Rolling Deploy Adapter ────────────────────────────────────────
+
+    ROLLING_DEPLOY_REQUIRED_METHODS = %i[previous_bundle_hashes fetch upload].freeze
+
+    def check_rolling_deploy_adapter
+      adapter = ReactOnRailsPro.configuration.rolling_deploy_adapter
+
+      if adapter.nil?
+        env_override = ENV.fetch("PREVIOUS_BUNDLE_HASHES", nil)
+        if env_override && !env_override.empty?
+          checker.add_warning(
+            "⚠️  PREVIOUS_BUNDLE_HASHES=#{truncate_for_warning(env_override).inspect} is set but no " \
+            "rolling_deploy_adapter is configured. Rolling-deploy seeding needs both — the env var " \
+            "overrides *discovery* but the adapter is still required to fetch bundle files. " \
+            "Set config.rolling_deploy_adapter or unset PREVIOUS_BUNDLE_HASHES."
+          )
+        else
+          checker.add_info("ℹ️  No rolling_deploy_adapter configured (rolling-deploy seeding disabled).")
+        end
+        return
+      end
+
+      return unless report_adapter_protocol(adapter)
+
+      env_override = ENV.fetch("PREVIOUS_BUNDLE_HASHES", nil)
+      if env_override && !env_override.empty?
+        # PREVIOUS_BUNDLE_HASHES is a full discovery override at runtime, so
+        # probing adapter#previous_bundle_hashes here would surface timeout/error
+        # noise for a code path the deploy will never invoke. Skip the probe and
+        # state the override explicitly so operators see what's happening.
+        checker.add_info(
+          "ℹ️  PREVIOUS_BUNDLE_HASHES=#{truncate_for_warning(env_override).inspect} is set; " \
+          "skipping rolling_deploy_adapter#previous_bundle_hashes probe (env var overrides discovery)."
+        )
+        report_resolved_cache_dir
+        return
+      end
+
+      report_previous_bundle_hashes_probe(adapter)
+      report_resolved_cache_dir
+    rescue StandardError => e
+      checker.add_warning("⚠️  Could not evaluate rolling_deploy_adapter: #{e.message}")
+    end
+
+    # Cap echoed env-var values so a malformed (or accidentally large)
+    # PREVIOUS_BUNDLE_HASHES value doesn't dump kilobytes into operator output.
+    PREVIOUS_BUNDLE_HASHES_DISPLAY_LIMIT = 80
+    private_constant :PREVIOUS_BUNDLE_HASHES_DISPLAY_LIMIT
+
+    def truncate_for_warning(value)
+      return value if value.length <= PREVIOUS_BUNDLE_HASHES_DISPLAY_LIMIT
+
+      "#{value[0, PREVIOUS_BUNDLE_HASHES_DISPLAY_LIMIT]}… (#{value.length} chars total)"
+    end
+
+    def report_adapter_protocol(adapter)
+      missing = ROLLING_DEPLOY_REQUIRED_METHODS.reject { |m| adapter.respond_to?(m) }
+      if missing.empty?
+        checker.add_success(
+          "✅ rolling_deploy_adapter responds to all required methods " \
+          "(#{ROLLING_DEPLOY_REQUIRED_METHODS.join(', ')})"
+        )
+        true
+      else
+        checker.add_warning(
+          "⚠️  rolling_deploy_adapter is missing required methods: #{missing.join(', ')}. " \
+          "See docs/pro/rolling-deploy-adapters.md."
+        )
+        false
+      end
+    end
+
+    def report_previous_bundle_hashes_probe(adapter)
+      start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      timeout_seconds = rolling_deploy_discovery_timeout_seconds
+      hashes = Timeout.timeout(timeout_seconds) { Array(adapter.previous_bundle_hashes) }
+      latency_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - start) * 1000).round
+
+      if hashes.empty?
+        checker.add_warning(
+          "⚠️  rolling_deploy_adapter#previous_bundle_hashes returned []. " \
+          "Usually indicates the upload side has never run on a prior deploy."
+        )
+      else
+        checker.add_success(
+          "✅ rolling_deploy_adapter#previous_bundle_hashes returned #{hashes.length} hash(es) in #{latency_ms}ms"
+        )
+      end
+    rescue Timeout::Error
+      checker.add_warning(
+        "⚠️  rolling_deploy_adapter#previous_bundle_hashes timed out after " \
+        "#{timeout_seconds}s"
+      )
+    rescue StandardError => e
+      checker.add_warning("⚠️  rolling_deploy_adapter#previous_bundle_hashes raised #{e.class}: #{e.message}")
+    end
+
+    def rolling_deploy_discovery_timeout_seconds
+      if defined?(ReactOnRailsPro::RollingDeployCacheStager::DISCOVERY_TIMEOUT_SECONDS)
+        ReactOnRailsPro::RollingDeployCacheStager::DISCOVERY_TIMEOUT_SECONDS
+      else
+        # Must match the canonical Pro constant. Bidirectional pointers:
+        #   Pro file:     react_on_rails_pro/lib/react_on_rails_pro/rolling_deploy_cache_stager.rb
+        #   Pro constant: ReactOnRailsPro::RollingDeployCacheStager::DISCOVERY_TIMEOUT_SECONDS
+        #   Pro guard:    react_on_rails_pro/spec/dummy/spec/rolling_deploy_cache_stager_spec.rb
+        #                 (describe "DISCOVERY_TIMEOUT_SECONDS" → expects this fallback to equal Pro constant)
+        # The Pro spec catches drift in the Pro→OSS direction. If you change
+        # the value here without updating the Pro constant + spec, doctor will
+        # silently use a different timeout from the live stager.
+        10
+      end
+    end
+
+    # Fallback used when the Pro gem isn't loaded. Must match
+    # ReactOnRailsPro::RollingDeployCacheStager::TEMPORARY_DIRECTORY_PATTERN so
+    # doctor still filters staging/backup dirs out of the bundle-hash count.
+    # Drift is caught by:
+    #   react_on_rails_pro/spec/dummy/spec/rolling_deploy_cache_stager_spec.rb
+    #   describe "TEMPORARY_DIRECTORY_PATTERN"
+    # PID is `\d+` to match container deployments (Docker/Kubernetes) where
+    # seeding runs as PID 1.
+    ROLLING_DEPLOY_TEMP_DIR_PATTERN = /\.(?:staging|previous)-\d+-[0-9a-f]{8,}\z/
+
+    def report_resolved_cache_dir
+      cache_dir = ReactOnRailsPro::Utils.resolve_renderer_cache_dir
+      if File.directory?(cache_dir)
+        temp_dir_pattern = rolling_deploy_temp_dir_pattern
+        subdirs = Dir.children(cache_dir).select do |entry|
+          File.directory?(File.join(cache_dir, entry)) && !entry.match?(temp_dir_pattern)
+        end
+        checker.add_info("ℹ️  Resolved renderer cache dir: #{cache_dir} (#{subdirs.length} bundle-hash subdir(s))")
+      else
+        checker.add_info("ℹ️  Resolved renderer cache dir: #{cache_dir} (does not exist yet)")
+      end
+    end
+
+    def rolling_deploy_temp_dir_pattern
+      if defined?(ReactOnRailsPro::RollingDeployCacheStager::TEMPORARY_DIRECTORY_PATTERN)
+        ReactOnRailsPro::RollingDeployCacheStager::TEMPORARY_DIRECTORY_PATTERN
+      else
+        ROLLING_DEPLOY_TEMP_DIR_PATTERN
       end
     end
 

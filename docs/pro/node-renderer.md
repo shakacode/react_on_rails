@@ -18,6 +18,30 @@ ExecJS embeds a JavaScript runtime (mini_racer/V8) inside the Ruby process. This
 
 The Pro Node Renderer solves all of these by running a standalone Node.js server that handles rendering requests from Rails over HTTP.
 
+The contrast in one picture — the old way runs JavaScript inside Rails, while the Node Renderer runs it in a separate service:
+
+```mermaid
+flowchart LR
+    subgraph Exec["ExecJS — JavaScript inside Rails"]
+        direction TB
+        E1["Rails process"] --> E2["JavaScript runtime<br/>inside the same process"]
+        E2 --> E3["Rails waits while<br/>JavaScript renders HTML"]
+    end
+    subgraph Node["Node Renderer — JavaScript in a separate service"]
+        direction TB
+        N1["Rails process"] -- "render request" --> N2["Node Renderer"]
+        N2 --> N3["Worker 1<br/>renders HTML"]
+        N2 --> N4["Worker 2<br/>renders HTML"]
+        N2 --> N5["Worker N<br/>renders HTML"]
+    end
+    style Exec fill:#fff4e5,stroke:#e0a000,color:#000
+    style E3 fill:#ffe5e5,stroke:#d1242f,color:#000
+    style Node fill:#e6f0ff,stroke:#2c6ecb,color:#000
+    style N3 fill:#e6ffed,stroke:#2da44e,color:#000
+    style N4 fill:#e6ffed,stroke:#2da44e,color:#000
+    style N5 fill:#e6ffed,stroke:#2da44e,color:#000
+```
+
 ## Performance Benefits
 
 | Metric               | ExecJS                      | Node Renderer            |
@@ -37,6 +61,33 @@ At [Popmenu](https://www.shakacode.com/recent-work/popmenu/) (a ShakaCode client
 3. The rendered HTML is returned to Rails and inserted into the view
 4. Workers are pooled and can be automatically restarted to mitigate memory leaks
 
+Because rendering runs out-of-process, the renderer scales concurrency across a worker pool instead of blocking the Ruby request cycle. Rails (on an async server such as Puma or Falcon) multiplexes many requests over HTTP/2; the master process forks workers (default: CPU count − 1), auto-restarts crashed ones, and can do scheduled rolling restarts. Each request is rendered in its own per-request `sharedExecutionContext`, so concurrent renders never leak data into one another:
+
+```mermaid
+flowchart TB
+    subgraph Rails["Rails receives many page requests"]
+        direction LR
+        Req1["page request 1"]
+        Req2["page request 2"]
+        Req3["page request N"]
+    end
+    Req1 -- "send render job" --> Master
+    Req2 -- "send render job" --> Master
+    Req3 -- "send render job" --> Master
+    subgraph Renderer["Node Renderer"]
+        Master["Dispatcher<br/>hands jobs to workers"]
+        Master --> WA["Worker A<br/>renders several pages at once"]
+        Master --> WB["Worker B<br/>renders several pages at once"]
+    end
+    style Rails fill:#e6f0ff,stroke:#2c6ecb,color:#000
+    style Renderer fill:#e6ffed,stroke:#2da44e,color:#000
+    style Master fill:#e6f0ff,stroke:#2c6ecb,color:#000
+    style WA fill:#e6ffed,stroke:#2da44e,color:#000
+    style WB fill:#e6ffed,stroke:#2da44e,color:#000
+```
+
+By contrast, ExecJS renders one request per V8 context and blocks the Ruby thread for the duration. For concurrent _streaming_ specifically, see [Streaming SSR](./streaming-ssr.md).
+
 ## Key Features
 
 - **Worker pool** — Configurable number of workers (defaults to CPU count minus 1)
@@ -44,6 +95,40 @@ At [Popmenu](https://www.shakacode.com/recent-work/popmenu/) (a ShakaCode client
 - **Bundle caching** — Server bundles are cached on the Node side for fast re-renders
 - **Shared secret authentication** — Secure communication between Rails and Node
 - **Prerender caching** — Combined with [prerender caching](../oss/building-features/caching.md#level-1-prerender-caching), rendering results are cached across requests
+
+React on Rails Pro stacks several caches, each skipping more work than the one below it. The two Rails-side caches differ in **scope**: a [fragment-cache](../oss/building-features/caching.md#level-2-fragment-caching) hit skips even props assembly (the props block never runs), while [prerender caching](../oss/building-features/caching.md#level-1-prerender-caching) still assembles props but skips the JavaScript evaluation. The renderer cache layers sit on the server-side render path; request-scoped deduplication and browser chunk caching are shown as side optimizations because they do not feed into each other:
+
+```mermaid
+flowchart TB
+    Req["Need HTML for a component"] --> L1{"Does Rails already<br/>have the final HTML?"}
+    L1 -- "yes" --> Done["Return HTML"]
+    L1 -- "no" --> L2{"Does Rails have<br/>a saved render result?"}
+    L2 -- "yes" --> Done
+    L2 -- "no" --> L3
+    subgraph Renderer["Node Renderer"]
+        L3{"Is the JS bundle<br/>already warm in memory?"}
+        L3 -- "yes" --> Exec["Run JavaScript<br/>to make HTML"]
+        L3 -- "no" --> L4{"Is the JS bundle<br/>saved on disk?"}
+        L4 -- "yes" --> Exec
+        L4 -- "no" --> Upload["Rails sends<br/>the bundle once"]
+        Upload --> Exec
+    end
+    Exec --> Done
+    Exec -. "during one render" .-> L5["Repeated data reads<br/>share one result"]
+    Browser["Browser starts the page"] -. "later" .-> L6["Browser code chunks<br/>cached by the browser"]
+    style L1 fill:#e6f0ff,stroke:#2c6ecb,color:#000
+    style L2 fill:#e6f0ff,stroke:#2c6ecb,color:#000
+    style Done fill:#e6ffed,stroke:#2da44e,color:#000
+    style Renderer fill:#e6ffed,stroke:#2da44e,color:#000
+    style L3 fill:#e6ffed,stroke:#2da44e,color:#000
+    style L4 fill:#fff4e5,stroke:#e0a000,color:#000
+    style Upload fill:#ffe5e5,stroke:#d1242f,color:#000
+    style Browser fill:#e6f0ff,stroke:#2c6ecb,color:#000
+    style L5 fill:#e6f0ff,stroke:#2c6ecb,color:#000
+    style L6 fill:#e6f0ff,stroke:#2c6ecb,color:#000
+```
+
+(Fragment caching subsumes prerender caching: on a fragment-cache hit the prerender cache is never consulted.)
 
 ## Getting Started
 
@@ -70,7 +155,7 @@ Configure Rails to use the Node Renderer:
 ReactOnRailsPro.configure do |config|
   config.server_renderer = "NodeRenderer"
   config.renderer_url = ENV["REACT_RENDERER_URL"] || "http://localhost:3800"
-  config.renderer_password = ENV.fetch("RENDERER_PASSWORD", "devPassword")
+  config.renderer_password = ENV["RENDERER_PASSWORD"]
 end
 ```
 
@@ -87,11 +172,16 @@ The renderer password secures communication between Rails and the Node Renderer.
 | `production`          | **Yes**            | Raises error on boot if `RENDERER_PASSWORD` is missing   |
 | `qa`, `preview`, etc. | **Yes**            | Raises error on boot if `RENDERER_PASSWORD` is missing   |
 
-In production-like environments (anything other than `development` or `test`), both the Rails app and the Node Renderer will refuse to start without a non-empty password. Set the same `RENDERER_PASSWORD` for both sides:
+In production-like environments (anything other than `development` or `test`), both the Rails app and the Node Renderer will refuse to start without a non-empty password. Additionally, a warning is logged if the password:
+
+- Matches a known-weak default (e.g. `devPassword`, `myPassword1`, `password`, `changeme`, `admin`, `secret`, `test`, `renderer`)
+- Is shorter than 16 characters
+
+Set the same `RENDERER_PASSWORD` for both sides:
 
 ```bash
-# Set for both Rails and Node Renderer
-export RENDERER_PASSWORD="your-secure-password"
+# Set for both Rails and Node Renderer — use a strong random value
+export RENDERER_PASSWORD="$(openssl rand -hex 32)"
 ```
 
 The Node Renderer reads `RENDERER_PASSWORD` directly from `process.env`. On the Ruby side, React on Rails Pro
@@ -107,15 +197,40 @@ the initializer or URL.
 If neither `NODE_ENV` nor `RAILS_ENV` is set, the Node Renderer treats the environment as
 production-like and still requires `RENDERER_PASSWORD`.
 
-For local development, you can either omit the password entirely (no authentication) or set a convenience default:
+The install generator writes a random password into your config files for development convenience.
+For production, always set `RENDERER_PASSWORD` as an environment variable and remove any literal
+password from version control.
 
-```ruby
-config.renderer_password = ENV.fetch("RENDERER_PASSWORD", "devPassword")
-```
+#### Password Rotation
+
+To rotate the renderer password:
+
+1. Set the new `RENDERER_PASSWORD` env var on both the Rails app and the Node Renderer.
+2. Restart both processes. The new password takes effect immediately.
 
 ## Eliminating Cold-Start Latency in Docker Deployments
 
 When a new container starts, the Node Renderer has an empty bundle cache. The first SSR request triggers a costly 410→retry round-trip where Rails sends the full bundle over HTTP, adding 200ms–1s+ of latency depending on bundle size. In rolling deploys, this affects every new pod.
+
+That round-trip is the difference between a warm and a cold render request:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Rails
+    participant Renderer as Node Renderer
+    Rails->>Renderer: Please render this page
+    alt renderer already has the bundle
+        Renderer-->>Rails: HTML
+    else renderer is missing the bundle
+        Renderer-->>Rails: I need that bundle first
+        Rails->>Renderer: Upload the bundle
+        Rails->>Renderer: Please render again
+        Renderer-->>Rails: HTML
+    end
+```
+
+Pre-seeding the cache (below) makes every fresh renderer take the warm path on its very first request.
 
 ### Pre-seeding the bundle cache
 
@@ -171,19 +286,159 @@ RUN bundle exec rake react_on_rails_pro:pre_seed_renderer_cache
 
 ### Rolling deploys: seed current and previous bundle hashes
 
-During a rolling deploy, new renderer instances can receive requests for both the current deployed bundle hash and the previous hash while old Rails instances drain. Treat this as a two-hash cache-seeding problem, not a single-file problem.
+During a rolling deploy, new renderer instances can receive requests for both the current deployed bundle hash and the previous hash while old Rails instances drain. Treat this as a two-hash cache-seeding problem, not a single-file problem — and each seeded hash must carry its own companion `loadable-stats.json` / RSC manifests built in lockstep with that bundle.
 
-At startup, aim to have the cache contain:
+`pre_seed_renderer_cache` handles the current bundle. For previous hashes, configure a **`rolling_deploy_adapter`** that:
 
-- the current server bundle hash
-- the previous server bundle hash
-- the current and previous RSC bundle hashes as well, if RSC support is enabled
-- any required copied assets and RSC manifests in each seeded hash directory
+- Publishes each successful deploy's bundle + companion assets to an artifact store (S3, Control Plane image registry, etc.) via its `upload` method — called automatically after `assets:precompile` in production-like environments.
+- Advertises recent deploys' bundle hashes via `previous_bundle_hashes`.
+- Retrieves the bundle + assets for a given historical hash via `fetch`.
 
-`pre_seed_renderer_cache` seeds the current locally built bundle outputs. For the previous deployed hash, the most practical approach is to publish bundle artifacts keyed by hash after each successful deploy, then fetch the previous hash artifact during the next build and place it into the same `<cache>/<bundleHash>/...` layout before boot.
+```ruby
+# config/initializers/react_on_rails_pro.rb
+ReactOnRailsPro.configure do |config|
+  config.rolling_deploy_adapter = MyApp::S3RollingDeployAdapter
+end
+```
+
+During the next build, `pre_seed_renderer_cache` calls `previous_bundle_hashes`, deduplicates against the current hash, then fetches and stages each into `<cache>/<bundleHash>/...` — preventing 410→retry for draining-version requests.
+
+See [Rolling-Deploy Adapters](./rolling-deploy-adapters.md) for the full protocol spec, reference implementations (S3, Control Plane, Filesystem), and a discussion of the loadable-stats wrinkle.
+
+## Observability with OpenTelemetry
+
+The Node Renderer ships an optional OpenTelemetry integration for distributed tracing. When enabled, every SSR request becomes a trace you can inspect in any OTLP-compatible backend (Jaeger, Honeycomb, Datadog, Grafana Tempo, New Relic, etc.).
+
+### Install the OpenTelemetry packages (peer dependencies)
+
+**npm:**
+
+```bash
+npm install \
+  @opentelemetry/api \
+  @opentelemetry/sdk-trace-node \
+  @opentelemetry/sdk-trace-base \
+  @opentelemetry/resources \
+  @opentelemetry/semantic-conventions \
+  @opentelemetry/exporter-trace-otlp-http \
+  @opentelemetry/instrumentation \
+  @opentelemetry/instrumentation-http \
+  @fastify/otel
+```
+
+**yarn:**
+
+```bash
+yarn add \
+  @opentelemetry/api \
+  @opentelemetry/sdk-trace-node \
+  @opentelemetry/sdk-trace-base \
+  @opentelemetry/resources \
+  @opentelemetry/semantic-conventions \
+  @opentelemetry/exporter-trace-otlp-http \
+  @opentelemetry/instrumentation \
+  @opentelemetry/instrumentation-http \
+  @fastify/otel
+```
+
+**pnpm:**
+
+```bash
+pnpm add \
+  @opentelemetry/api \
+  @opentelemetry/sdk-trace-node \
+  @opentelemetry/sdk-trace-base \
+  @opentelemetry/resources \
+  @opentelemetry/semantic-conventions \
+  @opentelemetry/exporter-trace-otlp-http \
+  @opentelemetry/instrumentation \
+  @opentelemetry/instrumentation-http \
+  @fastify/otel
+```
+
+### Enable from your renderer entrypoint
+
+OpenTelemetry must be initialized **before** the Fastify server starts so that the auto-instrumentation can patch the modules at require-time. Call `init()` first in your entrypoint:
+
+```js
+import { init as initOpenTelemetry } from 'react-on-rails-pro-node-renderer/integrations/opentelemetry';
+
+initOpenTelemetry({
+  serviceName: 'my-app-node-renderer', // optional; defaults to "react-on-rails-pro-node-renderer"
+  fastify: true, // register HTTP + Fastify auto-instrumentation
+  tracing: true, // wrap SSR rendering in spans
+});
+
+// Now start the renderer:
+const { reactOnRailsProNodeRenderer } = await import('react-on-rails-pro-node-renderer');
+await reactOnRailsProNodeRenderer().catch((e) => {
+  throw e;
+});
+```
+
+> [!NOTE]
+> With `fastify: true`, OpenTelemetry patches the HTTP and Fastify modules process-wide. If a later init step fails after those patches are installed, OpenTelemetry does not provide a rollback API; the patched modules remain installed and use a no-op tracer until the process restarts.
+
+### Configuration via standard OpenTelemetry environment variables
+
+| Env var                                          | Purpose                                                                                                                     | Default                            |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`                    | OTLP collector endpoint                                                                                                     | `http://localhost:4318`            |
+| `OTEL_EXPORTER_OTLP_HEADERS`                     | Auth headers (e.g. `api-key=xxx`)                                                                                           | none                               |
+| `OTEL_SERVICE_NAME`                              | Service name in traces (overrides `init({ serviceName })`)                                                                  | `react-on-rails-pro-node-renderer` |
+| `OTEL_RESOURCE_ATTRIBUTES`                       | Additional resource attributes (csv); `service.name` applies when `OTEL_SERVICE_NAME` and `init({ serviceName })` are unset | none                               |
+| `OTEL_TRACES_SAMPLER`, `OTEL_TRACES_SAMPLER_ARG` | Trace sampling                                                                                                              | parent-based, always-on            |
+
+### Span taxonomy
+
+| Span                                 | Where                                                             | Attributes                                                                |
+| ------------------------------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `ror.ssr.request`                    | Root span for each SSR render request                             | (none — root)                                                             |
+| `ror.bundle.build_execution_context` | Loading a bundle into the VM                                      | `bundle.timestamp`, `bundle.paths.count`, `cache.strategy`                |
+| `ror.bundle.upload`                  | When new bundles are uploaded mid-request or via `/upload-assets` | `bundle.count`, `assets.count`, `bytes.total` (sum of upload source size) |
+| `ror.vm.execute`                     | The actual SSR JS execution inside the VM                         | `bundle.timestamp`                                                        |
+| `ror.result.prepare`                 | Building the response payload                                     | `response.bytes` (UTF-8 byte length; omitted for streamed responses)      |
+| `ror.incremental.stream`             | Wraps the incremental NDJSON request lifecycle                    | (none)                                                                    |
+| `ror.incremental.process_chunk`      | Processing each NDJSON update chunk                               | (none)                                                                    |
+
+Outbound HTTP calls inside your SSR bundle are automatically captured by `HttpInstrumentation` as child spans.
+
+**Cache-miss note:** On a cache-miss path `ror.bundle.build_execution_context` appears twice. The first span has `cache.strategy=cache-first` and can end with ERROR status when the VM cache probe misses. The second span has `cache.strategy=cache-miss` for the real VM build after bundle upload or bundle discovery. Scope error alerts to exclude `cache.strategy=cache-first` when that miss is expected.
+
+As a trace, the spans nest under the root `ror.ssr.request`. On the warm path the spans fire in order: `ror.bundle.build_execution_context` (`cache-first`) → `ror.vm.execute` → `ror.result.prepare`. Cold-path spans (upload and `cache-miss` build) appear only between the first two; outbound `fetch` calls from your bundle are captured automatically as HTTP child spans; and incremental (async-props) renders add their own stream/chunk spans:
+
+```mermaid
+flowchart TB
+    Root["One server-render trace"]
+    Root --> Warm["Warm path<br/>load bundle -> run JavaScript -> prepare result"]
+    Root -. "cold start" .-> Cold["Upload bundle first<br/>then load it"]
+    Warm -. "if JavaScript fetches data" .-> Http["Data-fetch spans"]
+    Root -. "if slow data is streamed" .-> Inc["Streaming-data spans"]
+    Inc --> Chunk["One span for each<br/>incoming data chunk"]
+    style Root fill:#e6f0ff,stroke:#2c6ecb,color:#000
+    style Warm fill:#e6ffed,stroke:#2da44e,color:#000
+    style Cold fill:#fff4e5,stroke:#e0a000,color:#000
+    style Http fill:#fff4e5,stroke:#e0a000,color:#000
+    style Inc fill:#e6f0ff,stroke:#2c6ecb,color:#000
+    style Chunk fill:#e6ffed,stroke:#2da44e,color:#000
+```
+
+### Production defaults
+
+- **Span processor**: `BatchSpanProcessor` in production (`NODE_ENV=production` or `RAILS_ENV=production`), `SimpleSpanProcessor` otherwise. Override with `init({ spanProcessor })`.
+- **Exporter**: OTLP HTTP. Override with `init({ exporter })`.
+- **Graceful shutdown**: Pending batched spans are flushed when Fastify's `onClose` hook fires (during worker shutdown), so traces are not lost on rolling restarts. The renderer waits up to 5000ms by default before continuing worker shutdown; override with `init({ shutdownTimeoutMs })`. The worker also has a 10s `app.close()` watchdog, so keep custom OTel shutdown timeouts below that window.
+
+### Privacy note
+
+The `renderingRequest` payload and rendered response body are **never** included in span attributes. Only bundle hashes, counts, and byte sizes (`bytes.total`, `response.bytes`) are recorded. This matches the renderer's existing logging policy.
 
 ## Further Reading
 
+- [Streaming SSR](./streaming-ssr.md) — Progressive HTML streaming and the async-props data flow (with diagrams)
+- [React Server Components rendering flow](./react-server-components/rendering-flow.md) — How the RSC, server, and client bundles fit together
+- [RSC data fetching patterns](../oss/migrating/rsc-data-fetching.md) — How Rails data reaches components during render (async props vs. direct fetch)
+- [Rolling-Deploy Adapters](./rolling-deploy-adapters.md) — Protocol spec and reference implementations for `rolling_deploy_adapter`
 - [Node Renderer basics](../oss/building-features/node-renderer/basics.md) — Architecture and core concepts
 - [JavaScript configuration](../oss/building-features/node-renderer/js-configuration.md) — Node-side config options
 - [Error reporting and tracing](../oss/building-features/node-renderer/error-reporting-and-tracing.md) — Monitoring in production

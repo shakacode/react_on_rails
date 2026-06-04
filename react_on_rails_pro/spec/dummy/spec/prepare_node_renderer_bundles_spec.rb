@@ -21,6 +21,7 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
                                         renderer_url: "http://localhost:3800",
                                         renderer_request_retry_limit: 5,
                                         enable_rsc_support: false,
+                                        rolling_deploy_adapter: nil,
                                         assets_to_copy: [
                                           path_in_webpack_folder(asset_filename),
                                           path_in_webpack_folder(asset_filename2)
@@ -172,6 +173,7 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
                                           renderer_url: "http://localhost:3800",
                                           renderer_request_retry_limit: 5,
                                           enable_rsc_support: true,
+                                          rolling_deploy_adapter: nil,
                                           assets_to_copy: nil)
       allow(ReactOnRailsPro).to receive(:configuration).and_return(dbl_configuration)
       allow(ReactOnRailsPro::Utils).to receive_messages(

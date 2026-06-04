@@ -1,7 +1,7 @@
 PATH
   remote: ../..
   specs:
-    react_on_rails (16.6.0)
+    react_on_rails (17.0.0.rc.1)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -194,6 +194,8 @@ GEM
     nokogiri (1.19.1)
       mini_portile2 (~> 2.8.2)
       racc (~> 1.4)
+    nokogiri (1.19.1-arm64-darwin)
+      racc (~> 1.4)
     nokogiri (1.19.1-x86_64-linux-gnu)
       racc (~> 1.4)
     ostruct (0.6.3)
@@ -228,7 +230,7 @@ GEM
       nio4r (~> 2.0)
     racc (1.8.1)
     rack (3.2.5)
-    rack-proxy (0.7.7)
+    rack-proxy (0.8.2)
       rack
     rack-session (2.1.1)
       base64 (>= 0.1.0)
@@ -346,7 +348,7 @@ GEM
       rubyzip (>= 1.2.2, < 3.0)
       websocket (~> 1.0)
     semantic_range (3.1.1)
-    shakapacker (9.6.1)
+    shakapacker (10.1.0)
       activesupport (>= 5.2)
       package_json
       rack-proxy (>= 0.6.1)
@@ -365,8 +367,10 @@ GEM
       actionpack (>= 5.2)
       activesupport (>= 5.2)
       sprockets (>= 3.0.0)
-    sqlite3 (1.6.3)
+    sqlite3 (2.9.4)
       mini_portile2 (~> 2.8.0)
+    sqlite3 (2.9.4-arm64-darwin)
+    sqlite3 (2.9.4-x86_64-linux-gnu)
     steep (1.9.4)
       activesupport (>= 5.1)
       concurrent-ruby (>= 1.1.10)
@@ -419,6 +423,7 @@ GEM
     zeitwerk (2.7.5)
 
 PLATFORMS
+  arm64-darwin
   ruby
   x86_64-linux
 
@@ -458,11 +463,11 @@ DEPENDENCIES
   sass-rails (~> 6.0)
   sdoc
   selenium-webdriver (= 4.9.0)
-  shakapacker (= 9.6.1)
+  shakapacker (= 10.1.0)
   simplecov (~> 0.16.1)
   spring (~> 4.0)
   sprockets (~> 4.0)
-  sqlite3 (~> 1.6)
+  sqlite3 (~> 2.0)
   steep
   turbo-rails
   turbolinks
@@ -470,4 +475,4 @@ DEPENDENCIES
   webdrivers (= 5.3.0)
 
 BUNDLED WITH
-   2.5.9
+  4.0.10

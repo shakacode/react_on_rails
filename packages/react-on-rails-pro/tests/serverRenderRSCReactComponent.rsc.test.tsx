@@ -4,12 +4,13 @@
 /// <reference types="react/experimental" />
 
 import * as React from 'react';
-import { Suspense } from 'react';
+import { Suspense, useInsertionEffect, useState } from 'react';
 import * as mock from 'mock-fs';
 import * as path from 'path';
 import { finished } from 'stream/promises';
 import { text } from 'stream/consumers';
 import ReactOnRails, { RailsContextWithServerStreamingCapabilities } from '../src/ReactOnRailsRSC.ts';
+import LengthPrefixedStreamParser from '../src/parseLengthPrefixedStream.ts';
 
 const PromiseWrapper = async ({ promise, name }: { promise: Promise<string>; name: string }) => {
   console.log(`[${name}] Before awaitng`);
@@ -41,10 +42,67 @@ const PromiseContainer = ({ name }: { name: string }) => {
   );
 };
 
-ReactOnRails.register({ PromiseContainer });
+const HooksWithoutClientDirective = () => {
+  useState('client state');
+
+  return <p>Client hook in RSC runtime</p>;
+};
+
+const InsertionEffectWithoutClientDirective = () => {
+  useInsertionEffect(() => undefined);
+
+  return <p>Client insertion effect in RSC runtime</p>;
+};
+
+ReactOnRails.register({
+  HooksWithoutClientDirective,
+  InsertionEffectWithoutClientDirective,
+  PromiseContainer,
+});
 
 const manifestFileDirectory = path.resolve(__dirname, '../src');
 const clientManifestPath = path.join(manifestFileDirectory, 'react-client-manifest.json');
+
+type ParsedRSCChunk = {
+  html: string;
+  hasErrors?: boolean;
+  renderingError?: {
+    message?: string;
+    stack?: string;
+  };
+};
+
+const parseLengthPrefixedChunks = (str: string) => {
+  const parser = new LengthPrefixedStreamParser();
+  const results: ParsedRSCChunk[] = [];
+  parser.feed(new TextEncoder().encode(str), (content, metadata) => {
+    results.push({ html: new TextDecoder().decode(content), ...metadata });
+  });
+  return results;
+};
+
+const renderRSCComponent = (name: string, throwJsErrors: boolean) =>
+  ReactOnRails.serverRenderRSCReactComponent({
+    railsContext: {
+      reactClientManifestFileName: 'react-client-manifest.json',
+      reactServerClientManifestFileName: 'react-server-client-manifest.json',
+    } as unknown as RailsContextWithServerStreamingCapabilities,
+    name,
+    renderingReturnsPromises: true,
+    throwJsErrors,
+    domNodeId: 'dom-id',
+    props: {},
+  });
+
+const captureRenderedError = async (name: string) => {
+  let error: unknown;
+  try {
+    await text(renderRSCComponent(name, true));
+  } catch (e) {
+    error = e;
+  }
+  return error;
+};
 
 beforeEach(() => {
   mock({
@@ -157,4 +215,46 @@ test('[bug] catches logs outside the component during reading the stream', async
   expect(content1).not.toContain('From Interval');
   // Here's the bug
   expect(content1).toContain('Outside The Component');
+});
+
+test('explains likely missing use client directive when a server component calls a client hook', async () => {
+  const error = await captureRenderedError('HooksWithoutClientDirective');
+
+  expect(error).toBeInstanceOf(Error);
+  expect((error as Error).message).toContain('HooksWithoutClientDirective');
+  expect((error as Error).message).toContain('client hook');
+  expect((error as Error).message).toContain('"use client";');
+  expect((error as Error).message).toContain('Original error:');
+  expect((error as Error).message).toContain('useState');
+  expect((error as Error).message).toContain('is not a function');
+  expect((error as Error).message).toContain((error as Error & { cause: Error }).cause.message);
+  expect((error as Error & { cause: Error }).cause.message).toContain('useState');
+  expect((error as Error & { cause: Error }).cause.message).toContain('is not a function');
+  expect((error as Error).stack).toContain('addRSCClientHookDiagnostic');
+  expect((error as Error).stack).toContain('Caused by:');
+});
+
+test('explains likely missing use client directive for newer client hooks', async () => {
+  const error = await captureRenderedError('InsertionEffectWithoutClientDirective');
+
+  expect(error).toBeInstanceOf(Error);
+  expect((error as Error).message).toContain('InsertionEffectWithoutClientDirective');
+  expect((error as Error).message).toContain('client hook "useInsertionEffect"');
+  expect((error as Error).message).toContain('"use client";');
+  expect((error as Error).message).toContain('Original error:');
+  expect((error as Error).message).toContain('useInsertionEffect');
+  expect((error as Error).message).toContain('is not a function');
+});
+
+test('reports the client hook diagnostic in stream metadata when throwJsErrors is false', async () => {
+  const renderResult = await text(renderRSCComponent('HooksWithoutClientDirective', false));
+  const chunks = parseLengthPrefixedChunks(renderResult);
+  const errorChunk = chunks.find((chunk) => chunk.hasErrors);
+
+  expect(errorChunk?.renderingError?.message).toContain('HooksWithoutClientDirective');
+  expect(errorChunk?.renderingError?.message).toContain('client hook');
+  expect(errorChunk?.renderingError?.message).toContain('"use client";');
+  expect(errorChunk?.renderingError?.message).toContain('Original error:');
+  expect(errorChunk?.renderingError?.message).toContain('useState');
+  expect(errorChunk?.renderingError?.message).toContain('is not a function');
 });

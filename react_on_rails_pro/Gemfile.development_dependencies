@@ -8,7 +8,7 @@ git_source(:github) { |repo| "https://github.com/#{repo}.git" }
 
 gem "react_on_rails", path: "../"
 
-gem "shakapacker", "9.6.1"
+gem "shakapacker", "10.1.0"
 gem "bootsnap", require: false
 gem "rails", "~> 7.1"
 gem "puma", "~> 6"
@@ -55,11 +55,18 @@ group :development, :test do
   gem "scss_lint", require: false
   gem "fakefs", require: "fakefs/safe"
 
-  # Ruby 3.5+ removed these from the default gem set; they must now be declared explicitly
+  # Ruby 3.4+ removed these from the default gem set; they must now be declared explicitly
   # to avoid `cannot load such file` errors from gems that lazy-require them (e.g. jbuilder).
   gem "benchmark", require: false
+  gem "csv", require: false
   gem "logger", require: false
   gem "ostruct", require: false
+  # base64 was promoted from a default gem to a bundled gem in Ruby 3.4, so Bundler-managed
+  # apps must declare it explicitly. jwt 3.x lists base64 as a runtime dep (which transitively
+  # satisfies our spec on jwt 3.x), but jwt 2.x does not — only jwt >= 2.7 added base64 as an
+  # explicit runtime dep. Declare it here so license_validator_spec.rb's `require "base64"`
+  # works on Ruby 3.4+ regardless of whether bundler resolves jwt 2.x or 3.x.
+  gem "base64", require: false
 end
 
 group :test do

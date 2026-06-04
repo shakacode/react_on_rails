@@ -81,7 +81,7 @@ addNotifier((msg) => {
   - `executor` should wrap an async function in the service's unit of work.
   - Since the only units of work we currently track are rendering requests, the options to start them are specified in `startSsrRequestOptions`.
 
-To track requests as [sessions](https://docs.bugsnag.com/platforms/javascript/capturing-sessions/#startsession) in BugSnag 8.x+,
+To track requests as sessions in BugSnag 8.x+,
 the above example becomes
 
 ```js

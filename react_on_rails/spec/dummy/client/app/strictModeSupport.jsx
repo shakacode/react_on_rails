@@ -1,15 +1,47 @@
 import React from 'react';
 
-const REACT_OBJECT_COMPONENT_TYPES = new Set([
-  Symbol.for('react.forward_ref'),
-  Symbol.for('react.lazy'),
-  Symbol.for('react.memo'),
-]);
+const useStrictMode = process.env.NODE_ENV !== 'production';
+let reactObjectComponentTypes;
+let wrappedFunctionComponents;
+let wrappedRenderFunctions;
+let wrappedObjectComponents;
 
-const wrappedFunctionComponents = new WeakMap();
-const wrappedRenderFunctions = new WeakMap();
-// Object-typed React components (memo, forwardRef, lazy) are GC-safe in a WeakMap.
-const wrappedObjectComponents = new WeakMap();
+const getReactObjectComponentTypes = () => {
+  if (!reactObjectComponentTypes) {
+    reactObjectComponentTypes = new Set([
+      Symbol.for('react.forward_ref'),
+      Symbol.for('react.lazy'),
+      Symbol.for('react.memo'),
+    ]);
+  }
+
+  return reactObjectComponentTypes;
+};
+
+const getWrappedFunctionComponents = () => {
+  if (!wrappedFunctionComponents) {
+    wrappedFunctionComponents = new WeakMap();
+  }
+
+  return wrappedFunctionComponents;
+};
+
+const getWrappedRenderFunctions = () => {
+  if (!wrappedRenderFunctions) {
+    wrappedRenderFunctions = new WeakMap();
+  }
+
+  return wrappedRenderFunctions;
+};
+
+const getWrappedObjectComponents = () => {
+  if (!wrappedObjectComponents) {
+    // Object-typed React components (memo, forwardRef, lazy) are GC-safe in a WeakMap.
+    wrappedObjectComponents = new WeakMap();
+  }
+
+  return wrappedObjectComponents;
+};
 
 const isPromiseLike = (value) =>
   typeof value === 'object' && value !== null && typeof value.then === 'function';
@@ -19,7 +51,7 @@ const isFunctionWithMetadata = (component) => typeof component === 'function';
 const isObjectComponent = (component) =>
   typeof component === 'object' &&
   component !== null &&
-  REACT_OBJECT_COMPONENT_TYPES.has(component.$$typeof ?? 0);
+  getReactObjectComponentTypes().has(component.$$typeof ?? 0);
 
 const isReactComponent = (component) => isFunctionWithMetadata(component) || isObjectComponent(component);
 
@@ -58,30 +90,41 @@ const createStrictModeWrapper = (Component) => {
 };
 
 const wrapComponentInStrictMode = (component) => {
+  if (!useStrictMode) {
+    return component;
+  }
+
   if (typeof component === 'function') {
-    const cachedComponent = wrappedFunctionComponents.get(component);
+    const componentCache = getWrappedFunctionComponents();
+    const cachedComponent = componentCache.get(component);
     if (cachedComponent) {
       return cachedComponent;
     }
 
     const wrappedComponent = createStrictModeWrapper(component);
-    wrappedFunctionComponents.set(component, wrappedComponent);
+    componentCache.set(component, wrappedComponent);
     return wrappedComponent;
   }
 
-  const cachedComponent = wrappedObjectComponents.get(component);
+  const objectComponentCache = getWrappedObjectComponents();
+  const cachedComponent = objectComponentCache.get(component);
   if (cachedComponent) {
     return cachedComponent;
   }
 
   const wrappedComponent = createStrictModeWrapper(component);
-  wrappedObjectComponents.set(component, wrappedComponent);
+  objectComponentCache.set(component, wrappedComponent);
   return wrappedComponent;
 };
 
-export const wrapElementInStrictMode = (reactElement) => <React.StrictMode>{reactElement}</React.StrictMode>;
+export const wrapElementInStrictMode = (reactElement) =>
+  useStrictMode ? <React.StrictMode>{reactElement}</React.StrictMode> : reactElement;
 
 const wrapRenderFunctionResult = (result) => {
+  if (!useStrictMode) {
+    return result;
+  }
+
   if (isPromiseLike(result)) {
     return result.then(wrapRenderFunctionResult);
   }
@@ -103,7 +146,12 @@ const wrapRenderFunctionResult = (result) => {
 // re-entry path unreachable. Note: when called directly (outside the registry path), the wrapper's
 // hardcoded `length === 2` does not reflect the original function's arity.
 const wrapRenderFunctionInStrictMode = (renderFunction) => {
-  const cachedRenderFunction = wrappedRenderFunctions.get(renderFunction);
+  if (!useStrictMode) {
+    return renderFunction;
+  }
+
+  const renderFunctionCache = getWrappedRenderFunctions();
+  const cachedRenderFunction = renderFunctionCache.get(renderFunction);
   if (cachedRenderFunction) {
     return cachedRenderFunction;
   }
@@ -119,12 +167,16 @@ const wrapRenderFunctionInStrictMode = (renderFunction) => {
     wrappedRenderFunction.renderFunction = true;
   }
 
-  wrappedRenderFunctions.set(renderFunction, wrappedRenderFunction);
+  renderFunctionCache.set(renderFunction, wrappedRenderFunction);
   return wrappedRenderFunction;
 };
 
-export const wrapRegisteredComponentsWithStrictMode = (components) =>
-  Object.fromEntries(
+export const wrapRegisteredComponentsWithStrictMode = (components) => {
+  if (!useStrictMode) {
+    return components;
+  }
+
+  return Object.fromEntries(
     Object.entries(components).map(([name, component]) => {
       if (isRendererFunction(component)) {
         return [name, component];
@@ -141,3 +193,4 @@ export const wrapRegisteredComponentsWithStrictMode = (components) =>
       return [name, wrapComponentInStrictMode(component)];
     }),
   );
+};

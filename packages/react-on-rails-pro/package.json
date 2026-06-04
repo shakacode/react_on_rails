@@ -1,6 +1,6 @@
 {
   "name": "react-on-rails-pro",
-  "version": "16.6.0",
+  "version": "17.0.0-rc.1",
   "description": "React on Rails Pro package with React Server Components support",
   "main": "lib/ReactOnRails.full.js",
   "type": "module",
@@ -45,6 +45,7 @@
       "default": "./lib/tanstack-router.js"
     },
     "./registerServerComponent/client": "./lib/registerServerComponent/client.js",
+    "./registerDefaultRSCProvider/client": "./lib/registerDefaultRSCProvider.client.js",
     "./registerServerComponent/server": {
       "react-server": "./lib/registerServerComponent/server.rsc.js",
       "default": "./lib/registerServerComponent/server.js"
@@ -54,7 +55,14 @@
       "react-server": "./lib/wrapServerComponentRenderer/server.rsc.js",
       "default": "./lib/wrapServerComponentRenderer/server.js"
     },
-    "./RSCRoute": "./lib/RSCRoute.js",
+    "./cache": {
+      "react-server": "./lib/cache/index.js",
+      "default": "./lib/cache/index.stub.js"
+    },
+    "./RSCRoute": {
+      "types": "./lib/RSCRoute.d.ts",
+      "default": "./lib/RSCRoute.js"
+    },
     "./RSCProvider": "./lib/RSCProvider.js",
     "./ServerComponentFetchError": "./lib/ServerComponentFetchError.js"
   },
@@ -64,7 +72,7 @@
   "peerDependencies": {
     "react": ">= 16",
     "react-dom": ">= 16",
-    "react-on-rails-rsc": ">= 19.0.2 <= 19.2.3",
+    "react-on-rails-rsc": ">= 19.0.2 < 20.0.0",
     "@tanstack/react-router": ">=1.139.0 <2.0.0"
   },
   "peerDependenciesMeta": {
@@ -85,6 +93,8 @@
   },
   "homepage": "https://reactonrails.com/docs/pro/",
   "devDependencies": {
+    "@tanstack/react-router": "1.163.3",
+    "@tanstack/store": "0.9.1",
     "@types/mock-fs": "^4.13.4",
     "mock-fs": "^5.5.0",
     "react": "^19.0.3",

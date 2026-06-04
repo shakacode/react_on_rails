@@ -47,13 +47,35 @@ Streams a server-rendered React component using React 18's `renderToPipeableStre
 
 Requires the controller to use `stream_view_containing_react_components`.
 
-Options: same as `react_component`.
+`stream_react_component` forces `prerender: true`; passing `prerender: false` has no effect. Common options mirror `react_component`, including `props`, `id`, `html_options`, `trace`, and `raise_on_prerender_error`.
 
 > **Note (Pro):** React on Rails Pro hydrates streamed components early (before `DOMContentLoaded`) automatically — no per-component toggle is exposed.
 
 ```ruby
 <%= stream_react_component("App", props: { data: @data }) %>
 ```
+
+### `stream_react_component_with_async_props(component_name, options = {}, &block)`
+
+Async-props variant of `stream_react_component`. Use this when the view has synchronous props plus slower values that should stream to React behind Suspense boundaries.
+
+Use this helper for RSC Server Components with `config.enable_rsc_support = true`. For non-RSC streaming SSR, use `stream_react_component`.
+
+Requires the controller to use `stream_view_containing_react_components`, same as `stream_react_component`.
+
+This helper accepts the same options as `stream_react_component`, plus a block that receives an emitter. Call `emit.call(prop_name, value)` for each async prop as it becomes available. RSC Server Components read emitted values through the injected `getReactOnRailsAsyncProp` prop.
+
+For the complete React component pattern using `WithAsyncProps` and `getReactOnRailsAsyncProp`, see [Data Fetching in React on Rails Pro](../migrating/rsc-data-fetching.md#data-fetching-in-react-on-rails-pro).
+
+```ruby
+<%= stream_react_component_with_async_props("ProductPage",
+      props: { name: @product.name, price: @product.price }) do |emit|
+  emit.call("reviews", @product.reviews.as_json(only: [:id, :text, :rating]))
+end %>
+```
+
+> [!IMPORTANT]
+> `stream_react_component_with_async_props` requires `config.enable_rsc_support = true` and always forces `prerender: true`; passing `prerender: false` has no effect. The emitter block runs normal Ruby code sequentially, so `emit.call` does **not** parallelize slow queries by itself. For independent slow data sources, start the work concurrently before emitting values; see [Avoiding Server-Side Waterfalls](../migrating/rsc-data-fetching.md#avoiding-server-side-waterfalls).
 
 ### `cached_stream_react_component(component_name, options = {}, &block)`
 
@@ -70,11 +92,31 @@ Renders the React Server Component payload as NDJSON. Each line contains:
 - `hasErrors` — boolean
 - `isShellReady` — boolean
 
-Requires `enable_rsc_support = true` in configuration.
+Requires `enable_rsc_support = true` in configuration. This helper is normally used by `rsc_payload_route`; call it directly only when you need custom RSC payload rendering.
+
+Common options include `props`, `trace`, and `id`. The helper forces `prerender: true`; passing `prerender: false` has no effect.
 
 ```ruby
 <%= rsc_payload_react_component("RSCPage", props: { id: @post.id }) %>
 ```
+
+### `rsc_payload_react_component_with_async_props(component_name, options = {}, &block)`
+
+Async-props variant of `rsc_payload_react_component`. Use this only when custom RSC payload rendering needs Rails-emitted async props, such as an overridden payload route or template. For standard streamed ERB views, use `stream_react_component_with_async_props`.
+
+Requires `enable_rsc_support = true` in configuration, same as `rsc_payload_react_component`.
+
+This helper accepts the same options as `rsc_payload_react_component`, plus a block that receives an emitter. Call `emit.call(prop_name, value)` for each async prop.
+
+```ruby
+<%= rsc_payload_react_component_with_async_props("ProductPage",
+      props: { name: @product.name, price: @product.price }) do |emit|
+  emit.call("reviews", @product.reviews.as_json(only: [:id, :text, :rating]))
+end %>
+```
+
+> [!IMPORTANT]
+> `rsc_payload_react_component_with_async_props` requires `config.enable_rsc_support = true` and always forces `prerender: true`; passing `prerender: false` has no effect. The emitter block runs normal Ruby code sequentially, so `emit.call` does **not** parallelize slow queries by itself. For independent slow data sources, start the work concurrently before emitting values; see [Avoiding Server-Side Waterfalls](../migrating/rsc-data-fetching.md#avoiding-server-side-waterfalls).
 
 ### `async_react_component(component_name, options = {})`
 

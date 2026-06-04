@@ -5,6 +5,7 @@ import RSCRoute from 'react-on-rails-pro/RSCRoute';
 import EchoProps from './EchoProps';
 import { ErrorBoundary } from './ErrorBoundary';
 import ServerComponentWithRetry from './ServerComponentWithRetry';
+import RefetchStressPage from './RefetchStressPage.client';
 
 export default function App({ basePath = '/server_router', ...props }: { basePath?: string }) {
   return (
@@ -48,10 +49,18 @@ export default function App({ basePath = '/server_router', ...props }: { basePat
             <Link to={`${basePath}/server-component-with-retry`}>Server Component with Retry</Link>
           </li>
           <li>
+            <Link to={`${basePath}/refetch-stress`}>Refetch Stress (Issue 3106)</Link>
+          </li>
+          <li>
             <Link to={`${basePath}/deterministic-rsc-error`}>Deterministic RSC Error</Link>
           </li>
           <li>
             <Link to={`${basePath}/async-props-component`}>Async Props Component</Link>
+          </li>
+          <li>
+            <Link to={`${basePath}/mixed-ssr-and-deferred-server-components`}>
+              Mixed SSR and Deferred Server Components
+            </Link>
           </li>
         </ul>
       </nav>
@@ -89,6 +98,7 @@ export default function App({ basePath = '/server_router', ...props }: { basePat
             element={<RSCRoute componentName="AsyncComponentsTreeForTesting" componentProps={props} />}
           />
           <Route path={`${basePath}/server-component-with-retry`} element={<ServerComponentWithRetry />} />
+          <Route path={`${basePath}/refetch-stress`} element={<RefetchStressPage />} />
           <Route
             path={`${basePath}/deterministic-rsc-error`}
             element={<RSCRoute componentName="DeterministicRSCErrorComponent" componentProps={{}} />}
@@ -100,6 +110,21 @@ export default function App({ basePath = '/server_router', ...props }: { basePat
           <Route
             path={`${basePath}/async-props-component-for-testing`}
             element={<RSCRoute componentName="AsyncPropsComponentForTesting" componentProps={props} />}
+          />
+          <Route
+            path={`${basePath}/mixed-ssr-and-deferred-server-components`}
+            element={
+              <section data-testid="mixed-rsc-route-page">
+                <h1>Mixed RSC route shell before</h1>
+                <RSCRoute componentName="MyServerComponent" componentProps={{}} />
+                <Suspense
+                  fallback={<aside data-testid="deferred-rsc-route-fallback">Deferred route loading</aside>}
+                >
+                  <RSCRoute componentName="SimpleComponent" componentProps={{}} ssr={false} />
+                </Suspense>
+                <footer>Mixed RSC route shell after</footer>
+              </section>
+            }
           />
         </Routes>
       </Suspense>

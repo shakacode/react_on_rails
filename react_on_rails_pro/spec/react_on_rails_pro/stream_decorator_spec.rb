@@ -17,6 +17,42 @@ RSpec.describe ReactOnRailsPro::StreamDecorator do
     end
   end
 
+  describe "#http_status" do
+    it "uses http_status as the status accessor" do
+      allow(mock_component).to receive(:http_status).and_return(204)
+
+      expect(stream_decorator.http_status).to eq(204)
+    end
+
+    it "delegates status recording state to the component" do
+      allow(mock_component).to receive(:http_status_recorded?).and_return(true)
+
+      expect(stream_decorator.http_status_recorded?).to be(true)
+    end
+
+    it "treats components without status metadata as unknown status" do
+      component = Class.new do
+        def each_chunk; end
+      end.new
+      decorator = described_class.new(component)
+
+      expect(decorator.http_status).to be_nil
+      expect(decorator.http_status_recorded?).to be(false)
+    end
+
+    it "does not fall back to status aliases" do
+      component = Class.new do
+        def status
+          200
+        end
+      end.new
+      decorator = described_class.new(component)
+
+      expect(decorator.http_status).to be_nil
+      expect(decorator.http_status_recorded?).to be(false)
+    end
+  end
+
   describe "#each_chunk" do
     before do
       allow(mock_component).to receive(:each_chunk).and_yield("chunk1").and_yield("chunk2")

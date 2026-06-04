@@ -12,6 +12,16 @@
  * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
+// Side-effect import: keeps `react-on-rails-rsc/client.browser` in the webpack
+// module graph for the client bundle so RSCWebpackPlugin (which scans every
+// parsed module for this exact resource) can detect the client runtime and
+// emit `react-client-manifest.json`. Without this direct import, the plugin
+// relies on a 3-level transitive chain
+// (`wrapServerComponentRenderer/client` → `getReactServerComponent.client`
+// → `react-on-rails-rsc/client.browser`). Any tooling that severs that chain
+// (tree-shaking, transpilers, NormalModuleReplacement, custom externals)
+// silently drops the manifest and breaks RSC hydration on the renderer.
+import 'react-on-rails-rsc/client.browser';
 import * as React from 'react';
 import * as ReactDOMClient from 'react-dom/client';
 import { ReactComponentOrRenderFunction, RenderFunction } from 'react-on-rails/types';
@@ -19,6 +29,7 @@ import isRenderFunction from 'react-on-rails/isRenderFunction';
 import { ensureReactUseAvailable } from 'react-on-rails/reactApis';
 import { createRSCProvider } from '../RSCProvider.tsx';
 import getReactServerComponent from '../getReactServerComponent.client.ts';
+import handleRecoverableError from '../handleRecoverableError.client.ts';
 
 ensureReactUseAvailable();
 
@@ -88,7 +99,10 @@ const wrapServerComponentRenderer = (
     );
 
     if (domNode.innerHTML) {
-      ReactDOMClient.hydrateRoot(domNode, root, { identifierPrefix: domNodeId });
+      ReactDOMClient.hydrateRoot(domNode, root, {
+        identifierPrefix: domNodeId,
+        onRecoverableError: handleRecoverableError,
+      });
     } else {
       ReactDOMClient.createRoot(domNode, { identifierPrefix: domNodeId }).render(root);
     }

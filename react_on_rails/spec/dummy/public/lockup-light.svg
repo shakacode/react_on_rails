@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 360" role="img" aria-label="React on Rails">
+<title>React on Rails</title>
+<rect width="1500" height="360" rx="0" fill="#FFFFFF"/>
+<g transform="translate(58 58) scale(0.23828125)"><rect x="64" y="64" width="896" height="896" rx="192" fill="#0B1118" stroke="#26313D" stroke-width="12"/>
+<g><g fill="none" stroke="#00D8FF" stroke-width="45" stroke-linecap="round" stroke-linejoin="round">
+  <ellipse cx="512" cy="512" rx="318" ry="118"/>
+  <ellipse cx="512" cy="512" rx="318" ry="118" transform="rotate(60 512 512)"/>
+  <ellipse cx="512" cy="512" rx="318" ry="118" transform="rotate(-60 512 512)"/>
+</g>
+<g transform="translate(512 506) rotate(-3) scale(1.04)">
+<path d="M-180 -60 L-116 -132 L116 -132 L180 -60 L96 72 L0 158 L-96 72 Z" fill="#EC221E"/>
+<path d="M-180 -60 L-116 -132 L-58 -18 Z" fill="#FF3B30"/>
+<path d="M-116 -132 L116 -132 L58 -18 L-58 -18 Z" fill="#F72B23"/>
+<path d="M116 -132 L180 -60 L58 -18 Z" fill="#A81510" opacity="0.86"/>
+<path d="M-180 -60 L-58 -18 L-96 72 Z" fill="#D7201B"/>
+<path d="M58 -18 L180 -60 L96 72 Z" fill="#75100C" opacity="0.62"/>
+<path d="M-96 72 L-58 -18 L0 158 Z" fill="#E3231D"/>
+<path d="M58 -18 L96 72 L0 158 Z" fill="#B81914" opacity="0.82"/>
+<path d="M-96 72 L96 72 L0 158 Z" fill="#C81F1A" opacity="0.86"/>
+<path d="M-70 -28 L-10 -50 L86 -44 L34 -26 L-35 -8 Z" fill="#FF5A45" opacity="0.70"/>
+<path d="M-116 -132 L-58 -18 L58 -18 L116 -132" fill="none" stroke="#FF6E61" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.10"/>
+<path d="M-96 72 L0 158 L96 72" fill="none" stroke="#FF6E61" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.11"/>
+</g></g></g>
+<text x="340" y="150" font-family="Inter, Avenir Next, Helvetica, Arial, sans-serif" font-size="72" font-weight="800" fill="#161B22">React on Rails</text>
+<text x="340" y="205" font-family="Inter, Avenir Next, Helvetica, Arial, sans-serif" font-size="28" font-weight="500" fill="#64748B">Rails conventions with modern React</text>
+</svg>

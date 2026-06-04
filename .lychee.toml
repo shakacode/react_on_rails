@@ -48,6 +48,7 @@ exclude = [
   # ============================================================================
   # Expired, hostname mismatch, or verification failed
   '^https://(www\.)?blinkinc\.com',     # SSL certificate expired
+  '^https://(www\.)?flyhomes\.com',     # SSL certificate intermittently expired (#3268)
   '^https://(www\.)?localwise\.com',    # SSL verification failed
   '^https://(www\.)?mycfsapp\.com',     # SSL hostname mismatch
   '^https://(www\.)?scoutapp\.com',     # SSL hostname mismatch
@@ -120,6 +121,7 @@ exclude = [
   '^https://github\.com/shakacode/react_on_rails/issues/2766$',  # Intermittent 502 from GitHub issue pages in CI
   '^https://github\.com/rack/rack/blob/main/SPEC\.rdoc$',  # Intermittent 502 from GitHub blob pages in CI
   '^https://github\.com/shakacode/shakapacker/blob/cdf32835d3e0949952b8b4b53063807f714f9b24/package/environments/base\.js(#.*)?$',  # Intermittent 502 from GitHub blob view in CI
+  '^https://github\.com/K4sku$',  # Intermittent 502 from GitHub user page in CI
   '^https://github\.com/npm/cli/issues/6253$',  # Intermittent 502 from GitHub issue pages in CI
   '^https://github\.com/search\?q=gem\+react_on_rails&ref=advsearch&type=repositories&utf8=%E2%9C%93$',  # Intermittent 502 from GitHub search in CI
 
@@ -143,6 +145,7 @@ exclude = [
 # Exclude paths (regex patterns)
 exclude_path = [
   'docs/planning/',           # Contains placeholder links
+  'internal/history/',        # Archived historical snapshots; internal links intentionally frozen
   '.*/node_modules/.*',       # Dependencies
   '.*/spec/.*',               # Test fixtures
   'SUMMARY.md',               # GitBook TOC with old doc structure links (kept for redirects)

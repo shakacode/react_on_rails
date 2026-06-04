@@ -510,8 +510,10 @@ module ReactOnRails
       # @return [Boolean] true if successful, false otherwise
       def add_packages(packages, dev: false)
         return true if add_npm_dependencies(packages, dev: dev)
+        return true if install_packages_with_fallback(packages, dev: dev)
 
-        install_packages_with_fallback(packages, dev: dev)
+        write_versioned_package_specs_to_package_json(packages, dev: dev)
+        false
       end
 
       def install_js_dependencies
@@ -557,6 +559,36 @@ module ReactOnRails
       rescue StandardError => e
         GeneratorMessages.add_warning("⚠️  Fallback package install failed: #{e.message}")
         false
+      end
+
+      # Last-resort fallback for install failures. This rewrites package.json with
+      # JSON.pretty_generate so users can rerun their package manager manually.
+      def write_versioned_package_specs_to_package_json(packages, dev:)
+        return false unless File.exist?("package.json")
+
+        versioned_packages = packages.filter_map { |package_spec| package_name_and_version_from_spec(package_spec) }
+        return false if versioned_packages.empty?
+
+        content = JSON.parse(File.read("package.json"))
+        dependency_field = dev ? "devDependencies" : "dependencies"
+        content[dependency_field] ||= {}
+
+        versioned_packages.each do |package_name, package_version|
+          content[dependency_field][package_name] = package_version
+        end
+
+        File.write("package.json", "#{JSON.pretty_generate(content)}\n")
+        GeneratorMessages.add_warning(package_json_pin_fallback_warning(versioned_packages))
+        true
+      rescue StandardError => e
+        GeneratorMessages.add_warning("⚠️  Could not write dependency pins to package.json: #{e.message}")
+        false
+      end
+
+      def package_json_pin_fallback_warning(versioned_packages)
+        pinned_list = versioned_packages.map { |name, version| "#{name}@#{version}" }.join(", ")
+        "⚠️  Package manager install failed. Wrote the following version pins to package.json " \
+          "so you can rerun your package manager manually: #{pinned_list}"
       end
 
       def fallback_package_manager
@@ -621,6 +653,13 @@ module ReactOnRails
 
       def version_specified?(package_spec, package_name)
         package_spec != package_name
+      end
+
+      def package_name_and_version_from_spec(package_spec)
+        package_name = package_name_from_spec(package_spec)
+        return nil unless package_name && version_specified?(package_spec, package_name)
+
+        [package_name, package_spec.delete_prefix("#{package_name}@")]
       end
     end
   end

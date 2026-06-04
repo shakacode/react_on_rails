@@ -10,7 +10,7 @@ MAX_COMMENT_SIZE = 220 * 1024
 SAFETY_MARGIN = 500
 MAX_CHUNK_SIZE = MAX_COMMENT_SIZE - SAFETY_MARGIN
 
-MARKER = "<!-- BENCHER_REPORT -->"
+MARKER = ENV.fetch("BENCHER_REPORT_MARKER", "<!-- BENCHER_REPORT -->")
 
 # rubocop:disable Metrics/AbcSize
 def split_html_report(html)

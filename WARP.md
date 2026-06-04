@@ -311,7 +311,7 @@ subject(:method_result) { instance.method_name(arg) }
 ### Dependencies
 
 - Shakapacker >= 6.0 required (v16+ drops Webpacker support)
-- Ruby >= 3.0
+- Ruby >= 3.3
 - Node.js >= 18 (tested: 18-22)
 - Rails >= 5.2
 
@@ -350,14 +350,6 @@ subject(:method_result) { instance.method_name(arg) }
 - **Always run `bundle exec rubocop` before pushing**
 - Use `rake autofix` to fix most issues automatically
 - Check `.rubocop.yml` for project-specific rules
-
-## Monorepo Merger (In Progress)
-
-The project is merging `react_on_rails` and `react_on_rails_pro` into a unified monorepo. During this transition:
-
-- Continue contributing to current structure
-- License compliance is critical (no Pro code in MIT areas)
-- See `docs/MONOREPO_MERGER_PLAN_REF.md` for details
 
 ## Additional Resources
 

@@ -25,7 +25,9 @@ let reactDomClient: typeof import('react-dom/client');
 if (supportsRootApi) {
   // This will never throw an exception, but it's the way to tell Webpack the dependency is optional
   // https://github.com/webpack/webpack/issues/339#issuecomment-47739112
-  // Unfortunately, it only converts the error to a warning.
+  // Unfortunately, it only converts the error to a warning. React 16/17 consumers can suppress
+  // the warning by passing `reactDomClientWarning` from 'react-on-rails/webpackHelpers' to their
+  // webpack `ignoreWarnings` config. See #3137.
   try {
     reactDomClient = require('react-dom/client') as typeof import('react-dom/client');
   } catch (_e) {
@@ -35,7 +37,18 @@ if (supportsRootApi) {
   }
 }
 
-type HydrateOrRenderType = (domNode: Element, reactElement: ReactElement) => RenderReturnType;
+export type ReactHydrateOptions = {
+  identifierPrefix?: string;
+  onCaughtError?: (error: unknown, errorInfo: unknown) => void;
+  onRecoverableError?: (error: unknown, errorInfo: unknown) => void;
+  onUncaughtError?: (error: unknown, errorInfo: unknown) => void;
+};
+
+type HydrateOrRenderType = (
+  domNode: Element,
+  reactElement: ReactElement,
+  options?: ReactHydrateOptions,
+) => RenderReturnType;
 
 // Cast ReactDOM to include legacy APIs for React 16/17 compatibility
 // These methods exist at runtime but are removed from @types/react-dom@19
@@ -56,12 +69,16 @@ if (!supportsRootApi) {
 
 /* eslint-disable @typescript-eslint/no-non-null-assertion -- reactDomClient is always defined when supportsRootApi is true */
 export const reactHydrate: HydrateOrRenderType = supportsRootApi
-  ? reactDomClient!.hydrateRoot
+  ? (domNode, reactElement, options) => reactDomClient!.hydrateRoot(domNode, reactElement, options)
   : (domNode, reactElement) => legacyReactDOM.hydrate(reactElement, domNode);
 
-export function reactRender(domNode: Element, reactElement: ReactElement): RenderReturnType {
+export function reactRender(
+  domNode: Element,
+  reactElement: ReactElement,
+  options?: ReactHydrateOptions,
+): RenderReturnType {
   if (supportsRootApi) {
-    const root = reactDomClient!.createRoot(domNode);
+    const root = reactDomClient!.createRoot(domNode, options);
     root.render(reactElement);
     return root;
   }
@@ -71,7 +88,7 @@ export function reactRender(domNode: Element, reactElement: ReactElement): Rende
 
 export const unmountComponentAtNode: (container: Element) => boolean = supportsRootApi
   ? // not used if we use root API
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
     (_container: Element) => false
   : (container: Element) => legacyReactDOM.unmountComponentAtNode(container);
 

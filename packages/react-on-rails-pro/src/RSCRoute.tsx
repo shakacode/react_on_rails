@@ -17,8 +17,21 @@
 'use client';
 
 import * as React from 'react';
-import { Component, use, type ReactNode } from 'react';
+import {
+  Component,
+  createContext,
+  forwardRef,
+  use,
+  useCallback,
+  useContext,
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  type ReactNode,
+} from 'react';
 import { useRSC } from './RSCProvider.tsx';
+import { RSCRouteSSRFalseBailoutError } from './RSCRouteSSRFalseBailoutError.ts';
 import { ServerComponentFetchError } from './ServerComponentFetchError.ts';
 
 /**
@@ -50,31 +63,56 @@ class RSCRouteErrorBoundary extends Component<
 }
 
 /**
- * Renders a React Server Component inside a React Client Component.
+ * Imperative handle exposed by `<RSCRoute>` via `ref`.
  *
- * RSCRoute provides a bridge between client and server components, allowing server components
- * to be directly rendered inside client components. This component:
+ * `refetch()` re-fetches the server component using the RSCRoute's currently
+ * rendered `componentName` and `componentProps`. It resolves with the new
+ * rendered ReactNode and rejects if the fetch fails or the RSC payload resolves
+ * to an Error object.
  *
- * 1. During initial SSR - Uses the RSC payload to render the server component and embeds the payload in the page
- * 2. During hydration - Uses the embedded RSC payload already in the page
- * 3. During client navigation - Fetches the RSC payload via HTTP
- *
- * @example
- * ```tsx
- * <RSCRoute componentName="MyServerComponent" componentProps={{ user }} />
- * ```
- *
- * @important Only use for server components whose props change rarely. Frequent prop changes
- * will cause network requests for each change, impacting performance.
- *
- * @important This component expects that the component tree that contains it is wrapped using
- * wrapServerComponentRenderer from 'react-on-rails/wrapServerComponentRenderer/client' for client-side
- * rendering or 'react-on-rails/wrapServerComponentRenderer/server' for server-side rendering.
+ * Behavior caveats:
+ * - **Concurrent refetches:** only the most-recent cache write wins; earlier
+ *   returned promises may resolve with stale data while the UI has already
+ *   moved on to a later refetch.
+ * - **Unmount:** if the owning `<RSCRoute>` unmounts before resolution, the
+ *   shared cache still updates (so other RSCRoutes bound to the same key
+ *   reflect the new payload) but no visible re-render happens in the
+ *   unmounted instance.
  */
+export type RSCRouteHandle = {
+  refetch: () => Promise<ReactNode>;
+};
+
 export type RSCRouteProps = {
   componentName: string;
   componentProps: unknown;
+  ssr?: boolean;
 };
+
+const CurrentRSCRouteContext = createContext<RSCRouteHandle | null>(null);
+
+/**
+ * Returns the `RSCRouteHandle` of the nearest ancestor `<RSCRoute>`, so a
+ * client component rendered inside a server component subtree can refetch
+ * that server component without knowing its name or props.
+ *
+ * @throws If called outside of any `<RSCRoute>` ancestor.
+ *
+ * @example
+ * ```tsx
+ * function InlineRefreshButton() {
+ *   const { refetch } = useCurrentRSCRoute();
+ *   return <button onClick={() => refetch().catch(console.error)}>Refresh</button>;
+ * }
+ * ```
+ */
+export function useCurrentRSCRoute(): RSCRouteHandle {
+  const handle = useContext(CurrentRSCRouteContext);
+  if (handle === null) {
+    throw new Error('useCurrentRSCRoute must be used inside an <RSCRoute>');
+  }
+  return handle;
+}
 
 const PromiseWrapper = ({ promise }: { promise: Promise<ReactNode> }) => {
   // use is available in React 18.3+
@@ -89,14 +127,86 @@ const PromiseWrapper = ({ promise }: { promise: Promise<ReactNode> }) => {
   return promiseResult;
 };
 
-const RSCRoute = ({ componentName, componentProps }: RSCRouteProps): ReactNode => {
-  const { getComponent } = useRSC();
-  const componentPromise = getComponent(componentName, componentProps);
-  return (
-    <RSCRouteErrorBoundary componentName={componentName} componentProps={componentProps}>
-      <PromiseWrapper promise={componentPromise} />
-    </RSCRouteErrorBoundary>
-  );
-};
+const rejectErrorPayload = (promise: Promise<ReactNode>): Promise<ReactNode> =>
+  promise.then((payload) => {
+    if (payload instanceof Error) {
+      throw payload;
+    }
+    return payload;
+  });
+
+const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
+  ({ componentName, componentProps }, ref) => {
+    const { getComponent, refetchComponent } = useRSC();
+
+    // Read the latest committed props in `refetch`, even when a descendant
+    // captured the handle at an earlier render.
+    const latestPropsRef = useRef({ componentName, componentProps });
+    useLayoutEffect(() => {
+      latestPropsRef.current = { componentName, componentProps };
+    }, [componentName, componentProps]);
+
+    const refetch = useCallback((): Promise<ReactNode> => {
+      const { componentName: n, componentProps: p } = latestPropsRef.current;
+      // refetchComponent swaps the cache promise and bumps the provider's
+      // version inside startTransition. That re-renders every <RSCRoute>
+      // (including this one) as a transition commit, so old content stays
+      // visible while the new promise streams in.
+      return rejectErrorPayload(refetchComponent(n, p));
+    }, [refetchComponent]);
+
+    const handle = useMemo<RSCRouteHandle>(() => ({ refetch }), [refetch]);
+    useImperativeHandle(ref, () => handle, [handle]);
+
+    const componentPromise = getComponent(componentName, componentProps);
+    return (
+      <CurrentRSCRouteContext.Provider value={handle}>
+        <RSCRouteErrorBoundary componentName={componentName} componentProps={componentProps}>
+          <PromiseWrapper promise={componentPromise} />
+        </RSCRouteErrorBoundary>
+      </CurrentRSCRouteContext.Provider>
+    );
+  },
+);
+
+RSCRouteContent.displayName = 'RSCRouteContent';
+
+/**
+ * Renders a React Server Component inside a React Client Component.
+ *
+ * RSCRoute provides a bridge between client and server components, allowing server components
+ * to be directly rendered inside client components. This component:
+ *
+ * 1. By default during initial SSR - Uses the RSC payload to render the server component and embeds the payload in the page
+ * 2. During hydration - Uses the embedded RSC payload already in the page
+ * 3. During client navigation - Fetches the RSC payload via HTTP
+ *
+ * Pass ssr={false} to skip rendering route content during streaming server rendering. When wrapped
+ * in Suspense, React renders the nearest fallback in the server HTML and retries this route on the
+ * client through the same RSC provider path used by the default ssr={true} mode.
+ *
+ * @example
+ * ```tsx
+ * <RSCRoute componentName="MyServerComponent" componentProps={{ user }} />
+ * ```
+ *
+ * @important Only use for server components whose props change rarely. Frequent prop changes
+ * will cause network requests for each change, impacting performance.
+ *
+ * @important This component expects that the component tree that contains it is wrapped using
+ * wrapServerComponentRenderer from 'react-on-rails/wrapServerComponentRenderer/client' for client-side
+ * rendering or 'react-on-rails/wrapServerComponentRenderer/server' for server-side rendering.
+ */
+const RSCRoute = forwardRef<RSCRouteHandle, RSCRouteProps>(
+  ({ componentName, componentProps, ssr = true }, ref): ReactNode => {
+    if (!ssr && typeof window === 'undefined') {
+      throw new RSCRouteSSRFalseBailoutError(componentName);
+    }
+
+    return <RSCRouteContent ref={ref} componentName={componentName} componentProps={componentProps} />;
+  },
+);
+
+RSCRoute.displayName = 'RSCRoute';
 
 export default RSCRoute;

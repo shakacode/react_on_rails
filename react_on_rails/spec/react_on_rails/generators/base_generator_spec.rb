@@ -180,4 +180,83 @@ RSpec.describe ReactOnRails::Generators::BaseGenerator, type: :generator do
       expect(File.directory?(webpack_dir)).to be(true)
     end
   end
+
+  describe "#using_rspack? default bundler resolution" do
+    let(:destination) { File.expand_path("../dummy-for-generators", __dir__) }
+
+    def base_generator(options = {})
+      described_class.new([], options, { destination_root: destination })
+    end
+
+    def write_shakapacker_yml(assets_bundler)
+      FileUtils.mkdir_p(File.join(destination, "config"))
+      File.write(File.join(destination, "config/shakapacker.yml"), <<~YAML)
+        default: &default
+          source_path: app/javascript
+          assets_bundler: #{assets_bundler}
+        development:
+          <<: *default
+      YAML
+    end
+
+    before { FileUtils.rm_rf(destination) }
+    after { FileUtils.rm_rf(destination) }
+
+    it "declares --rspack without a static default so the fresh-install default applies" do
+      # Regression guard (see install_generator_spec for full rationale): a `default:` on the
+      # --rspack class_option would make options.key?(:rspack) always true and silently break the
+      # fresh-install Rspack default for unflagged CLI runs.
+      expect(described_class.class_options[:rspack].default).to be_nil
+    end
+
+    it "defaults a fresh install (no flag, no existing config) to Rspack" do
+      expect(base_generator.using_rspack?).to be(true)
+    end
+
+    it "falls back to Webpack on a fresh install when Rspack is unsupported (Shakapacker < 9.0)" do
+      generator = base_generator
+      allow(generator).to receive(:shakapacker_version_9_or_higher?).and_return(false)
+
+      expect(generator.using_rspack?).to be(false)
+    end
+
+    it "honors an explicit --no-rspack" do
+      expect(base_generator(rspack: false).using_rspack?).to be(false)
+    end
+
+    it "honors an explicit --rspack" do
+      expect(base_generator(rspack: true).using_rspack?).to be(true)
+    end
+
+    it "treats --webpack as an alias for --no-rspack" do
+      expect(base_generator(webpack: true).using_rspack?).to be(false)
+    end
+
+    it "treats --no-webpack as selecting Rspack" do
+      expect(base_generator(webpack: false).using_rspack?).to be(true)
+    end
+
+    it "raises on contradictory --rspack and --webpack flags" do
+      expect { base_generator(rspack: true, webpack: true).using_rspack? }
+        .to raise_error(Thor::Error, /Conflicting bundler flags/)
+    end
+
+    it "does not flip an existing Webpack app that omits the flag" do
+      write_shakapacker_yml("webpack")
+
+      expect(base_generator.using_rspack?).to be(false)
+    end
+
+    it "keeps Rspack for an existing Rspack app that omits the flag" do
+      write_shakapacker_yml("rspack")
+
+      expect(base_generator.using_rspack?).to be(true)
+    end
+
+    it "lets an explicit --no-rspack override an existing Rspack app" do
+      write_shakapacker_yml("rspack")
+
+      expect(base_generator(rspack: false).using_rspack?).to be(false)
+    end
+  end
 end

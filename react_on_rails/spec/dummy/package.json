@@ -35,6 +35,8 @@
     "@babel/preset-react": "^7.10.4",
     "@playwright/test": "^1.55.1",
     "@pmmmwh/react-refresh-webpack-plugin": "^0.5.1",
+    "@rspack/cli": "^2.0.0",
+    "@rspack/core": "^2.0.0",
     "@rescript/react": "^0.13.0",
     "@swc/core": "^1.7.0",
     "@types/react": "^19.0.0",
@@ -50,18 +52,21 @@
     "playwright": "^1.55.1",
     "react-refresh": "^0.11.0",
     "rescript": "^11.1.4",
+    "rspack-manifest-plugin": "^5.0.0",
     "sass": "^1.43.4",
-    "sass-loader": "^12.3.0",
+    "sass-loader": "^16.0.0",
     "sass-resources-loader": "^2.1.0",
-    "shakapacker": "9.6.1",
+    "shakapacker": "10.1.0",
+    "shakapacker-rspack": "~10.1.0",
+    "shakapacker-webpack": "~10.1.0",
     "style-loader": "^3.3.1",
     "swc-loader": "^0.2.6",
     "terser-webpack-plugin": "5.3.1",
     "url-loader": "^4.0.0",
     "webpack": "^5.104.1",
-    "webpack-assets-manifest": "5",
-    "webpack-cli": "^6.0.1",
-    "webpack-dev-server": "^5.2.1",
+    "webpack-assets-manifest": "^6.0.0",
+    "webpack-cli": "^7.0.0",
+    "webpack-dev-server": "^5.2.4",
     "webpack-merge": "5"
   },
   "browser": {
@@ -85,6 +90,5 @@
     "build:rescript": "npx rescript clean && npx rescript build -with-deps",
     "build:rescript:dev": "npx rescript build -w"
   },
-  "version": "0.0.0",
-  "packageManager": "pnpm@9.14.2"
+  "version": "0.0.0"
 }

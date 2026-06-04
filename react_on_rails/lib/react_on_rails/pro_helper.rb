@@ -15,6 +15,8 @@ module ReactOnRails
                                                 "data-component-name" => render_options.react_component_name,
                                                 "data-trace" => (render_options.trace ? true : nil),
                                                 "data-dom-id" => render_options.dom_id,
+                                                "data-ssr-identifier-prefix" =>
+                                                  (render_options.html_streaming? ? render_options.dom_id : nil),
                                                 "data-store-dependencies" =>
                                                   render_options.store_dependencies&.to_json)
 

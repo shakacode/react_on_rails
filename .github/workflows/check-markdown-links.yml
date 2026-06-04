@@ -37,10 +37,10 @@ jobs:
         uses: pnpm/action-setup@v4
 
       - name: Setup Node
-        uses: ./.github/actions/setup-node-with-retry
+        uses: actions/setup-node@v4
         with:
-          # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
-          node-version: '22.11.0'
+          # Pin to 22.12.0 (Shakapacker 10.1 floor) to avoid V8 bug in 22.21.0
+          node-version: '22.12.0'
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
@@ -79,5 +79,6 @@ jobs:
       - name: Check markdown links
         uses: lycheeverse/lychee-action@v2
         with:
+          lycheeVersion: v0.23.0
           args: --config .lychee.toml docs/ *.md react_on_rails_pro/*.md
           fail: true

@@ -2,10 +2,10 @@
 
 module ReactOnRails
   module TestHelper
-    # Because you will probably want to run RSpec tests that rely on compiled webpack assets
+    # Because you will probably want to run RSpec tests that rely on compiled JavaScript assets
     # (typically, your integration/feature specs where `js: true`), you will want to ensure you
-    # don't accidentally run tests on missing or stale webpack assets. If you did use stale
-    # Webpack assets, you will get invalid test results as your tests do not use the very latest
+    # don't accidentally run tests on missing or stale generated assets. If you did use stale
+    # assets, you will get invalid test results as your tests do not use the very latest
     # JavaScript code.
     #
     # Call this method from inside of the `RSpec.configure` block in your `spec/rails_helper.rb`
@@ -17,12 +17,12 @@ module ReactOnRails
     #
     # You can pass an RSpec metatag as an list of parameter to this helper method
     # if you want this helper to run on examples other than where `js: true` or
-    # `server_rendering: true` (default). The helper will compile webpack files at most
+    # `server_rendering: true` (default). The helper will compile generated files at most
     # once per test run.
     #
-    # If you do not want to be slowed down by re-compiling webpack assets from scratch every test
+    # If you do not want to be slowed down by re-compiling generated assets from scratch every test
     # run, you can call `yarn run build:client` (and `yarn run build:server` if doing server
-    # rendering) to have webpack recompile these files in the background, which will be *much*
+    # rendering) to have the bundler recompile these files in the background, which will be *much*
     # faster. The helper looks for these processes and will abort recompiling if it finds them
     # to be running.
     #

@@ -7,11 +7,28 @@ module ReactOnRailsPro
     LICENSE_URL = "https://pro.reactonrails.com/"
     # TODO: Remove this legacy migration warning path after 16.5.0 stable release (target: 2026-05-31).
     LEGACY_LICENSE_FILE = "config/react_on_rails_pro_license.key"
+    ROLLING_DEPLOY_AUTO_ROUTE_PREFIX = "react_on_rails_pro_auto_rolling_deploy"
     private_constant :LICENSE_URL
     private_constant :LEGACY_LICENSE_FILE
+    private_constant :ROLLING_DEPLOY_AUTO_ROUTE_PREFIX
 
     initializer "react_on_rails_pro.routes" do
       ActionDispatch::Routing::Mapper.include ReactOnRailsPro::Routes
+    end
+
+    initializer "react_on_rails_pro.rolling_deploy_routes" do |app|
+      app.routes.prepend do
+        pro_config = ReactOnRailsPro.configuration
+        mount_path = pro_config.rolling_deploy_mount_path
+
+        if pro_config.rolling_deploy_http_adapter? && mount_path.present?
+          ReactOnRailsPro::RollingDeploy::BundlesController.draw_routes(
+            self,
+            path: mount_path,
+            as_prefix: ROLLING_DEPLOY_AUTO_ROUTE_PREFIX
+          )
+        end
+      end
     end
 
     # Check license status on Rails startup and log appropriately

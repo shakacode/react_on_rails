@@ -326,6 +326,7 @@ describe ReactOnRailsProHelper do
           data-component-name="TestingStreamableComponent"
           data-trace="true"
           data-dom-id="TestingStreamableComponent-react-component-0"
+          data-ssr-identifier-prefix="TestingStreamableComponent-react-component-0"
         >{"helloWorldData":{"name":"Mr. Server Side Rendering"}}</script>
       SCRIPT
     end
@@ -342,12 +343,7 @@ describe ReactOnRailsProHelper do
 
     # mock_chunks can be an Async::Queue or an Array
     def mock_request_and_response(mock_chunks = chunks, count: 1)
-      # Reset connection instance variables to ensure clean state for tests
-      ReactOnRailsPro::Request.instance_variable_set(:@connection, nil)
-      original_httpx_plugin = HTTPX.method(:plugin)
-      allow(HTTPX).to receive(:plugin) do |*args|
-        original_httpx_plugin.call(:mock_stream).plugin(*args)
-      end
+      install_renderer_http_client_mock("http://localhost:3800")
       clear_stream_mocks
 
       chunks_read.clear
@@ -493,11 +489,7 @@ describe ReactOnRailsProHelper do
         mock_request_and_response(many_chunks)
 
         # Simulate client disconnect after first chunk
-        call_count = 0
-        allow(mocked_rails_stream).to receive(:closed?) do
-          call_count += 1
-          call_count > 1 # false for first call, true after
-        end
+        allow(mocked_rails_stream).to receive(:closed?).and_return(false, true)
 
         # Start streaming - first chunk returned synchronously
         initial_result = stream_react_component(component_name, props: props, **component_options)
@@ -525,11 +517,7 @@ describe ReactOnRailsProHelper do
         mock_request_and_response(many_chunks)
 
         # Simulate client disconnect after first chunk
-        closed_call_count = 0
-        allow(mocked_rails_stream).to receive(:closed?) do
-          closed_call_count += 1
-          closed_call_count > 1
-        end
+        allow(mocked_rails_stream).to receive(:closed?).and_return(false, true)
 
         on_complete_called = false
         on_complete = lambda { |_chunks|
@@ -948,11 +936,7 @@ describe ReactOnRailsProHelper do
       allow(mocked_response).to receive(:stream).and_return(mocked_stream)
       allow(self).to receive(:response).and_return(mocked_response)
 
-      ReactOnRailsPro::Request.instance_variable_set(:@connection, nil)
-      original_httpx_plugin = HTTPX.method(:plugin)
-      allow(HTTPX).to receive(:plugin) do |*args|
-        original_httpx_plugin.call(:mock_stream).plugin(*args)
-      end
+      install_renderer_http_client_mock("http://localhost:3800")
       clear_stream_mocks
 
       mock_streaming_response(%r{http://localhost:3800/bundles/[a-f0-9]{32}-test/render/[a-f0-9]{32}}, 200,

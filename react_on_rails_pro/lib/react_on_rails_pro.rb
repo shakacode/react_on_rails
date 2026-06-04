@@ -3,9 +3,6 @@
 require "rails"
 require "react_on_rails"
 
-# Apply HTTPX bug fix for stream_bidi plugin
-require "react_on_rails_pro/httpx_stream_bidi_patch"
-
 require "react_on_rails_pro/request"
 require "react_on_rails_pro/version"
 require "react_on_rails_pro/constants"
@@ -26,6 +23,9 @@ require "react_on_rails_pro/js_code_builder"
 require "react_on_rails_pro/rendering_strategy/node_strategy"
 require "react_on_rails_pro/assets_precompile"
 require "react_on_rails_pro/prepare_node_renderer_bundles"
+require "react_on_rails_pro/rolling_deploy/tarball"
+require "react_on_rails_pro/rolling_deploy_adapters/http"
+require "react_on_rails_pro/rolling_deploy_cache_stager"
 require "react_on_rails_pro/pre_seed_renderer_cache"
 require "react_on_rails_pro/concerns/stream"
 require "react_on_rails_pro/concerns/rsc_payload_renderer"

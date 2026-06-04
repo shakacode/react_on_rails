@@ -145,6 +145,8 @@ async function buildVM(filePath: string): Promise<VMContext> {
         // 1. docs/oss/building-features/node-renderer/js-configuration.md
         // 2. packages/react-on-rails-pro-node-renderer/src/shared/configBuilder.ts (JSDoc on `supportModules`)
         // 3. docs/oss/migrating/rsc-troubleshooting.md ("Node Renderer VM Context -- Missing Globals")
+        // NOTE: fetch, Headers, Request, Response, AbortController, and AbortSignal are intentionally
+        // NOT injected here -- callers must provide them via `additionalContext` if their bundle needs them.
         extendContext(contextObject, {
           Buffer,
           TextDecoder,

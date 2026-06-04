@@ -137,7 +137,7 @@ if [ "$RUN_ALL" = false ]; then
       RUN_JS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ JS unit tests" && echo true || echo false)
       RUN_DUMMY=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ Dummy app integration tests" && echo true || echo false)
       RUN_GENERATORS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ Generator tests" && echo true || echo false)
-      RUN_PRO_LINT=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ React on Rails Pro lint" && echo true || echo false)
+      RUN_PRO_LINT=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ React on Rails Pro Lint" && echo true || echo false)
       RUN_PRO_TESTS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ React on Rails Pro tests" && echo true || echo false)
     fi
   else
@@ -161,7 +161,7 @@ if [ "$RUN_ALL" = false ]; then
     RUN_JS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ JS unit tests" && echo true || echo false)
     RUN_DUMMY=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ Dummy app integration tests" && echo true || echo false)
     RUN_GENERATORS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ Generator tests" && echo true || echo false)
-    RUN_PRO_LINT=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ React on Rails Pro lint" && echo true || echo false)
+    RUN_PRO_LINT=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ React on Rails Pro Lint" && echo true || echo false)
     RUN_PRO_TESTS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ React on Rails Pro tests" && echo true || echo false)
   fi
 else
@@ -284,10 +284,9 @@ fi
 
 if [ "$RUN_PRO_LINT" = true ]; then
   if ensure_pro_dependencies; then
-    run_job "React on Rails Pro RuboCop" "cd react_on_rails_pro && bundle exec rubocop"
-    run_job "React on Rails Pro ESLint" "cd react_on_rails_pro && pnpm run nps eslint"
-    run_job "React on Rails Pro Format Check" "cd react_on_rails_pro && pnpm run nps format.listDifferent"
-    run_job "React on Rails Pro TypeScript Check" "cd react_on_rails_pro && pnpm run nps check-typescript"
+    run_job "React on Rails Pro RuboCop" "cd react_on_rails_pro && bundle exec rubocop --ignore-parent-exclusion"
+    run_job "React on Rails Pro RBS Validate" "cd react_on_rails_pro && bundle exec rake rbs:validate"
+    run_job "React on Rails Pro TypeScript Check" "pnpm run nps check-typescript"
   fi
 fi
 

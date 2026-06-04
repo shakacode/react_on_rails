@@ -6,6 +6,9 @@ on:
       docs_only:
         description: 'Only documentation files changed'
         value: ${{ jobs.detect.outputs.docs_only }}
+      non_runtime_only:
+        description: 'Only documentation or source comments changed'
+        value: ${{ jobs.detect.outputs.non_runtime_only }}
       run_lint:
         description: 'Should run linting'
         value: ${{ jobs.detect.outputs.run_lint }}
@@ -21,6 +24,10 @@ on:
       run_generators:
         description: 'Should run generator tests'
         value: ${{ jobs.detect.outputs.run_generators }}
+      run_e2e_tests:
+        description: 'Should run Playwright E2E tests'
+        # TODO: wire into .github/workflows/playwright.yml job gating.
+        value: ${{ jobs.detect.outputs.run_e2e_tests }}
 
 jobs:
   detect:
@@ -30,11 +37,13 @@ jobs:
       actions: read
     outputs:
       docs_only: ${{ steps.changes.outputs.docs_only }}
+      non_runtime_only: ${{ steps.changes.outputs.non_runtime_only }}
       run_lint: ${{ steps.changes.outputs.run_lint }}
       run_ruby_tests: ${{ steps.changes.outputs.run_ruby_tests }}
       run_js_tests: ${{ steps.changes.outputs.run_js_tests }}
       run_dummy_tests: ${{ steps.changes.outputs.run_dummy_tests }}
       run_generators: ${{ steps.changes.outputs.run_generators }}
+      run_e2e_tests: ${{ steps.changes.outputs.run_e2e_tests }}
     steps:
       - uses: actions/checkout@v4
         with:

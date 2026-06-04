@@ -396,10 +396,52 @@ def collapse_prerelease_sections(changelog, base_version, channel)
 end
 # rubocop:enable Metrics/AbcSize
 
+# For rc/beta modes, if an active prerelease base already exists (from a
+# tag or a draft changelog header above the latest stable), reuse it
+# directly. The bump decision was made when the first RC of the series
+# was stamped; once rc.0 ships, rc.1 must stay on the same base version
+# even if Unreleased is empty or its headings suggest a different bump.
+#
+# Returns the next prerelease version string (e.g., "16.4.0.rc.1") when an
+# active base is found, or nil otherwise so the caller can fall through to
+# stable-bump inference.
+#
+# Note: active_prerelease_base_version is channel-agnostic — it returns the
+# highest active base across rc, beta, alpha, etc. This project does not mix
+# channels on a single base version (e.g., we don't ship both 16.4.0.beta.N
+# and 16.4.0.rc.N), so the active base unambiguously belongs to the current
+# channel in practice.
+def next_active_prerelease_version(changelog, mode, monorepo_root)
+  return nil unless %w[rc beta].include?(mode)
+
+  active_base = active_prerelease_base_version(monorepo_root, changelog)
+  return nil unless active_base
+
+  indices = prerelease_indices_from_tags(monorepo_root, active_base, mode)
+  next_index = indices.empty? ? 0 : indices.max + 1
+  if indices.empty? && other_prerelease_channel_present?(monorepo_root, active_base, mode)
+    warn "WARNING: active prerelease base #{active_base} was found via a different channel. " \
+         "Verify the computed version is correct."
+  end
+  "#{active_base}.#{mode}.#{next_index}"
+end
+
+def other_prerelease_channel_present?(monorepo_root, base_version, mode)
+  other_channels = %w[test beta alpha rc pre].reject { |channel| channel == mode }
+  other_channels.any? do |channel|
+    !prerelease_indices_from_tags(monorepo_root, base_version, channel).empty?
+  end
+end
+
 def compute_auto_version(changelog, mode, monorepo_root, changelog_for_bump: nil)
-  # Keep backward compatibility with older callers that pass changelog_for_bump
-  # as a keyword while allowing the new 3-argument call shape.
+  # changelog_for_bump is only consulted when the bump type must be inferred
+  # from [Unreleased]: namely release mode, and rc/beta cold-start (no active
+  # prerelease base). It is ignored once an rc/beta series has begun.
   changelog_for_bump ||= changelog
+
+  active_version = next_active_prerelease_version(changelog, mode, monorepo_root)
+  return active_version if active_version
+
   bump_type = inferred_bump_type_from_unreleased(changelog_for_bump)
   latest_stable = latest_stable_tag_version(monorepo_root)
   base_version = bump_stable_version(latest_stable, bump_type)
@@ -450,9 +492,13 @@ desc "Updates CHANGELOG.md by inserting a version header and compare links.
 Argument: Mode (`release`, `rc`, `beta`) or explicit git tag/version.
 
 Modes:
-  - release: auto-compute next stable version from Unreleased section headings
-  - rc: auto-compute next RC version and collapse prior RC sections of same base version
-  - beta: auto-compute next beta version and collapse prior beta sections of same base version
+  - release: auto-compute next stable version and collapse prior RC/beta
+             sections of the same base version into the new stable section
+  - rc: auto-compute next RC version; prior RC/beta sections of the same
+        base version are left in place so users can see what changed
+        between RCs
+  - beta: auto-compute next beta version; prior beta/RC sections of the
+          same base version are left in place
 
 Explicit argument examples:
   - v16.4.0.rc.6
@@ -473,7 +519,16 @@ task :update_changelog, %i[mode_or_tag] do |_, args|
 
   if auto_mode
     fetch_git_tags!(monorepo_root)
-    prepared_changelog = prepare_changelog_for_auto_version(changelog, monorepo_root)
+    # Collapse prior prerelease sections only when stamping the stable
+    # release. For rc/beta modes, each prerelease keeps its own section
+    # so users on an earlier RC can see what changed between RCs.
+    # For release mode, collapse prior prerelease sections before computing
+    # the version; for rc/beta, the changelog is used as-is.
+    prepared_changelog = if auto_mode == "release"
+                           prepare_changelog_for_auto_version(changelog, monorepo_root)
+                         else
+                           changelog
+                         end
     changelog_version = compute_auto_version(prepared_changelog, auto_mode, monorepo_root)
     changelog = prepared_changelog
     tag_date = Date.today.strftime("%Y-%m-%d")

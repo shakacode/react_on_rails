@@ -41,7 +41,7 @@ const AsyncHelloWorldHooks = (props) => {
   if (typeof window !== 'undefined') {
     return <HelloWorldHooks {...props} />;
   }
-  // eslint-disable-next-line react/destructuring-assignment
+
   if (props.throwAsyncError) {
     return Promise.reject(new Error('Async error from AsyncHelloWorldHooks'));
   }
@@ -52,7 +52,7 @@ const AsyncHelloWorldHooks = (props) => {
 
 const AsyncComponentsTreeForTesting = (props) => {
   console.log('Sync console log from AsyncComponentsTreeForTesting');
-  // eslint-disable-next-line react/destructuring-assignment
+
   if (props.throwSyncError) {
     throw new Error('Sync error from AsyncComponentsTreeForTesting');
   }

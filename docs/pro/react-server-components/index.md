@@ -31,13 +31,38 @@ Combined with streaming SSR, RSC sends the initial HTML shell immediately while 
 
 React's selective hydration allows client components to become interactive independently as their code loads, rather than waiting for the entire page's JavaScript to execute. Components that users interact with get priority hydration.
 
-### Direct Data Access
+### Server-Prepared Data, No Client Fetching
 
-Server components can access databases, file systems, and internal APIs directly without exposing endpoints to the client. This simplifies data fetching and eliminates the need for client-side data fetching libraries in many cases.
+In React on Rails, Rails is the backend: your controller owns database access, authorization, and caching, then passes data to the component tree as props (or streams slow data as [async props](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently)). Server components render from that data without exposing API endpoints to the client or shipping client-side data-fetching libraries. Unlike Next.js-style RSC, components don't fetch their own data — see [RSC Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md).
 
 ### Real-World Results
 
 Teams adopting RSC have reported dramatic wins — BlogHunch's 30% server-cost reduction, Frigade's 62% client-bundle reduction, and Mux's 50,000-line incremental migration — all documented in [Migration Success Stories](./success-stories.md). DoorDash's 65% LCP improvement from an earlier Next.js SSR migration is included as a useful server-rendering baseline.
+
+The public demo below shows how these ideas look in an inspectable React on Rails Pro application.
+
+## Live Demo and Evidence {#live-demo-and-evidence}
+
+The public [LocalHub marketplace demo](https://rsc.reactonrails.com/) shows the
+same marketplace-style surfaces rendered with traditional SSR, client rendering,
+and React Server Components. Use this canonical link list when you want
+inspectable proof instead of a static claim:
+
+- [RSC performance showcase](https://rsc.reactonrails.com/search-performance) —
+  Lighthouse scores, transfer deltas, bootup time, and report links for each
+  measured page family
+- [Bundle-size evidence](https://rsc.reactonrails.com/lighthouse-reports/bundle-sizes.html) —
+  per-route resource and chunk breakdowns
+- [Raw Lighthouse reports](https://rsc.reactonrails.com/lighthouse-reports/index.html) —
+  the underlying Lighthouse artifacts
+- [Why RSC](https://rsc.reactonrails.com/why-rsc) — a non-framework-specific
+  walkthrough of why server-only dependencies stay off the browser
+- [Demo source](https://github.com/shakacode/react-on-rails-demo-marketplace-rsc) —
+  Rails + React on Rails Pro implementation code
+
+> [!NOTE]
+> Treat these public measurements as directional evidence, not a universal
+> performance guarantee for every app.
 
 ## Current Support Status
 
