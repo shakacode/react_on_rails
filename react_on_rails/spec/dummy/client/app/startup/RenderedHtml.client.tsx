@@ -1,7 +1,7 @@
 // Top level component for simple client side only rendering
 import React from 'react';
 
-import EchoProps from '../components/EchoProps';
+import EchoProps, { type EchoPropsProps } from '../components/EchoProps';
 
 /*
  *  Export a function that takes the props and returns a ReactComponent.
@@ -19,4 +19,6 @@ import EchoProps from '../components/EchoProps';
 // You may do either:
 // export default (props, _railsContext) => () => <EchoProps {...props} />;
 // or
-export default (props) => <EchoProps {...props} />;
+const RenderedHtml = (props: EchoPropsProps) => <EchoProps {...props} />;
+
+export default RenderedHtml;
