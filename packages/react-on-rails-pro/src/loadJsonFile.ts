@@ -12,7 +12,6 @@
  * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import * as fs from 'fs';
 import * as fsPromises from 'fs/promises';
 import * as path from 'path';
 
@@ -21,10 +20,10 @@ const loadedJsonFiles = new Map<string, LoadedJsonFile>();
 
 const resolveJsonFilePath = (fileName: string): string => path.resolve(__dirname, fileName);
 
-export function getJsonFileSignature(fileName: string): string {
+export async function getJsonFileSignature(fileName: string): Promise<string> {
   const filePath = resolveJsonFilePath(fileName);
   try {
-    const stats = fs.statSync(filePath);
+    const stats = await fsPromises.stat(filePath);
     return `${filePath}\0${stats.size}\0${stats.mtimeMs}`;
   } catch {
     return `${filePath}\0missing`;

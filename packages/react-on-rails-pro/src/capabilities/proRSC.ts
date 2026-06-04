@@ -57,7 +57,7 @@ const wrapWithRscCssLinks = (renderedTree: React.ReactNode, cssHrefs: readonly s
   const stylesheetLinks = cssHrefs.map((href) =>
     React.createElement('link', { key: href, rel: 'stylesheet', href, precedence: RSC_CSS_PRECEDENCE }),
   );
-  return React.createElement(React.Fragment, null, stylesheetLinks, renderedTree);
+  return React.createElement(React.Fragment, null, ...stylesheetLinks, renderedTree);
 };
 
 const CLIENT_HOOK_NAMES = [
@@ -124,9 +124,8 @@ const streamRenderRSCComponent = (
     | { rscBundleHash?: string }
     | undefined;
 
-  // Initialize manifest loader and BUILD_ID on first render request.
-  // These are per-process constants that don't change between requests.
-  setManifestFileNames(reactClientManifestFileName, reactServerClientManifestFileName);
+  // Initialize manifest loader; in development this also invalidates derived
+  // caches when manifests change on disk.
   if (rscPayloadParams?.rscBundleHash) {
     setBuildId(rscPayloadParams.rscBundleHash);
   }
@@ -153,6 +152,7 @@ const streamRenderRSCComponent = (
   };
 
   const initializeAndRender = async () => {
+    await setManifestFileNames(reactClientManifestFileName, reactServerClientManifestFileName);
     const { renderToPipeableStream } = await getServerRenderer();
     const cssHrefsPromise = getRscCssHrefs().catch((err: unknown) => {
       console.error('Error loading RSC CSS hrefs', convertToError(err));

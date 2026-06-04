@@ -25,6 +25,10 @@ const writeManifest = async (filePath: string, cssFile: string) => {
 };
 
 describe('manifestLoader', () => {
+  afterEach(async () => {
+    await setManifestFileNames('', '');
+  });
+
   it('invalidates manifest-derived CSS when the client manifest file changes', async () => {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ror-manifest-loader-'));
     const clientManifest = path.join(tempDir, 'react-client-manifest.json');
@@ -32,11 +36,11 @@ describe('manifestLoader', () => {
 
     await writeManifest(clientManifest, 'css/first.css');
     await writeManifest(serverClientManifest, 'css/first.css');
-    setManifestFileNames(clientManifest, serverClientManifest);
+    await setManifestFileNames(clientManifest, serverClientManifest);
     await expect(getRscCssHrefs()).resolves.toEqual(['/packs/css/first.css']);
 
     await writeManifest(clientManifest, 'css/second.css');
-    setManifestFileNames(clientManifest, serverClientManifest);
+    await setManifestFileNames(clientManifest, serverClientManifest);
 
     await expect(getRscCssHrefs()).resolves.toEqual(['/packs/css/second.css']);
   });
