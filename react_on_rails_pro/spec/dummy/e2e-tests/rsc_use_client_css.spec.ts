@@ -12,9 +12,11 @@ import { test, expect } from '@playwright/test';
 test.describe('RSC use-client CSS (#3211 FOUC fix)', () => {
   test('preloads the use-client stylesheet (hoisted into SSR <head>) and styles the probe', async ({
     page,
+    request,
   }) => {
-    const response = await page.goto('/rsc_posts_page_over_http', { waitUntil: 'commit' });
-    const ssrHtml = (await response?.text()) ?? '';
+    const response = await request.get('/rsc_posts_page_over_http');
+    expect(response.ok()).toBe(true);
+    const ssrHtml = await response.text();
 
     // No-FOUC guarantee: the renderer hoists the use-client stylesheet into the
     // server-rendered <head> with our precedence group, so the browser will not
@@ -22,6 +24,8 @@ test.describe('RSC use-client CSS (#3211 FOUC fix)', () => {
     expect(ssrHtml).toMatch(
       /<link(?=[^>]*\brel="stylesheet")(?=[^>]*\bdata-precedence="ror-rsc")(?=[^>]*\bhref="[^"]*\.css")[^>]*>/,
     );
+
+    await page.goto('/rsc_posts_page_over_http', { waitUntil: 'commit' });
 
     const probe = page.getByTestId('rsc-css-probe');
     await expect(probe).toBeVisible();
