@@ -206,3 +206,35 @@ describe('wrapServerComponentRenderer/client teardown (issue #3209)', () => {
     expect(unmount).toHaveBeenCalledTimes(1);
   });
 });
+
+// Issue #3209: ComponentRegistry classifies a registration as a renderer only when
+// `renderFunction && length === 3`, and only renderers have their returned teardown captured and run
+// on unmount. If the wrapper's arity regresses, it is silently demoted to a plain render-function and
+// the mount leak this fix closes returns — so pin the declared arity here.
+describe('wrapServerComponentRenderer/client renderer arity (issue #3209)', () => {
+  beforeEach(() => {
+    jest.resetModules();
+    jest.doMock('react-dom/client', () => ({ createRoot: jest.fn(), hydrateRoot: jest.fn() }));
+    jest.doMock('react-on-rails-rsc/client.browser', () => ({}));
+    jest.doMock('../src/getReactServerComponent.client.ts', () => ({
+      __esModule: true,
+      default: jest.fn(() => jest.fn()),
+    }));
+  });
+
+  afterEach(() => {
+    jest.dontMock('react-dom/client');
+    jest.dontMock('react-on-rails-rsc/client.browser');
+    jest.dontMock('../src/getReactServerComponent.client.ts');
+    jest.resetModules();
+  });
+
+  it('declares 3 parameters so it is registered as a renderer (teardown is captured)', () => {
+    // eslint-disable-next-line global-require, @typescript-eslint/no-var-requires
+    const wrapServerComponentRenderer = require('../src/wrapServerComponentRenderer/client.tsx').default;
+
+    const WrappedComponent = wrapServerComponentRenderer(() => null, 'WrappedComponent');
+
+    expect(WrappedComponent).toHaveLength(3);
+  });
+});

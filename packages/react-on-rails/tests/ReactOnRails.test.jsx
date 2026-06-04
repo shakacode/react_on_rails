@@ -31,12 +31,13 @@ describe('ReactOnRails', () => {
     expect(document.getElementById('root').textContent).toBe(' WORLD ');
   });
 
-  it('reports unsupported renderer teardowns passed to manual render', () => {
+  it('rejects renderer functions passed to manual render without invoking them', () => {
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     try {
-      const teardown = jest.fn();
-      function ManualRenderer(_props, _railsContext, _domNodeId) {
-        return { teardown };
+      // 3-argument arity makes ComponentRegistry classify this as a renderer (isRenderer === true).
+      const renderer = jest.fn();
+      function ManualRenderer(props, railsContext, domNodeId) {
+        return renderer(props, railsContext, domNodeId);
       }
       ReactOnRails.register({ ManualRenderer });
 
@@ -48,11 +49,11 @@ describe('ReactOnRails', () => {
       expect(() => ReactOnRails.render('ManualRenderer', {}, 'manual-renderer-root')).toThrow(
         'ReactOnRails.render() does not support renderer functions ("ManualRenderer").',
       );
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'ReactOnRails.render() does not support renderer functions ("ManualRenderer"). ' +
-          'Use normal React on Rails component rendering so renderer teardowns are captured on navigation.',
-      );
-      expect(teardown).not.toHaveBeenCalled();
+      // The renderer is rejected *before* it is invoked, so it can't create a leaked mount, and the
+      // failure surfaces only through the thrown error — not a confusing console.error on a path that
+      // already throws.
+      expect(renderer).not.toHaveBeenCalled();
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
     } finally {
       consoleErrorSpy.mockRestore();
     }

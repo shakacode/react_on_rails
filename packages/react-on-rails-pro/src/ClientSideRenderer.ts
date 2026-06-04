@@ -38,6 +38,15 @@ import * as ComponentRegistry from './ComponentRegistry.ts';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 
+/** Narrows an unknown value to a thenable (has a callable `.then`) without assuming a native Promise. */
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+  return (
+    value != null &&
+    (typeof value === 'object' || typeof value === 'function') &&
+    typeof (value as { then?: unknown }).then === 'function'
+  );
+}
+
 /**
  * Invokes a renderer teardown, swallowing async rejections so a failing teardown cannot produce an
  * unhandled promise rejection. Synchronous throws propagate to the caller's try/catch.
@@ -51,14 +60,6 @@ const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
  * MUST SYNC: A sibling helper exists in packages/react-on-rails/src/ClientRenderer.ts. If you
  * change the error-handling logic or log format here, update that copy too.
  */
-function isThenable(value: unknown): value is PromiseLike<unknown> {
-  return (
-    value != null &&
-    (typeof value === 'object' || typeof value === 'function') &&
-    typeof (value as { then?: unknown }).then === 'function'
-  );
-}
-
 function invokeRendererTeardown(teardown: RendererTeardown | undefined, domNodeId: string): void {
   if (!teardown) return;
   const maybePromise = teardown();

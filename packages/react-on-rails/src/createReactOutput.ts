@@ -78,21 +78,23 @@ export default function createReactOutput({
     if (trace) {
       console.log(`${name} is a renderFunction`);
     }
-    // createReactOutput is only meant to handle render-functions that return a component or
-    // server-render hash. The 3-argument renderer form (which may return a RendererTeardownResult)
-    // does not reach here on the normal paths:
-    // the streaming client renderers delegate it earlier (`delegateToRenderer`), and server
-    // rendering rejects it upstream in validateComponent ("Detected a renderer while server
-    // rendering"). The one path that is NOT guarded is the manual public `ReactOnRails.render()`
-    // API, which calls this directly; passing a renderer there is unsupported.
-    const manualRendererMessage = isRenderer ? unsupportedManualRendererMessage(name) : undefined;
-    if (manualRendererMessage) {
-      console.error(manualRendererMessage);
+    // createReactOutput only handles render-functions that return a component or server-render hash.
+    // The 3-argument renderer form (which owns its own mount and may return a RendererTeardownResult)
+    // never reaches here on the supported paths: the client renderers delegate it earlier
+    // (`delegateToRenderer`) and return before this call, and server rendering rejects it upstream in
+    // validateComponent ("Detected a renderer while server rendering"). The only path that reaches
+    // here with a renderer is the manual public `ReactOnRails.render()` API, where renderers are
+    // unsupported because their teardown can't be tracked for cleanup. Reject it loudly and *before*
+    // invoking, rather than calling it with no domNodeId and rendering a half-wired, leak-prone result.
+    if (isRenderer) {
+      throw new Error(unsupportedManualRendererMessage(name));
     }
 
     const renderFunctionResult = (component as RenderFunction)(props, railsContext);
+    // Defense-in-depth: a 2-argument render function isn't expected to return a teardown wrapper, but
+    // the public RenderFunction return type can't structurally exclude it, so reject that at runtime too.
     if (isRendererTeardownResult(renderFunctionResult)) {
-      throw new Error(manualRendererMessage ?? unsupportedManualRendererMessage(name));
+      throw new Error(unsupportedManualRendererMessage(name));
     }
 
     if (isServerRenderHash(renderFunctionResult)) {
@@ -106,7 +108,7 @@ export default function createReactOutput({
       // we can't call React.createElement with this type of Object.
       return renderFunctionResult.then((result) => {
         if (isRendererTeardownResult(result)) {
-          throw new Error(manualRendererMessage ?? unsupportedManualRendererMessage(name));
+          throw new Error(unsupportedManualRendererMessage(name));
         }
         // If the result is a function, then it returned a React Component (even class components are functions).
         if (typeof result === 'function') {

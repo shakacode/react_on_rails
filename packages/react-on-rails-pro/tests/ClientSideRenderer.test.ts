@@ -303,6 +303,14 @@ describe('ClientSideRenderer', () => {
     await renderOrHydrateComponent(componentSpec);
 
     expect(renderer).toHaveBeenCalledTimes(1);
+    // The 3-arg renderer signature is load-bearing (#3209): a wrong or dropped domNodeId would
+    // mis-target getReactServerComponent and silently break teardown capture, so assert the exact
+    // args rather than only the call count.
+    expect(renderer).toHaveBeenCalledWith(
+      { greeting: 'hello' },
+      expect.objectContaining({ rscPayloadGenerationUrlPath: '/rsc_payload' }),
+      'dom-id-123',
+    );
     expect(defaultProviderFactory).not.toHaveBeenCalled();
     expect(mockReactHydrateOrRender).not.toHaveBeenCalled();
   });
