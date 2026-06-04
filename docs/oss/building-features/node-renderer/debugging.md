@@ -101,7 +101,7 @@ See the [Memory Leaks guide](../../../pro/js-memory-leaks.md) for common pattern
 ## Debugging Jest tests
 
 1. See [the Jest documentation](https://jestjs.io/docs/troubleshooting) for overall guidance.
-2. For RubyMine, see [the RubyMine documentation](https://www.jetbrains.com/help/ruby/running-unit-tests-on-jest.html) for the current information. The original [Testing With Jest in WebStorm](https://blog.jetbrains.com/webstorm/2018/10/testing-with-jest-in-webstorm/) post can be useful as well.
+2. For JetBrains IDEs, see [the RubyMine documentation](https://www.jetbrains.com/help/ruby/running-unit-tests-on-jest.html) for current instructions.
 
 ## Debugging the Ruby gem
 

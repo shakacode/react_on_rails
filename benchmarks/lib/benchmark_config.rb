@@ -38,6 +38,12 @@ end
 # Common benchmark parameters with defaults
 OUTDIR = "bench_results"
 BENCHMARK_JSON = "#{OUTDIR}/benchmark.json".freeze
+# Sidecar carrying the summary-table columns Bencher never sees (p90, raw Status),
+# keyed by the same canonical name as the BMF so track_benchmarks.rb joins them.
+# NOTE: track_benchmarks.rb independently defines DISPLAY_JSON with the same default
+# path (via ENV.fetch("BENCHMARK_DISPLAY_JSON")); they are separate programs, so keep
+# the two in sync.
+DISPLAY_JSON = "#{OUTDIR}/benchmark_display.json".freeze
 RATE = env_or_default("RATE", "max")
 CONNECTIONS = env_or_default("CONNECTIONS", 10).to_i
 MAX_CONNECTIONS = env_or_default("MAX_CONNECTIONS", CONNECTIONS).to_i

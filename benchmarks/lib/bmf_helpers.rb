@@ -30,14 +30,18 @@ class BmfCollector
   # @param rps [Numeric, nil] Requests per second
   # @param p50 [Numeric, nil] 50th percentile latency in ms
   # @param status [String, nil] Status string like "200=100,5xx=2"
-  def add(name:, rps:, p50:, status:)
-    # Skip if RPS is not a valid number (FAILED, MISSING, etc.)
-    return unless rps.is_a?(Numeric)
-
+  # @param p90 [Numeric, nil] 90th percentile latency in ms (summary-only; not sent
+  #   to Bencher, but retained for the display sidecar so the table can show it)
+  def add(name:, rps:, p50:, status:, p90: nil)
+    # Keep every row, including failures (rps "FAILED"/"MISSING"): the display sidecar
+    # must still show a failed route/test rather than dropping it silently. The
+    # numeric-rps filter lives in #to_bmf so only valid measures reach Bencher.
     @results << {
       name: "#{@prefix}#{name}#{@suffix}",
       rps: rps,
       p50: p50.is_a?(Numeric) ? p50 : nil,
+      p90: p90.is_a?(Numeric) ? p90 : nil,
+      status: status,
       failed_pct: calculate_failed_percentage(status)
     }
   end
@@ -47,6 +51,10 @@ class BmfCollector
     output = {}
 
     @results.each do |r|
+      # Only numeric-rps rows are valid Bencher measures; failed/MISSING rows are kept
+      # for the display sidecar (see #add) but must not reach the BMF payload.
+      next unless r[:rps].is_a?(Numeric)
+
       benchmark_entry = {}
 
       # RPS (higher is better) - use Lower Boundary threshold in Bencher
@@ -91,6 +99,52 @@ class BmfCollector
 
     File.write(output_path, JSON.pretty_generate(bmf_json))
     puts "Wrote #{bmf_json.length} total benchmarks to #{output_path}"
+    true
+  end
+
+  # Rows for the Markdown summary table, joined with the Bencher report by name in
+  # track_benchmarks.rb. Includes every row #add recorded — failed/MISSING rows too,
+  # so a failed route/test stays visible in the summary even though it never reaches
+  # Bencher (#to_bmf filters those out). rps may therefore be a non-numeric token like
+  # "FAILED"/"MISSING"; BenchmarkTable renders it as text and never highlights a
+  # non-numeric cell. p90 and the raw status string are summary-only (absent from to_bmf).
+  # failed_pct is a tracked measure, so it is carried here (as a number) to give the
+  # table a highlightable Fail% column; a failed row (non-numeric rps) has no real
+  # failure rate, so it is left nil ("—").
+  def display_rows
+    @results.map do |r|
+      {
+        "name" => r[:name], "rps" => r[:rps], "p50" => r[:p50], "p90" => r[:p90],
+        "failed_pct" => (r[:rps].is_a?(Numeric) ? r[:failed_pct] : nil), "status" => r[:status]
+      }
+    end
+  end
+
+  # Write the display sidecar (a JSON array of display_rows). Supports append: to
+  # match write_bmf_json, so a job that runs more than one bench script keeps every
+  # suite's rows (defensive; the current matrix runs one script per job).
+  def write_display_json(output_path, append: false)
+    rows = display_rows
+    if rows.empty?
+      warn "WARNING: No valid benchmark results for the display sidecar"
+      return false
+    end
+
+    if append && File.exist?(output_path)
+      begin
+        existing = JSON.parse(File.read(output_path))
+        if existing.is_a?(Array)
+          rows = existing + rows
+        else
+          warn "WARNING: Existing #{output_path} is not a JSON array (#{existing.class}), overwriting"
+        end
+      rescue JSON::ParserError => e
+        warn "WARNING: Existing #{output_path} contains invalid JSON (#{e.message}), overwriting"
+      end
+    end
+
+    File.write(output_path, JSON.pretty_generate(rows))
+    puts "Wrote #{rows.length} display rows to #{output_path}"
     true
   end
 

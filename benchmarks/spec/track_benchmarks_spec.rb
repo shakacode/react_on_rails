@@ -6,46 +6,79 @@ require_relative "../track_benchmarks"
 require_relative "../lib/bmf_helpers"
 
 # track_benchmarks.rb runs its tracking flow only under `if __FILE__ == $PROGRAM_NAME`,
-# so requiring it just loads the helpers. These pin the stderr/exit-code
-# classification that decides whether a Bencher run is a real regression (alert) vs
-# a missing-baseline retry — the two are mutually exclusive by design: an alert must
-# never trigger a start-point-hash retry, or a real regression would be silently
-# re-measured against the wrong baseline.
+# so requiring it just loads the helpers. These pin the classification that decides
+# whether a Bencher run is a real regression vs a missing-baseline retry — now read
+# from the JSON report's alerts[] rather than by grepping stderr. The two are
+# mutually exclusive by design: an alert must never trigger a start-point-hash retry,
+# or a real regression would be silently re-measured against the wrong baseline.
 RSpec.describe "track_benchmarks" do
-  describe "#alert?" do
-    it "is true for a non-zero exit whose stderr names an alert/violation" do
-      [
-        "Alert: rps boundary violation",
-        "Threshold violation detected",
-        "found a boundary violation on p90_latency"
-      ].each do |stderr|
-        expect(alert?(stderr, 1)).to be(true), "expected alert for: #{stderr}"
-      end
+  def report_with_alert
+    BencherReport.parse(
+      JSON.generate(
+        "results" => [],
+        "alerts" => [{
+          "benchmark" => { "name" => "/x" },
+          "threshold" => { "measure" => { "slug" => "rps" } },
+          "metric" => { "value" => 1.0 },
+          "limit" => "lower",
+          "status" => "active"
+        }]
+      )
+    )
+  end
+
+  def report_without_alert
+    BencherReport.parse(JSON.generate("results" => [], "alerts" => []))
+  end
+
+  describe "#regression?" do
+    it "is true when the report has an active alert" do
+      expect(regression?(report_with_alert)).to be(true)
     end
 
-    it "is false on success even if the text mentions an alert" do
-      expect(alert?("Alert: rps boundary violation", 0)).to be(false)
+    it "is false when the report has no active alert" do
+      expect(regression?(report_without_alert)).to be(false)
     end
 
-    it "is false for a non-zero exit with no alert phrase (operational failure)" do
-      expect(alert?("error: failed to authenticate with the API", 1)).to be(false)
+    it "is false when there is no report (operational failure, no stdout to parse)" do
+      expect(regression?(nil)).to be(false)
     end
   end
 
   describe "#retry_without_start_point_hash?" do
-    it "is true when the start-point head version is missing and there is no alert" do
-      expect(retry_without_start_point_hash?("Head Version abc123 not found", 1)).to be(true)
+    it "is true when the start-point head version is missing and there is no regression" do
+      expect(retry_without_start_point_hash?("Head Version abc123 not found", 1, report_without_alert)).to be(true)
     end
 
-    it "is false when an alert is also present (must not retry a real regression)" do
-      stderr = "Head Version abc123 not found\nAlert: rps boundary violation"
-      expect(retry_without_start_point_hash?(stderr, 1)).to be(false)
-      expect(alert?(stderr, 1)).to be(true)
+    it "is true when the head version is missing and no report was produced" do
+      expect(retry_without_start_point_hash?("Head Version abc123 not found", 1, nil)).to be(true)
+    end
+
+    it "is false when the report has an active alert (must not retry a real regression)" do
+      report = report_with_alert
+      expect(retry_without_start_point_hash?("Head Version abc123 not found", 1, report)).to be(false)
+      expect(regression?(report)).to be(true)
     end
 
     it "is false on success and for unrelated non-zero failures" do
-      expect(retry_without_start_point_hash?("Head Version abc123 not found", 0)).to be(false)
-      expect(retry_without_start_point_hash?("some other error", 1)).to be(false)
+      expect(retry_without_start_point_hash?("Head Version abc123 not found", 0, report_without_alert)).to be(false)
+      expect(retry_without_start_point_hash?("some other error", 1, report_without_alert)).to be(false)
+    end
+  end
+
+  # On a main regression the rendered table feeds the report-regressions hand-off. If
+  # the display sidecar was missing/corrupt the table is empty, and an empty-bodied
+  # issue is useless — the hand-off must substitute a run-URL pointer instead.
+  describe "#regression_handoff_summary" do
+    it "returns the rendered table unchanged when it is non-empty" do
+      expect(regression_handoff_summary("### Summary\n| a |")).to eq("### Summary\n| a |")
+    end
+
+    it "substitutes a run-URL pointer when the table is empty" do
+      allow(Github).to receive(:run_url).and_return("https://github.test/run/1")
+      summary = regression_handoff_summary("")
+      expect(summary).not_to be_empty
+      expect(summary).to include("https://github.test/run/1")
     end
   end
 
@@ -70,6 +103,12 @@ RSpec.describe "track_benchmarks" do
   end
 
   describe "#bencher_args" do
+    it "requests the JSON report format (so the report can be parsed, not grepped)" do
+      args = bencher_args("my-branch", [])
+      expect(args.each_cons(2)).to include(%w[--format json])
+      expect(args).not_to include("html")
+    end
+
     # Parse only the threshold tail: OptionParser raises InvalidOption on any flag it
     # doesn't declare, and the leading `bencher run` flags aren't declared here, so
     # drop everything before the first --threshold-measure.
@@ -104,6 +143,33 @@ RSpec.describe "track_benchmarks" do
       collector.add(name: "x", rps: 1.0, p50: 1.0, status: "200=1")
 
       expect(collector.to_bmf.fetch("x").keys).to match_array(THRESHOLDS.map(&:first))
+    end
+  end
+
+  # The summary table's highlightable columns must stay in lockstep with the tracked
+  # measures/sides Bencher is configured with, or a column would either be silently
+  # un-highlightable or highlighted with the wrong direction.
+  describe "summary table highlight columns" do
+    it "use measures and directions that exist in THRESHOLDS" do
+      thresholds = THRESHOLDS.to_h { |measure, direction, _boundary| [measure, direction] }
+
+      BenchmarkTable::COLUMNS.select { |col| col[:measure] }.each do |col|
+        expect(thresholds).to include(col[:measure])
+        expect(col[:direction]).to eq(thresholds[col[:measure]])
+      end
+    end
+
+    # The reverse direction: every tracked measure must have a highlightable column,
+    # or an alert on that measure (e.g. failed_pct) would fire but render as an
+    # un-highlighted cell — invisible in the PR comment and the regression hand-off.
+    it "expose every tracked THRESHOLDS measure as a highlightable column" do
+      highlightable = BenchmarkTable::COLUMNS.select { |col| col[:measure] }
+                                             .to_h { |col| [col[:measure], col[:direction]] }
+
+      THRESHOLDS.each do |measure, direction, _boundary|
+        expect(highlightable).to include(measure)
+        expect(highlightable[measure]).to eq(direction)
+      end
     end
   end
 end

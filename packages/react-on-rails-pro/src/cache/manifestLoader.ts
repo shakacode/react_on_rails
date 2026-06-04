@@ -14,20 +14,91 @@
 
 import type { BundleManifest } from 'react-on-rails-rsc';
 import { buildClientRenderer } from 'react-on-rails-rsc/client.node';
-import loadJsonFile from '../loadJsonFile.ts';
+import loadJsonFile, { clearLoadedJsonFile, getJsonFileSignature } from '../loadJsonFile.ts';
+import resolveCssHrefs from '../resolveCssHrefs.ts';
 
 let clientManifestFileName: string | undefined;
 let serverClientManifestFileName: string | undefined;
+let manifestCacheKey: string | undefined;
 
 let clientRendererPromise: Promise<ReturnType<typeof buildClientRenderer>> | undefined;
+let rscCssHrefsPromise: Promise<string[]> | undefined;
 
-export function setManifestFileNames(clientManifest: string, serverClientManifest: string): void {
+const buildManifestCacheKey = async (
+  clientManifest: string,
+  serverClientManifest: string,
+): Promise<string> => {
+  const [clientManifestSignature, serverClientManifestSignature] = await Promise.all([
+    getJsonFileSignature(clientManifest),
+    getJsonFileSignature(serverClientManifest),
+  ]);
+  return `${clientManifestSignature}\0${serverClientManifestSignature}`;
+};
+
+const clearManifestDerivedCaches = (manifestFiles: Array<string | undefined>): void => {
+  clientRendererPromise = undefined;
+  rscCssHrefsPromise = undefined;
+  for (const manifestFile of manifestFiles) {
+    if (manifestFile) {
+      clearLoadedJsonFile(manifestFile);
+    }
+  }
+};
+
+export async function setManifestFileNames(
+  clientManifest: string,
+  serverClientManifest: string,
+): Promise<void> {
+  const previousClientManifest = clientManifestFileName;
+  const previousServerClientManifest = serverClientManifestFileName;
+  const nextManifestCacheKey = await buildManifestCacheKey(clientManifest, serverClientManifest);
+
   clientManifestFileName = clientManifest;
   serverClientManifestFileName = serverClientManifest;
+
+  if (nextManifestCacheKey !== manifestCacheKey) {
+    manifestCacheKey = nextManifestCacheKey;
+    clearManifestDerivedCaches([
+      previousClientManifest,
+      previousServerClientManifest,
+      clientManifest,
+      serverClientManifest,
+    ]);
+  }
+}
+
+/**
+ * Stylesheet hrefs for every `'use client'` module reference in the RSC client
+ * manifest, used to emit `<link rel="stylesheet" precedence>` into the RSC
+ * payload so React hoists them into `<head>` (preventing CSS FOUC, see #3211).
+ * Memoized per manifest file signature so development rebuilds refresh stylesheet
+ * hrefs while production requests reuse the same loaded manifest.
+ */
+export function getRscCssHrefs(): Promise<string[]> {
+  if (!rscCssHrefsPromise) {
+    if (!clientManifestFileName) {
+      throw new Error(
+        'Manifest file names not set. Ensure setManifestFileNames() is called before getRscCssHrefs(). ' +
+          'This is done automatically during the first RSC render request.',
+      );
+    }
+    const clientFile = clientManifestFileName;
+    rscCssHrefsPromise = loadJsonFile<BundleManifest>(clientFile)
+      .then((reactClientManifest) => resolveCssHrefs(reactClientManifest))
+      .catch((err: unknown) => {
+        rscCssHrefsPromise = undefined;
+        throw err;
+      });
+  }
+  return rscCssHrefsPromise;
 }
 
 export function getClientManifestFileName(): string | undefined {
   return clientManifestFileName;
+}
+
+export function getManifestCacheKey(): string | undefined {
+  return manifestCacheKey;
 }
 
 export function getClientRenderer(): Promise<ReturnType<typeof buildClientRenderer>> {
