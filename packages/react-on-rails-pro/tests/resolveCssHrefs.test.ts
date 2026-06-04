@@ -109,4 +109,15 @@ describe('resolveCssHrefs', () => {
       }),
     ).toEqual(['/webpack/test/css/a.css', 'https://cdn.example.com/css/b.css']);
   });
+
+  it('leaves a CSS href equal to the normalized manifest prefix unchanged', () => {
+    expect(
+      resolveCssHrefs({
+        moduleLoading: { prefix: '/webpack/test/' },
+        filePathToModuleMetadata: {
+          'file:///app/A.jsx': { css: ['/webpack/test'] },
+        },
+      }),
+    ).toEqual(['/webpack/test']);
+  });
 });
