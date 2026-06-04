@@ -44,6 +44,8 @@ REPORT_JSON = ENV.fetch("BENCHER_REPORT_JSON", "bench_results/bencher_report.jso
 # Written by the bench scripts (BmfCollector#write_display_json); carries the
 # summary-table columns Bencher never sees (p90, raw Status), keyed by the same
 # canonical name as the report so the join is exact.
+# NOTE: benchmark_config.rb independently defines DISPLAY_JSON with the same default
+# path; the bench scripts and this tracker run as separate programs, so keep them in sync.
 DISPLAY_JSON = ENV.fetch("BENCHMARK_DISPLAY_JSON", "bench_results/benchmark_display.json")
 REGRESSION_REPORT_JSON = File.join("bench_results", RegressionReport::FILENAME)
 
@@ -129,9 +131,17 @@ def run_bencher(branch, start_point_args)
     report = nil
   else
     File.write(REPORT_JSON, stdout)
-    # Parse defensively: an unexpected shape raises BencherReport::FormatError and
-    # fails the job loudly rather than silently mis-reporting or missing an alert.
-    report = BencherReport.parse(stdout)
+    # Parse defensively: an unexpected shape raises BencherReport::FormatError. Fail
+    # the job loudly, but with a targeted ::error:: annotation instead of a raw Ruby
+    # backtrace so the failure is triageable in CI logs. This covers both the initial
+    # run and the start-point-hash retry, since both go through run_bencher.
+    begin
+      report = BencherReport.parse(stdout)
+    rescue BencherReport::FormatError => e
+      warn "::error::Bencher JSON report has an unexpected shape — re-verify against " \
+           "benchmarks/spec/bencher_report_spec.rb before bumping the CLI pin. #{e.message}"
+      exit 1
+    end
   end
   [stderr, status.exitstatus, report]
 end
@@ -208,7 +218,15 @@ def display_rows
   return [] unless File.exist?(DISPLAY_JSON)
 
   parsed = JSON.parse(File.read(DISPLAY_JSON))
-  parsed.is_a?(Array) ? parsed : []
+  unless parsed.is_a?(Array)
+    # Mirror the write side (BmfCollector#write_display_json warns on a non-array
+    # sidecar). Without this the table would silently disappear on a contract break,
+    # and a main regression hand-off could store an empty summary with no diagnostic.
+    warn "::warning::#{DISPLAY_JSON} is not a JSON array (got #{parsed.class}); skipping the summary table"
+    return []
+  end
+
+  parsed
 rescue JSON::ParserError => e
   warn "::warning::Could not parse #{DISPLAY_JSON} (#{e.message}); skipping the summary table"
   []
@@ -216,12 +234,15 @@ end
 
 # The Markdown summary table: display rows joined with the Bencher report by
 # benchmark name, with tracked values highlighted by significance. Empty string
-# when there are no rows (nothing to post).
-def rendered_report(report)
+# when there are no rows (nothing to post). suite_name is passed in rather than read
+# from the SUITE_NAME constant (which is only assigned inside the
+# __FILE__ == $PROGRAM_NAME block) so this stays callable from specs/require-only
+# contexts without raising NameError.
+def rendered_report(report, suite_name)
   rows = display_rows
   return "" if rows.empty?
 
-  BenchmarkTable.new(title: "#{SUITE_NAME} Benchmark Summary", rows: rows, report: report).to_markdown
+  BenchmarkTable.new(title: "#{suite_name} Benchmark Summary", rows: rows, report: report).to_markdown
 end
 
 # Body for the report-regressions hand-off. Normally the rendered table; but if the
@@ -290,7 +311,7 @@ if __FILE__ == $PROGRAM_NAME
 
   # Build the Markdown summary table once; the same body feeds the job summary, the
   # PR comment, and (on a main regression) the report-regressions hand-off.
-  report_markdown = rendered_report(report)
+  report_markdown = rendered_report(report, SUITE_NAME)
   post_report_to_summary(report_markdown)
   replace_pr_comments(report_markdown)
 

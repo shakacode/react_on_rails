@@ -59,6 +59,10 @@ class BencherReport
       upper_limit || mirror(lower_limit)
     end
 
+    # Bencher's t-test prediction interval is symmetric about the baseline by
+    # construction, so the unconfigured side is the configured side mirrored across
+    # baseline: a limit at distance d from baseline maps to baseline ∓ d. (Verified
+    # for the pinned CLI; re-confirm when bumping the pin.)
     def mirror(limit)
       return nil if limit.nil?
 
@@ -111,6 +115,10 @@ class BencherReport
           boundary = parse_boundary(measure_entry)
           # Index by both slug and name so callers can match either form (Bencher
           # slugifies the BMF measure key, e.g. "p50_latency" -> "p50-latency").
+          # Invariant: slug and name are expected to normalize to distinct strings
+          # across all measures of a given benchmark. If two measures collided on a
+          # normalized key the later write would silently overwrite the earlier
+          # boundary; that can't happen with the current Bencher measure set.
           per_measure[normalize(dig_string(measure_entry, "measure", "slug"))] = boundary
           per_measure[normalize(dig_string(measure_entry, "measure", "name"))] = boundary
         end
@@ -131,7 +139,12 @@ class BencherReport
 
   # Informational alert fields (benchmark/measure/limit) are read leniently so a
   # schema quirk there can't crash regression detection; only the entry shape and
-  # `status` (which decides "active") are strict.
+  # `status` (which decides "active") are strict. Strict means a missing or
+  # non-String `status` on ANY alert — active, dismissed, or silenced — raises
+  # FormatError and fails the job. This is deliberate: status drives regression
+  # detection, so we fail loud rather than risk silently skipping an alert we could
+  # not classify. A future upgrader who hits this should check dismissed/silenced
+  # entries too, not just active ones.
   def parse_alerts(raw)
     fetch_array(raw, "alerts").filter_map do |entry|
       raise FormatError, "alert is not an object (got #{entry.class})" unless entry.is_a?(Hash)
