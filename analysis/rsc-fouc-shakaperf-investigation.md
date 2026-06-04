@@ -49,10 +49,6 @@ Current/fixed selector capture: styled first paint.
 
 ![Current/fixed styled RSC CSS probe](rsc-fouc-shakaperf-artifacts/images/first-paint-current-styled-probe.png)
 
-First-paint selector diff.
-
-![First-paint selector diff](rsc-fouc-shakaperf-artifacts/images/first-paint-old-vs-current-diff.png)
-
 ### Test matrix
 
 | Test                                  | Control       | Experiment    | ShakaPerf result        | Investigation result                              | Purpose                                                                         |
