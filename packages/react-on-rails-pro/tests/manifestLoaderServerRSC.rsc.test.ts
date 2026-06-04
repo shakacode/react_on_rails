@@ -26,6 +26,10 @@ const writeManifest = async (filePath: string, moduleName = 'initial') => {
 };
 
 describe('manifestLoaderServer', () => {
+  afterEach(async () => {
+    await setManifestFileNames('', '');
+  });
+
   it('invalidates the server renderer when the client manifest file changes', async () => {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ror-manifest-loader-server-'));
     const clientManifest = path.join(tempDir, 'react-client-manifest.json');
@@ -34,11 +38,11 @@ describe('manifestLoaderServer', () => {
     await writeManifest(clientManifest);
     await writeManifest(serverClientManifest);
 
-    setManifestFileNames(clientManifest, serverClientManifest);
+    await setManifestFileNames(clientManifest, serverClientManifest);
     const firstRenderer = await getServerRenderer();
 
     await writeManifest(clientManifest, 'changed-client-manifest');
-    setManifestFileNames(clientManifest, serverClientManifest);
+    await setManifestFileNames(clientManifest, serverClientManifest);
     const secondRenderer = await getServerRenderer();
 
     expect(secondRenderer).not.toBe(firstRenderer);

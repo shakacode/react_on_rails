@@ -24,8 +24,16 @@ let manifestCacheKey: string | undefined;
 let clientRendererPromise: Promise<ReturnType<typeof buildClientRenderer>> | undefined;
 let rscCssHrefsPromise: Promise<string[]> | undefined;
 
-const buildManifestCacheKey = (clientManifest: string, serverClientManifest: string): string =>
-  `${getJsonFileSignature(clientManifest)}\0${getJsonFileSignature(serverClientManifest)}`;
+const buildManifestCacheKey = async (
+  clientManifest: string,
+  serverClientManifest: string,
+): Promise<string> => {
+  const [clientManifestSignature, serverClientManifestSignature] = await Promise.all([
+    getJsonFileSignature(clientManifest),
+    getJsonFileSignature(serverClientManifest),
+  ]);
+  return `${clientManifestSignature}\0${serverClientManifestSignature}`;
+};
 
 const clearManifestDerivedCaches = (manifestFiles: Array<string | undefined>): void => {
   clientRendererPromise = undefined;
@@ -37,10 +45,13 @@ const clearManifestDerivedCaches = (manifestFiles: Array<string | undefined>): v
   }
 };
 
-export function setManifestFileNames(clientManifest: string, serverClientManifest: string): void {
+export async function setManifestFileNames(
+  clientManifest: string,
+  serverClientManifest: string,
+): Promise<void> {
   const previousClientManifest = clientManifestFileName;
   const previousServerClientManifest = serverClientManifestFileName;
-  const nextManifestCacheKey = buildManifestCacheKey(clientManifest, serverClientManifest);
+  const nextManifestCacheKey = await buildManifestCacheKey(clientManifest, serverClientManifest);
 
   clientManifestFileName = clientManifest;
   serverClientManifestFileName = serverClientManifest;

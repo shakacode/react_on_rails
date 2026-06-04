@@ -110,6 +110,12 @@ Let's search for the client component `ToggleContainer` that we built before in 
 
 This entry indicates that the `ToggleContainer` client component is included in the `client25` chunk. The `js/client25.js` file contains the client-side code for the `ToggleContainer` component. You can find the `client25` chunk in the `public/webpack/<environment>/js/client25.js` file. Also, the `id` field is the Webpack module ID for the `ToggleContainer` client component. It's used by react runtime to load and hydrate the component in the browser.
 
+### CSS Links for `'use client'` Boundaries
+
+React on Rails Pro reads CSS metadata from the RSC client manifest and emits `<link rel="stylesheet" precedence="ror-rsc">` entries into the RSC payload. React hoists those links into `<head>` and delays committing the corresponding streamed content until the stylesheets are ready, which prevents a flash of unstyled content for client components behind RSC boundaries.
+
+The current resolver works from the manifest alone, so it emits CSS for every `'use client'` module entry in the manifest instead of only the client references encountered by one render. This is intentional for now: CSS modules and component-scoped styles remain safe, but global CSS imported by a client component can apply on an RSC page that did not render that component. If that matters for your app, avoid importing page-specific global CSS from broad client-component entry points until `react-on-rails-rsc` can attach CSS at the rendered client-reference boundary.
+
 If you want to change the file name of the `react-client-manifest.json` file, you can do so by setting the `clientManifestFilename` option in the `react-on-rails-rsc/WebpackPlugin` plugin as follows:
 
 ```js
