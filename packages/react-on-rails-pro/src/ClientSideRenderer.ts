@@ -197,7 +197,11 @@ You should return a React.Component always for the client side entry point.`);
         unmountComponentAtNode(domNode);
       } catch (e: unknown) {
         const error = e instanceof Error ? e : new Error('Unknown error');
-        console.info(
+        // A thrown error here means the component tree did not unmount cleanly — that is a
+        // teardown failure, not informational chatter, and most log collectors / default
+        // browser-console filters drop `info`. Use `console.error` to match the other caught
+        // errors in this file.
+        console.error(
           `Caught error calling unmountComponentAtNode: ${error.message} for domNode`,
           domNode,
           error,
