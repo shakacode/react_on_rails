@@ -60,7 +60,9 @@ def generate_rsc_manifest_client_references_if_needed
     "RSC_BUNDLE_ONLY" => "true"
   }
 
-  system(env, shakapacker_bin.to_s, exception: true)
+  Dir.chdir(Rails.root) do
+    system(env, shakapacker_bin.to_s, exception: true)
+  end
   puts Rainbow("✅ RSC manifest client references generated successfully").green
 end
 

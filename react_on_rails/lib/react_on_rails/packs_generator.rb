@@ -380,13 +380,13 @@ module ReactOnRails
       components.keys.reject { |name| client_entrypoint?(components[name]) }
     end
 
-    def server_component_registration_entries
+    def server_component_registration_entries(components = nil)
       return {} unless ReactOnRails::Utils.rsc_support_enabled?
 
       # Compute the component map once and reuse it: passing it to
       # server_component_names_for_registration avoids a second components_for_server_registration
       # scan, and this method runs on the per-request dev staleness check.
-      components = components_for_server_registration
+      components ||= components_for_server_registration
       components.slice(*server_component_names_for_registration(components))
     end
 
@@ -783,10 +783,18 @@ module ReactOnRails
         end
       end
 
-      return true if generated_server_bundle_stale?
-      return true if server_component_registration_entry_stale?
+      server_registration_components = server_registration_components_for_staleness
+      return true if generated_server_bundle_stale?(server_registration_components)
+      return true if server_component_registration_entry_stale?(server_registration_components)
 
       false
+    end
+
+    def server_registration_components_for_staleness
+      return nil if ReactOnRails.configuration.server_bundle_js_file.blank? &&
+                    !ReactOnRails::Utils.rsc_support_enabled?
+
+      components_for_server_registration
     end
 
     def generated_component_pack_stale?(file, most_recent_mtime)
@@ -803,23 +811,23 @@ module ReactOnRails
       File.read(path) != store_pack_file_contents(file)
     end
 
-    def generated_server_bundle_stale?
+    def generated_server_bundle_stale?(components = nil)
       return false if ReactOnRails.configuration.server_bundle_js_file.blank?
 
       path = generated_server_bundle_file_path
       return true unless File.exist?(path)
 
-      components = components_for_server_registration
+      components ||= components_for_server_registration
       source_files = components.values + store_to_path.values
       return true if generated_file_older_than_sources?(path, source_files)
 
       File.read(path) != generated_server_pack_file_content(components)
     end
 
-    def server_component_registration_entry_stale?
+    def server_component_registration_entry_stale?(components = nil)
       return false unless ReactOnRails::Utils.rsc_support_enabled?
 
-      entries = server_component_registration_entries
+      entries = server_component_registration_entries(components)
       return false if entries.empty?
 
       path = server_component_registration_entry_file_path

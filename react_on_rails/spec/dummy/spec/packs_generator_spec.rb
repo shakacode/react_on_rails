@@ -607,6 +607,51 @@ module ReactOnRails
           expect(generator).to have_received(:server_component_registration_entry_content).with(entries).twice
         end
 
+        it "reuses server registration components across the staleness fast path" do
+          generator = described_class.new
+          components = {
+            "ReactServerComponent" =>
+              "#{packer_source_path}/components/ReactServerComponents/ror_components/ReactServerComponent.jsx"
+          }
+          generated_server_bundle_path = File.join(
+            Pathname(packer_source_entry_path).parent,
+            "generated/server-bundle-generated.js"
+          )
+          registration_entry_path = File.join(
+            Pathname(packer_source_entry_path).parent,
+            "generated/server-component-registration-entry.js"
+          )
+
+          allow(generator).to receive_messages(
+            common_component_to_path: {},
+            client_component_to_path: {},
+            store_to_path: {},
+            generated_server_bundle_file_path: generated_server_bundle_path,
+            server_component_registration_entry_file_path: registration_entry_path,
+            client_entrypoint?: false
+          )
+          allow(generator).to receive(:components_for_server_registration).and_return(components)
+          allow(generator).to receive(:generated_file_older_than_sources?)
+            .with(generated_server_bundle_path, components.values)
+            .and_return(false)
+          allow(generator).to receive(:generated_file_older_than_sources?)
+            .with(registration_entry_path, components.values)
+            .and_return(false)
+          allow(generator).to receive(:generated_server_pack_file_content).with(components).and_return("fresh")
+          allow(generator)
+            .to receive(:server_component_registration_entry_content)
+            .with(components)
+            .and_return("fresh")
+          allow(File).to receive(:exist?).and_call_original
+          allow(File).to receive(:exist?).with(generated_server_bundle_path).and_return(true)
+          allow(File).to receive(:exist?).with(registration_entry_path).and_return(true)
+          allow(File).to receive(:read).with(generated_server_bundle_path).and_return("fresh")
+          allow(File).to receive(:read).with(registration_entry_path).and_return("fresh")
+
+          expect(generator.send(:stale_or_missing_packs?)).to be(false)
+          expect(generator).to have_received(:components_for_server_registration).once
+        end
+
         it "creates a server component registration entry for RSC reference discovery" do
           generated_entry_path = File.join(
             Pathname(packer_source_entry_path).parent,

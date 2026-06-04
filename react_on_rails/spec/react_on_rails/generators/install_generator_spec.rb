@@ -4072,7 +4072,8 @@ describe InstallGenerator, type: :generator do
         expect(content).to include('ENV["RSC_REFERENCE_DISCOVERY_BUILD"] == "true"')
         expect(content).to include("ReactOnRailsPro::Utils.rsc_support_enabled?")
         expect(content).to include('"RSC_BUNDLE_ONLY" => "true"')
-        expect(content).to include('system(env, "bin/shakapacker", exception: true)')
+        expect(content).to include("Dir.chdir(Rails.root) do")
+        expect(content).to include("system(env, shakapacker_bin.to_s, exception: true)")
       end
     end
 
