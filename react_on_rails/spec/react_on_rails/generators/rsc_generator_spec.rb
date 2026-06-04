@@ -2343,6 +2343,42 @@ describe RscGenerator, type: :generator do
       expect(migrated_content).not_to include("react-on-rails-rsc/WebpackPlugin")
     end
 
+    it "preserves declaration order when the native rspack import appears after the legacy import" do
+      allow(generator).to receive(:using_rspack?).and_return(true)
+      config_path = "config/rspack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+
+            return clientConfig;
+          };
+
+          const { RSCRspackPlugin } = require('react-on-rails-rsc/RspackPlugin');
+
+          module.exports = configureClient;
+        JS
+      )
+
+      content = File.read(File.join(destination_root, config_path))
+      generator.send(:update_existing_rsc_webpack_config, config_path, content, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      native_import = "const { RSCRspackPlugin } = require('react-on-rails-rsc/RspackPlugin');"
+      expect(migrated_content.scan("react-on-rails-rsc/RspackPlugin").length).to eq(1)
+      expect(migrated_content.index(native_import)).to be < migrated_content.index("const configureClient = ()")
+      expect(migrated_content).to include(
+        "new RSCRspackPlugin({ isServer: false, clientReferences: rscClientReferences })"
+      )
+      expect(migrated_content).not_to include("RSCWebpackPlugin")
+      expect(migrated_content).not_to include("react-on-rails-rsc/WebpackPlugin")
+    end
+
     it "does not rename a legacy plugin invocation when the import form cannot be normalized" do
       allow(generator).to receive(:using_rspack?).and_return(true)
       config_path = "config/rspack/clientWebpackConfig.js"

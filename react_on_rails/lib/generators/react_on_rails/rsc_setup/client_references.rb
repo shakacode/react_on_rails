@@ -159,21 +159,38 @@ module ReactOnRails
 
         def normalize_rsc_plugin_import_for_active_bundler(content, inactive_plugin_class_name,
                                                            inactive_plugin_import_path)
-          active_import_seen = commonjs_named_imported?(content, rsc_plugin_import_path, rsc_plugin_class_name)
+          active_import_position = commonjs_named_import_position(
+            content,
+            rsc_plugin_import_path,
+            rsc_plugin_class_name
+          )
+          converted_inactive_import_position = nil
           import_regex = rsc_plugin_commonjs_import_regex(inactive_plugin_import_path)
           normalized_content = content.gsub(import_regex) do |statement|
-            next statement unless js_top_level_position?(content, Regexp.last_match.begin(0))
+            statement_position = Regexp.last_match.begin(0)
+            next statement unless js_top_level_position?(content, statement_position)
 
-            if active_import_seen
+            if active_import_position && active_import_position < statement_position
               remove_commonjs_named_import_binding(statement, inactive_plugin_class_name)
             else
-              active_import_seen = true
+              converted_inactive_import_position ||= statement_position
+              active_import_position = statement_position
               statement
-                .gsub(/\b#{inactive_plugin_class_name}\b/, rsc_plugin_class_name)
+                .gsub(/\b#{Regexp.escape(inactive_plugin_class_name)}\b/, rsc_plugin_class_name)
                 .gsub(inactive_plugin_import_path, rsc_plugin_import_path)
             end
           end
-          [normalized_content, active_import_seen]
+
+          if converted_inactive_import_position
+            normalized_content = remove_commonjs_named_imports_after_position(
+              normalized_content,
+              rsc_plugin_import_path,
+              rsc_plugin_class_name,
+              converted_inactive_import_position
+            )
+          end
+
+          [normalized_content, !active_import_position.nil?]
         end
 
         def rsc_plugin_commonjs_import_regex(import_path)
@@ -181,6 +198,18 @@ module ReactOnRails
             "^[ \\t]*(?:const|let|var)\\s+\\{[^}]*\\}\\s*=\\s*" \
             "require\\(['\"]#{Regexp.escape(import_path)}['\"]\\);?[ \\t]*(?:\\r?\\n)?"
           )
+        end
+
+        def remove_commonjs_named_imports_after_position(content, import_path, binding_name, keep_position)
+          import_regex = rsc_plugin_commonjs_import_regex(import_path)
+          content.gsub(import_regex) do |statement|
+            statement_position = Regexp.last_match.begin(0)
+            next statement if statement_position <= keep_position
+            next statement unless js_top_level_position?(content, statement_position)
+            next statement unless commonjs_import_statement_declares_binding?(statement, binding_name)
+
+            remove_commonjs_named_import_binding(statement, binding_name)
+          end
         end
 
         def remove_commonjs_named_import_binding(statement, binding_name)
@@ -1464,6 +1493,29 @@ module ReactOnRails
 
             destructuring_declares_binding?(captures.first, binding_name)
           end
+        end
+
+        def commonjs_named_import_position(content, package_name, binding_name)
+          import_regex = rsc_plugin_commonjs_import_regex(package_name)
+
+          content.to_enum(:scan, import_regex).each do
+            # Module-scope check guards against false positives when the same destructuring
+            # appears inside a function body (which does not produce a module-scope binding).
+            match = Regexp.last_match
+            next unless js_top_level_position?(content, match.begin(0))
+            next unless commonjs_import_statement_declares_binding?(match[0], binding_name)
+
+            return match.begin(0)
+          end
+
+          nil
+        end
+
+        def commonjs_import_statement_declares_binding?(statement, binding_name)
+          match = statement.match(/\A[ \t]*(?:const|let|var)\s+\{(?<bindings>[^}]*)\}/)
+          return false unless match
+
+          destructuring_declares_binding?(match[:bindings], binding_name)
         end
 
         def top_level_binding?(content, binding_name)
