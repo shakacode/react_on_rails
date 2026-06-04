@@ -157,7 +157,9 @@ type RenderFunctionResult = RenderFunctionSyncResult | RenderFunctionAsyncResult
  *
  * @see RenderFunction
  */
-type RendererTeardown = () => void | Promise<void>;
+type RendererTeardownReturn = void | Promise<void>;
+
+type RendererTeardown = () => RendererTeardownReturn;
 
 /**
  * Object wrapper returned by a 3-argument renderer to opt into cleanup. The wrapper keeps teardown
@@ -191,6 +193,12 @@ type RendererResult = void | RendererTeardownResult | Promise<void | RendererTea
 // explicit `{ teardown }` wrapper.
 type RendererFunctionResult = RendererResult | RenderFunctionResult;
 
+interface RenderFunctionMarker {
+  // We allow specifying that the function is RenderFunction and not a React Function Component
+  // by setting this property
+  renderFunction?: true;
+}
+
 /**
  * The precise call signature of the 3-argument "renderer" form `(props, railsContext, domNodeId) =>
  * …`. A renderer owns its own mount and may return nothing or a {@link RendererTeardownResult}
@@ -199,9 +207,8 @@ type RendererFunctionResult = RendererResult | RenderFunctionResult;
  * the old `RenderFunction` type; those non-teardown values are ignored at runtime. Shared by the
  * core and Pro client renderers so the two cannot drift.
  */
-interface RendererFunction {
+interface RendererFunction extends RenderFunctionMarker {
   (props?: Record<string, unknown>, railsContext?: RailsContext, domNodeId?: string): RendererFunctionResult;
-  renderFunction?: true;
 }
 
 type StreamableComponentResult = ReactElement | Promise<ReactElement | string>;
@@ -211,12 +218,6 @@ type AsyncPropsManager = {
   setProp: (propName: string, propValue: unknown) => void;
   endStream: () => void;
 };
-
-interface RenderFunctionMarker {
-  // We allow specifying that the function is RenderFunction and not a React Function Component
-  // by setting this property
-  renderFunction?: true;
-}
 
 /**
  * Render-functions are used to create dynamic React components or server-rendered HTML with side effects.

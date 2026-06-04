@@ -558,4 +558,66 @@ describe('ClientSideRenderer', () => {
     expect(() => unmountAll()).not.toThrow();
     expect(rootUnmount).not.toHaveBeenCalled();
   });
+
+  it('runs the previous renderer teardown when the same dom id node is replaced', async () => {
+    const firstTeardown = jest.fn();
+    const secondTeardown = jest.fn();
+    const renderer = jest.fn();
+    let callCount = 0;
+    const TestRenderer: RendererFunction = (
+      _props?: Record<string, unknown>,
+      _railsContext?: RailsContext,
+      _domNodeId?: string,
+    ) => {
+      renderer();
+      callCount += 1;
+      return { teardown: callCount === 1 ? firstTeardown : secondTeardown };
+    };
+    ComponentRegistry.register({ TestComponent: TestRenderer });
+    const componentSpec = setupTestComponentDom('dom-id-renderer-replace');
+    addRailsContext();
+
+    await renderOrHydrateComponent(componentSpec);
+    expect(renderer).toHaveBeenCalledTimes(1);
+
+    const oldMountNode = document.getElementById('dom-id-renderer-replace');
+    expect(oldMountNode).not.toBeNull();
+    const newMountNode = document.createElement('div');
+    newMountNode.id = 'dom-id-renderer-replace';
+    oldMountNode?.replaceWith(newMountNode);
+
+    await renderOrHydrateComponent(componentSpec);
+
+    expect(firstTeardown).toHaveBeenCalledTimes(1);
+    expect(secondTeardown).not.toHaveBeenCalled();
+    expect(renderer).toHaveBeenCalledTimes(2);
+  });
+
+  it('unmounts the previous React root when the same dom id node is replaced', async () => {
+    const firstRootUnmount = jest.fn();
+    const secondRootUnmount = jest.fn();
+    mockReactHydrateOrRender
+      .mockReturnValueOnce({ render: jest.fn(), unmount: firstRootUnmount })
+      .mockReturnValueOnce({ render: jest.fn(), unmount: secondRootUnmount });
+    ComponentRegistry.register({
+      TestComponent: ({ greeting }: { greeting: string }) => React.createElement('div', null, greeting),
+    });
+    const componentSpec = setupTestComponentDom('dom-id-root-replace');
+    addRailsContext();
+
+    await renderOrHydrateComponent(componentSpec);
+    expect(mockReactHydrateOrRender).toHaveBeenCalledTimes(1);
+
+    const oldMountNode = document.getElementById('dom-id-root-replace');
+    expect(oldMountNode).not.toBeNull();
+    const newMountNode = document.createElement('div');
+    newMountNode.id = 'dom-id-root-replace';
+    oldMountNode?.replaceWith(newMountNode);
+
+    await renderOrHydrateComponent(componentSpec);
+
+    expect(firstRootUnmount).toHaveBeenCalledTimes(1);
+    expect(secondRootUnmount).not.toHaveBeenCalled();
+    expect(mockReactHydrateOrRender).toHaveBeenCalledTimes(2);
+  });
 });

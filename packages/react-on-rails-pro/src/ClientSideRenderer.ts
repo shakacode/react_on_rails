@@ -48,8 +48,8 @@ const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
  * share it. Keep the local thenable guard in sync with the OSS helper so non-native thenables are
  * handled the same way in both packages. The shared `RendererFunction`/`RendererTeardown`/
  * `RendererTeardownResult` *types* are imported, so only this small runtime helper is duplicated.
- * NOTE: A sibling helper exists in packages/react-on-rails/src/ClientRenderer.ts. If you change the
- * error-handling logic or log format here, update that copy too.
+ * MUST SYNC: A sibling helper exists in packages/react-on-rails/src/ClientRenderer.ts. If you
+ * change the error-handling logic or log format here, update that copy too.
  */
 function isThenable(value: unknown): value is PromiseLike<unknown> {
   return (
@@ -129,6 +129,8 @@ const getSsrIdentifierPrefix = (el: Element): string | undefined =>
 class ComponentRenderer {
   private domNodeId: string;
 
+  private domNode?: Element;
+
   private ssrIdentifierPrefix?: string;
 
   private state: 'unmounted' | 'rendering' | 'rendered';
@@ -178,6 +180,10 @@ class ComponentRenderer {
     return this.renderPromise !== undefined;
   }
 
+  isRenderingDomNode(domNode: Element | null): boolean {
+    return this.domNode === undefined || this.domNode === domNode;
+  }
+
   /**
    * Used for client rendering by ReactOnRails. Either calls ReactDOM.hydrate, ReactDOM.render, or
    * delegates to a renderer registered by the user.
@@ -192,6 +198,7 @@ class ComponentRenderer {
     try {
       const domNode = document.getElementById(domNodeId);
       if (domNode) {
+        this.domNode = domNode;
         const componentObj = await ComponentRegistry.getOrWaitForComponent(name);
         if (this.state === 'unmounted') {
           return;
@@ -379,7 +386,13 @@ const renderedRoots = new Map<string, ComponentRenderer>();
 export function renderOrHydrateComponent(domIdOrElement: string | Element) {
   const domId = getDomId(domIdOrElement);
   debugTurbolinks('renderOrHydrateComponent', domId);
+  const domNode = document.getElementById(domId);
   let root = renderedRoots.get(domId);
+  if (root && !root.isRenderingDomNode(domNode)) {
+    root.unmount();
+    renderedRoots.delete(domId);
+    root = undefined;
+  }
   if (!root) {
     const newRoot = new ComponentRenderer(domIdOrElement);
     if (!newRoot.hasStartedRendering()) {

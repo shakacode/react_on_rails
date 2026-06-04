@@ -56,7 +56,7 @@ const renderedRoots = new Map<string, RenderedEntry>();
  * Invokes a renderer teardown, swallowing async rejections so a failing teardown cannot produce an
  * unhandled promise rejection. Synchronous throws propagate to the caller's try/catch. `domNodeId`
  * is included in the log so a failure can be traced to its mount.
- * NOTE: A sibling helper exists in packages/react-on-rails-pro/src/ClientSideRenderer.ts. If you
+ * MUST SYNC: A sibling helper exists in packages/react-on-rails-pro/src/ClientSideRenderer.ts. If you
  * change the error-handling logic or log format here, update that copy too.
  */
 function invokeRendererTeardown(teardown: RendererTeardown | undefined, domNodeId: string): void {
@@ -193,8 +193,9 @@ function trackRendererMount(domNodeId: string, domNode: Element, result: Rendere
           // limitation, but the consequence is still a leak, so log it as an error. Pro avoids this
           // race entirely.
           console.error(
-            `Renderer teardown for dom node "${domNodeId}" resolved after its mount was removed; ` +
-              'the teardown was dropped and that mount may leak on cleanup.',
+            `[react-on-rails] Renderer teardown for dom node "${domNodeId}" resolved after the ` +
+              'page or node was already cleaned up; the teardown was dropped and that mount may ' +
+              'leak. Use react-on-rails-pro for reliable async-renderer teardown on fast navigations.',
           );
         }
       })

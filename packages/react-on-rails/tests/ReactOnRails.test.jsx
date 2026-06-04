@@ -5,8 +5,13 @@ import { createStore } from 'redux';
 import * as React from 'react';
 import * as createReactClass from 'create-react-class';
 import ReactOnRails from '../src/ReactOnRails.client.ts';
+import ComponentRegistry from '../src/ComponentRegistry.ts';
 
 describe('ReactOnRails', () => {
+  afterEach(() => {
+    ComponentRegistry.clear();
+  });
+
   it('render returns a virtual DOM element for component', () => {
     const R1 = createReactClass({
       render() {
@@ -24,6 +29,33 @@ describe('ReactOnRails', () => {
     ReactOnRails.render('R1', {}, 'root');
 
     expect(document.getElementById('root').textContent).toBe(' WORLD ');
+  });
+
+  it('reports unsupported renderer teardowns passed to manual render', () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const teardown = jest.fn();
+      function ManualRenderer(_props, _railsContext, _domNodeId) {
+        return { teardown };
+      }
+      ReactOnRails.register({ ManualRenderer });
+
+      const root = document.createElement('div');
+      root.id = 'manual-renderer-root';
+      document.body.innerHTML = '';
+      document.body.appendChild(root);
+
+      expect(() => ReactOnRails.render('ManualRenderer', {}, 'manual-renderer-root')).toThrow(
+        'ReactOnRails.render() does not support renderer functions ("ManualRenderer").',
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'ReactOnRails.render() does not support renderer functions ("ManualRenderer"). ' +
+          'Use normal React on Rails component rendering so renderer teardowns are captured on navigation.',
+      );
+      expect(teardown).not.toHaveBeenCalled();
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 
   it('accepts traceTurbolinks as an option true', () => {

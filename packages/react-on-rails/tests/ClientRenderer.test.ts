@@ -405,7 +405,7 @@ describe('ClientRenderer', () => {
       runPageUnload();
       expect(staleTeardown).not.toHaveBeenCalled();
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('resolved after its mount was removed'),
+        expect.stringContaining('resolved after the page or node was already cleaned up'),
       );
       consoleErrorSpy.mockRestore();
     });
@@ -429,7 +429,7 @@ describe('ClientRenderer', () => {
 
       expect(teardown).not.toHaveBeenCalled();
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('resolved after its mount was removed'),
+        expect.stringContaining('resolved after the page or node was already cleaned up'),
       );
       consoleErrorSpy.mockRestore();
     });
