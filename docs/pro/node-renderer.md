@@ -228,7 +228,7 @@ The reliable shape is to start the renderer, wait for its port to accept connect
     RENDERER_WORKERS_COUNT: 1
   run: |
     # Start the renderer in the background and capture its logs.
-    node client/node-renderer.js > /tmp/node-renderer.log 2>&1 &
+    node renderer/node-renderer.js > /tmp/node-renderer.log 2>&1 &
     renderer_pid=$!
 
     # Always stop the renderer when this step exits (pass, fail, or timeout).
@@ -239,8 +239,8 @@ The reliable shape is to start the renderer, wait for its port to accept connect
     trap cleanup EXIT
 
     # Wait up to 30s for the renderer port to accept connections, then run the tests.
-    for attempt in {1..30}; do
-      if ruby -rsocket -e 'TCPSocket.new("127.0.0.1", 3800).close' 2>/dev/null; then
+    for _ in {1..30}; do
+      if ruby -rsocket -e 'TCPSocket.new("127.0.0.1", Integer(ENV.fetch("RENDERER_PORT", "3800"))).close' 2>/dev/null; then
         bin/rails test   # or: bundle exec rspec
         exit $?
       fi
@@ -269,7 +269,7 @@ The reliable shape is to start the renderer, wait for its port to accept connect
 Set `RENDERER_HOST` and the host inside `REACT_RENDERER_URL` to the **same literal** — `127.0.0.1`. `RENDERER_HOST` defaults to `localhost`, which can resolve to either IPv6 (`::1`) or IPv4 (`127.0.0.1`) depending on the runner's name-resolution order. If the renderer binds to one family while Rails dials the other, the connection is refused even though the renderer is running. Using `127.0.0.1` everywhere — including the readiness probe above — removes that ambiguity.
 
 > [!NOTE]
-> `client/node-renderer.js` is the entry point created by the Pro generator (`bundle exec rails generate react_on_rails:pro`); adjust the path if your renderer entry point lives elsewhere. In the `test` environment the renderer password is optional, so this snippet omits it. If your CI runs the tests under a production-like `RAILS_ENV` (anything other than `development` or `test`), set the same `RENDERER_PASSWORD` on both the renderer and Rails — see [Renderer Password Security](#renderer-password-security).
+> `renderer/node-renderer.js` is the entry point created by the Pro generator (`bundle exec rails generate react_on_rails:pro`); adjust the path if your renderer entry point lives elsewhere. In the `test` environment the renderer password is optional, so this snippet omits it. If your CI runs the tests under a production-like `RAILS_ENV` (anything other than `development` or `test`), set the same `RENDERER_PASSWORD` on both the renderer and Rails — see [Renderer Password Security](#renderer-password-security).
 
 ## Eliminating Cold-Start Latency in Docker Deployments
 
