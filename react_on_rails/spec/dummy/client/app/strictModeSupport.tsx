@@ -1,4 +1,4 @@
-import React, { type ReactNode } from 'react';
+import React, { type ReactElement } from 'react';
 
 const useStrictMode = process.env.NODE_ENV !== 'production';
 
@@ -156,7 +156,7 @@ const wrapComponentInStrictMode = (component: ReactComponentCandidate): ReactCom
   return wrappedComponent;
 };
 
-const wrapElementInStrictMode = (reactElement: ReactNode): ReactNode =>
+const wrapElementInStrictMode = (reactElement: ReactElement): ReactElement =>
   useStrictMode ? <React.StrictMode>{reactElement}</React.StrictMode> : reactElement;
 
 const wrapRenderFunctionResult = (result: unknown): unknown => {

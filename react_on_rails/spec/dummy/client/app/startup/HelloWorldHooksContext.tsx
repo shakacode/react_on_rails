@@ -15,7 +15,7 @@ type HelloWorldHooksContextProps = {
 type HelloWorldHooksContextRenderFunction = (
   props: HelloWorldHooksContextProps,
   railsContext: RailsContextData,
-) => React.ComponentType;
+) => React.ComponentType<Record<string, never>>;
 
 // You could pass props here or use the closure
 const HelloWorldHooksContext: HelloWorldHooksContextRenderFunction = ({ helloWorldData }, railsContext) => {
@@ -33,7 +33,7 @@ const HelloWorldHooksContext: HelloWorldHooksContextRenderFunction = ({ helloWor
           />
         </p>
         <p>Rails Context :</p>
-        <RailsContext {...{ railsContext }} />
+        <RailsContext railsContext={railsContext} />
       </>
     );
   };

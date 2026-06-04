@@ -356,13 +356,18 @@ module ReactOnRails
       return if ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint
       return if ReactOnRails.configuration.server_bundle_js_file.blank?
 
-      relative_path_to_generated_server_bundle = relative_path(server_bundle_entrypoint,
-                                                               generated_server_bundle_file_path)
-      relative_import_path_to_generated_server_bundle = relative_import_path(server_bundle_entrypoint,
+      source_entrypoint = server_bundle_entrypoint
+      relative_path_to_generated_server_bundle = relative_path(source_entrypoint, generated_server_bundle_file_path)
+      relative_import_path_to_generated_server_bundle = relative_import_path(source_entrypoint,
                                                                              generated_server_bundle_file_path)
+      generated_server_bundle_import_statement = "import '#{relative_import_path_to_generated_server_bundle}';"
+      if %w[.ts .tsx].include?(File.extname(source_entrypoint))
+        generated_server_bundle_import_statement += " // eslint-disable-line import/extensions"
+      end
+
       content = <<~FILE_CONTENT
         // import statement added by react_on_rails:generate_packs rake task
-        import '#{relative_import_path_to_generated_server_bundle}';
+        #{generated_server_bundle_import_statement}
       FILE_CONTENT
 
       legacy_relative_import_path_to_generated_server_bundle = "./#{relative_path_to_generated_server_bundle}"
@@ -374,7 +379,7 @@ module ReactOnRails
       /x
 
       ReactOnRails::Utils.prepend_to_file_if_text_not_present(
-        file: server_bundle_entrypoint,
+        file: source_entrypoint,
         text_to_prepend: content,
         regex: generated_server_bundle_import_regex
       )

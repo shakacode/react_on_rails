@@ -28,7 +28,7 @@ const assetLoaderRules = [
 ];
 ```
 
-A full example can be found at [react_on_rails/spec/dummy/client/app/startup/ImageExample.tsx](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails/spec/dummy/client/app/startup)
+A full example can be found at [react_on_rails/spec/dummy/client/app/startup/ImageExample.tsx](https://github.com/shakacode/react_on_rails/blob/a31c5a502e96235b98738ecb54a1d37a59a13d3a/react_on_rails/spec/dummy/client/app/startup/ImageExample.tsx)
 
 You are free to use images either in image tags or as background images in SCSS files. In current
 apps, prefer relative imports from files under `app/javascript`, or define your own webpack alias

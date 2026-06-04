@@ -7,12 +7,6 @@ import HelloWorldContainer from '../components/HelloWorldContainer';
 import { wrapElementInStrictMode } from '../strictModeSupport';
 import type { ReduxAppStore } from '../store/reduxTypes';
 
-declare const module: {
-  hot?: {
-    accept(dependencies: string[], callback: () => void): void;
-  };
-};
-
 type DomRenderer = (domNode: Element, element: ReactNode) => void;
 const hydrateOrRender = (shouldHydrate: boolean): DomRenderer =>
   shouldHydrate

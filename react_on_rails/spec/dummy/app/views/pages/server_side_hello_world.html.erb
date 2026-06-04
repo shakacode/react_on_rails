@@ -47,7 +47,7 @@
     spec/dummy/client/app/packs/client-bundle.ts
     <br/>
     <pre>
-      import HelloWorld from '../components/HelloWorld';
+      import HelloWorld from '../startup/HelloWorld';
       import ReactOnRails from 'react-on-rails/client';
       ReactOnRails.register({ HelloWorld });
     </pre>
@@ -57,7 +57,7 @@
     spec/dummy/client/app/packs/server-bundle.ts
     <br/>
     <pre>
-    import HelloWorld from '../components/HelloWorld';
+    import HelloWorld from '../startup/HelloWorld';
     global.HelloWorld = HelloWorld;
     </pre>
   </li>

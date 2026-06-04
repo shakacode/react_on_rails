@@ -486,6 +486,30 @@ module ReactOnRails
         expect(File.read(server_bundle_js_file_path).scan(/(?=#{test_string})/).count).to equal(1)
       end
 
+      it "adds a lint-safe import statement to a TypeScript server bundle source entrypoint" do
+        same_instance = described_class.instance
+        backup_server_bundle_js_file_path = "#{server_bundle_js_file_path}.bak"
+        server_bundle_ts_file_path = server_bundle_js_file_path.sub(/\.js\z/, ".ts")
+
+        FileUtils.mv(server_bundle_js_file_path, backup_server_bundle_js_file_path)
+        File.write(server_bundle_ts_file_path, "")
+        same_instance.generate_packs_if_stale
+
+        generated_import = "import '../generated/server-bundle-generated.js'; " \
+                           "// eslint-disable-line import/extensions"
+        expect(File.read(server_bundle_ts_file_path)).to include(generated_import)
+
+        same_instance.generate_packs_if_stale
+        generated_import_count = File.read(server_bundle_ts_file_path)
+                                     .scan(%r{import '../generated/server-bundle-generated\.js'}).count
+        expect(generated_import_count).to equal(1)
+      ensure
+        FileUtils.rm_f(server_bundle_ts_file_path) if server_bundle_ts_file_path
+        if backup_server_bundle_js_file_path && File.exist?(backup_server_bundle_js_file_path)
+          FileUtils.mv(backup_server_bundle_js_file_path, server_bundle_js_file_path)
+        end
+      end
+
       it "serializes concurrent generation and rechecks staleness after waiting" do
         generator = nil
         first_thread = nil
@@ -1257,6 +1281,48 @@ module ReactOnRails
                                                             configured_entrypoint)
 
         expect(resolved_entrypoint).to eq(typescript_entrypoint)
+      end
+
+      it "uses a JSX source entrypoint before TypeScript when both could match a missing JavaScript output" do
+        configured_entrypoint = File.join(@tmpdir, "server-bundle.js")
+        jsx_entrypoint = File.join(@tmpdir, "server-bundle.jsx")
+        typescript_entrypoint = File.join(@tmpdir, "server-bundle.ts")
+        File.write(jsx_entrypoint, "")
+        File.write(typescript_entrypoint, "")
+
+        resolved_entrypoint = described_class.instance.send(:resolve_server_bundle_source_entrypoint,
+                                                            configured_entrypoint)
+
+        expect(resolved_entrypoint).to eq(jsx_entrypoint)
+      end
+
+      it "uses a TSX source entrypoint when the configured TypeScript entrypoint is missing" do
+        configured_entrypoint = File.join(@tmpdir, "server-bundle.ts")
+        tsx_entrypoint = File.join(@tmpdir, "server-bundle.tsx")
+        File.write(tsx_entrypoint, "")
+
+        resolved_entrypoint = described_class.instance.send(:resolve_server_bundle_source_entrypoint,
+                                                            configured_entrypoint)
+
+        expect(resolved_entrypoint).to eq(tsx_entrypoint)
+      end
+
+      it "returns the configured entrypoint when no source file exists for any extension" do
+        configured_entrypoint = File.join(@tmpdir, "server-bundle.js")
+
+        resolved_entrypoint = described_class.instance.send(:resolve_server_bundle_source_entrypoint,
+                                                            configured_entrypoint)
+
+        expect(resolved_entrypoint).to eq(configured_entrypoint)
+      end
+
+      it "checks all server bundle source extensions when the configured entrypoint has no extension" do
+        configured_entrypoint = File.join(@tmpdir, "server-bundle")
+
+        source_extensions = described_class.instance.send(:server_bundle_source_extensions_for,
+                                                          configured_entrypoint)
+
+        expect(source_extensions).to eq(described_class::SERVER_BUNDLE_SOURCE_EXTENSIONS)
       end
     end
 

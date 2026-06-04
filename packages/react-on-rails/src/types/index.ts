@@ -187,7 +187,7 @@ interface RenderFunction {
 }
 
 type ReactComponentOrRenderFunction = ReactComponent | RenderFunction;
-type RegisteredComponentValue = ReactComponentOrRenderFunction | object;
+type RegisteredComponentValue = ReactComponentOrRenderFunction | Record<string, unknown>;
 
 type PipeableOrReadableStream = PipeableStream | NodeJS.ReadableStream;
 

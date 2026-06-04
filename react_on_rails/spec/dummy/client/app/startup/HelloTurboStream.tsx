@@ -15,7 +15,7 @@ type HelloTurboStreamProps = {
 const HelloTurboStream = ({ helloTurboStreamData, railsContext }: HelloTurboStreamProps) => (
   <div>
     <h3 className={css.brightColor}>Hello, {helloTurboStreamData.name}!</h3>
-    {railsContext && <RailsContext {...{ railsContext }} />}
+    {railsContext && <RailsContext railsContext={railsContext} />}
   </div>
 );
 

@@ -15,7 +15,7 @@ import EchoProps, { type EchoPropsProps } from '../components/EchoProps';
  *  And the use of renderToString would probably be done with React Router v4
  *
  */
-const RenderedHtml = (
+const RenderedHtml: RenderFunction = (
   props: EchoPropsProps | undefined,
   _railsContext?: RailsContext,
 ): ServerRenderResult => {
@@ -23,6 +23,4 @@ const RenderedHtml = (
   return { renderedHtml };
 };
 
-const renderFunction: RenderFunction = RenderedHtml;
-
-export default renderFunction;
+export default RenderedHtml;
