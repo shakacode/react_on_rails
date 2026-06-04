@@ -39,6 +39,28 @@ describe('resolveCssHrefs', () => {
     ]);
   });
 
+  it('includes CSS for every manifest entry because rendered client references are not available here', () => {
+    const hrefs = resolveCssHrefs({
+      moduleLoading: { prefix: '/packs/' },
+      filePathToModuleMetadata: {
+        'file:///app/RenderedClient.jsx': {
+          id: '1',
+          chunks: [],
+          css: ['css/rendered-client.css'],
+          name: '*',
+        },
+        'file:///app/UnrenderedClient.jsx': {
+          id: '2',
+          chunks: [],
+          css: ['css/unrendered-client.css'],
+          name: '*',
+        },
+      },
+    });
+
+    expect(hrefs).toEqual(['/packs/css/rendered-client.css', '/packs/css/unrendered-client.css']);
+  });
+
   it('joins prefix and file with exactly one slash regardless of trailing/leading slashes', () => {
     expect(
       resolveCssHrefs({

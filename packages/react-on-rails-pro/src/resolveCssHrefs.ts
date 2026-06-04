@@ -39,10 +39,14 @@ const joinPrefix = (prefix: string, file: string): string => {
 };
 
 /**
- * Collect every CSS file recorded for a `'use client'` module reference in the
- * RSC client manifest, prepend the manifest's `moduleLoading.prefix` (so CDN /
- * non-default `publicPath` deployments get fully-qualified hrefs), dedupe while
- * preserving manifest/chunk order, and return the href list.
+ * Collect every CSS file recorded for every `'use client'` module reference in
+ * the RSC client manifest. This intentionally returns a manifest-wide list
+ * rather than a per-render list because this resolver receives only the emitted
+ * manifest, not the client references encountered by a specific RSC payload.
+ *
+ * Each href is prefixed with `moduleLoading.prefix` (so CDN / non-default
+ * `publicPath` deployments get fully-qualified hrefs), deduped, and returned in
+ * manifest/chunk order.
  */
 export default function resolveCssHrefs(manifest: RscCssManifest): string[] {
   const prefix = manifest.moduleLoading?.prefix ?? '';
