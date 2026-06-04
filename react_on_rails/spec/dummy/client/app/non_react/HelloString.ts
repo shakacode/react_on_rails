@@ -2,7 +2,7 @@
 // This shows you can server side render any JS code.
 
 const HelloString = {
-  world() {
+  world(): string {
     return 'Hello WORLD! Will this work?? YES! Time to visit Maui';
   },
 };
