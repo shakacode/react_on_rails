@@ -2,16 +2,17 @@
 
 ## Purpose
 
-Track the work needed for [Issue 2182](https://github.com/shakacode/react_on_rails/issues/2182): verify React 19.2.x
-support and decide how React on Rails should expose any partial pre-rendering workflow that becomes practical for Rails
-apps.
+Plan the work requested in [Issue 2182](https://github.com/shakacode/react_on_rails/issues/2182) (the originating
+issue, now closed): verify React 19.2.x support and decide how React on Rails should expose any partial pre-rendering
+workflow that becomes practical for Rails apps. Active follow-up is tracked in
+[Issue 3255](https://github.com/shakacode/react_on_rails/issues/3255).
 
 This is a planning document for [Issue 2182](https://github.com/shakacode/react_on_rails/issues/2182). The one package
 change it has driven — the `react-on-rails-rsc` peer-ceiling widening — is captured in the Decision Record below; beyond
 that it does not change build configuration or Pro package code.
 
-**Status**: Draft | **Created**: 2026-04-30 | **Last updated**: 2026-06-03 | **Tracks**:
-[Issue 2182](https://github.com/shakacode/react_on_rails/issues/2182) and
+**Status**: Draft | **Created**: 2026-04-30 | **Last updated**: 2026-06-03 | **Originated from**:
+[Issue 2182](https://github.com/shakacode/react_on_rails/issues/2182) (closed) | **Active tracking**:
 [Issue 3255](https://github.com/shakacode/react_on_rails/issues/3255)
 
 ## Decision Record — React Version Support Range ([Issue 3486](https://github.com/shakacode/react_on_rails/issues/3486))
@@ -168,7 +169,8 @@ Use a dedicated branch for the actual version verification work:
 
 - [ ] Confirm docs that mention explicit React versions are either updated or intentionally left on older minimum-version
       examples.
-- [ ] Fill the secondary reviewer placeholders in the Open Questions section before opening the first implementation PR.
+- [ ] Confirm the secondary and backup reviewers named in the Resolved Decisions section are still available before
+      opening the first implementation PR.
 
 If any verification step fails, capture the exact command and failure in a comment on
 [Issue 3255](https://github.com/shakacode/react_on_rails/issues/3255), then apply this default decision rule
@@ -224,45 +226,59 @@ Evaluate these in order:
 - The decision on the minimum supported React version, including whether React 18.x remains supported, is documented
   before any package-range change is merged.
 
+## Resolved Decisions
+
+The five questions below were resolved in
+[Issue 3255](https://github.com/shakacode/react_on_rails/issues/3255) on 2026-06-02. The overarching frame: PPR splits
+into two tracks, and the first example ships **Track A** — streaming SSR with Suspense and a fragment-cached shell, on
+existing stable React 19 plus existing Pro helpers (`stream_react_component`, `cached_stream_react_component`). **Track B**
+— RSC with `"use cache"`, per [`ppr-implementation-plan.md`](./ppr-implementation-plan.md) — is the longer-term path,
+tracked in [Issue 3571](https://github.com/shakacode/react_on_rails/issues/3571).
+
+**Secondary reviewer (SSR-vs-RSC)**: Abanoub Ghadban (@AbanoubGhadban) (fallback: @justin808)
+
+**Backup reviewer (benchmarks)**: Abanoub Ghadban (@AbanoubGhadban) (fallback: @justin808)
+
+1. **First example — SSR strategy (the prerequisite decision).** Use traditional **streaming SSR with Suspense** (Pro
+   `stream_react_component`), not RSC and not both-in-one. RSC PPR becomes Example 2 under Track B
+   ([Issue 3571](https://github.com/shakacode/react_on_rails/issues/3571)). Rationale: it ships on stable React 19 and
+   existing Pro helpers as docs plus one dummy-app route, rather than blocking on the multi-month Track B toolchain.
+2. **Static-shell caching layer.** Layered, defaulting to the **Rails fragment cache** for the first example via the
+   existing `cached_stream_react_component` (`cache_key` + `cache_options[:expires_in]`); dynamic holes stream per
+   request and are never cached. Tier 2 (HTTP caching headers such as
+   `Cache-Control: public, s-maxage, stale-while-revalidate`) applies only to fully static routes with no live
+   holes. Tier 3 (CDN edge cache of shell + postponed state with an origin resume protocol) is split into
+   [Issue 3572](https://github.com/shakacode/react_on_rails/issues/3572). Non-goal for v1: HTTP/CDN-caching a
+   streamed response that still has live per-request holes.
+3. **Who renders the shell vs. where it is cached.** Both, composed — these are orthogonal axes. The **Node Renderer
+   renders** the shell via `stream_react_component`; the **Rails fragment cache stores** it via
+   `cached_stream_react_component`, so the shell is rendered once and replayed without re-invoking the renderer. Track B
+   uses the same composition with richer paired artifacts (HTML prelude + opaque `postponed` state).
+4. **Streamed-failure status codes and error boundaries.** The HTTP status is committed at the shell boundary, before
+   the first byte flushes: a pre-flush failure returns a real 4xx/5xx and the normal error page. After the first flush
+   the response is irrevocably 200 — a failure inside a streamed hole is handled **in-band** by a React error boundary
+   scoped to that hole, and reported **out-of-band** (existing Pro Sentry/Honeybadger hooks, plus an optional
+   machine-readable in-stream marker so monitoring can distinguish a clean 200 from a degraded 200). Each dynamic hole
+   gets its own error boundary so one failed region degrades only itself. A full mid-stream abort yields a truncated
+   response; the React client runtime recovers un-flushed boundaries on hydration, falling back to client render where
+   it cannot.
+5. **Acceptance metrics.** Primary: **TTFB and LCP**. Secondary: response-end (full-stream complete) and total
+   transferred bytes. **Client-JS reduction is a Track B (RSC) metric only** — it does not apply to the Track A example,
+   which ships the same client bundle as normal SSR. Benchmark plan: a same-route **A/B** comparison (the identical page
+   rendered as plain SSR vs. the PPR pattern), using the existing harness in
+   [`library-benchmarking.md`](./library-benchmarking.md) — a max-rate run for capacity plus a fixed-rate run for
+   meaningful TTFB/LCP latency comparison, with Bencher tracking regressions. Hold the delivery path
+   (`ActionController::Live` vs. Node Renderer streaming) constant within an A/B pair and report which was used.
+
 ## Open Questions
 
-Track these in [Issue 3255](https://github.com/shakacode/react_on_rails/issues/3255) before implementation begins so
-each decision has an owner, acceptance criteria, and a closure path.
+These remain open after [Issue 3255](https://github.com/shakacode/react_on_rails/issues/3255); they were outside that
+issue's five-question scope. Track each one to an explicit decision before the implementation step it gates.
 
-The prerequisite decision is whether the first implementation should prove the pattern through traditional SSR with
-Suspense, RSC, or both. Record that answer in Issue 3255 before opening the first implementation PR; until then, caching,
-benchmarks, and streamed-error semantics stay provisional rather than settled.
-
-Before implementation starts, assign a secondary reviewer for the prerequisite SSR-vs-RSC decision so the plan does not
-stall if @justin808 is unavailable, and a backup reviewer for benchmark metrics (which can be validated independently
-from the rest of the implementation tree). These placeholders must be filled in
-[Issue 3255](https://github.com/shakacode/react_on_rails/issues/3255) before the first implementation PR is opened — add
-checklist items there so each assignment is auditable in the issue tracker. If no name is assigned by that point,
-@justin808 is the fallback owner for both roles.
-
-**Secondary reviewer (SSR-vs-RSC)**: _[name to be filled before first implementation PR; fallback: @justin808]_
-
-**Backup reviewer (benchmarks)**: _[name to be filled before first implementation PR; fallback: @justin808]_
-
-- Which Rails caching layer should be recommended for the static-shell: fragment cache, HTTP cache, CDN cache, or a
-  combination?
-  **Owner**: @justin808 | **Target**: before any implementation PR is opened
-- Should the static-shell be rendered by the Node Renderer, cached as a Rails partial fragment, or selected per example?
-  **Owner**: @justin808 | **Target**: before any implementation PR is opened
 - How does the static-shell or streaming-SSR pattern interact with Turbo Drive navigation, Turbo Frames, and Turbo Streams?
   Confirm whether Turbo page visits re-request the full response instead of reusing a cached shell, and whether
   `stream_react_component` can flush into a Turbo Stream frame.
   **Owner**: @justin808 | **Target**: before any implementation PR is opened
-- Should the first example use traditional SSR with Suspense, RSC, or both?
-  **Owner**: @justin808 | **Secondary reviewer**: React on Rails maintainer with Pro access | **Target**: prerequisite
-  decision before any implementation PR is opened
-- How should failures in the dynamic portion affect status codes and error boundaries after part of the response has
-  streamed?
-  **Owner**: @justin808 | **Target**: concurrently with the SSR-vs-RSC strategy decision, before public docs or examples
-- What metrics matter most for acceptance: TTFB, LCP, response end, total bytes, or client JavaScript reduction, and how
-  do Rails `ActionController::Live` and Node Renderer streaming paths affect those metrics differently?
-  **Owner**: @justin808 | **Secondary reviewer**: React on Rails maintainer with Pro access | **Target**: after the
-  SSR-vs-RSC strategy decision, before benchmark implementation
 - ~~Should the minimum supported React version retain React 18.x compatibility or move to React 19.x only?~~
   **Owner**: @justin808 | **Resolved** 2026-06-03 ([Issue 3486](https://github.com/shakacode/react_on_rails/issues/3486)):
   retain React 18.x (peers stay `>= 16`). See the Decision Record at the top of this document.
