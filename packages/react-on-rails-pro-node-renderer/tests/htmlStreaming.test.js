@@ -71,6 +71,9 @@ const makeRequest = async (options = {}) => {
   return { status, chunks, fullBody, timeToFirstByte, streamingTime, jsonChunks };
 };
 
+const findComponentShellChunk = (chunks) =>
+  chunks.find((chunk) => chunk.includes('<p>Header for AsyncComponentsTreeForTesting</p>'));
+
 describe('html streaming', () => {
   it("should send each html chunk immediately when it's ready", async () => {
     const { status, timeToFirstByte, streamingTime, chunks } = await makeRequest();
@@ -81,17 +84,19 @@ describe('html streaming', () => {
     expect(streamingTime).toBeGreaterThan(3 * timeToFirstByte);
   }, 10000);
 
-  it('should returns the component shell only in the first chunk', async () => {
+  it('should stream the component shell with suspense fallbacks', async () => {
     const { status, chunks } = await makeRequest();
     expect(status).toBe(200);
 
-    const firstChunk = chunks[0];
+    // React 19 can flush an initial Suspense marker before the shell HTML.
+    const shellChunk = findComponentShellChunk(chunks);
+    expect(shellChunk).toBeDefined();
 
-    expect(firstChunk).toContain('<p>Header for AsyncComponentsTreeForTesting</p>');
-    expect(firstChunk).toContain('<p>Footer for AsyncComponentsTreeForTesting</p>');
-    expect(firstChunk).toContain('Loading HelloWorldHooks...');
-    expect(firstChunk).toContain('Loading branch1...');
-    expect(firstChunk).toContain('Loading branch2...');
+    expect(shellChunk).toContain('<p>Header for AsyncComponentsTreeForTesting</p>');
+    expect(shellChunk).toContain('<p>Footer for AsyncComponentsTreeForTesting</p>');
+    expect(shellChunk).toContain('Loading HelloWorldHooks...');
+    expect(shellChunk).toContain('Loading branch1...');
+    expect(shellChunk).toContain('Loading branch2...');
   }, 10000);
 
   it('should stream chunks one by one', async () => {
@@ -186,7 +191,9 @@ describe('html streaming', () => {
       expect(chunks.length).toBeGreaterThan(5);
       expect(status).toBe(200);
 
-      expect(chunks[0]).toContain('<p>Header for AsyncComponentsTreeForTesting</p>');
+      const shellChunk = findComponentShellChunk(chunks);
+      expect(shellChunk).toBeDefined();
+      expect(shellChunk).toContain('<p>Header for AsyncComponentsTreeForTesting</p>');
       expect(fullBody).toContain('branch1 (level 4)');
       expect(fullBody).toContain('branch1 (level 3)');
       expect(fullBody).toContain('branch1 (level 2)');
@@ -195,16 +202,16 @@ describe('html streaming', () => {
       expect(fullBody).toContain('branch2 (level 1)');
       expect(fullBody).toContain('branch2 (level 0)');
 
-      expect(jsonChunks[0].isShellReady).toBeTruthy();
-      expect(jsonChunks[0].hasErrors).toBeTruthy();
-      expect(jsonChunks[0].renderingError).toMatchObject({
+      const chunksWithError = jsonChunks.filter((chunk) => chunk.hasErrors);
+      expect(chunksWithError).toHaveLength(1);
+      expect(chunksWithError[0].isShellReady).toBeTruthy();
+      expect(chunksWithError[0].renderingError).toMatchObject({
         message: 'Async error from AsyncHelloWorldHooks',
         stack: expect.stringMatching(
           /Error: Async error from AsyncHelloWorldHooks\s*at AsyncHelloWorldHooks/,
         ),
       });
-      expect(jsonChunks.slice(1).some((chunk) => chunk.hasErrors)).toBeFalsy();
-      expect(jsonChunks.slice(1).some((chunk) => chunk.renderingError)).toBeFalsy();
+      expect(jsonChunks.filter((chunk) => chunk.renderingError)).toHaveLength(1);
     },
     10000,
   );
