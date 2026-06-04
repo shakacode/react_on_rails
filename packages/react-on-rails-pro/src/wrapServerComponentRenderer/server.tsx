@@ -68,9 +68,9 @@ const wrapServerComponentRenderer = (
     }
 
     // The 2-argument server render-function form is expected to resolve to the component to mount.
-    // RenderFunction's return union is wider than that (this PR added RendererTeardownResult; the
-    // server form can also yield an HTML/server-render result), so this narrows to the expected shape
-    // and the `typeof Component !== 'function'` guard below rejects anything else at runtime.
+    // RenderFunction can also yield an HTML/server-render result, so this narrows to the expected
+    // component shape and the `typeof Component !== 'function'` guard below rejects anything else at
+    // runtime.
     const Component = isRenderFunction(componentOrRenderFunction)
       ? ((await componentOrRenderFunction(props, railsContext)) as ReactComponent)
       : componentOrRenderFunction;

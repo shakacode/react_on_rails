@@ -169,38 +169,40 @@ type RendererTeardownResult = {
 };
 
 /**
- * What the 3-argument renderer form may return: nothing, or a {@link RendererTeardownResult}.
- * Renderer functions own their DOM rendering/hydration, so unlike server-side render-functions they
- * do not return a component or HTML.
+ * What the 3-argument renderer form may return for cleanup: nothing, or a
+ * {@link RendererTeardownResult}. Runtime cleanup only recognizes this explicit wrapper; legacy
+ * component/server-result returns from 3-argument renderers are ignored.
  *
  * Consumers discriminate this union at runtime by an object with a `teardown` function vs. a thenable
  * (an async renderer, awaited/adopted before re-checking) vs. anything else (no teardown). The
  * `void` arm is therefore treated as "no teardown," same as `undefined`.
  */
 // `void` (not `undefined`) is required for the opt-out case: a renderer that returns nothing has
-// type `(...) => void`, and that stays assignable to `RenderFunction` only while `void` is part of
+// type `(...) => void`, and that stays assignable to `RendererFunction` only while `void` is part of
 // this union. Switching to `undefined` breaks backward compatibility for every existing
 // nothing-returning renderer. The no-invalid-void-type rule is disabled because this `void` is a
 // deliberate "may return nothing" marker in a return-position union, exactly the case it over-flags.
 // eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- renderer functions may return nothing
 type RendererResult = void | RendererTeardownResult | Promise<void | RendererTeardownResult>;
 
+// Renderer functions historically ignored any non-teardown return value. Keeping the legacy
+// RenderFunctionResult arm preserves existing 3-argument renderers that returned a component/server
+// result only to satisfy the old RenderFunction type; runtime cleanup still only recognizes the
+// explicit `{ teardown }` wrapper.
+type RendererFunctionResult = RendererResult | RenderFunctionResult;
+
 /**
  * The precise call signature of the 3-argument "renderer" form `(props, railsContext, domNodeId) =>
- * …`. A renderer owns its own mount and returns a {@link RendererResult} (nothing, a teardown result,
- * or a promise resolving to one). The client renderers assert a registered component to this shape —
- * rather than the public {@link RenderFunction}, whose single signature has optional params and a
- * union return type spanning both the renderer and server render-function shapes — so the call
- * result reads as a RendererResult directly. Because `RenderFunction` is not assignable to
- * `RendererFunction`, `as RendererFunction` is a widening assertion guarded by the runtime
- * `isRenderer` invariant, not a sound narrowing. Shared by the core and Pro client renderers so the
- * two cannot drift.
+ * …`. A renderer owns its own mount and may return nothing or a {@link RendererTeardownResult}
+ * (possibly async) to opt into cleanup. It also accepts the legacy {@link RenderFunctionResult}
+ * return shapes because older 3-argument renderers sometimes returned a component only to satisfy
+ * the old `RenderFunction` type; those non-teardown values are ignored at runtime. Shared by the
+ * core and Pro client renderers so the two cannot drift.
  */
-type RendererFunction = (
-  props?: Record<string, unknown>,
-  railsContext?: RailsContext,
-  domNodeId?: string,
-) => RendererResult;
+interface RendererFunction {
+  (props?: Record<string, unknown>, railsContext?: RailsContext, domNodeId?: string): RendererFunctionResult;
+  renderFunction?: true;
+}
 
 type StreamableComponentResult = ReactElement | Promise<ReactElement | string>;
 
@@ -209,6 +211,12 @@ type AsyncPropsManager = {
   setProp: (propName: string, propValue: unknown) => void;
   endStream: () => void;
 };
+
+interface RenderFunctionMarker {
+  // We allow specifying that the function is RenderFunction and not a React Function Component
+  // by setting this property
+  renderFunction?: true;
+}
 
 /**
  * Render-functions are used to create dynamic React components or server-rendered HTML with side effects.
@@ -236,24 +244,22 @@ type AsyncPropsManager = {
  *
  * @remarks
  * The 3-argument "renderer" form `(props, railsContext, domNodeId)` owns its own DOM
- * rendering/hydration and may optionally return `{ teardown }` (a {@link RendererTeardownResult}, or
- * a promise resolving to one) so React on Rails can clean the mount up on Turbo/Turbolinks navigation
- * or same-id node replacement. Returning nothing keeps the previous (leaky) behavior, so existing
- * renderers are unaffected.
- *
- * Synchronous teardowns are always honored. An *async* teardown is best-effort in this open-source
- * package: if a navigation or node replacement happens before the renderer resolves its teardown,
- * that still-pending teardown may be dropped. React on Rails Pro's client renderer handles this
- * race reliably.
+ * rendering/hydration. Use {@link RendererFunction} for renderers that return nothing or an optional
+ * `{ teardown }` wrapper for cleanup. `RenderFunction` still accepts legacy 3-argument renderers
+ * that returned a component/server result only to satisfy the old type; React on Rails ignores those
+ * return values on the client renderer path.
  */
-interface RenderFunction {
-  (props?: any, railsContext?: RailsContext, domNodeId?: string): RenderFunctionResult | RendererResult;
-  // We allow specifying that the function is RenderFunction and not a React Function Component
-  // by setting this property
-  renderFunction?: true;
+interface ServerRenderFunction extends RenderFunctionMarker {
+  (props?: any, railsContext?: RailsContext): RenderFunctionResult;
 }
 
-type ReactComponentOrRenderFunction = ReactComponent | RenderFunction;
+interface LegacyRendererRenderFunction extends RenderFunctionMarker {
+  (props?: any, railsContext?: RailsContext, domNodeId?: string): RenderFunctionResult;
+}
+
+type RenderFunction = ServerRenderFunction | LegacyRendererRenderFunction;
+
+type ReactComponentOrRenderFunction = ReactComponent | RenderFunction | RendererFunction;
 
 type PipeableOrReadableStream = PipeableStream | NodeJS.ReadableStream;
 
@@ -264,7 +270,6 @@ export type {
   RenderFunction,
   RendererTeardown,
   RendererTeardownResult,
-  RendererResult,
   RendererFunction,
   RenderFunctionResult,
   Store,

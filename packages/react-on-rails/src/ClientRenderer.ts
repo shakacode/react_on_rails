@@ -3,7 +3,6 @@ import type {
   RegisteredComponent,
   RailsContext,
   RendererFunction,
-  RendererResult,
   RendererTeardown,
   RendererTeardownResult,
   RenderReturnType,
@@ -18,6 +17,8 @@ import { onPageUnloaded } from './pageLifecycle.ts';
 import { supportsRootApi, unmountComponentAtNode } from './reactApis.cts';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
+
+type RendererResult = ReturnType<RendererFunction>;
 
 // An entry in `renderedRoots`. We track two kinds of mounts so both can be cleaned up on page
 // unload or same-id node replacement:
@@ -135,14 +136,11 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
       );
     }
 
-    // Call the renderer function with the expected signature. A renderer owns its own mount and
-    // returns a RendererResult: nothing, a teardown wrapper, or a promise resolving to one.
-    // `component` is typed as the public `RenderFunction` (optional params, a return union spanning
-    // both the renderer and server render-function shapes), which is NOT assignable to the narrower
-    // `RendererFunction`. So `as RendererFunction` is a deliberate widening assertion, not a sound
-    // narrowing — it is justified by the runtime `isRenderer` invariant (the registry only sets it
-    // for a 3-arg render function), which the type system cannot express. Asserting the precise
-    // shape here lets us read the call result as a RendererResult without a second cast.
+    // Call the renderer function with the expected signature. A renderer owns its own mount and may
+    // return nothing, a teardown wrapper, or a promise resolving to one. `component` is the registered
+    // component union, so `as RendererFunction` is a runtime-invariant assertion guarded by
+    // `isRenderer` (the registry only sets it for a 3-arg render function), not a structural
+    // narrowing.
     const result = (component as RendererFunction)(props, railsContext, domNodeId);
     return { delegated: true, result };
   }
@@ -159,16 +157,17 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
  * async renderer resolves its teardown, the still-pending teardown is dropped and that one mount
  * leaks — the resolved teardown is discarded because the entry is no longer the active mount for
  * this id (the `renderedRoots.get(domNodeId) === entry` guard below). The drop is an expected,
- * documented outcome rather than a failure, so it is surfaced via `console.warn` (not `console.error`)
- * so it is diagnosable rather than silent. Synchronous teardowns are unaffected. The Pro client
- * renderer (`react-on-rails-pro`) awaits the renderer and re-checks the unmount state, so it runs the
- * teardown even when a navigation races the resolve; prefer Pro if you depend on async renderer
- * teardowns surviving fast navigations.
+ * documented core limitation, but it still leaves a renderer-owned mount uncleaned, so it is logged
+ * with `console.error` rather than silently ignored. Synchronous teardowns are unaffected. The Pro
+ * client renderer (`react-on-rails-pro`) awaits the renderer and re-checks the unmount state, so it
+ * runs the teardown even when a navigation races the resolve; prefer Pro if you depend on async
+ * renderer teardowns surviving fast navigations.
  *
- * Renderer results that do not include a teardown wrapper are intentionally left untracked. Before
- * this cleanup contract existed, renderer-owned mounts were never tracked, so repeated page-loaded
- * calls re-invoked those legacy renderers; preserving that behavior keeps "return nothing" backward
- * compatible.
+ * Renderer results that ultimately do not include a teardown wrapper are left untracked:
+ * synchronous no-wrapper returns are not stored, and async results that resolve without a wrapper use
+ * only a temporary placeholder until the promise settles. Before this cleanup contract existed,
+ * renderer-owned mounts were never tracked, so repeated page-loaded calls re-invoked those legacy
+ * renderers; preserving that behavior keeps "return nothing" backward compatible.
  */
 function trackRendererMount(domNodeId: string, domNode: Element, result: RendererResult): void {
   if (isRendererTeardownResult(result)) {
@@ -190,10 +189,10 @@ function trackRendererMount(domNodeId: string, domNode: Element, result: Rendere
         } else {
           // The mount was unmounted or its node replaced before this async teardown resolved, so the
           // entry is no longer the active mount and the teardown can't be attached — it is dropped
-          // and that one mount may leak on cleanup. This is the expected, documented best-effort
-          // limitation (not a failure), so warn (rather than dropping silently or erroring) to keep
-          // it diagnosable in production. Pro avoids this race entirely.
-          console.warn(
+          // and that one mount may leak on cleanup. This is the expected, documented best-effort core
+          // limitation, but the consequence is still a leak, so log it as an error. Pro avoids this
+          // race entirely.
+          console.error(
             `Renderer teardown for dom node "${domNodeId}" resolved after its mount was removed; ` +
               'the teardown was dropped and that mount may leak on cleanup.',
           );
@@ -354,11 +353,9 @@ export function reactOnRailsComponentLoaded(domId: string): Promise<void> {
 /**
  * Unmount all rendered React components, run all renderer-function teardowns, and clear roots.
  * Registered with `onPageUnloaded` to run on the page-unload lifecycle (Turbo/Turbolinks
- * soft-navigation page swap, not a native browser unload) to prevent memory leaks. Exported for
- * testing.
- * @internal
+ * soft-navigation page swap, not a native browser unload) to prevent memory leaks.
  */
-export function unmountAllComponents(): void {
+function unmountAllComponents(): void {
   renderedRoots.forEach((entry, domNodeId) => {
     try {
       teardownEntry(entry, domNodeId);

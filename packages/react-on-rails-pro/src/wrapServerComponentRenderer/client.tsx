@@ -24,7 +24,7 @@
 import 'react-on-rails-rsc/client.browser';
 import * as React from 'react';
 import * as ReactDOMClient from 'react-dom/client';
-import { ReactComponent, ReactComponentOrRenderFunction, RenderFunction } from 'react-on-rails/types';
+import { ReactComponent, ReactComponentOrRenderFunction, RendererFunction } from 'react-on-rails/types';
 import isRenderFunction from 'react-on-rails/isRenderFunction';
 import { ensureReactUseAvailable } from 'react-on-rails/reactApis';
 import { createRSCProvider } from '../RSCProvider.tsx';
@@ -65,11 +65,12 @@ const wrapServerComponentRenderer = (
   // teardown captured and run on unmount. Dropping `domNodeId` from this signature would silently
   // demote the wrapper to a plain render-function, drop the teardown below, and re-introduce the
   // mount leak this fix closes. Keep all three parameters declared.
-  const wrapper: RenderFunction = async (props, railsContext, domNodeId) => {
+  const wrapper: RendererFunction = async (props, railsContext, domNodeId) => {
     // A registerServerComponent render function is expected to resolve to the component to mount,
-    // not a renderer teardown. RenderFunction's return union is wider (this PR added
-    // RendererTeardownResult), so this narrows to the expected shape; the
-    // `typeof Component !== 'function'` guard below rejects anything else at runtime.
+    // not a renderer teardown. RendererFunction still accepts legacy render-function return shapes
+    // because older 3-arg renderers sometimes returned a component just to satisfy the old public
+    // type; this wrapper narrows to the expected component shape, and the guard below rejects
+    // anything else at runtime.
     const Component = isRenderFunction(componentOrRenderFunction)
       ? ((await componentOrRenderFunction(props, railsContext, domNodeId)) as ReactComponent)
       : componentOrRenderFunction;

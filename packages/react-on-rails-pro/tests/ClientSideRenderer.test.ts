@@ -4,7 +4,7 @@
 
 import * as React from 'react';
 import { resetRailsContext } from 'react-on-rails/context';
-import type { RailsContext, RenderFunction } from 'react-on-rails/types';
+import type { RailsContext, RendererFunction } from 'react-on-rails/types';
 import * as ComponentRegistry from '../src/ComponentRegistry.ts';
 import * as StoreRegistry from '../src/StoreRegistry.ts';
 import { renderOrHydrateComponent, hydrateStore, unmountAll } from '../src/ClientSideRenderer.ts';
@@ -286,13 +286,13 @@ describe('ClientSideRenderer', () => {
 
   it('delegates renderer roots without wrapping them with the default RSC provider', async () => {
     const renderer = jest.fn();
-    const TestRenderer: RenderFunction = (
+    const TestRenderer: RendererFunction = (
       props?: Record<string, unknown>,
       railsContext?: RailsContext,
       domNodeId?: string,
     ) => {
       renderer(props, railsContext, domNodeId);
-      return Promise.resolve('');
+      return Promise.resolve();
     };
     const defaultProviderFactory = jest.fn(({ reactElement }: DefaultRSCProviderFactoryArgs) => reactElement);
     ComponentRegistry.register({ TestComponent: TestRenderer });
@@ -311,7 +311,7 @@ describe('ClientSideRenderer', () => {
   // callback so React on Rails can clean it up on unmount (Turbo navigation / node replacement).
   it('runs the teardown returned by a renderer when the component is unmounted', async () => {
     const teardown = jest.fn();
-    const TestRenderer: RenderFunction = (
+    const TestRenderer: RendererFunction = (
       _props?: Record<string, unknown>,
       _railsContext?: RailsContext,
       _domNodeId?: string,
@@ -337,7 +337,7 @@ describe('ClientSideRenderer', () => {
 
   it('runs a teardown returned asynchronously by a renderer on unmount', async () => {
     const teardown = jest.fn();
-    const TestRenderer: RenderFunction = (
+    const TestRenderer: RendererFunction = (
       _props?: Record<string, unknown>,
       _railsContext?: RailsContext,
       _domNodeId?: string,
@@ -361,7 +361,7 @@ describe('ClientSideRenderer', () => {
       // promise, exercising invokeRendererTeardown's rejection-swallowing path so the failure is
       // logged rather than left as an unhandled rejection.
       const teardown = jest.fn(() => Promise.reject(rejection));
-      const TestRenderer: RenderFunction = (
+      const TestRenderer: RendererFunction = (
         _props?: Record<string, unknown>,
         _railsContext?: RailsContext,
         _domNodeId?: string,
@@ -394,10 +394,9 @@ describe('ClientSideRenderer', () => {
       // Unlike the core renderer (which logs and swallows the rejection), Pro awaits the renderer, so
       // a rejection propagates to render()'s outer catch and rejects the render promise with the
       // wrapped "encountered an error while rendering" message.
-      // Parameterize reject as `<() => void>` so the rejected promise types as the renderer-teardown
-      // arm of RenderFunction's return union (a bare Promise.reject resolves across both arms and
-      // satisfies neither under ts-jest's type-check).
-      const TestRenderer: RenderFunction = (
+      // Parameterize reject as `<{ teardown: () => void }>` so the rejected promise types as the
+      // renderer-teardown arm of RendererFunction's return union.
+      const TestRenderer: RendererFunction = (
         _props?: Record<string, unknown>,
         _railsContext?: RailsContext,
         _domNodeId?: string,
@@ -415,7 +414,7 @@ describe('ClientSideRenderer', () => {
   });
 
   it('does not throw on unmount when the renderer returns nothing', async () => {
-    const TestRenderer: RenderFunction = (
+    const TestRenderer: RendererFunction = (
       _props?: Record<string, unknown>,
       _railsContext?: RailsContext,
       _domNodeId?: string,
@@ -440,7 +439,7 @@ describe('ClientSideRenderer', () => {
     const rendererPromise = new Promise<{ teardown: () => void }>((resolve) => {
       resolveRenderer = resolve;
     });
-    const TestRenderer: RenderFunction = (
+    const TestRenderer: RendererFunction = (
       _props?: Record<string, unknown>,
       _railsContext?: RailsContext,
       _domNodeId?: string,
@@ -482,7 +481,7 @@ describe('ClientSideRenderer', () => {
       const rendererPromise = new Promise<{ teardown: () => void }>((resolve) => {
         resolveRenderer = resolve;
       });
-      const TestRenderer: RenderFunction = (
+      const TestRenderer: RendererFunction = (
         _props?: Record<string, unknown>,
         _railsContext?: RailsContext,
         _domNodeId?: string,
@@ -542,7 +541,7 @@ describe('ClientSideRenderer', () => {
     // unmounted on page unload. It must not be, because renderers are delegated before any root is
     // created.
     mockReactHydrateOrRender.mockReturnValue({ render: jest.fn(), unmount: rootUnmount });
-    const TestRenderer: RenderFunction = (
+    const TestRenderer: RendererFunction = (
       _props?: Record<string, unknown>,
       _railsContext?: RailsContext,
       _domNodeId?: string,

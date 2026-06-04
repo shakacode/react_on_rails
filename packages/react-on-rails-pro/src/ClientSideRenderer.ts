@@ -45,18 +45,24 @@ const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
  * Intentionally re-implemented (not imported) from the OSS `react-on-rails` `invokeRendererTeardown`:
  * the OSS module does not export it, so re-implementing keeps the Pro client renderer decoupled from
  * OSS internals (no reliance on a non-public export) instead of widening the OSS public API just to
- * share it. Note this copy inlines the thenable check (`maybePromise && typeof maybePromise.then ===
- * 'function'`) rather than reusing OSS's `isThenable` helper; the two are equivalent for the
- * `void | Promise<void>` value a renderer teardown produces. The shared `RendererFunction`/
- * `RendererTeardown`/`RendererTeardownResult` *types* are imported, so only this small runtime
- * helper is duplicated.
+ * share it. Keep the local thenable guard in sync with the OSS helper so non-native thenables are
+ * handled the same way in both packages. The shared `RendererFunction`/`RendererTeardown`/
+ * `RendererTeardownResult` *types* are imported, so only this small runtime helper is duplicated.
  * NOTE: A sibling helper exists in packages/react-on-rails/src/ClientRenderer.ts. If you change the
  * error-handling logic or log format here, update that copy too.
  */
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+  return (
+    value != null &&
+    (typeof value === 'object' || typeof value === 'function') &&
+    typeof (value as { then?: unknown }).then === 'function'
+  );
+}
+
 function invokeRendererTeardown(teardown: RendererTeardown | undefined, domNodeId: string): void {
   if (!teardown) return;
   const maybePromise = teardown();
-  if (maybePromise && typeof maybePromise.then === 'function') {
+  if (isThenable(maybePromise)) {
     // Detect a thenable with `.then` (Promises/A+) but swallow the rejection via
     // `Promise.resolve(...).catch(...)`: a non-native thenable may lack `.catch`, so calling it
     // directly could itself throw or leave the rejection unhandled. This keeps a failing async
@@ -100,11 +106,10 @@ async function delegateToRenderer(
     }
 
     // The renderer owns its own mount and may return a teardown wrapper so we can clean it up on
-    // unmount (Turbo/Turbolinks navigation). `component` is the public `RenderFunction`, which is
-    // not assignable to the narrower `RendererFunction`, so `as RendererFunction` is a widening
-    // assertion guarded by the runtime `isRenderer` invariant (not a sound narrowing). The awaited
-    // `result` is then `void | RendererTeardownResult`, so the object wrapper picks out the teardown
-    // without confusing legacy bare function returns for cleanup.
+    // unmount (Turbo/Turbolinks navigation). `component` is the registered component union, so
+    // `as RendererFunction` is a runtime-invariant assertion guarded by `isRenderer` (not a
+    // structural narrowing). The object wrapper picks out only explicit teardown returns without
+    // confusing legacy bare function returns for cleanup.
     const result = await (component as RendererFunction)(props, railsContext, domNodeId);
     return {
       delegated: true,
