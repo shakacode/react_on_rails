@@ -3,6 +3,11 @@ import _ from 'lodash';
 import Post from './Post';
 
 const Posts = async ({ artificialDelay, postsCount = 2, fetchPosts, fetchComments, fetchUser }) => {
+  const requestedPostsCount = Number(postsCount);
+  if (Number.isFinite(requestedPostsCount) && requestedPostsCount <= 0) {
+    return <div />;
+  }
+
   await new Promise((resolve) => {
     setTimeout(resolve, artificialDelay);
   });
