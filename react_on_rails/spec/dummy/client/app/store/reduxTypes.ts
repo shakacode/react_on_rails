@@ -16,7 +16,7 @@ type ReduxAppProps = Record<string, unknown> & {
 
 type StateProps = Record<string, unknown> & {
   helloWorldData: HelloWorldData;
-  modificationTarget?: unknown;
+  modificationTarget: unknown;
 };
 
 type ReduxAppState = StateProps & {
@@ -29,7 +29,7 @@ function propsForReduxState(props: Record<string, unknown>): StateProps {
   const stateProps = { ...(props as ReduxAppProps) };
   delete stateProps.prerender;
 
-  return stateProps;
+  return { modificationTarget: undefined, ...stateProps };
 }
 
 export type { HelloWorldData, ReduxAppProps, ReduxAppState, ReduxAppStore, StateProps };

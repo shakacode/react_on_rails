@@ -1,31 +1,33 @@
-import PropTypes from 'prop-types';
 import React from 'react';
-import RailsContext from './RailsContext';
 
-// Super simple example of the simplest possible React component
-export default class HelloWorldRedux extends React.Component {
-  static propTypes = {
-    actions: PropTypes.object.isRequired,
-    data: PropTypes.object.isRequired,
-    railsContext: PropTypes.object.isRequired,
+import type { HelloWorldNameUpdateAction } from '../actions/HelloWorldActions';
+import type { HelloWorldData } from '../store/reduxTypes';
+import RailsContext, { type RailsContextForDisplay } from './RailsContext';
+
+type HelloWorldReduxActions = {
+  updateName(name: string): HelloWorldNameUpdateAction;
+};
+
+type HelloWorldReduxProps = {
+  actions: HelloWorldReduxActions;
+  data: HelloWorldData;
+  railsContext: RailsContextForDisplay;
+};
+
+export default class HelloWorldRedux extends React.Component<HelloWorldReduxProps> {
+  private nameDomRef: HTMLInputElement | null = null;
+
+  handleChange = () => {
+    const name = this.nameDomRef?.value;
+
+    if (name !== undefined) {
+      this.props.actions.updateName(name);
+    }
   };
 
-  // Not necessary if we only call super, but we'll need to initialize state, etc.
-  constructor(props) {
-    super(props);
-    this.setNameDomRef = this.setNameDomRef.bind(this);
-    this.handleChange = this.handleChange.bind(this);
-  }
-
-  handleChange() {
-    const name = this.nameDomRef.value;
-
-    this.props.actions.updateName(name);
-  }
-
-  setNameDomRef(nameDomNode) {
+  setNameDomRef = (nameDomNode: HTMLInputElement | null) => {
     this.nameDomRef = nameDomNode;
-  }
+  };
 
   render() {
     const { data, railsContext } = this.props;
@@ -47,8 +49,10 @@ export default class HelloWorldRedux extends React.Component {
           With Redux, say hello to:
           <input type="text" ref={this.setNameDomRef} value={name} onChange={this.handleChange} />
         </p>
-        <RailsContext {...{ railsContext }} />
+        <RailsContext railsContext={railsContext} />
       </div>
     );
   }
 }
+
+export type { HelloWorldReduxActions, HelloWorldReduxProps };
