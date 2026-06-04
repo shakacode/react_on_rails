@@ -25,9 +25,37 @@ The fixed behavior is that RSC CSS is represented before hydration, so the bound
 
 ## ShakaPerf results
 
+### ShakaPerf report screenshots
+
+Old/pre-fix vs current/fixed first paint. ShakaPerf reports a visual change (`25.48%`) on the RSC CSS probe.
+
+![ShakaPerf report showing old/pre-fix vs current/fixed first-paint visual change](rsc-fouc-shakaperf-artifacts/images/shakaperf-first-paint-old-vs-current-report.png)
+
+Current/fixed vs current/fixed first paint. Same test, same fixed side on both servers. ShakaPerf reports no difference (`0.00%`).
+
+![ShakaPerf report showing current/fixed vs current/fixed first-paint no difference](rsc-fouc-shakaperf-artifacts/images/shakaperf-first-paint-current-vs-current-report.png)
+
+Natural first-visible assertion. This does not block app JS; the old/pre-fix side fails the first-visible computed-style assertion.
+
+![ShakaPerf report showing natural first-visible assertion failure on old/pre-fix side](rsc-fouc-shakaperf-artifacts/images/shakaperf-natural-first-visible-old-vs-current-report.png)
+
+### Selector screenshots
+
+Old/pre-fix selector capture: unstyled first paint.
+
+![Old/pre-fix unstyled RSC CSS probe](rsc-fouc-shakaperf-artifacts/images/first-paint-old-unstyled-probe.png)
+
+Current/fixed selector capture: styled first paint.
+
+![Current/fixed styled RSC CSS probe](rsc-fouc-shakaperf-artifacts/images/first-paint-current-styled-probe.png)
+
+First-paint selector diff.
+
+![First-paint selector diff](rsc-fouc-shakaperf-artifacts/images/first-paint-old-vs-current-diff.png)
+
 ### Test matrix
 
-| Test                                  | Control       | Experiment    | ShakaPerf result        | Investigation result                              | Notes                                                                           |
+| Test                                  | Control       | Experiment    | ShakaPerf result        | Investigation result                              | Purpose                                                                         |
 | ------------------------------------- | ------------- | ------------- | ----------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------- |
 | Deterministic first-paint visual test | old/pre-fix   | current/fixed | FAIL: 1 visual mismatch | PASS: real A/B diff detected                      | Blocks app JS before navigation to isolate server-rendered first paint.         |
 | Deterministic first-paint visual test | current/fixed | current/fixed | PASS                    | PASS                                              | Control run proving the test is stable when both sides are fixed.               |
@@ -57,9 +85,9 @@ For a pure visual "capture exactly at first visible frame" report card, ShakaPer
 
 ## Artifact index
 
-Copied PR-ready artifacts live in [rsc-fouc-shakaperf-artifacts/](rsc-fouc-shakaperf-artifacts/).
+Artifacts: [rsc-fouc-shakaperf-artifacts/](rsc-fouc-shakaperf-artifacts/)
 
-Artifact README: [rsc-fouc-shakaperf-artifacts/README.md](rsc-fouc-shakaperf-artifacts/README.md)
+Artifact index: [rsc-fouc-shakaperf-artifacts/README.md](rsc-fouc-shakaperf-artifacts/README.md)
 
 ### ShakaPerf setup and tests
 
