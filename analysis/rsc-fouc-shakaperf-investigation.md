@@ -1,14 +1,5 @@
 # RSC FOUC ShakaPerf Investigation
 
-## Format
-
-ShakaPerf examples are artifact-first, not narrative-first:
-
-- generated `report.html` / `report.json` with status, test metadata, artifacts, screenshots, and diffs;
-- discovery reports with a verdict table, status labels, coverage decisions, and follow-ups.
-
-This report follows that shape: verdict first, evidence table, artifact index, coverage decisions, follow-ups.
-
 ## Verdict
 
 | Area                         | Status               | Finding                                                                                  |
@@ -49,8 +40,8 @@ The fixed behavior is that RSC CSS is represented before hydration, so the bound
 | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Old/pre-fix first-paint probe image         | `840x24`, expected green CSS `0.0%`, white/plain background `95.12%`, dark text `1.45%`.                                     | [image](rsc-fouc-shakaperf-artifacts/images/first-paint-old-unstyled-probe.png)                                                                                                                                                                                                     |
 | Current/fixed first-paint probe image       | `214x36`, expected green CSS `70.35%`, white/plain background `0.0%`.                                                        | [image](rsc-fouc-shakaperf-artifacts/images/first-paint-current-styled-probe.png)                                                                                                                                                                                                   |
-| Old/pre-fix vs current/fixed visual diff    | `1851` diff pixels.                                                                                                          | [image](rsc-fouc-shakaperf-artifacts/images/first-paint-old-vs-current-diff.png)                                                                                                                                                                                                    |
-| Current/fixed vs current/fixed visual diff  | `0` diff pixels.                                                                                                             | [report](rsc-fouc-shakaperf-artifacts/reports/first-paint-current-vs-current/full-report.html)                                                                                                                                                                                      |
+| Old/pre-fix vs current/fixed visual diff    | `1851` diff pixels.                                                                                                          | [ShakaPerf report screenshot](rsc-fouc-shakaperf-artifacts/images/shakaperf-first-paint-old-vs-current-report.png), [selector diff](rsc-fouc-shakaperf-artifacts/images/first-paint-old-vs-current-diff.png)                                                                        |
+| Current/fixed vs current/fixed visual diff  | `0` diff pixels.                                                                                                             | [ShakaPerf report screenshot](rsc-fouc-shakaperf-artifacts/images/shakaperf-first-paint-current-vs-current-report.png), [report](rsc-fouc-shakaperf-artifacts/reports/first-paint-current-vs-current/full-report.html)                                                              |
 | Natural first-visible old/pre-fix assertion | `backgroundColor: rgba(0, 0, 0, 0)`, `color: rgb(0, 0, 0)`, `padding: 0px`, `borderRadius: 0px`, `width: 840`, `height: 24`. | [log](rsc-fouc-shakaperf-artifacts/logs/natural-first-visible-old-vs-current.log), [old image](rsc-fouc-shakaperf-artifacts/images/natural-first-visible-old-unstyled-probe.png), [fixed image](rsc-fouc-shakaperf-artifacts/images/natural-first-visible-current-styled-probe.png) |
 
 ### ShakaPerf limitation / workaround
@@ -89,10 +80,6 @@ Artifact README: [rsc-fouc-shakaperf-artifacts/README.md](rsc-fouc-shakaperf-art
 | Current/fixed vs current/fixed deterministic first paint       | [full-report.html](rsc-fouc-shakaperf-artifacts/reports/first-paint-current-vs-current/full-report.html)           | [log](rsc-fouc-shakaperf-artifacts/logs/first-paint-current-vs-current.log)           |
 | Old/pre-fix vs current/fixed natural first-visible assertion   | [full-report.html](rsc-fouc-shakaperf-artifacts/reports/natural-first-visible-old-vs-current/full-report.html)     | [log](rsc-fouc-shakaperf-artifacts/logs/natural-first-visible-old-vs-current.log)     |
 | Current/fixed vs current/fixed natural first-visible assertion | [full-report.html](rsc-fouc-shakaperf-artifacts/reports/natural-first-visible-current-vs-current/full-report.html) | [log](rsc-fouc-shakaperf-artifacts/logs/natural-first-visible-current-vs-current.log) |
-
-### Source-analysis note
-
-Private/cross-repo source dumps are intentionally not included in this PR artifact bundle. hichee findings are summarized for ShakaCode maintainers, but hichee patches/logs are not copied into the public artifact bundle.
 
 ## Implementation comparison
 
@@ -156,41 +143,33 @@ Current npm dist-tags observed during the investigation:
 
 Reference: private `shakacode/hichee#9379`.
 
-Status: not ShakaPerf-proven yet.
+This is not proven with ShakaPerf yet. What we have so far is package and manifest evidence:
 
-Maintainer-facing summary:
+- PR head uses vendored `react-on-rails-rsc-19.0.5-rc.1`;
+- that package contains the upstream RSC CSS metadata/loader/server-global path;
+- the hichee patch path also handles ReScript `make` exports;
+- local production manifests show CSS metadata on the PR/head side and none on the compared base side.
 
-- PR head uses a vendored `react-on-rails-rsc-19.0.5-rc.1` package;
-- that vendored package contains the upstream RSC CSS metadata/loader/server-global path;
-- the hichee patch path also includes ReScript `make` export handling;
-- local production manifest evidence showed CSS metadata on the PR/head side and no CSS metadata on the compared base side;
-- no hichee browser/ShakaPerf proof is claimed here yet.
-
-Manifest evidence from local production build artifacts:
+Manifest evidence from the local production build artifacts:
 
 | hichee side | Manifest entries | Entries with CSS | Unique CSS files |
 | ----------- | ---------------: | ---------------: | ---------------: |
 | base        |               92 |                0 |                0 |
 | PR head     |              101 |               87 |                5 |
 
-Private hichee patches, logs, and source dumps are intentionally not copied into this public PR artifact bundle.
-
-Coverage decision:
-
-| Area                             | Decision                                     |
-| -------------------------------- | -------------------------------------------- |
-| hichee package/manifest evidence | Summarized in this report.                   |
-| hichee source patches/logs       | Not included in this public artifact bundle. |
-| hichee browser behavior          | TODO with ShakaPerf.                         |
-| hichee first-paint FOUC proof    | TODO with ShakaPerf.                         |
+No hichee browser/ShakaPerf proof is claimed here. That is still the next step.
 
 ## Unit-test plan
 
-No new unit tests are delivered in this investigation.
+No new unit tests are included in this PR.
 
-Add tests after hichee is ShakaPerf-proven and/or the upstream package fix is released and pinned, so the tests target the stable intended integration instead of temporary downstream/vendor patch behavior.
+The safest order is:
 
-Candidate tests:
+1. prove hichee with ShakaPerf;
+2. confirm whether the downstream bridge stays or is replaced by the upstream package fix;
+3. add unit tests against that final path.
+
+Good unit-test targets after that:
 
 | Test                                                                                           | Location / owner                                         |
 | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
@@ -203,8 +182,8 @@ Candidate tests:
 
 ## Follow-ups
 
-1. Run ShakaPerf against hichee once the production runtime is intentionally started.
+1. Prove the hichee branch with ShakaPerf.
 2. Recheck `react_on_rails#3577` after the upstream package fix is released/pinned.
 3. Decide whether the downstream bridge in `react_on_rails#3587` should stay, shrink to Rails asset integration, or be removed after upstream package adoption.
-4. Add unit tests only after the target integration path is settled.
-5. If ShakaPerf should show a literal first-visible screenshot without JS blocking, add/request a first-visible capture hook or capture mode.
+4. Add unit tests after the target integration path is settled.
+5. If we want ShakaPerf to produce a first-visible screenshot without blocking JS, add/request a first-visible capture hook or capture mode.
