@@ -26,6 +26,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Changed
 
+- **[Pro]** **Updated the RSC rollout pin to `react-on-rails-rsc@19.0.5-rc.5`**: Pro RSC install docs, generator defaults, package metadata, and example guidance now point at `19.0.5-rc.5` while keeping React on the supported `19.0.x` range and documenting the temporary exact prerelease pin. [PR 3577](https://github.com/shakacode/react_on_rails/pull/3577) by [justin808](https://github.com/justin808).
 - **[Pro]** **Widened the `react-on-rails-rsc` peer-dependency range to the full React 19 line**: `react-on-rails-pro` now declares `react-on-rails-rsc` as `>= 19.0.2 < 20.0.0` (previously `>= 19.0.2 <= 19.2.3`), so future `react-on-rails-rsc` patch and minor releases on the React 19 line no longer trigger a peer-dependency warning. The `react` / `react-dom` peers stay at `>= 16`: React 18 support is retained, and the React-19-only RSC path is gated through the optional `react-on-rails-rsc` peer rather than by raising the React baseline. Resolves [Issue 3486](https://github.com/shakacode/react_on_rails/issues/3486). [PR 3580](https://github.com/shakacode/react_on_rails/pull/3580) by [justin808](https://github.com/justin808).
 
 ### [17.0.0.rc.1] - 2026-06-02
