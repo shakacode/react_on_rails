@@ -171,9 +171,11 @@ end
 # standalone script never requires `config/environment` (it only walks up for the Rails root), so
 # ReactOnRailsPro is not loaded and `rsc_support_enabled?` is unavailable here. Instead it relies on
 # the registration entry's absence as the capability signal: the entry is written only when RSC is
-# enabled (see PacksGenerator#create_server_component_registration_entry), so a missing entry means
-# RSC is off and discovery is skipped. The early `RSC_REFERENCE_DISCOVERY_BUILD` guard prevents the
-# discovery build (which re-invokes bin/shakapacker) from recursing into itself.
+# enabled AND there is at least one server component to register (see
+# PacksGenerator#create_server_component_registration_entry, which returns early when there are no
+# server components), so a missing entry means there is nothing to discover (RSC off, or RSC on with
+# no server components) and discovery is skipped. The early `RSC_REFERENCE_DISCOVERY_BUILD` guard
+# prevents the discovery build (which re-invokes bin/shakapacker) from recursing into itself.
 def generate_rsc_manifest_client_references_if_needed
   return if ENV["RSC_REFERENCE_DISCOVERY_BUILD"] == "true"
 

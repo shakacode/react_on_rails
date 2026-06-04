@@ -2927,6 +2927,12 @@ describe RscGenerator, type: :generator do
         expect(content).to include("statSync")
         expect(content).to include("catch {")
         expect(content).to include("may be stale")
+        # The fallback resolves to an array, exactly like the manifest path (payload.refs) and the
+        # Pro dummy mirror's DEFAULT_CLIENT_REFERENCES, so clientReferences always receives an array
+        # regardless of which branch the cascade returns from (mirror parity).
+        expect(content).to include("return [fallbackRscClientReferences];")
+        # Pin the include extension set byte-for-byte in lockstep with the Pro dummy mirror.
+        expect(content).to include("/\\.(js|mjs|cjs|ts|mts|cts|jsx|tsx)$/")
       end
     end
   end

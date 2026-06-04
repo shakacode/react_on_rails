@@ -187,7 +187,7 @@ importers:
         specifier: ^19.0.3
         version: 19.2.3(react@19.2.3)
       react-on-rails-rsc:
-        specifier: ^19.0.5-rc.5
+        specifier: 19.0.5-rc.5
         version: 19.0.5-rc.5(patch_hash=54cc9530415d851de24187f295a29d37d04685e8454e7589635fba11586b5119)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(webpack@5.105.2(@swc/core@1.15.3))
       redux:
         specifier: ^4.2.1
@@ -264,7 +264,7 @@ importers:
         specifier: ^19.0.3
         version: 19.2.0(react@19.2.0)
       react-on-rails-rsc:
-        specifier: ^19.0.5-rc.5
+        specifier: 19.0.5-rc.5
         version: 19.0.5-rc.5(patch_hash=54cc9530415d851de24187f295a29d37d04685e8454e7589635fba11586b5119)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(webpack@5.105.2(@swc/core@1.15.3))
 
   packages/react-on-rails-pro-node-renderer:
@@ -725,7 +725,7 @@ importers:
         specifier: workspace:*
         version: link:../../../packages/react-on-rails-pro-node-renderer
       react-on-rails-rsc:
-        specifier: ^19.0.5-rc.5
+        specifier: 19.0.5-rc.5
         version: 19.0.5-rc.5(patch_hash=54cc9530415d851de24187f295a29d37d04685e8454e7589635fba11586b5119)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(webpack@5.104.1)
       react-proptypes:
         specifier: ^1.0.0

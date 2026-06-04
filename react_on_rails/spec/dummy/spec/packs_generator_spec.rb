@@ -390,6 +390,26 @@ module ReactOnRails
         ENV.delete("REACT_ON_RAILS_VERBOSE")
       end
 
+      it "regenerates the registration entry when its content is stale but its mtime is current" do
+        described_class.instance.generate_packs_if_stale
+        generator = described_class.instance
+        registration_entry = generator.send(:server_component_registration_entry_file_path)
+        expect(File.exist?(registration_entry)).to be(true)
+
+        # A fresh mtime keeps generated_file_older_than_sources? false, so this exercises the
+        # content-equality branch of server_component_registration_entry_stale? specifically
+        # (the mtime branch is covered by the preceding example). This is the branch that catches an
+        # added/removed/renamed server component when no source mtime happens to be newer.
+        File.write(registration_entry, "// stale registration entry\n")
+        fresh_mtime = Time.now + 60
+        File.utime(fresh_mtime, fresh_mtime, registration_entry)
+
+        described_class.instance.generate_packs_if_stale
+
+        expect(File.read(registration_entry)).not_to include("stale registration entry")
+        expect(File.read(registration_entry)).to include("registerServerComponent")
+      end
+
       it "checks generated pack contents without emitting likely-client warnings" do
         described_class.instance.generate_packs_if_stale
         component_name = "ReactServerComponent"
@@ -501,7 +521,10 @@ module ReactOnRails
               "#{packer_source_path}/components/ReactServerComponents/ror_components/ReactServerComponent.jsx"
           }
 
-          allow(generator).to receive(:components_for_server_registration).once.and_return(components)
+          # Guard the no-rescan optimization: generated_server_pack_file_content must fetch the
+          # component map exactly once (components_for_server_registration runs an un-memoized
+          # Dir.glob). `expect ... .once` verifies the count; `allow ... .once` would not.
+          expect(generator).to receive(:components_for_server_registration).once.and_return(components)
           generated_server_bundle_path = File.join(
             Pathname(packer_source_entry_path).parent,
             "generated/server-bundle-generated.js"

@@ -82,7 +82,9 @@ describe('rscManifestClientReferences (Pro dummy) mirrors the generator resoluti
     const refs = rscManifestClientReferences();
     expect(Array.isArray(refs)).toBe(true);
     expect(refs[0]).toMatchObject({ directory: './client/app', recursive: true });
-    // Locks the include extensions in lockstep with the generator template.
+    // Locks the include extensions byte-for-byte in lockstep with the generator template's
+    // `fallbackRscClientReferences` (asserted on the generator side in rsc_generator_spec.rb).
+    expect(refs[0].include.source).toBe('\\.(js|mjs|cjs|ts|mts|cts|jsx|tsx)$');
     expect(refs[0].include.test('Foo.mjs')).toBe(true);
     expect(refs[0].include.test('Foo.cts')).toBe(true);
   });
