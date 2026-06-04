@@ -11,7 +11,16 @@ class RSCManifestCssPlugin {
     compiler.hooks.thisCompilation.tap(pluginName, (compilation) => {
       const { webpack } = compiler;
       const reportStage = webpack?.Compilation?.PROCESS_ASSETS_STAGE_REPORT;
-      const stage = typeof reportStage === 'number' ? reportStage + 1 : undefined;
+      if (typeof reportStage !== 'number') {
+        compilation.warnings.push(
+          new Error(
+            'RSCManifestCssPlugin: webpack.Compilation.PROCESS_ASSETS_STAGE_REPORT is not available. ' +
+              'CSS metadata will not be added to the RSC client manifest.',
+          ),
+        );
+        return;
+      }
+      const stage = reportStage + 1;
 
       compilation.hooks.processAssets.tap(
         {
@@ -35,7 +44,7 @@ class RSCManifestCssPlugin {
           Object.entries(metadata).forEach(([resourceKey, entry]) => {
             if (!entry || !Array.isArray(entry.chunks)) return;
 
-            const nextChunks = Array.isArray(entry.chunks) ? [...entry.chunks] : [];
+            const nextChunks = [...entry.chunks];
             const chunkIdsWithJs = RSCManifestCssPlugin.chunkIdsWithJavaScriptFiles(nextChunks);
             const css = Array.isArray(entry.css) ? [...entry.css] : [];
             const seenCss = new Set(css);

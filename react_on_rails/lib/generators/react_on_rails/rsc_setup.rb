@@ -467,10 +467,13 @@ module ReactOnRails
 
         # Add RSCWebpackPlugin to client config before return statement
         client_references_option = setup_status == :scoped ? ", clientReferences: rscClientReferences" : ""
+        manifest_css_plugin_invocation = rsc_manifest_css_plugin_invocation(config_path, content)
+        return unless manifest_css_plugin_invocation
+
         rsc_plugin_code = "  // Add React Server Components plugin for client bundle\n  " \
                           "clientConfig.plugins.push(\n    " \
                           "new RSCWebpackPlugin({ isServer: false#{client_references_option} }),\n    " \
-                          "#{rsc_manifest_css_plugin_invocation(content)},\n  " \
+                          "#{manifest_css_plugin_invocation},\n  " \
                           ");"
         gsub_file(
           config_path,
@@ -543,7 +546,9 @@ module ReactOnRails
 
         indent = return_match[0][/\A[ \t]*/]
         line_ending = js_line_ending(content)
-        plugin_invocation = rsc_manifest_css_plugin_invocation(content)
+        plugin_invocation = rsc_manifest_css_plugin_invocation(config_path, content)
+        return unless plugin_invocation
+
         plugin_push = "#{indent}clientConfig.plugins.push(#{plugin_invocation});#{line_ending}" \
                       "#{line_ending}#{return_match[0]}"
         updated_content = content.dup
@@ -551,23 +556,42 @@ module ReactOnRails
         updated_content
       end
 
-      def rsc_manifest_css_plugin_invocation(content)
-        filename = rsc_manifest_css_plugin_client_manifest_filename(content)
+      def rsc_manifest_css_plugin_invocation(config_path, content)
+        filename = rsc_manifest_css_plugin_client_manifest_filename(config_path, content)
+        return if filename == :manual_configuration_required
         return "new RSCManifestCssPlugin()" unless filename
 
         "new RSCManifestCssPlugin({ clientManifestFilename: #{filename.inspect} })"
       end
 
-      def rsc_manifest_css_plugin_client_manifest_filename(content)
-        filenames = rsc_plugin_option_sections(content, is_server: false)
-                    .filter_map do |section|
-                      rsc_plugin_body_string_option(section.fetch(:body), "clientManifestFilename")
-                    end
-                    .uniq
-        return filenames.first if filenames.length == 1
+      def rsc_manifest_css_plugin_client_manifest_filename(config_path, content)
+        filenames, non_literal_key_present = rsc_manifest_css_plugin_client_manifest_filename_options(content)
+        manual_configuration_required = filenames.length > 1 || non_literal_key_present
 
-        warn_multiple_rsc_manifest_css_plugin_filenames(filenames) if filenames.length > 1
+        return filenames.first if filenames.one? && !manual_configuration_required
+
+        warn_multiple_rsc_manifest_css_plugin_filenames(config_path, filenames) if filenames.length > 1
+        warn_non_literal_rsc_manifest_css_plugin_filename(config_path) if non_literal_key_present
+        return :manual_configuration_required if manual_configuration_required
+
         nil
+      end
+
+      def rsc_manifest_css_plugin_client_manifest_filename_options(content)
+        filenames = []
+        non_literal_key_present = false
+
+        rsc_plugin_option_sections(content, is_server: false).each do |section|
+          body = section.fetch(:body)
+          literal = rsc_plugin_body_string_option(body, "clientManifestFilename")
+          if literal
+            filenames << literal
+          elsif rsc_plugin_body_has_top_level_key?(body, "clientManifestFilename")
+            non_literal_key_present = true
+          end
+        end
+
+        [filenames.uniq, non_literal_key_present]
       end
 
       def rsc_plugin_body_string_option(body, key)
@@ -589,11 +613,20 @@ module ReactOnRails
         nil
       end
 
-      def warn_multiple_rsc_manifest_css_plugin_filenames(filenames)
+      def warn_multiple_rsc_manifest_css_plugin_filenames(config_path, filenames)
         GeneratorMessages.add_warning(
-          "Could not infer a single RSCManifestCssPlugin clientManifestFilename because client webpack " \
-          "config has multiple RSCWebpackPlugin clientManifestFilename values: #{filenames.join(', ')}. " \
+          "Could not infer a single RSCManifestCssPlugin clientManifestFilename in #{config_path} because " \
+          "client webpack config has multiple RSCWebpackPlugin clientManifestFilename values: " \
+          "#{filenames.join(', ')}. " \
           "Please pass the matching filename to RSCManifestCssPlugin manually."
+        )
+      end
+
+      def warn_non_literal_rsc_manifest_css_plugin_filename(config_path)
+        GeneratorMessages.add_warning(
+          "Could not infer RSCManifestCssPlugin clientManifestFilename in #{config_path} because client webpack " \
+          "config has a non-literal RSCWebpackPlugin clientManifestFilename value. Please add RSCManifestCssPlugin " \
+          "manually with the same clientManifestFilename."
         )
       end
 

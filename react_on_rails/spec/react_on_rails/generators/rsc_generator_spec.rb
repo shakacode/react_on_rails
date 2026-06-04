@@ -543,6 +543,115 @@ describe RscGenerator, type: :generator do
     end
   end
 
+  context "when an existing client webpack config lists the custom RSC client manifest filename first" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+          config.react_client_manifest_file = "first-client-manifest.json"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            delete clientConfig.entry['server-bundle'];
+
+            clientConfig.plugins.push(
+              new RSCWebpackPlugin({
+                clientManifestFilename: "first-client-manifest.json",
+                isServer: false,
+              })
+            );
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "passes the first custom client manifest filename to the RSC manifest CSS helper" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content).to include(
+          'new RSCManifestCssPlugin({ clientManifestFilename: "first-client-manifest.json" })'
+        )
+      end
+    end
+  end
+
+  context "when an existing client webpack config uses a non-literal RSC client manifest filename" do
+    before do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          const clientManifestFilename = process.env.RSC_CLIENT_MANIFEST_FILENAME;
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            delete clientConfig.entry['server-bundle'];
+
+            clientConfig.plugins.push(
+              new RSCWebpackPlugin({
+                isServer: false,
+                clientManifestFilename,
+              })
+            );
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "does not insert a default RSC manifest CSS helper for the wrong manifest" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content).not_to include("RSCManifestCssPlugin")
+        expect(content).not_to include("new RSCManifestCssPlugin()")
+      end
+    end
+
+    it "warns that the RSC manifest CSS helper needs manual configuration" do
+      messages = GeneratorMessages.messages.join("\n")
+      expect(messages).to include("non-literal RSCWebpackPlugin clientManifestFilename")
+      expect(messages).to include(
+        "Please add RSCManifestCssPlugin manually with the same clientManifestFilename"
+      )
+    end
+  end
+
   context "when an existing client webpack config already imports the RSC manifest CSS helper" do
     before(:all) do
       prepare_destination
