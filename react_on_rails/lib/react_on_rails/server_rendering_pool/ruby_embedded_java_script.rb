@@ -22,21 +22,19 @@ module ReactOnRails
         Errno::EPERM
       ].freeze
 
-      # Matches connection-failure signatures in error messages, covering both raw
-      # Errno messages and the Pro renderer client's wrapped errors. Used in addition
-      # to the class check above so localized Errno messages and re-wrapped errors are
-      # still classified as connectivity problems.
+      # Renderer-anchored connection signatures, used only as a fallback for failures that
+      # survive as text rather than as one of the Errno classes above. The Pro renderer
+      # client re-wraps transport failures as "<Connection|Time out> error on renderer
+      # request: ...", and raw Errno messages carry the "connect(2) for host:port" shape.
+      # These patterns are deliberately narrow (anchored to renderer/socket wording) so a
+      # genuine in-process bundle error whose text merely mentions a connection — e.g. a
+      # component's own failed `fetch` during SSR reporting "ECONNREFUSED" — is NOT
+      # misclassified as a renderer connectivity problem. Structured cases are handled by
+      # the Errno classes above, checked across the error's #cause chain. See issue #3604.
       RENDERER_CONNECTION_ERROR_REGEX = /
-        ECONNREFUSED | ECONNRESET | EHOSTUNREACH | ENETUNREACH | ETIMEDOUT | EPIPE | EPERM
-        | connect\(2\)\sfor
-        | Connection\srefused
-        | Connection\sreset
-        | Connection\stimed\sout
-        | No\sroute\sto\shost
-        | Network\sis\sunreachable
-        | Operation\snot\spermitted
+        connect\(2\)\sfor
         | Failed\sto\sopen\sTCP\sconnection
-        | Connection\serror\son\srenderer\srequest
+        | error\son\srenderer\srequest
       /xi
 
       class << self
@@ -243,10 +241,28 @@ module ReactOnRails
         private
 
         # Distinguishes "Rails could not reach the renderer" from "the renderer evaluated
-        # the bundle and the bundle failed". See issue #3604.
+        # the bundle and the bundle failed". The connection Errno (ECONNREFUSED, EPERM, ...)
+        # is checked across err and its #cause chain because the Pro renderer client
+        # re-wraps the original Errno inside its own error; a narrow message check then
+        # catches connection failures that only survive as text. See issue #3604.
         def renderer_connection_error?(err)
-          RENDERER_CONNECTION_ERROR_CLASSES.any? { |klass| err.is_a?(klass) } ||
+          connection_error_class_in_chain?(err) ||
             err.message.to_s.match?(RENDERER_CONNECTION_ERROR_REGEX)
+        end
+
+        # Walks err and its #cause chain looking for a known connection Errno, so a wrapped
+        # error (e.g. ReactOnRailsPro::Error -> ConnectionError -> Errno::ECONNREFUSED) is
+        # still recognised. Identity-guarded so a self-referential cause cannot loop.
+        def connection_error_class_in_chain?(err)
+          seen = []
+          current = err
+          while current && seen.none? { |e| e.equal?(current) }
+            return true if RENDERER_CONNECTION_ERROR_CLASSES.any? { |klass| current.is_a?(klass) }
+
+            seen << current
+            current = current.cause
+          end
+          false
         end
 
         def renderer_connection_error_message(err)

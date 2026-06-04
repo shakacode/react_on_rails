@@ -30,6 +30,18 @@ module ReactOnRails
           e
         end
 
+        # Builds an error whose #cause is an instance of cause_class, mimicking how the Pro
+        # renderer client re-wraps the original Errno inside its own error.
+        def wrapped_error(cause_class, cause_message, wrapper_message)
+          begin
+            raise cause_class, cause_message
+          rescue cause_class
+            raise StandardError, wrapper_message
+          end
+        rescue StandardError => e
+          e
+        end
+
         around do |example|
           original = ENV.fetch("REACT_RENDERER_URL", nil)
           ENV.delete("REACT_RENDERER_URL")
@@ -99,6 +111,33 @@ module ReactOnRails
           end
         end
 
+        context "when the connection Errno survives only as the error's #cause" do
+          # The Pro renderer client wraps the original Errno (ReactOnRailsPro::Error ->
+          # ConnectionError -> Errno::ECONNREFUSED). The wrapper message here carries no
+          # connection signature, so classification must come from walking the cause chain.
+          let(:error) { wrapped_error(Errno::ECONNREFUSED, "connect(2) for 127.0.0.1:3800", "renderer request failed") }
+
+          it "is classified as a connection failure via the cause chain" do
+            message = render_error_for(error).message
+            expect(message).to include("could not connect to the Node renderer")
+            expect(message).not_to include("Check your webpack configuration")
+          end
+        end
+
+        context "when the renderer request times out (Pro 'Time out error on renderer request')" do
+          let(:error) do
+            StandardError.new(
+              "Time out error on renderer request: /bundles/abc123/render.\nOriginal error:\nTimed out!\n"
+            )
+          end
+
+          it "is classified as a connection failure rather than a bundle error" do
+            message = render_error_for(error).message
+            expect(message).to include("could not connect to the Node renderer")
+            expect(message).not_to include("Check your webpack configuration")
+          end
+        end
+
         context "when REACT_RENDERER_URL is set but the error carries no host/port" do
           let(:error) { Errno::ECONNREFUSED.new }
 
@@ -115,6 +154,20 @@ module ReactOnRails
           let(:error) { RuntimeError.new("ReferenceError: SomeComponent is not defined") }
 
           it "keeps the existing webpack/server-bundle troubleshooting message" do
+            message = render_error_for(error).message
+            expect(message).to include("Error evaluating server bundle. Check your webpack configuration.")
+            expect(message).not_to include("could not connect to the Node renderer")
+          end
+        end
+
+        context "when an in-process bundle error merely mentions a connection (e.g. a component's own fetch)" do
+          # A component fetching during SSR can fail with a JS-level "ECONNREFUSED" string,
+          # but the renderer itself was reached. This must NOT be reclassified as a renderer
+          # connectivity failure (the inverse of the issue #3604 bug); there is no Errno in
+          # the chain and the message has no renderer/socket anchor.
+          let(:error) { RuntimeError.new("Error: connect ECONNREFUSED 127.0.0.1:5432 (database)") }
+
+          it "keeps the webpack/server-bundle message instead of blaming the renderer" do
             message = render_error_for(error).message
             expect(message).to include("Error evaluating server bundle. Check your webpack configuration.")
             expect(message).not_to include("could not connect to the Node renderer")
