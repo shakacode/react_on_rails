@@ -87,19 +87,33 @@ jobs:
     steps:
       - id: set-matrix
         run: |
-          # Determine if we should run full matrix (main, workflow_dispatch, force_run, or full-ci label)
+          # Determine if we should run full matrix (main, workflow_dispatch, force_run, or full-ci label).
+          # Legs are built with `jq -nc` so the JSON stays readable/diffable (one leg per line) while
+          # still emitting compact single-line output for $GITHUB_OUTPUT. Refs #3481.
           if [[ "${{ github.ref }}" == "refs/heads/main" ]] || \
              [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
              [[ "${{ inputs.force_run }}" == "true" ]] || \
              [[ "${{ needs.detect-changes.outputs.has_full_ci_label }}" == "true" ]]; then
             # Full matrix: test both latest and minimum supported versions, plus an
-            # Rspack leg (alongside Webpack) so both bundlers stay green. Refs #3481.
-            echo 'matrix={"include":[{"ruby-version":"4.0","node-version":"22","dependency-level":"latest","bundler":"webpack"},{"ruby-version":"3.3","node-version":"20","dependency-level":"minimum","bundler":"webpack"},{"ruby-version":"4.0","node-version":"22","dependency-level":"latest","bundler":"rspack"}]}' >> "$GITHUB_OUTPUT"
+            # Rspack leg (alongside Webpack) so both bundlers stay green.
+            matrix="$(jq -nc '{
+              "include": [
+                { "ruby-version": "4.0", "node-version": "22", "dependency-level": "latest",  "bundler": "webpack" },
+                { "ruby-version": "3.3", "node-version": "20", "dependency-level": "minimum", "bundler": "webpack" },
+                { "ruby-version": "4.0", "node-version": "22", "dependency-level": "latest",  "bundler": "rspack" }
+              ]
+            }')"
           else
             # PR matrix: test only latest versions for fast feedback, with an Rspack
-            # leg alongside Webpack to guard both bundlers. Refs #3481.
-            echo 'matrix={"include":[{"ruby-version":"4.0","node-version":"22","dependency-level":"latest","bundler":"webpack"},{"ruby-version":"4.0","node-version":"22","dependency-level":"latest","bundler":"rspack"}]}' >> "$GITHUB_OUTPUT"
+            # leg alongside Webpack to guard both bundlers.
+            matrix="$(jq -nc '{
+              "include": [
+                { "ruby-version": "4.0", "node-version": "22", "dependency-level": "latest", "bundler": "webpack" },
+                { "ruby-version": "4.0", "node-version": "22", "dependency-level": "latest", "bundler": "rspack" }
+              ]
+            }')"
           fi
+          echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
 
   build-dummy-app-test-bundles:
     needs: [detect-changes, setup-integration-matrix]
@@ -117,6 +131,9 @@ jobs:
         needs.detect-changes.outputs.run_dummy_tests == 'true'
       )
     strategy:
+      # Keep both bundler legs reporting independently: a failure in one bundler
+      # must not cancel the other (the default fail-fast: true would). Refs #3481.
+      fail-fast: false
       matrix: ${{ fromJson(needs.setup-integration-matrix.outputs.matrix) }}
     runs-on: ubuntu-22.04
     steps:
@@ -178,11 +195,15 @@ jobs:
         # pass this step (the next step's grep matches even on a failed build, since Shakapacker logs
         # "Completed <bundler> build" before it exits non-zero). Fail fast here instead. Refs #3481.
         shell: bash
+        env:
+          # Lifted into env: (rather than inline in the run: line) to match the verify step and avoid
+          # interpolating ${{ }} directly into shell. matrix.bundler is webpack | rspack. Refs #3481.
+          SHAKAPACKER_ASSETS_BUNDLER: ${{ matrix.bundler }}
         run: |
           set -o pipefail
           rm -rf react_on_rails/spec/dummy/public/webpack/test
           pnpm --filter "react_on_rails" run build:rescript
-          cd react_on_rails/spec/dummy && RAILS_ENV="test" NODE_ENV="test" SHAKAPACKER_ASSETS_BUNDLER="${{ matrix.bundler }}" bin/shakapacker 2>&1 | tee "$RUNNER_TEMP/shakapacker-build.log"
+          cd react_on_rails/spec/dummy && RAILS_ENV="test" NODE_ENV="test" bin/shakapacker 2>&1 | tee "$RUNNER_TEMP/shakapacker-build.log"
       - name: Verify test bundles were built with ${{ matrix.bundler }}
         # Guard against a silent bundler fallback. Both Shakapacker's bundler-binary selection and its
         # "[Shakapacker] Completed <bundler> build" log line resolve through config.rspack?, which is
@@ -205,7 +226,7 @@ jobs:
           fi
           echo "Confirmed: dummy test bundles built with ${EXPECTED_BUNDLER}."
       - id: get-sha
-        run: echo "sha=\"$(git rev-parse HEAD)\"" >> "$GITHUB_OUTPUT"
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Save test bundles to cache (for build number checksum used by RSpec job)
         uses: actions/cache/save@v4
         with:
@@ -228,6 +249,9 @@ jobs:
         needs.detect-changes.outputs.run_dummy_tests == 'true'
       )
     strategy:
+      # Keep both bundler legs reporting independently: a failure in one bundler
+      # must not cancel the other (the default fail-fast: true would). Refs #3481.
+      fail-fast: false
       matrix: ${{ fromJson(needs.setup-integration-matrix.outputs.matrix) }}
     runs-on: ubuntu-22.04
     steps:
@@ -267,7 +291,7 @@ jobs:
         if: matrix.dependency-level == 'minimum'
         run: script/convert
       - id: get-sha
-        run: echo "sha=\"$(git rev-parse HEAD)\"" >> "$GITHUB_OUTPUT"
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Save test bundles to cache (for build number checksum used by RSpec job)
         uses: actions/cache@v4
         with:
@@ -321,6 +345,11 @@ jobs:
         run: |
           echo "CI_DEPENDENCY_LEVEL=ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}-${{ matrix.bundler }}" >> "$GITHUB_ENV"
       - name: Main CI
+        # SHAKAPACKER_ASSETS_BUNDLER is intentionally not set here: the specs consume the pre-built
+        # bundles restored from cache above and never re-invoke bin/shakapacker, so the active bundler
+        # is already baked into the compiled assets. If a future spec or setup hook ever does rebuild,
+        # set this step's env to SHAKAPACKER_ASSETS_BUNDLER: ${{ matrix.bundler }} so the rspack leg
+        # can't silently fall back to webpack (the shakapacker.yml default). Refs #3481.
         run: cd react_on_rails && bundle exec rake run_rspec:all_dummy
       - name: Store test results
         uses: actions/upload-artifact@v4
