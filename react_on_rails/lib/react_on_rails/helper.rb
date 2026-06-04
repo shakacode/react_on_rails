@@ -62,7 +62,7 @@ module ReactOnRails
     #     a generator:
     #   See README.md for how to "register" your React components.
     #   See spec/dummy/client/app/packs/server-bundle.js and
-    #     spec/dummy/client/app/packs/client-bundle.js for examples of this.
+    #     spec/dummy/client/app/packs/client-bundle.ts for examples of this.
     #
     # options:
     #   props: Ruby Hash or JSON string which contains the properties to pass to the react object. Do

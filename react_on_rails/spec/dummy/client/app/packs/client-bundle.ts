@@ -15,12 +15,15 @@ const useStrictMode = process.env.NODE_ENV !== 'production';
 
 const STRICT_MODE_PATCHED = '__reactOnRailsDummyStrictModePatched';
 
+const reactOnRailsWithStrictModeFlag = ReactOnRails as typeof ReactOnRails &
+  Partial<Record<typeof STRICT_MODE_PATCHED, true>>;
+
 // Scope: this patch only affects `ReactOnRails.register` calls that share this bundle's
 // `react-on-rails/client` module instance. Coverage today:
 //   - This pack and its imports (HelloTurboStream, ManualRenderComponent, SharedReduxStore).
 //   - The auto-generated `packs/generated/*.js` entries — they share this `ReactOnRails` instance
 //     because shakapacker's webpack build produces one runtime per compilation, and they run
-//     after `client-bundle.js` on every page that loads them.
+//     after the `client-bundle` pack on every page that loads them.
 //   - Inline ERB views that call `ReactOnRails.register` after this pack has run.
 //   - Manual-render trees in `startup/` and `app-react16/startup/` already wrap with
 //     `wrapElementInStrictMode` directly (they don't need this `register` patch).
@@ -29,12 +32,12 @@ const STRICT_MODE_PATCHED = '__reactOnRailsDummyStrictModePatched';
 // webpack compilation (e.g., a standalone bundle config) would get its own unpatched module
 // instance. When adding a pack like that, either fold it into this compilation or duplicate
 // this `STRICT_MODE_PATCHED` block at the top of the new pack before any `register` calls.
-if (useStrictMode && !ReactOnRails[STRICT_MODE_PATCHED]) {
+if (useStrictMode && !reactOnRailsWithStrictModeFlag[STRICT_MODE_PATCHED]) {
   const originalRegister = ReactOnRails.register.bind(ReactOnRails);
 
   ReactOnRails.register = (components) =>
     originalRegister(wrapRegisteredComponentsWithStrictMode(components));
-  Object.defineProperty(ReactOnRails, STRICT_MODE_PATCHED, { value: true });
+  Object.defineProperty(reactOnRailsWithStrictModeFlag, STRICT_MODE_PATCHED, { value: true });
 }
 
 ReactOnRails.setOptions({
@@ -47,6 +50,6 @@ ReactOnRails.register({
   ManualRenderComponent,
 });
 
-ReactOnRails.registerStore({
+ReactOnRails.registerStoreGenerators({
   SharedReduxStore,
 });

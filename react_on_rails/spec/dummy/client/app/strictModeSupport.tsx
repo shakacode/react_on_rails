@@ -181,7 +181,7 @@ const wrapRenderFunctionResult = (result: unknown): unknown => {
 
 // The wrapped function below has `length === 2`, so `isRenderFunction` would re-classify it as a
 // render function if it ever flowed back through `wrapRegisteredComponentsWithStrictMode`. The
-// `STRICT_MODE_PATCHED` guard on the patched `register` call (in `client-bundle.js`) keeps that
+// `STRICT_MODE_PATCHED` guard on the patched `register` call (in `client-bundle.ts`) keeps that
 // re-entry path unreachable. Note: when called directly (outside the registry path), the wrapper's
 // hardcoded `length === 2` does not reflect the original function's arity.
 const wrapRenderFunctionInStrictMode = (renderFunction: RenderFunction): RenderFunction => {
