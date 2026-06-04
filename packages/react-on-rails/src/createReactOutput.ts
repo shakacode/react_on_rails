@@ -1,11 +1,5 @@
 import { createElement, isValidElement, type ReactElement } from 'react';
-import type {
-  CreateParams,
-  ReactComponent,
-  RenderFunction,
-  RenderFunctionResult,
-  CreateReactOutputResult,
-} from './types/index.ts';
+import type { CreateParams, ReactComponent, RenderFunction, CreateReactOutputResult } from './types/index.ts';
 import { isServerRenderHash, isPromise } from './isServerRenderResult.ts';
 
 function createReactElementFromRenderFunctionResult(
@@ -72,17 +66,14 @@ export default function createReactOutput({
     if (trace) {
       console.log(`${name} is a renderFunction`);
     }
-    // createReactOutput is only meant to handle the server-side / 2-argument render-function form,
-    // which returns a component or server-render hash — so we call with 2 args and narrow the result
-    // back to RenderFunctionResult, excluding the renderer-only return shapes. The 3-argument
-    // renderer form (which may return a RendererTeardownResult) does not reach here on the normal
-    // paths:
+    // createReactOutput is only meant to handle render-functions that return a component or
+    // server-render hash. The 3-argument renderer form (which may return a RendererTeardownResult)
+    // does not reach here on the normal paths:
     // the streaming client renderers delegate it earlier (`delegateToRenderer`), and server
     // rendering rejects it upstream in validateComponent ("Detected a renderer while server
     // rendering"). The one path that is NOT guarded is the manual public `ReactOnRails.render()`
-    // API, which calls this directly; passing a renderer there is unsupported and the `as` is
-    // type-only, so runtime behavior is unchanged regardless.
-    const renderFunctionResult = (component as RenderFunction)(props, railsContext) as RenderFunctionResult;
+    // API, which calls this directly; passing a renderer there is unsupported.
+    const renderFunctionResult = (component as RenderFunction)(props, railsContext);
     if (isServerRenderHash(renderFunctionResult)) {
       // We just return at this point, because calling function knows how to handle this case and
       // we can't call React.createElement with this type of Object.
