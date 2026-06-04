@@ -16,7 +16,7 @@
   <li>
     <p>Use register to expose the rendering function to ReactOnRails:</p>
     <pre>
-  import ManualRenderApp from './ManualRenderAppRenderer';
+  import ManualRenderApp from '../startup/ManualRenderApp';
 
   ReactOnRails.register({
     ManualRenderApp,
@@ -29,7 +29,7 @@
   <li>
     <p>A renderer is a function that accepts props, railsContext, domNodeId:</p>
     <pre>
-  import ReactDOMClient from 'react-dom/client';
+  import { createRoot, hydrateRoot } from 'react-dom/client';
 
   const ManualRenderApp = (props, railsContext, domNodeId) => {
     const reactElement = (
@@ -39,11 +39,16 @@
       <%= '</div>' %>
     );
 
-    const root = ReactDOMClient.createRoot(document.getElementById(domNodeId));
-    root.render(reactElement);
+    const domNode = document.getElementById(domNodeId);
+    if (props.prerender) {
+      hydrateRoot(domNode, reactElement);
+    } else {
+      const root = createRoot(domNode);
+      root.render(reactElement);
+    }
   };
     </pre>
-    <h4>spec/dummy/client/app/startup/ManualRenderAppRenderer.jsx</h4>
+    <h4>spec/dummy/client/app/startup/ManualRenderApp.tsx</h4>
     <br>
   </li>
 </ul>
