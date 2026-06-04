@@ -236,6 +236,12 @@ jobs:
           key: dummy-app-bundle-${{ steps.get-sha.outputs.sha }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}-${{ matrix.bundler }}
 
   dummy-app-integration-tests:
+    # Known Layer-1 tradeoff (#3481): `needs` gates job-to-job, not matrix-leg-to-leg, so if either
+    # bundler's build leg in build-dummy-app-test-bundles fails, that whole job is marked failed and
+    # every integration leg here is skipped — including the bundler that built fine. Independent
+    # build-level signal is still preserved (fail-fast: false runs both build legs); only the
+    # integration run is gated. A per-bundler build+integration job split would fully decouple them
+    # and is deferred to a later layer of #3481.
     needs: [detect-changes, setup-integration-matrix, build-dummy-app-test-bundles]
     # Run on main, workflow_dispatch, OR when tests needed on PR
     if: |
