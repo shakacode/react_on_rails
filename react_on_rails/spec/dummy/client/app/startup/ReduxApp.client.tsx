@@ -18,10 +18,6 @@ declare const module: {
 };
 
 type DomRenderer = (domNode: Element, element: ReactNode) => void;
-type StrictModeElementWrapper = (reactElement: ReactNode) => ReactNode;
-
-const wrapReduxElementInStrictMode = wrapElementInStrictMode as StrictModeElementWrapper;
-
 const hydrateOrRender = (shouldHydrate: boolean): DomRenderer =>
   shouldHydrate
     ? (domNode, element) => {
@@ -43,7 +39,7 @@ export default function ReduxApp(
   const store: ReduxAppStore = createStore(combinedReducer, combinedProps, applyMiddleware(thunk));
 
   const renderApp = (Component: typeof HelloWorldContainer) => {
-    const element = wrapReduxElementInStrictMode(
+    const element = wrapElementInStrictMode(
       <Provider store={store}>
         <Component />
       </Provider>,

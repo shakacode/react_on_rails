@@ -14,10 +14,6 @@ declare const module: {
 };
 
 type DomRenderer = (domNode: Element, element: ReactNode) => void;
-type StrictModeElementWrapper = (reactElement: ReactNode) => ReactNode;
-
-const wrapReduxElementInStrictMode = wrapElementInStrictMode as StrictModeElementWrapper;
-
 const hydrateOrRender = (shouldHydrate: boolean): DomRenderer =>
   shouldHydrate
     ? (domNode, element) => {
@@ -37,7 +33,7 @@ export default function ReduxSharedStoreApp(
   const store = ReactOnRails.getStore('SharedReduxStore') as ReduxAppStore;
 
   const renderApp = (Component: typeof HelloWorldContainer) => {
-    const element = wrapReduxElementInStrictMode(
+    const element = wrapElementInStrictMode(
       <Provider store={store}>
         <Component />
       </Provider>,
