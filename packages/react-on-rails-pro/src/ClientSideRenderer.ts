@@ -18,7 +18,7 @@ import type { ReactElement } from 'react';
 import type {
   RailsContext,
   RegisteredComponent,
-  RendererResult,
+  RendererFunction,
   RendererTeardown,
   Root,
 } from 'react-on-rails/types';
@@ -41,10 +41,13 @@ const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
  * Invokes a renderer teardown, swallowing async rejections so a failing teardown cannot produce an
  * unhandled promise rejection. Synchronous throws propagate to the caller's try/catch.
  *
- * Intentionally duplicated from the OSS `react-on-rails` ClientRenderer rather than imported: it is a
- * tiny self-contained helper that the OSS module does not export, so duplicating keeps the Pro client
- * renderer decoupled from OSS internals (no reliance on a non-public export) instead of widening the
- * OSS public API just to share it.
+ * Intentionally re-implemented (not imported) from the OSS `react-on-rails` `invokeRendererTeardown`:
+ * the OSS module does not export it, so re-implementing keeps the Pro client renderer decoupled from
+ * OSS internals (no reliance on a non-public export) instead of widening the OSS public API just to
+ * share it. Note this copy inlines the thenable check (`maybePromise && typeof maybePromise.then ===
+ * 'function'`) rather than reusing OSS's `isThenable` helper; the two are equivalent for the
+ * `void | Promise<void>` value a renderer teardown produces. The shared `RendererFunction`/
+ * `RendererTeardown` *types* are imported, so only this small runtime helper is duplicated.
  */
 function invokeRendererTeardown(teardown: RendererTeardown | undefined, domNodeId: string): void {
   if (!teardown) return;
@@ -59,17 +62,6 @@ function invokeRendererTeardown(teardown: RendererTeardown | undefined, domNodeI
     });
   }
 }
-
-// The 3-argument renderer call signature. A renderer owns its own mount and returns a RendererResult
-// (nothing, a teardown, or a promise resolving to one). Casting the registered component to this
-// precise type — rather than the public `RenderFunction`, which unifies the renderer and server
-// render-function shapes by arity — narrows the awaited result to `void | RendererTeardown` without
-// a value-level cast.
-type RendererFunction = (
-  props?: Record<string, unknown>,
-  railsContext?: RailsContext,
-  domNodeId?: string,
-) => RendererResult;
 
 type DelegationResult = { delegated: false } | { delegated: true; teardown?: RendererTeardown };
 

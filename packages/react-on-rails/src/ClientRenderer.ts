@@ -2,6 +2,7 @@ import type { ReactElement } from 'react';
 import type {
   RegisteredComponent,
   RailsContext,
+  RendererFunction,
   RendererResult,
   RendererTeardown,
   RenderReturnType,
@@ -21,23 +22,13 @@ const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 // unload or same-id node replacement:
 // - `react`: a React root (or legacy backing instance) that ReactOnRails created itself.
 // - `renderer`: a user renderer function (3-arg form) that owns its own mount; cleanup runs the
-//   optional teardown it returned. `teardown` is undefined in two cases: the renderer opted out
-//   (returned nothing), or an async teardown has not resolved yet — `trackRendererMount` only
-//   attaches a late-resolving teardown while this entry is still the active mount for its id.
+//   optional teardown it returned. `teardown` is undefined in three cases: the renderer opted out
+//   (returned nothing), an async teardown has not resolved yet — `trackRendererMount` only attaches
+//   a late-resolving teardown while this entry is still the active mount for its id — or the
+//   renderer's own promise rejected, so it never produced a teardown.
 type RenderedEntry =
   | { kind: 'react'; root: RenderReturnType; domNode: Element }
   | { kind: 'renderer'; teardown?: RendererTeardown; domNode: Element };
-
-// The 3-argument renderer call signature. A renderer owns its own mount and returns a RendererResult
-// (nothing, a teardown, or a promise resolving to one) — distinct from the server render-function
-// shape that the public `RenderFunction` interface unifies by arity. Casting the registered
-// component to this precise type narrows the call result to RendererResult without a value-level
-// cast at the call site.
-type RendererFunction = (
-  props?: Record<string, unknown>,
-  railsContext?: RailsContext,
-  domNodeId?: string,
-) => RendererResult;
 
 /** Narrows an unknown value to a thenable (has a callable `.then`) without assuming a native Promise. */
 function isThenable(value: unknown): value is PromiseLike<unknown> {
@@ -131,9 +122,10 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
 
     // Call the renderer function with the expected signature. A renderer owns its own mount and
     // returns a RendererResult: nothing, a teardown callback, or a promise resolving to one. We cast
-    // to `RendererFunction` (the precise 3-arg shape) rather than the public `RenderFunction`, which
-    // unifies the renderer and server render-function shapes by arity; here `isRenderer` is known
-    // true, so the result is a RendererResult with no further cast.
+    // to the shared `RendererFunction` (the precise 3-arg shape) rather than the public
+    // `RenderFunction`, whose single signature has optional params and a union return type covering
+    // both the renderer and server render-function shapes; here `isRenderer` is known true, so the
+    // result is a RendererResult with no further cast.
     const result = (component as RendererFunction)(props, railsContext, domNodeId);
     return { delegated: true, result };
   }
@@ -330,7 +322,9 @@ export function reactOnRailsComponentLoaded(domId: string): Promise<void> {
 
 /**
  * Unmount all rendered React components, run all renderer-function teardowns, and clear roots.
- * This should be called on page unload to prevent memory leaks. Exported for testing.
+ * Registered with `onPageUnloaded` to run on the page-unload lifecycle (Turbo/Turbolinks
+ * soft-navigation page swap, not a native browser unload) to prevent memory leaks. Exported for
+ * testing.
  * @internal
  */
 export function unmountAllComponents(): void {

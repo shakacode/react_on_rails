@@ -172,6 +172,21 @@ type RendererTeardown = () => void | Promise<void>;
 // eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- renderer functions may return nothing
 type RendererResult = void | RendererTeardown | Promise<void | RendererTeardown>;
 
+/**
+ * The precise call signature of the 3-argument "renderer" form `(props, railsContext, domNodeId) =>
+ * …`. A renderer owns its own mount and returns a {@link RendererResult} (nothing, a teardown, or a
+ * promise resolving to one). The client renderers cast a registered component to this — rather than
+ * the public {@link RenderFunction}, whose single signature has optional params and a union return
+ * type spanning both the renderer and server render-function shapes — to narrow the call result to
+ * RendererResult with no value-level cast. Shared by the core and Pro client renderers so the two
+ * cannot drift.
+ */
+type RendererFunction = (
+  props?: Record<string, unknown>,
+  railsContext?: RailsContext,
+  domNodeId?: string,
+) => RendererResult;
+
 type StreamableComponentResult = ReactElement | Promise<ReactElement | string>;
 
 type AsyncPropsManager = {
@@ -234,6 +249,7 @@ export type {
   RenderFunction,
   RendererTeardown,
   RendererResult,
+  RendererFunction,
   RenderFunctionResult,
   Store,
   StoreGenerator,

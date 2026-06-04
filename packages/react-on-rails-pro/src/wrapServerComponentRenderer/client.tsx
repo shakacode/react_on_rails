@@ -60,6 +60,11 @@ const wrapServerComponentRenderer = (
     throw new Error(`wrapServerComponentRenderer: component '${componentName}' is not a function`);
   }
 
+  // The 3-argument arity here is load-bearing: ComponentRegistry classifies a registration as a
+  // renderer only when `renderFunction && length === 3`, and only renderers have their returned
+  // teardown captured and run on unmount. Dropping `domNodeId` from this signature would silently
+  // demote the wrapper to a plain render-function, drop the teardown below, and re-introduce the
+  // mount leak this fix closes. Keep all three parameters declared.
   const wrapper: RenderFunction = async (props, railsContext, domNodeId) => {
     // A registerServerComponent render function is expected to resolve to the component to mount,
     // not a renderer teardown. RenderFunction's return union is wider (this PR added
