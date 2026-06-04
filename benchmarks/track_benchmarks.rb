@@ -313,15 +313,21 @@ if __FILE__ == $PROGRAM_NAME
   # PR comment, and (on a main regression) the report-regressions hand-off.
   report_markdown = rendered_report(report, SUITE_NAME)
   post_report_to_summary(report_markdown)
-  # A nil report means Bencher produced no parseable output (operational failure). On
-  # a PR, replacing the comment now would delete the previous run's real report and
-  # make an auth/API/network failure look like a normal un-highlighted summary, while
-  # the job still exits 0. Keep the prior comment intact and surface the failure
-  # instead. (post_report_to_summary above is per-run and clobbers nothing, so the raw
-  # numbers still appear in this run's job summary.)
-  if report.nil? && ENV.fetch("GITHUB_EVENT_NAME") == "pull_request"
+  pr_event = ENV.fetch("GITHUB_EVENT_NAME") == "pull_request"
+  if report.nil? && pr_event
+    # A nil report means Bencher produced no parseable output (operational failure). On
+    # a PR, replacing the comment now would delete the previous run's real report and
+    # make an auth/API/network failure look like a normal un-highlighted summary, while
+    # the job still exits 0. Keep the prior comment intact and surface the failure
+    # instead. (post_report_to_summary above is per-run and clobbers nothing.)
     warn "::warning::Bencher produced no report for #{SUITE_NAME} (operational failure); " \
          "keeping the previous PR comment intact instead of overwriting it with an un-highlighted table."
+  elsif pr_event && regression?(report) && report_markdown.empty?
+    # A real regression but no table to render (display sidecar missing/empty). Don't
+    # leave the stale PR comment looking unchanged — post the run-URL fallback (which
+    # also emits ::error::) so the regression is visible in the PR thread, mirroring the
+    # main-push report-regressions hand-off.
+    replace_pr_comments(regression_handoff_summary(report_markdown))
   else
     replace_pr_comments(report_markdown)
   end

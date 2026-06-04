@@ -111,20 +111,30 @@ class BencherReport
       iteration.each do |result|
         name = dig_string(result, "benchmark", "name")
         per_measure = index[name] ||= {}
-        fetch_array(result, "measures").each do |measure_entry|
-          boundary = parse_boundary(measure_entry)
-          # Index by both slug and name so callers can match either form (Bencher
-          # slugifies the BMF measure key, e.g. "p50_latency" -> "p50-latency").
-          # Invariant: slug and name are expected to normalize to distinct strings
-          # across all measures of a given benchmark. If two measures collided on a
-          # normalized key the later write would silently overwrite the earlier
-          # boundary; that can't happen with the current Bencher measure set.
-          per_measure[normalize(dig_string(measure_entry, "measure", "slug"))] = boundary
-          per_measure[normalize(dig_string(measure_entry, "measure", "name"))] = boundary
-        end
+        fetch_array(result, "measures").each { |measure_entry| index_measure(per_measure, measure_entry, name) }
       end
     end
     index
+  end
+
+  # Index one measure's boundary under both its normalized slug and name so callers can
+  # match either form (Bencher slugifies the BMF key, e.g. "p50_latency" ->
+  # "p50-latency"). Invariant: slug and name normalize to distinct keys across a
+  # benchmark's measures. Enforce it (fail loud) rather than let a future collision
+  # silently overwrite an earlier boundary and mis-report significance. A single
+  # measure whose slug and name normalize together is fine — it's the same boundary.
+  def index_measure(per_measure, measure_entry, benchmark_name)
+    boundary = parse_boundary(measure_entry)
+    slug_key = normalize(dig_string(measure_entry, "measure", "slug"))
+    name_key = normalize(dig_string(measure_entry, "measure", "name"))
+    [slug_key, name_key].each do |key|
+      existing = per_measure[key]
+      if existing && !existing.equal?(boundary)
+        raise FormatError, "normalized measure key collision on #{key.inspect} for benchmark #{benchmark_name.inspect}"
+      end
+
+      per_measure[key] = boundary
+    end
   end
 
   def parse_boundary(measure_entry)

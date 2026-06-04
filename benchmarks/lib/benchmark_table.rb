@@ -79,13 +79,13 @@ class BenchmarkTable
   def render_value(value)
     return "—" if value.nil?
 
-    # Escape pipes (which break the table column structure) and backslashes (so an
-    # escape character in a value can't combine with following text, and to satisfy
-    # static analysis) in a single pass, which avoids double-escaping. Cell values are
-    # controlled CI output (route paths, test names, status strings like
-    # "200=900,5xx=10"), not untrusted input, so other Markdown metacharacters
-    # (*, _, backtick) are intentionally left unescaped — the naming convention is
-    # assumed to avoid them.
-    value.to_s.gsub(/[\\|]/) { |char| "\\#{char}" }
+    # Escape the Markdown metacharacters that affect inline rendering in a table cell,
+    # in a single pass (which avoids double-escaping): the pipe (breaks the column
+    # structure), the backslash (the escape char itself — also satisfies static
+    # analysis), and *, _, ` (emphasis/code spans — a route or test name with
+    # underscores/asterisks/backticks would otherwise render as Markdown). Cell values
+    # are controlled CI output (route paths, test names, status strings like
+    # "200=900,5xx=10"), so this is rendering robustness, not untrusted-input sanitizing.
+    value.to_s.gsub(/[\\`*_|]/) { |char| "\\#{char}" }
   end
 end

@@ -106,6 +106,16 @@ RSpec.describe BenchmarkTable do
     expect(markdown).to include('x\\\\\\|y')
   end
 
+  it "escapes emphasis/code metacharacters (_ * `) so names don't render as Markdown" do
+    markdown = render(
+      rows: [row(name: "a_b_c", rps: 1.0, p50: 2.0, p90: 3.0, status: "`x` *y*")],
+      report: fake_report
+    )
+
+    expect(markdown).to include('a\_b\_c')
+    expect(markdown).to include('\`x\` \*y\*')
+  end
+
   it "renders a non-numeric rps token (FAILED/MISSING) as plain text without highlighting" do
     report = fake_report(["/broken", "rps"] => :regression)
     markdown = render(
