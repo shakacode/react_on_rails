@@ -25,13 +25,13 @@ const TestComponent = () => (
     <img src={blueprintIcon} alt="blueprint icon" />
     <hr />
     <h1>Below is a div with a background svg</h1>
-    <div className={css.googleLogo} alt="google logo" />
+    <div className={css.googleLogo} role="img" aria-label="google logo" />
     <hr />
     <h1>SVG lego icon img tag with global path</h1>
     <img src={legoIcon} alt="lego icon" />
     <hr />
     <h1>SVG lego icon with background image to global path</h1>
-    <div className={css.legoIcon} alt="lego icon again" />
+    <div className={css.legoIcon} role="img" aria-label="lego icon again" />
   </div>
 );
 

@@ -2,7 +2,9 @@ import React from 'react';
 
 import styles from '../components/CssModulesImagesFontsExample.module.scss';
 
-export default (_props) => (
+type CssModulesImagesFontsExampleProps = Record<string, never>;
+
+const CssModulesImagesFontsExample = (_props: CssModulesImagesFontsExampleProps) => (
   <div>
     <h1 className={styles.heading}>This should be open sans light green.</h1>
     <div>
@@ -19,3 +21,5 @@ export default (_props) => (
     </div>
   </div>
 );
+
+export default CssModulesImagesFontsExample;
