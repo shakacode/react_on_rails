@@ -14,7 +14,7 @@ jest.mock('shakapacker', () => ({
 
 jest.mock('fs', () => {
   const actual = jest.requireActual('fs');
-  return { ...actual, existsSync: jest.fn(), readFileSync: jest.fn() };
+  return { ...actual, existsSync: jest.fn(), readFileSync: jest.fn(), statSync: jest.fn() };
 });
 
 const fs = require('fs');
@@ -37,6 +37,7 @@ describe('rscManifestClientReferences (Pro dummy) mirrors the generator resoluti
     delete process.env.RSC_BUNDLE_ONLY;
     fs.existsSync.mockReset();
     fs.readFileSync.mockReset();
+    fs.statSync.mockReset();
   });
 
   afterAll(() => {
@@ -110,5 +111,47 @@ describe('rscManifestClientReferences (Pro dummy) mirrors the generator resoluti
     const refs = rscManifestClientReferences();
     expect(Array.isArray(refs)).toBe(true);
     expect(refs[0]).toMatchObject({ directory: './client/app', recursive: true });
+  });
+
+  it('warns (but still uses the manifest) when it is older than the registration entry', () => {
+    fs.existsSync.mockImplementation((p) => p === DEFAULT_MANIFEST || p === REGISTRATION_ENTRY);
+    fs.readFileSync.mockReturnValue(JSON.stringify({ refs: ['client/app/A.jsx'] }));
+    fs.statSync.mockImplementation((p) => ({ mtimeMs: p === REGISTRATION_ENTRY ? 2000 : 1000 }));
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx']);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringMatching(/may be stale/));
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('does not warn when the manifest is newer than the registration entry', () => {
+    fs.existsSync.mockImplementation((p) => p === DEFAULT_MANIFEST || p === REGISTRATION_ENTRY);
+    fs.readFileSync.mockReturnValue(JSON.stringify({ refs: ['client/app/A.jsx'] }));
+    fs.statSync.mockImplementation((p) => ({ mtimeMs: p === REGISTRATION_ENTRY ? 1000 : 2000 }));
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx']);
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('does not warn or stat when the registration entry is absent', () => {
+    fs.existsSync.mockImplementation((p) => p === DEFAULT_MANIFEST);
+    fs.readFileSync.mockReturnValue(JSON.stringify({ refs: ['client/app/A.jsx'] }));
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx']);
+      expect(warnSpy).not.toHaveBeenCalled();
+      expect(fs.statSync).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 });

@@ -445,8 +445,19 @@ module ReactOnRails
       FileUtils.mkdir_p(generated_nonentrypoints_directory_path)
     end
 
+    # The server-component registration entry lives in the nonentrypoints `generated/` directory.
+    # That equals generated_server_bundle_directory_path in the default mode, but when
+    # make_generated_server_bundle_the_entrypoint is true the server bundle path is the entrypoint
+    # and generated_server_bundle_directory_path is nil — so the nonentrypoints directory would
+    # otherwise never be scanned and a stale registration entry could never be cleaned. Add it
+    # explicitly (only when RSC is enabled, to avoid creating an empty directory otherwise).
+    def directories_to_clean
+      directories = [generated_packs_directory_path, generated_server_bundle_directory_path]
+      directories << generated_nonentrypoints_directory_path if ReactOnRails::Utils.rsc_support_enabled?
+      directories.compact.uniq
+    end
+
     def clean_non_generated_files_with_feedback(verbose: false)
-      directories_to_clean = [generated_packs_directory_path, generated_server_bundle_directory_path].compact.uniq
       expected_files = build_expected_files_set
 
       puts Rainbow("🧹 Cleaning non-generated files...").yellow if verbose
@@ -496,7 +507,9 @@ module ReactOnRails
 
     def find_unexpected_files(existing_files, dir_path, expected_files)
       existing_files.reject do |file|
-        if dir_path == generated_server_bundle_directory_path
+        # The server bundle and the registration entry both live in the nonentrypoints `generated/`
+        # directory (which equals generated_server_bundle_directory_path in the default mode).
+        if dir_path == generated_nonentrypoints_directory_path
           [
             expected_files[:server_bundle],
             expected_files[:server_component_registration_entry]
@@ -530,11 +543,6 @@ module ReactOnRails
     end
 
     def clean_generated_directories_with_feedback(verbose: false)
-      directories_to_clean = [
-        generated_packs_directory_path,
-        generated_server_bundle_directory_path
-      ].compact.uniq
-
       puts Rainbow("🧹 Cleaning generated directories...").yellow if verbose
 
       total_deleted = directories_to_clean.sum { |dir_path| clean_directory_with_feedback(dir_path, verbose: verbose) }

@@ -390,6 +390,17 @@ module ReactOnRails
         File.write(component_source, original_source) if original_source
       end
 
+      it "does not write a registration entry when there are no server components to register" do
+        generator = described_class.instance
+        allow(generator).to receive(:server_component_registration_entries).and_return({})
+        entry_path = generator.send(:server_component_registration_entry_file_path)
+        FileUtils.rm_f(entry_path)
+
+        generator.send(:create_server_component_registration_entry)
+
+        expect(File.exist?(entry_path)).to be(false)
+      end
+
       context "when RSC support is disabled" do
         before do
           allow(ReactOnRailsPro::Utils).to receive(:rsc_support_enabled?).and_return(false)
@@ -472,6 +483,57 @@ module ReactOnRails
           expect(generated_entry_content.strip).to eq(expected_content.strip)
           expect(generated_entry_content).not_to include("ReactOnRails.register")
           expect(generated_entry_content).not_to include("ReactClientComponent")
+        end
+
+        it "preserves the registration entry while removing stray files during cleanup" do
+          generated_dir = File.join(Pathname(packer_source_entry_path).parent, "generated")
+          entry_path = File.join(generated_dir, "server-component-registration-entry.js")
+          stray_path = File.join(generated_dir, "stray-orphan.js")
+          File.write(stray_path, "// stray\n")
+          expect(File.exist?(entry_path)).to be(true)
+
+          described_class.instance.generate_packs_if_stale
+
+          expect(File.exist?(stray_path)).to be(false)
+          expect(File.exist?(entry_path)).to be(true)
+        end
+
+        it "regenerates the registration entry when only it is missing" do
+          entry_path = File.join(
+            Pathname(packer_source_entry_path).parent,
+            "generated/server-component-registration-entry.js"
+          )
+          expect(File.exist?(entry_path)).to be(true)
+          File.delete(entry_path)
+
+          described_class.instance.generate_packs_if_stale
+
+          expect(File.exist?(entry_path)).to be(true)
+        end
+
+        it "scans the nonentrypoints directory for cleanup even when the server bundle is the entrypoint" do
+          generator = described_class.instance
+          ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint = true
+          nonentrypoints_dir = generator.send(:generated_nonentrypoints_directory_path)
+
+          # generated_server_bundle_directory_path is nil in entrypoint mode, so without the explicit
+          # add the registration entry's directory would never be enumerated for cleanup.
+          expect(generator.send(:directories_to_clean)).to include(nonentrypoints_dir)
+        ensure
+          ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint = false
+        end
+
+        it "treats the registration entry as expected and stray files as unexpected" do
+          generator = described_class.instance
+          nonentrypoints_dir = generator.send(:generated_nonentrypoints_directory_path)
+          entry = generator.send(:server_component_registration_entry_file_path)
+          stray = File.join(nonentrypoints_dir, "stray-orphan.js")
+          expected_files = generator.send(:build_expected_files_set)
+
+          unexpected = generator.send(:find_unexpected_files, [entry, stray], nonentrypoints_dir, expected_files)
+
+          expect(unexpected).to include(stray)
+          expect(unexpected).not_to include(entry)
         end
       end
     end

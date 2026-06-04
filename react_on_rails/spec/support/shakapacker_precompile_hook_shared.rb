@@ -16,7 +16,11 @@
 require "fileutils"
 require "json"
 
-EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_SEGMENTS = %w[/node_modules/ /public/ /tmp/].freeze
+# Guarded so the specs, which `load` this script once per example, don't warn on constant
+# re-initialization (the script is also run directly as the precompile hook).
+unless defined?(EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_SEGMENTS)
+  EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_SEGMENTS = %w[/node_modules/ /public/ /tmp/].freeze
+end
 
 # Find Rails root by walking upward looking for config/environment.rb
 def find_rails_root
@@ -136,6 +140,16 @@ def rsc_manifest_registration_entry(rails_root)
 end
 
 # Generate RSC manifest client references if a server component registration entry exists.
+#
+# Unlike the shipped template hook
+# (lib/generators/react_on_rails/templates/base/base/bin/shakapacker-precompile-hook), which loads
+# the full Rails environment and gates on `ReactOnRailsPro::Utils.rsc_support_enabled?`, this
+# standalone script never requires `config/environment` (it only walks up for the Rails root), so
+# ReactOnRailsPro is not loaded and `rsc_support_enabled?` is unavailable here. Instead it relies on
+# the registration entry's absence as the capability signal: the entry is written only when RSC is
+# enabled (see PacksGenerator#create_server_component_registration_entry), so a missing entry means
+# RSC is off and discovery is skipped. The early `RSC_REFERENCE_DISCOVERY_BUILD` guard prevents the
+# discovery build (which re-invokes bin/shakapacker) from recursing into itself.
 def generate_rsc_manifest_client_references_if_needed
   return if ENV["RSC_REFERENCE_DISCOVERY_BUILD"] == "true"
 
@@ -160,8 +174,10 @@ def generate_rsc_manifest_client_references_if_needed
     system(env, shakapacker_bin, exception: true)
     puts "✅ RSC manifest client references generated successfully"
   end
-rescue Errno::ENOENT => e
-  warn "⚠️  Warning: #{e.message}"
+# The discovered manifest is load-bearing for correct client references, so a failed discovery build
+# must abort the precompile (exit 1) rather than warn — matching the template hook, which lets the
+# error propagate to its top-level rescue. The shakapacker binary's existence is already asserted
+# above, so any failure here (including Errno::ENOENT) is a real error, not a benign "tool missing".
 rescue StandardError => e
   warn "❌ RSC manifest client reference generation failed: #{e.message}"
   exit 1

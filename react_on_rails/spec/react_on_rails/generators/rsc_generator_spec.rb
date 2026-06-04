@@ -2915,6 +2915,11 @@ describe RscGenerator, type: :generator do
         expect(content).to include("Run bin/shakapacker-precompile-hook before bin/shakapacker.")
         expect(content).to include("Array.isArray(payload.refs)")
         expect(content).to include("to contain a refs array")
+        # The configured override is path-resolved on both sides (mirror parity).
+        expect(content).to include("resolve(configuredRefsJson)")
+        # Best-effort staleness warning: manifest older than the registration entry -> console.warn.
+        expect(content).to include("statSync")
+        expect(content).to include("may be stale")
       end
     end
   end
