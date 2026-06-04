@@ -120,4 +120,15 @@ describe('resolveCssHrefs', () => {
       }),
     ).toEqual(['/webpack/test']);
   });
+
+  it('leaves protocol-relative CSS hrefs unprefixed', () => {
+    expect(
+      resolveCssHrefs({
+        moduleLoading: { prefix: '/webpack/test/' },
+        filePathToModuleMetadata: {
+          'file:///app/A.jsx': { css: ['//cdn.example.com/css/a.css'] },
+        },
+      }),
+    ).toEqual(['//cdn.example.com/css/a.css']);
+  });
 });

@@ -53,8 +53,10 @@ const joinPrefix = (prefix: string, file: string): string => {
  * manifest, not the client references encountered by a specific RSC payload.
  *
  * Each href is prefixed with `moduleLoading.prefix` (so CDN / non-default
- * `publicPath` deployments get fully-qualified hrefs), deduped, and returned in
- * manifest/chunk order.
+ * `publicPath` deployments get fully-qualified hrefs) unless it is already
+ * absolute (`scheme://` or protocol-relative `//`) or already begins with that
+ * prefix, in which case it is returned unchanged to avoid double-prefixing.
+ * Hrefs are deduped and returned in manifest/chunk order.
  */
 export default function resolveCssHrefs(manifest: RscCssManifest): string[] {
   const prefix = manifest.moduleLoading?.prefix ?? '';

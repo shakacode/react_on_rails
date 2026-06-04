@@ -55,6 +55,12 @@ const findScriptCloseEnd = (html, lowerHtml, fromIndex) => {
   return html.length;
 };
 
+// Returns `html` with the contents of every <script>...</script> element removed.
+// RSC Flight payloads serialize fallback text as script data, which would
+// otherwise trip the "not rendered as HTML" assertions below. This is a lossy,
+// best-effort scrub: on a malformed or unclosed <script> it over-strips (drops the
+// remainder), so it is only sound for one-directional `not.toContain` checks — it
+// can prove text is absent from rendered HTML, never that text is present.
 const htmlOutsideScripts = (html) => {
   const lowerHtml = html.toLowerCase();
   let cursor = 0;

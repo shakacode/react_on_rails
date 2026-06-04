@@ -22,7 +22,17 @@ test.describe('RSC use-client CSS (#3211 FOUC fix)', () => {
     expect(ssrHtml).toMatch(
       /<link(?=[^>]*\brel="preload")(?=[^>]*\bas="style")(?=[^>]*\bhref="[^"]*\.css")[^>]*>/,
     );
+    // React serializes the precedence reveal as a ["<css href>","ror-rsc"] tuple in
+    // its bootstrap stream. This tracks that internal serialization format and may
+    // need updating across React minor versions.
     expect(ssrHtml).toMatch(/\[\s*"[^"]*\.css"\s*,\s*"ror-rsc"\s*\]/);
+
+    // The probe is rendered in isolation here: `posts_count=0` makes `Posts` return
+    // null (see Posts.jsx), so the FOUC fix is exercised without depending on the
+    // posts data fetch. Pin that contract so a future default/guard change can't
+    // silently re-render posts on this probe route. `placehold.co` is each post's
+    // thumbnail (Post.jsx) and `ssrHtml` is the full stream, so this is timing-safe.
+    expect(ssrHtml).not.toContain('placehold.co');
 
     await page.goto(CSS_PROBE_PATH, { waitUntil: 'commit' });
 
