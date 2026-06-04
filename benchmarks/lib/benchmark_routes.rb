@@ -15,7 +15,8 @@ NON_BENCHMARK_ROUTES = %w[
 
 def route_has_required_params?(path)
   path_without_optional = path.gsub(/\([^)]*\)/, "")
-  path_without_optional.include?(":")
+  # `:id` / `*splat` segments outside the optional parens are required, so the route isn't a literal URL.
+  path_without_optional.include?(":") || path_without_optional.match?(/\*[A-Za-z_]/)
 end
 
 def strip_optional_params(route)
@@ -59,6 +60,12 @@ def benchmark_routes_from_rails_routes_output(routes_output)
     stripped = line.strip
 
     case stripped
+    when /\A-+\[ Route \d+ \]/
+      # The separator is the real block delimiter, so flush the route accumulated
+      # so far here rather than keying off Controller#Action being the last field.
+      route = benchmark_route_from_rails_output(current_route)
+      routes << route if route
+      current_route = {}
     when /\APrefix\s+\|\s*(.*)\z/
       current_route[:prefix] = Regexp.last_match(1)
     when /\AVerb\s+\|\s*(.*)\z/
@@ -67,12 +74,12 @@ def benchmark_routes_from_rails_routes_output(routes_output)
       current_route[:uri] = Regexp.last_match(1)
     when /\AController#Action\s+\|\s*(.*)\z/
       current_route[:controller_action] = Regexp.last_match(1)
-
-      route = benchmark_route_from_rails_output(current_route)
-      routes << route if route
-      current_route = {}
     end
   end
+
+  # Flush the final block: there is no trailing separator after the last route.
+  route = benchmark_route_from_rails_output(current_route)
+  routes << route if route
 
   routes
 end
@@ -100,11 +107,12 @@ def normalize_route_path(route)
 end
 
 def benchmark_route_from_rails_output(route)
+  # Guard required keys: separator-triggered flushes run on every block, so incomplete ones skip rather than raise.
   return unless route[:verb] == "GET"
-  return unless benchmark_controller_action?(route[:controller_action])
+  return unless route[:controller_action] && benchmark_controller_action?(route[:controller_action])
 
   path = route[:uri]
-  return if route_has_required_params?(path)
+  return if path.nil? || route_has_required_params?(path)
   return if path.include?("_for_testing")
 
   normalized = normalize_route_path(strip_optional_params(path))

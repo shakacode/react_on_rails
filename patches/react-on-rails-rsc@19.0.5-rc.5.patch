@@ -1,0 +1,35 @@
+diff --git a/dist/react-server-dom-webpack/cjs/react-server-dom-webpack-plugin.js b/dist/react-server-dom-webpack/cjs/react-server-dom-webpack-plugin.js
+index 41807a7..7345559 100644
+--- a/dist/react-server-dom-webpack/cjs/react-server-dom-webpack-plugin.js
++++ b/dist/react-server-dom-webpack/cjs/react-server-dom-webpack-plugin.js
+@@ -288,20 +288,26 @@ class ReactFlightWebpackPlugin {
+                                     filePathToModuleMetadata[module] = {
+                                         id,
+                                         chunks: chunks.slice(),
++                                        css: cssChunks,
+                                         name: "*"
+                                     };
+                         }
+                         const chunks = [];
++                        const cssChunks = [];
+                         chunkGroup.chunks.forEach(function (c) {
++                            let jsRecorded = false;
+                             var _iterator = _createForOfIteratorHelper(c.files), _step;
+                             try {
+                                 for (_iterator.s(); !(_step = _iterator.n()).done;) {
+                                     const file = _step.value;
+-                                    if (file.endsWith(".js") &&
+-                                        !file.endsWith(".hot-update.js") &&
+-                                        (_this.isServer || !runtimeChunkFiles.has(file))) {
++                                    if (file.endsWith(".hot-update.js"))
++                                        continue;
++                                    if (!jsRecorded && file.endsWith(".js") && (_this.isServer || !runtimeChunkFiles.has(file))) {
+                                         chunks.push(c.id, file);
+-                                        break;
++                                        jsRecorded = true;
++                                    }
++                                    else if (file.endsWith(".css")) {
++                                        cssChunks.push(file);
+                                     }
+                                 }
+                             }

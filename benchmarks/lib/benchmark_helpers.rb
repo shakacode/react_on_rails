@@ -19,9 +19,13 @@ rescue StandardError => e
   raise "Failed to read #{tool_name} results: #{e.message}"
 end
 
-# Create failure metrics array for summary (rps, p50, p90 + status message)
+# Create failure metrics array for summary (rps, p50, p90 + status message).
+# The status message is truncated so a long exception (e.g. a JSON parse error)
+# cannot misalign the `column -t` summary table.
 def failure_metrics(error)
-  ["FAILED", "FAILED", "FAILED", error.message]
+  message = error.message.to_s.tr("\n", " ")
+  message = "#{message[0, 77]}..." if message.length > 80
+  ["FAILED", "FAILED", "FAILED", message]
 end
 
 # Append a line to the summary file
