@@ -149,7 +149,7 @@ const config: KnipConfig = {
     'react_on_rails/spec/dummy': {
       entry: [
         'app/assets/config/manifest.js!',
-        'client/app/packs/**/*.js!',
+        'client/app/packs/**/*.{js,jsx,ts,tsx}!',
         // Not sure why this isn't detected as a dependency of client/app/packs/server-bundle.js
         'client/app/generated/server-bundle-generated.js!',
         'config/webpack/{production,development,test}.js',
@@ -182,7 +182,7 @@ const config: KnipConfig = {
         'client/app/startup/**',
         'client/app/store/**',
         // ReScript entry files that import compiled .res.js files (compiled at build time)
-        'client/app/packs/rescript-components.js',
+        'client/app/packs/rescript-components.ts',
       ],
       project: ['**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}!', 'config/webpack/*.js'],
       paths: {
