@@ -19,8 +19,10 @@ afterAll(async () => {
 
 jest.spyOn(errorReporter, 'message').mockImplementation(jest.fn());
 
-const SHELL_HEADER = '<p>Header for AsyncComponentsTreeForTesting</p>';
-const SHELL_FOOTER = '<p>Footer for AsyncComponentsTreeForTesting</p>';
+const SHELL_HEADER_TEXT = 'Header for AsyncComponentsTreeForTesting';
+const SHELL_FOOTER_TEXT = 'Footer for AsyncComponentsTreeForTesting';
+const SHELL_HEADER = `<p>${SHELL_HEADER_TEXT}</p>`;
+const SHELL_FOOTER = `<p>${SHELL_FOOTER_TEXT}</p>`;
 
 const findShellChunkIndex = (chunks) => {
   const shellChunkIndex = chunks.findIndex((chunk) => chunk.includes(SHELL_HEADER));
@@ -29,6 +31,55 @@ const findShellChunkIndex = (chunks) => {
 };
 
 const findShellChunk = (chunks) => chunks[findShellChunkIndex(chunks)];
+
+const isScriptTagBoundary = (char) =>
+  char === undefined ||
+  char === '>' ||
+  char === '/' ||
+  char === ' ' ||
+  char === '\n' ||
+  char === '\r' ||
+  char === '\t' ||
+  char === '\f';
+
+const findScriptCloseEnd = (html, lowerHtml, fromIndex) => {
+  let closeIndex = lowerHtml.indexOf('</script', fromIndex);
+  while (closeIndex !== -1) {
+    const boundaryIndex = closeIndex + '</script'.length;
+    if (isScriptTagBoundary(lowerHtml[boundaryIndex])) {
+      const tagEnd = lowerHtml.indexOf('>', boundaryIndex);
+      return tagEnd === -1 ? html.length : tagEnd + 1;
+    }
+    closeIndex = lowerHtml.indexOf('</script', closeIndex + 1);
+  }
+  return html.length;
+};
+
+const htmlOutsideScripts = (html) => {
+  const lowerHtml = html.toLowerCase();
+  let cursor = 0;
+  let result = '';
+  let openIndex = lowerHtml.indexOf('<script');
+
+  while (openIndex !== -1) {
+    const boundaryIndex = openIndex + '<script'.length;
+    if (!isScriptTagBoundary(lowerHtml[boundaryIndex])) {
+      openIndex = lowerHtml.indexOf('<script', openIndex + 1);
+      continue;
+    }
+
+    const openTagEnd = lowerHtml.indexOf('>', boundaryIndex);
+    result += html.slice(cursor, openIndex);
+    if (openTagEnd === -1) {
+      return result;
+    }
+
+    cursor = findScriptCloseEnd(html, lowerHtml, openTagEnd + 1);
+    openIndex = lowerHtml.indexOf('<script', cursor);
+  }
+
+  return result + html.slice(cursor);
+};
 
 const makeRequest = async (options = {}) => {
   const startTime = Date.now();
@@ -110,26 +161,14 @@ describe('html streaming', () => {
     const { status, chunks } = await makeRequest();
     expect(status).toBe(200);
 
-    // Strip <script> tags from the chunk before checking for rendered HTML.
-    // RSC Flight payload <script> tags contain the serialized React tree which
-    // includes fallback text as data (e.g., "Loading branch1..." inside a JSON
-    // string). We only want to assert that the fallback is not rendered as HTML.
-    // Note: the `i` flag and per-tag matching keep CodeQL's bad-tag-filter and
-    // incomplete-multi-character-sanitization rules happy; this is test-only
-    // string scrubbing for assertions, not security sanitization.
-    // lgtm[js/incomplete-multi-character-sanitization]
-    // lgtm[js/bad-tag-filter]
+    // RSC Flight payload scripts can include fallback text as serialized data.
+    // This assertion only checks text rendered outside script elements.
     const shellChunkIndex = findShellChunkIndex(chunks);
     expect(chunks.length).toBeGreaterThan(shellChunkIndex + 1);
 
-    let nextChunkHtml = chunks[shellChunkIndex + 1];
-    let prev;
-    do {
-      prev = nextChunkHtml;
-      nextChunkHtml = nextChunkHtml.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, '');
-    } while (prev !== nextChunkHtml);
-    expect(nextChunkHtml).not.toContain(SHELL_HEADER);
-    expect(nextChunkHtml).not.toContain(SHELL_FOOTER);
+    const nextChunkHtml = htmlOutsideScripts(chunks[shellChunkIndex + 1]);
+    expect(nextChunkHtml).not.toContain(SHELL_HEADER_TEXT);
+    expect(nextChunkHtml).not.toContain(SHELL_FOOTER_TEXT);
     expect(nextChunkHtml).not.toContain('Loading branch1...');
     expect(nextChunkHtml).not.toContain('Loading branch2...');
     expect(nextChunkHtml).not.toContain('branch1 (level 0)');
