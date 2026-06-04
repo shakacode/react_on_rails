@@ -26,23 +26,23 @@
 <h2>Setup</h2>
 <ol>
   <li>
-    Create redux listening component: spec/dummy/client/app/components/HelloWorldRedux.jsx
+    Create redux listening component: spec/dummy/client/app/components/HelloWorldRedux.tsx
   </li>
   <li>
-    Create redux container: spec/dummy/client/app/components/HelloWorldContainer.js
+    Create redux container: spec/dummy/client/app/components/HelloWorldContainer.tsx
   </li>
   <li>
-    Create redux app client side: spec/dummy/client/app/startup/ClientReduxApp.jsx
+    Create redux app client side: spec/dummy/client/app/startup/ReduxApp.client.tsx
   </li>
   <li>
-    Create redux app server side: spec/dummy/client/app/startup/ServerReduxApp.jsx
+    Create redux app server side: spec/dummy/client/app/startup/ReduxApp.server.tsx
   </li>
   <li>
     Expose the Redux Component on the client side:
     spec/dummy/client/app/packs/client-bundle.js
     <br/>
     <pre>
-    import ReduxApp from './ClientReduxApp';
+    import ReduxApp from '../startup/ReduxApp.client';
     import ReactOnRails from 'react-on-rails/client';
     ReactOnRails.register({ ReduxApp });
     </pre>
@@ -52,8 +52,9 @@
     spec/dummy/client/app/packs/server-bundle.js
     <br/>
     <pre>
-    import ReduxApp from './ServerReduxApp';
-    global.ReduxApp = ReduxApp;
+    import ReactOnRails from 'react-on-rails';
+    import ReduxApp from '../startup/ReduxApp.server';
+    ReactOnRails.register({ ReduxApp });
     </pre>
   </li>
   <li>
