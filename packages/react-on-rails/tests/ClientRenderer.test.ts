@@ -287,7 +287,10 @@ describe('ClientRenderer', () => {
       await new Promise((resolve) => {
         setTimeout(resolve, 0);
       });
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error in renderer teardown:', rejection);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error in renderer teardown for dom node "renderer-async-teardown-reject":',
+        rejection,
+      );
       consoleErrorSpy.mockRestore();
     });
 
@@ -311,9 +314,13 @@ describe('ClientRenderer', () => {
       expect(() => unmountAllComponents()).not.toThrow();
       expect(throwingTeardown).toHaveBeenCalledTimes(1);
       expect(okTeardown).toHaveBeenCalledTimes(1);
-      // Renderer-owned teardown failures use the renderer label so they are greppable alongside the
-      // async-rejection path, regardless of whether the teardown threw synchronously or rejected.
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error in renderer teardown:', expect.any(Error));
+      // Renderer-owned teardown failures use the renderer label (tagged with the dom node id) so they
+      // are greppable alongside the async-rejection path, regardless of whether the teardown threw
+      // synchronously or rejected.
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error in renderer teardown for dom node "renderer-throws":',
+        expect.any(Error),
+      );
 
       consoleErrorSpy.mockRestore();
     });
@@ -399,7 +406,9 @@ describe('ClientRenderer', () => {
       });
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Error resolving renderer teardown; mount may leak on cleanup:',
+        expect.stringContaining(
+          'Renderer for dom node "renderer-reject" rejected; the component did not mount',
+        ),
         rejection,
       );
       consoleErrorSpy.mockRestore();

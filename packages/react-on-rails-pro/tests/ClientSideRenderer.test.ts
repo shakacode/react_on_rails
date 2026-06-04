@@ -377,7 +377,10 @@ describe('ClientSideRenderer', () => {
     await new Promise((resolve) => {
       setTimeout(resolve, 0);
     });
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Error in renderer teardown:', rejection);
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      'Error in renderer teardown for dom node "dom-id-teardown-async-reject":',
+      rejection,
+    );
     consoleErrorSpy.mockRestore();
   });
 
@@ -492,7 +495,10 @@ describe('ClientSideRenderer', () => {
     // The synchronous throw is caught and logged, so renderPromise resolves rather than rejecting.
     await expect(renderPromise).resolves.toBeUndefined();
     expect(teardown).toHaveBeenCalledTimes(1);
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Error in renderer teardown:', teardownError);
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      'Error in renderer teardown for dom node "dom-id-teardown-race-throws":',
+      teardownError,
+    );
     consoleErrorSpy.mockRestore();
   });
 });

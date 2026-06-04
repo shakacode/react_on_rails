@@ -150,9 +150,10 @@ type RenderFunctionResult = RenderFunctionSyncResult | RenderFunctionAsyncResult
 /**
  * Optional cleanup callback that a renderer function (the 3-argument form
  * `(props, railsContext, domNodeId) => …`) may return. React on Rails invokes it when the mount is
- * torn down — on Turbo/Turbolinks navigation (page unload), and in the core client renderer also
- * when the same `domNodeId` node is replaced — so renderer-managed React roots, event listeners,
- * and subscriptions are released instead of leaked. May be synchronous or asynchronous.
+ * torn down — on Turbo/Turbolinks navigation (the framework's soft-navigation page swap, not a
+ * native browser unload), and in the core client renderer also when the same `domNodeId` node is
+ * replaced — so renderer-managed React roots, event listeners, and subscriptions are released
+ * instead of leaked. May be synchronous or asynchronous.
  *
  * @see RenderFunction
  */

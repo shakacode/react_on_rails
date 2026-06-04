@@ -67,8 +67,10 @@ const wrapServerComponentRenderer = (
       );
     }
 
-    // When componentOrRenderFunction is a render function, it resolves to the component to mount
-    // (not a renderer teardown), so narrow back to ReactComponent.
+    // The 2-argument server render-function form is expected to resolve to the component to mount.
+    // RenderFunction's return union is wider than that (this PR added RendererTeardown; the server
+    // form can also yield an HTML/server-render result), so this narrows to the expected shape and
+    // the `typeof Component !== 'function'` guard below rejects anything else at runtime.
     const Component = isRenderFunction(componentOrRenderFunction)
       ? ((await componentOrRenderFunction(props, railsContext)) as ReactComponent)
       : componentOrRenderFunction;

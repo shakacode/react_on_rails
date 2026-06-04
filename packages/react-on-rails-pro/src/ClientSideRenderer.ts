@@ -18,7 +18,7 @@ import type { ReactElement } from 'react';
 import type {
   RailsContext,
   RegisteredComponent,
-  RenderFunction,
+  RendererResult,
   RendererTeardown,
   Root,
 } from 'react-on-rails/types';
@@ -46,7 +46,7 @@ const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
  * renderer decoupled from OSS internals (no reliance on a non-public export) instead of widening the
  * OSS public API just to share it.
  */
-function invokeRendererTeardown(teardown: RendererTeardown | undefined): void {
+function invokeRendererTeardown(teardown: RendererTeardown | undefined, domNodeId: string): void {
   if (!teardown) return;
   const maybePromise = teardown();
   if (maybePromise && typeof maybePromise.then === 'function') {
@@ -55,10 +55,21 @@ function invokeRendererTeardown(teardown: RendererTeardown | undefined): void {
     // directly could itself throw or leave the rejection unhandled. This keeps a failing async
     // teardown from surfacing as an unhandled promise rejection.
     Promise.resolve(maybePromise).catch((error: unknown) => {
-      console.error('Error in renderer teardown:', error);
+      console.error(`Error in renderer teardown for dom node "${domNodeId}":`, error);
     });
   }
 }
+
+// The 3-argument renderer call signature. A renderer owns its own mount and returns a RendererResult
+// (nothing, a teardown, or a promise resolving to one). Casting the registered component to this
+// precise type — rather than the public `RenderFunction`, which unifies the renderer and server
+// render-function shapes by arity — narrows the awaited result to `void | RendererTeardown` without
+// a value-level cast.
+type RendererFunction = (
+  props?: Record<string, unknown>,
+  railsContext?: RailsContext,
+  domNodeId?: string,
+) => RendererResult;
 
 type DelegationResult = { delegated: false } | { delegated: true; teardown?: RendererTeardown };
 
@@ -81,11 +92,12 @@ async function delegateToRenderer(
     }
 
     // The renderer owns its own mount and may return a teardown callback so we can clean it up on
-    // unmount (Turbo/Turbolinks navigation / page unload).
-    const result = await (component as RenderFunction)(props, railsContext, domNodeId);
+    // unmount (Turbo/Turbolinks navigation). `result` is `void | RendererTeardown`, so a `function`
+    // check narrows to the teardown with no cast.
+    const result = await (component as RendererFunction)(props, railsContext, domNodeId);
     return {
       delegated: true,
-      teardown: typeof result === 'function' ? (result as RendererTeardown) : undefined,
+      teardown: typeof result === 'function' ? result : undefined,
     };
   }
 
@@ -172,10 +184,10 @@ class ComponentRenderer {
             // outer catch, which would rethrow it as a misleading "encountered an error while
             // rendering" rejection even though the component is already unmounted.
             try {
-              invokeRendererTeardown(delegation.teardown);
+              invokeRendererTeardown(delegation.teardown, domNodeId);
             } catch (teardownError: unknown) {
               const error = teardownError instanceof Error ? teardownError : new Error('Unknown error');
-              console.error('Error in renderer teardown:', error);
+              console.error(`Error in renderer teardown for dom node "${domNodeId}":`, error);
             }
           } else {
             this.rendererTeardown = delegation.teardown;
@@ -247,10 +259,10 @@ You should return a React.Component always for the client side entry point.`);
       const { rendererTeardown } = this;
       this.rendererTeardown = undefined;
       try {
-        invokeRendererTeardown(rendererTeardown);
+        invokeRendererTeardown(rendererTeardown, this.domNodeId);
       } catch (e: unknown) {
         const error = e instanceof Error ? e : new Error('Unknown error');
-        console.error('Error in renderer teardown:', error);
+        console.error(`Error in renderer teardown for dom node "${this.domNodeId}":`, error);
       }
       return;
     }

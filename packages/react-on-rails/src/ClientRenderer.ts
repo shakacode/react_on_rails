@@ -2,7 +2,6 @@ import type { ReactElement } from 'react';
 import type {
   RegisteredComponent,
   RailsContext,
-  RenderFunction,
   RendererResult,
   RendererTeardown,
   RenderReturnType,
@@ -22,28 +21,51 @@ const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 // unload or same-id node replacement:
 // - `react`: a React root (or legacy backing instance) that ReactOnRails created itself.
 // - `renderer`: a user renderer function (3-arg form) that owns its own mount; cleanup runs the
-//   optional teardown it returned (undefined when the renderer opted out).
+//   optional teardown it returned. `teardown` is undefined in two cases: the renderer opted out
+//   (returned nothing), or an async teardown has not resolved yet — `trackRendererMount` only
+//   attaches a late-resolving teardown while this entry is still the active mount for its id.
 type RenderedEntry =
   | { kind: 'react'; root: RenderReturnType; domNode: Element }
   | { kind: 'renderer'; teardown?: RendererTeardown; domNode: Element };
+
+// The 3-argument renderer call signature. A renderer owns its own mount and returns a RendererResult
+// (nothing, a teardown, or a promise resolving to one) — distinct from the server render-function
+// shape that the public `RenderFunction` interface unifies by arity. Casting the registered
+// component to this precise type narrows the call result to RendererResult without a value-level
+// cast at the call site.
+type RendererFunction = (
+  props?: Record<string, unknown>,
+  railsContext?: RailsContext,
+  domNodeId?: string,
+) => RendererResult;
+
+/** Narrows an unknown value to a thenable (has a callable `.then`) without assuming a native Promise. */
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+  return (
+    value != null &&
+    (typeof value === 'object' || typeof value === 'function') &&
+    typeof (value as { then?: unknown }).then === 'function'
+  );
+}
 
 // Track all rendered roots for cleanup
 const renderedRoots = new Map<string, RenderedEntry>();
 
 /**
  * Invokes a renderer teardown, swallowing async rejections so a failing teardown cannot produce an
- * unhandled promise rejection. Synchronous throws propagate to the caller's try/catch.
+ * unhandled promise rejection. Synchronous throws propagate to the caller's try/catch. `domNodeId`
+ * is included in the log so a failure can be traced to its mount.
  */
-function invokeRendererTeardown(teardown: RendererTeardown | undefined): void {
+function invokeRendererTeardown(teardown: RendererTeardown | undefined, domNodeId: string): void {
   if (!teardown) return;
   const maybePromise = teardown();
-  if (maybePromise && typeof maybePromise.then === 'function') {
+  if (isThenable(maybePromise)) {
     // Detect a thenable with `.then` (Promises/A+) but swallow the rejection via
     // `Promise.resolve(...).catch(...)`: a non-native thenable may lack `.catch`, so calling it
     // directly could itself throw or leave the rejection unhandled. This keeps a failing async
     // teardown from surfacing as an unhandled promise rejection.
     Promise.resolve(maybePromise).catch((error: unknown) => {
-      console.error('Error in renderer teardown:', error);
+      console.error(`Error in renderer teardown for dom node "${domNodeId}":`, error);
     });
   }
 }
@@ -53,9 +75,9 @@ function invokeRendererTeardown(teardown: RendererTeardown | undefined): void {
  * Synchronous errors are not caught here; callers wrap this in try/catch so one failure does not
  * abort cleanup of the remaining entries.
  */
-function teardownEntry(entry: RenderedEntry): void {
+function teardownEntry(entry: RenderedEntry, domNodeId: string): void {
   if (entry.kind === 'renderer') {
-    invokeRendererTeardown(entry.teardown);
+    invokeRendererTeardown(entry.teardown, domNodeId);
     return;
   }
   if (supportsRootApi && entry.root && typeof entry.root === 'object' && 'unmount' in entry.root) {
@@ -108,10 +130,11 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
     }
 
     // Call the renderer function with the expected signature. A renderer owns its own mount and
-    // returns a RendererResult: nothing, a teardown callback, or a promise resolving to one (the
-    // `RenderFunction` call signature unifies this with the server render-function shape, so narrow
-    // to RendererResult here where `isRenderer` is known true).
-    const result = (component as RenderFunction)(props, railsContext, domNodeId) as RendererResult;
+    // returns a RendererResult: nothing, a teardown callback, or a promise resolving to one. We cast
+    // to `RendererFunction` (the precise 3-arg shape) rather than the public `RenderFunction`, which
+    // unifies the renderer and server render-function shapes by arity; here `isRenderer` is known
+    // true, so the result is a RendererResult with no further cast.
+    const result = (component as RendererFunction)(props, railsContext, domNodeId);
     return { delegated: true, result };
   }
 
@@ -138,13 +161,13 @@ function trackRendererMount(domNodeId: string, domNode: Element, result: Rendere
 
   if (typeof result === 'function') {
     entry.teardown = result;
-  } else if (result && typeof (result as Promise<unknown>).then === 'function') {
-    (result as Promise<unknown>)
+  } else if (isThenable(result)) {
+    Promise.resolve(result)
       .then((resolved) => {
         if (typeof resolved !== 'function') return;
         // Only attach if this exact entry is still the active mount for this id.
         if (renderedRoots.get(domNodeId) === entry) {
-          entry.teardown = resolved as RendererTeardown;
+          entry.teardown = resolved;
         } else {
           // The mount was unmounted or its node replaced before this async teardown resolved, so the
           // entry is no longer the active mount and the teardown can't be attached — it is dropped
@@ -157,10 +180,14 @@ function trackRendererMount(domNodeId: string, domNode: Element, result: Rendere
         }
       })
       .catch((error: unknown) => {
-        // The renderer's render promise rejected, so no teardown was captured and this mount will
-        // leak on cleanup. Log it (rather than letting it surface as an unhandled rejection) so the
-        // dropped teardown is diagnosable, mirroring invokeRendererTeardown above.
-        console.error('Error resolving renderer teardown; mount may leak on cleanup:', error);
+        // The renderer's own promise rejected: the render failed, so the component never mounted and
+        // no teardown was captured. Log it (rather than letting it surface as an unhandled rejection)
+        // so the failure is diagnosable; any partial mount the renderer created may leak on cleanup.
+        console.error(
+          `Renderer for dom node "${domNodeId}" rejected; the component did not mount and no ` +
+            'teardown was captured. Any mount it created may leak on cleanup:',
+          error,
+        );
       });
   }
 }
@@ -197,13 +224,15 @@ function renderElement(el: Element, railsContext: RailsContext): void {
         // DOM node was replaced (e.g., via async HTML injection) - clean up the old root or run
         // the old renderer's teardown.
         try {
-          teardownEntry(existing);
+          teardownEntry(existing, domNodeId);
         } catch (unmountError) {
           // Surface the failure unconditionally (matching unmountAllComponents) so a teardown/unmount
           // error on node replacement is as visible as one on page unload, using the same greppable
           // labels. We still continue: the old mount may leak, but the new node must be rendered.
           const label =
-            existing.kind === 'renderer' ? 'Error in renderer teardown:' : 'Error unmounting component:';
+            existing.kind === 'renderer'
+              ? `Error in renderer teardown for dom node "${domNodeId}":`
+              : `Error unmounting component for dom node "${domNodeId}":`;
           console.error(label, unmountError);
         }
         renderedRoots.delete(domNodeId);
@@ -305,13 +334,16 @@ export function reactOnRailsComponentLoaded(domId: string): Promise<void> {
  * @internal
  */
 export function unmountAllComponents(): void {
-  renderedRoots.forEach((entry) => {
+  renderedRoots.forEach((entry, domNodeId) => {
     try {
-      teardownEntry(entry);
+      teardownEntry(entry, domNodeId);
     } catch (error) {
       // Use the same label as the async-rejection path so renderer-teardown failures are greppable
       // whether the teardown threw synchronously (here) or rejected (invokeRendererTeardown).
-      const label = entry.kind === 'renderer' ? 'Error in renderer teardown:' : 'Error unmounting component:';
+      const label =
+        entry.kind === 'renderer'
+          ? `Error in renderer teardown for dom node "${domNodeId}":`
+          : `Error unmounting component for dom node "${domNodeId}":`;
       console.error(label, error);
     }
   });
