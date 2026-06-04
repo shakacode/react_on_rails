@@ -88,7 +88,8 @@
     "build:dev:watch": "npx rescript build -w && RAILS_ENV=development NODE_ENV=development bin/shakapacker --watch",
     "build:clean": "pnpm run build:rescript && rm -rf public/webpack || true",
     "build:rescript": "npx rescript clean && npx rescript build -with-deps",
-    "build:rescript:dev": "npx rescript build -w"
+    "build:rescript:dev": "npx rescript build -w",
+    "type-check": "tsc --noEmit --noErrorTruncation"
   },
   "version": "0.0.0"
 }
