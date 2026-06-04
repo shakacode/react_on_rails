@@ -30,9 +30,10 @@ permissions:
 jobs:
   build-dummy-app-test-bundles:
     strategy:
-      # Keep the legs reporting independently: a failure in one leg (e.g. webpack minimum) must not
-      # cancel the others, and across the two per-bundler calls a webpack failure must not cancel
-      # rspack (the default fail-fast: true would). Refs #3481.
+      # fail-fast: false keeps this bundler's own matrix legs independent: a failure in one leg
+      # (e.g. webpack minimum) must not cancel the others (the default fail-fast: true would).
+      # Cross-bundler independence (a webpack failure not cancelling rspack) comes from the two
+      # callers being separate top-level jobs in integration-tests.yml, not from fail-fast. Refs #3481.
       fail-fast: false
       matrix: ${{ fromJson(inputs.matrix) }}
     runs-on: ubuntu-22.04

@@ -85,7 +85,7 @@ jobs:
     # Emit one matrix per bundler. Each is fed to a separate per-bundler reusable-workflow call
     # (webpack-dummy-app-tests / rspack-dummy-app-tests) so the bundlers' build -> integration
     # chains are fully decoupled: a build failure in one bundler can no longer skip the other
-    # bundler's integration tests. Refs #3593 (follow-up to #3481).
+    # bundler's integration tests. Refs #3593 (follow-up to #3481 / #3581).
     outputs:
       webpack_matrix: ${{ steps.set-matrix.outputs.webpack_matrix }}
       rspack_matrix: ${{ steps.set-matrix.outputs.rspack_matrix }}
