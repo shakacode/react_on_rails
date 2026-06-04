@@ -187,11 +187,13 @@ interface RenderFunction {
 }
 
 type ReactComponentOrRenderFunction = ReactComponent | RenderFunction;
+type RegisteredComponentValue = ReactComponentOrRenderFunction | object;
 
 type PipeableOrReadableStream = PipeableStream | NodeJS.ReadableStream;
 
 export type {
   ReactComponentOrRenderFunction,
+  RegisteredComponentValue,
   ReactComponent,
   AuthenticityHeaders,
   RenderFunction,
@@ -211,7 +213,7 @@ export type {
 
 export interface RegisteredComponent {
   name: string;
-  component: ReactComponentOrRenderFunction;
+  component: RegisteredComponentValue;
   /**
    * Indicates if the registered component is a RenderFunction
    * @see RenderFunction for more details on its behavior and usage.
@@ -307,7 +309,7 @@ export interface ReactOnRails {
    * find you components for rendering.
    * @param components keys are component names, values are components
    */
-  register(components: Record<string, ReactComponentOrRenderFunction>): void;
+  register(components: Record<string, RegisteredComponentValue>): void;
   /** @deprecated Use registerStoreGenerators instead */
   registerStore(stores: Record<string, StoreGenerator>): void;
   /**

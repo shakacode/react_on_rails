@@ -1,4 +1,4 @@
-import type { RegisteredComponent, ReactComponentOrRenderFunction } from './types/index.ts';
+import type { RegisteredComponent, RegisteredComponentValue } from './types/index.ts';
 import isRenderFunction from './isRenderFunction.ts';
 
 const registeredComponents = new Map<string, RegisteredComponent>();
@@ -7,7 +7,7 @@ export default {
   /**
    * @param components { component1: component1, component2: component2, etc. }
    */
-  register(components: Record<string, ReactComponentOrRenderFunction>): void {
+  register(components: Record<string, RegisteredComponentValue>): void {
     Object.keys(components).forEach((name) => {
       const component = components[name];
       if (!component) {

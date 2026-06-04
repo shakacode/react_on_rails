@@ -2,7 +2,7 @@ import type { ReactElement } from 'react';
 import type {
   RegisteredComponent,
   RenderReturnType,
-  ReactComponentOrRenderFunction,
+  RegisteredComponentValue,
   AuthenticityHeaders,
   Store,
   StoreGenerator,
@@ -22,7 +22,7 @@ const DEFAULT_OPTIONS = {
 
 export interface Registries {
   ComponentRegistry: {
-    register: (components: Record<string, ReactComponentOrRenderFunction>) => void;
+    register: (components: Record<string, RegisteredComponentValue>) => void;
     get: (name: string) => RegisteredComponent;
     components: () => Map<string, RegisteredComponent>;
   };
@@ -114,7 +114,7 @@ export function createCoreCapability(registries: Registries) {
     // REGISTRY METHOD IMPLEMENTATIONS - Using provided registries
     // ===================================================================
 
-    register(components: Record<string, ReactComponentOrRenderFunction>): void {
+    register(components: Record<string, RegisteredComponentValue>): void {
       if (this.options.debugMode || this.options.logComponentRegistration) {
         // Use performance.now() if available, otherwise fallback to Date.now()
         const perf = typeof performance !== 'undefined' ? performance : { now: () => Date.now() };
@@ -135,7 +135,10 @@ export function createCoreCapability(registries: Registries) {
         if (this.options.debugMode) {
           componentNames.forEach((name) => {
             const component = components[name];
-            const size = component.toString().length;
+            const size =
+              typeof component === 'function'
+                ? component.toString().length
+                : Object.prototype.toString.call(component).length;
             console.log(`[ReactOnRails] ✅ Registered: ${name} (${size} chars)`);
           });
         }

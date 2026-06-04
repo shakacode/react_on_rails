@@ -1,6 +1,6 @@
 // See discussion:
 // https://discuss.reactjs.org/t/how-to-determine-if-js-object-is-react-component/2825/2
-import { ReactComponentOrRenderFunction, RenderFunction } from './types/index.ts';
+import type { RegisteredComponentValue, RenderFunction } from './types/index.ts';
 
 /**
  * Used to determine we'll call be calling React.createElement on the component of if this is a
@@ -8,22 +8,26 @@ import { ReactComponentOrRenderFunction, RenderFunction } from './types/index.ts
  * @param component
  * @returns {boolean}
  */
-export default function isRenderFunction(
-  component: ReactComponentOrRenderFunction,
-): component is RenderFunction {
-  // No for es5 or es6 React Component
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-  if ((component as RenderFunction).prototype?.isReactComponent) {
+export default function isRenderFunction(component: RegisteredComponentValue): component is RenderFunction {
+  if (typeof component !== 'function') {
     return false;
   }
 
-  if ((component as RenderFunction).renderFunction) {
+  const callableComponent = component as RenderFunction;
+
+  // No for es5 or es6 React Component
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+  if (callableComponent.prototype?.isReactComponent) {
+    return false;
+  }
+
+  if (callableComponent.renderFunction) {
     return true;
   }
 
   // If zero or one args, then we know that this is a regular function that will
   // return a React component
-  if ((component as RenderFunction).length >= 2) {
+  if (callableComponent.length >= 2) {
     return true;
   }
 
