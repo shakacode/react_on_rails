@@ -363,6 +363,33 @@ module ReactOnRails
         ENV.delete("REACT_ON_RAILS_VERBOSE")
       end
 
+      it "regenerates server artifacts when a server-only component source is newer" do
+        described_class.instance.generate_packs_if_stale
+        generator = described_class.instance
+        server_component_source =
+          "#{packer_source_path}/components/#{components_directory}/ror_components/" \
+          "ReactServerComponentWithClientAndServer.server.jsx"
+        registration_entry = generator.send(:server_component_registration_entry_file_path)
+        original_source_mtime = File.mtime(server_component_source)
+
+        stale_generated_time = Time.now - 60
+        fresh_source_time = Time.now - 30
+        FileUtils.touch(generated_server_bundle_file_path, mtime: stale_generated_time)
+        FileUtils.touch(registration_entry, mtime: stale_generated_time)
+        FileUtils.touch(server_component_source, mtime: fresh_source_time)
+
+        ENV["REACT_ON_RAILS_VERBOSE"] = "true"
+        expect do
+          described_class.instance.generate_packs_if_stale
+        end.to output(GENERATED_PACKS_CONSOLE_OUTPUT_REGEX).to_stdout
+
+        expect(File.mtime(generated_server_bundle_file_path)).to be > fresh_source_time
+        expect(File.mtime(registration_entry)).to be > fresh_source_time
+      ensure
+        FileUtils.touch(server_component_source, mtime: original_source_mtime) if original_source_mtime
+        ENV.delete("REACT_ON_RAILS_VERBOSE")
+      end
+
       it "checks generated pack contents without emitting likely-client warnings" do
         described_class.instance.generate_packs_if_stale
         component_name = "ReactServerComponent"

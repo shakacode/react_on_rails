@@ -768,19 +768,22 @@ module ReactOnRails
       store_files = store_to_path.values
       all_source_files = component_files + store_files
 
-      return false if all_source_files.empty?
+      if all_source_files.any?
+        most_recent_mtime = Utils.find_most_recent_mtime(all_source_files).to_i
 
-      most_recent_mtime = Utils.find_most_recent_mtime(all_source_files).to_i
+        # Check component packs
+        component_files.each do |file|
+          return true if generated_component_pack_stale?(file, most_recent_mtime)
+        end
 
-      # Check component packs
-      component_files.each do |file|
-        return true if generated_component_pack_stale?(file, most_recent_mtime)
+        # Check store packs
+        store_files.each do |file|
+          return true if generated_store_pack_stale?(file, most_recent_mtime)
+        end
       end
 
-      # Check store packs
-      store_files.each do |file|
-        return true if generated_store_pack_stale?(file, most_recent_mtime)
-      end
+      return true if generated_server_bundle_stale?
+      return true if server_component_registration_entry_stale?
 
       false
     end
@@ -797,6 +800,37 @@ module ReactOnRails
       return true if !File.exist?(path) || File.mtime(path).to_i < most_recent_mtime
 
       File.read(path) != store_pack_file_contents(file)
+    end
+
+    def generated_server_bundle_stale?
+      return false if ReactOnRails.configuration.server_bundle_js_file.blank?
+
+      path = generated_server_bundle_file_path
+      return true unless File.exist?(path)
+
+      source_files = components_for_server_registration.values + store_to_path.values
+      return true if generated_file_older_than_sources?(path, source_files)
+
+      File.read(path) != generated_server_pack_file_content
+    end
+
+    def server_component_registration_entry_stale?
+      return false unless ReactOnRails::Utils.rsc_support_enabled?
+
+      entries = server_component_registration_entries
+      return false if entries.empty?
+
+      path = server_component_registration_entry_file_path
+      return true unless File.exist?(path)
+      return true if generated_file_older_than_sources?(path, entries.values)
+
+      File.read(path) != server_component_registration_entry_content
+    end
+
+    def generated_file_older_than_sources?(generated_file, source_files)
+      return false if source_files.empty?
+
+      File.mtime(generated_file).to_i < Utils.find_most_recent_mtime(source_files).to_i
     end
   end
   # rubocop:enable Metrics/ClassLength
