@@ -85,6 +85,28 @@ RSpec.describe BenchmarkTable do
     expect(markdown).to include('/a\|b')
   end
 
+  it "escapes backslashes (so the escape char can't combine with following text)" do
+    markdown = render(
+      rows: [row(name: "/a\\b", rps: 1.0, p50: 2.0, p90: 3.0, status: "x\\|y")],
+      report: fake_report
+    )
+
+    # "/a\b" -> "/a\\b"; "x\|y" -> "x\\\|y" (backslash escaped, then the pipe escaped).
+    expect(markdown).to include('/a\\\\b')
+    expect(markdown).to include('x\\\\\\|y')
+  end
+
+  it "renders a non-numeric rps token (FAILED/MISSING) as plain text without highlighting" do
+    report = fake_report(["/broken", "rps"] => :regression)
+    markdown = render(
+      rows: [row(name: "/broken", rps: "FAILED", p50: nil, p90: nil, status: "Connection refused")],
+      report: report
+    )
+
+    expect(markdown).to include("| /broken | FAILED | — | — | Connection refused |")
+    expect(markdown).not_to include("**FAILED**")
+  end
+
   it "renders without a report (no highlighting) when report is nil" do
     markdown = render(
       rows: [row(name: "/foo", rps: 100.0, p50: 5.0, p90: 6.0, status: "200=100")],

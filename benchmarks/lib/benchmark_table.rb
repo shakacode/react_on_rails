@@ -76,12 +76,13 @@ class BenchmarkTable
   def render_value(value)
     return "—" if value.nil?
 
-    # Escape only the pipe, which would otherwise break the table column structure.
-    # Cell values are controlled CI output (route paths, test names, status strings
-    # like "200=900,5xx=10"), not untrusted input, so other Markdown metacharacters
-    # don't need escaping here. This relies on the naming convention never using
-    # Markdown emphasis/code characters (*, _, backtick) or a leading backslash; if a
-    # benchmark name ever does, broaden the escaping accordingly.
-    value.to_s.gsub("|", "\\|")
+    # Escape pipes (which break the table column structure) and backslashes (so an
+    # escape character in a value can't combine with following text, and to satisfy
+    # static analysis) in a single pass, which avoids double-escaping. Cell values are
+    # controlled CI output (route paths, test names, status strings like
+    # "200=900,5xx=10"), not untrusted input, so other Markdown metacharacters
+    # (*, _, backtick) are intentionally left unescaped — the naming convention is
+    # assumed to avoid them.
+    value.to_s.gsub(/[\\|]/) { |char| "\\#{char}" }
   end
 end

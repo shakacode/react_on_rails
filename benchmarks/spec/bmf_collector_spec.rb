@@ -79,14 +79,23 @@ RSpec.describe BmfCollector do
         )
       end
 
-      it "stores nil for non-numeric p50/p90 and excludes rows with non-numeric rps" do
+      it "stores nil for non-numeric p50/p90 and keeps failed rows with their raw rps token" do
         collector = described_class.new
         collector.add(name: "/partial", rps: 100.0, p50: "MISSING", p90: "MISSING", status: "200=100")
-        collector.add(name: "/broken", rps: "FAILED", p50: "FAILED", p90: "FAILED", status: "FAILED")
+        collector.add(name: "/broken", rps: "FAILED", p50: "FAILED", p90: "FAILED", status: "Connection refused")
 
         expect(collector.display_rows).to eq(
-          [{ "name" => "/partial", "rps" => 100.0, "p50" => nil, "p90" => nil, "status" => "200=100" }]
+          [{ "name" => "/partial", "rps" => 100.0, "p50" => nil, "p90" => nil, "status" => "200=100" },
+           { "name" => "/broken", "rps" => "FAILED", "p50" => nil, "p90" => nil, "status" => "Connection refused" }]
         )
+      end
+
+      it "keeps a failed row visible in the sidecar even though to_bmf drops it" do
+        collector = described_class.new
+        collector.add(name: "/broken", rps: "FAILED", p50: "FAILED", p90: "FAILED", status: "Connection refused")
+
+        expect(collector.display_rows.map { |row| row["name"] }).to eq(["/broken"])
+        expect(collector.to_bmf).to be_empty
       end
     end
 

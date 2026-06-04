@@ -33,9 +33,9 @@ class BmfCollector
   # @param p90 [Numeric, nil] 90th percentile latency in ms (summary-only; not sent
   #   to Bencher, but retained for the display sidecar so the table can show it)
   def add(name:, rps:, p50:, status:, p90: nil)
-    # Skip if RPS is not a valid number (FAILED, MISSING, etc.)
-    return unless rps.is_a?(Numeric)
-
+    # Keep every row, including failures (rps "FAILED"/"MISSING"): the display sidecar
+    # must still show a failed route/test rather than dropping it silently. The
+    # numeric-rps filter lives in #to_bmf so only valid measures reach Bencher.
     @results << {
       name: "#{@prefix}#{name}#{@suffix}",
       rps: rps,
@@ -51,6 +51,10 @@ class BmfCollector
     output = {}
 
     @results.each do |r|
+      # Only numeric-rps rows are valid Bencher measures; failed/MISSING rows are kept
+      # for the display sidecar (see #add) but must not reach the BMF payload.
+      next unless r[:rps].is_a?(Numeric)
+
       benchmark_entry = {}
 
       # RPS (higher is better) - use Lower Boundary threshold in Bencher
@@ -99,9 +103,11 @@ class BmfCollector
   end
 
   # Rows for the Markdown summary table, joined with the Bencher report by name in
-  # track_benchmarks.rb. Mirrors exactly the rows #add accepted (its numeric-rps
-  # guard), so the set lines up with what the BMF/report can contain. p90 and the
-  # raw status string are summary-only — they are absent from to_bmf.
+  # track_benchmarks.rb. Includes every row #add recorded — failed/MISSING rows too,
+  # so a failed route/test stays visible in the summary even though it never reaches
+  # Bencher (#to_bmf filters those out). rps may therefore be a non-numeric token like
+  # "FAILED"/"MISSING"; BenchmarkTable renders it as text and never highlights a
+  # non-numeric cell. p90 and the raw status string are summary-only (absent from to_bmf).
   def display_rows
     @results.map do |r|
       { "name" => r[:name], "rps" => r[:rps], "p50" => r[:p50], "p90" => r[:p90], "status" => r[:status] }

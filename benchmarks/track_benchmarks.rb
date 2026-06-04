@@ -313,7 +313,18 @@ if __FILE__ == $PROGRAM_NAME
   # PR comment, and (on a main regression) the report-regressions hand-off.
   report_markdown = rendered_report(report, SUITE_NAME)
   post_report_to_summary(report_markdown)
-  replace_pr_comments(report_markdown)
+  # A nil report means Bencher produced no parseable output (operational failure). On
+  # a PR, replacing the comment now would delete the previous run's real report and
+  # make an auth/API/network failure look like a normal un-highlighted summary, while
+  # the job still exits 0. Keep the prior comment intact and surface the failure
+  # instead. (post_report_to_summary above is per-run and clobbers nothing, so the raw
+  # numbers still appear in this run's job summary.)
+  if report.nil? && ENV.fetch("GITHUB_EVENT_NAME") == "pull_request"
+    warn "::warning::Bencher produced no report for #{SUITE_NAME} (operational failure); " \
+         "keeping the previous PR comment intact instead of overwriting it with an un-highlighted table."
+  else
+    replace_pr_comments(report_markdown)
+  end
 
   if main_push? && bencher_exit_code != 0
     if regression?(report)
