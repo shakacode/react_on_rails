@@ -129,8 +129,9 @@ def run_benchmark_suite(routes, bmf_collector, runner: method(:benchmark_route))
   routes.each do |route|
     rps, p50, p90, status = runner.call(route)
     add_to_summary(route, rps, p50, p90, status)
-    # Add to BMF collector for Bencher output (p90 stays in the summary table only)
-    bmf_collector.add(name: route, rps: rps, p50: p50, status: status)
+    # Add to BMF collector for Bencher output. p90 is retained for the display
+    # sidecar (the summary table) only — it is never sent to Bencher as a measure.
+    bmf_collector.add(name: route, rps: rps, p50: p50, p90: p90, status: status)
   rescue StandardError => e
     # ::error:: must go to stdout — GitHub Actions only parses workflow commands
     # from stdout, not stderr, so writing here is what renders the UI annotation.
@@ -207,6 +208,8 @@ if __FILE__ == $PROGRAM_NAME
   # downstream Bencher step having no `if: always()`.
   if failed_routes.empty?
     bmf_collector.write_bmf_json(BENCHMARK_JSON)
+    # Display sidecar (summary table data) — written alongside the BMF.
+    bmf_collector.write_display_json(DISPLAY_JSON)
   else
     $stdout.puts "::error::#{failed_routes.length} of #{routes.length} benchmark route(s) failed: " \
                  "#{failed_routes.join(', ')}"

@@ -9,6 +9,8 @@ require "time"
 require_relative "lib/github"
 require_relative "lib/github_cli"
 require_relative "lib/regression_report"
+require_relative "lib/bencher_report"
+require_relative "lib/benchmark_table"
 
 MAX_SAMPLE = "64"
 # Per-measure t-test boundaries (the confidence level Bencher uses for its
@@ -30,12 +32,6 @@ THRESHOLDS = [
   ["failed_pct", :upper, "0.95"]
 ].freeze
 
-# Bencher exits non-zero both for a performance alert (a real regression) and for
-# operational problems; we tell them apart by grepping stderr for these phrases.
-# They are not a documented API contract, so the CLI is pinned in benchmark.yml and
-# this must be re-verified on upgrade.
-ALERT_PATTERN = /\bAlerts?\b|threshold violation|boundary violation/i
-
 def env!(key)
   ENV.fetch(key) do
     warn "#{key} is required"
@@ -44,8 +40,13 @@ def env!(key)
 end
 
 BENCHMARK_JSON = ENV.fetch("BENCHMARK_JSON", "bench_results/benchmark.json")
-REPORT_HTML = ENV.fetch("BENCHER_REPORT_HTML", "bench_results/bencher_report.html")
-CHUNK_PREFIX = "bench_results/bencher_chunk"
+REPORT_JSON = ENV.fetch("BENCHER_REPORT_JSON", "bench_results/bencher_report.json")
+# Written by the bench scripts (BmfCollector#write_display_json); carries the
+# summary-table columns Bencher never sees (p90, raw Status), keyed by the same
+# canonical name as the report so the join is exact.
+# NOTE: benchmark_config.rb independently defines DISPLAY_JSON with the same default
+# path; the bench scripts and this tracker run as separate programs, so keep them in sync.
+DISPLAY_JSON = ENV.fetch("BENCHMARK_DISPLAY_JSON", "bench_results/benchmark_display.json")
 REGRESSION_REPORT_JSON = File.join("bench_results", RegressionReport::FILENAME)
 
 def branch_and_start_point_args
@@ -113,7 +114,7 @@ def bencher_args(branch, start_point_args)
     "--file", BENCHMARK_JSON,
     "--err",
     "--quiet",
-    "--format", "html",
+    "--format", "json",
     *THRESHOLDS.flat_map { |measure, direction, boundary| threshold_args(measure, direction, boundary) }
   ]
 end
@@ -121,38 +122,39 @@ end
 def run_bencher(branch, start_point_args)
   stdout, stderr, status = Open3.capture3(*bencher_args(branch, start_point_args))
   warn stderr unless stderr.empty?
-  # Bencher prints the HTML report to stdout, including the alert report on a
-  # non-zero "alert" exit (which we still want to publish). An empty stdout means
-  # an operational failure with no report, so clear any stale file rather than
+  # Bencher prints the JSON report to stdout, including on a non-zero "alert" exit
+  # (a real regression, which we still want to publish). An empty stdout means an
+  # operational failure with no report, so clear any stale file rather than
   # persisting/posting garbage or leaving a previous attempt's report behind.
   if stdout.empty?
-    FileUtils.rm_f(REPORT_HTML)
+    FileUtils.rm_f(REPORT_JSON)
+    report = nil
   else
-    File.write(REPORT_HTML, stdout)
+    File.write(REPORT_JSON, stdout)
+    # Parse defensively: an unexpected shape raises BencherReport::FormatError. Fail
+    # the job loudly, but with a targeted ::error:: annotation instead of a raw Ruby
+    # backtrace so the failure is triageable in CI logs. This covers both the initial
+    # run and the start-point-hash retry, since both go through run_bencher.
+    begin
+      report = BencherReport.parse(stdout)
+    rescue BencherReport::FormatError => e
+      warn "::error::Bencher JSON report has an unexpected shape — re-verify against " \
+           "benchmarks/spec/bencher_report_spec.rb before bumping the CLI pin. #{e.message}"
+      exit 1
+    end
   end
-  [stderr, status.exitstatus]
+  [stderr, status.exitstatus, report]
 end
 
 def append_step_summary(markdown)
   File.open(ENV.fetch("GITHUB_STEP_SUMMARY"), "a") { |file| file.write(markdown) }
 end
 
-def post_report_to_summary
-  return unless File.size?(REPORT_HTML)
+def post_report_to_summary(markdown)
+  return if markdown.empty?
 
-  append_step_summary("## #{SUITE_NAME} Bencher Report\n")
-  append_step_summary(File.read(REPORT_HTML))
-end
-
-def split_report_for_comments
-  # Clear leftover chunks before splitting so a shorter new report doesn't leave
-  # numbered chunks from the previous run lying around for the post step to pick up.
-  Dir.glob("#{CHUNK_PREFIX}*.html").each { |path| File.delete(path) }
-  return true if system({ "BENCHER_REPORT_MARKER" => REPORT_MARKER },
-                        "ruby", "benchmarks/split_html_report.rb", REPORT_HTML, CHUNK_PREFIX)
-
-  warn "::error::Failed to split HTML report for #{SUITE_NAME}; PR comments will not be posted"
-  false
+  append_step_summary("## #{SUITE_NAME} Bencher Report\n\n")
+  append_step_summary(markdown)
 end
 
 def stale_comment_ids(before:)
@@ -187,94 +189,91 @@ def delete_stale_report_comments(before:)
   warn "::warning::Failed to delete #{failed} stale #{SUITE_NAME} Bencher report comment(s); they may remain visible."
 end
 
-def post_report_comment_chunks
-  chunk_files = Dir["#{CHUNK_PREFIX}*.html"].sort_by do |chunk_file|
-    chunk_file[/bencher_chunk(?:\.(\d+))?\.html\z/, 1].to_i
-  end
-
-  posted_any = false
-  any_failed = false
-  chunk_files.each do |chunk_file|
-    puts "Posting #{chunk_file} (#{File.size(chunk_file)} bytes)..."
-    if GithubCli.run(
-      "gh", "pr", "comment", ENV.fetch("PR_NUMBER"), "--body-file", chunk_file,
-      error_message: "Failed to post #{chunk_file}"
-    )
-      posted_any = true
-    else
-      any_failed = true
-    end
-  end
-
-  [posted_any, any_failed]
-end
-
-def replace_pr_comments
+def replace_pr_comments(markdown)
   return unless ENV.fetch("GITHUB_EVENT_NAME") == "pull_request"
-  return unless File.size?(REPORT_HTML)
+  return if markdown.empty?
 
-  return unless split_report_for_comments
-
-  # Capture cutoff before posting so the GC sweeps only pre-existing comments and leaves
-  # the chunks this run just posted intact. If every post fails the GC is skipped entirely
-  # and the prior run's comments stay visible.
+  body = "#{REPORT_MARKER}\n#{markdown}"
+  # Capture cutoff before posting so the GC sweeps only pre-existing comments and
+  # leaves the one this run just posted intact. If the post fails the GC is skipped
+  # entirely and the prior run's comment stays visible.
   cutoff_ts = Time.now.utc.iso8601
-  posted_any, any_failed = post_report_comment_chunks
+  # Send the body over stdin (--body-file -) rather than as a CLI argument so a
+  # large report can't hit the OS argument-length limit.
+  posted = GithubCli.run(
+    "gh", "pr", "comment", ENV.fetch("PR_NUMBER"), "--body-file", "-",
+    error_message: "Failed to post #{SUITE_NAME} benchmark report comment",
+    stdin_data: body
+  )
 
-  if posted_any
+  if posted
     delete_stale_report_comments(before: cutoff_ts)
   else
-    warn "No #{SUITE_NAME} chunks were posted successfully; keeping prior Bencher comments in place."
+    warn "::warning::Failed to post #{SUITE_NAME} benchmark report comment; keeping prior comments in place."
+  end
+end
+
+# The display rows written by the bench scripts (BmfCollector#write_display_json).
+def display_rows
+  return [] unless File.exist?(DISPLAY_JSON)
+
+  parsed = JSON.parse(File.read(DISPLAY_JSON))
+  unless parsed.is_a?(Array)
+    # Mirror the write side (BmfCollector#write_display_json warns on a non-array
+    # sidecar). Without this the table would silently disappear on a contract break,
+    # and a main regression hand-off could store an empty summary with no diagnostic.
+    warn "::warning::#{DISPLAY_JSON} is not a JSON array (got #{parsed.class}); skipping the summary table"
+    return []
   end
 
-  return unless any_failed
-
-  fallback_body = <<~MARKDOWN
-    #{REPORT_MARKER}
-    **#{SUITE_NAME} Bencher report chunks were too large to post as PR comments.**
-
-    View the full report in the job summary: #{Github.run_url}
-  MARKDOWN
-  GithubCli.run(
-    "gh", "pr", "comment", ENV.fetch("PR_NUMBER"), "--body", fallback_body,
-    error_message: "Failed to post fallback #{SUITE_NAME} Bencher report comment"
-  )
+  parsed
+rescue JSON::ParserError => e
+  warn "::warning::Could not parse #{DISPLAY_JSON} (#{e.message}); skipping the summary table"
+  []
 end
 
-def formatted_summary(title, path)
-  return "" unless File.exist?(path)
+# The Markdown summary table: display rows joined with the Bencher report by
+# benchmark name, with tracked values highlighted by significance. Empty string
+# when there are no rows (nothing to post). suite_name is passed in rather than read
+# from the SUITE_NAME constant (which is only assigned inside the
+# __FILE__ == $PROGRAM_NAME block) so this stays callable from specs/require-only
+# contexts without raising NameError.
+def rendered_report(report, suite_name)
+  rows = display_rows
+  return "" if rows.empty?
 
-  stdout, status = Open3.capture2("column", "-t", "-s", "\t", path)
-  body = status.success? ? stdout : File.read(path)
-
-  <<~MARKDOWN
-
-    ### #{title}
-
-    ```
-    #{body}
-    ```
-  MARKDOWN
+  BenchmarkTable.new(title: "#{suite_name} Benchmark Summary", rows: rows, report: report).to_markdown
 end
 
-def benchmark_summary
-  [
-    formatted_summary("#{SUITE_NAME} Rails Benchmark Summary", "bench_results/summary.txt"),
-    formatted_summary("#{SUITE_NAME} Node Renderer Benchmark Summary", "bench_results/node_renderer_summary.txt")
-  ].join
+# Body for the report-regressions hand-off. Normally the rendered table; but if the
+# display sidecar was missing/corrupt rendered_report returned "" — don't hand off an
+# empty-bodied regression issue. Substitute a run-URL pointer (and shout via ::error::)
+# so report-regressions still files something actionable.
+def regression_handoff_summary(report_markdown)
+  return report_markdown unless report_markdown.empty?
+
+  warn "::error::Bencher flagged a regression on main but the summary table could not be " \
+       "rendered (the display sidecar was missing or invalid); the auto-filed issue will link " \
+       "the run instead of showing the table. Investigate: #{Github.run_url}"
+  "_Summary table unavailable (the benchmark display sidecar was missing or empty). " \
+    "See the Bencher dashboard and the workflow run: #{Github.run_url}_"
 end
 
-def alert?(stderr, exit_code)
-  exit_code != 0 && stderr.match?(ALERT_PATTERN)
+# A real performance regression: Bencher raised at least one active alert in the
+# JSON report. Deterministic — no stderr grepping. nil report (operational failure
+# with no parseable stdout) is not a regression.
+def regression?(report)
+  report&.regression? || false
 end
 
-# A missing start-point baseline (not an alert): retrying without the start-point
-# hash falls back to the latest baseline. The alert exclusion is load-bearing — a
-# real regression must not be silently re-run against a different baseline.
-def retry_without_start_point_hash?(stderr, exit_code)
+# A missing start-point baseline (operational, not a regression): retrying without
+# the start-point hash falls back to the latest baseline. The no-regression guard is
+# load-bearing — a real regression must not be silently re-run against a different
+# baseline. The stderr match detects the operational error, not an alert.
+def retry_without_start_point_hash?(stderr, exit_code, report)
   exit_code != 0 &&
     stderr.match?(/Head Version.*not found/) &&
-    !stderr.match?(ALERT_PATTERN)
+    !regression?(report)
 end
 
 def main_push?
@@ -296,35 +295,58 @@ if __FILE__ == $PROGRAM_NAME
   env!("BENCHER_API_TOKEN")
 
   branch, start_point_args = branch_and_start_point_args
-  stderr, bencher_exit_code = run_bencher(branch, start_point_args)
+  stderr, bencher_exit_code, report = run_bencher(branch, start_point_args)
 
-  if retry_without_start_point_hash?(stderr, bencher_exit_code)
+  if retry_without_start_point_hash?(stderr, bencher_exit_code, report)
     retry_args = start_point_args.dup
     if (hash_arg_index = retry_args.index("--start-point-hash"))
       retry_args.slice!(hash_arg_index, 2)
     end
     puts "Start-point hash not found in Bencher; retrying without --start-point-hash"
     puts "::warning::Start-point hash not found in Bencher; falling back to latest baseline for comparison"
-    stderr, bencher_exit_code = run_bencher(branch, retry_args)
+    # The retry's stderr is unused: regression classification reads the JSON report,
+    # and this path only triggers when the first run had no regression.
+    _retry_stderr, bencher_exit_code, report = run_bencher(branch, retry_args)
   end
 
-  post_report_to_summary
-  replace_pr_comments
+  # Build the Markdown summary table once; the same body feeds the job summary, the
+  # PR comment, and (on a main regression) the report-regressions hand-off.
+  report_markdown = rendered_report(report, SUITE_NAME)
+  post_report_to_summary(report_markdown)
+  pr_event = ENV.fetch("GITHUB_EVENT_NAME") == "pull_request"
+  if report.nil? && pr_event
+    # A nil report means Bencher produced no parseable output (operational failure). On
+    # a PR, replacing the comment now would delete the previous run's real report and
+    # make an auth/API/network failure look like a normal un-highlighted summary, while
+    # the job still exits 0. Keep the prior comment intact and surface the failure
+    # instead. (post_report_to_summary above is per-run and clobbers nothing.)
+    warn "::warning::Bencher produced no report for #{SUITE_NAME} (operational failure); " \
+         "keeping the previous PR comment intact instead of overwriting it with an un-highlighted table."
+  elsif pr_event && regression?(report) && report_markdown.empty?
+    # A real regression but no table to render (display sidecar missing/empty). Don't
+    # leave the stale PR comment looking unchanged — post the run-URL fallback (which
+    # also emits ::error::) so the regression is visible in the PR thread, mirroring the
+    # main-push report-regressions hand-off.
+    replace_pr_comments(regression_handoff_summary(report_markdown))
+  else
+    replace_pr_comments(report_markdown)
+  end
 
   if main_push? && bencher_exit_code != 0
-    if alert?(stderr, bencher_exit_code)
+    if regression?(report)
       # Record the regression for the post-matrix report-regressions job rather than
       # filing the issue here: parallel matrix suites would otherwise race to create
       # duplicate issues and clobber each other's sections in the shared comment.
       # Use the un-sharded suite name so that job can combine a suite's shards into a
       # single section (shard_label keeps their ordering deterministic).
+      handoff_summary = regression_handoff_summary(report_markdown)
       begin
         File.write(
           REGRESSION_REPORT_JSON,
           JSON.generate(
             RegressionReport::SUITE_NAME => ENV.fetch("BENCHMARK_SUITE_GROUP", SUITE_NAME),
             RegressionReport::SHARD_LABEL => ENV.fetch("BENCHMARK_SHARD_LABEL", ""),
-            RegressionReport::SUMMARY => benchmark_summary
+            RegressionReport::SUMMARY => handoff_summary
           )
         )
         warn "::warning::Bencher flagged a #{SUITE_NAME} regression on main (exit #{bencher_exit_code}). " \

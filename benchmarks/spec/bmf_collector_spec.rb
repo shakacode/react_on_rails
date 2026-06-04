@@ -2,6 +2,7 @@
 
 require_relative "spec_helper"
 require_relative "../lib/bmf_helpers"
+require "tmpdir"
 
 # BmfCollector produces the JSON Bencher ingests. Its measure names must stay in
 # lockstep with track_benchmarks.rb's THRESHOLDS, so pin the emitted shape: the
@@ -59,6 +60,109 @@ RSpec.describe BmfCollector do
       expect(failed_pct("200=100")).to eq(0.0)
       expect(failed_pct("MISSING")).to eq(0.0)
       expect(failed_pct("FAILED")).to eq(0.0)
+    end
+  end
+
+  # The display sidecar carries the columns the Markdown summary table needs but
+  # that Bencher never sees: p90 and the human Status string. It is keyed by the
+  # same canonical name the BMF uses, so track_benchmarks.rb joins it with the
+  # Bencher report exactly (no name reconstruction).
+  describe "display sidecar" do
+    describe "#display_rows" do
+      it "includes p90 and the raw status, keyed by the canonical (prefixed/suffixed) name" do
+        collector = described_class.new(prefix: "Pro Node Renderer: ", suffix: ": Pro")
+        collector.add(name: "simple_eval", rps: 100.0, p50: 5.0, p90: 6.0, status: "200=100")
+
+        expect(collector.display_rows).to eq(
+          [{ "name" => "Pro Node Renderer: simple_eval: Pro", "rps" => 100.0,
+             "p50" => 5.0, "p90" => 6.0, "failed_pct" => 0.0, "status" => "200=100" }]
+        )
+      end
+
+      it "stores nil for non-numeric p50/p90 and keeps failed rows with their raw rps token" do
+        collector = described_class.new
+        collector.add(name: "/partial", rps: 100.0, p50: "MISSING", p90: "MISSING", status: "200=100")
+        collector.add(name: "/broken", rps: "FAILED", p50: "FAILED", p90: "FAILED", status: "Connection refused")
+
+        expect(collector.display_rows).to eq(
+          [{ "name" => "/partial", "rps" => 100.0, "p50" => nil, "p90" => nil,
+             "failed_pct" => 0.0, "status" => "200=100" },
+           { "name" => "/broken", "rps" => "FAILED", "p50" => nil, "p90" => nil,
+             "failed_pct" => nil, "status" => "Connection refused" }]
+        )
+      end
+
+      it "keeps a failed row visible in the sidecar even though to_bmf drops it" do
+        collector = described_class.new
+        collector.add(name: "/broken", rps: "FAILED", p50: "FAILED", p90: "FAILED", status: "Connection refused")
+
+        expect(collector.display_rows.map { |row| row["name"] }).to eq(["/broken"])
+        expect(collector.to_bmf).to be_empty
+      end
+    end
+
+    describe "#write_display_json" do
+      it "writes the rows as a JSON array" do
+        Dir.mktmpdir do |dir|
+          path = File.join(dir, "display.json")
+          collector = described_class.new
+          collector.add(name: "/foo", rps: 1.0, p50: 2.0, p90: 3.0, status: "200=1")
+
+          expect(collector.write_display_json(path)).to be(true)
+          expect(JSON.parse(File.read(path))).to eq(
+            [{ "name" => "/foo", "rps" => 1.0, "p50" => 2.0, "p90" => 3.0,
+               "failed_pct" => 0.0, "status" => "200=1" }]
+          )
+        end
+      end
+
+      it "appends to existing rows when append: true" do
+        Dir.mktmpdir do |dir|
+          path = File.join(dir, "display.json")
+          File.write(path, JSON.generate([{ "name" => "/old", "rps" => 9.0, "p50" => nil,
+                                            "p90" => nil, "status" => "200=1" }]))
+          collector = described_class.new
+          collector.add(name: "/new", rps: 1.0, p50: 2.0, p90: 3.0, status: "200=1")
+
+          collector.write_display_json(path, append: true)
+          names = JSON.parse(File.read(path)).map { |row| row["name"] }
+          expect(names).to eq(["/old", "/new"])
+        end
+      end
+
+      it "overwrites (keeping only new rows) when the existing file is a non-array JSON shape" do
+        Dir.mktmpdir do |dir|
+          path = File.join(dir, "display.json")
+          File.write(path, JSON.generate("not" => "an array"))
+          collector = described_class.new
+          collector.add(name: "/new", rps: 1.0, p50: 2.0, p90: 3.0, status: "200=1")
+
+          expect(collector.write_display_json(path, append: true)).to be(true)
+          expect(JSON.parse(File.read(path)).map { |row| row["name"] }).to eq(["/new"])
+        end
+      end
+
+      it "overwrites (keeping only new rows) when the existing file is invalid JSON" do
+        Dir.mktmpdir do |dir|
+          path = File.join(dir, "display.json")
+          File.write(path, "{not valid json")
+          collector = described_class.new
+          collector.add(name: "/new", rps: 1.0, p50: 2.0, p90: 3.0, status: "200=1")
+
+          expect(collector.write_display_json(path, append: true)).to be(true)
+          expect(JSON.parse(File.read(path)).map { |row| row["name"] }).to eq(["/new"])
+        end
+      end
+    end
+  end
+
+  # p90 is summary-only: it must never become a tracked Bencher measure.
+  describe "p90 stays out of the BMF output" do
+    it "is not added to to_bmf even when supplied" do
+      collector = described_class.new
+      collector.add(name: "/foo", rps: 1.0, p50: 2.0, p90: 3.0, status: "200=1")
+
+      expect(collector.to_bmf.fetch("/foo").keys).to contain_exactly("rps", "p50_latency", "failed_pct")
     end
   end
 end

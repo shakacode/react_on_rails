@@ -234,10 +234,16 @@ jobs:
           persist-credentials: false
 
       - name: Install Bencher CLI
-        # Pinned: alert-detection heuristics grep stderr for "Alert[s]",
-        # "threshold violation", and "boundary violation". Those strings
-        # are not a documented API contract, so upgrading the CLI requires
-        # re-verifying that the expected phrases still appear in alert output.
+        # Pinned: reporting parses Bencher's `--format json` report — results +
+        # boundaries drive the summary-table significance highlighting, and the
+        # alerts[] array drives regression detection (benchmarks/track_benchmarks.rb
+        # via benchmarks/lib/bencher_report.rb). That JSON shape is not a documented
+        # stability contract, so the parser fails loudly on unexpected shapes and the
+        # CLI is pinned; before bumping, re-verify the shape against
+        # benchmarks/spec/bencher_report_spec.rb AND diff a live `--format json` run
+        # against a reference payload to confirm each boundary is still symmetric about
+        # baseline (lower_limit/upper_limit equidistant). The spec checks the parsing
+        # logic, not the payload's statistical symmetry that Boundary#mirror relies on.
         uses: bencherdev/bencher@v0.6.2
 
       - name: Add tools directory to PATH

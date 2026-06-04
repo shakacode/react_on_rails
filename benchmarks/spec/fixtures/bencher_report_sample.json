@@ -1,0 +1,35 @@
+{
+  "results": [
+    [
+      {
+        "benchmark": { "name": "/heavy: Core" },
+        "measures": [
+          {
+            "measure": { "slug": "rps", "name": "rps" },
+            "metric": { "value": 80.0 },
+            "boundary": { "baseline": 100.0, "lower_limit": 90.0, "upper_limit": null }
+          },
+          {
+            "measure": { "slug": "p50-latency", "name": "p50_latency" },
+            "metric": { "value": 3.5 },
+            "boundary": { "baseline": 5.0, "lower_limit": null, "upper_limit": 6.0 }
+          },
+          {
+            "measure": { "slug": "failed-pct", "name": "failed_pct" },
+            "metric": { "value": 1.1 },
+            "boundary": { "baseline": 0.2, "lower_limit": null, "upper_limit": 1.0 }
+          }
+        ]
+      }
+    ]
+  ],
+  "alerts": [
+    {
+      "benchmark": { "name": "/heavy: Core" },
+      "threshold": { "measure": { "slug": "rps" } },
+      "metric": { "value": 80.0 },
+      "limit": "lower",
+      "status": "active"
+    }
+  ]
+}
