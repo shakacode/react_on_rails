@@ -3,7 +3,7 @@
 // See: https://reactonrails.com/docs/pro/react-server-components/
 
 const { existsSync } = require('fs');
-const { dirname, resolve } = require('path');
+const { resolve } = require('path');
 const { config } = require('shakapacker');
 const { RSCReferenceDiscoveryPlugin } = require('react-on-rails-rsc/RSCReferenceDiscoveryPlugin');
 const serverWebpackModule = require('./serverWebpackConfig');
@@ -27,10 +27,10 @@ const configureRsc = () => {
   const rscConfig = serverWebpackConfig(true);
   const discoveryBuild = process.env.RSC_REFERENCE_DISCOVERY_BUILD === 'true';
 
-  const sourceEntryDirectory = resolve(config.source_path, config.source_entry_path);
   const serverComponentRegistrationEntry = resolve(
-    dirname(sourceEntryDirectory),
-    'generated/server-component-registration-entry.js',
+    config.source_path,
+    config.source_entry_path,
+    '../generated/server-component-registration-entry.js',
   );
 
   if (discoveryBuild) {

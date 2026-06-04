@@ -62,6 +62,8 @@ function readManifestReferences(refsJson) {
 // is best-effort — it cannot detect a new 'use client' file reached by an unchanged server
 // component (that is the `--watch` snapshot limitation documented above).
 function warnIfManifestStale(refsJson) {
+  // Best-effort: statSync can race a file removed between the existsSync guard and here, so swallow
+  // that rather than crash the build over a warning.
   try {
     if (
       fs.existsSync(SERVER_COMPONENT_REGISTRATION_ENTRY) &&
@@ -74,8 +76,7 @@ function warnIfManifestStale(refsJson) {
       );
     }
   } catch {
-    // The manifest warning is non-fatal; the file can disappear between existsSync and statSync
-    // while another build is rewriting ssr-generated.
+    // manifest or registration entry vanished between existsSync and statSync — skip the warning
   }
 }
 

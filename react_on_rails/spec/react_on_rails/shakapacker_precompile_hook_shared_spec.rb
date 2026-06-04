@@ -9,19 +9,22 @@ RSpec.describe "Shakapacker precompile hook shared script" do
   end
 
   def with_env(overrides)
+    # Initialize outside the begin/ensure region so the cleanup always has a hash to iterate,
+    # even if an ENV operation in the protected body raises.
     original = {}
-    original = overrides.transform_values { |_| nil }
-    overrides.each_key { |key| original[key] = ENV.fetch(key, nil) }
-    overrides.each { |key, value| ENV[key] = value }
-    yield
-  ensure
-    original.each { |key, value| value.nil? ? ENV.delete(key) : ENV[key] = value }
+    begin
+      overrides.each_key { |key| original[key] = ENV.fetch(key, nil) }
+      overrides.each { |key, value| ENV[key] = value }
+      yield
+    ensure
+      original.each { |key, value| value.nil? ? ENV.delete(key) : ENV[key] = value }
+    end
   end
 
   it "preserves setup failures while cleaning any captured env keys" do
     bad_overrides = Object.new
 
-    def bad_overrides.transform_values
+    def bad_overrides.each_key
       raise "env setup failed"
     end
 

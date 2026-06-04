@@ -195,4 +195,20 @@ describe('rscManifestClientReferences (Pro dummy) mirrors the generator resoluti
       warnSpy.mockRestore();
     }
   });
+
+  it('still returns the manifest if statSync races a deleted file during the staleness check', () => {
+    fs.existsSync.mockImplementation((p) => p === DEFAULT_MANIFEST || p === REGISTRATION_ENTRY);
+    fs.readFileSync.mockReturnValue(JSON.stringify({ refs: ['client/app/A.jsx'] }));
+    fs.statSync.mockImplementation(() => {
+      throw Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' });
+    });
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx']);
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
 });
