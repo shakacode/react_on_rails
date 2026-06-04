@@ -272,7 +272,7 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
 
     render(
       name: string,
-      props: Record<string, string>,
+      props: Record<string, unknown>,
       domNodeId: string,
       hydrate: boolean,
     ): RenderReturnType {

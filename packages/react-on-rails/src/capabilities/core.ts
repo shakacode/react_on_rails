@@ -192,7 +192,7 @@ export function createCoreCapability(registries: Registries) {
 
     render(
       name: string,
-      props: Record<string, string>,
+      props: Record<string, unknown>,
       domNodeId: string,
       hydrate: boolean,
     ): RenderReturnType {

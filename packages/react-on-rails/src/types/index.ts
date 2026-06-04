@@ -441,7 +441,12 @@ export interface ReactOnRailsInternal extends ReactOnRails {
    *   (see "What is a root?" in https://github.com/reactwg/react-18/discussions/5).
    *   Under React 16/17: Reference to your component's backing instance or `null` for stateless components.
    */
-  render(name: string, props: Record<string, string>, domNodeId: string, hydrate?: boolean): RenderReturnType;
+  render(
+    name: string,
+    props: Record<string, unknown>,
+    domNodeId: string,
+    hydrate?: boolean,
+  ): RenderReturnType;
   /**
    * Get the component that you registered
    * @returns {name, component, renderFunction, isRenderer}
