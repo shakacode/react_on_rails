@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "rails_helper"
+require "tmpdir"
 
 # rubocop:disable Metrics/ModuleLength
 module ReactOnRails
@@ -1070,6 +1071,24 @@ module ReactOnRails
       end
     end
 
+    describe "#relative_import_path" do
+      subject(:computed_relative_import_path) { described_class.instance.send(:relative_import_path, from, to) }
+
+      context "when target is outside the entrypoint directory" do
+        let(:from) { "/app/packs/server-bundle.ts" }
+        let(:to) { "/app/generated/server-bundle-generated.js" }
+
+        it { is_expected.to eq "../generated/server-bundle-generated.js" }
+      end
+
+      context "when target is in the same directory" do
+        let(:from) { "/app/generated/server-bundle.ts" }
+        let(:to) { "/app/generated/server-bundle-generated.js" }
+
+        it { is_expected.to eq "./server-bundle-generated.js" }
+      end
+    end
+
     describe "CLIENT_API_PATTERN" do
       subject { content.match?(described_class::CLIENT_API_PATTERN) }
 
@@ -1208,6 +1227,36 @@ module ReactOnRails
       it "lists client components" do
         expect { described_class.instance.send(:log_rsc_classification_summary) }
           .to output(/Client components.*ReactClientComponent/).to_stdout
+      end
+    end
+
+    describe "#resolve_server_bundle_source_entrypoint" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          @tmpdir = tmpdir
+          example.run
+        end
+      end
+
+      it "uses the configured server bundle entrypoint when it exists" do
+        configured_entrypoint = File.join(@tmpdir, "server-bundle.js")
+        File.write(configured_entrypoint, "")
+
+        resolved_entrypoint = described_class.instance.send(:resolve_server_bundle_source_entrypoint,
+                                                            configured_entrypoint)
+
+        expect(resolved_entrypoint).to eq(configured_entrypoint)
+      end
+
+      it "uses a TypeScript source entrypoint when the configured JavaScript output filename is missing" do
+        configured_entrypoint = File.join(@tmpdir, "server-bundle.js")
+        typescript_entrypoint = File.join(@tmpdir, "server-bundle.ts")
+        File.write(typescript_entrypoint, "")
+
+        resolved_entrypoint = described_class.instance.send(:resolve_server_bundle_source_entrypoint,
+                                                            configured_entrypoint)
+
+        expect(resolved_entrypoint).to eq(typescript_entrypoint)
       end
     end
 

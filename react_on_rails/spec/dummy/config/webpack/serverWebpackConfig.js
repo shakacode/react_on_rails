@@ -24,7 +24,7 @@ const configureServer = () => {
 
   if (!serverEntry['server-bundle']) {
     throw new Error(
-      "Create a pack with the file name 'server-bundle.js' containing all the server rendering files",
+      "Create a pack named 'server-bundle' containing all the server rendering files, for example 'server-bundle.js' or 'server-bundle.ts'",
     );
   }
 

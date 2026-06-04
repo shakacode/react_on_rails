@@ -28,6 +28,7 @@ module ReactOnRails
   class PacksGenerator
     CONTAINS_CLIENT_OR_SERVER_REGEX = /\.(server|client)($|\.)/
     COMPONENT_EXTENSIONS = /\.(jsx?|tsx?)$/
+    SERVER_BUNDLE_SOURCE_EXTENSIONS = %w[.js .jsx .ts .tsx .mjs .cjs].freeze
     # Auto-registration requires nested_entries support which was added in 7.0.0
     # Note: The gemspec requires Shakapacker >= 6.0 for basic functionality
     MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING = "7.0.0"
@@ -357,15 +358,25 @@ module ReactOnRails
 
       relative_path_to_generated_server_bundle = relative_path(server_bundle_entrypoint,
                                                                generated_server_bundle_file_path)
+      relative_import_path_to_generated_server_bundle = relative_import_path(server_bundle_entrypoint,
+                                                                             generated_server_bundle_file_path)
       content = <<~FILE_CONTENT
         // import statement added by react_on_rails:generate_packs rake task
-        import "./#{relative_path_to_generated_server_bundle}"
+        import '#{relative_import_path_to_generated_server_bundle}';
       FILE_CONTENT
+
+      legacy_relative_import_path_to_generated_server_bundle = "./#{relative_path_to_generated_server_bundle}"
+      generated_server_bundle_import_regex = /
+        import\s+['"]
+        (?:#{Regexp.union(relative_import_path_to_generated_server_bundle,
+                          legacy_relative_import_path_to_generated_server_bundle).source})
+        ['"]
+      /x
 
       ReactOnRails::Utils.prepend_to_file_if_text_not_present(
         file: server_bundle_entrypoint,
         text_to_prepend: content,
-        regex: %r{import ['"]\./#{relative_path_to_generated_server_bundle}['"]}
+        regex: generated_server_bundle_import_regex
       )
     end
 
@@ -506,8 +517,31 @@ module ReactOnRails
     end
 
     def server_bundle_entrypoint
-      Rails.root.join(ReactOnRails::PackerUtils.packer_source_entry_path,
-                      ReactOnRails.configuration.server_bundle_js_file)
+      configured_entrypoint = Rails.root.join(
+        ReactOnRails::PackerUtils.packer_source_entry_path,
+        ReactOnRails.configuration.server_bundle_js_file
+      ).to_s
+
+      resolve_server_bundle_source_entrypoint(configured_entrypoint)
+    end
+
+    def resolve_server_bundle_source_entrypoint(configured_entrypoint)
+      return configured_entrypoint if File.exist?(configured_entrypoint)
+
+      base_path = configured_entrypoint.sub(%r{\.[^./]+\z}, "")
+      server_bundle_source_extensions_for(configured_entrypoint).each do |extension|
+        candidate_entrypoint = "#{base_path}#{extension}"
+        return candidate_entrypoint if File.exist?(candidate_entrypoint)
+      end
+
+      configured_entrypoint
+    end
+
+    def server_bundle_source_extensions_for(configured_entrypoint)
+      configured_extension = File.extname(configured_entrypoint)
+      return SERVER_BUNDLE_SOURCE_EXTENSIONS if configured_extension.empty?
+
+      SERVER_BUNDLE_SOURCE_EXTENSIONS.reject { |extension| extension == configured_extension }
     end
 
     def generated_packs_directory_path
@@ -536,6 +570,13 @@ module ReactOnRails
       to_path = Pathname.new(to)
 
       to_path.relative_path_from(from_dir)
+    end
+
+    def relative_import_path(from, to)
+      relative_path_string = relative_path(from, to).to_s
+      return relative_path_string if relative_path_string.start_with?(".")
+
+      "./#{relative_path_string}"
     end
 
     def generated_pack_path(file_path)
