@@ -1,5 +1,9 @@
-import PropTypes from 'prop-types';
 import React from 'react';
+import type { CSSProperties } from 'react';
+
+type ManualRenderComponentProps = {
+  name: string;
+};
 
 /**
  * A simple component used to test the reactOnRailsPageLoaded() behavior
@@ -11,10 +15,10 @@ import React from 'react';
  *
  * Note: This tests the core package's manual rendering API, not Pro's async hydration.
  */
-const ManualRenderComponent = ({ name }) => {
+const ManualRenderComponent = ({ name }: ManualRenderComponentProps) => {
   // Use inline styles to verify that hydration issues would cause CSS property
   // format mismatches (camelCase in React vs kebab-case in server HTML)
-  const containerStyle = {
+  const containerStyle: CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
@@ -31,10 +35,6 @@ const ManualRenderComponent = ({ name }) => {
       <p>If you see hydration errors, the fix for issue #2210 is not working.</p>
     </div>
   );
-};
-
-ManualRenderComponent.propTypes = {
-  name: PropTypes.string.isRequired,
 };
 
 export default ManualRenderComponent;
