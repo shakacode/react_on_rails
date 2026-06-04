@@ -349,7 +349,7 @@ module ReactOnRails
         "import #{name} from '#{relative_path(generated_server_bundle_file_path, component_path)}';"
       end
 
-      server_components = server_component_names_for_registration
+      server_components = server_component_names_for_registration(component_for_server_registration_to_path)
       client_components = component_for_server_registration_to_path.keys - server_components
 
       # Include stores in server bundle
@@ -370,22 +370,23 @@ module ReactOnRails
       common_components_for_server_bundle.merge(server_component_to_path)
     end
 
-    def server_component_names_for_registration
+    # Accepts an already-fetched component map so callers that have one don't trigger a second
+    # components_for_server_registration scan (its Dir.glob is un-memoized).
+    def server_component_names_for_registration(components = nil)
       return [] unless ReactOnRails::Utils.rsc_support_enabled?
 
-      components = components_for_server_registration
+      components ||= components_for_server_registration
       components.keys.reject { |name| client_entrypoint?(components[name]) }
     end
 
     def server_component_registration_entries
       return {} unless ReactOnRails::Utils.rsc_support_enabled?
 
-      # Compute the component map once. Calling server_component_names_for_registration here would
-      # re-run components_for_server_registration (and its un-memoized Dir.glob scans) a second time;
-      # this method runs on the per-request dev staleness check, so the duplicate scan is wasteful.
+      # Compute the component map once and reuse it: passing it to
+      # server_component_names_for_registration avoids a second components_for_server_registration
+      # scan, and this method runs on the per-request dev staleness check.
       components = components_for_server_registration
-      server_component_names = components.keys.reject { |name| client_entrypoint?(components[name]) }
-      components.slice(*server_component_names)
+      components.slice(*server_component_names_for_registration(components))
     end
 
     def server_component_registration_entry_content
