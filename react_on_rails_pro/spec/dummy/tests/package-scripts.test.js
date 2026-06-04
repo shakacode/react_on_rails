@@ -1,15 +1,13 @@
 const packageJson = require('../package.json');
 
 describe('package scripts', () => {
-  it.each([
-    ['build:client', 'public/webpack/production'],
-    ['build:server', 'public/webpack/production'],
-  ])(
-    '%s cleans production webpack output and ssr-generated before discovery',
-    (scriptName, webpackOutput) => {
+  it.each(['build:client', 'build:server'])(
+    '%s refreshes generated RSC refs without deleting production webpack output',
+    (scriptName) => {
       const script = packageJson.scripts[scriptName];
 
-      expect(script).toMatch(new RegExp(`^rm -rf ${webpackOutput} ssr-generated && `));
+      expect(script).toMatch(/^rm -rf ssr-generated && /);
+      expect(script).not.toContain('public/webpack/production');
       expect(script).toContain('bin/shakapacker-precompile-hook');
     },
   );
