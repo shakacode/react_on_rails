@@ -73,13 +73,13 @@ If you already have an existing server bundle entrypoint and have not set `make_
 
 ```javascript
 // import statement added by react_on_rails:generate_packs rake task
-import './../generated/server-bundle-generated.js';
+import '../generated/server-bundle-generated.js';
 ```
 
 We recommend committing this import statement to your version control system.
 
 > Example (dummy app): see the server bundle entrypoint import.
-> [Dummy server-bundle.js](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/spec/dummy/client/app/packs/server-bundle.js)
+> [Dummy server-bundle.ts](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/spec/dummy/client/app/packs/server-bundle.ts)
 
 ## Usage
 
@@ -607,11 +607,11 @@ registerServerComponent({ Dashboard, Profile });
 ReactOnRails.register({ LikeButton, CommentForm });
 ```
 
-Your existing `packs/server-bundle.js` entry file doesn't need manual changes — the packs generator adds one import line at the top pointing to the aggregated file:
+Your existing `packs/server-bundle.js` or `packs/server-bundle.ts` entry file doesn't need manual changes — the packs generator adds one import line at the top pointing to the aggregated file:
 
 ```js
-// packs/server-bundle.js
-import './../generated/server-bundle-generated.js'; // added by react_on_rails:generate_packs
+// packs/server-bundle.js or packs/server-bundle.ts
+import '../generated/server-bundle-generated.js'; // added by react_on_rails:generate_packs
 // ... your own custom server-side code continues here
 ```
 
