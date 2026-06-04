@@ -20,6 +20,7 @@ import type {
   RegisteredComponent,
   RendererFunction,
   RendererTeardown,
+  RendererTeardownResult,
   Root,
 } from 'react-on-rails/types';
 
@@ -47,7 +48,10 @@ const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
  * share it. Note this copy inlines the thenable check (`maybePromise && typeof maybePromise.then ===
  * 'function'`) rather than reusing OSS's `isThenable` helper; the two are equivalent for the
  * `void | Promise<void>` value a renderer teardown produces. The shared `RendererFunction`/
- * `RendererTeardown` *types* are imported, so only this small runtime helper is duplicated.
+ * `RendererTeardown`/`RendererTeardownResult` *types* are imported, so only this small runtime
+ * helper is duplicated.
+ * NOTE: A sibling helper exists in packages/react-on-rails/src/ClientRenderer.ts. If you change the
+ * error-handling logic or log format here, update that copy too.
  */
 function invokeRendererTeardown(teardown: RendererTeardown | undefined, domNodeId: string): void {
   if (!teardown) return;
@@ -61,6 +65,14 @@ function invokeRendererTeardown(teardown: RendererTeardown | undefined, domNodeI
       console.error(`Error in renderer teardown for dom node "${domNodeId}":`, error);
     });
   }
+}
+
+function isRendererTeardownResult(value: unknown): value is RendererTeardownResult {
+  return (
+    value != null &&
+    typeof value === 'object' &&
+    typeof (value as { teardown?: unknown }).teardown === 'function'
+  );
 }
 
 // Result of attempting renderer delegation. Pro awaits the renderer inside delegateToRenderer, so it
@@ -87,16 +99,16 @@ async function delegateToRenderer(
       );
     }
 
-    // The renderer owns its own mount and may return a teardown callback so we can clean it up on
+    // The renderer owns its own mount and may return a teardown wrapper so we can clean it up on
     // unmount (Turbo/Turbolinks navigation). `component` is the public `RenderFunction`, which is
     // not assignable to the narrower `RendererFunction`, so `as RendererFunction` is a widening
     // assertion guarded by the runtime `isRenderer` invariant (not a sound narrowing). The awaited
-    // `result` is then `void | RendererTeardown`, so a `typeof === 'function'` check picks out the
-    // teardown with no further cast.
+    // `result` is then `void | RendererTeardownResult`, so the object wrapper picks out the teardown
+    // without confusing legacy bare function returns for cleanup.
     const result = await (component as RendererFunction)(props, railsContext, domNodeId);
     return {
       delegated: true,
-      teardown: typeof result === 'function' ? result : undefined,
+      teardown: isRendererTeardownResult(result) ? result.teardown : undefined,
     };
   }
 
@@ -125,7 +137,7 @@ class ComponentRenderer {
   // unmountComponentAtNode on a node the renderer owns.
   private rendererOwnedMount = false;
 
-  // Set when a renderer-owned mount returned a teardown callback; run on unmount.
+  // Set when a renderer-owned mount returned a teardown wrapper; run on unmount.
   private rendererTeardown?: RendererTeardown;
 
   private renderPromise?: Promise<void>;

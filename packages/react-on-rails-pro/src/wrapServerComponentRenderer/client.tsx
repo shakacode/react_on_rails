@@ -68,8 +68,8 @@ const wrapServerComponentRenderer = (
   const wrapper: RenderFunction = async (props, railsContext, domNodeId) => {
     // A registerServerComponent render function is expected to resolve to the component to mount,
     // not a renderer teardown. RenderFunction's return union is wider (this PR added
-    // RendererTeardown), so this narrows to the expected shape; the `typeof Component !== 'function'`
-    // guard below rejects anything else at runtime.
+    // RendererTeardownResult), so this narrows to the expected shape; the
+    // `typeof Component !== 'function'` guard below rejects anything else at runtime.
     const Component = isRenderFunction(componentOrRenderFunction)
       ? ((await componentOrRenderFunction(props, railsContext, domNodeId)) as ReactComponent)
       : componentOrRenderFunction;
@@ -118,10 +118,10 @@ const wrapServerComponentRenderer = (
       reactRoot.render(rootElement);
     }
 
-    // Return a teardown so React on Rails unmounts this root on Turbo/Turbolinks navigation (the
-    // soft-navigation page swap) instead of leaking it. This closes the leak for every
-    // registerServerComponent user.
-    return () => reactRoot.unmount();
+    // Return an explicit teardown wrapper so React on Rails unmounts this root on Turbo/Turbolinks
+    // navigation (the soft-navigation page swap) instead of leaking it. This closes the leak for every
+    // registerServerComponent user without confusing legacy bare function returns for cleanup.
+    return { teardown: () => reactRoot.unmount() };
   };
 
   return wrapper;

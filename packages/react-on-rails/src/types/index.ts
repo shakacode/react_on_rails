@@ -149,24 +149,33 @@ type RenderFunctionResult = RenderFunctionSyncResult | RenderFunctionAsyncResult
 
 /**
  * Optional cleanup callback that a renderer function (the 3-argument form
- * `(props, railsContext, domNodeId) => …`) may return. React on Rails invokes it when the mount is
- * torn down — on Turbo/Turbolinks navigation (the framework's soft-navigation page swap, not a
- * native browser unload), and in the core client renderer also when the same `domNodeId` node is
- * replaced — so renderer-managed React roots, event listeners, and subscriptions are released
- * instead of leaked. May be synchronous or asynchronous.
+ * `(props, railsContext, domNodeId) => …`) may return inside a {@link RendererTeardownResult}.
+ * React on Rails invokes it when the mount is torn down — on Turbo/Turbolinks navigation (the
+ * framework's soft-navigation page swap, not a native browser unload), and in the core client
+ * renderer also when the same `domNodeId` node is replaced — so renderer-managed React roots, event
+ * listeners, and subscriptions are released instead of leaked. May be synchronous or asynchronous.
  *
  * @see RenderFunction
  */
 type RendererTeardown = () => void | Promise<void>;
 
 /**
- * What the 3-argument renderer form may return: nothing, or a {@link RendererTeardown} (sync or
- * async). Renderer functions own their DOM rendering/hydration, so unlike server-side
- * render-functions they do not return a component or HTML.
+ * Object wrapper returned by a 3-argument renderer to opt into cleanup. The wrapper keeps teardown
+ * detection unambiguous: legacy renderers may have returned function components before this contract
+ * existed, so a bare function return is treated as no teardown.
+ */
+type RendererTeardownResult = {
+  teardown: RendererTeardown;
+};
+
+/**
+ * What the 3-argument renderer form may return: nothing, or a {@link RendererTeardownResult}.
+ * Renderer functions own their DOM rendering/hydration, so unlike server-side render-functions they
+ * do not return a component or HTML.
  *
- * Consumers discriminate this union at runtime by `typeof result === 'function'` (a teardown) vs.
- * a thenable (an async renderer, awaited/adopted before re-checking) vs. anything else (no
- * teardown). The `void` arm is therefore treated as "no teardown," same as `undefined`.
+ * Consumers discriminate this union at runtime by an object with a `teardown` function vs. a thenable
+ * (an async renderer, awaited/adopted before re-checking) vs. anything else (no teardown). The
+ * `void` arm is therefore treated as "no teardown," same as `undefined`.
  */
 // `void` (not `undefined`) is required for the opt-out case: a renderer that returns nothing has
 // type `(...) => void`, and that stays assignable to `RenderFunction` only while `void` is part of
@@ -174,12 +183,12 @@ type RendererTeardown = () => void | Promise<void>;
 // nothing-returning renderer. The no-invalid-void-type rule is disabled because this `void` is a
 // deliberate "may return nothing" marker in a return-position union, exactly the case it over-flags.
 // eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- renderer functions may return nothing
-type RendererResult = void | RendererTeardown | Promise<void | RendererTeardown>;
+type RendererResult = void | RendererTeardownResult | Promise<void | RendererTeardownResult>;
 
 /**
  * The precise call signature of the 3-argument "renderer" form `(props, railsContext, domNodeId) =>
- * …`. A renderer owns its own mount and returns a {@link RendererResult} (nothing, a teardown, or a
- * promise resolving to one). The client renderers assert a registered component to this shape —
+ * …`. A renderer owns its own mount and returns a {@link RendererResult} (nothing, a teardown result,
+ * or a promise resolving to one). The client renderers assert a registered component to this shape —
  * rather than the public {@link RenderFunction}, whose single signature has optional params and a
  * union return type spanning both the renderer and server render-function shapes — so the call
  * result reads as a RendererResult directly. Because `RenderFunction` is not assignable to
@@ -227,10 +236,10 @@ type AsyncPropsManager = {
  *
  * @remarks
  * The 3-argument "renderer" form `(props, railsContext, domNodeId)` owns its own DOM
- * rendering/hydration and may optionally return a {@link RendererTeardown} (or a promise resolving
- * to one) so React on Rails can clean the mount up on Turbo/Turbolinks navigation or same-id node
- * replacement. Returning nothing keeps the previous (leaky) behavior, so existing renderers are
- * unaffected.
+ * rendering/hydration and may optionally return `{ teardown }` (a {@link RendererTeardownResult}, or
+ * a promise resolving to one) so React on Rails can clean the mount up on Turbo/Turbolinks navigation
+ * or same-id node replacement. Returning nothing keeps the previous (leaky) behavior, so existing
+ * renderers are unaffected.
  *
  * Synchronous teardowns are always honored. An *async* teardown is best-effort in this open-source
  * package: if a navigation or node replacement happens before the renderer resolves its teardown,
@@ -254,6 +263,7 @@ export type {
   AuthenticityHeaders,
   RenderFunction,
   RendererTeardown,
+  RendererTeardownResult,
   RendererResult,
   RendererFunction,
   RenderFunctionResult,

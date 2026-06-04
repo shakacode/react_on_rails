@@ -126,7 +126,7 @@ describe('ClientRenderer', () => {
   });
 
   // Issue #3209: renderer functions (the 3-arg `(props, railsContext, domNodeId)` form) own their
-  // own mount. They may return a teardown callback so React on Rails can clean the mount up on
+  // own mount. They may return a teardown wrapper so React on Rails can clean the mount up on
   // page unload (Turbo/Turbolinks navigation) or when the same dom-id node is replaced.
   describe('renderer functions (issue #3209: teardown cleanup)', () => {
     const setupRailsContext = () => {
@@ -194,12 +194,12 @@ describe('ClientRenderer', () => {
       );
     });
 
-    it('runs the returned teardown on page unload (unmountAllComponents)', () => {
+    it('runs the returned teardown wrapper on page unload (unmountAllComponents)', () => {
       const teardown = jest.fn();
       const renderer = jest.fn();
       const TestRenderer: RenderFunction = (props, railsContext, domNodeId) => {
         renderer(props, railsContext, domNodeId);
-        return teardown;
+        return { teardown };
       };
       ComponentRegistry.register({ TestRenderer });
       setupRendererDom('renderer-unload');
@@ -218,7 +218,7 @@ describe('ClientRenderer', () => {
       const renderer = jest.fn();
       const TestRenderer: RenderFunction = (props, railsContext, domNodeId) => {
         renderer(props, railsContext, domNodeId);
-        return teardown;
+        return { teardown };
       };
       ComponentRegistry.register({ TestRenderer });
       const targetNode1 = setupRendererDom('renderer-replace');
@@ -243,18 +243,36 @@ describe('ClientRenderer', () => {
     it('does not throw on unmount when the renderer returns nothing', () => {
       // Intentionally returns nothing (legacy renderer that does not opt into cleanup). Three
       // parameters keep its runtime arity at 3 so it is still classified as a renderer.
-      const TestRenderer: RenderFunction = (_props, _railsContext, _domNodeId) => {};
+      const renderer = jest.fn();
+      const TestRenderer: RenderFunction = (_props, _railsContext, _domNodeId) => {
+        renderer();
+      };
       ComponentRegistry.register({ TestRenderer });
       setupRendererDom('renderer-void');
 
       renderComponent('renderer-void');
+      renderComponent('renderer-void');
 
+      expect(renderer).toHaveBeenCalledTimes(2);
       expect(() => unmountAllComponents()).not.toThrow();
+    });
+
+    it('does not treat a returned component-like function as a teardown', () => {
+      const ReturnedComponent = jest.fn(() => React.createElement('div', null, 'legacy component result'));
+      const TestRenderer: RenderFunction = (_props, _railsContext, _domNodeId) => ReturnedComponent;
+      ComponentRegistry.register({ TestRenderer });
+      setupRendererDom('renderer-component-result');
+
+      renderComponent('renderer-component-result');
+      unmountAllComponents();
+
+      expect(ReturnedComponent).not.toHaveBeenCalled();
     });
 
     it('runs a teardown returned asynchronously by the renderer', async () => {
       const teardown = jest.fn();
-      const TestRenderer: RenderFunction = (_props, _railsContext, _domNodeId) => Promise.resolve(teardown);
+      const TestRenderer: RenderFunction = (_props, _railsContext, _domNodeId) =>
+        Promise.resolve({ teardown });
       ComponentRegistry.register({ TestRenderer });
       setupRendererDom('renderer-async');
 
@@ -269,12 +287,12 @@ describe('ClientRenderer', () => {
     it('logs (and swallows) when an async teardown rejects on unmount', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       const rejection = new Error('async teardown boom');
-      // The renderer returns a teardown synchronously; the teardown itself returns a rejecting
+      // The renderer returns a teardown wrapper synchronously; the teardown itself returns a rejecting
       // promise. This exercises invokeRendererTeardown's rejection-swallowing path (the reason it
       // wraps the call in Promise.resolve(...).catch) so the failure is logged, not left as an
       // unhandled rejection.
       const teardown = jest.fn(() => Promise.reject(rejection));
-      const TestRenderer: RenderFunction = (_props, _railsContext, _domNodeId) => teardown;
+      const TestRenderer: RenderFunction = (_props, _railsContext, _domNodeId) => ({ teardown });
       ComponentRegistry.register({ TestRenderer });
       setupRendererDom('renderer-async-teardown-reject');
 
@@ -300,8 +318,10 @@ describe('ClientRenderer', () => {
         throw new Error('teardown boom');
       });
       const okTeardown = jest.fn();
-      const ThrowingRenderer: RenderFunction = (_props, _railsContext, _domNodeId) => throwingTeardown;
-      const OkRenderer: RenderFunction = (_props, _railsContext, _domNodeId) => okTeardown;
+      const ThrowingRenderer: RenderFunction = (_props, _railsContext, _domNodeId) => ({
+        teardown: throwingTeardown,
+      });
+      const OkRenderer: RenderFunction = (_props, _railsContext, _domNodeId) => ({ teardown: okTeardown });
       ComponentRegistry.register({ ThrowingRenderer, OkRenderer });
       // Insertion order matters: the throwing teardown runs first, so we prove cleanup of the
       // later-registered entry still happens.
@@ -330,11 +350,11 @@ describe('ClientRenderer', () => {
       // teardown resolves only after the same-id node has been replaced, so it must NOT be attached
       // to or run against the new mount.
       const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-      const resolvers: Array<(teardown: () => void) => void> = [];
+      const resolvers: Array<(result: { teardown: () => void }) => void> = [];
       const renderer = jest.fn();
       const AsyncRenderer: RenderFunction = (_props, _railsContext, _domNodeId) => {
         renderer();
-        return new Promise<() => void>((resolve) => {
+        return new Promise<{ teardown: () => void }>((resolve) => {
           resolvers.push(resolve);
         });
       };
@@ -354,7 +374,7 @@ describe('ClientRenderer', () => {
 
       // The first (now-stale) renderer finally resolves its teardown.
       const staleTeardown = jest.fn();
-      resolvers[0](staleTeardown);
+      resolvers[0]({ teardown: staleTeardown });
       await Promise.resolve();
 
       // The stale teardown was not attached to the replaced mount, so cleanup never runs it. The
@@ -373,7 +393,8 @@ describe('ClientRenderer', () => {
       // renderer's promise resolves, which is the actual race the core package cannot win (Pro does).
       const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
       const teardown = jest.fn();
-      const TestRenderer: RenderFunction = (_props, _railsContext, _domNodeId) => Promise.resolve(teardown);
+      const TestRenderer: RenderFunction = (_props, _railsContext, _domNodeId) =>
+        Promise.resolve({ teardown });
       ComponentRegistry.register({ TestRenderer });
       setupRendererDom('renderer-async-race');
 
@@ -394,8 +415,11 @@ describe('ClientRenderer', () => {
     it('logs (and does not rethrow) when an async renderer rejects before returning a teardown', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       const rejection = new Error('renderer rejected');
-      const RejectingRenderer: RenderFunction = (_props, _railsContext, _domNodeId) =>
-        Promise.reject<() => void>(rejection);
+      const renderer = jest
+        .fn<Promise<{ teardown: () => void }> | void, []>()
+        .mockImplementationOnce(() => Promise.reject<{ teardown: () => void }>(rejection))
+        .mockImplementationOnce(() => {});
+      const RejectingRenderer: RenderFunction = (_props, _railsContext, _domNodeId) => renderer();
       ComponentRegistry.register({ RejectingRenderer });
       setupRendererDom('renderer-reject', 'RejectingRenderer');
 
@@ -412,6 +436,8 @@ describe('ClientRenderer', () => {
         ),
         rejection,
       );
+      renderComponent('renderer-reject');
+      expect(renderer).toHaveBeenCalledTimes(2);
       consoleErrorSpy.mockRestore();
     });
 
@@ -425,7 +451,7 @@ describe('ClientRenderer', () => {
       });
       const TestRenderer: RenderFunction = (_props, _railsContext, _domNodeId) => {
         renderer();
-        return throwingTeardown;
+        return { teardown: throwingTeardown };
       };
       ComponentRegistry.register({ TestRenderer });
       const targetNode1 = setupRendererDom('renderer-replace-throws');
@@ -459,10 +485,10 @@ describe('ClientRenderer', () => {
       const teardown = jest.fn();
       const TestRenderer: RenderFunction = (_props, _railsContext, _domNodeId) =>
         ({
-          then(onFulfilled: (value: () => void) => void) {
-            onFulfilled(teardown);
+          then(onFulfilled: (value: { teardown: () => void }) => void) {
+            onFulfilled({ teardown });
           },
-        }) as unknown as Promise<() => void>;
+        }) as unknown as Promise<{ teardown: () => void }>;
       ComponentRegistry.register({ TestRenderer });
       setupRendererDom('renderer-thenable');
 

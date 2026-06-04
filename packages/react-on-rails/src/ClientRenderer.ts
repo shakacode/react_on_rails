@@ -5,6 +5,7 @@ import type {
   RendererFunction,
   RendererResult,
   RendererTeardown,
+  RendererTeardownResult,
   RenderReturnType,
 } from './types/index.ts';
 import ComponentRegistry from './ComponentRegistry.ts';
@@ -22,10 +23,10 @@ const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 // unload or same-id node replacement:
 // - `react`: a React root (or legacy backing instance) that ReactOnRails created itself.
 // - `renderer`: a user renderer function (3-arg form) that owns its own mount; cleanup runs the
-//   optional teardown it returned. `teardown` is undefined in three cases: the renderer opted out
-//   (returned nothing), an async teardown has not resolved yet — `trackRendererMount` only attaches
-//   a late-resolving teardown while this entry is still the active mount for its id — or the
-//   renderer's own promise rejected, so it never produced a teardown.
+//   optional teardown it returned. The `domNode` reference is retained so same-id node replacement can
+//   be detected before running the old teardown. `teardown` is undefined only while an async teardown
+//   has not resolved yet — `trackRendererMount` only attaches a late-resolving teardown while this
+//   entry is still the active mount for its id.
 type RenderedEntry =
   | { kind: 'react'; root: RenderReturnType; domNode: Element }
   | { kind: 'renderer'; teardown?: RendererTeardown; domNode: Element };
@@ -39,6 +40,14 @@ function isThenable(value: unknown): value is PromiseLike<unknown> {
   );
 }
 
+function isRendererTeardownResult(value: unknown): value is RendererTeardownResult {
+  return (
+    value != null &&
+    typeof value === 'object' &&
+    typeof (value as { teardown?: unknown }).teardown === 'function'
+  );
+}
+
 // Track all rendered roots for cleanup
 const renderedRoots = new Map<string, RenderedEntry>();
 
@@ -46,6 +55,8 @@ const renderedRoots = new Map<string, RenderedEntry>();
  * Invokes a renderer teardown, swallowing async rejections so a failing teardown cannot produce an
  * unhandled promise rejection. Synchronous throws propagate to the caller's try/catch. `domNodeId`
  * is included in the log so a failure can be traced to its mount.
+ * NOTE: A sibling helper exists in packages/react-on-rails-pro/src/ClientSideRenderer.ts. If you
+ * change the error-handling logic or log format here, update that copy too.
  */
 function invokeRendererTeardown(teardown: RendererTeardown | undefined, domNodeId: string): void {
   if (!teardown) return;
@@ -125,7 +136,7 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
     }
 
     // Call the renderer function with the expected signature. A renderer owns its own mount and
-    // returns a RendererResult: nothing, a teardown callback, or a promise resolving to one.
+    // returns a RendererResult: nothing, a teardown wrapper, or a promise resolving to one.
     // `component` is typed as the public `RenderFunction` (optional params, a return union spanning
     // both the renderer and server render-function shapes), which is NOT assignable to the narrower
     // `RendererFunction`. So `as RendererFunction` is a deliberate widening assertion, not a sound
@@ -140,9 +151,9 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
 }
 
 /**
- * Records a renderer-function mount and captures its optional teardown. The renderer may return the
- * teardown synchronously, or a promise resolving to one (async renderers). The entry is stored
- * immediately so the replaced-node path can find it even before an async teardown resolves.
+ * Records a renderer-function mount and captures its optional teardown. The renderer may return a
+ * teardown wrapper synchronously, or a promise resolving to one (async renderers). The entry is
+ * stored immediately so the replaced-node path can find it even before an async teardown resolves.
  *
  * Known limitation (core package): if the mount is unmounted or its node is replaced *before* an
  * async renderer resolves its teardown, the still-pending teardown is dropped and that one mount
@@ -153,20 +164,29 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
  * renderer (`react-on-rails-pro`) awaits the renderer and re-checks the unmount state, so it runs the
  * teardown even when a navigation races the resolve; prefer Pro if you depend on async renderer
  * teardowns surviving fast navigations.
+ *
+ * Renderer results that do not include a teardown wrapper are intentionally left untracked. Before
+ * this cleanup contract existed, renderer-owned mounts were never tracked, so repeated page-loaded
+ * calls re-invoked those legacy renderers; preserving that behavior keeps "return nothing" backward
+ * compatible.
  */
 function trackRendererMount(domNodeId: string, domNode: Element, result: RendererResult): void {
-  const entry: RenderedEntry = { kind: 'renderer', domNode, teardown: undefined };
-  renderedRoots.set(domNodeId, entry);
-
-  if (typeof result === 'function') {
-    entry.teardown = result;
+  if (isRendererTeardownResult(result)) {
+    renderedRoots.set(domNodeId, { kind: 'renderer', domNode, teardown: result.teardown });
   } else if (isThenable(result)) {
+    const entry: RenderedEntry = { kind: 'renderer', domNode, teardown: undefined };
+    renderedRoots.set(domNodeId, entry);
     Promise.resolve(result)
       .then((resolved) => {
-        if (typeof resolved !== 'function') return;
+        if (!isRendererTeardownResult(resolved)) {
+          if (renderedRoots.get(domNodeId) === entry) {
+            renderedRoots.delete(domNodeId);
+          }
+          return;
+        }
         // Only attach if this exact entry is still the active mount for this id.
         if (renderedRoots.get(domNodeId) === entry) {
-          entry.teardown = resolved;
+          entry.teardown = resolved.teardown;
         } else {
           // The mount was unmounted or its node replaced before this async teardown resolved, so the
           // entry is no longer the active mount and the teardown can't be attached — it is dropped
@@ -180,6 +200,9 @@ function trackRendererMount(domNodeId: string, domNode: Element, result: Rendere
         }
       })
       .catch((error: unknown) => {
+        if (renderedRoots.get(domNodeId) === entry) {
+          renderedRoots.delete(domNodeId);
+        }
         // The renderer's own promise rejected: the render failed, so the component never mounted and
         // no teardown was captured. Log it (rather than letting it surface as an unhandled rejection)
         // so the failure is diagnosable; any partial mount the renderer created may leak on cleanup.
@@ -241,8 +264,8 @@ function renderElement(el: Element, railsContext: RailsContext): void {
       const componentObj = ComponentRegistry.get(name);
       const delegation = delegateToRenderer(componentObj, props, railsContext, domNodeId, trace);
       if (delegation.delegated) {
-        // The renderer owns its own mount; record it (with any teardown it returned) so it gets
-        // cleaned up on page unload or same-id node replacement.
+        // The renderer owns its own mount; record it (with any teardown wrapper it returned) so it
+        // gets cleaned up on page unload or same-id node replacement.
         trackRendererMount(domNodeId, domNode, delegation.result);
         return;
       }

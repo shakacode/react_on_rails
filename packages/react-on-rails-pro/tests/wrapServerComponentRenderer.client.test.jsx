@@ -129,9 +129,9 @@ describe('wrapServerComponentRenderer/client recoverable errors', () => {
   });
 });
 
-// Issue #3209: the wrapper returns a teardown so React on Rails unmounts the RSC root on Turbo
-// navigation / node replacement instead of leaking it (the leak hit every registerServerComponent
-// user). This closes that leak for the framework-shipped renderer.
+// Issue #3209: the wrapper returns a teardown result so React on Rails unmounts the RSC root on
+// Turbo navigation / node replacement instead of leaking it (the leak hit every
+// registerServerComponent user). This closes that leak for the framework-shipped renderer.
 describe('wrapServerComponentRenderer/client teardown (issue #3209)', () => {
   const setupWrapper = async ({ withServerHtml }) => {
     jest.resetModules();
@@ -160,9 +160,13 @@ describe('wrapServerComponentRenderer/client teardown (issue #3209)', () => {
     document.body.appendChild(domNode);
 
     const WrappedComponent = wrapServerComponentRenderer(() => null, 'WrappedComponent');
-    const teardown = await WrappedComponent({}, { rscPayloadGenerationUrlPath: '/rsc_payload' }, domNode.id);
+    const teardownResult = await WrappedComponent(
+      {},
+      { rscPayloadGenerationUrlPath: '/rsc_payload' },
+      domNode.id,
+    );
 
-    return { teardown, unmount, render, hydrateRoot, createRoot };
+    return { teardownResult, unmount, render, hydrateRoot, createRoot };
   };
 
   beforeEach(() => {
@@ -177,27 +181,27 @@ describe('wrapServerComponentRenderer/client teardown (issue #3209)', () => {
     document.body.innerHTML = '';
   });
 
-  it('returns a teardown that unmounts the hydrated root', async () => {
-    const { teardown, unmount, hydrateRoot } = await setupWrapper({ withServerHtml: true });
+  it('returns a teardown result that unmounts the hydrated root', async () => {
+    const { teardownResult, unmount, hydrateRoot } = await setupWrapper({ withServerHtml: true });
 
     expect(hydrateRoot).toHaveBeenCalledTimes(1);
-    expect(typeof teardown).toBe('function');
+    expect(typeof teardownResult.teardown).toBe('function');
     expect(unmount).not.toHaveBeenCalled();
 
-    await teardown();
+    await teardownResult.teardown();
 
     expect(unmount).toHaveBeenCalledTimes(1);
   });
 
-  it('returns a teardown that unmounts the client-rendered root', async () => {
-    const { teardown, unmount, createRoot, render } = await setupWrapper({ withServerHtml: false });
+  it('returns a teardown result that unmounts the client-rendered root', async () => {
+    const { teardownResult, unmount, createRoot, render } = await setupWrapper({ withServerHtml: false });
 
     expect(createRoot).toHaveBeenCalledTimes(1);
     expect(render).toHaveBeenCalledTimes(1);
-    expect(typeof teardown).toBe('function');
+    expect(typeof teardownResult.teardown).toBe('function');
     expect(unmount).not.toHaveBeenCalled();
 
-    await teardown();
+    await teardownResult.teardown();
 
     expect(unmount).toHaveBeenCalledTimes(1);
   });
