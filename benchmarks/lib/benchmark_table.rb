@@ -11,13 +11,16 @@ class BenchmarkTable
 
   # Display-order columns. A :measure + :direction makes the column highlightable
   # and MUST match the tracked measure/side in track_benchmarks.rb THRESHOLDS
-  # (rps: higher-is-better/:lower; p50_latency: lower-is-better/:upper). Columns
-  # without them (p90, Status) are shown but never highlighted.
+  # (rps: higher-is-better/:lower; p50_latency and failed_pct: lower-is-better/:upper).
+  # Every THRESHOLDS measure has a highlightable column here (pinned both directions by
+  # track_benchmarks_spec.rb) so an alert on any tracked measure is visible in the
+  # table. Columns without :measure (p90, Status) are shown but never highlighted.
   COLUMNS = [
     { header: "Benchmark", field: "name" },
     { header: "RPS", field: "rps", measure: "rps", direction: :lower },
     { header: "p50(ms)", field: "p50", measure: "p50_latency", direction: :upper },
     { header: "p90(ms)", field: "p90" },
+    { header: "Fail%", field: "failed_pct", measure: "failed_pct", direction: :upper },
     { header: "Status", field: "status" }
   ].freeze
 

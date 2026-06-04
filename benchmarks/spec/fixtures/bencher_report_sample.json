@@ -13,6 +13,11 @@
             "measure": { "slug": "p50-latency", "name": "p50_latency" },
             "metric": { "value": 3.5 },
             "boundary": { "baseline": 5.0, "lower_limit": null, "upper_limit": 6.0 }
+          },
+          {
+            "measure": { "slug": "failed-pct", "name": "failed_pct" },
+            "metric": { "value": 1.1 },
+            "boundary": { "baseline": 0.2, "lower_limit": null, "upper_limit": 1.0 }
           }
         ]
       }

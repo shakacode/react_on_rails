@@ -158,5 +158,18 @@ RSpec.describe "track_benchmarks" do
         expect(col[:direction]).to eq(thresholds[col[:measure]])
       end
     end
+
+    # The reverse direction: every tracked measure must have a highlightable column,
+    # or an alert on that measure (e.g. failed_pct) would fire but render as an
+    # un-highlighted cell — invisible in the PR comment and the regression hand-off.
+    it "expose every tracked THRESHOLDS measure as a highlightable column" do
+      highlightable = BenchmarkTable::COLUMNS.select { |col| col[:measure] }
+                                             .to_h { |col| [col[:measure], col[:direction]] }
+
+      THRESHOLDS.each do |measure, direction, _boundary|
+        expect(highlightable).to include(measure)
+        expect(highlightable[measure]).to eq(direction)
+      end
+    end
   end
 end

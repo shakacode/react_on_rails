@@ -75,7 +75,7 @@ RSpec.describe BmfCollector do
 
         expect(collector.display_rows).to eq(
           [{ "name" => "Pro Node Renderer: simple_eval: Pro", "rps" => 100.0,
-             "p50" => 5.0, "p90" => 6.0, "status" => "200=100" }]
+             "p50" => 5.0, "p90" => 6.0, "failed_pct" => 0.0, "status" => "200=100" }]
         )
       end
 
@@ -85,8 +85,10 @@ RSpec.describe BmfCollector do
         collector.add(name: "/broken", rps: "FAILED", p50: "FAILED", p90: "FAILED", status: "Connection refused")
 
         expect(collector.display_rows).to eq(
-          [{ "name" => "/partial", "rps" => 100.0, "p50" => nil, "p90" => nil, "status" => "200=100" },
-           { "name" => "/broken", "rps" => "FAILED", "p50" => nil, "p90" => nil, "status" => "Connection refused" }]
+          [{ "name" => "/partial", "rps" => 100.0, "p50" => nil, "p90" => nil,
+             "failed_pct" => 0.0, "status" => "200=100" },
+           { "name" => "/broken", "rps" => "FAILED", "p50" => nil, "p90" => nil,
+             "failed_pct" => nil, "status" => "Connection refused" }]
         )
       end
 
@@ -108,7 +110,8 @@ RSpec.describe BmfCollector do
 
           expect(collector.write_display_json(path)).to be(true)
           expect(JSON.parse(File.read(path))).to eq(
-            [{ "name" => "/foo", "rps" => 1.0, "p50" => 2.0, "p90" => 3.0, "status" => "200=1" }]
+            [{ "name" => "/foo", "rps" => 1.0, "p50" => 2.0, "p90" => 3.0,
+               "failed_pct" => 0.0, "status" => "200=1" }]
           )
         end
       end

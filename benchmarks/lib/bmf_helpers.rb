@@ -108,9 +108,15 @@ class BmfCollector
   # Bencher (#to_bmf filters those out). rps may therefore be a non-numeric token like
   # "FAILED"/"MISSING"; BenchmarkTable renders it as text and never highlights a
   # non-numeric cell. p90 and the raw status string are summary-only (absent from to_bmf).
+  # failed_pct is a tracked measure, so it is carried here (as a number) to give the
+  # table a highlightable Fail% column; a failed row (non-numeric rps) has no real
+  # failure rate, so it is left nil ("—").
   def display_rows
     @results.map do |r|
-      { "name" => r[:name], "rps" => r[:rps], "p50" => r[:p50], "p90" => r[:p90], "status" => r[:status] }
+      {
+        "name" => r[:name], "rps" => r[:rps], "p50" => r[:p50], "p90" => r[:p90],
+        "failed_pct" => (r[:rps].is_a?(Numeric) ? r[:failed_pct] : nil), "status" => r[:status]
+      }
     end
   end
 

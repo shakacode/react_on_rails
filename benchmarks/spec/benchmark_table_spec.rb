@@ -18,8 +18,8 @@ RSpec.describe BenchmarkTable do
     end
   end
 
-  def row(name:, rps:, p50:, p90:, status:)
-    { "name" => name, "rps" => rps, "p50" => p50, "p90" => p90, "status" => status }
+  def row(name:, rps:, p50:, p90:, status:, failed_pct: nil)
+    { "name" => name, "rps" => rps, "p50" => p50, "p90" => p90, "failed_pct" => failed_pct, "status" => status }
   end
 
   def render(rows:, report:)
@@ -33,9 +33,9 @@ RSpec.describe BenchmarkTable do
     )
 
     expect(markdown).to include("### Core Benchmark Summary")
-    expect(markdown).to include("| Benchmark | RPS | p50(ms) | p90(ms) | Status |")
-    expect(markdown).to include("| --- | --- | --- | --- | --- |")
-    expect(markdown).to include("| /foo | 100.0 | 5.0 | 6.0 | 200=100 |")
+    expect(markdown).to include("| Benchmark | RPS | p50(ms) | p90(ms) | Fail% | Status |")
+    expect(markdown).to include("| --- | --- | --- | --- | --- | --- |")
+    expect(markdown).to include("| /foo | 100.0 | 5.0 | 6.0 | — | 200=100 |")
     expect(markdown).to include("🔴 significant regression")
     expect(markdown).to include("🟢 significant improvement")
   end
@@ -50,7 +50,17 @@ RSpec.describe BenchmarkTable do
       report: report
     )
 
-    expect(markdown).to include("| /foo | **80.0** 🔴 | **4.0** 🟢 | 6.0 | 200=100 |")
+    expect(markdown).to include("| /foo | **80.0** 🔴 | **4.0** 🟢 | 6.0 | — | 200=100 |")
+  end
+
+  it "bolds + tags a regressed failed_pct cell in the Fail% column" do
+    report = fake_report(["/foo", "failed_pct"] => :regression)
+    markdown = render(
+      rows: [row(name: "/foo", rps: 100.0, p50: 5.0, p90: 6.0, failed_pct: 2.0, status: "200=980,5xx=20")],
+      report: report
+    )
+
+    expect(markdown).to include("| /foo | 100.0 | 5.0 | 6.0 | **2.0** 🔴 | 200=980,5xx=20 |")
   end
 
   it "never highlights non-tracked columns (p90, Status) and leaves untouched rows plain" do
@@ -62,7 +72,7 @@ RSpec.describe BenchmarkTable do
       report: report
     )
 
-    expect(markdown).to include("| /foo | 100.0 | 5.0 | 6.0 | 200=100 |")
+    expect(markdown).to include("| /foo | 100.0 | 5.0 | 6.0 | — | 200=100 |")
     expect(markdown).not_to include("**6.0**")
   end
 
@@ -73,7 +83,7 @@ RSpec.describe BenchmarkTable do
       report: report
     )
 
-    expect(markdown).to include("| /p | 100.0 | — | — | 200=100 |")
+    expect(markdown).to include("| /p | 100.0 | — | — | — | 200=100 |")
   end
 
   it "escapes pipe characters in values" do
@@ -103,7 +113,7 @@ RSpec.describe BenchmarkTable do
       report: report
     )
 
-    expect(markdown).to include("| /broken | FAILED | — | — | Connection refused |")
+    expect(markdown).to include("| /broken | FAILED | — | — | — | Connection refused |")
     expect(markdown).not_to include("**FAILED**")
   end
 
@@ -113,7 +123,7 @@ RSpec.describe BenchmarkTable do
       report: nil
     )
 
-    expect(markdown).to include("| /foo | 100.0 | 5.0 | 6.0 | 200=100 |")
+    expect(markdown).to include("| /foo | 100.0 | 5.0 | 6.0 | — | 200=100 |")
   end
 
   it "shows a placeholder instead of an empty table when there are no rows" do
