@@ -135,6 +135,39 @@ describe('rscManifestClientReferences (Pro dummy) mirrors the generator resoluti
     }
   });
 
+  it('warns when the configured override manifest is older than the registration entry', () => {
+    process.env.RSC_MANIFEST_CLIENT_REFERENCES_JSON = 'tmp/custom-refs.json';
+    const overrideManifest = path.resolve('tmp/custom-refs.json');
+    fs.existsSync.mockImplementation((p) => p === overrideManifest || p === REGISTRATION_ENTRY);
+    fs.readFileSync.mockReturnValue(JSON.stringify({ refs: ['client/app/A.jsx'] }));
+    fs.statSync.mockImplementation((p) => ({ mtimeMs: p === REGISTRATION_ENTRY ? 2000 : 1000 }));
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx']);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringMatching(/may be stale/));
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('skips the non-fatal staleness warning when the manifest disappears before stat', () => {
+    fs.existsSync.mockImplementation((p) => p === DEFAULT_MANIFEST || p === REGISTRATION_ENTRY);
+    fs.readFileSync.mockReturnValue(JSON.stringify({ refs: ['client/app/A.jsx'] }));
+    fs.statSync.mockImplementation((p) => {
+      if (p === DEFAULT_MANIFEST) throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+      return { mtimeMs: 2000 };
+    });
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx']);
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
   it('does not warn when the manifest is newer than the registration entry', () => {
     fs.existsSync.mockImplementation((p) => p === DEFAULT_MANIFEST || p === REGISTRATION_ENTRY);
     fs.readFileSync.mockReturnValue(JSON.stringify({ refs: ['client/app/A.jsx'] }));

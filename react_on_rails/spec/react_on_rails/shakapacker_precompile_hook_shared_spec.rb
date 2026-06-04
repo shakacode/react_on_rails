@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "spec_helper"
+require "tmpdir"
 
 RSpec.describe "Shakapacker precompile hook shared script" do
   before do
@@ -8,12 +9,23 @@ RSpec.describe "Shakapacker precompile hook shared script" do
   end
 
   def with_env(overrides)
+    original = {}
     original = overrides.transform_values { |_| nil }
     overrides.each_key { |key| original[key] = ENV.fetch(key, nil) }
     overrides.each { |key, value| ENV[key] = value }
     yield
   ensure
     original.each { |key, value| value.nil? ? ENV.delete(key) : ENV[key] = value }
+  end
+
+  it "preserves setup failures while cleaning any captured env keys" do
+    bad_overrides = Object.new
+
+    def bad_overrides.transform_values
+      raise "env setup failed"
+    end
+
+    expect { with_env(bad_overrides) { raise "should not yield" } }.to raise_error(RuntimeError, "env setup failed")
   end
 
   it "exposes run_precompile_tasks for load-based callers" do
@@ -29,12 +41,18 @@ RSpec.describe "Shakapacker precompile hook shared script" do
   end
 
   describe "valid_rsc_registration_entry_path?" do
-    it "rejects registration entries under node_modules, public, or tmp" do
+    it "rejects registration entries under generated dependency, output, temp, or test trees" do
       expect(valid_rsc_registration_entry_path?(
                "/app/node_modules/pkg/client/generated/server-component-registration-entry.js"
              )).to be(false)
       expect(valid_rsc_registration_entry_path?(
                "/app/public/packs/generated/server-component-registration-entry.js"
+             )).to be(false)
+      expect(valid_rsc_registration_entry_path?(
+               "/app/spec/fixtures/generated/server-component-registration-entry.js"
+             )).to be(false)
+      expect(valid_rsc_registration_entry_path?(
+               "/app/test/fixtures/generated/server-component-registration-entry.js"
              )).to be(false)
       expect(valid_rsc_registration_entry_path?(
                "/app/tmp/cache/generated/server-component-registration-entry.js"
@@ -45,6 +63,50 @@ RSpec.describe "Shakapacker precompile hook shared script" do
       expect(valid_rsc_registration_entry_path?(
                "/app/client/app/generated/server-component-registration-entry.js"
              )).to be(true)
+    end
+
+    it "treats excluded names as path components instead of substrings" do
+      expect(valid_rsc_registration_entry_path?(
+               "/app/client/tmpfiles/generated/server-component-registration-entry.js"
+             )).to be(true)
+    end
+  end
+
+  describe "rsc_manifest_registration_entry" do
+    it "finds app entries without traversing excluded directory trees" do
+      Dir.mktmpdir(nil, "/tmp") do |rails_root|
+        app_entry = File.join(rails_root, "client", "app", "generated", "server-component-registration-entry.js")
+        node_modules_entry = File.join(
+          rails_root,
+          "node_modules",
+          "pkg",
+          "generated",
+          "server-component-registration-entry.js"
+        )
+        FileUtils.mkdir_p(File.dirname(app_entry))
+        FileUtils.mkdir_p(File.dirname(node_modules_entry))
+        File.write(app_entry, "// app\n")
+        File.write(node_modules_entry, "// ignored\n")
+
+        expect(rsc_manifest_registration_entry(rails_root)).to eq(app_entry)
+      end
+    end
+
+    it "ignores generated registration fixtures under spec trees" do
+      Dir.mktmpdir(nil, "/tmp") do |rails_root|
+        fixture_entry = File.join(
+          rails_root,
+          "spec",
+          "fixtures",
+          "automated_packs_generation",
+          "generated",
+          "server-component-registration-entry.js"
+        )
+        FileUtils.mkdir_p(File.dirname(fixture_entry))
+        File.write(fixture_entry, "// fixture\n")
+
+        expect(rsc_manifest_registration_entry(rails_root)).to be_nil
+      end
     end
   end
 

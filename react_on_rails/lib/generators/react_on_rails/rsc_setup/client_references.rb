@@ -44,6 +44,8 @@ module ReactOnRails
             // The resolution cascade below is mirrored, branch for branch, by the Pro dummy's
             // hand-written rscManifestClientReferences.js and pinned on both sides by contract tests.
             const rscClientReferences = (() => {
+              // `resolve` and `config` are provided by the surrounding generated webpack config;
+              // `fs` stays local so this injected snippet remains self-contained.
               const { existsSync, readFileSync, statSync } = require('fs');
               const configuredRefsJson = process.env.RSC_MANIFEST_CLIENT_REFERENCES_JSON;
               const defaultRefsJson = resolve('ssr-generated/rsc-client-references.json');
@@ -67,6 +69,24 @@ module ReactOnRails
                 return payload.refs;
               };
 
+              const warnIfManifestStale = (refsJson) => {
+                try {
+                  if (
+                    existsSync(serverComponentRegistrationEntry) &&
+                    statSync(serverComponentRegistrationEntry).mtimeMs > statSync(refsJson).mtimeMs
+                  ) {
+                    console.warn(
+                      `[react_on_rails] ${refsJson} is older than the server component ` +
+                        'registration entry; RSC client references may be stale. ' +
+                        'Re-run bin/shakapacker-precompile-hook.',
+                    );
+                  }
+                } catch {
+                  // The manifest warning is non-fatal; the file can disappear between existsSync
+                  // and statSync while another build is rewriting ssr-generated.
+                }
+              };
+
               if (configuredRefsJson) {
                 const resolvedRefsJson = resolve(configuredRefsJson);
                 if (!existsSync(resolvedRefsJson)) {
@@ -74,21 +94,12 @@ module ReactOnRails
                     `RSC_MANIFEST_CLIENT_REFERENCES_JSON is set but the file does not exist: ${resolvedRefsJson}`,
                   );
                 }
+                warnIfManifestStale(resolvedRefsJson);
                 return readManifestReferences(resolvedRefsJson);
               }
 
               if (existsSync(defaultRefsJson)) {
-                if (
-                  existsSync(serverComponentRegistrationEntry) &&
-                  statSync(serverComponentRegistrationEntry).mtimeMs > statSync(defaultRefsJson).mtimeMs
-                ) {
-                  console.warn(
-                    `[react_on_rails] ${defaultRefsJson} is older than the server component ` +
-                      'registration entry; RSC client references may be stale. ' +
-                      'Re-run bin/shakapacker-precompile-hook.',
-                  );
-                }
-
+                warnIfManifestStale(defaultRefsJson);
                 return readManifestReferences(defaultRefsJson);
               }
 

@@ -14,12 +14,13 @@
 # See: https://github.com/shakacode/shakapacker/blob/main/docs/precompile_hook.md
 
 require "fileutils"
+require "find"
 require "json"
 
 # Guarded so the specs, which `load` this script once per example, don't warn on constant
 # re-initialization (the script is also run directly as the precompile hook).
-unless defined?(EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_SEGMENTS)
-  EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_SEGMENTS = %w[/node_modules/ /public/ /tmp/].freeze
+unless defined?(EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_COMPONENTS)
+  EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_COMPONENTS = %w[node_modules public spec test tmp].freeze
 end
 
 # Find Rails root by walking upward looking for config/environment.rb
@@ -129,14 +130,37 @@ rescue StandardError => e
   exit 1
 end
 
-def valid_rsc_registration_entry_path?(path)
-  EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_SEGMENTS.none? { |segment| path.include?(segment) }
+def rsc_registration_entry_path_components(path, rails_root: nil)
+  expanded_path = File.expand_path(path)
+  return [] if rails_root && expanded_path == File.expand_path(rails_root)
+
+  if rails_root
+    expanded_root = "#{File.expand_path(rails_root)}#{File::SEPARATOR}"
+    expanded_path = expanded_path.delete_prefix(expanded_root) if expanded_path.start_with?(expanded_root)
+  end
+
+  expanded_path.split(File::SEPARATOR).reject(&:empty?)
+end
+
+def valid_rsc_registration_entry_path?(path, rails_root: nil)
+  path_components = rsc_registration_entry_path_components(path, rails_root: rails_root)
+  EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_COMPONENTS.none? { |component| path_components.include?(component) }
 end
 
 def rsc_manifest_registration_entry(rails_root)
-  Dir.glob(File.join(rails_root, "**", "generated", "server-component-registration-entry.js")).find do |path|
-    valid_rsc_registration_entry_path?(path)
+  Find.find(rails_root) do |path|
+    if File.directory?(path)
+      Find.prune unless valid_rsc_registration_entry_path?(path, rails_root: rails_root)
+      next
+    end
+
+    next unless File.basename(path) == "server-component-registration-entry.js"
+    next unless File.basename(File.dirname(path)) == "generated"
+
+    return path if valid_rsc_registration_entry_path?(path, rails_root: rails_root)
   end
+
+  nil
 end
 
 # Generate RSC manifest client references if a server component registration entry exists.

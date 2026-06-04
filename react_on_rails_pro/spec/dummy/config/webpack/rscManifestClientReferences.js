@@ -15,7 +15,7 @@ const { config } = require('shakapacker');
 //   - parse errors:       malformed JSON re-thrown as "Failed to parse RSC client references manifest ..."
 //   - fallback ordering:  configured JSON -> default JSON -> (discovery/bundle-only build -> broad
 //     fallback) -> (registration entry present -> throw the precompile-hook hint) -> broad fallback
-//   - staleness warning:  default manifest older than the registration entry -> console.warn (non-fatal)
+//   - staleness warning:  selected manifest older than the registration entry -> console.warn (non-fatal)
 //   - precompile hint:    "Run bin/shakapacker-precompile-hook before bin/shakapacker."
 // Both sides are pinned by contract tests so drift on either side fails CI: this resolver by the
 // dummy-root tests/rsc-manifest-client-references.test.js (run by the Pro `package-js-tests` CI
@@ -61,16 +61,21 @@ function readManifestReferences(refsJson) {
 // server components changed but the discovery build was not re-run, so the refs may be stale. This
 // is best-effort — it cannot detect a new 'use client' file reached by an unchanged server
 // component (that is the `--watch` snapshot limitation documented above).
-function warnIfManifestStale() {
-  if (
-    fs.existsSync(SERVER_COMPONENT_REGISTRATION_ENTRY) &&
-    fs.statSync(SERVER_COMPONENT_REGISTRATION_ENTRY).mtimeMs > fs.statSync(DEFAULT_REFERENCES_JSON).mtimeMs
-  ) {
-    console.warn(
-      `[react_on_rails] ${DEFAULT_REFERENCES_JSON} is older than the server component ` +
-        'registration entry; RSC client references may be stale. ' +
-        'Re-run bin/shakapacker-precompile-hook.',
-    );
+function warnIfManifestStale(refsJson) {
+  try {
+    if (
+      fs.existsSync(SERVER_COMPONENT_REGISTRATION_ENTRY) &&
+      fs.statSync(SERVER_COMPONENT_REGISTRATION_ENTRY).mtimeMs > fs.statSync(refsJson).mtimeMs
+    ) {
+      console.warn(
+        `[react_on_rails] ${refsJson} is older than the server component ` +
+          'registration entry; RSC client references may be stale. ' +
+          'Re-run bin/shakapacker-precompile-hook.',
+      );
+    }
+  } catch {
+    // The manifest warning is non-fatal; the file can disappear between existsSync and statSync
+    // while another build is rewriting ssr-generated.
   }
 }
 
@@ -83,11 +88,12 @@ function rscManifestClientReferences() {
         `RSC_MANIFEST_CLIENT_REFERENCES_JSON is set but the file does not exist: ${resolvedRefsJson}`,
       );
     }
+    warnIfManifestStale(resolvedRefsJson);
     return readManifestReferences(resolvedRefsJson);
   }
 
   if (fs.existsSync(DEFAULT_REFERENCES_JSON)) {
-    warnIfManifestStale();
+    warnIfManifestStale(DEFAULT_REFERENCES_JSON);
     return readManifestReferences(DEFAULT_REFERENCES_JSON);
   }
 

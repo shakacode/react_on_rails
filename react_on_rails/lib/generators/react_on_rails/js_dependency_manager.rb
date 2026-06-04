@@ -142,7 +142,7 @@ module ReactOnRails
 
       # RSC package releases follow the React 19.0.x line (independent from gem versioning).
       RSC_REACT_VERSION_RANGE = "~19.0.4"
-      RSC_PACKAGE_VERSION_PIN = "19.0.4"
+      RSC_PACKAGE_VERSION_PIN = "19.0.5-rc.5"
 
       private
 
@@ -235,7 +235,7 @@ module ReactOnRails
         say "Installing React dependencies..."
 
         # RSC requires React 19.0.x specifically (not 19.1.x or later)
-        # Pin to ~19.0.4 to allow patch updates while staying within 19.0.x
+        # Pin React to ~19.0.4 while using an RSC package release that exports manifest discovery.
         react_deps = if respond_to?(:use_rsc?) && use_rsc?
                        ["react@#{RSC_REACT_VERSION_RANGE}", "react-dom@#{RSC_REACT_VERSION_RANGE}",
                         "prop-types@^15.0.0"]

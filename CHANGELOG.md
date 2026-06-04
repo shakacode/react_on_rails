@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Added
+
+- **[Pro]** **RSC manifest client reference discovery during precompile**: Generated RSC Webpack configs now run `RSCReferenceDiscoveryPlugin` through the Shakapacker precompile hook to emit `rsc-client-references.json`, use that manifest for RSC client-reference bundling, and warn when the selected manifest is stale. The generator now pins `react-on-rails-rsc` to `19.0.5-rc.5`, the first released package containing the discovery plugin export, and the Pro peer range explicitly accepts that prerelease. [PR 3556](https://github.com/shakacode/react_on_rails/pull/3556) by [ihabadham](https://github.com/ihabadham).
+
 #### Changed
 
 - **[Pro]** **Widened the `react-on-rails-rsc` peer-dependency range to the full React 19 line**: `react-on-rails-pro` now declares `react-on-rails-rsc` as `>= 19.0.2 < 20.0.0` (previously `>= 19.0.2 <= 19.2.3`), so future `react-on-rails-rsc` patch and minor releases on the React 19 line no longer trigger a peer-dependency warning. The `react` / `react-dom` peers stay at `>= 16`: React 18 support is retained, and the React-19-only RSC path is gated through the optional `react-on-rails-rsc` peer rather than by raising the React baseline. Resolves [Issue 3486](https://github.com/shakacode/react_on_rails/issues/3486). [PR 3580](https://github.com/shakacode/react_on_rails/pull/3580) by [justin808](https://github.com/justin808).

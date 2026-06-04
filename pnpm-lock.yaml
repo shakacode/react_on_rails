@@ -182,8 +182,8 @@ importers:
         specifier: ^19.0.3
         version: 19.2.3(react@19.2.3)
       react-on-rails-rsc:
-        specifier: git+https://github.com/shakacode/react_on_rails_rsc.git#a7f3838fda713f42743591e2c83447c9f8ec8bb8
-        version: https://codeload.github.com/shakacode/react_on_rails_rsc/tar.gz/a7f3838fda713f42743591e2c83447c9f8ec8bb8(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(webpack@5.105.2(@swc/core@1.15.3))
+        specifier: ^19.0.5-rc.5
+        version: 19.0.5-rc.5(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(webpack@5.105.2(@swc/core@1.15.3))
       redux:
         specifier: ^4.2.1
         version: 4.2.1
@@ -259,8 +259,8 @@ importers:
         specifier: ^19.0.3
         version: 19.2.0(react@19.2.0)
       react-on-rails-rsc:
-        specifier: ^19.0.4
-        version: 19.0.4(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(webpack@5.105.2(@swc/core@1.15.3))
+        specifier: ^19.0.5-rc.5
+        version: 19.0.5-rc.5(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(webpack@5.105.2(@swc/core@1.15.3))
 
   packages/react-on-rails-pro-node-renderer:
     dependencies:
@@ -720,8 +720,8 @@ importers:
         specifier: workspace:*
         version: link:../../../packages/react-on-rails-pro-node-renderer
       react-on-rails-rsc:
-        specifier: git+https://github.com/shakacode/react_on_rails_rsc.git#a7f3838fda713f42743591e2c83447c9f8ec8bb8
-        version: https://codeload.github.com/shakacode/react_on_rails_rsc/tar.gz/a7f3838fda713f42743591e2c83447c9f8ec8bb8(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(webpack@5.104.1)
+        specifier: ^19.0.5-rc.5
+        version: 19.0.5-rc.5(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(webpack@5.104.1)
       react-proptypes:
         specifier: ^1.0.0
         version: 1.0.0
@@ -7369,16 +7369,8 @@ packages:
   react-is@18.3.1:
     resolution: {integrity: sha512-/LLMVyas0ljjAtoYiPqYiL8VWXzUUdThrmU5+n20DZv+a+ClRoevUzw5JxU+Ieh5/c87ytoTBV9G1FiKfNJdmg==}
 
-  react-on-rails-rsc@19.0.4:
-    resolution: {integrity: sha512-KtHYz0opcXJk+Zw5aabjNiaszzpTdFgs1YfSLIZJSzU5SpddUw7b08epkxeJq/TCpR60Q9vsjxX3Q3OWJ97tMg==}
-    peerDependencies:
-      react: ^19.0.3
-      react-dom: ^19.0.3
-      webpack: ^5.59.0
-
-  react-on-rails-rsc@https://codeload.github.com/shakacode/react_on_rails_rsc/tar.gz/a7f3838fda713f42743591e2c83447c9f8ec8bb8:
-    resolution: {gitHosted: true, integrity: sha512-Hh997qc6cS8W2wxO0aGlTSnv310PV9ACmRoGhrmi0p3LA0UmVsHLfV7xpVQmayLLTkMTQUNCnVfnxDzDBNWP7Q==, tarball: https://codeload.github.com/shakacode/react_on_rails_rsc/tar.gz/a7f3838fda713f42743591e2c83447c9f8ec8bb8}
-    version: 19.0.5-rc.3
+  react-on-rails-rsc@19.0.5-rc.5:
+    resolution: {integrity: sha512-NTe3g34iR0ya8XFUpwbqE37ff4x5YGZEGowWGbY4o/wqNPykICDH5Nsd7MjqUSwun5NYqI92FHKHSEhpHgPq2A==}
     peerDependencies:
       react: ^19.0.3
       react-dom: ^19.0.3
@@ -16658,7 +16650,7 @@ snapshots:
 
   react-is@18.3.1: {}
 
-  react-on-rails-rsc@19.0.4(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(webpack@5.105.2(@swc/core@1.15.3)):
+  react-on-rails-rsc@19.0.5-rc.5(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(webpack@5.105.2(@swc/core@1.15.3)):
     dependencies:
       acorn-loose: 8.5.2
       neo-async: 2.6.2
@@ -16667,7 +16659,7 @@ snapshots:
       webpack: 5.105.2(@swc/core@1.15.3)
       webpack-sources: 3.3.3
 
-  react-on-rails-rsc@https://codeload.github.com/shakacode/react_on_rails_rsc/tar.gz/a7f3838fda713f42743591e2c83447c9f8ec8bb8(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(webpack@5.104.1):
+  react-on-rails-rsc@19.0.5-rc.5(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(webpack@5.104.1):
     dependencies:
       acorn-loose: 8.5.2
       neo-async: 2.6.2
@@ -16676,7 +16668,7 @@ snapshots:
       webpack: 5.104.1(@swc/core@1.15.3)(webpack-cli@7.0.3)
       webpack-sources: 3.3.3
 
-  react-on-rails-rsc@https://codeload.github.com/shakacode/react_on_rails_rsc/tar.gz/a7f3838fda713f42743591e2c83447c9f8ec8bb8(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(webpack@5.105.2(@swc/core@1.15.3)):
+  react-on-rails-rsc@19.0.5-rc.5(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(webpack@5.105.2(@swc/core@1.15.3)):
     dependencies:
       acorn-loose: 8.5.2
       neo-async: 2.6.2

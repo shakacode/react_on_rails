@@ -465,6 +465,34 @@ module ReactOnRails
           expect(generated_server_bundle_content.strip).to eq(expected_content.strip)
         end
 
+        it "classifies server and client components without rescanning component paths" do
+          generator = described_class.new
+          components = {
+            "ReactClientComponent" =>
+              "#{packer_source_path}/components/ReactServerComponents/ror_components/ReactClientComponent.jsx",
+            "ReactServerComponent" =>
+              "#{packer_source_path}/components/ReactServerComponents/ror_components/ReactServerComponent.jsx"
+          }
+
+          allow(generator).to receive(:components_for_server_registration).once.and_return(components)
+          generated_server_bundle_path = File.join(
+            Pathname(packer_source_entry_path).parent,
+            "generated/server-bundle-generated.js"
+          )
+          allow(generator).to receive_messages(
+            store_to_path: {},
+            generated_server_bundle_file_path: generated_server_bundle_path
+          )
+          allow(generator).to receive(:client_entrypoint?) do |path|
+            path.end_with?("ReactClientComponent.jsx")
+          end
+
+          generated_server_bundle_content = generator.send(:generated_server_pack_file_content)
+
+          expect(generated_server_bundle_content).to include("registerServerComponent({ReactServerComponent});")
+          expect(generated_server_bundle_content).to include("ReactOnRails.register({ReactClientComponent});")
+        end
+
         it "creates a server component registration entry for RSC reference discovery" do
           generated_entry_path = File.join(
             Pathname(packer_source_entry_path).parent,

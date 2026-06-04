@@ -2921,8 +2921,11 @@ describe RscGenerator, type: :generator do
         expect(content).to include("RSC_MANIFEST_CLIENT_REFERENCES_JSON is set but the file does not exist")
         # Malformed manifest JSON is re-thrown with the file path (mirror parity).
         expect(content).to include("Failed to parse RSC client references manifest")
+        # Configured overrides also get the best-effort staleness warning (mirror parity).
+        expect(content).to include("warnIfManifestStale(resolvedRefsJson)")
         # Best-effort staleness warning: manifest older than the registration entry -> console.warn.
         expect(content).to include("statSync")
+        expect(content).to include("catch {")
         expect(content).to include("may be stale")
       end
     end

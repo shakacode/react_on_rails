@@ -349,7 +349,14 @@ module ReactOnRails
         "import #{name} from '#{relative_path(generated_server_bundle_file_path, component_path)}';"
       end
 
-      server_components = server_component_names_for_registration
+      server_components =
+        if ReactOnRails::Utils.rsc_support_enabled?
+          component_for_server_registration_to_path.keys.reject do |name|
+            client_entrypoint?(component_for_server_registration_to_path[name])
+          end
+        else
+          []
+        end
       client_components = component_for_server_registration_to_path.keys - server_components
 
       # Include stores in server bundle
