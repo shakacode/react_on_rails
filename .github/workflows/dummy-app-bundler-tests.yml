@@ -248,21 +248,26 @@ jobs:
           SHAKAPACKER_ASSETS_BUNDLER: ${{ matrix.bundler }}
         run: cd react_on_rails && bundle exec rake run_rspec:all_dummy
       - name: Store test results
+        # always(): upload rspec results even when the Main CI step failed, so failures are debuggable.
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: main-rspec-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}-${{ matrix.bundler }}
           path: ~/rspec
       - name: Store artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: dummy-app-capybara-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}-${{ matrix.bundler }}
           path: react_on_rails/spec/dummy/tmp/capybara
       - name: Store artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: dummy-app-test-log-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}-${{ matrix.bundler }}
           path: react_on_rails/spec/dummy/log/test.log
       - name: Store artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: dummy-app-pnpm-log-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}-${{ matrix.bundler }}
