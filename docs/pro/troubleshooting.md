@@ -14,12 +14,14 @@ For issues related to upgrading from GitHub Packages to public distribution, see
 
 ### Connection refused to renderer
 
-**Symptom**: `Errno::ECONNREFUSED` or timeout errors when Rails tries to reach the node renderer.
+**Symptom**: `Errno::ECONNREFUSED` or timeout errors when Rails tries to reach the node renderer. In tests, this often surfaces as a generic **server-rendering error** — the actual root cause is that the renderer was unavailable when Rails connected to `REACT_RENDERER_URL`, not a webpack or bundle misconfiguration.
 
 **Fixes**:
 
 - Verify the renderer is running: `curl http://localhost:3800/`
 - Check that `config.renderer_url` in `config/initializers/react_on_rails_pro.rb` matches the renderer's actual port
+- Use the **same host literal** on both sides — prefer `127.0.0.1` over `localhost`. `RENDERER_HOST` defaults to `localhost`, which can resolve to IPv6 (`::1`) or IPv4 (`127.0.0.1`) depending on the machine's name-resolution order; if the renderer binds to one family and Rails dials the other, the connection is refused even though the renderer is running.
+- In CI, make sure the renderer stays alive for the entire Rails test process — start it, wait for its port, run the tests, and clean up in the same step. See [Running Rails Tests Against the Node Renderer in CI](./node-renderer.md#running-rails-tests-against-the-node-renderer-in-ci).
 - On Heroku, ensure the renderer is started via `Procfile.web` (see [Heroku deployment](../oss/building-features/node-renderer/heroku.md))
 
 ### Workers crashing with memory leaks

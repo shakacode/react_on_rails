@@ -208,6 +208,69 @@ To rotate the renderer password:
 1. Set the new `RENDERER_PASSWORD` env var on both the Rails app and the Node Renderer.
 2. Restart both processes. The new password takes effect immediately.
 
+## Running Rails Tests Against the Node Renderer in CI
+
+Apps that prerender React components — or generate RSC payloads — through the Node Renderer have Rails integration tests that depend on a **live renderer**. When the renderer is not running, or Rails connects to the wrong host, those tests fail with a server-rendering error whose root cause is a renderer connection failure, not a webpack or bundle problem. See [Connection refused to renderer](./troubleshooting.md#connection-refused-to-renderer) for that failure mode.
+
+The reliable shape is to start the renderer, wait for its port to accept connections, run the Rails test command, and clean the renderer up — **all in a single CI step**. A background process started in one GitHub Actions step is not a dependable contract for the next step, so keep the renderer's lifetime inside the same step that runs the tests.
+
+### GitHub Actions
+
+```yaml
+- name: Run Rails tests with the Node Renderer
+  env:
+    RAILS_ENV: test
+    # Rails reads this to find the renderer (config.renderer_url).
+    REACT_RENDERER_URL: http://127.0.0.1:3800
+    # Use the SAME host on both sides — see "Use 127.0.0.1, not localhost" below.
+    RENDERER_HOST: 127.0.0.1
+    RENDERER_PORT: 3800
+    RENDERER_WORKERS_COUNT: 1
+  run: |
+    # Start the renderer in the background and capture its logs.
+    node client/node-renderer.js > /tmp/node-renderer.log 2>&1 &
+    renderer_pid=$!
+
+    # Always stop the renderer when this step exits (pass, fail, or timeout).
+    cleanup() {
+      kill "$renderer_pid" 2>/dev/null || true
+      wait "$renderer_pid" 2>/dev/null || true
+    }
+    trap cleanup EXIT
+
+    # Wait up to 30s for the renderer port to accept connections, then run the tests.
+    for attempt in {1..30}; do
+      if ruby -rsocket -e 'TCPSocket.new("127.0.0.1", 3800).close' 2>/dev/null; then
+        bin/rails test   # or: bundle exec rspec
+        exit $?
+      fi
+      sleep 1
+    done
+
+    # Readiness never succeeded — surface the renderer log so the failure is diagnosable.
+    if [ -f /tmp/node-renderer.log ]; then
+      echo "::error::Renderer failed to start within 30 seconds. Log output:"
+      cat /tmp/node-renderer.log
+    else
+      echo "::error::Renderer failed to start and produced no log file."
+    fi
+    exit 1
+```
+
+### Why each part matters
+
+- **Single-step lifetime** — Starting the renderer and running the tests in one `run:` block guarantees the renderer is alive for the whole test process. A renderer backgrounded in a separate step may be torn down before the test step begins.
+- **`trap cleanup EXIT`** — Kills the renderer whether the tests pass, fail, or the readiness loop times out, so no orphaned process lingers on the runner.
+- **Readiness polling, not a fixed `sleep`** — The `TCPSocket` probe runs the tests as soon as the port accepts connections, instead of guessing a fixed wait. The test command starts only once the renderer can actually serve requests.
+- **Renderer logs on failure** — If readiness never succeeds, the step prints `/tmp/node-renderer.log` so you see the real startup error (missing bundle, port conflict, password mismatch) rather than a bare timeout.
+
+### Use `127.0.0.1`, not `localhost`
+
+Set `RENDERER_HOST` and the host inside `REACT_RENDERER_URL` to the **same literal** — `127.0.0.1`. `RENDERER_HOST` defaults to `localhost`, which can resolve to either IPv6 (`::1`) or IPv4 (`127.0.0.1`) depending on the runner's name-resolution order. If the renderer binds to one family while Rails dials the other, the connection is refused even though the renderer is running. Using `127.0.0.1` everywhere — including the readiness probe above — removes that ambiguity.
+
+> [!NOTE]
+> `client/node-renderer.js` is the entry point created by the Pro generator (`bundle exec rails generate react_on_rails:pro`); adjust the path if your renderer entry point lives elsewhere. In the `test` environment the renderer password is optional, so this snippet omits it. If your CI runs the tests under a production-like `RAILS_ENV` (anything other than `development` or `test`), set the same `RENDERER_PASSWORD` on both the renderer and Rails — see [Renderer Password Security](#renderer-password-security).
+
 ## Eliminating Cold-Start Latency in Docker Deployments
 
 When a new container starts, the Node Renderer has an empty bundle cache. The first SSR request triggers a costly 410→retry round-trip where Rails sends the full bundle over HTTP, adding 200ms–1s+ of latency depending on bundle size. In rolling deploys, this affects every new pod.
