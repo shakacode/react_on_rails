@@ -135,9 +135,11 @@ jobs:
             RUN_PRO_NODE_RENDERER_BENCHMARKS=true
           fi
 
-          echo "run_core_benchmarks=$RUN_CORE_BENCHMARKS" >> "$GITHUB_OUTPUT"
-          echo "run_pro_benchmarks=$RUN_PRO_BENCHMARKS" >> "$GITHUB_OUTPUT"
-          echo "run_pro_node_renderer_benchmarks=$RUN_PRO_NODE_RENDERER_BENCHMARKS" >> "$GITHUB_OUTPUT"
+          {
+            echo "run_core_benchmarks=$RUN_CORE_BENCHMARKS"
+            echo "run_pro_benchmarks=$RUN_PRO_BENCHMARKS"
+            echo "run_pro_node_renderer_benchmarks=$RUN_PRO_NODE_RENDERER_BENCHMARKS"
+          } >> "$GITHUB_OUTPUT"
         shell: bash
       - name: Set benchmark matrices
         id: benchmark-matrices
@@ -395,7 +397,9 @@ jobs:
           bundle exec rake react_on_rails_pro:pre_seed_renderer_cache MODE=symlink
 
           echo "🚀 Starting ${{ matrix.suite_name }} node renderer..."
-          node renderer/node-renderer.js &
+          renderer_log="${RUNNER_TEMP:-$PWD}/node-renderer.log"
+          echo "TARGET_LOG=$renderer_log" >> "$GITHUB_ENV"
+          node renderer/node-renderer.js > "$renderer_log" 2>&1 &
           renderer_pid=$!
           # Persist the PID so "Execute benchmark suite" can confirm the renderer
           # survived the run; a backgrounded child under `set -e` does not
@@ -409,6 +413,7 @@ jobs:
             # of looping until the timeout (or racing a dead/restarting target).
             if ! kill -0 "$renderer_pid" 2>/dev/null; then
               echo "::error::Node renderer (PID $renderer_pid) exited during startup"
+              cat "$renderer_log" || true
               exit 1
             fi
             if ruby -e "require 'socket'; TCPSocket.new('localhost', 3800).close"; then
@@ -420,6 +425,7 @@ jobs:
           done
 
           echo "::error::Node renderer failed to start within 30 seconds"
+          cat "$renderer_log" || true
           exit 1
 
       - name: Start Rails production server
@@ -489,6 +495,13 @@ jobs:
           if ! kill -0 "$TARGET_PID" 2>/dev/null; then
             echo "::error::Benchmark target (PID $TARGET_PID) died during the benchmark run; metrics are unreliable"
             exit 1
+          fi
+          if [ -n "${TARGET_LOG:-}" ] && [ -f "$TARGET_LOG" ]; then
+            if grep -q "died UNEXPECTEDLY" "$TARGET_LOG"; then
+              echo "::error::Benchmark target logged an unexpected worker restart; metrics are unreliable"
+              grep -n "died UNEXPECTEDLY" "$TARGET_LOG" || true
+              exit 1
+            fi
           fi
 
           echo "✅ Benchmark suite completed successfully"
