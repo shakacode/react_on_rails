@@ -187,7 +187,7 @@ importers:
         specifier: ^19.0.3
         version: 19.2.3(react@19.2.3)
       react-on-rails-rsc:
-        specifier: ^19.0.4
+        specifier: 19.0.4
         version: 19.0.4(patch_hash=e0eae6c987bb9de707491f7cee07c400963613636ca67397b6a730de4754d0c5)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(webpack@5.105.2(@swc/core@1.15.3))
       redux:
         specifier: ^4.2.1
@@ -264,7 +264,7 @@ importers:
         specifier: ^19.0.3
         version: 19.2.0(react@19.2.0)
       react-on-rails-rsc:
-        specifier: ^19.0.4
+        specifier: 19.0.4
         version: 19.0.4(patch_hash=e0eae6c987bb9de707491f7cee07c400963613636ca67397b6a730de4754d0c5)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(webpack@5.105.2(@swc/core@1.15.3))
 
   packages/react-on-rails-pro-node-renderer:
@@ -725,7 +725,7 @@ importers:
         specifier: workspace:*
         version: link:../../../packages/react-on-rails-pro-node-renderer
       react-on-rails-rsc:
-        specifier: ^19.0.4
+        specifier: 19.0.4
         version: 19.0.4(patch_hash=e0eae6c987bb9de707491f7cee07c400963613636ca67397b6a730de4754d0c5)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(webpack@5.104.1)
       react-proptypes:
         specifier: ^1.0.0

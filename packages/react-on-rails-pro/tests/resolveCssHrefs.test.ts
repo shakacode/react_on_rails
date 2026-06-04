@@ -12,7 +12,7 @@ describe('resolveCssHrefs', () => {
     ).toEqual([]);
   });
 
-  it('collects CSS across modules, prefixes, dedupes, and sorts', () => {
+  it('collects CSS across modules, prefixes, dedupes, and preserves manifest order', () => {
     const hrefs = resolveCssHrefs({
       moduleLoading: { prefix: '/webpack/test/' },
       filePathToModuleMetadata: {
@@ -31,11 +31,11 @@ describe('resolveCssHrefs', () => {
       },
     });
 
-    // shared.css appears in two modules but is emitted once; output is sorted.
+    // shared.css appears in two modules but is emitted once where it first appears.
     expect(hrefs).toEqual([
-      '/webpack/test/css/header.css',
       '/webpack/test/css/layout.css',
       '/webpack/test/css/shared.css',
+      '/webpack/test/css/header.css',
     ]);
   });
 

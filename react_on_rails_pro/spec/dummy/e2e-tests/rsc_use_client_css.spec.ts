@@ -19,7 +19,9 @@ test.describe('RSC use-client CSS (#3211 FOUC fix)', () => {
     // No-FOUC guarantee: the renderer hoists the use-client stylesheet into the
     // server-rendered <head> with our precedence group, so the browser will not
     // paint the boundary until the stylesheet has loaded.
-    expect(ssrHtml).toMatch(/<link[^>]*rel="stylesheet"[^>]*data-precedence="ror-rsc"[^>]*>/);
+    expect(ssrHtml).toMatch(
+      /<link(?=[^>]*\brel="stylesheet")(?=[^>]*\bdata-precedence="ror-rsc")(?=[^>]*\bhref="[^"]*\.css")[^>]*>/,
+    );
 
     const probe = page.getByTestId('rsc-css-probe');
     await expect(probe).toBeVisible();

@@ -71,8 +71,9 @@ chunkGroup.chunks.forEach(function (c) {
 });
 ```
 
-Patched loop keeps JS behavior **byte-identical** (still one `.js` per chunk) and
-additionally collects every `.css` file into a sibling `cssChunks` array:
+Patched loop preserves one-`.js`-per-chunk recording while iterating every entry
+in `c.files`, and additionally collects every `.css` file into a sibling
+`cssChunks` array:
 
 ```js
 chunkGroup.chunks.forEach(function (c) {
@@ -109,11 +110,11 @@ Injection point: `streamRenderRSCComponent` in
 `renderToPipeableStream(await reactRenderingResult, …)`.
 
 New pure helper `resolveCssHrefs(manifest): string[]` walks
-`filePathToModuleMetadata`, collects every entry's `css`, dedupes via `Set`,
-prepends `moduleLoading.prefix`, and returns a **sorted** array (sort = build/test
-stability, not cascade semantics). The client manifest is loaded through a small
-cached accessor added next to the existing loaders in `cache/` so the renderer
-can read it without re-reading the file per request.
+`filePathToModuleMetadata`, collects every entry's `css`, dedupes while
+preserving manifest/chunk order, and prepends `moduleLoading.prefix`. The client
+manifest is loaded through a small cached accessor added next to the existing
+loaders in `cache/` so the renderer can read it without re-reading the file per
+unchanged manifest file signature.
 
 Wrap the user tree:
 
@@ -172,16 +173,16 @@ navigation they decode and React hoists/dedupes/suspends commit identically.
 
 ## Touch points
 
-| File                                                             | Change                                                             |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `package.json` (`pnpm.patchedDependencies`)                      | register the patch                                                 |
-| `patches/react-on-rails-rsc@19.0.4.patch` _(new)_                | collect `.css` into `css[]`                                        |
-| `packages/react-on-rails-pro/src/resolveCssHrefs.ts` _(new)_     | manifest → sorted deduped hrefs                                    |
-| `cache/` client-manifest accessor                                | cached read of client manifest for the renderer                    |
-| `packages/react-on-rails-pro/src/capabilities/proRSC.ts`         | wrap tree with `<link precedence>` before `renderToPipeableStream` |
-| `…/spec/dummy/spec/requests/rsc_use_client_css_manifest_spec.rb` | unpend; assert `css`                                               |
-| `…/spec/dummy/e2e-tests/`                                        | assert `<link precedence>` in `<head>` + computed bg color         |
-| `react_on_rails_rsc` types (consumed)                            | `ImportManifestEntry.css?: string[]` (via patch + local type)      |
+| File                                                             | Change                                                                         |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `package.json` (`pnpm.patchedDependencies`)                      | register the patch                                                             |
+| `patches/react-on-rails-rsc@19.0.4.patch` _(new)_                | collect `.css` into `css[]`                                                    |
+| `packages/react-on-rails-pro/src/resolveCssHrefs.ts` _(new)_     | manifest → ordered deduped hrefs                                               |
+| `cache/` client-manifest accessor                                | cached read of client manifest for the renderer, invalidated by file signature |
+| `packages/react-on-rails-pro/src/capabilities/proRSC.ts`         | wrap tree with `<link precedence>` before `renderToPipeableStream`             |
+| `…/spec/dummy/spec/requests/rsc_use_client_css_manifest_spec.rb` | unpend; assert `css`                                                           |
+| `…/spec/dummy/e2e-tests/`                                        | assert `<link precedence>` in `<head>` + computed bg color                     |
+| `react_on_rails_rsc` types (consumed)                            | `ImportManifestEntry.css?: string[]` (via patch + local type)                  |
 
 ## Migration / compatibility
 

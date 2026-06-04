@@ -54,14 +54,10 @@ const wrapWithRscCssLinks = (renderedTree: React.ReactNode, cssHrefs: readonly s
     return renderedTree;
   }
 
-  return React.createElement(
-    React.Fragment,
-    null,
-    ...cssHrefs.map((href) =>
-      React.createElement('link', { key: href, rel: 'stylesheet', href, precedence: RSC_CSS_PRECEDENCE }),
-    ),
-    renderedTree,
+  const stylesheetLinks = cssHrefs.map((href) =>
+    React.createElement('link', { key: href, rel: 'stylesheet', href, precedence: RSC_CSS_PRECEDENCE }),
   );
+  return React.createElement(React.Fragment, null, stylesheetLinks, renderedTree);
 };
 
 const CLIENT_HOOK_NAMES = [
@@ -124,13 +120,13 @@ const streamRenderRSCComponent = (
   assertRailsContextWithServerStreamingCapabilities(railsContext);
 
   const { reactClientManifestFileName, reactServerClientManifestFileName } = railsContext;
+  const rscPayloadParams = railsContext.serverSideRSCPayloadParameters as
+    | { rscBundleHash?: string }
+    | undefined;
 
   // Initialize manifest loader and BUILD_ID on first render request.
   // These are per-process constants that don't change between requests.
   setManifestFileNames(reactClientManifestFileName, reactServerClientManifestFileName);
-  const rscPayloadParams = railsContext.serverSideRSCPayloadParameters as
-    | { rscBundleHash?: string }
-    | undefined;
   if (rscPayloadParams?.rscBundleHash) {
     setBuildId(rscPayloadParams.rscBundleHash);
   }
@@ -158,7 +154,11 @@ const streamRenderRSCComponent = (
 
   const initializeAndRender = async () => {
     const { renderToPipeableStream } = await getServerRenderer();
-    const [renderedTree, cssHrefs] = await Promise.all([reactRenderingResult, getRscCssHrefs()]);
+    const cssHrefsPromise = getRscCssHrefs().catch((err: unknown) => {
+      console.error('Error loading RSC CSS hrefs', convertToError(err));
+      return [] as string[];
+    });
+    const [renderedTree, cssHrefs] = await Promise.all([reactRenderingResult, cssHrefsPromise]);
     const rscStream = renderToPipeableStream(wrapWithRscCssLinks(renderedTree, cssHrefs), {
       onError: (err) => {
         const error = convertToError(err);

@@ -41,24 +41,26 @@ const joinPrefix = (prefix: string, file: string): string => {
 /**
  * Collect every CSS file recorded for a `'use client'` module reference in the
  * RSC client manifest, prepend the manifest's `moduleLoading.prefix` (so CDN /
- * non-default `publicPath` deployments get fully-qualified hrefs), dedupe, and
- * return a stably sorted list.
- *
- * The sort exists for build/test determinism, not cascade semantics — CSS
- * Modules are expected to be scoped, so emission order does not affect styling.
+ * non-default `publicPath` deployments get fully-qualified hrefs), dedupe while
+ * preserving manifest/chunk order, and return the href list.
  */
 export default function resolveCssHrefs(manifest: RscCssManifest): string[] {
   const prefix = manifest.moduleLoading?.prefix ?? '';
   const metadata = manifest.filePathToModuleMetadata ?? {};
 
-  const hrefs = new Set<string>();
+  const hrefs: string[] = [];
+  const seenHrefs = new Set<string>();
   for (const entry of Object.values(metadata)) {
     for (const file of entry?.css ?? []) {
       if (typeof file === 'string' && file.length > 0) {
-        hrefs.add(joinPrefix(prefix, file));
+        const href = joinPrefix(prefix, file);
+        if (!seenHrefs.has(href)) {
+          seenHrefs.add(href);
+          hrefs.push(href);
+        }
       }
     }
   }
 
-  return Array.from(hrefs).sort();
+  return hrefs;
 }

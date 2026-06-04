@@ -12,11 +12,28 @@
  * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
+import * as fs from 'fs';
+import * as fsPromises from 'fs/promises';
 import * as path from 'path';
-import * as fs from 'fs/promises';
 
 type LoadedJsonFile = Record<string, unknown>;
 const loadedJsonFiles = new Map<string, LoadedJsonFile>();
+
+const resolveJsonFilePath = (fileName: string): string => path.resolve(__dirname, fileName);
+
+export function getJsonFileSignature(fileName: string): string {
+  const filePath = resolveJsonFilePath(fileName);
+  try {
+    const stats = fs.statSync(filePath);
+    return `${filePath}\0${stats.size}\0${stats.mtimeMs}`;
+  } catch {
+    return `${filePath}\0missing`;
+  }
+}
+
+export function clearLoadedJsonFile(fileName: string): void {
+  loadedJsonFiles.delete(resolveJsonFilePath(fileName));
+}
 
 export default async function loadJsonFile<T extends LoadedJsonFile = LoadedJsonFile>(
   fileName: string,
@@ -24,14 +41,14 @@ export default async function loadJsonFile<T extends LoadedJsonFile = LoadedJson
   // Asset JSON files are uploaded to node renderer.
   // Renderer copies assets to the same place as the server-bundle.js and rsc-bundle.js.
   // Thus, the __dirname of this code is where we can find the manifest file.
-  const filePath = path.resolve(__dirname, fileName);
+  const filePath = resolveJsonFilePath(fileName);
   const loadedJsonFile = loadedJsonFiles.get(filePath);
   if (loadedJsonFile) {
     return loadedJsonFile as T;
   }
 
   try {
-    const file = JSON.parse(await fs.readFile(filePath, 'utf8')) as T;
+    const file = JSON.parse(await fsPromises.readFile(filePath, 'utf8')) as T;
     loadedJsonFiles.set(filePath, file);
     return file;
   } catch (error) {
