@@ -66,6 +66,22 @@ RSpec.describe "track_benchmarks" do
     end
   end
 
+  # On a main regression the rendered table feeds the report-regressions hand-off. If
+  # the display sidecar was missing/corrupt the table is empty, and an empty-bodied
+  # issue is useless — the hand-off must substitute a run-URL pointer instead.
+  describe "#regression_handoff_summary" do
+    it "returns the rendered table unchanged when it is non-empty" do
+      expect(regression_handoff_summary("### Summary\n| a |")).to eq("### Summary\n| a |")
+    end
+
+    it "substitutes a run-URL pointer when the table is empty" do
+      allow(Github).to receive(:run_url).and_return("https://github.test/run/1")
+      summary = regression_handoff_summary("")
+      expect(summary).not_to be_empty
+      expect(summary).to include("https://github.test/run/1")
+    end
+  end
+
   # The boundary/side mapping is a silent safety control: a flipped side or wrong
   # value would stop regressions from alerting while CI stays green, so pin it.
   describe "#threshold_args" do

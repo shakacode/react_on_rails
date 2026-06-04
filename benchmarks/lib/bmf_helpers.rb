@@ -121,7 +121,11 @@ class BmfCollector
     if append && File.exist?(output_path)
       begin
         existing = JSON.parse(File.read(output_path))
-        rows = existing + rows if existing.is_a?(Array)
+        if existing.is_a?(Array)
+          rows = existing + rows
+        else
+          warn "WARNING: Existing #{output_path} is not a JSON array (#{existing.class}), overwriting"
+        end
       rescue JSON::ParserError => e
         warn "WARNING: Existing #{output_path} contains invalid JSON (#{e.message}), overwriting"
       end

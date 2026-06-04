@@ -8,16 +8,18 @@ require "json"
 # intervals so the summary table can flag values that moved significantly vs
 # baseline in EITHER direction.
 #
-# The report shape is not a documented stability contract, so every access is
-# guarded and unexpected shapes raise FormatError: the job fails loudly rather
-# than silently rendering garbage or missing a regression.
+# The report shape is not a documented stability contract, so accesses are guarded:
+# anything that decides a regression or the table structure raises FormatError (fail
+# loud rather than mis-report), while purely informational alert fields are read
+# leniently (see #parse_alerts). The job fails loudly rather than silently rendering
+# garbage or missing a regression.
 class BencherReport
   class FormatError < StandardError; end
 
   # One benchmark+measure's value and its prediction interval. baseline/limits are
   # nil when Bencher has no boundary yet (new benchmark / insufficient history) or
   # for the unconfigured side of a one-sided threshold.
-  Boundary = Struct.new(:value, :baseline, :lower_limit, :upper_limit) do
+  Boundary = Struct.new(:value, :baseline, :lower_limit, :upper_limit, keyword_init: true) do
     # Classify `value` vs the interval given the measure's regression direction.
     #   :lower => higher-is-better (rps): regression = value drops below interval
     #   :upper => lower-is-better (latency/failed_pct): regression = value climbs above
@@ -120,16 +122,16 @@ class BencherReport
   def parse_boundary(measure_entry)
     value = dig_number(measure_entry, "metric", "value")
     raw = measure_entry["boundary"]
-    return Boundary.new(value, nil, nil, nil) if raw.nil?
+    return Boundary.new(value: value, baseline: nil, lower_limit: nil, upper_limit: nil) if raw.nil?
     raise FormatError, "boundary is not an object (got #{raw.class})" unless raw.is_a?(Hash)
 
-    Boundary.new(value, optional_number(raw, "baseline"),
-                 optional_number(raw, "lower_limit"), optional_number(raw, "upper_limit"))
+    Boundary.new(value: value, baseline: optional_number(raw, "baseline"),
+                 lower_limit: optional_number(raw, "lower_limit"), upper_limit: optional_number(raw, "upper_limit"))
   end
 
   # Informational alert fields (benchmark/measure/limit) are read leniently so a
-  # schema quirk there can't crash regression detection; only `status` (which
-  # decides "active") is strict.
+  # schema quirk there can't crash regression detection; only the entry shape and
+  # `status` (which decides "active") are strict.
   def parse_alerts(raw)
     fetch_array(raw, "alerts").filter_map do |entry|
       raise FormatError, "alert is not an object (got #{entry.class})" unless entry.is_a?(Hash)

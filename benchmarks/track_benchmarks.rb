@@ -224,6 +224,20 @@ def rendered_report(report)
   BenchmarkTable.new(title: "#{SUITE_NAME} Benchmark Summary", rows: rows, report: report).to_markdown
 end
 
+# Body for the report-regressions hand-off. Normally the rendered table; but if the
+# display sidecar was missing/corrupt rendered_report returned "" — don't hand off an
+# empty-bodied regression issue. Substitute a run-URL pointer (and shout via ::error::)
+# so report-regressions still files something actionable.
+def regression_handoff_summary(report_markdown)
+  return report_markdown unless report_markdown.empty?
+
+  warn "::error::Bencher flagged a regression on main but the summary table could not be " \
+       "rendered (the display sidecar was missing or invalid); the auto-filed issue will link " \
+       "the run instead of showing the table. Investigate: #{Github.run_url}"
+  "_Summary table unavailable (the benchmark display sidecar was missing or empty). " \
+    "See the Bencher dashboard and the workflow run: #{Github.run_url}_"
+end
+
 # A real performance regression: Bencher raised at least one active alert in the
 # JSON report. Deterministic — no stderr grepping. nil report (operational failure
 # with no parseable stdout) is not a regression.
@@ -287,13 +301,14 @@ if __FILE__ == $PROGRAM_NAME
       # duplicate issues and clobber each other's sections in the shared comment.
       # Use the un-sharded suite name so that job can combine a suite's shards into a
       # single section (shard_label keeps their ordering deterministic).
+      handoff_summary = regression_handoff_summary(report_markdown)
       begin
         File.write(
           REGRESSION_REPORT_JSON,
           JSON.generate(
             RegressionReport::SUITE_NAME => ENV.fetch("BENCHMARK_SUITE_GROUP", SUITE_NAME),
             RegressionReport::SHARD_LABEL => ENV.fetch("BENCHMARK_SHARD_LABEL", ""),
-            RegressionReport::SUMMARY => report_markdown
+            RegressionReport::SUMMARY => handoff_summary
           )
         )
         warn "::warning::Bencher flagged a #{SUITE_NAME} regression on main (exit #{bencher_exit_code}). " \

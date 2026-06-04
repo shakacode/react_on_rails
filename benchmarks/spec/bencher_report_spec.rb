@@ -161,6 +161,33 @@ RSpec.describe BencherReport do
       )
       expect(report.significance("/nb", "rps", :lower)).to be_nil
     end
+
+    # Bencher configures only one threshold side per measure, so every test above
+    # exercises the mirror branch. When BOTH limits are present (a two-sided
+    # boundary) the parser must use the REAL limit on each side, not the mirror —
+    # else the `lower_limit || mirror(upper_limit)` precedence could silently invert
+    # and stay green. Asymmetric limits (90/120 about baseline 100) make real ≠ mirror.
+    def two_sided_report(value:)
+      described_class.parse(
+        report_json(results: [[benchmark_result(
+          name: "/b",
+          measures: [measure_entry(slug: "rps", name: "rps", value: value,
+                                   baseline: 100.0, lower_limit: 90.0, upper_limit: 120.0)]
+        )]])
+      )
+    end
+
+    it "uses the real lower limit, not the mirror of the upper, when both are present" do
+      # mirror of upper 120 about 100 = 80; 85 is below the real lower (90) but above
+      # the mirror, so only the correct precedence flags it as a regression.
+      expect(two_sided_report(value: 85.0).significance("/b", "rps", :lower)).to eq(:regression)
+    end
+
+    it "uses the real upper limit, not the mirror of the lower, when both are present" do
+      # mirror of lower 90 about 100 = 110; 115 is above the mirror but below the real
+      # upper (120), so the correct precedence leaves it un-flagged.
+      expect(two_sided_report(value: 115.0).significance("/b", "rps", :lower)).to be_nil
+    end
   end
 
   describe "defensive parsing" do

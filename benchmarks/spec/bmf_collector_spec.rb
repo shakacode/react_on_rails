@@ -117,6 +117,30 @@ RSpec.describe BmfCollector do
           expect(names).to eq(["/old", "/new"])
         end
       end
+
+      it "overwrites (keeping only new rows) when the existing file is a non-array JSON shape" do
+        Dir.mktmpdir do |dir|
+          path = File.join(dir, "display.json")
+          File.write(path, JSON.generate("not" => "an array"))
+          collector = described_class.new
+          collector.add(name: "/new", rps: 1.0, p50: 2.0, p90: 3.0, status: "200=1")
+
+          expect(collector.write_display_json(path, append: true)).to be(true)
+          expect(JSON.parse(File.read(path)).map { |row| row["name"] }).to eq(["/new"])
+        end
+      end
+
+      it "overwrites (keeping only new rows) when the existing file is invalid JSON" do
+        Dir.mktmpdir do |dir|
+          path = File.join(dir, "display.json")
+          File.write(path, "{not valid json")
+          collector = described_class.new
+          collector.add(name: "/new", rps: 1.0, p50: 2.0, p90: 3.0, status: "200=1")
+
+          expect(collector.write_display_json(path, append: true)).to be(true)
+          expect(JSON.parse(File.read(path)).map { |row| row["name"] }).to eq(["/new"])
+        end
+      end
     end
   end
 
