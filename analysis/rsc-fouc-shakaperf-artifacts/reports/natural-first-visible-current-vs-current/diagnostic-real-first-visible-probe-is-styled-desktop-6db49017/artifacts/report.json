@@ -1,0 +1,37 @@
+{
+  "testSuite": "shaka-perf-visreg",
+  "tests": [
+    {
+      "pair": {
+        "reference": "control_screenshot/0871352999_diagnostic_real_first_visible_probe_is_styled_0_data-testidrsc-css-probe_0_desktop.png",
+        "referenceLog": "<react_on_rails_worktree>/compare-results/control_screenshot/0871352999_diagnostic_real_first_visible_probe_is_styled_0_data-testidrsc-css-probe_0_desktop.log.json",
+        "test": "experiment_screenshot/0871352999_diagnostic_real_first_visible_probe_is_styled_0_data-testidrsc-css-probe_0_desktop.png",
+        "testLog": "<react_on_rails_worktree>/compare-results/experiment_screenshot/0871352999_diagnostic_real_first_visible_probe_is_styled_0_data-testidrsc-css-probe_0_desktop.log.json",
+        "selector": "[data-testid=\"rsc-css-probe\"]",
+        "fileName": "0871352999_diagnostic_real_first_visible_probe_is_styled_0_data-testidrsc-css-probe_0_desktop.png",
+        "label": "diagnostic real first visible probe is styled",
+        "requireSameDimensions": true,
+        "misMatchThreshold": 0.001,
+        "url": "http://localhost:3030/rsc_posts_page_over_http",
+        "referenceUrl": "http://localhost:3030/rsc_posts_page_over_http",
+        "expect": 0,
+        "viewportLabel": "desktop",
+        "testFile": "<react_on_rails_worktree>/tmp-rsc-real-first-visible-assertion.abtest.ts",
+        "testLine": 6,
+        "refWhitePixelPercent": 0,
+        "testWhitePixelPercent": 0,
+        "refIsBottomSeventyPercentWhite": false,
+        "testIsBottomSeventyPercentWhite": false,
+        "diff": {
+          "isSameDimensions": true,
+          "dimensionDifference": {
+            "width": 0,
+            "height": 0
+          },
+          "misMatchPercentage": "0.00"
+        }
+      },
+      "status": "pass"
+    }
+  ]
+}

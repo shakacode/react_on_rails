@@ -1,0 +1,41 @@
+{
+  "testSuite": "shaka-perf-visreg",
+  "tests": [
+    {
+      "pair": {
+        "reference": "control_screenshot/464897168_rsc_first_paint_use-client_css_is_styled_before_hydration_0_data-testidrsc-css-probe_0_desktop.png",
+        "referenceLog": "<react_on_rails_worktree>/compare-results/control_screenshot/464897168_rsc_first_paint_use-client_css_is_styled_before_hydration_0_data-testidrsc-css-probe_0_desktop.log.json",
+        "test": "experiment_screenshot/464897168_rsc_first_paint_use-client_css_is_styled_before_hydration_0_data-testidrsc-css-probe_0_desktop.png",
+        "testLog": "<react_on_rails_worktree>/compare-results/experiment_screenshot/464897168_rsc_first_paint_use-client_css_is_styled_before_hydration_0_data-testidrsc-css-probe_0_desktop.log.json",
+        "selector": "[data-testid=\"rsc-css-probe\"]",
+        "fileName": "464897168_rsc_first_paint_use-client_css_is_styled_before_hydration_0_data-testidrsc-css-probe_0_desktop.png",
+        "label": "rsc first paint use-client css is styled before hydration",
+        "requireSameDimensions": true,
+        "misMatchThreshold": 0.001,
+        "url": "http://localhost:3030/rsc_posts_page_over_http",
+        "referenceUrl": "http://localhost:3020/rsc_posts_page_over_http",
+        "expect": 0,
+        "viewportLabel": "desktop",
+        "testFile": "<react_on_rails_worktree>/ab-tests/rsc-fouc.abtest.ts",
+        "testLine": 5,
+        "refWhitePixelPercent": 95,
+        "testWhitePixelPercent": 0,
+        "refIsBottomSeventyPercentWhite": false,
+        "testIsBottomSeventyPercentWhite": false,
+        "pixelmatchDiffImage": "experiment_screenshot/464897168_rsc_first_paint_use-client_css_is_styled_before_hydration_0_data-testidrsc-css-probe_0_desktop_pixelmatch_diff.png",
+        "diff": {
+          "isSameDimensions": false,
+          "dimensionDifference": {
+            "width": 626,
+            "height": -12
+          },
+          "rawMisMatchPercentage": 25.476190476190474,
+          "misMatchPercentage": "25.48",
+          "analysisTime": 3
+        },
+        "diffImage": "experiment_screenshot/failed_diff_464897168_rsc_first_paint_use-client_css_is_styled_before_hydration_0_data-testidrsc-css-probe_0_desktop.png"
+      },
+      "status": "fail"
+    }
+  ]
+}

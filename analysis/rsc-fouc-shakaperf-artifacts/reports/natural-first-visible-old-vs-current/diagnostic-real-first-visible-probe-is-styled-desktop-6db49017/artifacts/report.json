@@ -1,0 +1,44 @@
+{
+  "testSuite": "shaka-perf-visreg",
+  "tests": [
+    {
+      "pair": {
+        "reference": "control_screenshot/1340773730_diagnostic_real_first_visible_probe_is_styled_0_data-testidrsc-css-probe_0_desktop.png",
+        "referenceLog": "<react_on_rails_worktree>/compare-results/control_screenshot/1340773730_diagnostic_real_first_visible_probe_is_styled_0_data-testidrsc-css-probe_0_desktop.log.json",
+        "test": "experiment_screenshot/1340773730_diagnostic_real_first_visible_probe_is_styled_0_data-testidrsc-css-probe_0_desktop.png",
+        "testLog": "<react_on_rails_worktree>/compare-results/experiment_screenshot/1340773730_diagnostic_real_first_visible_probe_is_styled_0_data-testidrsc-css-probe_0_desktop.log.json",
+        "selector": "[data-testid=\"rsc-css-probe\"]",
+        "fileName": "1340773730_diagnostic_real_first_visible_probe_is_styled_0_data-testidrsc-css-probe_0_desktop.png",
+        "label": "diagnostic real first visible probe is styled",
+        "requireSameDimensions": true,
+        "misMatchThreshold": 0.001,
+        "url": "http://localhost:3030/rsc_posts_page_over_http",
+        "referenceUrl": "http://localhost:3020/rsc_posts_page_over_http",
+        "expect": 0,
+        "viewportLabel": "desktop",
+        "testFile": "<react_on_rails_worktree>/tmp-rsc-real-first-visible-assertion.abtest.ts",
+        "testLine": 6,
+        "engineErrorMsg": "[  control   ] control first visible probe is unstyled: {\"backgroundColor\":\"rgba(0, 0, 0, 0)\",\"color\":\"rgb(0, 0, 0)\",\"padding\":\"0px\",\"borderRadius\":\"0px\",\"width\":840,\"height\":24,\"text\":\"RSC use-client CSS probe\"}",
+        "hadEngineError": true,
+        "annotationErrorMsg": "Failed while assert styled",
+        "refWhitePixelPercent": 61.61,
+        "refIsBottomSeventyPercentWhite": false,
+        "testWhitePixelPercent": 60.99,
+        "testIsBottomSeventyPercentWhite": false,
+        "diff": {
+          "isSameDimensions": true,
+          "dimensionDifference": {
+            "width": 0,
+            "height": 0
+          },
+          "rawMisMatchPercentage": 12.94697265625,
+          "misMatchPercentage": "12.95",
+          "analysisTime": 23
+        },
+        "diffImage": "experiment_screenshot/failed_diff_1340773730_diagnostic_real_first_visible_probe_is_styled_0_data-testidrsc-css-probe_0_desktop.png",
+        "error": "Failed while assert styled"
+      },
+      "status": "fail"
+    }
+  ]
+}
