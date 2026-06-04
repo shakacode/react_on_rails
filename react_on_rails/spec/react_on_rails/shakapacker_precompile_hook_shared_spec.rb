@@ -60,6 +60,15 @@ RSpec.describe "Shakapacker precompile hook shared script" do
       expect(valid_rsc_registration_entry_path?(
                "/app/tmp/cache/generated/server-component-registration-entry.js"
              )).to be(false)
+      expect(valid_rsc_registration_entry_path?(
+               "/app/.git/objects/generated/server-component-registration-entry.js"
+             )).to be(false)
+      expect(valid_rsc_registration_entry_path?(
+               "/app/vendor/bundle/generated/server-component-registration-entry.js"
+             )).to be(false)
+      expect(valid_rsc_registration_entry_path?(
+               "/app/log/generated/server-component-registration-entry.js"
+             )).to be(false)
     end
 
     it "accepts a registration entry under the app source tree" do
@@ -124,15 +133,38 @@ RSpec.describe "Shakapacker precompile hook shared script" do
       expect(self).not_to have_received(:find_rails_root)
     end
 
-    it "does nothing when no server component registration entry is present" do
-      allow(self).to receive_messages(find_rails_root: "/rails/root", rsc_manifest_registration_entry: nil)
+    it "removes stale default client references when no server component registration entry is present" do
+      Dir.mktmpdir(nil, "/tmp") do |rails_root|
+        stale_manifest = File.join(rails_root, "ssr-generated", "rsc-client-references.json")
+        FileUtils.mkdir_p(File.dirname(stale_manifest))
+        File.write(stale_manifest, "{}\n")
+        allow(self).to receive_messages(find_rails_root: rails_root, rsc_manifest_registration_entry: nil)
+        allow(self).to receive(:system)
+
+        with_env("RSC_REFERENCE_DISCOVERY_BUILD" => nil) do
+          generate_rsc_manifest_client_references_if_needed
+        end
+
+        expect(self).not_to have_received(:system)
+        expect(File).not_to exist(stale_manifest)
+      end
+    end
+
+    it "aborts when a registration entry exists but the shakapacker binstub is missing" do
+      registration_entry = "/rails/root/client/app/generated/server-component-registration-entry.js"
+      allow(self).to receive_messages(find_rails_root: "/rails/root",
+                                      rsc_manifest_registration_entry: registration_entry)
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with("/rails/root/bin/shakapacker").and_return(false)
+      allow(self).to receive(:warn)
       allow(self).to receive(:system)
 
       with_env("RSC_REFERENCE_DISCOVERY_BUILD" => nil) do
-        generate_rsc_manifest_client_references_if_needed
+        expect { generate_rsc_manifest_client_references_if_needed }.to raise_error(SystemExit)
       end
 
       expect(self).not_to have_received(:system)
+      expect(self).to have_received(:warn).with(%r{bin/shakapacker is missing})
     end
 
     it "aborts the precompile with a non-zero exit when the discovery build fails" do

@@ -543,6 +543,70 @@ module ReactOnRails
           expect(generated_server_bundle_content).to include("ReactOnRails.register({ReactClientComponent});")
         end
 
+        it "reuses precomputed components when checking generated server bundle freshness" do
+          generator = described_class.new
+          components = {
+            "ReactServerComponent" =>
+              "#{packer_source_path}/components/ReactServerComponents/ror_components/ReactServerComponent.jsx"
+          }
+          generated_server_bundle_path = File.join(
+            Pathname(packer_source_entry_path).parent,
+            "generated/server-bundle-generated.js"
+          )
+
+          allow(generator).to receive(:components_for_server_registration).and_return(components)
+          allow(generator).to receive_messages(
+            generated_server_bundle_file_path: generated_server_bundle_path,
+            store_to_path: {}
+          )
+          allow(generator).to receive(:generated_file_older_than_sources?)
+            .with(generated_server_bundle_path, components.values)
+            .and_return(false)
+          allow(generator).to receive(:generated_server_pack_file_content).with(components).and_return("fresh")
+          allow(File).to receive(:exist?).and_call_original
+          allow(File).to receive(:exist?).with(generated_server_bundle_path).and_return(true)
+          allow(File).to receive(:read).with(generated_server_bundle_path).and_return("fresh")
+
+          expect(generator.send(:generated_server_bundle_stale?)).to be(false)
+          expect(generator).to have_received(:components_for_server_registration).once
+          expect(generator).to have_received(:generated_server_pack_file_content).with(components)
+        end
+
+        it "reuses precomputed entries when writing and checking the RSC registration entry" do
+          generator = described_class.new
+          entries = {
+            "ReactServerComponent" =>
+              "#{packer_source_path}/components/ReactServerComponents/ror_components/ReactServerComponent.jsx"
+          }
+          registration_entry_path = File.join(
+            Pathname(packer_source_entry_path).parent,
+            "generated/server-component-registration-entry.js"
+          )
+
+          allow(generator).to receive_messages(
+            server_component_registration_entries: entries,
+            server_component_registration_entry_file_path: registration_entry_path
+          )
+          allow(generator).to receive(:server_component_registration_entry_content)
+            .with(entries)
+            .and_return("fresh")
+          allow(generator).to receive(:ensure_nonentrypoints_directory!)
+          expect(File).to receive(:write).with(registration_entry_path, "fresh")
+
+          generator.send(:create_server_component_registration_entry)
+
+          allow(generator).to receive(:generated_file_older_than_sources?)
+            .with(registration_entry_path, entries.values)
+            .and_return(false)
+          allow(File).to receive(:exist?).and_call_original
+          allow(File).to receive(:exist?).with(registration_entry_path).and_return(true)
+          allow(File).to receive(:read).with(registration_entry_path).and_return("fresh")
+
+          expect(generator.send(:server_component_registration_entry_stale?)).to be(false)
+          expect(generator).to have_received(:server_component_registration_entries).twice
+          expect(generator).to have_received(:server_component_registration_entry_content).with(entries).twice
+        end
+
         it "creates a server component registration entry for RSC reference discovery" do
           generated_entry_path = File.join(
             Pathname(packer_source_entry_path).parent,

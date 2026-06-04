@@ -4144,7 +4144,13 @@ describe InstallGenerator, type: :generator do
 
       assert_file "bin/dev", custom_bin_dev
       assert_file "bin/switch-bundler"
-      assert_file "bin/shakapacker-precompile-hook"
+      assert_file "bin/shakapacker-precompile-hook" do |content|
+        expect(content).to include('stale_manifest = Rails.root.join("ssr-generated", "rsc-client-references.json")')
+        expect(content).to include("clear_stale_rsc_manifest_client_references")
+        expect(content).to include('shakapacker_bin = Rails.root.join("bin", "shakapacker")')
+        expect(content).to include("bin/shakapacker is missing; cannot generate RSC manifest client references.")
+        expect(content).to include("system(env, shakapacker_bin.to_s, exception: true)")
+      end
     end
 
     it "keeps DEFAULT_ROUTE unchanged in custom bin/dev files for non-RSC installs" do

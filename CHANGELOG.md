@@ -26,7 +26,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Added
 
-- **[Pro]** **RSC manifest client reference discovery during precompile**: Generated RSC Webpack configs now run `RSCReferenceDiscoveryPlugin` through the Shakapacker precompile hook to emit `rsc-client-references.json`, use that manifest for RSC client-reference bundling, and warn when the selected manifest is stale. The generator now pins `react-on-rails-rsc` to `19.0.5-rc.5`, the first released package containing the discovery plugin export, and the Pro peer range explicitly accepts that prerelease. [PR 3556](https://github.com/shakacode/react_on_rails/pull/3556) by [ihabadham](https://github.com/ihabadham).
+- **[Pro]** **RSC manifest client reference discovery during precompile**: Generated RSC Webpack configs now run `RSCReferenceDiscoveryPlugin` through the Shakapacker precompile hook to emit `rsc-client-references.json`, use that manifest for RSC client-reference bundling, and warn when the selected manifest is stale. The generator now pins `react-on-rails-rsc` to `19.0.5-rc.6`, the prerelease containing the discovery plugin export and RSC manifest CSS fixes, and the Pro peer range explicitly accepts that prerelease. [PR 3556](https://github.com/shakacode/react_on_rails/pull/3556) by [ihabadham](https://github.com/ihabadham).
 
 #### Changed
 
@@ -34,7 +34,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
-- **[Pro]** **RSC CSS no longer flashes unstyled (FOUC) behind `'use client'` boundaries**: CSS imported by a `'use client'` boundary in a true React Server Component tree is now preloaded instead of loading only as a side effect of the JS chunk evaluating. The RSC client manifest now records each client reference's `.css` siblings (via a `pnpm` patch to `react-on-rails-rsc` until the upstream fix is published), and the Pro RSC renderer emits `<link rel="stylesheet" precedence="ror-rsc">` for them inside the RSC payload so React 19 hoists the stylesheets into `<head>` and blocks paint until they load — on both server render and client-side navigation. Fixes [Issue 3211](https://github.com/shakacode/react_on_rails/issues/3211). [PR 3587](https://github.com/shakacode/react_on_rails/pull/3587) by [justin808](https://github.com/justin808).
+- **[Pro]** **RSC CSS no longer flashes unstyled (FOUC) behind `'use client'` boundaries**: CSS imported by a `'use client'` boundary in a true React Server Component tree is now preloaded instead of loading only as a side effect of the JS chunk evaluating. The published `react-on-rails-rsc@19.0.5-rc.6` package now records each client reference's `.css` siblings in the RSC client manifest, and the Pro RSC renderer emits `<link rel="stylesheet" precedence="ror-rsc">` for them inside the RSC payload so React 19 hoists the stylesheets into `<head>` and blocks paint until they load — on both server render and client-side navigation. Fixes [Issue 3211](https://github.com/shakacode/react_on_rails/issues/3211). [PR 3587](https://github.com/shakacode/react_on_rails/pull/3587) by [justin808](https://github.com/justin808).
 
 ### [17.0.0.rc.1] - 2026-06-02
 

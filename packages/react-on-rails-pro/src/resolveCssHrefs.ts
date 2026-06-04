@@ -15,9 +15,9 @@
 /**
  * Structural view of the RSC client manifest, narrowed to the fields needed to
  * resolve stylesheet hrefs. The `css` array on each module entry is published by
- * the patched `react-server-dom-webpack-plugin` (see
- * `patches/react-on-rails-rsc@19.0.5-rc.5.patch`); it is absent on unpatched
- * manifests, which `resolveCssHrefs` treats as "no CSS".
+ * `react-on-rails-rsc` 19.0.5-rc.6+ through its patched
+ * `react-server-dom-webpack-plugin`; it is absent on older manifests, which
+ * `resolveCssHrefs` treats as "no CSS".
  */
 type RscCssModuleEntry = {
   css?: string[];

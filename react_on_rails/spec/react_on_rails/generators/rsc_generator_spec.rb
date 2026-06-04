@@ -62,6 +62,12 @@ describe RscGenerator, type: :generator do
     it "creates RSC webpack config" do
       assert_file "config/webpack/rscWebpackConfig.js" do |content|
         expect(content).to include("rscConfig")
+        expect(content).not_to include(
+          "const { RSCReferenceDiscoveryPlugin } = require('react-on-rails-rsc/RSCReferenceDiscoveryPlugin');\n" \
+          "const serverWebpackModule = require('./serverWebpackConfig');"
+        )
+        expect(content).to include("require('react-on-rails-rsc/RSCReferenceDiscoveryPlugin')")
+        expect(content).to include("Run bin/shakapacker-precompile-hook before bin/shakapacker.")
       end
     end
 

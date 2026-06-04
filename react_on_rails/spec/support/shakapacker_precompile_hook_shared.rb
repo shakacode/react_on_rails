@@ -20,7 +20,7 @@ require "json"
 # Guarded so the specs, which `load` this script once per example, don't warn on constant
 # re-initialization (the script is also run directly as the precompile hook).
 unless defined?(EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_COMPONENTS)
-  EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_COMPONENTS = %w[node_modules public spec test tmp].freeze
+  EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_COMPONENTS = %w[.git log node_modules public spec test tmp vendor].freeze
 end
 
 # Find Rails root by walking upward looking for config/environment.rb
@@ -163,6 +163,11 @@ def rsc_manifest_registration_entry(rails_root)
   nil
 end
 
+def clear_stale_rsc_manifest_client_references(rails_root)
+  stale_manifest = File.join(rails_root, "ssr-generated", "rsc-client-references.json")
+  FileUtils.rm_f(stale_manifest)
+end
+
 # Generate RSC manifest client references if a server component registration entry exists.
 #
 # Unlike the shipped template hook
@@ -183,10 +188,16 @@ def generate_rsc_manifest_client_references_if_needed
   return unless rails_root
 
   registration_entry = rsc_manifest_registration_entry(rails_root)
-  return unless registration_entry
+  unless registration_entry
+    clear_stale_rsc_manifest_client_references(rails_root)
+    return
+  end
 
   shakapacker_bin = File.join(rails_root, "bin", "shakapacker")
-  return unless File.exist?(shakapacker_bin)
+  unless File.exist?(shakapacker_bin)
+    raise "bin/shakapacker is missing; cannot generate RSC manifest client references. " \
+          "Restore bin/shakapacker before precompiling RSC assets."
+  end
 
   puts "🔎 Generating RSC manifest client references..."
 

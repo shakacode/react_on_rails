@@ -24,7 +24,13 @@ exit 0 if ENV["SHAKAPACKER_SKIP_PRECOMPILE_HOOK"] == "true"
 ENV["REACT_ON_RAILS_SKIP_VALIDATION"] = "true"
 
 require "pathname"
+require "fileutils"
 require_relative "../config/environment"
+
+def clear_stale_rsc_manifest_client_references
+  stale_manifest = Rails.root.join("ssr-generated", "rsc-client-references.json")
+  FileUtils.rm_f(stale_manifest)
+end
 
 def generate_rsc_manifest_client_references_if_needed
   return if ENV["RSC_REFERENCE_DISCOVERY_BUILD"] == "true"
@@ -35,7 +41,16 @@ def generate_rsc_manifest_client_references_if_needed
     Pathname(ReactOnRails::PackerUtils.packer_source_entry_path).parent,
     "generated/server-component-registration-entry.js"
   )
-  return unless File.exist?(registration_entry)
+  unless File.exist?(registration_entry)
+    clear_stale_rsc_manifest_client_references
+    return
+  end
+
+  shakapacker_bin = Rails.root.join("bin", "shakapacker")
+  unless File.exist?(shakapacker_bin)
+    raise "bin/shakapacker is missing; cannot generate RSC manifest client references. " \
+          "Restore bin/shakapacker before precompiling RSC assets."
+  end
 
   puts Rainbow("🔎 Generating RSC manifest client references...").cyan
 
@@ -45,7 +60,7 @@ def generate_rsc_manifest_client_references_if_needed
     "RSC_BUNDLE_ONLY" => "true"
   }
 
-  system(env, "bin/shakapacker", exception: true)
+  system(env, shakapacker_bin.to_s, exception: true)
   puts Rainbow("✅ RSC manifest client references generated successfully").green
 end
 

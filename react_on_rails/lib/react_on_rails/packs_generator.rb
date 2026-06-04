@@ -308,10 +308,11 @@ module ReactOnRails
     end
 
     def create_server_component_registration_entry(verbose: false)
-      return if server_component_registration_entries.empty?
+      entries = server_component_registration_entries
+      return if entries.empty?
 
       ensure_nonentrypoints_directory!
-      File.write(server_component_registration_entry_file_path, server_component_registration_entry_content)
+      File.write(server_component_registration_entry_file_path, server_component_registration_entry_content(entries))
       return unless verbose
 
       puts(
@@ -342,8 +343,8 @@ module ReactOnRails
       content
     end
 
-    def generated_server_pack_file_content
-      component_for_server_registration_to_path = components_for_server_registration
+    def generated_server_pack_file_content(component_for_server_registration_to_path = nil)
+      component_for_server_registration_to_path ||= components_for_server_registration
 
       component_on_server_imports = component_for_server_registration_to_path.map do |name, component_path|
         "import #{name} from '#{relative_path(generated_server_bundle_file_path, component_path)}';"
@@ -389,8 +390,8 @@ module ReactOnRails
       components.slice(*server_component_names_for_registration(components))
     end
 
-    def server_component_registration_entry_content
-      entries = server_component_registration_entries
+    def server_component_registration_entry_content(entries = nil)
+      entries ||= server_component_registration_entries
       imports = entries.map do |name, component_path|
         "import #{name} from '#{relative_path(server_component_registration_entry_file_path, component_path)}';"
       end
@@ -808,10 +809,11 @@ module ReactOnRails
       path = generated_server_bundle_file_path
       return true unless File.exist?(path)
 
-      source_files = components_for_server_registration.values + store_to_path.values
+      components = components_for_server_registration
+      source_files = components.values + store_to_path.values
       return true if generated_file_older_than_sources?(path, source_files)
 
-      File.read(path) != generated_server_pack_file_content
+      File.read(path) != generated_server_pack_file_content(components)
     end
 
     def server_component_registration_entry_stale?
@@ -824,7 +826,7 @@ module ReactOnRails
       return true unless File.exist?(path)
       return true if generated_file_older_than_sources?(path, entries.values)
 
-      File.read(path) != server_component_registration_entry_content
+      File.read(path) != server_component_registration_entry_content(entries)
     end
 
     def generated_file_older_than_sources?(generated_file, source_files)
