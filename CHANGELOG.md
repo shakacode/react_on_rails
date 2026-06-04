@@ -30,6 +30,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **TypeScript source server bundles work with auto-generated packs**: React on Rails now resolves the configured server bundle source entrypoint by extension, so apps can keep `config.server_bundle_js_file = "server-bundle.js"` as the compiled/runtime bundle name while using a TypeScript source entrypoint such as `packs/server-bundle.ts`. Public registration types also now cover plain object modules used by `server_render_js`, matching existing runtime behavior. Resolves [Issue 1583](https://github.com/shakacode/react_on_rails/issues/1583). [PR 3606](https://github.com/shakacode/react_on_rails/pull/3606) by [ihabadham](https://github.com/ihabadham).
+
 - **[Pro]** **RSC CSS no longer flashes unstyled (FOUC) behind `'use client'` boundaries**: CSS imported by a `'use client'` boundary in a true React Server Component tree is now preloaded instead of loading only as a side effect of the JS chunk evaluating. The RSC client manifest now records each client reference's `.css` siblings (via a `pnpm` patch to `react-on-rails-rsc` until the upstream fix is published), and the Pro RSC renderer emits `<link rel="stylesheet" precedence="ror-rsc">` for them inside the RSC payload so React 19 hoists the stylesheets into `<head>` and blocks paint until they load — on both server render and client-side navigation. Fixes [Issue 3211](https://github.com/shakacode/react_on_rails/issues/3211). [PR 3587](https://github.com/shakacode/react_on_rails/pull/3587) by [justin808](https://github.com/justin808).
 
 ### [17.0.0.rc.1] - 2026-06-02
