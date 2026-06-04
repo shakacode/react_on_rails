@@ -241,7 +241,7 @@ jobs:
     # every integration leg here is skipped — including the bundler that built fine. Independent
     # build-level signal is still preserved (fail-fast: false runs both build legs); only the
     # integration run is gated. A per-bundler build+integration job split would fully decouple them
-    # and is deferred to a later layer of #3481.
+    # and is tracked in #3593.
     needs: [detect-changes, setup-integration-matrix, build-dummy-app-test-bundles]
     # Run on main, workflow_dispatch, OR when tests needed on PR
     if: |
