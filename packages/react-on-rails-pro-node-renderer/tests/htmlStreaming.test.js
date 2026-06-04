@@ -19,6 +19,17 @@ afterAll(async () => {
 
 jest.spyOn(errorReporter, 'message').mockImplementation(jest.fn());
 
+const SHELL_HEADER = '<p>Header for AsyncComponentsTreeForTesting</p>';
+const SHELL_FOOTER = '<p>Footer for AsyncComponentsTreeForTesting</p>';
+
+const findShellChunkIndex = (chunks) => {
+  const shellChunkIndex = chunks.findIndex((chunk) => chunk.includes(SHELL_HEADER));
+  expect(shellChunkIndex).toBeGreaterThanOrEqual(0);
+  return shellChunkIndex;
+};
+
+const findShellChunk = (chunks) => chunks[findShellChunkIndex(chunks)];
+
 const makeRequest = async (options = {}) => {
   const startTime = Date.now();
   const form = createForm(options);
@@ -71,9 +82,6 @@ const makeRequest = async (options = {}) => {
   return { status, chunks, fullBody, timeToFirstByte, streamingTime, jsonChunks };
 };
 
-const findComponentShellChunk = (chunks) =>
-  chunks.find((chunk) => chunk.includes('<p>Header for AsyncComponentsTreeForTesting</p>'));
-
 describe('html streaming', () => {
   it("should send each html chunk immediately when it's ready", async () => {
     const { status, timeToFirstByte, streamingTime, chunks } = await makeRequest();
@@ -89,11 +97,10 @@ describe('html streaming', () => {
     expect(status).toBe(200);
 
     // React 19 can flush an initial Suspense marker before the shell HTML.
-    const shellChunk = findComponentShellChunk(chunks);
-    expect(shellChunk).toBeDefined();
+    const shellChunk = findShellChunk(chunks);
 
-    expect(shellChunk).toContain('<p>Header for AsyncComponentsTreeForTesting</p>');
-    expect(shellChunk).toContain('<p>Footer for AsyncComponentsTreeForTesting</p>');
+    expect(shellChunk).toContain(SHELL_HEADER);
+    expect(shellChunk).toContain(SHELL_FOOTER);
     expect(shellChunk).toContain('Loading HelloWorldHooks...');
     expect(shellChunk).toContain('Loading branch1...');
     expect(shellChunk).toContain('Loading branch2...');
@@ -112,17 +119,20 @@ describe('html streaming', () => {
     // string scrubbing for assertions, not security sanitization.
     // lgtm[js/incomplete-multi-character-sanitization]
     // lgtm[js/bad-tag-filter]
-    let secondChunkHtml = chunks[1];
+    const shellChunkIndex = findShellChunkIndex(chunks);
+    expect(chunks.length).toBeGreaterThan(shellChunkIndex + 1);
+
+    let nextChunkHtml = chunks[shellChunkIndex + 1];
     let prev;
     do {
-      prev = secondChunkHtml;
-      secondChunkHtml = secondChunkHtml.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, '');
-    } while (prev !== secondChunkHtml);
-    expect(secondChunkHtml).not.toContain('<p>Header for AsyncComponentsTreeForTesting</p>');
-    expect(secondChunkHtml).not.toContain('<p>Footer for AsyncComponentsTreeForTesting</p>');
-    expect(secondChunkHtml).not.toContain('Loading branch1...');
-    expect(secondChunkHtml).not.toContain('Loading branch2...');
-    expect(secondChunkHtml).not.toContain('branch1 (level 0)');
+      prev = nextChunkHtml;
+      nextChunkHtml = nextChunkHtml.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, '');
+    } while (prev !== nextChunkHtml);
+    expect(nextChunkHtml).not.toContain(SHELL_HEADER);
+    expect(nextChunkHtml).not.toContain(SHELL_FOOTER);
+    expect(nextChunkHtml).not.toContain('Loading branch1...');
+    expect(nextChunkHtml).not.toContain('Loading branch2...');
+    expect(nextChunkHtml).not.toContain('branch1 (level 0)');
   }, 10000);
 
   it('should contains all components', async () => {
@@ -191,9 +201,7 @@ describe('html streaming', () => {
       expect(chunks.length).toBeGreaterThan(5);
       expect(status).toBe(200);
 
-      const shellChunk = findComponentShellChunk(chunks);
-      expect(shellChunk).toBeDefined();
-      expect(shellChunk).toContain('<p>Header for AsyncComponentsTreeForTesting</p>');
+      expect(findShellChunk(chunks)).toContain(SHELL_HEADER);
       expect(fullBody).toContain('branch1 (level 4)');
       expect(fullBody).toContain('branch1 (level 3)');
       expect(fullBody).toContain('branch1 (level 2)');
