@@ -229,6 +229,36 @@ RSpec.describe GeneratorHelper, type: :generator do
     end
   end
 
+  describe "#generated_precompile_hook_will_be_configured?" do
+    let(:shakapacker_yml_path) { File.join(destination_root, "config/shakapacker.yml") }
+
+    before do
+      FileUtils.mkdir_p(File.dirname(shakapacker_yml_path))
+      allow(ReactOnRails::PackerUtils).to receive(:shakapacker_version_requirement_met?)
+        .with("9.0.0")
+        .and_return(true)
+    end
+
+    after do
+      FileUtils.rm_rf(File.join(destination_root, "config"))
+    end
+
+    it "does not materialize the generated hook when an unquoted active hook already exists" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        default: &default
+          precompile_hook: bin/shakapacker-precompile-hook
+          # precompile_hook: ~
+
+        test:
+          <<: *default
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(false)
+    end
+  end
+
   describe "Pro/RSC flag helpers" do
     it "treats --rsc as implying Pro" do
       allow(self).to receive(:options).and_return({ rsc: true, pro: false })

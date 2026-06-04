@@ -6,7 +6,7 @@ module ReactOnRails
       SHAKAPACKER_YML_PATH = "config/shakapacker.yml"
       DEFAULT_PRECOMPILE_HOOK_COMMAND = "bin/shakapacker-precompile-hook"
       COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER = /^(\s*)#\s*precompile_hook:\s*~\s*$/
-      ACTIVE_PRECOMPILE_HOOK = /^\s+precompile_hook:\s*['"][^'"]+['"]/
+      ACTIVE_PRECOMPILE_HOOK = /^\s+precompile_hook:\s*(?:"[^"]+"|'[^']+'|[^#\s][^#\n]*)/
       private_constant :SHAKAPACKER_YML_PATH, :DEFAULT_PRECOMPILE_HOOK_COMMAND,
                        :COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER, :ACTIVE_PRECOMPILE_HOOK
 
@@ -37,7 +37,7 @@ module ReactOnRails
         return false unless shakapacker_supports_precompile_hook?
 
         content = File.read(shakapacker_config_path)
-        return false if content.match?(ACTIVE_PRECOMPILE_HOOK)
+        return false if active_precompile_hook_configured?(content)
         return false unless content.match?(COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER)
 
         materialized_content = content.gsub(
@@ -50,6 +50,10 @@ module ReactOnRails
         )
       rescue StandardError
         false
+      end
+
+      def active_precompile_hook_configured?(content)
+        content.match?(ACTIVE_PRECOMPILE_HOOK)
       end
 
       def effective_precompile_hook(config, environment)

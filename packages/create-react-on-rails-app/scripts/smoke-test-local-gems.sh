@@ -177,9 +177,21 @@ verify_rails_route() {
 
 verify_generated_app_runtime() {
   local app_dir="$1"
+  local app_name
+  local build_output
+  local build_status
 
-  echo "Building test bundles for $(basename "$app_dir")..."
-  (cd "$app_dir" && "${PNPM_CMD[@]}" run build:test >/dev/null)
+  app_name="$(basename "$app_dir")"
+  echo "Building test bundles for $app_name..."
+  if build_output="$(cd "$app_dir" && "${PNPM_CMD[@]}" run build:test 2>&1)"; then
+    :
+  else
+    build_status=$?
+    echo "pnpm run build:test failed for $app_name. Output:" >&2
+    printf '%s\n' "$build_output" >&2
+    return "$build_status"
+  fi
+
   verify_rails_route "$app_dir" "/" "OSS vs Pro"
   verify_rails_route "$app_dir" "/hello_world" "Say hello to:"
 }
