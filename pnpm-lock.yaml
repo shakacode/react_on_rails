@@ -33,11 +33,6 @@ overrides:
   picomatch@>=4.0.0 <4.0.4: '>=4.0.4 <5'
   yaml@>=1.0.0 <1.10.3: '>=1.10.3 <2'
 
-patchedDependencies:
-  react-on-rails-rsc@19.0.5-rc.5:
-    hash: 9ec7107fdd367694791cd9b604b34cf0ef9d73d286799eac0f0beaf086262543
-    path: patches/react-on-rails-rsc@19.0.5-rc.5.patch
-
 importers:
 
   .:
@@ -187,8 +182,8 @@ importers:
         specifier: ~19.0.4
         version: 19.0.7(react@19.0.7)
       react-on-rails-rsc:
-        specifier: 19.0.5-rc.5
-        version: 19.0.5-rc.5(patch_hash=9ec7107fdd367694791cd9b604b34cf0ef9d73d286799eac0f0beaf086262543)(react-dom@19.0.7(react@19.0.7))(react@19.0.7)(webpack@5.105.2(@swc/core@1.15.3))
+        specifier: 19.0.5-rc.6
+        version: 19.0.5-rc.6(react-dom@19.0.7(react@19.0.7))(react@19.0.7)(webpack@5.105.2(@swc/core@1.15.3))
       redux:
         specifier: ^4.2.1
         version: 4.2.1
@@ -264,8 +259,8 @@ importers:
         specifier: ~19.0.4
         version: 19.0.7(react@19.0.7)
       react-on-rails-rsc:
-        specifier: 19.0.5-rc.5
-        version: 19.0.5-rc.5(patch_hash=9ec7107fdd367694791cd9b604b34cf0ef9d73d286799eac0f0beaf086262543)(react-dom@19.0.7(react@19.0.7))(react@19.0.7)(webpack@5.105.2(@swc/core@1.15.3))
+        specifier: 19.0.5-rc.6
+        version: 19.0.5-rc.6(react-dom@19.0.7(react@19.0.7))(react@19.0.7)(webpack@5.105.2(@swc/core@1.15.3))
 
   packages/react-on-rails-pro-node-renderer:
     dependencies:
@@ -725,8 +720,8 @@ importers:
         specifier: workspace:*
         version: link:../../../packages/react-on-rails-pro-node-renderer
       react-on-rails-rsc:
-        specifier: 19.0.5-rc.5
-        version: 19.0.5-rc.5(patch_hash=9ec7107fdd367694791cd9b604b34cf0ef9d73d286799eac0f0beaf086262543)(react-dom@19.0.7(react@19.0.7))(react@19.0.7)(webpack@5.104.1)
+        specifier: 19.0.5-rc.6
+        version: 19.0.5-rc.6(react-dom@19.0.7(react@19.0.7))(react@19.0.7)(webpack@5.104.1)
       react-proptypes:
         specifier: ^1.0.0
         version: 1.0.0
@@ -7369,8 +7364,8 @@ packages:
   react-is@18.3.1:
     resolution: {integrity: sha512-/LLMVyas0ljjAtoYiPqYiL8VWXzUUdThrmU5+n20DZv+a+ClRoevUzw5JxU+Ieh5/c87ytoTBV9G1FiKfNJdmg==}
 
-  react-on-rails-rsc@19.0.5-rc.5:
-    resolution: {integrity: sha512-NTe3g34iR0ya8XFUpwbqE37ff4x5YGZEGowWGbY4o/wqNPykICDH5Nsd7MjqUSwun5NYqI92FHKHSEhpHgPq2A==}
+  react-on-rails-rsc@19.0.5-rc.6:
+    resolution: {integrity: sha512-BCnSJ4lzLP6lqegQlr5smJW/54NAEwnQy1OMLBYUwXYKXEozuLlGH/GzLf0F0nR69fDmKyUL51fzcg6Khm4AkA==}
     peerDependencies:
       react: ~19.0.4
       react-dom: ~19.0.4
@@ -16623,7 +16618,7 @@ snapshots:
 
   react-is@18.3.1: {}
 
-  react-on-rails-rsc@19.0.5-rc.5(patch_hash=9ec7107fdd367694791cd9b604b34cf0ef9d73d286799eac0f0beaf086262543)(react-dom@19.0.7(react@19.0.7))(react@19.0.7)(webpack@5.104.1):
+  react-on-rails-rsc@19.0.5-rc.6(react-dom@19.0.7(react@19.0.7))(react@19.0.7)(webpack@5.104.1):
     dependencies:
       acorn-loose: 8.5.2
       neo-async: 2.6.2
@@ -16632,7 +16627,7 @@ snapshots:
       webpack: 5.104.1(@swc/core@1.15.3)(webpack-cli@7.0.3)
       webpack-sources: 3.3.3
 
-  react-on-rails-rsc@19.0.5-rc.5(patch_hash=9ec7107fdd367694791cd9b604b34cf0ef9d73d286799eac0f0beaf086262543)(react-dom@19.0.7(react@19.0.7))(react@19.0.7)(webpack@5.105.2(@swc/core@1.15.3)):
+  react-on-rails-rsc@19.0.5-rc.6(react-dom@19.0.7(react@19.0.7))(react@19.0.7)(webpack@5.105.2(@swc/core@1.15.3)):
     dependencies:
       acorn-loose: 8.5.2
       neo-async: 2.6.2

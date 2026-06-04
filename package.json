@@ -69,7 +69,7 @@
     "publint": "^0.3.4",
     "react": "~19.0.4",
     "react-dom": "~19.0.4",
-    "react-on-rails-rsc": "19.0.5-rc.5",
+    "react-on-rails-rsc": "19.0.5-rc.6",
     "redux": "^4.2.1",
     "size-limit": "^12.0.0",
     "stylelint": "^16.14.0",
@@ -120,9 +120,6 @@
   "homepage": "https://github.com/shakacode/react_on_rails#readme",
   "packageManager": "pnpm@10.33.4+sha512.1c67b3b359b2d408119ba1ed289f34b8fc3c6873412bec6fd264fbdc82489e510fcbecb9ce9d22dae7f3b76269d8441046014bdca53b9979cd7a561ad631b800",
   "pnpm": {
-    "patchedDependencies": {
-      "react-on-rails-rsc@19.0.5-rc.5": "patches/react-on-rails-rsc@19.0.5-rc.5.patch"
-    },
     "// for overrides": [
       "Generated via pnpm audit --fix, with manual caps added to prevent major version jumps.",
       "These force patched versions of transitive dev dependencies. Remove when upstream packages update.",
