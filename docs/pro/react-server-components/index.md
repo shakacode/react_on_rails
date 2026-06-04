@@ -39,11 +39,11 @@ In React on Rails, Rails is the backend: your controller owns database access, a
 
 Teams adopting RSC have reported dramatic wins — BlogHunch's 30% server-cost reduction, Frigade's 62% client-bundle reduction, and Mux's 50,000-line incremental migration — all documented in [Migration Success Stories](./success-stories.md). DoorDash's 65% LCP improvement from an earlier Next.js SSR migration is included as a useful server-rendering baseline.
 
-The public demo below shows how these ideas look in an inspectable React on Rails Pro application.
+The Marketplace demo below shows how these ideas look in an inspectable React on Rails Pro application.
 
 ## Live Demo and Evidence {#live-demo-and-evidence}
 
-The public [LocalHub marketplace demo](https://rsc.reactonrails.com/) shows the
+The public [Marketplace demo](https://rsc.reactonrails.com/) shows the
 same marketplace-style surfaces rendered with traditional SSR, client rendering,
 and React Server Components. Use this canonical link list when you want
 inspectable proof instead of a static claim:

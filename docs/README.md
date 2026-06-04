@@ -1,10 +1,5 @@
 # Documentation Guide
 
-> **Current docs:** This documentation is for React on Rails 17. For historical v15 material, see the
-> [React on Rails 15.0.0 docs](https://github.com/shakacode/react_on_rails/tree/15.0.0/docs) and
-> [React on Rails 15.0.0 code](https://github.com/shakacode/react_on_rails/tree/15.0.0). Version 15.0.0 was
-> retracted, so use these links only when maintaining older applications.
-
 React on Rails is one product with two tiers: open source for Rails + React integration, and Pro when you need higher SSR throughput, deeper RSC support, or maintainer-backed help.
 
 ## Choose the path that matches your app
@@ -40,7 +35,7 @@ React on Rails is one product with two tiers: open source for Rails + React inte
 - [API Reference](./oss/api-reference/view-helpers-api.md)
 - [Deployment and troubleshooting](./oss/deployment/README.md)
 - [Configuration](./oss/configuration/README.md)
-- [Changelog](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md)
+- [Changelog](./oss/upgrading/changelog.md)
 
 ## Pro features
 
