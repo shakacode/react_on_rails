@@ -20,6 +20,8 @@ A few important points about the detection:
 - **`fn.renderFunction = true` is an escape hatch** for render functions that don't need `railsContext` but still want to be treated as render functions (e.g., so they can return a hash). Without the flag, a one-parameter function is classified as a regular React component.
 
 ```jsx
+import ReactDOMClient from 'react-dom/client';
+
 // Regular React Component — 0 or 1 params, renders normally
 const HelloMessage = (props) => <div>Hello {props.name}</div>;
 
@@ -42,10 +44,12 @@ HelloHash.renderFunction = true;
 // Optionally return a teardown (or a promise resolving to one); React on Rails runs it on
 // Turbo/Turbolinks navigation (or same-id node replacement) so the root is unmounted, not leaked.
 const LazyHydrate = (props, railsContext, domNodeId) =>
-  // whenVisible is a hypothetical helper that resolves when the element scrolls into view
+  // whenVisible is a hypothetical helper that resolves when the element scrolls into view.
+  // The teardown is registered only after hydration runs, so navigating away before the element
+  // becomes visible leaves nothing mounted to clean up.
   whenVisible(domNodeId).then(() => {
     const domNode = document.getElementById(domNodeId);
-    const root = ReactDOM.hydrateRoot(domNode, <HelloMessage {...props} />);
+    const root = ReactDOMClient.hydrateRoot(domNode, <HelloMessage {...props} />);
     return () => root.unmount();
   });
 

@@ -118,10 +118,15 @@ import ReactDOMClient from 'react-dom/client';
 // Renderer function: 3 params, mounts itself, returns a teardown.
 const MyRenderer = (props, _railsContext, domNodeId) => {
   const domNode = document.getElementById(domNodeId);
-  const root = domNode.innerHTML
-    ? ReactDOMClient.hydrateRoot(domNode, <MyComponent {...props} />)
-    : ReactDOMClient.createRoot(domNode);
-  if (!domNode.innerHTML) {
+  if (!domNode) {
+    throw new Error(`Missing DOM element with id: ${domNodeId}`);
+  }
+
+  let root;
+  if (domNode.innerHTML) {
+    root = ReactDOMClient.hydrateRoot(domNode, <MyComponent {...props} />);
+  } else {
+    root = ReactDOMClient.createRoot(domNode);
     root.render(<MyComponent {...props} />);
   }
 
@@ -137,13 +142,17 @@ import ReactDOM from 'react-dom';
 
 const MyLegacyRenderer = (props, _railsContext, domNodeId) => {
   const domNode = document.getElementById(domNodeId);
+  if (!domNode) {
+    throw new Error(`Missing DOM element with id: ${domNodeId}`);
+  }
+
   ReactDOM.render(<MyComponent {...props} />, domNode);
   return () => ReactDOM.unmountComponentAtNode(domNode);
 };
 ```
 
 > [!NOTE]
-> Synchronous teardowns are always honored. An **async** teardown is best-effort in the open-source package: if a navigation or node replacement happens before the renderer resolves its teardown, that still-pending teardown may be dropped. React on Rails Pro's client renderer awaits the renderer and handles this race reliably.
+> Synchronous teardowns are always honored. An **async** teardown is best-effort in the open-source package: if a navigation or node replacement happens before the renderer resolves its teardown, that still-pending teardown may be dropped (React on Rails logs a `console.error` when this happens, so the dropped teardown is diagnosable rather than silent). React on Rails Pro's client renderer awaits the renderer and handles this race reliably.
 
 ---
 
