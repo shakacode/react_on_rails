@@ -126,6 +126,13 @@ module ReactOnRails
 
         def update_existing_rsc_webpack_config(config_path, content, is_server:)
           return unless rsc_plugin_sections_safe_to_rewrite?(config_path, content, is_server: is_server)
+
+          normalized_content = normalize_rsc_plugin_for_active_bundler(content)
+          if normalized_content != content
+            write_existing_rsc_config(config_path, normalized_content, action: :rewrite)
+            content = normalized_content
+          end
+
           return if rsc_plugin_uses_scoped_client_references?(content, is_server: is_server)
           return unless prepare_rsc_client_references_rewrite!(config_path, content, is_server: is_server)
 
@@ -133,6 +140,84 @@ module ReactOnRails
 
           rollback_incomplete_rsc_client_references_setup(config_path, content)
           warn_missing_rsc_plugin_target(config_path, is_server: is_server)
+        end
+
+        def normalize_rsc_plugin_for_active_bundler(content)
+          inactive_plugin_class_name = using_rspack? ? "RSCWebpackPlugin" : "RSCRspackPlugin"
+          inactive_plugin_import_path =
+            using_rspack? ? "react-on-rails-rsc/WebpackPlugin" : "react-on-rails-rsc/RspackPlugin"
+
+          normalized_content, active_plugin_binding_available = normalize_rsc_plugin_import_for_active_bundler(
+            content,
+            inactive_plugin_class_name,
+            inactive_plugin_import_path
+          )
+          return normalized_content unless active_plugin_binding_available
+
+          normalize_rsc_plugin_invocations_for_active_bundler(normalized_content, inactive_plugin_class_name)
+        end
+
+        def normalize_rsc_plugin_import_for_active_bundler(content, inactive_plugin_class_name,
+                                                           inactive_plugin_import_path)
+          active_import_seen = commonjs_named_imported?(content, rsc_plugin_import_path, rsc_plugin_class_name)
+          import_regex = rsc_plugin_commonjs_import_regex(inactive_plugin_import_path)
+          normalized_content = content.gsub(import_regex) do |statement|
+            next statement unless js_top_level_position?(content, Regexp.last_match.begin(0))
+
+            if active_import_seen
+              remove_commonjs_named_import_binding(statement, inactive_plugin_class_name)
+            else
+              active_import_seen = true
+              statement
+                .gsub(/\b#{inactive_plugin_class_name}\b/, rsc_plugin_class_name)
+                .gsub(inactive_plugin_import_path, rsc_plugin_import_path)
+            end
+          end
+          [normalized_content, active_import_seen]
+        end
+
+        def rsc_plugin_commonjs_import_regex(import_path)
+          Regexp.new(
+            "^[ \\t]*(?:const|let|var)\\s+\\{[^}]*\\}\\s*=\\s*" \
+            "require\\(['\"]#{Regexp.escape(import_path)}['\"]\\);?[ \\t]*(?:\\r?\\n)?"
+          )
+        end
+
+        def remove_commonjs_named_import_binding(statement, binding_name)
+          match = statement.match(
+            /
+              \A
+              (?<prefix>[ \t]*(?:const|let|var)\s+\{)
+              (?<bindings>[^}]*)
+              (?<suffix>\}\s*=\s*require\([^)]+\);?[ \t]*(?:\r?\n)?)
+              \z
+            /x
+          )
+          return "" unless match
+
+          remaining_bindings = match[:bindings].split(",").map(&:strip).reject do |binding|
+            destructuring_binding_declares_name?(binding, binding_name)
+          end
+          return "" if remaining_bindings.empty?
+
+          "#{match[:prefix]} #{remaining_bindings.join(', ')} #{match[:suffix]}"
+        end
+
+        def normalize_rsc_plugin_invocations_for_active_bundler(content, inactive_plugin_class_name)
+          normalized_content = content.dup
+          pattern = /\bnew\s+#{Regexp.escape(inactive_plugin_class_name)}\b/
+          search_from = 0
+
+          while (match = normalized_content.match(pattern, search_from))
+            search_from = match.end(0)
+            next unless js_code_position?(normalized_content, match.begin(0))
+
+            replacement = match[0].sub(inactive_plugin_class_name, rsc_plugin_class_name)
+            normalized_content[match.begin(0)...match.end(0)] = replacement
+            search_from = match.begin(0) + replacement.length
+          end
+
+          normalized_content
         end
 
         def prepare_rsc_client_references_rewrite!(config_path, content, is_server:)

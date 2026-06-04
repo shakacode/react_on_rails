@@ -140,8 +140,9 @@ module ReactOnRails
         react-on-rails-rsc
       ].freeze
 
-      # React stays on the supported 19.0.x range; react-on-rails-rsc may lead it during RC rollouts.
-      # TODO: Re-align RSC_REACT_VERSION_RANGE after react-on-rails-rsc@19.0.5 stable ships.
+      # RSC package releases follow the React 19.0.x line (independent from gem versioning).
+      # TODO(#3488): bump both this range and RSC_PACKAGE_VERSION_PIN when 19.0.5 stable ships,
+      # then verify peer-dep alignment between react@19.0.x and react-on-rails-rsc@19.0.5.
       RSC_REACT_VERSION_RANGE = "~19.0.4"
       # Pinned to 19.0.5-rc.x because the native rspack manifest plugin
       # (`react-on-rails-rsc/RspackPlugin`) the generator scaffolds for rspack projects is only
@@ -420,7 +421,8 @@ module ReactOnRails
                      :yellow
           GeneratorMessages.add_warning(
             "Warning: #{warning_msg} " \
-            "The installed react-on-rails-rsc version may not match the expected compatibility pin."
+            "The installed react-on-rails-rsc version may not match the expected compatibility pin." \
+            "#{rspack_rsc_dependency_fallback_warning}"
           )
           return if add_packages(RSC_DEPENDENCIES)
 
@@ -446,6 +448,14 @@ module ReactOnRails
       # subclasses may override to return [packages, false] when pinning should be skipped.
       def rsc_packages_with_version
         [RSC_DEPENDENCIES.map { |pkg| "#{pkg}@#{RSC_PACKAGE_VERSION_PIN}" }, true]
+      end
+
+      def rspack_rsc_dependency_fallback_warning
+        return "" unless using_rspack?
+
+        " Rspack RSC projects require react-on-rails-rsc #{RSC_PACKAGE_VERSION_PIN} or newer " \
+          "for react-on-rails-rsc/RspackPlugin; if the fallback installs an older latest version, " \
+          "rerun npm install react-on-rails-rsc@#{RSC_PACKAGE_VERSION_PIN} manually."
       end
 
       def remove_base_package_if_present

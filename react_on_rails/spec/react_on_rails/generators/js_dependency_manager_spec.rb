@@ -679,6 +679,22 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect(instance).to have_received(:add_packages).with(["react-on-rails-rsc"])
       expect(warnings.join("\n")).to include("installed react-on-rails-rsc version may not match")
     end
+
+    it "warns rspack users that unversioned fallback may miss the native RSC plugin export" do
+      instance.using_rspack = true
+      allow(instance)
+        .to receive(:rsc_packages_with_version)
+        .and_return([["react-on-rails-rsc@19.0.5-rc.5"], true])
+
+      allow(instance).to receive(:add_packages).with(["react-on-rails-rsc@19.0.5-rc.5"]).and_return(false)
+      allow(instance).to receive(:add_packages).with(["react-on-rails-rsc"]).and_return(true)
+
+      instance.send(:add_rsc_dependencies)
+
+      warning_text = warnings.join("\n")
+      expect(warning_text).to include("Rspack RSC projects require react-on-rails-rsc 19.0.5-rc.5 or newer")
+      expect(warning_text).to include("react-on-rails-rsc/RspackPlugin")
+    end
   end
 
   describe "#add_babel_react_dependencies" do

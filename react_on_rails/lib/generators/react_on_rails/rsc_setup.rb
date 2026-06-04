@@ -507,7 +507,7 @@ module ReactOnRails
       end
 
       def warn_incomplete_new_rsc_plugin_setup(config_path, is_server:)
-        insertion_point = is_server ? "server webpack insertion points" : "client webpack return statement"
+        insertion_point = is_server ? "server bundler insertion points" : "client bundler return statement"
         GeneratorMessages.add_warning(
           "Could not finish adding #{rsc_plugin_class_name} to #{config_path}: expected #{insertion_point} " \
           "was not found. Reverted partial RSC setup; please add #{rsc_plugin_class_name} and " \
