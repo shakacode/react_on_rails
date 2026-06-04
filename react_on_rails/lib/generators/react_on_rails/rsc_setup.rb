@@ -544,6 +544,9 @@ module ReactOnRails
           unless rsc_plugin_client_references_configured?(content, is_server: true)
             missing << "generated scoped clientReferences in serverWebpackConfig.js"
           end
+        elsif content.include?(inactive_rsc_plugin_class_name)
+          missing << "#{rsc_plugin_class_name} in serverWebpackConfig.js " \
+                     "(found #{inactive_rsc_plugin_class_name} — wrong bundler plugin; replace it manually)"
         else
           missing << "#{rsc_plugin_class_name} in serverWebpackConfig.js"
         end
@@ -562,6 +565,9 @@ module ReactOnRails
           unless rsc_plugin_client_references_configured?(content, is_server: false)
             missing << "generated scoped clientReferences in clientWebpackConfig.js"
           end
+        elsif content.include?(inactive_rsc_plugin_class_name)
+          missing << "#{rsc_plugin_class_name} in clientWebpackConfig.js " \
+                     "(found #{inactive_rsc_plugin_class_name} — wrong bundler plugin; replace it manually)"
         else
           missing << "#{rsc_plugin_class_name} in clientWebpackConfig.js"
         end

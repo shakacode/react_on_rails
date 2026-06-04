@@ -2485,6 +2485,39 @@ describe RscGenerator, type: :generator do
       expect(migrated_content).not_to include("react-on-rails-rsc/WebpackPlugin")
     end
 
+    it "reports the wrong bundler plugin during rspack server-config verification instead of a bare missing warning" do
+      allow(generator).to receive(:using_rspack?).and_return(true)
+      simulate_existing_file(
+        "config/rspack/serverWebpackConfig.js",
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          const rscBundle = false;
+          serverWebpackConfig.plugins.push(new RSCWebpackPlugin({ isServer: true }));
+        JS
+      )
+
+      expect(generator.send(:check_rsc_server_config)).to include(
+        "RSCRspackPlugin in serverWebpackConfig.js " \
+        "(found RSCWebpackPlugin — wrong bundler plugin; replace it manually)"
+      )
+    end
+
+    it "reports the wrong bundler plugin during rspack client-config verification instead of a bare missing warning" do
+      allow(generator).to receive(:using_rspack?).and_return(true)
+      simulate_existing_file(
+        "config/rspack/clientWebpackConfig.js",
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+        JS
+      )
+
+      expect(generator.send(:check_rsc_client_config)).to include(
+        "RSCRspackPlugin in clientWebpackConfig.js " \
+        "(found RSCWebpackPlugin — wrong bundler plugin; replace it manually)"
+      )
+    end
+
     it "does not inject duplicate imports when existing bindings are indented" do
       config_path = "config/webpack/clientWebpackConfig.js"
       simulate_existing_file(

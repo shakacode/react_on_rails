@@ -209,6 +209,15 @@ module GeneratorHelper
     using_rspack? ? "RSCRspackPlugin" : "RSCWebpackPlugin"
   end
 
+  # The other bundler's plugin class name — the one this project should NOT be using.
+  # Used to detect a config left in a mixed state (e.g. a legacy `RSCWebpackPlugin` surviving
+  # in an rspack project) so diagnostics can say "wrong bundler plugin" rather than "missing".
+  #
+  # @return [String] "RSCWebpackPlugin" when rspack, "RSCRspackPlugin" otherwise
+  def inactive_rsc_plugin_class_name
+    using_rspack? ? "RSCWebpackPlugin" : "RSCRspackPlugin"
+  end
+
   # `react-on-rails-rsc` subpath that exports {#rsc_plugin_class_name}.
   #
   # @return [String] "react-on-rails-rsc/RspackPlugin" when rspack,

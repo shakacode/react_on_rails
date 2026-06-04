@@ -222,7 +222,11 @@ module ReactOnRails
               \z
             /x
           )
-          return "" unless match
+          # Defensive: this is only called on lines already matched by
+          # rsc_plugin_commonjs_import_regex, so a parse failure here means a hand-edited
+          # variant we don't recognize. Keep the original import rather than silently deleting it
+          # (an empty return would drop the line and surface a ReferenceError at bundler config load).
+          return statement unless match
 
           remaining_bindings = match[:bindings].split(",").map(&:strip).reject do |binding|
             destructuring_binding_declares_name?(binding, binding_name)
