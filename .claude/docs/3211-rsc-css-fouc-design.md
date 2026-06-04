@@ -2,12 +2,22 @@
 
 Status: approved 2026-06-03. Single PR (patch + renderer + tests).
 
-> **Update 2026-06-04:** The upstream manifest fix landed in
-> `react-on-rails-rsc@19.0.5-rc.6`, which records `.css` siblings (plus `.mjs`
-> chunk support and href normalization) natively. The local `pnpm patch`
-> described in **Part A** has been **removed** — the rollout now pins `rc.6` and
-> relies on the published plugin. The renderer-side design (Part B onward) is
-> unchanged and still in force.
+> **Update 2026-06-04:** The local `pnpm patch` to `react-on-rails-rsc` described
+> in **Part A** has been **removed**. Two independent changes superseded it:
+>
+> - The upstream manifest fix landed in `react-on-rails-rsc@19.0.5-rc.6`, which
+>   records `.css` siblings (plus `.mjs` chunk support and href normalization)
+>   natively. The rollout now pins `rc.6` ([PR #3577](https://github.com/shakacode/react_on_rails/pull/3577)).
+> - A generated `RSCManifestCssPlugin` (shipped under
+>   `config/webpack/rscManifestCssPlugin.js` and wired into the client webpack
+>   config by the RSC generator) adds the manifest's `.css` arrays at build time
+>   from an app-owned plugin ([PR #3605](https://github.com/shakacode/react_on_rails/pull/3605)).
+>
+> The two mechanisms coexist (the plugin dedupes against any `.css` already
+> recorded natively). The renderer-side design (Part B onward) is unchanged and
+> still in force. This document is retained as the as-approved design snapshot;
+> for the current app-owned manifest mechanism see
+> `react_on_rails/lib/generators/react_on_rails/templates/rsc/base/config/webpack/rscManifestCssPlugin.js`.
 
 ## Problem
 

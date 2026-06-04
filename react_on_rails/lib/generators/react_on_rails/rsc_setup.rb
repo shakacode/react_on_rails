@@ -687,8 +687,9 @@ module ReactOnRails
 
       def new_rsc_plugin_setup_complete?(content, is_server:)
         return false unless rsc_plugin_invocation_in_js_code?(content)
-        # Client path intentionally only requires the plugin invocation, not the scoped helper.
-        # The `:unscoped` degraded path (taken when scoping is blocked) writes the plugin
+        # Client path requires both plugin invocations (RSCWebpackPlugin checked above and
+        # RSCManifestCssPlugin checked here) but intentionally NOT the scoped `rscClientReferences`
+        # helper. The `:unscoped` degraded path (taken when scoping is blocked) writes the plugin
         # without `rscClientReferences`, and this guard must not trigger the rollback in that
         # case. The server path keeps the stricter check below because the `rscBundle`
         # signature change is the marker of a complete server-side rewrite.

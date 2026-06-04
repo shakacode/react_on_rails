@@ -29,7 +29,10 @@ class RSCManifestCssPlugin {
         },
         () => {
           const asset = compilation.getAsset(this.clientManifestFilename);
-          if (!asset) return;
+          if (!asset) {
+            this.warnMissingManifestAsset(compilation);
+            return;
+          }
 
           const manifest = this.parseManifest(asset.source.source(), compilation);
           if (!manifest) return;
@@ -119,6 +122,41 @@ class RSCManifestCssPlugin {
       );
       return null;
     }
+  }
+
+  // The plugin's whole job is silent metadata augmentation, so a missing manifest
+  // asset must not pass unnoticed. Warn only when the configured filename is absent
+  // but some other client manifest was emitted (the likely cause: a
+  // `clientManifestFilename` drift between RSCWebpackPlugin and this plugin). When no
+  // client manifest exists at all we stay quiet, so HMR/partial rebuilds and non-RSC
+  // builds do not produce spurious warnings.
+  warnMissingManifestAsset(compilation) {
+    const candidates = RSCManifestCssPlugin.clientManifestAssetNames(compilation).filter(
+      (name) => name !== this.clientManifestFilename,
+    );
+    if (candidates.length === 0) return;
+
+    compilation.warnings.push(
+      new Error(
+        `RSCManifestCssPlugin: configured clientManifestFilename ` +
+          `"${this.clientManifestFilename}" was not emitted, so no CSS metadata was added to the ` +
+          `RSC client manifest (stylesheets behind 'use client' boundaries will not preload, ` +
+          `risking a flash of unstyled content). Other client manifests were emitted: ` +
+          `${candidates.join(', ')}. Set clientManifestFilename to match RSCWebpackPlugin.`,
+      ),
+    );
+  }
+
+  static clientManifestAssetNames(compilation) {
+    if (typeof compilation.getAssets !== 'function') return [];
+
+    const names = [];
+    for (const asset of compilation.getAssets()) {
+      if (typeof asset.name === 'string' && asset.name.endsWith('client-manifest.json')) {
+        names.push(asset.name);
+      }
+    }
+    return names;
   }
 
   static chunksById(compilation) {
