@@ -1,6 +1,7 @@
 // Top level component for simple client side only rendering
 import React from 'react';
-import HelloWorld from './HelloWorld';
+
+import HelloWorld, { type HelloWorldProps } from './HelloWorld';
 
 /*
  *  Export a function that takes the props and returns a ReactComponent.
@@ -11,4 +12,6 @@ import HelloWorld from './HelloWorld';
  *  Note, this is a fictional example, as you'd only use a Render-Function if you wanted to run
  *  some extra code, such as setting up Redux and React Router.
  */
-export default (props) => <HelloWorld {...props} />;
+const HelloWorldApp = (props: HelloWorldProps) => <HelloWorld {...props} />;
+
+export default HelloWorldApp;

@@ -1,35 +1,40 @@
-import PropTypes from 'prop-types';
 import React from 'react';
+import type { RailsContext as RailsContextData } from 'react-on-rails/types';
+
 import RailsContext from '../components/RailsContext';
 
 // Example of CSS modules...
 import css from '../components/HelloWorld.module.scss';
 
+type HelloWorldData = Record<string, unknown> & {
+  name: string;
+};
+
+type HelloWorldProps = Record<string, unknown> & {
+  helloWorldData: HelloWorldData;
+  railsContext?: RailsContextData;
+};
+
+type HelloWorldState = HelloWorldData;
+
 // Super simple example of the simplest possible React component
-class HelloWorld extends React.Component {
-  static propTypes = {
-    helloWorldData: PropTypes.shape({
-      name: PropTypes.string,
-    }).isRequired,
-    railsContext: PropTypes.object,
-  };
+class HelloWorld extends React.Component<HelloWorldProps, HelloWorldState> {
+  private nameDomRef: HTMLInputElement | null = null;
 
   // Not necessary if we only call super, but we'll need to initialize state, etc.
-  constructor(props) {
+  constructor(props: HelloWorldProps) {
     super(props);
     this.state = props.helloWorldData;
-    this.setNameDomRef = this.setNameDomRef.bind(this);
-    this.handleChange = this.handleChange.bind(this);
   }
 
-  handleChange() {
-    const name = this.nameDomRef.value;
+  handleChange = () => {
+    const name = (this.nameDomRef as HTMLInputElement).value;
     this.setState({ name });
-  }
+  };
 
-  setNameDomRef(nameDomNode) {
+  setNameDomRef = (nameDomNode: HTMLInputElement | null) => {
     this.nameDomRef = nameDomNode;
-  }
+  };
 
   render() {
     console.log(
@@ -53,4 +58,5 @@ class HelloWorld extends React.Component {
   }
 }
 
+export type { HelloWorldData, HelloWorldProps };
 export default HelloWorld;
