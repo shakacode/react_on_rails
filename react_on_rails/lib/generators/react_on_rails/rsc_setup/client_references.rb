@@ -45,7 +45,7 @@ module ReactOnRails
                 anchor,
                 shakapacker_config_import_statement(existing_imports_content),
                 path_resolve_import_statement(existing_imports_content),
-                rsc_webpack_plugin_import_statement(content),
+                rsc_plugin_import_statement(content),
                 "",
                 rsc_client_references_js
               ]
@@ -63,7 +63,7 @@ module ReactOnRails
               [
                 anchor,
                 path_resolve_import_statement(existing_imports_content),
-                rsc_webpack_plugin_import_statement(content),
+                rsc_plugin_import_statement(content),
                 "",
                 rsc_client_references_js
               ]
@@ -79,7 +79,7 @@ module ReactOnRails
             is_server: is_server,
             plugin_pending: true
           )
-            return inject_rsc_webpack_plugin_import(config_path, content, is_server: is_server) ? :unscoped : :failed
+            return inject_rsc_plugin_import(config_path, content, is_server: is_server) ? :unscoped : :failed
           end
 
           # `rsc_client_references_defined?` covers both scoped and unscoped declarations.
@@ -89,7 +89,7 @@ module ReactOnRails
           # plugin-import-only path and let downstream callers honor the scoped/unscoped
           # state of whatever the user already wrote.
           if rsc_client_references_defined?(content)
-            return :failed unless inject_rsc_webpack_plugin_import(config_path, content, is_server: is_server)
+            return :failed unless inject_rsc_plugin_import(config_path, content, is_server: is_server)
             return :scoped if scoped_rsc_client_references_defined?(content)
 
             warn_unscoped_rsc_client_references_helper(config_path)
@@ -945,13 +945,13 @@ module ReactOnRails
           body
         end
 
-        def inject_rsc_webpack_plugin_import(config_path, content, is_server:)
+        def inject_rsc_plugin_import(config_path, content, is_server:)
           replace_rsc_client_references_setup_anchor(config_path, content, is_server: is_server) do |anchor|
             join_rsc_client_references_setup(
               content,
               [
                 anchor,
-                rsc_webpack_plugin_import_statement(content)
+                rsc_plugin_import_statement(content)
               ]
             )
           end
@@ -1229,7 +1229,7 @@ module ReactOnRails
         # The plugin class name and import path follow the active bundler
         # (`RSCRspackPlugin`/`react-on-rails-rsc/RspackPlugin` for rspack, the webpack pair
         # otherwise) via {#rsc_plugin_class_name} / {#rsc_plugin_import_path}.
-        def rsc_webpack_plugin_import_statement(content)
+        def rsc_plugin_import_statement(content)
           return if commonjs_named_imported?(content, rsc_plugin_import_path, rsc_plugin_class_name)
 
           "const { #{rsc_plugin_class_name} } = require('#{rsc_plugin_import_path}');"
