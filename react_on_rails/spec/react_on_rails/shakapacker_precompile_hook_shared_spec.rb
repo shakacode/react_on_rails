@@ -8,13 +8,16 @@ RSpec.describe "Shakapacker precompile hook shared script" do
   end
 
   def with_env(overrides)
-    # Initialize before any ENV operation that could raise, so the ensure block can always iterate.
+    # Initialize outside the begin/ensure region so the cleanup always has a hash to iterate,
+    # even if an ENV operation in the protected body raises.
     original = {}
-    overrides.each_key { |key| original[key] = ENV.fetch(key, nil) }
-    overrides.each { |key, value| ENV[key] = value }
-    yield
-  ensure
-    original.each { |key, value| value.nil? ? ENV.delete(key) : ENV[key] = value }
+    begin
+      overrides.each_key { |key| original[key] = ENV.fetch(key, nil) }
+      overrides.each { |key, value| ENV[key] = value }
+      yield
+    ensure
+      original.each { |key, value| value.nil? ? ENV.delete(key) : ENV[key] = value }
+    end
   end
 
   it "exposes run_precompile_tasks for load-based callers" do
