@@ -3,6 +3,7 @@ import type {
   RegisteredComponent,
   RailsContext,
   RenderFunction,
+  RendererResult,
   RendererTeardown,
   RenderReturnType,
 } from './types/index.ts';
@@ -36,8 +37,12 @@ const renderedRoots = new Map<string, RenderedEntry>();
 function invokeRendererTeardown(teardown: RendererTeardown | undefined): void {
   if (!teardown) return;
   const maybePromise = teardown();
-  if (maybePromise && typeof maybePromise.catch === 'function') {
-    maybePromise.catch((error: unknown) => {
+  if (maybePromise && typeof maybePromise.then === 'function') {
+    // Detect a thenable with `.then` (Promises/A+) but swallow the rejection via
+    // `Promise.resolve(...).catch(...)`: a non-native thenable may lack `.catch`, so calling it
+    // directly could itself throw or leave the rejection unhandled. This keeps a failing async
+    // teardown from surfacing as an unhandled promise rejection.
+    Promise.resolve(maybePromise).catch((error: unknown) => {
       console.error('Error in renderer teardown:', error);
     });
   }
@@ -81,7 +86,7 @@ function domNodeIdForEl(el: Element): string {
   return el.getAttribute('data-dom-id') || '';
 }
 
-type DelegationResult = { delegated: false } | { delegated: true; result: unknown };
+type DelegationResult = { delegated: false } | { delegated: true; result: RendererResult };
 
 function delegateToRenderer(
   componentObj: RegisteredComponent,
@@ -102,9 +107,11 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
       );
     }
 
-    // Call the renderer function with the expected signature. It may return a teardown callback
-    // (or a promise resolving to one) so we can clean up its mount later.
-    const result = (component as RenderFunction)(props, railsContext, domNodeId);
+    // Call the renderer function with the expected signature. A renderer owns its own mount and
+    // returns a RendererResult: nothing, a teardown callback, or a promise resolving to one (the
+    // `RenderFunction` call signature unifies this with the server render-function shape, so narrow
+    // to RendererResult here where `isRenderer` is known true).
+    const result = (component as RenderFunction)(props, railsContext, domNodeId) as RendererResult;
     return { delegated: true, result };
   }
 
@@ -125,12 +132,12 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
  * unmount state, so it runs the teardown even when a navigation races the resolve; prefer Pro if you
  * depend on async renderer teardowns surviving fast navigations.
  */
-function trackRendererMount(domNodeId: string, domNode: Element, result: unknown): void {
+function trackRendererMount(domNodeId: string, domNode: Element, result: RendererResult): void {
   const entry: RenderedEntry = { kind: 'renderer', domNode, teardown: undefined };
   renderedRoots.set(domNodeId, entry);
 
   if (typeof result === 'function') {
-    entry.teardown = result as RendererTeardown;
+    entry.teardown = result;
   } else if (result && typeof (result as Promise<unknown>).then === 'function') {
     (result as Promise<unknown>)
       .then((resolved) => {
@@ -192,10 +199,12 @@ function renderElement(el: Element, railsContext: RailsContext): void {
         try {
           teardownEntry(existing);
         } catch (unmountError) {
-          // Ignore unmount errors for replaced nodes
-          if (trace) {
-            console.log(`Error unmounting replaced component: ${name}`, unmountError);
-          }
+          // Surface the failure unconditionally (matching unmountAllComponents) so a teardown/unmount
+          // error on node replacement is as visible as one on page unload, using the same greppable
+          // labels. We still continue: the old mount may leak, but the new node must be rendered.
+          const label =
+            existing.kind === 'renderer' ? 'Error in renderer teardown:' : 'Error unmounting component:';
+          console.error(label, unmountError);
         }
         renderedRoots.delete(domNodeId);
       }

@@ -49,8 +49,12 @@ const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 function invokeRendererTeardown(teardown: RendererTeardown | undefined): void {
   if (!teardown) return;
   const maybePromise = teardown();
-  if (maybePromise && typeof maybePromise.catch === 'function') {
-    maybePromise.catch((error: unknown) => {
+  if (maybePromise && typeof maybePromise.then === 'function') {
+    // Detect a thenable with `.then` (Promises/A+) but swallow the rejection via
+    // `Promise.resolve(...).catch(...)`: a non-native thenable may lack `.catch`, so calling it
+    // directly could itself throw or leave the rejection unhandled. This keeps a failing async
+    // teardown from surfacing as an unhandled promise rejection.
+    Promise.resolve(maybePromise).catch((error: unknown) => {
       console.error('Error in renderer teardown:', error);
     });
   }

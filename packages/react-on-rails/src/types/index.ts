@@ -150,9 +150,9 @@ type RenderFunctionResult = RenderFunctionSyncResult | RenderFunctionAsyncResult
 /**
  * Optional cleanup callback that a renderer function (the 3-argument form
  * `(props, railsContext, domNodeId) => …`) may return. React on Rails invokes it when the mount is
- * torn down — on Turbo/Turbolinks navigation (page unload) or when the same `domNodeId` node is
- * replaced — so renderer-managed React roots, event listeners, and subscriptions are released
- * instead of leaked. May be synchronous or asynchronous.
+ * torn down — on Turbo/Turbolinks navigation (page unload), and in the core client renderer also
+ * when the same `domNodeId` node is replaced — so renderer-managed React roots, event listeners,
+ * and subscriptions are released instead of leaked. May be synchronous or asynchronous.
  *
  * @see RenderFunction
  */
@@ -163,6 +163,11 @@ type RendererTeardown = () => void | Promise<void>;
  * async). Renderer functions own their DOM rendering/hydration, so unlike server-side
  * render-functions they do not return a component or HTML.
  */
+// `void` (not `undefined`) is required for the opt-out case: a renderer that returns nothing has
+// type `(...) => void`, and that stays assignable to `RenderFunction` only while `void` is part of
+// this union. Switching to `undefined` breaks backward compatibility for every existing
+// nothing-returning renderer. The no-invalid-void-type rule is disabled because this `void` is a
+// deliberate "may return nothing" marker in a return-position union, exactly the case it over-flags.
 // eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- renderer functions may return nothing
 type RendererResult = void | RendererTeardown | Promise<void | RendererTeardown>;
 

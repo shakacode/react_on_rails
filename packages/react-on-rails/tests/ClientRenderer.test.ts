@@ -266,6 +266,31 @@ describe('ClientRenderer', () => {
       expect(teardown).toHaveBeenCalledTimes(1);
     });
 
+    it('logs (and swallows) when an async teardown rejects on unmount', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const rejection = new Error('async teardown boom');
+      // The renderer returns a teardown synchronously; the teardown itself returns a rejecting
+      // promise. This exercises invokeRendererTeardown's rejection-swallowing path (the reason it
+      // wraps the call in Promise.resolve(...).catch) so the failure is logged, not left as an
+      // unhandled rejection.
+      const teardown = jest.fn(() => Promise.reject(rejection));
+      const TestRenderer: RenderFunction = (_props, _railsContext, _domNodeId) => teardown;
+      ComponentRegistry.register({ TestRenderer });
+      setupRendererDom('renderer-async-teardown-reject');
+
+      renderComponent('renderer-async-teardown-reject');
+
+      unmountAllComponents();
+      expect(teardown).toHaveBeenCalledTimes(1);
+
+      // Flush microtasks so the swallowing .catch runs.
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error in renderer teardown:', rejection);
+      consoleErrorSpy.mockRestore();
+    });
+
     it('continues running other teardowns when one teardown throws on unmount', () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       const throwingTeardown = jest.fn(() => {
@@ -515,6 +540,68 @@ describe('ClientRenderer', () => {
       // The mock SHOULD have been called again for the replaced node
       expect(mockHydrateOrRender.mock.calls.length).toBe(callCountAfterFirstRender + 1);
       expect(targetNode2.innerHTML).toContain('Rendered:');
+    });
+  });
+
+  describe('unmountAllComponents (React-root cleanup)', () => {
+    const setupRailsContext = () => {
+      const railsContextElement = document.createElement('div');
+      railsContextElement.id = 'js-react-on-rails-context';
+      railsContextElement.textContent = JSON.stringify({
+        railsEnv: 'test',
+        inMailer: false,
+        i18nLocale: 'en',
+        i18nDefaultLocale: 'en',
+        rorVersion: '13.0.0',
+        rorPro: false,
+        href: 'http://localhost:3000',
+        location: 'http://localhost:3000',
+        scheme: 'http',
+        host: 'localhost',
+        port: 3000,
+        pathname: '/',
+        search: null,
+        httpAcceptLanguage: 'en',
+        serverSide: false,
+        componentRegistryTimeout: 0,
+      });
+      document.body.appendChild(railsContextElement);
+    };
+
+    beforeEach(() => {
+      // Isolate from roots tracked by earlier tests.
+      unmountAllComponents();
+      setupRailsContext();
+    });
+
+    it('unmounts the framework-created React root on page unload', () => {
+      const TestComponent: React.FC<{ message: string }> = ({ message }) =>
+        React.createElement('div', null, `Hello, ${message}!`);
+      ComponentRegistry.register({ TestComponent });
+
+      const componentElement = document.createElement('div');
+      componentElement.className = 'js-react-on-rails-component';
+      componentElement.setAttribute('data-component-name', 'TestComponent');
+      componentElement.setAttribute('data-dom-id', 'root-unmount');
+      componentElement.textContent = JSON.stringify({ message: 'World' });
+      document.body.appendChild(componentElement);
+
+      const targetNode = document.createElement('div');
+      targetNode.id = 'root-unmount';
+      document.body.appendChild(targetNode);
+
+      // Drive the React 18+ Root API branch in teardownEntry: return a root object whose unmount we
+      // can assert on. The default mock returns undefined, so that branch is otherwise never
+      // exercised and a regression breaking root unmount on page unload would pass unnoticed.
+      const rootUnmount = jest.fn();
+      const mockHydrateOrRender = require('../src/reactHydrateOrRender.ts').default as jest.Mock;
+      mockHydrateOrRender.mockReturnValueOnce({ render: jest.fn(), unmount: rootUnmount });
+
+      renderComponent('root-unmount');
+      expect(rootUnmount).not.toHaveBeenCalled();
+
+      unmountAllComponents();
+      expect(rootUnmount).toHaveBeenCalledTimes(1);
     });
   });
 });
