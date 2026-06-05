@@ -279,6 +279,17 @@ def regression?(report)
   report&.regression? || false
 end
 
+# The names of the benchmarks Bencher raised an active alert for, deduped. Read from
+# the same alerts[] as #regression?, so it is exactly the set of rows the summary
+# table flags 🔴. Handed off to report-regressions so it can decide which benchmarks
+# regressed without re-parsing the rendered table. Empty when there is no report or no
+# alert carried a benchmark name.
+def regressed_benchmark_names(report)
+  return [] unless report
+
+  report.alerts.filter_map(&:benchmark).uniq
+end
+
 # A missing start-point baseline (operational, not a regression): retrying without
 # the start-point hash falls back to the latest baseline. The no-regression guard is
 # load-bearing — a real regression must not be silently re-run against a different
@@ -361,7 +372,8 @@ if __FILE__ == $PROGRAM_NAME
           JSON.generate(
             RegressionReport::SUITE_NAME => ENV.fetch("BENCHMARK_SUITE_GROUP", SUITE_NAME),
             RegressionReport::SHARD_LABEL => ENV.fetch("BENCHMARK_SHARD_LABEL", ""),
-            RegressionReport::SUMMARY => handoff_summary
+            RegressionReport::SUMMARY => handoff_summary,
+            RegressionReport::REGRESSED_BENCHMARKS => regressed_benchmark_names(report)
           )
         )
         Github.warning(

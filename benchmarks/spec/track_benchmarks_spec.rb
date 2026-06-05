@@ -45,6 +45,43 @@ RSpec.describe "track_benchmarks" do
     end
   end
 
+  describe "#regressed_benchmark_names" do
+    it "returns the deduped benchmark names from active alerts" do
+      report = BencherReport.parse(
+        JSON.generate(
+          "results" => [],
+          "alerts" => [
+            { "benchmark" => { "name" => "/posts_page: Pro" },
+              "threshold" => { "measure" => { "slug" => "rps" } }, "status" => "active" },
+            { "benchmark" => { "name" => "/posts_page: Pro" },
+              "threshold" => { "measure" => { "slug" => "p50-latency" } }, "status" => "active" },
+            { "benchmark" => { "name" => "/other: Pro" },
+              "threshold" => { "measure" => { "slug" => "rps" } }, "status" => "active" }
+          ]
+        )
+      )
+      expect(regressed_benchmark_names(report)).to contain_exactly("/posts_page: Pro", "/other: Pro")
+    end
+
+    it "is empty when there is no report" do
+      expect(regressed_benchmark_names(nil)).to eq([])
+    end
+
+    it "is empty when there are no active alerts" do
+      expect(regressed_benchmark_names(report_without_alert)).to eq([])
+    end
+
+    it "ignores non-active alerts (dismissed/silenced never count as regressions)" do
+      report = BencherReport.parse(
+        JSON.generate(
+          "results" => [],
+          "alerts" => [{ "benchmark" => { "name" => "/x: Pro" }, "status" => "dismissed" }]
+        )
+      )
+      expect(regressed_benchmark_names(report)).to eq([])
+    end
+  end
+
   describe "#retry_without_start_point_hash?" do
     it "is true when the start-point head version is missing and there is no regression" do
       expect(retry_without_start_point_hash?("Head Version abc123 not found", 1, report_without_alert)).to be(true)

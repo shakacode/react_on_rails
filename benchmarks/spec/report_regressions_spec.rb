@@ -243,14 +243,15 @@ RSpec.describe "benchmark regression reporting" do
       end
     end
 
-    def write_payload(dir, artifact:, suite:, shard_label: "1/1", summary: nil)
+    def write_payload(dir, artifact:, suite:, shard_label: "1/1", summary: nil, regressed: nil)
       artifact_dir = File.join(dir, artifact)
       FileUtils.mkdir_p(artifact_dir)
-      File.write(
-        File.join(artifact_dir, RegressionReport::FILENAME),
-        JSON.generate(suite_name: suite, shard_label: shard_label,
-                      summary: summary || "#{suite} #{shard_label} regressed")
-      )
+      payload = { suite_name: suite, shard_label: shard_label,
+                  summary: summary || "#{suite} #{shard_label} regressed" }
+      # Omit the key entirely when regressed is nil so the "older writer" fail-safe path
+      # (payload without REGRESSED_BENCHMARKS) stays covered by the existing examples.
+      payload[RegressionReport::REGRESSED_BENCHMARKS] = regressed unless regressed.nil?
+      File.write(File.join(artifact_dir, RegressionReport::FILENAME), JSON.generate(payload))
     end
 
     it "exits 0 and reports nothing when no payloads are present" do
@@ -293,6 +294,51 @@ RSpec.describe "benchmark regression reporting" do
         output, status = run_script(script, dir, gh_stub: failing_gh)
         expect(status).not_to be_success
         expect(output).to match(/Failed to file regression issue for Core/)
+      end
+    end
+
+    # The temporary /posts_page: Pro suppression (IGNORED_REGRESSION_BENCHMARKS). These
+    # examples (and the constant) should be deleted when that suppression is lifted.
+    it "suppresses the issue when every regressed benchmark is ignored" do
+      ignored = IGNORED_REGRESSION_BENCHMARKS.first
+      Dir.mktmpdir do |dir|
+        write_payload(dir, artifact: "regression-pro", suite: "Pro", regressed: [ignored])
+        output, status = run_script(script, dir, gh_stub: fake_gh)
+        expect(status).to be_success
+        expect(output).to match(/temporarily ignored/)
+        expect(output).not_to match(/Filing regression report/)
+      end
+    end
+
+    it "still files when a non-ignored benchmark also regressed alongside an ignored one" do
+      ignored = IGNORED_REGRESSION_BENCHMARKS.first
+      Dir.mktmpdir do |dir|
+        write_payload(dir, artifact: "regression-pro", suite: "Pro",
+                           regressed: [ignored, "/some_other_route: Pro"])
+        output, status = run_script(script, dir, gh_stub: fake_gh)
+        expect(status).to be_success
+        expect(output).to match(/Filing regression report for Pro/)
+      end
+    end
+
+    it "still files when another suite regressed even if this suite's regression is ignored" do
+      ignored = IGNORED_REGRESSION_BENCHMARKS.first
+      Dir.mktmpdir do |dir|
+        write_payload(dir, artifact: "regression-pro", suite: "Pro", regressed: [ignored])
+        write_payload(dir, artifact: "regression-core", suite: "Core", regressed: ["/hello: Core"])
+        output, status = run_script(script, dir, gh_stub: fake_gh)
+        expect(status).to be_success
+        expect(output).to match(/Filing regression report for Core/)
+        expect(output).to match(/Filing regression report for Pro/)
+      end
+    end
+
+    it "files normally when a payload omits the regressed-benchmarks list (fail-safe)" do
+      Dir.mktmpdir do |dir|
+        write_payload(dir, artifact: "regression-pro", suite: "Pro") # no regressed key
+        output, status = run_script(script, dir, gh_stub: fake_gh)
+        expect(status).to be_success
+        expect(output).to match(/Filing regression report for Pro/)
       end
     end
 
