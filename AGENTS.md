@@ -170,6 +170,8 @@ restores/saves the gem cache, and supports non-frozen installs via `frozen: 'fal
 
 **Commit messages**: Explain why, not what. One logical change per commit.
 
+**Squash merges**: When completing a GitHub squash merge, include the PR number in the squash commit title using the format `<PR title> (#<PR number>)`, for example `Docs: clarify rails new JavaScript skip flag (#3666)`. For CLI merges, pass `--subject "<PR title> (#<PR number>)"` to `gh pr merge --squash` and verify the title before confirming the merge.
+
 **PR creation**: Use `gh pr create` with a clear title, summary, and test plan.
 
 ## Review Workflow
