@@ -66,6 +66,28 @@ RSpec.describe "track_benchmarks" do
     end
   end
 
+  describe "#run_bencher" do
+    it "emits the perf-link context warning to stdout so GitHub Actions annotates it" do
+      status = instance_double(Process::Status, exitstatus: 0)
+      report_json = JSON.generate(
+        "results" => [[{
+          "benchmark" => { "name" => "/foo", "uuid" => "bench-uuid" },
+          "measures" => [{
+            "measure" => { "slug" => "rps", "name" => "rps", "uuid" => "rps-uuid" },
+            "metric" => { "value" => 1.0 }
+          }]
+        }]],
+        "alerts" => []
+      )
+
+      allow(Open3).to receive(:capture3).and_return([report_json, "", status])
+      allow(File).to receive(:write).with(REPORT_JSON, report_json)
+
+      expect { run_bencher("branch", []) }
+        .to output(/::warning::Bencher report listed benchmarks but no perf-link context/).to_stdout
+    end
+  end
+
   # On a main regression the rendered table feeds the report-regressions hand-off. If
   # the display sidecar was missing/corrupt the table is empty, and an empty-bodied
   # issue is useless — the hand-off must substitute a run-URL pointer instead.

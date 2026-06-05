@@ -29,7 +29,8 @@ RSpec.describe "BencherReport + BenchmarkTable integration" do
   # benchmarks/measures in document order, then report=) — exercises the real link seam.
   let(:perf_url) do
     "https://bencher.dev/perf/react-on-rails-t8a9ncxo?branches=branch-uuid&heads=head-uuid" \
-      "&testbeds=testbed-uuid&benchmarks=bench-uuid&measures=rps-uuid,p50-uuid,p90-uuid,failed-uuid&report=report-uuid"
+      "&testbeds=testbed-uuid&benchmarks=bench-uuid" \
+      "&measures=rps-uuid,p50-uuid,p90-uuid,failed-uuid&report=report-uuid"
   end
 
   it "classifies the fixture as a regression and exposes the active alert" do

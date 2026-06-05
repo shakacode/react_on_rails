@@ -96,7 +96,7 @@ class BenchmarkTable
   # when the measure crossed its boundary. No baseline (new benchmark / boundary-less p90)
   # or an exact match → just the value.
   def metric_cell(name, col, value)
-    text = render_value(value)
+    text = format_number(value).to_s
     baseline = @report.boundary(name, col[:measure])&.baseline
     # No baseline (new benchmark / boundary-less p90), a zero baseline (no meaningful
     # percent, and it would divide by zero), or an exact match → just the value.

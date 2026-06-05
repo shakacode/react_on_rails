@@ -74,6 +74,16 @@ RSpec.describe BenchmarkTable do
     expect(markdown).to include("100.0 ▲2.3% (97.76)")
   end
 
+  it "rounds displayed metric values to the same precision as baselines" do
+    report = fake_report(baselines: { ["/foo", "rps"] => 97.756 })
+    markdown = render(
+      rows: [row(name: "/foo", rps: 100.126, p50: 5.0, p90: 6.0, status: "200=100")],
+      report: report
+    )
+
+    expect(markdown).to include("100.13 ▲2.4% (97.76)")
+  end
+
   it "bolds + tags a regressed RPS cell and an improved p50 cell, replacing the arrow with the emoji" do
     report = fake_report(
       verdicts: { ["/foo", "rps"] => :regression, ["/foo", "p50_latency"] => :improvement },
@@ -144,14 +154,14 @@ RSpec.describe BenchmarkTable do
   end
 
   it "escapes brackets in a linked name so they can't prematurely close the link" do
-    report = fake_report(urls: { "a]b" => "https://bencher.dev/perf/p?benchmarks=BM" })
+    report = fake_report(urls: { "a[b]c" => "https://bencher.dev/perf/p?benchmarks=BM" })
     markdown = render(
-      rows: [row(name: "a]b", rps: 100.0, p50: 5.0, p90: 6.0, status: "200=100")],
+      rows: [row(name: "a[b]c", rps: 100.0, p50: 5.0, p90: 6.0, status: "200=100")],
       report: report
     )
 
-    # The "]" is backslash-escaped inside the link text, so the link wraps the whole name.
-    expect(markdown).to include('| [a\]b](https://bencher.dev/perf/p?benchmarks=BM) | 100.0 |')
+    # Brackets are backslash-escaped inside the link text, so the link wraps the whole name.
+    expect(markdown).to include('| [a\[b\]c](https://bencher.dev/perf/p?benchmarks=BM) | 100.0 |')
   end
 
   it "leaves the benchmark name unlinked when the report has no perf URL for it" do
