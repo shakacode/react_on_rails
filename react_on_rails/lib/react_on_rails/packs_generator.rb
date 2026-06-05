@@ -385,7 +385,7 @@ module ReactOnRails
 
       # Compute the component map once and reuse it: passing it to
       # server_component_names_for_registration avoids a second components_for_server_registration
-      # scan, and this method runs on the per-request dev staleness check.
+      # scan, and this method runs on the dev-server staleness check on each webpack compile.
       components ||= components_for_server_registration
       components.slice(*server_component_names_for_registration(components))
     end

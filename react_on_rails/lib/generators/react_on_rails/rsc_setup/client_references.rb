@@ -44,9 +44,10 @@ module ReactOnRails
             // The resolution cascade below is mirrored, branch for branch, by the Pro dummy's
             // hand-written rscManifestClientReferences.js and pinned on both sides by contract tests.
             const rscClientReferences = (() => {
-              // fs is required here, not at the top of the generated config: the path helper
-              // (resolve) and config are already in scope from the surrounding webpack config, so
-              // only fs is pulled in to keep this injected snippet self-contained.
+              // fs is required inside the IIFE rather than at the top of the file because the
+              // module-scope bindings 'resolve' (from 'path') and 'config' (from 'shakapacker') are
+              // already present — either pre-existing in the config or injected alongside this
+              // snippet by the generator — so only fs is pulled in here.
               const { existsSync, readFileSync, statSync } = require('fs');
               const configuredRefsJson = process.env.RSC_MANIFEST_CLIENT_REFERENCES_JSON;
               const defaultRefsJson = resolve('ssr-generated/rsc-client-references.json');
