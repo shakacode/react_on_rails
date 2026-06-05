@@ -2,7 +2,7 @@
 
 **Status:** Draft, pending user review
 **Date:** 2026-05-27
-**Companion to:** [rc-testing-plan-design.md](rc-testing-plan-design.md)
+**Companion to:** [rc-testing-plan.md](rc-testing-plan.md)
 
 ## Purpose
 
@@ -219,4 +219,4 @@ When a release-track run lands while a freshness PR is open:
 
 ## Lifecycle
 
-This file is a design spec. Once approved and the orchestrator lands, the canonical implementation lives in `rakelib/demo_fleet.rake` + `internal/contributor-info/demo-fleet.yml`. Delete this design doc in the implementing PR — same rule as `rc-testing-plan-design.md`.
+This file is a design spec. Once approved and the orchestrator lands, the canonical implementation lives in `rakelib/demo_fleet.rake` + `internal/contributor-info/demo-fleet.yml`. Delete this design doc in the implementing PR.

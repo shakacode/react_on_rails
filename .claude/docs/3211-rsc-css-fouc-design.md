@@ -2,6 +2,13 @@
 
 Status: approved 2026-06-03. Single PR (released package + renderer + tests).
 
+> **Update 2026-06-04:** The upstream manifest fix landed in
+> `react-on-rails-rsc@19.0.5-rc.6`, which records `.css` siblings (plus `.mjs`
+> chunk support and href normalization) natively. The local `pnpm patch`
+> described in **Part A** has been **removed** — the rollout now pins `rc.6` and
+> relies on the published plugin. The renderer-side design (Part B onward) is
+> unchanged and still in force.
+
 ## Problem
 
 When a true React Server Component renders a `'use client'` boundary, any CSS

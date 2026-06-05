@@ -19,6 +19,74 @@ afterAll(async () => {
 
 jest.spyOn(errorReporter, 'message').mockImplementation(jest.fn());
 
+const SHELL_HEADER_TEXT = 'Header for AsyncComponentsTreeForTesting';
+const SHELL_FOOTER_TEXT = 'Footer for AsyncComponentsTreeForTesting';
+const SHELL_HEADER = `<p>${SHELL_HEADER_TEXT}</p>`;
+const SHELL_FOOTER = `<p>${SHELL_FOOTER_TEXT}</p>`;
+
+const findShellChunkIndex = (chunks) => {
+  const shellChunkIndex = chunks.findIndex((chunk) => chunk.includes(SHELL_HEADER));
+  expect(shellChunkIndex).toBeGreaterThanOrEqual(0);
+  return shellChunkIndex;
+};
+
+const findShellChunk = (chunks) => chunks[findShellChunkIndex(chunks)];
+
+const isScriptTagBoundary = (char) =>
+  char === undefined ||
+  char === '>' ||
+  char === '/' ||
+  char === ' ' ||
+  char === '\n' ||
+  char === '\r' ||
+  char === '\t' ||
+  char === '\f';
+
+const findScriptCloseEnd = (html, lowerHtml, fromIndex) => {
+  let closeIndex = lowerHtml.indexOf('</script', fromIndex);
+  while (closeIndex !== -1) {
+    const boundaryIndex = closeIndex + '</script'.length;
+    if (isScriptTagBoundary(lowerHtml[boundaryIndex])) {
+      const tagEnd = lowerHtml.indexOf('>', boundaryIndex);
+      return tagEnd === -1 ? html.length : tagEnd + 1;
+    }
+    closeIndex = lowerHtml.indexOf('</script', closeIndex + 1);
+  }
+  return html.length;
+};
+
+// Returns `html` with the contents of every <script>...</script> element removed.
+// RSC Flight payloads serialize fallback text as script data, which would
+// otherwise trip the "not rendered as HTML" assertions below. This is a lossy,
+// best-effort scrub: on a malformed or unclosed <script> it over-strips (drops the
+// remainder), so it is only sound for one-directional `not.toContain` checks — it
+// can prove text is absent from rendered HTML, never that text is present.
+const htmlOutsideScripts = (html) => {
+  const lowerHtml = html.toLowerCase();
+  let cursor = 0;
+  let result = '';
+  let openIndex = lowerHtml.indexOf('<script');
+
+  while (openIndex !== -1) {
+    const boundaryIndex = openIndex + '<script'.length;
+    if (!isScriptTagBoundary(lowerHtml[boundaryIndex])) {
+      openIndex = lowerHtml.indexOf('<script', openIndex + 1);
+      continue;
+    }
+
+    const openTagEnd = lowerHtml.indexOf('>', boundaryIndex);
+    result += html.slice(cursor, openIndex);
+    if (openTagEnd === -1) {
+      return result;
+    }
+
+    cursor = findScriptCloseEnd(html, lowerHtml, openTagEnd + 1);
+    openIndex = lowerHtml.indexOf('<script', cursor);
+  }
+
+  return result + html.slice(cursor);
+};
+
 const makeRequest = async (options = {}) => {
   const startTime = Date.now();
   const form = createForm(options);
@@ -81,43 +149,35 @@ describe('html streaming', () => {
     expect(streamingTime).toBeGreaterThan(3 * timeToFirstByte);
   }, 10000);
 
-  it('should returns the component shell only in the first chunk', async () => {
+  it('should stream the component shell with suspense fallbacks', async () => {
     const { status, chunks } = await makeRequest();
     expect(status).toBe(200);
 
-    const firstChunk = chunks[0];
+    // React 19 can flush an initial Suspense marker before the shell HTML.
+    const shellChunk = findShellChunk(chunks);
 
-    expect(firstChunk).toContain('<p>Header for AsyncComponentsTreeForTesting</p>');
-    expect(firstChunk).toContain('<p>Footer for AsyncComponentsTreeForTesting</p>');
-    expect(firstChunk).toContain('Loading HelloWorldHooks...');
-    expect(firstChunk).toContain('Loading branch1...');
-    expect(firstChunk).toContain('Loading branch2...');
+    expect(shellChunk).toContain(SHELL_HEADER);
+    expect(shellChunk).toContain(SHELL_FOOTER);
+    expect(shellChunk).toContain('Loading HelloWorldHooks...');
+    expect(shellChunk).toContain('Loading branch1...');
+    expect(shellChunk).toContain('Loading branch2...');
   }, 10000);
 
   it('should stream chunks one by one', async () => {
     const { status, chunks } = await makeRequest();
     expect(status).toBe(200);
 
-    // Strip <script> tags from the chunk before checking for rendered HTML.
-    // RSC Flight payload <script> tags contain the serialized React tree which
-    // includes fallback text as data (e.g., "Loading branch1..." inside a JSON
-    // string). We only want to assert that the fallback is not rendered as HTML.
-    // Note: the `i` flag and per-tag matching keep CodeQL's bad-tag-filter and
-    // incomplete-multi-character-sanitization rules happy; this is test-only
-    // string scrubbing for assertions, not security sanitization.
-    // lgtm[js/incomplete-multi-character-sanitization]
-    // lgtm[js/bad-tag-filter]
-    let secondChunkHtml = chunks[1];
-    let prev;
-    do {
-      prev = secondChunkHtml;
-      secondChunkHtml = secondChunkHtml.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, '');
-    } while (prev !== secondChunkHtml);
-    expect(secondChunkHtml).not.toContain('<p>Header for AsyncComponentsTreeForTesting</p>');
-    expect(secondChunkHtml).not.toContain('<p>Footer for AsyncComponentsTreeForTesting</p>');
-    expect(secondChunkHtml).not.toContain('Loading branch1...');
-    expect(secondChunkHtml).not.toContain('Loading branch2...');
-    expect(secondChunkHtml).not.toContain('branch1 (level 0)');
+    // RSC Flight payload scripts can include fallback text as serialized data.
+    // This assertion only checks text rendered outside script elements.
+    const shellChunkIndex = findShellChunkIndex(chunks);
+    expect(chunks.length).toBeGreaterThan(shellChunkIndex + 1);
+
+    const nextChunkHtml = htmlOutsideScripts(chunks[shellChunkIndex + 1]);
+    expect(nextChunkHtml).not.toContain(SHELL_HEADER_TEXT);
+    expect(nextChunkHtml).not.toContain(SHELL_FOOTER_TEXT);
+    expect(nextChunkHtml).not.toContain('Loading branch1...');
+    expect(nextChunkHtml).not.toContain('Loading branch2...');
+    expect(nextChunkHtml).not.toContain('branch1 (level 0)');
   }, 10000);
 
   it('should contains all components', async () => {
@@ -186,7 +246,7 @@ describe('html streaming', () => {
       expect(chunks.length).toBeGreaterThan(5);
       expect(status).toBe(200);
 
-      expect(chunks[0]).toContain('<p>Header for AsyncComponentsTreeForTesting</p>');
+      expect(findShellChunk(chunks)).toContain(SHELL_HEADER);
       expect(fullBody).toContain('branch1 (level 4)');
       expect(fullBody).toContain('branch1 (level 3)');
       expect(fullBody).toContain('branch1 (level 2)');
@@ -195,16 +255,16 @@ describe('html streaming', () => {
       expect(fullBody).toContain('branch2 (level 1)');
       expect(fullBody).toContain('branch2 (level 0)');
 
-      expect(jsonChunks[0].isShellReady).toBeTruthy();
-      expect(jsonChunks[0].hasErrors).toBeTruthy();
-      expect(jsonChunks[0].renderingError).toMatchObject({
+      const chunksWithError = jsonChunks.filter((chunk) => chunk.hasErrors);
+      expect(chunksWithError).toHaveLength(1);
+      expect(chunksWithError[0].isShellReady).toBeTruthy();
+      expect(chunksWithError[0].renderingError).toMatchObject({
         message: 'Async error from AsyncHelloWorldHooks',
         stack: expect.stringMatching(
           /Error: Async error from AsyncHelloWorldHooks\s*at AsyncHelloWorldHooks/,
         ),
       });
-      expect(jsonChunks.slice(1).some((chunk) => chunk.hasErrors)).toBeFalsy();
-      expect(jsonChunks.slice(1).some((chunk) => chunk.renderingError)).toBeFalsy();
+      expect(jsonChunks.filter((chunk) => chunk.renderingError)).toHaveLength(1);
     },
     10000,
   );

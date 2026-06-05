@@ -23,12 +23,15 @@ Before running the generator, verify your environment:
 If React is below 19.0.4, upgrade it first:
 
 ```bash
-pnpm add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@~19.0.4
-# or: yarn add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@~19.0.4
-# or: npm install react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@~19.0.4
+pnpm add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5-rc.6
+# or: yarn add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5-rc.6
+# or: npm install react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5-rc.6
 ```
 
 > **React 19.0.4+** is recommended. Earlier 19.0.x versions (19.0.0--19.0.3) have known security vulnerabilities — see the [v16.2.0 release notes](../../oss/upgrading/release-notes/16.2.0.md) for details.
+
+> [!NOTE]
+> `react-on-rails-rsc@19.0.5-rc.6` is an exact release-candidate pin. Keep that exact pin until a stable `react-on-rails-rsc@19.0.5` release is available.
 
 ## Pre-Migration: Audit Components for Client API Usage
 

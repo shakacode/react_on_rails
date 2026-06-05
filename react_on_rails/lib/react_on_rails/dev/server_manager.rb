@@ -13,6 +13,7 @@ require "time"
 require "uri"
 require "yaml"
 require_relative "../packer_utils"
+require_relative "../shakapacker_config_helpers"
 require_relative "../system_checker"
 require_relative "database_checker"
 require_relative "server_mode"
@@ -21,6 +22,10 @@ require_relative "service_checker"
 module ReactOnRails
   module Dev
     class ServerManager
+      # Commands live on `class << self`, so extend (rather than include) the
+      # shared shakapacker-config helpers to expose them as singleton methods.
+      extend ReactOnRails::ShakapackerConfigHelpers
+
       HELP_FLAGS = ["-h", "--help"].freeze
       TEST_WATCH_MODES = %w[auto full client-only].freeze
       OPEN_BROWSER_WAIT_TIMEOUT = 60
@@ -472,53 +477,6 @@ module ReactOnRails
           development_private == test_private
         end
 
-        def parsed_shakapacker_config
-          config_path = shakapacker_config_path
-          return nil unless File.exist?(config_path)
-
-          YAML.safe_load(ERB.new(File.read(config_path)).result, aliases: true, permitted_classes: [Symbol])
-        rescue StandardError, ScriptError
-          nil
-        end
-
-        def configured_assets_bundler
-          config = parsed_shakapacker_config
-          return nil unless config.is_a?(Hash)
-
-          rails_env = ENV["RAILS_ENV"] || ENV["RACK_ENV"] || "development"
-          bundler_from_shakapacker_section(config, rails_env) || bundler_from_shakapacker_section(config, "default")
-        rescue StandardError, ScriptError
-          nil
-        end
-
-        def active_assets_bundler
-          configured_assets_bundler || "webpack"
-        end
-
-        def assets_bundler_label
-          active_assets_bundler.capitalize
-        end
-
-        def dev_server_label
-          active_assets_bundler == "webpack" ? "webpack-dev-server" : "#{assets_bundler_label} dev server"
-        end
-
-        def development_reload_mode_label
-          development_hmr_enabled? ? "HMR" : "Live reload"
-        end
-
-        def development_reload_feature_label
-          development_hmr_enabled? ? "Hot Module Replacement (HMR)" : "Live reload"
-        end
-
-        def development_mode_title
-          development_hmr_enabled? ? "HMR Development mode (default)" : "Live reload development mode (default)"
-        end
-
-        def hmr_procfile_description
-          "#{development_reload_mode_label} development with #{dev_server_label}"
-        end
-
         def default_procfile_description(default_mode)
           bundler_aware_dev_server_text(ServerMode.text(default_mode, :procfile_description))
         end
@@ -570,74 +528,6 @@ module ReactOnRails
           else
             "#{assets_bundler_label} compilation failed"
           end
-        end
-
-        def bundler_from_shakapacker_section(config, section_name)
-          section = config[section_name] || config[section_name.to_sym]
-          return nil unless section.is_a?(Hash)
-
-          normalize_assets_bundler(section["assets_bundler"] || section[:assets_bundler])
-        end
-
-        def normalize_assets_bundler(value)
-          normalized = value.to_s.strip.downcase
-          ReactOnRails::SystemChecker::SUPPORTED_ASSETS_BUNDLERS.include?(normalized) ? normalized : nil
-        end
-
-        def development_hmr_enabled?
-          dev_server = development_dev_server_config
-          return hmr_config_value?(dev_server["hmr"]) if dev_server.key?("hmr")
-
-          return false if truthy_config_value?(dev_server["live_reload"])
-
-          # Default to HMR when neither hmr nor live_reload is configured, preserving historical behavior.
-          true
-        end
-
-        def hmr_config_value?(value)
-          value.to_s.strip.casecmp?("only") || truthy_config_value?(value)
-        end
-
-        def development_dev_server_config
-          config = parsed_shakapacker_config
-          return {} unless config.is_a?(Hash)
-
-          development_config = shakapacker_section(config, "default").merge(shakapacker_section(config, "development"))
-          dev_server_config_for(development_config)
-        end
-
-        def shakapacker_section(config, section_name)
-          section = config[section_name] || config[section_name.to_sym]
-          section.is_a?(Hash) ? section : {}
-        end
-
-        def dev_server_config_for(section)
-          dev_server = section["dev_server"] || section[:dev_server]
-          return {} unless dev_server.is_a?(Hash)
-
-          dev_server.transform_keys(&:to_s)
-        end
-
-        def truthy_config_value?(value)
-          value == true || value.to_s == "true"
-        end
-
-        # Resolves SHAKAPACKER_CONFIG the same way ReactOnRails::Engine does, so this CLI
-        # sees the same config file as Rails boot even when invoked from a directory other
-        # than the Rails root. Falls back to Dir.pwd when Rails isn't loaded (bin/dev does
-        # not require Rails directly).
-        def shakapacker_config_path
-          env_config_path = ENV.fetch("SHAKAPACKER_CONFIG", nil)
-          base = shakapacker_config_base_dir
-          return File.expand_path("config/shakapacker.yml", base) if env_config_path.to_s.empty?
-
-          File.expand_path(env_config_path, base)
-        end
-
-        def shakapacker_config_base_dir
-          return Rails.root.to_s if defined?(Rails) && Rails.respond_to?(:root) && Rails.root
-
-          Dir.pwd
         end
 
         # rubocop:disable Metrics/AbcSize
@@ -893,13 +783,18 @@ module ReactOnRails
         def help_react_refresh_troubleshooting(default_mode)
           return help_hmr_react_refresh_troubleshooting if default_mode == :hmr
 
-          <<~REFRESH
+          troubleshooting = <<~REFRESH
             #{Rainbow('⚛️  React Refresh:').yellow.bold}
             #{Rainbow('React Refresh requires HMR; current default mode is not HMR.').white}
             #{Rainbow('•').yellow} #{Rainbow(ServerMode.text(default_mode, :refresh_guidance)).white}
             #{Rainbow('•').yellow} #{Rainbow(ServerMode.text(default_mode, :refresh_note)).white}
-            #{rspack_react_refresh_config_hint}
           REFRESH
+
+          # Append the rspack/other-bundler config-hint bullet only when present so it
+          # lines up with the bullets above; webpack returns "" and we skip it rather
+          # than emitting a trailing blank line.
+          hint = rspack_react_refresh_config_hint
+          hint.empty? ? troubleshooting : "#{troubleshooting}#{hint}\n"
         end
 
         def rspack_react_refresh_config_hint
@@ -913,6 +808,10 @@ module ReactOnRails
         def help_hmr_react_refresh_troubleshooting
           plugin_check = "Check that both babel plugin and #{react_refresh_bundler_plugin_description} are configured:"
 
+          # The babel `react-refresh/babel` plugin is gated on WEBPACK_SERVE in the
+          # generated babel.config.js for both webpack and rspack apps, so that
+          # qualifier intentionally stays bundler-agnostic. Only the bundler plugin
+          # line below (react_refresh_bundler_config_hint) is bundler-specific.
           <<~REFRESH
             #{Rainbow('⚛️  React Refresh Issues:').yellow.bold}
             #{Rainbow('If you see "$RefreshSig$ is not defined" errors:').white}

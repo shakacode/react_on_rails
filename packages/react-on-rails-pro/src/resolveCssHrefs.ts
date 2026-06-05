@@ -15,8 +15,8 @@
 /**
  * Structural view of the RSC client manifest, narrowed to the fields needed to
  * resolve stylesheet hrefs. The `css` array on each module entry is published by
- * `react-on-rails-rsc` 19.0.5-rc.6+ through its patched
- * `react-server-dom-webpack-plugin`; it is absent on older manifests, which
+ * `react-server-dom-webpack-plugin` as of `react-on-rails-rsc@19.0.5-rc.6`; it is
+ * absent on manifests produced by builds that predate that fix, which
  * `resolveCssHrefs` treats as "no CSS".
  */
 type RscCssModuleEntry = {
@@ -34,9 +34,14 @@ export type RscCssManifest = {
 const joinPrefix = (prefix: string, file: string): string => {
   if (!prefix) return file;
   const base = prefix.endsWith('/') ? prefix.slice(0, -1) : prefix;
-  // Webpack manifest CSS paths are root-relative, so an href that already starts with
-  // the full public path has already been prefixed.
-  if (base.startsWith('/') && (file === base || file.startsWith(`${base}/`))) {
+  // Manifest CSS paths are usually root-relative, but callers may pass already
+  // prefixed or absolute hrefs; avoid double-prefixing either shape.
+  if (
+    file === base ||
+    file.startsWith(`${base}/`) ||
+    /^[a-z][a-z\d+\-.]*:\/\//i.test(file) ||
+    file.startsWith('//')
+  ) {
     return file;
   }
   const rel = file.startsWith('/') ? file.slice(1) : file;
@@ -50,8 +55,10 @@ const joinPrefix = (prefix: string, file: string): string => {
  * manifest, not the client references encountered by a specific RSC payload.
  *
  * Each href is prefixed with `moduleLoading.prefix` (so CDN / non-default
- * `publicPath` deployments get fully-qualified hrefs), deduped, and returned in
- * manifest/chunk order.
+ * `publicPath` deployments get fully-qualified hrefs) unless it is already
+ * absolute (`scheme://` or protocol-relative `//`) or already begins with that
+ * prefix, in which case it is returned unchanged to avoid double-prefixing.
+ * Hrefs are deduped and returned in manifest/chunk order.
  */
 export default function resolveCssHrefs(manifest: RscCssManifest): string[] {
   const prefix = manifest.moduleLoading?.prefix ?? '';
