@@ -358,7 +358,9 @@ module ReactOnRails
             %r{(?<target>https?://[^\s,"')]+)}
           ].each do |regex|
             match = message.match(regex)
-            return match[:target].delete('"') if match
+            # Trim trailing prose punctuation (e.g. a sentence-final "." or ":") that the
+            # broad capture classes can otherwise absorb.
+            return match[:target].delete('"').sub(/[.;:]+\z/, "") if match
           end
           nil
         end
@@ -378,7 +380,9 @@ module ReactOnRails
           uri.user = nil
           uri.to_s
         rescue URI::InvalidURIError
-          url
+          # Best-effort strip of the common user:pass@ form so a URL that URI rejects as
+          # malformed still doesn't leak a password into the message or logs.
+          url.to_s.gsub(%r{//[^/@]*@}, "//")
         end
 
         def file_url_to_string(url)

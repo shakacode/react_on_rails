@@ -153,6 +153,18 @@ module ReactOnRails
           end
         end
 
+        context "when the error uses the Net::HTTP 'Failed to open TCP connection' format" do
+          let(:error) do
+            StandardError.new("Failed to open TCP connection to 127.0.0.1:3800 (Connection refused)")
+          end
+
+          it "is classified as a connection failure and names the host/port" do
+            message = render_error_for(error).message
+            expect(message).to include("could not connect to the Node renderer at 127.0.0.1:3800")
+            expect(message).not_to include("Check your webpack configuration")
+          end
+        end
+
         context "when REACT_RENDERER_URL is set but the error carries no host/port" do
           let(:error) { Errno::ECONNREFUSED.new }
 
