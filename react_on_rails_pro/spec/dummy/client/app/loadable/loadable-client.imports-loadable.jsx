@@ -13,7 +13,9 @@ const App = (props, railsContext, domNodeId) =>
   // navigation or same-id node replacement instead of leaking it. The callback form would discard it.
   loadableReady().then(() => {
     const el = document.getElementById(domNodeId);
-    if (!el) return undefined; // Navigation may remove the node before chunks resolve.
+    // Navigation may remove the node before chunks resolve; no root was mounted,
+    // so React on Rails treats undefined as no teardown.
+    if (!el) return undefined;
 
     const reactElement = wrapElementInStrictMode(
       <HelmetProvider>

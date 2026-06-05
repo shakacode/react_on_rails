@@ -16,7 +16,6 @@ export default (_props: unknown, _railsContext: RailsContext, domNodeId: string)
     throw new Error(`Missing DOM element with id: ${domNodeId}`);
   }
 
-  console.log('window.__SSR_COMPUTATION_CACHE', window.__SSR_COMPUTATION_CACHE);
   const ssrComputationCache = window.__SSR_COMPUTATION_CACHE;
   setSSRCache(ssrComputationCache);
   const App = wrapElementInStrictMode(<ApolloGraphQL />);
