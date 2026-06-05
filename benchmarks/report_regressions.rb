@@ -316,15 +316,20 @@ rescue StandardError => e
   nil
 end
 
-# True only when every payload reports its regressed benchmarks AND all of them are in
-# IGNORED_REGRESSION_BENCHMARKS. Fails safe toward filing: a payload missing the list
-# (older writer / hand-off that couldn't name them), an empty list, or any non-ignored
-# benchmark returns false, so a real regression is never silently dropped.
-def only_ignored_benchmarks_regressed?(payloads)
-  per_payload = payloads.map { |payload| payload[RegressionReport::REGRESSED_BENCHMARKS] }
-  return false unless per_payload.all? { |names| names.is_a?(Array) && !names.empty? }
+# Returns the regressed benchmarks to suppress only when every payload reports its
+# regressed benchmarks AND all of them are in IGNORED_REGRESSION_BENCHMARKS. Fails
+# safe toward filing: no payloads, a payload missing the list (older writer / hand-off
+# that couldn't name them), an empty list, or any non-ignored benchmark returns nil.
+def suppressed_regressed_benchmarks(payloads)
+  return nil if payloads.empty?
 
-  per_payload.flatten.uniq.all? { |name| IGNORED_REGRESSION_BENCHMARKS.include?(name) }
+  per_payload = payloads.map { |payload| payload[RegressionReport::REGRESSED_BENCHMARKS] }
+  return nil unless per_payload.all? { |names| names.is_a?(Array) && !names.empty? }
+
+  regressed_benchmarks = per_payload.flatten.uniq
+  return nil unless regressed_benchmarks.all? { |name| IGNORED_REGRESSION_BENCHMARKS.include?(name) }
+
+  regressed_benchmarks
 end
 
 def report_regressions(artifacts_dir)
@@ -342,12 +347,13 @@ def report_regressions(artifacts_dir)
   # payloads being readable: an unreadable payload is an unknown regression that could
   # be anything, so fall through and let the normal flow file (and then fail) rather
   # than suppress it.
-  if readable.size == payloads.size && only_ignored_benchmarks_regressed?(readable)
+  suppressed_benchmarks = suppressed_regressed_benchmarks(readable) if readable.size == payloads.size
+  if suppressed_benchmarks
     # Surface as a run-summary notice (not a plain log line) so it is visible that the
     # suppression is active and still needs removing once the baseline recovers.
     Github.notice(
       "Benchmark regression issue suppressed: the only regressed benchmark(s) are " \
-      "temporarily ignored (#{IGNORED_REGRESSION_BENCHMARKS.join(', ')}). Remove " \
+      "temporarily ignored (#{suppressed_benchmarks.join(', ')}). Remove " \
       "IGNORED_REGRESSION_BENCHMARKS in report_regressions.rb once their Bencher baseline recovers."
     )
     return true

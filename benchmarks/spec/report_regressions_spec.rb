@@ -310,6 +310,23 @@ RSpec.describe "benchmark regression reporting" do
       end
     end
 
+    it "reports only the ignored benchmarks that actually regressed in the suppression notice" do
+      ignored = IGNORED_REGRESSION_BENCHMARKS.first
+      unused_ignored = "/unused_route: Pro"
+      stub_const("IGNORED_REGRESSION_BENCHMARKS", [ignored, unused_ignored].freeze)
+
+      Dir.mktmpdir do |dir|
+        write_payload(dir, artifact: "regression-pro", suite: "Pro", regressed: [ignored])
+        expect do
+          expect(report_regressions(dir)).to be(true)
+        end.to output(
+          satisfy do |text|
+            text.include?("temporarily ignored (#{ignored})") && !text.include?(unused_ignored)
+          end
+        ).to_stdout
+      end
+    end
+
     it "still files when a non-ignored benchmark also regressed alongside an ignored one" do
       ignored = IGNORED_REGRESSION_BENCHMARKS.first
       Dir.mktmpdir do |dir|
