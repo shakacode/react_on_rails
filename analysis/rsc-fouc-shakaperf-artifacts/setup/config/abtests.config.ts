@@ -13,9 +13,48 @@ const { control: CONTROL_PORT, experiment: EXPERIMENT_PORT } = assignPortsAutoma
   experiment: 3030,
 });
 
-const PARALLELISM = Math.max(1, Math.floor(os.cpus().length / 2));
+const parseArtifactParallelism = (value: string | undefined) => {
+  const trimmedValue = value?.trim();
+  if (!trimmedValue) {
+    return undefined;
+  }
 
-export default defineConfig({
+  const parsedValue = Number(trimmedValue);
+  if (!Number.isFinite(parsedValue)) {
+    console.warn(
+      `[shakaperf] SHAKAPERF_ARTIFACT_PARALLELISM="${value}" is not a finite number; falling back to auto-detected default.`,
+    );
+    return undefined;
+  }
+
+  const parallelism = Math.floor(parsedValue);
+  if (parallelism <= 0) {
+    console.warn(
+      `[shakaperf] SHAKAPERF_ARTIFACT_PARALLELISM="${value}" floors to ${parallelism} (must be >= 1 after flooring); falling back to auto-detected default.`,
+    );
+    return undefined;
+  }
+
+  // Fractional inputs >= 1 are accepted and intentionally floored
+  // (for example, "1.7" runs one worker).
+  return parallelism;
+};
+
+const CONFIGURED_PARALLELISM = parseArtifactParallelism(process.env.SHAKAPERF_ARTIFACT_PARALLELISM);
+const DEFAULT_PARALLELISM = Math.max(1, Math.floor(os.availableParallelism() / 2));
+const PARALLELISM = CONFIGURED_PARALLELISM ?? DEFAULT_PARALLELISM;
+const NO_SANDBOX_RAW = process.env.SHAKAPERF_CHROMIUM_NO_SANDBOX;
+const NO_SANDBOX_VALUE = NO_SANDBOX_RAW?.trim();
+// Match parseArtifactParallelism: empty or whitespace-only is treated as unset,
+// so no warning is emitted and `--no-sandbox` is not added.
+if (NO_SANDBOX_VALUE && NO_SANDBOX_VALUE !== 'true') {
+  console.warn(
+    `[shakaperf] SHAKAPERF_CHROMIUM_NO_SANDBOX="${NO_SANDBOX_RAW}" is not "true" after trimming; --no-sandbox will NOT be added. Values like "1", "yes", or "TRUE" are ignored.`,
+  );
+}
+const CHROMIUM_ARGS = NO_SANDBOX_VALUE === 'true' ? ['--no-sandbox'] : [];
+
+export const rscFoucShakaPerfConfig = {
   shared: {
     controlURL: `http://localhost:${CONTROL_PORT}`,
     experimentURL: `http://localhost:${EXPERIMENT_PORT}`,
@@ -30,8 +69,9 @@ export default defineConfig({
     comparePixelmatchThreshold: 0.1,
     engineOptions: {
       browser: 'chromium',
-      // Required inside Docker's non-root Chromium runtime; local runs may omit it.
-      args: ['--no-sandbox'],
+      // Set SHAKAPERF_CHROMIUM_NO_SANDBOX=true only when the ShakaPerf
+      // browser runner itself is inside Docker and Chromium cannot sandbox.
+      args: CHROMIUM_ARGS,
     },
   },
 
@@ -84,4 +124,6 @@ export default defineConfig({
     // resort for what can't be baked into an image — chiefly starting an
     // embedded service daemon — and run in both containers at start.
   },
-});
+} satisfies Parameters<typeof defineConfig>[0];
+
+export default defineConfig(rscFoucShakaPerfConfig);
