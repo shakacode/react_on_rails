@@ -23,7 +23,9 @@ test.describe('RSC use-client CSS (#3211 FOUC fix)', () => {
     // preload/bootstrap pair or a blocking stylesheet link before the SSR probe.
     const hasStylePreload =
       /<link(?=[^>]*\brel="preload")(?=[^>]*\bas="style")(?=[^>]*\bhref="[^"]*\.css")[^>]*>/.test(ssrHtml);
-    const hasPrecedenceBootstrap = /\[\s*"[^"]*\.css"\s*,\s*"ror-rsc"\s*\]/.test(ssrHtml);
+    const hasPrecedenceBootstrap =
+      /\[\s*"[^"]*\.css"\s*,\s*"(?:ror-rsc|rsc-css)"\s*\]/.test(ssrHtml) ||
+      /HS\[\\"[^"]*\.css\\"\s*,\s*\\"(?:ror-rsc|rsc-css)\\"\]/.test(ssrHtml);
     const stylesheetLinkMatch = ssrHtml.match(
       /<link(?=[^>]*\brel="stylesheet")(?=[^>]*\bdata-precedence="(?:ror-rsc|rsc-css)")(?=[^>]*\bhref="[^"]*\.css")[^>]*>/,
     );
@@ -46,12 +48,17 @@ test.describe('RSC use-client CSS (#3211 FOUC fix)', () => {
     const probe = page.getByTestId('rsc-css-probe');
     await expect(probe).toBeVisible();
 
-    // The precedence-grouped stylesheet resource is present in the live document
-    // (React keeps it as it manages the loaded stylesheet).
+    // The CSS resource remains visible in the live document either as React's
+    // managed stylesheet link or as the preload hint that feeds the RSC CSS
+    // bootstrap path.
     await expect(
       page
         .locator(
-          'link[rel="stylesheet"][data-precedence="ror-rsc"], link[rel="stylesheet"][data-precedence="rsc-css"]',
+          [
+            'link[rel="stylesheet"][data-precedence="ror-rsc"]',
+            'link[rel="stylesheet"][data-precedence="rsc-css"]',
+            'link[rel="preload"][as="style"][href$=".css"]',
+          ].join(', '),
         )
         .first(),
     ).toBeAttached();

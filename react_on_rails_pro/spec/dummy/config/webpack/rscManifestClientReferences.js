@@ -13,8 +13,8 @@ const { config } = require('shakapacker');
 //   - default manifest:   ssr-generated/rsc-client-references.json (resolved against the Rails root)
 //   - manifest shape:     { refs: [...] }, else throw "... to contain a refs array"
 //   - parse errors:       malformed JSON re-thrown as "Failed to parse RSC client references manifest ..."
-//   - fallback ordering:  configured JSON -> default JSON -> (discovery/bundle-only build -> broad
-//     fallback) -> (registration entry present with old discovery tooling -> warn and broad
+//   - fallback ordering:  configured JSON -> (discovery/bundle-only build -> broad fallback) ->
+//     default JSON -> (registration entry present with old discovery tooling -> warn and broad
 //     fallback) -> (registration entry present with current tooling -> throw the precompile-hook
 //     hint) -> broad fallback
 //   - staleness warning:  selected manifest older than the registration entry -> console.warn (non-fatal)
@@ -118,13 +118,13 @@ function rscManifestClientReferences() {
     return readManifestReferences(resolvedRefsJson);
   }
 
+  if (process.env.RSC_REFERENCE_DISCOVERY_BUILD === 'true' || process.env.RSC_BUNDLE_ONLY === 'true') {
+    return DEFAULT_CLIENT_REFERENCES;
+  }
+
   if (fs.existsSync(DEFAULT_REFERENCES_JSON)) {
     warnIfManifestStale(DEFAULT_REFERENCES_JSON);
     return readManifestReferences(DEFAULT_REFERENCES_JSON);
-  }
-
-  if (process.env.RSC_REFERENCE_DISCOVERY_BUILD === 'true' || process.env.RSC_BUNDLE_ONLY === 'true') {
-    return DEFAULT_CLIENT_REFERENCES;
   }
 
   if (fs.existsSync(SERVER_COMPONENT_REGISTRATION_ENTRY)) {

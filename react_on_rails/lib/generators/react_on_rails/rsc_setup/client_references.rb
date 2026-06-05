@@ -121,13 +121,13 @@ module ReactOnRails
                 return readManifestReferences(resolvedRefsJson);
               }
 
+              if (process.env.RSC_REFERENCE_DISCOVERY_BUILD === 'true' || process.env.RSC_BUNDLE_ONLY === 'true') {
+                return [fallbackRscClientReferences];
+              }
+
               if (existsSync(defaultRefsJson)) {
                 warnIfManifestStale(defaultRefsJson);
                 return readManifestReferences(defaultRefsJson);
-              }
-
-              if (process.env.RSC_REFERENCE_DISCOVERY_BUILD === 'true' || process.env.RSC_BUNDLE_ONLY === 'true') {
-                return [fallbackRscClientReferences];
               }
 
               if (existsSync(serverComponentRegistrationEntry)) {

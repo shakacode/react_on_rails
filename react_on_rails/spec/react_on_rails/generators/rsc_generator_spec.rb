@@ -2934,6 +2934,14 @@ describe RscGenerator, type: :generator do
         expect(content).to include("Failed to parse RSC client references manifest")
         # Configured overrides also get the best-effort staleness warning (mirror parity).
         expect(content).to include("warnIfManifestStale(resolvedRefsJson)")
+        configured_refs_index = content.index("if (configuredRefsJson)")
+        discovery_build_index = content.index("if (process.env.RSC_REFERENCE_DISCOVERY_BUILD")
+        default_refs_index = content.index("if (existsSync(defaultRefsJson))")
+        expect(configured_refs_index).not_to be_nil
+        expect(discovery_build_index).not_to be_nil
+        expect(default_refs_index).not_to be_nil
+        expect(configured_refs_index).to be < discovery_build_index
+        expect(discovery_build_index).to be < default_refs_index
         # Best-effort staleness warning: manifest older than the registration entry -> console.warn.
         expect(content).to include("statSync")
         expect(content).to include("catch {")

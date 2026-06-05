@@ -53,6 +53,16 @@ describe('rscManifestClientReferences (Pro dummy) mirrors the generator resoluti
     expect(fs.readFileSync).toHaveBeenCalledWith(path.resolve('tmp/custom-refs.json'), 'utf8');
   });
 
+  it('honors the configured override during a discovery build', () => {
+    process.env.RSC_MANIFEST_CLIENT_REFERENCES_JSON = 'tmp/custom-refs.json';
+    process.env.RSC_REFERENCE_DISCOVERY_BUILD = 'true';
+    fs.existsSync.mockReturnValue(true);
+    fs.readFileSync.mockReturnValue(JSON.stringify({ refs: ['client/app/A.jsx'] }));
+
+    expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx']);
+    expect(fs.readFileSync).toHaveBeenCalledWith(path.resolve('tmp/custom-refs.json'), 'utf8');
+  });
+
   it('prefers the default discovered manifest when it exists', () => {
     fs.existsSync.mockImplementation((p) => p === DEFAULT_MANIFEST);
     fs.readFileSync.mockReturnValue(JSON.stringify({ refs: ['client/app/B.jsx', 'client/app/C.jsx'] }));
@@ -87,6 +97,17 @@ describe('rscManifestClientReferences (Pro dummy) mirrors the generator resoluti
     expect(refs[0].include.source).toBe('\\.(js|mjs|cjs|ts|mts|cts|jsx|tsx)$');
     expect(refs[0].include.test('Foo.mjs')).toBe(true);
     expect(refs[0].include.test('Foo.cts')).toBe(true);
+  });
+
+  it('bypasses the default manifest during a discovery build even when it exists', () => {
+    process.env.RSC_REFERENCE_DISCOVERY_BUILD = 'true';
+    fs.existsSync.mockImplementation((p) => p === DEFAULT_MANIFEST);
+    fs.readFileSync.mockReturnValue('{ not valid json');
+
+    const refs = rscManifestClientReferences();
+    expect(Array.isArray(refs)).toBe(true);
+    expect(refs[0]).toMatchObject({ directory: './client/app', recursive: true });
+    expect(fs.readFileSync).not.toHaveBeenCalledWith(DEFAULT_MANIFEST, 'utf8');
   });
 
   it('falls back to a broad scan during a bundle-only build with no manifest', () => {
