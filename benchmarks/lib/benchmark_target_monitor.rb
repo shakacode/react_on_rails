@@ -45,6 +45,10 @@ class BenchmarkTargetMonitor
 
     @measurement_started = true
     @log_windowed = target_log?
+    if @target_log && !@log_windowed
+      warn "BenchmarkTargetMonitor: TARGET_LOG=#{@target_log.inspect} set but log windowing disabled " \
+           "(file does not exist or output_dir is nil); worker-restart checks will be skipped."
+    end
     preserve_and_blank_target_log if @log_windowed
   end
 
@@ -86,7 +90,8 @@ class BenchmarkTargetMonitor
       remaining = file.size
       until remaining.zero?
         chunk_size = [remaining, BLANK_CHUNK_SIZE].min
-        file.write(BLANK_CHUNK.byteslice(0, chunk_size))
+        chunk = chunk_size == BLANK_CHUNK_SIZE ? BLANK_CHUNK : BLANK_CHUNK.byteslice(0, chunk_size)
+        file.write(chunk)
         remaining -= chunk_size
       end
     end
@@ -128,5 +133,8 @@ class BenchmarkTargetMonitor
 
       "#{index + 1}:#{line}"
     end
+  rescue Errno::ENOENT
+    raise MonitorFailure, "Target log #{@target_log.inspect} disappeared before post-measurement scan; " \
+                          "discarding benchmark metrics."
   end
 end

@@ -71,13 +71,14 @@ RSpec.describe "benchmark target monitoring" do
       end
     end
 
-    it "does not monitor or blank the live log when startup logs cannot be preserved" do
+    it "warns and skips live log monitoring when startup logs cannot be preserved" do
       content = "booting\nWorker 1 died UNEXPECTEDLY :(, restarting\nready\n"
 
       with_log_file(content) do |log_path, _output_dir|
         monitor = described_class.new(target_log: log_path)
 
-        monitor.start_measurement!
+        expect { monitor.start_measurement! }
+          .to output(/BenchmarkTargetMonitor: TARGET_LOG=.*worker-restart checks will be skipped/).to_stderr
 
         expect(File.read(log_path)).to eq(content)
         expect { monitor.verify_after_measurement! }.not_to raise_error
@@ -88,7 +89,9 @@ RSpec.describe "benchmark target monitoring" do
       Dir.mktmpdir do |dir|
         monitor = described_class.new(target_log: File.join(dir, "missing.log"), output_dir: File.join(dir, "out"))
 
-        expect { monitor.start_measurement! }.not_to raise_error
+        expect { monitor.start_measurement! }
+          .to output(/BenchmarkTargetMonitor: TARGET_LOG=.*missing\.log.*worker-restart checks will be skipped/)
+          .to_stderr
         expect { monitor.verify_after_measurement! }.not_to raise_error
       end
     end
@@ -99,7 +102,9 @@ RSpec.describe "benchmark target monitoring" do
         output_dir = File.join(dir, "bench_results")
         monitor = described_class.new(target_log: log_path, output_dir: output_dir)
 
-        monitor.start_measurement!
+        expect { monitor.start_measurement! }
+          .to output(/BenchmarkTargetMonitor: TARGET_LOG=.*target\.log.*worker-restart checks will be skipped/)
+          .to_stderr
         File.write(log_path, "Worker 1 died UNEXPECTEDLY :(, restarting\n")
 
         expect { monitor.verify_after_measurement! }.not_to raise_error
@@ -121,6 +126,7 @@ RSpec.describe "benchmark target monitoring" do
         preserved = File.join(output_dir, described_class::STARTUP_LOG_FILENAME)
         expect(File.read(preserved)).not_to include("died UNEXPECTEDLY")
         expect(File.read(log_path)).not_to include("died UNEXPECTEDLY")
+        expect { monitor.verify_after_measurement! }.not_to raise_error
       end
     end
 
@@ -141,6 +147,20 @@ RSpec.describe "benchmark target monitoring" do
           .to raise_error(
             BenchmarkTargetMonitor::MonitorFailure,
             /node-renderer master logged `died UNEXPECTEDLY`.*discarding benchmark metrics/m
+          )
+      end
+    end
+
+    it "fails with a monitor error when the target log disappears before verification" do
+      with_log_file("startup complete\n") do |log_path, output_dir|
+        monitor = described_class.new(target_log: log_path, output_dir: output_dir)
+        monitor.start_measurement!
+        FileUtils.rm_f(log_path)
+
+        expect { monitor.verify_after_measurement! }
+          .to raise_error(
+            BenchmarkTargetMonitor::MonitorFailure,
+            /Target log .* disappeared before post-measurement scan/
           )
       end
     end

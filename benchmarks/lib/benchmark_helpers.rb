@@ -102,6 +102,7 @@ def display_summary(summary_file)
   system("column", "-t", "-s", "\t", summary_file)
 end
 
+# Requires BENCHMARK_JSON and DISPLAY_JSON constants from benchmark_config.rb.
 def write_benchmark_payload(bmf_collector, target_monitor:, append: false)
   target_monitor.verify_after_measurement!
   bmf_collector.write_bmf_json(BENCHMARK_JSON, append: append)
