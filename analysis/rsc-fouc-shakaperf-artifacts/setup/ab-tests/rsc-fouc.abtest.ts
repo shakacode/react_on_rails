@@ -25,7 +25,6 @@ abTest(
     await page.waitForSelector(RSC_CSS_PROBE_SELECTOR, { state: 'visible', timeout: 10_000 });
 
     await annotate('wait for css/network idle');
-    await page.waitForLoadState('load');
     await page.waitForLoadState('networkidle');
 
     await annotate('two frames before capture');

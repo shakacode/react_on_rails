@@ -38,6 +38,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       sqlite3 \
     && rm -rf /var/lib/apt/lists/*
 
+# Some base images already reserve GID 1000; clear any matching group first so
+# the non-root test user can own bind-mounted artifacts consistently.
 RUN getent group ${GID} | cut -d: -f1 | xargs -r groupdel || true \
     && groupadd --gid ${GID} ${NON_ROOT_USER} \
     && useradd ${NON_ROOT_USER} --uid ${UID} --gid ${GID} --create-home --shell /bin/bash \
