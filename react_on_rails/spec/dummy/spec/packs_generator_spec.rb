@@ -813,7 +813,7 @@ module ReactOnRails
                                      .scan(%r{import '../generated/server-bundle-generated\.js'}).count
         expect(generated_import_count).to equal(1)
       ensure
-        FileUtils.rm_f(server_bundle_ts_file_path) if server_bundle_ts_file_path
+        FileUtils.rm_f(server_bundle_ts_file_path)
         if backup_server_bundle_js_file_path && File.exist?(backup_server_bundle_js_file_path)
           FileUtils.mv(backup_server_bundle_js_file_path, server_bundle_js_file_path)
         end
@@ -832,7 +832,7 @@ module ReactOnRails
                            "// eslint-disable-line import/extensions"
         expect(File.read(server_bundle_jsx_file_path)).to include(generated_import)
       ensure
-        FileUtils.rm_f(server_bundle_jsx_file_path) if server_bundle_jsx_file_path
+        FileUtils.rm_f(server_bundle_jsx_file_path)
         if backup_server_bundle_js_file_path && File.exist?(backup_server_bundle_js_file_path)
           FileUtils.mv(backup_server_bundle_js_file_path, server_bundle_js_file_path)
         end
@@ -852,7 +852,7 @@ module ReactOnRails
                              "// eslint-disable-line import/extensions"
           expect(File.read(server_bundle_source_file_path)).to include(generated_import)
         ensure
-          FileUtils.rm_f(server_bundle_source_file_path) if server_bundle_source_file_path
+          FileUtils.rm_f(server_bundle_source_file_path)
           if backup_server_bundle_js_file_path && File.exist?(backup_server_bundle_js_file_path)
             FileUtils.mv(backup_server_bundle_js_file_path, server_bundle_js_file_path)
           end
@@ -1626,6 +1626,10 @@ module ReactOnRails
         typescript_entrypoint = File.join(@tmpdir, "server-bundle.ts")
         File.write(typescript_entrypoint, "")
 
+        expect(Rails.logger).to receive(:debug).with(
+          "[react_on_rails] server bundle source entrypoint resolved to #{typescript_entrypoint} " \
+          "(configured: #{configured_entrypoint})"
+        )
         resolved_entrypoint = described_class.instance.send(:resolve_server_bundle_source_entrypoint,
                                                             configured_entrypoint)
 

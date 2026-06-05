@@ -10,6 +10,24 @@ type ContextFunctionReturnInvalidJSXProps = Record<string, unknown> & {
   };
 };
 
+/*
+ * This is intentionally wrong: a 2-arg function that returns JSX directly.
+ * React on Rails treats 2-arg functions as render functions, so this gets
+ * called as renderFn(props, railsContext) and the JSX is used as if it were
+ * a React component type, which will fail at runtime.
+ *
+ * The correct pattern for a render function that uses railsContext is:
+ *
+ *   const ContextFunctionReturnInvalidJSX = (
+ *     { helloWorldData }: ContextFunctionReturnInvalidJSXProps,
+ *     railsContext: RailsContextForDisplay,
+ *   ) => () => (
+ *     <>
+ *       <h3>Hello, {helloWorldData.name}!</h3>
+ *       <RailsContext railsContext={railsContext} />
+ *     </>
+ *   );
+ */
 const ContextFunctionReturnInvalidJSX = (
   { helloWorldData }: ContextFunctionReturnInvalidJSXProps,
   railsContext: RailsContextForDisplay,

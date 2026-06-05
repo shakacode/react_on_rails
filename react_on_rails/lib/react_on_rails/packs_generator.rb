@@ -639,7 +639,13 @@ module ReactOnRails
       base_path = configured_entrypoint.sub(%r{\.[^./]+\z}, "")
       server_bundle_source_extensions_for(configured_entrypoint).each do |extension|
         candidate_entrypoint = "#{base_path}#{extension}"
-        return candidate_entrypoint if File.exist?(candidate_entrypoint)
+        next unless File.exist?(candidate_entrypoint)
+
+        Rails.logger&.debug(
+          "[react_on_rails] server bundle source entrypoint resolved to #{candidate_entrypoint} " \
+          "(configured: #{configured_entrypoint})"
+        )
+        return candidate_entrypoint
       end
 
       configured_entrypoint
