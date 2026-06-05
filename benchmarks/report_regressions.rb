@@ -35,7 +35,8 @@ BENCHER_URL = "https://bencher.dev/perf/react-on-rails-t8a9ncxo"
 # REMOVE this entry (restoring unconditional filing) once the failure-era samples have
 # rolled out of Bencher's 64-run t-test window for /posts_page: Pro on main — i.e. once
 # the dashboard baseline reflects real timings again. After that a regression for it is
-# genuine and must be reported.
+# genuine and must be reported. Tracking issue + full revert steps:
+# https://github.com/shakacode/react_on_rails/issues/3669
 IGNORED_REGRESSION_BENCHMARKS = ["/posts_page: Pro"].freeze
 
 # Creates (or updates) the single per-commit regression issue and upserts one
