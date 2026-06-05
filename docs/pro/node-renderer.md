@@ -240,17 +240,30 @@ The reliable shape is to start the renderer, wait for its port to accept connect
 
     # Wait up to 30s for the renderer port to accept connections, then run the tests.
     for _ in {1..30}; do
+      # Fail fast if the renderer crashed before its port opened (missing bundle,
+      # syntax error, port conflict) instead of waiting out the full timeout.
+      if ! kill -0 "$renderer_pid" 2>/dev/null; then
+        echo "::error::Renderer process exited before becoming ready."
+        echo "::group::Renderer startup log"
+        cat /tmp/node-renderer.log 2>/dev/null || true
+        echo "::endgroup::"
+        exit 1
+      fi
       if ruby -rsocket -e 'TCPSocket.new("127.0.0.1", Integer(ENV.fetch("RENDERER_PORT", "3800"))).close' 2>/dev/null; then
-        bin/rails test   # or: bundle exec rspec
-        exit $?
+        # Renderer is ready — run the tests and exit with their status. `|| exit $?`
+        # preserves a failing exit code under `bash -e`; the trap still cleans up.
+        bin/rails test || exit $?   # or: bundle exec rspec
+        exit 0
       fi
       sleep 1
     done
 
     # Readiness never succeeded — surface the renderer log so the failure is diagnosable.
     if [ -f /tmp/node-renderer.log ]; then
-      echo "::error::Renderer failed to start within 30 seconds. Log output:"
+      echo "::error::Renderer failed to start within 30 seconds."
+      echo "::group::Renderer startup log"
       cat /tmp/node-renderer.log
+      echo "::endgroup::"
     else
       echo "::error::Renderer failed to start and produced no log file."
     fi
@@ -262,7 +275,9 @@ The reliable shape is to start the renderer, wait for its port to accept connect
 - **Single-step lifetime** — Starting the renderer and running the tests in one `run:` block guarantees the renderer is alive for the whole test process. A renderer backgrounded in a separate step may be torn down before the test step begins.
 - **`trap cleanup EXIT`** — Kills the renderer whether the tests pass, fail, or the readiness loop times out, so no orphaned process lingers on the runner.
 - **Readiness polling, not a fixed `sleep`** — The `TCPSocket` probe runs the tests as soon as the port accepts connections, instead of guessing a fixed wait. The test command starts only once the renderer can actually serve requests.
-- **Renderer logs on failure** — If readiness never succeeds, the step prints `/tmp/node-renderer.log` so you see the real startup error (missing bundle, port conflict, password mismatch) rather than a bare timeout.
+- **Fail fast on a crashed renderer** — The `kill -0` liveness check at the top of the loop catches a renderer that died on startup (missing bundle, syntax error, port conflict) and prints its log immediately, instead of waiting out the full 30‑second timeout.
+- **`bin/rails test` or `bundle exec rspec`** — These are interchangeable; use whichever your suite runs under. Swap only that one command and leave the surrounding readiness loop, `trap`, and exit handling in place.
+- **Renderer logs on failure** — If readiness never succeeds, the step prints `/tmp/node-renderer.log` (collapsed under a `::group::` in the Actions UI) so you see the real startup error (missing bundle, port conflict, password mismatch) rather than a bare timeout.
 
 ### Use `127.0.0.1`, not `localhost`
 
