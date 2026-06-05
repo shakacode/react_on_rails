@@ -141,13 +141,14 @@ Keep these changes minimal and confined — the goal is to dockerize without rew
 Create `twin-servers/Procfile`. One process line per app process **per side**, plus a readiness notifier per side. See `references/compose-and-procfile.md` for SSR/worker variants. Minimal Rails example:
 
 ```procfile
-control-rails: yarn shaka-perf servers run-overmind-command control "bundle exec puma -C config/puma.rb -b tcp://0.0.0.0:3000"
-experiment-rails: yarn shaka-perf servers run-overmind-command experiment "bundle exec puma -C config/puma.rb -b tcp://0.0.0.0:3000"
+control-rails: yarn shaka-perf servers run-overmind-command control "SECRET_KEY_BASE=dummy-secret-key-base-for-shakaperf bundle exec puma -C config/puma.rb -b tcp://0.0.0.0:3000"
+experiment-rails: yarn shaka-perf servers run-overmind-command experiment "SECRET_KEY_BASE=dummy-secret-key-base-for-shakaperf bundle exec puma -C config/puma.rb -b tcp://0.0.0.0:3000"
 notify-control-server-started: yarn shaka-perf servers notify-server-started control
 notify-experiment-server-started: yarn shaka-perf servers notify-server-started experiment
 ```
 
 - `run-overmind-command <side> "<cmd>"` runs the command inside that side's container with PID tracking, so Overmind can stop/restart it cleanly. The command binds to `0.0.0.0:3000` _inside_ the container; the host port mapping comes from `ports`.
+- The inline `SECRET_KEY_BASE` is a fixed dummy for this hermetic perf rig. Use a project-specific dummy value when the Rails process requires one at boot, rather than baking it into Docker `ENV`.
 - `notify-server-started <side>` waits for the side's port (from `ports`), announces it, then idles to keep Overmind happy. Run background workers (Sidekiq, SSR) as their own lines per side — never share a worker between sides.
 
 ---
