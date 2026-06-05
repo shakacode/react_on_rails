@@ -220,6 +220,8 @@ const UserProfile = async ({ userPromise, siteName }) => {
   );
 };
 
+const ProfileSkeleton = () => <p>Loading profile...</p>;
+
 const ProfilePage = ({ getReactOnRailsAsyncProp, siteName }) => {
   const userPromise = getReactOnRailsAsyncProp('user');
 
@@ -236,6 +238,8 @@ const ProfilePage = ({ getReactOnRailsAsyncProp, siteName }) => {
     </div>
   );
 };
+
+export default ProfilePage;
 ```
 
 > **Production note:** Wrap each `<Suspense>` in an `<ErrorBoundary>` so a rejected async-prop stream degrades to fallback UI instead of crashing the whole page. See the [error-handling pattern](../../pro/react-server-components/inside-client-components.md#error-handling) for a reusable boundary.
