@@ -1991,7 +1991,7 @@ describe InstallGenerator, type: :generator do
   describe "#add_rsc_dependencies" do
     let(:install_generator) { described_class.new([], { rsc: true }, destination_root: destination_root) }
     let(:rsc_pin) { ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN }
-    let(:rsc_stable_target) { rsc_pin.split("-", 2).first }
+    let(:rsc_stable_target) { install_generator.send(:rsc_stable_package_version_target) }
 
     before do
       allow(install_generator).to receive(:say)

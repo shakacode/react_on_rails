@@ -668,6 +668,8 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect(info).to include("stable react-on-rails-rsc@19.1.0")
       expect(info).not_to include("stable react-on-rails-rsc@19.0.5")
       expect(warning).to include("pinned react-on-rails-rsc@19.1.0-rc.1")
+      expect(warning).to include("react-on-rails-rsc/WebpackPlugin")
+      expect(warning).to include("react-on-rails-rsc/RspackPlugin")
       expect(warning).to include("stable 19.1.0")
       expect(warning).not_to include("stable 19.0.5")
     end
@@ -698,8 +700,10 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect(instance).not_to have_received(:add_packages).with(["react-on-rails-rsc"])
 
       warning_text = warnings.join("\n")
+      expect(warnings.size).to eq(1)
       expect(warning_text).to include("Could not install the pinned react-on-rails-rsc@19.0.5-rc.6")
       expect(warning_text).to include("left the version pin in package.json")
+      expect(warning_text).to include("react-on-rails-rsc/WebpackPlugin")
       expect(warning_text).to include("react-on-rails-rsc/RspackPlugin")
       manual_command = "npm install --save-exact react-on-rails-rsc@19.0.5-rc.6"
       expect(warning_text).to include(manual_command)
@@ -719,9 +723,34 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect(instance).not_to have_received(:add_packages).with(["react-on-rails-rsc"])
 
       warning_text = warnings.join("\n")
+      expect(warnings.size).to eq(1)
       expect(warning_text).to include("Could not install the pinned react-on-rails-rsc@19.0.5-rc.6")
       expect(warning_text).to include("Error adding React Server Components dependencies: network down")
       expect(warning_text).to include("npm install --save-exact react-on-rails-rsc@19.0.5-rc.6")
+    end
+
+    it "uses computed rsc packages for manual recovery when installation raises" do
+      rsc_package = "custom-rsc-package@1.2.3"
+      allow(instance).to receive(:rsc_packages_with_version).and_return([[rsc_package], true])
+      allow(instance).to receive(:add_packages).with([rsc_package]).and_raise("network down")
+      allow(instance).to receive(:rsc_packages_with_pin).and_raise("should not be called")
+
+      instance.send(:add_rsc_dependencies)
+
+      warning_text = warnings.join("\n")
+      expect(warning_text).to include("Error adding React Server Components dependencies: network down")
+      expect(warning_text).to include("npm install --save-exact #{rsc_package}")
+    end
+
+    it "falls back to unversioned rsc packages when version resolution raises" do
+      allow(instance).to receive(:rsc_packages_with_version).and_raise("pin lookup failed")
+      allow(instance).to receive(:rsc_packages_with_pin).and_raise("should not be called")
+
+      instance.send(:add_rsc_dependencies)
+
+      warning_text = warnings.join("\n")
+      expect(warning_text).to include("Error adding React Server Components dependencies: pin lookup failed")
+      expect(warning_text).to include("npm install --save-exact react-on-rails-rsc")
     end
   end
 

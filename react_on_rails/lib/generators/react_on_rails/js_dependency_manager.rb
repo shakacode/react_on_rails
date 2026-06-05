@@ -408,27 +408,25 @@ module ReactOnRails
       end
 
       def add_rsc_dependencies
+        rsc_packages = RSC_DEPENDENCIES
+        used_version_pins = false
         say "Installing React Server Components dependencies..."
         rsc_packages, used_version_pins = rsc_packages_with_version
         GeneratorMessages.add_info(rsc_dependency_pin_info) if used_version_pins
         return if add_packages(rsc_packages)
 
-        GeneratorMessages.add_warning(rsc_dependency_pin_failed_warning) if used_version_pins
-
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Failed to add React Server Components dependencies.
-
+          #{rsc_dependency_pin_failure_details(used_version_pins)}
           You can install them manually by running:
             #{manual_add_packages_command(rsc_packages)}
         MSG
       rescue StandardError => e
-        GeneratorMessages.add_warning(rsc_dependency_pin_failed_warning) if used_version_pins
-        manual_install_packages = rsc_packages_with_pin
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Error adding React Server Components dependencies: #{e.message}
-
+          #{rsc_dependency_pin_failure_details(used_version_pins)}
           You can install them manually by running:
-            #{manual_add_packages_command(manual_install_packages)}
+            #{manual_add_packages_command(rsc_packages)}
         MSG
       end
 
@@ -457,11 +455,18 @@ module ReactOnRails
 
       def rsc_dependency_pin_failed_warning
         "Warning: Could not install the pinned react-on-rails-rsc@#{RSC_PACKAGE_VERSION_PIN}. " \
-          "All RSC projects are temporarily pinned to that version because the unversioned " \
-          "`latest` tag may not export react-on-rails-rsc/RspackPlugin until stable " \
+          "All RSC projects are temporarily pinned to that version: the prerelease keeps " \
+          "react-on-rails-rsc/WebpackPlugin compatible while adding react-on-rails-rsc/RspackPlugin, " \
+          "and the unversioned `latest` tag may not include both until stable " \
           "#{rsc_stable_package_version_target} " \
           "is published, so the generator left the version pin in package.json rather than " \
           "install a potentially incompatible version."
+      end
+
+      def rsc_dependency_pin_failure_details(used_version_pins)
+        return "" unless used_version_pins
+
+        "\n#{rsc_dependency_pin_failed_warning}\n"
       end
 
       def remove_base_package_if_present
