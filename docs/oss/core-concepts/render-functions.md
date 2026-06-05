@@ -41,18 +41,18 @@ const HelloHash = (props) => {
 HelloHash.renderFunction = true;
 
 // Renderer Function — 3 params, handles hydration itself, CLIENT ONLY.
-// Optionally return a teardown (or a promise resolving to one); React on Rails runs it on
+// Optionally return a { teardown } wrapper (or a promise resolving to one); React on Rails runs it on
 // Turbo/Turbolinks navigation (or same-id node replacement) so the root is unmounted, not leaked.
 const LazyHydrate = (props, railsContext, domNodeId) =>
   // This is a concise-body arrow, so it implicitly returns the whenVisible(...).then(...) promise
-  // that resolves to the teardown. If you switch to a `{ }` block body, add an explicit `return`
-  // or the teardown is dropped. whenVisible is a hypothetical helper that resolves when the element
+  // that resolves to the teardown wrapper. If you switch to a `{ }` block body, add an explicit
+  // `return` or the teardown is dropped. whenVisible is a hypothetical helper that resolves when the element
   // scrolls into view; the teardown is registered only after hydration runs, so navigating away
   // before the element becomes visible leaves nothing mounted to clean up.
   whenVisible(domNodeId).then(() => {
     const domNode = document.getElementById(domNodeId);
     const root = ReactDOMClient.hydrateRoot(domNode, <HelloMessage {...props} />);
-    return () => root.unmount();
+    return { teardown: () => root.unmount() };
   });
 
 ReactOnRails.register({ HelloMessage, HelloWithContext, HelloHash, LazyHydrate });

@@ -521,7 +521,7 @@ export interface ReactOnRailsInternal extends ReactOnRails {
    * / Turbolinks `turbolinks:before-render` event, or in your framework's teardown hook — to avoid
    * leaking the root (and any subscriptions or timers it holds) across navigations. If you want
    * automatic cleanup instead, register a renderer function (the 3-argument render-function form) and
-   * return a {@link RendererTeardown}; React on Rails tracks those mounts and runs the teardown for
+   * return a {@link RendererTeardownResult}; React on Rails tracks those mounts and runs the teardown for
    * you.
    *
    * @param name Name of your registered component

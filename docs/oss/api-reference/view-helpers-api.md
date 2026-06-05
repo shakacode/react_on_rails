@@ -110,12 +110,12 @@ Why would you want to take over mounting yourself? One use case is code splittin
 
 Because a renderer function owns the React root it creates, React on Rails cannot unmount that root for you the way it does for the components it mounts itself. With [Turbo](https://turbo.hotwired.dev/) or Turbolinks, the page swaps without a full reload, so a renderer that never unmounts leaks its root (and any subscriptions or timers it holds) on every navigation.
 
-To opt in to cleanup, **return a teardown callback** — `() => void | Promise<void>`, or a promise resolving to one — from the renderer. React on Rails stores it and runs it when the mount is torn down: on Turbo/Turbolinks navigation (when the framework swaps in the next page) or when the same `domNodeId` node is replaced. Returning nothing keeps the previous (leaky) behavior, so existing renderers are unaffected.
+To opt in to cleanup, **return a teardown wrapper** — `{ teardown: () => void | Promise<void> }`, or a promise resolving to one — from the renderer. React on Rails stores it and runs it when the mount is torn down: on Turbo/Turbolinks navigation (when the framework swaps in the next page) or when the same `domNodeId` node is replaced. Returning nothing keeps the previous (leaky) behavior, so existing renderers are unaffected.
 
 ```jsx
 import ReactDOMClient from 'react-dom/client';
 
-// Renderer function: 3 params, mounts itself, returns a teardown.
+// Renderer function: 3 params, mounts itself, returns a teardown wrapper.
 const MyRenderer = (props, _railsContext, domNodeId) => {
   const domNode = document.getElementById(domNodeId);
   if (!domNode) {
@@ -128,7 +128,7 @@ const MyRenderer = (props, _railsContext, domNodeId) => {
   root.render(<MyComponent {...props} />);
 
   // Unmounted automatically on the next Turbo navigation (or same-id node replacement).
-  return () => root.unmount();
+  return { teardown: () => root.unmount() };
 };
 ```
 
@@ -147,7 +147,7 @@ const MyLegacyRenderer = (props, _railsContext, domNodeId) => {
   }
 
   ReactDOM.render(<MyComponent {...props} />, domNode);
-  return () => ReactDOM.unmountComponentAtNode(domNode);
+  return { teardown: () => ReactDOM.unmountComponentAtNode(domNode) };
 };
 ```
 

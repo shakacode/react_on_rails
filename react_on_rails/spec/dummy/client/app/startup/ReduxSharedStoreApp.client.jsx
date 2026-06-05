@@ -63,5 +63,5 @@ export default (props, _railsContext, domNodeId) => {
     });
   }
 
-  return () => root.unmount();
+  return { teardown: () => root.unmount() };
 };

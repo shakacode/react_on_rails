@@ -52,7 +52,7 @@ export default (props, railsContext, domNodeId) => {
 
   const root = hydrateOrRender(document.getElementById(domNodeId), element, prerender);
 
-  // Return a teardown so React on Rails unmounts this root on Turbo/Turbolinks navigation
+  // Return a teardown wrapper so React on Rails unmounts this root on Turbo/Turbolinks navigation
   // (page unload) or same-id node replacement instead of leaking it.
-  return () => root.unmount();
+  return { teardown: () => root.unmount() };
 };

@@ -31,9 +31,9 @@ The best source of docs is the `interface ReactOnRails` in [types/index.ts](http
  *   returns a React component, `{ renderedHtml }` object, or Promise (Pro Node renderer only)
  * - 3 params: Renderer function — called with (props, railsContext, domNodeId),
  *   responsible for calling ReactDOM.render/hydrate directly (client-only).
- *   May optionally return a teardown callback `() => void | Promise<void>` (or a promise resolving
- *   to one); React on Rails runs it on Turbo/Turbolinks navigation or same-id node replacement to
- *   unmount the renderer's root instead of leaking it. See the view-helpers renderer-function docs.
+ *   May optionally return a `{ teardown }` wrapper (or a promise resolving to one); React on Rails
+ *   runs it on Turbo/Turbolinks navigation or same-id node replacement to unmount the renderer's root
+ *   instead of leaking it. See the view-helpers renderer-function docs.
  *
  * Render-Functions can return:
  * - A React component (function or class) — used with `react_component`

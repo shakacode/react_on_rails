@@ -50,8 +50,8 @@ export default (props, _railsContext, domNodeId) => {
     });
   }
 
-  // Return a teardown so React on Rails unmounts this tree on Turbo/Turbolinks navigation
+  // Return a teardown wrapper so React on Rails unmounts this tree on Turbo/Turbolinks navigation
   // (page unload) or same-id node replacement instead of leaking it. The React 16/17 API unmounts
   // by container node rather than via a root handle.
-  return () => ReactDOM.unmountComponentAtNode(domNode);
+  return { teardown: () => ReactDOM.unmountComponentAtNode(domNode) };
 };

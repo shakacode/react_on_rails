@@ -9,7 +9,7 @@ import { wrapElementInStrictMode } from '../strictModeSupport';
 
 const App = (props, railsContext, domNodeId) =>
   // loadableReady resolves once the split chunks are present, then we hydrate. Returning the promise
-  // (which resolves to a teardown) lets React on Rails unmount this root on Turbo/Turbolinks
+  // (which resolves to a teardown wrapper) lets React on Rails unmount this root on Turbo/Turbolinks
   // navigation or same-id node replacement instead of leaking it.
   loadableReady().then(() => {
     const el = document.getElementById(domNodeId);
@@ -19,7 +19,7 @@ const App = (props, railsContext, domNodeId) =>
       </HelmetProvider>,
     );
     const root = hydrateRoot(el, reactElement);
-    return () => root.unmount();
+    return { teardown: () => root.unmount() };
   });
 
 export default App;
