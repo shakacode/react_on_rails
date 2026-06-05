@@ -195,7 +195,7 @@ One of the biggest advantages of React 19 native metadata over react-helmet is *
 
 ### Async Components with Dynamic Metadata
 
-Metadata can be rendered inside async components within Suspense boundaries. When the async component resolves, React streams the metadata to the client and updates `<head>`.
+Metadata can be rendered inside async components within Suspense boundaries. When the async-prop Promise resolves, React streams the updated metadata to the client and replaces the loading `<head>` tags.
 
 Use [async props](../migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently) to stream slow data from Rails while showing a loading shell immediately. These APIs are available in React on Rails Pro: the parent component calls `getReactOnRailsAsyncProp` to obtain a Promise for each slow prop, passes it to an async child that `await`s it, and wraps that child in `<Suspense>`:
 
@@ -242,17 +242,19 @@ const ProfilePage = ({ getReactOnRailsAsyncProp, siteName }) => {
 export default ProfilePage;
 ```
 
-> **Production note:** Error Boundaries help with client-side RSC payload fetches, refetches, and render-time failures after the initial stream. They do **not** catch errors thrown during the initial Server Component HTML stream; handle Rails/server-side failures before or inside `emit.call` with Rails-side rescue, logging, and serializable fallback values. See [Error Boundary limitations](../migrating/rsc-troubleshooting.md#error-boundary-limitations) and the [client-side retry pattern](../../pro/react-server-components/inside-client-components.md#error-handling).
-
 ```erb
 <%# Rails view — controller authorizes @user and captures request-scoped values first %>
 <% site_name = Current.account.name %>
 
 <%= stream_react_component_with_async_props("ProfilePage",
                                             props: { siteName: site_name }) do |emit|
-  emit.call("user", @user.as_json(only: %i[name bio]))
+  # Run slow work here, inside the block, not in the controller.
+  user_profile = UserProfileLoader.call(@user.id)
+  emit.call("user", user_profile.as_json(only: %i[name bio]))
 end %>
 ```
+
+> **Production note:** Error Boundaries help with client-side RSC payload fetches, refetches, and render-time failures after the initial stream. They do **not** catch errors thrown during the initial Server Component HTML stream; handle Rails/server-side failures before or inside `emit.call` with Rails-side rescue, logging, and serializable fallback values. See [Error Boundary limitations](../migrating/rsc-troubleshooting.md#error-boundary-limitations) and the [client-side retry pattern](../../pro/react-server-components/inside-client-components.md#error-handling).
 
 > **React on Rails note:** Keep authorization, database access, and cache-aware data loading in Rails. When auth, tenancy, or request state lives in `CurrentAttributes`, capture the needed serializable values before entering async-props work, pass them as regular props or IDs, and resolve scoped records server-side before calling `emit.call`. The React component never fetches data itself; it awaits the Promise that `getReactOnRailsAsyncProp` returns. See [RSC data fetching](../migrating/rsc-data-fetching.md).
 
@@ -280,6 +282,8 @@ const AsyncContent = async ({ articlePromise }) => {
   );
 };
 
+const ArticleSkeleton = () => <p>Loading article...</p>;
+
 const ArticlePage = ({ getReactOnRailsAsyncProp, canonicalUrl }) => {
   const articlePromise = getReactOnRailsAsyncProp('article');
 
@@ -303,7 +307,9 @@ export default ArticlePage;
 
 <%= stream_react_component_with_async_props("ArticlePage",
                                             props: { canonicalUrl: canonical_url }) do |emit|
-  emit.call("article", @article.as_json(
+  # Run slow article-body work here, after first-wave SEO props are sent.
+  article = ArticleContentLoader.call(@article.id)
+  emit.call("article", article.as_json(
     only: %i[title excerpt cover_image body]
   ))
 end %>

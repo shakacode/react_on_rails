@@ -151,6 +151,7 @@ The `async` keyword is intentional in these examples: it makes the render functi
 
 ```jsx
 const MyComponent = async (props, _railsContext) => {
+  // async makes the Pro Node renderer receive a Promise; data still comes from Rails props.
   const data = props.data;
   return `<div>Hello ${data.name}</div>`;
 };
