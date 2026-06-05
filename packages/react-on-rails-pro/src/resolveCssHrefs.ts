@@ -34,6 +34,9 @@ export type RscCssManifest = {
 const joinPrefix = (prefix: string, file: string): string => {
   if (!prefix) return file;
   const base = prefix.endsWith('/') ? prefix.slice(0, -1) : prefix;
+  if (base.startsWith('/') && (file === base || file.startsWith(`${base}/`))) {
+    return file;
+  }
   const rel = file.startsWith('/') ? file.slice(1) : file;
   return `${base}/${rel}`;
 };
