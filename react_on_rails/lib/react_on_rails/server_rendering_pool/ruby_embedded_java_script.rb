@@ -281,9 +281,9 @@ module ReactOnRails
 
         def renderer_connection_error_message(err)
           target = renderer_target_from_error(err)
-          configured_url = sanitized_renderer_url(ENV.fetch("REACT_RENDERER_URL", nil))
+          configured_var, configured_url = configured_renderer_url
           configured_line = if configured_url
-                              "REACT_RENDERER_URL is currently \"#{configured_url}\" — confirm it matches the " \
+                              "#{configured_var} is currently \"#{configured_url}\" — confirm it matches the " \
                                 "renderer's host and port (RENDERER_HOST / RENDERER_PORT)"
                             else
                               "REACT_RENDERER_URL is not set — set it to the renderer's host and port " \
@@ -328,14 +328,25 @@ module ReactOnRails
         # Best-effort extraction of the host/port (or URL) Rails attempted to reach, so the
         # connection error can name the actual target. Walks the #cause chain because the Pro
         # renderer client wraps the original Errno (whose message carries "connect(2) for
-        # host:port") inside a generic outer error. Falls back to the configured renderer URL
-        # (REACT_RENDERER_URL, then the legacy RENDERER_URL alias), with credentials redacted.
+        # host:port") inside a generic outer error. Falls back to the configured renderer URL.
         def renderer_target_from_error(err)
           each_in_cause_chain(err) do |current|
             target = target_from_message(current.message)
             return target if target
           end
-          sanitized_renderer_url(ENV.fetch("REACT_RENDERER_URL", nil) || ENV.fetch("RENDERER_URL", nil))
+          configured_renderer_url.last
+        end
+
+        # Resolves the configured renderer URL and the env var it came from, so the headline
+        # target and the checklist line stay consistent. A blank (present-but-empty) value is
+        # treated as unset, and the legacy RENDERER_URL alias is the fallback. Credentials are
+        # stripped for safe display. Returns [var_name, sanitized_url] or [nil, nil].
+        def configured_renderer_url
+          %w[REACT_RENDERER_URL RENDERER_URL].each do |var|
+            value = ENV.fetch(var, nil)
+            return [var, sanitized_renderer_url(value)] unless value.nil? || value.empty?
+          end
+          [nil, nil]
         end
 
         def target_from_message(message)

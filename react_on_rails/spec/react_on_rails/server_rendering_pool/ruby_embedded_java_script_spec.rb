@@ -2,6 +2,7 @@
 
 require_relative "../spec_helper"
 
+# rubocop:disable Metrics/ModuleLength
 module ReactOnRails
   module ServerRenderingPool
     describe RubyEmbeddedJavaScript do
@@ -185,6 +186,27 @@ module ReactOnRails
             message = render_error_for(error).message
             expect(message).to include("could not connect to the Node renderer at http://legacy-host:3800")
           end
+
+          it "keeps the checklist consistent by naming RENDERER_URL rather than calling it unset" do
+            message = render_error_for(error).message
+            expect(message).to include('RENDERER_URL is currently "http://legacy-host:3800"')
+            expect(message).not_to include("REACT_RENDERER_URL is not set")
+          end
+        end
+
+        context "when REACT_RENDERER_URL is present but blank and the legacy RENDERER_URL is set" do
+          let(:error) { Errno::ECONNREFUSED.new }
+
+          before do
+            ENV["REACT_RENDERER_URL"] = ""
+            ENV["RENDERER_URL"] = "http://legacy-host:3800"
+          end
+
+          it "treats the blank value as unset and uses the legacy RENDERER_URL" do
+            message = render_error_for(error).message
+            expect(message).to include("could not connect to the Node renderer at http://legacy-host:3800")
+            expect(message).not_to include('is currently ""')
+          end
         end
 
         context "when the bundle actually fails to evaluate" do
@@ -224,3 +246,4 @@ module ReactOnRails
     end
   end
 end
+# rubocop:enable Metrics/ModuleLength
