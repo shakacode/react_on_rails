@@ -10,7 +10,7 @@ import { wrapElementInStrictMode } from '../strictModeSupport';
 const App = (props, railsContext, domNodeId) =>
   // loadableReady resolves once the split chunks are present, then we hydrate. Returning the promise
   // (which resolves to a teardown wrapper) lets React on Rails unmount this root on Turbo/Turbolinks
-  // navigation or same-id node replacement instead of leaking it.
+  // navigation or same-id node replacement instead of leaking it. The callback form would discard it.
   loadableReady().then(() => {
     const el = document.getElementById(domNodeId);
     if (!el) return undefined; // Navigation may remove the node before chunks resolve.

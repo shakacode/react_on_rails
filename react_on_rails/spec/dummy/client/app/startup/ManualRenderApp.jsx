@@ -12,8 +12,9 @@ export default (props, _railsContext, domNodeId) => {
 
   const domNode = document.getElementById(domNodeId);
   if (!domNode) {
+    const renderMode = props.prerender ? 'hydrate' : 'render';
     throw new Error(
-      `Cannot hydrate ManualRenderApp because DOM element with id "${domNodeId}" was not found.`,
+      `Cannot ${renderMode} ManualRenderApp because DOM element with id "${domNodeId}" was not found.`,
     );
   }
 

@@ -62,7 +62,15 @@ export default (props, railsContext, domNodeId) => {
       // hydrateRoot on an emptied node (hydration mismatch) whenever prerender was true.
       root.render(element);
     } else {
-      root = hydrateOrRender(document.getElementById(domNodeId), element);
+      const domNode = document.getElementById(domNodeId);
+      if (!domNode) {
+        const renderMode = prerender ? 'hydrate' : 'render';
+        throw new Error(
+          `Cannot ${renderMode} ReduxApp because DOM element with id "${domNodeId}" was not found.`,
+        );
+      }
+
+      root = hydrateOrRender(domNode, element);
     }
   };
 
