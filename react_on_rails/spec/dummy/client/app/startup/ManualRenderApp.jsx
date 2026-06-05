@@ -11,6 +11,12 @@ export default (props, _railsContext, domNodeId) => {
   );
 
   const domNode = document.getElementById(domNodeId);
+  if (!domNode) {
+    throw new Error(
+      `Cannot hydrate ManualRenderApp because DOM element with id "${domNodeId}" was not found.`,
+    );
+  }
+
   let root;
   if (props.prerender) {
     root = ReactDOMClient.hydrateRoot(domNode, reactElement);
