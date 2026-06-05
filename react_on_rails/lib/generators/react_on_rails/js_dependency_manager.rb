@@ -145,18 +145,9 @@ module ReactOnRails
       # which pins `react-on-rails-rsc`. The two track different versions during the RC window:
       # react/react-dom stay on stable 19.0.x while react-on-rails-rsc rides an RC.
       RSC_REACT_VERSION_RANGE = "~19.0.4"
-      # Pinned to 19.0.5-rc.x because the native rspack manifest plugin
-      # (`react-on-rails-rsc/RspackPlugin`) the generator scaffolds for rspack projects is only
-      # exported from 19.0.5 onward. This single pin applies to ALL `--rsc` installs, so webpack
-      # projects are also pinned to this RC during the pre-stable window (intentional: the RC is
-      # backward-compatible for webpack — it still exports `react-on-rails-rsc/WebpackPlugin`). The
-      # #3488 stable bump below moves every bundler to 19.0.5 at once.
-      # TODO(#3488): when react-on-rails-rsc 19.0.5 stable ships, bump RSC_PACKAGE_VERSION_PIN to
-      # "19.0.5" (and RSC_REACT_VERSION_RANGE too if react/react-dom advance), then verify peer-dep
-      # alignment between react@19.0.x and react-on-rails-rsc@19.0.5. At that point the `latest`
-      # tag exports RspackPlugin, so the rspack-only fallback skip in add_rsc_dependencies can be
-      # removed (rspack can safely share the webpack unversioned-fallback path again).
-      # (tracked in https://github.com/shakacode/react_on_rails/issues/3488).
+      # Pinned to 19.0.5-rc.6 because the discovery plugin export, native Rspack plugin, and
+      # RSC manifest CSS fixes all ship in that prerelease.
+      # TODO(#3642): switch to a stable react-on-rails-rsc release after 19.0.5 stable ships.
       RSC_PACKAGE_VERSION_PIN = "19.0.5-rc.6"
 
       private
@@ -235,14 +226,14 @@ module ReactOnRails
           ⚠️  Failed to add react-on-rails package.
 
           You can install it manually by running:
-            npm install #{react_on_rails_pkg}
+            #{manual_add_packages_command([react_on_rails_pkg])}
         MSG
       rescue StandardError => e
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Error adding react-on-rails package: #{e.message}
 
           You can install it manually by running:
-            npm install #{react_on_rails_pkg}
+            #{manual_add_packages_command([react_on_rails_pkg])}
         MSG
       end
 
@@ -250,7 +241,7 @@ module ReactOnRails
         say "Installing React dependencies..."
 
         # RSC requires React 19.0.x specifically (not 19.1.x or later)
-        # Pin to ~19.0.4 to allow patch updates while staying within 19.0.x
+        # Pin React to ~19.0.4 while using an RSC package release that exports manifest discovery.
         react_deps = if respond_to?(:use_rsc?) && use_rsc?
                        ["react@#{RSC_REACT_VERSION_RANGE}", "react-dom@#{RSC_REACT_VERSION_RANGE}",
                         "prop-types@^15.0.0"]
@@ -264,14 +255,14 @@ module ReactOnRails
           ⚠️  Failed to add React dependencies.
 
           You can install them manually by running:
-            npm install #{react_deps.join(' ')}
+            #{manual_add_packages_command(react_deps)}
         MSG
       rescue StandardError => e
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Error adding React dependencies: #{e.message}
 
           You can install them manually by running:
-            npm install #{react_deps.join(' ')}
+            #{manual_add_packages_command(react_deps)}
         MSG
       end
 
@@ -283,14 +274,14 @@ module ReactOnRails
           ⚠️  Failed to add CSS dependencies.
 
           You can install them manually by running:
-            npm install #{CSS_DEPENDENCIES.join(' ')}
+            #{manual_add_packages_command(CSS_DEPENDENCIES)}
         MSG
       rescue StandardError => e
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Error adding CSS dependencies: #{e.message}
 
           You can install them manually by running:
-            npm install #{CSS_DEPENDENCIES.join(' ')}
+            #{manual_add_packages_command(CSS_DEPENDENCIES)}
         MSG
       end
 
@@ -302,14 +293,14 @@ module ReactOnRails
           ⚠️  Failed to add Rspack dependencies.
 
           You can install them manually by running:
-            npm install #{RSPACK_DEPENDENCIES.join(' ')}
+            #{manual_add_packages_command(RSPACK_DEPENDENCIES)}
         MSG
       rescue StandardError => e
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Error adding Rspack dependencies: #{e.message}
 
           You can install them manually by running:
-            npm install #{RSPACK_DEPENDENCIES.join(' ')}
+            #{manual_add_packages_command(RSPACK_DEPENDENCIES)}
         MSG
       end
 
@@ -322,14 +313,14 @@ module ReactOnRails
 
           SWC is the default JavaScript transpiler for Shakapacker 9.3.0+.
           You can install them manually by running:
-            npm install --save-dev #{SWC_DEPENDENCIES.join(' ')}
+            #{manual_add_packages_command(SWC_DEPENDENCIES, dev: true)}
         MSG
       rescue StandardError => e
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Error adding SWC dependencies: #{e.message}
 
           You can install them manually by running:
-            npm install --save-dev #{SWC_DEPENDENCIES.join(' ')}
+            #{manual_add_packages_command(SWC_DEPENDENCIES, dev: true)}
         MSG
       end
 
@@ -341,7 +332,7 @@ module ReactOnRails
           ⚠️  Failed to add Babel React preset dependency.
 
           You can install it manually by running:
-            npm install --save-dev #{BABEL_REACT_DEPENDENCIES.join(' ')}
+            #{manual_add_packages_command(BABEL_REACT_DEPENDENCIES, dev: true)}
         MSG
         false
       rescue StandardError => e
@@ -349,7 +340,7 @@ module ReactOnRails
           ⚠️  Error adding Babel React preset dependency: #{e.message}
 
           You can install it manually by running:
-            npm install --save-dev #{BABEL_REACT_DEPENDENCIES.join(' ')}
+            #{manual_add_packages_command(BABEL_REACT_DEPENDENCIES, dev: true)}
         MSG
         false
       end
@@ -362,14 +353,14 @@ module ReactOnRails
           ⚠️  Failed to add TypeScript dependencies.
 
           You can install them manually by running:
-            npm install --save-dev #{TYPESCRIPT_DEPENDENCIES.join(' ')}
+            #{manual_add_packages_command(TYPESCRIPT_DEPENDENCIES, dev: true)}
         MSG
       rescue StandardError => e
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Error adding TypeScript dependencies: #{e.message}
 
           You can install them manually by running:
-            npm install --save-dev #{TYPESCRIPT_DEPENDENCIES.join(' ')}
+            #{manual_add_packages_command(TYPESCRIPT_DEPENDENCIES, dev: true)}
         MSG
       end
 
@@ -390,14 +381,14 @@ module ReactOnRails
           ⚠️  Failed to add React on Rails Pro dependencies.
 
           You can install them manually by running:
-            npm install #{pro_packages.join(' ')}
+            #{manual_add_packages_command(pro_packages)}
         MSG
       rescue StandardError => e
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Error adding React on Rails Pro dependencies: #{e.message}
 
           You can install them manually by running:
-            npm install #{PRO_DEPENDENCIES.join(' ')}
+            #{manual_add_packages_command(PRO_DEPENDENCIES)}
         MSG
       end
 
@@ -417,45 +408,28 @@ module ReactOnRails
       end
 
       def add_rsc_dependencies
+        rsc_packages = RSC_DEPENDENCIES
+        used_version_pins = false
         say "Installing React Server Components dependencies..."
         rsc_packages, used_version_pins = rsc_packages_with_version
+        GeneratorMessages.add_info(rsc_dependency_pin_info) if used_version_pins
         return if add_packages(rsc_packages)
 
-        manual_install_packages = rsc_packages
-        if used_version_pins && using_rspack?
-          # Do NOT retry unversioned for rspack: the `latest` tag (currently 19.0.4) does not export
-          # react-on-rails-rsc/RspackPlugin, so an unversioned install would replace the pin already
-          # written to package.json with a known-incompatible version and silently break the build.
-          # Keep the pin and tell the user to finish the install manually.
-          GeneratorMessages.add_warning(rspack_rsc_dependency_pin_failed_warning)
-        elsif used_version_pins
-          warning_msg = "Could not install version-pinned RSC dependency. Retrying latest available package."
-          say_status :warning,
-                     warning_msg,
-                     :yellow
-          GeneratorMessages.add_warning(
-            "Warning: #{warning_msg} " \
-            "The installed react-on-rails-rsc version may not match the expected compatibility pin."
+        GeneratorMessages.add_warning(
+          rsc_dependency_failure_message(
+            "⚠️  Failed to add React Server Components dependencies.",
+            used_version_pins,
+            rsc_packages
           )
-          return if add_packages(RSC_DEPENDENCIES)
-
-          manual_install_packages = RSC_DEPENDENCIES
-        end
-
-        GeneratorMessages.add_warning(<<~MSG.strip)
-          ⚠️  Failed to add React Server Components dependencies.
-
-          You can install them manually by running:
-            npm install #{manual_install_packages.join(' ')}
-        MSG
+        )
       rescue StandardError => e
-        manual_install_packages = using_rspack? ? rsc_packages_with_pin : RSC_DEPENDENCIES
-        GeneratorMessages.add_warning(<<~MSG.strip)
-          ⚠️  Error adding React Server Components dependencies: #{e.message}
-
-          You can install them manually by running:
-            npm install #{manual_install_packages.join(' ')}
-        MSG
+        GeneratorMessages.add_warning(
+          rsc_dependency_failure_message(
+            "⚠️  Error adding React Server Components dependencies: #{e.message}",
+            used_version_pins,
+            rsc_packages
+          )
+        )
       end
 
       # Returns [pinned_packages, used_version_pins]. used_version_pins is always true here;
@@ -468,12 +442,42 @@ module ReactOnRails
         RSC_DEPENDENCIES.map { |pkg| "#{pkg}@#{RSC_PACKAGE_VERSION_PIN}" }
       end
 
-      def rspack_rsc_dependency_pin_failed_warning
+      def rsc_stable_package_version_target
+        RSC_PACKAGE_VERSION_PIN.split("-", 2).first
+      end
+
+      def rsc_dependency_pin_info
+        "React Server Components package pin: all --rsc installs temporarily use " \
+          "react-on-rails-rsc@#{RSC_PACKAGE_VERSION_PIN}, including Webpack projects. " \
+          "This prerelease keeps react-on-rails-rsc/WebpackPlugin compatible while adding " \
+          "react-on-rails-rsc/RspackPlugin. Keep the pin until stable " \
+          "react-on-rails-rsc@#{rsc_stable_package_version_target} " \
+          "is published and tagged latest."
+      end
+
+      def rsc_dependency_pin_failed_warning
         "Warning: Could not install the pinned react-on-rails-rsc@#{RSC_PACKAGE_VERSION_PIN}. " \
-          "Rspack RSC projects require that version (or newer) for react-on-rails-rsc/RspackPlugin, " \
-          "and the unversioned `latest` tag does not export it, so the generator left the pin in " \
-          "package.json rather than install an incompatible version. " \
-          "Run npm install react-on-rails-rsc@#{RSC_PACKAGE_VERSION_PIN} to finish setup."
+          "All RSC projects are temporarily pinned to that version: the prerelease keeps " \
+          "react-on-rails-rsc/WebpackPlugin compatible while adding react-on-rails-rsc/RspackPlugin, " \
+          "and the unversioned `latest` tag may not include both until stable " \
+          "#{rsc_stable_package_version_target} " \
+          "is published, so the generator left the version pin in package.json rather than " \
+          "install a potentially incompatible version."
+      end
+
+      def rsc_dependency_pin_failure_details(used_version_pins)
+        return unless used_version_pins
+
+        rsc_dependency_pin_failed_warning
+      end
+
+      def rsc_dependency_failure_message(summary, used_version_pins, rsc_packages)
+        [
+          summary,
+          rsc_dependency_pin_failure_details(used_version_pins),
+          "You can install them manually by running:",
+          "  #{manual_add_packages_command(rsc_packages)}"
+        ].compact.join("\n")
       end
 
       def remove_base_package_if_present
@@ -491,7 +495,7 @@ module ReactOnRails
           ⚠️  Could not remove base 'react-on-rails' package: #{e.message}
 
           Please remove it manually:
-            npm uninstall react-on-rails
+            #{manual_remove_packages_command(['react-on-rails'])}
         MSG
       end
 
@@ -507,14 +511,14 @@ module ReactOnRails
           ⚠️  Failed to add development dependencies.
 
           You can install them manually by running:
-            npm install --save-dev #{dev_deps.join(' ')}
+            #{manual_add_packages_command(dev_deps, dev: true)}
         MSG
       rescue StandardError => e
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Error adding development dependencies: #{e.message}
 
           You can install them manually by running:
-            npm install --save-dev #{dev_deps.join(' ')}
+            #{manual_add_packages_command(dev_deps, dev: true)}
         MSG
       end
 
@@ -575,9 +579,7 @@ module ReactOnRails
 
           This could be due to network issues or package manager problems.
           You can install dependencies manually later by running:
-          • npm install (if using npm)
-          • yarn install (if using yarn)
-          • pnpm install (if using pnpm)
+            #{manual_install_dependencies_command}
         MSG
         false
       end
@@ -633,16 +635,47 @@ module ReactOnRails
       end
 
       def build_install_args(package_manager, dev, packages)
-        base_commands = {
-          "npm" => %w[npm install --save-exact],
-          "yarn" => %w[yarn add --exact],
-          "pnpm" => %w[pnpm add --save-exact],
-          "bun" => %w[bun add --exact]
-        }
-
-        base_args = base_commands.fetch(package_manager).dup
+        base_args = package_manager_commands(package_manager).fetch(:install).dup
+        base_args -= exact_install_flags_for(package_manager) if packages_include_semver_ranges?(packages)
         base_args << dev_flag_for(package_manager) if dev
         base_args + packages
+      end
+
+      def build_remove_args(package_manager, packages)
+        package_manager_commands(package_manager).fetch(:remove) + packages
+      end
+
+      def manual_add_packages_command(packages, dev: false)
+        build_install_args(fallback_package_manager, dev, packages).join(" ")
+      end
+
+      def manual_install_dependencies_command
+        "#{fallback_package_manager} install"
+      end
+
+      def manual_remove_packages_command(packages)
+        build_remove_args(fallback_package_manager, packages).join(" ")
+      end
+
+      def package_manager_commands(package_manager)
+        {
+          "npm" => {
+            install: %w[npm install --save-exact],
+            remove: %w[npm uninstall]
+          },
+          "yarn" => {
+            install: %w[yarn add --exact],
+            remove: %w[yarn remove]
+          },
+          "pnpm" => {
+            install: %w[pnpm add --save-exact],
+            remove: %w[pnpm remove]
+          },
+          "bun" => {
+            install: %w[bun add --exact],
+            remove: %w[bun remove]
+          }
+        }.fetch(package_manager)
       end
 
       def dev_flag_for(package_manager)
@@ -652,6 +685,27 @@ module ReactOnRails
         else
           raise ArgumentError, "Unknown package manager for dev flag: #{package_manager}"
         end
+      end
+
+      def exact_install_flags_for(package_manager)
+        case package_manager
+        when "npm", "pnpm" then ["--save-exact"]
+        when "yarn", "bun" then ["--exact"]
+        else
+          raise ArgumentError, "Unknown package manager for exact install flag: #{package_manager}"
+        end
+      end
+
+      def packages_include_semver_ranges?(packages)
+        packages.any? { |package_spec| package_uses_semver_range?(package_spec) }
+      end
+
+      def package_uses_semver_range?(package_spec)
+        package_name_and_version = package_name_and_version_from_spec(package_spec)
+        return false unless package_name_and_version
+
+        _package_name, package_version = package_name_and_version
+        package_version.start_with?("~", "^")
       end
 
       def filter_missing_packages(packages)

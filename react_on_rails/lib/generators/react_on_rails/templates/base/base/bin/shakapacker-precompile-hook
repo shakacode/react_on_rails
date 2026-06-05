@@ -23,11 +23,57 @@ exit 0 if ENV["SHAKAPACKER_SKIP_PRECOMPILE_HOOK"] == "true"
 # and doesn't need package version validation since it's part of the build itself
 ENV["REACT_ON_RAILS_SKIP_VALIDATION"] = "true"
 
+require "pathname"
+require "fileutils"
 require_relative "../config/environment"
+
+def clear_stale_rsc_manifest_client_references
+  stale_manifest = Rails.root.join("ssr-generated", "rsc-client-references.json")
+  FileUtils.rm_f(stale_manifest)
+end
+
+# Keep this flow aligned with the standalone helper in
+# react_on_rails/spec/support/shakapacker_precompile_hook_shared.rb.
+def generate_rsc_manifest_client_references_if_needed
+  return if ENV["RSC_REFERENCE_DISCOVERY_BUILD"] == "true"
+  return unless defined?(ReactOnRailsPro)
+  return unless ReactOnRailsPro::Utils.rsc_support_enabled?
+
+  registration_entry = Rails.root.join(
+    Pathname(ReactOnRails::PackerUtils.packer_source_entry_path).parent,
+    "generated/server-component-registration-entry.js"
+  )
+  unless File.exist?(registration_entry)
+    clear_stale_rsc_manifest_client_references
+    return
+  end
+
+  shakapacker_bin = Rails.root.join("bin", "shakapacker")
+  unless File.exist?(shakapacker_bin)
+    raise "bin/shakapacker is missing; cannot generate RSC manifest client references. " \
+          "Restore bin/shakapacker before precompiling RSC assets."
+  end
+
+  puts Rainbow("🔎 Generating RSC manifest client references...").cyan
+
+  env = {
+    "SHAKAPACKER_SKIP_PRECOMPILE_HOOK" => "true",
+    "RSC_REFERENCE_DISCOVERY_BUILD" => "true",
+    "RSC_BUNDLE_ONLY" => "true",
+    "CLIENT_BUNDLE_ONLY" => nil,
+    "SERVER_BUNDLE_ONLY" => nil
+  }
+
+  Dir.chdir(Rails.root) do
+    system(env, shakapacker_bin.to_s, exception: true)
+  end
+  puts Rainbow("✅ RSC manifest client references generated successfully").green
+end
 
 begin
   puts Rainbow("🔄 Running React on Rails precompile hook...").cyan
   ReactOnRails::PacksGenerator.instance.generate_packs_if_stale
+  generate_rsc_manifest_client_references_if_needed
 rescue StandardError => e
   warn Rainbow("❌ Error in precompile hook: #{e.message}").red
   warn e.backtrace.first(5).join("\n")

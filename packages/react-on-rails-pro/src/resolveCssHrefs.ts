@@ -34,6 +34,8 @@ export type RscCssManifest = {
 const joinPrefix = (prefix: string, file: string): string => {
   if (!prefix) return file;
   const base = prefix.endsWith('/') ? prefix.slice(0, -1) : prefix;
+  // Manifest CSS paths are usually root-relative, but callers may pass already
+  // prefixed or absolute hrefs; avoid double-prefixing either shape.
   if (
     file === base ||
     file.startsWith(`${base}/`) ||

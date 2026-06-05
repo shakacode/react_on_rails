@@ -7,7 +7,7 @@ import type { ReactElement } from 'react';
 import type {
   RegisteredComponent,
   RenderReturnType,
-  ReactComponentOrRenderFunction,
+  RegisteredComponentValue,
   AuthenticityHeaders,
   Store,
   StoreGenerator,
@@ -18,6 +18,7 @@ import * as Authenticity from '../Authenticity.ts';
 import buildConsoleReplay, { consoleReplay } from '../buildConsoleReplay.ts';
 import reactHydrateOrRender from '../reactHydrateOrRender.ts';
 import createReactOutput from '../createReactOutput.ts';
+import componentRegistrationMetric from '../componentRegistrationMetric.ts';
 
 const DEFAULT_OPTIONS = {
   traceTurbolinks: false,
@@ -26,11 +27,13 @@ const DEFAULT_OPTIONS = {
   logComponentRegistration: false,
 };
 
+type RegisteredComponentEntry = RegisteredComponent<RegisteredComponentValue>;
+
 interface Registries {
   ComponentRegistry: {
-    register: (components: Record<string, ReactComponentOrRenderFunction>) => void;
-    get: (name: string) => RegisteredComponent;
-    components: () => Map<string, RegisteredComponent>;
+    register: (components: Record<string, RegisteredComponentValue>) => void;
+    get: (name: string) => RegisteredComponentEntry;
+    components: () => Map<string, RegisteredComponentEntry>;
   };
   StoreRegistry: {
     register: (storeGenerators: Record<string, StoreGenerator>) => void;
@@ -194,7 +197,7 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
     // REGISTRY METHOD IMPLEMENTATIONS - Using provided registries
     // ===================================================================
 
-    register(components: Record<string, ReactComponentOrRenderFunction>): void {
+    register(components: Record<string, RegisteredComponentValue>): void {
       if (this.options.debugMode || this.options.logComponentRegistration) {
         // Use performance.now() if available, otherwise fallback to Date.now()
         const perf = typeof performance !== 'undefined' ? performance : { now: () => Date.now() };
@@ -215,8 +218,10 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
         if (this.options.debugMode) {
           componentNames.forEach((name) => {
             const component = components[name];
-            const size = component.toString().length;
-            console.log(`[ReactOnRails] ✅ Registered: ${name} (${size} chars)`);
+            const registrationMetric = componentRegistrationMetric(component);
+            console.log(
+              `[ReactOnRails] ✅ Registered: ${name} (${registrationMetric.value} ${registrationMetric.label})`,
+            );
           });
         }
       } else {
@@ -254,11 +259,11 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
       StoreRegistry.clearHydratedStores();
     },
 
-    getComponent(name: string): RegisteredComponent {
+    getComponent(name: string): RegisteredComponentEntry {
       return ComponentRegistry.get(name);
     },
 
-    registeredComponents(): Map<string, RegisteredComponent> {
+    registeredComponents(): Map<string, RegisteredComponentEntry> {
       return ComponentRegistry.components();
     },
 
@@ -272,7 +277,7 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
 
     render(
       name: string,
-      props: Record<string, string>,
+      props: Record<string, unknown>,
       domNodeId: string,
       hydrate: boolean,
     ): RenderReturnType {

@@ -40,6 +40,7 @@ const runWebpack = () => {
     },
     resolve: {
       alias: {
+        'react-on-rails/@internal/rendererTeardown$': path.join(reactOnRailsSrcRoot, 'rendererTeardown.ts'),
         'react-on-rails/isRenderFunction$': path.join(reactOnRailsSrcRoot, 'isRenderFunction.ts'),
         'react-on-rails/reactApis$': path.join(reactOnRailsSrcRoot, 'reactApis.cts'),
         'react-on-rails/types$': path.join(reactOnRailsSrcRoot, 'types/index.ts'),

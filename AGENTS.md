@@ -170,6 +170,8 @@ restores/saves the gem cache, and supports non-frozen installs via `frozen: 'fal
 
 **Commit messages**: Explain why, not what. One logical change per commit.
 
+**Squash merges**: When completing a GitHub squash merge, include the PR number in the squash commit title using the format `<PR title> (#<PR number>)`, for example `Docs: clarify rails new JavaScript skip flag (#3666)`. For CLI merges, pass `--subject "<PR title> (#<PR number>)"` to `gh pr merge --squash` and verify the title before confirming the merge.
+
 **PR creation**: Use `gh pr create` with a clear title, summary, and test plan.
 
 ## Review Workflow
@@ -211,6 +213,7 @@ For small, focused PRs (roughly 5 files changed or fewer and one clear purpose):
 - Ensure all files end with a newline
 - Let Prettier and RuboCop handle formatting — never format manually
 - When adding docs under `docs/oss/` or `docs/pro/`, also add the doc ID to `docs/sidebars.ts` and run `script/check-docs-sidebar` — CI will fail otherwise. To intentionally exclude a doc from the sidebar, add its ID to `docs/.sidebar-exclusions` with a reason comment.
+- Pro package edits do not require special approval beyond the normal boundaries below; run the Pro-specific lint/tests that cover the changed files.
 
 ### Ask First
 

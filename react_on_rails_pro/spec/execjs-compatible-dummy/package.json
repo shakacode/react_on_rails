@@ -42,8 +42,7 @@
     "webpack-cli": "^7.0.0",
     "webpack-merge": "5"
   },
-  "scripts": {
-  },
+  "scripts": {},
   "devDependencies": {
     "@pmmmwh/react-refresh-webpack-plugin": "^0.5.15",
     "react-refresh": "^0.14.2",

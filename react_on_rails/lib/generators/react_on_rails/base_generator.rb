@@ -1230,8 +1230,9 @@ module ReactOnRails
 
         content = File.read(shakapacker_config_path)
 
-        # Already has an active (non-commented) precompile_hook configured? Don't overwrite.
-        return if content.match?(/^\s+precompile_hook:\s*['"][^'"]+['"]/)
+        # Don't materialize placeholders when any placeholder section already has
+        # a direct or inherited active precompile_hook.
+        return if active_precompile_hook_configured?(content)
 
         # Replace the commented placeholder with the actual value
         # Shakapacker 9.x default config has: # precompile_hook: ~

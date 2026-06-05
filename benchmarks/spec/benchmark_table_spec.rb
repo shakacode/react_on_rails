@@ -46,7 +46,8 @@ RSpec.describe BenchmarkTable do
     expect(markdown).to include("| --- | --- | --- | --- | --- |")
     expect(markdown).to include("| /foo | 100.0 | 5.0 | 6.0 | 200=100 |")
     expect(markdown).not_to include("Fail%")
-    expect(markdown).to include("▲/▼ change vs baseline")
+    expect(markdown).to include("▲/▼ non-zero change vs baseline")
+    expect(markdown).to include("0.0% exact/near-zero match")
     expect(markdown).to include("🔴 significant regression")
     expect(markdown).to include("🟢 significant improvement")
   end
@@ -133,14 +134,43 @@ RSpec.describe BenchmarkTable do
     expect(markdown).to include("| /foo | 100.0 | 5.0 | 6.0 | 200=100 |")
   end
 
-  it "shows only the value when the metric exactly equals its baseline (skips a 0.0% delta)" do
+  it "shows an explicit 0.0% delta when the metric exactly equals its baseline" do
     report = fake_report(baselines: { ["/foo", "rps"] => 100.0 })
     markdown = render(
       rows: [row(name: "/foo", rps: 100.0, p50: 5.0, p90: 6.0, status: "200=100")],
       report: report
     )
 
-    expect(markdown).to include("| /foo | 100.0 | 5.0 | 6.0 | 200=100 |")
+    expect(markdown).to include("| /foo | 100.0 0.0% (100.0) | 5.0 | 6.0 | 200=100 |")
+  end
+
+  it "shows 0.0% without an arrow when the rounded delta is zero" do
+    report = fake_report(baselines: { ["/foo", "rps"] => 100.0 })
+    markdown = render(
+      rows: [row(name: "/foo", rps: 100.00001, p50: 5.0, p90: 6.0, status: "200=100")],
+      report: report
+    )
+
+    expect(markdown).to include("| /foo | 100.0 0.0% (100.0) | 5.0 | 6.0 | 200=100 |")
+    expect(markdown).not_to include("▲0.0%")
+    expect(markdown).not_to include("▼0.0%")
+  end
+
+  it "preserves significance markers when a significant delta rounds to zero" do
+    report = fake_report(
+      verdicts: { ["/foo", "rps"] => :regression, ["/foo", "p50_latency"] => :improvement },
+      baselines: { ["/foo", "rps"] => 100.0, ["/foo", "p50_latency"] => 5.0 }
+    )
+    markdown = render(
+      rows: [row(name: "/foo", rps: 99.999, p50: 4.999, p90: 6.0, status: "200=100")],
+      report: report
+    )
+
+    expect(markdown).to include(
+      "| /foo | **100.0** 🔴 0.0% (100.0) | **5.0** 🟢 0.0% (5.0) | 6.0 | 200=100 |"
+    )
+    expect(markdown).not_to include("▲0.0%")
+    expect(markdown).not_to include("▼0.0%")
   end
 
   it "links the benchmark name to its perf URL when the report provides one" do

@@ -28,6 +28,12 @@ module ReactOnRails
   class PacksGenerator
     CONTAINS_CLIENT_OR_SERVER_REGEX = /\.(server|client)($|\.)/
     COMPONENT_EXTENSIONS = /\.(jsx?|tsx?)$/
+    # Fallback order when the configured server bundle file is missing. Keep .jsx before
+    # TypeScript extensions as the closest migration fallback for apps moving from JS/JSX to TS.
+    # The configured extension is excluded, so server-bundle.js tries .jsx, .ts, .tsx, ...
+    SERVER_BUNDLE_SOURCE_EXTENSIONS = %w[.js .jsx .ts .tsx .mts .cts .mjs .cjs].freeze
+    # import/extensions suppressions are needed when generated imports include an explicit .js extension.
+    SERVER_BUNDLE_IMPORT_EXTENSION_COMMENT_EXTENSIONS = %w[.jsx .ts .tsx .mts .cts .mjs .cjs].freeze
     # Auto-registration requires nested_entries support which was added in 7.0.0
     # Note: The gemspec requires Shakapacker >= 6.0 for basic functionality
     MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING = "7.0.0"
@@ -47,6 +53,7 @@ module ReactOnRails
     def generate_packs_if_stale
       return unless ReactOnRails.configuration.auto_load_bundle
 
+      @server_bundle_entrypoint = nil
       verbose = ENV["REACT_ON_RAILS_VERBOSE"] == "true"
 
       with_generated_packs_lock(verbose: verbose) do
@@ -60,6 +67,8 @@ module ReactOnRails
           generate_packs(verbose: verbose)
         end
       end
+    ensure
+      @server_bundle_entrypoint = nil
     end
 
     private
@@ -68,9 +77,14 @@ module ReactOnRails
       server_bundle_ready =
         ReactOnRails.configuration.server_bundle_js_file.blank? ||
         File.exist?(generated_server_bundle_file_path)
+      server_component_registration_entry_ready =
+        !ReactOnRails::Utils.rsc_support_enabled? ||
+        server_component_registration_entries.empty? ||
+        File.exist?(server_component_registration_entry_file_path)
 
       Dir.exist?(generated_packs_directory_path) &&
         server_bundle_ready &&
+        server_component_registration_entry_ready &&
         !stale_or_missing_packs?
     end
 
@@ -131,6 +145,7 @@ module ReactOnRails
       store_to_path.each_value { |store_path| create_store_pack(store_path, verbose: verbose) }
 
       create_server_pack(verbose: verbose) if ReactOnRails.configuration.server_bundle_js_file.present?
+      create_server_component_registration_entry(verbose: verbose) if ReactOnRails::Utils.rsc_support_enabled?
 
       log_rsc_classification_summary if ReactOnRails::Utils.rsc_support_enabled?
     end
@@ -294,10 +309,24 @@ module ReactOnRails
     end
 
     def create_server_pack(verbose: false)
+      ensure_nonentrypoints_directory! unless ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint
       File.write(generated_server_bundle_file_path, generated_server_pack_file_content)
 
       add_generated_pack_to_server_bundle
       puts(Rainbow("Generated Server Bundle: #{generated_server_bundle_file_path}").orange) if verbose
+    end
+
+    def create_server_component_registration_entry(verbose: false)
+      entries = server_component_registration_entries
+      return if entries.empty?
+
+      ensure_nonentrypoints_directory!
+      File.write(server_component_registration_entry_file_path, server_component_registration_entry_content(entries))
+      return unless verbose
+
+      puts(
+        Rainbow("Generated Server Component Entry: #{server_component_registration_entry_file_path}").orange
+      )
     end
 
     def build_server_pack_content(component_on_server_imports, server_components, client_components,
@@ -323,21 +352,14 @@ module ReactOnRails
       content
     end
 
-    def generated_server_pack_file_content
-      common_components_for_server_bundle = common_component_to_path.delete_if { |k| server_component_to_path.key?(k) }
-      component_for_server_registration_to_path = common_components_for_server_bundle.merge(server_component_to_path)
+    def generated_server_pack_file_content(component_for_server_registration_to_path = nil)
+      component_for_server_registration_to_path ||= components_for_server_registration
 
       component_on_server_imports = component_for_server_registration_to_path.map do |name, component_path|
         "import #{name} from '#{relative_path(generated_server_bundle_file_path, component_path)}';"
       end
 
-      load_server_components = ReactOnRails::Utils.rsc_support_enabled?
-      server_components = component_for_server_registration_to_path.keys.delete_if do |name|
-        next true unless load_server_components
-
-        component_path = component_for_server_registration_to_path[name]
-        client_entrypoint?(component_path)
-      end
+      server_components = server_component_names_for_registration(component_for_server_registration_to_path)
       client_components = component_for_server_registration_to_path.keys - server_components
 
       # Include stores in server bundle
@@ -351,41 +373,131 @@ module ReactOnRails
                                 store_imports: store_imports, store_names: store_names)
     end
 
+    def components_for_server_registration
+      common_components_for_server_bundle = common_component_to_path.reject do |name, _|
+        server_component_to_path.key?(name)
+      end
+      common_components_for_server_bundle.merge(server_component_to_path)
+    end
+
+    # Accepts an already-fetched component map so callers that have one don't trigger a second
+    # components_for_server_registration scan (its Dir.glob is un-memoized).
+    def server_component_names_for_registration(components = nil)
+      return [] unless ReactOnRails::Utils.rsc_support_enabled?
+
+      components ||= components_for_server_registration
+      components.keys.reject { |name| client_entrypoint?(components[name]) }
+    end
+
+    def server_component_registration_entries(components = nil)
+      return {} unless ReactOnRails::Utils.rsc_support_enabled?
+
+      # Compute the component map once and reuse it: passing it to
+      # server_component_names_for_registration avoids a second components_for_server_registration
+      # scan, and this method runs on the dev-server staleness check on each webpack compile.
+      components ||= components_for_server_registration
+      components.slice(*server_component_names_for_registration(components))
+    end
+
+    def server_component_registration_entry_content(entries = nil)
+      entries ||= server_component_registration_entries
+      imports = entries.map do |name, component_path|
+        "import #{name} from '#{relative_path(server_component_registration_entry_file_path, component_path)}';"
+      end
+
+      <<~FILE_CONTENT
+        #{imports.join("\n")}
+
+        import registerServerComponent from '#{react_on_rails_npm_package}/registerServerComponent/server';
+        registerServerComponent({ #{entries.keys.join(', ')} });
+      FILE_CONTENT
+    end
+
     def add_generated_pack_to_server_bundle
       return if ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint
       return if ReactOnRails.configuration.server_bundle_js_file.blank?
 
-      relative_path_to_generated_server_bundle = relative_path(server_bundle_entrypoint,
-                                                               generated_server_bundle_file_path)
+      source_entrypoint = server_bundle_entrypoint
+      relative_path_to_generated_server_bundle = relative_path(source_entrypoint, generated_server_bundle_file_path)
+      relative_import_path_to_generated_server_bundle = relative_import_path(source_entrypoint,
+                                                                             generated_server_bundle_file_path)
+      import_path_to_generated_server_bundle = generated_server_bundle_import_path(source_entrypoint)
+      generated_server_bundle_import_statement = "import '#{import_path_to_generated_server_bundle}';"
+      if SERVER_BUNDLE_IMPORT_EXTENSION_COMMENT_EXTENSIONS.include?(File.extname(source_entrypoint))
+        generated_server_bundle_import_statement += " // eslint-disable-line import/extensions"
+      end
+
       content = <<~FILE_CONTENT
         // import statement added by react_on_rails:generate_packs rake task
-        import "./#{relative_path_to_generated_server_bundle}"
+        #{generated_server_bundle_import_statement}
       FILE_CONTENT
 
+      legacy_relative_import_path_to_generated_server_bundle = "./#{relative_path_to_generated_server_bundle}"
+      # Match today's normalized import path, the extension-stripped .js source form, and the
+      # legacy "./" prefixed path so repeated generation stays idempotent across old outputs.
+      generated_server_bundle_import_pattern = Regexp.union(
+        relative_import_path_to_generated_server_bundle,
+        import_path_to_generated_server_bundle,
+        legacy_relative_import_path_to_generated_server_bundle
+      )
+      generated_server_bundle_import_regex = /
+        import\s+['"]
+        #{generated_server_bundle_import_pattern}
+        ['"]
+      /x
+
       ReactOnRails::Utils.prepend_to_file_if_text_not_present(
-        file: server_bundle_entrypoint,
+        file: source_entrypoint,
         text_to_prepend: content,
-        regex: %r{import ['"]\./#{relative_path_to_generated_server_bundle}['"]}
+        regex: generated_server_bundle_import_regex
       )
     end
 
     def generated_server_bundle_file_path
       return server_bundle_entrypoint if ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint
 
+      "#{generated_nonentrypoints_directory_path}/#{generated_server_bundle_file_name}.js"
+    end
+
+    def generated_server_bundle_file_name
       entrypoint_ext = File.extname(server_bundle_entrypoint)
       generated_interim_server_bundle_path = server_bundle_entrypoint.sub(
         /#{Regexp.escape(entrypoint_ext)}$/, "-generated#{entrypoint_ext}"
       )
-      generated_server_bundle_file_name = component_name(generated_interim_server_bundle_path)
-      source_entrypoint_parent = Pathname(ReactOnRails::PackerUtils.packer_source_entry_path).parent
-      generated_nonentrypoints_path = "#{source_entrypoint_parent}/generated"
+      component_name(generated_interim_server_bundle_path)
+    end
 
-      FileUtils.mkdir_p(generated_nonentrypoints_path)
-      "#{generated_nonentrypoints_path}/#{generated_server_bundle_file_name}.js"
+    def server_component_registration_entry_file_path
+      "#{generated_nonentrypoints_directory_path}/server-component-registration-entry.js"
+    end
+
+    def generated_nonentrypoints_directory_path
+      source_entrypoint_parent = Pathname(ReactOnRails::PackerUtils.packer_source_entry_path).parent
+      "#{source_entrypoint_parent}/generated"
+    end
+
+    # Creates the generated nonentrypoints directory. Kept separate from
+    # `generated_nonentrypoints_directory_path` so that read-only callers (staleness
+    # checks, cleanup enumeration in `build_expected_files_set`) can compute the path
+    # without the side effect of creating the directory. Call this only before writing
+    # a file into that directory.
+    def ensure_nonentrypoints_directory!
+      FileUtils.mkdir_p(generated_nonentrypoints_directory_path)
+    end
+
+    # The server-component registration entry lives in the nonentrypoints `generated/` directory.
+    # That equals generated_server_bundle_directory_path in the default mode, but when
+    # make_generated_server_bundle_the_entrypoint is true the server bundle path is the entrypoint
+    # and generated_server_bundle_directory_path is nil — so the nonentrypoints directory would
+    # otherwise never be scanned and a stale registration entry could never be cleaned. Add it
+    # explicitly (only when RSC is enabled, to avoid creating an empty directory otherwise).
+    def directories_to_clean
+      directories = [generated_packs_directory_path, generated_server_bundle_directory_path]
+      directories << generated_nonentrypoints_directory_path if ReactOnRails::Utils.rsc_support_enabled?
+      directories.compact.uniq
     end
 
     def clean_non_generated_files_with_feedback(verbose: false)
-      directories_to_clean = [generated_packs_directory_path, generated_server_bundle_directory_path].compact.uniq
       expected_files = build_expected_files_set
 
       puts Rainbow("🧹 Cleaning non-generated files...").yellow if verbose
@@ -408,8 +520,14 @@ module ReactOnRails
       if ReactOnRails.configuration.server_bundle_js_file.present?
         expected_server_bundle = generated_server_bundle_file_path
       end
+      expected_server_component_registration_entry = server_component_registration_entry_file_path if
+        ReactOnRails::Utils.rsc_support_enabled? && server_component_registration_entries.any?
 
-      { pack_files: expected_pack_files, server_bundle: expected_server_bundle }
+      {
+        pack_files: expected_pack_files,
+        server_bundle: expected_server_bundle,
+        server_component_registration_entry: expected_server_component_registration_entry
+      }
     end
 
     def clean_unexpected_files_from_directory(dir_path, expected_files, verbose: false)
@@ -429,8 +547,13 @@ module ReactOnRails
 
     def find_unexpected_files(existing_files, dir_path, expected_files)
       existing_files.reject do |file|
-        if dir_path == generated_server_bundle_directory_path
-          file == expected_files[:server_bundle]
+        # The server bundle and the registration entry both live in the nonentrypoints `generated/`
+        # directory (which equals generated_server_bundle_directory_path in the default mode).
+        if dir_path == generated_nonentrypoints_directory_path
+          [
+            expected_files[:server_bundle],
+            expected_files[:server_component_registration_entry]
+          ].compact.include?(file)
         else
           expected_files[:pack_files].include?(file)
         end
@@ -460,11 +583,6 @@ module ReactOnRails
     end
 
     def clean_generated_directories_with_feedback(verbose: false)
-      directories_to_clean = [
-        generated_packs_directory_path,
-        generated_server_bundle_directory_path
-      ].compact.uniq
-
       puts Rainbow("🧹 Cleaning generated directories...").yellow if verbose
 
       total_deleted = directories_to_clean.sum { |dir_path| clean_directory_with_feedback(dir_path, verbose: verbose) }
@@ -506,8 +624,54 @@ module ReactOnRails
     end
 
     def server_bundle_entrypoint
-      Rails.root.join(ReactOnRails::PackerUtils.packer_source_entry_path,
-                      ReactOnRails.configuration.server_bundle_js_file)
+      @server_bundle_entrypoint ||= begin
+        configured_entrypoint = Rails.root.join(
+          ReactOnRails::PackerUtils.packer_source_entry_path,
+          ReactOnRails.configuration.server_bundle_js_file
+        ).to_s
+
+        if ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint
+          configured_entrypoint
+        else
+          resolve_server_bundle_source_entrypoint(configured_entrypoint)
+        end
+      end
+    end
+
+    def resolve_server_bundle_source_entrypoint(configured_entrypoint)
+      # Existing configured .js path wins over alternate .ts fallback when both exist.
+      return configured_entrypoint if File.exist?(configured_entrypoint)
+
+      # Strip the existing extension when present; bare paths keep the full base and probe all extensions.
+      base_path = configured_entrypoint.sub(%r{\.[^./]+\z}, "")
+      server_bundle_source_extensions_for(configured_entrypoint).each do |extension|
+        candidate_entrypoint = "#{base_path}#{extension}"
+        next unless File.exist?(candidate_entrypoint)
+
+        Rails.logger&.debug(
+          "[react_on_rails] server bundle source entrypoint resolved to #{candidate_entrypoint} " \
+          "(configured: #{configured_entrypoint})"
+        )
+        return candidate_entrypoint
+      end
+
+      configured_entrypoint
+    end
+
+    def server_bundle_source_extensions_for(configured_entrypoint)
+      configured_extension = File.extname(configured_entrypoint)
+      return SERVER_BUNDLE_SOURCE_EXTENSIONS if configured_extension.empty?
+
+      SERVER_BUNDLE_SOURCE_EXTENSIONS.reject { |extension| extension == configured_extension }
+    end
+
+    def generated_server_bundle_import_path(source_entrypoint)
+      import_path = relative_import_path(source_entrypoint, generated_server_bundle_file_path)
+      # .js entrypoints can use an extensionless import to satisfy import/extensions. Non-JS
+      # entrypoints keep the explicit .js output path and the caller adds the eslint suppression.
+      return import_path.delete_suffix(".js") if File.extname(source_entrypoint) == ".js"
+
+      import_path
     end
 
     def generated_packs_directory_path
@@ -536,6 +700,13 @@ module ReactOnRails
       to_path = Pathname.new(to)
 
       to_path.relative_path_from(from_dir)
+    end
+
+    def relative_import_path(from, to)
+      relative_path_string = relative_path(from, to).to_s
+      return relative_path_string if relative_path_string.start_with?(".")
+
+      "./#{relative_path_string}"
     end
 
     def generated_pack_path(file_path)
@@ -682,21 +853,32 @@ module ReactOnRails
       store_files = store_to_path.values
       all_source_files = component_files + store_files
 
-      return false if all_source_files.empty?
+      if all_source_files.any?
+        most_recent_mtime = Utils.find_most_recent_mtime(all_source_files).to_i
 
-      most_recent_mtime = Utils.find_most_recent_mtime(all_source_files).to_i
+        # Check component packs
+        component_files.each do |file|
+          return true if generated_component_pack_stale?(file, most_recent_mtime)
+        end
 
-      # Check component packs
-      component_files.each do |file|
-        return true if generated_component_pack_stale?(file, most_recent_mtime)
+        # Check store packs
+        store_files.each do |file|
+          return true if generated_store_pack_stale?(file, most_recent_mtime)
+        end
       end
 
-      # Check store packs
-      store_files.each do |file|
-        return true if generated_store_pack_stale?(file, most_recent_mtime)
-      end
+      server_registration_components = server_registration_components_for_staleness
+      return true if generated_server_bundle_stale?(server_registration_components)
+      return true if server_component_registration_entry_stale?(server_registration_components)
 
       false
+    end
+
+    def server_registration_components_for_staleness
+      return nil if ReactOnRails.configuration.server_bundle_js_file.blank? &&
+                    !ReactOnRails::Utils.rsc_support_enabled?
+
+      components_for_server_registration
     end
 
     def generated_component_pack_stale?(file, most_recent_mtime)
@@ -711,6 +893,38 @@ module ReactOnRails
       return true if !File.exist?(path) || File.mtime(path).to_i < most_recent_mtime
 
       File.read(path) != store_pack_file_contents(file)
+    end
+
+    def generated_server_bundle_stale?(components = nil)
+      return false if ReactOnRails.configuration.server_bundle_js_file.blank?
+
+      path = generated_server_bundle_file_path
+      return true unless File.exist?(path)
+
+      components ||= components_for_server_registration
+      source_files = components.values + store_to_path.values
+      return true if generated_file_older_than_sources?(path, source_files)
+
+      File.read(path) != generated_server_pack_file_content(components)
+    end
+
+    def server_component_registration_entry_stale?(components = nil)
+      return false unless ReactOnRails::Utils.rsc_support_enabled?
+
+      entries = server_component_registration_entries(components)
+      return false if entries.empty?
+
+      path = server_component_registration_entry_file_path
+      return true unless File.exist?(path)
+      return true if generated_file_older_than_sources?(path, entries.values)
+
+      File.read(path) != server_component_registration_entry_content(entries)
+    end
+
+    def generated_file_older_than_sources?(generated_file, source_files)
+      return false if source_files.empty?
+
+      File.mtime(generated_file).to_i < Utils.find_most_recent_mtime(source_files).to_i
     end
   end
   # rubocop:enable Metrics/ClassLength

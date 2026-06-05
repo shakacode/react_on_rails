@@ -166,7 +166,7 @@ const MyLegacyRenderer = (props, _railsContext, domNodeId) => {
 [React Router](https://reactrouter.com/) is supported via manual integration, including server-side rendering. See:
 
 1. [React on Rails docs for React Router](../building-features/react-router.md)
-2. Examples in [spec/dummy/app/views/react_router](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails/spec/dummy/app/views/react_router) and follow to the JavaScript code in the [spec/dummy/client/app/startup/RouterApp.server.jsx](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/spec/dummy/client/app/startup/RouterApp.server.jsx).
+2. Examples in [spec/dummy/app/views/react_router](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails/spec/dummy/app/views/react_router) and follow to the JavaScript code in the [spec/dummy/client/app/startup/RouterApp.server.tsx](../../../react_on_rails/spec/dummy/client/app/startup/RouterApp.server.tsx).
 3. [React on Rails Pro loadable-components guide](../building-features/code-splitting.md) for modern code splitting with server-side rendering.
 
 ### TanStack Router

@@ -52,11 +52,6 @@ try {
 const customConfig = {
   options: {
     jsc: {
-      parser: {
-        syntax: 'ecmascript',
-        jsx: true,
-        dynamicImport: true,
-      },
       transform: {
         react: {
           runtime: 'automatic',
@@ -140,13 +135,13 @@ If you need stable React Server Components support today:
 
 ### Features Migrated Successfully
 
-| Babel Feature      | SWC Equivalent                    | Notes                       |
-| ------------------ | --------------------------------- | --------------------------- |
-| JSX Transform      | `jsc.transform.react`             | Automatic runtime supported |
-| React Fast Refresh | `jsc.transform.react.refresh`     | Works in development mode   |
-| Dynamic Imports    | `jsc.parser.dynamicImport`        | Fully supported             |
-| Class Properties   | Built-in                          | No config needed            |
-| TypeScript         | `jsc.parser.syntax: 'typescript'` | Native support              |
+| Babel Feature      | SWC Equivalent                 | Notes                       |
+| ------------------ | ------------------------------ | --------------------------- |
+| JSX Transform      | `jsc.transform.react`          | Automatic runtime supported |
+| React Fast Refresh | `jsc.transform.react.refresh`  | Works in development mode   |
+| Dynamic Imports    | Shakapacker SWC parser default | Fully supported             |
+| Class Properties   | Built-in                       | No config needed            |
+| TypeScript         | Shakapacker SWC parser default | Native support              |
 
 ### Features Requiring Different Approach
 
@@ -225,18 +220,7 @@ yarn add -D @typescript-eslint/parser @typescript-eslint/eslint-plugin
 
 ### Issue: TypeScript Files Not Transpiling
 
-**Solution**: For TypeScript files, update your SWC config to use TypeScript parser:
-
-```javascript
-jsc: {
-  parser: {
-    syntax: 'typescript',
-    tsx: true,
-    dynamicImport: true,
-  },
-  // ... rest of config
-}
-```
+**Solution**: Do not hardcode `jsc.parser` in `config/swc.config.js`. Shakapacker selects the SWC parser per file extension, using TypeScript mode for `.ts` and `.tsx` files. Keep custom settings under `jsc.transform`, `jsc.keepClassNames`, and other non-parser options unless the app has a specific parser feature to enable.
 
 ## Testing Results
 

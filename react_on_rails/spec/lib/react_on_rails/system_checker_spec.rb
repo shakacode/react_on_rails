@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "open3"
+
 require_relative "../../react_on_rails/spec_helper"
 require_relative "../../../lib/react_on_rails/system_checker"
 RSpec.describe ReactOnRails::SystemChecker do
@@ -8,22 +10,22 @@ RSpec.describe ReactOnRails::SystemChecker do
   let(:default_shakapacker_config_path) { rails_root.join("config/shakapacker.yml").to_s }
 
   describe "ShakapackerConfigHelpers self-contained require" do
-    # normalize_assets_bundler references SystemChecker::SUPPORTED_ASSETS_BUNDLERS
-    # lazily, and shakapacker_config_helpers.rb requires system_checker at the
-    # BOTTOM of the file so the constant resolves even when a consumer loads the
-    # helpers first. Every in-suite spec loads system_checker first, so this guard
-    # boots a fresh Ruby that requires ONLY the helpers file. It goes red if that
-    # require is removed (uninitialized SystemChecker) or moved to the top (which
-    # NameErrors on SystemChecker's class-body `include ShakapackerConfigHelpers`).
-    it "resolves SUPPORTED_ASSETS_BUNDLERS when the helpers file is loaded first" do
-      helpers_path = File.expand_path("../../../lib/react_on_rails/shakapacker_config_helpers", __dir__)
+    # Every in-suite spec loads system_checker first, so this guard boots a fresh
+    # Ruby with only lib/ on its load path and requires the helpers file directly.
+    # It goes red if the helper regains a SystemChecker load-order dependency.
+    it "normalizes supported bundlers without loading SystemChecker" do
+      lib_path = File.expand_path("../../../lib", __dir__)
       script = <<~RUBY
-        require #{helpers_path.inspect}
+        require "react_on_rails/shakapacker_config_helpers"
+        if defined?(ReactOnRails::SystemChecker)
+          warn "SystemChecker should not be loaded by ShakapackerConfigHelpers"
+          exit 1
+        end
         klass = Class.new { include ReactOnRails::ShakapackerConfigHelpers }
         puts klass.new.send(:normalize_assets_bundler, "rspack")
       RUBY
 
-      stdout, stderr, status = Open3.capture3(RbConfig.ruby, "-e", script)
+      stdout, stderr, status = Open3.capture3(RbConfig.ruby, "-I", lib_path, "-e", script)
 
       expect(status).to be_success, "Loading shakapacker_config_helpers standalone failed:\n#{stderr}"
       expect(stdout.strip).to eq("rspack")

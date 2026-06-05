@@ -73,13 +73,13 @@ If you already have an existing server bundle entrypoint and have not set `make_
 
 ```javascript
 // import statement added by react_on_rails:generate_packs rake task
-import './../generated/server-bundle-generated.js';
+import '../generated/server-bundle-generated.js';
 ```
 
 We recommend committing this import statement to your version control system.
 
 > Example (dummy app): see the server bundle entrypoint import.
-> [Dummy server-bundle.js](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/spec/dummy/client/app/packs/server-bundle.js)
+> [Dummy `server-bundle.ts`](../../../react_on_rails/spec/dummy/client/app/packs/server-bundle.ts)
 
 ## Usage
 
@@ -509,7 +509,7 @@ _Screenshots show browser dev tools network analysis demonstrating the dramatic 
 
 If server rendering is enabled, the component will be registered for usage both in server and client rendering. To have separate definitions for client and server rendering, name the component files `ComponentName.server.jsx` and `ComponentName.client.jsx`. The `ComponentName.server.jsx` file will be used for server rendering and the `ComponentName.client.jsx` file for client rendering. If you don't want the component rendered on the server, you should only have the `ComponentName.client.jsx` file.
 
-> Example (dummy app): paired files such as [`ReduxApp.client.jsx`](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/spec/dummy/client/app/startup/ReduxApp.client.jsx) and [`ReduxApp.server.jsx`](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/spec/dummy/client/app/startup/ReduxApp.server.jsx), and [`RouterApp.client.jsx`](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/spec/dummy/client/app/startup/RouterApp.client.jsx) and [`RouterApp.server.jsx`](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/spec/dummy/client/app/startup/RouterApp.server.jsx).
+> Example (dummy app): paired files such as [`ReduxApp.client.tsx`](../../../react_on_rails/spec/dummy/client/app/startup/ReduxApp.client.tsx) and [`ReduxApp.server.tsx`](../../../react_on_rails/spec/dummy/client/app/startup/ReduxApp.server.tsx), and [`RouterApp.client.tsx`](../../../react_on_rails/spec/dummy/client/app/startup/RouterApp.client.tsx) and [`RouterApp.server.tsx`](../../../react_on_rails/spec/dummy/client/app/startup/RouterApp.server.tsx).
 
 Once generated, all server entrypoints will be imported into a file named `[ReactOnRails.configuration.server_bundle_js_file]-generated.js`, which in turn will be imported into a source file named the same as `ReactOnRails.configuration.server_bundle_js_file`. If your server bundling logic is such that your server bundle source entrypoint is not named the same as your `ReactOnRails.configuration.server_bundle_js_file` and changing it would be difficult, please let us know.
 
@@ -607,11 +607,11 @@ registerServerComponent({ Dashboard, Profile });
 ReactOnRails.register({ LikeButton, CommentForm });
 ```
 
-Your existing `packs/server-bundle.js` entry file doesn't need manual changes — the packs generator adds one import line at the top pointing to the aggregated file:
+Your existing `packs/server-bundle.js` or `packs/server-bundle.ts` entry file doesn't need manual changes — the packs generator adds one import line at the top pointing to the aggregated file:
 
 ```js
-// packs/server-bundle.js
-import './../generated/server-bundle-generated.js'; // added by react_on_rails:generate_packs
+// packs/server-bundle.js or packs/server-bundle.ts
+import '../generated/server-bundle-generated.js'; // added by react_on_rails:generate_packs
 // ... your own custom server-side code continues here
 ```
 

@@ -190,6 +190,8 @@ if __FILE__ == $PROGRAM_NAME
   puts "Server is ready!"
 
   FileUtils.mkdir_p(OUTDIR)
+  target_monitor = BenchmarkTargetMonitor.from_env(output_dir: OUTDIR)
+  target_monitor.start_measurement!
 
   # Initialize BMF collector for Bencher output (suffix used for Core/Pro distinction)
   bmf_collector = BmfCollector.new(suffix: BMF_SUFFIX)
@@ -203,14 +205,16 @@ if __FILE__ == $PROGRAM_NAME
   puts "\nSummary saved to #{SUMMARY_TXT}"
   system("column", "-t", "-s", "\t", SUMMARY_TXT)
 
-  # Write the Bencher payload only on a fully green run. Guarding the write here
-  # (rather than writing unconditionally before exit) makes the "never upload a
-  # partial-success payload" invariant self-enforcing instead of relying on the
-  # downstream Bencher step having no `if: always()`.
+  # Write the Bencher payload only on a fully green run against a healthy target.
+  # Guarding the write here makes the "never upload partial metrics" invariant
+  # self-enforcing instead of relying on later workflow steps to discard data.
   if failed_routes.empty?
-    bmf_collector.write_bmf_json(BENCHMARK_JSON)
-    # Display sidecar (summary table data) — written alongside the BMF.
-    bmf_collector.write_display_json(DISPLAY_JSON)
+    begin
+      write_benchmark_payload(bmf_collector, target_monitor: target_monitor)
+    rescue BenchmarkTargetMonitor::MonitorFailure => e
+      $stdout.puts "::error::#{e.message}"
+      exit 1
+    end
   else
     $stdout.puts "::error::#{failed_routes.length} of #{routes.length} benchmark route(s) failed: " \
                  "#{failed_routes.join(', ')}"

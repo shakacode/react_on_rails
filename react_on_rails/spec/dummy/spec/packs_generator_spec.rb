@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "rails_helper"
+require "tmpdir"
 
 # rubocop:disable Metrics/ModuleLength
 module ReactOnRails
@@ -63,6 +64,43 @@ module ReactOnRails
           .to equal(false)
         FileUtils.mv("./temp", server_bundle_js_file_path)
         ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint = false
+      end
+
+      it "keeps generated output at the configured file when a matching TypeScript source exists" do
+        typescript_server_bundle_path = server_bundle_js_file_path.sub(/\.js\z/, ".ts")
+        FileUtils.mv(server_bundle_js_file_path, "./temp")
+        FileUtils.rm_rf server_bundle_js_file_path
+        File.write(typescript_server_bundle_path, "export default {};\n")
+        ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint = true
+
+        described_class.instance.generate_packs_if_stale
+
+        expect(File.exist?(server_bundle_js_file_path)).to equal(true)
+        expect(File.read(typescript_server_bundle_path)).to eq("export default {};\n")
+      ensure
+        ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint = false
+        FileUtils.rm_f(typescript_server_bundle_path)
+        FileUtils.mv("./temp", server_bundle_js_file_path) if File.exist?("./temp")
+      end
+    end
+
+    context "when computing the nonentrypoints directory path" do
+      it "is a pure accessor that does not create the directory as a side effect" do
+        generator = described_class.instance
+        nonentrypoints_dir = generator.send(:generated_nonentrypoints_directory_path)
+        FileUtils.rm_rf(nonentrypoints_dir)
+
+        # The path accessor must not touch the filesystem; the mkdir lives in
+        # ensure_nonentrypoints_directory!, called only before writes. This locks the behavior so
+        # read-only callers (staleness checks, cleanup enumeration) never create the directory.
+        expect(generator.send(:generated_nonentrypoints_directory_path)).to eq(nonentrypoints_dir)
+        expect(Dir.exist?(nonentrypoints_dir)).to be(false)
+
+        # ensure_nonentrypoints_directory! is the only thing that creates it.
+        generator.send(:ensure_nonentrypoints_directory!)
+        expect(Dir.exist?(nonentrypoints_dir)).to be(true)
+
+        FileUtils.rm_rf(nonentrypoints_dir)
       end
     end
 
@@ -343,6 +381,53 @@ module ReactOnRails
         ENV.delete("REACT_ON_RAILS_VERBOSE")
       end
 
+      it "regenerates server artifacts when a server-only component source is newer" do
+        described_class.instance.generate_packs_if_stale
+        generator = described_class.instance
+        server_component_source =
+          "#{packer_source_path}/components/#{components_directory}/ror_components/" \
+          "ReactServerComponentWithClientAndServer.server.jsx"
+        registration_entry = generator.send(:server_component_registration_entry_file_path)
+        original_source_mtime = File.mtime(server_component_source)
+
+        stale_generated_time = Time.now - 60
+        fresh_source_time = Time.now - 30
+        FileUtils.touch(generated_server_bundle_file_path, mtime: stale_generated_time)
+        FileUtils.touch(registration_entry, mtime: stale_generated_time)
+        FileUtils.touch(server_component_source, mtime: fresh_source_time)
+
+        ENV["REACT_ON_RAILS_VERBOSE"] = "true"
+        expect do
+          described_class.instance.generate_packs_if_stale
+        end.to output(GENERATED_PACKS_CONSOLE_OUTPUT_REGEX).to_stdout
+
+        expect(File.mtime(generated_server_bundle_file_path)).to be > fresh_source_time
+        expect(File.mtime(registration_entry)).to be > fresh_source_time
+      ensure
+        FileUtils.touch(server_component_source, mtime: original_source_mtime) if original_source_mtime
+        ENV.delete("REACT_ON_RAILS_VERBOSE")
+      end
+
+      it "regenerates the registration entry when its content is stale but its mtime is current" do
+        described_class.instance.generate_packs_if_stale
+        generator = described_class.instance
+        registration_entry = generator.send(:server_component_registration_entry_file_path)
+        expect(File.exist?(registration_entry)).to be(true)
+
+        # A fresh mtime keeps generated_file_older_than_sources? false, so this exercises the
+        # content-equality branch of server_component_registration_entry_stale? specifically
+        # (the mtime branch is covered by the preceding example). This is the branch that catches an
+        # added/removed/renamed server component when no source mtime happens to be newer.
+        File.write(registration_entry, "// stale registration entry\n")
+        fresh_mtime = Time.now + 60
+        File.utime(fresh_mtime, fresh_mtime, registration_entry)
+
+        described_class.instance.generate_packs_if_stale
+
+        expect(File.read(registration_entry)).not_to include("stale registration entry")
+        expect(File.read(registration_entry)).to include("registerServerComponent")
+      end
+
       it "checks generated pack contents without emitting likely-client warnings" do
         described_class.instance.generate_packs_if_stale
         component_name = "ReactServerComponent"
@@ -368,6 +453,17 @@ module ReactOnRails
         end.not_to output(/WARNING.*#{component_name}/).to_stdout
       ensure
         File.write(component_source, original_source) if original_source
+      end
+
+      it "does not write a registration entry when there are no server components to register" do
+        generator = described_class.instance
+        allow(generator).to receive(:server_component_registration_entries).and_return({})
+        entry_path = generator.send(:server_component_registration_entry_file_path)
+        FileUtils.rm_f(entry_path)
+
+        generator.send(:create_server_component_registration_entry)
+
+        expect(File.exist?(entry_path)).to be(false)
       end
 
       context "when RSC support is disabled" do
@@ -433,6 +529,216 @@ module ReactOnRails
 
           expect(generated_server_bundle_content.strip).to eq(expected_content.strip)
         end
+
+        it "classifies server and client components without rescanning component paths" do
+          generator = described_class.new
+          components = {
+            "ReactClientComponent" =>
+              "#{packer_source_path}/components/ReactServerComponents/ror_components/ReactClientComponent.jsx",
+            "ReactServerComponent" =>
+              "#{packer_source_path}/components/ReactServerComponents/ror_components/ReactServerComponent.jsx"
+          }
+
+          # Guard the no-rescan optimization: generated_server_pack_file_content must fetch the
+          # component map exactly once (components_for_server_registration runs an un-memoized
+          # Dir.glob). `expect ... .once` verifies the count; `allow ... .once` would not.
+          expect(generator).to receive(:components_for_server_registration).once.and_return(components)
+          generated_server_bundle_path = File.join(
+            Pathname(packer_source_entry_path).parent,
+            "generated/server-bundle-generated.js"
+          )
+          allow(generator).to receive_messages(
+            store_to_path: {},
+            generated_server_bundle_file_path: generated_server_bundle_path
+          )
+          allow(generator).to receive(:client_entrypoint?) do |path|
+            path.end_with?("ReactClientComponent.jsx")
+          end
+
+          generated_server_bundle_content = generator.send(:generated_server_pack_file_content)
+
+          expect(generated_server_bundle_content).to include("registerServerComponent({ReactServerComponent});")
+          expect(generated_server_bundle_content).to include("ReactOnRails.register({ReactClientComponent});")
+        end
+
+        it "reuses precomputed components when checking generated server bundle freshness" do
+          generator = described_class.new
+          components = {
+            "ReactServerComponent" =>
+              "#{packer_source_path}/components/ReactServerComponents/ror_components/ReactServerComponent.jsx"
+          }
+          generated_server_bundle_path = File.join(
+            Pathname(packer_source_entry_path).parent,
+            "generated/server-bundle-generated.js"
+          )
+
+          allow(generator).to receive(:components_for_server_registration).and_return(components)
+          allow(generator).to receive_messages(
+            generated_server_bundle_file_path: generated_server_bundle_path,
+            store_to_path: {}
+          )
+          allow(generator).to receive(:generated_file_older_than_sources?)
+            .with(generated_server_bundle_path, components.values)
+            .and_return(false)
+          allow(generator).to receive(:generated_server_pack_file_content).with(components).and_return("fresh")
+          allow(File).to receive(:exist?).and_call_original
+          allow(File).to receive(:exist?).with(generated_server_bundle_path).and_return(true)
+          allow(File).to receive(:read).with(generated_server_bundle_path).and_return("fresh")
+
+          expect(generator.send(:generated_server_bundle_stale?)).to be(false)
+          expect(generator).to have_received(:components_for_server_registration).once
+          expect(generator).to have_received(:generated_server_pack_file_content).with(components)
+        end
+
+        it "reuses precomputed entries when writing and checking the RSC registration entry" do
+          generator = described_class.new
+          entries = {
+            "ReactServerComponent" =>
+              "#{packer_source_path}/components/ReactServerComponents/ror_components/ReactServerComponent.jsx"
+          }
+          registration_entry_path = File.join(
+            Pathname(packer_source_entry_path).parent,
+            "generated/server-component-registration-entry.js"
+          )
+
+          allow(generator).to receive_messages(
+            server_component_registration_entries: entries,
+            server_component_registration_entry_file_path: registration_entry_path
+          )
+          allow(generator).to receive(:server_component_registration_entry_content)
+            .with(entries)
+            .and_return("fresh")
+          allow(generator).to receive(:ensure_nonentrypoints_directory!)
+          expect(File).to receive(:write).with(registration_entry_path, "fresh")
+
+          generator.send(:create_server_component_registration_entry)
+
+          allow(generator).to receive(:generated_file_older_than_sources?)
+            .with(registration_entry_path, entries.values)
+            .and_return(false)
+          allow(File).to receive(:exist?).and_call_original
+          allow(File).to receive(:exist?).with(registration_entry_path).and_return(true)
+          allow(File).to receive(:read).with(registration_entry_path).and_return("fresh")
+
+          expect(generator.send(:server_component_registration_entry_stale?)).to be(false)
+          expect(generator).to have_received(:server_component_registration_entries).twice
+          expect(generator).to have_received(:server_component_registration_entry_content).with(entries).twice
+        end
+
+        it "reuses server registration components across the staleness fast path" do
+          generator = described_class.new
+          components = {
+            "ReactServerComponent" =>
+              "#{packer_source_path}/components/ReactServerComponents/ror_components/ReactServerComponent.jsx"
+          }
+          generated_server_bundle_path = File.join(
+            Pathname(packer_source_entry_path).parent,
+            "generated/server-bundle-generated.js"
+          )
+          registration_entry_path = File.join(
+            Pathname(packer_source_entry_path).parent,
+            "generated/server-component-registration-entry.js"
+          )
+
+          allow(generator).to receive_messages(
+            common_component_to_path: {},
+            client_component_to_path: {},
+            store_to_path: {},
+            generated_server_bundle_file_path: generated_server_bundle_path,
+            server_component_registration_entry_file_path: registration_entry_path,
+            client_entrypoint?: false
+          )
+          allow(generator).to receive(:components_for_server_registration).and_return(components)
+          allow(generator).to receive(:generated_file_older_than_sources?)
+            .with(generated_server_bundle_path, components.values)
+            .and_return(false)
+          allow(generator).to receive(:generated_file_older_than_sources?)
+            .with(registration_entry_path, components.values)
+            .and_return(false)
+          allow(generator).to receive(:generated_server_pack_file_content).with(components).and_return("fresh")
+          allow(generator)
+            .to receive(:server_component_registration_entry_content)
+            .with(components)
+            .and_return("fresh")
+          allow(File).to receive(:exist?).and_call_original
+          allow(File).to receive(:exist?).with(generated_server_bundle_path).and_return(true)
+          allow(File).to receive(:exist?).with(registration_entry_path).and_return(true)
+          allow(File).to receive(:read).with(generated_server_bundle_path).and_return("fresh")
+          allow(File).to receive(:read).with(registration_entry_path).and_return("fresh")
+
+          expect(generator.send(:stale_or_missing_packs?)).to be(false)
+          expect(generator).to have_received(:components_for_server_registration).once
+        end
+
+        it "creates a server component registration entry for RSC reference discovery" do
+          generated_entry_path = File.join(
+            Pathname(packer_source_entry_path).parent,
+            "generated/server-component-registration-entry.js"
+          )
+          generated_entry_content = File.read(generated_entry_path)
+          expected_content = <<~CONTENT.strip
+            import ReactServerComponent from '../components/ReactServerComponents/ror_components/ReactServerComponent.jsx';
+            import ReactServerComponentWithClientAndServer from '../components/ReactServerComponents/ror_components/ReactServerComponentWithClientAndServer.server.jsx';
+
+            import registerServerComponent from 'react-on-rails-pro/registerServerComponent/server';
+            registerServerComponent({ ReactServerComponent, ReactServerComponentWithClientAndServer });
+          CONTENT
+
+          expect(generated_entry_content.strip).to eq(expected_content.strip)
+          expect(generated_entry_content).not_to include("ReactOnRails.register")
+          expect(generated_entry_content).not_to include("ReactClientComponent")
+        end
+
+        it "preserves the registration entry while removing stray files during cleanup" do
+          generated_dir = File.join(Pathname(packer_source_entry_path).parent, "generated")
+          entry_path = File.join(generated_dir, "server-component-registration-entry.js")
+          stray_path = File.join(generated_dir, "stray-orphan.js")
+          File.write(stray_path, "// stray\n")
+          expect(File.exist?(entry_path)).to be(true)
+
+          described_class.instance.generate_packs_if_stale
+
+          expect(File.exist?(stray_path)).to be(false)
+          expect(File.exist?(entry_path)).to be(true)
+        end
+
+        it "regenerates the registration entry when only it is missing" do
+          entry_path = File.join(
+            Pathname(packer_source_entry_path).parent,
+            "generated/server-component-registration-entry.js"
+          )
+          expect(File.exist?(entry_path)).to be(true)
+          File.delete(entry_path)
+
+          described_class.instance.generate_packs_if_stale
+
+          expect(File.exist?(entry_path)).to be(true)
+        end
+
+        it "scans the nonentrypoints directory for cleanup even when the server bundle is the entrypoint" do
+          generator = described_class.instance
+          ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint = true
+          nonentrypoints_dir = generator.send(:generated_nonentrypoints_directory_path)
+
+          # generated_server_bundle_directory_path is nil in entrypoint mode, so without the explicit
+          # add the registration entry's directory would never be enumerated for cleanup.
+          expect(generator.send(:directories_to_clean)).to include(nonentrypoints_dir)
+        ensure
+          ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint = false
+        end
+
+        it "treats the registration entry as expected and stray files as unexpected" do
+          generator = described_class.instance
+          nonentrypoints_dir = generator.send(:generated_nonentrypoints_directory_path)
+          entry = generator.send(:server_component_registration_entry_file_path)
+          stray = File.join(nonentrypoints_dir, "stray-orphan.js")
+          expected_files = generator.send(:build_expected_files_set)
+
+          unexpected = generator.send(:find_unexpected_files, [entry, stray], nonentrypoints_dir, expected_files)
+
+          expect(unexpected).to include(stray)
+          expect(unexpected).not_to include(entry)
+        end
       end
     end
 
@@ -476,13 +782,91 @@ module ReactOnRails
 
       it "adds a single import statement to the server bundle" do
         test_string = "// import statement added by react_on_rails:generate_packs"
+        generated_import = "import '../generated/server-bundle-generated';"
         same_instance = described_class.instance
         File.truncate(server_bundle_js_file_path, 0)
         same_instance.generate_packs_if_stale
-        expect(File.read(server_bundle_js_file_path).scan(/(?=#{test_string})/).count).to equal(1)
+        server_bundle_content = File.read(server_bundle_js_file_path)
+        expect(server_bundle_content.scan(/(?=#{test_string})/).count).to equal(1)
+        expect(server_bundle_content).to include(generated_import)
+        expect(server_bundle_content).not_to include("import '../generated/server-bundle-generated.js';")
         # the following expectation checks that an additional import statement is not added if one already exists
         same_instance.generate_packs_if_stale
         expect(File.read(server_bundle_js_file_path).scan(/(?=#{test_string})/).count).to equal(1)
+      end
+
+      it "adds a lint-safe import statement to a TypeScript server bundle source entrypoint" do
+        same_instance = described_class.instance
+        backup_server_bundle_js_file_path = "#{server_bundle_js_file_path}.bak"
+        server_bundle_ts_file_path = server_bundle_js_file_path.sub(/\.js\z/, ".ts")
+
+        FileUtils.mv(server_bundle_js_file_path, backup_server_bundle_js_file_path)
+        File.write(server_bundle_ts_file_path, "")
+        same_instance.generate_packs_if_stale
+
+        generated_import = "import '../generated/server-bundle-generated.js'; " \
+                           "// eslint-disable-line import/extensions"
+        expect(File.read(server_bundle_ts_file_path)).to include(generated_import)
+
+        same_instance.generate_packs_if_stale
+        generated_import_count = File.read(server_bundle_ts_file_path)
+                                     .scan(%r{import '../generated/server-bundle-generated\.js'}).count
+        expect(generated_import_count).to equal(1)
+      ensure
+        FileUtils.rm_f(server_bundle_ts_file_path)
+        if backup_server_bundle_js_file_path && File.exist?(backup_server_bundle_js_file_path)
+          FileUtils.mv(backup_server_bundle_js_file_path, server_bundle_js_file_path)
+        end
+      end
+
+      it "adds a lint-safe import statement to a JSX server bundle source entrypoint" do
+        same_instance = described_class.instance
+        backup_server_bundle_js_file_path = "#{server_bundle_js_file_path}.bak"
+        server_bundle_jsx_file_path = server_bundle_js_file_path.sub(/\.js\z/, ".jsx")
+
+        FileUtils.mv(server_bundle_js_file_path, backup_server_bundle_js_file_path)
+        File.write(server_bundle_jsx_file_path, "")
+        same_instance.generate_packs_if_stale
+
+        generated_import = "import '../generated/server-bundle-generated.js'; " \
+                           "// eslint-disable-line import/extensions"
+        expect(File.read(server_bundle_jsx_file_path)).to include(generated_import)
+
+        same_instance.generate_packs_if_stale
+        generated_import_count = File.read(server_bundle_jsx_file_path)
+                                     .scan(%r{import '../generated/server-bundle-generated\.js'}).count
+        expect(generated_import_count).to equal(1)
+      ensure
+        FileUtils.rm_f(server_bundle_jsx_file_path)
+        if backup_server_bundle_js_file_path && File.exist?(backup_server_bundle_js_file_path)
+          FileUtils.mv(backup_server_bundle_js_file_path, server_bundle_js_file_path)
+        end
+      end
+
+      %w[.mjs .cjs].each do |extension|
+        it "adds a lint-safe import statement to a #{extension} server bundle source entrypoint" do
+          same_instance = described_class.instance
+          backup_server_bundle_js_file_path = "#{server_bundle_js_file_path}.bak"
+          server_bundle_source_file_path = server_bundle_js_file_path.sub(/\.js\z/, extension)
+
+          FileUtils.mv(server_bundle_js_file_path, backup_server_bundle_js_file_path)
+          File.write(server_bundle_source_file_path, "")
+          same_instance.generate_packs_if_stale
+
+          generated_import = "import '../generated/server-bundle-generated.js'; " \
+                             "// eslint-disable-line import/extensions"
+          expect(File.read(server_bundle_source_file_path)).to include(generated_import)
+
+          same_instance.generate_packs_if_stale
+          generated_import_count = File.read(server_bundle_source_file_path)
+                                       .scan(%r{import '../generated/server-bundle-generated\.js'}).count
+          expect(generated_import_count).to equal(1)
+        ensure
+          FileUtils.rm_f(server_bundle_source_file_path)
+          if backup_server_bundle_js_file_path && File.exist?(backup_server_bundle_js_file_path)
+            FileUtils.mv(backup_server_bundle_js_file_path, server_bundle_js_file_path)
+          end
+        end
       end
 
       it "serializes concurrent generation and rechecks staleness after waiting" do
@@ -1070,6 +1454,24 @@ module ReactOnRails
       end
     end
 
+    describe "#relative_import_path" do
+      subject(:computed_relative_import_path) { described_class.instance.send(:relative_import_path, from, to) }
+
+      context "when target is outside the entrypoint directory" do
+        let(:from) { "/app/packs/server-bundle.ts" }
+        let(:to) { "/app/generated/server-bundle-generated.js" }
+
+        it { is_expected.to eq "../generated/server-bundle-generated.js" }
+      end
+
+      context "when target is in the same directory" do
+        let(:from) { "/app/generated/server-bundle.ts" }
+        let(:to) { "/app/generated/server-bundle-generated.js" }
+
+        it { is_expected.to eq "./server-bundle-generated.js" }
+      end
+    end
+
     describe "CLIENT_API_PATTERN" do
       subject { content.match?(described_class::CLIENT_API_PATTERN) }
 
@@ -1208,6 +1610,117 @@ module ReactOnRails
       it "lists client components" do
         expect { described_class.instance.send(:log_rsc_classification_summary) }
           .to output(/Client components.*ReactClientComponent/).to_stdout
+      end
+    end
+
+    describe "#resolve_server_bundle_source_entrypoint" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          @tmpdir = tmpdir
+          example.run
+        end
+      end
+
+      it "uses the configured server bundle entrypoint when it exists" do
+        configured_entrypoint = File.join(@tmpdir, "server-bundle.js")
+        File.write(configured_entrypoint, "")
+
+        resolved_entrypoint = described_class.instance.send(:resolve_server_bundle_source_entrypoint,
+                                                            configured_entrypoint)
+
+        expect(resolved_entrypoint).to eq(configured_entrypoint)
+      end
+
+      it "uses a TypeScript source entrypoint when the configured JavaScript output filename is missing" do
+        configured_entrypoint = File.join(@tmpdir, "server-bundle.js")
+        typescript_entrypoint = File.join(@tmpdir, "server-bundle.ts")
+        File.write(typescript_entrypoint, "")
+
+        expect(Rails.logger).to receive(:debug).with(
+          "[react_on_rails] server bundle source entrypoint resolved to #{typescript_entrypoint} " \
+          "(configured: #{configured_entrypoint})"
+        )
+        resolved_entrypoint = described_class.instance.send(:resolve_server_bundle_source_entrypoint,
+                                                            configured_entrypoint)
+
+        expect(resolved_entrypoint).to eq(typescript_entrypoint)
+      end
+
+      it "uses a JSX source entrypoint before TypeScript when both could match a missing JavaScript output" do
+        configured_entrypoint = File.join(@tmpdir, "server-bundle.js")
+        jsx_entrypoint = File.join(@tmpdir, "server-bundle.jsx")
+        typescript_entrypoint = File.join(@tmpdir, "server-bundle.ts")
+        File.write(jsx_entrypoint, "")
+        File.write(typescript_entrypoint, "")
+
+        resolved_entrypoint = described_class.instance.send(:resolve_server_bundle_source_entrypoint,
+                                                            configured_entrypoint)
+
+        expect(resolved_entrypoint).to eq(jsx_entrypoint)
+      end
+
+      it "uses a TSX source entrypoint when the configured TypeScript entrypoint is missing" do
+        configured_entrypoint = File.join(@tmpdir, "server-bundle.ts")
+        tsx_entrypoint = File.join(@tmpdir, "server-bundle.tsx")
+        File.write(tsx_entrypoint, "")
+
+        resolved_entrypoint = described_class.instance.send(:resolve_server_bundle_source_entrypoint,
+                                                            configured_entrypoint)
+
+        expect(resolved_entrypoint).to eq(tsx_entrypoint)
+      end
+
+      it "uses a TypeScript ESM source entrypoint when the configured JavaScript output filename is missing" do
+        configured_entrypoint = File.join(@tmpdir, "server-bundle.js")
+        mts_entrypoint = File.join(@tmpdir, "server-bundle.mts")
+        File.write(mts_entrypoint, "")
+
+        resolved_entrypoint = described_class.instance.send(:resolve_server_bundle_source_entrypoint,
+                                                            configured_entrypoint)
+
+        expect(resolved_entrypoint).to eq(mts_entrypoint)
+      end
+
+      it "uses a TypeScript CommonJS source entrypoint when the configured JavaScript output filename is missing" do
+        configured_entrypoint = File.join(@tmpdir, "server-bundle.js")
+        cts_entrypoint = File.join(@tmpdir, "server-bundle.cts")
+        File.write(cts_entrypoint, "")
+
+        resolved_entrypoint = described_class.instance.send(:resolve_server_bundle_source_entrypoint,
+                                                            configured_entrypoint)
+
+        expect(resolved_entrypoint).to eq(cts_entrypoint)
+      end
+
+      it "returns the configured entrypoint when no source file exists for any extension" do
+        configured_entrypoint = File.join(@tmpdir, "server-bundle.js")
+
+        resolved_entrypoint = described_class.instance.send(:resolve_server_bundle_source_entrypoint,
+                                                            configured_entrypoint)
+
+        expect(resolved_entrypoint).to eq(configured_entrypoint)
+      end
+
+      it "checks all server bundle source extensions when the configured entrypoint has no extension" do
+        configured_entrypoint = File.join(@tmpdir, "server-bundle")
+
+        source_extensions = described_class.instance.send(:server_bundle_source_extensions_for,
+                                                          configured_entrypoint)
+
+        expect(source_extensions).to eq(described_class::SERVER_BUNDLE_SOURCE_EXTENSIONS)
+      end
+
+      it "uses the first matching source extension when the configured entrypoint has no extension" do
+        configured_entrypoint = File.join(@tmpdir, "server-bundle")
+        javascript_entrypoint = File.join(@tmpdir, "server-bundle.js")
+        typescript_entrypoint = File.join(@tmpdir, "server-bundle.ts")
+        File.write(javascript_entrypoint, "")
+        File.write(typescript_entrypoint, "")
+
+        resolved_entrypoint = described_class.instance.send(:resolve_server_bundle_source_entrypoint,
+                                                            configured_entrypoint)
+
+        expect(resolved_entrypoint).to eq(javascript_entrypoint)
       end
     end
 

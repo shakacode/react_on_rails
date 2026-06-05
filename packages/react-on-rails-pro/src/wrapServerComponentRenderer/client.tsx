@@ -26,6 +26,7 @@ import * as React from 'react';
 import * as ReactDOMClient from 'react-dom/client';
 import { ReactComponent, ReactComponentOrRenderFunction, RendererFunction } from 'react-on-rails/types';
 import isRenderFunction from 'react-on-rails/isRenderFunction';
+import { isRendererTeardownResult } from 'react-on-rails/@internal/rendererTeardown';
 import { ensureReactUseAvailable } from 'react-on-rails/reactApis';
 import { createRSCProvider } from '../RSCProvider.tsx';
 import getReactServerComponent from '../getReactServerComponent.client.ts';
@@ -74,6 +75,16 @@ const wrapServerComponentRenderer = (
     const Component = isRenderFunction(componentOrRenderFunction)
       ? ((await componentOrRenderFunction(props, railsContext, domNodeId)) as ReactComponent)
       : componentOrRenderFunction;
+
+    // Preserve compatibility with existing 3-arg render functions: they are awaited before domNodeId
+    // validation; moving that check earlier is a future improvement. Keep this teardown-result guard
+    // before DOM checks so wrong-shaped render results get the clearer error.
+    if (isRendererTeardownResult(Component)) {
+      throw new Error(
+        `wrapServerComponentRenderer: render function for server component '${componentName}' ` +
+          'returned a renderer teardown result; expected a React component.',
+      );
+    }
 
     if (typeof Component !== 'function') {
       throw new Error(`wrapServerComponentRenderer: component '${componentName}' is not a function`);
