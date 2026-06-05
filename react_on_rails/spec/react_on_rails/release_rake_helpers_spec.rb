@@ -333,7 +333,8 @@ RSpec.describe "release.rake helper methods" do
           repo_slug: repo_slug,
           ref: "release-branch",
           head_sha: head_sha,
-          ignored_run_ids: ["999999"]
+          ignored_run_ids: ["999999"],
+          earliest_created_at: kind_of(Time)
         )
         .and_return(run)
       allow(self).to receive(:capture_gh_output_with_timeout)
@@ -363,7 +364,8 @@ RSpec.describe "release.rake helper methods" do
           repo_slug: repo_slug,
           ref: "release-branch",
           head_sha: head_sha,
-          ignored_run_ids: ["999999"]
+          ignored_run_ids: ["999999"],
+          earliest_created_at: kind_of(Time)
         )
       expect(self).to have_received(:capture_gh_output_with_timeout)
         .with(
@@ -439,7 +441,8 @@ RSpec.describe "release.rake helper methods" do
           repo_slug: repo_slug,
           ref: "release-branch",
           head_sha: head_sha,
-          ignored_run_ids: []
+          ignored_run_ids: [],
+          earliest_created_at: kind_of(Time)
         )
         .and_return(run)
       allow(self).to receive(:capture_gh_output_with_timeout)
@@ -476,7 +479,8 @@ RSpec.describe "release.rake helper methods" do
           repo_slug: repo_slug,
           ref: "release-branch",
           head_sha: head_sha,
-          ignored_run_ids: []
+          ignored_run_ids: [],
+          earliest_created_at: kind_of(Time)
         )
         .and_return(run)
       allow(self).to receive(:capture_gh_output_with_timeout)
@@ -521,6 +525,23 @@ RSpec.describe "release.rake helper methods" do
           ref: "release-branch",
           head_sha: head_sha,
           ignored_run_ids: [1]
+        )
+      ).to eq(matching_run)
+    end
+
+    it "ignores workflow_dispatch runs created before the new dispatch starts" do
+      stale_run = { "databaseId" => 1, "headSha" => head_sha, "createdAt" => "2026-06-05T01:00:00Z" }
+      matching_run = { "databaseId" => 2, "headSha" => head_sha, "createdAt" => "2026-06-05T01:00:10Z" }
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug: repo_slug, ref: "release-branch")
+        .and_return([stale_run, matching_run])
+
+      expect(
+        wait_for_shakaperf_release_gate_run!(
+          repo_slug: repo_slug,
+          ref: "release-branch",
+          head_sha: head_sha,
+          earliest_created_at: Time.iso8601("2026-06-05T01:00:05Z")
         )
       ).to eq(matching_run)
     end

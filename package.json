@@ -166,6 +166,7 @@
       "protobufjs: intentionally NOT listed - its postinstall is a version-scheme warning, not a build step.",
       "@swc/core: postinstall verifies the platform-specific native binary loads.",
       "shaka-perf: postinstall records the Node binary used by the CLI and builds its socketpair helper.",
+      "shaka-perf is exact-pinned; re-audit its postinstall before upgrading to a new stable release.",
       "unrs-resolver: napi-postinstall check, used by eslint-import-resolver-typescript.",
       "protobufjs: intentionally omitted; its postinstall reports version-scheme warnings, not a build step."
     ],

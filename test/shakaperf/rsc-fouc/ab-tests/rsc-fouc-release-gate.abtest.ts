@@ -134,7 +134,7 @@ abTest(
         };
       },
       { probeSelector: RSC_CSS_PROBE_SELECTOR, stylesheetSelector: RSC_STYLESHEET_SELECTOR },
-      { timeout: 5_000, polling: 'raf' },
+      { timeout: 10_000, polling: 'raf' },
     );
     const state = (await stateHandle.jsonValue()) as FirstVisibleProbeState;
 

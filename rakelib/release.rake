@@ -7,6 +7,7 @@ require "open3"
 require "rubygems/version"
 require "shellwords"
 require "tempfile"
+require "time"
 require "tmpdir"
 require_relative "task_helpers"
 require_relative "../react_on_rails/lib/react_on_rails/version_syntax_converter"
@@ -244,7 +245,8 @@ def handle_shakaperf_release_gate_violation!(message:)
     #{message}
 
     The version-bump commit may already be pushed to the remote without a tag or published packages.
-    After fixing the gate, retry the release from that commit; or push a revert commit before retrying.
+    For a transient gate failure, retry the release from that same commit; the version bump is already present.
+    If the gate should not be retried, push a revert commit before retrying the release.
 
     To override this release gate (use only for an urgent release when ShakaPerf is known-unrelated):
       RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake release[...]
@@ -260,7 +262,7 @@ def fetch_shakaperf_release_gate_runs(repo_slug:, ref:)
     "--workflow", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
     "--branch", ref,
     "--event", "workflow_dispatch",
-    "--json", "databaseId,headSha,status,conclusion,url",
+    "--json", "createdAt,databaseId,headSha,status,conclusion,url",
     "--limit", SHAKAPERF_RELEASE_GATE_RUN_LIST_LIMIT.to_s
   )
 
@@ -277,14 +279,27 @@ rescue JSON::ParserError => e
   )
 end
 
-def wait_for_shakaperf_release_gate_run!(repo_slug:, ref:, head_sha:, ignored_run_ids: [])
+def shakaperf_release_gate_run_created_after?(run, earliest_created_at)
+  return true unless earliest_created_at
+
+  created_at = run["createdAt"]
+  return false unless created_at
+
+  Time.iso8601(created_at) >= earliest_created_at
+rescue ArgumentError
+  false
+end
+
+def wait_for_shakaperf_release_gate_run!(repo_slug:, ref:, head_sha:, ignored_run_ids: [], earliest_created_at: nil)
   deadline = Time.now + SHAKAPERF_RELEASE_GATE_START_TIMEOUT_SECONDS
   ignored_run_ids = ignored_run_ids.map(&:to_s)
 
   loop do
     runs = fetch_shakaperf_release_gate_runs(repo_slug: repo_slug, ref: ref)
     matching_run = runs.find do |run|
-      run["headSha"] == head_sha && !ignored_run_ids.include?(run["databaseId"].to_s)
+      run["headSha"] == head_sha &&
+        !ignored_run_ids.include?(run["databaseId"].to_s) &&
+        shakaperf_release_gate_run_created_after?(run, earliest_created_at)
     end
     return matching_run if matching_run
 
@@ -336,6 +351,7 @@ def run_shakaperf_release_gate!(monorepo_root:, ref:, head_sha:, allow_override:
   existing_run_ids = fetch_shakaperf_release_gate_runs(repo_slug: repo_slug, ref: ref).map do |run|
     run["databaseId"].to_s
   end
+  dispatch_started_at = Time.now.utc
   output, status = capture_gh_output(
     "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE, "--repo", repo_slug, "--ref", ref
   )
@@ -350,7 +366,8 @@ def run_shakaperf_release_gate!(monorepo_root:, ref:, head_sha:, allow_override:
     repo_slug: repo_slug,
     ref: ref,
     head_sha: head_sha,
-    ignored_run_ids: existing_run_ids
+    ignored_run_ids: existing_run_ids,
+    earliest_created_at: dispatch_started_at
   )
   watch_shakaperf_release_gate_run!(repo_slug: repo_slug, run: run)
 
