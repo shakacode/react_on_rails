@@ -3,8 +3,10 @@ import { test, expect } from '@playwright/test';
 const CSS_PROBE_PATH = '/rsc_posts_page_over_http?posts_count=0';
 
 // Regression test for issue #3211: CSS imported behind a `'use client'` boundary
-// in a true RSC tree must be preloaded through React's stylesheet precedence
-// stream bootstrap, so the browser waits for it before revealing the boundary.
+// in a true RSC tree must be present before the boundary content that needs it.
+// React 19 may serialize that as preload/bootstrap hints or as a hoisted
+// precedence link; either shape lets the browser load the stylesheet before
+// painting the probe.
 // Without the fix the stylesheet only loads as a side effect of the JS chunk
 // evaluating, producing a flash of unstyled content (FOUC).
 //
@@ -16,16 +18,23 @@ test.describe('RSC use-client CSS (#3211 FOUC fix)', () => {
     expect(response.ok()).toBe(true);
     const ssrHtml = await response.text();
 
-    // No-FOUC guarantee: the stream includes CSS preloads plus React's reveal
-    // bootstrap for the precedence group, so the browser waits on the stylesheet
-    // before revealing the streamed boundary.
-    expect(ssrHtml).toMatch(
-      /<link(?=[^>]*\brel="preload")(?=[^>]*\bas="style")(?=[^>]*\bhref="[^"]*\.css")[^>]*>/,
+    // No-FOUC guarantee: local and CI streams can differ between React's native
+    // RSC stylesheet hints and our wrapper precedence link. Accept either the
+    // preload/bootstrap pair or a blocking stylesheet link before the SSR probe.
+    const hasStylePreload =
+      /<link(?=[^>]*\brel="preload")(?=[^>]*\bas="style")(?=[^>]*\bhref="[^"]*\.css")[^>]*>/.test(ssrHtml);
+    const hasPrecedenceBootstrap =
+      /\[\s*"[^"]*\.css"\s*,\s*"(?:ror-rsc|rsc-css)"\s*\]/.test(ssrHtml) ||
+      /HS\[\\"[^"]*\.css\\"\s*,\s*\\"(?:ror-rsc|rsc-css)\\"\]/.test(ssrHtml);
+    const stylesheetLinkMatch = ssrHtml.match(
+      /<link(?=[^>]*\brel="stylesheet")(?=[^>]*\bdata-precedence="(?:ror-rsc|rsc-css)")(?=[^>]*\bhref="[^"]*\.css")[^>]*>/,
     );
-    // React serializes the precedence reveal as a ["<css href>","ror-rsc"] tuple in
-    // its bootstrap stream. This tracks that internal serialization format and may
-    // need updating across React minor versions.
-    expect(ssrHtml).toMatch(/\[\s*"[^"]*\.css"\s*,\s*"ror-rsc"\s*\]/);
+    const stylesheetLinkIndex = stylesheetLinkMatch?.index ?? -1;
+    const probeIndex = ssrHtml.indexOf('data-testid="rsc-css-probe"');
+    const hasBlockingStylesheetLink = stylesheetLinkIndex >= 0 && probeIndex > stylesheetLinkIndex;
+
+    expect(hasStylePreload || hasBlockingStylesheetLink).toBe(true);
+    expect(hasPrecedenceBootstrap || hasBlockingStylesheetLink).toBe(true);
 
     // The probe is rendered in isolation here: `posts_count=0` makes `Posts` return
     // null (see Posts.jsx), so the FOUC fix is exercised without depending on the
@@ -39,9 +48,20 @@ test.describe('RSC use-client CSS (#3211 FOUC fix)', () => {
     const probe = page.getByTestId('rsc-css-probe');
     await expect(probe).toBeVisible();
 
-    // The precedence-grouped stylesheet resource is present in the live document
-    // (React keeps it as it manages the loaded stylesheet).
-    await expect(page.locator('link[rel="stylesheet"][data-precedence="ror-rsc"]').first()).toBeAttached();
+    // The CSS resource remains visible in the live document either as React's
+    // managed stylesheet link or as the preload hint that feeds the RSC CSS
+    // bootstrap path.
+    await expect(
+      page
+        .locator(
+          [
+            'link[rel="stylesheet"][data-precedence="ror-rsc"]',
+            'link[rel="stylesheet"][data-precedence="rsc-css"]',
+            'link[rel="preload"][as="style"][href$=".css"]',
+          ].join(', '),
+        )
+        .first(),
+    ).toBeAttached();
 
     // End result: the probe paints with the background color from its CSS module
     // (UseClientCssProbe.module.scss: background-color: rgb(212 250 236)).

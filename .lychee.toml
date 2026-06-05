@@ -73,6 +73,7 @@ exclude = [
   '^https://tanstack\.com/query/latest/docs/framework/react/guides/ssr$', # Connection failed from CI
   '^https://lodash\.com',                    # Connection reset from CI
   '^https://vite-ruby\.netlify\.app/?$',     # Intermittent connection resets from CI
+  '^https://www\.developerway\.com/posts/react-server-components-performance$', # Returns 503 from CI
 
   # ============================================================================
   # PLANNED DEPLOYMENTS NOT YET LIVE

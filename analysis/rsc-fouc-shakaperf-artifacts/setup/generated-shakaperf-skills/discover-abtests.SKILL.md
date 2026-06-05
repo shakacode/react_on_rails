@@ -132,9 +132,9 @@ Check for spinners, skeleton screens, loading indicators. Use `javascript_tool` 
   - Dropdowns (`select`, custom dropdowns)
   - Textareas
   - Checkboxes and radio buttons
-  
+
   **Try filling them during probing** — actually type values into inputs, select dates on calendars, increment number fields, check checkboxes. This confirms what works and what doesn't before you write test code.
-  
+
   **Fill before clicking action buttons.** When a form has both inputs and a submit/action button (like "Book Now", "Search", "Apply"), the right test sequence is: fill all inputs first → capture the filled state → then click the button. A test that clicks "Book Now" without filling in dates and guests misses the most interesting UI state (the populated form) and may also miss validation behavior.
 
 **A7. Probe inside modals/expanded UI**: when clicking reveals new UI (modal, drawer, expanded panel), probe THAT UI for its own interactive elements — buttons, forms, links within the modal. Keep going as long as new testable UI appears. For each form inside a modal, record all fields so you can write a form-fill test in Step B.

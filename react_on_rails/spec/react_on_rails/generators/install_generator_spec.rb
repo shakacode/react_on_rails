@@ -4096,6 +4096,27 @@ describe InstallGenerator, type: :generator do
       end
     end
 
+    it "emits the RSC manifest discovery logic in bin/shakapacker-precompile-hook" do
+      # The shipped template hook is a separate implementation from spec/support's standalone copy;
+      # pin its load-bearing pieces so an accidental edit/deletion fails here rather than silently in
+      # a user's RSC build. The discovery build re-invokes bin/shakapacker, so the recursion guard
+      # and the rsc_support_enabled? gate are critical.
+      Dir.chdir(destination_root) do
+        install_generator.send(:add_bin_scripts)
+      end
+
+      assert_file "bin/shakapacker-precompile-hook" do |content|
+        expect(content).to include("generate_rsc_manifest_client_references_if_needed")
+        expect(content).to include('ENV["RSC_REFERENCE_DISCOVERY_BUILD"] == "true"')
+        expect(content).to include("ReactOnRailsPro::Utils.rsc_support_enabled?")
+        expect(content).to include('"RSC_BUNDLE_ONLY" => "true"')
+        expect(content).to include('"CLIENT_BUNDLE_ONLY" => nil')
+        expect(content).to include('"SERVER_BUNDLE_ONLY" => nil')
+        expect(content).to include("Dir.chdir(Rails.root) do")
+        expect(content).to include("system(env, shakapacker_bin.to_s, exception: true)")
+      end
+    end
+
     it "detects the legacy Rails foreman bin/dev template" do
       simulate_existing_file("bin/dev", <<~BASH)
         #!/usr/bin/env bash
@@ -4164,7 +4185,13 @@ describe InstallGenerator, type: :generator do
 
       assert_file "bin/dev", custom_bin_dev
       assert_file "bin/switch-bundler"
-      assert_file "bin/shakapacker-precompile-hook"
+      assert_file "bin/shakapacker-precompile-hook" do |content|
+        expect(content).to include('stale_manifest = Rails.root.join("ssr-generated", "rsc-client-references.json")')
+        expect(content).to include("clear_stale_rsc_manifest_client_references")
+        expect(content).to include('shakapacker_bin = Rails.root.join("bin", "shakapacker")')
+        expect(content).to include("bin/shakapacker is missing; cannot generate RSC manifest client references.")
+        expect(content).to include("system(env, shakapacker_bin.to_s, exception: true)")
+      end
     end
 
     it "keeps DEFAULT_ROUTE unchanged in custom bin/dev files for non-RSC installs" do
