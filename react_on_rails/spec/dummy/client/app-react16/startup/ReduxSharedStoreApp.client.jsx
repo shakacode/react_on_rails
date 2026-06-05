@@ -17,11 +17,18 @@ import { wrapElementInStrictMode } from '../../app/strictModeSupport';
  *  React will see that the state is the same and not do anything.
  */
 export default (props, _railsContext, domNodeId) => {
-  const render = props.prerender ? ReactDOM.hydrate : ReactDOM.render;
+  const { prerender } = props;
+  const render = prerender ? ReactDOM.hydrate : ReactDOM.render;
   // eslint-disable-next-line no-param-reassign
   delete props.prerender;
 
   const domNode = document.getElementById(domNodeId);
+  if (!domNode) {
+    const renderMode = prerender ? 'hydrate' : 'render';
+    throw new Error(
+      `Cannot ${renderMode} ReduxSharedStoreApp because DOM element with id "${domNodeId}" was not found.`,
+    );
+  }
 
   // This is where we get the existing store.
   const store = ReactOnRails.getStore('SharedReduxStore');

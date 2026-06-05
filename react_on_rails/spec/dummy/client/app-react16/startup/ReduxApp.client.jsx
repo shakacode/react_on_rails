@@ -23,11 +23,18 @@ import { wrapElementInStrictMode } from '../../app/strictModeSupport';
  *
  */
 export default (props, railsContext, domNodeId) => {
-  const render = props.prerender ? ReactDOM.hydrate : ReactDOM.render;
+  const { prerender } = props;
+  const render = prerender ? ReactDOM.hydrate : ReactDOM.render;
   // eslint-disable-next-line no-param-reassign
   delete props.prerender;
 
   const domNode = document.getElementById(domNodeId);
+  if (!domNode) {
+    const renderMode = prerender ? 'hydrate' : 'render';
+    throw new Error(
+      `Cannot ${renderMode} ReduxApp because DOM element with id "${domNodeId}" was not found.`,
+    );
+  }
 
   const combinedReducer = combineReducers(reducers);
   const combinedProps = composeInitialState(props, railsContext);

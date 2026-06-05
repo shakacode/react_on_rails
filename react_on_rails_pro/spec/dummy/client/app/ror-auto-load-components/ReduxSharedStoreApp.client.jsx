@@ -42,8 +42,9 @@ export default (props, _railsContext, domNodeId) => {
 
   const domEl = document.getElementById(domNodeId);
   if (!domEl) {
+    const renderMode = prerender ? 'hydrate' : 'render';
     throw new Error(
-      `Cannot render ReduxSharedStoreApp because DOM element with id "${domNodeId}" was not found.`,
+      `Cannot ${renderMode} ReduxSharedStoreApp because DOM element with id "${domNodeId}" was not found.`,
     );
   }
 

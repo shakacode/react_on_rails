@@ -52,7 +52,10 @@ export default (props, railsContext, domNodeId) => {
 
   const domEl = document.getElementById(domNodeId);
   if (!domEl) {
-    throw new Error(`Cannot render ReduxApp because DOM element with id "${domNodeId}" was not found.`);
+    const renderMode = prerender ? 'hydrate' : 'render';
+    throw new Error(
+      `Cannot ${renderMode} ReduxApp because DOM element with id "${domNodeId}" was not found.`,
+    );
   }
 
   const root = hydrateOrRender(domEl, element, prerender);
