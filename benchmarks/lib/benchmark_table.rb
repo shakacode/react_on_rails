@@ -32,7 +32,8 @@ class BenchmarkTable
   # "(tracked measures)" qualifies the 🔴/🟢 significance flags, not the baseline: only
   # tracked measures (rps, p50) are flagged significant, but ANY measure with a baseline
   # (including the untracked p90) shows a ▲/▼ delta and an "(n)" baseline.
-  LEGEND = "#{UP}/#{DOWN} change vs baseline · #{REGRESSION} significant regression · " \
+  LEGEND = "#{UP}/#{DOWN} non-zero change vs baseline · 0.0% exact/near-zero match · " \
+           "#{REGRESSION} significant regression · " \
            "#{IMPROVEMENT} significant improvement (tracked measures) · (n) = baseline".freeze
 
   EMPTY = "_No benchmark results._"

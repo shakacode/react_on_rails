@@ -46,7 +46,8 @@ RSpec.describe BenchmarkTable do
     expect(markdown).to include("| --- | --- | --- | --- | --- |")
     expect(markdown).to include("| /foo | 100.0 | 5.0 | 6.0 | 200=100 |")
     expect(markdown).not_to include("Fail%")
-    expect(markdown).to include("▲/▼ change vs baseline")
+    expect(markdown).to include("▲/▼ non-zero change vs baseline")
+    expect(markdown).to include("0.0% exact/near-zero match")
     expect(markdown).to include("🔴 significant regression")
     expect(markdown).to include("🟢 significant improvement")
   end
