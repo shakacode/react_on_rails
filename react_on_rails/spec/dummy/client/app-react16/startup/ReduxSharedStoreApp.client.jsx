@@ -17,9 +17,18 @@ import { wrapElementInStrictMode } from '../../app/strictModeSupport';
  *  React will see that the state is the same and not do anything.
  */
 export default (props, _railsContext, domNodeId) => {
-  const render = props.prerender ? ReactDOM.hydrate : ReactDOM.render;
+  const { prerender } = props;
+  const render = prerender ? ReactDOM.hydrate : ReactDOM.render;
   // eslint-disable-next-line no-param-reassign
   delete props.prerender;
+
+  const domNode = document.getElementById(domNodeId);
+  if (!domNode) {
+    const renderMode = prerender ? 'hydrate' : 'render';
+    throw new Error(
+      `Cannot ${renderMode} ReduxSharedStoreApp because DOM element with id "${domNodeId}" was not found.`,
+    );
+  }
 
   // This is where we get the existing store.
   const store = ReactOnRails.getStore('SharedReduxStore');
@@ -29,13 +38,15 @@ export default (props, _railsContext, domNodeId) => {
 
   // Provider uses this.props.children, so we're not typical React syntax.
   // This allows redux to add additional props to the HelloWorldContainer.
+  // The React 16/17 API re-renders into the same container idempotently, so hot reload reuses the
+  // existing tree (no separate root to unmount first).
   const renderApp = (Component) => {
     const element = wrapElementInStrictMode(
       <Provider store={store}>
         <Component />
       </Provider>,
     );
-    render(element, document.getElementById(domNodeId));
+    render(element, domNode);
   };
 
   renderApp(HelloWorldContainer);
@@ -45,4 +56,9 @@ export default (props, _railsContext, domNodeId) => {
       renderApp(HelloWorldContainer);
     });
   }
+
+  // Return a teardown wrapper so React on Rails unmounts this tree on Turbo/Turbolinks navigation
+  // (page unload) or same-id node replacement instead of leaking it. The React 16/17 API unmounts
+  // by container node rather than via a root handle.
+  return { teardown: () => ReactDOM.unmountComponentAtNode(domNode) };
 };

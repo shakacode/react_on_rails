@@ -524,6 +524,17 @@ export interface ReactOnRailsInternal extends ReactOnRails {
    * ```
    * under React 18+.
    *
+   * @remarks
+   * **Cleanup is the caller's responsibility.** Unlike the components React on Rails mounts itself
+   * (which are unmounted automatically on Turbo/Turbolinks navigation and same-id node replacement),
+   * a root created by this imperative API is **not** tracked internally. The returned root is handed
+   * back to you, and you must call `unmount()` on it yourself — e.g. on a Turbo `turbo:before-render`
+   * / Turbolinks `turbolinks:before-render` event, or in your framework's teardown hook — to avoid
+   * leaking the root (and any subscriptions or timers it holds) across navigations. If you want
+   * automatic cleanup instead, register a renderer function (the 3-argument render-function form) and
+   * return a {@link RendererTeardownResult}; React on Rails tracks those mounts and runs the teardown for
+   * you.
+   *
    * @param name Name of your registered component
    * @param props Props to pass to your component
    * @param domNodeId HTML ID of the node the component will be rendered at

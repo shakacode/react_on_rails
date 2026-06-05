@@ -6,20 +6,22 @@ This guide explains how render-functions work in React on Rails and how to use t
 
 Before diving into render-functions, it helps to know the three kinds of values you can register with `ReactOnRails.register`. React on Rails classifies each registered entry based on its shape, and the classification determines where it can run (server, client, or both) and which Ruby helpers can invoke it.
 
-| Type                  | Signature                                  | Server (SSR)    | Client | Detection rule                                                          |
-| --------------------- | ------------------------------------------ | --------------- | ------ | ----------------------------------------------------------------------- |
-| **React Component**   | `(props) => JSX` or class component        | Yes             | Yes    | `Function.length <= 1` and no `renderFunction` flag                     |
-| **Render Function**   | `(props, railsContext) => ...`             | Yes             | Yes    | `Function.length >= 2` **or** `fn.renderFunction === true`              |
-| **Renderer Function** | `(props, railsContext, domNodeId) => void` | **No — throws** | Yes    | A render function (detected first) with exactly `Function.length === 3` |
+| Type                  | Signature                                                  | Server (SSR)    | Client | Detection rule                                                          |
+| --------------------- | ---------------------------------------------------------- | --------------- | ------ | ----------------------------------------------------------------------- |
+| **React Component**   | `(props) => JSX` or class component                        | Yes             | Yes    | `Function.length <= 1` and no `renderFunction` flag                     |
+| **Render Function**   | `(props, railsContext) => ...`                             | Yes             | Yes    | `Function.length >= 2` **or** `fn.renderFunction === true`              |
+| **Renderer Function** | `(props, railsContext, domNodeId) => void \| { teardown }` | **No — throws** | Yes    | A render function (detected first) with exactly `Function.length === 3` |
 
 A few important points about the detection:
 
 - **The detection is based on `Function.length`** (the number of declared parameters). Destructured parameters count as 1 — `({ name }) => ...` has length 1.
 - **Render functions return** a React component, a React element, a server-render hash object, or a promise that resolves to one of those. See [Types of Render-Functions and Their Return Values](#types-of-render-functions-and-their-return-values) below.
-- **Renderer functions do not return anything meaningful.** They take control of mounting/hydration themselves by calling `ReactDOM.hydrateRoot` / `createRoot` against `domNodeId`. Because there is no DOM on the server, **registering a renderer function and then server-rendering it throws a descriptive error**. Renderer functions are strictly client-side.
+- **Renderer functions may optionally return a teardown wrapper** — `{ teardown: () => void | Promise<void> }`, or a promise resolving to one. They take control of mounting/hydration themselves by calling `ReactDOM.hydrateRoot` / `createRoot` against `domNodeId`. Because there is no DOM on the server, **registering a renderer function and then server-rendering it throws a descriptive error**. Renderer functions are strictly client-side.
 - **`fn.renderFunction = true` is an escape hatch** for render functions that don't need `railsContext` but still want to be treated as render functions (e.g., so they can return a hash). Without the flag, a one-parameter function is classified as a regular React component.
 
 ```jsx
+import ReactDOMClient from 'react-dom/client';
+
 // Regular React Component — 0 or 1 params, renders normally
 const HelloMessage = (props) => <div>Hello {props.name}</div>;
 
@@ -38,17 +40,23 @@ const HelloHash = (props) => {
 };
 HelloHash.renderFunction = true;
 
-// Renderer Function — 3 params, handles hydration itself, CLIENT ONLY
-const LazyHydrate = (props, railsContext, domNodeId) => {
-  // whenVisible is a hypothetical helper that resolves when the element scrolls into view
+// Renderer Function — 3 params, handles hydration itself, CLIENT ONLY.
+// Optionally return a { teardown } wrapper, or a promise resolving to one.
+// React on Rails runs it on Turbo/Turbolinks navigation or same-id replacement.
+const LazyHydrate = (props, _railsContext, domNodeId) =>
   whenVisible(domNodeId).then(() => {
-    const root = document.getElementById(domNodeId);
-    ReactDOM.hydrateRoot(root, <HelloMessage {...props} />);
+    const domNode = document.getElementById(domNodeId);
+    // Navigation may remove the node before visibility resolves, so there is no mounted root to clean up.
+    if (!domNode) return undefined;
+
+    const root = ReactDOMClient.hydrateRoot(domNode, <HelloMessage {...props} />);
+    return { teardown: () => root.unmount() };
   });
-};
 
 ReactOnRails.register({ HelloMessage, HelloWithContext, HelloHash, LazyHydrate });
 ```
+
+`whenVisible` is a hypothetical helper that resolves when the element scrolls into view. The `LazyHydrate` example uses a concise-body arrow, so it returns the `whenVisible(...).then(...)` promise. If navigation removes the node before hydration runs, the callback returns nothing because there is no mounted root to clean up. If you switch the renderer to a `{ }` block body, add an explicit `return` or React on Rails will not receive the teardown wrapper.
 
 The rest of this document focuses on **render functions** — the most flexible of the three types, with the richest set of return values. For renderer functions (client-side mounting control), see [Renderer Functions](../api-reference/view-helpers-api.md#renderer-functions-function-that-will-call-reactdomrender-or-reactdomhydrate) in the view helpers reference.
 

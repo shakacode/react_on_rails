@@ -23,10 +23,20 @@ export default (_props, _railsContext, domNodeId) => {
     ssrForceFetchDelay: 100,
   });
   const el = document.getElementById(domNodeId);
+  if (!el) {
+    throw new Error(
+      `Cannot hydrate ApolloGraphQLApp because DOM element with id "${domNodeId}" was not found.`,
+    );
+  }
+
   const App = wrapElementInStrictMode(
     <ApolloProvider client={client}>
       <ApolloGraphQL />
     </ApolloProvider>,
   );
-  hydrateRoot(el, App);
+  const root = hydrateRoot(el, App);
+
+  // Return a teardown wrapper so React on Rails unmounts this root on Turbo/Turbolinks navigation
+  // (page unload) or same-id node replacement instead of leaking it.
+  return { teardown: () => root.unmount() };
 };

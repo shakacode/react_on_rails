@@ -106,6 +106,59 @@ Why would you want to take over mounting yourself? One use case is code splittin
 > [!IMPORTANT]
 > **Renderer functions are strictly client-only.** There is no DOM on the server, so a renderer function cannot produce SSR output. React on Rails detects renderer functions at registration time and will throw a descriptive error like `Detected a renderer while server rendering component 'X'. See https://reactonrails.com/docs/core-concepts/render-functions for more information.` if you attempt to use one with `react_component(... prerender: true)`, `react_component_hash` (which forces prerendering), or `stream_react_component` (which is server-streaming only). For rendering that needs to run on the server, use a regular render function instead.
 
+#### Cleaning up on Turbo/Turbolinks navigation (optional teardown)
+
+Because a renderer function owns the React root it creates, React on Rails cannot unmount that root for you the way it does for the components it mounts itself. With [Turbo](https://turbo.hotwired.dev/) or Turbolinks, the page swaps without a full reload, so a renderer that never unmounts leaks its root (and any subscriptions or timers it holds) on every navigation.
+
+To opt in to cleanup, **return a teardown wrapper** — `{ teardown: () => void | Promise<void> }`, or a promise resolving to one — from the renderer. React on Rails stores it and runs it when the mount is torn down: on Turbo/Turbolinks navigation (when the framework swaps in the next page) or when the same `domNodeId` node is replaced. Returning nothing keeps the previous (leaky) behavior, so existing renderers are unaffected.
+
+```jsx
+import ReactDOMClient from 'react-dom/client';
+
+// Renderer function: 3 params, mounts itself, returns a teardown wrapper.
+const MyRenderer = (props, _railsContext, domNodeId) => {
+  const domNode = document.getElementById(domNodeId);
+  if (!domNode) {
+    throw new Error(`Missing DOM element with id: ${domNodeId}`);
+  }
+
+  // This example always creates a fresh root. See the hydration note below if your renderer
+  // needs to hydrate server-rendered markup.
+  const root = ReactDOMClient.createRoot(domNode);
+  root.render(<MyComponent {...props} />);
+
+  // Unmounted automatically on the next Turbo navigation (or same-id node replacement).
+  return { teardown: () => root.unmount() };
+};
+```
+
+> [!NOTE]
+> **Hydrating server-rendered markup?** `prerender` is not a prop React on Rails injects — the top-level `prerender:` render option only controls server rendering and is rejected for renderer functions (see the note above). If your client renderer also serves components that were rendered on the server through a separate server bundle (a server/client split), pass an application-level signal in the component's `props`, such as `serverRendered`, and branch on it. The in-repo dummy apps use their own fixture props for this decision; the custom flag here is just an example for renderers that need an explicit hydrate-vs-render signal. Remove that renderer-only flag before spreading props into your component: `const { serverRendered, ...componentProps } = props;`, then call `ReactDOMClient.hydrateRoot(domNode, <MyComponent {...componentProps} />)` when `serverRendered` is true.
+
+Under the React 16/17 legacy API there is no root handle, so unmount by container node instead:
+
+```jsx
+import ReactDOM from 'react-dom';
+
+const MyLegacyRenderer = (props, _railsContext, domNodeId) => {
+  const { serverRendered, ...componentProps } = props;
+  const domNode = document.getElementById(domNodeId);
+  if (!domNode) {
+    throw new Error(`Missing DOM element with id: ${domNodeId}`);
+  }
+
+  if (serverRendered) {
+    ReactDOM.hydrate(<MyComponent {...componentProps} />, domNode);
+  } else {
+    ReactDOM.render(<MyComponent {...componentProps} />, domNode);
+  }
+  return { teardown: () => ReactDOM.unmountComponentAtNode(domNode) };
+};
+```
+
+> [!NOTE]
+> Synchronous teardowns are always honored. An **async** teardown is best-effort in the open-source package: if a navigation or node replacement happens before the renderer resolves its teardown, that still-pending teardown may be dropped. React on Rails logs a `console.error` when this happens — search for `resolved after its mount was removed` (the teardown was dropped) or `Error resolving renderer teardown` (the render promise rejected) — so the dropped teardown is diagnosable rather than silent. React on Rails Pro's client renderer awaits the renderer and handles this race reliably.
+
 ---
 
 ### React Router

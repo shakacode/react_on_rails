@@ -16,9 +16,12 @@ export default (_props: unknown, _railsContext: RailsContext, domNodeId: string)
     throw new Error(`Missing DOM element with id: ${domNodeId}`);
   }
 
-  console.log('window.__SSR_COMPUTATION_CACHE', window.__SSR_COMPUTATION_CACHE);
   const ssrComputationCache = window.__SSR_COMPUTATION_CACHE;
   setSSRCache(ssrComputationCache);
   const App = wrapElementInStrictMode(<ApolloGraphQL />);
-  hydrateRoot(el, App);
+  const root = hydrateRoot(el, App);
+
+  // Return a teardown wrapper so React on Rails unmounts this root on Turbo/Turbolinks navigation
+  // (page unload) or same-id node replacement instead of leaking it.
+  return { teardown: () => root.unmount() };
 };
