@@ -92,8 +92,8 @@ The default is to bake **everything** into the image, including a fully migrated
 ```dockerfile
 RUN initdb -D ~/pgdata && \
     pg_ctl -D ~/pgdata -l ~/pgdata/logfile start && \
-    SECRET_KEY_BASE_DUMMY=1 bin/rails db:prepare && \
-    SECRET_KEY_BASE_DUMMY=1 bin/rails db:seed && \
+    SECRET_KEY_BASE_DUMMY=1 bundle exec rails db:prepare && \
+    SECRET_KEY_BASE_DUMMY=1 bundle exec rails db:seed && \
     pg_ctl -D ~/pgdata stop
 ```
 
@@ -178,7 +178,7 @@ RUN bundle install && \
 # App code + asset build
 COPY --chown=${NON_ROOT_USER}:${NON_ROOT_USER} . .
 RUN bundle exec bootsnap precompile --gemfile app/ lib/
-RUN SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile
+RUN SECRET_KEY_BASE_DUMMY=1 bundle exec rails assets:precompile
 
 # Writable dirs
 RUN mkdir -p log tmp/pids tmp/cache storage && \
@@ -187,8 +187,8 @@ RUN mkdir -p log tmp/pids tmp/cache storage && \
 # Prepare + seed the DB at build time so the image is self-contained. SQLite
 # has no daemon, so the seeded file under storage/ is the whole database — it
 # gets baked in here and needs zero setupCommands at runtime.
-RUN SECRET_KEY_BASE_DUMMY=1 ./bin/rails db:prepare && \
-    SECRET_KEY_BASE_DUMMY=1 ./bin/rails db:seed
+RUN SECRET_KEY_BASE_DUMMY=1 bundle exec rails db:prepare && \
+    SECRET_KEY_BASE_DUMMY=1 bundle exec rails db:seed
 
 EXPOSE 3000
 # For twin-servers: CMD/ENTRYPOINT removed — compose uses `sleep infinity`.
