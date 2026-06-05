@@ -9,6 +9,10 @@ If you would like help in migrating between React on Rails versions or help with
 
 We specialize in helping companies to quickly and efficiently upgrade. The older versions use the Rails asset pipeline to package client assets. The current and recommended way is to use Webpack 4+ for asset preparation. You may also need help migrating from the `rails/webpacker`'s Webpack configuration to a better setup ready for Server Side Rendering.
 
+## v15 Retraction Notice
+
+React on Rails v15.0.0 was retracted due to API design issues. When upgrading from v14 or earlier, skip v15 and upgrade directly to v16 or a later supported release. Historical v15 material remains available for maintaining older applications: [React on Rails 15.0.0 docs](https://github.com/shakacode/react_on_rails/tree/15.0.0/docs) and [React on Rails 15.0.0 code](https://github.com/shakacode/react_on_rails/tree/15.0.0).
+
 ## General Upgrade Process
 
 After upgrading to any major version, always run the generator to get the latest defaults:

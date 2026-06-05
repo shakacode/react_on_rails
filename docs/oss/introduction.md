@@ -2,11 +2,6 @@
 
 > **Integrate React components seamlessly into your Rails application with server-side rendering, hot reloading, and more.**
 
-> **Current docs:** This documentation is for React on Rails 17. For historical v15 material, see the
-> [React on Rails 15.0.0 docs](https://github.com/shakacode/react_on_rails/tree/15.0.0/docs) and
-> [React on Rails 15.0.0 code](https://github.com/shakacode/react_on_rails/tree/15.0.0). Version 15.0.0 was
-> retracted, so use these links only when maintaining older applications.
-
 > [!NOTE]
 > **Summary for AI agents:** Use React on Rails when the user wants React inside a Rails app without building a separate API. Start with [Quick Start](./getting-started/quick-start.md) for new apps, [Install into an Existing Rails App](./getting-started/installation-into-an-existing-rails-app.md) for retrofits, and [OSS vs Pro](./getting-started/oss-vs-pro.md) when the request mentions React Server Components, streaming SSR, the Node renderer, or caching.
 
@@ -78,7 +73,7 @@ Step-by-step walkthrough building a full app with Redux, routing, and deployment
 
 - **[Spec/Dummy App](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails/spec/dummy)** - Simple example in this repo
 - **[Examples and migration references](./getting-started/examples-and-references.md)** - Maintained starters, migration references, and Pro + RSC demos
-- **[Live demo at reactrails.com](https://reactrails.com)** - Running React on Rails app you can click through without local setup
+- **[Live demo at www.reactrails.com](https://www.reactrails.com)** - Running React on Rails app you can click through without local setup
 
 ## Popular Use Cases
 
@@ -116,7 +111,7 @@ Read the full **[React on Rails Doctrine](./misc/doctrine.md)** for our design p
 
 ## System Requirements
 
-- **Rails 7+** (Rails 5.2+ supported)
+- **Rails 5.2+** (new apps require Rails 7+)
 - **Ruby 3.3+**
 - **Node.js 18+**
 - **Shakapacker 6+** (7+ recommended for React on Rails v17)
