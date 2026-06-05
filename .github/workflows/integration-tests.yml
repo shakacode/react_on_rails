@@ -82,8 +82,13 @@ jobs:
   setup-integration-matrix:
     needs: detect-changes
     runs-on: ubuntu-22.04
+    # Emit one matrix per bundler. Each is fed to a separate per-bundler reusable-workflow call
+    # (webpack-dummy-app-tests / rspack-dummy-app-tests) so the bundlers' build -> integration
+    # chains are fully decoupled: a build failure in one bundler can no longer skip the other
+    # bundler's integration tests. Refs #3593 (follow-up to #3481 / #3581).
     outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      webpack_matrix: ${{ steps.set-matrix.outputs.webpack_matrix }}
+      rspack_matrix: ${{ steps.set-matrix.outputs.rspack_matrix }}
     steps:
       - id: set-matrix
         run: |
@@ -94,32 +99,37 @@ jobs:
              [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
              [[ "${{ inputs.force_run }}" == "true" ]] || \
              [[ "${{ needs.detect-changes.outputs.has_full_ci_label }}" == "true" ]]; then
-            # Full matrix: test both latest and minimum supported versions, plus an
-            # Rspack leg (alongside Webpack) so both bundlers stay green.
-            matrix="$(jq -nc '{
+            # Full matrix: test both latest and minimum supported versions for Webpack.
+            webpack_matrix="$(jq -nc '{
               "include": [
                 {"ruby-version":"4.0","node-version":"22","dependency-level":"latest","bundler":"webpack"},
-                {"ruby-version":"3.3","node-version":"20","dependency-level":"minimum","bundler":"webpack"},
-                {"ruby-version":"4.0","node-version":"22","dependency-level":"latest","bundler":"rspack"}
+                {"ruby-version":"3.3","node-version":"20","dependency-level":"minimum","bundler":"webpack"}
               ]
             }')"
           else
-            # PR matrix: test only latest versions for fast feedback, with an Rspack
-            # leg alongside Webpack to guard both bundlers.
-            matrix="$(jq -nc '{
+            # PR matrix: test only latest versions for fast feedback.
+            webpack_matrix="$(jq -nc '{
               "include": [
-                {"ruby-version":"4.0","node-version":"22","dependency-level":"latest","bundler":"webpack"},
-                {"ruby-version":"4.0","node-version":"22","dependency-level":"latest","bundler":"rspack"}
+                {"ruby-version":"4.0","node-version":"22","dependency-level":"latest","bundler":"webpack"}
               ]
             }')"
           fi
-          echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
+          # Rspack runs the latest leg in both full and PR modes (it has no minimum-version leg yet).
+          rspack_matrix="$(jq -nc '{
+            "include": [
+              {"ruby-version":"4.0","node-version":"22","dependency-level":"latest","bundler":"rspack"}
+            ]
+          }')"
+          echo "webpack_matrix=${webpack_matrix}" >> "$GITHUB_OUTPUT"
+          echo "rspack_matrix=${rspack_matrix}" >> "$GITHUB_OUTPUT"
 
-  build-dummy-app-test-bundles:
+  # One reusable-workflow call per bundler. Each call owns its own build -> integration job chain
+  # (see dummy-app-bundler-tests.yml) with a matched 1:1 `needs`, so a build failure in one bundler
+  # no longer skips the other bundler's integration tests. Refs #3593 (follow-up to #3481 / #3581).
+  # The gating `if:` below is identical for both calls; it preserves the prior skip behavior
+  # (docs/comment-only commits skip heavy jobs while main code changes always run full CI).
+  webpack-dummy-app-tests:
     needs: [detect-changes, setup-integration-matrix]
-    # Skip only if: main push AND non-runtime-only changes
-    # Otherwise run if: on main OR workflow_dispatch OR dummy tests needed
-    # This allows docs/comment-only commits to skip heavy jobs while ensuring full CI on main for code changes
     if: |
       !(
         github.event_name == 'push' &&
@@ -130,122 +140,14 @@ jobs:
         github.event_name == 'workflow_dispatch' ||
         needs.detect-changes.outputs.run_dummy_tests == 'true'
       )
-    strategy:
-      # Keep both bundler legs reporting independently: a failure in one bundler
-      # must not cancel the other (the default fail-fast: true would). Refs #3481.
-      fail-fast: false
-      matrix: ${{ fromJson(needs.setup-integration-matrix.outputs.matrix) }}
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - name: Setup Ruby
-        uses: ./.github/actions/setup-ruby
-        with:
-          ruby-version: ${{ matrix.ruby-version }}
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node-version }}
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-      - name: Get pnpm store directory
-        shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-      - name: Print system information
-        run: |
-          echo "Linux release: "; cat /etc/issue
-          echo "Current user: "; whoami
-          echo "Current directory: "; pwd
-          echo "Ruby version: "; ruby -v
-          echo "Node version: "; node -v
-          echo "pnpm version: "; pnpm --version
-          echo "Bundler version: "; bundle --version
-      - name: Run conversion script for older Node compatibility
-        if: matrix.dependency-level == 'minimum'
-        run: script/convert
-      - name: Install Node modules with pnpm
-        # minimum config changes package.json (shakapacker version), so can't use frozen lockfile
-        run: pnpm install ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '--no-frozen-lockfile' }}
-      - name: Build workspace packages
-        run: pnpm run build
-      - name: Verify single React resolution for core dummy build
-        run: node script/check-single-react-resolution.mjs react_on_rails/spec/dummy packages/react-on-rails
-      - name: Install Ruby Gems for dummy app
-        uses: ./.github/actions/setup-bundle
-        with:
-          working-directory: react_on_rails/spec/dummy
-          ruby-version: ${{ matrix.ruby-version }}
-          frozen: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
-      - name: generate file system-based packs
-        env:
-          SHAKAPACKER_ASSETS_BUNDLER: ${{ matrix.bundler }}
-        run: cd react_on_rails/spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs
-      - name: Smoke check generated pack entrypoints
-        run: test -s react_on_rails/spec/dummy/client/app/generated/server-bundle-generated.js
-      - name: Build test bundles for dummy app
-        # shell: bash gives `bash -eo pipefail`; set -o pipefail is explicit belt-and-suspenders.
-        # Without pipefail the `tee` below masks a nonzero bin/shakapacker exit, letting a broken build
-        # pass this step (the next step's grep matches even on a failed build, since Shakapacker logs
-        # "Completed <bundler> build" before it exits non-zero). Fail fast here instead. Refs #3481.
-        shell: bash
-        env:
-          # Lifted into env: (rather than inline in the run: line) to match the verify step and avoid
-          # interpolating ${{ }} directly into shell. matrix.bundler is webpack | rspack. Refs #3481.
-          SHAKAPACKER_ASSETS_BUNDLER: ${{ matrix.bundler }}
-        run: |
-          set -o pipefail
-          rm -rf react_on_rails/spec/dummy/public/webpack/test
-          pnpm --filter "react_on_rails" run build:rescript
-          cd react_on_rails/spec/dummy && RAILS_ENV="test" NODE_ENV="test" bin/shakapacker 2>&1 | tee "$RUNNER_TEMP/shakapacker-build.log"
-      - name: Verify test bundles were built with ${{ matrix.bundler }}
-        # Guard against a silent bundler fallback. Both Shakapacker's bundler-binary selection and its
-        # "[Shakapacker] Completed <bundler> build" log line resolve through config.rspack?, which is
-        # driven by the SHAKAPACKER_ASSETS_BUNDLER env var set in the build step above. Matching the log
-        # therefore confirms the rspack leg actually compiled with rspack (and the webpack leg with
-        # webpack) rather than silently falling back to the other bundler and still going green.
-        # (The build step's set -o pipefail handles the compile-failed case; this guards selection.)
-        # Refs #3481.
-        env:
-          EXPECTED_BUNDLER: ${{ matrix.bundler }}
-        run: |
-          log="$RUNNER_TEMP/shakapacker-build.log"
-          if [ ! -s "$log" ]; then
-            echo "::error::Build log $log is missing or empty - the build step did not produce a log."
-            exit 1
-          fi
-          if ! grep -qF "[Shakapacker] Completed ${EXPECTED_BUNDLER} build" "$log"; then
-            echo "::error::Expected a '${EXPECTED_BUNDLER}' build, but Shakapacker did not report completing one. The leg may have silently used a different bundler."
-            exit 1
-          fi
-          echo "Confirmed: dummy test bundles built with ${EXPECTED_BUNDLER}."
-      - id: get-sha
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - name: Save test bundles to cache (for build number checksum used by RSpec job)
-        uses: actions/cache/save@v4
-        with:
-          # Both bundlers emit into public/webpack in this app (shakapacker.yml public_output_path),
-          # so this path is correct on the rspack leg too despite the "webpack" directory name.
-          path: react_on_rails/spec/dummy/public/webpack
-          key: dummy-app-bundle-${{ steps.get-sha.outputs.sha }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}-${{ matrix.bundler }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/dummy-app-bundler-tests.yml
+    with:
+      matrix: ${{ needs.setup-integration-matrix.outputs.webpack_matrix }}
 
-  dummy-app-integration-tests:
-    # Known Layer-1 tradeoff (#3481): `needs` gates job-to-job, not matrix-leg-to-leg, so if either
-    # bundler's build leg in build-dummy-app-test-bundles fails, that whole job is marked failed and
-    # every integration leg here is skipped — including the bundler that built fine. Independent
-    # build-level signal is still preserved (fail-fast: false runs both build legs); only the
-    # integration run is gated. A per-bundler build+integration job split would fully decouple them
-    # and is tracked in #3593.
-    needs: [detect-changes, setup-integration-matrix, build-dummy-app-test-bundles]
-    # Run on main, workflow_dispatch, OR when tests needed on PR
+  rspack-dummy-app-tests:
+    needs: [detect-changes, setup-integration-matrix]
     if: |
       !(
         github.event_name == 'push' &&
@@ -256,127 +158,8 @@ jobs:
         github.event_name == 'workflow_dispatch' ||
         needs.detect-changes.outputs.run_dummy_tests == 'true'
       )
-    strategy:
-      # Keep both bundler legs reporting independently: a failure in one bundler
-      # must not cancel the other (the default fail-fast: true would). Refs #3481.
-      fail-fast: false
-      matrix: ${{ fromJson(needs.setup-integration-matrix.outputs.matrix) }}
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - name: Setup Ruby
-        uses: ./.github/actions/setup-ruby
-        with:
-          ruby-version: ${{ matrix.ruby-version }}
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node-version }}
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-      - name: Get pnpm store directory
-        shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-      - name: Print system information
-        run: |
-          echo "Linux release: "; cat /etc/issue
-          echo "Current user: "; whoami
-          echo "Current directory: "; pwd
-          echo "Ruby version: "; ruby -v
-          echo "Node version: "; node -v
-          echo "pnpm version: "; pnpm --version
-          echo "Bundler version: "; bundle --version
-      - name: Run conversion script for older Node compatibility
-        if: matrix.dependency-level == 'minimum'
-        run: script/convert
-      - id: get-sha
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - name: Save test bundles to cache (for build number checksum used by RSpec job)
-        uses: actions/cache@v4
-        with:
-          # Both bundlers emit into public/webpack in this app (shakapacker.yml public_output_path),
-          # so this path is correct on the rspack leg too despite the "webpack" directory name.
-          path: react_on_rails/spec/dummy/public/webpack
-          key: dummy-app-bundle-${{ steps.get-sha.outputs.sha }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}-${{ matrix.bundler }}
-      - name: Install Node modules with pnpm
-        # minimum config changes package.json (shakapacker version), so can't use frozen lockfile
-        run: pnpm install ${{ matrix.dependency-level == 'latest' && '--frozen-lockfile' || '--no-frozen-lockfile' }}
-      - name: Build workspace packages
-        run: pnpm run build
-      - name: Dummy JS tests
-        run: pnpm --filter "react_on_rails" run test:js
-      - name: Install Ruby Gems for package
-        uses: ./.github/actions/setup-bundle
-        with:
-          working-directory: react_on_rails
-          ruby-version: ${{ matrix.ruby-version }}
-          frozen: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
-      - name: Install Ruby Gems for dummy app
-        uses: ./.github/actions/setup-bundle
-        with:
-          working-directory: react_on_rails/spec/dummy
-          ruby-version: ${{ matrix.ruby-version }}
-          frozen: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
-      - name: Ensure minimum required Chrome version
-        run: |
-          echo -e "Already installed $(google-chrome --version)\n"
-          MINIMUM_REQUIRED_CHROME_VERSION=75
-          INSTALLED_CHROME_MAJOR_VERSION="$(google-chrome --version | tr ' .' '\t' | cut -f3)"
-          if [[ $INSTALLED_CHROME_MAJOR_VERSION -lt $MINIMUM_REQUIRED_CHROME_VERSION ]]; then
-            wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-            sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
-            sudo apt-get update
-            sudo apt-get install google-chrome-stable
-            echo -e "\nInstalled $(google-chrome --version)"
-          fi
-      - name: Increase the amount of inotify watchers
-        run: echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
-      - name: generate file system-based packs
-        env:
-          SHAKAPACKER_ASSETS_BUNDLER: ${{ matrix.bundler }}
-        run: cd react_on_rails/spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs
-      - name: Git Stuff
-        if: matrix.dependency-level == 'minimum'
-        run: |
-          git config user.email "you@example.com"
-          git config user.name "Your Name"
-          git commit -am "stop generators from complaining about uncommitted code"
-      - run: cd react_on_rails/spec/dummy && bundle info shakapacker
-      - name: Set packer version environment variable
-        run: |
-          echo "CI_DEPENDENCY_LEVEL=ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}-${{ matrix.bundler }}" >> "$GITHUB_ENV"
-      - name: Main CI
-        # Normal runs consume cached bundles, but EnsureAssetsCompiled can rebuild if assets are stale.
-        # Keep the override here so the rspack leg cannot fall back to webpack on that path. Refs #3481.
-        env:
-          SHAKAPACKER_ASSETS_BUNDLER: ${{ matrix.bundler }}
-        run: cd react_on_rails && bundle exec rake run_rspec:all_dummy
-      - name: Store test results
-        uses: actions/upload-artifact@v4
-        with:
-          name: main-rspec-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}-${{ matrix.bundler }}
-          path: ~/rspec
-      - name: Store artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: dummy-app-capybara-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}-${{ matrix.bundler }}
-          path: react_on_rails/spec/dummy/tmp/capybara
-      - name: Store artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: dummy-app-test-log-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}-${{ matrix.bundler }}
-          path: react_on_rails/spec/dummy/log/test.log
-      - name: Store artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: dummy-app-pnpm-log-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}-${{ matrix.bundler }}
-          path: react_on_rails/spec/dummy/pnpm-debug.log
+    permissions:
+      contents: read
+    uses: ./.github/workflows/dummy-app-bundler-tests.yml
+    with:
+      matrix: ${{ needs.setup-integration-matrix.outputs.rspack_matrix }}
