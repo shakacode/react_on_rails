@@ -4,15 +4,15 @@ This directory contains GitHub Actions workflows for continuous integration and 
 
 ## PR Comment Commands
 
-### `/run-skipped-ci` (or `/run-skipped-tests`) - Run Full CI Suite
+### `+ci-run-full` - Run Full CI Suite
 
 When you open a PR, CI automatically runs a subset of tests for faster feedback (latest Ruby/Node versions only). To run the **complete CI suite** including all dependency combinations, add a comment to your PR:
 
 ```
-/run-skipped-ci
-# or use the shorter alias:
-/run-skipped-tests
++ci-run-full
 ```
+
+Post one CI command per comment. If a comment contains multiple `+ci-*` commands, the command workflow handles only the first one.
 
 This command will trigger:
 
@@ -21,9 +21,22 @@ This command will trigger:
 - ✅ React on Rails Pro integration tests
 - ✅ React on Rails Pro package tests
 
+`+ci-run-full` dispatches this manually maintained workflow map:
+
+- **Lint JS and Ruby** (`lint-js-and-ruby.yml`)
+- **JS unit tests for Renderer package** (`package-js-tests.yml`)
+- **Rspec test for gem** (`gem-tests.yml`)
+- **Integration Tests** (`integration-tests.yml`)
+- **Assets Precompile Check** (`precompile-check.yml`)
+- **Generator tests** (`examples.yml`)
+- **React on Rails Pro - Integration Tests** (`pro-integration-tests.yml`)
+- **React on Rails Pro - Package Tests** (`pro-test-package-and-gem.yml`)
+
+When adding or removing a full-CI-capable workflow, update both this list and the `workflowMap` in `ci-commands.yml`.
+
 The bot will:
 
-1. React with a 🚀 to your comment
+1. React to your comment (`rocket` when workflows are triggered, `confused` when the command cannot run)
 2. Post a confirmation message with links to the triggered workflows
 3. Start all CI jobs on your PR branch
 
@@ -35,7 +48,15 @@ By default, PRs run a subset of CI jobs to provide fast feedback:
 - Skips example generator tests
 - Skips some Pro package tests
 
-This is intentional to keep PR feedback loops fast. However, before merging, you should verify compatibility across all supported versions. The `/run-skipped-ci` (or `/run-skipped-tests`) command makes this easy without waiting for the PR to be merged to main.
+This is intentional to keep PR feedback loops fast. However, before merging high-risk changes, you should verify compatibility across all supported versions. The `+ci-run-full` command makes this easy without waiting for the PR to be merged to main.
+
+For low-risk or docs-only changes where a maintainer intentionally does not want full CI, use:
+
+```
++ci-skip-full docs-only change; markdown checks are enough
+```
+
+The reason is optional. The bot records the current PR head SHA so the waiver is auditable and does not apply after another push. It does not cancel or block workflow runs.
 
 ### Security & Access Control
 
@@ -45,11 +66,13 @@ This is intentional to keep PR feedback loops fast. However, before merging, you
 - Unauthorized access to Pro package tests
 - Potential DoS attacks via repeated CI runs
 
-If an unauthorized user attempts to use `/run-skipped-ci` or `/run-skipped-tests`, they'll receive a message explaining the restriction.
+The workflow first filters comment authors to `OWNER`, `MEMBER`, or `COLLABORATOR` associations to avoid allocating runners for obvious external mentions. The script still verifies repository write access before executing any command. If an unauthorized associated user attempts to use `+ci-run-full`, they'll receive a message explaining the restriction.
+
+The job-level `contains('+ci-')` prefilter is intentionally broad because GitHub Actions expressions do not support regular expressions. A prose mention such as `+ci-related` can still start the lightweight command workflow, but the script strips quoted/code blocks and only executes commands that appear at the start of a comment line.
 
 ### Concurrency Protection
 
-Multiple `/run-skipped-ci` or `/run-skipped-tests` comments on the same PR will cancel in-progress runs to prevent resource waste and duplicate results.
+Multiple CI command comments on the same PR run one at a time so a status/help command cannot interrupt a full-CI dispatch.
 
 ## Testing Comment-Triggered Workflows
 
@@ -83,7 +106,8 @@ For more details, see [GitHub's documentation on issue_comment events](https://d
 
 ### Utility Workflows
 
-- **`run-skipped-ci.yml`** - Triggered by `/run-skipped-ci` or `/run-skipped-tests` comment on PRs
+- **`ci-commands.yml`** - Triggered by `+ci-*` comments on PRs
+- **`run-skipped-ci.yml`** - Legacy workflow triggered by `/run-skipped-ci` or `/run-skipped-tests` comment on PRs
 - **`pr-welcome-comment.yml`** - Auto-comments on new PRs with helpful info
 - **`detect-changes.yml`** - Detects which parts of the codebase changed
 
@@ -101,7 +125,8 @@ For more details, see [GitHub's documentation on issue_comment events](https://d
 Most workflows use minimal permissions. The comment-triggered workflows require:
 
 - `contents: read` - To read the repository code
-- `pull-requests: write` - To post comments and reactions
+- `pull-requests: read` - To inspect PR metadata and changed files
+- `issues: write` - To post comments, labels, and reactions
 - `actions: write` - To trigger other workflows
 
 ## Conditional Execution
@@ -110,6 +135,6 @@ Many workflows use change detection to skip unnecessary jobs:
 
 - Runs all jobs on pushes to `main`
 - Runs only relevant jobs on PRs based on changed files
-- Can be overridden with `workflow_dispatch` or `/run-skipped-ci` (or `/run-skipped-tests`) command
+- Can be overridden with `workflow_dispatch` or `+ci-run-full`
 
 See `script/ci-changes-detector` for the change detection logic.
