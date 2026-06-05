@@ -14,6 +14,17 @@ const UNSTYLED_BACKGROUNDS = [
   'rgb(255, 255, 255)',
 ];
 
+type FirstVisibleProbeState = {
+  hasStylesheet: boolean;
+  backgroundColor: string;
+  color: string;
+  padding: string;
+  borderRadius: string;
+  width: number;
+  height: number;
+  text: string | null;
+};
+
 abTest(
   'rsc first paint use-client css emits stylesheet before hydration',
   {
@@ -31,24 +42,41 @@ abTest(
     },
   },
   async ({ page, annotate }) => {
-    await annotate('wait for css probe');
-    await page.waitForSelector(RSC_CSS_PROBE_SELECTOR, { state: 'visible', timeout: 10_000 });
-
-    await annotate('assert RSC stylesheet link is server-rendered');
-    await page.waitForSelector(RSC_STYLESHEET_SELECTOR, { state: 'attached', timeout: 5_000 });
-
-    await annotate('assert probe CSS is applied before hydration');
-    await page.waitForFunction(
-      ({ selector, unstyledBackgrounds }) => {
-        const element = document.querySelector(selector);
+    await annotate('capture first visible css probe');
+    const stateHandle = await page.waitForFunction(
+      ({ probeSelector, stylesheetSelector }) => {
+        const element = document.querySelector(probeSelector);
         if (!element) return false;
 
-        const { backgroundColor } = getComputedStyle(element);
-        return !unstyledBackgrounds.includes(backgroundColor);
+        const box = element.getBoundingClientRect();
+        if (box.width <= 0 || box.height <= 0) return false;
+
+        const style = getComputedStyle(element);
+        return {
+          hasStylesheet: Boolean(document.querySelector(stylesheetSelector)),
+          backgroundColor: style.backgroundColor,
+          color: style.color,
+          padding: style.padding,
+          borderRadius: style.borderRadius,
+          width: Math.round(box.width),
+          height: Math.round(box.height),
+          text: element.textContent,
+        };
       },
-      { selector: RSC_CSS_PROBE_SELECTOR, unstyledBackgrounds: UNSTYLED_BACKGROUNDS },
-      { timeout: 5_000, polling: 'raf' },
+      { probeSelector: RSC_CSS_PROBE_SELECTOR, stylesheetSelector: RSC_STYLESHEET_SELECTOR },
+      { timeout: 10_000, polling: 'raf' },
     );
+    const state = (await stateHandle.jsonValue()) as FirstVisibleProbeState;
+
+    await annotate('assert stylesheet at first visibility');
+    if (!state.hasStylesheet) {
+      throw new Error(`RSC stylesheet missing at first visible probe: ${JSON.stringify(state)}`);
+    }
+
+    await annotate('assert CSS at first visibility');
+    if (UNSTYLED_BACKGROUNDS.includes(state.backgroundColor)) {
+      throw new Error(`first visible probe is unstyled before hydration: ${JSON.stringify(state)}`);
+    }
 
     await annotate('wait for load');
     await page.waitForLoadState('load');
@@ -86,8 +114,8 @@ abTest(
     // JavaScript is intentionally unblocked here for the visual report; the first abtest is the SSR correctness guard.
     await annotate('wait first visible');
     const stateHandle = await page.waitForFunction(
-      (selector) => {
-        const element = document.querySelector(selector);
+      ({ probeSelector, stylesheetSelector }) => {
+        const element = document.querySelector(probeSelector);
         if (!element) return false;
 
         const box = element.getBoundingClientRect();
@@ -95,6 +123,7 @@ abTest(
 
         const style = getComputedStyle(element);
         return {
+          hasStylesheet: Boolean(document.querySelector(stylesheetSelector)),
           backgroundColor: style.backgroundColor,
           color: style.color,
           padding: style.padding,
@@ -104,18 +133,10 @@ abTest(
           text: element.textContent,
         };
       },
-      RSC_CSS_PROBE_SELECTOR,
+      { probeSelector: RSC_CSS_PROBE_SELECTOR, stylesheetSelector: RSC_STYLESHEET_SELECTOR },
       { timeout: 5_000, polling: 'raf' },
     );
-    const state = (await stateHandle.jsonValue()) as {
-      backgroundColor: string;
-      color: string;
-      padding: string;
-      borderRadius: string;
-      width: number;
-      height: number;
-      text: string | null;
-    };
+    const state = (await stateHandle.jsonValue()) as FirstVisibleProbeState;
 
     await annotate('assert styled');
     if (UNSTYLED_BACKGROUNDS.includes(state.backgroundColor)) {

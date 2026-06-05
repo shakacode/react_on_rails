@@ -448,7 +448,7 @@ RSpec.describe "release.rake helper methods" do
           allow_override: false,
           dry_run: false
         )
-      end.to raise_error(SystemExit, /ShakaPerf release gate failed.*Tests failed/m)
+      end.to raise_error(SystemExit, %r{ShakaPerf release gate failed.*actions/runs/123456.*Tests failed}m)
     end
 
     it "aborts when watching the matching gate run times out" do
@@ -482,7 +482,7 @@ RSpec.describe "release.rake helper methods" do
           allow_override: false,
           dry_run: false
         )
-      end.to raise_error(SystemExit, /Timed out watching ShakaPerf release gate run 123456/)
+      end.to raise_error(SystemExit, %r{Timed out watching ShakaPerf release gate run 123456.*actions/runs/123456}m)
     end
 
     it "finds the workflow_dispatch run for the pushed head SHA" do
@@ -511,6 +511,21 @@ RSpec.describe "release.rake helper methods" do
           ignored_run_ids: [1]
         )
       ).to eq(matching_run)
+    end
+
+    it "aborts when no matching workflow_dispatch run appears before the deadline" do
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug: repo_slug, ref: "release-branch")
+        .and_return([{ "databaseId" => 1, "headSha" => "other" }])
+      stub_const("SHAKAPERF_RELEASE_GATE_START_TIMEOUT_SECONDS", -1)
+
+      expect do
+        wait_for_shakaperf_release_gate_run!(
+          repo_slug: repo_slug,
+          ref: "release-branch",
+          head_sha: head_sha
+        )
+      end.to raise_error(SystemExit, /Timed out waiting for ShakaPerf release gate workflow to start/)
     end
   end
 

@@ -144,11 +144,13 @@ jobs:
 
           for attempt in {1..60}; do
             echo "Waiting for RSC FOUC probe server (${attempt}/60)..."
-            # /empty is a stable Pro dummy route; the RSC page proves the renderer is warm enough for the gate.
-            if curl --connect-timeout 2 --max-time 5 -fsS "$SHAKAPERF_CONTROL_URL/empty" > /dev/null &&
+            # /info proves the renderer socket responds, /empty proves Rails responds,
+            # and the RSC page proves both sides are warm enough for the gate.
+            if curl --connect-timeout 2 --max-time 5 -fsS "http://127.0.0.1:3800/info" > /dev/null &&
+              curl --connect-timeout 2 --max-time 5 -fsS "$SHAKAPERF_CONTROL_URL/empty" > /dev/null &&
               curl --connect-timeout 2 --max-time 5 -fsS "$SHAKAPERF_CONTROL_URL/rsc_posts_page_over_http" > /dev/null
             then
-              # Both endpoints are up; exit this step and leave the background servers running for ShakaPerf.
+              # All probes are up; exit this step and leave the background servers running for ShakaPerf.
               exit 0
             fi
 
@@ -167,7 +169,7 @@ jobs:
             sleep 2
           done
 
-          echo "::error::Timed out waiting for $SHAKAPERF_CONTROL_URL/empty and /rsc_posts_page_over_http"
+          echo "::error::Timed out waiting for renderer /info, $SHAKAPERF_CONTROL_URL/empty, and /rsc_posts_page_over_http"
           tail -n 200 "$RUNNER_TEMP/shakaperf-logs/node-renderer.log" || true
           tail -n 200 "$RUNNER_TEMP/shakaperf-logs/rails.log" || true
           exit 1

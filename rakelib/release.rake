@@ -25,7 +25,7 @@ NPM_PUBLISH_VERIFY_ATTEMPTS = 6
 NPM_PUBLISH_VERIFY_RETRY_DELAY_SECONDS = 5
 NPM_INSTALL_DEPENDENCY_FIELDS = %w[dependencies optionalDependencies peerDependencies].freeze
 SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE = "shakaperf-release-gates.yml"
-SHAKAPERF_RELEASE_GATE_START_TIMEOUT_SECONDS = 120
+SHAKAPERF_RELEASE_GATE_START_TIMEOUT_SECONDS = 300
 SHAKAPERF_RELEASE_GATE_START_POLL_SECONDS = 5
 SHAKAPERF_RELEASE_GATE_RUN_LIST_LIMIT = 100
 SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS = 60 * 60
@@ -250,21 +250,24 @@ def wait_for_shakaperf_release_gate_run!(repo_slug:, ref:, head_sha:, ignored_ru
   )
 end
 
-def watch_shakaperf_release_gate_run!(repo_slug:, run_id:)
+def watch_shakaperf_release_gate_run!(repo_slug:, run:)
+  run_id = run.fetch("databaseId").to_s
+  run_url = run["url"] || "https://github.com/#{repo_slug}/actions/runs/#{run_id}"
+
   output, status = begin
     Timeout.timeout(SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS) do
       capture_gh_output("run", "watch", run_id, "--repo", repo_slug, "--exit-status")
     end
   rescue Timeout::Error
     handle_shakaperf_release_gate_violation!(
-      message: "❌ Timed out watching ShakaPerf release gate run #{run_id}."
+      message: "❌ Timed out watching ShakaPerf release gate run #{run_id}.\n\nRun: #{run_url}"
     )
   end
 
   return if status.success?
 
   handle_shakaperf_release_gate_violation!(
-    message: "❌ ShakaPerf release gate failed.\n\n#{output}"
+    message: "❌ ShakaPerf release gate failed.\n\nRun: #{run_url}\n\n#{output}"
   )
 end
 
@@ -301,7 +304,7 @@ def run_shakaperf_release_gate!(monorepo_root:, ref:, head_sha:, allow_override:
     ignored_run_ids: existing_run_ids
   )
   run_id = run.fetch("databaseId").to_s
-  watch_shakaperf_release_gate_run!(repo_slug: repo_slug, run_id: run_id)
+  watch_shakaperf_release_gate_run!(repo_slug: repo_slug, run: run)
 
   puts "✓ ShakaPerf release gate passed: #{run['url'] || "GitHub Actions run #{run_id}"}"
 end
