@@ -21,11 +21,21 @@ const parseArtifactParallelism = (value: string | undefined) => {
 
   const parsedValue = Number(trimmedValue);
   if (!Number.isFinite(parsedValue)) {
+    console.warn(
+      `[shakaperf] SHAKAPERF_ARTIFACT_PARALLELISM="${value}" is not a finite number; falling back to auto-detected default.`,
+    );
     return undefined;
   }
 
   const parallelism = Math.floor(parsedValue);
-  return parallelism > 0 ? parallelism : undefined;
+  if (parallelism <= 0) {
+    console.warn(
+      `[shakaperf] SHAKAPERF_ARTIFACT_PARALLELISM="${value}" parsed to ${parallelism}; falling back to auto-detected default.`,
+    );
+    return undefined;
+  }
+
+  return parallelism;
 };
 
 const CONFIGURED_PARALLELISM = parseArtifactParallelism(process.env.SHAKAPERF_ARTIFACT_PARALLELISM);

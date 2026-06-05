@@ -1,3 +1,4 @@
+# REACT_RENDERER_URL is inherited from the Docker ENV default; export it first when running outside Docker.
 control-node-renderer: shaka-perf servers run-overmind-command control "cd react_on_rails_pro/spec/dummy && RAILS_ENV=test NODE_ENV=test RENDERER_PORT=3800 pnpm run node-renderer"
 control-rails: shaka-perf servers run-overmind-command control "cd react_on_rails_pro/spec/dummy && RAILS_ENV=test NODE_ENV=test PORT=3000 SECRET_KEY_BASE=dummy-secret-key-base-for-shakaperf-rsc-fouc bundle exec rails s -b 0.0.0.0 -p 3000"
 experiment-node-renderer: shaka-perf servers run-overmind-command experiment "cd react_on_rails_pro/spec/dummy && RAILS_ENV=test NODE_ENV=test RENDERER_PORT=3800 pnpm run node-renderer"
