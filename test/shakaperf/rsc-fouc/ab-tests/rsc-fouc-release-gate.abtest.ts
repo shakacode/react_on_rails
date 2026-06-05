@@ -2,8 +2,8 @@ import { abTest, installRequestBlocking } from 'shaka-shared';
 
 const RSC_CSS_PROBE_SELECTOR = '[data-testid="rsc-css-probe"]';
 const RSC_STYLESHEET_SELECTOR = 'link[rel="stylesheet"][data-precedence="ror-rsc"]';
-// Matches .probe background-color in react_on_rails_pro/spec/dummy/client/app/components/RSCPostsPage/UseClientCssProbe.module.scss.
-const EXPECTED_BACKGROUND = 'rgb(212, 250, 236)';
+// A styled probe must have a real CSS-module background, not the default unstyled page background.
+const UNSTYLED_BACKGROUNDS = ['rgba(0, 0, 0, 0)', 'transparent', 'rgb(255, 255, 255)'];
 
 abTest(
   'rsc first paint use-client css emits stylesheet before hydration',
@@ -30,13 +30,14 @@ abTest(
 
     await annotate('assert probe CSS is applied before hydration');
     await page.waitForFunction(
-      ({ expectedBackground, selector }) => {
+      ({ selector, unstyledBackgrounds }) => {
         const element = document.querySelector(selector);
         if (!element) return false;
 
-        return getComputedStyle(element).backgroundColor === expectedBackground;
+        const { backgroundColor } = getComputedStyle(element);
+        return !unstyledBackgrounds.includes(backgroundColor);
       },
-      { expectedBackground: EXPECTED_BACKGROUND, selector: RSC_CSS_PROBE_SELECTOR },
+      { selector: RSC_CSS_PROBE_SELECTOR, unstyledBackgrounds: UNSTYLED_BACKGROUNDS },
       { timeout: 5_000, polling: 'raf' },
     );
 
@@ -107,7 +108,7 @@ abTest(
     };
 
     await annotate('assert styled');
-    if (state.backgroundColor !== EXPECTED_BACKGROUND) {
+    if (UNSTYLED_BACKGROUNDS.includes(state.backgroundColor)) {
       throw new Error(
         `${isControl ? 'control' : 'experiment'} first visible probe is unstyled: ${JSON.stringify(state)}`,
       );

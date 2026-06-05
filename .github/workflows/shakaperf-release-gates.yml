@@ -10,6 +10,10 @@ on:
       - 'v*'
       - '*-rc*'
 
+concurrency:
+  group: shakaperf-release-gates-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   NODE_VERSION: 22.12.0
   RUBY_VERSION: 3.3.7
@@ -22,6 +26,7 @@ jobs:
     env:
       RAILS_ENV: test
       NODE_ENV: test
+      # Dummy value for RAILS_ENV=test; no real credentials are encrypted or persisted.
       SECRET_KEY_BASE: dummy-secret-key-base-for-shakaperf-rsc-fouc
       SHAKAPERF_CONTROL_URL: http://127.0.0.1:3030
       SHAKAPERF_EXPERIMENT_URL: http://127.0.0.1:3030
@@ -130,7 +135,9 @@ jobs:
 
           for attempt in {1..60}; do
             echo "Waiting for RSC FOUC probe server (${attempt}/60)..."
-            if curl --connect-timeout 2 --max-time 5 -fsS "$SHAKAPERF_CONTROL_URL/rsc_posts_page_over_http" > /dev/null; then
+            if curl --connect-timeout 2 --max-time 5 -fsS "$SHAKAPERF_CONTROL_URL/empty" > /dev/null &&
+              curl --connect-timeout 2 --max-time 5 -fsS "$SHAKAPERF_CONTROL_URL/rsc_posts_page_over_http" > /dev/null
+            then
               exit 0
             fi
 
@@ -149,7 +156,7 @@ jobs:
             sleep 2
           done
 
-          echo "::error::Timed out waiting for $SHAKAPERF_CONTROL_URL/rsc_posts_page_over_http"
+          echo "::error::Timed out waiting for $SHAKAPERF_CONTROL_URL/empty and /rsc_posts_page_over_http"
           tail -n 200 "$RUNNER_TEMP/shakaperf-logs/node-renderer.log" || true
           tail -n 200 "$RUNNER_TEMP/shakaperf-logs/rails.log" || true
           exit 1

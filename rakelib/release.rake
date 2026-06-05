@@ -23,6 +23,9 @@ NPM_REGISTRY_URL = "https://registry.npmjs.org/"
 NPM_PUBLISH_VERIFY_ATTEMPTS = 6
 NPM_PUBLISH_VERIFY_RETRY_DELAY_SECONDS = 5
 NPM_INSTALL_DEPENDENCY_FIELDS = %w[dependencies optionalDependencies peerDependencies].freeze
+SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE = "shakaperf-release-gates.yml"
+SHAKAPERF_RELEASE_GATE_START_TIMEOUT_SECONDS = 120
+SHAKAPERF_RELEASE_GATE_START_POLL_SECONDS = 5
 
 # Helper methods for release-specific tasks
 # These are defined at the top level so they have access to Rake's sh method
@@ -176,6 +179,113 @@ def verify_gh_auth(monorepo_root:)
   end
 
   puts "✓ GitHub CLI authenticated with write access to #{repo_slug}"
+end
+
+def current_git_sha!(monorepo_root)
+  output, status = Open3.capture2e("git", "-C", monorepo_root, "rev-parse", "HEAD")
+  abort "❌ Unable to resolve current git SHA.\n\n#{output}" unless status.success?
+
+  output.strip
+end
+
+def handle_shakaperf_release_gate_violation!(message:)
+  abort <<~ERROR
+    #{message}
+
+    To override this release gate (use only for an urgent release when ShakaPerf is known-unrelated):
+      RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake release[...]
+      # or pass override_ci_status as the 4th positional argument:
+      bundle exec rake "release[VERSION,false,false,true]"
+  ERROR
+end
+
+def fetch_shakaperf_release_gate_runs(repo_slug:, ref:)
+  output, status = capture_gh_output(
+    "run", "list",
+    "--repo", repo_slug,
+    "--workflow", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
+    "--branch", ref,
+    "--event", "workflow_dispatch",
+    "--json", "databaseId,headSha,status,conclusion,url",
+    "--limit", "20"
+  )
+
+  unless status.success?
+    handle_shakaperf_release_gate_violation!(
+      message: "❌ Unable to list ShakaPerf release gate workflow runs.\n\n#{output}"
+    )
+  end
+
+  JSON.parse(output)
+rescue JSON::ParserError => e
+  handle_shakaperf_release_gate_violation!(
+    message: "❌ Failed to parse ShakaPerf release gate workflow runs: #{e.message}\n\nOutput:\n#{output}"
+  )
+end
+
+def wait_for_shakaperf_release_gate_run!(repo_slug:, ref:, head_sha:, ignored_run_ids: [])
+  deadline = Time.now + SHAKAPERF_RELEASE_GATE_START_TIMEOUT_SECONDS
+  ignored_run_ids = ignored_run_ids.map(&:to_s)
+
+  loop do
+    runs = fetch_shakaperf_release_gate_runs(repo_slug: repo_slug, ref: ref)
+    matching_run = runs.find do |run|
+      run["headSha"] == head_sha && !ignored_run_ids.include?(run["databaseId"].to_s)
+    end
+    return matching_run if matching_run
+
+    break if Time.now >= deadline
+
+    sleep SHAKAPERF_RELEASE_GATE_START_POLL_SECONDS
+  end
+
+  handle_shakaperf_release_gate_violation!(
+    message: "❌ Timed out waiting for ShakaPerf release gate workflow to start for #{head_sha[0, 8]}."
+  )
+end
+
+def run_shakaperf_release_gate!(monorepo_root:, ref:, head_sha:, allow_override:, dry_run:)
+  if dry_run
+    puts "⚠️ DRY RUN: Would run ShakaPerf release gate on #{ref} at #{head_sha[0, 8]} before publishing."
+    return
+  end
+
+  if allow_override
+    puts "⚠️ CI STATUS OVERRIDE enabled — skipping ShakaPerf release gate."
+    return
+  end
+
+  repo_slug = github_repo_slug(monorepo_root)
+  puts "\nRunning ShakaPerf release gate on #{ref} at #{head_sha[0, 8]} before tagging and publishing..."
+  existing_run_ids = fetch_shakaperf_release_gate_runs(repo_slug: repo_slug, ref: ref).map do |run|
+    run["databaseId"].to_s
+  end
+  output, status = capture_gh_output(
+    "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE, "--repo", repo_slug, "--ref", ref
+  )
+
+  unless status.success?
+    handle_shakaperf_release_gate_violation!(
+      message: "❌ Unable to dispatch ShakaPerf release gate workflow.\n\n#{output}"
+    )
+  end
+
+  run = wait_for_shakaperf_release_gate_run!(
+    repo_slug: repo_slug,
+    ref: ref,
+    head_sha: head_sha,
+    ignored_run_ids: existing_run_ids
+  )
+  run_id = run.fetch("databaseId").to_s
+  output, status = capture_gh_output("run", "watch", run_id, "--repo", repo_slug, "--exit-status")
+
+  unless status.success?
+    handle_shakaperf_release_gate_violation!(
+      message: "❌ ShakaPerf release gate failed.\n\n#{output}"
+    )
+  end
+
+  puts "✓ ShakaPerf release gate passed: #{run['url'] || "GitHub Actions run #{run_id}"}"
 end
 
 def run_release_preflight_checks!(monorepo_root:, dry_run:)
@@ -1221,14 +1331,17 @@ This will update and release:
   - empty (auto): use latest CHANGELOG.md version if newer, else patch bump
 2nd argument: Dry run (true/false, default: false)
 3rd argument: Override version policy checks (true/false, default: false)
-4th argument: Override main-branch CI status check (true/false, default: false)
+4th argument: Override release CI gates (true/false, default: false)
 
-Main-branch CI policy:
+Release CI policy:
   Before releasing, the script checks CI status on origin/main HEAD.
   - Stable releases require every check run on the commit to have succeeded.
   - Pre-releases require only the GitHub-branch-protection-required checks
     to have succeeded.
-  In-progress checks block the release until they finish, or until you
+  After pushing the version bump commit, the script runs the ShakaPerf RSC FOUC
+  workflow_dispatch gate and waits for it before creating/pushing the tag and
+  publishing npm packages or Ruby gems.
+  In-progress checks and failing gates block the release until they pass, or until you
   explicitly override via the 4th argument or RELEASE_CI_STATUS_OVERRIDE=true.
 
 Environment variables:
@@ -1236,7 +1349,7 @@ Environment variables:
   NPM_OTP=<code>               # Provide NPM one-time password (reused for all NPM publishes)
   RUBYGEMS_OTP=<code>          # Provide RubyGems one-time password (reused for both gems)
   RELEASE_VERSION_POLICY_OVERRIDE=true # Override release version policy checks
-  RELEASE_CI_STATUS_OVERRIDE=true      # Override main-branch CI status check
+  RELEASE_CI_STATUS_OVERRIDE=true      # Override release CI gates
   GEM_RELEASE_MAX_RETRIES=<n>  # Override max retry attempts (default: 3)
 
 Examples:
@@ -1401,6 +1514,15 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
         sh_in_dir_for_release(release_root, "LEFTHOOK=0 git commit -m 'Bump version to #{actual_gem_version}'")
       end
 
+      sh_in_dir_for_release(release_root, "LEFTHOOK=0 git push")
+      run_shakaperf_release_gate!(
+        monorepo_root: release_root,
+        ref: current_branch,
+        head_sha: current_git_sha!(release_root),
+        allow_override: allow_ci_status_override,
+        dry_run: is_dry_run
+      )
+
       tag_name = "v#{actual_gem_version}"
       tag_exists = system("git", "-C", release_root, "rev-parse", "--verify", "--quiet", "refs/tags/#{tag_name}",
                           out: File::NULL, err: File::NULL)
@@ -1410,7 +1532,6 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
         sh_in_dir_for_release(release_root, "git tag #{tag_name}")
       end
 
-      sh_in_dir_for_release(release_root, "LEFTHOOK=0 git push")
       sh_in_dir_for_release(release_root, "LEFTHOOK=0 git push --tags")
 
       puts "\n#{'=' * 80}"

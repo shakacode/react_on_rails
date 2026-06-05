@@ -299,6 +299,153 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#run_shakaperf_release_gate!" do
+    let(:monorepo_root) { "/tmp/repo" }
+    let(:repo_slug) { "shakacode/react_on_rails" }
+    let(:head_sha) { "abc1234def5678abcdef" }
+    let(:success_status) { instance_double(Process::Status, success?: true) }
+    let(:failure_status) { instance_double(Process::Status, success?: false) }
+    let(:run) do
+      {
+        "databaseId" => 123_456,
+        "headSha" => head_sha,
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
+      }
+    end
+
+    before do
+      allow(self).to receive(:github_repo_slug).with(monorepo_root).and_return(repo_slug)
+    end
+
+    it "dispatches the workflow on the release ref and watches the matching run" do
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug: repo_slug, ref: "release-branch")
+        .and_return([{ "databaseId" => 999_999, "headSha" => head_sha }])
+      allow(self).to receive(:capture_gh_output)
+        .with(
+          "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
+          "--repo", repo_slug,
+          "--ref", "release-branch"
+        )
+        .and_return(["", success_status])
+      allow(self).to receive(:wait_for_shakaperf_release_gate_run!)
+        .with(
+          repo_slug: repo_slug,
+          ref: "release-branch",
+          head_sha: head_sha,
+          ignored_run_ids: ["999999"]
+        )
+        .and_return(run)
+      allow(self).to receive(:capture_gh_output)
+        .with("run", "watch", "123456", "--repo", repo_slug, "--exit-status")
+        .and_return(["", success_status])
+
+      expect do
+        run_shakaperf_release_gate!(
+          monorepo_root: monorepo_root,
+          ref: "release-branch",
+          head_sha: head_sha,
+          allow_override: false,
+          dry_run: false
+        )
+      end.to output(/ShakaPerf release gate passed/).to_stdout
+      expect(self).to have_received(:capture_gh_output)
+        .with(
+          "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
+          "--repo", repo_slug,
+          "--ref", "release-branch"
+        )
+      expect(self).to have_received(:wait_for_shakaperf_release_gate_run!)
+        .with(
+          repo_slug: repo_slug,
+          ref: "release-branch",
+          head_sha: head_sha,
+          ignored_run_ids: ["999999"]
+        )
+      expect(self).to have_received(:capture_gh_output)
+        .with("run", "watch", "123456", "--repo", repo_slug, "--exit-status")
+    end
+
+    it "skips dispatching when the CI status override is enabled" do
+      expect(self).not_to receive(:capture_gh_output)
+
+      expect do
+        run_shakaperf_release_gate!(
+          monorepo_root: monorepo_root,
+          ref: "release-branch",
+          head_sha: head_sha,
+          allow_override: true,
+          dry_run: false
+        )
+      end.to output(/skipping ShakaPerf release gate/).to_stdout
+    end
+
+    it "prints the intended gate during dry runs without dispatching" do
+      expect(self).not_to receive(:capture_gh_output)
+
+      expect do
+        run_shakaperf_release_gate!(
+          monorepo_root: monorepo_root,
+          ref: "release-branch",
+          head_sha: head_sha,
+          allow_override: false,
+          dry_run: true
+        )
+      end.to output(/DRY RUN: Would run ShakaPerf release gate/).to_stdout
+    end
+
+    it "aborts when workflow dispatch fails" do
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug: repo_slug, ref: "release-branch")
+        .and_return([])
+      allow(self).to receive(:capture_gh_output)
+        .with(
+          "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
+          "--repo", repo_slug,
+          "--ref", "release-branch"
+        )
+        .and_return(["HTTP 404", failure_status])
+
+      expect do
+        run_shakaperf_release_gate!(
+          monorepo_root: monorepo_root,
+          ref: "release-branch",
+          head_sha: head_sha,
+          allow_override: false,
+          dry_run: false
+        )
+      end.to raise_error(SystemExit, /Unable to dispatch ShakaPerf release gate workflow.*HTTP 404/m)
+    end
+
+    it "finds the workflow_dispatch run for the pushed head SHA" do
+      matching_run = { "databaseId" => 2, "headSha" => head_sha }
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug: repo_slug, ref: "release-branch")
+        .and_return([{ "databaseId" => 1, "headSha" => "old" }, matching_run])
+
+      expect(
+        wait_for_shakaperf_release_gate_run!(repo_slug: repo_slug, ref: "release-branch", head_sha: head_sha)
+      ).to eq(matching_run)
+    end
+
+    it "ignores stale workflow_dispatch runs for the same head SHA" do
+      stale_run = { "databaseId" => 1, "headSha" => head_sha }
+      matching_run = { "databaseId" => 2, "headSha" => head_sha }
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug: repo_slug, ref: "release-branch")
+        .and_return([stale_run, matching_run])
+
+      expect(
+        wait_for_shakaperf_release_gate_run!(
+          repo_slug: repo_slug,
+          ref: "release-branch",
+          head_sha: head_sha,
+          ignored_run_ids: [1]
+        )
+      ).to eq(matching_run)
+    end
+  end
+
   describe "#publish_gem_with_retry" do
     it "passes OTP via environment instead of shell interpolation" do
       expect(self).to receive(:sh_args_in_dir_for_release).with(

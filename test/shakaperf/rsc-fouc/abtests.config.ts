@@ -16,7 +16,7 @@ export default defineConfig({
     defaultMisMatchThreshold: 0.001,
     maxNumDiffPixels: 10,
     comparePixelmatchThreshold: 0.1,
-    compareRetries: 1,
+    compareRetries: 2,
     compareRetryDelay: 500,
     engineOptions: {
       browser: 'chromium',

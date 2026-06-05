@@ -16,7 +16,8 @@ captures the probe and gives release artifacts for review.
   JavaScript and verifies the server-rendered stylesheet link exists before
   capturing the probe.
 - `rsc real first-visible probe is styled`: uses `waitUntil: "commit"` and RAF
-  polling to assert the first visible probe frame already has the expected CSS.
+  polling to assert the first visible probe frame already has a non-default
+  CSS-module background.
 
 ## Local Run
 
