@@ -76,6 +76,8 @@ const wrapServerComponentRenderer = (
       ? ((await componentOrRenderFunction(props, railsContext, domNodeId)) as ReactComponent)
       : componentOrRenderFunction;
 
+    // Preserve compatibility with existing 3-arg render functions: they are awaited before domNodeId
+    // validation. Moving that guard earlier is intentionally deferred to #3647.
     if (isRendererTeardownResult(Component)) {
       throw new Error(
         `wrapServerComponentRenderer: render function for server component '${componentName}' ` +

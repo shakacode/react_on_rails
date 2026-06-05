@@ -1,6 +1,6 @@
 import type { RendererTeardownResult } from './types/index.ts';
 
-// eslint-disable-next-line import/prefer-default-export -- internal teardown helper should use a named import.
+// eslint-disable-next-line import/prefer-default-export -- single-export module; named export keeps the type guard's API tied to its predicate name.
 export function isRendererTeardownResult(value: unknown): value is RendererTeardownResult {
   return (
     value != null &&
