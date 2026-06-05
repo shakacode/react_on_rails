@@ -39,6 +39,30 @@ const runPageUnload = (): void => {
   });
 };
 
+const setupRailsContext = (): void => {
+  const railsContextElement = document.createElement('div');
+  railsContextElement.id = 'js-react-on-rails-context';
+  railsContextElement.textContent = JSON.stringify({
+    railsEnv: 'test',
+    inMailer: false,
+    i18nLocale: 'en',
+    i18nDefaultLocale: 'en',
+    rorVersion: '13.0.0',
+    rorPro: false,
+    href: 'http://localhost:3000',
+    location: 'http://localhost:3000',
+    scheme: 'http',
+    host: 'localhost',
+    port: 3000,
+    pathname: '/',
+    search: null,
+    httpAcceptLanguage: 'en',
+    serverSide: false,
+    componentRegistryTimeout: 0,
+  });
+  document.body.appendChild(railsContextElement);
+};
+
 describe('ClientRenderer', () => {
   beforeEach(() => {
     // Clear registries
@@ -62,28 +86,7 @@ describe('ClientRenderer', () => {
 
   describe('renderComponent', () => {
     it('renders a simple React component', () => {
-      // Setup Rails context
-      const railsContextElement = document.createElement('div');
-      railsContextElement.id = 'js-react-on-rails-context';
-      railsContextElement.textContent = JSON.stringify({
-        railsEnv: 'test',
-        inMailer: false,
-        i18nLocale: 'en',
-        i18nDefaultLocale: 'en',
-        rorVersion: '13.0.0',
-        rorPro: false,
-        href: 'http://localhost:3000',
-        location: 'http://localhost:3000',
-        scheme: 'http',
-        host: 'localhost',
-        port: 3000,
-        pathname: '/',
-        search: null,
-        httpAcceptLanguage: 'en',
-        serverSide: false,
-        componentRegistryTimeout: 0,
-      });
-      document.body.appendChild(railsContextElement);
+      setupRailsContext();
 
       // Register a simple component
       const TestComponent: React.FC<{ message: string }> = ({ message }) =>
@@ -119,28 +122,7 @@ describe('ClientRenderer', () => {
     });
 
     it('handles missing DOM element gracefully', () => {
-      // Setup Rails context
-      const railsContextElement = document.createElement('div');
-      railsContextElement.id = 'js-react-on-rails-context';
-      railsContextElement.textContent = JSON.stringify({
-        railsEnv: 'test',
-        inMailer: false,
-        i18nLocale: 'en',
-        i18nDefaultLocale: 'en',
-        rorVersion: '13.0.0',
-        rorPro: false,
-        href: 'http://localhost:3000',
-        location: 'http://localhost:3000',
-        scheme: 'http',
-        host: 'localhost',
-        port: 3000,
-        pathname: '/',
-        search: null,
-        httpAcceptLanguage: 'en',
-        serverSide: false,
-        componentRegistryTimeout: 0,
-      });
-      document.body.appendChild(railsContextElement);
+      setupRailsContext();
 
       // Test with non-existent DOM ID
       expect(() => renderComponent('non-existent-component')).not.toThrow();
@@ -151,30 +133,6 @@ describe('ClientRenderer', () => {
   // own mount. They may return a teardown wrapper so React on Rails can clean the mount up on
   // page unload (Turbo/Turbolinks navigation) or when the same dom-id node is replaced.
   describe('renderer functions (issue #3209: teardown cleanup)', () => {
-    const setupRailsContext = () => {
-      const railsContextElement = document.createElement('div');
-      railsContextElement.id = 'js-react-on-rails-context';
-      railsContextElement.textContent = JSON.stringify({
-        railsEnv: 'test',
-        inMailer: false,
-        i18nLocale: 'en',
-        i18nDefaultLocale: 'en',
-        rorVersion: '13.0.0',
-        rorPro: false,
-        href: 'http://localhost:3000',
-        location: 'http://localhost:3000',
-        scheme: 'http',
-        host: 'localhost',
-        port: 3000,
-        pathname: '/',
-        search: null,
-        httpAcceptLanguage: 'en',
-        serverSide: false,
-        componentRegistryTimeout: 0,
-      });
-      document.body.appendChild(railsContextElement);
-    };
-
     const setupRendererDom = (domId: string, componentName = 'TestRenderer'): HTMLElement => {
       const componentElement = document.createElement('div');
       componentElement.className = 'js-react-on-rails-component';
@@ -410,6 +368,50 @@ describe('ClientRenderer', () => {
       consoleErrorSpy.mockRestore();
     });
 
+    it('does not let a stale async renderer overwrite a newer same-id teardown', async () => {
+      // No additional setupRailsContext() call needed; the enclosing beforeEach already runs it.
+      // This test exercises teardown-race ordering only, not full component rendering.
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const resolvers: Array<(result: { teardown: () => void }) => void> = [];
+        const AsyncRenderer: RendererFunction = (_props, _railsContext, _domNodeId) =>
+          new Promise<{ teardown: () => void }>((resolve) => {
+            resolvers.push(resolve);
+          });
+        ComponentRegistry.register({ AsyncRenderer });
+        const node1 = setupRendererDom('renderer-stale-after-newer', 'AsyncRenderer');
+
+        renderComponent('renderer-stale-after-newer');
+
+        node1.remove();
+        const node2 = document.createElement('div');
+        node2.id = 'renderer-stale-after-newer';
+        document.body.appendChild(node2);
+        // Keep the original component descriptor in place to simulate a soft navigation replacing
+        // only the mount node for this id.
+        renderComponent('renderer-stale-after-newer');
+        expect(resolvers).toHaveLength(2);
+
+        const staleTeardown = jest.fn();
+        const currentTeardown = jest.fn();
+        // Resolve the newer renderer first so its teardown is attached to the active entry before
+        // the stale renderer settles.
+        resolvers[1]({ teardown: currentTeardown });
+        await Promise.resolve();
+        resolvers[0]({ teardown: staleTeardown });
+        await Promise.resolve();
+
+        runPageUnload();
+        expect(currentTeardown).toHaveBeenCalledTimes(1);
+        expect(staleTeardown).not.toHaveBeenCalled();
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          expect.stringContaining('resolved after the page or node was already cleaned up'),
+        );
+      } finally {
+        consoleErrorSpy.mockRestore();
+      }
+    });
+
     it('drops and logs about an async teardown when unmount races the renderer resolving', async () => {
       // Complements the happy-path async test above: here page unload fires BEFORE the
       // renderer's promise resolves, which is the actual race the core package cannot win (Pro does).
@@ -546,7 +548,8 @@ describe('ClientRenderer', () => {
       setupRendererDom('renderer-thenable');
 
       renderComponent('renderer-thenable');
-      // Flush microtasks so Promise.resolve(thenable) adopts the thenable and captures the teardown.
+      // Flush through a macrotask: Promise.resolve(nonNativeThenable) first schedules thenable
+      // assimilation, then the downstream handler captures the teardown.
       await new Promise((resolve) => {
         setTimeout(resolve, 0);
       });
@@ -558,28 +561,7 @@ describe('ClientRenderer', () => {
 
   describe('reactOnRailsComponentLoaded', () => {
     it('is an alias for renderComponent', () => {
-      // Setup minimal Rails context
-      const railsContextElement = document.createElement('div');
-      railsContextElement.id = 'js-react-on-rails-context';
-      railsContextElement.textContent = JSON.stringify({
-        railsEnv: 'test',
-        inMailer: false,
-        i18nLocale: 'en',
-        i18nDefaultLocale: 'en',
-        rorVersion: '13.0.0',
-        rorPro: false,
-        href: 'http://localhost:3000',
-        location: 'http://localhost:3000',
-        scheme: 'http',
-        host: 'localhost',
-        port: 3000,
-        pathname: '/',
-        search: null,
-        httpAcceptLanguage: 'en',
-        serverSide: false,
-        componentRegistryTimeout: 0,
-      });
-      document.body.appendChild(railsContextElement);
+      setupRailsContext();
 
       // Should work the same as renderComponent
       expect(() => reactOnRailsComponentLoaded('test-component')).not.toThrow();
@@ -587,30 +569,6 @@ describe('ClientRenderer', () => {
   });
 
   describe('Issue #2210: Multiple calls to renderComponent', () => {
-    const setupRailsContext = () => {
-      const railsContextElement = document.createElement('div');
-      railsContextElement.id = 'js-react-on-rails-context';
-      railsContextElement.textContent = JSON.stringify({
-        railsEnv: 'test',
-        inMailer: false,
-        i18nLocale: 'en',
-        i18nDefaultLocale: 'en',
-        rorVersion: '13.0.0',
-        rorPro: false,
-        href: 'http://localhost:3000',
-        location: 'http://localhost:3000',
-        scheme: 'http',
-        host: 'localhost',
-        port: 3000,
-        pathname: '/',
-        search: null,
-        httpAcceptLanguage: 'en',
-        serverSide: false,
-        componentRegistryTimeout: 0,
-      });
-      document.body.appendChild(railsContextElement);
-    };
-
     it('skips already-rendered components to prevent hydration errors', () => {
       setupRailsContext();
 
@@ -694,30 +652,6 @@ describe('ClientRenderer', () => {
   });
 
   describe('page unload cleanup (React-root cleanup)', () => {
-    const setupRailsContext = () => {
-      const railsContextElement = document.createElement('div');
-      railsContextElement.id = 'js-react-on-rails-context';
-      railsContextElement.textContent = JSON.stringify({
-        railsEnv: 'test',
-        inMailer: false,
-        i18nLocale: 'en',
-        i18nDefaultLocale: 'en',
-        rorVersion: '13.0.0',
-        rorPro: false,
-        href: 'http://localhost:3000',
-        location: 'http://localhost:3000',
-        scheme: 'http',
-        host: 'localhost',
-        port: 3000,
-        pathname: '/',
-        search: null,
-        httpAcceptLanguage: 'en',
-        serverSide: false,
-        componentRegistryTimeout: 0,
-      });
-      document.body.appendChild(railsContextElement);
-    };
-
     beforeEach(() => {
       // Isolate from roots tracked by earlier tests.
       runPageUnload();

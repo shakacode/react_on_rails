@@ -1,24 +1,11 @@
 import { createElement, isValidElement, type ReactElement } from 'react';
-import type {
-  CreateParams,
-  ReactComponent,
-  RenderFunction,
-  CreateReactOutputResult,
-  RendererTeardownResult,
-} from './types/index.ts';
+import type { CreateParams, ReactComponent, RenderFunction, CreateReactOutputResult } from './types/index.ts';
 import { isServerRenderHash, isPromise } from './isServerRenderResult.ts';
+import { isRendererTeardownResult } from './rendererTeardown.ts';
 
 const unsupportedManualRendererMessage = (name: string) =>
   `ReactOnRails.render() does not support renderer functions ("${name}"). ` +
   'Use normal React on Rails component rendering so renderer teardowns are captured on navigation.';
-
-function isRendererTeardownResult(value: unknown): value is RendererTeardownResult {
-  return (
-    value != null &&
-    typeof value === 'object' &&
-    typeof (value as { teardown?: unknown }).teardown === 'function'
-  );
-}
 
 function createReactElementFromRenderFunctionResult(
   renderFunctionResult: ReactComponent,
