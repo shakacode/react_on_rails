@@ -389,6 +389,36 @@ jobs:
 
           echo "✅ Production assets built successfully"
 
+      - name: Prepare and seed benchmark database
+        # The Pro Rails suite serves DB-backed routes (e.g. /posts_page). Without
+        # a migrated + seeded database those routes 500 on every request (the
+        # `posts` table does not exist), so the benchmark must create and seed it
+        # before the server starts. On a fresh CI runner `db:prepare` creates the
+        # database, loads the schema, and — because the database is newly created —
+        # runs db/seeds.rb (deterministic and faker-free so it works under
+        # RAILS_ENV=production). Note: `db:prepare` only seeds on first creation, so
+        # the row-count check below fails the job loudly if seeding was skipped (an
+        # empty table would otherwise serve a 200 "No posts found" payload that the
+        # benchmark scores as healthy).
+        if: matrix.server_kind == 'rails' && matrix.pro_env == 'true'
+        working-directory: ${{ matrix.app_directory }}
+        # Pass the matrix value via env (treated as data, not interpolated into
+        # the shell), matching the "Execute benchmark suite" step below.
+        env:
+          RAILS_ENV: production
+          NODE_ENV: production
+          SUITE_NAME: ${{ matrix.suite_name }}
+        run: |
+          set -euo pipefail
+          echo "🌱 Preparing and seeding $SUITE_NAME benchmark database..."
+          bundle exec rails db:prepare
+          # Guard every table `/posts_page` reads (posts, plus the users and
+          # comments it joins), not just posts: a partial seed would otherwise
+          # let the route 500 (or render an empty page) while the job stayed
+          # green. `set -o pipefail` keeps this abort fatal even if the command
+          # is ever piped.
+          bundle exec rails runner 'counts = { posts: Post.count, users: User.count, comments: Comment.count }; empty = counts.select { |_, c| c.zero? }.keys; abort("Benchmark DB seeding incomplete after db:prepare (empty: #{empty.join(", ")}); seeds did not run") if empty.any?; puts "✅ Database seeded (#{counts.map { |k, v| "#{v} #{k}" }.join(", ")})"'
+
       - name: Start Pro node renderer
         if: matrix.server_kind == 'node-renderer'
         working-directory: ${{ matrix.app_directory }}
