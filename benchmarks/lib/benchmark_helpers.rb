@@ -4,6 +4,7 @@ require "json"
 require "fileutils"
 require "net/http"
 require "uri"
+require_relative "benchmark_target_monitor"
 
 # Shared utilities for benchmark scripts
 # Note: env_or_default and validation helpers are in benchmark_config.rb
@@ -99,4 +100,11 @@ end
 def display_summary(summary_file)
   puts "\nSummary saved to #{summary_file}"
   system("column", "-t", "-s", "\t", summary_file)
+end
+
+# Requires BENCHMARK_JSON and DISPLAY_JSON constants from benchmark_config.rb.
+def write_benchmark_payload(bmf_collector, target_monitor:, append: false)
+  target_monitor.verify_after_measurement!
+  bmf_collector.write_bmf_json(BENCHMARK_JSON, append: append)
+  bmf_collector.write_display_json(DISPLAY_JSON, append: append)
 end
