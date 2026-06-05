@@ -8,11 +8,16 @@
 # development/test-only `faker` gem is not loaded. Deterministic data also keeps
 # benchmark runs reproducible from one CI run to the next.
 
-USER_COUNT = 10
-POSTS_PER_USER = 3..7
-COMMENTS_PER_POST = 2..5
+# Local variables (not top-level constants) so re-running `rails db:seed` in an
+# already-loaded process — seeds.rb is `load`ed, not `require`d — does not emit
+# `warning: already initialized constant`. The per-record counts cycle through
+# these arrays, which stays correct even if a range is later made exclusive or
+# non-unit-step (unlike `range.first + (idx % range.size)`).
+user_count = 10
+post_counts = (3..7).to_a
+comment_counts = (2..5).to_a
 
-LOREM = %w[
+lorem = %w[
   lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor
   incididunt ut labore et dolore magna aliqua enim ad minim veniam quis nostrud
   exercitation ullamco laboris nisi aliquip ex ea commodo consequat duis aute
@@ -20,7 +25,7 @@ LOREM = %w[
 ].freeze
 
 lorem_words = lambda do |count, offset|
-  Array.new(count) { |i| LOREM[(offset + i) % LOREM.size] }
+  Array.new(count) { |i| lorem[(offset + i) % lorem.size] }
 end
 lorem_sentence = ->(word_count, offset) { "#{lorem_words.call(word_count, offset).join(' ').capitalize}." }
 lorem_paragraph = lambda do |sentence_count, offset|
@@ -33,14 +38,14 @@ Post.delete_all
 User.delete_all
 
 puts "Creating users..."
-users = Array.new(USER_COUNT) do |i|
+users = Array.new(user_count) do |i|
   User.create!(name: "User #{i + 1}", email: "user-#{i + 1}@example.com")
 end
 
 puts "Creating posts..."
 posts = []
 users.each_with_index do |user, user_index|
-  post_count = POSTS_PER_USER.first + (user_index % POSTS_PER_USER.size)
+  post_count = post_counts[user_index % post_counts.size]
   post_count.times do |post_index|
     seed = (user_index * 11) + post_index
     posts << user.posts.create!(
@@ -52,7 +57,7 @@ end
 
 puts "Creating comments..."
 posts.each_with_index do |post, post_index|
-  comment_count = COMMENTS_PER_POST.first + (post_index % COMMENTS_PER_POST.size)
+  comment_count = comment_counts[post_index % comment_counts.size]
   comment_count.times do |comment_index|
     seed = (post_index * 7) + comment_index
     post.comments.create!(

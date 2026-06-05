@@ -23,8 +23,10 @@ RSpec.describe "Posts page", :server_rendering do
   before do
     # The suite intentionally leaves `maintain_test_schema!` disabled, so make
     # this DB-backed spec self-sufficient: load the schema if it is not present
-    # yet. The table check is cheap and the load only runs on the first example.
-    unless ActiveRecord::Base.connection.table_exists?(:posts)
+    # yet. Check every table the examples touch (not just `posts`) so a partial
+    # schema can't slip past the guard. The check is cheap and the load only runs
+    # on the first example.
+    unless %i[users posts comments].all? { |t| ActiveRecord::Base.connection.table_exists?(t) }
       ActiveRecord::Schema.verbose = false
       load Rails.root.join("db/schema.rb")
     end
@@ -51,6 +53,9 @@ RSpec.describe "Posts page", :server_rendering do
 
     expect(response).to have_http_status(:ok)
 
+    # Parse for the heading so we assert "Posts Page" renders specifically in an
+    # <h1> (the page chrome), not just anywhere in the body. The seeded titles
+    # below are plain-text content, so a raw substring match is sufficient there.
     html = Nokogiri::HTML(response.body)
     expect(html.css("h1").map(&:text)).to include("Posts Page")
     expect(response.body).to include("Sentinel Post 1")

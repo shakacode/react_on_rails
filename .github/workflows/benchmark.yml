@@ -400,12 +400,17 @@ jobs:
         # benchmark scores as healthy).
         if: matrix.server_kind == 'rails' && matrix.pro_env == 'true'
         working-directory: ${{ matrix.app_directory }}
+        # Route the matrix value through env so the shell treats it as data, not
+        # code (GitHub Actions injection hardening), matching the "Execute
+        # benchmark suite" step below — even though it comes from our own
+        # generate_matrix.rb.
         env:
           RAILS_ENV: production
           NODE_ENV: production
+          SUITE_NAME: ${{ matrix.suite_name }}
         run: |
           set -e
-          echo "🌱 Preparing and seeding ${{ matrix.suite_name }} benchmark database..."
+          echo "🌱 Preparing and seeding $SUITE_NAME benchmark database..."
           bundle exec rails db:prepare
           bundle exec rails runner 'count = Post.count; abort("Benchmark DB has 0 posts after db:prepare; seeds did not run") if count.zero?; puts "✅ Database seeded (#{count} posts)"'
 
