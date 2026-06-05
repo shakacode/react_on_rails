@@ -1994,6 +1994,7 @@ describe InstallGenerator, type: :generator do
     let(:rsc_stable_target) { install_generator.send(:rsc_stable_package_version_target) }
 
     before do
+      GeneratorMessages.clear
       allow(install_generator).to receive(:say)
       allow(install_generator).to receive(:fallback_package_manager).and_return("pnpm")
     end

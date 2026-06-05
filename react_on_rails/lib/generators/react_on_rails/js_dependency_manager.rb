@@ -415,19 +415,21 @@ module ReactOnRails
         GeneratorMessages.add_info(rsc_dependency_pin_info) if used_version_pins
         return if add_packages(rsc_packages)
 
-        GeneratorMessages.add_warning(<<~MSG.strip)
-          ⚠️  Failed to add React Server Components dependencies.
-          #{rsc_dependency_pin_failure_details(used_version_pins)}
-          You can install them manually by running:
-            #{manual_add_packages_command(rsc_packages)}
-        MSG
+        GeneratorMessages.add_warning(
+          rsc_dependency_failure_message(
+            "⚠️  Failed to add React Server Components dependencies.",
+            used_version_pins,
+            rsc_packages
+          )
+        )
       rescue StandardError => e
-        GeneratorMessages.add_warning(<<~MSG.strip)
-          ⚠️  Error adding React Server Components dependencies: #{e.message}
-          #{rsc_dependency_pin_failure_details(used_version_pins)}
-          You can install them manually by running:
-            #{manual_add_packages_command(rsc_packages)}
-        MSG
+        GeneratorMessages.add_warning(
+          rsc_dependency_failure_message(
+            "⚠️  Error adding React Server Components dependencies: #{e.message}",
+            used_version_pins,
+            rsc_packages
+          )
+        )
       end
 
       # Returns [pinned_packages, used_version_pins]. used_version_pins is always true here;
@@ -464,9 +466,18 @@ module ReactOnRails
       end
 
       def rsc_dependency_pin_failure_details(used_version_pins)
-        return "" unless used_version_pins
+        return unless used_version_pins
 
-        "\n#{rsc_dependency_pin_failed_warning}\n"
+        rsc_dependency_pin_failed_warning
+      end
+
+      def rsc_dependency_failure_message(summary, used_version_pins, rsc_packages)
+        [
+          summary,
+          rsc_dependency_pin_failure_details(used_version_pins),
+          "You can install them manually by running:",
+          "  #{manual_add_packages_command(rsc_packages)}"
+        ].compact.join("\n")
       end
 
       def remove_base_package_if_present
@@ -625,6 +636,7 @@ module ReactOnRails
 
       def build_install_args(package_manager, dev, packages)
         base_args = package_manager_commands(package_manager).fetch(:install).dup
+        base_args -= exact_install_flags_for(package_manager) if packages_include_semver_ranges?(packages)
         base_args << dev_flag_for(package_manager) if dev
         base_args + packages
       end
@@ -673,6 +685,27 @@ module ReactOnRails
         else
           raise ArgumentError, "Unknown package manager for dev flag: #{package_manager}"
         end
+      end
+
+      def exact_install_flags_for(package_manager)
+        case package_manager
+        when "npm", "pnpm" then ["--save-exact"]
+        when "yarn", "bun" then ["--exact"]
+        else
+          raise ArgumentError, "Unknown package manager for exact install flag: #{package_manager}"
+        end
+      end
+
+      def packages_include_semver_ranges?(packages)
+        packages.any? { |package_spec| package_uses_semver_range?(package_spec) }
+      end
+
+      def package_uses_semver_range?(package_spec)
+        package_name_and_version = package_name_and_version_from_spec(package_spec)
+        return false unless package_name_and_version
+
+        _package_name, package_version = package_name_and_version
+        package_version.start_with?("~", "^")
       end
 
       def filter_missing_packages(packages)

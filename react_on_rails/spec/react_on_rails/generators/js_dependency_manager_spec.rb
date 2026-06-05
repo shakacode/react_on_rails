@@ -260,14 +260,24 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect(instance.system_calls).to eq([])
     end
 
-    it "does not skip fallback install for versioned package specs" do
+    it "preserves semver ranges in fallback install commands without exact-save flags" do
       instance.add_npm_dependencies_result = false
       allow(instance).to receive(:existing_package_names).and_return(%w[react])
 
       result = instance.send(:add_packages, ["react@~19.0.4"])
 
       expect(result).to be(true)
-      expect(instance.system_calls).to include(%w[npm install --save-exact react@~19.0.4])
+      expect(instance.system_calls).to include(%w[npm install react@~19.0.4])
+    end
+
+    it "uses exact-save fallback commands for exact package pins" do
+      instance.add_npm_dependencies_result = false
+      allow(instance).to receive(:existing_package_names).and_return(%w[react-on-rails-rsc])
+
+      result = instance.send(:add_packages, ["react-on-rails-rsc@19.0.5-rc.6"])
+
+      expect(result).to be(true)
+      expect(instance.system_calls).to include(%w[npm install --save-exact react-on-rails-rsc@19.0.5-rc.6])
     end
   end
 
@@ -495,7 +505,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect(warnings.first.to_s).to include("Failed to add React dependencies")
     end
 
-    it "warns with the pinned React install command when the RSC add fails" do
+    it "warns with a range-based React install command when the RSC add fails" do
       instance.use_rsc = true
       instance.add_npm_dependencies_result = false
       instance.system_result = false
@@ -504,7 +514,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
       expect(warnings.size).to be > 0
       expect(warnings.first.to_s)
-        .to include("npm install --save-exact react@~19.0.4 react-dom@~19.0.4 prop-types@^15.0.0")
+        .to include("npm install react@~19.0.4 react-dom@~19.0.4 prop-types@^15.0.0")
     end
   end
 
@@ -751,6 +761,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       warning_text = warnings.join("\n")
       expect(warning_text).to include("Error adding React Server Components dependencies: pin lookup failed")
       expect(warning_text).to include("npm install --save-exact react-on-rails-rsc")
+      expect(warning_text).not_to include("pin lookup failed\n\nYou can install")
     end
   end
 
@@ -811,7 +822,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       instance.send(:add_react_dependencies)
 
       warning = warnings.first
-      expect(warning.to_s).to include("npm install --save-exact")
+      expect(warning.to_s).to include("npm install")
       expect(warning.to_s).to include("manually")
     end
   end
