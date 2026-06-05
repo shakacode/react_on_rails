@@ -21,7 +21,7 @@ jobs:
       actions: write
       contents: read
       issues: write
-      pull-requests: write
+      pull-requests: read
     steps:
       - name: Handle +ci command
         uses: actions/github-script@v7
@@ -162,29 +162,49 @@ jobs:
               return files;
             }
 
+            function isDocsOnlyPath(filename) {
+              return filename.endsWith('.md') ||
+                filename.endsWith('.mdx') ||
+                filename.endsWith('.markdown') ||
+                filename.endsWith('.rst') ||
+                filename.endsWith('.txt') ||
+                filename === '.lychee.toml' ||
+                filename.startsWith('docs/') ||
+                filename.startsWith('internal/') ||
+                filename.startsWith('.github/ISSUE_TEMPLATE/');
+            }
+
             function isDocsOnly(files) {
               return files.length > 0 &&
-                files.every((file) => file.filename.endsWith('.md') || file.filename.startsWith('docs/'));
+                files.every((file) => isDocsOnlyPath(file.filename));
             }
 
             async function findCurrentWaiver(sha) {
               const marker = `<!-- ci-skip-full:${sha} -->`;
-              const comments = await github.paginate(github.rest.issues.listComments, {
+              for await (const page of github.paginate.iterator(github.rest.issues.listComments, {
                 owner,
                 repo,
                 issue_number: issueNumber,
-                per_page: 100
-              });
+                per_page: 100,
+                sort: 'created',
+                direction: 'desc'
+              })) {
+                const found = page.data.find((comment) =>
+                  comment.user?.login === 'github-actions[bot]' &&
+                  comment.user?.type === 'Bot' &&
+                  (comment.body || '').startsWith(marker)
+                );
 
-              return [...comments].reverse().find((comment) =>
-                comment.user?.login === 'github-actions[bot]' &&
-                comment.user?.type === 'Bot' &&
-                (comment.body || '').startsWith(marker)
-              );
+                if (found) {
+                  return found;
+                }
+              }
+
+              return null;
             }
 
             function oneLine(value) {
-              return value.replace(/[\r\n]+/g, ' ').trim();
+              return value.replace(/[\r\n]+/g, ' ').replace(/`+/g, "'").trim();
             }
 
             function helpBody() {
@@ -210,6 +230,7 @@ jobs:
 
             async function triggerFullCi(pr) {
               if (pr.head.repo.full_name !== repoFullName) {
+                await addReaction('confused');
                 await postComment([
                   'Unable to run full CI from this command because the PR branch is from a fork.',
                   '',
@@ -259,6 +280,8 @@ jobs:
                 }
               }
 
+              await addReaction(succeeded.length > 0 ? 'rocket' : 'confused');
+
               let labelAdded = false;
               if (succeeded.length > 0) {
                 try {
@@ -303,7 +326,7 @@ jobs:
                 '## Full CI Waiver Recorded for This SHA',
                 '',
                 `@${actor} recorded a full-CI waiver for \`${shortSha}\` (audit record only - no workflow run was cancelled or blocked).`,
-                `Reason: ${reason}`,
+                `Reason: \`${reason}\``,
                 '',
                 'This waiver is bound to the current head SHA and does not apply after another push.',
                 'Standard optimized CI still applies for the files changed in this PR.',
@@ -339,7 +362,7 @@ jobs:
                 '',
                 `Head SHA: \`${pr.head.sha.slice(0, 12)}\``,
                 `Changed files: ${files.length}`,
-                `Docs-only heuristic: ${docsOnly ? 'yes' : 'no'}`,
+                `Docs-only heuristic (matches ci-changes-detector metadata paths): ${docsOnly ? 'yes' : 'no'}`,
                 `\`full-ci\` label: ${hasFullCi ? 'present' : 'absent'}`,
                 `Current full-CI waiver: ${waiver ? 'present for this SHA' : 'not present for this SHA'}`,
                 '',
@@ -380,7 +403,6 @@ jobs:
 
             switch (parsed.command) {
               case '+ci-run-full':
-                await addReaction('rocket');
                 await triggerFullCi(pr);
                 break;
               case '+ci-skip-full':

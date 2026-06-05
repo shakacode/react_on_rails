@@ -36,7 +36,7 @@ When adding or removing a full-CI-capable workflow, update both this list and th
 
 The bot will:
 
-1. React with a 🚀 to your comment
+1. React to your comment (`rocket` when workflows are triggered, `confused` when the command cannot run)
 2. Post a confirmation message with links to the triggered workflows
 3. Start all CI jobs on your PR branch
 
@@ -123,7 +123,8 @@ For more details, see [GitHub's documentation on issue_comment events](https://d
 Most workflows use minimal permissions. The comment-triggered workflows require:
 
 - `contents: read` - To read the repository code
-- `pull-requests: write` - To post comments and reactions
+- `pull-requests: read` - To inspect PR metadata and changed files
+- `issues: write` - To post comments, labels, and reactions
 - `actions: write` - To trigger other workflows
 
 ## Conditional Execution

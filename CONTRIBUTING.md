@@ -511,7 +511,7 @@ React on Rails uses an optimized CI pipeline that runs faster on branches while 
 
 - **On PRs/Branches**: Runs reduced test matrix (latest Ruby/Node versions only) for faster feedback (~12 min vs ~45 min)
 - **On Main**: Runs full test matrix (all Ruby/Node/dependency combinations) for complete coverage
-- **Docs-only changes**: CI skips entirely when only `.md` files or `docs/` directory change
+- **Docs-only changes**: CI skips entirely when only documentation/metadata paths change (`*.md`, `*.mdx`, `*.markdown`, `*.rst`, `*.txt`, `docs/`, `internal/`, `.github/ISSUE_TEMPLATE/`, or `.lychee.toml`)
 
 ### Local CI Tools
 
@@ -672,7 +672,7 @@ Use this when you intentionally choose not to run full CI before merge, especial
 
 #### `+ci-status` and `+ci-help`
 
-Use `+ci-status` to summarize the current head SHA, whether the PR looks docs-only, whether `full-ci` is present, and whether the current SHA has a waiver comment.
+Use `+ci-status` to summarize the current head SHA, whether the PR matches the docs-only metadata paths, whether `full-ci` is present, and whether the current SHA has a waiver comment.
 
 Use `+ci-help` to list the available CI commands.
 
