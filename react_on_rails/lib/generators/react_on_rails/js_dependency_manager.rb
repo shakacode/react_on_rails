@@ -151,7 +151,9 @@ module ReactOnRails
       # exports `react-on-rails-rsc/WebpackPlugin`).
       # TODO(#3488): when react-on-rails-rsc 19.0.5 stable ships, bump RSC_PACKAGE_VERSION_PIN to
       # "19.0.5" (and RSC_REACT_VERSION_RANGE too if react/react-dom advance), then verify peer-dep
-      # alignment between react@19.0.x and react-on-rails-rsc@19.0.5
+      # alignment between react@19.0.x and react-on-rails-rsc@19.0.5. At that point the `latest`
+      # tag exports RspackPlugin, so the rspack-only fallback skip in add_rsc_dependencies can be
+      # removed (rspack can safely share the webpack unversioned-fallback path again).
       # (tracked in https://github.com/shakacode/react_on_rails/issues/3488).
       RSC_PACKAGE_VERSION_PIN = "19.0.5-rc.6"
 
@@ -418,17 +420,20 @@ module ReactOnRails
         return if add_packages(rsc_packages)
 
         manual_install_packages = rsc_packages
-        if used_version_pins
+        if used_version_pins && using_rspack?
+          # Do NOT retry unversioned for rspack: the `latest` tag (currently 19.0.4) does not export
+          # react-on-rails-rsc/RspackPlugin, so an unversioned install would replace the pin already
+          # written to package.json with a known-incompatible version and silently break the build.
+          # Keep the pin and tell the user to finish the install manually.
+          GeneratorMessages.add_warning(rspack_rsc_dependency_pin_failed_warning)
+        elsif used_version_pins
           warning_msg = "Could not install version-pinned RSC dependency. Retrying latest available package."
           say_status :warning,
                      warning_msg,
                      :yellow
           GeneratorMessages.add_warning(
-            [
-              "Warning: #{warning_msg}",
-              "The installed react-on-rails-rsc version may not match the expected compatibility pin.",
-              rspack_rsc_dependency_fallback_warning
-            ].compact.join(" ")
+            "Warning: #{warning_msg} " \
+            "The installed react-on-rails-rsc version may not match the expected compatibility pin."
           )
           return if add_packages(RSC_DEPENDENCIES)
 
@@ -456,12 +461,12 @@ module ReactOnRails
         [RSC_DEPENDENCIES.map { |pkg| "#{pkg}@#{RSC_PACKAGE_VERSION_PIN}" }, true]
       end
 
-      def rspack_rsc_dependency_fallback_warning
-        return nil unless using_rspack?
-
-        "Rspack RSC projects require react-on-rails-rsc #{RSC_PACKAGE_VERSION_PIN} or newer " \
-          "for react-on-rails-rsc/RspackPlugin; if the fallback installs an older latest version, " \
-          "rerun npm install react-on-rails-rsc@#{RSC_PACKAGE_VERSION_PIN} manually."
+      def rspack_rsc_dependency_pin_failed_warning
+        "Warning: Could not install the pinned react-on-rails-rsc@#{RSC_PACKAGE_VERSION_PIN}. " \
+          "Rspack RSC projects require that version (or newer) for react-on-rails-rsc/RspackPlugin, " \
+          "and the unversioned `latest` tag does not export it, so the generator left the pin in " \
+          "package.json rather than install an incompatible version. " \
+          "Run npm install react-on-rails-rsc@#{RSC_PACKAGE_VERSION_PIN} to finish setup."
       end
 
       def remove_base_package_if_present

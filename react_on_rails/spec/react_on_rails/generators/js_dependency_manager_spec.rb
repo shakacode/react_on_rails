@@ -680,7 +680,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect(warnings.join("\n")).to include("installed react-on-rails-rsc version may not match")
     end
 
-    it "warns rspack users that unversioned fallback may miss the native RSC plugin export" do
+    it "skips the unversioned fallback for rspack and keeps the pin when the pinned install fails" do
       instance.using_rspack = true
       allow(instance)
         .to receive(:rsc_packages_with_version)
@@ -691,9 +691,14 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
       instance.send(:add_rsc_dependencies)
 
+      # rspack must NOT retry the unversioned `latest` (it lacks RspackPlugin)
+      expect(instance).not_to have_received(:add_packages).with(["react-on-rails-rsc"])
+
       warning_text = warnings.join("\n")
-      expect(warning_text).to include("Rspack RSC projects require react-on-rails-rsc 19.0.5-rc.6 or newer")
+      expect(warning_text).to include("Could not install the pinned react-on-rails-rsc@19.0.5-rc.6")
       expect(warning_text).to include("react-on-rails-rsc/RspackPlugin")
+      # the manual instruction points at the pinned version, not the unversioned package
+      expect(warning_text).to include("npm install react-on-rails-rsc@19.0.5-rc.6")
     end
   end
 
