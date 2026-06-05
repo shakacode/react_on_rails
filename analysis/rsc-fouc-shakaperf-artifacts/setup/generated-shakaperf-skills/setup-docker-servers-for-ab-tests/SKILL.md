@@ -6,6 +6,9 @@ argument-hint: [path-to-existing-Dockerfile] [services e.g. postgres,redis,elast
 
 # setup-docker-servers-for-ab-tests
 
+> [!NOTE]
+> This file is mirrored by `../setup-docker-servers-for-ab-tests.SKILL.md`; update both copies together when changing generated ShakaPerf instructions.
+
 Twin-servers runs **two production-mode copies of one app side by side** — `control` (the baseline branch) and `experiment` (your branch) — so `shaka-perf compare` can diff them for visual and performance regressions. This skill sets up the Docker infrastructure that makes that happen in the current project.
 
 The whole point is an **apples-to-apples comparison**: control and experiment must be identical in every way _except the application code under test_ — same base image, dependencies, services, environment, data. Any incidental drift (a service only one side has, an env var that differs, a slower disk path) surfaces later as a phantom regression that's brutal to trace. Keep asking: _are these two sides truly identical?_
