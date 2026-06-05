@@ -606,6 +606,8 @@ For more details, see [`internal/contributor-info/ci-optimization.md`](./interna
 
 React on Rails provides PR comment commands to control CI behavior:
 
+Post one CI command per comment. If a comment contains multiple `+ci-*` commands, the command workflow handles only the first one.
+
 #### `+ci-run-full` - Enable Full CI Mode
 
 Runs all skipped CI checks and enables full CI mode for the PR:

@@ -14,6 +14,7 @@ jobs:
     if: |
       github.event.issue.pull_request &&
       github.event.comment.user.type != 'Bot' &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) &&
       contains(github.event.comment.body, '+ci-')
     runs-on: ubuntu-22.04
     permissions:
@@ -191,6 +192,7 @@ jobs:
                 '## CI Commands',
                 '',
                 'Use these commands at the start of a PR comment line:',
+                'Post one CI command per comment; if multiple commands are present, only the first is handled.',
                 '',
                 '- `+ci-run-full` - run the expensive full CI matrix and add `full-ci` for future commits',
                 '- `+ci-stop-full` - remove `full-ci` so future commits return to optimized CI',

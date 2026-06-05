@@ -12,12 +12,27 @@ When you open a PR, CI automatically runs a subset of tests for faster feedback 
 +ci-run-full
 ```
 
+Post one CI command per comment. If a comment contains multiple `+ci-*` commands, the command workflow handles only the first one.
+
 This command will trigger:
 
 - ✅ Main test suite with both latest and minimum supported versions
 - ✅ All example app generator tests
 - ✅ React on Rails Pro integration tests
 - ✅ React on Rails Pro package tests
+
+`+ci-run-full` dispatches this manually maintained workflow map:
+
+- **Lint JS and Ruby** (`lint-js-and-ruby.yml`)
+- **JS unit tests for Renderer package** (`package-js-tests.yml`)
+- **Rspec test for gem** (`gem-tests.yml`)
+- **Integration Tests** (`integration-tests.yml`)
+- **Assets Precompile Check** (`precompile-check.yml`)
+- **Generator tests** (`examples.yml`)
+- **React on Rails Pro - Integration Tests** (`pro-integration-tests.yml`)
+- **React on Rails Pro - Package Tests** (`pro-test-package-and-gem.yml`)
+
+When adding or removing a full-CI-capable workflow, update both this list and the `workflowMap` in `ci-commands.yml`.
 
 The bot will:
 
@@ -51,7 +66,7 @@ The reason is optional. The bot records the current PR head SHA so the waiver is
 - Unauthorized access to Pro package tests
 - Potential DoS attacks via repeated CI runs
 
-If an unauthorized user attempts to use `+ci-run-full`, they'll receive a message explaining the restriction.
+The workflow first filters comment authors to `OWNER`, `MEMBER`, or `COLLABORATOR` associations to avoid allocating runners for obvious external mentions. The script still verifies repository write access before executing any command. If an unauthorized associated user attempts to use `+ci-run-full`, they'll receive a message explaining the restriction.
 
 ### Concurrency Protection
 
