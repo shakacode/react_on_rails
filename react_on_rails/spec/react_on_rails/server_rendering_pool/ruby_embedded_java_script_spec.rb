@@ -26,7 +26,10 @@ module ReactOnRails
         def render_error_for(error)
           described_class.exec_server_render_js("someComponentJS()", render_options, evaluator_raising(error))
           raise "expected exec_server_render_js to raise"
-        rescue ReactOnRails::Error => e
+        rescue StandardError => e
+          # Rescue StandardError (not just ReactOnRails::Error) so an unexpected error type
+          # surfaces as a clean `be_a(ReactOnRails::Error)` expectation failure rather than a
+          # confusing raw exception out of the helper.
           e
         end
 
@@ -44,7 +47,9 @@ module ReactOnRails
 
         around do |example|
           original = ENV.fetch("REACT_RENDERER_URL", nil)
+          original_legacy = ENV.fetch("RENDERER_URL", nil)
           ENV.delete("REACT_RENDERER_URL")
+          ENV.delete("RENDERER_URL")
           example.run
         ensure
           if original.nil?
@@ -52,13 +57,17 @@ module ReactOnRails
           else
             ENV["REACT_RENDERER_URL"] = original
           end
+          if original_legacy.nil?
+            ENV.delete("RENDERER_URL")
+          else
+            ENV["RENDERER_URL"] = original_legacy
+          end
         end
 
         context "when the renderer connection is blocked (Errno::EPERM, the issue #3604 case)" do
           let(:error) { Errno::EPERM.new("connect(2) for 127.0.0.1:3800") }
 
           it "raises a ReactOnRails::Error" do
-            expect { render_error_for(error) }.not_to raise_error
             expect(render_error_for(error)).to be_a(ReactOnRails::Error)
           end
 
@@ -122,6 +131,11 @@ module ReactOnRails
             expect(message).to include("could not connect to the Node renderer")
             expect(message).not_to include("Check your webpack configuration")
           end
+
+          it "names the host and port extracted from the wrapped cause" do
+            message = render_error_for(error).message
+            expect(message).to include("at 127.0.0.1:3800")
+          end
         end
 
         context "when the renderer request times out (Pro 'Time out error on renderer request')" do
@@ -147,6 +161,29 @@ module ReactOnRails
             message = render_error_for(error).message
             expect(message).to include("could not connect to the Node renderer at http://localhost:3800")
             expect(message).to include('REACT_RENDERER_URL is currently "http://localhost:3800"')
+          end
+        end
+
+        context "when REACT_RENDERER_URL embeds credentials" do
+          let(:error) { Errno::ECONNREFUSED.new }
+
+          before { ENV["REACT_RENDERER_URL"] = "https://:s3cr3t@renderer.example.com:3800" }
+
+          it "redacts the password from the connection error message" do
+            message = render_error_for(error).message
+            expect(message).to include("renderer.example.com:3800")
+            expect(message).not_to include("s3cr3t")
+          end
+        end
+
+        context "when only the legacy RENDERER_URL is set and the error carries no host/port" do
+          let(:error) { Errno::ECONNREFUSED.new }
+
+          before { ENV["RENDERER_URL"] = "http://legacy-host:3800" }
+
+          it "falls back to the legacy RENDERER_URL for the target" do
+            message = render_error_for(error).message
+            expect(message).to include("could not connect to the Node renderer at http://legacy-host:3800")
           end
         end
 

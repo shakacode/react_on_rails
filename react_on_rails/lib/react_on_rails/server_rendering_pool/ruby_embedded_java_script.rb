@@ -11,6 +11,14 @@ module ReactOnRails
       # Error classes that signal Rails could not reach the renderer process (e.g. the
       # Pro Node renderer configured via REACT_RENDERER_URL) rather than the renderer
       # evaluating the bundle and the bundle itself failing. See issue #3604.
+      #
+      # Errno::EPERM is intentionally NOT in this list: it is a general "Operation not
+      # permitted" error (file permissions, process signals, privileged-port binds), so a
+      # class match — especially across the #cause chain — would misclassify a non-network
+      # EPERM (e.g. a bundle file read wrapped in ReactOnRails::Error) as a renderer
+      # connection failure. The sandboxed connect(2) EPERM from issue #3604 is matched
+      # instead by the "connect(2) for" branch of RENDERER_CONNECTION_ERROR_REGEX below
+      # (its message is "Operation not permitted - connect(2) for host:port").
       RENDERER_CONNECTION_ERROR_CLASSES = [
         SocketError,
         Errno::ECONNREFUSED,
@@ -18,8 +26,7 @@ module ReactOnRails
         Errno::EHOSTUNREACH,
         Errno::ENETUNREACH,
         Errno::ETIMEDOUT,
-        Errno::EPIPE,
-        Errno::EPERM
+        Errno::EPIPE
       ].freeze
 
       # Renderer-anchored connection signatures, used only as a fallback for failures that
@@ -241,7 +248,7 @@ module ReactOnRails
         private
 
         # Distinguishes "Rails could not reach the renderer" from "the renderer evaluated
-        # the bundle and the bundle failed". The connection Errno (ECONNREFUSED, EPERM, ...)
+        # the bundle and the bundle failed". The connection Errno (ECONNREFUSED, ECONNRESET, ...)
         # is checked across err and its #cause chain because the Pro renderer client
         # re-wraps the original Errno inside its own error; a narrow message check then
         # catches connection failures that only survive as text. See issue #3604.
@@ -252,27 +259,35 @@ module ReactOnRails
 
         # Walks err and its #cause chain looking for a known connection Errno, so a wrapped
         # error (e.g. ReactOnRailsPro::Error -> ConnectionError -> Errno::ECONNREFUSED) is
-        # still recognised. Identity-guarded so a self-referential cause cannot loop.
+        # still recognised.
         def connection_error_class_in_chain?(err)
-          seen = []
-          current = err
-          while current && seen.none? { |e| e.equal?(current) }
+          each_in_cause_chain(err) do |current|
             return true if RENDERER_CONNECTION_ERROR_CLASSES.any? { |klass| current.is_a?(klass) }
-
-            seen << current
-            current = current.cause
           end
           false
         end
 
+        # Yields err and each error in its #cause chain. Identity-guarded so a
+        # self-referential cause cannot loop.
+        def each_in_cause_chain(err)
+          seen = []
+          current = err
+          while current && seen.none? { |e| e.equal?(current) }
+            yield current
+            seen << current
+            current = current.cause
+          end
+        end
+
         def renderer_connection_error_message(err)
-          target = renderer_target_from_error(err.message)
-          configured_url = ENV.fetch("REACT_RENDERER_URL", nil)
+          target = renderer_target_from_error(err)
+          configured_url = sanitized_renderer_url(ENV.fetch("REACT_RENDERER_URL", nil))
           configured_line = if configured_url
                               "REACT_RENDERER_URL is currently \"#{configured_url}\" — confirm it matches the " \
                                 "renderer's host and port (RENDERER_HOST / RENDERER_PORT)"
                             else
-                              "REACT_RENDERER_URL matches the renderer's host and port (RENDERER_HOST / RENDERER_PORT)"
+                              "REACT_RENDERER_URL is not set — set it to the renderer's host and port " \
+                                "(RENDERER_HOST / RENDERER_PORT, e.g. http://127.0.0.1:3800)"
                             end
 
           <<~MSG
@@ -311,8 +326,19 @@ module ReactOnRails
         end
 
         # Best-effort extraction of the host/port (or URL) Rails attempted to reach, so the
-        # connection error can name the actual target. Falls back to REACT_RENDERER_URL.
-        def renderer_target_from_error(message)
+        # connection error can name the actual target. Walks the #cause chain because the Pro
+        # renderer client wraps the original Errno (whose message carries "connect(2) for
+        # host:port") inside a generic outer error. Falls back to the configured renderer URL
+        # (REACT_RENDERER_URL, then the legacy RENDERER_URL alias), with credentials redacted.
+        def renderer_target_from_error(err)
+          each_in_cause_chain(err) do |current|
+            target = target_from_message(current.message)
+            return target if target
+          end
+          sanitized_renderer_url(ENV.fetch("REACT_RENDERER_URL", nil) || ENV.fetch("RENDERER_URL", nil))
+        end
+
+        def target_from_message(message)
           message = message.to_s
           [
             /connect\(2\) for (?<target>[^\s,)]+)/,
@@ -322,7 +348,25 @@ module ReactOnRails
             match = message.match(regex)
             return match[:target].delete('"') if match
           end
-          ENV.fetch("REACT_RENDERER_URL", nil)
+          nil
+        end
+
+        # Strips any embedded credentials from a configured renderer URL before it is
+        # interpolated into an error message, so a password in the URL (a supported config
+        # convenience, e.g. https://:password@host:3800) cannot leak into logs or error
+        # trackers. Mirrors ReactOnRailsPro::Configuration#strip_renderer_url_userinfo.
+        def sanitized_renderer_url(url)
+          return url if url.nil? || url.empty?
+
+          uri = URI.parse(url)
+          return url if uri.userinfo.nil?
+
+          # URI rejects a password without a user, so clear password first.
+          uri.password = nil
+          uri.user = nil
+          uri.to_s
+        rescue URI::InvalidURIError
+          url
         end
 
         def file_url_to_string(url)
