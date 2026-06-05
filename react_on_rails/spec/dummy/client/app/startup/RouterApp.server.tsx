@@ -11,10 +11,12 @@ type RouterAppProps = {
   };
 } & Omit<ComponentProps<typeof StaticRouter>, 'children' | 'location'>;
 
-const RouterApp = (props: RouterAppProps, railsContext: RailsContext) => () => (
-  <StaticRouter location={railsContext.location} {...props}>
-    {routes}
-  </StaticRouter>
-);
+const RouterApp =
+  ({ helloWorldData: _helloWorldData, ...routerProps }: RouterAppProps, railsContext: RailsContext) =>
+  () => (
+    <StaticRouter location={railsContext.location} {...routerProps}>
+      {routes}
+    </StaticRouter>
+  );
 
 export default RouterApp;
