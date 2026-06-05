@@ -5,8 +5,14 @@ const config: KnipConfig = {
   workspaces: {
     // Root workspace - manages the monorepo and global tooling
     '.': {
-      entry: ['eslint.config.ts', 'jest.config.base.js', 'benchmarks/k6.ts'],
-      project: ['*.{js,mjs,ts}'],
+      entry: [
+        'eslint.config.ts',
+        'jest.config.base.js',
+        'benchmarks/k6.ts',
+        '.github/workflows/shakaperf-release-gates.yml',
+        'test/shakaperf/**/*.ts',
+      ],
+      project: ['*.{js,mjs,ts}', 'test/shakaperf/**/*.ts'],
       ignoreBinaries: [
         // Has to be installed globally
         'yalc',
@@ -49,7 +55,17 @@ const config: KnipConfig = {
         // Used for package validation but not directly imported
         '@arethetypeswrong/cli',
         'publint',
+        // Used by the release gate workflow via `pnpm exec shaka-perf`; Knip does
+        // not detect that CLI usage from the GitHub Actions shell command.
+        'shaka-perf',
       ],
+    },
+
+    // Create React on Rails app package workspace
+    'packages/create-react-on-rails-app': {
+      entry: ['bin/create-react-on-rails-app.js!', 'src/index.ts!'],
+      project: ['src/**/*.ts', 'tests/**/*.ts', 'jest.config.js'],
+      ignore: ['lib/**', 'node_modules/**'],
     },
 
     // React on Rails core package workspace
@@ -58,6 +74,7 @@ const config: KnipConfig = {
         'src/ReactOnRails.full.ts!',
         'src/ReactOnRails.client.ts!',
         'src/base/full.rsc.ts!',
+        'src/capabilities/ssr.rsc.ts!',
         'src/context.ts!',
       ],
       project: ['src/**/*.[jt]s{x,}!', 'tests/**/*.[jt]s{x,}', '!lib/**'],
@@ -127,6 +144,8 @@ const config: KnipConfig = {
         'src/getReactServerComponent.server.ts!',
         'src/transformRSCNodeStream.ts!',
         'src/tanstack-router.ts!',
+        'src/cache/index.stub.ts!',
+        'src/registerDefaultRSCProvider.client.tsx!',
       ],
       project: ['src/**/*.[jt]s{x,}!', 'tests/**/*.[jt]s{x,}', '!lib/**'],
       ignore: [

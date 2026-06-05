@@ -1,0 +1,210 @@
+name: ShakaPerf Release Gates
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: shakaperf-release-gates-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: 22.12.0
+  RUBY_VERSION: 3.3.7
+
+jobs:
+  rsc-fouc:
+    name: RSC FOUC ShakaPerf Gate
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    env:
+      RAILS_ENV: test
+      NODE_ENV: test
+      # Dummy value for RAILS_ENV=test; no real credentials are encrypted or persisted.
+      SECRET_KEY_BASE: dummy-secret-key-base-for-shakaperf-rsc-fouc # gitleaks:allow
+      SHAKAPERF_CONTROL_URL: http://127.0.0.1:3000
+      SHAKAPERF_EXPERIMENT_URL: http://127.0.0.1:3000
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Check Pro license secret
+        env:
+          REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+        run: |
+          if [[ -z "${REACT_ON_RAILS_PRO_LICENSE}" ]]; then
+            echo "::error::REACT_ON_RAILS_PRO_LICENSE_V2 secret is not set; cannot run the Pro dummy app ShakaPerf gate"
+            exit 1
+          fi
+
+      - name: Setup Ruby
+        uses: ./.github/actions/setup-ruby
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
+          bundler-version: 2.5.4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Print system information
+        run: |
+          echo "Linux release: "; cat /etc/issue
+          echo "Current user: "; whoami
+          echo "Current directory: "; pwd
+          echo "Ruby version: "; ruby -v
+          echo "Node version: "; node -v
+          echo "pnpm version: "; pnpm --version
+          echo "Bundler version: "; bundle --version
+
+      - name: Install Node modules with pnpm
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Ruby Gems for Pro package
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: react_on_rails_pro
+          ruby-version: ${{ env.RUBY_VERSION }}
+
+      - name: Install Ruby Gems for Pro dummy app
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: react_on_rails_pro/spec/dummy
+          ruby-version: ${{ env.RUBY_VERSION }}
+
+      - name: Build Pro JavaScript packages
+        run: |
+          pnpm --filter react-on-rails run build
+          pnpm --filter react-on-rails-pro run build
+          pnpm --filter react-on-rails-pro-node-renderer run build
+
+      - name: Prepare Pro dummy app
+        working-directory: react_on_rails_pro/spec/dummy
+        env:
+          REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+        run: |
+          bundle exec rake react_on_rails:generate_packs
+          pnpm run build:test
+          bundle exec rails db:prepare
+
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright Chromium
+        working-directory: react_on_rails_pro/spec/dummy
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Start Pro dummy app
+        shell: bash
+        env:
+          REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+          NODE_OPTIONS: --dns-result-order=ipv4first
+        run: |
+          set -euo pipefail
+
+          mkdir -p "$RUNNER_TEMP/shakaperf-logs"
+
+          cd react_on_rails_pro/spec/dummy
+          RENDERER_PORT=3800 pnpm run node-renderer > "$RUNNER_TEMP/shakaperf-logs/node-renderer.log" 2>&1 &
+          node_renderer_pid="$!"
+          echo "$node_renderer_pid" > "$RUNNER_TEMP/shakaperf-node-renderer.pid"
+
+          # RSCPostsPageOverHTTP fetches http://localhost:3000/api/... inside the node renderer.
+          PORT=3000 REACT_RENDERER_URL=http://127.0.0.1:3800 bundle exec rails s -b 127.0.0.1 -p 3000 \
+            > "$RUNNER_TEMP/shakaperf-logs/rails.log" 2>&1 &
+          rails_pid="$!"
+          echo "$rails_pid" > "$RUNNER_TEMP/shakaperf-rails.pid"
+
+          for attempt in {1..60}; do
+            echo "Waiting for RSC FOUC probe server (${attempt}/60)..."
+            # /info proves the renderer socket responds, /empty proves Rails responds,
+            # and the RSC page proves both sides are warm enough for the gate.
+            if curl --connect-timeout 2 --max-time 5 -fsS "http://127.0.0.1:3800/info" > /dev/null &&
+              curl --connect-timeout 2 --max-time 5 -fsS "$SHAKAPERF_CONTROL_URL/empty" > /dev/null &&
+              curl --connect-timeout 2 --max-time 5 -fsS "$SHAKAPERF_CONTROL_URL/rsc_posts_page_over_http" > /dev/null
+            then
+              # All probes are up; exit this step and leave the background servers running for ShakaPerf.
+              exit 0
+            fi
+
+            if ! kill -0 "$node_renderer_pid" 2>/dev/null; then
+              echo "::error::Node renderer died before becoming ready"
+              tail -n 100 "$RUNNER_TEMP/shakaperf-logs/node-renderer.log" || true
+              exit 1
+            fi
+
+            if ! kill -0 "$rails_pid" 2>/dev/null; then
+              echo "::error::Rails server died before becoming ready"
+              tail -n 100 "$RUNNER_TEMP/shakaperf-logs/rails.log" || true
+              exit 1
+            fi
+
+            sleep 2
+          done
+
+          echo "::error::Timed out waiting for renderer /info, $SHAKAPERF_CONTROL_URL/empty, and /rsc_posts_page_over_http"
+          tail -n 200 "$RUNNER_TEMP/shakaperf-logs/node-renderer.log" || true
+          tail -n 200 "$RUNNER_TEMP/shakaperf-logs/rails.log" || true
+          exit 1
+
+      - name: Run RSC FOUC ShakaPerf gate
+        run: |
+          # This release gate compares the candidate app with itself. The assertions
+          # in the abtest are absolute, so they fail even when both sides are broken.
+          pnpm exec shaka-perf compare \
+            --categories visreg \
+            --config test/shakaperf/rsc-fouc/abtests.config.ts \
+            --filter test/shakaperf/rsc-fouc/ab-tests/rsc-fouc-release-gate.abtest.ts \
+            --controlURL "$SHAKAPERF_CONTROL_URL" \
+            --experimentURL "$SHAKAPERF_EXPERIMENT_URL" \
+            --full-report-zip
+
+      - name: Upload ShakaPerf report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rsc-fouc-shakaperf-report
+          path: compare-results/
+          retention-days: 30
+
+      - name: Upload ShakaPerf server logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rsc-fouc-shakaperf-server-logs
+          path: ${{ runner.temp }}/shakaperf-logs/
+          retention-days: 30
+
+      - name: Stop Pro dummy app
+        if: always()
+        shell: bash
+        run: |
+          for pidfile in "$RUNNER_TEMP/shakaperf-rails.pid" "$RUNNER_TEMP/shakaperf-node-renderer.pid"; do
+            if [ -f "$pidfile" ]; then
+              kill "$(cat "$pidfile")" 2>/dev/null || true
+            fi
+          done
