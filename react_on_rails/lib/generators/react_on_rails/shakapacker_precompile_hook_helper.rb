@@ -39,8 +39,6 @@ module ReactOnRails
         return unless generated_precompile_hook_will_be_configured?(shakapacker_config_path, environment: environment)
 
         DEFAULT_PRECOMPILE_HOOK_COMMAND
-      rescue ShakapackerYmlErbError
-        nil
       end
 
       def generated_precompile_hook_will_be_configured?(shakapacker_config_path, environment:)
@@ -66,6 +64,8 @@ module ReactOnRails
       end
 
       def active_precompile_hook_configured?(content)
+        # Parse rendered ERB for effective hook values, but inspect raw YAML
+        # sections so conditional ERB hook declarations are still detectable.
         config = parse_shakapacker_yml_content(content)
         document = shakapacker_yml_document(content)
 
@@ -119,6 +119,7 @@ module ReactOnRails
       def environment_effective_raw_precompile_hook?(document, config, environment)
         section_name = shakapacker_config_key?(config, environment) ? environment.to_s : "production"
 
+        # `document` carries prebuilt raw section indexes from the caller.
         raw_active_precompile_hook_in_section_tree?(
           section_name, document.section_index, document.anchor_index
         )
@@ -221,9 +222,8 @@ module ReactOnRails
       def render_shakapacker_yml_erb(content)
         require "erb"
 
-        # Use TOPLEVEL_BINDING so simple ENV lookups work. Rails-specific ERB
-        # raises here and is caught as ShakapackerYmlErbError so we fail closed
-        # instead of risking an overwrite of custom hook config.
+        # TOPLEVEL_BINDING matches Rails config ERB evaluation closely enough for
+        # ENV/Rails constants; unavailable app-specific helpers still fail closed.
         ERB.new(content).result(TOPLEVEL_BINDING)
       rescue ScriptError, StandardError => e
         warn_shakapacker_yml_erb_error(e)
