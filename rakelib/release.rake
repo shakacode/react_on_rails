@@ -1514,6 +1514,7 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
         sh_in_dir_for_release(release_root, "LEFTHOOK=0 git commit -m 'Bump version to #{actual_gem_version}'")
       end
 
+      # Push the version-bump commit first so the workflow_dispatch run can be matched by headSha.
       sh_in_dir_for_release(release_root, "LEFTHOOK=0 git push")
       run_shakaperf_release_gate!(
         monorepo_root: release_root,

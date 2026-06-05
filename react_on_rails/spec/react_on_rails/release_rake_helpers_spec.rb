@@ -417,6 +417,40 @@ RSpec.describe "release.rake helper methods" do
       end.to raise_error(SystemExit, /Unable to dispatch ShakaPerf release gate workflow.*HTTP 404/m)
     end
 
+    it "aborts when the matching gate run fails" do
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug: repo_slug, ref: "release-branch")
+        .and_return([])
+      allow(self).to receive(:capture_gh_output)
+        .with(
+          "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
+          "--repo", repo_slug,
+          "--ref", "release-branch"
+        )
+        .and_return(["", success_status])
+      allow(self).to receive(:wait_for_shakaperf_release_gate_run!)
+        .with(
+          repo_slug: repo_slug,
+          ref: "release-branch",
+          head_sha: head_sha,
+          ignored_run_ids: []
+        )
+        .and_return(run)
+      allow(self).to receive(:capture_gh_output)
+        .with("run", "watch", "123456", "--repo", repo_slug, "--exit-status")
+        .and_return(["Tests failed", failure_status])
+
+      expect do
+        run_shakaperf_release_gate!(
+          monorepo_root: monorepo_root,
+          ref: "release-branch",
+          head_sha: head_sha,
+          allow_override: false,
+          dry_run: false
+        )
+      end.to raise_error(SystemExit, /ShakaPerf release gate failed.*Tests failed/m)
+    end
+
     it "finds the workflow_dispatch run for the pushed head SHA" do
       matching_run = { "databaseId" => 2, "headSha" => head_sha }
       allow(self).to receive(:fetch_shakaperf_release_gate_runs)
