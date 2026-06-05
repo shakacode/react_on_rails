@@ -145,11 +145,11 @@ const MyComponent = (props, _railsContext) => {
 
 This and other promise options below are only available in React on Rails Pro with the Node renderer.
 
-> **React on Rails note:** Async render functions should still receive application data from Rails props whenever possible. Keep authorization, database access, and cache-aware loading in Rails, then pass the prepared data through `react_component`, `react_component_hash`, or Pro streamed async props. See [RSC data fetching](../migrating/rsc-data-fetching.md) for the same Rails-first data boundary applied to RSC.
+> **React on Rails note:** Async render functions should still receive application data from Rails — either as regular props or via [async props](../migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently) (`getReactOnRailsAsyncProp`). Keep authorization, database access, and cache-aware loading in Rails rather than fetching inside the render function. See [RSC data fetching](../migrating/rsc-data-fetching.md).
 
 ```jsx
 const MyComponent = async (props, _railsContext) => {
-  const data = await fetchData();
+  const data = await props.getReactOnRailsAsyncProp('data');
   return `<div>Hello ${data.name}</div>`;
 };
 ```
@@ -165,7 +165,7 @@ const MyComponent = async (props, _railsContext) => {
 
 ```jsx
 const MyComponent = async (props, _railsContext) => {
-  const data = await fetchData();
+  const data = await props.getReactOnRailsAsyncProp('data');
   return {
     componentHtml: `<div>Hello ${data.name}</div>`,
     title: `<title>${data.title}</title>`,
@@ -178,7 +178,7 @@ const MyComponent = async (props, _railsContext) => {
 
 ```jsx
 const MyComponent = async (props, _railsContext) => {
-  const data = await fetchData();
+  const data = await props.getReactOnRailsAsyncProp('data');
   return () => <div>Hello {data.name}</div>;
 };
 ```
@@ -382,7 +382,7 @@ ReactOnRails.register({ HelmetComponent });
 
 ```jsx
 const AsyncStringComponent = async (props) => {
-  const data = await fetchData();
+  const data = await props.getReactOnRailsAsyncProp('data');
   return `<div>Hello ${data.name}</div>`;
 };
 AsyncStringComponent.renderFunction = true;
@@ -391,14 +391,14 @@ ReactOnRails.register({ AsyncStringComponent });
 
 ```erb
 <%# Ruby %>
-<%= react_component("AsyncStringComponent", props: { dataUrl: "/api/data" }) %>
+<%= react_component("AsyncStringComponent", props: { name: @user.name }) %>
 ```
 
 ### Return Type 6: Promise of server-side hash
 
 ```jsx
 const AsyncObjectComponent = async (props) => {
-  const data = await fetchData();
+  const data = await props.getReactOnRailsAsyncProp('data');
   return {
     componentHtml: `<div>Hello ${data.name}</div>`,
     title: `<title>${data.title}</title>`,
@@ -411,7 +411,7 @@ ReactOnRails.register({ AsyncObjectComponent });
 
 ```erb
 <%# Ruby - MUST use react_component_hash %>
-<% helmet_data = react_component_hash("AsyncObjectComponent", props: { dataUrl: "/api/data" }) %>
+<% helmet_data = react_component_hash("AsyncObjectComponent", props: { name: @user.name }) %>
 
 <% content_for :head do %>
   <%= helmet_data["title"] %>
@@ -427,7 +427,7 @@ ReactOnRails.register({ AsyncObjectComponent });
 
 ```jsx
 const AsyncReactComponent = async (props) => {
-  const data = await fetchData();
+  const data = await props.getReactOnRailsAsyncProp('data');
   return () => <div>Hello {data.name}</div>;
 };
 AsyncReactComponent.renderFunction = true;
@@ -436,7 +436,7 @@ ReactOnRails.register({ AsyncReactComponent });
 
 ```erb
 <%# Ruby %>
-<%= react_component("AsyncReactComponent", props: { dataUrl: "/api/data" }) %>
+<%= react_component("AsyncReactComponent", props: { name: @user.name }) %>
 ```
 
 ### Return Type 8: Redirect Object (Legacy)
