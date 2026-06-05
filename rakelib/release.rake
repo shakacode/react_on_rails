@@ -279,6 +279,10 @@ rescue JSON::ParserError => e
   )
 end
 
+def shakaperf_release_gate_dispatch_started_at
+  Time.at(Time.now.to_i).utc
+end
+
 def shakaperf_release_gate_run_created_after?(run, earliest_created_at)
   return true unless earliest_created_at
 
@@ -351,7 +355,7 @@ def run_shakaperf_release_gate!(monorepo_root:, ref:, head_sha:, allow_override:
   existing_run_ids = fetch_shakaperf_release_gate_runs(repo_slug: repo_slug, ref: ref).map do |run|
     run["databaseId"].to_s
   end
-  dispatch_started_at = Time.now.utc
+  dispatch_started_at = shakaperf_release_gate_dispatch_started_at
   output, status = capture_gh_output(
     "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE, "--repo", repo_slug, "--ref", ref
   )

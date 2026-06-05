@@ -546,6 +546,23 @@ RSpec.describe "release.rake helper methods" do
       ).to eq(matching_run)
     end
 
+    it "uses GitHub's second-precision timestamps when matching newly dispatched runs" do
+      allow(Time).to receive(:now).and_return(Time.iso8601("2026-06-05T01:00:05.900Z"))
+      newly_dispatched_run = { "databaseId" => 1, "headSha" => head_sha, "createdAt" => "2026-06-05T01:00:05Z" }
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug: repo_slug, ref: "release-branch")
+        .and_return([newly_dispatched_run])
+
+      expect(
+        wait_for_shakaperf_release_gate_run!(
+          repo_slug: repo_slug,
+          ref: "release-branch",
+          head_sha: head_sha,
+          earliest_created_at: shakaperf_release_gate_dispatch_started_at
+        )
+      ).to eq(newly_dispatched_run)
+    end
+
     it "aborts when no matching workflow_dispatch run appears before the deadline" do
       allow(self).to receive(:fetch_shakaperf_release_gate_runs)
         .with(repo_slug: repo_slug, ref: "release-branch")
