@@ -30,6 +30,36 @@ RSpec.describe BenchmarkTargetMonitor do
     end
   end
 
+  it "does not blank the live log when startup logs cannot be preserved" do
+    content = "booting\nWorker 1 died UNEXPECTEDLY :(, restarting\nready\n"
+
+    with_log_file(content) do |log_path, _output_dir|
+      monitor = described_class.new(target_log: log_path)
+
+      monitor.start_measurement!
+
+      expect(File.read(log_path)).to eq(content)
+    end
+  end
+
+  it "blanks bytes appended after log preservation but before opening the log for overwrite" do
+    with_log_file("booting\nready\n") do |log_path, output_dir|
+      monitor = described_class.new(target_log: log_path, output_dir: output_dir)
+      late_log_line = "Worker 2 died UNEXPECTEDLY :(, restarting\n"
+
+      allow(File).to receive(:open).and_wrap_original do |original_open, path, mode, *args, &block|
+        original_open.call(path, "ab") { |file| file.write(late_log_line) } if path == log_path && mode == "r+b"
+        original_open.call(path, mode, *args, &block)
+      end
+
+      monitor.start_measurement!
+
+      preserved = File.join(output_dir, described_class::STARTUP_LOG_FILENAME)
+      expect(File.read(preserved)).not_to include("died UNEXPECTEDLY")
+      expect(File.read(log_path)).not_to include("died UNEXPECTEDLY")
+    end
+  end
+
   it "fails when the node renderer master logs an unexpected worker restart during measurement" do
     with_log_file("startup complete\n") do |log_path, output_dir|
       monitor = described_class.new(target_log: log_path, output_dir: output_dir)

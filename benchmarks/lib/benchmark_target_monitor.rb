@@ -57,8 +57,10 @@ class BenchmarkTargetMonitor
   end
 
   def preserve_and_blank_target_log
-    FileUtils.mkdir_p(@output_dir) if @output_dir
-    File.binwrite(File.join(@output_dir, STARTUP_LOG_FILENAME), File.binread(@target_log)) if @output_dir
+    return unless @output_dir
+
+    FileUtils.mkdir_p(@output_dir)
+    File.binwrite(File.join(@output_dir, STARTUP_LOG_FILENAME), File.binread(@target_log))
     blank_existing_log_bytes
   end
 
@@ -67,8 +69,8 @@ class BenchmarkTargetMonitor
   # startup bytes with newlines keeps the existing workflow grep text-only while
   # preventing pre-measurement events from matching the post-run scan.
   def blank_existing_log_bytes
-    remaining = File.size(@target_log)
     File.open(@target_log, "r+b") do |file|
+      remaining = file.size
       until remaining.zero?
         chunk_size = [remaining, BLANK_CHUNK_SIZE].min
         file.write("\n" * chunk_size)
