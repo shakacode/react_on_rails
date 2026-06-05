@@ -405,6 +405,15 @@ RSpec.describe GeneratorHelper, type: :generator do
       YAML
     end
 
+    it "ignores nested precompile_hook keys when scanning a section" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(false)
+        default:
+          nested:
+            precompile_hook: <%= false %>
+          # precompile_hook: ~
+      YAML
+    end
+
     it "treats raw ERB precompile hooks as active because they may vary by environment" do
       expect(active_precompile_hook_configured?(<<~YAML)).to be(true)
         default:
@@ -652,6 +661,19 @@ RSpec.describe GeneratorHelper, type: :generator do
 
         test:
           <<: *default
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(true)
+    end
+
+    it "materializes when only a nested map has a raw precompile_hook" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        test:
+          nested:
+            precompile_hook: <%= false %>
+          # precompile_hook: ~
       YAML
 
       expect(

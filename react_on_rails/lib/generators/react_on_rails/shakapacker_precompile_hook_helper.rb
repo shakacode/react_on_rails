@@ -7,13 +7,12 @@ module ReactOnRails
       SHAKAPACKER_YML_PATH = "config/shakapacker.yml"
       DEFAULT_PRECOMPILE_HOOK_COMMAND = "bin/shakapacker-precompile-hook"
       COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER = /^(\s*)#\s*precompile_hook:\s*~\s*$/
-      PRECOMPILE_HOOK_KEY = /^\s+precompile_hook:\s*/
       RAW_PRECOMPILE_HOOK_VALUE = /^\s+precompile_hook:\s*([^#]*?)\s*(?:#.*)?$/
       UNQUOTED_INACTIVE_PRECOMPILE_HOOK_VALUE = /\A(?:|~|null|false|true|yes|no|on|off)\z/i
       class ShakapackerYmlErbError < StandardError; end
       ShakapackerYmlDocument = Struct.new(:sections, :section_index, :anchor_index, keyword_init: true)
       private_constant :SHAKAPACKER_YML_PATH, :DEFAULT_PRECOMPILE_HOOK_COMMAND,
-                       :COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER, :PRECOMPILE_HOOK_KEY, :RAW_PRECOMPILE_HOOK_VALUE,
+                       :COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER, :RAW_PRECOMPILE_HOOK_VALUE,
                        :UNQUOTED_INACTIVE_PRECOMPILE_HOOK_VALUE,
                        :ShakapackerYmlErbError, :ShakapackerYmlDocument
 
@@ -183,7 +182,12 @@ module ReactOnRails
       end
 
       def raw_precompile_hook_state(section)
+        child_indent = shakapacker_yml_section_child_indent(section)
+        return nil unless child_indent
+
         precompile_hook_values = section.each_line.filter_map do |line|
+          next unless shakapacker_yml_section_child_line?(line, child_indent)
+
           line.match(RAW_PRECOMPILE_HOOK_VALUE)&.[](1)
         end
         return nil if precompile_hook_values.empty?
@@ -202,12 +206,29 @@ module ReactOnRails
         value
       end
 
+      def shakapacker_yml_section_child_indent(section)
+        section.each_line.drop(1).filter_map do |line|
+          next if line.strip.empty? || line.match?(/^\s*#/)
+
+          indent = line[/\A */].length
+          indent if indent.positive?
+        end.min
+      end
+
+      def shakapacker_yml_section_child_line?(line, child_indent)
+        line[/\A */].length == child_indent
+      end
+
       def shakapacker_yml_section_merge_aliases(section)
         aliases = []
+        child_indent = shakapacker_yml_section_child_indent(section)
+        return aliases unless child_indent
+
         lines = section.each_line.to_a
         lines.each_with_index do |line, index|
           match = line.match(/^(\s+)<<:\s*(.*)$/)
           next unless match
+          next unless match[1].length == child_indent
 
           aliases.concat(match[2].scan(/\*([A-Za-z0-9_-]+)/).flatten)
           aliases.concat(shakapacker_yml_block_merge_aliases(lines[(index + 1)..], match[1].length))
