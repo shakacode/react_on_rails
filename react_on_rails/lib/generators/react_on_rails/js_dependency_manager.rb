@@ -442,18 +442,24 @@ module ReactOnRails
         RSC_DEPENDENCIES.map { |pkg| "#{pkg}@#{RSC_PACKAGE_VERSION_PIN}" }
       end
 
+      def rsc_stable_package_version_target
+        RSC_PACKAGE_VERSION_PIN.split("-", 2).first
+      end
+
       def rsc_dependency_pin_info
         "React Server Components package pin: all --rsc installs temporarily use " \
           "react-on-rails-rsc@#{RSC_PACKAGE_VERSION_PIN}, including Webpack projects. " \
           "This prerelease keeps react-on-rails-rsc/WebpackPlugin compatible while adding " \
-          "react-on-rails-rsc/RspackPlugin. Keep the pin until stable react-on-rails-rsc@19.0.5 " \
+          "react-on-rails-rsc/RspackPlugin. Keep the pin until stable " \
+          "react-on-rails-rsc@#{rsc_stable_package_version_target} " \
           "is published and tagged latest."
       end
 
       def rsc_dependency_pin_failed_warning
         "Warning: Could not install the pinned react-on-rails-rsc@#{RSC_PACKAGE_VERSION_PIN}. " \
           "All RSC projects are temporarily pinned to that version because the unversioned " \
-          "`latest` tag may not export react-on-rails-rsc/RspackPlugin until stable 19.0.5 " \
+          "`latest` tag may not export react-on-rails-rsc/RspackPlugin until stable " \
+          "#{rsc_stable_package_version_target} " \
           "is published, so the generator left the version pin in package.json rather than " \
           "install a potentially incompatible version."
       end

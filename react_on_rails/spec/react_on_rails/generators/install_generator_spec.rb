@@ -1991,6 +1991,7 @@ describe InstallGenerator, type: :generator do
   describe "#add_rsc_dependencies" do
     let(:install_generator) { described_class.new([], { rsc: true }, destination_root: destination_root) }
     let(:rsc_pin) { ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN }
+    let(:rsc_stable_target) { rsc_pin.split("-", 2).first }
 
     before do
       allow(install_generator).to receive(:say)
@@ -2005,7 +2006,7 @@ describe InstallGenerator, type: :generator do
       message_text = GeneratorMessages.messages.join("\n")
       expect(message_text).to include("all --rsc installs")
       expect(message_text).to include("react-on-rails-rsc@#{rsc_pin}")
-      expect(message_text).to include("stable react-on-rails-rsc@19.0.5")
+      expect(message_text).to include("stable react-on-rails-rsc@#{rsc_stable_target}")
       expect(message_text).to include("react-on-rails-rsc/RspackPlugin")
       expect(message_text).to include("Webpack")
     end

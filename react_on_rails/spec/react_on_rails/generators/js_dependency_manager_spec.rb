@@ -657,6 +657,22 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
     end
   end
 
+  describe "RSC package pin messages" do
+    it "derives the stable release target from the prerelease package pin" do
+      stub_const("ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN", "19.1.0-rc.1")
+
+      info = instance.send(:rsc_dependency_pin_info)
+      warning = instance.send(:rsc_dependency_pin_failed_warning)
+
+      expect(info).to include("react-on-rails-rsc@19.1.0-rc.1")
+      expect(info).to include("stable react-on-rails-rsc@19.1.0")
+      expect(info).not_to include("stable react-on-rails-rsc@19.0.5")
+      expect(warning).to include("pinned react-on-rails-rsc@19.1.0-rc.1")
+      expect(warning).to include("stable 19.1.0")
+      expect(warning).not_to include("stable 19.0.5")
+    end
+  end
+
   describe "#add_rsc_dependencies" do
     it "installs version-pinned rsc dependency" do
       rsc_package = "react-on-rails-rsc@#{ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN}"
