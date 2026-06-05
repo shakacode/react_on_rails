@@ -1,6 +1,24 @@
 import { createElement, isValidElement, type ReactElement } from 'react';
-import type { CreateParams, ReactComponent, RenderFunction, CreateReactOutputResult } from './types/index.ts';
+import type {
+  CreateParams,
+  ReactComponent,
+  RenderFunction,
+  CreateReactOutputResult,
+  RendererTeardownResult,
+} from './types/index.ts';
 import { isServerRenderHash, isPromise } from './isServerRenderResult.ts';
+
+const unsupportedManualRendererMessage = (name: string) =>
+  `ReactOnRails.render() does not support renderer functions ("${name}"). ` +
+  'Use normal React on Rails component rendering so renderer teardowns are captured on navigation.';
+
+function isRendererTeardownResult(value: unknown): value is RendererTeardownResult {
+  return (
+    value != null &&
+    typeof value === 'object' &&
+    typeof (value as { teardown?: unknown }).teardown === 'function'
+  );
+}
 
 function createReactElementFromRenderFunctionResult(
   renderFunctionResult: ReactComponent,
@@ -41,7 +59,7 @@ export default function createReactOutput({
   trace,
   shouldHydrate,
 }: CreateParams): CreateReactOutputResult {
-  const { name, component, renderFunction } = componentObj;
+  const { name, component, renderFunction, isRenderer } = componentObj;
 
   if (trace) {
     if (railsContext && railsContext.serverSide) {
@@ -66,7 +84,25 @@ export default function createReactOutput({
     if (trace) {
       console.log(`${name} is a renderFunction`);
     }
+    // createReactOutput only handles render-functions that return a component or server-render hash.
+    // The 3-argument renderer form (which owns its own mount and may return a RendererTeardownResult)
+    // never reaches here on the supported paths: the client renderers delegate it earlier
+    // (`delegateToRenderer`) and return before this call, and server rendering rejects it upstream in
+    // validateComponent ("Detected a renderer while server rendering"). The only path that reaches
+    // here with a renderer is the manual public `ReactOnRails.render()` API, where renderers are
+    // unsupported because their teardown can't be tracked for cleanup. Reject it loudly and *before*
+    // invoking, rather than calling it with no domNodeId and rendering a half-wired, leak-prone result.
+    if (isRenderer) {
+      throw new Error(unsupportedManualRendererMessage(name));
+    }
+
     const renderFunctionResult = (component as RenderFunction)(props, railsContext);
+    // Defense-in-depth: a 2-argument render function isn't expected to return a teardown wrapper, but
+    // the public RenderFunction return type can't structurally exclude it, so reject that at runtime too.
+    if (isRendererTeardownResult(renderFunctionResult)) {
+      throw new Error(unsupportedManualRendererMessage(name));
+    }
+
     if (isServerRenderHash(renderFunctionResult)) {
       // We just return at this point, because calling function knows how to handle this case and
       // we can't call React.createElement with this type of Object.
@@ -77,6 +113,9 @@ export default function createReactOutput({
       // We just return at this point, because calling function knows how to handle this case and
       // we can't call React.createElement with this type of Object.
       return renderFunctionResult.then((result) => {
+        if (isRendererTeardownResult(result)) {
+          throw new Error(unsupportedManualRendererMessage(name));
+        }
         // If the result is a function, then it returned a React Component (even class components are functions).
         if (typeof result === 'function') {
           return createReactElementFromRenderFunctionResult(result, name, props);

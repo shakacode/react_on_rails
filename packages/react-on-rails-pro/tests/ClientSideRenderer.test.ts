@@ -4,7 +4,7 @@
 
 import * as React from 'react';
 import { resetRailsContext } from 'react-on-rails/context';
-import type { RailsContext, RenderFunction } from 'react-on-rails/types';
+import type { RailsContext, RendererFunction } from 'react-on-rails/types';
 import * as ComponentRegistry from '../src/ComponentRegistry.ts';
 import * as StoreRegistry from '../src/StoreRegistry.ts';
 import { renderOrHydrateComponent, hydrateStore, unmountAll } from '../src/ClientSideRenderer.ts';
@@ -286,13 +286,13 @@ describe('ClientSideRenderer', () => {
 
   it('delegates renderer roots without wrapping them with the default RSC provider', async () => {
     const renderer = jest.fn();
-    const TestRenderer: RenderFunction = (
+    const TestRenderer: RendererFunction = (
       props?: Record<string, unknown>,
       railsContext?: RailsContext,
       domNodeId?: string,
     ) => {
       renderer(props, railsContext, domNodeId);
-      return Promise.resolve('');
+      return Promise.resolve();
     };
     const defaultProviderFactory = jest.fn(({ reactElement }: DefaultRSCProviderFactoryArgs) => reactElement);
     ComponentRegistry.register({ TestComponent: TestRenderer });
@@ -303,7 +303,329 @@ describe('ClientSideRenderer', () => {
     await renderOrHydrateComponent(componentSpec);
 
     expect(renderer).toHaveBeenCalledTimes(1);
+    // The 3-arg renderer signature is load-bearing (#3209): a wrong or dropped domNodeId would
+    // mis-target getReactServerComponent and silently break teardown capture, so assert the exact
+    // args rather than only the call count.
+    expect(renderer).toHaveBeenCalledWith(
+      { greeting: 'hello' },
+      expect.objectContaining({ rscPayloadGenerationUrlPath: '/rsc_payload' }),
+      'dom-id-123',
+    );
     expect(defaultProviderFactory).not.toHaveBeenCalled();
     expect(mockReactHydrateOrRender).not.toHaveBeenCalled();
+  });
+
+  // Issue #3209: a renderer function (3-arg form) owns its own mount and may return a teardown wrapper
+  // callback so React on Rails can clean it up on unmount (Turbo navigation / node replacement).
+  it('runs the teardown returned by a renderer when the component is unmounted', async () => {
+    const teardown = jest.fn();
+    const TestRenderer: RendererFunction = (
+      _props?: Record<string, unknown>,
+      _railsContext?: RailsContext,
+      _domNodeId?: string,
+    ) => ({ teardown });
+    ComponentRegistry.register({ TestComponent: TestRenderer });
+    const componentSpec = setupTestComponentDom('dom-id-teardown');
+    addRailsContext();
+
+    await renderOrHydrateComponent(componentSpec);
+    expect(teardown).not.toHaveBeenCalled();
+
+    // Simulate Turbo/Turbolinks page unload.
+    unmountAll();
+    expect(teardown).toHaveBeenCalledTimes(1);
+
+    // A second page-unload sweep must not re-run the teardown. unmountAll clears the tracked-roots
+    // map, so the second sweep finds nothing — this guards against a regression where the map is not
+    // cleared (the per-instance single-shot guard is unreachable via the public API once cleared).
+    unmountAll();
+    expect(teardown).toHaveBeenCalledTimes(1);
+    expect(mockReactHydrateOrRender).not.toHaveBeenCalled();
+  });
+
+  it('runs a teardown returned asynchronously by a renderer on unmount', async () => {
+    const teardown = jest.fn();
+    const TestRenderer: RendererFunction = (
+      _props?: Record<string, unknown>,
+      _railsContext?: RailsContext,
+      _domNodeId?: string,
+    ) => Promise.resolve({ teardown });
+    ComponentRegistry.register({ TestComponent: TestRenderer });
+    const componentSpec = setupTestComponentDom('dom-id-teardown-async');
+    addRailsContext();
+
+    await renderOrHydrateComponent(componentSpec);
+    expect(teardown).not.toHaveBeenCalled();
+
+    unmountAll();
+    expect(teardown).toHaveBeenCalledTimes(1);
+  });
+
+  it('logs (and swallows) when an async teardown rejects on unmount', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const rejection = new Error('async teardown boom');
+      // The renderer returns a teardown wrapper synchronously; the teardown itself returns a rejecting
+      // promise, exercising invokeRendererTeardown's rejection-swallowing path so the failure is
+      // logged rather than left as an unhandled rejection.
+      const teardown = jest.fn(() => Promise.reject(rejection));
+      const TestRenderer: RendererFunction = (
+        _props?: Record<string, unknown>,
+        _railsContext?: RailsContext,
+        _domNodeId?: string,
+      ) => ({ teardown });
+      ComponentRegistry.register({ TestComponent: TestRenderer });
+      const componentSpec = setupTestComponentDom('dom-id-teardown-async-reject');
+      addRailsContext();
+
+      await renderOrHydrateComponent(componentSpec);
+      unmountAll();
+      expect(teardown).toHaveBeenCalledTimes(1);
+
+      // Flush microtasks so the swallowing .catch runs.
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error in renderer teardown for dom node "dom-id-teardown-async-reject":',
+        rejection,
+      );
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
+  it('rejects with a render error when an async renderer rejects before returning a teardown', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const rejection = new Error('renderer rejected');
+      // Unlike the core renderer (which logs and swallows the rejection), Pro awaits the renderer, so
+      // a rejection propagates to render()'s outer catch and rejects the render promise with the
+      // wrapped "encountered an error while rendering" message.
+      // Parameterize reject as `<{ teardown: () => void }>` so the rejected promise types as the
+      // renderer-teardown arm of RendererFunction's return union.
+      const TestRenderer: RendererFunction = (
+        _props?: Record<string, unknown>,
+        _railsContext?: RailsContext,
+        _domNodeId?: string,
+      ) => Promise.reject<{ teardown: () => void }>(rejection);
+      ComponentRegistry.register({ TestComponent: TestRenderer });
+      const componentSpec = setupTestComponentDom('dom-id-renderer-reject');
+      addRailsContext();
+
+      await expect(renderOrHydrateComponent(componentSpec)).rejects.toThrow(
+        'ReactOnRails encountered an error while rendering component: TestComponent',
+      );
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
+  it('does not throw on unmount when the renderer returns nothing', async () => {
+    const TestRenderer: RendererFunction = (
+      _props?: Record<string, unknown>,
+      _railsContext?: RailsContext,
+      _domNodeId?: string,
+    ) => {
+      // Legacy renderer that does not opt into cleanup.
+    };
+    ComponentRegistry.register({ TestComponent: TestRenderer });
+    const componentSpec = setupTestComponentDom('dom-id-teardown-none');
+    addRailsContext();
+
+    await renderOrHydrateComponent(componentSpec);
+
+    expect(() => unmountAll()).not.toThrow();
+  });
+
+  it('runs the teardown when unmount races an async renderer still resolving (issue #3209)', async () => {
+    // Unlike the core renderer, Pro awaits the renderer and re-checks unmount state, so a teardown
+    // that resolves after a Turbo navigation has already unmounted the mount is still run, not
+    // leaked.
+    const teardown = jest.fn();
+    let resolveRenderer!: (value: { teardown: () => void }) => void;
+    const rendererPromise = new Promise<{ teardown: () => void }>((resolve) => {
+      resolveRenderer = resolve;
+    });
+    const TestRenderer: RendererFunction = (
+      _props?: Record<string, unknown>,
+      _railsContext?: RailsContext,
+      _domNodeId?: string,
+    ) => rendererPromise;
+    ComponentRegistry.register({ TestComponent: TestRenderer });
+    const componentSpec = setupTestComponentDom('dom-id-teardown-race');
+    addRailsContext();
+
+    // Start rendering but do not await — the renderer's promise is still pending, so render() is
+    // parked awaiting it.
+    const renderPromise = renderOrHydrateComponent(componentSpec);
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+
+    // Simulate a Turbo/Turbolinks navigation unmounting the mount before the renderer resolves.
+    unmountAll();
+    expect(teardown).not.toHaveBeenCalled();
+
+    // The renderer finally resolves; unmount() could not see the teardown, so render() runs it now.
+    resolveRenderer({ teardown });
+    await renderPromise;
+
+    expect(teardown).toHaveBeenCalledTimes(1);
+  });
+
+  it('logs (and does not reject) when a raced async renderer teardown throws synchronously', async () => {
+    // Same race as above, but the resolved teardown throws synchronously. render() must guard the
+    // call (like unmount() does) so the throw is logged rather than escaping render()'s outer catch,
+    // which would reject renderPromise with a misleading "encountered an error while rendering" error
+    // after the component is already unmounted.
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const teardownError = new Error('teardown boom');
+      const teardown = jest.fn(() => {
+        throw teardownError;
+      });
+      let resolveRenderer!: (value: { teardown: () => void }) => void;
+      const rendererPromise = new Promise<{ teardown: () => void }>((resolve) => {
+        resolveRenderer = resolve;
+      });
+      const TestRenderer: RendererFunction = (
+        _props?: Record<string, unknown>,
+        _railsContext?: RailsContext,
+        _domNodeId?: string,
+      ) => rendererPromise;
+      ComponentRegistry.register({ TestComponent: TestRenderer });
+      const componentSpec = setupTestComponentDom('dom-id-teardown-race-throws');
+      addRailsContext();
+
+      const renderPromise = renderOrHydrateComponent(componentSpec);
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+
+      unmountAll();
+      resolveRenderer({ teardown });
+
+      // The synchronous throw is caught and logged, so renderPromise resolves rather than rejecting.
+      await expect(renderPromise).resolves.toBeUndefined();
+      expect(teardown).toHaveBeenCalledTimes(1);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error in renderer teardown for dom node "dom-id-teardown-race-throws":',
+        teardownError,
+      );
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
+  // Symmetry with the core suite's React-root cleanup test: a normal (non-renderer) component mounts
+  // a React root that React on Rails owns, so page unload must unmount that root. The default
+  // reactHydrateOrRender mock returns undefined, so inject a root whose unmount we can assert on —
+  // otherwise a regression dropping `this.root.unmount()` for non-renderer mounts would go unnoticed.
+  it('unmounts the framework-created React root on page unload (non-renderer mount)', async () => {
+    const rootUnmount = jest.fn();
+    mockReactHydrateOrRender.mockReturnValueOnce({ render: jest.fn(), unmount: rootUnmount });
+    ComponentRegistry.register({
+      TestComponent: ({ greeting }: { greeting: string }) => React.createElement('div', null, greeting),
+    });
+    const componentSpec = setupTestComponentDom('dom-id-root-unmount');
+    addRailsContext();
+
+    await renderOrHydrateComponent(componentSpec);
+    expect(mockReactHydrateOrRender).toHaveBeenCalledTimes(1);
+    expect(rootUnmount).not.toHaveBeenCalled();
+
+    unmountAll();
+    expect(rootUnmount).toHaveBeenCalledTimes(1);
+  });
+
+  // Complements the no-teardown renderer test: a renderer that opts out of cleanup still owns its own
+  // mount, so unmount() must take the renderer-owned path and NOT unmount a React root (it never
+  // created one). With the default mock, a non-renderer mount would set `this.root`; a renderer mount
+  // must leave it unset, so no root-unmount can fire here.
+  it('does not unmount a React root for a renderer mount that returns no teardown', async () => {
+    const rootUnmount = jest.fn();
+    // If the renderer path were mistaken for a React-root mount, this root would be captured and
+    // unmounted on page unload. It must not be, because renderers are delegated before any root is
+    // created.
+    mockReactHydrateOrRender.mockReturnValue({ render: jest.fn(), unmount: rootUnmount });
+    const TestRenderer: RendererFunction = (
+      _props?: Record<string, unknown>,
+      _railsContext?: RailsContext,
+      _domNodeId?: string,
+    ) => {
+      // Legacy renderer that does not opt into cleanup.
+    };
+    ComponentRegistry.register({ TestComponent: TestRenderer });
+    const componentSpec = setupTestComponentDom('dom-id-renderer-no-root');
+    addRailsContext();
+
+    await renderOrHydrateComponent(componentSpec);
+    expect(mockReactHydrateOrRender).not.toHaveBeenCalled();
+
+    expect(() => unmountAll()).not.toThrow();
+    expect(rootUnmount).not.toHaveBeenCalled();
+  });
+
+  it('runs the previous renderer teardown when the same dom id node is replaced', async () => {
+    const firstTeardown = jest.fn();
+    const secondTeardown = jest.fn();
+    const renderer = jest.fn();
+    let callCount = 0;
+    const TestRenderer: RendererFunction = (
+      _props?: Record<string, unknown>,
+      _railsContext?: RailsContext,
+      _domNodeId?: string,
+    ) => {
+      renderer();
+      callCount += 1;
+      return { teardown: callCount === 1 ? firstTeardown : secondTeardown };
+    };
+    ComponentRegistry.register({ TestComponent: TestRenderer });
+    const componentSpec = setupTestComponentDom('dom-id-renderer-replace');
+    addRailsContext();
+
+    await renderOrHydrateComponent(componentSpec);
+    expect(renderer).toHaveBeenCalledTimes(1);
+
+    const oldMountNode = document.getElementById('dom-id-renderer-replace');
+    expect(oldMountNode).not.toBeNull();
+    const newMountNode = document.createElement('div');
+    newMountNode.id = 'dom-id-renderer-replace';
+    oldMountNode?.replaceWith(newMountNode);
+
+    await renderOrHydrateComponent(componentSpec);
+
+    expect(firstTeardown).toHaveBeenCalledTimes(1);
+    expect(secondTeardown).not.toHaveBeenCalled();
+    expect(renderer).toHaveBeenCalledTimes(2);
+  });
+
+  it('unmounts the previous React root when the same dom id node is replaced', async () => {
+    const firstRootUnmount = jest.fn();
+    const secondRootUnmount = jest.fn();
+    mockReactHydrateOrRender
+      .mockReturnValueOnce({ render: jest.fn(), unmount: firstRootUnmount })
+      .mockReturnValueOnce({ render: jest.fn(), unmount: secondRootUnmount });
+    ComponentRegistry.register({
+      TestComponent: ({ greeting }: { greeting: string }) => React.createElement('div', null, greeting),
+    });
+    const componentSpec = setupTestComponentDom('dom-id-root-replace');
+    addRailsContext();
+
+    await renderOrHydrateComponent(componentSpec);
+    expect(mockReactHydrateOrRender).toHaveBeenCalledTimes(1);
+
+    const oldMountNode = document.getElementById('dom-id-root-replace');
+    expect(oldMountNode).not.toBeNull();
+    const newMountNode = document.createElement('div');
+    newMountNode.id = 'dom-id-root-replace';
+    oldMountNode?.replaceWith(newMountNode);
+
+    await renderOrHydrateComponent(componentSpec);
+
+    expect(firstRootUnmount).toHaveBeenCalledTimes(1);
+    expect(secondRootUnmount).not.toHaveBeenCalled();
+    expect(mockReactHydrateOrRender).toHaveBeenCalledTimes(2);
   });
 });

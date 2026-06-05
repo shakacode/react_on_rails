@@ -15,7 +15,14 @@
 /* eslint-disable max-classes-per-file */
 
 import type { ReactElement } from 'react';
-import type { RailsContext, RegisteredComponent, RenderFunction, Root } from 'react-on-rails/types';
+import type {
+  RailsContext,
+  RegisteredComponent,
+  RendererFunction,
+  RendererTeardown,
+  RendererTeardownResult,
+  Root,
+} from 'react-on-rails/types';
 
 import { getRailsContext, resetRailsContext } from 'react-on-rails/context';
 import createReactOutput from 'react-on-rails/createReactOutput';
@@ -31,13 +38,63 @@ import * as ComponentRegistry from './ComponentRegistry.ts';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 
+/** Narrows an unknown value to a thenable (has a callable `.then`) without assuming a native Promise. */
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+  return (
+    value != null &&
+    (typeof value === 'object' || typeof value === 'function') &&
+    typeof (value as { then?: unknown }).then === 'function'
+  );
+}
+
+/**
+ * Invokes a renderer teardown, swallowing async rejections so a failing teardown cannot produce an
+ * unhandled promise rejection. Synchronous throws propagate to the caller's try/catch.
+ *
+ * Intentionally re-implemented (not imported) from the OSS `react-on-rails` `invokeRendererTeardown`:
+ * the OSS module does not export it, so re-implementing keeps the Pro client renderer decoupled from
+ * OSS internals (no reliance on a non-public export) instead of widening the OSS public API just to
+ * share it. Keep the local thenable guard in sync with the OSS helper so non-native thenables are
+ * handled the same way in both packages. The shared `RendererFunction`/`RendererTeardown`/
+ * `RendererTeardownResult` *types* are imported, so only this small runtime helper is duplicated.
+ * MUST SYNC: A sibling helper exists in packages/react-on-rails/src/ClientRenderer.ts. If you
+ * change the error-handling logic or log format here, update that copy too.
+ */
+function invokeRendererTeardown(teardown: RendererTeardown | undefined, domNodeId: string): void {
+  if (!teardown) return;
+  const maybePromise = teardown();
+  if (isThenable(maybePromise)) {
+    // Detect a thenable with `.then` (Promises/A+) but swallow the rejection via
+    // `Promise.resolve(...).catch(...)`: a non-native thenable may lack `.catch`, so calling it
+    // directly could itself throw or leave the rejection unhandled. This keeps a failing async
+    // teardown from surfacing as an unhandled promise rejection.
+    Promise.resolve(maybePromise).catch((error: unknown) => {
+      console.error(`Error in renderer teardown for dom node "${domNodeId}":`, error);
+    });
+  }
+}
+
+function isRendererTeardownResult(value: unknown): value is RendererTeardownResult {
+  return (
+    value != null &&
+    typeof value === 'object' &&
+    typeof (value as { teardown?: unknown }).teardown === 'function'
+  );
+}
+
+// Result of attempting renderer delegation. Pro awaits the renderer inside delegateToRenderer, so it
+// pre-resolves to an optional teardown. The core renderer has its own DelegationResult that instead
+// carries the raw (possibly still-pending) RendererResult because it cannot await; the two
+// intentionally differ and are not meant to be unified.
+type DelegationResult = { delegated: false } | { delegated: true; teardown?: RendererTeardown };
+
 async function delegateToRenderer(
   componentObj: RegisteredComponent,
   props: Record<string, unknown>,
   railsContext: RailsContext,
   domNodeId: string,
   trace: boolean,
-): Promise<boolean> {
+): Promise<DelegationResult> {
   const { name, component, isRenderer } = componentObj;
 
   if (isRenderer) {
@@ -49,11 +106,19 @@ async function delegateToRenderer(
       );
     }
 
-    await (component as RenderFunction)(props, railsContext, domNodeId);
-    return true;
+    // The renderer owns its own mount and may return a teardown wrapper so we can clean it up on
+    // unmount (Turbo/Turbolinks navigation). `component` is the registered component union, so
+    // `as RendererFunction` is a runtime-invariant assertion guarded by `isRenderer` (not a
+    // structural narrowing). The object wrapper picks out only explicit teardown returns without
+    // confusing legacy bare function returns for cleanup.
+    const result = await (component as RendererFunction)(props, railsContext, domNodeId);
+    return {
+      delegated: true,
+      teardown: isRendererTeardownResult(result) ? result.teardown : undefined,
+    };
   }
 
-  return false;
+  return { delegated: false };
 }
 
 const getDomId = (domIdOrElement: string | Element): string =>
@@ -65,11 +130,23 @@ const getSsrIdentifierPrefix = (el: Element): string | undefined =>
 class ComponentRenderer {
   private domNodeId: string;
 
+  private domNode?: Element;
+
   private ssrIdentifierPrefix?: string;
 
   private state: 'unmounted' | 'rendering' | 'rendered';
 
   private root?: Root;
+
+  // True once this mount was delegated to a renderer function (3-arg form), which owns its own
+  // React root. Tracked separately from `rendererTeardown` because a renderer may own the mount yet
+  // return no teardown: in that case unmount() must still skip the React-root cleanup below (we
+  // never created that root), matching the core client renderer rather than calling
+  // unmountComponentAtNode on a node the renderer owns.
+  private rendererOwnedMount = false;
+
+  // Set when a renderer-owned mount returned a teardown wrapper; run on unmount.
+  private rendererTeardown?: RendererTeardown;
 
   private renderPromise?: Promise<void>;
 
@@ -104,6 +181,12 @@ class ComponentRenderer {
     return this.renderPromise !== undefined;
   }
 
+  isRenderingDomNode(domNode: Element | null): boolean {
+    // `this.domNode` is undefined until render() sets it; treat "not yet known" as a match so a
+    // concurrent second call does not prematurely unmount a still-starting render.
+    return this.domNode === undefined || this.domNode === domNode;
+  }
+
   /**
    * Used for client rendering by ReactOnRails. Either calls ReactDOM.hydrate, ReactDOM.render, or
    * delegates to a renderer registered by the user.
@@ -118,16 +201,35 @@ class ComponentRenderer {
     try {
       const domNode = document.getElementById(domNodeId);
       if (domNode) {
+        this.domNode = domNode;
         const componentObj = await ComponentRegistry.getOrWaitForComponent(name);
         if (this.state === 'unmounted') {
           return;
         }
 
-        if (
-          (await delegateToRenderer(componentObj, props, railsContext, domNodeId, trace)) ||
+        const delegation = await delegateToRenderer(componentObj, props, railsContext, domNodeId, trace);
+        if (delegation.delegated) {
           // @ts-expect-error The state can change while awaiting delegateToRenderer
-          this.state === 'unmounted'
-        ) {
+          if (this.state === 'unmounted') {
+            // unmount() ran while the renderer was resolving and could not see the teardown yet, so
+            // run it now to avoid leaking the renderer's mount. Guard it like unmount() does (below)
+            // so a synchronously-throwing teardown is logged here rather than escaping to render()'s
+            // outer catch, which would rethrow it as a misleading "encountered an error while
+            // rendering" rejection even though the component is already unmounted.
+            try {
+              invokeRendererTeardown(delegation.teardown, domNodeId);
+            } catch (teardownError: unknown) {
+              console.error(`Error in renderer teardown for dom node "${domNodeId}":`, teardownError);
+            }
+          } else {
+            this.rendererOwnedMount = true;
+            this.rendererTeardown = delegation.teardown;
+            this.state = 'rendered';
+          }
+          return;
+        }
+        // @ts-expect-error The state can change while awaiting delegateToRenderer
+        if (this.state === 'unmounted') {
           return;
         }
 
@@ -184,11 +286,30 @@ You should return a React.Component always for the client side entry point.`);
     }
     this.state = 'unmounted';
 
+    if (this.rendererOwnedMount) {
+      // This mount was owned by a renderer function (3-arg form), so React on Rails never created a
+      // React root for it. Run the teardown the renderer returned (if any) instead of unmounting a
+      // root we don't own; a renderer that returned no teardown is a no-op here. This deliberately
+      // skips the React-root / unmountComponentAtNode path below so we never touch a node the
+      // renderer owns, matching the core client renderer.
+      const { rendererTeardown } = this;
+      this.rendererOwnedMount = false;
+      this.rendererTeardown = undefined;
+      try {
+        invokeRendererTeardown(rendererTeardown, this.domNodeId);
+      } catch (e: unknown) {
+        console.error(`Error in renderer teardown for dom node "${this.domNodeId}":`, e);
+      }
+      return;
+    }
+
     if (supportsRootApi) {
       this.root?.unmount();
       this.root = undefined;
     } else {
-      const domNode = document.getElementById(this.domNodeId);
+      // Use the stored node first. During same-id replacement, document.getElementById(this.domNodeId)
+      // already points at the new node, but the old legacy React tree is attached to this.domNode.
+      const domNode = this.domNode ?? document.getElementById(this.domNodeId);
       if (!domNode) {
         return;
       }
@@ -270,7 +391,13 @@ const renderedRoots = new Map<string, ComponentRenderer>();
 export function renderOrHydrateComponent(domIdOrElement: string | Element) {
   const domId = getDomId(domIdOrElement);
   debugTurbolinks('renderOrHydrateComponent', domId);
+  const domNode = document.getElementById(domId);
   let root = renderedRoots.get(domId);
+  if (root && !root.isRenderingDomNode(domNode)) {
+    root.unmount();
+    renderedRoots.delete(domId);
+    root = undefined;
+  }
   if (!root) {
     const newRoot = new ComponentRenderer(domIdOrElement);
     if (!newRoot.hasStartedRendering()) {
