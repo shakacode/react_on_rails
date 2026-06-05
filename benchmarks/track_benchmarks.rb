@@ -142,6 +142,14 @@ def run_bencher(branch, start_point_args)
            "benchmarks/spec/bencher_report_spec.rb before bumping the CLI pin. #{e.message}"
       exit 1
     end
+    # Cosmetic-but-diagnostic: if the report lists benchmarks but no shared perf-link
+    # context, EVERY name renders unlinked (likely a report-shape drift). Surface it as a
+    # ::warning:: — not a failure — so it is noticed without breaking the job over a link.
+    if report.perf_links_unavailable?
+      warn "::warning::Bencher report listed benchmarks but no perf-link context " \
+           "(project/branch/testbed uuid); benchmark names will render unlinked. Re-verify the " \
+           "report shape against benchmarks/spec/bencher_perf_url_spec.rb before bumping the CLI pin."
+    end
   end
   [stderr, status.exitstatus, report]
 end

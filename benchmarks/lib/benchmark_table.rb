@@ -29,8 +29,11 @@ class BenchmarkTable
     { header: "Status", field: "status" }
   ].freeze
 
+  # "(tracked measures)" qualifies the 🔴/🟢 significance flags, not the baseline: only
+  # tracked measures (rps, p50) are flagged significant, but ANY measure with a baseline
+  # (including the untracked p90) shows a ▲/▼ delta and an "(n)" baseline.
   LEGEND = "#{UP}/#{DOWN} change vs baseline · #{REGRESSION} significant regression · " \
-           "#{IMPROVEMENT} significant improvement · (n) = baseline (tracked measures only)".freeze
+           "#{IMPROVEMENT} significant improvement (tracked measures) · (n) = baseline".freeze
 
   EMPTY = "_No benchmark results._"
 
@@ -79,8 +82,9 @@ class BenchmarkTable
   end
 
   # The benchmark name, linked to its Bencher perf plot when the report exposes a URL.
-  # The link text is still escaped; benchmark names are controlled CI output (route paths,
-  # test names) with no [] so they can't break the link syntax.
+  # The link text is render_value-escaped, which now includes [] (see render_value), so a
+  # name with a bracket can't prematurely close the [text](url) link — defense in depth on
+  # top of names being controlled CI output (route paths, test names).
   def name_cell(row)
     name = row["name"]
     text = render_value(name)
@@ -94,8 +98,8 @@ class BenchmarkTable
   def metric_cell(name, col, value)
     text = render_value(value)
     baseline = @report.boundary(name, col[:measure])&.baseline
-    # No baseline (new benchmark / boundary-less p90), an exact match, or a zero baseline
-    # (no meaningful percent, and it would divide by zero) → just the value.
+    # No baseline (new benchmark / boundary-less p90), a zero baseline (no meaningful
+    # percent, and it would divide by zero), or an exact match → just the value.
     return text if baseline.nil? || baseline.zero? || value == baseline
 
     verdict = col[:direction] ? @report.significance(name, col[:measure], col[:direction]) : nil
@@ -126,10 +130,11 @@ class BenchmarkTable
     # Escape the Markdown metacharacters that affect inline rendering in a table cell,
     # in a single pass (which avoids double-escaping): the pipe (breaks the column
     # structure), the backslash (the escape char itself — also satisfies static
-    # analysis), and *, _, ` (emphasis/code spans — a route or test name with
-    # underscores/asterisks/backticks would otherwise render as Markdown). Cell values
-    # are controlled CI output (route paths, test names, status strings like
+    # analysis), *, _, ` (emphasis/code spans — a route or test name with
+    # underscores/asterisks/backticks would otherwise render as Markdown), and [] (so a
+    # bracket can't close the [text](url) link wrapping the name — see name_cell). Cell
+    # values are controlled CI output (route paths, test names, status strings like
     # "200=900,5xx=10"), so this is rendering robustness, not untrusted-input sanitizing.
-    value.to_s.gsub(/[\\`*_|]/) { |char| "\\#{char}" }
+    value.to_s.gsub(/[\\`*_|\[\]]/) { |char| "\\#{char}" }
   end
 end

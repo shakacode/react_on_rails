@@ -260,6 +260,33 @@ RSpec.describe BencherReport do
     end
   end
 
+  # All perf links share one report-wide context (project/branch/testbed uuid). Losing it
+  # silently unlinks EVERY benchmark name — a likely report-shape drift the caller surfaces
+  # as a ::warning:: (never a FormatError, since links are cosmetic). The strict parse does
+  # not read these fields, so a report can parse cleanly yet still have unusable perf links.
+  describe "#perf_links_unavailable?" do
+    def result_for(name)
+      { "benchmark" => { "name" => name, "uuid" => "BM" },
+        "measures" => [{ "measure" => { "slug" => "rps", "name" => "rps", "uuid" => "M1" },
+                         "metric" => { "value" => 1.0 } }] }
+    end
+
+    it "is true when the report lists benchmarks but the shared perf context is absent" do
+      raw = { "results" => [[result_for("/foo")]], "alerts" => [] }
+      expect(described_class.new(raw).perf_links_unavailable?).to be(true)
+    end
+
+    it "is false when the shared perf context is present" do
+      raw = { "project" => { "slug" => "P" }, "branch" => { "uuid" => "B" }, "testbed" => { "uuid" => "T" },
+              "results" => [[result_for("/foo")]], "alerts" => [] }
+      expect(described_class.new(raw).perf_links_unavailable?).to be(false)
+    end
+
+    it "is false when the report lists no benchmarks (nothing to link)" do
+      expect(described_class.new("results" => [], "alerts" => []).perf_links_unavailable?).to be(false)
+    end
+  end
+
   describe "defensive parsing" do
     it "raises FormatError on invalid JSON" do
       expect { described_class.parse("{not json") }.to raise_error(BencherReport::FormatError, /not valid JSON/)

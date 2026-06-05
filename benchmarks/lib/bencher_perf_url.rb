@@ -1,9 +1,11 @@
 # frozen_string_literal: true
 
 # Builds the public Bencher perf-plot URL for a single benchmark from a parsed
-# `bencher run --format json` report (issue #3601 item 2). Matches the query shape
-# Bencher's own PR-comment code emits (lib/bencher_comment perf_url + JsonPerfQuery:
-# branches/heads/testbeds/benchmarks/measures comma-lists, then a trailing report=).
+# `bencher run --format json` report (issue #3601 item 2). The query mirrors the
+# comma-separated lists Bencher's perf view expects — branches/heads/testbeds/benchmarks/
+# measures, then a trailing report= — as of the CLI v0.6.2 pin in bencher_report.rb. That
+# shape is an external, undocumented contract, so re-verify a real perf link still resolves
+# when bumping the pin (the param order is pinned in-repo by bencher_report_spec.rb).
 #
 # Every field here is informational — it only decides whether a benchmark name links
 # out — so extraction is lenient: a missing piece yields nil and an unlinked name, never
@@ -31,18 +33,29 @@ class BencherPerfUrl
     "#{BASE}/perf/#{@context[:project_slug]}?#{query(target, measure_uuids)}"
   end
 
+  # True when the report-wide ids every perf link needs (project slug + branch & testbed
+  # uuids) are all present. They are shared by every benchmark, so if any is missing EVERY
+  # link degrades to an unlinked name — the all-or-nothing signal BencherReport warns on.
+  def context_ready?
+    [@context[:project_slug], @context[:branch_uuid], @context[:testbed_uuid]].all?
+  end
+
+  # True when the report listed at least one (named) benchmark.
+  def any_benchmarks?
+    @targets.any?
+  end
+
   private
 
   def ready?(target, measure_uuids)
-    @context[:project_slug] && @context[:branch_uuid] && @context[:testbed_uuid] &&
-      target[:benchmark_uuid] && !measure_uuids.empty?
+    context_ready? && target[:benchmark_uuid] && !measure_uuids.empty?
   end
 
-  # Param order mirrors Bencher's JsonPerfQuery (branches, heads, testbeds, benchmarks,
-  # measures) plus the trailing report= it appends. Values are UUIDs / a slug / comma-
-  # joined UUID lists — all URL-safe — so no escaping is needed; Bencher percent-encodes
-  # the list comma to %2C, but a literal comma decodes identically (its parser splits on
-  # ",") and keeps the URL readable.
+  # Param order matches the comma-separated lists Bencher's perf view expects (branches,
+  # heads, testbeds, benchmarks, measures) plus a trailing report=. Values are UUIDs / a
+  # slug / comma-joined UUID lists — all RFC 3986 query-safe characters — so no escaping is
+  # needed; the list comma is left literal (a valid query sub-delimiter) for readability
+  # rather than percent-encoded to %2C.
   def query(target, measure_uuids)
     params = [["branches", @context[:branch_uuid]]]
     params << ["heads", @context[:head_uuid]] if @context[:head_uuid]

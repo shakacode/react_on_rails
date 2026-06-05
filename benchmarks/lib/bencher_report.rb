@@ -113,6 +113,15 @@ class BencherReport
     @perf_urls.for_benchmark(benchmark_name)
   end
 
+  # True when the report lists benchmarks but is missing the shared perf-link context
+  # (project slug / branch / testbed uuid), so EVERY benchmark name degrades to an unlinked
+  # plain name. A single benchmark missing its own uuid stays silent (a per-row cosmetic
+  # miss); losing the shared context instead is a likely report-contract drift, so the
+  # caller surfaces it as a ::warning:: — never a FormatError (the links are cosmetic).
+  def perf_links_unavailable?
+    @perf_urls.any_benchmarks? && !@perf_urls.context_ready?
+  end
+
   private
 
   def index_boundaries(raw)
