@@ -24,7 +24,12 @@
 import 'react-on-rails-rsc/client.browser';
 import * as React from 'react';
 import * as ReactDOMClient from 'react-dom/client';
-import { ReactComponent, ReactComponentOrRenderFunction, RendererFunction } from 'react-on-rails/types';
+import {
+  ReactComponent,
+  ReactComponentOrRenderFunction,
+  RendererFunction,
+  RendererTeardownResult,
+} from 'react-on-rails/types';
 import isRenderFunction from 'react-on-rails/isRenderFunction';
 import { ensureReactUseAvailable } from 'react-on-rails/reactApis';
 import { createRSCProvider } from '../RSCProvider.tsx';
@@ -32,6 +37,14 @@ import getReactServerComponent from '../getReactServerComponent.client.ts';
 import handleRecoverableError from '../handleRecoverableError.client.ts';
 
 ensureReactUseAvailable();
+
+function isRendererTeardownResult(value: unknown): value is RendererTeardownResult {
+  return (
+    value != null &&
+    typeof value === 'object' &&
+    typeof (value as { teardown?: unknown }).teardown === 'function'
+  );
+}
 
 /**
  * Wraps a client component with the necessary RSC context and handling for client-side operations.
@@ -74,6 +87,13 @@ const wrapServerComponentRenderer = (
     const Component = isRenderFunction(componentOrRenderFunction)
       ? ((await componentOrRenderFunction(props, railsContext, domNodeId)) as ReactComponent)
       : componentOrRenderFunction;
+
+    if (isRendererTeardownResult(Component)) {
+      throw new Error(
+        `wrapServerComponentRenderer: render function for server component '${componentName}' ` +
+          'returned a renderer teardown result; expected a React component.',
+      );
+    }
 
     if (typeof Component !== 'function') {
       throw new Error(`wrapServerComponentRenderer: component '${componentName}' is not a function`);
