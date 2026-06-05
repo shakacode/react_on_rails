@@ -8,7 +8,7 @@ const bundler = config.assets_bundler === 'rspack'
   : require('webpack');
 <% if use_rsc? -%>
 const { resolve } = require('path');
-const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+const { <%= rsc_plugin_class_name %> } = require('<%= rsc_plugin_import_path %>');
 
 const rscClientReferences = {
   directory: resolve(config.source_path),
@@ -33,7 +33,7 @@ function extractLoader(rule, loaderName) {
 
 <% end -%>
 <% if use_rsc? -%>
-// rscBundle parameter: when true, skips RSCWebpackPlugin (RSC bundle doesn't need it)
+// rscBundle parameter: when true, skips <%= rsc_plugin_class_name %> (RSC bundle doesn't need it)
 const configureServer = (rscBundle = false) => {
 <% else -%>
 const configureServer = () => {
@@ -83,10 +83,10 @@ const configureServer = () => {
   };
 <% if use_rsc? -%>
   // Add RSC plugin for server bundle (handles client component references)
-  // Skip for RSC bundle - it doesn't need RSCWebpackPlugin
+  // Skip for RSC bundle - it doesn't need <%= rsc_plugin_class_name %>
   if (!rscBundle) {
     serverWebpackConfig.plugins.push(
-      new RSCWebpackPlugin({ isServer: true, clientReferences: rscClientReferences }),
+      new <%= rsc_plugin_class_name %>({ isServer: true, clientReferences: rscClientReferences }),
     );
   }
 <% end -%>
