@@ -11,7 +11,7 @@ ARG PNPM_VERSION=10.33.4
 
 # Runtime-only values stay out of image ENV where possible. The Procfile passes
 # the fixed dummy SECRET_KEY_BASE when it starts Rails; REACT_RENDERER_URL stays
-# here as the single Docker default inherited by the Rails process.
+# here as the Docker default and is repeated literally in the Rails command.
 ENV APP_PATH=/home/${NON_ROOT_USER}/app \
     BUNDLE_PATH=/home/${NON_ROOT_USER}/bundle \
     GEM_HOME=/home/${NON_ROOT_USER}/bundle \
