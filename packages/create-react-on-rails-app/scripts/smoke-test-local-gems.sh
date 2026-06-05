@@ -183,10 +183,9 @@ verify_generated_app_runtime() {
 
   app_name="$(basename "$app_dir")"
   echo "Building test bundles for $app_name..."
-  if build_output="$(cd "$app_dir" && "${PNPM_CMD[@]}" run build:test 2>&1)"; then
-    :
-  else
-    build_status=$?
+  build_status=0
+  build_output="$(cd "$app_dir" && "${PNPM_CMD[@]}" run build:test 2>&1)" || build_status=$?
+  if [ "$build_status" -ne 0 ]; then
     echo "pnpm run build:test failed for $app_name. Output:" >&2
     printf '%s\n' "$build_output" >&2
     return "$build_status"

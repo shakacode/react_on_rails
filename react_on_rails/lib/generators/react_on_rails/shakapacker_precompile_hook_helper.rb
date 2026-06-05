@@ -9,7 +9,7 @@ module ReactOnRails
       COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER = /^(\s*)#\s*precompile_hook:\s*~\s*$/
       PRECOMPILE_HOOK_KEY = /^\s+precompile_hook:\s*/
       ERB_PRECOMPILE_HOOK = /^\s+precompile_hook:\s*.*<%/
-      ShakapackerYmlErbError = Class.new(StandardError)
+      class ShakapackerYmlErbError < StandardError; end
       ShakapackerYmlDocument = Struct.new(:sections, :section_index, :anchor_index, keyword_init: true)
       private_constant :SHAKAPACKER_YML_PATH, :DEFAULT_PRECOMPILE_HOOK_COMMAND,
                        :COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER, :PRECOMPILE_HOOK_KEY, :ERB_PRECOMPILE_HOOK,
@@ -68,6 +68,8 @@ module ReactOnRails
 
         # The generator materializes all placeholders at once, so one direct or
         # inherited active hook keeps the whole file under Shakapacker control.
+        # As a result, one custom active hook prevents materializing generated
+        # hooks in other sections; this is safer than partial materialization.
         document.sections.any? do |section|
           next false unless section.match?(COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER)
 
@@ -87,7 +89,8 @@ module ReactOnRails
       end
 
       def shakapacker_yml_sections(content)
-        # Split at top-level YAML keys; standalone top-level comments become harmless one-line sections.
+        # Split at top-level YAML mapping keys. Top-level comments and document
+        # separators become harmless single-line sections with no recognized name.
         content.each_line.slice_before { |line| line.match?(/^\S/) }.map(&:join)
       end
 
@@ -204,6 +207,9 @@ module ReactOnRails
       def render_shakapacker_yml_erb(content)
         require "erb"
 
+        # Use TOPLEVEL_BINDING so simple ENV lookups work. Rails-specific ERB
+        # raises here and is caught as ShakapackerYmlErbError so we fail closed
+        # instead of risking an overwrite of custom hook config.
         ERB.new(content).result(TOPLEVEL_BINDING)
       rescue ScriptError, StandardError => e
         warn_shakapacker_yml_erb_error(e)
