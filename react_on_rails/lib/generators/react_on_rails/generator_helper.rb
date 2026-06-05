@@ -226,6 +226,15 @@ module GeneratorHelper
     using_rspack? ? "react-on-rails-rsc/RspackPlugin" : "react-on-rails-rsc/WebpackPlugin"
   end
 
+  # Import path for the inactive bundler's plugin — the counterpart to {#rsc_plugin_import_path},
+  # used when migrating a legacy config to the active bundler's plugin.
+  #
+  # @return [String] "react-on-rails-rsc/WebpackPlugin" when rspack,
+  #   "react-on-rails-rsc/RspackPlugin" otherwise
+  def inactive_rsc_plugin_import_path
+    using_rspack? ? "react-on-rails-rsc/WebpackPlugin" : "react-on-rails-rsc/RspackPlugin"
+  end
+
   # Detect the installed React version from package.json
   # Uses VERSION_PARTS_REGEX pattern from VersionChecker for consistency
   #

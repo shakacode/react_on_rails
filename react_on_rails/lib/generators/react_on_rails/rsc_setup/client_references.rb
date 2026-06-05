@@ -143,18 +143,14 @@ module ReactOnRails
         end
 
         def normalize_rsc_plugin_for_active_bundler(content)
-          inactive_plugin_class_name = using_rspack? ? "RSCWebpackPlugin" : "RSCRspackPlugin"
-          inactive_plugin_import_path =
-            using_rspack? ? "react-on-rails-rsc/WebpackPlugin" : "react-on-rails-rsc/RspackPlugin"
-
           normalized_content, active_plugin_binding_available = normalize_rsc_plugin_import_for_active_bundler(
             content,
-            inactive_plugin_class_name,
-            inactive_plugin_import_path
+            inactive_rsc_plugin_class_name,
+            inactive_rsc_plugin_import_path
           )
           return normalized_content unless active_plugin_binding_available
 
-          normalize_rsc_plugin_invocations_for_active_bundler(normalized_content, inactive_plugin_class_name)
+          normalize_rsc_plugin_invocations_for_active_bundler(normalized_content, inactive_rsc_plugin_class_name)
         end
 
         def normalize_rsc_plugin_import_for_active_bundler(content, inactive_plugin_class_name,

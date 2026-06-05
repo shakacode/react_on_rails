@@ -147,8 +147,10 @@ module ReactOnRails
       RSC_REACT_VERSION_RANGE = "~19.0.4"
       # Pinned to 19.0.5-rc.x because the native rspack manifest plugin
       # (`react-on-rails-rsc/RspackPlugin`) the generator scaffolds for rspack projects is only
-      # exported from 19.0.5 onward. This RC is backward-compatible for webpack projects (it still
-      # exports `react-on-rails-rsc/WebpackPlugin`).
+      # exported from 19.0.5 onward. This single pin applies to ALL `--rsc` installs, so webpack
+      # projects are also pinned to this RC during the pre-stable window (intentional: the RC is
+      # backward-compatible for webpack — it still exports `react-on-rails-rsc/WebpackPlugin`). The
+      # #3488 stable bump below moves every bundler to 19.0.5 at once.
       # TODO(#3488): when react-on-rails-rsc 19.0.5 stable ships, bump RSC_PACKAGE_VERSION_PIN to
       # "19.0.5" (and RSC_REACT_VERSION_RANGE too if react/react-dom advance), then verify peer-dep
       # alignment between react@19.0.x and react-on-rails-rsc@19.0.5. At that point the `latest`
