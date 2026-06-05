@@ -4,13 +4,18 @@ require "rails_helper"
 
 # Integration coverage for the `/posts_page` benchmark route (issue #3602).
 #
-# `/posts_page` is the only synchronous (non-streaming) benchmark route that
-# reads from the database, so a missing `posts` table surfaces as a hard 500 on
-# every request — which is exactly how it regressed in the Pro benchmark suite.
-# (The streaming RSC posts routes mask the same failure because their HTTP 200
-# status line is sent before the body errors.) These examples render the page
-# with seeded records and assert it returns 200 with the post content, guarding
-# against the route silently breaking again.
+# `/posts_page` renders DB records synchronously (non-streaming), so when the
+# `posts` table was missing in the Pro benchmark suite it surfaced as a hard 500
+# on every request. (The streaming RSC posts routes mask that class of failure
+# because their HTTP 200 status line is flushed before the body errors.)
+#
+# These examples do not reproduce the missing-table case itself — the `before`
+# block loads the schema (see below), so the table is always present here. The
+# missing-table 500 is prevented upstream by seeding the benchmark DB before the
+# server starts (.github/workflows/benchmark.yml). What these examples guard is
+# the layer above that: with the table in place the route must server-render
+# seeded posts and return 200, and an empty table must return 200 "No posts
+# found" rather than 500.
 #
 # Requires the Pro node renderer to be running, like the other server-rendering
 # request specs: the page is rendered with `prerender: true`.
