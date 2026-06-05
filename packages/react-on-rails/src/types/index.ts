@@ -1,6 +1,6 @@
 /// <reference types="react/experimental" />
 
-import type { ReactElement, ReactNode, Component, ComponentType } from 'react';
+import type { ReactElement, ReactNode, Component, ComponentType, ExoticComponent } from 'react';
 import type { PipeableStream } from 'react-dom/server';
 import type { Readable } from 'stream';
 
@@ -15,7 +15,7 @@ type Store = {
   getState(): unknown;
 };
 
-type ReactComponent = ComponentType<any> | string;
+type ReactComponent = ComponentType<any> | ExoticComponent<any> | string;
 
 // Keep these in sync with method lib/react_on_rails/helper.rb#rails_context
 export type RailsContext = {

@@ -20,6 +20,21 @@ function isRendererTeardownResult(value: unknown): value is RendererTeardownResu
   );
 }
 
+function isReactObjectComponentType(value: unknown): value is ReactComponent {
+  if (value == null || typeof value !== 'object') {
+    return false;
+  }
+
+  // React.memo, React.forwardRef, React.lazy, and related component types are non-callable
+  // objects tagged with React's element-type marker.
+  const typeMarker = (value as { $$typeof?: unknown }).$$typeof;
+  return typeof typeMarker === 'symbol' || typeof typeMarker === 'number';
+}
+
+function isReactComponentType(value: unknown): value is ReactComponent {
+  return typeof value === 'function' || typeof value === 'string' || isReactObjectComponentType(value);
+}
+
 function createReactElementFromRenderFunctionResult(
   renderFunctionResult: ReactComponent,
   name: string,
@@ -131,9 +146,11 @@ export default function createReactOutput({
     return createReactElementFromRenderFunctionResult(renderFunctionResult, name, props);
   }
 
-  if (typeof component !== 'function' && typeof component !== 'string') {
-    throw new Error(`Registered component "${name}" must be a function or string component.`);
+  if (!isReactComponentType(component)) {
+    throw new Error(
+      `Registered component "${name}" must be a function, string, or React object component type.`,
+    );
   }
 
-  return createElement(component as ReactComponent, props);
+  return createElement(component, props);
 }
