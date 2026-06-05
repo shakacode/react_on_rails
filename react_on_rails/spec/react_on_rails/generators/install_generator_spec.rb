@@ -585,6 +585,58 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "when Shakapacker was pre-installed with an inherited custom precompile_hook value" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+
+      simulate_existing_file("config/shakapacker.yml", <<~YAML)
+        default: &default
+          source_path: app/javascript
+          source_entry_path: packs
+          public_output_path: packs
+          assets_bundler: "webpack"
+          precompile_hook: bin/custom-precompile-hook
+
+        development:
+          <<: *default
+
+        test:
+          <<: *default
+          compile: true
+          # precompile_hook: ~
+
+        production:
+          <<: *default
+      YAML
+      simulate_existing_file("bin/shakapacker", "")
+      simulate_existing_file("bin/shakapacker-dev-server", "")
+      simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+
+      Dir.chdir(destination_root) do
+        run_generator(["--ignore-warnings", "--skip"])
+      end
+    end
+
+    it "leaves the inherited custom hook under Shakapacker control" do
+      assert_file "config/shakapacker.yml" do |content|
+        expect(content).to include("precompile_hook: bin/custom-precompile-hook")
+        expect(content).to include("# precompile_hook: ~")
+        expect(content).not_to include("precompile_hook: 'bin/shakapacker-precompile-hook'")
+      end
+
+      assert_file "package.json" do |content|
+        scripts = JSON.parse(content).fetch("scripts")
+        expect(scripts["build:test"]).to eq("RAILS_ENV=test NODE_ENV=test bin/shakapacker")
+      end
+    end
+  end
+
   context "when Shakapacker was pre-installed with an active hook in an unrelated environment" do
     before(:all) do
       prepare_destination

@@ -1221,7 +1221,8 @@ module ReactOnRails
 
         content = File.read(shakapacker_config_path)
 
-        # Don't materialize a placeholder beside an active precompile_hook in the same YAML section.
+        # Don't materialize placeholders when any placeholder section already has
+        # a direct or inherited active precompile_hook.
         return if active_precompile_hook_configured?(content)
 
         # Replace the commented placeholder with the actual value

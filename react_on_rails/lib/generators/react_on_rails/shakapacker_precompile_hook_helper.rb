@@ -6,13 +6,14 @@ module ReactOnRails
       SHAKAPACKER_YML_PATH = "config/shakapacker.yml"
       DEFAULT_PRECOMPILE_HOOK_COMMAND = "bin/shakapacker-precompile-hook"
       COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER = /^(\s*)#\s*precompile_hook:\s*~\s*$/
-      # Unquoted YAML null/false scalars parse as nil/false, so they are inactive unless quoted.
+      # Unquoted YAML null/boolean scalars parse as nil/false/true, so they are inactive unless quoted.
+      # The /i flag intentionally covers YAML scalar aliases such as Null, TRUE, No, and OFF.
       ACTIVE_PRECOMPILE_HOOK = /
         ^\s+precompile_hook:\s*
         (?:
           "[^"]+"
           | '[^']+'
-          | (?!(?:~|null|false|no|off)\s*(?:\#|$)) [^#\s][^#\n]*
+          | (?!(?:~|null|true|false|yes|no|on|off)\s*(?:\#|$)) [^#\s][^#\n]*
         )
       /ix
       private_constant :SHAKAPACKER_YML_PATH, :DEFAULT_PRECOMPILE_HOOK_COMMAND,
@@ -61,13 +62,32 @@ module ReactOnRails
       end
 
       def active_precompile_hook_configured?(content)
+        config = parse_shakapacker_yml_content(content)
+
+        # The generator materializes all placeholders at once, so one direct or
+        # inherited active hook keeps the whole file under Shakapacker control.
         shakapacker_yml_sections(content).any? do |section|
-          section.match?(ACTIVE_PRECOMPILE_HOOK) && section.match?(COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER)
+          next false unless section.match?(COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER)
+
+          section.match?(ACTIVE_PRECOMPILE_HOOK) || section_inherits_active_precompile_hook?(section, config)
         end
       end
 
       def shakapacker_yml_sections(content)
+        # Split at every top-level YAML key so each environment block is evaluated independently.
+        # Standalone top-level comments become harmless one-line sections.
         content.each_line.slice_before { |line| line.match?(/^\S/) }.map(&:join)
+      end
+
+      def section_inherits_active_precompile_hook?(section, config)
+        section_name = shakapacker_yml_section_name(section)
+        return false unless section_name
+
+        !normalize_precompile_hook(effective_precompile_hook(config, section_name)).nil?
+      end
+
+      def shakapacker_yml_section_name(section)
+        section.match(/\A([A-Za-z0-9_-]+):(?:\s|$)/)&.[](1)
       end
 
       def effective_precompile_hook(config, environment)
@@ -100,7 +120,7 @@ module ReactOnRails
       end
 
       def normalize_precompile_hook(hook)
-        return nil if hook.nil? || hook == false || hook.to_s.empty?
+        return nil if hook.nil? || hook == false || hook == true || hook.to_s.empty?
 
         hook.to_s.strip
       end
