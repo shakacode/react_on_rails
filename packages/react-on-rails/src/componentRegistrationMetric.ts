@@ -10,9 +10,5 @@ export default function componentRegistrationMetric(component: RegisteredCompone
     return { label: 'source chars', value: component.toString().length };
   }
 
-  try {
-    return { label: 'export keys', value: Object.keys(component as object).length };
-  } catch {
-    return { label: 'tag chars', value: Object.prototype.toString.call(component).length };
-  }
+  return { label: 'export keys', value: Object.keys(component as object).length };
 }

@@ -31,7 +31,8 @@ module ReactOnRails
     # Fallback order when the configured server bundle file is missing.
     # The configured extension is excluded, so server-bundle.js tries .jsx, .ts, .tsx, ...
     SERVER_BUNDLE_SOURCE_EXTENSIONS = %w[.js .jsx .ts .tsx .mts .cts .mjs .cjs].freeze
-    # import/extensions only needs suppressions for extensions the rule expects to be omitted.
+    # import/extensions suppressions are needed for non-standard JS extensions.
+    # .mjs/.cjs are valid ESM/CJS extensions, so they do not need suppression comments.
     SERVER_BUNDLE_IMPORT_EXTENSION_COMMENT_EXTENSIONS = %w[.jsx .ts .tsx .mts .cts].freeze
     # Auto-registration requires nested_entries support which was added in 7.0.0
     # Note: The gemspec requires Shakapacker >= 6.0 for basic functionality
@@ -52,6 +53,7 @@ module ReactOnRails
     def generate_packs_if_stale
       return unless ReactOnRails.configuration.auto_load_bundle
 
+      @server_bundle_entrypoint = nil
       verbose = ENV["REACT_ON_RAILS_VERBOSE"] == "true"
 
       with_generated_packs_lock(verbose: verbose) do
@@ -65,6 +67,8 @@ module ReactOnRails
           generate_packs(verbose: verbose)
         end
       end
+    ensure
+      @server_bundle_entrypoint = nil
     end
 
     private
@@ -613,14 +617,18 @@ module ReactOnRails
     end
 
     def server_bundle_entrypoint
-      configured_entrypoint = Rails.root.join(
-        ReactOnRails::PackerUtils.packer_source_entry_path,
-        ReactOnRails.configuration.server_bundle_js_file
-      ).to_s
+      @server_bundle_entrypoint ||= begin
+        configured_entrypoint = Rails.root.join(
+          ReactOnRails::PackerUtils.packer_source_entry_path,
+          ReactOnRails.configuration.server_bundle_js_file
+        ).to_s
 
-      return configured_entrypoint if ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint
-
-      resolve_server_bundle_source_entrypoint(configured_entrypoint)
+        if ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint
+          configured_entrypoint
+        else
+          resolve_server_bundle_source_entrypoint(configured_entrypoint)
+        end
+      end
     end
 
     def resolve_server_bundle_source_entrypoint(configured_entrypoint)
