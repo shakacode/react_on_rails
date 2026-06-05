@@ -30,6 +30,15 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Check Pro license secret
+        env:
+          REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+        run: |
+          if [[ -z "${REACT_ON_RAILS_PRO_LICENSE}" ]]; then
+            echo "::error::REACT_ON_RAILS_PRO_LICENSE_V2 secret is not set; cannot run the Pro dummy app ShakaPerf gate"
+            exit 1
+          fi
+
       - name: Setup Ruby
         uses: ./.github/actions/setup-ruby
         with:
@@ -86,15 +95,6 @@ jobs:
           pnpm --filter react-on-rails run build
           pnpm --filter react-on-rails-pro run build
           pnpm --filter react-on-rails-pro-node-renderer run build
-
-      - name: Check Pro license secret
-        env:
-          REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
-        run: |
-          if [[ -z "${REACT_ON_RAILS_PRO_LICENSE}" ]]; then
-            echo "::error::REACT_ON_RAILS_PRO_LICENSE_V2 secret is not set; cannot run the Pro dummy app ShakaPerf gate"
-            exit 1
-          fi
 
       - name: Prepare Pro dummy app
         working-directory: react_on_rails_pro/spec/dummy
