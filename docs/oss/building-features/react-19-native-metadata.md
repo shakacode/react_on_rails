@@ -199,7 +199,7 @@ Metadata can be rendered inside async components within Suspense boundaries. Whe
 
 Use [async props](../migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently) to stream slow data from Rails while showing a loading shell immediately. These APIs are available in React on Rails Pro: the parent component calls `getReactOnRailsAsyncProp` to obtain a Promise for each slow prop, passes it to an async child that `await`s it, and wraps that child in `<Suspense>`:
 
-> **React on Rails Pro setup:** The controller must `include ReactOnRailsPro::Stream`, render the view via `stream_view_containing_react_components`, and set `config.enable_rsc_support = true` in `config/initializers/react_on_rails.rb`.
+> **React on Rails Pro setup:** This async-props helper is Pro-only. The controller must `include ReactOnRailsPro::Stream` and render the view via `stream_view_containing_react_components` (see [Streaming SSR](../../pro/streaming-ssr.md#4-render-the-view-using-the-stream_view_containing_react_components-helper)), and RSC must be enabled with `config.enable_rsc_support = true` in `config/initializers/react_on_rails_pro.rb` (see [React on Rails Pro configuration](../configuration/configuration-pro.md)).
 
 > **Server Component boundary:** Async function components such as `UserProfile` must run in a Server Component tree. Keep this file free of a `'use client'` directive. If resolved data needs to cross into a Client Component, await it in the server component first and pass only serializable props.
 
@@ -242,7 +242,7 @@ const ProfilePage = ({ getReactOnRailsAsyncProp, siteName }) => {
 export default ProfilePage;
 ```
 
-> **Production note:** Wrap each `<Suspense>` in an `<ErrorBoundary>` so a rejected async-prop stream degrades to fallback UI instead of crashing the whole page. See the [error-handling pattern](../../pro/react-server-components/inside-client-components.md#error-handling) for a reusable boundary.
+> **Production note:** Error Boundaries help with client-side RSC payload fetches, refetches, and render-time failures after the initial stream. They do **not** catch errors thrown during the initial Server Component HTML stream; handle Rails/server-side failures before or inside `emit.call` with Rails-side rescue, logging, and serializable fallback values. See [Error Boundary limitations](../migrating/rsc-troubleshooting.md#error-boundary-limitations) and the [client-side retry pattern](../../pro/react-server-components/inside-client-components.md#error-handling).
 
 ```erb
 <%# Rails view — controller authorizes @user and captures request-scoped values first %>
