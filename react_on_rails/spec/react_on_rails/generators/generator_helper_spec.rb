@@ -322,6 +322,18 @@ RSpec.describe GeneratorHelper, type: :generator do
       YAML
     end
 
+    it "detects inherited active hooks through block merge lists" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(true)
+        default: &default
+          precompile_hook: <%= false %>
+
+        test:
+          <<:
+            - *default
+          # precompile_hook: ~
+      YAML
+    end
+
     it "treats raw ERB precompile hooks as active because they may vary by environment" do
       expect(active_precompile_hook_configured?(<<~YAML)).to be(true)
         default:
@@ -496,6 +508,22 @@ RSpec.describe GeneratorHelper, type: :generator do
 
         test:
           <<: *default
+          # precompile_hook: ~
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(false)
+    end
+
+    it "does not materialize over a raw ERB hook inherited through a block merge list" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        default: &default
+          precompile_hook: <%= false %>
+
+        test:
+          <<:
+            - *default
           # precompile_hook: ~
       YAML
 

@@ -157,7 +157,20 @@ module ReactOnRails
       end
 
       def shakapacker_yml_section_merge_aliases(section)
-        section.each_line.grep(/^\s+<<:/).flat_map { |line| line.scan(/\*([A-Za-z0-9_-]+)/).flatten }
+        aliases = []
+        lines = section.each_line.to_a
+        lines.each_with_index do |line, index|
+          next unless line.match?(/^\s+<<:/)
+
+          aliases.concat(line.scan(/\*([A-Za-z0-9_-]+)/).flatten)
+          aliases.concat(shakapacker_yml_block_merge_aliases(lines[(index + 1)..]))
+        end
+        aliases
+      end
+
+      def shakapacker_yml_block_merge_aliases(lines)
+        lines.take_while { |line| line.match?(/^\s+-\s+\*/) }
+             .flat_map { |line| line.scan(/\*([A-Za-z0-9_-]+)/).flatten }
       end
 
       def effective_precompile_hook(config, environment)
