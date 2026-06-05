@@ -267,14 +267,13 @@ module ReactOnRails
           false
         end
 
-        # Yields err and each error in its #cause chain. Identity-guarded so a
-        # self-referential cause cannot loop.
+        # Yields err and each error in its #cause chain. Identity-guarded (Set of object_ids)
+        # so a self-referential cause cannot loop.
         def each_in_cause_chain(err)
-          seen = []
+          seen = Set.new
           current = err
-          while current && seen.none? { |e| e.equal?(current) }
+          while current && seen.add?(current.object_id)
             yield current
-            seen << current
             current = current.cause
           end
         end
@@ -332,7 +331,9 @@ module ReactOnRails
         def renderer_target_from_error(err)
           each_in_cause_chain(err) do |current|
             target = target_from_message(current.message)
-            return target if target
+            # Sanitize here too: a target scraped from the message can itself be a full URL
+            # with embedded credentials (e.g. "TCP connection to https://user:pw@host:3800").
+            return sanitized_renderer_url(target) if target
           end
           configured_renderer_url.last
         end

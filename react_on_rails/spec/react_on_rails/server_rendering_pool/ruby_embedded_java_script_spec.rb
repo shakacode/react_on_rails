@@ -177,6 +177,24 @@ module ReactOnRails
           end
         end
 
+        context "when the error message itself names a renderer URL with embedded credentials" do
+          let(:error) do
+            StandardError.new(
+              "Connection error on renderer request: failed to open TCP connection to " \
+              "https://user:sekret@renderer.example.com:3800"
+            )
+          end
+
+          it "redacts credentials from the target named in the headline" do
+            message = render_error_for(error).message
+            expect(message).to include("could not connect to the Node renderer at https://renderer.example.com:3800")
+            # The credentialed form must not appear in the target position. (The raw exception
+            # text is still echoed verbatim under "Caught error:" — pre-existing behavior for
+            # every error type in this file — so the password can survive there.)
+            expect(message).not_to include("at https://user:sekret@")
+          end
+        end
+
         context "when only the legacy RENDERER_URL is set and the error carries no host/port" do
           let(:error) { Errno::ECONNREFUSED.new }
 
