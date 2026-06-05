@@ -40,5 +40,17 @@ export default (props, _railsContext, domNodeId) => {
     </Provider>,
   );
 
-  hydrateOrRender(document.getElementById(domNodeId), element, prerender);
+  const domEl = document.getElementById(domNodeId);
+  if (!domEl) {
+    const renderMode = prerender ? 'hydrate' : 'render';
+    throw new Error(
+      `Cannot ${renderMode} ReduxSharedStoreApp because DOM element with id "${domNodeId}" was not found.`,
+    );
+  }
+
+  const root = hydrateOrRender(domEl, element, prerender);
+
+  // Return a teardown wrapper so React on Rails unmounts this root on Turbo/Turbolinks navigation
+  // (page unload) or same-id node replacement instead of leaking it.
+  return { teardown: () => root.unmount() };
 };

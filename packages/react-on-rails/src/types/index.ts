@@ -1,6 +1,6 @@
 /// <reference types="react/experimental" />
 
-import type { ReactElement, ReactNode, Component, ComponentType } from 'react';
+import type { ReactElement, ReactNode, Component, ComponentType, ExoticComponent } from 'react';
 import type { PipeableStream } from 'react-dom/server';
 import type { Readable } from 'stream';
 
@@ -15,7 +15,7 @@ type Store = {
   getState(): unknown;
 };
 
-type ReactComponent = ComponentType<any> | string;
+type ReactComponent = ComponentType<any> | ExoticComponent<any> | string;
 
 // Keep these in sync with method lib/react_on_rails/helper.rb#rails_context
 export type RailsContext = {
@@ -264,11 +264,14 @@ interface LegacyRendererRenderFunction extends RenderFunctionMarker {
 type RenderFunction = ServerRenderFunction | LegacyRendererRenderFunction;
 
 type ReactComponentOrRenderFunction = ReactComponent | RenderFunction | RendererFunction;
+// Plain-object modules registered via server_render_js: no render function and no React component.
+type RegisteredComponentValue = ReactComponentOrRenderFunction | Record<string, unknown>;
 
 type PipeableOrReadableStream = PipeableStream | NodeJS.ReadableStream;
 
 export type {
   ReactComponentOrRenderFunction,
+  RegisteredComponentValue,
   ReactComponent,
   AuthenticityHeaders,
   RenderFunction,
@@ -289,9 +292,17 @@ export type {
   PipeableOrReadableStream,
 };
 
-export interface RegisteredComponent {
+/**
+ * The generic defaults to the pre-object-registration component type so existing consumers that
+ * read `registeredComponent.component` stay source-compatible. Use
+ * `RegisteredComponent<RegisteredComponentValue>` when handling plain-object server_render_js
+ * registrations.
+ */
+export interface RegisteredComponent<
+  ComponentValue extends RegisteredComponentValue = ReactComponentOrRenderFunction,
+> {
   name: string;
-  component: ReactComponentOrRenderFunction;
+  component: ComponentValue;
   /**
    * Indicates if the registered component is a RenderFunction
    * @see RenderFunction for more details on its behavior and usage.
@@ -331,7 +342,7 @@ export interface RSCRenderParams extends Omit<RenderParams, 'railsContext'> {
 }
 
 export interface CreateParams extends Params {
-  componentObj: RegisteredComponent;
+  componentObj: RegisteredComponent<RegisteredComponentValue>;
   shouldHydrate?: boolean;
 }
 
@@ -387,7 +398,7 @@ export interface ReactOnRails {
    * find you components for rendering.
    * @param components keys are component names, values are components
    */
-  register(components: Record<string, ReactComponentOrRenderFunction>): void;
+  register(components: Record<string, RegisteredComponentValue>): void;
   /** @deprecated Use registerStoreGenerators instead */
   registerStore(stores: Record<string, StoreGenerator>): void;
   /**
@@ -513,6 +524,17 @@ export interface ReactOnRailsInternal extends ReactOnRails {
    * ```
    * under React 18+.
    *
+   * @remarks
+   * **Cleanup is the caller's responsibility.** Unlike the components React on Rails mounts itself
+   * (which are unmounted automatically on Turbo/Turbolinks navigation and same-id node replacement),
+   * a root created by this imperative API is **not** tracked internally. The returned root is handed
+   * back to you, and you must call `unmount()` on it yourself — e.g. on a Turbo `turbo:before-render`
+   * / Turbolinks `turbolinks:before-render` event, or in your framework's teardown hook — to avoid
+   * leaking the root (and any subscriptions or timers it holds) across navigations. If you want
+   * automatic cleanup instead, register a renderer function (the 3-argument render-function form) and
+   * return a {@link RendererTeardownResult}; React on Rails tracks those mounts and runs the teardown for
+   * you.
+   *
    * @param name Name of your registered component
    * @param props Props to pass to your component
    * @param domNodeId HTML ID of the node the component will be rendered at
@@ -521,17 +543,22 @@ export interface ReactOnRailsInternal extends ReactOnRails {
    *   (see "What is a root?" in https://github.com/reactwg/react-18/discussions/5).
    *   Under React 16/17: Reference to your component's backing instance or `null` for stateless components.
    */
-  render(name: string, props: Record<string, string>, domNodeId: string, hydrate?: boolean): RenderReturnType;
+  render(
+    name: string,
+    props: Record<string, unknown>,
+    domNodeId: string,
+    hydrate?: boolean,
+  ): RenderReturnType;
   /**
    * Get the component that you registered
    * @returns {name, component, renderFunction, isRenderer}
    */
-  getComponent(name: string): RegisteredComponent;
+  getComponent(name: string): RegisteredComponent<RegisteredComponentValue>;
   /**
    * Get the component that you registered, or wait for it to be registered
    * @returns {name, component, renderFunction, isRenderer}
    */
-  getOrWaitForComponent(name: string): Promise<RegisteredComponent>;
+  getOrWaitForComponent(name: string): Promise<RegisteredComponent<RegisteredComponentValue>>;
   /**
    * Used by server rendering by Rails
    */
@@ -571,7 +598,7 @@ export interface ReactOnRailsInternal extends ReactOnRails {
   /**
    * Get a Map containing all registered components. Useful for debugging.
    */
-  registeredComponents(): Map<string, RegisteredComponent>;
+  registeredComponents(): Map<string, RegisteredComponent<RegisteredComponentValue>>;
   /**
    * Get a Map containing all registered store generators. Useful for debugging.
    */

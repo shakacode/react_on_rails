@@ -24,5 +24,17 @@ export default (props, _railsContext, domNodeId) => {
     </div>,
   );
 
-  hydrateOrRender(document.getElementById(domNodeId), reactElement, prerender);
+  const domEl = document.getElementById(domNodeId);
+  if (!domEl) {
+    const operation = prerender ? 'hydrate' : 'render';
+    throw new Error(
+      `Cannot ${operation} ManualRenderApp because DOM element with id "${domNodeId}" was not found.`,
+    );
+  }
+
+  const root = hydrateOrRender(domEl, reactElement, prerender);
+
+  // Return a teardown wrapper so React on Rails unmounts this root on Turbo/Turbolinks navigation
+  // (page unload) or same-id node replacement instead of leaking it.
+  return { teardown: () => root.unmount() };
 };

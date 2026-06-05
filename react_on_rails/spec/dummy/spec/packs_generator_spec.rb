@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "rails_helper"
+require "tmpdir"
 
 # rubocop:disable Metrics/ModuleLength
 module ReactOnRails
@@ -63,6 +64,23 @@ module ReactOnRails
           .to equal(false)
         FileUtils.mv("./temp", server_bundle_js_file_path)
         ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint = false
+      end
+
+      it "keeps generated output at the configured file when a matching TypeScript source exists" do
+        typescript_server_bundle_path = server_bundle_js_file_path.sub(/\.js\z/, ".ts")
+        FileUtils.mv(server_bundle_js_file_path, "./temp")
+        FileUtils.rm_rf server_bundle_js_file_path
+        File.write(typescript_server_bundle_path, "export default {};\n")
+        ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint = true
+
+        described_class.instance.generate_packs_if_stale
+
+        expect(File.exist?(server_bundle_js_file_path)).to equal(true)
+        expect(File.read(typescript_server_bundle_path)).to eq("export default {};\n")
+      ensure
+        ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint = false
+        FileUtils.rm_f(typescript_server_bundle_path)
+        FileUtils.mv("./temp", server_bundle_js_file_path) if File.exist?("./temp")
       end
     end
 
@@ -764,13 +782,91 @@ module ReactOnRails
 
       it "adds a single import statement to the server bundle" do
         test_string = "// import statement added by react_on_rails:generate_packs"
+        generated_import = "import '../generated/server-bundle-generated';"
         same_instance = described_class.instance
         File.truncate(server_bundle_js_file_path, 0)
         same_instance.generate_packs_if_stale
-        expect(File.read(server_bundle_js_file_path).scan(/(?=#{test_string})/).count).to equal(1)
+        server_bundle_content = File.read(server_bundle_js_file_path)
+        expect(server_bundle_content.scan(/(?=#{test_string})/).count).to equal(1)
+        expect(server_bundle_content).to include(generated_import)
+        expect(server_bundle_content).not_to include("import '../generated/server-bundle-generated.js';")
         # the following expectation checks that an additional import statement is not added if one already exists
         same_instance.generate_packs_if_stale
         expect(File.read(server_bundle_js_file_path).scan(/(?=#{test_string})/).count).to equal(1)
+      end
+
+      it "adds a lint-safe import statement to a TypeScript server bundle source entrypoint" do
+        same_instance = described_class.instance
+        backup_server_bundle_js_file_path = "#{server_bundle_js_file_path}.bak"
+        server_bundle_ts_file_path = server_bundle_js_file_path.sub(/\.js\z/, ".ts")
+
+        FileUtils.mv(server_bundle_js_file_path, backup_server_bundle_js_file_path)
+        File.write(server_bundle_ts_file_path, "")
+        same_instance.generate_packs_if_stale
+
+        generated_import = "import '../generated/server-bundle-generated.js'; " \
+                           "// eslint-disable-line import/extensions"
+        expect(File.read(server_bundle_ts_file_path)).to include(generated_import)
+
+        same_instance.generate_packs_if_stale
+        generated_import_count = File.read(server_bundle_ts_file_path)
+                                     .scan(%r{import '../generated/server-bundle-generated\.js'}).count
+        expect(generated_import_count).to equal(1)
+      ensure
+        FileUtils.rm_f(server_bundle_ts_file_path)
+        if backup_server_bundle_js_file_path && File.exist?(backup_server_bundle_js_file_path)
+          FileUtils.mv(backup_server_bundle_js_file_path, server_bundle_js_file_path)
+        end
+      end
+
+      it "adds a lint-safe import statement to a JSX server bundle source entrypoint" do
+        same_instance = described_class.instance
+        backup_server_bundle_js_file_path = "#{server_bundle_js_file_path}.bak"
+        server_bundle_jsx_file_path = server_bundle_js_file_path.sub(/\.js\z/, ".jsx")
+
+        FileUtils.mv(server_bundle_js_file_path, backup_server_bundle_js_file_path)
+        File.write(server_bundle_jsx_file_path, "")
+        same_instance.generate_packs_if_stale
+
+        generated_import = "import '../generated/server-bundle-generated.js'; " \
+                           "// eslint-disable-line import/extensions"
+        expect(File.read(server_bundle_jsx_file_path)).to include(generated_import)
+
+        same_instance.generate_packs_if_stale
+        generated_import_count = File.read(server_bundle_jsx_file_path)
+                                     .scan(%r{import '../generated/server-bundle-generated\.js'}).count
+        expect(generated_import_count).to equal(1)
+      ensure
+        FileUtils.rm_f(server_bundle_jsx_file_path)
+        if backup_server_bundle_js_file_path && File.exist?(backup_server_bundle_js_file_path)
+          FileUtils.mv(backup_server_bundle_js_file_path, server_bundle_js_file_path)
+        end
+      end
+
+      %w[.mjs .cjs].each do |extension|
+        it "adds a lint-safe import statement to a #{extension} server bundle source entrypoint" do
+          same_instance = described_class.instance
+          backup_server_bundle_js_file_path = "#{server_bundle_js_file_path}.bak"
+          server_bundle_source_file_path = server_bundle_js_file_path.sub(/\.js\z/, extension)
+
+          FileUtils.mv(server_bundle_js_file_path, backup_server_bundle_js_file_path)
+          File.write(server_bundle_source_file_path, "")
+          same_instance.generate_packs_if_stale
+
+          generated_import = "import '../generated/server-bundle-generated.js'; " \
+                             "// eslint-disable-line import/extensions"
+          expect(File.read(server_bundle_source_file_path)).to include(generated_import)
+
+          same_instance.generate_packs_if_stale
+          generated_import_count = File.read(server_bundle_source_file_path)
+                                       .scan(%r{import '../generated/server-bundle-generated\.js'}).count
+          expect(generated_import_count).to equal(1)
+        ensure
+          FileUtils.rm_f(server_bundle_source_file_path)
+          if backup_server_bundle_js_file_path && File.exist?(backup_server_bundle_js_file_path)
+            FileUtils.mv(backup_server_bundle_js_file_path, server_bundle_js_file_path)
+          end
+        end
       end
 
       it "serializes concurrent generation and rechecks staleness after waiting" do
@@ -1358,6 +1454,24 @@ module ReactOnRails
       end
     end
 
+    describe "#relative_import_path" do
+      subject(:computed_relative_import_path) { described_class.instance.send(:relative_import_path, from, to) }
+
+      context "when target is outside the entrypoint directory" do
+        let(:from) { "/app/packs/server-bundle.ts" }
+        let(:to) { "/app/generated/server-bundle-generated.js" }
+
+        it { is_expected.to eq "../generated/server-bundle-generated.js" }
+      end
+
+      context "when target is in the same directory" do
+        let(:from) { "/app/generated/server-bundle.ts" }
+        let(:to) { "/app/generated/server-bundle-generated.js" }
+
+        it { is_expected.to eq "./server-bundle-generated.js" }
+      end
+    end
+
     describe "CLIENT_API_PATTERN" do
       subject { content.match?(described_class::CLIENT_API_PATTERN) }
 
@@ -1496,6 +1610,117 @@ module ReactOnRails
       it "lists client components" do
         expect { described_class.instance.send(:log_rsc_classification_summary) }
           .to output(/Client components.*ReactClientComponent/).to_stdout
+      end
+    end
+
+    describe "#resolve_server_bundle_source_entrypoint" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          @tmpdir = tmpdir
+          example.run
+        end
+      end
+
+      it "uses the configured server bundle entrypoint when it exists" do
+        configured_entrypoint = File.join(@tmpdir, "server-bundle.js")
+        File.write(configured_entrypoint, "")
+
+        resolved_entrypoint = described_class.instance.send(:resolve_server_bundle_source_entrypoint,
+                                                            configured_entrypoint)
+
+        expect(resolved_entrypoint).to eq(configured_entrypoint)
+      end
+
+      it "uses a TypeScript source entrypoint when the configured JavaScript output filename is missing" do
+        configured_entrypoint = File.join(@tmpdir, "server-bundle.js")
+        typescript_entrypoint = File.join(@tmpdir, "server-bundle.ts")
+        File.write(typescript_entrypoint, "")
+
+        expect(Rails.logger).to receive(:debug).with(
+          "[react_on_rails] server bundle source entrypoint resolved to #{typescript_entrypoint} " \
+          "(configured: #{configured_entrypoint})"
+        )
+        resolved_entrypoint = described_class.instance.send(:resolve_server_bundle_source_entrypoint,
+                                                            configured_entrypoint)
+
+        expect(resolved_entrypoint).to eq(typescript_entrypoint)
+      end
+
+      it "uses a JSX source entrypoint before TypeScript when both could match a missing JavaScript output" do
+        configured_entrypoint = File.join(@tmpdir, "server-bundle.js")
+        jsx_entrypoint = File.join(@tmpdir, "server-bundle.jsx")
+        typescript_entrypoint = File.join(@tmpdir, "server-bundle.ts")
+        File.write(jsx_entrypoint, "")
+        File.write(typescript_entrypoint, "")
+
+        resolved_entrypoint = described_class.instance.send(:resolve_server_bundle_source_entrypoint,
+                                                            configured_entrypoint)
+
+        expect(resolved_entrypoint).to eq(jsx_entrypoint)
+      end
+
+      it "uses a TSX source entrypoint when the configured TypeScript entrypoint is missing" do
+        configured_entrypoint = File.join(@tmpdir, "server-bundle.ts")
+        tsx_entrypoint = File.join(@tmpdir, "server-bundle.tsx")
+        File.write(tsx_entrypoint, "")
+
+        resolved_entrypoint = described_class.instance.send(:resolve_server_bundle_source_entrypoint,
+                                                            configured_entrypoint)
+
+        expect(resolved_entrypoint).to eq(tsx_entrypoint)
+      end
+
+      it "uses a TypeScript ESM source entrypoint when the configured JavaScript output filename is missing" do
+        configured_entrypoint = File.join(@tmpdir, "server-bundle.js")
+        mts_entrypoint = File.join(@tmpdir, "server-bundle.mts")
+        File.write(mts_entrypoint, "")
+
+        resolved_entrypoint = described_class.instance.send(:resolve_server_bundle_source_entrypoint,
+                                                            configured_entrypoint)
+
+        expect(resolved_entrypoint).to eq(mts_entrypoint)
+      end
+
+      it "uses a TypeScript CommonJS source entrypoint when the configured JavaScript output filename is missing" do
+        configured_entrypoint = File.join(@tmpdir, "server-bundle.js")
+        cts_entrypoint = File.join(@tmpdir, "server-bundle.cts")
+        File.write(cts_entrypoint, "")
+
+        resolved_entrypoint = described_class.instance.send(:resolve_server_bundle_source_entrypoint,
+                                                            configured_entrypoint)
+
+        expect(resolved_entrypoint).to eq(cts_entrypoint)
+      end
+
+      it "returns the configured entrypoint when no source file exists for any extension" do
+        configured_entrypoint = File.join(@tmpdir, "server-bundle.js")
+
+        resolved_entrypoint = described_class.instance.send(:resolve_server_bundle_source_entrypoint,
+                                                            configured_entrypoint)
+
+        expect(resolved_entrypoint).to eq(configured_entrypoint)
+      end
+
+      it "checks all server bundle source extensions when the configured entrypoint has no extension" do
+        configured_entrypoint = File.join(@tmpdir, "server-bundle")
+
+        source_extensions = described_class.instance.send(:server_bundle_source_extensions_for,
+                                                          configured_entrypoint)
+
+        expect(source_extensions).to eq(described_class::SERVER_BUNDLE_SOURCE_EXTENSIONS)
+      end
+
+      it "uses the first matching source extension when the configured entrypoint has no extension" do
+        configured_entrypoint = File.join(@tmpdir, "server-bundle")
+        javascript_entrypoint = File.join(@tmpdir, "server-bundle.js")
+        typescript_entrypoint = File.join(@tmpdir, "server-bundle.ts")
+        File.write(javascript_entrypoint, "")
+        File.write(typescript_entrypoint, "")
+
+        resolved_entrypoint = described_class.instance.send(:resolve_server_bundle_source_entrypoint,
+                                                            configured_entrypoint)
+
+        expect(resolved_entrypoint).to eq(javascript_entrypoint)
       end
     end
 

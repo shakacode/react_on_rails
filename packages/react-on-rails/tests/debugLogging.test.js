@@ -101,7 +101,7 @@ describe('Debug Logging', () => {
         expect.stringMatching(/\[ReactOnRails\] Component registration completed in \d+\.\d+ms/),
       );
       expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringMatching(/\[ReactOnRails\] ✅ Registered: TestComponent \(\d+ chars\)/),
+        expect.stringMatching(/\[ReactOnRails\] ✅ Registered: TestComponent \(\d+ source chars\)/),
       );
     });
 
@@ -120,10 +120,10 @@ describe('Debug Logging', () => {
 
       // Check that individual component registrations are logged with size info
       expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringMatching(/\[ReactOnRails\] ✅ Registered: SmallComponent \(\d+ chars\)/),
+        expect.stringMatching(/\[ReactOnRails\] ✅ Registered: SmallComponent \(\d+ source chars\)/),
       );
       expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringMatching(/\[ReactOnRails\] ✅ Registered: LargerComponent \(\d+ chars\)/),
+        expect.stringMatching(/\[ReactOnRails\] ✅ Registered: LargerComponent \(\d+ source chars\)/),
       );
     });
 
@@ -144,7 +144,7 @@ describe('Debug Logging', () => {
         expect.stringMatching(/\[ReactOnRails\] Component registration completed in \d+\.\d+ms/),
       );
       expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringMatching(/\[ReactOnRails\] ✅ Registered: TestComponent \(\d+ chars\)/),
+        expect.stringMatching(/\[ReactOnRails\] ✅ Registered: TestComponent \(\d+ source chars\)/),
       );
     });
   });

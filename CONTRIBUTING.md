@@ -511,7 +511,7 @@ React on Rails uses an optimized CI pipeline that runs faster on branches while 
 
 - **On PRs/Branches**: Runs reduced test matrix (latest Ruby/Node versions only) for faster feedback (~12 min vs ~45 min)
 - **On Main**: Runs full test matrix (all Ruby/Node/dependency combinations) for complete coverage
-- **Docs-only changes**: CI skips entirely when only `.md` files or `docs/` directory change
+- **Docs-only changes**: CI skips entirely when only documentation/metadata paths change (`*.md`, `*.mdx`, `*.markdown`, `*.rst`, `*.txt`, `docs/`, `internal/`, `.github/ISSUE_TEMPLATE/`, or `.lychee.toml`)
 
 ### Local CI Tools
 
@@ -606,14 +606,14 @@ For more details, see [`internal/contributor-info/ci-optimization.md`](./interna
 
 React on Rails provides PR comment commands to control CI behavior:
 
-#### `/run-skipped-ci` (or `/run-skipped-tests`) - Enable Full CI Mode
+Post one CI command per comment. If a comment contains multiple `+ci-*` commands, the command workflow handles only the first one.
+
+#### `+ci-run-full` - Enable Full CI Mode
 
 Runs all skipped CI checks and enables full CI mode for the PR:
 
 ```
-/run-skipped-ci
-# or use the shorter alias:
-/run-skipped-tests
++ci-run-full
 ```
 
 **What it does:**
@@ -631,12 +631,12 @@ Runs all skipped CI checks and enables full CI mode for the PR:
 - Validating generator changes or core functionality
 - Before merging PRs that touch critical paths
 
-#### `/stop-run-skipped-ci` - Disable Full CI Mode
+#### `+ci-stop-full` - Disable Full CI Mode
 
 Removes the `full-ci` label and returns to standard CI behavior:
 
 ```
-/stop-run-skipped-ci
++ci-stop-full
 ```
 
 **What it does:**
@@ -650,11 +650,40 @@ Removes the `full-ci` label and returns to standard CI behavior:
 - You've validated changes with full CI and want to return to faster feedback
 - Reducing CI time during rapid iteration on a PR
 
+#### `+ci-skip-full [reason]` - Record a Full CI Waiver
+
+Records that a maintainer intentionally waived the expensive full matrix for the current PR head SHA:
+
+```
++ci-skip-full docs-only change; markdown checks are enough
+```
+
+The reason is optional. If omitted, the bot records `not provided`.
+
+**What it does:**
+
+- Posts an audit comment with the current head SHA
+- Does not cancel or block any workflow run
+- Removes `full-ci` if present
+- Does not skip the standard optimized CI selected for the changed files
+- Does not apply to later pushes, because the waiver is bound to the SHA in the comment
+
+Use this when you intentionally choose not to run full CI before merge, especially when acting as an administrator.
+
+#### `+ci-status` and `+ci-help`
+
+Use `+ci-status` to summarize the current head SHA, whether the PR matches the docs-only metadata paths, whether `full-ci` is present, and whether the current SHA has a waiver comment.
+
+Use `+ci-help` to list the available CI commands.
+
 **Note:** The `full-ci` label is preserved on merged PRs as a historical record of which PRs ran with comprehensive testing.
+
+Legacy slash commands (`/run-skipped-ci`, `/run-skipped-tests`, and `/stop-run-skipped-ci`) still work, but the `+ci-*` commands are preferred because GitHub's comment editor uses `/` for built-in slash command autocomplete.
 
 #### Important Notes
 
-- **Force-pushes:** The `/run-skipped-ci` command adds the `full-ci` label to your PR. If you force-push after commenting, the initial workflow run will test the old commit, but subsequent pushes will automatically run full CI because the label persists.
+- **Force-pushes:** The `+ci-run-full` command adds the `full-ci` label to your PR. If you force-push after commenting, the initial workflow run will test the old commit, but subsequent pushes will automatically run full CI because the label persists.
+- **Waivers:** The `+ci-skip-full` command records the exact SHA in the PR conversation. If you push another commit, use `+ci-skip-full` again if you still intend to waive full CI.
 - **Branch operations:** Avoid deleting or force-pushing branches while workflows are running, as this may cause failures.
 
 ### Benchmarking
