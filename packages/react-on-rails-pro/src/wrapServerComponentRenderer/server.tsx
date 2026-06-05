@@ -13,7 +13,12 @@
  */
 
 import * as React from 'react';
-import type { RenderFunction, ReactComponentOrRenderFunction } from 'react-on-rails/types';
+import type {
+  RailsContext,
+  ReactComponent,
+  RenderFunction,
+  ReactComponentOrRenderFunction,
+} from 'react-on-rails/types';
 import isRenderFunction from 'react-on-rails/isRenderFunction';
 import { assertRailsContextWithServerStreamingCapabilities } from 'react-on-rails/types';
 import getReactServerComponent from '../getReactServerComponent.server.ts';
@@ -46,7 +51,10 @@ const wrapServerComponentRenderer = (
     throw new Error(`wrapServerComponentRenderer: component '${componentName}' is not a function`);
   }
 
-  const wrapper: RenderFunction = async (props, railsContext) => {
+  const wrapper: RenderFunction = async (
+    props: Record<string, unknown> | undefined,
+    railsContext: RailsContext | undefined,
+  ) => {
     try {
       assertRailsContextWithServerStreamingCapabilities(railsContext);
     } catch (e) {
@@ -67,8 +75,12 @@ const wrapServerComponentRenderer = (
       );
     }
 
+    // The 2-argument server render-function form is expected to resolve to the component to mount.
+    // RenderFunction can also yield an HTML/server-render result, so this narrows to the expected
+    // component shape and the `typeof Component !== 'function'` guard below rejects anything else at
+    // runtime.
     const Component = isRenderFunction(componentOrRenderFunction)
-      ? await componentOrRenderFunction(props, railsContext)
+      ? ((await componentOrRenderFunction(props, railsContext)) as ReactComponent)
       : componentOrRenderFunction;
 
     if (typeof Component !== 'function') {

@@ -24,7 +24,7 @@
 import 'react-on-rails-rsc/client.browser';
 import * as React from 'react';
 import * as ReactDOMClient from 'react-dom/client';
-import { ReactComponentOrRenderFunction, RenderFunction } from 'react-on-rails/types';
+import { ReactComponent, ReactComponentOrRenderFunction, RendererFunction } from 'react-on-rails/types';
 import isRenderFunction from 'react-on-rails/isRenderFunction';
 import { ensureReactUseAvailable } from 'react-on-rails/reactApis';
 import { createRSCProvider } from '../RSCProvider.tsx';
@@ -60,9 +60,19 @@ const wrapServerComponentRenderer = (
     throw new Error(`wrapServerComponentRenderer: component '${componentName}' is not a function`);
   }
 
-  const wrapper: RenderFunction = async (props, railsContext, domNodeId) => {
+  // The 3-argument arity here is load-bearing: ComponentRegistry classifies a registration as a
+  // renderer only when `renderFunction && length === 3`, and only renderers have their returned
+  // teardown captured and run on unmount. Dropping `domNodeId` from this signature would silently
+  // demote the wrapper to a plain render-function, drop the teardown below, and re-introduce the
+  // mount leak this fix closes. Keep all three parameters declared.
+  const wrapper: RendererFunction = async (props, railsContext, domNodeId) => {
+    // A registerServerComponent render function is expected to resolve to the component to mount,
+    // not a renderer teardown. RendererFunction still accepts legacy render-function return shapes
+    // because older 3-arg renderers sometimes returned a component just to satisfy the old public
+    // type; this wrapper narrows to the expected component shape, and the guard below rejects
+    // anything else at runtime.
     const Component = isRenderFunction(componentOrRenderFunction)
-      ? await componentOrRenderFunction(props, railsContext, domNodeId)
+      ? ((await componentOrRenderFunction(props, railsContext, domNodeId)) as ReactComponent)
       : componentOrRenderFunction;
 
     if (typeof Component !== 'function') {
@@ -90,7 +100,7 @@ const wrapServerComponentRenderer = (
       getServerComponent: getReactServerComponent(domNodeId, railsContext),
     });
 
-    const root = (
+    const rootElement = (
       <RSCProvider>
         <React.Suspense fallback={null}>
           <Component {...props} />
@@ -98,18 +108,21 @@ const wrapServerComponentRenderer = (
       </RSCProvider>
     );
 
-    if (domNode.innerHTML) {
-      ReactDOMClient.hydrateRoot(domNode, root, {
-        identifierPrefix: domNodeId,
-        onRecoverableError: handleRecoverableError,
-      });
-    } else {
-      ReactDOMClient.createRoot(domNode, { identifierPrefix: domNodeId }).render(root);
-    }
-    // Added only to satisfy the return type of RenderFunction
-    // However, the returned value of renderFunction is not used in ReactOnRails
-    // TODO: fix this behavior
-    return '';
+    const reactRoot = domNode.innerHTML
+      ? ReactDOMClient.hydrateRoot(domNode, rootElement, {
+          identifierPrefix: domNodeId,
+          onRecoverableError: handleRecoverableError,
+        })
+      : (() => {
+          const root = ReactDOMClient.createRoot(domNode, { identifierPrefix: domNodeId });
+          root.render(rootElement);
+          return root;
+        })();
+
+    // Return an explicit teardown wrapper so React on Rails unmounts this root on Turbo/Turbolinks
+    // navigation (the soft-navigation page swap) instead of leaking it. This closes the leak for every
+    // registerServerComponent user without confusing legacy bare function returns for cleanup.
+    return { teardown: () => reactRoot.unmount() };
   };
 
   return wrapper;

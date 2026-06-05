@@ -5,8 +5,13 @@ import { createStore } from 'redux';
 import * as React from 'react';
 import * as createReactClass from 'create-react-class';
 import ReactOnRails from '../src/ReactOnRails.client.ts';
+import ComponentRegistry from '../src/ComponentRegistry.ts';
 
 describe('ReactOnRails', () => {
+  afterEach(() => {
+    ComponentRegistry.clear();
+  });
+
   it('render returns a virtual DOM element for component', () => {
     const R1 = createReactClass({
       render() {
@@ -24,6 +29,34 @@ describe('ReactOnRails', () => {
     ReactOnRails.render('R1', {}, 'root');
 
     expect(document.getElementById('root').textContent).toBe(' WORLD ');
+  });
+
+  it('rejects renderer functions passed to manual render without invoking them', () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      // 3-argument arity makes ComponentRegistry classify this as a renderer (isRenderer === true).
+      const renderer = jest.fn();
+      function ManualRenderer(props, railsContext, domNodeId) {
+        return renderer(props, railsContext, domNodeId);
+      }
+      ReactOnRails.register({ ManualRenderer });
+
+      const root = document.createElement('div');
+      root.id = 'manual-renderer-root';
+      document.body.innerHTML = '';
+      document.body.appendChild(root);
+
+      expect(() => ReactOnRails.render('ManualRenderer', {}, 'manual-renderer-root')).toThrow(
+        'ReactOnRails.render() does not support renderer functions ("ManualRenderer").',
+      );
+      // The renderer is rejected *before* it is invoked, so it can't create a leaked mount, and the
+      // failure surfaces only through the thrown error — not a confusing console.error on a path that
+      // already throws.
+      expect(renderer).not.toHaveBeenCalled();
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 
   it('accepts traceTurbolinks as an option true', () => {

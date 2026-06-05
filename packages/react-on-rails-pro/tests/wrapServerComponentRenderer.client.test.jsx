@@ -128,3 +128,113 @@ describe('wrapServerComponentRenderer/client recoverable errors', () => {
     }
   });
 });
+
+// Issue #3209: the wrapper returns a teardown result so React on Rails unmounts the RSC root on
+// Turbo navigation / node replacement instead of leaking it (the leak hit every
+// registerServerComponent user). This closes that leak for the framework-shipped renderer.
+describe('wrapServerComponentRenderer/client teardown (issue #3209)', () => {
+  const setupWrapper = async ({ withServerHtml }) => {
+    jest.resetModules();
+
+    const unmount = jest.fn();
+    const render = jest.fn();
+    const hydrateRoot = jest.fn(() => ({ unmount }));
+    const createRoot = jest.fn(() => ({ render, unmount }));
+    const getReactServerComponent = jest.fn(() => jest.fn());
+
+    jest.doMock('react-dom/client', () => ({ createRoot, hydrateRoot }));
+    jest.doMock('react-on-rails-rsc/client.browser', () => ({}));
+    jest.doMock('../src/getReactServerComponent.client.ts', () => ({
+      __esModule: true,
+      default: getReactServerComponent,
+    }));
+
+    // eslint-disable-next-line global-require, @typescript-eslint/no-var-requires
+    const wrapServerComponentRenderer = require('../src/wrapServerComponentRenderer/client.tsx').default;
+
+    const domNode = document.createElement('div');
+    domNode.id = 'wrapped-rsc-teardown';
+    if (withServerHtml) {
+      domNode.innerHTML = '<main>server html</main>';
+    }
+    document.body.appendChild(domNode);
+
+    const WrappedComponent = wrapServerComponentRenderer(() => null, 'WrappedComponent');
+    const teardownResult = await WrappedComponent(
+      {},
+      { rscPayloadGenerationUrlPath: '/rsc_payload' },
+      domNode.id,
+    );
+
+    return { teardownResult, unmount, render, hydrateRoot, createRoot };
+  };
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  afterEach(() => {
+    jest.dontMock('react-dom/client');
+    jest.dontMock('react-on-rails-rsc/client.browser');
+    jest.dontMock('../src/getReactServerComponent.client.ts');
+    jest.resetModules();
+    document.body.innerHTML = '';
+  });
+
+  it('returns a teardown result that unmounts the hydrated root', async () => {
+    const { teardownResult, unmount, hydrateRoot } = await setupWrapper({ withServerHtml: true });
+
+    expect(hydrateRoot).toHaveBeenCalledTimes(1);
+    expect(typeof teardownResult.teardown).toBe('function');
+    expect(unmount).not.toHaveBeenCalled();
+
+    await teardownResult.teardown();
+
+    expect(unmount).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns a teardown result that unmounts the client-rendered root', async () => {
+    const { teardownResult, unmount, createRoot, render } = await setupWrapper({ withServerHtml: false });
+
+    expect(createRoot).toHaveBeenCalledTimes(1);
+    expect(render).toHaveBeenCalledTimes(1);
+    expect(typeof teardownResult.teardown).toBe('function');
+    expect(unmount).not.toHaveBeenCalled();
+
+    await teardownResult.teardown();
+
+    expect(unmount).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Issue #3209: ComponentRegistry classifies a registration as a renderer only when
+// `renderFunction && length === 3`, and only renderers have their returned teardown captured and run
+// on unmount. If the wrapper's arity regresses, it is silently demoted to a plain render-function and
+// the mount leak this fix closes returns — so pin the declared arity here.
+describe('wrapServerComponentRenderer/client renderer arity (issue #3209)', () => {
+  beforeEach(() => {
+    jest.resetModules();
+    jest.doMock('react-dom/client', () => ({ createRoot: jest.fn(), hydrateRoot: jest.fn() }));
+    jest.doMock('react-on-rails-rsc/client.browser', () => ({}));
+    jest.doMock('../src/getReactServerComponent.client.ts', () => ({
+      __esModule: true,
+      default: jest.fn(() => jest.fn()),
+    }));
+  });
+
+  afterEach(() => {
+    jest.dontMock('react-dom/client');
+    jest.dontMock('react-on-rails-rsc/client.browser');
+    jest.dontMock('../src/getReactServerComponent.client.ts');
+    jest.resetModules();
+  });
+
+  it('declares 3 parameters so it is registered as a renderer (teardown is captured)', () => {
+    // eslint-disable-next-line global-require, @typescript-eslint/no-var-requires
+    const wrapServerComponentRenderer = require('../src/wrapServerComponentRenderer/client.tsx').default;
+
+    const WrappedComponent = wrapServerComponentRenderer(() => null, 'WrappedComponent');
+
+    expect(WrappedComponent).toHaveLength(3);
+  });
+});
