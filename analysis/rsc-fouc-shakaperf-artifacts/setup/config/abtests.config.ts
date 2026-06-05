@@ -42,12 +42,15 @@ const CONFIGURED_PARALLELISM = parseArtifactParallelism(process.env.SHAKAPERF_AR
 const DEFAULT_PARALLELISM = Math.max(1, Math.floor(os.availableParallelism() / 2));
 const PARALLELISM = CONFIGURED_PARALLELISM ?? DEFAULT_PARALLELISM;
 const NO_SANDBOX_RAW = process.env.SHAKAPERF_CHROMIUM_NO_SANDBOX;
-if (NO_SANDBOX_RAW !== undefined && NO_SANDBOX_RAW !== 'true' && NO_SANDBOX_RAW !== '') {
+const NO_SANDBOX_VALUE = NO_SANDBOX_RAW?.trim();
+// Match parseArtifactParallelism: empty or whitespace-only is treated as unset,
+// so no warning is emitted and `--no-sandbox` is not added.
+if (NO_SANDBOX_VALUE && NO_SANDBOX_VALUE !== 'true') {
   console.warn(
-    `[shakaperf] SHAKAPERF_CHROMIUM_NO_SANDBOX="${NO_SANDBOX_RAW}" is not exactly "true"; --no-sandbox will NOT be added. Values like "1", "yes", or "TRUE" are ignored.`,
+    `[shakaperf] SHAKAPERF_CHROMIUM_NO_SANDBOX="${NO_SANDBOX_RAW}" is not "true" after trimming; --no-sandbox will NOT be added. Values like "1", "yes", or "TRUE" are ignored.`,
   );
 }
-const CHROMIUM_ARGS = NO_SANDBOX_RAW === 'true' ? ['--no-sandbox'] : [];
+const CHROMIUM_ARGS = NO_SANDBOX_VALUE === 'true' ? ['--no-sandbox'] : [];
 
 export const rscFoucShakaPerfConfig = {
   shared: {

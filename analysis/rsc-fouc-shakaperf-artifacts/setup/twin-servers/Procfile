@@ -1,8 +1,9 @@
+# Docker also sets REACT_RENDERER_URL=http://localhost:3800 in image ENV. The
+# Rails commands repeat that literal so direct Procfile runs work and host-shell
+# exports cannot rewrite container wiring.
 control-node-renderer: shaka-perf servers run-overmind-command control "cd react_on_rails_pro/spec/dummy && RAILS_ENV=test NODE_ENV=test RENDERER_PORT=3800 pnpm run node-renderer"
-# Keep this URL literal: Procfile shells run on the host before entering the container.
 control-rails: shaka-perf servers run-overmind-command control "cd react_on_rails_pro/spec/dummy && RAILS_ENV=test NODE_ENV=test PORT=3000 SECRET_KEY_BASE=dummy-secret-key-base-for-shakaperf-rsc-fouc REACT_RENDERER_URL=http://localhost:3800 bundle exec rails s -b 0.0.0.0 -p 3000"
 experiment-node-renderer: shaka-perf servers run-overmind-command experiment "cd react_on_rails_pro/spec/dummy && RAILS_ENV=test NODE_ENV=test RENDERER_PORT=3800 pnpm run node-renderer"
-# Keep this URL literal: Procfile shells run on the host before entering the container.
 experiment-rails: shaka-perf servers run-overmind-command experiment "cd react_on_rails_pro/spec/dummy && RAILS_ENV=test NODE_ENV=test PORT=3000 SECRET_KEY_BASE=dummy-secret-key-base-for-shakaperf-rsc-fouc REACT_RENDERER_URL=http://localhost:3800 bundle exec rails s -b 0.0.0.0 -p 3000"
 notify-control-server-started: shaka-perf servers notify-server-started control
 notify-experiment-server-started: shaka-perf servers notify-server-started experiment
