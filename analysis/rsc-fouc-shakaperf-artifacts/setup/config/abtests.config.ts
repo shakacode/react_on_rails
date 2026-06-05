@@ -13,7 +13,13 @@ const { control: CONTROL_PORT, experiment: EXPERIMENT_PORT } = assignPortsAutoma
   experiment: 3030,
 });
 
-const PARALLELISM = Math.max(1, Math.floor(os.cpus().length / 2));
+const CONFIGURED_PARALLELISM = Number.parseInt(process.env.SHAKAPERF_ARTIFACT_PARALLELISM ?? '', 10);
+const DEFAULT_PARALLELISM = Math.max(1, Math.floor(os.availableParallelism() / 2));
+const PARALLELISM =
+  Number.isFinite(CONFIGURED_PARALLELISM) && CONFIGURED_PARALLELISM > 0
+    ? CONFIGURED_PARALLELISM
+    : DEFAULT_PARALLELISM;
+const CHROMIUM_ARGS = process.env.SHAKAPERF_CHROMIUM_NO_SANDBOX === 'true' ? ['--no-sandbox'] : [];
 
 export default defineConfig({
   shared: {
@@ -30,8 +36,9 @@ export default defineConfig({
     comparePixelmatchThreshold: 0.1,
     engineOptions: {
       browser: 'chromium',
-      // Required inside Docker's non-root Chromium runtime; local runs may omit it.
-      args: ['--no-sandbox'],
+      // Set SHAKAPERF_CHROMIUM_NO_SANDBOX=true only when the ShakaPerf
+      // browser runner itself is inside Docker and Chromium cannot sandbox.
+      args: CHROMIUM_ARGS,
     },
   },
 

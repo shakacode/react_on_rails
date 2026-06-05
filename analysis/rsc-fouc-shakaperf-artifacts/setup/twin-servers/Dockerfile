@@ -9,8 +9,9 @@ ARG UID=1000
 ARG GID=1000
 ARG PNPM_VERSION=10.33.4
 
-# The secret-key value is a fixed dummy for this hermetic SQLite test image:
-# no real data, credentials, or external services are present in the artifact.
+# Runtime-only values stay out of image ENV where possible. The Procfile passes
+# the fixed dummy SECRET_KEY_BASE when it starts Rails; REACT_RENDERER_URL stays
+# here as the single Docker default inherited by the Rails process.
 ENV APP_PATH=/home/${NON_ROOT_USER}/app \
     BUNDLE_PATH=/home/${NON_ROOT_USER}/bundle \
     GEM_HOME=/home/${NON_ROOT_USER}/bundle \
@@ -19,7 +20,6 @@ ENV APP_PATH=/home/${NON_ROOT_USER}/app \
     RAILS_ENV=test \
     NODE_ENV=test \
     TWIN_SERVERS=true \
-    SECRET_KEY_BASE=dummy-secret-key-base-for-shakaperf-rsc-fouc \
     REACT_RENDERER_URL=http://localhost:3800
 
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
@@ -64,7 +64,7 @@ RUN cd react_on_rails_pro/spec/dummy \
     && bundle install --jobs=4 --retry=3 \
     && bundle exec rake react_on_rails:generate_packs \
     && pnpm run build:test \
-    && RAILS_ENV=test bundle exec rails db:prepare
+    && SECRET_KEY_BASE_DUMMY=1 RAILS_ENV=test bundle exec rails db:prepare
 
 EXPOSE 3000 3800
 

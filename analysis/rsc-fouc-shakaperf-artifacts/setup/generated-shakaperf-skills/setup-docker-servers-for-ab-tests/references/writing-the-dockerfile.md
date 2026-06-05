@@ -26,7 +26,7 @@ How to write `twin-servers/Dockerfile` so both sides build into identical, bind-
 
 **Recreate writable dirs in the production stage.** `log`, `tmp/pids`, `tmp/cache`, `storage` (and any runtime-written dir) must exist and be owned by the user — `mkdir -p … && chown -R`.
 
-**Config goes in `ENV`, not docker-compose.** Bake `SECRET_KEY_BASE`, placeholder/skip values for third-party API keys, `TWIN_SERVERS=true`, cache server addresses, and DB config as `ENV` directives. Why: the image becomes self-contained and provably identical on both sides, and compose stays a thin per-side differentiator. The _only_ things that belong in compose `environment:` are values that must differ between control and experiment.
+**Stable non-secret config goes in `ENV`, not docker-compose.** Bake placeholder/skip values for third-party API keys, `TWIN_SERVERS=true`, cache server addresses, and DB config as `ENV` directives. Why: the image becomes self-contained and provably identical on both sides, and compose stays a thin per-side differentiator. Do not bake real secrets into image `ENV`; pass boot-only dummy values such as `SECRET_KEY_BASE` through the build command or the Procfile/runtime command when possible. The _only_ things that belong in compose `environment:` are values that must differ between control and experiment.
 
 **Pass runtime versions as build args; never edit the project's version files.** Dockerizing must not require touching `.node-version`, `.ruby-version`, `package.json#engines`, or any app file outside `twin-servers/` and the minimal `TWIN_SERVERS` guards. Drive the version from `dockerBuildArgs` → `ARG`/`ENV` in the Dockerfile. If you change `.node-version` to make Docker happy, you've changed what every developer and CI runs.
 
@@ -92,7 +92,8 @@ The default is to bake **everything** into the image, including a fully migrated
 ```dockerfile
 RUN initdb -D ~/pgdata && \
     pg_ctl -D ~/pgdata -l ~/pgdata/logfile start && \
-    bin/rails db:prepare && bin/rails db:seed && \
+    SECRET_KEY_BASE_DUMMY=1 bin/rails db:prepare && \
+    SECRET_KEY_BASE_DUMMY=1 bin/rails db:seed && \
     pg_ctl -D ~/pgdata stop
 ```
 
@@ -158,7 +159,6 @@ ENV RAILS_ENV="production" \
     BUNDLE_DEPLOYMENT="1" \
     BUNDLE_PATH=${BUNDLE_PATH} \
     BUNDLE_WITHOUT="development test" \
-    SECRET_KEY_BASE="not-a-real-secret-just-for-perf-testing" \
     RAILS_LOG_TO_STDOUT="true" \
     RAILS_SERVE_STATIC_FILES="true" \
     TWIN_SERVERS="true"
@@ -187,7 +187,8 @@ RUN mkdir -p log tmp/pids tmp/cache storage && \
 # Prepare + seed the DB at build time so the image is self-contained. SQLite
 # has no daemon, so the seeded file under storage/ is the whole database — it
 # gets baked in here and needs zero setupCommands at runtime.
-RUN ./bin/rails db:prepare && ./bin/rails db:seed
+RUN SECRET_KEY_BASE_DUMMY=1 ./bin/rails db:prepare && \
+    SECRET_KEY_BASE_DUMMY=1 ./bin/rails db:seed
 
 EXPOSE 3000
 # For twin-servers: CMD/ENTRYPOINT removed — compose uses `sleep infinity`.
@@ -220,10 +221,10 @@ ARG NODE_PATH
 ARG APP_PATH
 
 ENV NODE_VERSION=18.20.4
-# Config baked in — identical on both sides. Third-party keys are placeholders;
-# the app must no-op them under TWIN_SERVERS (see Phase 4).
-ENV SECRET_KEY_BASE=dummy-secret-key-base \
-    TWIN_SERVERS=true \
+# Stable non-secret config baked in — identical on both sides. Third-party keys
+# are placeholders; the app must no-op them under TWIN_SERVERS (see Phase 4).
+# Pass SECRET_KEY_BASE through the Procfile/runtime command when possible.
+ENV TWIN_SERVERS=true \
     DB_USERNAME=${NON_ROOT_USER} \
     CAMPAIGN_MONITOR_API_KEY=skip \
     RECAPTCHA_SECRET_KEY=placeholder \
@@ -274,7 +275,7 @@ COPY --chown=${NON_ROOT_USER}:${NON_ROOT_USER} package.json yarn.lock ./
 RUN NODE_ENV=development yarn install --frozen-lockfile
 COPY --chown=${NON_ROOT_USER}:${NON_ROOT_USER} . .
 RUN bundle exec bootsnap precompile --gemfile app/ lib/
-RUN bundle exec rails assets:precompile
+RUN SECRET_KEY_BASE_DUMMY=1 bundle exec rails assets:precompile
 RUN yarn cache clean
 
 # ── production: lean final image ───────────────────────────────────────────
@@ -296,7 +297,8 @@ RUN mkdir -p log tmp/pids tmp/cache storage && \
 # here too.)
 RUN initdb -D ~/pgdata && \
     pg_ctl -D ~/pgdata -l ~/pgdata/logfile start && \
-    bundle exec rails db:prepare && bundle exec rails db:seed && \
+    SECRET_KEY_BASE_DUMMY=1 bundle exec rails db:prepare && \
+    SECRET_KEY_BASE_DUMMY=1 bundle exec rails db:seed && \
     pg_ctl -D ~/pgdata stop
 
 EXPOSE 3000

@@ -1,6 +1,7 @@
+import { defineConfig } from 'shaka-shared';
 import baseConfig from './abtests.config';
 
-export default {
+export default defineConfig({
   ...baseConfig,
   visreg: {
     ...baseConfig.visreg,
@@ -13,4 +14,4 @@ export default {
     compareRetries: 0,
     compareRetryDelay: 0,
   },
-};
+});
