@@ -530,6 +530,8 @@ module ReactOnRails
         ReactOnRails.configuration.server_bundle_js_file
       ).to_s
 
+      return configured_entrypoint if ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint
+
       resolve_server_bundle_source_entrypoint(configured_entrypoint)
     end
 

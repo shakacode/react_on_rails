@@ -65,6 +65,23 @@ module ReactOnRails
         FileUtils.mv("./temp", server_bundle_js_file_path)
         ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint = false
       end
+
+      it "keeps generated output at the configured file when a matching TypeScript source exists" do
+        typescript_server_bundle_path = server_bundle_js_file_path.sub(/\.js\z/, ".ts")
+        FileUtils.mv(server_bundle_js_file_path, "./temp")
+        FileUtils.rm_rf server_bundle_js_file_path
+        File.write(typescript_server_bundle_path, "export default {};\n")
+        ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint = true
+
+        described_class.instance.generate_packs_if_stale
+
+        expect(File.exist?(server_bundle_js_file_path)).to equal(true)
+        expect(File.read(typescript_server_bundle_path)).to eq("export default {};\n")
+      ensure
+        ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint = false
+        FileUtils.rm_f(typescript_server_bundle_path)
+        FileUtils.mv("./temp", server_bundle_js_file_path) if File.exist?("./temp")
+      end
     end
 
     context "when component with common file only" do
