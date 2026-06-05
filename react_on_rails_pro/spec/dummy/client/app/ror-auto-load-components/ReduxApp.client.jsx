@@ -50,7 +50,12 @@ export default (props, railsContext, domNodeId) => {
     </Provider>,
   );
 
-  const root = hydrateOrRender(document.getElementById(domNodeId), element, prerender);
+  const domEl = document.getElementById(domNodeId);
+  if (!domEl) {
+    throw new Error(`Cannot render ReduxApp because DOM element with id "${domNodeId}" was not found.`);
+  }
+
+  const root = hydrateOrRender(domEl, element, prerender);
 
   // Return a teardown wrapper so React on Rails unmounts this root on Turbo/Turbolinks navigation
   // (page unload) or same-id node replacement instead of leaking it.
