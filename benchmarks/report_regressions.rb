@@ -225,8 +225,10 @@ class RegressionIssueReporter
     # so a parse miss is a warning, not an error.
     number = stdout[%r{/issues/(\d+)}, 1]
     unless number
-      warn "::warning::Created the issue but could not parse its number from gh output " \
-           "(#{stdout.strip.inspect}); its comment section may be missing"
+      Github.warning(
+        "Created the issue but could not parse its number from gh output " \
+        "(#{stdout.strip.inspect}); its comment section may be missing"
+      )
     end
     number
   end

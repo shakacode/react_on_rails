@@ -192,6 +192,20 @@ RSpec.describe "benchmark regression reporting" do
         expect(calls).not_to include("comment list")
       end
     end
+
+    context "when issue creation succeeds but gh output does not include an issue URL" do
+      before do
+        capture_responses["issue list"] = ""
+        capture_responses["issue create"] = "Created issue without a parseable URL\n"
+      end
+
+      it "emits the parse warning to stdout so GitHub Actions annotates it" do
+        expect { expect(report).to eq("") }
+          .to output(/::warning::Created the issue but could not parse its number/).to_stdout
+          .and output("").to_stderr
+        expect(calls).not_to include("comment list")
+      end
+    end
   end
 
   # These drive the script end-to-end as a subprocess with a fake `gh` on PATH (no

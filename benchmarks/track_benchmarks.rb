@@ -146,9 +146,11 @@ def run_bencher(branch, start_point_args)
     # context, EVERY name renders unlinked (likely a report-shape drift). Surface it as a
     # ::warning:: — not a failure — so it is noticed without breaking the job over a link.
     if report.perf_links_unavailable?
-      $stdout.puts "::warning::Bencher report listed benchmarks but no perf-link context " \
-                   "(project/branch/testbed uuid); benchmark names will render unlinked. Re-verify the " \
-                   "report shape against benchmarks/spec/bencher_perf_url_spec.rb before bumping the CLI pin."
+      Github.warning(
+        "Bencher report listed benchmarks but no perf-link context " \
+        "(project/branch/testbed uuid); benchmark names will render unlinked. Re-verify the " \
+        "report shape against benchmarks/spec/bencher_perf_url_spec.rb before bumping the CLI pin."
+      )
     end
   end
   [stderr, status.exitstatus, report]
@@ -194,7 +196,10 @@ def delete_stale_report_comments(before:)
   end
   return if failed.zero?
 
-  warn "::warning::Failed to delete #{failed} stale #{SUITE_NAME} Bencher report comment(s); they may remain visible."
+  Github.warning(
+    "Failed to delete #{failed} stale #{SUITE_NAME} Bencher report comment(s); " \
+    "they may remain visible."
+  )
 end
 
 def replace_pr_comments(markdown)
@@ -217,7 +222,7 @@ def replace_pr_comments(markdown)
   if posted
     delete_stale_report_comments(before: cutoff_ts)
   else
-    warn "::warning::Failed to post #{SUITE_NAME} benchmark report comment; keeping prior comments in place."
+    Github.warning("Failed to post #{SUITE_NAME} benchmark report comment; keeping prior comments in place.")
   end
 end
 
@@ -230,13 +235,13 @@ def display_rows
     # Mirror the write side (BmfCollector#write_display_json warns on a non-array
     # sidecar). Without this the table would silently disappear on a contract break,
     # and a main regression hand-off could store an empty summary with no diagnostic.
-    warn "::warning::#{DISPLAY_JSON} is not a JSON array (got #{parsed.class}); skipping the summary table"
+    Github.warning("#{DISPLAY_JSON} is not a JSON array (got #{parsed.class}); skipping the summary table")
     return []
   end
 
   parsed
 rescue JSON::ParserError => e
-  warn "::warning::Could not parse #{DISPLAY_JSON} (#{e.message}); skipping the summary table"
+  Github.warning("Could not parse #{DISPLAY_JSON} (#{e.message}); skipping the summary table")
   []
 end
 
@@ -311,7 +316,7 @@ if __FILE__ == $PROGRAM_NAME
       retry_args.slice!(hash_arg_index, 2)
     end
     puts "Start-point hash not found in Bencher; retrying without --start-point-hash"
-    puts "::warning::Start-point hash not found in Bencher; falling back to latest baseline for comparison"
+    Github.warning("Start-point hash not found in Bencher; falling back to latest baseline for comparison")
     # The retry's stderr is unused: regression classification reads the JSON report,
     # and this path only triggers when the first run had no regression.
     _retry_stderr, bencher_exit_code, report = run_bencher(branch, retry_args)
@@ -328,8 +333,10 @@ if __FILE__ == $PROGRAM_NAME
     # make an auth/API/network failure look like a normal un-highlighted summary, while
     # the job still exits 0. Keep the prior comment intact and surface the failure
     # instead. (post_report_to_summary above is per-run and clobbers nothing.)
-    warn "::warning::Bencher produced no report for #{SUITE_NAME} (operational failure); " \
-         "keeping the previous PR comment intact instead of overwriting it with an un-highlighted table."
+    Github.warning(
+      "Bencher produced no report for #{SUITE_NAME} (operational failure); " \
+      "keeping the previous PR comment intact instead of overwriting it with an un-highlighted table."
+    )
   elsif pr_event && regression?(report) && report_markdown.empty?
     # A real regression but no table to render (display sidecar missing/empty). Don't
     # leave the stale PR comment looking unchanged — post the run-URL fallback (which
@@ -357,9 +364,11 @@ if __FILE__ == $PROGRAM_NAME
             RegressionReport::SUMMARY => handoff_summary
           )
         )
-        warn "::warning::Bencher flagged a #{SUITE_NAME} regression on main (exit #{bencher_exit_code}). " \
-             "The report-regressions job will file the issue. " \
-             "See the Bencher dashboard and the workflow run: #{Github.run_url}"
+        Github.warning(
+          "Bencher flagged a #{SUITE_NAME} regression on main (exit #{bencher_exit_code}). " \
+          "The report-regressions job will file the issue. " \
+          "See the Bencher dashboard and the workflow run: #{Github.run_url}"
+        )
       rescue StandardError => e # rubocop:disable Metrics/BlockNesting
         # The suite still fails (exit 1 below), so the regression is surfaced; but the
         # hand-off payload is gone, so report-regressions can't auto-file the issue.

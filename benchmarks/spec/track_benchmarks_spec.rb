@@ -88,6 +88,31 @@ RSpec.describe "track_benchmarks" do
     end
   end
 
+  describe "GitHub warning annotations" do
+    it "writes warning workflow commands to stdout, not stderr" do
+      expect { Github.warning("benchmark annotation") }
+        .to output("::warning::benchmark annotation\n").to_stdout
+        .and output("").to_stderr
+    end
+
+    it "escapes workflow command data so multiline messages stay in one annotation" do
+      expect { Github.warning("first line\n100% reproducible\r\nsecond line") }
+        .to output("::warning::first line%0A100%25 reproducible%0D%0Asecond line\n").to_stdout
+    end
+
+    it "emits display sidecar warnings to stdout so GitHub Actions annotates them" do
+      allow(File).to receive(:exist?).with(DISPLAY_JSON).and_return(true)
+      allow(File).to receive(:read).with(DISPLAY_JSON).and_return(JSON.generate({ "not" => "an array" }))
+
+      rows = nil
+      warning_pattern = /::warning::#{Regexp.escape(DISPLAY_JSON)} is not a JSON array/o
+      expect { rows = display_rows }
+        .to output(warning_pattern).to_stdout
+
+      expect(rows).to eq([])
+    end
+  end
+
   # On a main regression the rendered table feeds the report-regressions hand-off. If
   # the display sidecar was missing/corrupt the table is empty, and an empty-bodied
   # issue is useless — the hand-off must substitute a run-URL pointer instead.
