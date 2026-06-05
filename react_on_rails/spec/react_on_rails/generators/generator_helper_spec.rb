@@ -389,6 +389,22 @@ RSpec.describe GeneratorHelper, type: :generator do
       YAML
     end
 
+    it "honors merge-list precedence when an earlier alias disables a later raw hook" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(false)
+        base: &base
+          precompile_hook: false
+
+        default: &default
+          precompile_hook: <%= false %>
+
+        test:
+          <<:
+            - *base
+            - *default
+          # precompile_hook: ~
+      YAML
+    end
+
     it "treats raw ERB precompile hooks as active because they may vary by environment" do
       expect(active_precompile_hook_configured?(<<~YAML)).to be(true)
         default:
@@ -608,6 +624,26 @@ RSpec.describe GeneratorHelper, type: :generator do
       ).to be(false)
     end
 
+    it "materializes when an earlier merge-list alias disables a later raw hook" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        base: &base
+          precompile_hook: false
+
+        default: &default
+          precompile_hook: <%= false %>
+
+        test:
+          <<:
+            - *base
+            - *default
+          # precompile_hook: ~
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(true)
+    end
+
     it "materializes when an inactive hook has a trailing comment that contains ERB" do
       File.write(shakapacker_yml_path, <<~YAML)
         default: &default
@@ -631,6 +667,22 @@ RSpec.describe GeneratorHelper, type: :generator do
 
         test:
           <<: *default
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(false)
+    end
+
+    it "does not fall back to production raw hooks when parsed YAML is empty and the target section exists" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        production:
+          # precompile_hook: ~
+
+        test:
+          released_at: 2026-06-05
+          precompile_hook: 'bin/custom-test-hook'
+          # precompile_hook: ~
       YAML
 
       expect(

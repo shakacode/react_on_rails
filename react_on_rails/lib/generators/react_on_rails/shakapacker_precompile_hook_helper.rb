@@ -135,7 +135,7 @@ module ReactOnRails
       end
 
       def environment_effective_raw_precompile_hook?(document, config, environment)
-        section_name = shakapacker_config_key?(config, environment) ? environment.to_s : "production"
+        section_name = shakapacker_effective_section_name(document, config, environment)
 
         # `document` carries prebuilt raw section indexes from the caller.
         raw_active_precompile_hook_in_section_tree?(
@@ -143,35 +143,55 @@ module ReactOnRails
         )
       end
 
+      def shakapacker_effective_section_name(document, config, environment)
+        return environment.to_s if shakapacker_config_key?(config, environment)
+        return environment.to_s if document.section_index.key?(environment.to_s)
+
+        "production"
+      end
+
       def shakapacker_yml_section_name(section)
         section.match(/\A([A-Za-z0-9_-]+):(?:\s|$)/)&.[](1)
       end
 
       def raw_active_precompile_hook_in_section_tree?(section_name, section_index, anchor_index, visited = {})
-        return false if visited[section_name]
+        raw_precompile_hook_state_in_section_tree(section_name, section_index, anchor_index, visited) == :active
+      end
+
+      def raw_precompile_hook_state_in_section_tree(section_name, section_index, anchor_index, visited = {})
+        return nil if visited[section_name]
 
         visited[section_name] = true
         section = section_index[section_name]
-        return false unless section
-        return true if raw_active_precompile_hook?(section)
-        return false if section.match?(PRECOMPILE_HOOK_KEY)
+        return nil unless section
 
-        shakapacker_yml_section_merge_aliases(section).any? do |anchor_name|
+        local_state = raw_precompile_hook_state(section)
+        return local_state if local_state
+
+        shakapacker_yml_section_merge_aliases(section).each do |anchor_name|
           inherited_section_name = anchor_index[anchor_name]
-          inherited_section_name &&
-            raw_active_precompile_hook_in_section_tree?(inherited_section_name, section_index, anchor_index, visited)
+          next unless inherited_section_name
+
+          inherited_state = raw_precompile_hook_state_in_section_tree(
+            inherited_section_name, section_index, anchor_index, visited.dup
+          )
+          return inherited_state if inherited_state
         end
+
+        nil
       end
 
-      def raw_active_precompile_hook?(section)
-        section.each_line.any? do |line|
-          match = line.match(RAW_PRECOMPILE_HOOK_VALUE)
-          next false unless match
-
-          raw_value = unquote_shakapacker_yml_scalar(match[1].strip)
-          raw_value.include?("<%") ||
-            !raw_value.match?(UNQUOTED_INACTIVE_PRECOMPILE_HOOK_VALUE)
+      def raw_precompile_hook_state(section)
+        precompile_hook_values = section.each_line.filter_map do |line|
+          line.match(RAW_PRECOMPILE_HOOK_VALUE)&.[](1)
         end
+        return nil if precompile_hook_values.empty?
+
+        raw_value = unquote_shakapacker_yml_scalar(precompile_hook_values.last.strip)
+        return :active if raw_value.include?("<%")
+        return :active unless raw_value.match?(UNQUOTED_INACTIVE_PRECOMPILE_HOOK_VALUE)
+
+        :inactive
       end
 
       def unquote_shakapacker_yml_scalar(value)
