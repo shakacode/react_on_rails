@@ -1,8 +1,8 @@
-# Rails commands intentionally omit REACT_RENDERER_URL; Docker provides the default via ENV.
-# When running outside Docker, export REACT_RENDERER_URL manually before starting Rails.
 control-node-renderer: shaka-perf servers run-overmind-command control "cd react_on_rails_pro/spec/dummy && RAILS_ENV=test NODE_ENV=test RENDERER_PORT=3800 pnpm run node-renderer"
+# Rails omits REACT_RENDERER_URL because Docker sets it via the Dockerfile ENV; export it manually for non-container Procfile runs.
 control-rails: shaka-perf servers run-overmind-command control "cd react_on_rails_pro/spec/dummy && RAILS_ENV=test NODE_ENV=test PORT=3000 SECRET_KEY_BASE=dummy-secret-key-base-for-shakaperf-rsc-fouc bundle exec rails s -b 0.0.0.0 -p 3000"
 experiment-node-renderer: shaka-perf servers run-overmind-command experiment "cd react_on_rails_pro/spec/dummy && RAILS_ENV=test NODE_ENV=test RENDERER_PORT=3800 pnpm run node-renderer"
+# Rails omits REACT_RENDERER_URL because Docker sets it via the Dockerfile ENV; export it manually for non-container Procfile runs.
 experiment-rails: shaka-perf servers run-overmind-command experiment "cd react_on_rails_pro/spec/dummy && RAILS_ENV=test NODE_ENV=test PORT=3000 SECRET_KEY_BASE=dummy-secret-key-base-for-shakaperf-rsc-fouc bundle exec rails s -b 0.0.0.0 -p 3000"
 notify-control-server-started: shaka-perf servers notify-server-started control
 notify-experiment-server-started: shaka-perf servers notify-server-started experiment
