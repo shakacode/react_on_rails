@@ -53,8 +53,8 @@ abTest(
 
     await annotate('assert styled');
 
-    // Assert both sides: old-vs-current should throw on the old control side,
-    // while current-vs-current should pass both sides and prove test stability.
+    // Both sides assert: old-vs-current intentionally throws on the old control
+    // side to surface the FOUC, while current-vs-current proves test stability.
     if (state.backgroundColor !== EXPECTED_BACKGROUND) {
       throw new Error(
         `${isControl ? 'control' : 'experiment'} first visible probe is unstyled: ${JSON.stringify(state)}`,
