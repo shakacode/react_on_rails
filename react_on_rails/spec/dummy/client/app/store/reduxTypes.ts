@@ -29,6 +29,7 @@ function propsForReduxState(props: Record<string, unknown>): StateProps {
   const stateProps = { ...(props as ReduxAppProps) };
   delete stateProps.prerender;
 
+  // Redux examples do not seed this field from Rails props; direct React props cover that path.
   return { ...stateProps, modificationTarget: undefined };
 }
 

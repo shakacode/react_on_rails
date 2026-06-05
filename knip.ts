@@ -169,7 +169,7 @@ const config: KnipConfig = {
       entry: [
         'app/assets/config/manifest.js!',
         'client/app/packs/**/*.{js,jsx,ts,tsx}!',
-        // Not sure why this isn't detected as a dependency of client/app/packs/server-bundle.js
+        // Not sure why this isn't detected as a dependency of client/app/packs/server-bundle.ts
         'client/app/generated/server-bundle-generated.js!',
         'config/webpack/{production,development,test}.js',
         // Declaring this as webpack.config instead doesn't work correctly
