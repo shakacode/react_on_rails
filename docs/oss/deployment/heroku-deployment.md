@@ -1,6 +1,6 @@
 # Heroku Deployment
 
-> **Note:** This guide is based on the working tutorial app at [reactrails.com](https://reactrails.com). While the instructions work, some versions referenced are older. For current Heroku best practices with Rails 7, see [Heroku's Rails 7 Guide](https://devcenter.heroku.com/articles/getting-started-with-rails7).
+> **Note:** This guide is based on the working tutorial app at [www.reactrails.com](https://www.reactrails.com). While the instructions work, some versions referenced are older. For current Heroku best practices with Rails 7, see [Heroku's Rails 7 Guide](https://devcenter.heroku.com/articles/getting-started-with-rails7).
 
 ## Create Your Heroku App
 

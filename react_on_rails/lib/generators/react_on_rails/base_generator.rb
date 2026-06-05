@@ -109,6 +109,14 @@ module ReactOnRails
         def shakapacker_version_9_or_higher?
           generator.__send__(:shakapacker_version_9_or_higher?)
         end
+
+        def rsc_plugin_class_name
+          generator.__send__(:rsc_plugin_class_name)
+        end
+
+        def rsc_plugin_import_path
+          generator.__send__(:rsc_plugin_import_path)
+        end
       end
 
       REMOVABLE_WEBPACK_FILES = (MANAGED_WEBPACK_FILE_TEMPLATES.keys +
@@ -963,8 +971,9 @@ module ReactOnRails
           # current run omits those options; in that case, we preserve the directory.
           # Templates rely on config[:message] plus a small helper subset exposed by
           # TemplateRenderContext (add_documentation_reference, use_pro?, use_rsc?,
-          # shakapacker_version_9_or_higher?). Missing method delegates raise
-          # NoMethodError and are caught below, treating the file as non-removable.
+          # shakapacker_version_9_or_higher?, rsc_plugin_class_name, rsc_plugin_import_path).
+          # Missing method delegates raise NoMethodError and are caught below, treating the
+          # file as non-removable.
           # Missing config hash keys return nil silently, so any new config key
           # required by templates must be added to template_doc_config above.
           # Use TemplateRenderContext#erb_binding to avoid leaking method-local

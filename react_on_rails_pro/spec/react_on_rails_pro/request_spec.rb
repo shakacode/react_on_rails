@@ -466,6 +466,8 @@ describe ReactOnRailsPro::Request do
       renderer_updates = output_writes.filter_map do |payload|
         parsed = JSON.parse(payload.chomp)
         parsed if parsed["bundleTimestamp"] && parsed["updateChunk"]
+      rescue JSON::ParserError
+        nil
       end
 
       failure_update = renderer_updates.find { |update| update["updateChunk"].include?("books async prop failed") }

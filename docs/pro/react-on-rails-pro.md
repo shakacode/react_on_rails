@@ -53,9 +53,9 @@ The fastest way to understand how the Pro feature set fits together is to inspec
 
 It demonstrates the Node renderer, caching, and SSR-oriented workflows in a real Rails app.
 
-## Explore the Public RSC Demo
+## Explore the Marketplace demo
 
-Use the public LocalHub demo when you want an inspectable React on Rails Pro + RSC marketplace surface. The
+Use the public Marketplace demo when you want an inspectable React on Rails Pro + RSC marketplace surface. The
 [React Server Components index](./react-server-components/index.md#live-demo-and-evidence) keeps the demo, evidence
 dashboard, Lighthouse artifacts, and source repository links in one place.
 

@@ -10,7 +10,8 @@ const rscReferenceDiscoveryPlugin = () => {
   } catch (error) {
     throw new Error(
       `Missing react-on-rails-rsc/RSCReferenceDiscoveryPlugin. ` +
-        `Install react-on-rails-rsc >= 19.0.5-rc.6 before running ` +
+        `Install react-on-rails-rsc with RSCReferenceDiscoveryPlugin support ` +
+        `(check package.json for the required peer range) before running ` +
         `bin/shakapacker-precompile-hook. ${error.message}`,
     );
   }

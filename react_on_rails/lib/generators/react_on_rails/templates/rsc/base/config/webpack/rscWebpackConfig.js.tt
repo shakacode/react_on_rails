@@ -13,7 +13,8 @@ const rscReferenceDiscoveryPlugin = () => {
   } catch (error) {
     throw new Error(
       `Missing react-on-rails-rsc/RSCReferenceDiscoveryPlugin. ` +
-        `Install react-on-rails-rsc >= 19.0.5-rc.6 before running ` +
+        `Install react-on-rails-rsc with RSCReferenceDiscoveryPlugin support ` +
+        `(check package.json for the required peer range) before running ` +
         `bin/shakapacker-precompile-hook. ${error.message}`,
     );
   }
@@ -34,7 +35,7 @@ const extractLoader =
   });
 
 const configureRsc = () => {
-  // Pass true to skip RSCWebpackPlugin - RSC bundle doesn't need it
+  // Pass true to skip the RSC manifest plugin - RSC bundle doesn't need it
   const rscConfig = serverWebpackConfig(true);
   const discoveryBuild = process.env.RSC_REFERENCE_DISCOVERY_BUILD === 'true';
 

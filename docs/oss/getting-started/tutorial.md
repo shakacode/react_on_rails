@@ -15,7 +15,7 @@ After finishing this tutorial you will get an application that can do the follow
 You can find it here:
 
 - [Source code for this app in PR, using the --redux option](https://github.com/shakacode/react_on_rails-test-new-redux-generation/pull/17) and [for Heroku](https://github.com/shakacode/react_on_rails-test-new-redux-generation/pull/18).
-- [Live on Heroku](https://reactrails.com/)
+- [Live on Heroku](https://www.reactrails.com/)
 
 By the time you read this, the latest may have changed. Be sure to check the versions here:
 
@@ -49,7 +49,7 @@ By the time you read this, the latest may have changed. Be sure to check the ver
 Trying out **React on Rails** is super easy, so long as you have the basic prerequisites.
 
 - **Ruby:** We support Ruby 3.3+ and recommend using the latest stable Ruby version. Solutions like [rvm](https://rvm.io) or [rbenv](https://github.com/rbenv/rbenv) make it easy to have multiple Ruby versions on your machine.
-- **Rails:** This tutorial targets Rails 7.0+. React on Rails supports Rails 6 and later, but some tutorial steps may differ for Rails 6.
+- **Rails:** React on Rails supports Rails 5.2 and later. This tutorial targets Rails 7.0+ for new apps, so some steps may differ for older existing apps.
 - **Node.js:** We support all [active Node versions](https://github.com/nodejs/release#release-schedule) but recommend using the latest LTS release of Nodejs for the longest support. Older inactive node versions might still work but is not guaranteed. We also recommend using [nvm](https://github.com/nvm-sh/nvm/) to ease using different node versions in different projects.
 - **Node Package manager:** You can use [npm](https://npmjs.com/), Yarn ([Classic](https://classic.yarnpkg.com/) or [Berry](https://yarnpkg.com/)), or [pnpm](https://pnpm.io/).
 - You need to have either [Overmind](https://github.com/DarthSim/overmind) or [Foreman](https://rubygems.org/gems/foreman) as a process manager.
@@ -58,10 +58,10 @@ Trying out **React on Rails** is super easy, so long as you have the basic prere
 
 Then we need to create a fresh Rails application as follows.
 
-First, be sure to run `rails -v` and check you are using Rails 7.0 or above for this tutorial.
+First, be sure to run `rails -v` and check you are using Rails 7.0 or above for this new tutorial app.
 
 ```bash
-# For Rails 6.x
+# For Rails 5.2-6.x
 rails new test-react-on-rails --skip-javascript
 
 # For Rails 7.x
@@ -110,7 +110,7 @@ You will be prompted to approve changes in certain files. Press `enter` to proce
 one by one or enter `a` to replace all configuration files required by the project.
 You can check the diffs before you commit to see what changed.
 
-**Note on Redux:** The basic installer uses React Hooks for state management. However, this tutorial demonstrates Redux integration (as used in the [live example](https://reactrails.com/)). To follow this tutorial with Redux, run:
+**Note on Redux:** The basic installer uses React Hooks for state management. However, this tutorial demonstrates Redux integration (as used in the [live example](https://www.reactrails.com/)). To follow this tutorial with Redux, run:
 
 ```bash
 rails generate react_on_rails:install --redux

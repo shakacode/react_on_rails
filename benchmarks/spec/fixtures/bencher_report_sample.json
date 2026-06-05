@@ -1,21 +1,30 @@
 {
+  "uuid": "report-uuid",
+  "project": { "slug": "react-on-rails-t8a9ncxo" },
+  "branch": { "uuid": "branch-uuid", "head": { "uuid": "head-uuid" } },
+  "testbed": { "uuid": "testbed-uuid" },
   "results": [
     [
       {
-        "benchmark": { "name": "/heavy: Core" },
+        "benchmark": { "name": "/heavy: Core", "uuid": "bench-uuid" },
         "measures": [
           {
-            "measure": { "slug": "rps", "name": "rps" },
+            "measure": { "slug": "rps", "name": "rps", "uuid": "rps-uuid" },
             "metric": { "value": 80.0 },
             "boundary": { "baseline": 100.0, "lower_limit": 90.0, "upper_limit": null }
           },
           {
-            "measure": { "slug": "p50-latency", "name": "p50_latency" },
+            "measure": { "slug": "p50-latency", "name": "p50_latency", "uuid": "p50-uuid" },
             "metric": { "value": 3.5 },
             "boundary": { "baseline": 5.0, "lower_limit": null, "upper_limit": 6.0 }
           },
           {
-            "measure": { "slug": "failed-pct", "name": "failed_pct" },
+            "measure": { "slug": "p90-latency", "name": "p90_latency", "uuid": "p90-uuid" },
+            "metric": { "value": 7.2 },
+            "boundary": { "baseline": 6.0, "lower_limit": null, "upper_limit": null }
+          },
+          {
+            "measure": { "slug": "failed-pct", "name": "failed_pct", "uuid": "failed-uuid" },
             "metric": { "value": 1.1 },
             "boundary": { "baseline": 0.2, "lower_limit": null, "upper_limit": 1.0 }
           }

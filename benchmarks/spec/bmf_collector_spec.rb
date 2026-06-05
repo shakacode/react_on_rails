@@ -4,12 +4,13 @@ require_relative "spec_helper"
 require_relative "../lib/bmf_helpers"
 require "tmpdir"
 
-# BmfCollector produces the JSON Bencher ingests. Its measure names must stay in
-# lockstep with track_benchmarks.rb's THRESHOLDS, so pin the emitted shape: the
-# tracked measures rps, p50_latency, and failed_pct.
+# BmfCollector produces the JSON Bencher ingests. The thresholded measures (rps,
+# p50_latency, failed_pct) must stay in lockstep with track_benchmarks.rb's THRESHOLDS.
+# p90_latency is also emitted but sent boundary-less (no threshold) so Bencher records its
+# history and can supply a baseline for the summary table — it is never alerted on.
 RSpec.describe BmfCollector do
   describe "#to_bmf" do
-    it "emits exactly rps, p50_latency and failed_pct" do
+    it "emits rps, p50_latency and failed_pct (and p90_latency only when p90 is supplied)" do
       collector = described_class.new
       collector.add(name: "/route", rps: 100.0, p50: 5.0, status: "200=100")
 
@@ -17,6 +18,22 @@ RSpec.describe BmfCollector do
       expect(entry.keys).to contain_exactly("rps", "p50_latency", "failed_pct")
       expect(entry["rps"]).to eq("value" => 100.0)
       expect(entry["p50_latency"]).to eq("value" => 5.0)
+    end
+
+    it "emits p90_latency (boundary-less) when p90 is supplied" do
+      collector = described_class.new
+      collector.add(name: "/route", rps: 100.0, p50: 5.0, p90: 6.0, status: "200=100")
+
+      entry = collector.to_bmf.fetch("/route")
+      expect(entry.keys).to contain_exactly("rps", "p50_latency", "p90_latency", "failed_pct")
+      expect(entry["p90_latency"]).to eq("value" => 6.0)
+    end
+
+    it "omits p90_latency when p90 is not numeric" do
+      collector = described_class.new
+      collector.add(name: "/partial", rps: 100.0, p50: 5.0, p90: "MISSING", status: "200=100")
+
+      expect(collector.to_bmf.fetch("/partial")).not_to have_key("p90_latency")
     end
 
     it "applies the prefix and suffix to the benchmark name" do
@@ -63,10 +80,11 @@ RSpec.describe BmfCollector do
     end
   end
 
-  # The display sidecar carries the columns the Markdown summary table needs but
-  # that Bencher never sees: p90 and the human Status string. It is keyed by the
-  # same canonical name the BMF uses, so track_benchmarks.rb joins it with the
-  # Bencher report exactly (no name reconstruction).
+  # The display sidecar carries the summary-table columns keyed by the same canonical
+  # name the BMF uses, so track_benchmarks.rb joins it with the Bencher report exactly (no
+  # name reconstruction). It still carries the raw Status string (Bencher never sees it)
+  # and keeps failed rows visible even though to_bmf drops them. failed_pct is no longer
+  # carried — the Fail% column was dropped (issue #3601 item 4), so nothing reads it.
   describe "display sidecar" do
     describe "#display_rows" do
       it "includes p90 and the raw status, keyed by the canonical (prefixed/suffixed) name" do
@@ -75,7 +93,7 @@ RSpec.describe BmfCollector do
 
         expect(collector.display_rows).to eq(
           [{ "name" => "Pro Node Renderer: simple_eval: Pro", "rps" => 100.0,
-             "p50" => 5.0, "p90" => 6.0, "failed_pct" => 0.0, "status" => "200=100" }]
+             "p50" => 5.0, "p90" => 6.0, "status" => "200=100" }]
         )
       end
 
@@ -85,10 +103,8 @@ RSpec.describe BmfCollector do
         collector.add(name: "/broken", rps: "FAILED", p50: "FAILED", p90: "FAILED", status: "Connection refused")
 
         expect(collector.display_rows).to eq(
-          [{ "name" => "/partial", "rps" => 100.0, "p50" => nil, "p90" => nil,
-             "failed_pct" => 0.0, "status" => "200=100" },
-           { "name" => "/broken", "rps" => "FAILED", "p50" => nil, "p90" => nil,
-             "failed_pct" => nil, "status" => "Connection refused" }]
+          [{ "name" => "/partial", "rps" => 100.0, "p50" => nil, "p90" => nil, "status" => "200=100" },
+           { "name" => "/broken", "rps" => "FAILED", "p50" => nil, "p90" => nil, "status" => "Connection refused" }]
         )
       end
 
@@ -110,8 +126,7 @@ RSpec.describe BmfCollector do
 
           expect(collector.write_display_json(path)).to be(true)
           expect(JSON.parse(File.read(path))).to eq(
-            [{ "name" => "/foo", "rps" => 1.0, "p50" => 2.0, "p90" => 3.0,
-               "failed_pct" => 0.0, "status" => "200=1" }]
+            [{ "name" => "/foo", "rps" => 1.0, "p50" => 2.0, "p90" => 3.0, "status" => "200=1" }]
           )
         end
       end
@@ -156,13 +171,14 @@ RSpec.describe BmfCollector do
     end
   end
 
-  # p90 is summary-only: it must never become a tracked Bencher measure.
-  describe "p90 stays out of the BMF output" do
-    it "is not added to to_bmf even when supplied" do
+  # p90 is sent to Bencher boundary-less: in the BMF (so a baseline can accrue) but never
+  # in THRESHOLDS, so it is recorded yet never alerted on (issue #3601 item 3).
+  describe "p90 reaches the BMF but is never thresholded" do
+    it "is added to to_bmf as p90_latency when supplied" do
       collector = described_class.new
       collector.add(name: "/foo", rps: 1.0, p50: 2.0, p90: 3.0, status: "200=1")
 
-      expect(collector.to_bmf.fetch("/foo").keys).to contain_exactly("rps", "p50_latency", "failed_pct")
+      expect(collector.to_bmf.fetch("/foo").keys).to contain_exactly("rps", "p50_latency", "p90_latency", "failed_pct")
     end
   end
 end

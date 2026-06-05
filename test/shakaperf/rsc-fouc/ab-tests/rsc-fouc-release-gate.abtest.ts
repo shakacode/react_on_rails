@@ -1,6 +1,7 @@
 import { abTest, installRequestBlocking } from 'shaka-shared';
 
 const RSC_CSS_PROBE_SELECTOR = '[data-testid="rsc-css-probe"]';
+const RSC_CSS_PROBE_PATH = '/rsc_posts_page_over_http?posts_count=0';
 const RSC_STYLESHEET_SELECTOR = 'link[rel="stylesheet"][data-precedence="ror-rsc"]';
 // A styled probe must have a real CSS-module background, not the default unstyled page background.
 // If the intended probe style ever matches one of these defaults, change the Pro dummy probe color first.
@@ -58,7 +59,7 @@ async function waitForFirstVisibleProbeState(page: ShakaPerfPage): Promise<First
 abTest(
   'rsc first paint use-client css emits stylesheet before hydration',
   {
-    startingPath: '/rsc_posts_page_over_http',
+    startingPath: RSC_CSS_PROBE_PATH,
     testTypes: ['visreg'],
     options: {
       beforeNavigate: ({ context }) => installRequestBlocking(context, ['.js']),
@@ -104,7 +105,7 @@ abTest(
 abTest(
   'rsc real first-visible probe is styled',
   {
-    startingPath: '/rsc_posts_page_over_http',
+    startingPath: RSC_CSS_PROBE_PATH,
     testTypes: ['visreg'],
     options: {
       viewports: ['desktop'],

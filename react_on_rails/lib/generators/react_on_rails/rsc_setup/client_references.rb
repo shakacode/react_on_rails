@@ -18,10 +18,12 @@ module ReactOnRails
         # back safely rather than producing a wrong rewrite.
         REGEX_LITERAL_PRECEDERS = ["(", "{", "[", "=", ":", ",", ";", "!", "?", "&", "|", "+", "-", "*", "~", "^",
                                    "<", ">"].freeze
-        # Matches `new RSCWebpackPlugin(` allowing whitespace/newlines between `new`, the class
-        # name, and the open paren. Shared by the partition scanner and the routing checks so
-        # both detect the same set of invocations.
-        RSC_PLUGIN_INVOCATION_REGEX = /new\s+RSCWebpackPlugin\s*\(/
+        # Matches `new RSCWebpackPlugin(` or `new RSCRspackPlugin(`, allowing whitespace/newlines
+        # between `new`, the class name, and the open paren. Both bundler plugin names are matched
+        # so detection and idempotency stay correct whether the config was scaffolded for webpack
+        # (`RSCWebpackPlugin`) or rspack (`RSCRspackPlugin`). Shared by the partition scanner and
+        # the routing checks so both detect the same set of invocations.
+        RSC_PLUGIN_INVOCATION_REGEX = /new\s+RSC(?:Webpack|Rspack)Plugin\s*\(/
 
         private
 
@@ -160,7 +162,7 @@ module ReactOnRails
                 anchor,
                 shakapacker_config_import_statement(existing_imports_content),
                 path_resolve_import_statement(existing_imports_content),
-                rsc_webpack_plugin_import_statement(content),
+                rsc_plugin_import_statement(content),
                 "",
                 rsc_client_references_js
               ]
@@ -178,7 +180,7 @@ module ReactOnRails
               [
                 anchor,
                 path_resolve_import_statement(existing_imports_content),
-                rsc_webpack_plugin_import_statement(content),
+                rsc_plugin_import_statement(content),
                 "",
                 rsc_client_references_js
               ]
@@ -194,7 +196,7 @@ module ReactOnRails
             is_server: is_server,
             plugin_pending: true
           )
-            return inject_rsc_webpack_plugin_import(config_path, content, is_server: is_server) ? :unscoped : :failed
+            return inject_rsc_plugin_import(config_path, content, is_server: is_server) ? :unscoped : :failed
           end
 
           # `rsc_client_references_defined?` covers both scoped and unscoped declarations.
@@ -214,7 +216,7 @@ module ReactOnRails
         end
 
         def prepare_existing_rsc_client_references_plugin_import(config_path, content, is_server:)
-          return :failed unless inject_rsc_webpack_plugin_import(config_path, content, is_server: is_server)
+          return :failed unless inject_rsc_plugin_import(config_path, content, is_server: is_server)
 
           content = read_current_rsc_config(config_path, fallback: content)
           if object_literal_rsc_client_references_defined?(content)
@@ -251,14 +253,146 @@ module ReactOnRails
         end
 
         def update_existing_rsc_webpack_config(config_path, content, is_server:)
+          normalized_content = normalize_rsc_plugin_for_active_bundler(config_path, content)
+          if normalized_content != content
+            write_existing_rsc_config(config_path, normalized_content, action: :rewrite)
+            content = normalized_content
+          end
+
           return unless rsc_plugin_sections_safe_to_rewrite?(config_path, content, is_server: is_server)
+
           return if rsc_plugin_uses_scoped_client_references?(content, is_server: is_server)
           return unless prepare_rsc_client_references_rewrite!(config_path, content, is_server: is_server)
 
           return if rewrite_rsc_plugin_client_references(config_path, is_server: is_server)
 
+          # Normalization above is committed independently. If clientReferences migration fails,
+          # rollback restores to the normalized plugin state rather than the original legacy plugin.
           rollback_incomplete_rsc_client_references_setup(config_path, content)
           warn_missing_rsc_plugin_target(config_path, is_server: is_server)
+        end
+
+        def normalize_rsc_plugin_for_active_bundler(config_path, content)
+          normalized_content, active_plugin_binding_available = normalize_rsc_plugin_import_for_active_bundler(
+            content,
+            inactive_rsc_plugin_class_name,
+            inactive_rsc_plugin_import_path
+          )
+          if !active_plugin_binding_available && inactive_rsc_plugin_esm_import?(content)
+            warn_unsupported_rsc_plugin_import_syntax(config_path)
+          end
+          return normalized_content unless active_plugin_binding_available
+
+          normalize_rsc_plugin_invocations_for_active_bundler(normalized_content, inactive_rsc_plugin_class_name)
+        end
+
+        def normalize_rsc_plugin_import_for_active_bundler(content, inactive_plugin_class_name,
+                                                           inactive_plugin_import_path)
+          active_import_position = commonjs_named_import_position(
+            content,
+            rsc_plugin_import_path,
+            rsc_plugin_class_name
+          )
+          converted_inactive_import_position = nil
+          import_regex = rsc_plugin_commonjs_import_regex(inactive_plugin_import_path)
+          normalized_content = content.gsub(import_regex) do |statement|
+            statement_position = Regexp.last_match.begin(0)
+            next statement unless js_top_level_position?(content, statement_position)
+
+            if active_import_position && active_import_position < statement_position
+              remove_commonjs_named_import_binding(statement, inactive_plugin_class_name)
+            else
+              converted_inactive_import_position ||= statement_position
+              active_import_position = statement_position
+              statement
+                .gsub(/\b#{Regexp.escape(inactive_plugin_class_name)}\b/, rsc_plugin_class_name)
+                .gsub(inactive_plugin_import_path, rsc_plugin_import_path)
+            end
+          end
+
+          if converted_inactive_import_position
+            normalized_content = remove_commonjs_named_imports_after_position(
+              normalized_content,
+              rsc_plugin_import_path,
+              rsc_plugin_class_name,
+              converted_inactive_import_position
+            )
+          end
+
+          [normalized_content, !active_import_position.nil?]
+        end
+
+        def rsc_plugin_commonjs_import_regex(import_path)
+          # Intentionally matches single-line destructuring only. Multi-line CommonJS destructuring is
+          # skipped safely because the lightweight regexp does not span newlines.
+          Regexp.new(
+            "^[ \\t]*(?:const|let|var)\\s+\\{[^}]*\\}\\s*=\\s*" \
+            "require\\(['\"]#{Regexp.escape(import_path)}['\"]\\);?[ \\t]*(?:\\r?\\n)?"
+          )
+        end
+
+        def inactive_rsc_plugin_esm_import?(content)
+          pattern = Regexp.new(
+            "^[ \\t]*import\\s+\\{[^}]*\\b#{Regexp.escape(inactive_rsc_plugin_class_name)}\\b[^}]*\\}" \
+            "\\s+from\\s+['\"]#{Regexp.escape(inactive_rsc_plugin_import_path)}['\"];?"
+          )
+
+          content.to_enum(:scan, pattern).any? do
+            js_top_level_position?(content, Regexp.last_match.begin(0))
+          end
+        end
+
+        def remove_commonjs_named_imports_after_position(content, import_path, binding_name, keep_position)
+          import_regex = rsc_plugin_commonjs_import_regex(import_path)
+          content.gsub(import_regex) do |statement|
+            statement_position = Regexp.last_match.begin(0)
+            next statement if statement_position <= keep_position
+            next statement unless js_top_level_position?(content, statement_position)
+            next statement unless commonjs_import_statement_declares_binding?(statement, binding_name)
+
+            remove_commonjs_named_import_binding(statement, binding_name)
+          end
+        end
+
+        def remove_commonjs_named_import_binding(statement, binding_name)
+          match = statement.match(
+            /
+              \A
+              (?<prefix>[ \t]*(?:const|let|var)\s+\{)
+              (?<bindings>[^}]*)
+              (?<suffix>\}\s*=\s*require\([^)]+\);?[ \t]*(?:\r?\n)?)
+              \z
+            /x
+          )
+          # Defensive: this is only called on lines already matched by
+          # rsc_plugin_commonjs_import_regex, so a parse failure here means a hand-edited
+          # variant we don't recognize. Keep the original import rather than silently deleting it
+          # (an empty return would drop the line and surface a ReferenceError at bundler config load).
+          return statement unless match
+
+          remaining_bindings = match[:bindings].split(",").map(&:strip).reject do |binding|
+            destructuring_binding_declares_name?(binding, binding_name)
+          end
+          return "" if remaining_bindings.empty?
+
+          "#{match[:prefix]} #{remaining_bindings.join(', ')} #{match[:suffix]}"
+        end
+
+        def normalize_rsc_plugin_invocations_for_active_bundler(content, inactive_plugin_class_name)
+          normalized_content = content.dup
+          pattern = /\bnew\s+#{Regexp.escape(inactive_plugin_class_name)}\b/
+          search_from = 0
+
+          while (match = normalized_content.match(pattern, search_from))
+            search_from = match.end(0)
+            next unless js_code_position?(normalized_content, match.begin(0))
+
+            replacement = match[0].sub(inactive_plugin_class_name, rsc_plugin_class_name)
+            normalized_content[match.begin(0)...match.end(0)] = replacement
+            search_from = match.begin(0) + replacement.length
+          end
+
+          normalized_content
         end
 
         def prepare_rsc_client_references_rewrite!(config_path, content, is_server:)
@@ -301,7 +435,7 @@ module ReactOnRails
           if rsc_plugin_defines_client_references?(content, is_server: is_server)
             GeneratorMessages.add_warning(
               "Skipped scoped clientReferences migration for #{config_path} because all matching " \
-              "RSCWebpackPlugin instances already define clientReferences (some may already be " \
+              "#{rsc_plugin_class_name} instances already define clientReferences (some may already be " \
               "correctly scoped to rscClientReferences). Please verify manually."
             )
             return false
@@ -313,14 +447,23 @@ module ReactOnRails
 
         def warn_unparseable_rsc_plugin_sections(config_path, count)
           GeneratorMessages.add_warning(
-            "Skipped scoped clientReferences migration for #{config_path}: #{count} RSCWebpackPlugin " \
+            "Skipped scoped clientReferences migration for #{config_path}: #{count} #{rsc_plugin_class_name} " \
             "options block(s) contain characters this lightweight scanner cannot parse safely " \
             "(most often a regex literal with an unmatched `{` or `}`, e.g. `/\\{/` or `/[{]/`, " \
             "or a regex literal after a keyword context such as `return` or `typeof`). " \
-            "All RSCWebpackPlugin calls in the file must be parseable for auto-migration to proceed, " \
+            "All #{rsc_plugin_class_name} calls in the file must be parseable for auto-migration to proceed, " \
             "including calls targeting the other bundle. " \
-            "Please add `clientReferences: rscClientReferences` manually to any RSCWebpackPlugin " \
+            "Please add `clientReferences: rscClientReferences` manually to any #{rsc_plugin_class_name} " \
             "that is missing it."
+          )
+        end
+
+        def warn_unsupported_rsc_plugin_import_syntax(config_path)
+          GeneratorMessages.add_warning(
+            "Could not automatically migrate #{inactive_rsc_plugin_class_name} to #{rsc_plugin_class_name} " \
+            "in #{config_path}: the plugin is imported with ESM syntax, while the generator can only rewrite " \
+            "CommonJS require() imports. Please replace it manually with: " \
+            "const { #{rsc_plugin_class_name} } = require('#{rsc_plugin_import_path}');"
           )
         end
 
@@ -968,13 +1111,13 @@ module ReactOnRails
           body
         end
 
-        def inject_rsc_webpack_plugin_import(config_path, content, is_server:)
+        def inject_rsc_plugin_import(config_path, content, is_server:)
           replace_rsc_client_references_setup_anchor(config_path, content, is_server: is_server) do |anchor|
             join_rsc_client_references_setup(
               content,
               [
                 anchor,
-                rsc_webpack_plugin_import_statement(content)
+                rsc_plugin_import_statement(content)
               ]
             )
           end
@@ -1260,14 +1403,17 @@ module ReactOnRails
 
         # Unlike `shakapacker_config_import_statement` / `path_resolve_import_statement` which check
         # `existing_imports_content` (the slice up through the anchor that they piggy-back on), this
-        # helper checks the FULL file content. A user's existing `RSCWebpackPlugin` import can sit
-        # below the anchor (e.g. a partially-edited or previously-failed migration), so dedup must
-        # see the whole file or it will inject a duplicate `const { RSCWebpackPlugin } = require(...)`
-        # and webpack will fail to load with `Identifier 'RSCWebpackPlugin' has already been declared`.
-        def rsc_webpack_plugin_import_statement(content)
-          return if commonjs_named_imported?(content, "react-on-rails-rsc/WebpackPlugin", "RSCWebpackPlugin")
+        # helper checks the FULL file content. A user's existing plugin import can sit below the
+        # anchor (e.g. a partially-edited or previously-failed migration), so dedup must see the
+        # whole file or it will inject a duplicate `const { <plugin> } = require(...)` and the
+        # bundler will fail to load with `Identifier '<plugin>' has already been declared`.
+        # The plugin class name and import path follow the active bundler
+        # (`RSCRspackPlugin`/`react-on-rails-rsc/RspackPlugin` for rspack, the webpack pair
+        # otherwise) via {#rsc_plugin_class_name} / {#rsc_plugin_import_path}.
+        def rsc_plugin_import_statement(content)
+          return if commonjs_named_imported?(content, rsc_plugin_import_path, rsc_plugin_class_name)
 
-          "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');"
+          "const { #{rsc_plugin_class_name} } = require('#{rsc_plugin_import_path}');"
         end
 
         def rsc_client_references_setup_import_pattern(is_server:)
@@ -1392,11 +1538,13 @@ module ReactOnRails
 
           manual_action =
             if plugin_pending
-              "RSCWebpackPlugin will be added without scoped clientReferences; please add clientReferences manually."
-            elsif content.include?("RSCWebpackPlugin")
+              "#{rsc_plugin_class_name} will be added without scoped clientReferences; " \
+                "please add clientReferences manually."
+            elsif content.include?(rsc_plugin_class_name)
               "Please add clientReferences manually."
             else
-              "RSCWebpackPlugin was not added to #{config_path}; please add the plugin and clientReferences manually."
+              "#{rsc_plugin_class_name} was not added to #{config_path}; " \
+                "please add the plugin and clientReferences manually."
             end
 
           GeneratorMessages.add_warning(
@@ -1528,7 +1676,8 @@ module ReactOnRails
 
         def manual_rsc_plugin_action(config_path, plugin_pending:)
           if plugin_pending
-            "RSCWebpackPlugin was not added to #{config_path}; please add the plugin and clientReferences manually."
+            "#{rsc_plugin_class_name} was not added to #{config_path}; " \
+              "please add the plugin and clientReferences manually."
           else
             "Please add clientReferences manually."
           end
@@ -1543,9 +1692,10 @@ module ReactOnRails
 
         def warn_missing_rsc_plugin_target(config_path, is_server:)
           GeneratorMessages.add_warning(
-            "Could not update RSCWebpackPlugin in #{config_path}: no plugin options with isServer: #{is_server} " \
-            "could be rewritten. Please add clientReferences manually. Dynamic or computed plugin options cannot be " \
-            "verified automatically, so verify this file manually after adding clientReferences."
+            "Could not update #{rsc_plugin_class_name} in #{config_path}: no plugin options with " \
+            "isServer: #{is_server} could be rewritten. Please add clientReferences manually. Dynamic or " \
+            "computed plugin options cannot be verified automatically, so verify this file manually after " \
+            "adding clientReferences."
           )
         end
 
@@ -1560,6 +1710,29 @@ module ReactOnRails
 
             destructuring_declares_binding?(captures.first, binding_name)
           end
+        end
+
+        def commonjs_named_import_position(content, package_name, binding_name)
+          import_regex = rsc_plugin_commonjs_import_regex(package_name)
+
+          content.to_enum(:scan, import_regex).each do
+            # Module-scope check guards against false positives when the same destructuring
+            # appears inside a function body (which does not produce a module-scope binding).
+            match = Regexp.last_match
+            next unless js_top_level_position?(content, match.begin(0))
+            next unless commonjs_import_statement_declares_binding?(match[0], binding_name)
+
+            return match.begin(0)
+          end
+
+          nil
+        end
+
+        def commonjs_import_statement_declares_binding?(statement, binding_name)
+          match = statement.match(/\A[ \t]*(?:const|let|var)\s+\{(?<bindings>[^}]*)\}/)
+          return false unless match
+
+          destructuring_declares_binding?(match[:bindings], binding_name)
         end
 
         def top_level_binding?(content, binding_name)

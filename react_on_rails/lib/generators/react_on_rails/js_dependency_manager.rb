@@ -140,12 +140,14 @@ module ReactOnRails
         react-on-rails-rsc
       ].freeze
 
-      # React stays on the supported 19.0.x range; RSC APIs are unstable across React minor releases,
-      # and react-on-rails-rsc may lead React during RC rollouts.
-      # TODO: Re-align RSC_REACT_VERSION_RANGE after react-on-rails-rsc@19.0.5 stable ships.
+      # React peer-dependency range for RSC apps. This governs the `react` / `react-dom` installs
+      # (see add_react_dependencies) and is intentionally distinct from RSC_PACKAGE_VERSION_PIN below,
+      # which pins `react-on-rails-rsc`. The two track different versions during the RC window:
+      # react/react-dom stay on stable 19.0.x while react-on-rails-rsc rides an RC.
       RSC_REACT_VERSION_RANGE = "~19.0.4"
-      # Temporary exact react-on-rails-rsc release-candidate pin: the RSCReferenceDiscoveryPlugin export
-      # and RSC manifest CSS fixes ship in 19.0.5-rc.6.
+      # Pinned to 19.0.5-rc.6 because the discovery plugin export, native Rspack plugin, and
+      # RSC manifest CSS fixes all ship in that prerelease.
+      # TODO(#3642): switch to a stable react-on-rails-rsc release after 19.0.5 stable ships.
       RSC_PACKAGE_VERSION_PIN = "19.0.5-rc.6"
 
       private
@@ -411,7 +413,13 @@ module ReactOnRails
         return if add_packages(rsc_packages)
 
         manual_install_packages = rsc_packages
-        if used_version_pins
+        if used_version_pins && using_rspack?
+          # Do NOT retry unversioned for rspack: the `latest` tag (currently 19.0.4) does not export
+          # react-on-rails-rsc/RspackPlugin, so an unversioned install would replace the pin already
+          # written to package.json with a known-incompatible version and silently break the build.
+          # Keep the pin and tell the user to finish the install manually.
+          GeneratorMessages.add_warning(rspack_rsc_dependency_pin_failed_warning)
+        elsif used_version_pins
           warning_msg = "Could not install version-pinned RSC dependency. Retrying latest available package."
           say_status :warning,
                      warning_msg,
@@ -432,18 +440,31 @@ module ReactOnRails
             npm install #{manual_install_packages.join(' ')}
         MSG
       rescue StandardError => e
+        manual_install_packages = using_rspack? ? rsc_packages_with_pin : RSC_DEPENDENCIES
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Error adding React Server Components dependencies: #{e.message}
 
           You can install them manually by running:
-            npm install #{RSC_DEPENDENCIES.join(' ')}
+            npm install #{manual_install_packages.join(' ')}
         MSG
       end
 
       # Returns [pinned_packages, used_version_pins]. used_version_pins is always true here;
       # subclasses may override to return [packages, false] when pinning should be skipped.
       def rsc_packages_with_version
-        [RSC_DEPENDENCIES.map { |pkg| "#{pkg}@#{RSC_PACKAGE_VERSION_PIN}" }, true]
+        [rsc_packages_with_pin, true]
+      end
+
+      def rsc_packages_with_pin
+        RSC_DEPENDENCIES.map { |pkg| "#{pkg}@#{RSC_PACKAGE_VERSION_PIN}" }
+      end
+
+      def rspack_rsc_dependency_pin_failed_warning
+        "Warning: Could not install the pinned react-on-rails-rsc@#{RSC_PACKAGE_VERSION_PIN}. " \
+          "Rspack RSC projects require that version (or newer) for react-on-rails-rsc/RspackPlugin, " \
+          "and the unversioned `latest` tag does not export it, so the generator left the pin in " \
+          "package.json rather than install an incompatible version. " \
+          "Run npm install react-on-rails-rsc@#{RSC_PACKAGE_VERSION_PIN} to finish setup."
       end
 
       def remove_base_package_if_present

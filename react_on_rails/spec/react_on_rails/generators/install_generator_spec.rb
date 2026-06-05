@@ -44,6 +44,39 @@ describe InstallGenerator, type: :generator do
     match[:version]
   end
 
+  describe "RSC managed-template cleanup rendering" do
+    # Regression: serverWebpackConfig.js.tt / clientWebpackConfig.js.tt interpolate
+    # `<%= rsc_plugin_class_name %>` / `<%= rsc_plugin_import_path %>` inside their `use_rsc?`
+    # blocks. The cleanup re-render path (rendered_template_for_cleanup) evaluates templates
+    # against the restricted TemplateRenderContext binding, so those helpers must be delegated
+    # there. If they are not, RSC managed configs render as TEMPLATE_RENDER_FAILED and are
+    # wrongly treated as non-removable (with a NameError warning printed during install).
+    render_failed_sentinel = ReactOnRails::Generators::BaseGenerator.const_get(:TEMPLATE_RENDER_FAILED)
+
+    %w[
+      base/base/config/webpack/serverWebpackConfig.js.tt
+      base/base/config/webpack/clientWebpackConfig.js.tt
+    ].each do |template_path|
+      basename = File.basename(template_path, ".tt")
+
+      it "renders #{basename} for an RSC webpack project during cleanup" do
+        rendered = render_stock_webpack_template(template_path, rsc: true, rspack: false)
+
+        expect(rendered).not_to equal(render_failed_sentinel)
+        expect(rendered).to include("RSCWebpackPlugin")
+        expect(rendered).to include("react-on-rails-rsc/WebpackPlugin")
+      end
+
+      it "renders #{basename} for an RSC rspack project during cleanup" do
+        rendered = render_stock_webpack_template(template_path, rsc: true, rspack: true)
+
+        expect(rendered).not_to equal(render_failed_sentinel)
+        expect(rendered).to include("RSCRspackPlugin")
+        expect(rendered).to include("react-on-rails-rsc/RspackPlugin")
+      end
+    end
+  end
+
   context "without args" do
     before(:all) { run_generator_test_with_args(%w[], package_json: true) }
 
@@ -2126,21 +2159,26 @@ describe InstallGenerator, type: :generator do
     end
 
     describe "RSC webpack config transforms in config/rspack/" do
-      it "adds RSCWebpackPlugin to serverWebpackConfig" do
+      it "adds the native RSCRspackPlugin to serverWebpackConfig" do
         assert_file "config/rspack/serverWebpackConfig.js" do |content|
-          expect(content).to include("RSCWebpackPlugin")
-          expect(content).to include("react-on-rails-rsc/WebpackPlugin")
+          expect(content).to include("RSCRspackPlugin")
+          expect(content).to include("react-on-rails-rsc/RspackPlugin")
           expect(content).to include("clientReferences: rscClientReferences")
           expect(content).to include("directory: resolve(config.source_path)")
+          # Native rspack plugin replaces the webpack plugin entirely under rspack.
+          expect(content).not_to include("RSCWebpackPlugin")
+          expect(content).not_to include("react-on-rails-rsc/WebpackPlugin")
         end
       end
 
-      it "adds RSCWebpackPlugin to clientWebpackConfig" do
+      it "adds the native RSCRspackPlugin to clientWebpackConfig" do
         assert_file "config/rspack/clientWebpackConfig.js" do |content|
-          expect(content).to include("RSCWebpackPlugin")
-          expect(content).to include("react-on-rails-rsc/WebpackPlugin")
+          expect(content).to include("RSCRspackPlugin")
+          expect(content).to include("react-on-rails-rsc/RspackPlugin")
           expect(content).to include("clientReferences: rscClientReferences")
           expect(content).to include("directory: resolve(config.source_path)")
+          expect(content).not_to include("RSCWebpackPlugin")
+          expect(content).not_to include("react-on-rails-rsc/WebpackPlugin")
         end
       end
 

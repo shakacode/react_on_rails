@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "spec_helper"
-require "timeout"
+require "async"
 require "react_on_rails_pro/stream_request"
 require "react_on_rails_pro/renderer_http_client"
 
@@ -269,8 +269,10 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       abort_after_first_chunk = proc { |_chunk| raise "client disconnected" }
 
       expect do
-        Timeout.timeout(5) do
-          stream.each_chunk(&abort_after_first_chunk)
+        Sync do
+          Async::Task.current.with_timeout(5) do
+            stream.each_chunk(&abort_after_first_chunk)
+          end
         end
       end.to raise_error(RuntimeError, "client disconnected")
 

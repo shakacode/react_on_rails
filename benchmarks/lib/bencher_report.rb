@@ -2,6 +2,8 @@
 
 require "json"
 
+require_relative "bencher_perf_url"
+
 # Parses the report emitted by `bencher run --format json` (Bencher CLI v0.6.2;
 # shape verified stable through current main). Exposes what benchmark reporting
 # needs: active regression alerts, and per benchmark+measure t-test prediction
@@ -83,6 +85,10 @@ class BencherReport
 
     @boundaries = index_boundaries(raw)
     @alerts = parse_alerts(raw)
+    # Per-benchmark perf links are informational (they only decide whether a name links
+    # out), so they live in a separate, fully-lenient builder — a missing field yields an
+    # unlinked name, never a FormatError that would fail the job over a cosmetic link.
+    @perf_urls = BencherPerfUrl.new(raw)
   end
 
   attr_reader :alerts
@@ -99,6 +105,21 @@ class BencherReport
   # :regression | :improvement | nil for benchmark+measure given its direction.
   def significance(benchmark_name, measure_key, direction)
     boundary(benchmark_name, measure_key)&.significance(direction)
+  end
+
+  # The Bencher perf-plot URL for one benchmark (all its measures), or nil when the
+  # report is missing any required id (then the caller renders the name unlinked).
+  def perf_url(benchmark_name)
+    @perf_urls.for_benchmark(benchmark_name)
+  end
+
+  # True when the report lists benchmarks but is missing the shared perf-link context
+  # (project slug / branch / testbed uuid), so EVERY benchmark name degrades to an unlinked
+  # plain name. A single benchmark missing its own uuid stays silent (a per-row cosmetic
+  # miss); losing the shared context instead is a likely report-contract drift, so the
+  # caller surfaces it as a ::warning:: — never a FormatError (the links are cosmetic).
+  def perf_links_unavailable?
+    @perf_urls.any_benchmarks? && !@perf_urls.context_ready?
   end
 
   private

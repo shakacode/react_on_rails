@@ -258,8 +258,9 @@ def run_vegeta_suite(test_cases, bundle, label, bmf_collector, runner: method(:r
     begin
       rps, p50, p90, status = runner.call(test_case, bundle)
       add_to_summary(test_case[:name], label, rps, p50, p90, status)
-      # Add to BMF collector for Bencher output. p90 is retained for the display
-      # sidecar (the summary table) only — it is never sent to Bencher as a measure.
+      # Add to BMF collector for Bencher output. p90 is sent to Bencher boundary-less
+      # (recorded for a summary-table baseline but never thresholded) and also kept in the
+      # display sidecar so the summary table can show it; see BmfCollector.
       bmf_collector.add(name: test_label, rps: rps, p50: p50, p90: p90, status: status)
     rescue StandardError => e
       # ::error:: must go to stdout — GitHub Actions only parses workflow commands

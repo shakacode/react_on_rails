@@ -61,6 +61,10 @@ const config = defineConfig([
     'packages/*/*.test.{js,jsx,ts,tsx}',
     'packages/*/babel.config.js',
     'packages/*/jest.config.js',
+    // ShakaPerf reproduction inputs depend on the external `shaka-shared`
+    // runtime and are committed as investigation artifacts, not repo TS source.
+    'analysis/rsc-fouc-shakaperf-artifacts/setup/ab-tests/**/*.ts',
+    'analysis/rsc-fouc-shakaperf-artifacts/setup/config/**/*.ts',
   ]),
   {
     files: ['**/*.[jt]s', '**/*.[jt]sx', '**/*.[cm][jt]s'],
