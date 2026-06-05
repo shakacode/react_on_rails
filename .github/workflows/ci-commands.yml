@@ -1,0 +1,371 @@
+name: CI Commands
+
+on:
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: ci-command-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  handle-ci-command:
+    if: |
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '+ci-')
+    runs-on: ubuntu-22.04
+    permissions:
+      actions: write
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Handle +ci command
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issueNumber = context.issue.number;
+            const commentId = context.payload.comment.id;
+            const actor = context.actor;
+            const repoFullName = `${owner}/${repo}`;
+
+            const validCommands = [
+              '+ci-run-full',
+              '+ci-skip-full',
+              '+ci-stop-full',
+              '+ci-status',
+              '+ci-help'
+            ];
+
+            function commandText(commentBody) {
+              return commentBody
+                .replace(/```[\s\S]*?```/g, '')
+                .replace(/~~~[\s\S]*?~~~/g, '')
+                .split('\n')
+                .filter((line) => !/^\s*>/.test(line))
+                .join('\n');
+            }
+
+            function parseCommand(commentBody) {
+              const match = commandText(commentBody)
+                .match(/(?:^|\n)\s*(\+ci-[a-z0-9][a-z0-9-]*)(?:[ \t]+([^\n]*))?/i);
+
+              if (!match) {
+                return null;
+              }
+
+              return {
+                command: match[1].toLowerCase(),
+                args: (match[2] || '').trim()
+              };
+            }
+
+            async function postComment(body) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                body
+              });
+            }
+
+            async function addReaction(content) {
+              await github.rest.reactions.createForIssueComment({
+                owner,
+                repo,
+                comment_id: commentId,
+                content
+              });
+            }
+
+            async function hasWriteAccess() {
+              const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
+                owner,
+                repo,
+                username: actor
+              });
+
+              return ['admin', 'write'].includes(permission.permission);
+            }
+
+            async function getPullRequest() {
+              const { data: pr } = await github.rest.pulls.get({
+                owner,
+                repo,
+                pull_number: issueNumber
+              });
+
+              return pr;
+            }
+
+            async function addFullCiLabel() {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                labels: ['full-ci']
+              });
+            }
+
+            async function removeFullCiLabel() {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner,
+                  repo,
+                  issue_number: issueNumber,
+                  name: 'full-ci'
+                });
+                return true;
+              } catch (error) {
+                if (error.status === 404) {
+                  return false;
+                }
+
+                throw error;
+              }
+            }
+
+            async function listPullRequestLabels() {
+              const labels = await github.paginate(github.rest.issues.listLabelsOnIssue, {
+                owner,
+                repo,
+                issue_number: issueNumber,
+                per_page: 100
+              });
+
+              return labels.map((label) => label.name);
+            }
+
+            async function listPullRequestFiles() {
+              return github.paginate(github.rest.pulls.listFiles, {
+                owner,
+                repo,
+                pull_number: issueNumber,
+                per_page: 100
+              });
+            }
+
+            function isDocsOnly(files) {
+              return files.length > 0 &&
+                files.every((file) => file.filename.endsWith('.md') || file.filename.startsWith('docs/'));
+            }
+
+            async function findCurrentWaiver(sha) {
+              const marker = `<!-- ci-skip-full:${sha} -->`;
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner,
+                repo,
+                issue_number: issueNumber,
+                per_page: 100
+              });
+
+              return comments.reverse().find((comment) =>
+                comment.user?.login === 'github-actions[bot]' &&
+                comment.user?.type === 'Bot' &&
+                (comment.body || '').startsWith(marker)
+              );
+            }
+
+            function helpBody() {
+              return [
+                '## CI Commands',
+                '',
+                'Use these commands at the start of a PR comment line:',
+                '',
+                '- `+ci-run-full` - run the expensive full CI matrix and add `full-ci` for future commits',
+                '- `+ci-stop-full` - remove `full-ci` so future commits return to optimized CI',
+                '- `+ci-skip-full [reason]` - record a SHA-bound waiver for the expensive full CI matrix',
+                '- `+ci-status` - summarize the PR CI policy state',
+                '- `+ci-help` - show this help',
+                '',
+                'Arguments are optional free text after the command. For example:',
+                '',
+                '```',
+                '+ci-skip-full docs-only change; markdown checks are enough',
+                '```'
+              ].join('\n');
+            }
+
+            async function triggerFullCi(pr) {
+              if (pr.head.repo.full_name !== repoFullName) {
+                await postComment([
+                  'Unable to run full CI from this command because the PR branch is from a fork.',
+                  '',
+                  'A maintainer should push the branch to this repository or trigger the required workflows manually.'
+                ].join('\n'));
+                return;
+              }
+
+              const workflowMap = {
+                'Lint JS and Ruby': 'lint-js-and-ruby.yml',
+                'JS unit tests for Renderer package': 'package-js-tests.yml',
+                'Rspec test for gem': 'gem-tests.yml',
+                'Integration Tests': 'integration-tests.yml',
+                'Assets Precompile Check': 'precompile-check.yml',
+                'Generator tests': 'examples.yml',
+                'React on Rails Pro - Integration Tests': 'pro-integration-tests.yml',
+                'React on Rails Pro - Package Tests': 'pro-test-package-and-gem.yml'
+              };
+
+              const succeeded = [];
+              const failed = [];
+
+              for (const workflowName of Object.keys(workflowMap)) {
+                const workflowFile = workflowMap[workflowName];
+                try {
+                  await github.rest.actions.createWorkflowDispatch({
+                    owner,
+                    repo,
+                    workflow_id: workflowFile,
+                    ref: pr.head.ref,
+                    inputs: {
+                      force_run: 'true'
+                    }
+                  });
+                  succeeded.push({ id: workflowFile, name: workflowName });
+                } catch (error) {
+                  failed.push({ workflow: workflowName, error: error.message });
+                }
+              }
+
+              let labelAdded = false;
+              if (succeeded.length > 0) {
+                try {
+                  await addFullCiLabel();
+                  labelAdded = true;
+                } catch (error) {
+                  failed.push({ workflow: 'full-ci label', error: error.message });
+                }
+              }
+
+              const failedList = failed.length > 0
+                ? `\n\nFailed:\n${failed.map((failure) => `- ${failure.workflow}: ${failure.error}`).join('\n')}`
+                : '';
+
+              await postComment([
+                '## Full CI Requested',
+                '',
+                `Triggered ${succeeded.length} workflow(s) for \`${pr.head.sha.slice(0, 12)}\`.`,
+                labelAdded
+                  ? 'Added `full-ci`, so future commits on this PR will keep running the full matrix until `+ci-stop-full` is used.'
+                  : 'The `full-ci` label was not added because no workflows were triggered.',
+                '',
+                'View progress in the Actions tab.',
+                failedList
+              ].join('\n'));
+
+              if (failed.length > 0) {
+                core.setFailed(`Failed to trigger: ${failed.map((failure) => failure.workflow).join(', ')}`);
+              }
+            }
+
+            async function handleSkipFull(pr, args) {
+              const removedFullCi = await removeFullCiLabel();
+              const reason = args || 'not provided';
+              const shortSha = pr.head.sha.slice(0, 12);
+
+              await postComment([
+                `<!-- ci-skip-full:${pr.head.sha} -->`,
+                '## Full CI Waived for This SHA',
+                '',
+                `@${actor} waived the expensive full CI matrix for \`${shortSha}\`.`,
+                `Reason: ${reason}`,
+                '',
+                'This waiver is bound to the current head SHA and does not apply after another push.',
+                'Standard optimized CI still applies for the files changed in this PR.',
+                removedFullCi ? '' : '',
+                removedFullCi ? 'Removed `full-ci` from this PR.' : ''
+              ].filter(Boolean).join('\n'));
+            }
+
+            async function handleStopFull() {
+              const removed = await removeFullCiLabel();
+              await postComment([
+                '## Full CI Mode Disabled',
+                '',
+                removed
+                  ? 'Removed `full-ci`. Future commits will use optimized path-based CI.'
+                  : '`full-ci` was not present. Future commits are already using optimized path-based CI.',
+                '',
+                'Use `+ci-run-full` to re-enable full CI mode.'
+              ].join('\n'));
+            }
+
+            async function handleStatus(pr) {
+              const [labels, files, waiver] = await Promise.all([
+                listPullRequestLabels(),
+                listPullRequestFiles(),
+                findCurrentWaiver(pr.head.sha)
+              ]);
+
+              const docsOnly = isDocsOnly(files);
+              const hasFullCi = labels.includes('full-ci');
+
+              await postComment([
+                '## CI Status',
+                '',
+                `Head SHA: \`${pr.head.sha.slice(0, 12)}\``,
+                `Changed files: ${files.length}`,
+                `Docs-only heuristic: ${docsOnly ? 'yes' : 'no'}`,
+                `\`full-ci\` label: ${hasFullCi ? 'present' : 'absent'}`,
+                `Current full-CI waiver: ${waiver ? 'present for this SHA' : 'not present for this SHA'}`,
+                '',
+                hasFullCi
+                  ? 'Full CI mode is enabled for this PR.'
+                  : 'Optimized path-based CI is active unless full CI is requested.'
+              ].join('\n'));
+            }
+
+            const parsed = parseCommand(context.payload.comment.body || '');
+            if (!parsed) {
+              return;
+            }
+
+            const userHasWriteAccess = await hasWriteAccess();
+
+            if (!validCommands.includes(parsed.command)) {
+              if (!userHasWriteAccess) {
+                return;
+              }
+
+              await addReaction('confused');
+              await postComment([
+                `Unknown CI command: \`${parsed.command}\`.`,
+                '',
+                helpBody()
+              ].join('\n'));
+              return;
+            }
+
+            if (!userHasWriteAccess) {
+              await postComment(`@${actor} Sorry, only repository collaborators with write access can use CI commands.`);
+              core.setFailed(`User ${actor} does not have write access`);
+              return;
+            }
+
+            const pr = await getPullRequest();
+
+            switch (parsed.command) {
+              case '+ci-run-full':
+                await addReaction('rocket');
+                await triggerFullCi(pr);
+                break;
+              case '+ci-skip-full':
+                await addReaction('eyes');
+                await handleSkipFull(pr, parsed.args);
+                break;
+              case '+ci-stop-full':
+                await addReaction('eyes');
+                await handleStopFull();
+                break;
+              case '+ci-status':
+                await addReaction('eyes');
+                await handleStatus(pr);
+                break;
+              case '+ci-help':
+                await addReaction('eyes');
+                await postComment(helpBody());
+                break;
+            }

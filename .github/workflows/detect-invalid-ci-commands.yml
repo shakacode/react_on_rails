@@ -82,7 +82,7 @@ jobs:
 
             ## Available GitHub Comment Commands
 
-            ### 1. \\\`/run-skipped-ci\\\` (or \\\`/run-skipped-tests\\\`) - Enable Full CI Mode
+            ### 1. \\\`+ci-run-full\\\` - Enable Full CI Mode
             Triggers all CI workflows that were skipped due to unchanged code.
 
             **What it does:**
@@ -96,14 +96,12 @@ jobs:
 
             **Example:**
             \\\`\\\`\\\`
-            /run-skipped-ci
-            # or use the shorter alias:
-            /run-skipped-tests
+            +ci-run-full
             \\\`\\\`\\\`
 
             ---
 
-            ### 2. \\\`/stop-run-skipped-ci\\\` - Disable Full CI Mode
+            ### 2. \\\`+ci-stop-full\\\` - Disable Full CI Mode
             Returns to standard CI behavior (optimized suite, skips tests for unchanged code).
 
             **What it does:**
@@ -116,12 +114,22 @@ jobs:
 
             **Example:**
             \\\`\\\`\\\`
-            /stop-run-skipped-ci
+            +ci-stop-full
             \\\`\\\`\\\`
 
             ---
 
-            ### 3. \\\`@claude\\\` - Claude Code AI Review
+            ### 3. \\\`+ci-skip-full [reason]\\\` - Record a Full CI Waiver
+            Records that a maintainer intentionally waived full CI for the current PR head SHA.
+
+            **Example:**
+            \\\`\\\`\\\`
+            +ci-skip-full docs-only change; markdown checks are enough
+            \\\`\\\`\\\`
+
+            ---
+
+            ### 4. \\\`@claude\\\` - Claude Code AI Review
             Invokes Claude Code AI to perform code review or answer questions.
 
             **What it does:**
@@ -162,6 +170,8 @@ jobs:
             \\\`\\\`\\\`
 
             ---
+
+            Legacy slash aliases still work, but \\\`+ci-*\\\` commands are preferred because GitHub's comment editor uses \\\`/\\\` for built-in slash command autocomplete.
 
             📖 For more details, see the [Contributing Guide](https://github.com/shakacode/react_on_rails/blob/main/CONTRIBUTING.md#using-comment-commands-to-trigger-ci)\`;
 

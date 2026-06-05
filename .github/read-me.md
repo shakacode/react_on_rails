@@ -4,14 +4,12 @@ This directory contains GitHub Actions workflows for continuous integration and 
 
 ## PR Comment Commands
 
-### `/run-skipped-ci` (or `/run-skipped-tests`) - Run Full CI Suite
+### `+ci-run-full` - Run Full CI Suite
 
 When you open a PR, CI automatically runs a subset of tests for faster feedback (latest Ruby/Node versions only). To run the **complete CI suite** including all dependency combinations, add a comment to your PR:
 
 ```
-/run-skipped-ci
-# or use the shorter alias:
-/run-skipped-tests
++ci-run-full
 ```
 
 This command will trigger:
@@ -35,7 +33,15 @@ By default, PRs run a subset of CI jobs to provide fast feedback:
 - Skips example generator tests
 - Skips some Pro package tests
 
-This is intentional to keep PR feedback loops fast. However, before merging, you should verify compatibility across all supported versions. The `/run-skipped-ci` (or `/run-skipped-tests`) command makes this easy without waiting for the PR to be merged to main.
+This is intentional to keep PR feedback loops fast. However, before merging high-risk changes, you should verify compatibility across all supported versions. The `+ci-run-full` command makes this easy without waiting for the PR to be merged to main.
+
+For low-risk or docs-only changes where a maintainer intentionally does not want full CI, use:
+
+```
++ci-skip-full docs-only change; markdown checks are enough
+```
+
+The reason is optional. The bot records the current PR head SHA so the waiver is auditable and does not apply after another push.
 
 ### Security & Access Control
 
@@ -45,11 +51,11 @@ This is intentional to keep PR feedback loops fast. However, before merging, you
 - Unauthorized access to Pro package tests
 - Potential DoS attacks via repeated CI runs
 
-If an unauthorized user attempts to use `/run-skipped-ci` or `/run-skipped-tests`, they'll receive a message explaining the restriction.
+If an unauthorized user attempts to use `+ci-run-full`, they'll receive a message explaining the restriction.
 
 ### Concurrency Protection
 
-Multiple `/run-skipped-ci` or `/run-skipped-tests` comments on the same PR will cancel in-progress runs to prevent resource waste and duplicate results.
+Multiple CI command comments on the same PR run one at a time so a status/help command cannot interrupt a full-CI dispatch.
 
 ## Testing Comment-Triggered Workflows
 
@@ -83,7 +89,8 @@ For more details, see [GitHub's documentation on issue_comment events](https://d
 
 ### Utility Workflows
 
-- **`run-skipped-ci.yml`** - Triggered by `/run-skipped-ci` or `/run-skipped-tests` comment on PRs
+- **`ci-commands.yml`** - Triggered by `+ci-*` comments on PRs
+- **`run-skipped-ci.yml`** - Legacy workflow triggered by `/run-skipped-ci` or `/run-skipped-tests` comment on PRs
 - **`pr-welcome-comment.yml`** - Auto-comments on new PRs with helpful info
 - **`detect-changes.yml`** - Detects which parts of the codebase changed
 
@@ -110,6 +117,6 @@ Many workflows use change detection to skip unnecessary jobs:
 
 - Runs all jobs on pushes to `main`
 - Runs only relevant jobs on PRs based on changed files
-- Can be overridden with `workflow_dispatch` or `/run-skipped-ci` (or `/run-skipped-tests`) command
+- Can be overridden with `workflow_dispatch` or `+ci-run-full`
 
 See `script/ci-changes-detector` for the change detection logic.
