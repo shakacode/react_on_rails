@@ -12,4 +12,5 @@ module RegressionReport
   SUITE_NAME = "suite_name"
   SHARD_LABEL = "shard_label"
   SUMMARY = "summary"
+  REGRESSED_BENCHMARKS = "regressed_benchmarks"
 end
