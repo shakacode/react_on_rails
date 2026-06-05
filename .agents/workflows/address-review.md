@@ -129,12 +129,12 @@ Execution flow when terminal access is available:
      ```
      Quick actions:
       f     — Fix must-fix items, then prompt for optional/discuss handling and skipped rationale replies
-      f+i   — Fix must-fix + create follow-up issue for discuss/optional items (and non-trivial skipped items)
+      f+i   — Fix must-fix + prepare one deferred-work bundle for discuss/optional items (and non-trivial skipped items)
       f+o   — Fix must-fix + address all optional items inline in the same PR
       d     — Discuss specific items before deciding (e.g., "d2,4"). Bare "d" presents all DISCUSS items.
       o     — Address specific optional items inline (e.g., "o6,7"). Bare "o" presents all OPTIONAL items for selection.
       r     — Reply with rationale to items (e.g., "r3,5", "r7-9", "r all skipped", "r all optional", "r all discuss"); add `+ resolve` to also resolve threads
-      m     — Skip code changes + create follow-up issue for must-fix/discuss/optional items (and non-trivial skipped items)
+      m     — Skip code changes + prepare one deferred-work bundle for must-fix/discuss/optional items (and non-trivial skipped items)
 
      Or pick items by number: "1,2", "all must-fix", "all optional", "1,3-5"
      ```
@@ -145,13 +145,13 @@ Execution flow when terminal access is available:
    - Do not post the PR summary checkpoint yet. Post it only after a chosen action reaches a stable stopping point so the summary reflects the new baseline.
 
 8. Execute the chosen action:
-   - **`f`**: Fix all must-fix items (if none exist, skip fix phase). If local changes exist, commit, ask for push confirmation, then push; if no local changes, skip commit/push and continue decision flow. Then reply/resolve addressed must-fix threads. If `OPTIONAL` items exist, present them and prompt me to choose: `o <nums>` to address inline, `f+i` to defer to a follow-up issue, or `r all optional + resolve` to decline and close (do not auto-address or auto-resolve optional items in `f`). If skipped items exist, ask for explicit confirmation before posting rationale replies/resolving skipped threads. Keep discuss items for an explicit follow-up decision (`d`, `f+i`, or `r all discuss + resolve`). Tell me the PR is merge-ready after `DISCUSS` items are resolved or explicitly deferred; `OPTIONAL` items do not block merge-readiness.
-   - **`f+i`**: Same must-fix handling as `f`, plus create a follow-up GitHub issue bundling discuss, optional, and non-trivial skipped items (in distinct sections). For trivial skipped items excluded from the follow-up issue (duplicates, factually incorrect suggestions, status noise), ask whether to post rationale replies and resolve those threads; default is no replies unless I opt in. For general PR comments and review summary bodies (which have no thread), the reply alone is sufficient. If there are no deferred items, skip issue creation and behave like `f`. No additional commit is needed unless later steps introduce local changes.
+   - **`f`**: Fix all must-fix items (if none exist, skip fix phase). If local changes exist, commit, ask for push confirmation, then push; if no local changes, skip commit/push and continue decision flow. Then reply/resolve addressed must-fix threads. If `OPTIONAL` items exist, present them and prompt me to choose: `o <nums>` to address inline, `f+i` to prepare a deferred-work bundle, or `r all optional + resolve` to decline and close (do not auto-address or auto-resolve optional items in `f`). If skipped items exist, ask for explicit confirmation before posting rationale replies/resolving skipped threads. Keep discuss items for an explicit follow-up decision (`d`, `f+i`, or `r all discuss + resolve`). Tell me the PR is merge-ready after `DISCUSS` items are resolved or explicitly deferred; `OPTIONAL` items do not block merge-readiness.
+   - **`f+i`**: Same must-fix handling as `f`, then prepare one deferred-work bundle for discuss, optional, and non-trivial skipped items (in distinct sections). Do not create a GitHub issue yet. Present the bundle and ask whether to link an existing issue, create one bundled follow-up issue, post a PR summary comment only, or drop the bundle as not worth tracking. For trivial skipped items excluded from the bundle (duplicates, factually incorrect suggestions, status noise), ask whether to post rationale replies and resolve those threads; default is no replies unless I opt in. For general PR comments and review summary bodies (which have no thread), the reply alone is sufficient. If there are no deferred items, skip deferred tracking and behave like `f`. No additional commit is needed unless later steps introduce local changes.
    - **`f+o`**: Same must-fix handling as `f`, plus address all `OPTIONAL` items inline in the same PR (make the code change, reply, resolve each thread). If optional fixes require a separate commit to keep the must-fix commit atomic, commit them and ask for push confirmation before pushing the additional commit. Then handle `DISCUSS` and `SKIPPED` items using `f`'s prompts for those tiers (skip the optional-items prompt; optional is already done). Tell me the PR is merge-ready once all selected work is pushed and `DISCUSS` items are resolved or explicitly deferred. If there are zero `OPTIONAL` items, behave like `f` and note that `f+o` had nothing additional to do.
    - **`d`**: Present requested items with full context, ask for a decision on each. Bare `d` presents all DISCUSS items. Approved → fix like must-fix (use the same commit/push-before-reply ordering as `f` when code changes occur). Declined → optionally reply with rationale. Note: `d` only accepts `DISCUSS` item numbers. If any selected number refers to an `OPTIONAL`, `MUST-FIX`, or `SKIPPED` item, do not proceed — respond with "Item N is {tier} — use `{o|f|r}` instead" for each mismatched number and ask for a corrected selection.
    - **`o`**: Present requested items with full context. Bare `o` presents all `OPTIONAL` items for selection. For each selected optional item, treat it the same as a must-fix: make the code change, run relevant checks, reply, and resolve the thread. Use the same commit/push-before-reply ordering as `f`. For optional items I decline, offer a rationale reply via `r <nums>`. Note: `o` only accepts `OPTIONAL` item numbers. If any selected number refers to a `DISCUSS`, `MUST-FIX`, or `SKIPPED` item, do not proceed — respond with "Item N is {tier} — use `{d|f|r}` instead" for each mismatched number and ask for a corrected selection.
    - **`r`**: Post rationale replies only for `SKIPPED`/`OPTIONAL`/`DISCUSS` items. Do not resolve threads unless I explicitly ask to resolve them. If selection includes any `MUST-FIX` item (including `r all must-fix`), direct me to `f` or explicit deferral (`f+i`/`m`) instead of replying.
-   - **`m`**: Create a follow-up issue for deferred items, reply in the original location for each deferred item (review-comment replies for inline comments; issue comments for general/review-summary comments), and resolve `DISCUSS`/`OPTIONAL`/`SKIPPED` threads when threads exist. Keep deferred `MUST-FIX` threads open by default unless I explicitly ask to close them. If any `MUST-FIX` items are deferred, signal that the PR is **not merge-ready** without an override decision.
+   - **`m`**: Prepare one deferred-work bundle for must-fix, discuss, optional, and non-trivial skipped items. Do not create a GitHub issue yet. Ask whether to link an existing issue, create one bundled follow-up issue, post a PR summary comment only, or drop the bundle. Reply in the original location for each deferred item only after I choose the tracking outcome. Resolve `DISCUSS`/`OPTIONAL`/`SKIPPED` threads when threads exist and the conversation is complete. Keep deferred `MUST-FIX` threads open by default unless I explicitly ask to close them. If any `MUST-FIX` items are deferred, signal that the PR is **not merge-ready** without an override decision.
    - **Direct selection** (e.g., "1,2", "all must-fix", "all optional", "1,3-5"): Address only selected items; if code changes were made, commit/push with confirmation before replying/resolving; then ask about remaining items.
    - Users can chain actions (e.g., `f+i` then `r7-9`).
    - Reply to each addressed review comment:
@@ -165,14 +165,21 @@ Execution flow when terminal access is available:
    - Ask for push confirmation before running `git push`.
    - **Parallel fixes**: When there are 2+ items to fix that touch different files with no logical dependencies, process them in parallel if your environment supports concurrent execution (e.g., sub-agents, background tasks). Items in the same file or with cross-file dependencies must be fixed sequentially. Instruct each sub-agent **not to commit** — all changes must remain unstaged so the self-review gate can run on the combined diff. After parallel fixes complete, verify no conflicts exist between the changes by checking whether any sub-agents touched the same files (`git diff --name-only`).
 
-9. Create follow-up issue (when `f+i` or `m` is chosen):
-   - Use `gh issue create --repo "${REPO}"` with title "Follow-up: Review feedback from PR #N"
+9. Deferred-work tracking (after `f+i`, `m`, or an explicit user request):
+   - Follow-up issues are expensive; default to no new issue.
+   - Present one deferred-work bundle and ask the user to choose: link an existing issue, create one bundled follow-up issue, post a PR summary comment only, or drop the bundle.
+   - Create at most one follow-up issue per PR by default. More than one follow-up issue requires explicit user approval.
+   - Every new follow-up issue title must begin with the exact prefix `Follow-up:`. For this workflow, use title `Follow-up: Review feedback from PR #N`.
+   - Build the issue body as a Markdown temp file and create the issue with `gh issue create --repo "${REPO}" --title "Follow-up: Review feedback from PR #N" --body-file "${issue_body_file}"`
+   - Do not pass multi-line Markdown through `--body`; this can leak literal `\n` text into the GitHub issue.
+   - Before creating the issue, inspect the body file and fix or abort if it contains literal `\n` escape sequences instead of real newlines.
    - For `f+i`, include discuss items, optional items, and non-trivial skipped items (must-fix is already addressed)
    - For `m`, include deferred must-fix items, discuss items, optional items, and non-trivial skipped items
    - Keep issue body structure consistent: use an optional `### Must-fix items (deferred)` section (for `m` only), then `### Discuss items`, then `### Optional items`, then `### Skipped items (non-trivial)`, plus the original PR link at the bottom
    - Omit any section heading whose content bucket is empty
-   - Reference the issue in thread replies
-   - Return the issue URL
+   - Only include actionable deferred work that remains useful outside the PR review context. Do not include pure duplicates, factually incorrect suggestions, status noise, or weak "could consider" comments.
+   - Reference the selected tracking outcome in thread replies: existing issue, new issue URL, PR summary comment, or "not tracking".
+   - Return the selected tracking outcome and issue URL if one was created
 
 10. Post a PR summary comment:
    - After any chosen action or completed action chain (`f`, `f+i`, `f+o`, `d`, `o`, `r`, `m`, or direct item selection), post a consolidated general PR comment that becomes the next default review cutoff.
@@ -180,7 +187,7 @@ Execution flow when terminal access is available:
    - Use a `Mattered` section for `MUST-FIX` and `DISCUSS` items, including whether each item was addressed, deferred, or left pending by user choice.
    - Use an `Optional` section listing `OPTIONAL` items and whether they were addressed inline, deferred to a follow-up issue, or declined.
    - Use a `Skipped` section for `SKIPPED` items with short reasons.
-   - Mention any follow-up issue URL that was created.
+   - Mention any deferred-work tracking outcome and follow-up issue URL that was created.
    - Mention whether the run used the default cutoff or the explicit `check all reviews` override.
    - End with a note that future full-PR scans should start after this comment unless I say `check all reviews`.
    - Use exact timestamps in the summary when referring to the scan window.
@@ -188,12 +195,12 @@ Execution flow when terminal access is available:
 
 11. Merge-ready signal:
    - After `f`, tell me the PR is merge-ready after `DISCUSS` items are resolved or explicitly deferred. `OPTIONAL` items do not block merge-readiness.
-   - After `f+i`, tell me the PR is merge-ready
+   - After `f+i`, tell me the PR is merge-ready only after the deferred bundle has an explicit tracking/drop decision
    - After `f+o`, tell me the PR is merge-ready once all selected work is pushed and `DISCUSS` items are resolved or explicitly deferred
-   - After `m`, only tell me the PR is merge-ready when no must-fix items were deferred; otherwise explicitly say it is not merge-ready
+   - After `m`, only tell me the PR is merge-ready when no must-fix items were deferred and the deferred bundle has an explicit tracking/drop decision; otherwise explicitly say it is not merge-ready
    - After direct selection, do not signal merge-ready automatically; first evaluate remaining `MUST-FIX`/`DISCUSS` items and ask whether to continue with `f`, `f+i`, `f+o`, `d`, `o`, `r`, or `m`. Unresolved `OPTIONAL` items do not block the merge-ready signal.
    - After `d`, `o`, or `r`, if unresolved `MUST-FIX`/`DISCUSS` items remain, do not signal merge-ready automatically; re-offer `f`, `f+i`, `f+o`, `d`, `o`, `r`, or `m`. Unresolved `OPTIONAL` items do not block the merge-ready signal.
-   - Show the follow-up issue URL if one was created
+   - Show the deferred-work tracking outcome if one was chosen
    - Do not auto-merge
 
 Output format for the triage:
@@ -214,12 +221,12 @@ SKIPPED (count):
 
 Quick actions:
   f     — Fix #N, then prompt for optional/discuss handling and skipped rationale replies
-  f+i   — Fix #N, create follow-up issue for discuss/optional/non-trivial skipped items, reply/resolve trivial skipped rest
+  f+i   — Fix #N, prepare one deferred-work bundle for discuss/optional/non-trivial skipped items
   f+o   — Fix #N plus address all optional items inline
   d     — Discuss specific items (e.g., "d2,4"). Bare "d" presents all DISCUSS items.
   o     — Address specific optional items inline (e.g., "o6,7"). Bare "o" presents all OPTIONAL items.
   r     — Reply with rationale (e.g., "r3,5", "r3-5", "r all skipped", "r all optional", "r all discuss"); add `+ resolve` to also resolve threads
-  m     — No code changes, create follow-up issue for must-fix/discuss/optional/non-trivial skipped items
+  m     — No code changes, prepare one deferred-work bundle for must-fix/discuss/optional/non-trivial skipped items
 
 Or pick items by number: "1,2", "all must-fix", "all optional", "1,3-5"
 ````

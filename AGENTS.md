@@ -10,6 +10,7 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
 - `.claude/commands/`: Claude Code slash commands
 - `.claude/skills/`: Claude Code skills
 - `.agents/workflows/`: shared prompt templates and reusable workflows for Codex, GPT, and other non-Claude tools
+- When the user assigns an issue, PR, review-fix pass, or merge queue to an agent, follow `.agents/workflows/pr-processing.md`
 - When the user asks to address PR review comments outside Claude slash commands, follow `.agents/workflows/address-review.md`
 
 ## Canonical Agent Policy
@@ -171,6 +172,12 @@ restores/saves the gem cache, and supports non-frozen installs via `frozen: 'fal
 **Commit messages**: Explain why, not what. One logical change per commit.
 
 **PR creation**: Use `gh pr create` with a clear title, summary, and test plan.
+
+**PR processing**: Before pushing a review-fix batch, opening a PR, marking a PR ready, requesting full CI, or reporting merge-readiness, run the agent PR processing flow in `.agents/workflows/pr-processing.md`: verify the work is worth doing, self-review the diff, run local validation, batch fixes, and document exact verification evidence.
+
+**Full CI usage**: Do not use full CI as the first real validation pass. Prefer local checks and targeted CI first. When the `+ci-*` PR comment commands are available, use `+ci-status` before deciding on full CI, `+ci-run-full` only at the final readiness gate, `+ci-stop-full` when an iterating PR should stop rerunning full CI, and `+ci-skip-full [reason]` only with explicit maintainer approval for an auditable low-risk waiver. Until those commands are available, use the current full-CI trigger documented in `.github/read-me.md` with the same readiness gate.
+
+**GitHub follow-up issues**: Follow-up issues are the exception. Prefer fixing or declining review feedback in the PR. If deferred work remains valuable, present one bundled deferred-work summary and ask whether to track it. Prefer an existing issue; otherwise create at most one bundled issue per PR unless the user explicitly approves more. New follow-up issue titles must begin with `Follow-up:`. Build multi-line issue bodies as Markdown files and pass them with `gh issue create --body-file`; do not pass escaped newline strings through `--body`.
 
 ## Review Workflow
 

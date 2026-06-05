@@ -203,10 +203,10 @@ After the triage list, present a **quick-action menu**:
 ```text
 Quick actions:
   f     — Fix must-fix items, then confirm whether to reply/resolve skipped items before deciding discuss items
-  f+i   — Fix must-fix + create follow-up issue for discuss/non-trivial skipped items
+  f+i   — Fix must-fix + prepare one deferred-work bundle for discuss/non-trivial skipped items
   d     — Discuss specific items before deciding (e.g., "d2,4"). Bare "d" presents all DISCUSS items.
   r     — Reply with rationale to items (e.g., "r3,5", "r7-9", "r all skipped", "r all discuss"); add `+ resolve` to also resolve those threads
-  m     — Skip code changes + create follow-up issue for must-fix/discuss/non-trivial skipped items
+  m     — Skip code changes + prepare one deferred-work bundle for must-fix/discuss/non-trivial skipped items
 
 Or pick items by number: "1,2", "all must-fix", "1,3-5"
 ```
@@ -229,19 +229,20 @@ Do not post the PR summary checkpoint during this triage-only phase. Post it onl
 3. Reply to each addressed comment explaining the fix.
 4. Resolve the corresponding review threads.
 5. If `SKIPPED` items exist, ask for explicit confirmation before posting rationale replies and resolving those threads (for example: "Reply/resolve 3 skipped items? y/n").
-6. Do **not** auto-resolve `DISCUSS` items in `f`; after must-fix work, re-present discuss items and prompt the user to choose `d` (discuss), `f+i` (create follow-up issue), or `r all discuss + resolve`. If `f` starts with zero `MUST-FIX` items, show this discuss decision menu immediately.
+6. Do **not** auto-resolve `DISCUSS` items in `f`; after must-fix work, re-present discuss items and prompt the user to choose `d` (discuss), `f+i` (prepare a deferred-work bundle), or `r all discuss + resolve`. If `f` starts with zero `MUST-FIX` items, show this discuss decision menu immediately.
 7. Tell the user the PR is merge-ready only after `DISCUSS` items are resolved or explicitly deferred.
-8. If any `DISCUSS` items remain, explicitly prompt with the next action (for example: "DISCUSS items remain - use `d` to review, `f+i` to defer to a follow-up issue, or `r all discuss + resolve` to decline and close.").
+8. If any `DISCUSS` items remain, explicitly prompt with the next action (for example: "DISCUSS items remain - use `d` to review, `f+i` to prepare a deferred-work bundle, or `r all discuss + resolve` to decline and close.").
 
-### Action `f+i` — Fix, follow-up issue, and merge-ready
+### Action `f+i` — Fix, deferred-work bundle, and merge-ready
 
 1. Do everything in `f` for `MUST-FIX` items. If there are no `MUST-FIX` items, skip the fix phase and continue with deferred-item handling.
-2. Create a **follow-up GitHub issue** (see Step 9) bundling all `DISCUSS` and non-trivial `SKIPPED` items.
-3. For each deferred item in the follow-up issue, post a reply in the original location referencing the issue (use review-comment replies for inline comments and issue comments for review summaries/general comments), and resolve the thread when one exists. For general PR comments and review summary bodies (which have no thread), the reply alone is sufficient.
-4. For trivial `SKIPPED` items that are not included in the follow-up issue (duplicates, factually incorrect suggestions, status noise), still post rationale replies and resolve those threads.
-5. If there are zero deferred items, skip issue creation and behave like `f`.
-6. No additional commit is required unless later steps introduce local changes; if they do, commit and ask for push confirmation before pushing.
-7. Tell the user the PR is merge-ready.
+2. Prepare one deferred-work bundle for all `DISCUSS` and non-trivial `SKIPPED` items. Do not create a GitHub issue yet.
+3. Present the bundle and ask whether to link an existing issue, create one bundled follow-up issue, post a PR summary comment only, or drop the bundle as not worth tracking.
+4. For each deferred item in the chosen tracking outcome, post a reply in the original location referencing that outcome (use review-comment replies for inline comments and issue comments for review summaries/general comments), and resolve the thread when one exists and the conversation is complete. For general PR comments and review summary bodies (which have no thread), the reply alone is sufficient.
+5. For trivial `SKIPPED` items that are not included in the bundle (duplicates, factually incorrect suggestions, status noise), still post rationale replies and resolve those threads only when the user confirms.
+6. If there are zero deferred items, skip deferred tracking and behave like `f`.
+7. No additional commit is required unless later steps introduce local changes; if they do, commit and ask for push confirmation before pushing.
+8. Tell the user the PR is merge-ready only after the deferred bundle has an explicit tracking/drop decision.
 
 ### Action `d` — Discuss items
 
@@ -256,12 +257,13 @@ Post rationale replies to the specified items explaining why they are being defe
 
 ### Action `m` — Merge as-is
 
-1. Create a follow-up GitHub issue (see Step 9) bundling `MUST-FIX`, `DISCUSS`, and non-trivial `SKIPPED` items.
-2. Post replies in the original location for each deferred item: use review-comment replies for inline comments and issue comments for review summaries/general comments.
-3. Resolve `DISCUSS` and `SKIPPED` review threads after replying (resolve only when a thread exists).
-4. If any `MUST-FIX` items were deferred, keep those review threads open by default unless the user explicitly asks to close them.
-5. If any `MUST-FIX` items were deferred, explicitly tell the user the PR is **not merge-ready** without an override decision.
-6. Only signal merge-ready with no code changes when there are zero deferred `MUST-FIX` items.
+1. Prepare one deferred-work bundle for `MUST-FIX`, `DISCUSS`, and non-trivial `SKIPPED` items. Do not create a GitHub issue yet.
+2. Ask whether to link an existing issue, create one bundled follow-up issue, post a PR summary comment only, or drop the bundle.
+3. Post replies in the original location for each deferred item only after the user chooses the tracking outcome: use review-comment replies for inline comments and issue comments for review summaries/general comments.
+4. Resolve `DISCUSS` and `SKIPPED` review threads after replying (resolve only when a thread exists and the conversation is complete).
+5. If any `MUST-FIX` items were deferred, keep those review threads open by default unless the user explicitly asks to close them.
+6. If any `MUST-FIX` items were deferred, explicitly tell the user the PR is **not merge-ready** without an override decision.
+7. Only signal merge-ready with no code changes when there are zero deferred `MUST-FIX` items and the deferred bundle has an explicit tracking/drop decision.
 
 ### Direct item selection (e.g., "1,2", "all must-fix", "1,3-5")
 
@@ -269,7 +271,7 @@ Address only the selected items. After completing them:
 
 1. If selected items produced local changes, commit and ask for push confirmation before pushing (skip this step when there are no local changes).
 2. Reply and resolve threads for addressed items.
-3. Ask whether remaining items should receive rationale replies, a follow-up issue, or be left as-is.
+3. Ask whether remaining items should receive rationale replies, one deferred-work bundle, or be left as-is.
 
 ### Combination actions
 
@@ -325,9 +327,18 @@ Do not resolve a thread if the fix is still pending, if you are unsure whether t
 
 If the user explicitly asks to close out a `DISCUSS` or `SKIPPED` item, reply with the rationale and resolve the thread only when the conversation is actually complete.
 
-## Step 9: Create Follow-Up Issue (when requested)
+## Step 9: Deferred-Work Tracking (when requested)
 
-When the user chooses `f+i`, `m`, or explicitly asks for a follow-up issue, create a GitHub issue that bundles deferred items.
+When the user chooses `f+i`, `m`, or explicitly asks for deferred tracking, prepare one deferred-work bundle first. Do not create a GitHub issue until the user chooses that tracking outcome.
+
+Ask the user to choose one outcome:
+
+- Link an existing issue
+- Create one bundled follow-up issue
+- Post a PR summary comment only
+- Drop the bundle as not worth tracking
+
+Only create a GitHub issue after the user chooses "create one bundled follow-up issue".
 
 **Run Steps 9 and 10 in a single shell call.** They share state — `${FOLLOW_UP_URL}` set in Step 9 is consumed by Step 10's summary template, `${issue_body_file}` and `${summary_body_file}` share an EXIT trap, and the `_cleanup_addr_review` function is defined once. Agents that execute each Bash tool call in a fresh subshell (the default in Claude Code and similar harnesses) will lose `${FOLLOW_UP_URL}` between calls and trigger Step 9's cleanup trap before Step 10 runs. Combine both steps into one heredoc/chained invocation, or capture Step 9's `FOLLOW_UP_URL` from stdout and pass it explicitly into Step 10's invocation.
 
@@ -366,7 +377,7 @@ ${SKIPPED_ITEMS}
 fi
 
 if [ -z "${MUST_FIX_SECTION}${DISCUSS_SECTION}${SKIPPED_SECTION}" ]; then
-  echo "No deferred items found; skip follow-up issue creation."
+  echo "No deferred items found; skip deferred tracking."
 else
   issue_body_file="$(mktemp)"
   # Cleanup covers both temp files; Step 10 redefines _cleanup_addr_review for its standalone path.
@@ -394,21 +405,32 @@ else
     printf 'Original PR: https://github.com/%s/pull/%s\n' "${REPO}" "${PR_NUMBER}"
   } > "${issue_body_file}"
 
+  if grep -n '\\n' "${issue_body_file}"; then
+    echo "Refusing to create issue: body contains literal \\n escapes" >&2
+    exit 1
+  fi
+
   FOLLOW_UP_URL=$(gh issue create --repo "${REPO}" --title "Follow-up: Review feedback from PR #${PR_NUMBER}" --body-file "${issue_body_file}" --json url -q .url)
 fi
 ```
 
 Rules for follow-up issues:
 
+- Follow-up issues are expensive; default to no new issue.
+- Prefer linking an existing issue over creating a new one.
+- Create at most one follow-up issue per PR by default. More than one follow-up issue requires explicit user approval.
+- Every new follow-up issue title must begin with the exact prefix `Follow-up:`.
+- Build multi-line issue bodies with `--body-file`; never pass escaped newline strings through `--body`.
 - Only include non-trivial `SKIPPED` items (skip pure duplicates and factually incorrect suggestions)
 - For `f+i`, omit the must-fix section because must-fix items were addressed in the current PR
 - For `m`, include a must-fix section with heading `### Must-fix items (deferred)` and deferred blockers
 - Omit any section heading when its corresponding item list is empty
 - Include the original reviewer username and comment link for each item
 - Include enough context that someone can act on the issue without re-reading the full PR review
-- After creating the issue, reference it in thread replies (e.g., "Tracked in #NNN for follow-up")
+- Do not include pure duplicates, factually incorrect suggestions, style nits, status noise, or weak "could consider" comments
+- After the user chooses a tracking outcome, reference that outcome in thread replies: existing issue, new issue URL, PR summary comment, or "not tracking"
 - Capture the `gh issue create` output into `FOLLOW_UP_URL` (as shown above) so Step 10's summary comment can include the link
-- Return the issue URL to the user
+- Return the selected tracking outcome and issue URL if one was created
 
 ## Step 10: Post PR Summary Comment
 
@@ -420,7 +442,7 @@ Rules for the summary comment:
 - Include the exact marker `<!-- address-review-summary -->` on its own line near the top.
 - Summarize `MUST-FIX` and `DISCUSS` items under a `Mattered` section, including whether each item was addressed, deferred, or left pending by user choice.
 - Summarize `SKIPPED` items under a `Skipped` section with short reasons.
-- Mention any follow-up issue URL that was created.
+- Mention any deferred-work tracking outcome and follow-up issue URL that was created.
 - Mention whether the run used the default cutoff or the explicit `check all reviews` override.
 - End with a note that future full-PR scans should start after this comment unless the user says `check all reviews`.
 
@@ -462,19 +484,20 @@ After completing the chosen action (`f`, `f+i`, `d`, `r`, `m`, or direct item se
 
 ```text
 All review threads resolved. PR is merge-ready.
-Follow-up issue: https://github.com/org/repo/issues/NNN (if created)
+Deferred-work tracking: <existing issue | new issue | PR summary comment | dropped> (if any)
 ```
 
 If `m` deferred any `MUST-FIX` items, report:
 
 ```text
-Deferred review feedback tracked in follow-up issue: https://github.com/org/repo/issues/NNN
+Deferred review feedback tracking: <existing issue | new issue | PR summary comment | dropped>
 Deferred MUST-FIX threads remain open by default.
 PR is NOT merge-ready because must-fix items were deferred.
 ```
 
 If the action was direct item selection and unresolved `MUST-FIX`/`DISCUSS` items remain, do not signal merge-ready. Re-offer the quick-action menu and ask whether to continue with `f`, `f+i`, `d`, `r`, or `m`.
 If the action was `d` or `r` and unresolved `MUST-FIX`/`DISCUSS` items remain, do not signal merge-ready; re-offer the quick-action menu and ask whether to continue with `f`, `f+i`, `d`, `r`, or `m`.
+If the action was `f+i` or `m`, do not signal merge-ready until the deferred bundle has an explicit tracking/drop decision.
 
 Do not automatically merge. Signal readiness (or non-readiness) and let the user decide.
 
@@ -510,10 +533,10 @@ SKIPPED (3):
 
 Quick actions:
   f     — Fix #1, then confirm whether to reply/resolve skipped items before deciding discuss items
-  f+i   — Fix #1, create follow-up issue for #2, reply/resolve trivial skipped #3-5
+  f+i   — Fix #1, prepare one deferred-work bundle for #2
   d     — Discuss specific items (e.g., "d2,4"). Bare "d" presents all DISCUSS items.
   r     — Reply with rationale (e.g., "r3,5", "r3-5", "r all skipped", "r all discuss"); add `+ resolve` to also resolve threads
-  m     — No code changes, create follow-up issue, merge-ready only when no must-fix items are deferred
+  m     — No code changes, prepare one deferred-work bundle, merge-ready only when no must-fix items are deferred
 
 Or pick items by number: "1,2", "all must-fix", "1,3-5"
 ```
