@@ -28,7 +28,7 @@ SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE = "shakaperf-release-gates.yml"
 SHAKAPERF_RELEASE_GATE_START_TIMEOUT_SECONDS = 600
 SHAKAPERF_RELEASE_GATE_START_POLL_SECONDS = 5
 SHAKAPERF_RELEASE_GATE_RUN_LIST_LIMIT = 100
-SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS = 60 * 60
+SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS = 50 * 60
 
 # Helper methods for release-specific tasks
 # These are defined at the top level so they have access to Rake's sh method
@@ -166,11 +166,26 @@ rescue Errno::ENOENT
   abort "❌ GitHub CLI (`gh`) is not installed. Install it from https://cli.github.com/ and retry."
 end
 
+def read_output_from_io(reader)
+  Thread.new do
+    reader.read
+  rescue IOError
+    ""
+  end
+end
+
+def stop_output_reader(output_reader)
+  return unless output_reader&.alive?
+
+  output_reader.join(0.5)
+  output_reader.kill if output_reader.alive?
+end
+
 def capture_gh_output_with_timeout(*args, timeout_seconds:)
   reader, writer = IO.pipe
   pid = Process.spawn("gh", *args, out: writer, err: writer)
   writer.close
-  output_reader = Thread.new { reader.read }
+  output_reader = read_output_from_io(reader)
   status = nil
   timed_out = false
   deadline = Time.now + timeout_seconds
@@ -193,6 +208,7 @@ rescue Errno::ENOENT
   abort "❌ GitHub CLI (`gh`) is not installed. Install it from https://cli.github.com/ and retry."
 ensure
   writer&.close unless writer&.closed?
+  stop_output_reader(output_reader)
   reader&.close unless reader&.closed?
 end
 

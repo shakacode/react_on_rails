@@ -25,6 +25,36 @@ type FirstVisibleProbeState = {
   text: string | null;
 };
 
+type ShakaPerfPage = Parameters<Parameters<typeof abTest>[2]>[0]['page'];
+
+async function waitForFirstVisibleProbeState(page: ShakaPerfPage): Promise<FirstVisibleProbeState> {
+  const stateHandle = await page.waitForFunction(
+    ({ probeSelector, stylesheetSelector }) => {
+      const element = document.querySelector(probeSelector);
+      if (!element) return false;
+
+      const box = element.getBoundingClientRect();
+      if (box.width <= 0 || box.height <= 0) return false;
+
+      const style = getComputedStyle(element);
+      return {
+        hasStylesheet: Boolean(document.querySelector(stylesheetSelector)),
+        backgroundColor: style.backgroundColor,
+        color: style.color,
+        padding: style.padding,
+        borderRadius: style.borderRadius,
+        width: Math.round(box.width),
+        height: Math.round(box.height),
+        text: element.textContent,
+      };
+    },
+    { probeSelector: RSC_CSS_PROBE_SELECTOR, stylesheetSelector: RSC_STYLESHEET_SELECTOR },
+    { timeout: 10_000, polling: 'raf' },
+  );
+
+  return (await stateHandle.jsonValue()) as FirstVisibleProbeState;
+}
+
 abTest(
   'rsc first paint use-client css emits stylesheet before hydration',
   {
@@ -43,30 +73,7 @@ abTest(
   },
   async ({ page, annotate }) => {
     await annotate('capture first visible css probe');
-    const stateHandle = await page.waitForFunction(
-      ({ probeSelector, stylesheetSelector }) => {
-        const element = document.querySelector(probeSelector);
-        if (!element) return false;
-
-        const box = element.getBoundingClientRect();
-        if (box.width <= 0 || box.height <= 0) return false;
-
-        const style = getComputedStyle(element);
-        return {
-          hasStylesheet: Boolean(document.querySelector(stylesheetSelector)),
-          backgroundColor: style.backgroundColor,
-          color: style.color,
-          padding: style.padding,
-          borderRadius: style.borderRadius,
-          width: Math.round(box.width),
-          height: Math.round(box.height),
-          text: element.textContent,
-        };
-      },
-      { probeSelector: RSC_CSS_PROBE_SELECTOR, stylesheetSelector: RSC_STYLESHEET_SELECTOR },
-      { timeout: 10_000, polling: 'raf' },
-    );
-    const state = (await stateHandle.jsonValue()) as FirstVisibleProbeState;
+    const state = await waitForFirstVisibleProbeState(page);
 
     await annotate('assert stylesheet at first visibility');
     if (!state.hasStylesheet) {
@@ -113,30 +120,7 @@ abTest(
     // Same candidate URL is loaded for both sides; isControl only labels the failing side in reports.
     // JavaScript is intentionally unblocked here for the visual report; the first abtest is the SSR correctness guard.
     await annotate('wait first visible');
-    const stateHandle = await page.waitForFunction(
-      ({ probeSelector, stylesheetSelector }) => {
-        const element = document.querySelector(probeSelector);
-        if (!element) return false;
-
-        const box = element.getBoundingClientRect();
-        if (box.width <= 0 || box.height <= 0) return false;
-
-        const style = getComputedStyle(element);
-        return {
-          hasStylesheet: Boolean(document.querySelector(stylesheetSelector)),
-          backgroundColor: style.backgroundColor,
-          color: style.color,
-          padding: style.padding,
-          borderRadius: style.borderRadius,
-          width: Math.round(box.width),
-          height: Math.round(box.height),
-          text: element.textContent,
-        };
-      },
-      { probeSelector: RSC_CSS_PROBE_SELECTOR, stylesheetSelector: RSC_STYLESHEET_SELECTOR },
-      { timeout: 10_000, polling: 'raf' },
-    );
-    const state = (await stateHandle.jsonValue()) as FirstVisibleProbeState;
+    const state = await waitForFirstVisibleProbeState(page);
 
     await annotate('assert styled');
     if (UNSTYLED_BACKGROUNDS.includes(state.backgroundColor)) {
