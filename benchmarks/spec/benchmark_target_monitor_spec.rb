@@ -53,6 +53,14 @@ RSpec.describe BenchmarkTargetMonitor do
       .to raise_error(BenchmarkTargetMonitor::MonitorFailure, /PID 123.*discarding benchmark metrics/)
   end
 
+  it "fails before liveness checks when the benchmark target PID is non-positive" do
+    pid_alive = ->(_pid) { raise "pid liveness check should not run" }
+    monitor = described_class.new(target_pid: "0", pid_alive: pid_alive)
+
+    expect { monitor.verify_after_measurement! }
+      .to raise_error(BenchmarkTargetMonitor::MonitorFailure, /TARGET_PID="0".*positive integer/)
+  end
+
   describe "#write_benchmark_payload" do
     let(:collector) { instance_double(BmfCollector) }
     let(:monitor) { instance_double(described_class) }

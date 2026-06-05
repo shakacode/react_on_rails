@@ -81,6 +81,11 @@ class BenchmarkTargetMonitor
     return unless @target_pid
 
     pid = Integer(@target_pid)
+    unless pid.positive?
+      raise MonitorFailure, "TARGET_PID=#{@target_pid.inspect} is not a positive integer; discarding " \
+                            "benchmark metrics because target liveness could not be verified."
+    end
+
     return if @pid_alive.call(pid)
 
     raise MonitorFailure, "Benchmark target PID #{pid} exited during the measured benchmark window; " \
