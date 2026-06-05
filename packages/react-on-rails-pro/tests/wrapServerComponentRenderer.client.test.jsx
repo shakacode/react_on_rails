@@ -60,7 +60,6 @@ const loadWrappedRendererWithMocks = () => {
 };
 
 const cleanupWrappedRendererMocks = () => {
-  jest.resetModules();
   document.body.innerHTML = '';
 };
 
