@@ -27,5 +27,10 @@ function hydrateOrRender(shouldHydrate: boolean): DomRenderer {
   };
 }
 
+// WeakMap entries clear when the DOM Element is collected. A root can stay live briefly if
+// navigation teardown detaches later, but this dummy helper does not own that lifecycle.
+const domRenderers = { hydrateOrRender };
+
+export default domRenderers;
 export { hydrateOrRender };
 export type { DomRenderer };

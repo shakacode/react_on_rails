@@ -28,7 +28,8 @@ module ReactOnRails
   class PacksGenerator
     CONTAINS_CLIENT_OR_SERVER_REGEX = /\.(server|client)($|\.)/
     COMPONENT_EXTENSIONS = /\.(jsx?|tsx?)$/
-    # Fallback order when the configured server bundle file is missing.
+    # Fallback order when the configured server bundle file is missing. Keep .jsx before
+    # TypeScript extensions as the closest migration fallback for apps moving from JS/JSX to TS.
     # The configured extension is excluded, so server-bundle.js tries .jsx, .ts, .tsx, ...
     SERVER_BUNDLE_SOURCE_EXTENSIONS = %w[.js .jsx .ts .tsx .mts .cts .mjs .cjs].freeze
     # import/extensions suppressions are needed when generated imports include an explicit .js extension.
@@ -432,6 +433,8 @@ module ReactOnRails
       FILE_CONTENT
 
       legacy_relative_import_path_to_generated_server_bundle = "./#{relative_path_to_generated_server_bundle}"
+      # Match today's normalized import path, the extension-stripped .js source form, and the
+      # legacy "./" prefixed path so repeated generation stays idempotent across old outputs.
       generated_server_bundle_import_pattern = Regexp.union(
         relative_import_path_to_generated_server_bundle,
         import_path_to_generated_server_bundle,
@@ -663,7 +666,9 @@ module ReactOnRails
     end
 
     def generated_server_bundle_import_path(source_entrypoint)
-      import_path = relative_import_path(source_entrypoint, generated_server_bundle_file_path).to_s
+      import_path = relative_import_path(source_entrypoint, generated_server_bundle_file_path)
+      # .js entrypoints can use an extensionless import to satisfy import/extensions. Non-JS
+      # entrypoints keep the explicit .js output path and the caller adds the eslint suppression.
       return import_path.delete_suffix(".js") if File.extname(source_entrypoint) == ".js"
 
       import_path

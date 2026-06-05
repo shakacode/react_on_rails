@@ -831,6 +831,11 @@ module ReactOnRails
         generated_import = "import '../generated/server-bundle-generated.js'; " \
                            "// eslint-disable-line import/extensions"
         expect(File.read(server_bundle_jsx_file_path)).to include(generated_import)
+
+        same_instance.generate_packs_if_stale
+        generated_import_count = File.read(server_bundle_jsx_file_path)
+                                     .scan(%r{import '../generated/server-bundle-generated\.js'}).count
+        expect(generated_import_count).to equal(1)
       ensure
         FileUtils.rm_f(server_bundle_jsx_file_path)
         if backup_server_bundle_js_file_path && File.exist?(backup_server_bundle_js_file_path)
