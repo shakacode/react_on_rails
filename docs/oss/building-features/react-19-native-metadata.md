@@ -197,7 +197,9 @@ One of the biggest advantages of React 19 native metadata over react-helmet is *
 
 Metadata can be rendered inside async components within Suspense boundaries. When the async component resolves, React streams the metadata to the client and updates `<head>`.
 
-Use [async props](../migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently) to stream slow data from Rails while showing a loading shell immediately. The parent component calls `getReactOnRailsAsyncProp` to obtain a Promise for each slow prop, passes it to an async child that `await`s it, and wraps that child in `<Suspense>`:
+Use [async props](../migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently) to stream slow data from Rails while showing a loading shell immediately. These APIs are available in React on Rails Pro: the parent component calls `getReactOnRailsAsyncProp` to obtain a Promise for each slow prop, passes it to an async child that `await`s it, and wraps that child in `<Suspense>`:
+
+> **React on Rails Pro setup:** The controller must `include ReactOnRailsPro::Stream`, render the view via `stream_view_containing_react_components`, and set `config.enable_rsc_support = true` in `config/initializers/react_on_rails.rb`.
 
 ```jsx
 const UserProfile = async ({ userPromise, siteName }) => {
@@ -231,6 +233,8 @@ const ProfilePage = ({ getReactOnRailsAsyncProp, siteName }) => {
 };
 ```
 
+> **Production note:** Wrap each `<Suspense>` in an `<ErrorBoundary>` so a rejected async-prop stream degrades to fallback UI instead of crashing the whole page. See the [error-handling pattern](../../pro/react-server-components/inside-client-components.md#error-handling) for a reusable boundary.
+
 ```erb
 <%# Rails view — controller authorizes @user and captures request-scoped values first %>
 <% site_name = Current.account.name %>
@@ -247,7 +251,7 @@ The initial `<title>` ("Loading Profile...") appears immediately. When Rails emi
 
 ### React Server Components (RSC) with Native Metadata
 
-Native metadata works in React Server Components too. Since RSC components run exclusively on the server, metadata tags are always server-rendered. Keep canonical URLs and any SEO-critical tags that Rails already knows in the first-wave shell, then use async props so that slower article content and metadata can stream in while the shell renders immediately:
+Native metadata works in React Server Components too. Since RSC components run exclusively on the server, metadata tags are always server-rendered. Keep canonical URLs and any SEO-critical tags that Rails already knows in the first-wave shell, then use React on Rails Pro async props so that slower article content and metadata can stream in while the shell renders immediately:
 
 ```jsx
 // NativeMetadataRSCApp.jsx (no 'use client' directive — this is a Server Component)
