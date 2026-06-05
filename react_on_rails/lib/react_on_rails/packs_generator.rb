@@ -432,11 +432,14 @@ module ReactOnRails
       FILE_CONTENT
 
       legacy_relative_import_path_to_generated_server_bundle = "./#{relative_path_to_generated_server_bundle}"
+      generated_server_bundle_import_pattern = Regexp.union(
+        relative_import_path_to_generated_server_bundle,
+        import_path_to_generated_server_bundle,
+        legacy_relative_import_path_to_generated_server_bundle
+      )
       generated_server_bundle_import_regex = /
         import\s+['"]
-        (?:#{Regexp.union(relative_import_path_to_generated_server_bundle,
-                          import_path_to_generated_server_bundle,
-                          legacy_relative_import_path_to_generated_server_bundle).source})
+        #{generated_server_bundle_import_pattern}
         ['"]
       /x
 
@@ -633,6 +636,7 @@ module ReactOnRails
     end
 
     def resolve_server_bundle_source_entrypoint(configured_entrypoint)
+      # Existing configured .js path wins over alternate .ts fallback when both exist.
       return configured_entrypoint if File.exist?(configured_entrypoint)
 
       # Strip the existing extension when present; bare paths keep the full base and probe all extensions.
