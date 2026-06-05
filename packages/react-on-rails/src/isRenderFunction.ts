@@ -3,8 +3,8 @@
 import type { RegisteredComponentValue, RenderFunction } from './types/index.ts';
 
 /**
- * Used to determine we'll call be calling React.createElement on the component of if this is a
- * Render-Function used return a function that takes props to return a React element
+ * Used to determine whether we'll call React.createElement on the component or if this is a
+ * Render-Function used to return a function that takes props to return a React element
  * @param component
  * @returns {boolean}
  */

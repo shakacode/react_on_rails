@@ -28,6 +28,8 @@ module ReactOnRails
   class PacksGenerator
     CONTAINS_CLIENT_OR_SERVER_REGEX = /\.(server|client)($|\.)/
     COMPONENT_EXTENSIONS = /\.(jsx?|tsx?)$/
+    # Fallback order when the configured server bundle file is missing.
+    # The configured extension is excluded, so server-bundle.js tries .jsx, .ts, .tsx, ...
     SERVER_BUNDLE_SOURCE_EXTENSIONS = %w[.js .jsx .ts .tsx .mts .cts .mjs .cjs].freeze
     # Auto-registration requires nested_entries support which was added in 7.0.0
     # Note: The gemspec requires Shakapacker >= 6.0 for basic functionality
@@ -361,7 +363,7 @@ module ReactOnRails
       relative_import_path_to_generated_server_bundle = relative_import_path(source_entrypoint,
                                                                              generated_server_bundle_file_path)
       generated_server_bundle_import_statement = "import '#{relative_import_path_to_generated_server_bundle}';"
-      if %w[.ts .tsx].include?(File.extname(source_entrypoint))
+      if SERVER_BUNDLE_SOURCE_EXTENSIONS.include?(File.extname(source_entrypoint))
         generated_server_bundle_import_statement += " // eslint-disable-line import/extensions"
       end
 

@@ -187,6 +187,7 @@ interface RenderFunction {
 }
 
 type ReactComponentOrRenderFunction = ReactComponent | RenderFunction;
+// Plain-object modules registered via server_render_js: no render function and no React component.
 type RegisteredComponentValue = ReactComponentOrRenderFunction | Record<string, unknown>;
 
 type PipeableOrReadableStream = PipeableStream | NodeJS.ReadableStream;

@@ -28,8 +28,10 @@ class HelloWorld extends React.Component<HelloWorldProps, HelloWorldState> {
   }
 
   handleChange = () => {
-    const name = (this.nameDomRef as HTMLInputElement).value;
-    this.setState({ name });
+    const name = this.nameDomRef?.value;
+    if (name !== undefined) {
+      this.setState({ name });
+    }
   };
 
   setNameDomRef = (nameDomNode: HTMLInputElement | null) => {

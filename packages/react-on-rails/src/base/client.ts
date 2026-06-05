@@ -221,7 +221,7 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
               }
 
               try {
-                return JSON.stringify(component)?.length ?? 0;
+                return Object.keys(component as object).length;
               } catch {
                 return Object.prototype.toString.call(component).length;
               }

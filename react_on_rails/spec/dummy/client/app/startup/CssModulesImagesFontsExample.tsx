@@ -2,7 +2,7 @@ import React from 'react';
 
 import styles from '../components/CssModulesImagesFontsExample.module.scss';
 
-type CssModulesImagesFontsExampleProps = Record<string, never>;
+type CssModulesImagesFontsExampleProps = Record<string, unknown>;
 
 const CssModulesImagesFontsExample = (_props: CssModulesImagesFontsExampleProps) => (
   <div>
