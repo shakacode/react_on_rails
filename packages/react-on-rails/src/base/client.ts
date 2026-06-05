@@ -215,18 +215,20 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
         if (this.options.debugMode) {
           componentNames.forEach((name) => {
             const component = components[name];
-            const size = (() => {
+            const registrationMetric = (() => {
               if (typeof component === 'function') {
-                return component.toString().length;
+                return { label: 'source chars', value: component.toString().length };
               }
 
               try {
-                return Object.keys(component as object).length;
+                return { label: 'export keys', value: Object.keys(component as object).length };
               } catch {
-                return Object.prototype.toString.call(component).length;
+                return { label: 'tag chars', value: Object.prototype.toString.call(component).length };
               }
             })();
-            console.log(`[ReactOnRails] ✅ Registered: ${name} (${size} chars)`);
+            console.log(
+              `[ReactOnRails] ✅ Registered: ${name} (${registrationMetric.value} ${registrationMetric.label})`,
+            );
           });
         }
       } else {
