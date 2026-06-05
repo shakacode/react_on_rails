@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactOnRails from 'react-on-rails/client';
-import RailsContext, { type RailsContextForDisplay } from '../components/RailsContext';
+import RailsContext from '../components/RailsContext';
+import type { RailsContextForDisplay } from '../types/railsContext';
 
 type HelloWorldRehydratableData = Record<string, unknown> & {
   name: string;

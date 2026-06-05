@@ -4,6 +4,7 @@ import { renderToString } from 'react-dom/server';
 import type { RailsContext, ServerRenderResult } from 'react-on-rails/types';
 import ReactHelmet, { type ReactHelmetProps } from '../components/ReactHelmet';
 
+// This counterpart takes two params, so React on Rails identifies it as a generator function.
 const ReactHelmetApp = (props: ReactHelmetProps, _railsContext: RailsContext): ServerRenderResult => {
   const helmetContext: HelmetDataContext = {};
   const componentHtml = renderToString(

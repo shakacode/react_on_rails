@@ -1,5 +1,6 @@
 import React from 'react';
-import RailsContext, { type RailsContextForDisplay } from '../components/RailsContext';
+import RailsContext from '../components/RailsContext';
+import type { RailsContextForDisplay } from '../types/railsContext';
 
 import css from '../components/HelloWorld.module.scss';
 

@@ -1,7 +1,6 @@
 import React from 'react';
-import type { RailsContext as RailsContextData } from 'react-on-rails/types';
 
-type RailsContextForDisplay = RailsContextData & Record<string, unknown>;
+import type { RailsContextForDisplay } from '../types/railsContext';
 
 type RailsContextProps = {
   railsContext: RailsContextForDisplay;
@@ -42,5 +41,5 @@ const RailsContext = ({ railsContext }: RailsContextProps) => (
   </table>
 );
 
-export type { RailsContextForDisplay, RailsContextProps };
+export type { RailsContextProps };
 export default RailsContext;

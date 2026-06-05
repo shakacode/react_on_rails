@@ -1,10 +1,10 @@
 // Example of using hooks when taking the props and railsContext
 // Note, you need the call the hooks API within the react component stateless function
 import React, { useState } from 'react';
-import type { RailsContext as RailsContextData } from 'react-on-rails/types';
 
 import css from '../components/HelloWorld.module.scss';
 import RailsContext from '../components/RailsContext';
+import type { RailsContextForDisplay } from '../types/railsContext';
 
 import type { HelloWorldData } from './HelloWorld';
 
@@ -14,7 +14,7 @@ type HelloWorldHooksContextProps = {
 
 type HelloWorldHooksContextRenderFunction = (
   props: HelloWorldHooksContextProps,
-  railsContext: RailsContextData,
+  railsContext: RailsContextForDisplay,
 ) => React.ComponentType<Record<string, never>>;
 
 // You could pass props here or use the closure

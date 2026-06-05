@@ -1,7 +1,8 @@
 // Example of incorrectly taking two params and returning JSX
 import React from 'react';
 import css from '../components/HelloWorld.module.scss';
-import RailsContext, { type RailsContextForDisplay } from '../components/RailsContext';
+import RailsContext from '../components/RailsContext';
+import type { RailsContextForDisplay } from '../types/railsContext';
 
 type ContextFunctionReturnInvalidJSXProps = Record<string, unknown> & {
   helloWorldData: Record<string, unknown> & {

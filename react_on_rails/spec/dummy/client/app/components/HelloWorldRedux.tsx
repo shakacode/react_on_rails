@@ -2,7 +2,8 @@ import React from 'react';
 
 import type { HelloWorldNameUpdateAction } from '../actions/HelloWorldActions';
 import type { HelloWorldData } from '../store/reduxTypes';
-import RailsContext, { type RailsContextForDisplay } from './RailsContext';
+import type { RailsContextForDisplay } from '../types/railsContext';
+import RailsContext from './RailsContext';
 
 type HelloWorldReduxActions = {
   updateName(name: string): HelloWorldNameUpdateAction;

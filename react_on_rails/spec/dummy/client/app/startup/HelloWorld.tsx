@@ -1,7 +1,7 @@
 import React from 'react';
-import type { RailsContext as RailsContextData } from 'react-on-rails/types';
 
 import RailsContext from '../components/RailsContext';
+import type { RailsContextForDisplay } from '../types/railsContext';
 
 // Example of CSS modules...
 import css from '../components/HelloWorld.module.scss';
@@ -12,7 +12,7 @@ type HelloWorldData = Record<string, unknown> & {
 
 type HelloWorldProps = Record<string, unknown> & {
   helloWorldData: HelloWorldData;
-  railsContext?: RailsContextData;
+  railsContext?: RailsContextForDisplay;
 };
 
 type HelloWorldState = HelloWorldData;

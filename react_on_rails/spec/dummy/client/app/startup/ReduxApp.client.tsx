@@ -1,5 +1,4 @@
-import React, { type ReactNode } from 'react';
-import ReactDOMClient from 'react-dom/client';
+import React from 'react';
 import { Provider } from 'react-redux';
 import type { RailsContext } from 'react-on-rails/types';
 import { applyMiddleware, combineReducers, legacy_createStore as createStore } from 'redux';
@@ -10,30 +9,7 @@ import reducers from '../reducers/reducersIndex';
 import { wrapElementInStrictMode } from '../strictModeSupport';
 import composeInitialState from '../store/composeInitialState';
 import type { ReduxAppStore } from '../store/reduxTypes';
-
-type DomRenderer = (domNode: Element, element: ReactNode) => void;
-type ReactRoot = ReturnType<typeof ReactDOMClient.createRoot>;
-
-const reactRoots = new WeakMap<Element, ReactRoot>();
-
-const hydrateOrRender =
-  (shouldHydrate: boolean): DomRenderer =>
-  (domNode, element) => {
-    const existingRoot = reactRoots.get(domNode);
-    if (existingRoot) {
-      existingRoot.render(element);
-      return;
-    }
-
-    const root = shouldHydrate
-      ? ReactDOMClient.hydrateRoot(domNode, element)
-      : ReactDOMClient.createRoot(domNode);
-    reactRoots.set(domNode, root);
-
-    if (!shouldHydrate) {
-      root.render(element);
-    }
-  };
+import { hydrateOrRender } from './domRenderers';
 
 export default function ReduxApp(
   props: Record<string, unknown>,
