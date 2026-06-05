@@ -6,9 +6,10 @@ module ReactOnRails
       SHAKAPACKER_YML_PATH = "config/shakapacker.yml"
       DEFAULT_PRECOMPILE_HOOK_COMMAND = "bin/shakapacker-precompile-hook"
       COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER = /^(\s*)#\s*precompile_hook:\s*~\s*$/
+      PRECOMPILE_HOOK_KEY = /^\s+precompile_hook:\s*/
       ERB_PRECOMPILE_HOOK = /^\s+precompile_hook:\s*.*<%/
       private_constant :SHAKAPACKER_YML_PATH, :DEFAULT_PRECOMPILE_HOOK_COMMAND,
-                       :COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER, :ERB_PRECOMPILE_HOOK
+                       :COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER, :PRECOMPILE_HOOK_KEY, :ERB_PRECOMPILE_HOOK
 
       private
 
@@ -111,6 +112,7 @@ module ReactOnRails
         section = section_index[section_name]
         return false unless section
         return true if section.match?(ERB_PRECOMPILE_HOOK)
+        return false if section.match?(PRECOMPILE_HOOK_KEY)
 
         shakapacker_yml_section_merge_aliases(section).any? do |anchor_name|
           inherited_section_name = anchor_index[anchor_name]

@@ -297,6 +297,18 @@ RSpec.describe GeneratorHelper, type: :generator do
           # precompile_hook: ~
       YAML
     end
+
+    it "does not treat inherited raw ERB hooks as active after a local inactive override" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(false)
+        default: &default
+          precompile_hook: <%= false %>
+
+        test:
+          <<: *default
+          precompile_hook: ~
+          # precompile_hook: ~
+      YAML
+    end
   end
 
   describe "#generated_precompile_hook_will_be_configured?" do
@@ -441,6 +453,22 @@ RSpec.describe GeneratorHelper, type: :generator do
       expect(
         generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
       ).to be(false)
+    end
+
+    it "materializes when the target environment locally disables an inherited raw ERB hook" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        default: &default
+          precompile_hook: <%= false %>
+
+        test:
+          <<: *default
+          precompile_hook: ~
+          # precompile_hook: ~
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(true)
     end
   end
 
