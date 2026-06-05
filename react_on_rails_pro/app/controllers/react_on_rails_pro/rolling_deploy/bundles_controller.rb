@@ -63,8 +63,10 @@ module ReactOnRailsPro
       # matcher applies segment constraints to the full segment. Derived from
       # SAFE_HASH_PATTERN by stripping the \A/\z anchors; the controller still
       # performs the anchored defense-in-depth validation before any filesystem
-      # lookup.
-      ROUTE_HASH_PATTERN = Regexp.new(SAFE_HASH_PATTERN.source.delete_prefix("\\A").delete_suffix("\\z"))
+      # lookup. Carries SAFE_HASH_PATTERN.options forward so any future flags
+      # (e.g. case-insensitivity) stay in sync between the two patterns.
+      ROUTE_HASH_PATTERN = Regexp.new(SAFE_HASH_PATTERN.source.delete_prefix("\\A").delete_suffix("\\z"),
+                                      SAFE_HASH_PATTERN.options)
 
       class << self
         # Helper for manual route mounts. The Pro engine uses these same route

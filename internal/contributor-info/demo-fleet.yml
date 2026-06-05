@@ -1,12 +1,14 @@
-# Demo fleet manifest — canonical list of demo repos under cross-repo
-# upgrade automation. Read by `rake demo_fleet:*` tasks and by humans
-# running the RC testing workflow described in rc-testing-plan-design.md.
+# Demo fleet manifest — draft list of demo repos under cross-repo upgrade
+# automation. Read by future `rake demo_fleet:*` tasks. The canonical
+# release-gate policy lives in rc-testing-plan.md; reconcile this draft manifest
+# with that plan before implementing automation.
 #
 # Schema version is bumped on breaking changes. Consumers must check it.
 #
 # Field semantics:
-#   tier           — hard_gate (Tier 1) | soft_track (Tier 2). Matches the
-#                    RC plan. hard_gate failures block a final release.
+#   tier           — hard_gate | soft_track. hard_gate failures block a final
+#                    release. soft_track repos are remembered for follow-up but
+#                    do not block.
 #   packages       — which of our packages the demo consumes. Each entry must
 #                    declare an ecosystem (`gem` | `npm`) and a package name.
 #                    The orchestrator only proposes bumps for listed packages,
@@ -71,18 +73,20 @@ defaults:
         - cpflow
 
 repos:
-  # ---------- Tier 1 (hard gate) ----------
+  # ---------- Current hard gates ----------
 
-  - name: shakacode/react-on-rails-rsc-demo
+  - name: shakacode/hichee
     tier: hard_gate
-    headline: Minimal RSC starter
+    headline: Private production-like app
     packages:
       - { ecosystem: gem, name: react_on_rails }
       - { ecosystem: npm, name: react-on-rails }
+      - { ecosystem: gem, name: react_on_rails_pro }
+      - { ecosystem: npm, name: react-on-rails-pro }
       - { ecosystem: gem, name: shakapacker }
       - { ecosystem: npm, name: shakapacker }
       - { ecosystem: gem, name: cpflow }
-    needs_pro: false
+    needs_pro: true
     smoke: [/]
     verify: true
 
@@ -131,8 +135,35 @@ repos:
     smoke: [/]
     verify: true
 
-  - name: shakacode/react_on_rails-demo-octochangelog-on-rails-pro
+  - name: shakacode/react-webpack-rails-tutorial
     tier: hard_gate
+    headline: Legacy tutorial reference app
+    packages:
+      - { ecosystem: gem, name: react_on_rails }
+      - { ecosystem: npm, name: react-on-rails }
+      - { ecosystem: gem, name: shakapacker }
+      - { ecosystem: npm, name: shakapacker }
+    needs_pro: false
+    package_manager: yarn_classic
+    smoke: [/]
+    verify: true
+
+  - name: shakacode/react-on-rails-starter-tanstack
+    tier: hard_gate
+    headline: TanStack starter example
+    packages:
+      - { ecosystem: gem, name: react_on_rails }
+      - { ecosystem: npm, name: react-on-rails }
+      - { ecosystem: gem, name: shakapacker }
+      - { ecosystem: npm, name: shakapacker }
+    needs_pro: false
+    smoke: [/]
+    verify: true
+
+  # ---------- Shelved / non-gating ----------
+
+  - name: shakacode/react_on_rails-demo-octochangelog-on-rails-pro
+    tier: soft_track
     headline: RSC + server-rendered markdown
     packages:
       - { ecosystem: gem, name: react_on_rails }
@@ -147,7 +178,7 @@ repos:
     verify: true
 
   - name: shakacode/react-on-rails-demo-ssr-hmr
-    tier: hard_gate
+    tier: soft_track
     headline: SSR + HMR coexistence
     packages:
       - { ecosystem: gem, name: react_on_rails }
@@ -160,7 +191,7 @@ repos:
     verify: true
 
   - name: shakacode/react-on-rails-demo-v16-bundle-splitting
-    tier: hard_gate
+    tier: soft_track
     headline: On-demand bundle loading
     packages:
       - { ecosystem: gem, name: react_on_rails }
@@ -171,8 +202,6 @@ repos:
     needs_pro: false
     smoke: [/]
     verify: true
-
-  # ---------- Tier 2 (soft track) ----------
 
   - name: shakacode/react-on-rails-example-open-flights
     tier: soft_track
@@ -198,19 +227,5 @@ repos:
       - { ecosystem: npm, name: shakapacker }
       - { ecosystem: gem, name: cpflow }
     needs_pro: false
-    smoke: [/]
-    verify: true
-
-  - name: shakacode/react-webpack-rails-tutorial
-    tier: soft_track
-    headline: Legacy tutorial reference app
-    packages:
-      - { ecosystem: gem, name: react_on_rails }
-      - { ecosystem: npm, name: react-on-rails }
-      - { ecosystem: gem, name: shakapacker }
-      - { ecosystem: npm, name: shakapacker }
-      - { ecosystem: gem, name: cpflow }
-    needs_pro: false
-    package_manager: yarn_classic
     smoke: [/]
     verify: true

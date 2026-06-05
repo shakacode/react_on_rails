@@ -30,6 +30,14 @@ describe ReactOnRailsPro::RollingDeploy::BundlesController do
         .to eq(described_class::SAFE_HASH_PATTERN.source.delete_prefix("\\A").delete_suffix("\\z"))
     end
 
+    it "carries the safe hash pattern's regexp options forward so the two stay in sync" do
+      # Enforces the guarantee in ROUTE_HASH_PATTERN's comment: a future flag
+      # added to SAFE_HASH_PATTERN (e.g. case-insensitivity) must reach the
+      # route constraint too. Currently both are 0; this fails if they diverge.
+      expect(described_class::ROUTE_HASH_PATTERN.options)
+        .to eq(described_class::SAFE_HASH_PATTERN.options)
+    end
+
     {
       "abc123" => true,
       "_hash" => true,

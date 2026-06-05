@@ -6,6 +6,9 @@ RSpec.describe "rolling-deploy auto routes", type: :request do
   let(:config) { ReactOnRailsPro.configuration }
   let(:default_path) { ReactOnRailsPro::Configuration::DEFAULT_ROLLING_DEPLOY_MOUNT_PATH }
   let(:token) { "a" * 32 }
+  # Engine keeps this prefix private; read it through const_get so the spec
+  # stays pinned to the real value instead of a copy that can silently drift.
+  let(:auto_route_prefix) { ReactOnRailsPro::Engine.const_get(:ROLLING_DEPLOY_AUTO_ROUTE_PREFIX) }
 
   around do |example|
     original_adapter = config.rolling_deploy_adapter
@@ -33,17 +36,26 @@ RSpec.describe "rolling-deploy auto routes", type: :request do
 
   def route_set_with_auto_mount
     path = default_path
+    as_prefix = auto_route_prefix
 
     ActionDispatch::Routing::RouteSet.new.tap do |routes|
       routes.prepend do
         ReactOnRailsPro::RollingDeploy::BundlesController.draw_routes(
           self,
           path: path,
-          # Must match ReactOnRailsPro::Engine::ROLLING_DEPLOY_AUTO_ROUTE_PREFIX.
-          as_prefix: "react_on_rails_pro_auto_rolling_deploy"
+          as_prefix: as_prefix
         )
       end
     end
+  end
+
+  it "pins the engine's auto-route prefix to its published value" do
+    # The other examples read the prefix through const_get, so the routes they
+    # mount and the helper names they assert move together — a rename of the
+    # constant would leave them green. This literal pin is the one place that
+    # catches such a rename, since the generated helper names are a contract
+    # for consumers' route specs and manual-mount docs.
+    expect(auto_route_prefix).to eq("react_on_rails_pro_auto_rolling_deploy")
   end
 
   it "auto-mounts the bundles controller when the built-in HTTP adapter is configured" do
@@ -82,7 +94,7 @@ RSpec.describe "rolling-deploy auto routes", type: :request do
       end
     end.not_to raise_error
     expect(routes.named_routes.helper_names).to include(
-      "react_on_rails_pro_auto_rolling_deploy_manifest_path",
+      "#{auto_route_prefix}_manifest_path",
       "react_on_rails_pro_rolling_deploy_manifest_path"
     )
   end
