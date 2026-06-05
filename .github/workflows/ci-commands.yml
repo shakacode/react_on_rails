@@ -270,14 +270,17 @@ jobs:
               const failedList = failed.length > 0
                 ? `\n\nFailed:\n${failed.map((failure) => `- ${failure.workflow}: ${failure.error}`).join('\n')}`
                 : '';
+              const labelMessage = labelAdded
+                ? 'Added `full-ci`, so future commits on this PR will keep running the full matrix until `+ci-stop-full` is used.'
+                : succeeded.length > 0
+                  ? 'The workflows were triggered, but the `full-ci` label was not added. See the failure details below.'
+                  : 'The `full-ci` label was not added because no workflows were triggered.';
 
               await postComment([
                 '## Full CI Requested',
                 '',
                 `Triggered ${succeeded.length} workflow(s) for \`${pr.head.sha.slice(0, 12)}\`.`,
-                labelAdded
-                  ? 'Added `full-ci`, so future commits on this PR will keep running the full matrix until `+ci-stop-full` is used.'
-                  : 'The `full-ci` label was not added because no workflows were triggered.',
+                labelMessage,
                 '',
                 'View progress in the Actions tab.',
                 failedList
