@@ -9,7 +9,7 @@ class BenchmarkTargetMonitor
 
   STARTUP_LOG_FILENAME = "target_startup_before_benchmark.log"
   UNEXPECTED_WORKER_RESTART = "died UNEXPECTEDLY"
-  BLANK_CHUNK_SIZE = 8 * 1024
+  BLANK_CHUNK_SIZE = 8 * 1024 # balances allocation cost against write-call count
   BLANK_CHUNK = ("\n" * BLANK_CHUNK_SIZE).freeze
 
   def self.from_env(output_dir:, env: ENV)
@@ -61,8 +61,8 @@ class BenchmarkTargetMonitor
   private
 
   def present_string(value)
-    value = value.to_s
-    value.empty? ? nil : value
+    string_value = value.to_s
+    string_value.empty? ? nil : string_value
   end
 
   def target_log?

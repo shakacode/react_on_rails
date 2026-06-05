@@ -163,6 +163,16 @@ RSpec.describe "benchmark target monitoring" do
       expect { monitor.verify_after_measurement! }
         .to raise_error(BenchmarkTargetMonitor::MonitorFailure, /TARGET_PID="0".*positive integer/)
     end
+
+    it "fails when TARGET_PID is not an integer string" do
+      pid_alive = ->(_pid) { raise "pid liveness check should not run" }
+      monitor = described_class.new(target_pid: "abc", pid_alive: pid_alive)
+
+      monitor.start_measurement!
+
+      expect { monitor.verify_after_measurement! }
+        .to raise_error(BenchmarkTargetMonitor::MonitorFailure, /TARGET_PID="abc".*is not an integer/)
+    end
   end
 
   describe "write_benchmark_payload" do
