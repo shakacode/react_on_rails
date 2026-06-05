@@ -10,9 +10,10 @@ module ReactOnRails
       PRECOMPILE_HOOK_KEY = /^\s+precompile_hook:\s*/
       ERB_PRECOMPILE_HOOK = /^\s+precompile_hook:\s*.*<%/
       ShakapackerYmlErbError = Class.new(StandardError)
+      ShakapackerYmlDocument = Struct.new(:sections, :section_index, :anchor_index, keyword_init: true)
       private_constant :SHAKAPACKER_YML_PATH, :DEFAULT_PRECOMPILE_HOOK_COMMAND,
                        :COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER, :PRECOMPILE_HOOK_KEY, :ERB_PRECOMPILE_HOOK,
-                       :ShakapackerYmlErbError
+                       :ShakapackerYmlErbError, :ShakapackerYmlDocument
 
       private
 
@@ -44,8 +45,9 @@ module ReactOnRails
 
         content = File.read(shakapacker_config_path)
         config = parse_shakapacker_yml_content(content)
+        document = shakapacker_yml_document(content)
         return false if normalize_precompile_hook(effective_precompile_hook(config, environment))
-        return false if environment_effective_raw_erb_precompile_hook?(content, config, environment)
+        return false if environment_effective_raw_erb_precompile_hook?(document, config, environment)
         return false unless content.match?(COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER)
 
         materialized_content = content.gsub(
@@ -54,25 +56,34 @@ module ReactOnRails
         )
         config = parse_shakapacker_yml_content(materialized_content)
         normalize_precompile_hook(effective_precompile_hook(config, environment)) == DEFAULT_PRECOMPILE_HOOK_COMMAND
+      # ShakapackerYmlErbError is caught here as StandardError and returns false to skip writes.
+      # active_precompile_hook_configured? returns true for the same error so both callers fail closed.
       rescue StandardError
         false
       end
 
       def active_precompile_hook_configured?(content)
         config = parse_shakapacker_yml_content(content)
-        sections = shakapacker_yml_sections(content)
-        section_index = shakapacker_yml_section_index(sections)
-        anchor_index = shakapacker_yml_anchor_index(sections)
+        document = shakapacker_yml_document(content)
 
         # The generator materializes all placeholders at once, so one direct or
         # inherited active hook keeps the whole file under Shakapacker control.
-        sections.any? do |section|
+        document.sections.any? do |section|
           next false unless section.match?(COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER)
 
-          section_effective_active_precompile_hook?(section, config, section_index, anchor_index)
+          section_effective_active_precompile_hook?(section, config, document.section_index, document.anchor_index)
         end
       rescue ShakapackerYmlErbError
         true
+      end
+
+      def shakapacker_yml_document(content)
+        sections = shakapacker_yml_sections(content)
+        ShakapackerYmlDocument.new(
+          sections: sections,
+          section_index: shakapacker_yml_section_index(sections),
+          anchor_index: shakapacker_yml_anchor_index(sections)
+        )
       end
 
       def shakapacker_yml_sections(content)
@@ -99,12 +110,11 @@ module ReactOnRails
           raw_erb_precompile_hook_in_section_tree?(section_name, section_index, anchor_index)
       end
 
-      def environment_effective_raw_erb_precompile_hook?(content, config, environment)
-        sections = shakapacker_yml_sections(content)
+      def environment_effective_raw_erb_precompile_hook?(document, config, environment)
         section_name = shakapacker_config_key?(config, environment) ? environment.to_s : "production"
 
         raw_erb_precompile_hook_in_section_tree?(
-          section_name, shakapacker_yml_section_index(sections), shakapacker_yml_anchor_index(sections)
+          section_name, document.section_index, document.anchor_index
         )
       end
 
