@@ -349,6 +349,15 @@ RSpec.describe GeneratorHelper, type: :generator do
           # precompile_hook: ~
       YAML
     end
+
+    it "detects raw active hooks when unrelated YAML values force parser fallback" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(true)
+        default:
+          released_at: 2026-06-05
+          precompile_hook: 'bin/custom-precompile-hook'
+          # precompile_hook: ~
+      YAML
+    end
   end
 
   describe "#generated_precompile_hook_will_be_configured?" do
@@ -484,6 +493,22 @@ RSpec.describe GeneratorHelper, type: :generator do
       File.write(shakapacker_yml_path, <<~YAML)
         default: &default
           precompile_hook: <%= false %>
+
+        test:
+          <<: *default
+          # precompile_hook: ~
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(false)
+    end
+
+    it "does not materialize over an inherited raw quoted hook when YAML parsing falls back" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        default: &default
+          released_at: 2026-06-05
+          precompile_hook: 'bin/custom-precompile-hook'
 
         test:
           <<: *default

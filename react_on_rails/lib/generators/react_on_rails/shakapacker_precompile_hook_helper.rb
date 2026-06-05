@@ -9,10 +9,13 @@ module ReactOnRails
       COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER = /^(\s*)#\s*precompile_hook:\s*~\s*$/
       PRECOMPILE_HOOK_KEY = /^\s+precompile_hook:\s*/
       ERB_PRECOMPILE_HOOK = /^\s+precompile_hook:\s*.*<%/
+      RAW_PRECOMPILE_HOOK_VALUE = /^\s+precompile_hook:\s*([^#]*?)\s*(?:#.*)?$/
+      UNQUOTED_INACTIVE_PRECOMPILE_HOOK_VALUE = /\A(?:|~|null|false|true|yes|no|on|off)\z/i
       class ShakapackerYmlErbError < StandardError; end
       ShakapackerYmlDocument = Struct.new(:sections, :section_index, :anchor_index, keyword_init: true)
       private_constant :SHAKAPACKER_YML_PATH, :DEFAULT_PRECOMPILE_HOOK_COMMAND,
                        :COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER, :PRECOMPILE_HOOK_KEY, :ERB_PRECOMPILE_HOOK,
+                       :RAW_PRECOMPILE_HOOK_VALUE, :UNQUOTED_INACTIVE_PRECOMPILE_HOOK_VALUE,
                        :ShakapackerYmlErbError, :ShakapackerYmlDocument
 
       private
@@ -47,7 +50,7 @@ module ReactOnRails
         config = parse_shakapacker_yml_content(content)
         document = shakapacker_yml_document(content)
         return false if normalize_precompile_hook(effective_precompile_hook(config, environment))
-        return false if environment_effective_raw_erb_precompile_hook?(document, config, environment)
+        return false if environment_effective_raw_precompile_hook?(document, config, environment)
         return false unless content.match?(COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER)
 
         materialized_content = content.gsub(
@@ -110,13 +113,13 @@ module ReactOnRails
         return false unless section_name
 
         !normalize_precompile_hook(effective_precompile_hook(config, section_name)).nil? ||
-          raw_erb_precompile_hook_in_section_tree?(section_name, section_index, anchor_index)
+          raw_active_precompile_hook_in_section_tree?(section_name, section_index, anchor_index)
       end
 
-      def environment_effective_raw_erb_precompile_hook?(document, config, environment)
+      def environment_effective_raw_precompile_hook?(document, config, environment)
         section_name = shakapacker_config_key?(config, environment) ? environment.to_s : "production"
 
-        raw_erb_precompile_hook_in_section_tree?(
+        raw_active_precompile_hook_in_section_tree?(
           section_name, document.section_index, document.anchor_index
         )
       end
@@ -125,19 +128,30 @@ module ReactOnRails
         section.match(/\A([A-Za-z0-9_-]+):(?:\s|$)/)&.[](1)
       end
 
-      def raw_erb_precompile_hook_in_section_tree?(section_name, section_index, anchor_index, visited = {})
+      def raw_active_precompile_hook_in_section_tree?(section_name, section_index, anchor_index, visited = {})
         return false if visited[section_name]
 
         visited[section_name] = true
         section = section_index[section_name]
         return false unless section
-        return true if section.match?(ERB_PRECOMPILE_HOOK)
+        return true if raw_active_precompile_hook?(section)
         return false if section.match?(PRECOMPILE_HOOK_KEY)
 
         shakapacker_yml_section_merge_aliases(section).any? do |anchor_name|
           inherited_section_name = anchor_index[anchor_name]
           inherited_section_name &&
-            raw_erb_precompile_hook_in_section_tree?(inherited_section_name, section_index, anchor_index, visited)
+            raw_active_precompile_hook_in_section_tree?(inherited_section_name, section_index, anchor_index, visited)
+        end
+      end
+
+      def raw_active_precompile_hook?(section)
+        section.each_line.any? do |line|
+          match = line.match(RAW_PRECOMPILE_HOOK_VALUE)
+          next false unless match
+
+          raw_value = match[1].strip
+          raw_value.include?("<%") ||
+            !raw_value.match?(UNQUOTED_INACTIVE_PRECOMPILE_HOOK_VALUE)
         end
       end
 
