@@ -196,7 +196,7 @@ module ReactOnRails
       def render_shakapacker_yml_erb(content)
         require "erb"
 
-        ERB.new(content).result
+        ERB.new(content).result(TOPLEVEL_BINDING)
       rescue ScriptError, StandardError => e
         warn_shakapacker_yml_erb_error(e)
         raise ShakapackerYmlErbError, "Could not evaluate ERB in #{SHAKAPACKER_YML_PATH}: #{e.message}"
