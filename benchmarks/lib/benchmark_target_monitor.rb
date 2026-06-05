@@ -10,6 +10,7 @@ class BenchmarkTargetMonitor
   STARTUP_LOG_FILENAME = "target_startup_before_benchmark.log"
   UNEXPECTED_WORKER_RESTART = "died UNEXPECTEDLY"
   BLANK_CHUNK_SIZE = 8 * 1024
+  BLANK_CHUNK = ("\n" * BLANK_CHUNK_SIZE).freeze
 
   def self.from_env(output_dir:, env: ENV)
     new(
@@ -20,6 +21,8 @@ class BenchmarkTargetMonitor
   end
 
   def self.pid_alive?(pid)
+    # Signal 0 checks process existence without delivering a signal. Zombies can
+    # still answer as alive; CI parents reap quickly enough for this guard.
     Process.kill(0, pid)
     true
   rescue Errno::EPERM
@@ -33,13 +36,19 @@ class BenchmarkTargetMonitor
     @target_log = present_string(target_log)
     @output_dir = output_dir
     @pid_alive = pid_alive || ->(pid) { self.class.pid_alive?(pid) }
+    @measurement_started = false
   end
 
   def start_measurement!
+    @measurement_started = true
     preserve_and_blank_target_log if target_log?
   end
 
   def verify_after_measurement!
+    unless @measurement_started
+      raise MonitorFailure, "start_measurement! was never called; discarding benchmark metrics."
+    end
+
     verify_target_pid!
     verify_unexpected_worker_log!
     true
@@ -53,7 +62,7 @@ class BenchmarkTargetMonitor
   end
 
   def target_log?
-    @target_log && File.file?(@target_log)
+    @target_log && @output_dir && File.file?(@target_log)
   end
 
   def preserve_and_blank_target_log
@@ -70,10 +79,12 @@ class BenchmarkTargetMonitor
   # preventing pre-measurement events from matching the post-run scan.
   def blank_existing_log_bytes
     File.open(@target_log, "r+b") do |file|
+      # Capture size after opening, so bytes appended before the open are blanked.
+      # Bytes appended after this point belong to the measured window.
       remaining = file.size
       until remaining.zero?
         chunk_size = [remaining, BLANK_CHUNK_SIZE].min
-        file.write("\n" * chunk_size)
+        file.write(BLANK_CHUNK.byteslice(0, chunk_size))
         remaining -= chunk_size
       end
     end
