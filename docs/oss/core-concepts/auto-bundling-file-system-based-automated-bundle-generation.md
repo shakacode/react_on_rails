@@ -79,7 +79,7 @@ import '../generated/server-bundle-generated.js';
 We recommend committing this import statement to your version control system.
 
 > Example (dummy app): see the server bundle entrypoint import.
-> [Dummy `server-bundle.ts`](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/spec/dummy/client/app/packs/server-bundle.ts)
+> [Dummy `server-bundle.ts`](../../../react_on_rails/spec/dummy/client/app/packs/server-bundle.ts)
 
 ## Usage
 
