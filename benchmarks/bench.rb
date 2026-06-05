@@ -129,8 +129,9 @@ def run_benchmark_suite(routes, bmf_collector, runner: method(:benchmark_route))
   routes.each do |route|
     rps, p50, p90, status = runner.call(route)
     add_to_summary(route, rps, p50, p90, status)
-    # Add to BMF collector for Bencher output. p90 is retained for the display
-    # sidecar (the summary table) only — it is never sent to Bencher as a measure.
+    # Add to BMF collector for Bencher output. p90 is sent to Bencher boundary-less
+    # (recorded for a summary-table baseline but never thresholded) and also kept in the
+    # display sidecar so the summary table can show it; see BmfCollector.
     bmf_collector.add(name: route, rps: rps, p50: p50, p90: p90, status: status)
   rescue StandardError => e
     # ::error:: must go to stdout — GitHub Actions only parses workflow commands

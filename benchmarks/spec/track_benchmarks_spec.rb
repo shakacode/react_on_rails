@@ -66,6 +66,28 @@ RSpec.describe "track_benchmarks" do
     end
   end
 
+  describe "#run_bencher" do
+    it "emits the perf-link context warning to stdout so GitHub Actions annotates it" do
+      status = instance_double(Process::Status, exitstatus: 0)
+      report_json = JSON.generate(
+        "results" => [[{
+          "benchmark" => { "name" => "/foo", "uuid" => "bench-uuid" },
+          "measures" => [{
+            "measure" => { "slug" => "rps", "name" => "rps", "uuid" => "rps-uuid" },
+            "metric" => { "value" => 1.0 }
+          }]
+        }]],
+        "alerts" => []
+      )
+
+      allow(Open3).to receive(:capture3).and_return([report_json, "", status])
+      allow(File).to receive(:write).with(REPORT_JSON, report_json)
+
+      expect { run_bencher("branch", []) }
+        .to output(/::warning::Bencher report listed benchmarks but no perf-link context/).to_stdout
+    end
+  end
+
   # On a main regression the rendered table feeds the report-regressions hand-off. If
   # the display sidecar was missing/corrupt the table is empty, and an empty-bodied
   # issue is useless — the hand-off must substitute a run-URL pointer instead.
@@ -135,41 +157,75 @@ RSpec.describe "track_benchmarks" do
     end
   end
 
-  # A threshold on a measure that no metric reports is a silent no-op, so the tracked
-  # measures must match exactly what BmfCollector emits.
+  # A threshold on a measure that no metric reports is a silent no-op, so every tracked
+  # measure must be among what BmfCollector emits. The reverse is NOT exact equality:
+  # BmfCollector also emits p90_latency boundary-less (recorded for a summary baseline but
+  # deliberately absent from THRESHOLDS, so never alerted on).
   describe "tracked measures" do
-    it "match exactly the measures BmfCollector emits" do
+    let(:emitted) do
       collector = BmfCollector.new
-      collector.add(name: "x", rps: 1.0, p50: 1.0, status: "200=1")
+      collector.add(name: "x", rps: 1.0, p50: 1.0, p90: 1.0, status: "200=1")
+      collector.to_bmf.fetch("x").keys
+    end
 
-      expect(collector.to_bmf.fetch("x").keys).to match_array(THRESHOLDS.map(&:first))
+    it "are all emitted by BmfCollector (so no threshold is a silent no-op)" do
+      expect(emitted).to include(*THRESHOLDS.map(&:first))
+    end
+
+    it "exclude p90_latency, which BmfCollector emits boundary-less (recorded but never alerted)" do
+      expect(emitted).to include("p90_latency")
+      expect(THRESHOLDS.map(&:first)).not_to include("p90_latency")
     end
   end
 
   # The summary table's highlightable columns must stay in lockstep with the tracked
   # measures/sides Bencher is configured with, or a column would either be silently
-  # un-highlightable or highlighted with the wrong direction.
+  # un-highlightable or highlighted with the wrong direction. A column is "highlightable"
+  # when it has a :direction; a column with a :measure but no :direction (p90_latency)
+  # only shows a baseline delta and is never tagged.
   describe "summary table highlight columns" do
+    # Tracked measures intentionally NOT shown as a table column: failed_pct is redundant
+    # with the Status column (issue #3601 item 4) but stays in THRESHOLDS as an alerting
+    # safety net. A measure listed here fires the build on a regression but renders only
+    # via Status, not a highlighted cell — a deliberate trade, pinned so re-adding a column
+    # (or dropping the threshold) is a conscious change.
+    display_suppressed = %w[failed_pct].freeze
+
     it "use measures and directions that exist in THRESHOLDS" do
       thresholds = THRESHOLDS.to_h { |measure, direction, _boundary| [measure, direction] }
 
-      BenchmarkTable::COLUMNS.select { |col| col[:measure] }.each do |col|
+      BenchmarkTable::COLUMNS.select { |col| col[:direction] }.each do |col|
         expect(thresholds).to include(col[:measure])
         expect(col[:direction]).to eq(thresholds[col[:measure]])
       end
     end
 
-    # The reverse direction: every tracked measure must have a highlightable column,
-    # or an alert on that measure (e.g. failed_pct) would fire but render as an
-    # un-highlighted cell — invisible in the PR comment and the regression hand-off.
-    it "expose every tracked THRESHOLDS measure as a highlightable column" do
-      highlightable = BenchmarkTable::COLUMNS.select { |col| col[:measure] }
+    # The reverse direction: every tracked measure must have a highlightable column —
+    # except the deliberately display-suppressed ones — or an alert on it would fire but
+    # render as an un-highlighted cell, invisible in the PR comment and regression hand-off.
+    it "expose every tracked THRESHOLDS measure as a highlightable column, except suppressed ones" do
+      highlightable = BenchmarkTable::COLUMNS.select { |col| col[:direction] }
                                              .to_h { |col| [col[:measure], col[:direction]] }
 
       THRESHOLDS.each do |measure, direction, _boundary|
-        expect(highlightable).to include(measure)
-        expect(highlightable[measure]).to eq(direction)
+        if display_suppressed.include?(measure)
+          expect(highlightable).not_to include(measure)
+        else
+          expect(highlightable).to include(measure)
+          expect(highlightable[measure]).to eq(direction)
+        end
       end
+    end
+
+    # p90_latency is a baseline-only column: it carries a :measure (so the table can show a
+    # delta if Bencher supplies a baseline) but no :direction, and it must NOT be in
+    # THRESHOLDS — it is sent boundary-less so it is recorded yet never alerted on.
+    it "treat p90_latency as a baseline-only column, not a tracked threshold" do
+      p90 = BenchmarkTable::COLUMNS.find { |col| col[:measure] == "p90_latency" }
+
+      expect(p90).not_to be_nil
+      expect(p90[:direction]).to be_nil
+      expect(THRESHOLDS.map(&:first)).not_to include("p90_latency")
     end
   end
 end

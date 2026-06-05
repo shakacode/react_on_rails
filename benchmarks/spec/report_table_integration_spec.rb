@@ -22,8 +22,15 @@ RSpec.describe "BencherReport + BenchmarkTable integration" do
   # Display rows as the bench scripts would emit them (BmfCollector#display_rows),
   # keyed by the same canonical name the fixture's report uses.
   let(:rows) do
-    [{ "name" => "/heavy: Core", "rps" => 80.0, "p50" => 3.5, "p90" => 7.2,
-       "failed_pct" => 1.1, "status" => "200=900,5xx=10" }]
+    [{ "name" => "/heavy: Core", "rps" => 80.0, "p50" => 3.5, "p90" => 7.2, "status" => "200=900,5xx=10" }]
+  end
+
+  # The per-benchmark perf URL built from the fixture's UUIDs (branches/heads/testbeds/
+  # benchmarks/measures in document order, then report=) — exercises the real link seam.
+  let(:perf_url) do
+    "https://bencher.dev/perf/react-on-rails-t8a9ncxo?branches=branch-uuid&heads=head-uuid" \
+      "&testbeds=testbed-uuid&benchmarks=bench-uuid" \
+      "&measures=rps-uuid,p50-uuid,p90-uuid,failed-uuid&report=report-uuid"
   end
 
   it "classifies the fixture as a regression and exposes the active alert" do
@@ -40,9 +47,19 @@ RSpec.describe "BencherReport + BenchmarkTable integration" do
     expect(report.significance("/heavy: Core", "failed_pct", :upper)).to eq(:regression)
   end
 
-  it "renders the regressed RPS/failed_pct cells and improved p50 cell, leaving p90/Status plain" do
+  it "exposes a per-benchmark perf URL built from the report's UUIDs" do
+    expect(report.perf_url("/heavy: Core")).to eq(perf_url)
+  end
+
+  it "links the name, bolds/tags the regressed RPS and improved p50 with deltas, and shows a plain p90 delta" do
     markdown = BenchmarkTable.new(title: "Core Benchmark Summary", rows: rows, report: report).to_markdown
 
-    expect(markdown).to include("| /heavy: Core | **80.0** 🔴 | **3.5** 🟢 | 7.2 | **1.1** 🔴 | 200=900,5xx=10 |")
+    # No Fail% column (dropped); p90 shows a ▲ delta vs its boundary-less baseline but is
+    # never bolded/tagged; the name links to the perf plot.
+    expect(markdown).to include(
+      "| [/heavy: Core](#{perf_url}) | **80.0** 🔴 20.0% (100.0) | **3.5** 🟢 30.0% (5.0) | " \
+      "7.2 ▲20.0% (6.0) | 200=900,5xx=10 |"
+    )
+    expect(markdown).not_to include("Fail%")
   end
 end
