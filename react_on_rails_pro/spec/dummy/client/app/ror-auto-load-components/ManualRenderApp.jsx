@@ -24,7 +24,14 @@ export default (props, _railsContext, domNodeId) => {
     </div>,
   );
 
-  const root = hydrateOrRender(document.getElementById(domNodeId), reactElement, prerender);
+  const domEl = document.getElementById(domNodeId);
+  if (!domEl) {
+    throw new Error(
+      `Cannot hydrate ManualRenderApp because DOM element with id "${domNodeId}" was not found.`,
+    );
+  }
+
+  const root = hydrateOrRender(domEl, reactElement, prerender);
 
   // Return a teardown wrapper so React on Rails unmounts this root on Turbo/Turbolinks navigation
   // (page unload) or same-id node replacement instead of leaking it.
