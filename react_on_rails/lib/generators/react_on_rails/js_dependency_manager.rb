@@ -413,16 +413,16 @@ module ReactOnRails
         GeneratorMessages.add_info(rsc_dependency_pin_info) if used_version_pins
         return if add_packages(rsc_packages)
 
-        manual_install_packages = rsc_packages
         GeneratorMessages.add_warning(rsc_dependency_pin_failed_warning) if used_version_pins
 
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Failed to add React Server Components dependencies.
 
           You can install them manually by running:
-            #{manual_add_packages_command(manual_install_packages)}
+            #{manual_add_packages_command(rsc_packages)}
         MSG
       rescue StandardError => e
+        GeneratorMessages.add_warning(rsc_dependency_pin_failed_warning) if used_version_pins
         manual_install_packages = rsc_packages_with_pin
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Error adding React Server Components dependencies: #{e.message}
@@ -613,16 +613,13 @@ module ReactOnRails
       end
 
       def build_install_args(package_manager, dev, packages)
-        base_commands = {
-          "npm" => %w[npm install --save-exact],
-          "yarn" => %w[yarn add --exact],
-          "pnpm" => %w[pnpm add --save-exact],
-          "bun" => %w[bun add --exact]
-        }
-
-        base_args = base_commands.fetch(package_manager).dup
+        base_args = package_manager_commands(package_manager).fetch(:install).dup
         base_args << dev_flag_for(package_manager) if dev
         base_args + packages
+      end
+
+      def build_remove_args(package_manager, packages)
+        package_manager_commands(package_manager).fetch(:remove) + packages
       end
 
       def manual_add_packages_command(packages, dev: false)
@@ -634,14 +631,28 @@ module ReactOnRails
       end
 
       def manual_remove_packages_command(packages)
-        base_commands = {
-          "npm" => %w[npm uninstall],
-          "yarn" => %w[yarn remove],
-          "pnpm" => %w[pnpm remove],
-          "bun" => %w[bun remove]
-        }
+        build_remove_args(fallback_package_manager, packages).join(" ")
+      end
 
-        (base_commands.fetch(fallback_package_manager).dup + packages).join(" ")
+      def package_manager_commands(package_manager)
+        {
+          "npm" => {
+            install: %w[npm install --save-exact],
+            remove: %w[npm uninstall]
+          },
+          "yarn" => {
+            install: %w[yarn add --exact],
+            remove: %w[yarn remove]
+          },
+          "pnpm" => {
+            install: %w[pnpm add --save-exact],
+            remove: %w[pnpm remove]
+          },
+          "bun" => {
+            install: %w[bun add --exact],
+            remove: %w[bun remove]
+          }
+        }.fetch(package_manager)
       end
 
       def dev_flag_for(package_manager)
