@@ -11,10 +11,10 @@ name: Dummy App Bundler Tests
 # call decouples the bundlers: a failed build here only skips THIS call's integration job; the other
 # bundler's separate call runs independently.
 #
-# Remaining (pre-existing, out of scope for #3593): within one call the build -> integration `needs`
-# still couples that bundler's own dependency-level legs (e.g. webpack latest + minimum) — if either
-# build leg fails, this call's integration job is skipped. Only the webpack/rspack dimension is
-# decoupled here; the latest/minimum coupling predates the bundler split.
+# Remaining (pre-existing, out of scope for #3593; tracked in #3622): within one call the build ->
+# integration `needs` still couples that bundler's own dependency-level legs (e.g. webpack latest +
+# minimum) — if either build leg fails, this call's integration job is skipped. Only the
+# webpack/rspack dimension is decoupled here; the latest/minimum coupling predates the bundler split.
 
 on:
   workflow_call:
