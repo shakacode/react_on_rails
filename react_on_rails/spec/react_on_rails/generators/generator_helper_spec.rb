@@ -227,6 +227,22 @@ RSpec.describe GeneratorHelper, type: :generator do
 
       expect(parse_shakapacker_yml_content(aliased_config)).to eq({})
     end
+
+    it "warns and raises when shakapacker.yml ERB cannot be evaluated" do
+      expect do
+        parse_shakapacker_yml_content(<<~YAML)
+          default:
+            precompile_hook: <%= missing_local %>
+        YAML
+      end.to raise_error(%r{Could not evaluate ERB in config/shakapacker\.yml})
+
+      expect(say_status_calls).to include(
+        a_hash_including(message: a_string_matching(%r{Could not evaluate ERB in config/shakapacker\.yml}))
+      )
+      expect(say_status_calls).to include(
+        a_hash_including(message: a_string_matching(/Skipping generated precompile_hook updates/))
+      )
+    end
   end
 
   describe "#active_precompile_hook_configured?" do
@@ -306,6 +322,14 @@ RSpec.describe GeneratorHelper, type: :generator do
         test:
           <<: *default
           precompile_hook: ~
+          # precompile_hook: ~
+      YAML
+    end
+
+    it "fails closed when ERB cannot be evaluated" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(true)
+        default:
+          precompile_hook: <%= missing_local %>
           # precompile_hook: ~
       YAML
     end

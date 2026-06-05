@@ -2,14 +2,17 @@
 
 module ReactOnRails
   module Generators
+    # rubocop:disable Metrics/ModuleLength
     module ShakapackerPrecompileHookHelper
       SHAKAPACKER_YML_PATH = "config/shakapacker.yml"
       DEFAULT_PRECOMPILE_HOOK_COMMAND = "bin/shakapacker-precompile-hook"
       COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER = /^(\s*)#\s*precompile_hook:\s*~\s*$/
       PRECOMPILE_HOOK_KEY = /^\s+precompile_hook:\s*/
       ERB_PRECOMPILE_HOOK = /^\s+precompile_hook:\s*.*<%/
+      ShakapackerYmlErbError = Class.new(StandardError)
       private_constant :SHAKAPACKER_YML_PATH, :DEFAULT_PRECOMPILE_HOOK_COMMAND,
-                       :COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER, :PRECOMPILE_HOOK_KEY, :ERB_PRECOMPILE_HOOK
+                       :COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER, :PRECOMPILE_HOOK_KEY, :ERB_PRECOMPILE_HOOK,
+                       :ShakapackerYmlErbError
 
       private
 
@@ -32,6 +35,8 @@ module ReactOnRails
         return unless generated_precompile_hook_will_be_configured?(shakapacker_config_path, environment: environment)
 
         DEFAULT_PRECOMPILE_HOOK_COMMAND
+      rescue ShakapackerYmlErbError
+        nil
       end
 
       def generated_precompile_hook_will_be_configured?(shakapacker_config_path, environment:)
@@ -66,6 +71,8 @@ module ReactOnRails
 
           section_effective_active_precompile_hook?(section, config, section_index, anchor_index)
         end
+      rescue ShakapackerYmlErbError
+        true
       end
 
       def shakapacker_yml_sections(content)
@@ -162,6 +169,8 @@ module ReactOnRails
 
       def parse_shakapacker_yml(path)
         parse_shakapacker_yml_content(File.read(path))
+      rescue ShakapackerYmlErbError
+        raise
       rescue StandardError
         {}
       end
@@ -177,7 +186,9 @@ module ReactOnRails
 
         YAML.safe_load(rendered_content, permitted_classes: [Symbol])
       rescue ArgumentError => e
-        parse_shakapacker_yml_after_alias_keyword_error(e, rendered_content || content)
+        parse_shakapacker_yml_after_alias_keyword_error(e, rendered_content)
+      rescue ShakapackerYmlErbError
+        raise
       rescue ScriptError, StandardError
         {}
       end
@@ -186,6 +197,20 @@ module ReactOnRails
         require "erb"
 
         ERB.new(content).result
+      rescue ScriptError, StandardError => e
+        warn_shakapacker_yml_erb_error(e)
+        raise ShakapackerYmlErbError, "Could not evaluate ERB in #{SHAKAPACKER_YML_PATH}: #{e.message}"
+      end
+
+      def warn_shakapacker_yml_erb_error(error)
+        return unless respond_to?(:say_status, true)
+
+        say_status :warning,
+                   "Could not evaluate ERB in #{SHAKAPACKER_YML_PATH}: #{error.class}: #{error.message}",
+                   :yellow
+        say_status :warning,
+                   "Skipping generated precompile_hook updates so custom Shakapacker config is not overwritten.",
+                   :yellow
       end
 
       def parse_shakapacker_yml_after_alias_keyword_error(error, content)
@@ -238,5 +263,6 @@ module ReactOnRails
         Dir.pwd
       end
     end
+    # rubocop:enable Metrics/ModuleLength
   end
 end
