@@ -206,6 +206,10 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     render "/pages/unwrapped_rsc_route_client_render"
   end
 
+  def react_intl_rsc_demo
+    stream_view_containing_react_components(template: "/pages/react_intl_rsc_demo")
+  end
+
   def unwrapped_rsc_route_stream_render
     stream_view_containing_react_components(template: "/pages/unwrapped_rsc_route_stream_render")
   end

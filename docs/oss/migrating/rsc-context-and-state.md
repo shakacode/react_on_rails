@@ -390,7 +390,10 @@ export default function ProductPage({ locale, messages, ...props }) {
 
 #### Server Components: `createIntl` from `react-intl` (recommended)
 
-Import `createIntl` from `react-intl` for a **context-free API** that provides full interpolation, pluralization, and date/number formatting without React Context. This is the recommended approach for i18n in Server Components:
+Import `createIntl` from `react-intl` for a **context-free API** that provides full interpolation, pluralization, and date/number formatting without React Context. This is the recommended approach for i18n in Server Components.
+
+> [!TIP]
+> When multiple Server Components need the same intl instance, wrap `createIntl` in `React.cache()` to avoid recreating it in every component. See [Sharing Per-Request Data in Server Components](../../pro/react-server-components/per-request-data.md) for the complete pattern with `React.cache()`, including i18n, auth, feature flags, and other per-request scenarios.
 
 ```jsx
 // ProductPage.jsx -- Server Component
