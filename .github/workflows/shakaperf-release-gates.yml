@@ -8,7 +8,7 @@ on:
   push:
     tags:
       - 'v*'
-      - '*-rc*'
+      - 'v*-rc*'
 
 concurrency:
   group: shakaperf-release-gates-${{ github.ref }}
@@ -110,6 +110,14 @@ jobs:
           pnpm run build:test
           bundle exec rails db:prepare
 
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
       - name: Install Playwright Chromium
         working-directory: react_on_rails_pro/spec/dummy
         run: pnpm exec playwright install --with-deps chromium
@@ -135,21 +143,22 @@ jobs:
 
           for attempt in {1..60}; do
             echo "Waiting for RSC FOUC probe server (${attempt}/60)..."
+            # /empty proves Rails accepts requests; the RSC page proves the renderer is warm enough for the gate.
             if curl --connect-timeout 2 --max-time 5 -fsS "$SHAKAPERF_CONTROL_URL/empty" > /dev/null &&
               curl --connect-timeout 2 --max-time 5 -fsS "$SHAKAPERF_CONTROL_URL/rsc_posts_page_over_http" > /dev/null
             then
               exit 0
             fi
 
-            if ! kill -0 "$rails_pid" 2>/dev/null; then
-              echo "::error::Rails server died before becoming ready"
-              tail -n 100 "$RUNNER_TEMP/shakaperf-logs/rails.log" || true
-              exit 1
-            fi
-
             if ! kill -0 "$node_renderer_pid" 2>/dev/null; then
               echo "::error::Node renderer died before becoming ready"
               tail -n 100 "$RUNNER_TEMP/shakaperf-logs/node-renderer.log" || true
+              exit 1
+            fi
+
+            if ! kill -0 "$rails_pid" 2>/dev/null; then
+              echo "::error::Rails server died before becoming ready"
+              tail -n 100 "$RUNNER_TEMP/shakaperf-logs/rails.log" || true
               exit 1
             fi
 

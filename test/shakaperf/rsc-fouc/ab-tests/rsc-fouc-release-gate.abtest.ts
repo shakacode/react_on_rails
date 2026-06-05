@@ -11,7 +11,7 @@ abTest(
     startingPath: '/rsc_posts_page_over_http',
     testTypes: ['visreg'],
     options: {
-      beforeNavigate: ({ context }) => installRequestBlocking(context, ['/webpack/test/js/']),
+      beforeNavigate: ({ context }) => installRequestBlocking(context, ['.js']),
       viewports: ['desktop'],
       visreg: {
         selectors: [RSC_CSS_PROBE_SELECTOR],
@@ -74,6 +74,7 @@ abTest(
   },
   async ({ page, annotate, isControl }) => {
     // Same candidate URL is loaded for both sides; isControl only labels the failing side in reports.
+    // JavaScript is intentionally unblocked here for the visual report; the first abtest is the SSR correctness guard.
     await annotate('wait first visible');
     const stateHandle = await page.waitForFunction(
       (selector) => {
