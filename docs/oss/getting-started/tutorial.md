@@ -58,13 +58,11 @@ Trying out **React on Rails** is super easy, so long as you have the basic prere
 
 Then we need to create a fresh Rails application as follows.
 
-First, be sure to run `rails -v` and check you are using Rails 7.0 or above for this new tutorial app.
+First, be sure to run `rails -v` and check you are using Rails 7.0 or above for this new tutorial app. Use
+`--skip-javascript` so React on Rails can install its Shakapacker JavaScript setup; Rails 5.2-6.x legacy apps also
+use that flag when creating a test app for this flow.
 
 ```bash
-# For Rails 5.2
-rails new test-react-on-rails --skip-webpacker
-
-# For Rails 6.x+
 rails new test-react-on-rails --skip-javascript
 
 cd test-react-on-rails
