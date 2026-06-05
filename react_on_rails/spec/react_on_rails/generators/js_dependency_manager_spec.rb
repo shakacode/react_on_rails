@@ -503,7 +503,8 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       instance.send(:add_react_dependencies)
 
       expect(warnings.size).to be > 0
-      expect(warnings.first.to_s).to include("npm install react@~19.0.4 react-dom@~19.0.4 prop-types@^15.0.0")
+      expect(warnings.first.to_s)
+        .to include("npm install --save-exact react@~19.0.4 react-dom@~19.0.4 prop-types@^15.0.0")
     end
   end
 
@@ -668,7 +669,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       )
     end
 
-    it "falls back to unversioned package when pinned install fails" do
+    it "keeps the pin instead of falling back to unversioned latest when pinned install fails" do
       rsc_package = "react-on-rails-rsc@#{ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN}"
       allow(instance).to receive(:rsc_packages_with_version).and_return([[rsc_package], true])
 
@@ -678,8 +679,8 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       instance.send(:add_rsc_dependencies)
 
       expect(instance).to have_received(:add_packages).with([rsc_package])
-      expect(instance).to have_received(:add_packages).with(["react-on-rails-rsc"])
-      expect(warnings.join("\n")).to include("installed react-on-rails-rsc version may not match")
+      expect(instance).not_to have_received(:add_packages).with(["react-on-rails-rsc"])
+      expect(warnings.join("\n")).to include("left the version pin in package.json")
     end
 
     it "skips the unversioned fallback for rspack and keeps the pin when the pinned install fails" do
@@ -700,7 +701,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect(warning_text).to include("Could not install the pinned react-on-rails-rsc@19.0.5-rc.6")
       expect(warning_text).to include("react-on-rails-rsc/RspackPlugin")
       # the manual instruction points at the pinned version, not the unversioned package
-      expect(warning_text).to include("npm install react-on-rails-rsc@19.0.5-rc.6")
+      expect(warning_text).to include("npm install --save-exact react-on-rails-rsc@19.0.5-rc.6")
     end
 
     it "keeps the rspack pin in the manual install instruction when the pinned install raises" do
@@ -718,7 +719,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
       warning_text = warnings.join("\n")
       expect(warning_text).to include("Error adding React Server Components dependencies: network down")
-      expect(warning_text).to include("npm install react-on-rails-rsc@19.0.5-rc.6")
+      expect(warning_text).to include("npm install --save-exact react-on-rails-rsc@19.0.5-rc.6")
     end
   end
 
@@ -779,7 +780,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       instance.send(:add_react_dependencies)
 
       warning = warnings.first
-      expect(warning.to_s).to include("npm install")
+      expect(warning.to_s).to include("npm install --save-exact")
       expect(warning.to_s).to include("manually")
     end
   end

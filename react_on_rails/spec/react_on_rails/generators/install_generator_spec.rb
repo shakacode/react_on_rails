@@ -1988,6 +1988,54 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  describe "#add_rsc_dependencies" do
+    let(:install_generator) { described_class.new([], { rsc: true }, destination_root: destination_root) }
+    let(:rsc_pin) { ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN }
+
+    before do
+      allow(install_generator).to receive(:say)
+      allow(install_generator).to receive(:fallback_package_manager).and_return("pnpm")
+    end
+
+    it "explains why every RSC install is temporarily pinned to the prerelease package" do
+      allow(install_generator).to receive(:add_packages).and_return(true)
+
+      install_generator.send(:add_rsc_dependencies)
+
+      message_text = GeneratorMessages.messages.join("\n")
+      expect(message_text).to include("all --rsc installs")
+      expect(message_text).to include("react-on-rails-rsc@#{rsc_pin}")
+      expect(message_text).to include("stable react-on-rails-rsc@19.0.5")
+      expect(message_text).to include("react-on-rails-rsc/RspackPlugin")
+      expect(message_text).to include("Webpack")
+    end
+
+    it "keeps the version pin and uses the detected package manager when manual RSC recovery is needed" do
+      allow(install_generator).to receive(:add_packages).and_return(false)
+
+      install_generator.send(:add_rsc_dependencies)
+
+      warning_text = GeneratorMessages.messages.join("\n")
+      expect(warning_text).to include("pnpm add --save-exact react-on-rails-rsc@#{rsc_pin}")
+      expect(warning_text).to include("left the version pin in package.json")
+      expect(warning_text).not_to include("npm install react-on-rails-rsc")
+      expect(warning_text).not_to include("Retrying latest available package")
+    end
+
+    it "uses yarn add syntax in the RSC pin failure warning when yarn is detected" do
+      allow(install_generator).to receive_messages(
+        add_packages: false,
+        fallback_package_manager: "yarn"
+      )
+
+      install_generator.send(:add_rsc_dependencies)
+
+      warning_text = GeneratorMessages.messages.join("\n")
+      expect(warning_text).to include("yarn add --exact react-on-rails-rsc@#{rsc_pin}")
+      expect(warning_text).not_to include("npm install react-on-rails-rsc")
+    end
+  end
+
   context "with --new-app and a preexisting root route" do
     before(:all) do
       run_generator_test_with_args(%w[--new-app], package_json: true) do

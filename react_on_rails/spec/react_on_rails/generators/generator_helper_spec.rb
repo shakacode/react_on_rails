@@ -136,7 +136,8 @@ RSpec.describe GeneratorHelper, type: :generator do
           result = add_npm_dependencies(packages)
           expect(result).to be false
           expect(say_status_calls).to include(a_hash_including(message: a_string_matching(/Could not add packages/)))
-          expect(say_status_calls).to include(a_hash_including(message: "Will fall back to direct npm commands."))
+          expect(say_status_calls)
+            .to include(a_hash_including(message: "Will fall back to direct package manager commands."))
         end
       end
     end

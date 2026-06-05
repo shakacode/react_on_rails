@@ -41,7 +41,7 @@ module GeneratorHelper
       result != false
     rescue StandardError => e
       say_status :warning, "Could not add packages via package_json gem: #{e.message}", :yellow
-      say_status :warning, "Will fall back to direct npm commands.", :yellow
+      say_status :warning, "Will fall back to direct package manager commands.", :yellow
       false
     end
   end
