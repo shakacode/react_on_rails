@@ -109,7 +109,7 @@ RSpec.describe ReactOnRails::Doctor do
   describe "#parsed_shakapacker_config" do
     it "reads and parses config/shakapacker.yml at most once per Doctor instance" do
       # Exercises the memoizing super override (doctor.rb): several checks consult
-      # the config through different public helpers, but a single diagnosis must
+      # the config through different (private) helpers, but a single diagnosis must
       # read and parse the file only once. Stubbing File (not the method itself)
       # keeps both the memoization and the super dispatch in the path under test.
       config_path = "/tmp/myapp/config/shakapacker.yml"
