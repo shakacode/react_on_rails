@@ -89,6 +89,27 @@ module ReactOnRails
                 }
               };
 
+              const fileContainsAll = (filePath, tokens) => {
+                try {
+                  return existsSync(filePath) && tokens.every((token) => readFileSync(filePath, 'utf8').includes(token));
+                } catch {
+                  return false;
+                }
+              };
+
+              const rscConfigSupportsDiscovery = () => {
+                const rscWebpackConfig = resolve('config/webpack/rscWebpackConfig.js');
+                const precompileHook = resolve('bin/shakapacker-precompile-hook');
+
+                return (
+                  fileContainsAll(rscWebpackConfig, ['RSC_REFERENCE_DISCOVERY_BUILD', 'RSCReferenceDiscoveryPlugin']) &&
+                  fileContainsAll(precompileHook, [
+                    'generate_rsc_manifest_client_references_if_needed',
+                    'RSC_REFERENCE_DISCOVERY_BUILD',
+                  ])
+                );
+              };
+
               if (configuredRefsJson) {
                 const resolvedRefsJson = resolve(configuredRefsJson);
                 if (!existsSync(resolvedRefsJson)) {
@@ -110,6 +131,15 @@ module ReactOnRails
               }
 
               if (existsSync(serverComponentRegistrationEntry)) {
+                if (!rscConfigSupportsDiscovery()) {
+                  console.warn(
+                    `[react_on_rails] Missing ${defaultRefsJson}, but this app's RSC webpack config ` +
+                      'or precompile hook does not support manifest discovery yet; falling back to broad client ' +
+                      'reference scan. Re-run rails g react_on_rails:rsc to update generated configs.',
+                  );
+                  return [fallbackRscClientReferences];
+                }
+
                 throw new Error(`Missing ${defaultRefsJson}. Run bin/shakapacker-precompile-hook before bin/shakapacker.`);
               }
 

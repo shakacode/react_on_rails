@@ -34,6 +34,8 @@ export type RscCssManifest = {
 const joinPrefix = (prefix: string, file: string): string => {
   if (!prefix) return file;
   const base = prefix.endsWith('/') ? prefix.slice(0, -1) : prefix;
+  // Webpack manifest CSS paths are root-relative, so an href that already starts with
+  // the full public path has already been prefixed.
   if (base.startsWith('/') && (file === base || file.startsWith(`${base}/`))) {
     return file;
   }

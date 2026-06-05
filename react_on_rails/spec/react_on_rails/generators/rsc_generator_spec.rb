@@ -2919,6 +2919,11 @@ describe RscGenerator, type: :generator do
         expect(content).to include("RSC_REFERENCE_DISCOVERY_BUILD")
         expect(content).to include("RSC_BUNDLE_ONLY")
         expect(content).to include("Run bin/shakapacker-precompile-hook before bin/shakapacker.")
+        expect(content).to include("rscConfigSupportsDiscovery")
+        expect(content).to include("config/webpack/rscWebpackConfig.js")
+        expect(content).to include("bin/shakapacker-precompile-hook")
+        expect(content).to include("falling back to broad client")
+        expect(content).to include("reference scan. Re-run rails g react_on_rails:rsc")
         expect(content).to include("Array.isArray(payload.refs)")
         expect(content).to include("to contain a refs array")
         # The configured override is path-resolved on both sides (mirror parity).

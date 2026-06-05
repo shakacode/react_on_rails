@@ -32,6 +32,8 @@ def clear_stale_rsc_manifest_client_references
   FileUtils.rm_f(stale_manifest)
 end
 
+# Keep this flow aligned with the standalone helper in
+# react_on_rails/spec/support/shakapacker_precompile_hook_shared.rb.
 def generate_rsc_manifest_client_references_if_needed
   return if ENV["RSC_REFERENCE_DISCOVERY_BUILD"] == "true"
   return unless defined?(ReactOnRailsPro)

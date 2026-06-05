@@ -14,7 +14,9 @@ const { config } = require('shakapacker');
 //   - manifest shape:     { refs: [...] }, else throw "... to contain a refs array"
 //   - parse errors:       malformed JSON re-thrown as "Failed to parse RSC client references manifest ..."
 //   - fallback ordering:  configured JSON -> default JSON -> (discovery/bundle-only build -> broad
-//     fallback) -> (registration entry present -> throw the precompile-hook hint) -> broad fallback
+//     fallback) -> (registration entry present with old discovery tooling -> warn and broad
+//     fallback) -> (registration entry present with current tooling -> throw the precompile-hook
+//     hint) -> broad fallback
 //   - staleness warning:  selected manifest older than the registration entry -> console.warn (non-fatal)
 //   - precompile hint:    "Run bin/shakapacker-precompile-hook before bin/shakapacker."
 // Both sides are pinned by contract tests so drift on either side fails CI: this resolver by the
@@ -80,6 +82,29 @@ function warnIfManifestStale(refsJson) {
   }
 }
 
+function fileContainsAll(filePath, tokens) {
+  try {
+    return (
+      fs.existsSync(filePath) && tokens.every((token) => fs.readFileSync(filePath, 'utf8').includes(token))
+    );
+  } catch {
+    return false;
+  }
+}
+
+function rscConfigSupportsDiscovery() {
+  const rscWebpackConfig = path.resolve('config/webpack/rscWebpackConfig.js');
+  const precompileHook = path.resolve('bin/shakapacker-precompile-hook');
+
+  return (
+    fileContainsAll(rscWebpackConfig, ['RSC_REFERENCE_DISCOVERY_BUILD', 'RSCReferenceDiscoveryPlugin']) &&
+    fileContainsAll(precompileHook, [
+      'generate_rsc_manifest_client_references_if_needed',
+      'RSC_REFERENCE_DISCOVERY_BUILD',
+    ])
+  );
+}
+
 function rscManifestClientReferences() {
   const configuredRefsJson = process.env.RSC_MANIFEST_CLIENT_REFERENCES_JSON;
   if (configuredRefsJson) {
@@ -103,6 +128,15 @@ function rscManifestClientReferences() {
   }
 
   if (fs.existsSync(SERVER_COMPONENT_REGISTRATION_ENTRY)) {
+    if (!rscConfigSupportsDiscovery()) {
+      console.warn(
+        `[react_on_rails] Missing ${DEFAULT_REFERENCES_JSON}, but this app's RSC webpack config ` +
+          'or precompile hook does not support manifest discovery yet; falling back to broad client ' +
+          'reference scan. Re-run rails g react_on_rails:rsc to update generated configs.',
+      );
+      return DEFAULT_CLIENT_REFERENCES;
+    }
+
     throw new Error(
       `Missing ${DEFAULT_REFERENCES_JSON}. Run bin/shakapacker-precompile-hook before bin/shakapacker.`,
     );

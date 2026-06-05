@@ -1,8 +1,20 @@
 const { existsSync } = require('fs');
 const { dirname, resolve } = require('path');
 const { config } = require('shakapacker');
-const { RSCReferenceDiscoveryPlugin } = require('react-on-rails-rsc/RSCReferenceDiscoveryPlugin');
 const { default: serverWebpackConfig, extractLoader } = require('./serverWebpackConfig');
+
+const rscReferenceDiscoveryPlugin = () => {
+  try {
+    // eslint-disable-next-line global-require
+    return require('react-on-rails-rsc/RSCReferenceDiscoveryPlugin').RSCReferenceDiscoveryPlugin;
+  } catch (error) {
+    throw new Error(
+      `Missing react-on-rails-rsc/RSCReferenceDiscoveryPlugin. ` +
+        `Install react-on-rails-rsc >= 19.0.5-rc.6 before running ` +
+        `bin/shakapacker-precompile-hook. ${error.message}`,
+    );
+  }
+};
 
 const configureRsc = () => {
   const rscConfig = serverWebpackConfig(true);
@@ -16,7 +28,10 @@ const configureRsc = () => {
 
   if (discoveryBuild) {
     if (!existsSync(serverComponentRegistrationEntry)) {
-      throw new Error(`Missing server component registration entry: ${serverComponentRegistrationEntry}`);
+      throw new Error(
+        `Missing server component registration entry: ${serverComponentRegistrationEntry}. ` +
+          `Run bin/shakapacker-precompile-hook before bin/shakapacker.`,
+      );
     }
 
     rscConfig.entry = {
@@ -76,6 +91,7 @@ const configureRsc = () => {
 
   if (discoveryBuild) {
     rscConfig.output.filename = 'rsc-reference-discovery.js';
+    const RSCReferenceDiscoveryPlugin = rscReferenceDiscoveryPlugin();
     rscConfig.plugins.push(new RSCReferenceDiscoveryPlugin());
   } else {
     // Update the output bundle name to be `rsc-bundle.js` instead of `server-bundle.js`

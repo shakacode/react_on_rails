@@ -4,8 +4,8 @@
 // contract that react_on_rails's RSC setup generator emits inline (`rsc_client_references_js` in
 // react_on_rails/lib/generators/react_on_rails/rsc_setup/client_references.rb), which is pinned on
 // the generator side by spec/react_on_rails/generators/rsc_generator_spec.rb. If the override env
-// var, default manifest path, manifest shape, fallback ordering, or error messages change here,
-// these tests fail.
+// var, default manifest path, manifest shape, fallback ordering, discovery-compatibility fallback,
+// or error messages change here, these tests fail.
 const path = require('path');
 
 jest.mock('shakapacker', () => ({
@@ -108,11 +108,41 @@ describe('rscManifestClientReferences (Pro dummy) mirrors the generator resoluti
   });
 
   it('throws the precompile-hook hint when the registration entry exists but the manifest is missing', () => {
-    fs.existsSync.mockImplementation((p) => p === REGISTRATION_ENTRY);
+    fs.existsSync.mockImplementation(
+      (p) =>
+        p === REGISTRATION_ENTRY ||
+        p === path.resolve('config/webpack/rscWebpackConfig.js') ||
+        p === path.resolve('bin/shakapacker-precompile-hook'),
+    );
+    fs.readFileSync.mockImplementation((p) => {
+      if (p === path.resolve('config/webpack/rscWebpackConfig.js')) {
+        return 'process.env.RSC_REFERENCE_DISCOVERY_BUILD; RSCReferenceDiscoveryPlugin';
+      }
+      if (p === path.resolve('bin/shakapacker-precompile-hook')) {
+        return 'generate_rsc_manifest_client_references_if_needed RSC_REFERENCE_DISCOVERY_BUILD';
+      }
+      return '';
+    });
 
     expect(() => rscManifestClientReferences()).toThrow(
       /Run bin\/shakapacker-precompile-hook before bin\/shakapacker/,
     );
+  });
+
+  it('falls back with a warning when existing RSC configs cannot produce the discovery manifest', () => {
+    fs.existsSync.mockImplementation((p) => p === REGISTRATION_ENTRY);
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      const refs = rscManifestClientReferences();
+      expect(Array.isArray(refs)).toBe(true);
+      expect(refs[0]).toMatchObject({ directory: './client/app', recursive: true });
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/falling back to broad client reference scan/),
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
   it('falls back to a broad scan when neither manifest nor registration entry exists', () => {

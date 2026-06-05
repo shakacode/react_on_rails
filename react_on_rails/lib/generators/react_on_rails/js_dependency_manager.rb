@@ -140,10 +140,12 @@ module ReactOnRails
         react-on-rails-rsc
       ].freeze
 
-      # RSC package releases follow the React 19.0.x line (independent from gem versioning).
+      # React package range for RSC-enabled apps. Keep within 19.0.x because RSC APIs are unstable
+      # across React minor releases; this is separate from the exact react-on-rails-rsc package pin.
       RSC_REACT_VERSION_RANGE = "~19.0.4"
-      # Temporary release-candidate pin: the RSCReferenceDiscoveryPlugin export and RSC manifest CSS
-      # fixes ship in 19.0.5-rc.6. Bump to the stable 19.0.5 release once it is published.
+      # Temporary react-on-rails-rsc release-candidate pin: the RSCReferenceDiscoveryPlugin export
+      # and RSC manifest CSS fixes ship in 19.0.5-rc.6. Bump to the stable 19.0.5 release once it is
+      # published.
       RSC_PACKAGE_VERSION_PIN = "19.0.5-rc.6"
 
       private
