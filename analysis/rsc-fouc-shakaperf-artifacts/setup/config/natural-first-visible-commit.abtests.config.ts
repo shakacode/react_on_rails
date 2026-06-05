@@ -1,12 +1,12 @@
 import { defineConfig } from 'shaka-shared';
-import baseConfig from './abtests.config';
+import { rscFoucShakaPerfConfig } from './abtests.config';
 
 export default defineConfig({
-  ...baseConfig,
+  ...rscFoucShakaPerfConfig,
   visreg: {
-    ...baseConfig.visreg,
+    ...rscFoucShakaPerfConfig.visreg,
     engineOptions: {
-      ...baseConfig.visreg?.engineOptions,
+      ...rscFoucShakaPerfConfig.visreg.engineOptions,
       gotoParameters: { waitUntil: 'commit' },
     },
     // No retries: this diagnostic assertion should expose the first visible

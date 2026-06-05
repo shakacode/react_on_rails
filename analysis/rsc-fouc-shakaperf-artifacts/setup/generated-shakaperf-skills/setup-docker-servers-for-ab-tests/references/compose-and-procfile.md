@@ -12,23 +12,23 @@ Two helper subcommands do the work:
 ### Minimal (single web process)
 
 ```procfile
-control-rails: yarn shaka-perf servers run-overmind-command control "SECRET_KEY_BASE=dummy-secret-key-base-for-shakaperf bundle exec puma -C config/puma.rb -b tcp://0.0.0.0:3000"
-experiment-rails: yarn shaka-perf servers run-overmind-command experiment "SECRET_KEY_BASE=dummy-secret-key-base-for-shakaperf bundle exec puma -C config/puma.rb -b tcp://0.0.0.0:3000"
+control-rails: yarn shaka-perf servers run-overmind-command control "SECRET_KEY_BASE=dummy-secret-key-base-for-shakaperf-rsc-fouc bundle exec puma -C config/puma.rb -b tcp://0.0.0.0:3000"
+experiment-rails: yarn shaka-perf servers run-overmind-command experiment "SECRET_KEY_BASE=dummy-secret-key-base-for-shakaperf-rsc-fouc bundle exec puma -C config/puma.rb -b tcp://0.0.0.0:3000"
 notify-control-server-started: yarn shaka-perf servers notify-server-started control
 notify-experiment-server-started: yarn shaka-perf servers notify-server-started experiment
 ```
 
-The inline `SECRET_KEY_BASE` is a fixed dummy for hermetic perf images whose Rails process requires one at boot. Use a project-specific dummy value, and keep real secrets out of Docker `ENV`.
+The inline `SECRET_KEY_BASE` is a fixed dummy for hermetic perf images whose Rails process requires one at boot. Use a project-specific dummy value, and keep real secrets out of Docker `ENV`. It is still visible in `ps`/`/proc/<pid>/cmdline` inside the container; use a wrapper script or file-backed secret if that exposure matters.
 
 ### Multiple processes (web + SSR renderer + worker)
 
 Add a line per extra process **per side**. Workers and SSR run inside the same app container as the web process — not separate containers (this is a perf rig; A/B isolation and simplicity beat production-style scaling). Never let a process serve both sides.
 
 ```procfile
-control-rails: yarn shaka-perf servers run-overmind-command control "SECRET_KEY_BASE=dummy-secret-key-base-for-shakaperf bundle exec puma -C config/puma.rb -b tcp://0.0.0.0:3000"
+control-rails: yarn shaka-perf servers run-overmind-command control "SECRET_KEY_BASE=dummy-secret-key-base-for-shakaperf-rsc-fouc bundle exec puma -C config/puma.rb -b tcp://0.0.0.0:3000"
 control-ssr: yarn shaka-perf servers run-overmind-command control "yarn tsx app/javascript/ssr-server.ts"
 control-sidekiq: yarn shaka-perf servers run-overmind-command control "bundle exec sidekiq -C config/sidekiq.yml"
-experiment-rails: yarn shaka-perf servers run-overmind-command experiment "SECRET_KEY_BASE=dummy-secret-key-base-for-shakaperf bundle exec puma -C config/puma.rb -b tcp://0.0.0.0:3000"
+experiment-rails: yarn shaka-perf servers run-overmind-command experiment "SECRET_KEY_BASE=dummy-secret-key-base-for-shakaperf-rsc-fouc bundle exec puma -C config/puma.rb -b tcp://0.0.0.0:3000"
 experiment-ssr: yarn shaka-perf servers run-overmind-command experiment "yarn tsx app/javascript/ssr-server.ts"
 experiment-sidekiq: yarn shaka-perf servers run-overmind-command experiment "bundle exec sidekiq -C config/sidekiq.yml"
 notify-control-server-started: yarn shaka-perf servers notify-server-started control

@@ -13,15 +13,27 @@ const { control: CONTROL_PORT, experiment: EXPERIMENT_PORT } = assignPortsAutoma
   experiment: 3030,
 });
 
-const CONFIGURED_PARALLELISM = Number.parseInt(process.env.SHAKAPERF_ARTIFACT_PARALLELISM ?? '', 10);
+const parseArtifactParallelism = (value: string | undefined) => {
+  const trimmedValue = value?.trim();
+  if (!trimmedValue) {
+    return undefined;
+  }
+
+  const parsedValue = Number(trimmedValue);
+  if (!Number.isFinite(parsedValue)) {
+    return undefined;
+  }
+
+  const parallelism = Math.floor(parsedValue);
+  return parallelism > 0 ? parallelism : undefined;
+};
+
+const CONFIGURED_PARALLELISM = parseArtifactParallelism(process.env.SHAKAPERF_ARTIFACT_PARALLELISM);
 const DEFAULT_PARALLELISM = Math.max(1, Math.floor(os.availableParallelism() / 2));
-const PARALLELISM =
-  Number.isFinite(CONFIGURED_PARALLELISM) && CONFIGURED_PARALLELISM > 0
-    ? CONFIGURED_PARALLELISM
-    : DEFAULT_PARALLELISM;
+const PARALLELISM = CONFIGURED_PARALLELISM ?? DEFAULT_PARALLELISM;
 const CHROMIUM_ARGS = process.env.SHAKAPERF_CHROMIUM_NO_SANDBOX === 'true' ? ['--no-sandbox'] : [];
 
-export default defineConfig({
+export const rscFoucShakaPerfConfig = {
   shared: {
     controlURL: `http://localhost:${CONTROL_PORT}`,
     experimentURL: `http://localhost:${EXPERIMENT_PORT}`,
@@ -91,4 +103,6 @@ export default defineConfig({
     // resort for what can't be baked into an image — chiefly starting an
     // embedded service daemon — and run in both containers at start.
   },
-});
+} satisfies Parameters<typeof defineConfig>[0];
+
+export default defineConfig(rscFoucShakaPerfConfig);
