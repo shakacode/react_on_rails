@@ -105,16 +105,16 @@ Use the 15-minute rule from `AGENTS.md`: if another short local check would like
 
 ## Full CI Backpressure
 
-Prefer the `+ci-*` PR comment commands from the CI command workflow when available.
+Use the `+ci-*` PR comment commands from the CI command workflow for full-CI decisions. These commands provide the audit trail for running, stopping, checking, or waiving full CI.
 
 - During active implementation or review-fix churn, do not request full CI.
-- If a PR is still being iterated and already has `full-ci`, ask whether to use `+ci-stop-full` before pushing more batches.
+- If a PR is still being iterated and already has `full-ci`, ask whether to comment `+ci-stop-full` before pushing more batches.
 - Use `+ci-status` before deciding whether full CI is already enabled or waived for the current SHA.
 - Use `+ci-run-full` only after local validation, self-review, review-thread triage, and the final push for the current batch.
 - Use `+ci-skip-full [reason]` only with explicit maintainer approval and only for low-risk/current-SHA cases where the reason is auditable.
-- Put one `+ci-*` command per PR comment.
-
-If `+ci-*` is not yet available on the target branch, use the repository's current full-CI trigger documented in `.github/read-me.md`, but keep the same readiness gate.
+- Use `+ci-help` when the command syntax or current behavior is unclear.
+- Put one `+ci-*` command per PR comment; the workflow handles only the first command in a comment.
+- Do not add or remove `full-ci` directly when a `+ci-*` command would create a clearer audit trail.
 
 ## Review Comment Handling
 
