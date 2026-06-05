@@ -150,10 +150,17 @@ module ReactOnRails
           match = line.match(RAW_PRECOMPILE_HOOK_VALUE)
           next false unless match
 
-          raw_value = match[1].strip
+          raw_value = unquote_shakapacker_yml_scalar(match[1].strip)
           raw_value.include?("<%") ||
             !raw_value.match?(UNQUOTED_INACTIVE_PRECOMPILE_HOOK_VALUE)
         end
+      end
+
+      def unquote_shakapacker_yml_scalar(value)
+        return value[1...-1] if value.length >= 2 && value.start_with?('"') && value.end_with?('"')
+        return value[1...-1] if value.length >= 2 && value.start_with?("'") && value.end_with?("'")
+
+        value
       end
 
       def shakapacker_yml_section_merge_aliases(section)

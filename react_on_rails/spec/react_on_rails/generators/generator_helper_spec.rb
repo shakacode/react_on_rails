@@ -290,6 +290,16 @@ RSpec.describe GeneratorHelper, type: :generator do
       end
     end
 
+    it "treats quoted empty scalars as inactive" do
+      ['""', "''"].each do |inactive_value|
+        expect(active_precompile_hook_configured?(<<~YAML)).to be(false), inactive_value
+          default:
+            precompile_hook: #{inactive_value}
+            # precompile_hook: ~
+        YAML
+      end
+    end
+
     it "ignores active hooks in sections without a commented placeholder" do
       expect(active_precompile_hook_configured?(<<~YAML)).to be(false)
         default:
