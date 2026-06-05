@@ -290,6 +290,28 @@ RSpec.describe GeneratorHelper, type: :generator do
       end
     end
 
+    it "treats quoted boolean-like raw scalars as active commands when YAML parsing falls back" do
+      ['"false"', "'false'", '"true"', "'true'", '"no"', "'off'"].each do |quoted_value|
+        expect(active_precompile_hook_configured?(<<~YAML)).to be(true), quoted_value
+          default:
+            released_at: 2026-06-05
+            precompile_hook: #{quoted_value}
+            # precompile_hook: ~
+        YAML
+      end
+    end
+
+    it "keeps unquoted boolean-like raw scalars inactive when YAML parsing falls back" do
+      %w[false true no off].each do |inactive_value|
+        expect(active_precompile_hook_configured?(<<~YAML)).to be(false), inactive_value
+          default:
+            released_at: 2026-06-05
+            precompile_hook: #{inactive_value}
+            # precompile_hook: ~
+        YAML
+      end
+    end
+
     it "treats quoted empty scalars as inactive" do
       ['""', "''"].each do |inactive_value|
         expect(active_precompile_hook_configured?(<<~YAML)).to be(false), inactive_value
@@ -785,6 +807,22 @@ RSpec.describe GeneratorHelper, type: :generator do
         default: &default
           released_at: 2026-06-05
           precompile_hook: 'bin/custom-precompile-hook'
+
+        test:
+          <<: *default
+          # precompile_hook: ~
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(false)
+    end
+
+    it "does not materialize over an inherited quoted boolean-like raw hook when YAML parsing falls back" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        default: &default
+          released_at: 2026-06-05
+          precompile_hook: "false"
 
         test:
           <<: *default

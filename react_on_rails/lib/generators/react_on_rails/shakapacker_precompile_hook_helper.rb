@@ -192,11 +192,24 @@ module ReactOnRails
         end
         return nil if precompile_hook_values.empty?
 
-        raw_value = unquote_shakapacker_yml_scalar(precompile_hook_values.last.strip)
-        return :active if raw_value.include?("<%")
+        raw_precompile_hook_value_state(precompile_hook_values.last.strip)
+      end
+
+      def raw_precompile_hook_value_state(raw_value)
+        unquoted_value = unquote_shakapacker_yml_scalar(raw_value)
+        return :active if unquoted_value.include?("<%")
+        return :inactive if unquoted_value.empty?
+        return :active if quoted_shakapacker_yml_scalar?(raw_value)
         return :active unless raw_value.match?(UNQUOTED_INACTIVE_PRECOMPILE_HOOK_VALUE)
 
         :inactive
+      end
+
+      def quoted_shakapacker_yml_scalar?(value)
+        return true if value.length >= 2 && value.start_with?('"') && value.end_with?('"')
+        return true if value.length >= 2 && value.start_with?("'") && value.end_with?("'")
+
+        false
       end
 
       def unquote_shakapacker_yml_scalar(value)
