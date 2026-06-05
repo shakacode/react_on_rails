@@ -61,10 +61,10 @@ Then we need to create a fresh Rails application as follows.
 First, be sure to run `rails -v` and check you are using Rails 7.0 or above for this new tutorial app.
 
 ```bash
-# For Rails 5.2-6.x
-rails new test-react-on-rails --skip-javascript
+# For Rails 5.2
+rails new test-react-on-rails --skip-webpacker
 
-# For Rails 7.x
+# For Rails 6.x+
 rails new test-react-on-rails --skip-javascript
 
 cd test-react-on-rails
