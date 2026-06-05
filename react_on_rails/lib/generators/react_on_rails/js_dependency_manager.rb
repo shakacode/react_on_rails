@@ -455,8 +455,7 @@ module ReactOnRails
           "All RSC projects are temporarily pinned to that version because the unversioned " \
           "`latest` tag may not export react-on-rails-rsc/RspackPlugin until stable 19.0.5 " \
           "is published, so the generator left the version pin in package.json rather than " \
-          "install a potentially incompatible version. " \
-          "Run #{manual_add_packages_command(rsc_packages_with_pin)} to finish setup."
+          "install a potentially incompatible version."
       end
 
       def remove_base_package_if_present

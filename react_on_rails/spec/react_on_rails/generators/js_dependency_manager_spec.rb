@@ -702,6 +702,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect(warning_text).to include("react-on-rails-rsc/RspackPlugin")
       # the manual instruction points at the pinned version, not the unversioned package
       expect(warning_text).to include("npm install --save-exact react-on-rails-rsc@19.0.5-rc.6")
+      expect(warning_text.scan("npm install --save-exact react-on-rails-rsc@19.0.5-rc.6").size).to eq(1)
     end
 
     it "keeps the rspack pin in the manual install instruction when the pinned install raises" do
