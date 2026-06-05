@@ -73,8 +73,8 @@ Use this order unless the changed files make a narrower or broader set clearly a
 - TypeScript package changes: run `pnpm run build`, package tests, `pnpm run lint`, and `pnpm run type-check`.
 - Generated examples or scripts: run the relevant generator/script command plus formatting and linting.
 - Documentation-only changes: run `pnpm start format.listDifferent`, sidebar validation for `docs/oss/` or `docs/pro/`, and `bin/check-links` for new or changed URLs. If committing, still run `bundle exec rubocop`; see Instructions step 3 for why this applies even to docs-only commits. RuboCop does not validate Markdown.
-- `react_on_rails_pro/**/*.{js,ts,tsx,jsx,json,css,md}` changes: confirm the Pro package edit was approved per the `AGENTS.md` ask-first rule, then run `cd react_on_rails_pro && pnpm start format.listDifferent` (the Pro package's local Prettier check via its `nps` script).
-- `react_on_rails_pro/**/*.rb` changes: confirm the Pro package edit was approved per the `AGENTS.md` ask-first rule, then run `bundle exec rubocop react_on_rails_pro/` and any targeted RSpec.
+- `react_on_rails_pro/**/*.{js,ts,tsx,jsx,json,css,md}` changes: run `cd react_on_rails_pro && pnpm start format.listDifferent` (the Pro package's local Prettier check via its `nps` script) plus any focused tests for the changed surface.
+- `react_on_rails_pro/**/*.rb` changes: run `(cd react_on_rails_pro && bundle exec rubocop --ignore-parent-exclusion)` and any targeted RSpec.
 - GitHub Actions workflow changes: confirm the edit was approved per the `AGENTS.md` ask-first rule, then run `actionlint` and `yamllint .github/`. Do not run RuboCop on `.yml` files.
 - Anything not listed above (for example, Rakefile edits, generator templates, RBS-only changes, or build scripts): apply the narrowest set of checks that covers the changed surface and explain the choice in the output.
 

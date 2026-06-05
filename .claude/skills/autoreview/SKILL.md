@@ -46,7 +46,7 @@ This is the portable core. Hold it regardless of which engine runs.
   `AGENTS.md` high-risk / `full-ci` / `benchmark` categories. Run it after the primary review is
   clean, keep it to one extra pass, and verify its findings the same way.
 - If you reject a finding as intentional/not worth fixing, add a brief inline code comment only when it documents a real invariant or ownership decision a future reviewer should know.
-- **Do not push just to review.** Push only when the user asked for push/ship/PR. Follow `AGENTS.md` git boundaries (Pro package edits are ask-first; never force-push `main`/`master`).
+- **Do not push just to review.** Push only when the user asked for push/ship/PR. Follow `AGENTS.md` git boundaries (never force-push `main`/`master`).
 
 ## Step 1 - Pick the target
 
@@ -98,7 +98,7 @@ Use `AGENTS.md` and `/verify` for the actual check set. Before a closeout review
 
 ```bash
 (cd react_on_rails && bundle exec rubocop)     # CI-equivalent OSS Ruby lint
-# Also, only when Pro Ruby or RuboCop config changed (Pro edits are ask-first per AGENTS.md):
+# Also, only when Pro Ruby or RuboCop config changed:
 (cd react_on_rails_pro && bundle exec rubocop --ignore-parent-exclusion)
 ```
 

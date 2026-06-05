@@ -1,14 +1,49 @@
-const { resolve } = require('path');
+const { existsSync } = require('fs');
+const { dirname, resolve } = require('path');
+const { config } = require('shakapacker');
 const { default: serverWebpackConfig, extractLoader } = require('./serverWebpackConfig');
+
+const rscReferenceDiscoveryPlugin = () => {
+  try {
+    // eslint-disable-next-line global-require
+    return require('react-on-rails-rsc/RSCReferenceDiscoveryPlugin').RSCReferenceDiscoveryPlugin;
+  } catch (error) {
+    throw new Error(
+      `Missing react-on-rails-rsc/RSCReferenceDiscoveryPlugin. ` +
+        `Install react-on-rails-rsc with RSCReferenceDiscoveryPlugin support ` +
+        `(check package.json for the required peer range) before running ` +
+        `bin/shakapacker-precompile-hook. ${error.message}`,
+    );
+  }
+};
 
 const configureRsc = () => {
   const rscConfig = serverWebpackConfig(true);
+  const discoveryBuild = process.env.RSC_REFERENCE_DISCOVERY_BUILD === 'true';
 
-  // Update the entry name to be `rsc-bundle` instead of `server-bundle`
-  const rscEntry = {
-    'rsc-bundle': rscConfig.entry['server-bundle'],
-  };
-  rscConfig.entry = rscEntry;
+  const sourceEntryDirectory = resolve(config.source_path, config.source_entry_path);
+  const serverComponentRegistrationEntry = resolve(
+    dirname(sourceEntryDirectory),
+    'generated/server-component-registration-entry.js',
+  );
+
+  if (discoveryBuild) {
+    if (!existsSync(serverComponentRegistrationEntry)) {
+      throw new Error(
+        `Missing server component registration entry: ${serverComponentRegistrationEntry}. ` +
+          `Run bin/shakapacker-precompile-hook before bin/shakapacker.`,
+      );
+    }
+
+    rscConfig.entry = {
+      'rsc-reference-discovery': serverComponentRegistrationEntry,
+    };
+  } else {
+    // Update the entry name to be `rsc-bundle` instead of `server-bundle`
+    rscConfig.entry = {
+      'rsc-bundle': rscConfig.entry['server-bundle'],
+    };
+  }
 
   // Add the RSC loader before the babel loader
   const { rules } = rscConfig.module;
@@ -55,8 +90,14 @@ const configureRsc = () => {
     },
   };
 
-  // Update the output bundle name to be `rsc-bundle.js` instead of `server-bundle.js`
-  rscConfig.output.filename = 'rsc-bundle.js';
+  if (discoveryBuild) {
+    rscConfig.output.filename = 'rsc-reference-discovery.js';
+    const RSCReferenceDiscoveryPlugin = rscReferenceDiscoveryPlugin();
+    rscConfig.plugins.push(new RSCReferenceDiscoveryPlugin());
+  } else {
+    // Update the output bundle name to be `rsc-bundle.js` instead of `server-bundle.js`
+    rscConfig.output.filename = 'rsc-bundle.js';
+  }
   return rscConfig;
 };
 

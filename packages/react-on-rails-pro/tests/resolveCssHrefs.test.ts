@@ -73,6 +73,38 @@ describe('resolveCssHrefs', () => {
     ).toEqual(['https://cdn.example.com/assets/css/a.css', 'https://cdn.example.com/assets/css/b.css']);
   });
 
+  it('does not double-prefix root-relative css files that already include the webpack prefix', () => {
+    expect(
+      resolveCssHrefs({
+        moduleLoading: { prefix: '/webpack/test/' },
+        filePathToModuleMetadata: {
+          'file:///app/SimpleClientComponent.jsx': {
+            id: '1',
+            chunks: [],
+            css: ['/webpack/test/css/client5-6dd89694.css'],
+            name: '*',
+          },
+        },
+      }),
+    ).toEqual(['/webpack/test/css/client5-6dd89694.css']);
+  });
+
+  it('still prefixes a root-relative css file that does not already include the webpack prefix', () => {
+    expect(
+      resolveCssHrefs({
+        moduleLoading: { prefix: '/webpack/test/' },
+        filePathToModuleMetadata: {
+          'file:///app/SimpleClientComponent.jsx': {
+            id: '1',
+            chunks: [],
+            css: ['/css/client5-6dd89694.css'],
+            name: '*',
+          },
+        },
+      }),
+    ).toEqual(['/webpack/test/css/client5-6dd89694.css']);
+  });
+
   it('treats a missing prefix as empty (bare hrefs)', () => {
     expect(
       resolveCssHrefs({

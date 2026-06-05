@@ -375,6 +375,9 @@ jobs:
           JEST_JUNIT_OUTPUT_DIR: ./jest
           JEST_JUNIT_ADD_FILE_ATTRIBUTE: "true"
 
+      - name: Run Pro dummy Jest unit tests
+        run: cd spec/dummy && pnpm run test:js
+
       - name: Store test results
         uses: actions/upload-artifact@v4
         if: always()

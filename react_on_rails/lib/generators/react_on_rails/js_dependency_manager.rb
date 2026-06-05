@@ -145,18 +145,9 @@ module ReactOnRails
       # which pins `react-on-rails-rsc`. The two track different versions during the RC window:
       # react/react-dom stay on stable 19.0.x while react-on-rails-rsc rides an RC.
       RSC_REACT_VERSION_RANGE = "~19.0.4"
-      # Pinned to 19.0.5-rc.x because the native rspack manifest plugin
-      # (`react-on-rails-rsc/RspackPlugin`) the generator scaffolds for rspack projects is only
-      # exported from 19.0.5 onward. This single pin applies to ALL `--rsc` installs, so webpack
-      # projects are also pinned to this RC during the pre-stable window (intentional: the RC is
-      # backward-compatible for webpack — it still exports `react-on-rails-rsc/WebpackPlugin`). The
-      # #3488 stable bump below moves every bundler to 19.0.5 at once.
-      # TODO(#3488): when react-on-rails-rsc 19.0.5 stable ships, bump RSC_PACKAGE_VERSION_PIN to
-      # "19.0.5" (and RSC_REACT_VERSION_RANGE too if react/react-dom advance), then verify peer-dep
-      # alignment between react@19.0.x and react-on-rails-rsc@19.0.5. At that point the `latest`
-      # tag exports RspackPlugin, so the rspack-only fallback skip in add_rsc_dependencies can be
-      # removed (rspack can safely share the webpack unversioned-fallback path again).
-      # (tracked in https://github.com/shakacode/react_on_rails/issues/3488).
+      # Pinned to 19.0.5-rc.6 because the discovery plugin export, native Rspack plugin, and
+      # RSC manifest CSS fixes all ship in that prerelease.
+      # TODO(#3642): switch to a stable react-on-rails-rsc release after 19.0.5 stable ships.
       RSC_PACKAGE_VERSION_PIN = "19.0.5-rc.6"
 
       private
@@ -250,7 +241,7 @@ module ReactOnRails
         say "Installing React dependencies..."
 
         # RSC requires React 19.0.x specifically (not 19.1.x or later)
-        # Pin to ~19.0.4 to allow patch updates while staying within 19.0.x
+        # Pin React to ~19.0.4 while using an RSC package release that exports manifest discovery.
         react_deps = if respond_to?(:use_rsc?) && use_rsc?
                        ["react@#{RSC_REACT_VERSION_RANGE}", "react-dom@#{RSC_REACT_VERSION_RANGE}",
                         "prop-types@^15.0.0"]

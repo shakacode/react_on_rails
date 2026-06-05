@@ -84,6 +84,26 @@ module ReactOnRails
       end
     end
 
+    context "when computing the nonentrypoints directory path" do
+      it "is a pure accessor that does not create the directory as a side effect" do
+        generator = described_class.instance
+        nonentrypoints_dir = generator.send(:generated_nonentrypoints_directory_path)
+        FileUtils.rm_rf(nonentrypoints_dir)
+
+        # The path accessor must not touch the filesystem; the mkdir lives in
+        # ensure_nonentrypoints_directory!, called only before writes. This locks the behavior so
+        # read-only callers (staleness checks, cleanup enumeration) never create the directory.
+        expect(generator.send(:generated_nonentrypoints_directory_path)).to eq(nonentrypoints_dir)
+        expect(Dir.exist?(nonentrypoints_dir)).to be(false)
+
+        # ensure_nonentrypoints_directory! is the only thing that creates it.
+        generator.send(:ensure_nonentrypoints_directory!)
+        expect(Dir.exist?(nonentrypoints_dir)).to be(true)
+
+        FileUtils.rm_rf(nonentrypoints_dir)
+      end
+    end
+
     context "when component with common file only" do
       let(:component_name) { "ComponentWithCommonOnly" }
       let(:component_pack) { "#{generated_directory}/#{component_name}.js" }
@@ -361,6 +381,53 @@ module ReactOnRails
         ENV.delete("REACT_ON_RAILS_VERBOSE")
       end
 
+      it "regenerates server artifacts when a server-only component source is newer" do
+        described_class.instance.generate_packs_if_stale
+        generator = described_class.instance
+        server_component_source =
+          "#{packer_source_path}/components/#{components_directory}/ror_components/" \
+          "ReactServerComponentWithClientAndServer.server.jsx"
+        registration_entry = generator.send(:server_component_registration_entry_file_path)
+        original_source_mtime = File.mtime(server_component_source)
+
+        stale_generated_time = Time.now - 60
+        fresh_source_time = Time.now - 30
+        FileUtils.touch(generated_server_bundle_file_path, mtime: stale_generated_time)
+        FileUtils.touch(registration_entry, mtime: stale_generated_time)
+        FileUtils.touch(server_component_source, mtime: fresh_source_time)
+
+        ENV["REACT_ON_RAILS_VERBOSE"] = "true"
+        expect do
+          described_class.instance.generate_packs_if_stale
+        end.to output(GENERATED_PACKS_CONSOLE_OUTPUT_REGEX).to_stdout
+
+        expect(File.mtime(generated_server_bundle_file_path)).to be > fresh_source_time
+        expect(File.mtime(registration_entry)).to be > fresh_source_time
+      ensure
+        FileUtils.touch(server_component_source, mtime: original_source_mtime) if original_source_mtime
+        ENV.delete("REACT_ON_RAILS_VERBOSE")
+      end
+
+      it "regenerates the registration entry when its content is stale but its mtime is current" do
+        described_class.instance.generate_packs_if_stale
+        generator = described_class.instance
+        registration_entry = generator.send(:server_component_registration_entry_file_path)
+        expect(File.exist?(registration_entry)).to be(true)
+
+        # A fresh mtime keeps generated_file_older_than_sources? false, so this exercises the
+        # content-equality branch of server_component_registration_entry_stale? specifically
+        # (the mtime branch is covered by the preceding example). This is the branch that catches an
+        # added/removed/renamed server component when no source mtime happens to be newer.
+        File.write(registration_entry, "// stale registration entry\n")
+        fresh_mtime = Time.now + 60
+        File.utime(fresh_mtime, fresh_mtime, registration_entry)
+
+        described_class.instance.generate_packs_if_stale
+
+        expect(File.read(registration_entry)).not_to include("stale registration entry")
+        expect(File.read(registration_entry)).to include("registerServerComponent")
+      end
+
       it "checks generated pack contents without emitting likely-client warnings" do
         described_class.instance.generate_packs_if_stale
         component_name = "ReactServerComponent"
@@ -386,6 +453,17 @@ module ReactOnRails
         end.not_to output(/WARNING.*#{component_name}/).to_stdout
       ensure
         File.write(component_source, original_source) if original_source
+      end
+
+      it "does not write a registration entry when there are no server components to register" do
+        generator = described_class.instance
+        allow(generator).to receive(:server_component_registration_entries).and_return({})
+        entry_path = generator.send(:server_component_registration_entry_file_path)
+        FileUtils.rm_f(entry_path)
+
+        generator.send(:create_server_component_registration_entry)
+
+        expect(File.exist?(entry_path)).to be(false)
       end
 
       context "when RSC support is disabled" do
@@ -450,6 +528,216 @@ module ReactOnRails
           CONTENT
 
           expect(generated_server_bundle_content.strip).to eq(expected_content.strip)
+        end
+
+        it "classifies server and client components without rescanning component paths" do
+          generator = described_class.new
+          components = {
+            "ReactClientComponent" =>
+              "#{packer_source_path}/components/ReactServerComponents/ror_components/ReactClientComponent.jsx",
+            "ReactServerComponent" =>
+              "#{packer_source_path}/components/ReactServerComponents/ror_components/ReactServerComponent.jsx"
+          }
+
+          # Guard the no-rescan optimization: generated_server_pack_file_content must fetch the
+          # component map exactly once (components_for_server_registration runs an un-memoized
+          # Dir.glob). `expect ... .once` verifies the count; `allow ... .once` would not.
+          expect(generator).to receive(:components_for_server_registration).once.and_return(components)
+          generated_server_bundle_path = File.join(
+            Pathname(packer_source_entry_path).parent,
+            "generated/server-bundle-generated.js"
+          )
+          allow(generator).to receive_messages(
+            store_to_path: {},
+            generated_server_bundle_file_path: generated_server_bundle_path
+          )
+          allow(generator).to receive(:client_entrypoint?) do |path|
+            path.end_with?("ReactClientComponent.jsx")
+          end
+
+          generated_server_bundle_content = generator.send(:generated_server_pack_file_content)
+
+          expect(generated_server_bundle_content).to include("registerServerComponent({ReactServerComponent});")
+          expect(generated_server_bundle_content).to include("ReactOnRails.register({ReactClientComponent});")
+        end
+
+        it "reuses precomputed components when checking generated server bundle freshness" do
+          generator = described_class.new
+          components = {
+            "ReactServerComponent" =>
+              "#{packer_source_path}/components/ReactServerComponents/ror_components/ReactServerComponent.jsx"
+          }
+          generated_server_bundle_path = File.join(
+            Pathname(packer_source_entry_path).parent,
+            "generated/server-bundle-generated.js"
+          )
+
+          allow(generator).to receive(:components_for_server_registration).and_return(components)
+          allow(generator).to receive_messages(
+            generated_server_bundle_file_path: generated_server_bundle_path,
+            store_to_path: {}
+          )
+          allow(generator).to receive(:generated_file_older_than_sources?)
+            .with(generated_server_bundle_path, components.values)
+            .and_return(false)
+          allow(generator).to receive(:generated_server_pack_file_content).with(components).and_return("fresh")
+          allow(File).to receive(:exist?).and_call_original
+          allow(File).to receive(:exist?).with(generated_server_bundle_path).and_return(true)
+          allow(File).to receive(:read).with(generated_server_bundle_path).and_return("fresh")
+
+          expect(generator.send(:generated_server_bundle_stale?)).to be(false)
+          expect(generator).to have_received(:components_for_server_registration).once
+          expect(generator).to have_received(:generated_server_pack_file_content).with(components)
+        end
+
+        it "reuses precomputed entries when writing and checking the RSC registration entry" do
+          generator = described_class.new
+          entries = {
+            "ReactServerComponent" =>
+              "#{packer_source_path}/components/ReactServerComponents/ror_components/ReactServerComponent.jsx"
+          }
+          registration_entry_path = File.join(
+            Pathname(packer_source_entry_path).parent,
+            "generated/server-component-registration-entry.js"
+          )
+
+          allow(generator).to receive_messages(
+            server_component_registration_entries: entries,
+            server_component_registration_entry_file_path: registration_entry_path
+          )
+          allow(generator).to receive(:server_component_registration_entry_content)
+            .with(entries)
+            .and_return("fresh")
+          allow(generator).to receive(:ensure_nonentrypoints_directory!)
+          expect(File).to receive(:write).with(registration_entry_path, "fresh")
+
+          generator.send(:create_server_component_registration_entry)
+
+          allow(generator).to receive(:generated_file_older_than_sources?)
+            .with(registration_entry_path, entries.values)
+            .and_return(false)
+          allow(File).to receive(:exist?).and_call_original
+          allow(File).to receive(:exist?).with(registration_entry_path).and_return(true)
+          allow(File).to receive(:read).with(registration_entry_path).and_return("fresh")
+
+          expect(generator.send(:server_component_registration_entry_stale?)).to be(false)
+          expect(generator).to have_received(:server_component_registration_entries).twice
+          expect(generator).to have_received(:server_component_registration_entry_content).with(entries).twice
+        end
+
+        it "reuses server registration components across the staleness fast path" do
+          generator = described_class.new
+          components = {
+            "ReactServerComponent" =>
+              "#{packer_source_path}/components/ReactServerComponents/ror_components/ReactServerComponent.jsx"
+          }
+          generated_server_bundle_path = File.join(
+            Pathname(packer_source_entry_path).parent,
+            "generated/server-bundle-generated.js"
+          )
+          registration_entry_path = File.join(
+            Pathname(packer_source_entry_path).parent,
+            "generated/server-component-registration-entry.js"
+          )
+
+          allow(generator).to receive_messages(
+            common_component_to_path: {},
+            client_component_to_path: {},
+            store_to_path: {},
+            generated_server_bundle_file_path: generated_server_bundle_path,
+            server_component_registration_entry_file_path: registration_entry_path,
+            client_entrypoint?: false
+          )
+          allow(generator).to receive(:components_for_server_registration).and_return(components)
+          allow(generator).to receive(:generated_file_older_than_sources?)
+            .with(generated_server_bundle_path, components.values)
+            .and_return(false)
+          allow(generator).to receive(:generated_file_older_than_sources?)
+            .with(registration_entry_path, components.values)
+            .and_return(false)
+          allow(generator).to receive(:generated_server_pack_file_content).with(components).and_return("fresh")
+          allow(generator)
+            .to receive(:server_component_registration_entry_content)
+            .with(components)
+            .and_return("fresh")
+          allow(File).to receive(:exist?).and_call_original
+          allow(File).to receive(:exist?).with(generated_server_bundle_path).and_return(true)
+          allow(File).to receive(:exist?).with(registration_entry_path).and_return(true)
+          allow(File).to receive(:read).with(generated_server_bundle_path).and_return("fresh")
+          allow(File).to receive(:read).with(registration_entry_path).and_return("fresh")
+
+          expect(generator.send(:stale_or_missing_packs?)).to be(false)
+          expect(generator).to have_received(:components_for_server_registration).once
+        end
+
+        it "creates a server component registration entry for RSC reference discovery" do
+          generated_entry_path = File.join(
+            Pathname(packer_source_entry_path).parent,
+            "generated/server-component-registration-entry.js"
+          )
+          generated_entry_content = File.read(generated_entry_path)
+          expected_content = <<~CONTENT.strip
+            import ReactServerComponent from '../components/ReactServerComponents/ror_components/ReactServerComponent.jsx';
+            import ReactServerComponentWithClientAndServer from '../components/ReactServerComponents/ror_components/ReactServerComponentWithClientAndServer.server.jsx';
+
+            import registerServerComponent from 'react-on-rails-pro/registerServerComponent/server';
+            registerServerComponent({ ReactServerComponent, ReactServerComponentWithClientAndServer });
+          CONTENT
+
+          expect(generated_entry_content.strip).to eq(expected_content.strip)
+          expect(generated_entry_content).not_to include("ReactOnRails.register")
+          expect(generated_entry_content).not_to include("ReactClientComponent")
+        end
+
+        it "preserves the registration entry while removing stray files during cleanup" do
+          generated_dir = File.join(Pathname(packer_source_entry_path).parent, "generated")
+          entry_path = File.join(generated_dir, "server-component-registration-entry.js")
+          stray_path = File.join(generated_dir, "stray-orphan.js")
+          File.write(stray_path, "// stray\n")
+          expect(File.exist?(entry_path)).to be(true)
+
+          described_class.instance.generate_packs_if_stale
+
+          expect(File.exist?(stray_path)).to be(false)
+          expect(File.exist?(entry_path)).to be(true)
+        end
+
+        it "regenerates the registration entry when only it is missing" do
+          entry_path = File.join(
+            Pathname(packer_source_entry_path).parent,
+            "generated/server-component-registration-entry.js"
+          )
+          expect(File.exist?(entry_path)).to be(true)
+          File.delete(entry_path)
+
+          described_class.instance.generate_packs_if_stale
+
+          expect(File.exist?(entry_path)).to be(true)
+        end
+
+        it "scans the nonentrypoints directory for cleanup even when the server bundle is the entrypoint" do
+          generator = described_class.instance
+          ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint = true
+          nonentrypoints_dir = generator.send(:generated_nonentrypoints_directory_path)
+
+          # generated_server_bundle_directory_path is nil in entrypoint mode, so without the explicit
+          # add the registration entry's directory would never be enumerated for cleanup.
+          expect(generator.send(:directories_to_clean)).to include(nonentrypoints_dir)
+        ensure
+          ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint = false
+        end
+
+        it "treats the registration entry as expected and stray files as unexpected" do
+          generator = described_class.instance
+          nonentrypoints_dir = generator.send(:generated_nonentrypoints_directory_path)
+          entry = generator.send(:server_component_registration_entry_file_path)
+          stray = File.join(nonentrypoints_dir, "stray-orphan.js")
+          expected_files = generator.send(:build_expected_files_set)
+
+          unexpected = generator.send(:find_unexpected_files, [entry, stray], nonentrypoints_dir, expected_files)
+
+          expect(unexpected).to include(stray)
+          expect(unexpected).not_to include(entry)
         end
       end
     end

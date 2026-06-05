@@ -658,24 +658,26 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
   describe "#add_rsc_dependencies" do
     it "installs version-pinned rsc dependency" do
-      allow(instance).to receive(:rsc_packages_with_version).and_return([["react-on-rails-rsc@19.0.5-rc.6"], true])
+      rsc_package = "react-on-rails-rsc@#{ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN}"
+      allow(instance).to receive(:rsc_packages_with_version).and_return([[rsc_package], true])
 
       instance.send(:add_rsc_dependencies)
 
       expect(instance.add_npm_dependencies_calls).to include(
-        a_hash_including(packages: ["react-on-rails-rsc@19.0.5-rc.6"], dev: false)
+        a_hash_including(packages: [rsc_package], dev: false)
       )
     end
 
     it "falls back to unversioned package when pinned install fails" do
-      allow(instance).to receive(:rsc_packages_with_version).and_return([["react-on-rails-rsc@19.0.5-rc.6"], true])
+      rsc_package = "react-on-rails-rsc@#{ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN}"
+      allow(instance).to receive(:rsc_packages_with_version).and_return([[rsc_package], true])
 
-      allow(instance).to receive(:add_packages).with(["react-on-rails-rsc@19.0.5-rc.6"]).and_return(false)
+      allow(instance).to receive(:add_packages).with([rsc_package]).and_return(false)
       allow(instance).to receive(:add_packages).with(["react-on-rails-rsc"]).and_return(true)
 
       instance.send(:add_rsc_dependencies)
 
-      expect(instance).to have_received(:add_packages).with(["react-on-rails-rsc@19.0.5-rc.6"])
+      expect(instance).to have_received(:add_packages).with([rsc_package])
       expect(instance).to have_received(:add_packages).with(["react-on-rails-rsc"])
       expect(warnings.join("\n")).to include("installed react-on-rails-rsc version may not match")
     end

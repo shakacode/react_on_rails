@@ -1,6 +1,6 @@
 # Design: Fix CSS FOUC behind `'use client'` boundaries (issue #3211)
 
-Status: approved 2026-06-03. Single PR (patch + renderer + tests).
+Status: approved 2026-06-03. Single PR (released package + renderer + tests).
 
 > **Update 2026-06-04:** The upstream manifest fix landed in
 > `react-on-rails-rsc@19.0.5-rc.6`, which records `.css` siblings (plus `.mjs`
@@ -19,8 +19,8 @@ seconds after first paint — producing a visible flash of unstyled content
 
 Two independent gaps cause this, and **both** must be closed:
 
-1. **Manifest gap.** The patched `react-server-dom-webpack-plugin.js` shipped by
-   `react-on-rails-rsc@19.0.4` records only `.js` files for each client
+1. **Manifest gap.** Versions of `react-server-dom-webpack-plugin.js` shipped
+   before `react-on-rails-rsc@19.0.5-rc.6` record only `.js` files for each client
    reference. The `mini-css-extract-plugin` CSS sibling of the same chunk group
    is dropped, so nothing downstream even _knows_ the CSS exists.
 2. **Renderer gap.** The Pro RSC renderer never emits any CSS metadata — no
@@ -36,10 +36,9 @@ manifest spec that traps gap #1.
 
 ## Why the fix is entirely in this repo
 
-The upstream package fix (`shakacode/react_on_rails_rsc#35`) is still open and
-unpublished. There is no fixed release to depend on. So the manifest half ships
-here as a `pnpm patch` against `19.0.4`, mirroring what rsc#35 will eventually
-publish; when a fixed release lands we drop the patch.
+The upstream package fix now ships in `react-on-rails-rsc@19.0.5-rc.6`, so this
+repo consumes the released package directly instead of carrying a local
+`pnpm patch`.
 
 ## The mechanism we rely on: React 19 `<link precedence>`
 
@@ -58,10 +57,9 @@ identically — so SSR and CSR are both covered with no CSR-specific code.
 
 ## Design
 
-### Part A — Manifest plugin patch (record CSS)
+### Part A — Manifest package fix (record CSS)
 
-`patches/react-on-rails-rsc@19.0.4.patch`, applied via pnpm
-`patchedDependencies`, rewrites the chunk-collection loop in
+`react-on-rails-rsc@19.0.5-rc.6` rewrites the chunk-collection loop in
 `dist/react-server-dom-webpack/cjs/react-server-dom-webpack-plugin.js`.
 
 Current (buggy) inner loop records at most the first `.js` per chunk and `break`s
@@ -182,14 +180,13 @@ navigation they decode and React hoists/dedupes/suspends commit identically.
 
 | File                                                             | Change                                                                         |
 | ---------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `package.json` (`pnpm.patchedDependencies`)                      | register the patch                                                             |
-| `patches/react-on-rails-rsc@19.0.4.patch` _(new)_                | collect `.css` into `css[]`                                                    |
+| `package.json` / workspace package manifests                     | consume `react-on-rails-rsc@19.0.5-rc.6` with the upstream CSS manifest fix    |
 | `packages/react-on-rails-pro/src/resolveCssHrefs.ts` _(new)_     | manifest → ordered deduped hrefs                                               |
 | `cache/` client-manifest accessor                                | cached read of client manifest for the renderer, invalidated by file signature |
 | `packages/react-on-rails-pro/src/capabilities/proRSC.ts`         | wrap tree with `<link precedence>` before `renderToPipeableStream`             |
 | `…/spec/dummy/spec/requests/rsc_use_client_css_manifest_spec.rb` | unpend; assert `css`                                                           |
 | `…/spec/dummy/e2e-tests/`                                        | assert `<link precedence>` in `<head>` + computed bg color                     |
-| `react_on_rails_rsc` types (consumed)                            | `ImportManifestEntry.css?: string[]` (via patch + local type)                  |
+| `react_on_rails_rsc` types (consumed)                            | `ImportManifestEntry.css?: string[]`                                           |
 
 ## Migration / compatibility
 

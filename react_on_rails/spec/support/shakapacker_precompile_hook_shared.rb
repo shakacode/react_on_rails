@@ -14,7 +14,14 @@
 # See: https://github.com/shakacode/shakapacker/blob/main/docs/precompile_hook.md
 
 require "fileutils"
+require "find"
 require "json"
+
+# Guarded so the specs, which `load` this script once per example, don't warn on constant
+# re-initialization (the script is also run directly as the precompile hook).
+unless defined?(EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_COMPONENTS)
+  EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_COMPONENTS = %w[.git log node_modules public spec test tmp vendor].freeze
+end
 
 # Find Rails root by walking upward looking for config/environment.rb
 def find_rails_root
@@ -123,10 +130,104 @@ rescue StandardError => e
   exit 1
 end
 
+def rsc_registration_entry_path_components(path, rails_root: nil)
+  expanded_path = File.expand_path(path)
+  return [] if rails_root && expanded_path == File.expand_path(rails_root)
+
+  if rails_root
+    expanded_root = "#{File.expand_path(rails_root)}#{File::SEPARATOR}"
+    expanded_path = expanded_path.delete_prefix(expanded_root) if expanded_path.start_with?(expanded_root)
+  end
+
+  expanded_path.split(File::SEPARATOR).reject(&:empty?)
+end
+
+def valid_rsc_registration_entry_path?(path, rails_root: nil)
+  path_components = rsc_registration_entry_path_components(path, rails_root: rails_root)
+  EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_COMPONENTS.none? { |component| path_components.include?(component) }
+end
+
+def rsc_manifest_registration_entry(rails_root)
+  Find.find(rails_root) do |path|
+    if File.directory?(path)
+      Find.prune unless valid_rsc_registration_entry_path?(path, rails_root: rails_root)
+      next
+    end
+
+    next unless File.basename(path) == "server-component-registration-entry.js"
+    next unless File.basename(File.dirname(path)) == "generated"
+
+    return path if valid_rsc_registration_entry_path?(path, rails_root: rails_root)
+  end
+
+  nil
+end
+
+def clear_stale_rsc_manifest_client_references(rails_root)
+  stale_manifest = File.join(rails_root, "ssr-generated", "rsc-client-references.json")
+  FileUtils.rm_f(stale_manifest)
+end
+
+# Generate RSC manifest client references if a server component registration entry exists.
+#
+# Unlike the shipped template hook
+# (lib/generators/react_on_rails/templates/base/base/bin/shakapacker-precompile-hook), which loads
+# the full Rails environment and gates on `ReactOnRailsPro::Utils.rsc_support_enabled?`, this
+# standalone script never requires `config/environment` (it only walks up for the Rails root), so
+# ReactOnRailsPro is not loaded and `rsc_support_enabled?` is unavailable here. Instead it relies on
+# the registration entry's absence as the capability signal: the entry is written only when RSC is
+# enabled AND there is at least one server component to register (see
+# PacksGenerator#create_server_component_registration_entry, which returns early when there are no
+# server components), so a missing entry means there is nothing to discover (RSC off, or RSC on with
+# no server components) and discovery is skipped. The early `RSC_REFERENCE_DISCOVERY_BUILD` guard
+# prevents the discovery build (which re-invokes bin/shakapacker) from recursing into itself.
+def generate_rsc_manifest_client_references_if_needed
+  return if ENV["RSC_REFERENCE_DISCOVERY_BUILD"] == "true"
+
+  rails_root = find_rails_root
+  return unless rails_root
+
+  registration_entry = rsc_manifest_registration_entry(rails_root)
+  unless registration_entry
+    clear_stale_rsc_manifest_client_references(rails_root)
+    return
+  end
+
+  shakapacker_bin = File.join(rails_root, "bin", "shakapacker")
+  unless File.exist?(shakapacker_bin)
+    raise "bin/shakapacker is missing; cannot generate RSC manifest client references. " \
+          "Restore bin/shakapacker before precompiling RSC assets."
+  end
+
+  puts "🔎 Generating RSC manifest client references..."
+
+  env = {
+    "SHAKAPACKER_SKIP_PRECOMPILE_HOOK" => "true",
+    "RSC_REFERENCE_DISCOVERY_BUILD" => "true",
+    "RSC_BUNDLE_ONLY" => "true",
+    "CLIENT_BUNDLE_ONLY" => nil,
+    "SERVER_BUNDLE_ONLY" => nil
+  }
+
+  Dir.chdir(rails_root) do
+    system(env, shakapacker_bin, exception: true)
+    puts "✅ RSC manifest client references generated successfully"
+  end
+# The discovered manifest is load-bearing for correct client references, so a failed discovery build
+# must abort the precompile (exit 1) rather than warn — matching the template hook, which lets the
+# error propagate to its top-level rescue. The shakapacker binary's existence is already asserted
+# above, so any failure here (including Errno::ENOENT) is a real error, not a benign "tool missing".
+rescue StandardError => e
+  warn "❌ RSC manifest client reference generation failed: #{e.message}"
+  warn e.backtrace.first(5).join("\n") if e.backtrace
+  exit 1
+end
+
 # Main execution (only if run directly, not when required)
 def run_precompile_tasks
   build_rescript_if_needed
   generate_packs_if_needed
+  generate_rsc_manifest_client_references_if_needed
 end
 
 run_precompile_tasks if __FILE__ == $PROGRAM_NAME
