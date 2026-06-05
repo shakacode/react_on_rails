@@ -301,6 +301,15 @@ RSpec.describe GeneratorHelper, type: :generator do
       end
     end
 
+    it "preserves hash characters inside quoted raw hook values when YAML parsing falls back" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(true)
+        default:
+          released_at: 2026-06-05
+          precompile_hook: "bin/custom#hook" # trailing comment
+          # precompile_hook: ~
+      YAML
+    end
+
     it "keeps unquoted boolean-like raw scalars inactive when YAML parsing falls back" do
       %w[false true no off].each do |inactive_value|
         expect(active_precompile_hook_configured?(<<~YAML)).to be(false), inactive_value
@@ -501,6 +510,15 @@ RSpec.describe GeneratorHelper, type: :generator do
           precompile_hook: 'bin/custom-precompile-hook'
           # precompile_hook: ~
       YAML
+    end
+  end
+
+  describe "#raw_precompile_hook_value" do
+    it "strips unquoted comments without truncating quoted hashes" do
+      expect(raw_precompile_hook_value(%(  precompile_hook: "bin/custom#hook" # comment))).to eq(
+        '"bin/custom#hook"'
+      )
+      expect(raw_precompile_hook_value("  precompile_hook: false # <%= old_hook %>")).to eq("false")
     end
   end
 

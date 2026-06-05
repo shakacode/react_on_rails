@@ -7,13 +7,15 @@ module ReactOnRails
       SHAKAPACKER_YML_PATH = "config/shakapacker.yml"
       DEFAULT_PRECOMPILE_HOOK_COMMAND = "bin/shakapacker-precompile-hook"
       COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER = /^(\s*)#\s*precompile_hook:\s*~\s*$/
-      RAW_PRECOMPILE_HOOK_VALUE = /^\s+precompile_hook:\s*([^#]*?)\s*(?:#.*)?$/
+      RAW_PRECOMPILE_HOOK_VALUE = /^\s+precompile_hook:\s*(.*?)\s*$/
+      # YAML boolean scalars, including truthy values, are not valid shell commands.
       UNQUOTED_INACTIVE_PRECOMPILE_HOOK_VALUE = /\A(?:|~|null|false|true|yes|no|on|off)\z/i
+      SHAKAPACKER_YML_QUOTE_CHARACTERS = ['"', "'"].freeze
       class ShakapackerYmlErbError < StandardError; end
       ShakapackerYmlDocument = Struct.new(:sections, :section_index, :anchor_index, keyword_init: true)
       private_constant :SHAKAPACKER_YML_PATH, :DEFAULT_PRECOMPILE_HOOK_COMMAND,
                        :COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER, :RAW_PRECOMPILE_HOOK_VALUE,
-                       :UNQUOTED_INACTIVE_PRECOMPILE_HOOK_VALUE,
+                       :UNQUOTED_INACTIVE_PRECOMPILE_HOOK_VALUE, :SHAKAPACKER_YML_QUOTE_CHARACTERS,
                        :ShakapackerYmlErbError, :ShakapackerYmlDocument
 
       private
@@ -56,10 +58,8 @@ module ReactOnRails
         )
         config = parse_shakapacker_yml_content(materialized_content)
         normalize_precompile_hook(effective_precompile_hook(config, environment)) == DEFAULT_PRECOMPILE_HOOK_COMMAND
-      rescue ShakapackerYmlErbError
-        # render_shakapacker_yml_erb already warned; materialization fails closed.
-        fail_closed_generated_precompile_hook
       rescue StandardError
+        # ERB evaluation failures already warned; materialization fails closed.
         false
       end
 
@@ -82,10 +82,6 @@ module ReactOnRails
         active_hook_configured
       rescue ShakapackerYmlErbError
         true
-      end
-
-      def fail_closed_generated_precompile_hook
-        false
       end
 
       def warn_existing_precompile_hook_placeholder_skip
@@ -161,6 +157,8 @@ module ReactOnRails
       def raw_precompile_hook_state_in_section_tree(section_name, section_index, anchor_index, visited = {})
         return nil if visited[section_name]
 
+        # Mutate this path's cycle state; recursive merge branches receive duped
+        # hashes so sibling aliases do not hide one another.
         visited[section_name] = true
         section = section_index[section_name]
         return nil unless section
@@ -188,11 +186,61 @@ module ReactOnRails
         precompile_hook_values = section.each_line.filter_map do |line|
           next unless shakapacker_yml_section_child_line?(line, child_indent)
 
-          line.match(RAW_PRECOMPILE_HOOK_VALUE)&.[](1)
+          raw_precompile_hook_value(line)
         end
         return nil if precompile_hook_values.empty?
 
-        raw_precompile_hook_value_state(precompile_hook_values.last.strip)
+        raw_precompile_hook_value_state(precompile_hook_values.last)
+      end
+
+      def raw_precompile_hook_value(line)
+        raw_value = line.match(RAW_PRECOMPILE_HOOK_VALUE)&.[](1)
+        return nil unless raw_value
+
+        strip_shakapacker_yml_inline_comment(raw_value).strip
+      end
+
+      def strip_shakapacker_yml_inline_comment(value)
+        value.each_char.with_index do |char, index|
+          next unless char == "#"
+          next unless shakapacker_yml_inline_comment_start?(value, index)
+          next if shakapacker_yml_quoted_at?(value, index)
+
+          return value[0...index].rstrip
+        end
+
+        value.rstrip
+      end
+
+      def shakapacker_yml_inline_comment_start?(value, index)
+        index.zero? || value[index - 1].match?(/\s/)
+      end
+
+      def shakapacker_yml_quoted_at?(value, target_index)
+        quote = nil
+        index = 0
+
+        while index < target_index
+          char = value[index]
+          if quote
+            if shakapacker_yml_escaped_quote?(value, index, quote)
+              index += 2
+              next
+            end
+            quote = nil if char == quote
+          elsif SHAKAPACKER_YML_QUOTE_CHARACTERS.include?(char)
+            quote = char
+          end
+
+          index += 1
+        end
+
+        !quote.nil?
+      end
+
+      def shakapacker_yml_escaped_quote?(value, index, quote)
+        (quote == '"' && value[index] == "\\") ||
+          (quote == "'" && value[index] == "'" && value[index + 1] == "'")
       end
 
       def raw_precompile_hook_value_state(raw_value)
@@ -247,6 +295,7 @@ module ReactOnRails
           aliases.concat(shakapacker_yml_block_merge_aliases(lines[(index + 1)..], match[1].length))
           merge_alias_groups << aliases
         end
+        # Later duplicate << keys override earlier ones in the rendered mapping.
         merge_alias_groups.reverse.flatten
       end
 
@@ -331,9 +380,9 @@ module ReactOnRails
         require "erb"
 
         # TOPLEVEL_BINDING matches Rails config ERB evaluation closely enough for
-        # ENV/Rails constants. The tradeoff is that evaluation uses this
-        # process's top-level scope rather than an app-isolated binding, so
-        # unavailable app helpers or side effects fail closed and skip writes.
+        # ENV/Rails constants. ERB can execute side-effectful Ruby here under the
+        # developer-invoked trust model Rails config ERB already uses. Missing app
+        # helpers or runtime failures fail closed and skip writes.
         ERB.new(content).result(TOPLEVEL_BINDING)
       rescue ScriptError, StandardError => e
         warn_shakapacker_yml_erb_error(e)
