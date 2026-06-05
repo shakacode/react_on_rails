@@ -14,6 +14,7 @@ module Github
 
   def escape_workflow_command_data(value)
     value.to_s
+         # Escape percent first so the percent signs introduced below are not double-encoded.
          .gsub("%", "%25")
          .gsub("\r", "%0D")
          .gsub("\n", "%0A")
