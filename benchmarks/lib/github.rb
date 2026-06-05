@@ -7,4 +7,8 @@ module Github
   def run_url
     "#{ENV.fetch('GITHUB_SERVER_URL')}/#{ENV.fetch('GITHUB_REPOSITORY')}/actions/runs/#{ENV.fetch('GITHUB_RUN_ID')}"
   end
+
+  def warning(message)
+    $stdout.puts "::warning::#{message}"
+  end
 end
