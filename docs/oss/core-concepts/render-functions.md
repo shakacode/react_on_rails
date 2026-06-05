@@ -46,6 +46,7 @@ HelloHash.renderFunction = true;
 const LazyHydrate = (props, _railsContext, domNodeId) =>
   whenVisible(domNodeId).then(() => {
     const domNode = document.getElementById(domNodeId);
+    // Navigation may remove the node before visibility resolves, so there is no mounted root to clean up.
     if (!domNode) return undefined;
 
     const root = ReactDOMClient.hydrateRoot(domNode, <HelloMessage {...props} />);

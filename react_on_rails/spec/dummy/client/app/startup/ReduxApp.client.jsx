@@ -75,5 +75,5 @@ export default (props, railsContext, domNodeId) => {
     });
   }
 
-  return { teardown: () => root?.unmount() };
+  return { teardown: () => root.unmount() };
 };
