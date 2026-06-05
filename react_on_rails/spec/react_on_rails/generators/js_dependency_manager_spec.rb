@@ -759,9 +759,16 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       instance.send(:add_rsc_dependencies)
 
       warning_text = warnings.join("\n")
+      expected_recovery = <<~MSG.strip
+        pin lookup failed
+
+        You can install them manually by running:
+            npm install --save-exact react-on-rails-rsc
+      MSG
+
       expect(warning_text).to include("Error adding React Server Components dependencies: pin lookup failed")
-      expect(warning_text).to include("npm install --save-exact react-on-rails-rsc")
-      expect(warning_text).not_to include("pin lookup failed\n\nYou can install")
+      expect(warning_text).to include(expected_recovery)
+      expect(warning_text).not_to include("Could not install the pinned react-on-rails-rsc")
     end
   end
 
