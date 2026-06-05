@@ -1634,6 +1634,25 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
     end
 
+    it "omits the bundler config-hint bullet on the webpack non-HMR path" do
+      # Symmetric to the rspack live-reload case above: rspack_react_refresh_config_hint
+      # returns "" for webpack, so the non-HMR troubleshooting block must not emit a
+      # config/webpack/development.js bullet (that hint only belongs on the HMR path).
+      allow(described_class).to receive_messages(
+        configured_assets_bundler: "webpack",
+        default_dev_server_mode: :live_reload,
+        development_dev_server_config: { "hmr" => false, "live_reload" => true }
+      )
+
+      output = capture_stdout { described_class.show_help }
+
+      aggregate_failures do
+        expect(output).to match(/React Refresh requires HMR; current default mode is not HMR/)
+        expect(output).not_to match(%r{config/webpack/development.js})
+        expect(output).not_to match(/ReactRefreshWebpackPlugin/)
+      end
+    end
+
     it "uses generic React Refresh guidance for future bundlers" do
       allow(described_class).to receive_messages(
         configured_assets_bundler: "future",

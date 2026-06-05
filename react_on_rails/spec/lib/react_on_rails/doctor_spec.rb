@@ -106,6 +106,29 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
+  describe "#parsed_shakapacker_config" do
+    it "reads and parses config/shakapacker.yml at most once per Doctor instance" do
+      # Exercises the memoizing super override (doctor.rb): several checks consult
+      # the config through different public helpers, but a single diagnosis must
+      # read and parse the file only once. Stubbing File (not the method itself)
+      # keeps both the memoization and the super dispatch in the path under test.
+      config_path = "/tmp/myapp/config/shakapacker.yml"
+      allow(doctor).to receive(:shakapacker_config_path).and_return(config_path)
+      allow(File).to receive(:exist?).with(config_path).and_return(true)
+      allow(File).to receive(:read).with(config_path).and_return("default:\n  assets_bundler: rspack\n")
+
+      first = doctor.send(:parsed_shakapacker_config)
+      doctor.send(:active_assets_bundler)
+      doctor.send(:development_hmr_enabled?)
+      second = doctor.send(:parsed_shakapacker_config)
+
+      aggregate_failures do
+        expect(first).to be(second)
+        expect(File).to have_received(:read).with(config_path).once
+      end
+    end
+  end
+
   describe "#development_dev_server_config" do
     it "defaults to HMR when development dev_server override omits mode keys" do
       allow(doctor).to receive(:parsed_shakapacker_config).and_return(

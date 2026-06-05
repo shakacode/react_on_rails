@@ -921,6 +921,23 @@ RSpec.describe ReactOnRails::SystemChecker do
         expect(checker.send(:configured_assets_bundler)).to eq("webpack")
       end
 
+      it "resolves symbol-valued YAML scalars (permitted_classes: [Symbol])" do
+        # Locks in the ShakapackerConfigHelpers consolidation: SystemChecker's
+        # parser previously omitted permitted_classes:[Symbol], so a `key: :value`
+        # entry raised → nil → wrong defaults. The shared helper permits Symbol,
+        # so `assets_bundler: :rspack` / `javascript_transpiler: :babel` parse.
+        allow(File).to receive(:read).with(default_shakapacker_config_path).and_return(<<~YAML)
+          default:
+            assets_bundler: :rspack
+            javascript_transpiler: :babel
+        YAML
+
+        aggregate_failures do
+          expect(checker.send(:configured_assets_bundler)).to eq("rspack")
+          expect(checker.send(:detected_javascript_transpiler)).to eq("babel")
+        end
+      end
+
       it "prefers the current Rails environment over the default config" do
         allow(File).to receive(:read).with(default_shakapacker_config_path).and_return(<<~YAML)
           default:

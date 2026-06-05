@@ -13,18 +13,21 @@ module ReactOnRails
   # Doctor and SystemChecker `include` this module so the helpers become private
   # instance methods. Dev::ServerManager `extend`s it because its commands live
   # on `class << self`; extend preserves the private visibility, so the helpers
-  # become private singleton methods there. Every helper depends only on other
-  # helpers in this module plus ENV/File, so it behaves identically either way.
+  # become private singleton methods there. The helpers call each other plus
+  # standard-library/Rails globals (ENV, File, Dir, YAML, ERB, Rails) and the
+  # SystemChecker::SUPPORTED_ASSETS_BUNDLERS constant — none of which resolve
+  # through `self` — so they behave identically whether included or extended.
   module ShakapackerConfigHelpers
     DEFAULT_SHAKAPACKER_CONFIG_PATH = "config/shakapacker.yml"
 
     private
 
-    # Reads and parses config/shakapacker.yml. Symbol values are permitted so
-    # this matches Shakapacker's own loader and ReactOnRails::Dev::ServerMode;
-    # ScriptError is rescued alongside StandardError because ERB/YAML can raise
-    # SyntaxError (a ScriptError, not a StandardError). Returns nil on any
-    # failure or when the document is not a mapping.
+    # Reads and parses config/shakapacker.yml. Symbol values are permitted so a
+    # `key: :value` entry parses instead of raising, matching how
+    # ReactOnRails::Dev::ServerMode loads the same file; ScriptError is rescued
+    # alongside StandardError because ERB/YAML can raise SyntaxError (a
+    # ScriptError, not a StandardError). Returns nil on any failure or when the
+    # document is not a mapping.
     def parsed_shakapacker_config
       config_path = shakapacker_config_path
       return nil unless File.exist?(config_path)
@@ -57,10 +60,13 @@ module ReactOnRails
       config = parsed_shakapacker_config
       return nil unless config.is_a?(Hash)
 
+      # No rescue here on purpose: parsed_shakapacker_config already returns nil
+      # on any config-file failure, and the section lookups below only do Hash
+      # access plus string normalization. A raise past this point is a
+      # programming error (e.g. a missing require for SUPPORTED_ASSETS_BUNDLERS)
+      # and should surface loudly rather than silently degrade to "webpack".
       rails_env = ENV["RAILS_ENV"] || ENV["RACK_ENV"] || "development"
       bundler_from_shakapacker_section(config, rails_env) || bundler_from_shakapacker_section(config, "default")
-    rescue StandardError, ScriptError
-      nil
     end
 
     def bundler_from_shakapacker_section(config, section_name)
@@ -130,3 +136,12 @@ module ReactOnRails
     end
   end
 end
+
+# Required at the bottom, after the module is defined, on purpose. SystemChecker
+# `include`s this module at class-body evaluation time, so requiring it from the
+# top of this file would trigger that include before ShakapackerConfigHelpers
+# exists whenever this file is loaded first — raising NameError. By the time the
+# require runs here the module is fully defined, and normalize_assets_bundler
+# only needs SUPPORTED_ASSETS_BUNDLERS lazily at call time, so deferring keeps
+# the module self-contained under either load order.
+require_relative "system_checker"

@@ -810,8 +810,9 @@ module ReactOnRails
 
           # The babel `react-refresh/babel` plugin is gated on WEBPACK_SERVE in the
           # generated babel.config.js for both webpack and rspack apps, so that
-          # qualifier intentionally stays bundler-agnostic. Only the bundler plugin
-          # line below (react_refresh_bundler_config_hint) is bundler-specific.
+          # qualifier intentionally stays bundler-agnostic. The bundler-specific
+          # parts are the plugin_check heading (via react_refresh_bundler_plugin_description)
+          # and the config-hint line below (react_refresh_bundler_config_hint).
           <<~REFRESH
             #{Rainbow('⚛️  React Refresh Issues:').yellow.bold}
             #{Rainbow('If you see "$RefreshSig$ is not defined" errors:').white}
