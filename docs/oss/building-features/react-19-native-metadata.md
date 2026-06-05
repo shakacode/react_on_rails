@@ -200,12 +200,12 @@ Metadata can be rendered inside async components within Suspense boundaries. Whe
 Use [async props](../migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently) to stream slow data from Rails while showing a loading shell immediately. The parent component calls `getReactOnRailsAsyncProp` to obtain a Promise for each slow prop, passes it to an async child that `await`s it, and wraps that child in `<Suspense>`:
 
 ```jsx
-const UserProfile = async ({ userPromise }) => {
+const UserProfile = async ({ userPromise, siteName }) => {
   const user = await userPromise;
 
   return (
     <>
-      <title>{`${user.name}'s Profile | My App`}</title>
+      <title>{`${user.name}'s Profile | ${siteName}`}</title>
       <meta name="description" content={`Profile page for ${user.name}`} />
       <h1>{user.name}</h1>
       <p>{user.bio}</p>
@@ -213,18 +213,18 @@ const UserProfile = async ({ userPromise }) => {
   );
 };
 
-const ProfilePage = ({ getReactOnRailsAsyncProp }) => {
+const ProfilePage = ({ getReactOnRailsAsyncProp, siteName }) => {
   const userPromise = getReactOnRailsAsyncProp('user');
 
   return (
     <div>
       {/* Initial metadata shown while loading */}
-      <title>Loading Profile... | My App</title>
-      <meta property="og:site_name" content="My App" />
+      <title>{`Loading Profile... | ${siteName}`}</title>
+      <meta property="og:site_name" content={siteName} />
 
       <Suspense fallback={<ProfileSkeleton />}>
         {/* Updated metadata streamed when resolved */}
-        <UserProfile userPromise={userPromise} />
+        <UserProfile userPromise={userPromise} siteName={siteName} />
       </Suspense>
     </div>
   );
@@ -232,20 +232,22 @@ const ProfilePage = ({ getReactOnRailsAsyncProp }) => {
 ```
 
 ```erb
-<%# Rails view — controller prepares @user; the emit block streams it as an async prop %>
+<%# Rails view — controller authorizes @user and captures request-scoped values first %>
+<% site_name = Current.account.name %>
+
 <%= stream_react_component_with_async_props("ProfilePage",
-                                            props: {}) do |emit|
+                                            props: { siteName: site_name }) do |emit|
   emit.call("user", @user.as_json(only: %i[name bio]))
 end %>
 ```
 
-> **React on Rails note:** Keep authorization, database access, and cache-aware data loading in Rails. The `emit` block is ordinary Rails code — it runs inside the controller's request context with full access to authorization, caching, and tenancy. The React component never fetches data itself; it awaits the Promise that `getReactOnRailsAsyncProp` returns. See [RSC data fetching](../migrating/rsc-data-fetching.md).
+> **React on Rails note:** Keep authorization, database access, and cache-aware data loading in Rails. When auth, tenancy, or request state lives in `CurrentAttributes`, capture the needed serializable values before entering async-props work, pass them as regular props or IDs, and resolve scoped records server-side before calling `emit.call`. The React component never fetches data itself; it awaits the Promise that `getReactOnRailsAsyncProp` returns. See [RSC data fetching](../migrating/rsc-data-fetching.md).
 
 The initial `<title>` ("Loading Profile...") appears immediately. When Rails emits the `user` prop via `emit.call`, the Promise resolves, `UserProfile` renders, and React replaces the title with the user-specific one.
 
 ### React Server Components (RSC) with Native Metadata
 
-Native metadata works in React Server Components too. Since RSC components run exclusively on the server, metadata tags are always server-rendered — ideal for SEO. Use async props so that slow article data streams in while the shell renders immediately:
+Native metadata works in React Server Components too. Since RSC components run exclusively on the server, metadata tags are always server-rendered. Keep canonical URLs and any SEO-critical tags that Rails already knows in the first-wave shell, then use async props so that slower article content and metadata can stream in while the shell renders immediately:
 
 ```jsx
 // NativeMetadataRSCApp.jsx (no 'use client' directive — this is a Server Component)
@@ -260,18 +262,18 @@ const AsyncContent = async ({ articlePromise }) => {
       <meta name="description" content={article.excerpt} />
       <meta property="og:title" content={article.title} />
       <meta property="og:image" content={article.cover_image} />
-      <link rel="canonical" href={article.canonical_url} />
       <article>{article.body}</article>
     </>
   );
 };
 
-const ArticlePage = ({ getReactOnRailsAsyncProp }) => {
+const ArticlePage = ({ getReactOnRailsAsyncProp, canonicalUrl }) => {
   const articlePromise = getReactOnRailsAsyncProp('article');
 
   return (
     <div>
       <title>Loading...</title>
+      {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
       <Suspense fallback={<ArticleSkeleton />}>
         <AsyncContent articlePromise={articlePromise} />
       </Suspense>
@@ -283,17 +285,18 @@ export default ArticlePage;
 ```
 
 ```erb
-<%# Rails view — controller prepares @article; the emit block streams it as an async prop %>
+<%# Rails view — controller authorizes @article and prepares first-wave SEO props %>
+<% canonical_url = @article.canonical_url %>
+
 <%= stream_react_component_with_async_props("ArticlePage",
-                                            props: {}) do |emit|
+                                            props: { canonicalUrl: canonical_url }) do |emit|
   emit.call("article", @article.as_json(
-    only: %i[title excerpt cover_image body],
-    methods: %i[canonical_url]
+    only: %i[title excerpt cover_image body]
   ))
 end %>
 ```
 
-> **React on Rails note:** RSC server components still run as part of a Rails-rendered request. The `emit` block keeps authorization, tenancy, caching, and instrumentation in Rails — the React component only awaits the Promise from `getReactOnRailsAsyncProp`. See [RSC data fetching](../migrating/rsc-data-fetching.md).
+> **React on Rails note:** RSC server components still run as part of a Rails-rendered request. Pass canonical URLs, tenant IDs, viewer IDs, and other first-wave context as explicit serializable props, or resolve the scoped records in Rails before streaming them through `emit.call`. The React component only awaits the Promise from `getReactOnRailsAsyncProp`. See [RSC data fetching](../migrating/rsc-data-fetching.md).
 
 ## Hybrid Approach: Rails-Side + React-Side Metadata
 
