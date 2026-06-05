@@ -385,6 +385,8 @@ describe('ClientRenderer', () => {
         const node2 = document.createElement('div');
         node2.id = 'renderer-stale-after-newer';
         document.body.appendChild(node2);
+        // Keep the original component descriptor in place to simulate a soft navigation replacing
+        // only the mount node for this id.
         renderComponent('renderer-stale-after-newer');
         expect(resolvers).toHaveLength(2);
 

@@ -24,27 +24,15 @@
 import 'react-on-rails-rsc/client.browser';
 import * as React from 'react';
 import * as ReactDOMClient from 'react-dom/client';
-import {
-  ReactComponent,
-  ReactComponentOrRenderFunction,
-  RendererFunction,
-  RendererTeardownResult,
-} from 'react-on-rails/types';
+import { ReactComponent, ReactComponentOrRenderFunction, RendererFunction } from 'react-on-rails/types';
 import isRenderFunction from 'react-on-rails/isRenderFunction';
+import { isRendererTeardownResult } from 'react-on-rails/@internal/rendererTeardown';
 import { ensureReactUseAvailable } from 'react-on-rails/reactApis';
 import { createRSCProvider } from '../RSCProvider.tsx';
 import getReactServerComponent from '../getReactServerComponent.client.ts';
 import handleRecoverableError from '../handleRecoverableError.client.ts';
 
 ensureReactUseAvailable();
-
-function isRendererTeardownResult(value: unknown): value is RendererTeardownResult {
-  return (
-    value != null &&
-    typeof value === 'object' &&
-    typeof (value as { teardown?: unknown }).teardown === 'function'
-  );
-}
 
 /**
  * Wraps a client component with the necessary RSC context and handling for client-side operations.
