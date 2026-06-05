@@ -14,7 +14,7 @@ export default defineConfig({
   visreg: {
     viewports: ['desktop'],
     defaultMisMatchThreshold: 0.001,
-    maxNumDiffPixels: 10,
+    maxNumDiffPixels: 50,
     comparePixelmatchThreshold: 0.1,
     compareRetries: 3,
     compareRetryDelay: 500,

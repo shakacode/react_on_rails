@@ -7,6 +7,7 @@ require "open3"
 require "rubygems/version"
 require "shellwords"
 require "tempfile"
+require "timeout"
 require "tmpdir"
 require_relative "task_helpers"
 require_relative "../react_on_rails/lib/react_on_rails/version_syntax_converter"
@@ -26,6 +27,8 @@ NPM_INSTALL_DEPENDENCY_FIELDS = %w[dependencies optionalDependencies peerDepende
 SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE = "shakaperf-release-gates.yml"
 SHAKAPERF_RELEASE_GATE_START_TIMEOUT_SECONDS = 120
 SHAKAPERF_RELEASE_GATE_START_POLL_SECONDS = 5
+SHAKAPERF_RELEASE_GATE_RUN_LIST_LIMIT = 100
+SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS = 60 * 60
 
 # Helper methods for release-specific tasks
 # These are defined at the top level so they have access to Rake's sh method
@@ -192,6 +195,9 @@ def handle_shakaperf_release_gate_violation!(message:)
   abort <<~ERROR
     #{message}
 
+    The version-bump commit may already be pushed to the remote without a tag or published packages.
+    After fixing the gate, retry the release from that commit; or push a revert commit before retrying.
+
     To override this release gate (use only for an urgent release when ShakaPerf is known-unrelated):
       RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake release[...]
       # or pass override_ci_status as the 4th positional argument:
@@ -207,7 +213,7 @@ def fetch_shakaperf_release_gate_runs(repo_slug:, ref:)
     "--branch", ref,
     "--event", "workflow_dispatch",
     "--json", "databaseId,headSha,status,conclusion,url",
-    "--limit", "20"
+    "--limit", SHAKAPERF_RELEASE_GATE_RUN_LIST_LIMIT.to_s
   )
 
   unless status.success?
@@ -244,6 +250,24 @@ def wait_for_shakaperf_release_gate_run!(repo_slug:, ref:, head_sha:, ignored_ru
   )
 end
 
+def watch_shakaperf_release_gate_run!(repo_slug:, run_id:)
+  output, status = begin
+    Timeout.timeout(SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS) do
+      capture_gh_output("run", "watch", run_id, "--repo", repo_slug, "--exit-status")
+    end
+  rescue Timeout::Error
+    handle_shakaperf_release_gate_violation!(
+      message: "❌ Timed out watching ShakaPerf release gate run #{run_id}."
+    )
+  end
+
+  return if status.success?
+
+  handle_shakaperf_release_gate_violation!(
+    message: "❌ ShakaPerf release gate failed.\n\n#{output}"
+  )
+end
+
 def run_shakaperf_release_gate!(monorepo_root:, ref:, head_sha:, allow_override:, dry_run:)
   if dry_run
     puts "⚠️ DRY RUN: Would run ShakaPerf release gate on #{ref} at #{head_sha[0, 8]} before publishing."
@@ -277,13 +301,7 @@ def run_shakaperf_release_gate!(monorepo_root:, ref:, head_sha:, allow_override:
     ignored_run_ids: existing_run_ids
   )
   run_id = run.fetch("databaseId").to_s
-  output, status = capture_gh_output("run", "watch", run_id, "--repo", repo_slug, "--exit-status")
-
-  unless status.success?
-    handle_shakaperf_release_gate_violation!(
-      message: "❌ ShakaPerf release gate failed.\n\n#{output}"
-    )
-  end
+  watch_shakaperf_release_gate_run!(repo_slug: repo_slug, run_id: run_id)
 
   puts "✓ ShakaPerf release gate passed: #{run['url'] || "GitHub Actions run #{run_id}"}"
 end

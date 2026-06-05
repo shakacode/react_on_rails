@@ -4,6 +4,7 @@ const RSC_CSS_PROBE_SELECTOR = '[data-testid="rsc-css-probe"]';
 const RSC_STYLESHEET_SELECTOR = 'link[rel="stylesheet"][data-precedence="ror-rsc"]';
 // A styled probe must have a real CSS-module background, not the default unstyled page background.
 // If the intended probe style ever matches one of these defaults, change the Pro dummy probe color first.
+// This avoids pinning the gate to cosmetic RGB changes in the dummy component.
 const UNSTYLED_BACKGROUNDS = [
   // Default computed background for an unstyled element.
   'rgba(0, 0, 0, 0)',

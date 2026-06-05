@@ -8,11 +8,10 @@ on:
   push:
     tags:
       - 'v*'
-      - 'v*-rc*'
 
 concurrency:
   group: shakaperf-release-gates-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   NODE_VERSION: 22.12.0
@@ -27,7 +26,7 @@ jobs:
       RAILS_ENV: test
       NODE_ENV: test
       # Dummy value for RAILS_ENV=test; no real credentials are encrypted or persisted.
-      SECRET_KEY_BASE: dummy-secret-key-base-for-shakaperf-rsc-fouc
+      SECRET_KEY_BASE: dummy-secret-key-base-for-shakaperf-rsc-fouc # gitleaks:allow
       SHAKAPERF_CONTROL_URL: http://127.0.0.1:3000
       SHAKAPERF_EXPERIMENT_URL: http://127.0.0.1:3000
     steps:
