@@ -133,7 +133,7 @@ const MyRenderer = (props, _railsContext, domNodeId) => {
 ```
 
 > [!NOTE]
-> **Hydrating server-rendered markup?** `prerender` is not a prop React on Rails injects — the top-level `prerender:` render option only controls server rendering and is rejected for renderer functions (see the note above). If you render a component on the server with a **separate server bundle** (a server/client split) and want the client renderer to hydrate that markup, pass your own flag in the component's `props`, such as `serverRendered`, and branch on it. Remove that renderer-only flag before spreading props into your component: `const { serverRendered, ...componentProps } = props;`, then call `ReactDOMClient.hydrateRoot(domNode, <MyComponent {...componentProps} />)` when `serverRendered` is true.
+> **Hydrating server-rendered markup?** `prerender` is not a prop React on Rails injects — the top-level `prerender:` render option only controls server rendering and is rejected for renderer functions (see the note above). If you render a component on the server with a **separate server bundle** (a server/client split) and want the client renderer to hydrate that markup, pass your own flag in the component's `props`, such as `serverRendered`, and branch on it. Remove that renderer-only flag before spreading props into your component: `const { serverRendered: _serverRendered, ...componentProps } = props;`, then call `ReactDOMClient.hydrateRoot(domNode, <MyComponent {...componentProps} />)` when `serverRendered` is true.
 
 Under the React 16/17 legacy API there is no root handle, so unmount by container node instead:
 

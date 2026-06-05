@@ -23,6 +23,12 @@ export default (_props, _railsContext, domNodeId) => {
     ssrForceFetchDelay: 100,
   });
   const el = document.getElementById(domNodeId);
+  if (!el) {
+    throw new Error(
+      `Cannot hydrate ApolloGraphQLApp because DOM element with id "${domNodeId}" was not found.`,
+    );
+  }
+
   const App = wrapElementInStrictMode(
     <ApolloProvider client={client}>
       <ApolloGraphQL />
