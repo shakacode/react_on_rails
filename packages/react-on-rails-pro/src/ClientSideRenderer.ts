@@ -20,12 +20,12 @@ import type {
   RegisteredComponent,
   RendererFunction,
   RendererTeardown,
-  RendererTeardownResult,
   Root,
 } from 'react-on-rails/types';
 
 import { getRailsContext, resetRailsContext } from 'react-on-rails/context';
 import createReactOutput from 'react-on-rails/createReactOutput';
+import { isRendererTeardownResult } from 'react-on-rails/@internal/rendererTeardown';
 import { isServerRenderHash } from 'react-on-rails/isServerRenderResult';
 import { supportsHydrate, supportsRootApi, unmountComponentAtNode } from 'react-on-rails/reactApis';
 import reactHydrateOrRender from 'react-on-rails/reactHydrateOrRender';
@@ -72,14 +72,6 @@ function invokeRendererTeardown(teardown: RendererTeardown | undefined, domNodeI
       console.error(`Error in renderer teardown for dom node "${domNodeId}":`, error);
     });
   }
-}
-
-function isRendererTeardownResult(value: unknown): value is RendererTeardownResult {
-  return (
-    value != null &&
-    typeof value === 'object' &&
-    typeof (value as { teardown?: unknown }).teardown === 'function'
-  );
 }
 
 // Result of attempting renderer delegation. Pro awaits the renderer inside delegateToRenderer, so it

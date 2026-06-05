@@ -6,6 +6,9 @@ argument-hint: [path-to-existing-Dockerfile] [services e.g. postgres,redis,elast
 
 # setup-docker-servers-for-ab-tests
 
+> [!NOTE]
+> Sync checklist: this file is mirrored at `analysis/rsc-fouc-shakaperf-artifacts/setup/generated-shakaperf-skills/setup-docker-servers-for-ab-tests.SKILL.md`; include both paths in review when either copy changes.
+
 Twin-servers runs **two production-mode copies of one app side by side** — `control` (the baseline branch) and `experiment` (your branch) — so `shaka-perf compare` can diff them for visual and performance regressions. This skill sets up the Docker infrastructure that makes that happen in the current project.
 
 The whole point is an **apples-to-apples comparison**: control and experiment must be identical in every way _except the application code under test_ — same base image, dependencies, services, environment, data. Any incidental drift (a service only one side has, an env var that differs, a slower disk path) surfaces later as a phantom regression that's brutal to trace. Keep asking: _are these two sides truly identical?_
@@ -50,7 +53,7 @@ Do not write anything yet. First understand what you're dockerizing, because the
 - **Existing production Dockerfile** — is there one to adapt? Adapting an existing, working production image is far safer than writing from scratch. Look in the repo root, `.docker/`, `config/`, CI files.
 - **Backing services** — Postgres? MySQL? Redis? Memcached? Elasticsearch? Read `config/database.yml`, `docker-compose*.yml`, `Gemfile`/`package.json`, `.env.example`, and the project's dev-setup docs (README, `bin/setup`). Every service the app needs at runtime must exist for **both** sides.
 - **Background processes** — Sidekiq/queues, an SSR/node renderer, asset watchers. Each becomes a Procfile line per side.
-- **Runtime versions** — `.ruby-version`, `.node-version`, `package.json#engines`. You will pass these as build args; **never edit these project files** to suit Docker (see the rule in `references/writing-the-dockerfile.md`).
+- **Runtime versions** — `.ruby-version`, `.node-version`, `package.json#engines`. You will pass these as build args; **never edit these project files** to suit Docker (see the rule in `references/writing-the-dockerfile.md`). If the config uses `os.availableParallelism()` for CPU-aware parallelism, keep Node >= 18.14; this RSC FOUC artifact pins Node 22.12.0.
 - **Existing setup scripts** — `bin/setup`, `db:prepare`, `db:seed`, migration tasks. Reuse these (run them in the Dockerfile build, so the prepared/seeded state is baked into the image) rather than reinventing them. Keep it DRY.
 
 **Gate — write a short Project Profile before moving on.** A few lines: stack, server start command + port, list of services and how each will be provided (embedded in the image vs. a compose service), background processes, runtime versions, and which existing setup scripts you'll reuse. If you can't fill this in, you haven't surveyed enough — keep digging. This profile is the spec for everything that follows.
@@ -105,7 +108,7 @@ Create `twin-servers/Dockerfile`. **Read `references/writing-the-dockerfile.md` 
 - **Non-root user with host-matching UID/GID.** Containers bind-mount a host directory, so the in-container user must match the host user or you get permission errors. Declare `ARG NON_ROOT_USER`, `ARG UID`, `ARG GID` (re-declared after each `FROM`) — `servers build` fills them from the host automatically.
 - **Put everything under that user's home** (`/home/$NON_ROOT_USER/app`, `…/bundle`, `…/node`), not `/app` or `/usr/local/...`, to avoid bind-mount permission conflicts.
 - **`COPY --chown=$NON_ROOT_USER:$NON_ROOT_USER`** for every copy so the user owns its files.
-- **Bake config into `ENV`, not docker-compose.** `SECRET_KEY_BASE`, placeholder API keys, `TWIN_SERVERS=true`, DB config — all `ENV` in the Dockerfile so the image is self-contained and identical on both sides. Reserve compose `environment:` strictly for the few values that _must_ differ between sides (e.g. `PERF_EXPERIMENT`).
+- **Bake stable non-secret config into `ENV`, not docker-compose.** Placeholder API keys, `TWIN_SERVERS=true`, DB config, and cache endpoints belong in Dockerfile `ENV` so the image is self-contained and identical on both sides. Do not bake real secrets into image `ENV`; pass boot-only dummy values such as `SECRET_KEY_BASE` through the build command or the Procfile/runtime command when possible. Inline Procfile values avoid image-layer and `docker inspect` exposure but remain visible in the container process list, so use them only for fixed dummies or replace them with a wrapper script/secret file. Reserve compose `environment:` strictly for the few values that _must_ differ between sides (e.g. `PERF_EXPERIMENT`).
 - **Embed backing services in the image** (install Postgres/Redis/Memcached in the Dockerfile) rather than as separate compose services. Simpler, fully isolated per side, no cross-container networking. See `references/writing-the-dockerfile.md`.
 - **Do all setup at build time — including migrations and seeding.** Run `db:prepare`/`db:seed` in a `RUN` so the data is baked into the image, identical on both sides. (A _running_ daemon is the one thing you can't bake in — hence the narrow `setupCommands` exception.)
 - **Pass runtime versions as build args**, e.g. `ENV NODE_VERSION=...` driven by `dockerBuildArgs`. Don't modify `.node-version`/`.ruby-version`/`engines`.
@@ -141,13 +144,14 @@ Keep these changes minimal and confined — the goal is to dockerize without rew
 Create `twin-servers/Procfile`. One process line per app process **per side**, plus a readiness notifier per side. See `references/compose-and-procfile.md` for SSR/worker variants. Minimal Rails example:
 
 ```procfile
-control-rails: yarn shaka-perf servers run-overmind-command control "bundle exec puma -C config/puma.rb -b tcp://0.0.0.0:3000"
-experiment-rails: yarn shaka-perf servers run-overmind-command experiment "bundle exec puma -C config/puma.rb -b tcp://0.0.0.0:3000"
+control-rails: yarn shaka-perf servers run-overmind-command control "SECRET_KEY_BASE=dummy-secret-key-base-for-shakaperf-rsc-fouc bundle exec puma -C config/puma.rb -b tcp://0.0.0.0:3000"
+experiment-rails: yarn shaka-perf servers run-overmind-command experiment "SECRET_KEY_BASE=dummy-secret-key-base-for-shakaperf-rsc-fouc bundle exec puma -C config/puma.rb -b tcp://0.0.0.0:3000"
 notify-control-server-started: yarn shaka-perf servers notify-server-started control
 notify-experiment-server-started: yarn shaka-perf servers notify-server-started experiment
 ```
 
 - `run-overmind-command <side> "<cmd>"` runs the command inside that side's container with PID tracking, so Overmind can stop/restart it cleanly. The command binds to `0.0.0.0:3000` _inside_ the container; the host port mapping comes from `ports`.
+- The inline `SECRET_KEY_BASE` is a fixed dummy for this hermetic perf rig. Use a project-specific dummy value when the Rails process requires one at boot, rather than baking it into Docker `ENV`. It will still be visible in `ps`/`/proc/<pid>/cmdline` inside the container; use a wrapper script or file-backed secret if that exposure matters.
 - `notify-server-started <side>` waits for the side's port (from `ports`), announces it, then idles to keep Overmind happy. Run background workers (Sidekiq, SSR) as their own lines per side — never share a worker between sides.
 
 ---

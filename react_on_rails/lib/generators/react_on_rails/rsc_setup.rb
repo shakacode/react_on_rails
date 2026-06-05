@@ -84,14 +84,14 @@ module ReactOnRails
             React 19.0.x. React 19.1.x and later are not yet supported.
 
             To install a compatible React version:
-              npm install react@~19.0.4 react-dom@~19.0.4
+              #{manual_add_packages_command(['react@~19.0.4', 'react-dom@~19.0.4'])}
           MSG
         elsif patch < 4
           GeneratorMessages.add_warning(<<~MSG.strip)
             ⚠️  React #{react_version} is below the recommended minimum for RSC.
 
             Please upgrade to at least React 19.0.4:
-              npm install react@19.0.4 react-dom@19.0.4
+              #{manual_add_packages_command(['react@19.0.4', 'react-dom@19.0.4'])}
 
             react-server-dom-webpack 19.0.0–19.0.3 has known vulnerabilities
             (CVE-2025-55182, CVE-2025-67779, CVE-2026-23864) fixed in 19.0.4+.
@@ -540,11 +540,12 @@ module ReactOnRails
         content = File.read(path)
         missing = []
         if content.include?(rsc_plugin_class_name)
+          missing.concat(stale_inactive_rsc_plugin_messages(content, "serverWebpackConfig.js"))
           warn_non_object_literal_rsc_plugin_options_for_config(content)
           unless rsc_plugin_client_references_configured?(content, is_server: true)
             missing << "generated scoped clientReferences in serverWebpackConfig.js"
           end
-        elsif content.include?(inactive_rsc_plugin_class_name)
+        elsif inactive_rsc_plugin_symbol_in_js_code?(content)
           missing << "#{rsc_plugin_class_name} in serverWebpackConfig.js " \
                      "(found #{inactive_rsc_plugin_class_name} — wrong bundler plugin; replace it manually)"
         else
@@ -561,11 +562,12 @@ module ReactOnRails
         content = File.read(path)
         missing = []
         if content.include?(rsc_plugin_class_name)
+          missing.concat(stale_inactive_rsc_plugin_messages(content, "clientWebpackConfig.js"))
           warn_non_object_literal_rsc_plugin_options_for_config(content)
           unless rsc_plugin_client_references_configured?(content, is_server: false)
             missing << "generated scoped clientReferences in clientWebpackConfig.js"
           end
-        elsif content.include?(inactive_rsc_plugin_class_name)
+        elsif inactive_rsc_plugin_symbol_in_js_code?(content)
           missing << "#{rsc_plugin_class_name} in clientWebpackConfig.js " \
                      "(found #{inactive_rsc_plugin_class_name} — wrong bundler plugin; replace it manually)"
         else
@@ -586,6 +588,15 @@ module ReactOnRails
         return unless non_object_literal_rsc_plugin_invocation_count(content).positive?
 
         warn_non_object_literal_rsc_plugin_options_once
+      end
+
+      def stale_inactive_rsc_plugin_messages(content, config_filename)
+        return [] unless inactive_rsc_plugin_symbol_in_js_code?(content)
+
+        [
+          "stale #{inactive_rsc_plugin_class_name} in #{config_filename} " \
+          "(found alongside #{rsc_plugin_class_name} — remove the inactive bundler plugin manually)"
+        ]
       end
 
       def warn_non_object_literal_rsc_plugin_options_once

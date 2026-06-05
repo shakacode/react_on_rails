@@ -395,6 +395,42 @@ describe('ClientSideRenderer', () => {
     }
   });
 
+  it('logs a non-native thenable teardown rejection without requiring .catch', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const rejection = new Error('thenable teardown boom');
+      const teardown = jest.fn(
+        () =>
+          ({
+            then(_onFulfilled: () => void, onRejected: (error: Error) => void) {
+              onRejected(rejection);
+            },
+          }) as unknown as Promise<void>,
+      );
+      const TestRenderer: RendererFunction = (
+        _props?: Record<string, unknown>,
+        _railsContext?: RailsContext,
+        _domNodeId?: string,
+      ) => ({ teardown });
+      ComponentRegistry.register({ TestComponent: TestRenderer });
+      const componentSpec = setupTestComponentDom('dom-id-teardown-thenable-reject');
+      addRailsContext();
+
+      await renderOrHydrateComponent(componentSpec);
+      unmountAll();
+      expect(teardown).toHaveBeenCalledTimes(1);
+
+      await Promise.resolve(); // lets Promise.resolve(nonNativeThenable) settle
+      await Promise.resolve(); // lets the .catch() rejection handler run
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error in renderer teardown for dom node "dom-id-teardown-thenable-reject":',
+        rejection,
+      );
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
   it('rejects with a render error when an async renderer rejects before returning a teardown', async () => {
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     try {

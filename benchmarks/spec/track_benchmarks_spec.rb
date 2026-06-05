@@ -45,6 +45,43 @@ RSpec.describe "track_benchmarks" do
     end
   end
 
+  describe "#regressed_benchmark_names" do
+    it "returns the deduped benchmark names from active alerts" do
+      report = BencherReport.parse(
+        JSON.generate(
+          "results" => [],
+          "alerts" => [
+            { "benchmark" => { "name" => "/posts_page: Pro" },
+              "threshold" => { "measure" => { "slug" => "rps" } }, "status" => "active" },
+            { "benchmark" => { "name" => "/posts_page: Pro" },
+              "threshold" => { "measure" => { "slug" => "p50-latency" } }, "status" => "active" },
+            { "benchmark" => { "name" => "/other: Pro" },
+              "threshold" => { "measure" => { "slug" => "rps" } }, "status" => "active" }
+          ]
+        )
+      )
+      expect(regressed_benchmark_names(report)).to contain_exactly("/posts_page: Pro", "/other: Pro")
+    end
+
+    it "is empty when there is no report" do
+      expect(regressed_benchmark_names(nil)).to eq([])
+    end
+
+    it "is empty when there are no active alerts" do
+      expect(regressed_benchmark_names(report_without_alert)).to eq([])
+    end
+
+    it "ignores non-active alerts (dismissed/silenced never count as regressions)" do
+      report = BencherReport.parse(
+        JSON.generate(
+          "results" => [],
+          "alerts" => [{ "benchmark" => { "name" => "/x: Pro" }, "status" => "dismissed" }]
+        )
+      )
+      expect(regressed_benchmark_names(report)).to eq([])
+    end
+  end
+
   describe "#retry_without_start_point_hash?" do
     it "is true when the start-point head version is missing and there is no regression" do
       expect(retry_without_start_point_hash?("Head Version abc123 not found", 1, report_without_alert)).to be(true)
@@ -85,6 +122,31 @@ RSpec.describe "track_benchmarks" do
 
       expect { run_bencher("branch", []) }
         .to output(/::warning::Bencher report listed benchmarks but no perf-link context/).to_stdout
+    end
+  end
+
+  describe "GitHub warning annotations" do
+    it "writes warning workflow commands to stdout, not stderr" do
+      expect { Github.warning("benchmark annotation") }
+        .to output("::warning::benchmark annotation\n").to_stdout
+        .and output("").to_stderr
+    end
+
+    it "escapes workflow command data so multiline messages stay in one annotation" do
+      expect { Github.warning("first line\n100% reproducible\r\nsecond line") }
+        .to output("::warning::first line%0A100%25 reproducible%0D%0Asecond line\n").to_stdout
+    end
+
+    it "emits display sidecar warnings to stdout so GitHub Actions annotates them" do
+      allow(File).to receive(:exist?).with(DISPLAY_JSON).and_return(true)
+      allow(File).to receive(:read).with(DISPLAY_JSON).and_return(JSON.generate({ "not" => "an array" }))
+
+      rows = nil
+      warning_pattern = /::warning::#{Regexp.escape(DISPLAY_JSON)} is not a JSON array/o
+      expect { rows = display_rows }
+        .to output(warning_pattern).to_stdout
+
+      expect(rows).to eq([])
     end
   end
 

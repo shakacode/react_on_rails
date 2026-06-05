@@ -37,6 +37,86 @@ const createBailoutDigestError = () => {
   return error;
 };
 
+const loadWrappedRendererWithMocks = () => {
+  jest.resetModules();
+
+  const unmount = jest.fn();
+  const render = jest.fn();
+  const hydrateRoot = jest.fn(() => ({ unmount }));
+  const createRoot = jest.fn(() => ({ render, unmount }));
+  const getReactServerComponent = jest.fn(() => jest.fn());
+
+  jest.doMock('react-dom/client', () => ({ createRoot, hydrateRoot }));
+  jest.doMock('react-on-rails-rsc/client.browser', () => ({}));
+  jest.doMock('../src/getReactServerComponent.client.ts', () => ({
+    __esModule: true,
+    default: getReactServerComponent,
+  }));
+
+  // eslint-disable-next-line global-require, @typescript-eslint/no-var-requires
+  const wrapServerComponentRenderer = require('../src/wrapServerComponentRenderer/client.tsx').default;
+
+  return { wrapServerComponentRenderer, createRoot, hydrateRoot, render, unmount, getReactServerComponent };
+};
+
+const cleanupWrappedRendererMocks = () => {
+  document.body.innerHTML = '';
+};
+
+describe('wrapServerComponentRenderer/client validation (issue #3647)', () => {
+  const railsContext = { rscPayloadGenerationUrlPath: '/rsc_payload' };
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  afterEach(() => {
+    cleanupWrappedRendererMocks();
+  });
+
+  it('rejects with an explicit message when domNodeId is missing', async () => {
+    const { wrapServerComponentRenderer } = loadWrappedRendererWithMocks();
+    const WrappedComponent = wrapServerComponentRenderer(() => null, 'MissingDomNodeIdComponent');
+
+    await expect(WrappedComponent({}, railsContext, undefined)).rejects.toThrow(
+      "RSCClientRoot: No domNodeId provided for server component 'MissingDomNodeIdComponent'",
+    );
+  });
+
+  it('rejects with an explicit message when the target DOM node is missing', async () => {
+    const { wrapServerComponentRenderer } = loadWrappedRendererWithMocks();
+    const WrappedComponent = wrapServerComponentRenderer(() => null, 'MissingDomNodeComponent');
+
+    await expect(WrappedComponent({}, railsContext, 'missing-rsc-root')).rejects.toThrow(
+      "RSCClientRoot: No DOM node found for id: missing-rsc-root (server component 'MissingDomNodeComponent')",
+    );
+  });
+
+  it('rejects with an explicit message when railsContext is missing', async () => {
+    const { wrapServerComponentRenderer } = loadWrappedRendererWithMocks();
+    const domNode = document.createElement('div');
+    domNode.id = 'rsc-root-without-context';
+    document.body.appendChild(domNode);
+    const WrappedComponent = wrapServerComponentRenderer(() => null, 'MissingRailsContextComponent');
+
+    await expect(WrappedComponent({}, undefined, domNode.id)).rejects.toThrow(
+      "RSCClientRoot: No railsContext provided for server component 'MissingRailsContextComponent'.",
+    );
+  });
+
+  it('rejects a render function that resolves to a renderer teardown result', async () => {
+    const { wrapServerComponentRenderer } = loadWrappedRendererWithMocks();
+    const renderFunction = (_props, _railsContext, _domNodeId) => ({ teardown: jest.fn() });
+    const WrappedComponent = wrapServerComponentRenderer(renderFunction, 'TeardownResultComponent');
+
+    // No DOM node needed; the teardown-result guard throws before getElementById is called.
+    await expect(WrappedComponent({}, railsContext, 'nonexistent-dom-id')).rejects.toThrow(
+      "wrapServerComponentRenderer: render function for server component 'TeardownResultComponent' " +
+        'returned a renderer teardown result; expected a React component.',
+    );
+  });
+});
+
 describe('wrapServerComponentRenderer/client recoverable errors', () => {
   let originalReportErrorDescriptor;
 

@@ -20,6 +20,25 @@ require_relative "lib/regression_report"
 
 BENCHER_URL = "https://bencher.dev/perf/react-on-rails-t8a9ncxo"
 
+# TEMPORARY — benchmarks whose regressions must NOT open an issue, by the exact
+# benchmark name Bencher reports (the leading-slash name shown in the summary table,
+# matched against RegressionReport::REGRESSED_BENCHMARKS in each suite's payload).
+#
+# /posts_page: Pro spent weeks hard-500ing on every request (failed_pct = 100), so the
+# route was effectively an instant error and Bencher built its rps/latency baseline
+# from those bogus-fast failure responses. Now that the route is fixed, its real
+# (slower) timings read as large regressions against that fast baseline and would file
+# a spurious regression issue on every main push. We can't surgically delete just this
+# benchmark's history in Bencher (the delete is blocked by a FOREIGN KEY constraint
+# from its reports/alerts), so we suppress its issue here instead.
+#
+# REMOVE this entry (restoring unconditional filing) once the failure-era samples have
+# rolled out of Bencher's 64-run t-test window for /posts_page: Pro on main — i.e. once
+# the dashboard baseline reflects real timings again. After that a regression for it is
+# genuine and must be reported. Tracking issue + full revert steps:
+# https://github.com/shakacode/react_on_rails/issues/3669
+IGNORED_REGRESSION_BENCHMARKS = ["/posts_page: Pro"].freeze
+
 # Creates (or updates) the single per-commit regression issue and upserts one
 # section per suite into a shared comment. Only safe to drive from a single
 # process — see the file header.
@@ -225,8 +244,10 @@ class RegressionIssueReporter
     # so a parse miss is a warning, not an error.
     number = stdout[%r{/issues/(\d+)}, 1]
     unless number
-      warn "::warning::Created the issue but could not parse its number from gh output " \
-           "(#{stdout.strip.inspect}); its comment section may be missing"
+      Github.warning(
+        "Created the issue but could not parse its number from gh output " \
+        "(#{stdout.strip.inspect}); its comment section may be missing"
+      )
     end
     number
   end
@@ -295,6 +316,22 @@ rescue StandardError => e
   nil
 end
 
+# Returns the regressed benchmarks to suppress only when every payload reports its
+# regressed benchmarks AND all of them are in IGNORED_REGRESSION_BENCHMARKS. Fails
+# safe toward filing: no payloads, a payload missing the list (older writer / hand-off
+# that couldn't name them), an empty list, or any non-ignored benchmark returns nil.
+def suppressed_regressed_benchmarks(payloads)
+  return nil if payloads.empty?
+
+  per_payload = payloads.map { |payload| payload[RegressionReport::REGRESSED_BENCHMARKS] }
+  return nil unless per_payload.all? { |names| names.is_a?(Array) && !names.empty? }
+
+  regressed_benchmarks = per_payload.flatten.uniq
+  return nil unless regressed_benchmarks.all? { |name| IGNORED_REGRESSION_BENCHMARKS.include?(name) }
+
+  regressed_benchmarks
+end
+
 def report_regressions(artifacts_dir)
   paths = regression_payload_paths(artifacts_dir)
 
@@ -305,6 +342,22 @@ def report_regressions(artifacts_dir)
 
   payloads = paths.map { |path| load_payload(path) }
   readable = payloads.compact
+
+  # Skip filing when every regressed benchmark is temporarily ignored. Gated on all
+  # payloads being readable: an unreadable payload is an unknown regression that could
+  # be anything, so fall through and let the normal flow file (and then fail) rather
+  # than suppress it.
+  suppressed_benchmarks = suppressed_regressed_benchmarks(readable) if readable.size == payloads.size
+  if suppressed_benchmarks
+    # Surface as a run-summary notice (not a plain log line) so it is visible that the
+    # suppression is active and still needs removing once the baseline recovers.
+    Github.notice(
+      "Benchmark regression issue suppressed: the only regressed benchmark(s) are " \
+      "temporarily ignored (#{suppressed_benchmarks.join(', ')}). Remove " \
+      "IGNORED_REGRESSION_BENCHMARKS in report_regressions.rb once their Bencher baseline recovers."
+    )
+    return true
+  end
 
   # One section per suite: a sharded suite emits one payload per shard, so combine
   # them rather than filing a section per shard. Suites sorted for stable output.

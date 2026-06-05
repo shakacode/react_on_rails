@@ -4,7 +4,6 @@ import type {
   RailsContext,
   RendererFunction,
   RendererTeardown,
-  RendererTeardownResult,
   RenderReturnType,
   RegisteredComponentValue,
 } from './types/index.ts';
@@ -16,6 +15,7 @@ import { getRailsContext } from './context.ts';
 import { isServerRenderHash } from './isServerRenderResult.ts';
 import { onPageUnloaded } from './pageLifecycle.ts';
 import { supportsRootApi, unmountComponentAtNode } from './reactApis.cts';
+import { isRendererTeardownResult } from './rendererTeardown.ts';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 
@@ -40,14 +40,6 @@ function isThenable(value: unknown): value is PromiseLike<unknown> {
     value != null &&
     (typeof value === 'object' || typeof value === 'function') &&
     typeof (value as { then?: unknown }).then === 'function'
-  );
-}
-
-function isRendererTeardownResult(value: unknown): value is RendererTeardownResult {
-  return (
-    value != null &&
-    typeof value === 'object' &&
-    typeof (value as { teardown?: unknown }).teardown === 'function'
   );
 }
 

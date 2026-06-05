@@ -25,6 +25,9 @@ abTest(
     await page.waitForSelector(RSC_CSS_PROBE_SELECTOR, { state: 'visible', timeout: 10_000 });
 
     await annotate('wait for css/network idle');
+    // This depends on installRequestBlocking aborting the webpack app bundle
+    // requests above. If those requests are merely stalled or continued,
+    // Playwright's networkidle wait can time out instead of settling.
     await page.waitForLoadState('networkidle');
 
     await annotate('two frames before capture');

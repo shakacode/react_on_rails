@@ -32,7 +32,8 @@ class BenchmarkTable
   # "(tracked measures)" qualifies the 🔴/🟢 significance flags, not the baseline: only
   # tracked measures (rps, p50) are flagged significant, but ANY measure with a baseline
   # (including the untracked p90) shows a ▲/▼ delta and an "(n)" baseline.
-  LEGEND = "#{UP}/#{DOWN} change vs baseline · #{REGRESSION} significant regression · " \
+  LEGEND = "#{UP}/#{DOWN} non-zero change vs baseline · 0.0% exact/near-zero match · " \
+           "#{REGRESSION} significant regression · " \
            "#{IMPROVEMENT} significant improvement (tracked measures) · (n) = baseline".freeze
 
   EMPTY = "_No benchmark results._"
@@ -94,13 +95,13 @@ class BenchmarkTable
 
   # value + ▲/▼ delta + (baseline), with the arrow swapped for 🔴/🟢 and the value bolded
   # when the measure crossed its boundary. No baseline (new benchmark / boundary-less p90)
-  # or an exact match → just the value.
+  # or zero baseline (no meaningful percent) → just the value.
   def metric_cell(name, col, value)
     text = format_number(value).to_s
     baseline = @report.boundary(name, col[:measure])&.baseline
     # No baseline (new benchmark / boundary-less p90), a zero baseline (no meaningful
-    # percent, and it would divide by zero), or an exact match → just the value.
-    return text if baseline.nil? || baseline.zero? || value == baseline
+    # percent, and it would divide by zero) → just the value.
+    return text if baseline.nil? || baseline.zero?
 
     verdict = col[:direction] ? @report.significance(name, col[:measure], col[:direction]) : nil
     value_text = verdict ? "**#{text}**" : text
@@ -108,11 +109,15 @@ class BenchmarkTable
   end
 
   # "▲2.3%" / "▼1.4%" for a plain change; "🔴 8.4%" / "🟢 5.0%" for a significant one (the
-  # emoji gets a trailing space so it renders clear of the percent). The percent is the
-  # absolute change vs baseline; direction is conveyed by the arrow, or by the emoji plus
-  # the column's known better-direction.
+  # emoji gets a trailing space so it renders clear of the percent). Non-significant
+  # rounded-to-zero changes display as plain "0.0%" so equality/tiny noise never gets a
+  # misleading arrow, while significant verdicts keep their marker.
+  # The percent is the absolute change vs baseline; direction is conveyed by the arrow,
+  # or by the emoji plus the column's known better-direction.
   def delta(verdict, value, baseline)
     percent = ((value - baseline) / baseline * 100).abs.round(1)
+    return "#{percent}%" if percent.zero? && verdict.nil?
+
     case verdict
     when :regression then "#{REGRESSION} #{percent}%"
     when :improvement then "#{IMPROVEMENT} #{percent}%"
