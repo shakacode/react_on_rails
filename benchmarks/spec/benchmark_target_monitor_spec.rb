@@ -32,6 +32,15 @@ RSpec.describe "benchmark target monitoring" do
       end
     end
 
+    it "is a no-op when neither TARGET_PID nor TARGET_LOG is provided" do
+      Dir.mktmpdir do |dir|
+        monitor = described_class.from_env(output_dir: dir, env: {})
+
+        expect { monitor.start_measurement! }.not_to raise_error
+        expect { monitor.verify_after_measurement! }.not_to raise_error
+      end
+    end
+
     it "preserves startup logs and blanks the live log before the measured window" do
       with_log_file("booting\nWorker 1 died UNEXPECTEDLY :(, restarting\nready\n") do |log_path, output_dir|
         monitor = described_class.new(target_log: log_path, output_dir: output_dir)
@@ -42,6 +51,23 @@ RSpec.describe "benchmark target monitoring" do
         expect(File.read(preserved)).to include("Worker 1 died UNEXPECTEDLY")
         expect(File.read(log_path)).not_to include("died UNEXPECTEDLY")
         expect { monitor.verify_after_measurement! }.not_to raise_error
+      end
+    end
+
+    it "does not re-preserve or blank measured log content when measurement starts twice" do
+      with_log_file("startup complete\n") do |log_path, output_dir|
+        monitor = described_class.new(target_log: log_path, output_dir: output_dir)
+        measured_restart = "Worker 2 died UNEXPECTEDLY :(, restarting\n"
+
+        monitor.start_measurement!
+        File.open(log_path, "a") { |file| file.write(measured_restart) }
+        monitor.start_measurement!
+
+        preserved = File.join(output_dir, described_class::STARTUP_LOG_FILENAME)
+        expect(File.read(preserved)).to eq("startup complete\n")
+        expect(File.read(log_path)).to include(measured_restart)
+        expect { monitor.verify_after_measurement! }
+          .to raise_error(BenchmarkTargetMonitor::MonitorFailure, /node-renderer master logged/)
       end
     end
 
@@ -63,6 +89,19 @@ RSpec.describe "benchmark target monitoring" do
         monitor = described_class.new(target_log: File.join(dir, "missing.log"), output_dir: File.join(dir, "out"))
 
         expect { monitor.start_measurement! }.not_to raise_error
+        expect { monitor.verify_after_measurement! }.not_to raise_error
+      end
+    end
+
+    it "does not scan a target log that is created after measurement starts" do
+      Dir.mktmpdir do |dir|
+        log_path = File.join(dir, "target.log")
+        output_dir = File.join(dir, "bench_results")
+        monitor = described_class.new(target_log: log_path, output_dir: output_dir)
+
+        monitor.start_measurement!
+        File.write(log_path, "Worker 1 died UNEXPECTEDLY :(, restarting\n")
+
         expect { monitor.verify_after_measurement! }.not_to raise_error
       end
     end

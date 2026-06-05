@@ -37,11 +37,15 @@ class BenchmarkTargetMonitor
     @output_dir = output_dir
     @pid_alive = pid_alive || ->(pid) { self.class.pid_alive?(pid) }
     @measurement_started = false
+    @log_windowed = false
   end
 
   def start_measurement!
+    return if @measurement_started
+
     @measurement_started = true
-    preserve_and_blank_target_log if target_log?
+    @log_windowed = target_log?
+    preserve_and_blank_target_log if @log_windowed
   end
 
   def verify_after_measurement!
@@ -66,8 +70,6 @@ class BenchmarkTargetMonitor
   end
 
   def preserve_and_blank_target_log
-    return unless @output_dir
-
     FileUtils.mkdir_p(@output_dir)
     File.binwrite(File.join(@output_dir, STARTUP_LOG_FILENAME), File.binread(@target_log))
     blank_existing_log_bytes
@@ -109,7 +111,7 @@ class BenchmarkTargetMonitor
   end
 
   def verify_unexpected_worker_log!
-    return unless target_log?
+    return unless @log_windowed
 
     matches = unexpected_worker_restart_lines
     return if matches.empty?
