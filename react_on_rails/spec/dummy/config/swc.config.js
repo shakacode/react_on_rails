@@ -12,11 +12,6 @@ try {
 const customConfig = {
   options: {
     jsc: {
-      parser: {
-        syntax: 'ecmascript',
-        jsx: true,
-        dynamicImport: true,
-      },
       transform: {
         react: {
           runtime: 'automatic',

@@ -1,4 +1,9 @@
-import type { RegisteredComponent, RenderingError, FinalHtmlResult } from './types/index.ts';
+import type {
+  RegisteredComponent,
+  RegisteredComponentValue,
+  RenderingError,
+  FinalHtmlResult,
+} from './types/index.ts';
 
 /**
  * Builds the metadata object for the length-prefixed streaming protocol.
@@ -122,7 +127,10 @@ export function convertToError(e: unknown): Error {
   return error;
 }
 
-export function validateComponent(componentObj: RegisteredComponent, componentName: string) {
+export function validateComponent(
+  componentObj: RegisteredComponent<RegisteredComponentValue>,
+  componentName: string,
+) {
   if (componentObj.isRenderer) {
     throw new Error(
       `Detected a renderer while server rendering component '${componentName}'. See https://github.com/shakacode/react_on_rails#renderer-functions`,

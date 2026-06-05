@@ -28,6 +28,12 @@ module ReactOnRails
   class PacksGenerator
     CONTAINS_CLIENT_OR_SERVER_REGEX = /\.(server|client)($|\.)/
     COMPONENT_EXTENSIONS = /\.(jsx?|tsx?)$/
+    # Fallback order when the configured server bundle file is missing. Keep .jsx before
+    # TypeScript extensions as the closest migration fallback for apps moving from JS/JSX to TS.
+    # The configured extension is excluded, so server-bundle.js tries .jsx, .ts, .tsx, ...
+    SERVER_BUNDLE_SOURCE_EXTENSIONS = %w[.js .jsx .ts .tsx .mts .cts .mjs .cjs].freeze
+    # import/extensions suppressions are needed when generated imports include an explicit .js extension.
+    SERVER_BUNDLE_IMPORT_EXTENSION_COMMENT_EXTENSIONS = %w[.jsx .ts .tsx .mts .cts .mjs .cjs].freeze
     # Auto-registration requires nested_entries support which was added in 7.0.0
     # Note: The gemspec requires Shakapacker >= 6.0 for basic functionality
     MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING = "7.0.0"
@@ -47,6 +53,7 @@ module ReactOnRails
     def generate_packs_if_stale
       return unless ReactOnRails.configuration.auto_load_bundle
 
+      @server_bundle_entrypoint = nil
       verbose = ENV["REACT_ON_RAILS_VERBOSE"] == "true"
 
       with_generated_packs_lock(verbose: verbose) do
@@ -60,6 +67,8 @@ module ReactOnRails
           generate_packs(verbose: verbose)
         end
       end
+    ensure
+      @server_bundle_entrypoint = nil
     end
 
     private
@@ -408,17 +417,39 @@ module ReactOnRails
       return if ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint
       return if ReactOnRails.configuration.server_bundle_js_file.blank?
 
-      relative_path_to_generated_server_bundle = relative_path(server_bundle_entrypoint,
-                                                               generated_server_bundle_file_path)
+      source_entrypoint = server_bundle_entrypoint
+      relative_path_to_generated_server_bundle = relative_path(source_entrypoint, generated_server_bundle_file_path)
+      relative_import_path_to_generated_server_bundle = relative_import_path(source_entrypoint,
+                                                                             generated_server_bundle_file_path)
+      import_path_to_generated_server_bundle = generated_server_bundle_import_path(source_entrypoint)
+      generated_server_bundle_import_statement = "import '#{import_path_to_generated_server_bundle}';"
+      if SERVER_BUNDLE_IMPORT_EXTENSION_COMMENT_EXTENSIONS.include?(File.extname(source_entrypoint))
+        generated_server_bundle_import_statement += " // eslint-disable-line import/extensions"
+      end
+
       content = <<~FILE_CONTENT
         // import statement added by react_on_rails:generate_packs rake task
-        import "./#{relative_path_to_generated_server_bundle}"
+        #{generated_server_bundle_import_statement}
       FILE_CONTENT
 
+      legacy_relative_import_path_to_generated_server_bundle = "./#{relative_path_to_generated_server_bundle}"
+      # Match today's normalized import path, the extension-stripped .js source form, and the
+      # legacy "./" prefixed path so repeated generation stays idempotent across old outputs.
+      generated_server_bundle_import_pattern = Regexp.union(
+        relative_import_path_to_generated_server_bundle,
+        import_path_to_generated_server_bundle,
+        legacy_relative_import_path_to_generated_server_bundle
+      )
+      generated_server_bundle_import_regex = /
+        import\s+['"]
+        #{generated_server_bundle_import_pattern}
+        ['"]
+      /x
+
       ReactOnRails::Utils.prepend_to_file_if_text_not_present(
-        file: server_bundle_entrypoint,
+        file: source_entrypoint,
         text_to_prepend: content,
-        regex: %r{import ['"]\./#{relative_path_to_generated_server_bundle}['"]}
+        regex: generated_server_bundle_import_regex
       )
     end
 
@@ -593,8 +624,54 @@ module ReactOnRails
     end
 
     def server_bundle_entrypoint
-      Rails.root.join(ReactOnRails::PackerUtils.packer_source_entry_path,
-                      ReactOnRails.configuration.server_bundle_js_file)
+      @server_bundle_entrypoint ||= begin
+        configured_entrypoint = Rails.root.join(
+          ReactOnRails::PackerUtils.packer_source_entry_path,
+          ReactOnRails.configuration.server_bundle_js_file
+        ).to_s
+
+        if ReactOnRails.configuration.make_generated_server_bundle_the_entrypoint
+          configured_entrypoint
+        else
+          resolve_server_bundle_source_entrypoint(configured_entrypoint)
+        end
+      end
+    end
+
+    def resolve_server_bundle_source_entrypoint(configured_entrypoint)
+      # Existing configured .js path wins over alternate .ts fallback when both exist.
+      return configured_entrypoint if File.exist?(configured_entrypoint)
+
+      # Strip the existing extension when present; bare paths keep the full base and probe all extensions.
+      base_path = configured_entrypoint.sub(%r{\.[^./]+\z}, "")
+      server_bundle_source_extensions_for(configured_entrypoint).each do |extension|
+        candidate_entrypoint = "#{base_path}#{extension}"
+        next unless File.exist?(candidate_entrypoint)
+
+        Rails.logger&.debug(
+          "[react_on_rails] server bundle source entrypoint resolved to #{candidate_entrypoint} " \
+          "(configured: #{configured_entrypoint})"
+        )
+        return candidate_entrypoint
+      end
+
+      configured_entrypoint
+    end
+
+    def server_bundle_source_extensions_for(configured_entrypoint)
+      configured_extension = File.extname(configured_entrypoint)
+      return SERVER_BUNDLE_SOURCE_EXTENSIONS if configured_extension.empty?
+
+      SERVER_BUNDLE_SOURCE_EXTENSIONS.reject { |extension| extension == configured_extension }
+    end
+
+    def generated_server_bundle_import_path(source_entrypoint)
+      import_path = relative_import_path(source_entrypoint, generated_server_bundle_file_path)
+      # .js entrypoints can use an extensionless import to satisfy import/extensions. Non-JS
+      # entrypoints keep the explicit .js output path and the caller adds the eslint suppression.
+      return import_path.delete_suffix(".js") if File.extname(source_entrypoint) == ".js"
+
+      import_path
     end
 
     def generated_packs_directory_path
@@ -623,6 +700,13 @@ module ReactOnRails
       to_path = Pathname.new(to)
 
       to_path.relative_path_from(from_dir)
+    end
+
+    def relative_import_path(from, to)
+      relative_path_string = relative_path(from, to).to_s
+      return relative_path_string if relative_path_string.start_with?(".")
+
+      "./#{relative_path_string}"
     end
 
     def generated_pack_path(file_path)

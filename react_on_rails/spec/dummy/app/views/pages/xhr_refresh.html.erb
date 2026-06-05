@@ -18,35 +18,35 @@
   Components will be prerendered by the server and inserted in the DOM (spec/dummy/app/views/pages/xhr_refresh.js.erb)<br/>
   No client rehydration will occur, preventing any event handler to be correctly attached<br/><br/>
 
-  Thus, the onChange handler of the HelloWorld component won't trigger whereas the one from HellowWorldRehydratable will, thanks to the "hydrate" javascript event dispatched from xhr_refresh.js.erb<br />
+  Thus, the onChange handler of the HelloWorld component won't trigger whereas the one from HelloWorldRehydratable will, thanks to the "hydrate" javascript event dispatched from xhr_refresh.js.erb<br />
 </p>
 
 <hr/>
 <h2>Setup</h2>
 <ol>
   <li>
-    Create component source: spec/dummy/client/app/components/HellowWorldRehydratable.jsx
+    Create component source: spec/dummy/client/app/startup/HelloWorldRehydratable.tsx
   </li>
   <li>
     Register the component in the client-bundle & server-bundle entrypoint files: spec/dummy/client/app/packs/
     <br/>
     <pre style='white-space: pre-wrap; word-break: keep-all;'>
-      import HellowWorldRehydratable from '../components/HellowWorldRehydratable';
+      import HelloWorldRehydratable from '../startup/HelloWorldRehydratable';
       import ReactOnRails from 'react-on-rails/client';
-      ReactOnRails.register({ HellowWorldRehydratable });
+      ReactOnRails.register({ HelloWorldRehydratable });
     </pre>
   </li>
   <li>
     Place the component on the view: spec/dummy/app/views/pages/xhr_refresh.html.erb, making sure it has a parent node easily selectable
     <br/>
     <pre style='white-space: pre-wrap; word-break: keep-all;'>
-      <div id='my-component-container'>
-        <%%= react_component("HellowWorldRehydratable", props: { helloWorldData: { name: 'HelloWorld' } }, prerender: true, trace: true, id: "HellowWorldRehydratable-react-component-0") %>
+      <div id='component-container'>
+        <%%= react_component("HelloWorldRehydratable", props: { helloWorldData: { name: 'HelloWorld' } }, prerender: true, trace: true, id: "HelloWorldRehydratable-react-component-0") %>
       </div>
     </pre>
   </li>
   <li>
-    Have a remote form allow to get xhr_request.js.erb
+    Have a remote form allow to get xhr_refresh.js.erb
     <br/>
     <pre style='white-space: pre-wrap; word-break: keep-all;'>
       <%%= form_tag '/xhr_refresh', method: :get, remote: true, format: :js do %>
@@ -55,11 +55,11 @@
     </pre>
   </li>
   <li>
-    In your xhr_request.js.erb, replace your container content and dispatch the 'hydrate' event that will be caught by HellowWorldRehydratable event handler
+    In your xhr_refresh.js.erb, replace your container content and dispatch the 'hydrate' event that will be caught by HelloWorldRehydratable event handler
     <br/>
     <pre style='white-space: pre-wrap; word-break: keep-all;'>
       var container = document.getElementById('component-container');
-      <%% new_component = react_component("HellowWorldRehydratable", props: { helloWorldData: { name: 'HelloWorld' } }, prerender: true, trace: true, id: "HellowWorldRehydratable-react-component-0") %>
+      <%% new_component = react_component("HelloWorldRehydratable", props: { helloWorldData: { name: 'HelloWorld' } }, prerender: true, trace: true, id: "HelloWorldRehydratable-react-component-0") %>
       container.innerHTML = "<%%= escape_javascript(new_component) %>";
 
       var event = document.createEvent('Event');

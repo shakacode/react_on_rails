@@ -5,6 +5,7 @@ import type {
   RendererFunction,
   RendererTeardown,
   RenderReturnType,
+  RegisteredComponentValue,
 } from './types/index.ts';
 import ComponentRegistry from './ComponentRegistry.ts';
 import StoreRegistry from './StoreRegistry.ts';
@@ -19,6 +20,7 @@ import { isRendererTeardownResult } from './rendererTeardown.ts';
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 
 type RendererResult = ReturnType<RendererFunction>;
+type RegisteredComponentEntry = RegisteredComponent<RegisteredComponentValue>;
 
 // An entry in `renderedRoots`. We track two kinds of mounts so both can be cleaned up on page
 // unload or same-id node replacement:
@@ -110,7 +112,7 @@ function domNodeIdForEl(el: Element): string {
 type DelegationResult = { delegated: false } | { delegated: true; result: RendererResult };
 
 function delegateToRenderer(
-  componentObj: RegisteredComponent,
+  componentObj: RegisteredComponentEntry,
   props: Record<string, unknown>,
   railsContext: RailsContext,
   domNodeId: string,
@@ -133,6 +135,10 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
     // component union, so `as RendererFunction` is a runtime-invariant assertion guarded by
     // `isRenderer` (the registry only sets it for a 3-arg render function), not a structural
     // narrowing.
+    if (typeof component !== 'function') {
+      throw new Error(`Registered renderer "${name}" must be a function.`);
+    }
+
     const result = (component as RendererFunction)(props, railsContext, domNodeId);
     return { delegated: true, result };
   }

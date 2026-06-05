@@ -63,6 +63,24 @@ describe('ComponentRegistry', () => {
     expect(actual).toEqual(expected);
   });
 
+  it('registers and retrieves plain object modules without treating them as render functions', () => {
+    const HelloString = {
+      world() {
+        return 'World';
+      },
+    };
+    ComponentRegistry.register({ HelloString });
+    const actual = ComponentRegistry.get('HelloString');
+    const expected = {
+      name: 'HelloString',
+      component: HelloString,
+      renderFunction: false,
+      isRenderer: false,
+    };
+    expect(actual).toEqual(expected);
+    expect(ComponentRegistry.components().get('HelloString')).toEqual(expected);
+  });
+
   it('registers and retrieves multiple components', () => {
     // Plain react stateless functional components
     const C5 = () => <div>WHY</div>;
