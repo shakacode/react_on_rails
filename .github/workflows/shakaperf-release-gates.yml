@@ -28,8 +28,8 @@ jobs:
       NODE_ENV: test
       # Dummy value for RAILS_ENV=test; no real credentials are encrypted or persisted.
       SECRET_KEY_BASE: dummy-secret-key-base-for-shakaperf-rsc-fouc
-      SHAKAPERF_CONTROL_URL: http://127.0.0.1:3030
-      SHAKAPERF_EXPERIMENT_URL: http://127.0.0.1:3030
+      SHAKAPERF_CONTROL_URL: http://127.0.0.1:3000
+      SHAKAPERF_EXPERIMENT_URL: http://127.0.0.1:3000
     steps:
       - uses: actions/checkout@v4
         with:
@@ -126,6 +126,7 @@ jobs:
         shell: bash
         env:
           REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+          NODE_OPTIONS: --dns-result-order=ipv4first
         run: |
           set -euo pipefail
 
@@ -136,17 +137,19 @@ jobs:
           node_renderer_pid="$!"
           echo "$node_renderer_pid" > "$RUNNER_TEMP/shakaperf-node-renderer.pid"
 
-          PORT=3030 REACT_RENDERER_URL=http://127.0.0.1:3800 bundle exec rails s -b 127.0.0.1 -p 3030 \
+          # RSCPostsPageOverHTTP fetches http://localhost:3000/api/... inside the node renderer.
+          PORT=3000 REACT_RENDERER_URL=http://127.0.0.1:3800 bundle exec rails s -b 127.0.0.1 -p 3000 \
             > "$RUNNER_TEMP/shakaperf-logs/rails.log" 2>&1 &
           rails_pid="$!"
           echo "$rails_pid" > "$RUNNER_TEMP/shakaperf-rails.pid"
 
           for attempt in {1..60}; do
             echo "Waiting for RSC FOUC probe server (${attempt}/60)..."
-            # /empty proves Rails accepts requests; the RSC page proves the renderer is warm enough for the gate.
+            # /empty is a stable Pro dummy route; the RSC page proves the renderer is warm enough for the gate.
             if curl --connect-timeout 2 --max-time 5 -fsS "$SHAKAPERF_CONTROL_URL/empty" > /dev/null &&
               curl --connect-timeout 2 --max-time 5 -fsS "$SHAKAPERF_CONTROL_URL/rsc_posts_page_over_http" > /dev/null
             then
+              # Both endpoints are up; exit this step and leave the background servers running for ShakaPerf.
               exit 0
             fi
 

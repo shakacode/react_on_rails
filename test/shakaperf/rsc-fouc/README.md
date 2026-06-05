@@ -28,8 +28,8 @@ pnpm exec shaka-perf compare \
   --categories visreg \
   --config test/shakaperf/rsc-fouc/abtests.config.ts \
   --filter test/shakaperf/rsc-fouc/ab-tests/rsc-fouc-release-gate.abtest.ts \
-  --controlURL http://127.0.0.1:3030 \
-  --experimentURL http://127.0.0.1:3030 \
+  --controlURL http://127.0.0.1:3000 \
+  --experimentURL http://127.0.0.1:3000 \
   --full-report-zip
 ```
 

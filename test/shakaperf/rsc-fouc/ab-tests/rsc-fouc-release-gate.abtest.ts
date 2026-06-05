@@ -3,6 +3,7 @@ import { abTest, installRequestBlocking } from 'shaka-shared';
 const RSC_CSS_PROBE_SELECTOR = '[data-testid="rsc-css-probe"]';
 const RSC_STYLESHEET_SELECTOR = 'link[rel="stylesheet"][data-precedence="ror-rsc"]';
 // A styled probe must have a real CSS-module background, not the default unstyled page background.
+// If the intended probe style ever matches one of these defaults, change the Pro dummy probe color first.
 const UNSTYLED_BACKGROUNDS = ['rgba(0, 0, 0, 0)', 'transparent', 'rgb(255, 255, 255)'];
 
 abTest(

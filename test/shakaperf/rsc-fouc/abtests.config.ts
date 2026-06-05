@@ -1,6 +1,6 @@
 import { defineConfig, DESKTOP_VIEWPORT } from 'shaka-shared';
 
-const DEFAULT_TARGET_URL = 'http://127.0.0.1:3030';
+const DEFAULT_TARGET_URL = 'http://127.0.0.1:3000';
 
 export default defineConfig({
   shared: {
