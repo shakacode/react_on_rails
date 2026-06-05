@@ -41,7 +41,7 @@ For low-risk or docs-only changes where a maintainer intentionally does not want
 +ci-skip-full docs-only change; markdown checks are enough
 ```
 
-The reason is optional. The bot records the current PR head SHA so the waiver is auditable and does not apply after another push.
+The reason is optional. The bot records the current PR head SHA so the waiver is auditable and does not apply after another push. It does not cancel or block workflow runs.
 
 ### Security & Access Control
 

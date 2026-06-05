@@ -81,11 +81,21 @@ jobs:
             }
 
             async function hasWriteAccess() {
-              const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
-                owner,
-                repo,
-                username: actor
-              });
+              let permission;
+              try {
+                ({ data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
+                  owner,
+                  repo,
+                  username: actor
+                }));
+              } catch (error) {
+                if ([403, 404].includes(error.status)) {
+                  console.log(`Unable to read permission for ${actor}: ${error.status}`);
+                  return false;
+                }
+
+                throw error;
+              }
 
               return ['admin', 'write'].includes(permission.permission);
             }
@@ -198,6 +208,7 @@ jobs:
                 return;
               }
 
+              // Keep this map in sync with the full-CI-capable workflows in .github/workflows.
               const workflowMap = {
                 'Lint JS and Ruby': 'lint-js-and-ruby.yml',
                 'JS unit tests for Renderer package': 'package-js-tests.yml',
@@ -268,16 +279,15 @@ jobs:
 
               await postComment([
                 `<!-- ci-skip-full:${pr.head.sha} -->`,
-                '## Full CI Waived for This SHA',
+                '## Full CI Waiver Recorded for This SHA',
                 '',
-                `@${actor} waived the expensive full CI matrix for \`${shortSha}\`.`,
+                `@${actor} recorded a full-CI waiver for \`${shortSha}\` (audit record only - no workflow run was cancelled or blocked).`,
                 `Reason: ${reason}`,
                 '',
                 'This waiver is bound to the current head SHA and does not apply after another push.',
                 'Standard optimized CI still applies for the files changed in this PR.',
-                removedFullCi ? '' : '',
-                removedFullCi ? 'Removed `full-ci` from this PR.' : ''
-              ].filter(Boolean).join('\n'));
+                ...(removedFullCi ? ['', 'Removed `full-ci` from this PR.'] : [])
+              ].join('\n'));
             }
 
             async function handleStopFull() {

@@ -661,6 +661,7 @@ The reason is optional. If omitted, the bot records `not provided`.
 **What it does:**
 
 - Posts an audit comment with the current head SHA
+- Does not cancel or block any workflow run
 - Removes `full-ci` if present
 - Does not skip the standard optimized CI selected for the changed files
 - Does not apply to later pushes, because the waiver is bound to the SHA in the comment
