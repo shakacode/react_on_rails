@@ -16,7 +16,7 @@
         "referenceUrl": "http://localhost:3030/rsc_posts_page_over_http",
         "expect": 0,
         "viewportLabel": "desktop",
-        "testFile": "<react_on_rails_worktree>/tmp-rsc-real-first-visible-assertion.abtest.ts",
+        "testFile": "<react_on_rails_worktree>/analysis/rsc-fouc-shakaperf-artifacts/setup/ab-tests/natural-first-visible-assertion.abtest.ts",
         "testLine": 6,
         "refWhitePixelPercent": 0,
         "testWhitePixelPercent": 0,

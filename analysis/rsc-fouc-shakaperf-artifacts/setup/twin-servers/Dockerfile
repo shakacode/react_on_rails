@@ -9,6 +9,8 @@ ARG UID=1000
 ARG GID=1000
 ARG PNPM_VERSION=10.33.4
 
+# The secret-key value is a fixed dummy for this hermetic SQLite test image:
+# no real data, credentials, or external services are present in the artifact.
 ENV APP_PATH=/home/${NON_ROOT_USER}/app \
     BUNDLE_PATH=/home/${NON_ROOT_USER}/bundle \
     GEM_HOME=/home/${NON_ROOT_USER}/bundle \
@@ -49,6 +51,8 @@ RUN npm install -g corepack@0.31.0 \
 USER ${NON_ROOT_USER}
 WORKDIR ${APP_PATH}
 
+# Copy the filtered repo context before installs because this monorepo's Bundler
+# and pnpm workspace resolution need package/gemspec files across the checkout.
 COPY --chown=${NON_ROOT_USER}:${NON_ROOT_USER} . .
 
 RUN bundle install --jobs=4 --retry=3

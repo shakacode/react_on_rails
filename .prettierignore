@@ -27,3 +27,6 @@ spec/react_on_rails/fixtures/i18n/locales_symbols/
 
 # Internal documentation - ignore formatting
 CLAUDE.md
+
+# Generated ShakaPerf investigation reports; keep the archived HTML untouched.
+analysis/rsc-fouc-shakaperf-artifacts/reports/**/*.html

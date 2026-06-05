@@ -11,7 +11,7 @@ Two helper subcommands do the work:
 
 ### Minimal (single web process)
 
-```
+```procfile
 control-rails: yarn shaka-perf servers run-overmind-command control "bundle exec puma -C config/puma.rb -b tcp://0.0.0.0:3000"
 experiment-rails: yarn shaka-perf servers run-overmind-command experiment "bundle exec puma -C config/puma.rb -b tcp://0.0.0.0:3000"
 notify-control-server-started: yarn shaka-perf servers notify-server-started control
@@ -22,7 +22,7 @@ notify-experiment-server-started: yarn shaka-perf servers notify-server-started 
 
 Add a line per extra process **per side**. Workers and SSR run inside the same app container as the web process — not separate containers (this is a perf rig; A/B isolation and simplicity beat production-style scaling). Never let a process serve both sides.
 
-```
+```procfile
 control-rails: yarn shaka-perf servers run-overmind-command control "bundle exec puma -C config/puma.rb -b tcp://0.0.0.0:3000"
 control-ssr: yarn shaka-perf servers run-overmind-command control "yarn tsx app/javascript/ssr-server.ts"
 control-sidekiq: yarn shaka-perf servers run-overmind-command control "bundle exec sidekiq -C config/sidekiq.yml"
@@ -35,7 +35,7 @@ notify-experiment-server-started: yarn shaka-perf servers notify-server-started 
 
 Commented-out lines are fine as scaffolding for optional processes (e.g. a renderer you may not need):
 
-```
+```procfile
 # control-renderer: yarn shaka-perf servers run-overmind-command control "node node-renderer.js"
 ```
 

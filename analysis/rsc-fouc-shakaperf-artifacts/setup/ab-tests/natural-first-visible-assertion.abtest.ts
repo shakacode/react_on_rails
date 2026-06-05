@@ -1,6 +1,7 @@
 import { abTest } from 'shaka-shared';
 
 const RSC_CSS_PROBE_SELECTOR = '[data-testid="rsc-css-probe"]';
+// bg-emerald-100 from the RSC CSS probe in react_on_rails_pro/spec/dummy.
 const EXPECTED_BACKGROUND = 'rgb(212, 250, 236)';
 
 abTest(
@@ -52,6 +53,8 @@ abTest(
 
     await annotate('assert styled');
 
+    // Assert both sides: old-vs-current should throw on the old control side,
+    // while current-vs-current should pass both sides and prove test stability.
     if (state.backgroundColor !== EXPECTED_BACKGROUND) {
       throw new Error(
         `${isControl ? 'control' : 'experiment'} first visible probe is unstyled: ${JSON.stringify(state)}`,

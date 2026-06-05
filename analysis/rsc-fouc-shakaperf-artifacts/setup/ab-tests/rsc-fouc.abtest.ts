@@ -8,6 +8,8 @@ abTest(
     startingPath: '/rsc_posts_page_over_http',
     testTypes: ['visreg'],
     options: {
+      // Block the webpack app bundle so the capture stays at server-rendered
+      // first paint before React hydration can repair missing styles.
       beforeNavigate: ({ context }) => installRequestBlocking(context, ['/webpack/test/js/']),
       viewports: ['desktop'],
       visreg: {

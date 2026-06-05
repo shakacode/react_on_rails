@@ -30,6 +30,7 @@ export default defineConfig({
     comparePixelmatchThreshold: 0.1,
     engineOptions: {
       browser: 'chromium',
+      // Required inside Docker's non-root Chromium runtime; local runs may omit it.
       args: ['--no-sandbox'],
     },
   },
@@ -63,6 +64,8 @@ export default defineConfig({
     controlDir: process.env.SHAKAPERF_CONTROL_DIR || `../${path.basename(process.cwd())}-control`,
     // Local build context. The same relative offset is applied under
     // experimentDir/controlDir when building those images.
+    // The paired Dockerfile.dockerignore keeps the repo-root context reproducible
+    // while excluding generated artifacts, node_modules, .git, and secrets.
     dockerBuildDir: '.',
     dockerfile: 'twin-servers/Dockerfile',
     dockerBuildArgs: {

@@ -40,7 +40,7 @@
     {
       "id": "diagnostic-real-first-visible-probe-is-styled-desktop-6db49017",
       "name": "diagnostic real first visible probe is styled",
-      "filePath": "<react_on_rails_worktree>/tmp-rsc-real-first-visible-assertion.abtest.ts",
+      "filePath": "<react_on_rails_worktree>/analysis/rsc-fouc-shakaperf-artifacts/setup/ab-tests/natural-first-visible-assertion.abtest.ts",
       "startingPath": "/rsc_posts_page_over_http",
       "viewport": {
         "label": "desktop",

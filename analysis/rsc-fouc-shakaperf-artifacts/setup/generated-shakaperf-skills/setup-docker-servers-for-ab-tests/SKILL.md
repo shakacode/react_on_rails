@@ -140,7 +140,7 @@ Keep these changes minimal and confined — the goal is to dockerize without rew
 
 Create `twin-servers/Procfile`. One process line per app process **per side**, plus a readiness notifier per side. See `references/compose-and-procfile.md` for SSR/worker variants. Minimal Rails example:
 
-```
+```procfile
 control-rails: yarn shaka-perf servers run-overmind-command control "bundle exec puma -C config/puma.rb -b tcp://0.0.0.0:3000"
 experiment-rails: yarn shaka-perf servers run-overmind-command experiment "bundle exec puma -C config/puma.rb -b tcp://0.0.0.0:3000"
 notify-control-server-started: yarn shaka-perf servers notify-server-started control
