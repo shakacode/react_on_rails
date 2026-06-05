@@ -6,18 +6,9 @@ module ReactOnRails
       SHAKAPACKER_YML_PATH = "config/shakapacker.yml"
       DEFAULT_PRECOMPILE_HOOK_COMMAND = "bin/shakapacker-precompile-hook"
       COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER = /^(\s*)#\s*precompile_hook:\s*~\s*$/
-      # Unquoted YAML null/boolean scalars parse as nil/false/true, so they are inactive unless quoted.
-      # The /i flag intentionally covers YAML scalar aliases such as Null, TRUE, No, and OFF.
-      ACTIVE_PRECOMPILE_HOOK = /
-        ^\s+precompile_hook:\s*
-        (?:
-          "[^"]+"
-          | '[^']+'
-          | (?!(?:~|null|true|false|yes|no|on|off)\s*(?:\#|$)) [^#\s][^#\n]*
-        )
-      /ix
+      ERB_PRECOMPILE_HOOK = /^\s+precompile_hook:\s*.*<%/
       private_constant :SHAKAPACKER_YML_PATH, :DEFAULT_PRECOMPILE_HOOK_COMMAND,
-                       :COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER, :ACTIVE_PRECOMPILE_HOOK
+                       :COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER, :ERB_PRECOMPILE_HOOK
 
       private
 
@@ -35,7 +26,7 @@ module ReactOnRails
 
         config = parse_shakapacker_yml(shakapacker_config_path)
         hook_command = normalize_precompile_hook(effective_precompile_hook(config, environment))
-        return hook_command if generated_precompile_hook?(hook_command)
+        return hook_command if hook_command == DEFAULT_PRECOMPILE_HOOK_COMMAND
 
         return unless generated_precompile_hook_will_be_configured?(shakapacker_config_path, environment: environment)
 
@@ -46,7 +37,9 @@ module ReactOnRails
         return false unless shakapacker_supports_precompile_hook?
 
         content = File.read(shakapacker_config_path)
-        return false if active_precompile_hook_configured?(content)
+        config = parse_shakapacker_yml_content(content)
+        return false if normalize_precompile_hook(effective_precompile_hook(config, environment))
+        return false if environment_effective_raw_erb_precompile_hook?(content, config, environment)
         return false unless content.match?(COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER)
 
         materialized_content = content.gsub(
@@ -54,40 +47,80 @@ module ReactOnRails
           "\\1precompile_hook: '#{DEFAULT_PRECOMPILE_HOOK_COMMAND}'"
         )
         config = parse_shakapacker_yml_content(materialized_content)
-        generated_precompile_hook?(
-          normalize_precompile_hook(effective_precompile_hook(config, environment))
-        )
+        normalize_precompile_hook(effective_precompile_hook(config, environment)) == DEFAULT_PRECOMPILE_HOOK_COMMAND
       rescue StandardError
         false
       end
 
       def active_precompile_hook_configured?(content)
         config = parse_shakapacker_yml_content(content)
+        sections = shakapacker_yml_sections(content)
+        section_index = shakapacker_yml_section_index(sections)
+        anchor_index = shakapacker_yml_anchor_index(sections)
 
         # The generator materializes all placeholders at once, so one direct or
         # inherited active hook keeps the whole file under Shakapacker control.
-        shakapacker_yml_sections(content).any? do |section|
+        sections.any? do |section|
           next false unless section.match?(COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER)
 
-          section.match?(ACTIVE_PRECOMPILE_HOOK) || section_inherits_active_precompile_hook?(section, config)
+          section_effective_active_precompile_hook?(section, config, section_index, anchor_index)
         end
       end
 
       def shakapacker_yml_sections(content)
-        # Split at every top-level YAML key so each environment block is evaluated independently.
-        # Standalone top-level comments become harmless one-line sections.
+        # Split at top-level YAML keys; standalone top-level comments become harmless one-line sections.
         content.each_line.slice_before { |line| line.match?(/^\S/) }.map(&:join)
       end
 
-      def section_inherits_active_precompile_hook?(section, config)
+      def shakapacker_yml_section_index(sections)
+        sections.filter_map { |section| (name = shakapacker_yml_section_name(section)) && [name, section] }.to_h
+      end
+
+      def shakapacker_yml_anchor_index(sections)
+        sections.filter_map do |section|
+          match = section.match(/\A[A-Za-z0-9_-]+:\s*&([A-Za-z0-9_-]+)/)
+          [match[1], shakapacker_yml_section_name(section)] if match
+        end.to_h
+      end
+
+      def section_effective_active_precompile_hook?(section, config, section_index, anchor_index)
         section_name = shakapacker_yml_section_name(section)
         return false unless section_name
 
-        !normalize_precompile_hook(effective_precompile_hook(config, section_name)).nil?
+        !normalize_precompile_hook(effective_precompile_hook(config, section_name)).nil? ||
+          raw_erb_precompile_hook_in_section_tree?(section_name, section_index, anchor_index)
+      end
+
+      def environment_effective_raw_erb_precompile_hook?(content, config, environment)
+        sections = shakapacker_yml_sections(content)
+        section_name = shakapacker_config_key?(config, environment) ? environment.to_s : "production"
+
+        raw_erb_precompile_hook_in_section_tree?(
+          section_name, shakapacker_yml_section_index(sections), shakapacker_yml_anchor_index(sections)
+        )
       end
 
       def shakapacker_yml_section_name(section)
         section.match(/\A([A-Za-z0-9_-]+):(?:\s|$)/)&.[](1)
+      end
+
+      def raw_erb_precompile_hook_in_section_tree?(section_name, section_index, anchor_index, visited = {})
+        return false if visited[section_name]
+
+        visited[section_name] = true
+        section = section_index[section_name]
+        return false unless section
+        return true if section.match?(ERB_PRECOMPILE_HOOK)
+
+        shakapacker_yml_section_merge_aliases(section).any? do |anchor_name|
+          inherited_section_name = anchor_index[anchor_name]
+          inherited_section_name &&
+            raw_erb_precompile_hook_in_section_tree?(inherited_section_name, section_index, anchor_index, visited)
+        end
+      end
+
+      def shakapacker_yml_section_merge_aliases(section)
+        section.each_line.grep(/^\s+<<:/).flat_map { |line| line.scan(/\*([A-Za-z0-9_-]+)/).flatten }
       end
 
       def effective_precompile_hook(config, environment)
@@ -125,10 +158,6 @@ module ReactOnRails
         hook.to_s.strip
       end
 
-      def generated_precompile_hook?(hook_command)
-        hook_command == DEFAULT_PRECOMPILE_HOOK_COMMAND
-      end
-
       def parse_shakapacker_yml(path)
         parse_shakapacker_yml_content(File.read(path))
       rescue StandardError
@@ -138,17 +167,30 @@ module ReactOnRails
       def parse_shakapacker_yml_content(content)
         require "yaml"
 
-        return YAML.safe_load(content, permitted_classes: [Symbol], aliases: true) if yaml_safe_load_supports_aliases?
+        rendered_content = render_shakapacker_yml_erb(content)
+        if yaml_safe_load_supports_aliases?
+          return YAML.safe_load(rendered_content, permitted_classes: [Symbol], aliases: true)
+        end
+        return {} if yaml_content_uses_aliases?(rendered_content)
+
+        YAML.safe_load(rendered_content, permitted_classes: [Symbol])
+      rescue ArgumentError => e
+        parse_shakapacker_yml_after_alias_keyword_error(e, rendered_content || content)
+      rescue ScriptError, StandardError
+        {}
+      end
+
+      def render_shakapacker_yml_erb(content)
+        require "erb"
+
+        ERB.new(content).result
+      end
+
+      def parse_shakapacker_yml_after_alias_keyword_error(error, content)
+        return {} unless yaml_alias_keyword_error?(error)
         return {} if yaml_content_uses_aliases?(content)
 
         YAML.safe_load(content, permitted_classes: [Symbol])
-      rescue ArgumentError => e
-        return {} if yaml_alias_keyword_error?(e) && yaml_content_uses_aliases?(content)
-        return YAML.safe_load(content, permitted_classes: [Symbol]) if yaml_alias_keyword_error?(e)
-
-        {}
-      rescue StandardError
-        {}
       end
 
       def yaml_safe_load_supports_aliases?

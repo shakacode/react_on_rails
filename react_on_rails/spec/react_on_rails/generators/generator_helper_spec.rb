@@ -278,6 +278,25 @@ RSpec.describe GeneratorHelper, type: :generator do
           # precompile_hook: ~
       YAML
     end
+
+    it "detects inherited active hooks after rendering ERB" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(true)
+        default: &default
+          precompile_hook: <%= "bin/custom-precompile-hook" %>
+
+        test:
+          <<: *default
+          # precompile_hook: ~
+      YAML
+    end
+
+    it "treats raw ERB precompile hooks as active because they may vary by environment" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(true)
+        default:
+          precompile_hook: <%= false %>
+          # precompile_hook: ~
+      YAML
+    end
   end
 
   describe "#generated_precompile_hook_will_be_configured?" do
@@ -324,6 +343,21 @@ RSpec.describe GeneratorHelper, type: :generator do
       ).to be(false)
     end
 
+    it "does not materialize the generated hook over an inherited custom hook defined through ERB" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        default: &default
+          precompile_hook: <%= "bin/custom-precompile-hook" %>
+
+        test:
+          <<: *default
+          # precompile_hook: ~
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(false)
+    end
+
     it "materializes the generated hook when unrelated environments use inactive YAML scalars" do
       %w[~ null false true yes on].each do |inactive_value|
         File.write(shakapacker_yml_path, <<~YAML)
@@ -358,6 +392,55 @@ RSpec.describe GeneratorHelper, type: :generator do
       expect(
         generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
       ).to be(true)
+    end
+
+    it "materializes the generated hook when an unrelated environment has an active hook beside a placeholder" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        default: &default
+          # precompile_hook: ~
+
+        development:
+          <<: *default
+          precompile_hook: bin/development-precompile-hook
+          # precompile_hook: ~
+
+        test:
+          <<: *default
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(true)
+    end
+
+    it "does not materialize over an ERB hook that may be active in the target build environment" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        default: &default
+          precompile_hook: '<%= Rails.env.production? ? "bin/custom-hook" : "" %>'
+          # precompile_hook: ~
+
+        test:
+          <<: *default
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "production")
+      ).to be(false)
+    end
+
+    it "does not materialize over an inherited raw ERB hook even if it renders inactive during install" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        default: &default
+          precompile_hook: <%= false %>
+
+        test:
+          <<: *default
+          # precompile_hook: ~
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(false)
     end
   end
 
