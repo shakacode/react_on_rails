@@ -547,7 +547,8 @@ describe('ClientRenderer', () => {
       setupRendererDom('renderer-thenable');
 
       renderComponent('renderer-thenable');
-      // Flush microtasks so Promise.resolve(thenable) adopts the thenable and captures the teardown.
+      // Flush through a macrotask: Promise.resolve(nonNativeThenable) first schedules thenable
+      // assimilation, then the downstream handler captures the teardown.
       await new Promise((resolve) => {
         setTimeout(resolve, 0);
       });
