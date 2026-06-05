@@ -352,6 +352,26 @@ RSpec.describe GeneratorHelper, type: :generator do
       YAML
     end
 
+    it "warns when an active hook causes placeholder materialization to be skipped" do
+      say_status_calls.clear
+
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(true)
+        default: &default
+          precompile_hook: bin/custom-precompile-hook
+
+        test:
+          <<: *default
+          # precompile_hook: ~
+      YAML
+
+      expect(say_status_calls).to include(
+        a_hash_including(message: a_string_matching(/Existing direct or inherited precompile_hook/))
+      )
+      expect(say_status_calls).to include(
+        a_hash_including(message: a_string_matching(/configure remaining sections manually/))
+      )
+    end
+
     it "detects inherited active hooks through commented block merge lists" do
       expect(active_precompile_hook_configured?(<<~YAML)).to be(true)
         base: &base

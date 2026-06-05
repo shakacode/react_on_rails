@@ -73,17 +73,31 @@ module ReactOnRails
         # with one gsub. If any placeholder section already resolves to a direct
         # or inherited active hook, leave the file unchanged rather than
         # partially materializing generated hooks in other sections.
-        document.sections.any? do |section|
+        active_hook_configured = document.sections.any? do |section|
           next false unless section.match?(COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER)
 
           section_effective_active_precompile_hook?(section, config, document.section_index, document.anchor_index)
         end
+        warn_existing_precompile_hook_placeholder_skip if active_hook_configured
+        active_hook_configured
       rescue ShakapackerYmlErbError
         true
       end
 
       def fail_closed_generated_precompile_hook
         false
+      end
+
+      def warn_existing_precompile_hook_placeholder_skip
+        return unless respond_to?(:say_status, true)
+
+        say_status :warning,
+                   "Existing direct or inherited precompile_hook found in a section with a placeholder.",
+                   :yellow
+        say_status :warning,
+                   "Skipping generated precompile_hook placeholder updates; " \
+                   "configure remaining sections manually if needed.",
+                   :yellow
       end
 
       def shakapacker_yml_document(content)
