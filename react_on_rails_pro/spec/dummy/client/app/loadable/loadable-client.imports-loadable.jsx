@@ -13,6 +13,8 @@ const App = (props, railsContext, domNodeId) =>
   // navigation or same-id node replacement instead of leaking it.
   loadableReady().then(() => {
     const el = document.getElementById(domNodeId);
+    if (!el) return undefined; // Navigation may remove the node before chunks resolve.
+
     const reactElement = wrapElementInStrictMode(
       <HelmetProvider>
         {React.createElement(ClientApp, { ...props, path: railsContext.pathname })}
