@@ -14,11 +14,12 @@ module ReactOnRails
   # instance methods. Dev::ServerManager `extend`s it because its commands live
   # on `class << self`; extend preserves the private visibility, so the helpers
   # become private singleton methods there. The helpers call each other plus
-  # standard-library/Rails globals (ENV, File, Dir, YAML, ERB, Rails) and the
-  # SystemChecker::SUPPORTED_ASSETS_BUNDLERS constant — none of which resolve
-  # through `self` — so they behave identically whether included or extended.
+  # standard-library/Rails globals (ENV, File, Dir, YAML, ERB, Rails) and module
+  # constants — none of which resolve through `self` — so they behave
+  # identically whether included or extended.
   module ShakapackerConfigHelpers
     DEFAULT_SHAKAPACKER_CONFIG_PATH = "config/shakapacker.yml"
+    SUPPORTED_ASSETS_BUNDLERS = %w[webpack rspack].freeze
 
     private
 
@@ -78,7 +79,7 @@ module ReactOnRails
 
     def normalize_assets_bundler(value)
       normalized = value.to_s.strip.downcase
-      ReactOnRails::SystemChecker::SUPPORTED_ASSETS_BUNDLERS.include?(normalized) ? normalized : nil
+      SUPPORTED_ASSETS_BUNDLERS.include?(normalized) ? normalized : nil
     end
 
     def active_assets_bundler
@@ -136,12 +137,3 @@ module ReactOnRails
     end
   end
 end
-
-# Required at the bottom, after the module is defined, on purpose. SystemChecker
-# `include`s this module at class-body evaluation time, so requiring it from the
-# top of this file would trigger that include before ShakapackerConfigHelpers
-# exists whenever this file is loaded first — raising NameError. By the time the
-# require runs here the module is fully defined, and normalize_assets_bundler
-# only needs SUPPORTED_ASSETS_BUNDLERS lazily at call time, so deferring keeps
-# the module self-contained under either load order.
-require_relative "system_checker"
