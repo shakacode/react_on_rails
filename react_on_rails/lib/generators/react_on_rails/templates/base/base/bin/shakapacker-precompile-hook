@@ -59,7 +59,9 @@ def generate_rsc_manifest_client_references_if_needed
   env = {
     "SHAKAPACKER_SKIP_PRECOMPILE_HOOK" => "true",
     "RSC_REFERENCE_DISCOVERY_BUILD" => "true",
-    "RSC_BUNDLE_ONLY" => "true"
+    "RSC_BUNDLE_ONLY" => "true",
+    "CLIENT_BUNDLE_ONLY" => nil,
+    "SERVER_BUNDLE_ONLY" => nil
   }
 
   Dir.chdir(Rails.root) do

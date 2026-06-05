@@ -184,5 +184,35 @@ RSpec.describe "Shakapacker precompile hook shared script" do
 
       expect(self).to have_received(:warn).with(/RSC manifest client reference generation failed/)
     end
+
+    it "clears client/server bundle-only env vars for the nested discovery build" do
+      registration_entry = "/rails/root/client/app/generated/server-component-registration-entry.js"
+      allow(self).to receive_messages(find_rails_root: "/rails/root",
+                                      rsc_manifest_registration_entry: registration_entry)
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with("/rails/root/bin/shakapacker").and_return(true)
+      allow(Dir).to receive(:chdir).with("/rails/root").and_yield
+      allow(self).to receive(:puts)
+      allow(self).to receive(:system)
+
+      with_env(
+        "CLIENT_BUNDLE_ONLY" => "true",
+        "SERVER_BUNDLE_ONLY" => "true",
+        "RSC_REFERENCE_DISCOVERY_BUILD" => nil
+      ) do
+        generate_rsc_manifest_client_references_if_needed
+      end
+
+      expect(self).to have_received(:system).with(
+        hash_including(
+          "CLIENT_BUNDLE_ONLY" => nil,
+          "SERVER_BUNDLE_ONLY" => nil,
+          "RSC_BUNDLE_ONLY" => "true",
+          "RSC_REFERENCE_DISCOVERY_BUILD" => "true"
+        ),
+        "/rails/root/bin/shakapacker",
+        exception: true
+      )
+    end
   end
 end
