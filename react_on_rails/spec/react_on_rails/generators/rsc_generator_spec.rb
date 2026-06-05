@@ -2156,6 +2156,40 @@ describe RscGenerator, type: :generator do
       expect(messages).not_to include("isServer: true")
     end
 
+    it "normalizes a legacy rspack plugin before skipping an unparseable clientReferences rewrite" do
+      allow(generator).to receive(:using_rspack?).and_return(true)
+      config_path = "config/rspack/serverWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { config } = require('shakapacker');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          serverWebpackConfig.plugins.push(
+            new RSCWebpackPlugin({
+              isServer: true,
+              include: /\\}/,
+            }),
+          );
+        JS
+      )
+      content = File.read(File.join(destination_root, config_path))
+
+      generator.send(:update_existing_rsc_webpack_config, config_path, content, is_server: true)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content).to include(
+        "const { RSCRspackPlugin } = require('react-on-rails-rsc/RspackPlugin');"
+      )
+      expect(migrated_content).to include("new RSCRspackPlugin({")
+      expect(migrated_content).not_to include("RSCWebpackPlugin")
+      expect(migrated_content).not_to include("clientReferences: rscClientReferences")
+
+      messages = GeneratorMessages.messages.join("\n")
+      expect(messages).to include(config_path)
+      expect(messages).to include("cannot parse safely")
+    end
+
     it "flags plugin invocations whose options block cannot find a closing brace" do
       content = <<~JS
         new RSCWebpackPlugin({
@@ -2409,6 +2443,10 @@ describe RscGenerator, type: :generator do
       )
       expect(migrated_content).not_to include("RSCRspackPlugin")
       expect(migrated_content).not_to include("react-on-rails-rsc/RspackPlugin")
+
+      messages = GeneratorMessages.messages.join("\n")
+      expect(messages).to include("ESM syntax")
+      expect(messages).to include("const { RSCRspackPlugin } = require('react-on-rails-rsc/RspackPlugin');")
     end
 
     it "ignores commented legacy plugin imports when deciding whether an rspack binding exists" do

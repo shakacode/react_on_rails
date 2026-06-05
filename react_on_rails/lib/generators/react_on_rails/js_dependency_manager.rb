@@ -449,18 +449,23 @@ module ReactOnRails
             npm install #{manual_install_packages.join(' ')}
         MSG
       rescue StandardError => e
+        manual_install_packages = using_rspack? ? rsc_packages_with_pin : RSC_DEPENDENCIES
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Error adding React Server Components dependencies: #{e.message}
 
           You can install them manually by running:
-            npm install #{RSC_DEPENDENCIES.join(' ')}
+            npm install #{manual_install_packages.join(' ')}
         MSG
       end
 
       # Returns [pinned_packages, used_version_pins]. used_version_pins is always true here;
       # subclasses may override to return [packages, false] when pinning should be skipped.
       def rsc_packages_with_version
-        [RSC_DEPENDENCIES.map { |pkg| "#{pkg}@#{RSC_PACKAGE_VERSION_PIN}" }, true]
+        [rsc_packages_with_pin, true]
+      end
+
+      def rsc_packages_with_pin
+        RSC_DEPENDENCIES.map { |pkg| "#{pkg}@#{RSC_PACKAGE_VERSION_PIN}" }
       end
 
       def rspack_rsc_dependency_pin_failed_warning

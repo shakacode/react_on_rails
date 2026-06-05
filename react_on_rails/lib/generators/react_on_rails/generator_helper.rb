@@ -209,30 +209,12 @@ module GeneratorHelper
     using_rspack? ? "RSCRspackPlugin" : "RSCWebpackPlugin"
   end
 
-  # The other bundler's plugin class name — the one this project should NOT be using.
-  # Used to detect a config left in a mixed state (e.g. a legacy `RSCWebpackPlugin` surviving
-  # in an rspack project) so diagnostics can say "wrong bundler plugin" rather than "missing".
-  #
-  # @return [String] "RSCWebpackPlugin" when rspack, "RSCRspackPlugin" otherwise
-  def inactive_rsc_plugin_class_name
-    using_rspack? ? "RSCWebpackPlugin" : "RSCRspackPlugin"
-  end
-
   # `react-on-rails-rsc` subpath that exports {#rsc_plugin_class_name}.
   #
   # @return [String] "react-on-rails-rsc/RspackPlugin" when rspack,
   #   "react-on-rails-rsc/WebpackPlugin" otherwise
   def rsc_plugin_import_path
     using_rspack? ? "react-on-rails-rsc/RspackPlugin" : "react-on-rails-rsc/WebpackPlugin"
-  end
-
-  # Import path for the inactive bundler's plugin — the counterpart to {#rsc_plugin_import_path},
-  # used when migrating a legacy config to the active bundler's plugin.
-  #
-  # @return [String] "react-on-rails-rsc/WebpackPlugin" when rspack,
-  #   "react-on-rails-rsc/RspackPlugin" otherwise
-  def inactive_rsc_plugin_import_path
-    using_rspack? ? "react-on-rails-rsc/WebpackPlugin" : "react-on-rails-rsc/RspackPlugin"
   end
 
   # Detect the installed React version from package.json
@@ -355,6 +337,24 @@ module GeneratorHelper
   # Record that a later step in this generator run will install the Pro gem.
   def defer_pro_gem_install!
     @pro_gem_install_deferred = true
+  end
+
+  # The other bundler's plugin class name — the one this project should NOT be using.
+  # Used to detect a config left in a mixed state (e.g. a legacy `RSCWebpackPlugin` surviving
+  # in an rspack project) so diagnostics can say "wrong bundler plugin" rather than "missing".
+  #
+  # @return [String] "RSCWebpackPlugin" when rspack, "RSCRspackPlugin" otherwise
+  def inactive_rsc_plugin_class_name
+    using_rspack? ? "RSCWebpackPlugin" : "RSCRspackPlugin"
+  end
+
+  # Import path for the inactive bundler's plugin — the counterpart to {#rsc_plugin_import_path},
+  # used when migrating a legacy config to the active bundler's plugin.
+  #
+  # @return [String] "react-on-rails-rsc/WebpackPlugin" when rspack,
+  #   "react-on-rails-rsc/RspackPlugin" otherwise
+  def inactive_rsc_plugin_import_path
+    using_rspack? ? "react-on-rails-rsc/WebpackPlugin" : "react-on-rails-rsc/RspackPlugin"
   end
 
   # NOTE: only the `default:` section is inspected — same assumption as

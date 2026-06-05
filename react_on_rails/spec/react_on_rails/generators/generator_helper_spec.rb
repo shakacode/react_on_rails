@@ -258,6 +258,8 @@ RSpec.describe GeneratorHelper, type: :generator do
 
       expect(rsc_plugin_class_name).to eq("RSCRspackPlugin")
       expect(rsc_plugin_import_path).to eq("react-on-rails-rsc/RspackPlugin")
+      expect(inactive_rsc_plugin_class_name).to eq("RSCWebpackPlugin")
+      expect(inactive_rsc_plugin_import_path).to eq("react-on-rails-rsc/WebpackPlugin")
     end
 
     it "scaffolds the RSCWebpackPlugin when not using rspack" do
@@ -265,6 +267,8 @@ RSpec.describe GeneratorHelper, type: :generator do
 
       expect(rsc_plugin_class_name).to eq("RSCWebpackPlugin")
       expect(rsc_plugin_import_path).to eq("react-on-rails-rsc/WebpackPlugin")
+      expect(inactive_rsc_plugin_class_name).to eq("RSCRspackPlugin")
+      expect(inactive_rsc_plugin_import_path).to eq("react-on-rails-rsc/RspackPlugin")
     end
   end
 

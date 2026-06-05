@@ -125,29 +125,34 @@ module ReactOnRails
         end
 
         def update_existing_rsc_webpack_config(config_path, content, is_server:)
-          return unless rsc_plugin_sections_safe_to_rewrite?(config_path, content, is_server: is_server)
-
-          normalized_content = normalize_rsc_plugin_for_active_bundler(content)
+          normalized_content = normalize_rsc_plugin_for_active_bundler(config_path, content)
           if normalized_content != content
             write_existing_rsc_config(config_path, normalized_content, action: :rewrite)
             content = normalized_content
           end
+
+          return unless rsc_plugin_sections_safe_to_rewrite?(config_path, content, is_server: is_server)
 
           return if rsc_plugin_uses_scoped_client_references?(content, is_server: is_server)
           return unless prepare_rsc_client_references_rewrite!(config_path, content, is_server: is_server)
 
           return if rewrite_rsc_plugin_client_references(config_path, is_server: is_server)
 
+          # Normalization above is committed independently. If clientReferences migration fails,
+          # rollback restores to the normalized plugin state rather than the original legacy plugin.
           rollback_incomplete_rsc_client_references_setup(config_path, content)
           warn_missing_rsc_plugin_target(config_path, is_server: is_server)
         end
 
-        def normalize_rsc_plugin_for_active_bundler(content)
+        def normalize_rsc_plugin_for_active_bundler(config_path, content)
           normalized_content, active_plugin_binding_available = normalize_rsc_plugin_import_for_active_bundler(
             content,
             inactive_rsc_plugin_class_name,
             inactive_rsc_plugin_import_path
           )
+          if !active_plugin_binding_available && inactive_rsc_plugin_esm_import?(content)
+            warn_unsupported_rsc_plugin_import_syntax(config_path)
+          end
           return normalized_content unless active_plugin_binding_available
 
           normalize_rsc_plugin_invocations_for_active_bundler(normalized_content, inactive_rsc_plugin_class_name)
@@ -190,10 +195,23 @@ module ReactOnRails
         end
 
         def rsc_plugin_commonjs_import_regex(import_path)
+          # Intentionally matches single-line destructuring only. Multi-line CommonJS destructuring is
+          # skipped safely because the lightweight regexp does not span newlines.
           Regexp.new(
             "^[ \\t]*(?:const|let|var)\\s+\\{[^}]*\\}\\s*=\\s*" \
             "require\\(['\"]#{Regexp.escape(import_path)}['\"]\\);?[ \\t]*(?:\\r?\\n)?"
           )
+        end
+
+        def inactive_rsc_plugin_esm_import?(content)
+          pattern = Regexp.new(
+            "^[ \\t]*import\\s+\\{[^}]*\\b#{Regexp.escape(inactive_rsc_plugin_class_name)}\\b[^}]*\\}" \
+            "\\s+from\\s+['\"]#{Regexp.escape(inactive_rsc_plugin_import_path)}['\"];?"
+          )
+
+          content.to_enum(:scan, pattern).any? do
+            js_top_level_position?(content, Regexp.last_match.begin(0))
+          end
         end
 
         def remove_commonjs_named_imports_after_position(content, import_path, binding_name, keep_position)
@@ -309,6 +327,15 @@ module ReactOnRails
             "including calls targeting the other bundle. " \
             "Please add `clientReferences: rscClientReferences` manually to any #{rsc_plugin_class_name} " \
             "that is missing it."
+          )
+        end
+
+        def warn_unsupported_rsc_plugin_import_syntax(config_path)
+          GeneratorMessages.add_warning(
+            "Could not automatically migrate #{inactive_rsc_plugin_class_name} to #{rsc_plugin_class_name} " \
+            "in #{config_path}: the plugin is imported with ESM syntax, while the generator can only rewrite " \
+            "CommonJS require() imports. Please replace it manually with: " \
+            "const { #{rsc_plugin_class_name} } = require('#{rsc_plugin_import_path}');"
           )
         end
 
