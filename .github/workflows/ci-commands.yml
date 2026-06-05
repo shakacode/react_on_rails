@@ -395,7 +395,7 @@ jobs:
 
             if (!userHasWriteAccess) {
               await postComment(`@${actor} Sorry, only repository collaborators with write access can use CI commands.`);
-              core.setFailed(`User ${actor} does not have write access`);
+              core.warning(`User ${actor} does not have write access`);
               return;
             }
 

@@ -68,6 +68,8 @@ The reason is optional. The bot records the current PR head SHA so the waiver is
 
 The workflow first filters comment authors to `OWNER`, `MEMBER`, or `COLLABORATOR` associations to avoid allocating runners for obvious external mentions. The script still verifies repository write access before executing any command. If an unauthorized associated user attempts to use `+ci-run-full`, they'll receive a message explaining the restriction.
 
+The job-level `contains('+ci-')` prefilter is intentionally broad because GitHub Actions expressions do not support regular expressions. A prose mention such as `+ci-related` can still start the lightweight command workflow, but the script strips quoted/code blocks and only executes commands that appear at the start of a comment line.
+
 ### Concurrency Protection
 
 Multiple CI command comments on the same PR run one at a time so a status/help command cannot interrupt a full-CI dispatch.
