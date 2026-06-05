@@ -108,13 +108,14 @@ class BenchmarkTable
   end
 
   # "▲2.3%" / "▼1.4%" for a plain change; "🔴 8.4%" / "🟢 5.0%" for a significant one (the
-  # emoji gets a trailing space so it renders clear of the percent). Rounded-to-zero
-  # changes display as plain "0.0%" so equality/tiny noise never gets a misleading arrow.
+  # emoji gets a trailing space so it renders clear of the percent). Non-significant
+  # rounded-to-zero changes display as plain "0.0%" so equality/tiny noise never gets a
+  # misleading arrow, while significant verdicts keep their marker.
   # The percent is the absolute change vs baseline; direction is conveyed by the arrow,
   # or by the emoji plus the column's known better-direction.
   def delta(verdict, value, baseline)
     percent = ((value - baseline) / baseline * 100).abs.round(1)
-    return "#{percent}%" if percent.zero?
+    return "#{percent}%" if percent.zero? && verdict.nil?
 
     case verdict
     when :regression then "#{REGRESSION} #{percent}%"
