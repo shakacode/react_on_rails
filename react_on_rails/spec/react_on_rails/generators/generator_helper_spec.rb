@@ -243,6 +243,22 @@ RSpec.describe GeneratorHelper, type: :generator do
         a_hash_including(message: a_string_matching(/Skipping generated precompile_hook updates/))
       )
     end
+
+    it "keeps file-level parsing tolerant when shakapacker.yml ERB cannot be evaluated" do
+      shakapacker_yml_path = File.join(destination_root, "config/shakapacker.yml")
+      FileUtils.mkdir_p(File.dirname(shakapacker_yml_path))
+      File.write(shakapacker_yml_path, <<~YAML)
+        default:
+          javascript_transpiler: <%= missing_local %>
+      YAML
+
+      expect(parse_shakapacker_yml(shakapacker_yml_path)).to eq({})
+      expect(say_status_calls).to include(
+        a_hash_including(message: a_string_matching(%r{Could not evaluate ERB in config/shakapacker\.yml}))
+      )
+    ensure
+      FileUtils.rm_f(shakapacker_yml_path)
+    end
   end
 
   describe "#active_precompile_hook_configured?" do

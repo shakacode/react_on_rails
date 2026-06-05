@@ -169,8 +169,6 @@ module ReactOnRails
 
       def parse_shakapacker_yml(path)
         parse_shakapacker_yml_content(File.read(path))
-      rescue ShakapackerYmlErbError
-        raise
       rescue StandardError
         {}
       end
