@@ -300,6 +300,14 @@ RSpec.describe GeneratorHelper, type: :generator do
       end
     end
 
+    it "ignores ERB in trailing comments after inactive scalar values" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(false)
+        default:
+          precompile_hook: false # previously used <%= "bin/custom-precompile-hook" %>
+          # precompile_hook: ~
+      YAML
+    end
+
     it "ignores active hooks in sections without a commented placeholder" do
       expect(active_precompile_hook_configured?(<<~YAML)).to be(false)
         default:
@@ -339,6 +347,23 @@ RSpec.describe GeneratorHelper, type: :generator do
 
         test:
           <<:
+            - *default
+          # precompile_hook: ~
+      YAML
+    end
+
+    it "detects inherited active hooks through commented block merge lists" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(true)
+        base: &base
+          compile: true
+
+        default: &default
+          precompile_hook: <%= false %>
+
+        test:
+          <<:
+            # Keep base first so later aliases can override it.
+            - *base
             - *default
           # precompile_hook: ~
       YAML
@@ -526,6 +551,27 @@ RSpec.describe GeneratorHelper, type: :generator do
       ).to be(false)
     end
 
+    it "does not materialize over a raw ERB hook inherited through a commented block merge list" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        base: &base
+          compile: true
+
+        default: &default
+          precompile_hook: <%= false %>
+
+        test:
+          <<:
+            # Keep base first so later aliases can override it.
+            - *base
+            - *default
+          # precompile_hook: ~
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(false)
+    end
+
     it "does not materialize over a raw ERB hook inherited through a block merge list" do
       File.write(shakapacker_yml_path, <<~YAML)
         default: &default
@@ -535,6 +581,36 @@ RSpec.describe GeneratorHelper, type: :generator do
           <<:
             - *default
           # precompile_hook: ~
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(false)
+    end
+
+    it "materializes when an inactive hook has a trailing comment that contains ERB" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        default: &default
+          precompile_hook: false # previously used <%= "bin/custom-precompile-hook" %>
+          # precompile_hook: ~
+
+        test:
+          <<: *default
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(true)
+    end
+
+    it "fails closed when ERB cannot be evaluated while checking generated hook materialization" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        default: &default
+          precompile_hook: <%= missing_local %>
+          # precompile_hook: ~
+
+        test:
+          <<: *default
       YAML
 
       expect(

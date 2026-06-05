@@ -183,8 +183,14 @@ verify_generated_app_runtime() {
 
   app_name="$(basename "$app_dir")"
   echo "Building test bundles for $app_name..."
+  if ! pushd "$app_dir" >/dev/null; then
+    echo "Cannot cd to generated app directory for $app_name: $app_dir" >&2
+    return 1
+  fi
+
   build_status=0
-  build_output="$(cd "$app_dir" && "${PNPM_CMD[@]}" run build:test 2>&1)" || build_status=$?
+  build_output="$("${PNPM_CMD[@]}" run build:test 2>&1)" || build_status=$?
+  popd >/dev/null
   if [ "$build_status" -ne 0 ]; then
     echo "pnpm run build:test failed for $app_name. Output:" >&2
     printf '%s\n' "$build_output" >&2

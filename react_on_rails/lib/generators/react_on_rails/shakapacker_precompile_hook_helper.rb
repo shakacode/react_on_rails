@@ -8,14 +8,13 @@ module ReactOnRails
       DEFAULT_PRECOMPILE_HOOK_COMMAND = "bin/shakapacker-precompile-hook"
       COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER = /^(\s*)#\s*precompile_hook:\s*~\s*$/
       PRECOMPILE_HOOK_KEY = /^\s+precompile_hook:\s*/
-      ERB_PRECOMPILE_HOOK = /^\s+precompile_hook:\s*.*<%/
       RAW_PRECOMPILE_HOOK_VALUE = /^\s+precompile_hook:\s*([^#]*?)\s*(?:#.*)?$/
       UNQUOTED_INACTIVE_PRECOMPILE_HOOK_VALUE = /\A(?:|~|null|false|true|yes|no|on|off)\z/i
       class ShakapackerYmlErbError < StandardError; end
       ShakapackerYmlDocument = Struct.new(:sections, :section_index, :anchor_index, keyword_init: true)
       private_constant :SHAKAPACKER_YML_PATH, :DEFAULT_PRECOMPILE_HOOK_COMMAND,
-                       :COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER, :PRECOMPILE_HOOK_KEY, :ERB_PRECOMPILE_HOOK,
-                       :RAW_PRECOMPILE_HOOK_VALUE, :UNQUOTED_INACTIVE_PRECOMPILE_HOOK_VALUE,
+                       :COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER, :PRECOMPILE_HOOK_KEY, :RAW_PRECOMPILE_HOOK_VALUE,
+                       :UNQUOTED_INACTIVE_PRECOMPILE_HOOK_VALUE,
                        :ShakapackerYmlErbError, :ShakapackerYmlDocument
 
       private
@@ -57,8 +56,9 @@ module ReactOnRails
         )
         config = parse_shakapacker_yml_content(materialized_content)
         normalize_precompile_hook(effective_precompile_hook(config, environment)) == DEFAULT_PRECOMPILE_HOOK_COMMAND
-      # ShakapackerYmlErbError is caught here as StandardError and returns false to skip writes.
-      # active_precompile_hook_configured? returns true for the same error so both callers fail closed.
+      rescue ShakapackerYmlErbError
+        # render_shakapacker_yml_erb already warned; materialization fails closed.
+        fail_closed_generated_precompile_hook
       rescue StandardError
         false
       end
@@ -69,10 +69,10 @@ module ReactOnRails
         config = parse_shakapacker_yml_content(content)
         document = shakapacker_yml_document(content)
 
-        # The generator materializes all placeholders at once, so one direct or
-        # inherited active hook keeps the whole file under Shakapacker control.
-        # As a result, one custom active hook prevents materializing generated
-        # hooks in other sections; this is safer than partial materialization.
+        # configure_precompile_hook_in_shakapacker rewrites every placeholder
+        # with one gsub. If any placeholder section already resolves to a direct
+        # or inherited active hook, leave the file unchanged rather than
+        # partially materializing generated hooks in other sections.
         document.sections.any? do |section|
           next false unless section.match?(COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER)
 
@@ -80,6 +80,10 @@ module ReactOnRails
         end
       rescue ShakapackerYmlErbError
         true
+      end
+
+      def fail_closed_generated_precompile_hook
+        false
       end
 
       def shakapacker_yml_document(content)
@@ -167,17 +171,24 @@ module ReactOnRails
         aliases = []
         lines = section.each_line.to_a
         lines.each_with_index do |line, index|
-          next unless line.match?(/^\s+<<:/)
+          match = line.match(/^(\s+)<<:\s*(.*)$/)
+          next unless match
 
-          aliases.concat(line.scan(/\*([A-Za-z0-9_-]+)/).flatten)
-          aliases.concat(shakapacker_yml_block_merge_aliases(lines[(index + 1)..]))
+          aliases.concat(match[2].scan(/\*([A-Za-z0-9_-]+)/).flatten)
+          aliases.concat(shakapacker_yml_block_merge_aliases(lines[(index + 1)..], match[1].length))
         end
         aliases
       end
 
-      def shakapacker_yml_block_merge_aliases(lines)
-        lines.take_while { |line| line.match?(/^\s+-\s+\*/) }
-             .flat_map { |line| line.scan(/\*([A-Za-z0-9_-]+)/).flatten }
+      def shakapacker_yml_block_merge_aliases(lines, merge_indent)
+        lines.each_with_object([]) do |line, aliases|
+          next if line.strip.empty? || line.match?(/^\s*#/)
+
+          break aliases if line[/\A */].length <= merge_indent
+
+          match = line.match(/^\s*-\s+\*([A-Za-z0-9_-]+)/)
+          aliases << match[1] if match
+        end
       end
 
       def effective_precompile_hook(config, environment)
@@ -217,7 +228,14 @@ module ReactOnRails
 
       def parse_shakapacker_yml(path)
         parse_shakapacker_yml_content(File.read(path))
+      rescue ShakapackerYmlErbError
+        # render_shakapacker_yml_erb already warned; file-level parsing stays tolerant.
+        empty_shakapacker_yml_config
       rescue StandardError
+        {}
+      end
+
+      def empty_shakapacker_yml_config
         {}
       end
 
@@ -243,7 +261,9 @@ module ReactOnRails
         require "erb"
 
         # TOPLEVEL_BINDING matches Rails config ERB evaluation closely enough for
-        # ENV/Rails constants; unavailable app-specific helpers still fail closed.
+        # ENV/Rails constants. The tradeoff is that evaluation uses this
+        # process's top-level scope rather than an app-isolated binding, so
+        # unavailable app helpers or side effects fail closed and skip writes.
         ERB.new(content).result(TOPLEVEL_BINDING)
       rescue ScriptError, StandardError => e
         warn_shakapacker_yml_erb_error(e)
