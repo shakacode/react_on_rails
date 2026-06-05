@@ -61,7 +61,13 @@ module ReactOnRails
       end
 
       def active_precompile_hook_configured?(content)
-        content.match?(ACTIVE_PRECOMPILE_HOOK)
+        shakapacker_yml_sections(content).any? do |section|
+          section.match?(ACTIVE_PRECOMPILE_HOOK) && section.match?(COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER)
+        end
+      end
+
+      def shakapacker_yml_sections(content)
+        content.each_line.slice_before { |line| line.match?(/^\S/) }.map(&:join)
       end
 
       def effective_precompile_hook(config, environment)
