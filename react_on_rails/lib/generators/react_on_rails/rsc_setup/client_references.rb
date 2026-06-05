@@ -273,11 +273,7 @@ module ReactOnRails
         end
 
         def normalize_rsc_plugin_for_active_bundler(config_path, content)
-          normalized_content, active_plugin_binding_available = normalize_rsc_plugin_import_for_active_bundler(
-            content,
-            inactive_rsc_plugin_class_name,
-            inactive_rsc_plugin_import_path
-          )
+          normalized_content, active_plugin_binding_available = normalize_rsc_plugin_import_for_active_bundler(content)
           if !active_plugin_binding_available && inactive_rsc_plugin_esm_import?(content)
             warn_unsupported_rsc_plugin_import_syntax(config_path)
           end
@@ -286,27 +282,26 @@ module ReactOnRails
           normalize_rsc_plugin_invocations_for_active_bundler(normalized_content, inactive_rsc_plugin_class_name)
         end
 
-        def normalize_rsc_plugin_import_for_active_bundler(content, inactive_plugin_class_name,
-                                                           inactive_plugin_import_path)
+        def normalize_rsc_plugin_import_for_active_bundler(content)
           active_import_position = commonjs_named_import_position(
             content,
             rsc_plugin_import_path,
             rsc_plugin_class_name
           )
           converted_inactive_import_position = nil
-          import_regex = rsc_plugin_commonjs_import_regex(inactive_plugin_import_path)
+          import_regex = rsc_plugin_commonjs_import_regex(inactive_rsc_plugin_import_path)
           normalized_content = content.gsub(import_regex) do |statement|
             statement_position = Regexp.last_match.begin(0)
             next statement unless js_top_level_position?(content, statement_position)
 
             if active_import_position && active_import_position < statement_position
-              remove_commonjs_named_import_binding(statement, inactive_plugin_class_name)
+              remove_commonjs_named_import_binding(statement, inactive_rsc_plugin_class_name)
             else
               converted_inactive_import_position ||= statement_position
               active_import_position = statement_position
               statement
-                .gsub(/\b#{Regexp.escape(inactive_plugin_class_name)}\b/, rsc_plugin_class_name)
-                .gsub(inactive_plugin_import_path, rsc_plugin_import_path)
+                .gsub(/\b#{Regexp.escape(inactive_rsc_plugin_class_name)}\b/, rsc_plugin_class_name)
+                .gsub(inactive_rsc_plugin_import_path, rsc_plugin_import_path)
             end
           end
 
@@ -323,12 +318,26 @@ module ReactOnRails
         end
 
         def rsc_plugin_commonjs_import_regex(import_path)
-          # Intentionally matches single-line destructuring only. Multi-line CommonJS destructuring is
-          # skipped safely because the lightweight regexp does not span newlines.
+          # Matches one CommonJS named-destructuring require statement. The binding list may span
+          # multiple lines (`[^}]*` crosses newlines), so multiline destructuring is normalized too;
+          # callers still guard matches with the JS top-level scanner before rewriting.
           Regexp.new(
             "^[ \\t]*(?:const|let|var)\\s+\\{[^}]*\\}\\s*=\\s*" \
             "require\\(['\"]#{Regexp.escape(import_path)}['\"]\\);?[ \\t]*(?:\\r?\\n)?"
           )
+        end
+
+        def inactive_rsc_plugin_symbol_in_js_code?(content)
+          commonjs_named_imported?(content, inactive_rsc_plugin_import_path, inactive_rsc_plugin_class_name) ||
+            inactive_rsc_plugin_esm_import?(content) ||
+            inactive_rsc_plugin_invocation_in_js_code?(content)
+        end
+
+        def inactive_rsc_plugin_invocation_in_js_code?(content)
+          pattern = /\bnew\s+#{Regexp.escape(inactive_rsc_plugin_class_name)}\s*\(/
+          content.to_enum(:scan, pattern).any? do
+            js_code_position?(content, Regexp.last_match.begin(0))
+          end
         end
 
         def inactive_rsc_plugin_esm_import?(content)

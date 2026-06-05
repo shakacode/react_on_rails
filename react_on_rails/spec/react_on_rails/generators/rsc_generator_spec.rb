@@ -2686,6 +2686,71 @@ describe RscGenerator, type: :generator do
       )
     end
 
+    it "reports a stale inactive import when an rspack client config also has the active plugin" do
+      allow(generator).to receive(:using_rspack?).and_return(true)
+      simulate_existing_file(
+        "config/rspack/clientWebpackConfig.js",
+        <<~JS
+          const { config } = require('shakapacker');
+          const { resolve } = require('path');
+          const { RSCRspackPlugin } = require('react-on-rails-rsc/RspackPlugin');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          const rscClientReferences = { directory: resolve(config.source_path) };
+          clientConfig.plugins.push(
+            new RSCRspackPlugin({ isServer: false, clientReferences: rscClientReferences }),
+          );
+        JS
+      )
+
+      expect(generator.send(:check_rsc_client_config)).to include(
+        "stale RSCWebpackPlugin in clientWebpackConfig.js " \
+        "(found alongside RSCRspackPlugin — remove the inactive bundler plugin manually)"
+      )
+    end
+
+    it "reports a stale inactive invocation when an rspack server config also has the active plugin" do
+      allow(generator).to receive(:using_rspack?).and_return(true)
+      simulate_existing_file(
+        "config/rspack/serverWebpackConfig.js",
+        <<~JS
+          const { config } = require('shakapacker');
+          const { resolve } = require('path');
+          const { RSCRspackPlugin } = require('react-on-rails-rsc/RspackPlugin');
+          const rscClientReferences = { directory: resolve(config.source_path) };
+          const rscBundle = false;
+          serverWebpackConfig.plugins.push(
+            new RSCRspackPlugin({ isServer: true, clientReferences: rscClientReferences }),
+          );
+          serverWebpackConfig.plugins.push(new RSCWebpackPlugin({ isServer: true }));
+        JS
+      )
+
+      expect(generator.send(:check_rsc_server_config)).to include(
+        "stale RSCWebpackPlugin in serverWebpackConfig.js " \
+        "(found alongside RSCRspackPlugin — remove the inactive bundler plugin manually)"
+      )
+    end
+
+    it "ignores inactive plugin names in comments and strings during mixed-plugin verification" do
+      allow(generator).to receive(:using_rspack?).and_return(true)
+      simulate_existing_file(
+        "config/rspack/clientWebpackConfig.js",
+        <<~JS
+          const { config } = require('shakapacker');
+          const { resolve } = require('path');
+          const { RSCRspackPlugin } = require('react-on-rails-rsc/RspackPlugin');
+          const rscClientReferences = { directory: resolve(config.source_path) };
+          // Previous import: const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          const migrationNote = "new RSCWebpackPlugin({ isServer: false })";
+          clientConfig.plugins.push(
+            new RSCRspackPlugin({ isServer: false, clientReferences: rscClientReferences }),
+          );
+        JS
+      )
+
+      expect(generator.send(:check_rsc_client_config)).to eq([])
+    end
+
     it "does not inject duplicate imports when existing bindings are indented" do
       config_path = "config/webpack/clientWebpackConfig.js"
       simulate_existing_file(
