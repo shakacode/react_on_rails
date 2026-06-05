@@ -7,7 +7,6 @@ require "open3"
 require "rubygems/version"
 require "shellwords"
 require "tempfile"
-require "timeout"
 require "tmpdir"
 require_relative "task_helpers"
 require_relative "../react_on_rails/lib/react_on_rails/version_syntax_converter"
@@ -166,6 +165,55 @@ rescue Errno::ENOENT
   abort "❌ GitHub CLI (`gh`) is not installed. Install it from https://cli.github.com/ and retry."
 end
 
+def capture_gh_output_with_timeout(*args, timeout_seconds:)
+  reader, writer = IO.pipe
+  pid = Process.spawn("gh", *args, out: writer, err: writer)
+  writer.close
+  output_reader = Thread.new { reader.read }
+  status = nil
+  timed_out = false
+  deadline = Time.now + timeout_seconds
+
+  loop do
+    waited_pid, status = Process.waitpid2(pid, Process::WNOHANG)
+    break if waited_pid
+
+    if Time.now >= deadline
+      timed_out = true
+      status = terminate_process(pid)
+      break
+    end
+
+    sleep 0.2
+  end
+
+  [output_reader.value, status, timed_out]
+rescue Errno::ENOENT
+  abort "❌ GitHub CLI (`gh`) is not installed. Install it from https://cli.github.com/ and retry."
+ensure
+  writer&.close unless writer&.closed?
+  reader&.close unless reader&.closed?
+end
+
+def terminate_process(pid)
+  Process.kill("TERM", pid)
+  deadline = Time.now + 5
+
+  loop do
+    waited_pid, status = Process.waitpid2(pid, Process::WNOHANG)
+    return status if waited_pid
+    break if Time.now >= deadline
+
+    sleep 0.1
+  end
+
+  Process.kill("KILL", pid)
+  _waited_pid, status = Process.waitpid2(pid)
+  status
+rescue Errno::ESRCH
+  nil
+end
+
 def verify_gh_auth(monorepo_root:)
   result, status = capture_gh_output("auth", "status")
   abort "❌ GitHub CLI authentication required! Run `gh auth login` and retry.\n\n#{result}" unless status.success?
@@ -254,11 +302,12 @@ def watch_shakaperf_release_gate_run!(repo_slug:, run:)
   run_id = run.fetch("databaseId").to_s
   run_url = run["url"] || "https://github.com/#{repo_slug}/actions/runs/#{run_id}"
 
-  output, status = begin
-    Timeout.timeout(SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS) do
-      capture_gh_output("run", "watch", run_id, "--repo", repo_slug, "--exit-status")
-    end
-  rescue Timeout::Error
+  output, status, timed_out = capture_gh_output_with_timeout(
+    "run", "watch", run_id, "--repo", repo_slug, "--exit-status",
+    timeout_seconds: SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS
+  )
+
+  if timed_out
     handle_shakaperf_release_gate_violation!(
       message: "❌ Timed out watching ShakaPerf release gate run #{run_id}.\n\nRun: #{run_url}"
     )
@@ -303,10 +352,9 @@ def run_shakaperf_release_gate!(monorepo_root:, ref:, head_sha:, allow_override:
     head_sha: head_sha,
     ignored_run_ids: existing_run_ids
   )
-  run_id = run.fetch("databaseId").to_s
   watch_shakaperf_release_gate_run!(repo_slug: repo_slug, run: run)
 
-  puts "✓ ShakaPerf release gate passed: #{run['url'] || "GitHub Actions run #{run_id}"}"
+  puts "✓ ShakaPerf release gate passed: #{run['url'] || "GitHub Actions run #{run.fetch('databaseId')}"}"
 end
 
 def run_release_preflight_checks!(monorepo_root:, dry_run:)
@@ -1362,6 +1410,8 @@ Release CI policy:
   After pushing the version bump commit, the script runs the ShakaPerf RSC FOUC
   workflow_dispatch gate and waits for it before creating/pushing the tag and
   publishing npm packages or Ruby gems.
+  If that gate fails, the remote branch has the version-bump commit but no release
+  tag or published packages; retry from that commit or push a revert commit first.
   In-progress checks and failing gates block the release until they pass, or until you
   explicitly override via the 4th argument or RELEASE_CI_STATUS_OVERRIDE=true.
 

@@ -336,9 +336,12 @@ RSpec.describe "release.rake helper methods" do
           ignored_run_ids: ["999999"]
         )
         .and_return(run)
-      allow(self).to receive(:capture_gh_output)
-        .with("run", "watch", "123456", "--repo", repo_slug, "--exit-status")
-        .and_return(["", success_status])
+      allow(self).to receive(:capture_gh_output_with_timeout)
+        .with(
+          "run", "watch", "123456", "--repo", repo_slug, "--exit-status",
+          timeout_seconds: SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS
+        )
+        .and_return(["", success_status, false])
 
       expect do
         run_shakaperf_release_gate!(
@@ -362,8 +365,11 @@ RSpec.describe "release.rake helper methods" do
           head_sha: head_sha,
           ignored_run_ids: ["999999"]
         )
-      expect(self).to have_received(:capture_gh_output)
-        .with("run", "watch", "123456", "--repo", repo_slug, "--exit-status")
+      expect(self).to have_received(:capture_gh_output_with_timeout)
+        .with(
+          "run", "watch", "123456", "--repo", repo_slug, "--exit-status",
+          timeout_seconds: SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS
+        )
     end
 
     it "skips dispatching when the CI status override is enabled" do
@@ -436,9 +442,12 @@ RSpec.describe "release.rake helper methods" do
           ignored_run_ids: []
         )
         .and_return(run)
-      allow(self).to receive(:capture_gh_output)
-        .with("run", "watch", "123456", "--repo", repo_slug, "--exit-status")
-        .and_return(["Tests failed", failure_status])
+      allow(self).to receive(:capture_gh_output_with_timeout)
+        .with(
+          "run", "watch", "123456", "--repo", repo_slug, "--exit-status",
+          timeout_seconds: SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS
+        )
+        .and_return(["Tests failed", failure_status, false])
 
       expect do
         run_shakaperf_release_gate!(
@@ -470,9 +479,12 @@ RSpec.describe "release.rake helper methods" do
           ignored_run_ids: []
         )
         .and_return(run)
-      allow(Timeout).to receive(:timeout)
-        .with(SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS)
-        .and_raise(Timeout::Error)
+      allow(self).to receive(:capture_gh_output_with_timeout)
+        .with(
+          "run", "watch", "123456", "--repo", repo_slug, "--exit-status",
+          timeout_seconds: SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS
+        )
+        .and_return(["Still running", failure_status, true])
 
       expect do
         run_shakaperf_release_gate!(
