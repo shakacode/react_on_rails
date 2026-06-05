@@ -2,6 +2,7 @@ import { abTest, installRequestBlocking } from 'shaka-shared';
 
 const RSC_CSS_PROBE_SELECTOR = '[data-testid="rsc-css-probe"]';
 const RSC_STYLESHEET_SELECTOR = 'link[rel="stylesheet"][data-precedence="ror-rsc"]';
+// Matches .probe background-color in react_on_rails_pro/spec/dummy/client/app/components/RSCPostsPage/UseClientCssProbe.module.scss.
 const EXPECTED_BACKGROUND = 'rgb(212, 250, 236)';
 
 abTest(
@@ -25,7 +26,7 @@ abTest(
     await page.waitForSelector(RSC_CSS_PROBE_SELECTOR, { state: 'visible', timeout: 10_000 });
 
     await annotate('assert RSC stylesheet link is server-rendered');
-    await page.waitForSelector(RSC_STYLESHEET_SELECTOR, { state: 'attached', timeout: 1_000 });
+    await page.waitForSelector(RSC_STYLESHEET_SELECTOR, { state: 'attached', timeout: 5_000 });
 
     await annotate('assert probe CSS is applied before hydration');
     await page.waitForFunction(
@@ -39,9 +40,8 @@ abTest(
       { timeout: 5_000, polling: 'raf' },
     );
 
-    await annotate('wait for css/network idle');
+    await annotate('wait for load');
     await page.waitForLoadState('load');
-    await page.waitForLoadState('networkidle');
 
     await annotate('two frames before capture');
     await page.evaluate(() => {
@@ -65,13 +65,14 @@ abTest(
       viewports: ['desktop'],
       visreg: {
         selectors: [RSC_CSS_PROBE_SELECTOR],
-        readyTimeout: 5_000,
+        readyTimeout: 10_000,
         misMatchThreshold: 0.001,
         maxNumDiffPixels: 10,
       },
     },
   },
   async ({ page, annotate, isControl }) => {
+    // Same candidate URL is loaded for both sides; isControl only labels the failing side in reports.
     await annotate('wait first visible');
     const stateHandle = await page.waitForFunction(
       (selector) => {

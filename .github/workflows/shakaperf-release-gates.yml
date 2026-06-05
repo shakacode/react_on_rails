@@ -23,7 +23,8 @@ jobs:
       RAILS_ENV: test
       NODE_ENV: test
       SECRET_KEY_BASE: dummy-secret-key-base-for-shakaperf-rsc-fouc
-      SHAKAPERF_TARGET_URL: http://127.0.0.1:3030
+      SHAKAPERF_CONTROL_URL: http://127.0.0.1:3030
+      SHAKAPERF_EXPERIMENT_URL: http://127.0.0.1:3030
     steps:
       - uses: actions/checkout@v4
         with:
@@ -86,6 +87,15 @@ jobs:
           pnpm --filter react-on-rails-pro run build
           pnpm --filter react-on-rails-pro-node-renderer run build
 
+      - name: Check Pro license secret
+        env:
+          REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+        run: |
+          if [[ -z "${REACT_ON_RAILS_PRO_LICENSE}" ]]; then
+            echo "::error::REACT_ON_RAILS_PRO_LICENSE_V2 secret is not set; cannot run the Pro dummy app ShakaPerf gate"
+            exit 1
+          fi
+
       - name: Prepare Pro dummy app
         working-directory: react_on_rails_pro/spec/dummy
         env:
@@ -110,33 +120,50 @@ jobs:
 
           cd react_on_rails_pro/spec/dummy
           RENDERER_PORT=3800 pnpm run node-renderer > "$RUNNER_TEMP/shakaperf-logs/node-renderer.log" 2>&1 &
-          echo "$!" > "$RUNNER_TEMP/shakaperf-node-renderer.pid"
+          node_renderer_pid="$!"
+          echo "$node_renderer_pid" > "$RUNNER_TEMP/shakaperf-node-renderer.pid"
 
           PORT=3030 REACT_RENDERER_URL=http://127.0.0.1:3800 bundle exec rails s -b 127.0.0.1 -p 3030 \
             > "$RUNNER_TEMP/shakaperf-logs/rails.log" 2>&1 &
-          echo "$!" > "$RUNNER_TEMP/shakaperf-rails.pid"
+          rails_pid="$!"
+          echo "$rails_pid" > "$RUNNER_TEMP/shakaperf-rails.pid"
 
           for attempt in {1..60}; do
             echo "Waiting for RSC FOUC probe server (${attempt}/60)..."
-            if curl -fsS "$SHAKAPERF_TARGET_URL/rsc_posts_page_over_http" > /dev/null; then
+            if curl -fsS "$SHAKAPERF_CONTROL_URL/rsc_posts_page_over_http" > /dev/null; then
               exit 0
             fi
+
+            if ! kill -0 "$rails_pid" 2>/dev/null; then
+              echo "::error::Rails server died before becoming ready"
+              tail -n 100 "$RUNNER_TEMP/shakaperf-logs/rails.log" || true
+              exit 1
+            fi
+
+            if ! kill -0 "$node_renderer_pid" 2>/dev/null; then
+              echo "::error::Node renderer died before becoming ready"
+              tail -n 100 "$RUNNER_TEMP/shakaperf-logs/node-renderer.log" || true
+              exit 1
+            fi
+
             sleep 2
           done
 
-          echo "::error::Timed out waiting for $SHAKAPERF_TARGET_URL/rsc_posts_page_over_http"
+          echo "::error::Timed out waiting for $SHAKAPERF_CONTROL_URL/rsc_posts_page_over_http"
           tail -n 200 "$RUNNER_TEMP/shakaperf-logs/node-renderer.log" || true
           tail -n 200 "$RUNNER_TEMP/shakaperf-logs/rails.log" || true
           exit 1
 
       - name: Run RSC FOUC ShakaPerf gate
         run: |
+          # This release gate compares the candidate app with itself. The assertions
+          # in the abtest are absolute, so they fail even when both sides are broken.
           pnpm exec shaka-perf compare \
             --categories visreg \
             --config test/shakaperf/rsc-fouc/abtests.config.ts \
             --filter test/shakaperf/rsc-fouc/ab-tests/rsc-fouc-release-gate.abtest.ts \
-            --controlURL "$SHAKAPERF_TARGET_URL" \
-            --experimentURL "$SHAKAPERF_TARGET_URL" \
+            --controlURL "$SHAKAPERF_CONTROL_URL" \
+            --experimentURL "$SHAKAPERF_EXPERIMENT_URL" \
             --full-report-zip
 
       - name: Upload ShakaPerf report

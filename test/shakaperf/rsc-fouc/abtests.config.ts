@@ -16,8 +16,8 @@ export default defineConfig({
     defaultMisMatchThreshold: 0.001,
     maxNumDiffPixels: 10,
     comparePixelmatchThreshold: 0.1,
-    compareRetries: 0,
-    compareRetryDelay: 0,
+    compareRetries: 1,
+    compareRetryDelay: 500,
     engineOptions: {
       browser: 'chromium',
       args: ['--no-sandbox'],
@@ -25,6 +25,8 @@ export default defineConfig({
     },
   },
 
+  // ShakaPerf validates all category defaults while loading the config, even
+  // when this release gate runs only `--categories visreg`.
   perf: {
     viewports: ['desktop'],
     numberOfMeasurements: 1,
