@@ -91,7 +91,10 @@ module ReactOnRails
 
               const fileContainsAll = (filePath, tokens) => {
                 try {
-                  return existsSync(filePath) && tokens.every((token) => readFileSync(filePath, 'utf8').includes(token));
+                  if (!existsSync(filePath)) return false;
+
+                  const content = readFileSync(filePath, 'utf8');
+                  return tokens.every((token) => content.includes(token));
                 } catch {
                   return false;
                 }
@@ -201,17 +204,28 @@ module ReactOnRails
           # plugin-import-only path and let downstream callers honor the scoped/unscoped
           # state of whatever the user already wrote.
           if rsc_client_references_defined?(content)
-            return :failed unless inject_rsc_webpack_plugin_import(config_path, content, is_server: is_server)
-            return :scoped if scoped_rsc_client_references_defined?(content)
-
-            warn_unscoped_rsc_client_references_helper(config_path)
-            return :unscoped
+            return prepare_existing_rsc_client_references_plugin_import(config_path, content, is_server: is_server)
           end
 
           return :failed unless inject_rsc_imports(config_path, content, existing_imports_content, is_server: is_server)
           return :scoped if rsc_client_references_setup_ready?(config_path, plugin_pending: true)
 
           :failed
+        end
+
+        def prepare_existing_rsc_client_references_plugin_import(config_path, content, is_server:)
+          return :failed unless inject_rsc_webpack_plugin_import(config_path, content, is_server: is_server)
+
+          content = read_current_rsc_config(config_path, fallback: content)
+          if object_literal_rsc_client_references_defined?(content)
+            return :failed unless replace_legacy_rsc_client_references_setup(config_path, content)
+
+            content = read_current_rsc_config(config_path, fallback: content)
+          end
+          return :scoped if generated_rsc_client_references_defined?(content)
+
+          warn_unscoped_rsc_client_references_helper(config_path)
+          :unscoped
         end
 
         def inject_rsc_imports(config_path, content, existing_imports_content, is_server:)
@@ -311,7 +325,11 @@ module ReactOnRails
         end
 
         def ensure_rsc_client_references_setup(config_path, content, is_server:)
-          return true if scoped_rsc_client_references_defined?(content)
+          return true if generated_rsc_client_references_defined?(content)
+
+          if object_literal_rsc_client_references_defined?(content)
+            return replace_legacy_rsc_client_references_setup_ready?(config_path, content)
+          end
 
           if rsc_client_references_defined?(content)
             warn_unscoped_rsc_client_references_helper(config_path)
@@ -334,8 +352,15 @@ module ReactOnRails
           rsc_client_references_setup_ready?(config_path)
         end
 
+        def replace_legacy_rsc_client_references_setup_ready?(config_path, content)
+          return false unless replace_legacy_rsc_client_references_setup(config_path, content)
+          return true if options[:skip]
+
+          rsc_client_references_setup_ready?(config_path)
+        end
+
         def rsc_plugin_uses_scoped_client_references?(content, is_server:)
-          scoped_rsc_client_references_defined?(content) &&
+          generated_rsc_client_references_defined?(content) &&
             rsc_plugin_references_scoped_client_references?(content, is_server: is_server)
         end
 
@@ -1166,6 +1191,21 @@ module ReactOnRails
           end
         end
 
+        def replace_legacy_rsc_client_references_setup(config_path, content)
+          range_start, range_end = scoped_object_literal_range(content, "rscClientReferences")
+          return false unless range_start
+
+          updated_content = content.dup
+          updated_content[range_start...range_end] = rsc_client_references_js
+          write_existing_rsc_config(config_path, updated_content, action: :rewrite)
+        end
+
+        def read_current_rsc_config(config_path, fallback:)
+          return fallback if options[:pretend] || options[:skip]
+
+          File.read(File.join(destination_root, config_path))
+        end
+
         def replace_rsc_client_references_setup_anchor(config_path, content, is_server:)
           anchor_match = rsc_client_references_setup_anchor_match(content, is_server: is_server)
           return unless anchor_match
@@ -1295,19 +1335,29 @@ module ReactOnRails
         end
 
         def scoped_object_literal_defined?(content, variable_name)
+          !!scoped_object_literal_range(content, variable_name)
+        end
+
+        def scoped_object_literal_range(content, variable_name)
           decl_pattern = /^[ \t]*(?:const|let|var)\s+#{Regexp.escape(variable_name)}\s*=\s*\{/
-          content.to_enum(:scan, decl_pattern).any? do
+          content.to_enum(:scan, decl_pattern).each do
             match = Regexp.last_match
-            next false unless js_top_level_position?(content, match.begin(0))
+            next unless js_top_level_position?(content, match.begin(0))
 
             open_brace = match.end(0) - 1
             close_brace = matching_js_closing_brace(content, open_brace)
-            next false unless close_brace
+            next unless close_brace
 
             body = content[(open_brace + 1)...close_brace]
-            rsc_plugin_options_without_comments(body)
-              .match?(/\bdirectory\s*:\s*resolve\(\s*config\.source_path\s*\)/)
+            stripped_body = rsc_plugin_options_without_comments(body)
+            next unless stripped_body.match?(/\bdirectory\s*:\s*resolve\(\s*config\.source_path\s*\)/)
+
+            range_end = close_brace + 1
+            range_end += 1 if content[range_end] == ";"
+            return [match.begin(0), range_end]
           end
+
+          nil
         end
 
         # Inclusive slice — the anchor itself is part of the returned content because callers
@@ -1451,7 +1501,7 @@ module ReactOnRails
           # output) instead.
           return true if options[:pretend]
           return true if options[:skip]
-          return true if scoped_rsc_client_references_defined?(File.read(File.join(destination_root, config_path)))
+          return true if generated_rsc_client_references_defined?(File.read(File.join(destination_root, config_path)))
 
           warn_rsc_client_references_injection_failed(config_path, plugin_pending: plugin_pending)
           false

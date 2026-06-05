@@ -1165,7 +1165,7 @@ describe RscGenerator, type: :generator do
       )
     end
 
-    it "does not duplicate an existing scoped rscClientReferences helper on the fresh-install path" do
+    it "upgrades an existing broad rscClientReferences helper on the fresh-install path" do
       config_path = "config/webpack/clientWebpackConfig.js"
       simulate_existing_file(
         config_path,
@@ -1194,12 +1194,56 @@ describe RscGenerator, type: :generator do
 
       migrated_content = File.read(File.join(destination_root, config_path))
       expect(migrated_content.scan("const rscClientReferences").length).to eq(1)
+      expect(migrated_content).to include("const fallbackRscClientReferences = {")
+      expect(migrated_content).to include("const rscClientReferences = (() => {")
       expect(migrated_content).to include(
         "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');"
       )
       expect(migrated_content).to include(
         "new RSCWebpackPlugin({ isServer: false, clientReferences: rscClientReferences })"
       )
+    end
+
+    it "upgrades an existing broad helper when the plugin already references rscClientReferences" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { config } = require('shakapacker');
+          const { resolve } = require('path');
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const rscClientReferences = {
+            directory: resolve(config.source_path),
+            recursive: true,
+            include: /\\.(js|mjs|cjs|ts|mts|cts|jsx|tsx)$/,
+          };
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(
+              new RSCWebpackPlugin({
+                isServer: false,
+                clientReferences: rscClientReferences,
+              }),
+            );
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      content = File.read(File.join(destination_root, config_path))
+      generator.send(:update_existing_rsc_webpack_config, config_path, content, is_server: false)
+
+      migrated_content = File.read(File.join(destination_root, config_path))
+      expect(migrated_content.scan("const rscClientReferences").length).to eq(1)
+      expect(migrated_content).to include("const fallbackRscClientReferences = {")
+      expect(migrated_content).to include("const rscClientReferences = (() => {")
+      expect(migrated_content).to include("clientReferences: rscClientReferences")
     end
 
     it "warns and skips wiring an existing unscoped rscClientReferences helper on the fresh-install path" do
@@ -1596,7 +1640,7 @@ describe RscGenerator, type: :generator do
       expect(generator.send(:rsc_plugin_uses_scoped_client_references?, content, is_server: false)).to be(false)
     end
 
-    it "treats a server plugin with scoped client references as already migrated" do
+    it "does not treat a legacy broad helper as already manifest-backed" do
       content = <<~JS
         const { config } = require('shakapacker');
         const { resolve } = require('path');
@@ -1605,6 +1649,30 @@ describe RscGenerator, type: :generator do
           recursive: true,
           include: /\\.(js|ts|jsx|tsx)$/,
         };
+        serverWebpackConfig.plugins.push(
+          new RSCWebpackPlugin({
+            isServer: true,
+            clientReferences: rscClientReferences,
+          }),
+        );
+      JS
+
+      expect(generator.send(:rsc_plugin_uses_scoped_client_references?, content, is_server: true)).to be(false)
+      expect(generator.send(:scoped_rsc_client_references_defined?, content)).to be(true)
+    end
+
+    it "treats a server plugin with manifest-backed client references as already migrated" do
+      content = <<~JS
+        const { config } = require('shakapacker');
+        const { resolve } = require('path');
+        const fallbackRscClientReferences = {
+          directory: resolve(config.source_path),
+          recursive: true,
+          include: /\\.(js|ts|jsx|tsx)$/,
+        };
+        const rscClientReferences = (() => {
+          return [fallbackRscClientReferences];
+        })();
         serverWebpackConfig.plugins.push(
           new RSCWebpackPlugin({
             isServer: true,
@@ -2922,6 +2990,7 @@ describe RscGenerator, type: :generator do
         expect(content).to include("rscConfigSupportsDiscovery")
         expect(content).to include("config/webpack/rscWebpackConfig.js")
         expect(content).to include("bin/shakapacker-precompile-hook")
+        expect(content).to include("const content = readFileSync(filePath, 'utf8');")
         expect(content).to include("falling back to broad client")
         expect(content).to include("reference scan. Re-run rails g react_on_rails:rsc")
         expect(content).to include("Array.isArray(payload.refs)")
@@ -2949,7 +3018,7 @@ describe RscGenerator, type: :generator do
         # The fallback resolves to an array, exactly like the manifest path (payload.refs) and the
         # Pro dummy mirror's DEFAULT_CLIENT_REFERENCES, so clientReferences always receives an array
         # regardless of which branch the cascade returns from (mirror parity).
-        expect(content).to include("return [fallbackRscClientReferences];")
+        expect(content.scan("return [fallbackRscClientReferences];").length).to eq(3)
         # Pin the include extension set byte-for-byte in lockstep with the Pro dummy mirror.
         expect(content).to include("/\\.(js|mjs|cjs|ts|mts|cts|jsx|tsx)$/")
       end

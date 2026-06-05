@@ -176,13 +176,16 @@ RSpec.describe "Shakapacker precompile hook shared script" do
       allow(Dir).to receive(:chdir).and_yield
       allow(self).to receive(:puts)
       allow(self).to receive(:warn)
-      allow(self).to receive(:system).and_raise(RuntimeError.new("discovery build failed"))
+      discovery_error = RuntimeError.new("discovery build failed")
+      discovery_error.set_backtrace(["bin/shakapacker:12", "config/webpack/rscWebpackConfig.js:4"])
+      allow(self).to receive(:system).and_raise(discovery_error)
 
       with_env("RSC_REFERENCE_DISCOVERY_BUILD" => nil) do
         expect { generate_rsc_manifest_client_references_if_needed }.to raise_error(SystemExit)
       end
 
       expect(self).to have_received(:warn).with(/RSC manifest client reference generation failed/)
+      expect(self).to have_received(:warn).with("bin/shakapacker:12\nconfig/webpack/rscWebpackConfig.js:4")
     end
 
     it "clears client/server bundle-only env vars for the nested discovery build" do

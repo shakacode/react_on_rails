@@ -84,9 +84,10 @@ function warnIfManifestStale(refsJson) {
 
 function fileContainsAll(filePath, tokens) {
   try {
-    return (
-      fs.existsSync(filePath) && tokens.every((token) => fs.readFileSync(filePath, 'utf8').includes(token))
-    );
+    if (!fs.existsSync(filePath)) return false;
+
+    const content = fs.readFileSync(filePath, 'utf8');
+    return tokens.every((token) => content.includes(token));
   } catch {
     return false;
   }

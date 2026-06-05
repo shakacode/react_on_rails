@@ -148,6 +148,9 @@ describe('rscManifestClientReferences (Pro dummy) mirrors the generator resoluti
     expect(() => rscManifestClientReferences()).toThrow(
       /Run bin\/shakapacker-precompile-hook before bin\/shakapacker/,
     );
+    expect(fs.readFileSync).toHaveBeenCalledTimes(2);
+    expect(fs.readFileSync).toHaveBeenCalledWith(path.resolve('config/webpack/rscWebpackConfig.js'), 'utf8');
+    expect(fs.readFileSync).toHaveBeenCalledWith(path.resolve('bin/shakapacker-precompile-hook'), 'utf8');
   });
 
   it('falls back with a warning when existing RSC configs cannot produce the discovery manifest', () => {

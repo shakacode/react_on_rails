@@ -219,6 +219,7 @@ def generate_rsc_manifest_client_references_if_needed
 # above, so any failure here (including Errno::ENOENT) is a real error, not a benign "tool missing".
 rescue StandardError => e
   warn "❌ RSC manifest client reference generation failed: #{e.message}"
+  warn e.backtrace.first(5).join("\n") if e.backtrace
   exit 1
 end
 
