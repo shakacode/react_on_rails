@@ -1,11 +1,9 @@
-import type {
-  ReactComponentOrRenderFunction,
-  RegisteredComponent,
-  RegisteredComponentValue,
-} from './types/index.ts';
+import type { RegisteredComponent, RegisteredComponentValue } from './types/index.ts';
 import isRenderFunction from './isRenderFunction.ts';
 
-const registeredComponents = new Map<string, RegisteredComponent>();
+type RegisteredComponentEntry = RegisteredComponent<RegisteredComponentValue>;
+
+const registeredComponents = new Map<string, RegisteredComponentEntry>();
 
 export default {
   /**
@@ -33,7 +31,7 @@ export default {
 
       registeredComponents.set(name, {
         name,
-        component: component as ReactComponentOrRenderFunction,
+        component,
         renderFunction,
         isRenderer,
       });
@@ -44,7 +42,7 @@ export default {
    * @param name
    * @returns { name, component, renderFunction, isRenderer }
    */
-  get(name: string): RegisteredComponent {
+  get(name: string): RegisteredComponentEntry {
     const registeredComponent = registeredComponents.get(name);
     if (registeredComponent !== undefined) {
       return registeredComponent;
@@ -60,7 +58,7 @@ Registered component names include [ ${keys} ]. Maybe you forgot to register the
    * @returns Map where key is the component name and values are the
    * { name, component, renderFunction, isRenderer}
    */
-  components(): Map<string, RegisteredComponent> {
+  components(): Map<string, RegisteredComponentEntry> {
     return registeredComponents;
   },
 

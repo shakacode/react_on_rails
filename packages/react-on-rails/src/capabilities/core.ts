@@ -21,11 +21,13 @@ const DEFAULT_OPTIONS = {
   logComponentRegistration: false,
 };
 
+type RegisteredComponentEntry = RegisteredComponent<RegisteredComponentValue>;
+
 export interface Registries {
   ComponentRegistry: {
     register: (components: Record<string, RegisteredComponentValue>) => void;
-    get: (name: string) => RegisteredComponent;
-    components: () => Map<string, RegisteredComponent>;
+    get: (name: string) => RegisteredComponentEntry;
+    components: () => Map<string, RegisteredComponentEntry>;
   };
   StoreRegistry: {
     register: (storeGenerators: Record<string, StoreGenerator>) => void;
@@ -177,11 +179,11 @@ export function createCoreCapability(registries: Registries) {
       StoreRegistry.clearHydratedStores();
     },
 
-    getComponent(name: string): RegisteredComponent {
+    getComponent(name: string): RegisteredComponentEntry {
       return ComponentRegistry.get(name);
     },
 
-    registeredComponents(): Map<string, RegisteredComponent> {
+    registeredComponents(): Map<string, RegisteredComponentEntry> {
       return ComponentRegistry.components();
     },
 
@@ -241,7 +243,7 @@ export function createCoreCapability(registries: Registries) {
     // PRO STUBS — overridden by Pro capabilities in react-on-rails-pro
     // ===================================================================
 
-    getOrWaitForComponent(): Promise<RegisteredComponent> {
+    getOrWaitForComponent(): Promise<RegisteredComponentEntry> {
       throw new Error('getOrWaitForComponent requires the react-on-rails-pro package.');
     },
 

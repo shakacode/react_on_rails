@@ -96,6 +96,10 @@ export default function createReactOutput({
       throw new Error(unsupportedManualRendererMessage(name));
     }
 
+    if (typeof component !== 'function') {
+      throw new Error(`Registered render function "${name}" must be a function.`);
+    }
+
     const renderFunctionResult = (component as RenderFunction)(props, railsContext);
     // Defense-in-depth: a 2-argument render function isn't expected to return a teardown wrapper, but
     // the public RenderFunction return type can't structurally exclude it, so reject that at runtime too.
@@ -126,6 +130,10 @@ export default function createReactOutput({
 
     return createReactElementFromRenderFunctionResult(renderFunctionResult, name, props);
   }
-  // else
+
+  if (typeof component !== 'function' && typeof component !== 'string') {
+    throw new Error(`Registered component "${name}" must be a function or string component.`);
+  }
+
   return createElement(component as ReactComponent, props);
 }

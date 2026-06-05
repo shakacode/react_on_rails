@@ -27,11 +27,13 @@ const DEFAULT_OPTIONS = {
   logComponentRegistration: false,
 };
 
+type RegisteredComponentEntry = RegisteredComponent<RegisteredComponentValue>;
+
 interface Registries {
   ComponentRegistry: {
     register: (components: Record<string, RegisteredComponentValue>) => void;
-    get: (name: string) => RegisteredComponent;
-    components: () => Map<string, RegisteredComponent>;
+    get: (name: string) => RegisteredComponentEntry;
+    components: () => Map<string, RegisteredComponentEntry>;
   };
   StoreRegistry: {
     register: (storeGenerators: Record<string, StoreGenerator>) => void;
@@ -257,11 +259,11 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
       StoreRegistry.clearHydratedStores();
     },
 
-    getComponent(name: string): RegisteredComponent {
+    getComponent(name: string): RegisteredComponentEntry {
       return ComponentRegistry.get(name);
     },
 
-    registeredComponents(): Map<string, RegisteredComponent> {
+    registeredComponents(): Map<string, RegisteredComponentEntry> {
       return ComponentRegistry.components();
     },
 

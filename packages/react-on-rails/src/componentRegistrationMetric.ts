@@ -6,7 +6,7 @@ type RegistrationMetric = {
 };
 
 export default function componentRegistrationMetric(component: RegisteredComponentValue): RegistrationMetric {
-  if (typeof component === 'function' || typeof component === 'string') {
+  if (typeof component === 'function') {
     return { label: 'source chars', value: component.toString().length };
   }
 

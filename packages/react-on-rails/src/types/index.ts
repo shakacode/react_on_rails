@@ -342,7 +342,7 @@ export interface RSCRenderParams extends Omit<RenderParams, 'railsContext'> {
 }
 
 export interface CreateParams extends Params {
-  componentObj: RegisteredComponent;
+  componentObj: RegisteredComponent<RegisteredComponentValue>;
   shouldHydrate?: boolean;
 }
 
@@ -542,12 +542,12 @@ export interface ReactOnRailsInternal extends ReactOnRails {
    * Get the component that you registered
    * @returns {name, component, renderFunction, isRenderer}
    */
-  getComponent(name: string): RegisteredComponent;
+  getComponent(name: string): RegisteredComponent<RegisteredComponentValue>;
   /**
    * Get the component that you registered, or wait for it to be registered
    * @returns {name, component, renderFunction, isRenderer}
    */
-  getOrWaitForComponent(name: string): Promise<RegisteredComponent>;
+  getOrWaitForComponent(name: string): Promise<RegisteredComponent<RegisteredComponentValue>>;
   /**
    * Used by server rendering by Rails
    */
@@ -587,7 +587,7 @@ export interface ReactOnRailsInternal extends ReactOnRails {
   /**
    * Get a Map containing all registered components. Useful for debugging.
    */
-  registeredComponents(): Map<string, RegisteredComponent>;
+  registeredComponents(): Map<string, RegisteredComponent<RegisteredComponentValue>>;
   /**
    * Get a Map containing all registered store generators. Useful for debugging.
    */
