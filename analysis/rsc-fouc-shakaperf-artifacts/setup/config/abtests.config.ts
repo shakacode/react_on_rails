@@ -41,7 +41,13 @@ const parseArtifactParallelism = (value: string | undefined) => {
 const CONFIGURED_PARALLELISM = parseArtifactParallelism(process.env.SHAKAPERF_ARTIFACT_PARALLELISM);
 const DEFAULT_PARALLELISM = Math.max(1, Math.floor(os.availableParallelism() / 2));
 const PARALLELISM = CONFIGURED_PARALLELISM ?? DEFAULT_PARALLELISM;
-const CHROMIUM_ARGS = process.env.SHAKAPERF_CHROMIUM_NO_SANDBOX === 'true' ? ['--no-sandbox'] : [];
+const NO_SANDBOX_RAW = process.env.SHAKAPERF_CHROMIUM_NO_SANDBOX;
+if (NO_SANDBOX_RAW !== undefined && NO_SANDBOX_RAW !== 'true' && NO_SANDBOX_RAW !== '') {
+  console.warn(
+    `[shakaperf] SHAKAPERF_CHROMIUM_NO_SANDBOX="${NO_SANDBOX_RAW}" is not "true"; --no-sandbox will NOT be added. Set it to exactly "true" to enable.`,
+  );
+}
+const CHROMIUM_ARGS = NO_SANDBOX_RAW === 'true' ? ['--no-sandbox'] : [];
 
 export const rscFoucShakaPerfConfig = {
   shared: {
