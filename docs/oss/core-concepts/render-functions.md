@@ -147,6 +147,8 @@ This and other promise options below are only available in React on Rails Pro wi
 
 > **React on Rails note:** Async render functions should still receive application data from Rails as regular props. For streaming slow props behind Suspense boundaries, React on Rails Pro async props inject `getReactOnRailsAsyncProp` when the Rails view uses `stream_react_component_with_async_props`. That streaming setup requires the controller to `include ReactOnRailsPro::Stream`, render via `stream_view_containing_react_components`, and set `config.enable_rsc_support = true`. Keep authorization, database access, and cache-aware loading in Rails rather than fetching inside the render function. See [RSC data fetching](../migrating/rsc-data-fetching.md).
 
+The `async` keyword is intentional in these examples: it makes the render function return a Promise so the Pro Node renderer can await the resolved string, hash, or component return value. The data is still prepared by Rails and read from props.
+
 ```jsx
 const MyComponent = async (props, _railsContext) => {
   const data = props.data;
