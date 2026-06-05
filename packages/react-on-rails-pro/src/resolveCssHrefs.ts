@@ -15,9 +15,9 @@
 /**
  * Structural view of the RSC client manifest, narrowed to the fields needed to
  * resolve stylesheet hrefs. The `css` array on each module entry is published by
- * the patched `react-server-dom-webpack-plugin` (see
- * `patches/react-on-rails-rsc@19.0.4.patch`); it is absent on unpatched
- * manifests, which `resolveCssHrefs` treats as "no CSS".
+ * `react-server-dom-webpack-plugin` as of `react-on-rails-rsc@19.0.5-rc.6`; it is
+ * absent on manifests produced by builds that predate that fix, which
+ * `resolveCssHrefs` treats as "no CSS".
  */
 type RscCssModuleEntry = {
   css?: string[];
@@ -34,6 +34,14 @@ export type RscCssManifest = {
 const joinPrefix = (prefix: string, file: string): string => {
   if (!prefix) return file;
   const base = prefix.endsWith('/') ? prefix.slice(0, -1) : prefix;
+  if (
+    file === base ||
+    file.startsWith(`${base}/`) ||
+    /^[a-z][a-z\d+\-.]*:\/\//i.test(file) ||
+    file.startsWith('//')
+  ) {
+    return file;
+  }
   const rel = file.startsWith('/') ? file.slice(1) : file;
   return `${base}/${rel}`;
 };
@@ -45,8 +53,10 @@ const joinPrefix = (prefix: string, file: string): string => {
  * manifest, not the client references encountered by a specific RSC payload.
  *
  * Each href is prefixed with `moduleLoading.prefix` (so CDN / non-default
- * `publicPath` deployments get fully-qualified hrefs), deduped, and returned in
- * manifest/chunk order.
+ * `publicPath` deployments get fully-qualified hrefs) unless it is already
+ * absolute (`scheme://` or protocol-relative `//`) or already begins with that
+ * prefix, in which case it is returned unchanged to avoid double-prefixing.
+ * Hrefs are deduped and returned in manifest/chunk order.
  */
 export default function resolveCssHrefs(manifest: RscCssManifest): string[] {
   const prefix = manifest.moduleLoading?.prefix ?? '';

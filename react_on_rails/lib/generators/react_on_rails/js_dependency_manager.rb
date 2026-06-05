@@ -140,9 +140,10 @@ module ReactOnRails
         react-on-rails-rsc
       ].freeze
 
-      # RSC package releases follow the React 19.0.x line (independent from gem versioning).
+      # React stays on the supported 19.0.x range; react-on-rails-rsc may lead it during RC rollouts.
+      # TODO: Re-align RSC_REACT_VERSION_RANGE after react-on-rails-rsc@19.0.5 stable ships.
       RSC_REACT_VERSION_RANGE = "~19.0.4"
-      RSC_PACKAGE_VERSION_PIN = "19.0.4"
+      RSC_PACKAGE_VERSION_PIN = "19.0.5-rc.6"
 
       private
 
