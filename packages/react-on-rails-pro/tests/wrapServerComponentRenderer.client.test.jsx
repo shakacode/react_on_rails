@@ -107,7 +107,7 @@ describe('wrapServerComponentRenderer/client validation (issue #3647)', () => {
 
   it('rejects a render function that resolves to a renderer teardown result', async () => {
     const { wrapServerComponentRenderer } = loadWrappedRendererWithMocks();
-    const renderFunction = (_props, _railsContext) => ({ teardown: jest.fn() });
+    const renderFunction = (_props, _railsContext, _domNodeId) => ({ teardown: jest.fn() });
     const WrappedComponent = wrapServerComponentRenderer(renderFunction, 'TeardownResultComponent');
 
     await expect(WrappedComponent({}, railsContext, 'any-dom-id')).rejects.toThrow(
