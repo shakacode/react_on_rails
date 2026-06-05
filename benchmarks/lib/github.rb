@@ -9,6 +9,13 @@ module Github
   end
 
   def warning(message)
-    $stdout.puts "::warning::#{message}"
+    $stdout.puts "::warning::#{escape_workflow_command_data(message)}"
+  end
+
+  def escape_workflow_command_data(value)
+    value.to_s
+         .gsub("%", "%25")
+         .gsub("\r", "%0D")
+         .gsub("\n", "%0A")
   end
 end

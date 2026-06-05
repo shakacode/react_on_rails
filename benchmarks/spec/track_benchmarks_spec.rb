@@ -95,6 +95,11 @@ RSpec.describe "track_benchmarks" do
         .and output("").to_stderr
     end
 
+    it "escapes workflow command data so multiline messages stay in one annotation" do
+      expect { Github.warning("first line\n100% reproducible\r\nsecond line") }
+        .to output("::warning::first line%0A100%25 reproducible%0D%0Asecond line\n").to_stdout
+    end
+
     it "emits display sidecar warnings to stdout so GitHub Actions annotates them" do
       allow(File).to receive(:exist?).with(DISPLAY_JSON).and_return(true)
       allow(File).to receive(:read).with(DISPLAY_JSON).and_return(JSON.generate({ "not" => "an array" }))

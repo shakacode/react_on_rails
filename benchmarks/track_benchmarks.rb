@@ -196,7 +196,10 @@ def delete_stale_report_comments(before:)
   end
   return if failed.zero?
 
-  Github.warning("Failed to delete #{failed} stale #{SUITE_NAME} Bencher report comment(s); they may remain visible.")
+  Github.warning(
+    "Failed to delete #{failed} stale #{SUITE_NAME} Bencher report comment(s); " \
+    "they may remain visible."
+  )
 end
 
 def replace_pr_comments(markdown)
