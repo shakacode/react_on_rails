@@ -6,9 +6,9 @@ type RegistrationMetric = {
 };
 
 export default function componentRegistrationMetric(component: RegisteredComponentValue): RegistrationMetric {
-  if (typeof component === 'function') {
+  if (typeof component === 'function' || typeof component === 'string') {
     return { label: 'source chars', value: component.toString().length };
   }
 
-  return { label: 'export keys', value: Object.keys(component as object).length };
+  return { label: 'export keys', value: Object.keys(component).length };
 }

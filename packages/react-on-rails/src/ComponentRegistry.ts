@@ -1,4 +1,8 @@
-import type { RegisteredComponent, RegisteredComponentValue } from './types/index.ts';
+import type {
+  ReactComponentOrRenderFunction,
+  RegisteredComponent,
+  RegisteredComponentValue,
+} from './types/index.ts';
 import isRenderFunction from './isRenderFunction.ts';
 
 const registeredComponents = new Map<string, RegisteredComponent>();
@@ -29,7 +33,7 @@ export default {
 
       registeredComponents.set(name, {
         name,
-        component,
+        component: component as ReactComponentOrRenderFunction,
         renderFunction,
         isRenderer,
       });

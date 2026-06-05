@@ -420,7 +420,8 @@ module ReactOnRails
       relative_path_to_generated_server_bundle = relative_path(source_entrypoint, generated_server_bundle_file_path)
       relative_import_path_to_generated_server_bundle = relative_import_path(source_entrypoint,
                                                                              generated_server_bundle_file_path)
-      generated_server_bundle_import_statement = "import '#{relative_import_path_to_generated_server_bundle}';"
+      import_path_to_generated_server_bundle = generated_server_bundle_import_path(source_entrypoint)
+      generated_server_bundle_import_statement = "import '#{import_path_to_generated_server_bundle}';"
       if SERVER_BUNDLE_IMPORT_EXTENSION_COMMENT_EXTENSIONS.include?(File.extname(source_entrypoint))
         generated_server_bundle_import_statement += " // eslint-disable-line import/extensions"
       end
@@ -434,6 +435,7 @@ module ReactOnRails
       generated_server_bundle_import_regex = /
         import\s+['"]
         (?:#{Regexp.union(relative_import_path_to_generated_server_bundle,
+                          import_path_to_generated_server_bundle,
                           legacy_relative_import_path_to_generated_server_bundle).source})
         ['"]
       /x
@@ -633,6 +635,7 @@ module ReactOnRails
     def resolve_server_bundle_source_entrypoint(configured_entrypoint)
       return configured_entrypoint if File.exist?(configured_entrypoint)
 
+      # Strip the existing extension when present; bare paths keep the full base and probe all extensions.
       base_path = configured_entrypoint.sub(%r{\.[^./]+\z}, "")
       server_bundle_source_extensions_for(configured_entrypoint).each do |extension|
         candidate_entrypoint = "#{base_path}#{extension}"
@@ -647,6 +650,13 @@ module ReactOnRails
       return SERVER_BUNDLE_SOURCE_EXTENSIONS if configured_extension.empty?
 
       SERVER_BUNDLE_SOURCE_EXTENSIONS.reject { |extension| extension == configured_extension }
+    end
+
+    def generated_server_bundle_import_path(source_entrypoint)
+      import_path = relative_import_path(source_entrypoint, generated_server_bundle_file_path).to_s
+      return import_path.delete_suffix(".js") if File.extname(source_entrypoint) == ".js"
+
+      import_path
     end
 
     def generated_packs_directory_path

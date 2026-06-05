@@ -15,6 +15,7 @@ function hydrateOrRender(shouldHydrate: boolean): DomRenderer {
       return;
     }
 
+    // hydrateRoot renders eagerly from its second argument; createRoot needs a later render call.
     const root = shouldHydrate
       ? ReactDOMClient.hydrateRoot(domNode, element)
       : ReactDOMClient.createRoot(domNode);

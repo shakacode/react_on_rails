@@ -782,10 +782,14 @@ module ReactOnRails
 
       it "adds a single import statement to the server bundle" do
         test_string = "// import statement added by react_on_rails:generate_packs"
+        generated_import = "import '../generated/server-bundle-generated';"
         same_instance = described_class.instance
         File.truncate(server_bundle_js_file_path, 0)
         same_instance.generate_packs_if_stale
-        expect(File.read(server_bundle_js_file_path).scan(/(?=#{test_string})/).count).to equal(1)
+        server_bundle_content = File.read(server_bundle_js_file_path)
+        expect(server_bundle_content.scan(/(?=#{test_string})/).count).to equal(1)
+        expect(server_bundle_content).to include(generated_import)
+        expect(server_bundle_content).not_to include("import '../generated/server-bundle-generated.js';")
         # the following expectation checks that an additional import statement is not added if one already exists
         same_instance.generate_packs_if_stale
         expect(File.read(server_bundle_js_file_path).scan(/(?=#{test_string})/).count).to equal(1)
@@ -1690,6 +1694,19 @@ module ReactOnRails
                                                           configured_entrypoint)
 
         expect(source_extensions).to eq(described_class::SERVER_BUNDLE_SOURCE_EXTENSIONS)
+      end
+
+      it "uses the first matching source extension when the configured entrypoint has no extension" do
+        configured_entrypoint = File.join(@tmpdir, "server-bundle")
+        javascript_entrypoint = File.join(@tmpdir, "server-bundle.js")
+        typescript_entrypoint = File.join(@tmpdir, "server-bundle.ts")
+        File.write(javascript_entrypoint, "")
+        File.write(typescript_entrypoint, "")
+
+        resolved_entrypoint = described_class.instance.send(:resolve_server_bundle_source_entrypoint,
+                                                            configured_entrypoint)
+
+        expect(resolved_entrypoint).to eq(javascript_entrypoint)
       end
     end
 

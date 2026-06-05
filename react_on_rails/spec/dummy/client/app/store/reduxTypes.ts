@@ -3,19 +3,19 @@ import type { Store } from 'redux';
 
 import type { HELLO_WORLD_NAME_UPDATE } from '../constants/HelloWorldConstants';
 
-type HelloWorldData = Record<string, unknown> & {
+type HelloWorldStoreData = Record<string, unknown> & {
   lastActionType?: typeof HELLO_WORLD_NAME_UPDATE | null;
   name: string;
 };
 
 type ReduxAppProps = Record<string, unknown> & {
-  helloWorldData: HelloWorldData;
+  helloWorldData: HelloWorldStoreData;
   modificationTarget?: unknown;
   prerender?: boolean;
 };
 
 type StateProps = Record<string, unknown> & {
-  helloWorldData: HelloWorldData;
+  helloWorldData: HelloWorldStoreData;
   modificationTarget: unknown;
 };
 
@@ -33,5 +33,5 @@ function propsForReduxState(props: Record<string, unknown>): StateProps {
   return { ...stateProps, modificationTarget: undefined };
 }
 
-export type { HelloWorldData, ReduxAppProps, ReduxAppState, ReduxAppStore, StateProps };
+export type { HelloWorldStoreData, ReduxAppProps, ReduxAppState, ReduxAppStore, StateProps };
 export { propsForReduxState };

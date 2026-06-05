@@ -292,9 +292,17 @@ export type {
   PipeableOrReadableStream,
 };
 
-export interface RegisteredComponent {
+/**
+ * The generic defaults to the pre-object-registration component type so existing consumers that
+ * read `registeredComponent.component` stay source-compatible. Use
+ * `RegisteredComponent<RegisteredComponentValue>` when handling plain-object server_render_js
+ * registrations.
+ */
+export interface RegisteredComponent<
+  ComponentValue extends RegisteredComponentValue = ReactComponentOrRenderFunction,
+> {
   name: string;
-  component: RegisteredComponentValue;
+  component: ComponentValue;
   /**
    * Indicates if the registered component is a RenderFunction
    * @see RenderFunction for more details on its behavior and usage.

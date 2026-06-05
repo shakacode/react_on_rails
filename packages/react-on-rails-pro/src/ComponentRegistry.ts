@@ -12,7 +12,11 @@
  * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import { type RegisteredComponent, type RegisteredComponentValue } from 'react-on-rails/types';
+import {
+  type ReactComponentOrRenderFunction,
+  type RegisteredComponent,
+  type RegisteredComponentValue,
+} from 'react-on-rails/types';
 import isRenderFunction from 'react-on-rails/isRenderFunction';
 import CallbackRegistry from './CallbackRegistry.ts';
 
@@ -44,7 +48,7 @@ export function register(components: Record<string, RegisteredComponentValue>): 
 
     componentRegistry.set(name, {
       name,
-      component,
+      component: component as ReactComponentOrRenderFunction,
       renderFunction,
       isRenderer,
     });

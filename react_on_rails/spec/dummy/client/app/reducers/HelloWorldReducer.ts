@@ -2,9 +2,9 @@ import type { UnknownAction } from 'redux';
 
 import type { HelloWorldNameUpdateAction } from '../actions/HelloWorldActions';
 import { HELLO_WORLD_NAME_UPDATE } from '../constants/HelloWorldConstants';
-import type { HelloWorldData } from '../store/reduxTypes';
+import type { HelloWorldStoreData } from '../store/reduxTypes';
 
-const initialState: HelloWorldData = {
+const initialState: HelloWorldStoreData = {
   lastActionType: null,
   name: 'Alex',
 };
@@ -14,9 +14,9 @@ function isHelloWorldNameUpdateAction(action: UnknownAction): action is HelloWor
 }
 
 export default function helloWorldReducer(
-  state: HelloWorldData = initialState,
+  state: HelloWorldStoreData = initialState,
   action: UnknownAction = { type: '' },
-): HelloWorldData {
+): HelloWorldStoreData {
   if (isHelloWorldNameUpdateAction(action)) {
     return {
       lastActionType: action.type,

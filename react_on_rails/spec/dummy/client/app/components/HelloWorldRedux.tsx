@@ -1,7 +1,7 @@
 import React from 'react';
 
 import type { HelloWorldNameUpdateAction } from '../actions/HelloWorldActions';
-import type { HelloWorldData } from '../store/reduxTypes';
+import type { HelloWorldStoreData } from '../store/reduxTypes';
 import type { RailsContextForDisplay } from '../types/railsContext';
 import RailsContext from './RailsContext';
 
@@ -11,7 +11,7 @@ type HelloWorldReduxActions = {
 
 type HelloWorldReduxProps = {
   actions: HelloWorldReduxActions;
-  data: HelloWorldData;
+  data: HelloWorldStoreData;
   railsContext: RailsContextForDisplay;
 };
 
