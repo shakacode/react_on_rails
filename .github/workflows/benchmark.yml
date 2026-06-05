@@ -135,9 +135,11 @@ jobs:
             RUN_PRO_NODE_RENDERER_BENCHMARKS=true
           fi
 
-          echo "run_core_benchmarks=$RUN_CORE_BENCHMARKS" >> "$GITHUB_OUTPUT"
-          echo "run_pro_benchmarks=$RUN_PRO_BENCHMARKS" >> "$GITHUB_OUTPUT"
-          echo "run_pro_node_renderer_benchmarks=$RUN_PRO_NODE_RENDERER_BENCHMARKS" >> "$GITHUB_OUTPUT"
+          {
+            echo "run_core_benchmarks=$RUN_CORE_BENCHMARKS"
+            echo "run_pro_benchmarks=$RUN_PRO_BENCHMARKS"
+            echo "run_pro_node_renderer_benchmarks=$RUN_PRO_NODE_RENDERER_BENCHMARKS"
+          } >> "$GITHUB_OUTPUT"
         shell: bash
       - name: Set benchmark matrices
         id: benchmark-matrices
@@ -401,20 +403,35 @@ jobs:
           bundle exec rake react_on_rails_pro:pre_seed_renderer_cache MODE=symlink
 
           echo "🚀 Starting ${{ matrix.suite_name }} node renderer..."
-          node renderer/node-renderer.js &
-          echo "Node renderer started in background"
+          renderer_log="${RUNNER_TEMP:-$PWD}/node-renderer.log"
+          echo "TARGET_LOG=$renderer_log" >> "$GITHUB_ENV"
+          node renderer/node-renderer.js > "$renderer_log" 2>&1 &
+          renderer_pid=$!
+          # Persist the PID so "Execute benchmark suite" can confirm the renderer
+          # survived the run; a backgrounded child under `set -e` does not
+          # propagate its failure to the step.
+          echo "TARGET_PID=$renderer_pid" >> "$GITHUB_ENV"
+          echo "Node renderer started in background (PID $renderer_pid)"
 
           echo "⏳ Waiting for node renderer to be ready..."
           for i in {1..30}; do
+            # Fail fast if the renderer bound the port and then crashed, instead
+            # of looping until the timeout (or racing a dead/restarting target).
+            if ! kill -0 "$renderer_pid" 2>/dev/null; then
+              echo "::error::Node renderer (PID $renderer_pid) exited during startup"
+              cat "$renderer_log" || true
+              exit 1
+            fi
             if ruby -e "require 'socket'; TCPSocket.new('localhost', 3800).close"; then
-              echo "✅ Node renderer is ready and listening"
+              echo "✅ Node renderer is ready and listening (PID $renderer_pid)"
               exit 0
             fi
             echo "  Attempt $i/30: Node renderer not ready yet..."
             sleep 1
           done
 
-          echo "❌ ERROR: Node renderer failed to start within 30 seconds"
+          echo "::error::Node renderer failed to start within 30 seconds"
+          cat "$renderer_log" || true
           exit 1
 
       - name: Start Rails production server
@@ -424,19 +441,30 @@ jobs:
           set -e
           echo "🚀 Starting ${{ matrix.suite_name }} production server..."
           $SERVER_CMD &
-          echo "Server started in background"
+          server_pid=$!
+          # Persist the PID so "Execute benchmark suite" can confirm the server
+          # survived the run; a backgrounded child under `set -e` does not
+          # propagate its failure to the step.
+          echo "TARGET_PID=$server_pid" >> "$GITHUB_ENV"
+          echo "Server started in background (PID $server_pid)"
 
           echo "⏳ Waiting for server to be ready..."
           for i in {1..30}; do
+            # Fail fast if the server bound the port and then crashed, instead of
+            # looping until the timeout (or racing a dead/restarting target).
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              echo "::error::Server (PID $server_pid) exited during startup"
+              exit 1
+            fi
             if curl -fsS http://localhost:3001 > /dev/null; then
-              echo "✅ Server is ready and responding"
+              echo "✅ Server is ready and responding (PID $server_pid)"
               exit 0
             fi
             echo "  Attempt $i/30: Server not ready yet..."
             sleep 1
           done
 
-          echo "❌ ERROR: Server failed to start within 30 seconds"
+          echo "::error::Server failed to start within 30 seconds"
           exit 1
 
       - name: Execute benchmark suite
@@ -460,6 +488,26 @@ jobs:
           elif ! $BENCH_CMD "$BENCHMARK_SCRIPT"; then
             echo "❌ ERROR: Benchmark execution failed"
             exit 1
+          fi
+
+          # The benchmark target was backgrounded in a prior step, so `set -e`
+          # never saw it crash. Confirm it survived the whole run: a mid-run
+          # death means the metrics were measured against a dead/restarting
+          # target and must not ship to Bencher, so fail the job.
+          if [ -z "$TARGET_PID" ]; then
+            echo "::error::TARGET_PID is unset; cannot verify the benchmark target stayed alive"
+            exit 1
+          fi
+          if ! kill -0 "$TARGET_PID" 2>/dev/null; then
+            echo "::error::Benchmark target (PID $TARGET_PID) died during the benchmark run; metrics are unreliable"
+            exit 1
+          fi
+          if [ -n "${TARGET_LOG:-}" ] && [ -f "$TARGET_LOG" ]; then
+            if grep -q "died UNEXPECTEDLY" "$TARGET_LOG"; then
+              echo "::error::Benchmark target logged an unexpected worker restart; metrics are unreliable"
+              grep -n "died UNEXPECTEDLY" "$TARGET_LOG" || true
+              exit 1
+            fi
           fi
 
           echo "✅ Benchmark suite completed successfully"
