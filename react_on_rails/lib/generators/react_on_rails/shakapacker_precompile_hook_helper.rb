@@ -46,7 +46,8 @@ module ReactOnRails
         content = File.read(shakapacker_config_path)
         config = parse_shakapacker_yml_content(content)
         document = shakapacker_yml_document(content)
-        return false if normalize_precompile_hook(effective_precompile_hook(config, environment))
+        active_hook = normalize_precompile_hook(effective_precompile_hook(config, environment))
+        return false if active_hook
         return false if environment_effective_raw_precompile_hook?(document, config, environment)
         return false unless content.match?(COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER)
 
