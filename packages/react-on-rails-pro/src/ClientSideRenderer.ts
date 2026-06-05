@@ -182,6 +182,8 @@ class ComponentRenderer {
   }
 
   isRenderingDomNode(domNode: Element | null): boolean {
+    // `this.domNode` is undefined until render() sets it; treat "not yet known" as a match so a
+    // concurrent second call does not prematurely unmount a still-starting render.
     return this.domNode === undefined || this.domNode === domNode;
   }
 
@@ -305,7 +307,9 @@ You should return a React.Component always for the client side entry point.`);
       this.root?.unmount();
       this.root = undefined;
     } else {
-      const domNode = document.getElementById(this.domNodeId);
+      // Use the stored node first. During same-id replacement, document.getElementById(this.domNodeId)
+      // already points at the new node, but the old legacy React tree is attached to this.domNode.
+      const domNode = this.domNode ?? document.getElementById(this.domNodeId);
       if (!domNode) {
         return;
       }

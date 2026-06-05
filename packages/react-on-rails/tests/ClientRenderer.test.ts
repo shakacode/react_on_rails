@@ -463,6 +463,36 @@ describe('ClientRenderer', () => {
       consoleErrorSpy.mockRestore();
     });
 
+    it('suppresses a stale async renderer rejection after page unload already cleared the entry', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const rejection = new Error('renderer rejected after unload');
+        let rejectRenderer!: (error: Error) => void;
+        const TestRenderer: RendererFunction = (_props, _railsContext, _domNodeId) =>
+          new Promise<{ teardown: () => void }>((_resolve, reject) => {
+            rejectRenderer = reject;
+          });
+        ComponentRegistry.register({ TestRenderer });
+        setupRendererDom('renderer-reject-after-unload', 'TestRenderer');
+
+        renderComponent('renderer-reject-after-unload');
+        runPageUnload();
+        rejectRenderer(rejection);
+
+        // Flush microtasks so the tracking .catch runs.
+        await new Promise((resolve) => {
+          setTimeout(resolve, 0);
+        });
+
+        expect(consoleErrorSpy).not.toHaveBeenCalledWith(
+          expect.stringContaining('Renderer for dom node "renderer-reject-after-unload" rejected'),
+          rejection,
+        );
+      } finally {
+        consoleErrorSpy.mockRestore();
+      }
+    });
+
     it('logs the failure but still re-renders when the previous teardown throws on node replacement', () => {
       // Covers the replaced-node catch in renderElement: a teardown that throws synchronously during
       // replacement is logged with the renderer label, and the new node is still rendered.

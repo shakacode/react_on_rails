@@ -108,16 +108,16 @@ const wrapServerComponentRenderer = (
       </RSCProvider>
     );
 
-    let reactRoot: ReactDOMClient.Root;
-    if (domNode.innerHTML) {
-      reactRoot = ReactDOMClient.hydrateRoot(domNode, rootElement, {
-        identifierPrefix: domNodeId,
-        onRecoverableError: handleRecoverableError,
-      });
-    } else {
-      reactRoot = ReactDOMClient.createRoot(domNode, { identifierPrefix: domNodeId });
-      reactRoot.render(rootElement);
-    }
+    const reactRoot = domNode.innerHTML
+      ? ReactDOMClient.hydrateRoot(domNode, rootElement, {
+          identifierPrefix: domNodeId,
+          onRecoverableError: handleRecoverableError,
+        })
+      : (() => {
+          const root = ReactDOMClient.createRoot(domNode, { identifierPrefix: domNodeId });
+          root.render(rootElement);
+          return root;
+        })();
 
     // Return an explicit teardown wrapper so React on Rails unmounts this root on Turbo/Turbolinks
     // navigation (the soft-navigation page swap) instead of leaking it. This closes the leak for every

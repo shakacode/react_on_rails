@@ -206,6 +206,9 @@ interface RenderFunctionMarker {
  * return shapes because older 3-argument renderers sometimes returned a component only to satisfy
  * the old `RenderFunction` type; those non-teardown values are ignored at runtime. Shared by the
  * core and Pro client renderers so the two cannot drift.
+ *
+ * @returns New renderer code should return `void` or `{ teardown }`. The broader legacy return
+ * shapes stay accepted only so existing 3-argument renderers remain type-compatible.
  */
 interface RendererFunction extends RenderFunctionMarker {
   (props?: Record<string, unknown>, railsContext?: RailsContext, domNodeId?: string): RendererFunctionResult;

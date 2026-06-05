@@ -200,12 +200,16 @@ function trackRendererMount(domNodeId: string, domNode: Element, result: Rendere
         }
       })
       .catch((error: unknown) => {
-        if (renderedRoots.get(domNodeId) === entry) {
-          renderedRoots.delete(domNodeId);
+        const isStillActive = renderedRoots.get(domNodeId) === entry;
+        if (!isStillActive) {
+          return;
         }
+        renderedRoots.delete(domNodeId);
         // The renderer's own promise rejected: the render failed, so the component never mounted and
         // no teardown was captured. Log it (rather than letting it surface as an unhandled rejection)
         // so the failure is diagnosable; any partial mount the renderer created may leak on cleanup.
+        // If this placeholder was already removed by page unload or node replacement, the page/node is
+        // already being cleaned up, so suppress a stale rejection log from the abandoned renderer.
         console.error(
           `Renderer for dom node "${domNodeId}" rejected; the component did not mount and no ` +
             'teardown was captured. Any mount it created may leak on cleanup:',
