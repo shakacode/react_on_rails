@@ -201,7 +201,12 @@ Use [async props](../migrating/rsc-data-fetching.md#async-props-stream-each-slow
 
 > **React on Rails Pro setup:** The controller must `include ReactOnRailsPro::Stream`, render the view via `stream_view_containing_react_components`, and set `config.enable_rsc_support = true` in `config/initializers/react_on_rails.rb`.
 
+> **Server Component boundary:** Async function components such as `UserProfile` must run in a Server Component tree. Keep this file free of a `'use client'` directive. If resolved data needs to cross into a Client Component, await it in the server component first and pass only serializable props.
+
 ```jsx
+import React, { Suspense } from 'react';
+
+// ProfilePage.jsx (no 'use client' directive; this is a Server Component tree)
 const UserProfile = async ({ userPromise, siteName }) => {
   const user = await userPromise;
 
