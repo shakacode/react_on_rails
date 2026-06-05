@@ -30,7 +30,7 @@ const parseArtifactParallelism = (value: string | undefined) => {
   const parallelism = Math.floor(parsedValue);
   if (parallelism <= 0) {
     console.warn(
-      `[shakaperf] SHAKAPERF_ARTIFACT_PARALLELISM="${value}" parsed to ${parallelism}; falling back to auto-detected default.`,
+      `[shakaperf] SHAKAPERF_ARTIFACT_PARALLELISM="${value}" floors to ${parallelism} (must be >= 1 after flooring); falling back to auto-detected default.`,
     );
     return undefined;
   }
@@ -44,7 +44,7 @@ const PARALLELISM = CONFIGURED_PARALLELISM ?? DEFAULT_PARALLELISM;
 const NO_SANDBOX_RAW = process.env.SHAKAPERF_CHROMIUM_NO_SANDBOX;
 if (NO_SANDBOX_RAW !== undefined && NO_SANDBOX_RAW !== 'true' && NO_SANDBOX_RAW !== '') {
   console.warn(
-    `[shakaperf] SHAKAPERF_CHROMIUM_NO_SANDBOX="${NO_SANDBOX_RAW}" is not "true"; --no-sandbox will NOT be added. Set it to exactly "true" to enable.`,
+    `[shakaperf] SHAKAPERF_CHROMIUM_NO_SANDBOX="${NO_SANDBOX_RAW}" is not exactly "true"; --no-sandbox will NOT be added. Values like "1", "yes", or "TRUE" are ignored.`,
   );
 }
 const CHROMIUM_ARGS = NO_SANDBOX_RAW === 'true' ? ['--no-sandbox'] : [];

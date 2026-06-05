@@ -7,7 +7,7 @@ argument-hint: [path-to-existing-Dockerfile] [services e.g. postgres,redis,elast
 # setup-docker-servers-for-ab-tests
 
 > [!NOTE]
-> This file is mirrored by `../setup-docker-servers-for-ab-tests.SKILL.md`; update both copies together when changing generated ShakaPerf instructions.
+> Sync checklist: this file is mirrored at `analysis/rsc-fouc-shakaperf-artifacts/setup/generated-shakaperf-skills/setup-docker-servers-for-ab-tests.SKILL.md`; include both paths in review when either copy changes.
 
 Twin-servers runs **two production-mode copies of one app side by side** — `control` (the baseline branch) and `experiment` (your branch) — so `shaka-perf compare` can diff them for visual and performance regressions. This skill sets up the Docker infrastructure that makes that happen in the current project.
 
