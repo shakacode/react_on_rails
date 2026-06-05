@@ -24,8 +24,7 @@ RSpec.describe "Posts page", :server_rendering do
     # The suite intentionally leaves `maintain_test_schema!` disabled, so make
     # this DB-backed spec self-sufficient: load the schema if it is not present
     # yet. Check every table the examples touch (not just `posts`) so a partial
-    # schema can't slip past the guard. The check is cheap and the load only runs
-    # on the first example.
+    # schema can't slip past the guard.
     unless %i[users posts comments].all? { |t| ActiveRecord::Base.connection.table_exists?(t) }
       ActiveRecord::Schema.verbose = false
       load Rails.root.join("db/schema.rb")

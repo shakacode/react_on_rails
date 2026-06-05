@@ -10,9 +10,8 @@
 
 # Local variables (not top-level constants) so re-running `rails db:seed` in an
 # already-loaded process — seeds.rb is `load`ed, not `require`d — does not emit
-# `warning: already initialized constant`. The per-record counts cycle through
-# these arrays, which stays correct even if a range is later made exclusive or
-# non-unit-step (unlike `range.first + (idx % range.size)`).
+# `warning: already initialized constant`. Per-record counts index into these
+# arrays, so cycling stays correct regardless of each range's bounds or step.
 user_count = 10
 post_counts = (3..7).to_a
 comment_counts = (2..5).to_a

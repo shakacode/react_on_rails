@@ -400,19 +400,22 @@ jobs:
         # benchmark scores as healthy).
         if: matrix.server_kind == 'rails' && matrix.pro_env == 'true'
         working-directory: ${{ matrix.app_directory }}
-        # Route the matrix value through env so the shell treats it as data, not
-        # code (GitHub Actions injection hardening), matching the "Execute
-        # benchmark suite" step below — even though it comes from our own
-        # generate_matrix.rb.
+        # Pass the matrix value via env (treated as data, not interpolated into
+        # the shell), matching the "Execute benchmark suite" step below.
         env:
           RAILS_ENV: production
           NODE_ENV: production
           SUITE_NAME: ${{ matrix.suite_name }}
         run: |
-          set -e
+          set -euo pipefail
           echo "🌱 Preparing and seeding $SUITE_NAME benchmark database..."
           bundle exec rails db:prepare
-          bundle exec rails runner 'count = Post.count; abort("Benchmark DB has 0 posts after db:prepare; seeds did not run") if count.zero?; puts "✅ Database seeded (#{count} posts)"'
+          # Guard every table `/posts_page` reads (posts, plus the users and
+          # comments it joins), not just posts: a partial seed would otherwise
+          # let the route 500 (or render an empty page) while the job stayed
+          # green. `set -o pipefail` keeps this abort fatal even if the command
+          # is ever piped.
+          bundle exec rails runner 'counts = { posts: Post.count, users: User.count, comments: Comment.count }; empty = counts.select { |_, c| c.zero? }.keys; abort("Benchmark DB seeding incomplete after db:prepare (empty: #{empty.join(", ")}); seeds did not run") if empty.any?; puts "✅ Database seeded (#{counts.map { |k, v| "#{v} #{k}" }.join(", ")})"'
 
       - name: Start Pro node renderer
         if: matrix.server_kind == 'node-renderer'
