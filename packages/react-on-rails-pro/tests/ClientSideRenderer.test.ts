@@ -420,9 +420,8 @@ describe('ClientSideRenderer', () => {
       unmountAll();
       expect(teardown).toHaveBeenCalledTimes(1);
 
-      await new Promise((resolve) => {
-        setTimeout(resolve, 0);
-      });
+      await Promise.resolve(); // lets Promise.resolve(nonNativeThenable) settle
+      await Promise.resolve(); // lets the .catch() rejection handler run
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         'Error in renderer teardown for dom node "dom-id-teardown-thenable-reject":',
         rejection,

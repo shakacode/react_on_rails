@@ -110,7 +110,8 @@ describe('wrapServerComponentRenderer/client validation (issue #3647)', () => {
     const renderFunction = (_props, _railsContext, _domNodeId) => ({ teardown: jest.fn() });
     const WrappedComponent = wrapServerComponentRenderer(renderFunction, 'TeardownResultComponent');
 
-    await expect(WrappedComponent({}, railsContext, 'any-dom-id')).rejects.toThrow(
+    // No DOM node needed; the teardown-result guard throws before getElementById is called.
+    await expect(WrappedComponent({}, railsContext, 'nonexistent-dom-id')).rejects.toThrow(
       "wrapServerComponentRenderer: render function for server component 'TeardownResultComponent' " +
         'returned a renderer teardown result; expected a React component.',
     );
