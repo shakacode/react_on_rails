@@ -229,6 +229,29 @@ RSpec.describe GeneratorHelper, type: :generator do
     end
   end
 
+  describe "#active_precompile_hook_configured?" do
+    it "treats quoted and unquoted command strings as active" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(true)
+        default:
+          precompile_hook: bin/shakapacker-precompile-hook
+      YAML
+
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(true)
+        default:
+          precompile_hook: 'bin/shakapacker-precompile-hook'
+      YAML
+    end
+
+    it "treats unquoted YAML null and false scalars as inactive" do
+      %w[~ null Null NULL false False FALSE no off].each do |inactive_value|
+        expect(active_precompile_hook_configured?(<<~YAML)).to be(false), inactive_value
+          default:
+            precompile_hook: #{inactive_value}
+        YAML
+      end
+    end
+  end
+
   describe "#generated_precompile_hook_will_be_configured?" do
     let(:shakapacker_yml_path) { File.join(destination_root, "config/shakapacker.yml") }
 
@@ -256,6 +279,25 @@ RSpec.describe GeneratorHelper, type: :generator do
       expect(
         generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
       ).to be(false)
+    end
+
+    it "materializes the generated hook when unrelated environments use inactive YAML scalars" do
+      %w[~ null false].each do |inactive_value|
+        File.write(shakapacker_yml_path, <<~YAML)
+          default: &default
+            # precompile_hook: ~
+
+          development:
+            precompile_hook: #{inactive_value}
+
+          test:
+            <<: *default
+        YAML
+
+        expect(
+          generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+        ).to be(true), inactive_value
+      end
     end
   end
 

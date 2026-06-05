@@ -6,7 +6,15 @@ module ReactOnRails
       SHAKAPACKER_YML_PATH = "config/shakapacker.yml"
       DEFAULT_PRECOMPILE_HOOK_COMMAND = "bin/shakapacker-precompile-hook"
       COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER = /^(\s*)#\s*precompile_hook:\s*~\s*$/
-      ACTIVE_PRECOMPILE_HOOK = /^\s+precompile_hook:\s*(?:"[^"]+"|'[^']+'|[^#\s][^#\n]*)/
+      # Unquoted YAML null/false scalars parse as nil/false, so they are inactive unless quoted.
+      ACTIVE_PRECOMPILE_HOOK = /
+        ^\s+precompile_hook:\s*
+        (?:
+          "[^"]+"
+          | '[^']+'
+          | (?!(?:~|null|false|no|off)\s*(?:\#|$)) [^#\s][^#\n]*
+        )
+      /ix
       private_constant :SHAKAPACKER_YML_PATH, :DEFAULT_PRECOMPILE_HOOK_COMMAND,
                        :COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER, :ACTIVE_PRECOMPILE_HOOK
 

@@ -493,6 +493,52 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "when Shakapacker was pre-installed with an inactive unquoted precompile_hook value" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+
+      simulate_existing_file("config/shakapacker.yml", <<~YAML)
+        default: &default
+          source_path: app/javascript
+          source_entry_path: packs
+          public_output_path: packs
+          assets_bundler: "webpack"
+          precompile_hook: false
+
+        development:
+          <<: *default
+
+        test:
+          <<: *default
+          compile: true
+          # precompile_hook: ~
+
+        production:
+          <<: *default
+      YAML
+      simulate_existing_file("bin/shakapacker", "")
+      simulate_existing_file("bin/shakapacker-dev-server", "")
+      simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+
+      Dir.chdir(destination_root) do
+        run_generator(["--ignore-warnings", "--skip"])
+      end
+    end
+
+    it "configures the commented generated hook placeholder" do
+      assert_file "config/shakapacker.yml" do |content|
+        expect(content).to match(/^\s+precompile_hook: false$/)
+        expect(content).to include("precompile_hook: 'bin/shakapacker-precompile-hook'")
+      end
+    end
+  end
+
   context "when shakapacker.yml already has a custom precompile_hook" do
     before(:all) do
       prepare_destination
