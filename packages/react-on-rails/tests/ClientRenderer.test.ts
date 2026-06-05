@@ -370,37 +370,40 @@ describe('ClientRenderer', () => {
 
     it('does not let a stale async renderer overwrite a newer same-id teardown', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-      const resolvers: Array<(result: { teardown: () => void }) => void> = [];
-      const AsyncRenderer: RendererFunction = (_props, _railsContext, _domNodeId) =>
-        new Promise<{ teardown: () => void }>((resolve) => {
-          resolvers.push(resolve);
-        });
-      ComponentRegistry.register({ AsyncRenderer });
-      const node1 = setupRendererDom('renderer-stale-after-newer', 'AsyncRenderer');
+      try {
+        const resolvers: Array<(result: { teardown: () => void }) => void> = [];
+        const AsyncRenderer: RendererFunction = (_props, _railsContext, _domNodeId) =>
+          new Promise<{ teardown: () => void }>((resolve) => {
+            resolvers.push(resolve);
+          });
+        ComponentRegistry.register({ AsyncRenderer });
+        const node1 = setupRendererDom('renderer-stale-after-newer', 'AsyncRenderer');
 
-      renderComponent('renderer-stale-after-newer');
+        renderComponent('renderer-stale-after-newer');
 
-      node1.remove();
-      const node2 = document.createElement('div');
-      node2.id = 'renderer-stale-after-newer';
-      document.body.appendChild(node2);
-      renderComponent('renderer-stale-after-newer');
-      expect(resolvers).toHaveLength(2);
+        node1.remove();
+        const node2 = document.createElement('div');
+        node2.id = 'renderer-stale-after-newer';
+        document.body.appendChild(node2);
+        renderComponent('renderer-stale-after-newer');
+        expect(resolvers).toHaveLength(2);
 
-      const staleTeardown = jest.fn();
-      const currentTeardown = jest.fn();
-      resolvers[1]({ teardown: currentTeardown });
-      await Promise.resolve();
-      resolvers[0]({ teardown: staleTeardown });
-      await Promise.resolve();
+        const staleTeardown = jest.fn();
+        const currentTeardown = jest.fn();
+        resolvers[1]({ teardown: currentTeardown });
+        await Promise.resolve();
+        resolvers[0]({ teardown: staleTeardown });
+        await Promise.resolve();
 
-      runPageUnload();
-      expect(currentTeardown).toHaveBeenCalledTimes(1);
-      expect(staleTeardown).not.toHaveBeenCalled();
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('resolved after the page or node was already cleaned up'),
-      );
-      consoleErrorSpy.mockRestore();
+        runPageUnload();
+        expect(currentTeardown).toHaveBeenCalledTimes(1);
+        expect(staleTeardown).not.toHaveBeenCalled();
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          expect.stringContaining('resolved after the page or node was already cleaned up'),
+        );
+      } finally {
+        consoleErrorSpy.mockRestore();
+      }
     });
 
     it('drops and logs about an async teardown when unmount races the renderer resolving', async () => {
