@@ -108,10 +108,10 @@ RSpec.describe ReactOnRails::Doctor do
 
   describe "#parsed_shakapacker_config" do
     it "reads and parses config/shakapacker.yml at most once per Doctor instance" do
-      # Exercises the memoizing super override (doctor.rb): several checks consult
-      # the config through different (private) helpers, but a single diagnosis must
-      # read and parse the file only once. Stubbing File (not the method itself)
-      # keeps both the memoization and the super dispatch in the path under test.
+      # Exercises Doctor's memoizing super override: several checks consult the
+      # config through different private helpers, but one diagnosis must read and
+      # parse config/shakapacker.yml only once. Stubbing File keeps both the
+      # memoization and the shared helper implementation in the path under test.
       config_path = "/tmp/myapp/config/shakapacker.yml"
       allow(doctor).to receive(:shakapacker_config_path).and_return(config_path)
       allow(File).to receive(:exist?).with(config_path).and_return(true)
@@ -124,6 +124,39 @@ RSpec.describe ReactOnRails::Doctor do
 
       aggregate_failures do
         expect(first).to be(second)
+        expect(File).to have_received(:read).with(config_path).once
+      end
+    end
+
+    it "memoizes nil when config/shakapacker.yml is missing" do
+      config_path = "/tmp/myapp/config/shakapacker.yml"
+      allow(doctor).to receive(:shakapacker_config_path).and_return(config_path)
+      allow(File).to receive(:exist?).with(config_path).and_return(false)
+
+      first = doctor.send(:parsed_shakapacker_config)
+      doctor.send(:active_assets_bundler)
+      second = doctor.send(:parsed_shakapacker_config)
+
+      aggregate_failures do
+        expect(first).to be_nil
+        expect(second).to be_nil
+        expect(File).to have_received(:exist?).with(config_path).once
+      end
+    end
+
+    it "memoizes nil when config/shakapacker.yml cannot be read" do
+      config_path = "/tmp/myapp/config/shakapacker.yml"
+      allow(doctor).to receive(:shakapacker_config_path).and_return(config_path)
+      allow(File).to receive(:exist?).with(config_path).and_return(true)
+      allow(File).to receive(:read).with(config_path).and_raise(Errno::EACCES)
+
+      first = doctor.send(:parsed_shakapacker_config)
+      doctor.send(:active_assets_bundler)
+      second = doctor.send(:parsed_shakapacker_config)
+
+      aggregate_failures do
+        expect(first).to be_nil
+        expect(second).to be_nil
         expect(File).to have_received(:read).with(config_path).once
       end
     end
