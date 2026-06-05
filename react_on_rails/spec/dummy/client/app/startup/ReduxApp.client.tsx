@@ -12,15 +12,28 @@ import composeInitialState from '../store/composeInitialState';
 import type { ReduxAppStore } from '../store/reduxTypes';
 
 type DomRenderer = (domNode: Element, element: ReactNode) => void;
-const hydrateOrRender = (shouldHydrate: boolean): DomRenderer =>
-  shouldHydrate
-    ? (domNode, element) => {
-        ReactDOMClient.hydrateRoot(domNode, element);
-      }
-    : (domNode, element) => {
-        const root = ReactDOMClient.createRoot(domNode);
-        root.render(element);
-      };
+type ReactRoot = ReturnType<typeof ReactDOMClient.createRoot>;
+
+const reactRoots = new WeakMap<Element, ReactRoot>();
+
+const hydrateOrRender =
+  (shouldHydrate: boolean): DomRenderer =>
+  (domNode, element) => {
+    const existingRoot = reactRoots.get(domNode);
+    if (existingRoot) {
+      existingRoot.render(element);
+      return;
+    }
+
+    const root = shouldHydrate
+      ? ReactDOMClient.hydrateRoot(domNode, element)
+      : ReactDOMClient.createRoot(domNode);
+    reactRoots.set(domNode, root);
+
+    if (!shouldHydrate) {
+      root.render(element);
+    }
+  };
 
 export default function ReduxApp(
   props: Record<string, unknown>,

@@ -1307,6 +1307,28 @@ module ReactOnRails
         expect(resolved_entrypoint).to eq(tsx_entrypoint)
       end
 
+      it "uses a TypeScript ESM source entrypoint when the configured JavaScript output filename is missing" do
+        configured_entrypoint = File.join(@tmpdir, "server-bundle.js")
+        mts_entrypoint = File.join(@tmpdir, "server-bundle.mts")
+        File.write(mts_entrypoint, "")
+
+        resolved_entrypoint = described_class.instance.send(:resolve_server_bundle_source_entrypoint,
+                                                            configured_entrypoint)
+
+        expect(resolved_entrypoint).to eq(mts_entrypoint)
+      end
+
+      it "uses a TypeScript CommonJS source entrypoint when the configured JavaScript output filename is missing" do
+        configured_entrypoint = File.join(@tmpdir, "server-bundle.js")
+        cts_entrypoint = File.join(@tmpdir, "server-bundle.cts")
+        File.write(cts_entrypoint, "")
+
+        resolved_entrypoint = described_class.instance.send(:resolve_server_bundle_source_entrypoint,
+                                                            configured_entrypoint)
+
+        expect(resolved_entrypoint).to eq(cts_entrypoint)
+      end
+
       it "returns the configured entrypoint when no source file exists for any extension" do
         configured_entrypoint = File.join(@tmpdir, "server-bundle.js")
 

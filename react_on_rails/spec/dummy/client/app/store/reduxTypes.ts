@@ -29,7 +29,7 @@ function propsForReduxState(props: Record<string, unknown>): StateProps {
   const stateProps = { ...(props as ReduxAppProps) };
   delete stateProps.prerender;
 
-  return { modificationTarget: undefined, ...stateProps };
+  return { ...stateProps, modificationTarget: undefined };
 }
 
 export type { HelloWorldData, ReduxAppProps, ReduxAppState, ReduxAppStore, StateProps };
