@@ -392,6 +392,8 @@ describe('ClientRenderer', () => {
 
         const staleTeardown = jest.fn();
         const currentTeardown = jest.fn();
+        // Resolve the newer renderer first so its teardown is attached to the active entry before
+        // the stale renderer settles.
         resolvers[1]({ teardown: currentTeardown });
         await Promise.resolve();
         resolvers[0]({ teardown: staleTeardown });

@@ -60,9 +60,6 @@ const loadWrappedRendererWithMocks = () => {
 };
 
 const cleanupWrappedRendererMocks = () => {
-  jest.dontMock('react-dom/client');
-  jest.dontMock('react-on-rails-rsc/client.browser');
-  jest.dontMock('../src/getReactServerComponent.client.ts');
   jest.resetModules();
   document.body.innerHTML = '';
 };
