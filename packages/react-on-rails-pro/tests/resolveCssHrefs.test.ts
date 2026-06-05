@@ -97,4 +97,38 @@ describe('resolveCssHrefs', () => {
 
     expect(resolveCssHrefs({})).toEqual([]);
   });
+
+  it('does not prefix CSS hrefs already emitted with the manifest public path', () => {
+    expect(
+      resolveCssHrefs({
+        moduleLoading: { prefix: '/webpack/test/' },
+        filePathToModuleMetadata: {
+          'file:///app/A.jsx': { css: ['/webpack/test/css/a.css'] },
+          'file:///app/B.jsx': { css: ['https://cdn.example.com/css/b.css'] },
+        },
+      }),
+    ).toEqual(['/webpack/test/css/a.css', 'https://cdn.example.com/css/b.css']);
+  });
+
+  it('leaves a CSS href equal to the normalized manifest prefix unchanged', () => {
+    expect(
+      resolveCssHrefs({
+        moduleLoading: { prefix: '/webpack/test/' },
+        filePathToModuleMetadata: {
+          'file:///app/A.jsx': { css: ['/webpack/test'] },
+        },
+      }),
+    ).toEqual(['/webpack/test']);
+  });
+
+  it('leaves protocol-relative CSS hrefs unprefixed', () => {
+    expect(
+      resolveCssHrefs({
+        moduleLoading: { prefix: '/webpack/test/' },
+        filePathToModuleMetadata: {
+          'file:///app/A.jsx': { css: ['//cdn.example.com/css/a.css'] },
+        },
+      }),
+    ).toEqual(['//cdn.example.com/css/a.css']);
+  });
 });

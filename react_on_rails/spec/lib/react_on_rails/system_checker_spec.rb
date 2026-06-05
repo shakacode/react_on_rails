@@ -7,6 +7,29 @@ RSpec.describe ReactOnRails::SystemChecker do
   let(:rails_root) { Pathname.new("/tmp/myapp") }
   let(:default_shakapacker_config_path) { rails_root.join("config/shakapacker.yml").to_s }
 
+  describe "ShakapackerConfigHelpers self-contained require" do
+    # normalize_assets_bundler references SystemChecker::SUPPORTED_ASSETS_BUNDLERS
+    # lazily, and shakapacker_config_helpers.rb requires system_checker at the
+    # BOTTOM of the file so the constant resolves even when a consumer loads the
+    # helpers first. Every in-suite spec loads system_checker first, so this guard
+    # boots a fresh Ruby that requires ONLY the helpers file. It goes red if that
+    # require is removed (uninitialized SystemChecker) or moved to the top (which
+    # NameErrors on SystemChecker's class-body `include ShakapackerConfigHelpers`).
+    it "resolves SUPPORTED_ASSETS_BUNDLERS when the helpers file is loaded first" do
+      helpers_path = File.expand_path("../../../lib/react_on_rails/shakapacker_config_helpers", __dir__)
+      script = <<~RUBY
+        require #{helpers_path.inspect}
+        klass = Class.new { include ReactOnRails::ShakapackerConfigHelpers }
+        puts klass.new.send(:normalize_assets_bundler, "rspack")
+      RUBY
+
+      stdout, stderr, status = Open3.capture3(RbConfig.ruby, "-e", script)
+
+      expect(status).to be_success, "Loading shakapacker_config_helpers standalone failed:\n#{stderr}"
+      expect(stdout.strip).to eq("rspack")
+    end
+  end
+
   describe "#initialize" do
     it "initializes with empty messages" do
       expect(checker.messages).to eq([])
@@ -919,6 +942,23 @@ RSpec.describe ReactOnRails::SystemChecker do
         YAML
 
         expect(checker.send(:configured_assets_bundler)).to eq("webpack")
+      end
+
+      it "resolves symbol-valued YAML scalars (permitted_classes: [Symbol])" do
+        # Locks in the ShakapackerConfigHelpers consolidation: SystemChecker's
+        # parser previously omitted permitted_classes:[Symbol], so a `key: :value`
+        # entry raised → nil → wrong defaults. The shared helper permits Symbol,
+        # so `assets_bundler: :rspack` / `javascript_transpiler: :babel` parse.
+        allow(File).to receive(:read).with(default_shakapacker_config_path).and_return(<<~YAML)
+          default:
+            assets_bundler: :rspack
+            javascript_transpiler: :babel
+        YAML
+
+        aggregate_failures do
+          expect(checker.send(:configured_assets_bundler)).to eq("rspack")
+          expect(checker.send(:detected_javascript_transpiler)).to eq("babel")
+        end
       end
 
       it "prefers the current Rails environment over the default config" do

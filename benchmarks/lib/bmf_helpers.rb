@@ -13,6 +13,8 @@
 # Measures (snake_case for easy CLI usage with --threshold-measure):
 #   - rps: Requests per second (higher is better - use Lower Boundary threshold)
 #   - p50_latency: 50th-percentile latency in ms (lower is better - Upper Boundary)
+#   - p90_latency: 90th-percentile latency in ms (sent boundary-less: recorded for a
+#       summary-table baseline but NOT in THRESHOLDS, so never alerted on)
 #   - failed_pct: Failed request percentage (lower is better - use Upper Boundary)
 
 require "json"
@@ -30,8 +32,8 @@ class BmfCollector
   # @param rps [Numeric, nil] Requests per second
   # @param p50 [Numeric, nil] 50th percentile latency in ms
   # @param status [String, nil] Status string like "200=100,5xx=2"
-  # @param p90 [Numeric, nil] 90th percentile latency in ms (summary-only; not sent
-  #   to Bencher, but retained for the display sidecar so the table can show it)
+  # @param p90 [Numeric, nil] 90th percentile latency in ms (sent to Bencher
+  #   boundary-less via to_bmf, and retained for the display sidecar so the table shows it)
   def add(name:, rps:, p50:, status:, p90: nil)
     # Keep every row, including failures (rps "FAILED"/"MISSING"): the display sidecar
     # must still show a failed route/test rather than dropping it silently. The
@@ -63,6 +65,12 @@ class BmfCollector
       # Latency (lower is better) - use Upper Boundary threshold in Bencher
       # Units (ms) configured in Bencher measure settings
       add_measure(benchmark_entry, "p50_latency", r[:p50])
+
+      # p90 latency (lower is better) - sent boundary-less: it is uploaded so Bencher
+      # records its history and can supply a baseline for the summary table, but it is NOT
+      # listed in track_benchmarks.rb THRESHOLDS, so it is never alerted on (its tail noise
+      # can't meet the false-positive target at any usable boundary).
+      add_measure(benchmark_entry, "p90_latency", r[:p90])
 
       # Failure percentage (lower is better) - use Upper Boundary threshold in Bencher
       add_measure(benchmark_entry, "failed_pct", r[:failed_pct])
@@ -107,16 +115,12 @@ class BmfCollector
   # so a failed route/test stays visible in the summary even though it never reaches
   # Bencher (#to_bmf filters those out). rps may therefore be a non-numeric token like
   # "FAILED"/"MISSING"; BenchmarkTable renders it as text and never highlights a
-  # non-numeric cell. p90 and the raw status string are summary-only (absent from to_bmf).
-  # failed_pct is a tracked measure, so it is carried here (as a number) to give the
-  # table a highlightable Fail% column; a failed row (non-numeric rps) has no real
-  # failure rate, so it is left nil ("—").
+  # non-numeric cell. The raw status string is summary-only (Bencher never sees it).
+  # failed_pct is intentionally NOT carried: the Fail% column was dropped (redundant with
+  # Status — issue #3601 item 4), so nothing reads it (it is still a tracked BMF measure).
   def display_rows
     @results.map do |r|
-      {
-        "name" => r[:name], "rps" => r[:rps], "p50" => r[:p50], "p90" => r[:p90],
-        "failed_pct" => (r[:rps].is_a?(Numeric) ? r[:failed_pct] : nil), "status" => r[:status]
-      }
+      { "name" => r[:name], "rps" => r[:rps], "p50" => r[:p50], "p90" => r[:p90], "status" => r[:status] }
     end
   end
 

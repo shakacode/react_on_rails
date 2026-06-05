@@ -4,6 +4,7 @@ require "erb"
 require "open3"
 require "yaml"
 require_relative "config_path_resolver"
+require_relative "shakapacker_config_helpers"
 
 module ReactOnRails
   # SystemChecker provides validation methods for React on Rails setup
@@ -11,6 +12,7 @@ module ReactOnRails
   # rubocop:disable Metrics/ClassLength
   class SystemChecker
     include ConfigPathResolver
+    include ShakapackerConfigHelpers
 
     attr_reader :messages
 
@@ -625,28 +627,6 @@ module ReactOnRails
       @inferred_bundler_notice_shown = true
     end
 
-    def configured_assets_bundler
-      config = parsed_shakapacker_config
-      return nil unless config.is_a?(Hash)
-
-      rails_env = ENV["RAILS_ENV"] || ENV["RACK_ENV"] || "development"
-      bundler_from_shakapacker_section(config, rails_env) || bundler_from_shakapacker_section(config, "default")
-    rescue StandardError, ScriptError
-      nil
-    end
-
-    def bundler_from_shakapacker_section(config, section_name)
-      section = config[section_name] || config[section_name.to_sym]
-      return nil unless section.is_a?(Hash)
-
-      normalize_assets_bundler(section["assets_bundler"] || section[:assets_bundler])
-    end
-
-    def normalize_assets_bundler(value)
-      normalized = value.to_s.strip.downcase
-      SUPPORTED_ASSETS_BUNDLERS.include?(normalized) ? normalized : nil
-    end
-
     def required_react_dependencies
       deps = {
         "react" => "React library",
@@ -679,31 +659,6 @@ module ReactOnRails
       default_config = config["default"] || {}
       transpiler = env_config["javascript_transpiler"] || default_config["javascript_transpiler"]
       normalize_transpiler_value(transpiler)
-    end
-
-    def parsed_shakapacker_config
-      shakapacker_config_path = shakapacker_config_path()
-      return nil unless File.exist?(shakapacker_config_path)
-
-      raw_content = File.read(shakapacker_config_path)
-      rendered_content = ERB.new(raw_content).result
-      parsed = YAML.safe_load(rendered_content, aliases: true)
-      parsed.is_a?(Hash) ? parsed : nil
-    rescue StandardError, ScriptError
-      nil
-    end
-
-    def shakapacker_config_path
-      env_config_path = ENV.fetch("SHAKAPACKER_CONFIG", nil)
-      return File.expand_path("config/shakapacker.yml", shakapacker_config_base_dir) if env_config_path.to_s.empty?
-
-      File.expand_path(env_config_path, shakapacker_config_base_dir)
-    end
-
-    def shakapacker_config_base_dir
-      return Rails.root.to_s if defined?(Rails) && Rails.respond_to?(:root) && Rails.root
-
-      Dir.pwd
     end
 
     def normalize_transpiler_value(transpiler)
@@ -877,10 +832,6 @@ module ReactOnRails
       rescue StandardError
         # Handle other file/access errors
       end
-    end
-
-    def active_assets_bundler
-      configured_assets_bundler || "webpack"
     end
   end
   # rubocop:enable Metrics/ClassLength

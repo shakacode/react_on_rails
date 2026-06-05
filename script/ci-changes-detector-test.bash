@@ -194,6 +194,57 @@ test_docs_changes_are_non_runtime_only() {
   assert_contains "$out" '"run_lint": false' "docs output"
 }
 
+# Regression for PR #3597: an internal docs/planning YAML (e.g.
+# internal/contributor-info/demo-fleet.yml) used to fall through to the
+# uncategorized catch-all, forcing the entire test + benchmark suite to run.
+test_internal_non_markdown_docs_are_non_runtime_only() {
+  setup_repo
+  write_file_change "internal/contributor-info/demo-fleet.yml" "fleet: []"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"docs_only": true' "internal yaml output"
+  assert_contains "$out" '"non_runtime_only": true' "internal yaml output"
+  assert_contains "$out" '"run_lint": false' "internal yaml output"
+  assert_contains "$out" '"run_ruby_tests": false' "internal yaml output"
+  assert_contains "$out" '"benchmarks_changed": false' "internal yaml output"
+}
+
+# Regression for PR #3597: a GitHub issue template (.github/ISSUE_TEMPLATE/*.yml)
+# is repo metadata, not CI infrastructure, and must not trigger any test suite.
+test_issue_template_changes_are_non_runtime_only() {
+  setup_repo
+  write_file_change ".github/ISSUE_TEMPLATE/rc-release-tracking.yml" "name: RC release"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"docs_only": true' "issue template output"
+  assert_contains "$out" '"non_runtime_only": true' "issue template output"
+  assert_contains "$out" '"run_lint": false' "issue template output"
+  assert_contains "$out" '"run_ruby_tests": false' "issue template output"
+}
+
+# Regression for PR #3597 (the exact file set): mixed internal markdown +
+# internal YAML + an issue-template YAML in one docs-only PR stays non-runtime,
+# so it never triggers the benchmark suite.
+test_docs_pr_with_internal_and_issue_template_yaml_is_non_runtime_only() {
+  setup_repo
+  mkdir -p internal/contributor-info .github/ISSUE_TEMPLATE
+  printf 'design notes\n' > internal/contributor-info/rc-testing-plan.md
+  printf 'fleet: []\n' > internal/contributor-info/demo-fleet.yml
+  printf 'name: RC release\n' > .github/ISSUE_TEMPLATE/rc-release-tracking.yml
+  commit_change "docs-only RC planning PR"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"docs_only": true' "docs PR output"
+  assert_contains "$out" '"non_runtime_only": true' "docs PR output"
+  assert_contains "$out" '"run_lint": false' "docs PR output"
+  assert_contains "$out" '"run_ruby_tests": false' "docs PR output"
+  assert_contains "$out" '"run_js_tests": false' "docs PR output"
+  assert_contains "$out" '"benchmarks_changed": false' "docs PR output"
+}
+
 test_ruby_comment_only_change_skips_heavy_tests_but_keeps_lint() {
   setup_repo
   perl -0pi -e 's/class Example/class Example\n    # Explain the fixture./' \
@@ -604,6 +655,9 @@ test_empty_diff_skips_everything() {
 
 run_test test_empty_diff_skips_everything
 run_test test_docs_changes_are_non_runtime_only
+run_test test_internal_non_markdown_docs_are_non_runtime_only
+run_test test_issue_template_changes_are_non_runtime_only
+run_test test_docs_pr_with_internal_and_issue_template_yaml_is_non_runtime_only
 run_test test_ruby_comment_only_change_skips_heavy_tests_but_keeps_lint
 run_test test_ruby_block_comment_only_change_skips_heavy_tests_but_keeps_lint
 run_test test_wrapping_ruby_code_with_block_comment_delimiters_remains_runtime_affecting

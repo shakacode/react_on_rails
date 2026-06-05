@@ -72,7 +72,7 @@
   "peerDependencies": {
     "react": ">= 16",
     "react-dom": ">= 16",
-    "react-on-rails-rsc": ">= 19.0.2 < 20.0.0",
+    "react-on-rails-rsc": "*",
     "@tanstack/react-router": ">=1.139.0 <2.0.0"
   },
   "peerDependenciesMeta": {
@@ -97,8 +97,8 @@
     "@tanstack/store": "0.9.1",
     "@types/mock-fs": "^4.13.4",
     "mock-fs": "^5.5.0",
-    "react": "^19.0.3",
-    "react-dom": "^19.0.3",
-    "react-on-rails-rsc": "19.0.4"
+    "react": "~19.0.4",
+    "react-dom": "~19.0.4",
+    "react-on-rails-rsc": "19.0.5-rc.6"
   }
 }

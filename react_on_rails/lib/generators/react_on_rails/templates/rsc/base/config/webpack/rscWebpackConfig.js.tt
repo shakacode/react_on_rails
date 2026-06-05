@@ -19,7 +19,7 @@ const extractLoader =
   });
 
 const configureRsc = () => {
-  // Pass true to skip RSCWebpackPlugin - RSC bundle doesn't need it
+  // Pass true to skip the RSC manifest plugin - RSC bundle doesn't need it
   const rscConfig = serverWebpackConfig(true);
 
   // Update the entry name to be `rsc-bundle` instead of `server-bundle`

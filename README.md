@@ -52,8 +52,9 @@ These docs are for React on Rails 17. Historical docs and code are available for
 [v14](https://github.com/shakacode/react_on_rails/tree/14.0.0),
 [v13](https://github.com/shakacode/react_on_rails/tree/13.4.0),
 [v12](https://github.com/shakacode/react_on_rails/tree/12.6.0), and
-[v11](https://github.com/shakacode/react_on_rails/tree/11.3.0). Version 15.0.0
-was retracted, so use the v15 links only when maintaining older applications.
+[v11](https://github.com/shakacode/react_on_rails/tree/11.3.0). See the
+[upgrade guide](https://reactonrails.com/docs/upgrading/upgrading-react-on-rails/#v15-retraction-notice)
+before using v15 material.
 
 ## Install in 30 Seconds
 
@@ -114,7 +115,7 @@ Start with the docs here:
 
 ## Requirements
 
-- Ruby on Rails >= 5
+- Ruby on Rails >= 5.2
 - Shakapacker >= 6.0 (autobundling requires >= 7.0; CI tested: 8.2.0 - 10.1.0)
 - Ruby >= 3.3 (CI tested: 3.3 - 4.0)
 - Node.js >= 18

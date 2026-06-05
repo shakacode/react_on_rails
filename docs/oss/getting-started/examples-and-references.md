@@ -19,17 +19,7 @@ source, while others require React on Rails Pro.
 - Use it when you want the maintained Rails + React + SSR + HMR walkthrough repo
   that backs the tutorial and Webpack configuration guidance.
 
-### React on Rails Pro + RSC Starter (Pro)
-
-- Repo: [shakacode/react-on-rails-rsc-demo](https://github.com/shakacode/react-on-rails-rsc-demo)
-  _(slug rename to `react-on-rails-demo-rsc` pending — update this line when the
-  rename completes)_
-- Use it when you want a minimal public sample for React Server Components with
-  React on Rails Pro.
-- Note: this repo uses React on Rails Pro. See [OSS vs Pro](./oss-vs-pro.md)
-  for evaluation guidance.
-
-### React on Rails + TanStack Starter (Pro)
+### React on Rails Pro + TanStack/RSC Starter (Pro)
 
 - Repo: [shakacode/react-on-rails-starter-tanstack](https://github.com/shakacode/react-on-rails-starter-tanstack)
 - Use it when you want the maintained Rails 8 + React on Rails Pro + TanStack
@@ -95,7 +85,7 @@ For detailed proof criteria and migration contribution guidance, see
 - [hn.reactonrails.com](https://hn.reactonrails.com/) — Hacker News reader
   showing React on Rails Pro with React 19 and React Server Components on a
   familiar read-heavy UI.
-- [reactrails.com](https://reactrails.com) — production-style React on Rails app
+- [www.reactrails.com](https://www.reactrails.com) — production-style React on Rails app
   you can click through in your browser without any local setup. Backed by the
   legacy [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial)
   source.
@@ -107,8 +97,11 @@ repos are useful historical references, but they are not the primary starting
 point for new evaluations.
 
 - Legacy full app: [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) —
-  older production-style app (see Live Demos above for the running site at reactrails.com).
+  older production-style app (see Live Demos above for the running site at www.reactrails.com).
   Still useful as a historical reference, but not the recommended starting point for new projects.
+- Minimal RSC sample: [shakacode/react-on-rails-rsc-demo](https://github.com/shakacode/react-on-rails-rsc-demo) —
+  older minimal React Server Components sample. Use the TanStack Starter above
+  for a current React on Rails Pro + RSC starting point.
 
 If you are choosing a public reference repo for docs, talks, or adoption work,
 start with the repos above.

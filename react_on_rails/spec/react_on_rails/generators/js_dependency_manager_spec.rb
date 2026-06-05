@@ -647,7 +647,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
   describe "#rsc_packages_with_version" do
     it "defines an explicit RSC package version pin independent from the React semver range prefix" do
       expect(ReactOnRails::Generators::JsDependencyManager::RSC_REACT_VERSION_RANGE).to eq("~19.0.4")
-      expect(ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN).to eq("19.0.4")
+      expect(ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN).to eq("19.0.5-rc.6")
     end
 
     it "pins react-on-rails-rsc to the React 19 compatibility track" do
@@ -658,26 +658,65 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
   describe "#add_rsc_dependencies" do
     it "installs version-pinned rsc dependency" do
-      allow(instance).to receive(:rsc_packages_with_version).and_return([["react-on-rails-rsc@19.0.4"], true])
+      allow(instance).to receive(:rsc_packages_with_version).and_return([["react-on-rails-rsc@19.0.5-rc.6"], true])
 
       instance.send(:add_rsc_dependencies)
 
       expect(instance.add_npm_dependencies_calls).to include(
-        a_hash_including(packages: ["react-on-rails-rsc@19.0.4"], dev: false)
+        a_hash_including(packages: ["react-on-rails-rsc@19.0.5-rc.6"], dev: false)
       )
     end
 
     it "falls back to unversioned package when pinned install fails" do
-      allow(instance).to receive(:rsc_packages_with_version).and_return([["react-on-rails-rsc@19.0.4"], true])
+      allow(instance).to receive(:rsc_packages_with_version).and_return([["react-on-rails-rsc@19.0.5-rc.6"], true])
 
-      allow(instance).to receive(:add_packages).with(["react-on-rails-rsc@19.0.4"]).and_return(false)
+      allow(instance).to receive(:add_packages).with(["react-on-rails-rsc@19.0.5-rc.6"]).and_return(false)
       allow(instance).to receive(:add_packages).with(["react-on-rails-rsc"]).and_return(true)
 
       instance.send(:add_rsc_dependencies)
 
-      expect(instance).to have_received(:add_packages).with(["react-on-rails-rsc@19.0.4"])
+      expect(instance).to have_received(:add_packages).with(["react-on-rails-rsc@19.0.5-rc.6"])
       expect(instance).to have_received(:add_packages).with(["react-on-rails-rsc"])
       expect(warnings.join("\n")).to include("installed react-on-rails-rsc version may not match")
+    end
+
+    it "skips the unversioned fallback for rspack and keeps the pin when the pinned install fails" do
+      instance.using_rspack = true
+      allow(instance)
+        .to receive(:rsc_packages_with_version)
+        .and_return([["react-on-rails-rsc@19.0.5-rc.6"], true])
+
+      allow(instance).to receive(:add_packages).with(["react-on-rails-rsc@19.0.5-rc.6"]).and_return(false)
+      allow(instance).to receive(:add_packages).with(["react-on-rails-rsc"]).and_return(true)
+
+      instance.send(:add_rsc_dependencies)
+
+      # rspack must NOT retry the unversioned `latest` (it lacks RspackPlugin)
+      expect(instance).not_to have_received(:add_packages).with(["react-on-rails-rsc"])
+
+      warning_text = warnings.join("\n")
+      expect(warning_text).to include("Could not install the pinned react-on-rails-rsc@19.0.5-rc.6")
+      expect(warning_text).to include("react-on-rails-rsc/RspackPlugin")
+      # the manual instruction points at the pinned version, not the unversioned package
+      expect(warning_text).to include("npm install react-on-rails-rsc@19.0.5-rc.6")
+    end
+
+    it "keeps the rspack pin in the manual install instruction when the pinned install raises" do
+      instance.using_rspack = true
+      allow(instance)
+        .to receive(:rsc_packages_with_version)
+        .and_return([["react-on-rails-rsc@19.0.5-rc.6"], true])
+
+      allow(instance).to receive(:add_packages).with(["react-on-rails-rsc@19.0.5-rc.6"]).and_raise("network down")
+      allow(instance).to receive(:add_packages).with(["react-on-rails-rsc"]).and_return(true)
+
+      instance.send(:add_rsc_dependencies)
+
+      expect(instance).not_to have_received(:add_packages).with(["react-on-rails-rsc"])
+
+      warning_text = warnings.join("\n")
+      expect(warning_text).to include("Error adding React Server Components dependencies: network down")
+      expect(warning_text).to include("npm install react-on-rails-rsc@19.0.5-rc.6")
     end
   end
 

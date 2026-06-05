@@ -254,8 +254,13 @@ while IFS= read -r file; do
   # any character including /.
   # shellcheck disable=SC2221,SC2222
   case "$file" in
-    # Documentation files
-    *.md|*.mdx|*.markdown|*.rst|*.txt|docs/*|.lychee.toml)
+    # Documentation and non-runtime project metadata. None of these affect the
+    # gem/package runtime, tests, or benchmarks, so they must NOT fall through to
+    # the catch-all below, which forces the entire test + benchmark suite to run
+    # (see the #3474 regression and the benchmarks-on-a-docs-PR case in #3597).
+    #   - internal/**              : planning, contributor-info, testimonials, history docs
+    #   - .github/ISSUE_TEMPLATE/** : GitHub issue templates (repo metadata, not CI infra)
+    *.md|*.mdx|*.markdown|*.rst|*.txt|docs/*|internal/*|internal/**/*|.github/ISSUE_TEMPLATE/*|.github/ISSUE_TEMPLATE/**/*|.lychee.toml)
       # Don't change DOCS_ONLY flag, just continue
       ;;
 

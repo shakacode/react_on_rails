@@ -7,6 +7,7 @@ require "timeout"
 require "yaml"
 require_relative "utils"
 require_relative "config_path_resolver"
+require_relative "shakapacker_config_helpers"
 require_relative "dev/server_mode"
 require_relative "version_syntax_converter"
 require_relative "version_synchronizer"
@@ -47,6 +48,7 @@ module ReactOnRails
   # rubocop:disable Metrics/ClassLength, Metrics/AbcSize
   class Doctor
     include ConfigPathResolver
+    include ShakapackerConfigHelpers
 
     MESSAGE_COLORS = {
       error: :red,
@@ -58,7 +60,6 @@ module ReactOnRails
     RSPEC_HELPER_FILES = ["spec/rails_helper.rb", "spec/spec_helper.rb"].freeze
     MINITEST_HELPER_FILE = "test/test_helper.rb"
     DEFAULT_BUILD_TEST_COMMAND = 'config.build_test_command = "RAILS_ENV=test bin/shakapacker"'
-    DEFAULT_SHAKAPACKER_CONFIG_PATH = "config/shakapacker.yml"
     SERVER_BUNDLE_SOURCE_EXTENSIONS = %w[.js .jsx .ts .tsx .mjs .cjs].freeze
     CUSTOM_LAUNCHER_INDICATOR_FILES = %w[dev].freeze
     RAILS_SERVER_COMMAND_REGEX = %r{\b(?:(?:bin/)?rails\s+(?:server|s)|puma|unicorn|rackup|passenger\s+start)\b}
@@ -341,7 +342,7 @@ module ReactOnRails
 
     def procfile_descriptions
       {
-        hmr: "#{development_reload_mode_label} development with #{dev_server_procfile_label}",
+        hmr: "#{development_reload_mode_label} development with #{dev_server_label}",
         static: "Static development with #{static_watch_label}"
       }
     end
@@ -353,7 +354,7 @@ module ReactOnRails
     def bundler_aware_dev_server_text(text)
       return text if active_assets_bundler == "webpack"
 
-      text.gsub("webpack-dev-server", dev_server_procfile_label)
+      text.gsub("webpack-dev-server", dev_server_label)
     end
 
     def check_bin_dev_script
@@ -549,99 +550,21 @@ module ReactOnRails
       puts
     end
 
-    def dev_server_label
-      active_assets_bundler == "webpack" ? "webpack-dev-server" : "#{assets_bundler_label} dev server"
-    end
-
-    def active_assets_bundler
-      configured_assets_bundler || "webpack"
-    end
-
-    def assets_bundler_label
-      active_assets_bundler.capitalize
-    end
-
-    def dev_server_procfile_label
-      dev_server_label
-    end
-
     def static_watch_label
       active_assets_bundler == "webpack" ? "webpack --watch" : "#{active_assets_bundler} watch"
     end
-
-    def development_reload_mode_label
-      development_hmr_enabled? ? "HMR" : "Live reload"
-    end
-
-    def configured_assets_bundler
-      config = parsed_shakapacker_config
-      return nil unless config.is_a?(Hash)
-
-      rails_env = ENV["RAILS_ENV"] || ENV["RACK_ENV"] || "development"
-      bundler_from_shakapacker_section(config, rails_env) || bundler_from_shakapacker_section(config, "default")
-    rescue StandardError, ScriptError
-      nil
-    end
-
-    def parsed_shakapacker_config
-      config_path = shakapacker_config_path
-      return nil unless File.exist?(config_path)
-
-      parse_shakapacker_config(File.read(config_path))
-    rescue StandardError, ScriptError
-      nil
-    end
-
-    def bundler_from_shakapacker_section(config, section_name)
-      section = config[section_name] || config[section_name.to_sym]
-      return nil unless section.is_a?(Hash)
-
-      normalize_assets_bundler(section["assets_bundler"] || section[:assets_bundler])
-    end
-
-    def normalize_assets_bundler(value)
-      normalized = value.to_s.strip.downcase
-      ReactOnRails::SystemChecker::SUPPORTED_ASSETS_BUNDLERS.include?(normalized) ? normalized : nil
-    end
-
-    def development_hmr_enabled?
-      dev_server = development_dev_server_config
-      return hmr_config_value?(dev_server["hmr"]) if dev_server.key?("hmr")
-
-      return false if truthy_config_value?(dev_server["live_reload"])
-
-      # Default to HMR when neither hmr nor live_reload is configured, preserving historical behavior.
-      true
-    end
-
-    def hmr_config_value?(value)
-      value.to_s.strip.casecmp?("only") || truthy_config_value?(value)
-    end
-
-    def development_dev_server_config
-      config = parsed_shakapacker_config
-      return {} unless config.is_a?(Hash)
-
-      development_config = shakapacker_section(config, "default").merge(shakapacker_section(config, "development"))
-      dev_server_config_for(development_config)
-    end
-
-    def shakapacker_section(config, section_name)
-      section = config[section_name] || config[section_name.to_sym]
-      section.is_a?(Hash) ? section : {}
-    end
-
-    def dev_server_config_for(section)
-      dev_server = section["dev_server"] || section[:dev_server]
-      return {} unless dev_server.is_a?(Hash)
-
-      dev_server.transform_keys(&:to_s)
-    end
-
-    def truthy_config_value?(value)
-      value == true || value.to_s == "true"
-    end
     # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+
+    # Memoized per Doctor instance (a fresh Doctor runs per `doctor` invocation),
+    # so a single diagnosis reads and parses config/shakapacker.yml at most once
+    # even though several checks consult it. The base implementation lives in
+    # ShakapackerConfigHelpers. ServerManager intentionally does not memoize its
+    # copy because its helpers live on `class << self` and would leak across specs.
+    def parsed_shakapacker_config
+      return @parsed_shakapacker_config if defined?(@parsed_shakapacker_config)
+
+      @parsed_shakapacker_config = super
+    end
 
     def print_test_workflow_next_steps
       case @test_output_path_strategy
@@ -2069,20 +1992,6 @@ module ReactOnRails
     # than the Rails root. Without this, a relative SHAKAPACKER_CONFIG would fail to resolve and
     # dev-server mode detection would silently fall back to HMR labels. Falls back to Dir.pwd when
     # Rails isn't booted (e.g. in unit specs).
-    def shakapacker_config_path
-      env_config_path = ENV.fetch("SHAKAPACKER_CONFIG", nil)
-      base = shakapacker_config_base_dir
-      return File.expand_path(DEFAULT_SHAKAPACKER_CONFIG_PATH, base) if env_config_path.to_s.empty?
-
-      File.expand_path(env_config_path, base)
-    end
-
-    def shakapacker_config_base_dir
-      return Rails.root.to_s if defined?(Rails) && Rails.respond_to?(:root) && Rails.root
-
-      Dir.pwd
-    end
-
     def default_dev_server_mode
       @default_dev_server_mode ||= Dev::ServerMode.detect(shakapacker_config_path)
     end
