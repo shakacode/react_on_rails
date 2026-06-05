@@ -35,6 +35,8 @@ const parseArtifactParallelism = (value: string | undefined) => {
     return undefined;
   }
 
+  // Fractional inputs >= 1 are accepted and intentionally floored
+  // (for example, "1.7" runs one worker).
   return parallelism;
 };
 

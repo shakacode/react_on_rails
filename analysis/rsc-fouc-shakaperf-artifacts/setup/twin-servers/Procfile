@@ -1,6 +1,9 @@
 # Docker also sets REACT_RENDERER_URL=http://localhost:3800 in image ENV. The
 # Rails commands repeat that literal so direct Procfile runs work and host-shell
 # exports cannot rewrite container wiring.
+# SECRET_KEY_BASE is a fixed dummy for this hermetic rig. It is intentionally
+# inline here and process-list visible; use the README wrapper/file guidance
+# before adapting this Procfile for any non-dummy secret.
 control-node-renderer: shaka-perf servers run-overmind-command control "cd react_on_rails_pro/spec/dummy && RAILS_ENV=test NODE_ENV=test RENDERER_PORT=3800 pnpm run node-renderer"
 control-rails: shaka-perf servers run-overmind-command control "cd react_on_rails_pro/spec/dummy && RAILS_ENV=test NODE_ENV=test PORT=3000 SECRET_KEY_BASE=dummy-secret-key-base-for-shakaperf-rsc-fouc REACT_RENDERER_URL=http://localhost:3800 bundle exec rails s -b 0.0.0.0 -p 3000"
 experiment-node-renderer: shaka-perf servers run-overmind-command experiment "cd react_on_rails_pro/spec/dummy && RAILS_ENV=test NODE_ENV=test RENDERER_PORT=3800 pnpm run node-renderer"
