@@ -834,6 +834,27 @@ module ReactOnRails
         end
       end
 
+      %w[.mjs .cjs].each do |extension|
+        it "adds a lint-safe import statement to a #{extension} server bundle source entrypoint" do
+          same_instance = described_class.instance
+          backup_server_bundle_js_file_path = "#{server_bundle_js_file_path}.bak"
+          server_bundle_source_file_path = server_bundle_js_file_path.sub(/\.js\z/, extension)
+
+          FileUtils.mv(server_bundle_js_file_path, backup_server_bundle_js_file_path)
+          File.write(server_bundle_source_file_path, "")
+          same_instance.generate_packs_if_stale
+
+          generated_import = "import '../generated/server-bundle-generated.js'; " \
+                             "// eslint-disable-line import/extensions"
+          expect(File.read(server_bundle_source_file_path)).to include(generated_import)
+        ensure
+          FileUtils.rm_f(server_bundle_source_file_path) if server_bundle_source_file_path
+          if backup_server_bundle_js_file_path && File.exist?(backup_server_bundle_js_file_path)
+            FileUtils.mv(backup_server_bundle_js_file_path, server_bundle_js_file_path)
+          end
+        end
+      end
+
       it "serializes concurrent generation and rechecks staleness after waiting" do
         generator = nil
         first_thread = nil

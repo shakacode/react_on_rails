@@ -31,9 +31,8 @@ module ReactOnRails
     # Fallback order when the configured server bundle file is missing.
     # The configured extension is excluded, so server-bundle.js tries .jsx, .ts, .tsx, ...
     SERVER_BUNDLE_SOURCE_EXTENSIONS = %w[.js .jsx .ts .tsx .mts .cts .mjs .cjs].freeze
-    # import/extensions suppressions are needed for non-standard JS extensions.
-    # .mjs/.cjs are valid ESM/CJS extensions, so they do not need suppression comments.
-    SERVER_BUNDLE_IMPORT_EXTENSION_COMMENT_EXTENSIONS = %w[.jsx .ts .tsx .mts .cts].freeze
+    # import/extensions suppressions are needed when generated imports include an explicit .js extension.
+    SERVER_BUNDLE_IMPORT_EXTENSION_COMMENT_EXTENSIONS = %w[.jsx .ts .tsx .mts .cts .mjs .cjs].freeze
     # Auto-registration requires nested_entries support which was added in 7.0.0
     # Note: The gemspec requires Shakapacker >= 6.0 for basic functionality
     MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING = "7.0.0"
