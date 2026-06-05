@@ -369,7 +369,8 @@ describe('ClientRenderer', () => {
     });
 
     it('does not let a stale async renderer overwrite a newer same-id teardown', async () => {
-      // No setupRailsContext(): this test only exercises teardown-race ordering, not component rendering.
+      // No additional setupRailsContext() call needed; the enclosing beforeEach already runs it.
+      // This test exercises teardown-race ordering only, not full component rendering.
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       try {
         const resolvers: Array<(result: { teardown: () => void }) => void> = [];
