@@ -130,7 +130,7 @@ jobs:
 
           for attempt in {1..60}; do
             echo "Waiting for RSC FOUC probe server (${attempt}/60)..."
-            if curl -fsS "$SHAKAPERF_CONTROL_URL/rsc_posts_page_over_http" > /dev/null; then
+            if curl --connect-timeout 2 --max-time 5 -fsS "$SHAKAPERF_CONTROL_URL/rsc_posts_page_over_http" > /dev/null; then
               exit 0
             fi
 
