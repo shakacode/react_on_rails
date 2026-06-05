@@ -405,6 +405,36 @@ RSpec.describe GeneratorHelper, type: :generator do
       YAML
     end
 
+    it "honors later duplicate merge keys when they disable earlier raw hooks" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(false)
+        default: &default
+          precompile_hook: <%= false %>
+
+        base: &base
+          precompile_hook: false
+
+        test:
+          <<: *default
+          <<: *base
+          # precompile_hook: ~
+      YAML
+    end
+
+    it "honors later duplicate merge keys when they enable earlier inactive hooks" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(true)
+        base: &base
+          precompile_hook: false
+
+        default: &default
+          precompile_hook: <%= false %>
+
+        test:
+          <<: *base
+          <<: *default
+          # precompile_hook: ~
+      YAML
+    end
+
     it "ignores nested precompile_hook keys when scanning a section" do
       expect(active_precompile_hook_configured?(<<~YAML)).to be(false)
         default:
@@ -651,6 +681,44 @@ RSpec.describe GeneratorHelper, type: :generator do
       expect(
         generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
       ).to be(true)
+    end
+
+    it "materializes when a later duplicate merge key disables an earlier raw hook" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        default: &default
+          precompile_hook: <%= false %>
+
+        base: &base
+          precompile_hook: false
+
+        test:
+          <<: *default
+          <<: *base
+          # precompile_hook: ~
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(true)
+    end
+
+    it "does not materialize when a later duplicate merge key enables an earlier inactive hook" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        base: &base
+          precompile_hook: false
+
+        default: &default
+          precompile_hook: <%= false %>
+
+        test:
+          <<: *base
+          <<: *default
+          # precompile_hook: ~
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(false)
     end
 
     it "materializes when an inactive hook has a trailing comment that contains ERB" do

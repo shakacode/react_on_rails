@@ -220,20 +220,21 @@ module ReactOnRails
       end
 
       def shakapacker_yml_section_merge_aliases(section)
-        aliases = []
         child_indent = shakapacker_yml_section_child_indent(section)
-        return aliases unless child_indent
+        return [] unless child_indent
 
         lines = section.each_line.to_a
+        merge_alias_groups = []
         lines.each_with_index do |line, index|
           match = line.match(/^(\s+)<<:\s*(.*)$/)
           next unless match
           next unless match[1].length == child_indent
 
-          aliases.concat(match[2].scan(/\*([A-Za-z0-9_-]+)/).flatten)
+          aliases = match[2].scan(/\*([A-Za-z0-9_-]+)/).flatten
           aliases.concat(shakapacker_yml_block_merge_aliases(lines[(index + 1)..], match[1].length))
+          merge_alias_groups << aliases
         end
-        aliases
+        merge_alias_groups.reverse.flatten
       end
 
       def shakapacker_yml_block_merge_aliases(lines, merge_indent)
