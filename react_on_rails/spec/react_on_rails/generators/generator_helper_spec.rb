@@ -228,6 +228,646 @@ RSpec.describe GeneratorHelper, type: :generator do
 
       expect(parse_shakapacker_yml_content(aliased_config)).to eq({})
     end
+
+    it "warns and raises when shakapacker.yml ERB cannot be evaluated" do
+      expect do
+        parse_shakapacker_yml_content(<<~YAML)
+          default:
+            precompile_hook: <%= missing_local %>
+        YAML
+      end.to raise_error(%r{Could not evaluate ERB in config/shakapacker\.yml})
+
+      expect(say_status_calls).to include(
+        a_hash_including(message: a_string_matching(%r{Could not evaluate ERB in config/shakapacker\.yml}))
+      )
+      expect(say_status_calls).to include(
+        a_hash_including(message: a_string_matching(/Skipping generated precompile_hook updates/))
+      )
+    end
+
+    it "keeps file-level parsing tolerant when shakapacker.yml ERB cannot be evaluated" do
+      shakapacker_yml_path = File.join(destination_root, "config/shakapacker.yml")
+      FileUtils.mkdir_p(File.dirname(shakapacker_yml_path))
+      File.write(shakapacker_yml_path, <<~YAML)
+        default:
+          javascript_transpiler: <%= missing_local %>
+      YAML
+
+      expect(parse_shakapacker_yml(shakapacker_yml_path)).to eq({})
+      expect(say_status_calls).to include(
+        a_hash_including(message: a_string_matching(%r{Could not evaluate ERB in config/shakapacker\.yml}))
+      )
+    ensure
+      FileUtils.rm_f(shakapacker_yml_path)
+    end
+  end
+
+  describe "#active_precompile_hook_configured?" do
+    it "treats quoted and unquoted command strings beside a placeholder as active" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(true)
+        default:
+          precompile_hook: bin/shakapacker-precompile-hook
+          # precompile_hook: ~
+      YAML
+
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(true)
+        default:
+          precompile_hook: 'bin/shakapacker-precompile-hook'
+          # precompile_hook: ~
+      YAML
+    end
+
+    it "treats unquoted YAML null and boolean scalars as inactive" do
+      %w[
+        ~ null Null NULL
+        false False FALSE no No NO off Off OFF
+        true True TRUE yes Yes YES on On ON
+      ].each do |inactive_value|
+        expect(active_precompile_hook_configured?(<<~YAML)).to be(false), inactive_value
+          default:
+            precompile_hook: #{inactive_value}
+            # precompile_hook: ~
+        YAML
+      end
+    end
+
+    it "treats quoted boolean-like raw scalars as active commands when YAML parsing falls back" do
+      ['"false"', "'false'", '"true"', "'true'", '"no"', "'off'"].each do |quoted_value|
+        expect(active_precompile_hook_configured?(<<~YAML)).to be(true), quoted_value
+          default:
+            released_at: 2026-06-05
+            precompile_hook: #{quoted_value}
+            # precompile_hook: ~
+        YAML
+      end
+    end
+
+    it "preserves hash characters inside quoted raw hook values when YAML parsing falls back" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(true)
+        default:
+          released_at: 2026-06-05
+          precompile_hook: "bin/custom#hook" # trailing comment
+          # precompile_hook: ~
+      YAML
+    end
+
+    it "keeps unquoted boolean-like raw scalars inactive when YAML parsing falls back" do
+      %w[false true no off].each do |inactive_value|
+        expect(active_precompile_hook_configured?(<<~YAML)).to be(false), inactive_value
+          default:
+            released_at: 2026-06-05
+            precompile_hook: #{inactive_value}
+            # precompile_hook: ~
+        YAML
+      end
+    end
+
+    it "treats quoted empty scalars as inactive" do
+      ['""', "''"].each do |inactive_value|
+        expect(active_precompile_hook_configured?(<<~YAML)).to be(false), inactive_value
+          default:
+            precompile_hook: #{inactive_value}
+            # precompile_hook: ~
+        YAML
+      end
+    end
+
+    it "ignores ERB in trailing comments after inactive scalar values" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(false)
+        default:
+          precompile_hook: false # previously used <%= "bin/custom-precompile-hook" %>
+          # precompile_hook: ~
+      YAML
+    end
+
+    it "ignores active hooks in sections without a commented placeholder" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(false)
+        default:
+          # precompile_hook: ~
+
+        development:
+          precompile_hook: bin/development-precompile-hook
+      YAML
+    end
+
+    it "detects active hooks inherited by sections with a commented placeholder" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(true)
+        default: &default
+          precompile_hook: bin/custom-precompile-hook
+
+        test:
+          <<: *default
+          # precompile_hook: ~
+      YAML
+    end
+
+    it "detects inherited active hooks after rendering ERB" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(true)
+        default: &default
+          precompile_hook: <%= "bin/custom-precompile-hook" %>
+
+        test:
+          <<: *default
+          # precompile_hook: ~
+      YAML
+    end
+
+    it "detects inherited active hooks through block merge lists" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(true)
+        default: &default
+          precompile_hook: <%= false %>
+
+        test:
+          <<:
+            - *default
+          # precompile_hook: ~
+      YAML
+    end
+
+    it "warns when an active hook causes placeholder materialization to be skipped" do
+      say_status_calls.clear
+
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(true)
+        default: &default
+          precompile_hook: bin/custom-precompile-hook
+
+        test:
+          <<: *default
+          # precompile_hook: ~
+      YAML
+
+      expect(say_status_calls).to include(
+        a_hash_including(message: a_string_matching(/Existing direct or inherited precompile_hook/))
+      )
+      expect(say_status_calls).to include(
+        a_hash_including(message: a_string_matching(/configure remaining sections manually/))
+      )
+    end
+
+    it "detects inherited active hooks through commented block merge lists" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(true)
+        base: &base
+          compile: true
+
+        default: &default
+          precompile_hook: <%= false %>
+
+        test:
+          <<:
+            # Keep base first so later aliases can override it.
+            - *base
+            - *default
+          # precompile_hook: ~
+      YAML
+    end
+
+    it "honors merge-list precedence when an earlier alias disables a later raw hook" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(false)
+        base: &base
+          precompile_hook: false
+
+        default: &default
+          precompile_hook: <%= false %>
+
+        test:
+          <<:
+            - *base
+            - *default
+          # precompile_hook: ~
+      YAML
+    end
+
+    it "honors later duplicate merge keys when they disable earlier raw hooks" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(false)
+        default: &default
+          precompile_hook: <%= false %>
+
+        base: &base
+          precompile_hook: false
+
+        test:
+          <<: *default
+          <<: *base
+          # precompile_hook: ~
+      YAML
+    end
+
+    it "honors later duplicate merge keys when they enable earlier inactive hooks" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(true)
+        base: &base
+          precompile_hook: false
+
+        default: &default
+          precompile_hook: <%= false %>
+
+        test:
+          <<: *base
+          <<: *default
+          # precompile_hook: ~
+      YAML
+    end
+
+    it "ignores nested precompile_hook keys when scanning a section" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(false)
+        default:
+          nested:
+            precompile_hook: <%= false %>
+          # precompile_hook: ~
+      YAML
+    end
+
+    it "treats raw ERB precompile hooks as active because they may vary by environment" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(true)
+        default:
+          precompile_hook: <%= false %>
+          # precompile_hook: ~
+      YAML
+    end
+
+    it "does not treat inherited raw ERB hooks as active after a local inactive override" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(false)
+        default: &default
+          precompile_hook: <%= false %>
+
+        test:
+          <<: *default
+          precompile_hook: ~
+          # precompile_hook: ~
+      YAML
+    end
+
+    it "fails closed when ERB cannot be evaluated" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(true)
+        default:
+          precompile_hook: <%= missing_local %>
+          # precompile_hook: ~
+      YAML
+    end
+
+    it "detects raw active hooks when unrelated YAML values force parser fallback" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(true)
+        default:
+          released_at: 2026-06-05
+          precompile_hook: 'bin/custom-precompile-hook'
+          # precompile_hook: ~
+      YAML
+    end
+  end
+
+  describe "#raw_precompile_hook_value" do
+    it "strips unquoted comments without truncating quoted hashes" do
+      expect(raw_precompile_hook_value(%(  precompile_hook: "bin/custom#hook" # comment))).to eq(
+        '"bin/custom#hook"'
+      )
+      expect(raw_precompile_hook_value("  precompile_hook: false # <%= old_hook %>")).to eq("false")
+    end
+  end
+
+  describe "#generated_precompile_hook_will_be_configured?" do
+    let(:shakapacker_yml_path) { File.join(destination_root, "config/shakapacker.yml") }
+
+    before do
+      FileUtils.mkdir_p(File.dirname(shakapacker_yml_path))
+      allow(ReactOnRails::PackerUtils).to receive(:shakapacker_version_requirement_met?)
+        .with("9.0.0")
+        .and_return(true)
+    end
+
+    after do
+      FileUtils.rm_rf(File.join(destination_root, "config"))
+    end
+
+    it "does not materialize the generated hook when an unquoted active hook already exists" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        default: &default
+          precompile_hook: bin/shakapacker-precompile-hook
+          # precompile_hook: ~
+
+        test:
+          <<: *default
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(false)
+    end
+
+    it "does not materialize the generated hook over an inherited custom hook" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        default: &default
+          precompile_hook: bin/custom-precompile-hook
+
+        test:
+          <<: *default
+          # precompile_hook: ~
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(false)
+    end
+
+    it "does not materialize the generated hook over an inherited custom hook defined through ERB" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        default: &default
+          precompile_hook: <%= "bin/custom-precompile-hook" %>
+
+        test:
+          <<: *default
+          # precompile_hook: ~
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(false)
+    end
+
+    it "materializes the generated hook when unrelated environments use inactive YAML scalars" do
+      %w[~ null false true yes on].each do |inactive_value|
+        File.write(shakapacker_yml_path, <<~YAML)
+          default: &default
+            # precompile_hook: ~
+
+          development:
+            precompile_hook: #{inactive_value}
+
+          test:
+            <<: *default
+        YAML
+
+        expect(
+          generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+        ).to be(true), inactive_value
+      end
+    end
+
+    it "materializes the generated hook when an unrelated environment has an active hook" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        default: &default
+          # precompile_hook: ~
+
+        development:
+          precompile_hook: bin/development-precompile-hook
+
+        test:
+          <<: *default
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(true)
+    end
+
+    it "materializes the generated hook when an unrelated environment has an active hook beside a placeholder" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        default: &default
+          # precompile_hook: ~
+
+        development:
+          <<: *default
+          precompile_hook: bin/development-precompile-hook
+          # precompile_hook: ~
+
+        test:
+          <<: *default
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(true)
+    end
+
+    it "does not materialize over an ERB hook that may be active in the target build environment" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        default: &default
+          precompile_hook: '<%= Rails.env.production? ? "bin/custom-hook" : "" %>'
+          # precompile_hook: ~
+
+        test:
+          <<: *default
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "production")
+      ).to be(false)
+    end
+
+    it "does not materialize over an inherited raw ERB hook even if it renders inactive during install" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        default: &default
+          precompile_hook: <%= false %>
+
+        test:
+          <<: *default
+          # precompile_hook: ~
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(false)
+    end
+
+    it "does not materialize over a raw ERB hook inherited through a commented block merge list" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        base: &base
+          compile: true
+
+        default: &default
+          precompile_hook: <%= false %>
+
+        test:
+          <<:
+            # Keep base first so later aliases can override it.
+            - *base
+            - *default
+          # precompile_hook: ~
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(false)
+    end
+
+    it "does not materialize over a raw ERB hook inherited through a block merge list" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        default: &default
+          precompile_hook: <%= false %>
+
+        test:
+          <<:
+            - *default
+          # precompile_hook: ~
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(false)
+    end
+
+    it "materializes when an earlier merge-list alias disables a later raw hook" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        base: &base
+          precompile_hook: false
+
+        default: &default
+          precompile_hook: <%= false %>
+
+        test:
+          <<:
+            - *base
+            - *default
+          # precompile_hook: ~
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(true)
+    end
+
+    it "materializes when a later duplicate merge key disables an earlier raw hook" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        default: &default
+          precompile_hook: <%= false %>
+
+        base: &base
+          precompile_hook: false
+
+        test:
+          <<: *default
+          <<: *base
+          # precompile_hook: ~
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(true)
+    end
+
+    it "does not materialize when a later duplicate merge key enables an earlier inactive hook" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        base: &base
+          precompile_hook: false
+
+        default: &default
+          precompile_hook: <%= false %>
+
+        test:
+          <<: *base
+          <<: *default
+          # precompile_hook: ~
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(false)
+    end
+
+    it "materializes when an inactive hook has a trailing comment that contains ERB" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        default: &default
+          precompile_hook: false # previously used <%= "bin/custom-precompile-hook" %>
+          # precompile_hook: ~
+
+        test:
+          <<: *default
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(true)
+    end
+
+    it "materializes when only a nested map has a raw precompile_hook" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        test:
+          nested:
+            precompile_hook: <%= false %>
+          # precompile_hook: ~
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(true)
+    end
+
+    it "fails closed when ERB cannot be evaluated while checking generated hook materialization" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        default: &default
+          precompile_hook: <%= missing_local %>
+          # precompile_hook: ~
+
+        test:
+          <<: *default
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(false)
+    end
+
+    it "does not fall back to production raw hooks when parsed YAML is empty and the target section exists" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        production:
+          # precompile_hook: ~
+
+        test:
+          released_at: 2026-06-05
+          precompile_hook: 'bin/custom-test-hook'
+          # precompile_hook: ~
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(false)
+    end
+
+    it "does not materialize over an inherited raw quoted hook when YAML parsing falls back" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        default: &default
+          released_at: 2026-06-05
+          precompile_hook: 'bin/custom-precompile-hook'
+
+        test:
+          <<: *default
+          # precompile_hook: ~
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(false)
+    end
+
+    it "does not materialize over an inherited quoted boolean-like raw hook when YAML parsing falls back" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        default: &default
+          released_at: 2026-06-05
+          precompile_hook: "false"
+
+        test:
+          <<: *default
+          # precompile_hook: ~
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(false)
+    end
+
+    it "materializes when the target environment locally disables an inherited raw ERB hook" do
+      File.write(shakapacker_yml_path, <<~YAML)
+        default: &default
+          precompile_hook: <%= false %>
+
+        test:
+          <<: *default
+          precompile_hook: ~
+          # precompile_hook: ~
+      YAML
+
+      expect(
+        generated_precompile_hook_will_be_configured?(shakapacker_yml_path, environment: "test")
+      ).to be(true)
+    end
   end
 
   describe "Pro/RSC flag helpers" do

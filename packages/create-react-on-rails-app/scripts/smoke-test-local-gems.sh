@@ -177,11 +177,50 @@ verify_rails_route() {
 
 verify_generated_app_runtime() {
   local app_dir="$1"
+  local app_name
+  local build_output
+  local build_status
 
-  echo "Building test bundles for $(basename "$app_dir")..."
-  (cd "$app_dir" && "${PNPM_CMD[@]}" run build:test >/dev/null)
+  app_name="$(basename "$app_dir")"
+  echo "Building test bundles for $app_name..."
+  if ! pushd "$app_dir" >/dev/null; then
+    echo "Cannot cd to generated app directory for $app_name: $app_dir" >&2
+    return 1
+  fi
+
+  build_status=0
+  build_output="$("${PNPM_CMD[@]}" run build:test 2>&1)" || build_status=$?
+  popd >/dev/null || {
+    echo "popd failed after building test bundles for $app_name" >&2
+    return 1
+  }
+  if [ "$build_status" -ne 0 ]; then
+    echo "pnpm run build:test failed for $app_name. Output:" >&2
+    printf '%s\n' "$build_output" >&2
+    return "$build_status"
+  fi
+
   verify_rails_route "$app_dir" "/" "OSS vs Pro"
   verify_rails_route "$app_dir" "/hello_world" "Say hello to:"
+}
+
+assert_file_absent() {
+  local file_path="$1"
+
+  if test -f "$file_path"; then
+    echo "Expected file to be absent: $file_path" >&2
+    return 1
+  fi
+}
+
+assert_grep_absent() {
+  local pattern="$1"
+  local file_path="$2"
+
+  if grep -q -- "$pattern" "$file_path"; then
+    echo "Expected $file_path not to contain: $pattern" >&2
+    return 1
+  fi
 }
 
 echo "Verifying generated files..."
@@ -199,7 +238,7 @@ grep -q 'DEFAULT_ROUTE = "/"' "$APP_TS_DIR/bin/dev"
 grep -q 'AUTO_OPEN_BROWSER_ONCE = true' "$APP_TS_DIR/bin/dev"
 grep -q -- '--open-browser-once' "$APP_TS_DIR/bin/dev"
 test -f "$APP_TS_DIR/pnpm-lock.yaml"
-! test -f "$APP_TS_DIR/package-lock.json"
+assert_file_absent "$APP_TS_DIR/package-lock.json"
 grep -q '"packageManager": "pnpm@' "$APP_TS_DIR/package.json"
 grep -q 'system!("pnpm install")' "$APP_TS_DIR/bin/setup"
 expect_git_history "$APP_TS_DIR" \
@@ -212,12 +251,12 @@ grep -q "gem \"react_on_rails\"" "$APP_JS_DIR/Gemfile"
 grep -q "path: \"$RUBY_GEM_DIR\"" "$APP_JS_DIR/Gemfile"
 grep -q 'root to: "home#index"' "$APP_JS_DIR/config/routes.rb"
 grep -q "hello_world" "$APP_JS_DIR/config/routes.rb"
-! grep -q "gem \"react_on_rails_pro\"" "$APP_JS_DIR/Gemfile"
+assert_grep_absent "gem \"react_on_rails_pro\"" "$APP_JS_DIR/Gemfile"
 test -f "$APP_JS_DIR/app/views/home/index.html.erb"
 grep -q 'DEFAULT_ROUTE = "/"' "$APP_JS_DIR/bin/dev"
 grep -q 'AUTO_OPEN_BROWSER_ONCE = true' "$APP_JS_DIR/bin/dev"
 test -f "$APP_JS_DIR/pnpm-lock.yaml"
-! test -f "$APP_JS_DIR/package-lock.json"
+assert_file_absent "$APP_JS_DIR/package-lock.json"
 grep -q '"packageManager": "pnpm@' "$APP_JS_DIR/package.json"
 grep -q 'system!("pnpm install")' "$APP_JS_DIR/bin/setup"
 expect_git_history "$APP_JS_DIR" \
@@ -236,7 +275,7 @@ grep -q 'DEFAULT_ROUTE = "/"' "$APP_RSPACK_DIR/bin/dev"
 grep -q 'AUTO_OPEN_BROWSER_ONCE = true' "$APP_RSPACK_DIR/bin/dev"
 grep -q '"@rspack/core"' "$APP_RSPACK_DIR/package.json"
 test -f "$APP_RSPACK_DIR/pnpm-lock.yaml"
-! test -f "$APP_RSPACK_DIR/package-lock.json"
+assert_file_absent "$APP_RSPACK_DIR/package-lock.json"
 grep -q '"packageManager": "pnpm@' "$APP_RSPACK_DIR/package.json"
 grep -q 'system!("pnpm install")' "$APP_RSPACK_DIR/bin/setup"
 expect_git_history "$APP_RSPACK_DIR" \
@@ -261,7 +300,7 @@ test -f "$APP_PRO_DIR/app/javascript/src/HelloWorld/ror_components/HelloWorld.cl
 grep -q 'DEFAULT_ROUTE = "/"' "$APP_PRO_DIR/bin/dev"
 grep -q 'AUTO_OPEN_BROWSER_ONCE = true' "$APP_PRO_DIR/bin/dev"
 test -f "$APP_PRO_DIR/pnpm-lock.yaml"
-! test -f "$APP_PRO_DIR/package-lock.json"
+assert_file_absent "$APP_PRO_DIR/package-lock.json"
 grep -q '"packageManager": "pnpm@' "$APP_PRO_DIR/package.json"
 grep -q 'system!("pnpm install")' "$APP_PRO_DIR/bin/setup"
 expect_git_history "$APP_PRO_DIR" \
@@ -283,7 +322,7 @@ grep -Eq "stream_react_component\\(['\\\"]HelloServer['\\\"]" "$APP_RSC_JS_DIR/a
 grep -q 'DEFAULT_ROUTE = "/"' "$APP_RSC_JS_DIR/bin/dev"
 grep -q 'AUTO_OPEN_BROWSER_ONCE = true' "$APP_RSC_JS_DIR/bin/dev"
 test -f "$APP_RSC_JS_DIR/pnpm-lock.yaml"
-! test -f "$APP_RSC_JS_DIR/package-lock.json"
+assert_file_absent "$APP_RSC_JS_DIR/package-lock.json"
 grep -q '"packageManager": "pnpm@' "$APP_RSC_JS_DIR/package.json"
 grep -q 'system!("pnpm install")' "$APP_RSC_JS_DIR/bin/setup"
 expect_git_history "$APP_RSC_JS_DIR" \
@@ -302,7 +341,7 @@ test -f "$APP_RSC_TS_DIR/app/javascript/src/HelloServer/components/HelloServer.t
 grep -q 'DEFAULT_ROUTE = "/"' "$APP_RSC_TS_DIR/bin/dev"
 grep -q 'AUTO_OPEN_BROWSER_ONCE = true' "$APP_RSC_TS_DIR/bin/dev"
 test -f "$APP_RSC_TS_DIR/pnpm-lock.yaml"
-! test -f "$APP_RSC_TS_DIR/package-lock.json"
+assert_file_absent "$APP_RSC_TS_DIR/package-lock.json"
 grep -q '"packageManager": "pnpm@' "$APP_RSC_TS_DIR/package.json"
 grep -q 'system!("pnpm install")' "$APP_RSC_TS_DIR/bin/setup"
 expect_git_history "$APP_RSC_TS_DIR" \
@@ -325,7 +364,7 @@ grep -q "\"@rspack/core\"" "$APP_RSC_RSPACK_DIR/package.json"
 grep -q 'DEFAULT_ROUTE = "/"' "$APP_RSC_RSPACK_DIR/bin/dev"
 grep -q 'AUTO_OPEN_BROWSER_ONCE = true' "$APP_RSC_RSPACK_DIR/bin/dev"
 test -f "$APP_RSC_RSPACK_DIR/pnpm-lock.yaml"
-! test -f "$APP_RSC_RSPACK_DIR/package-lock.json"
+assert_file_absent "$APP_RSC_RSPACK_DIR/package-lock.json"
 grep -q '"packageManager": "pnpm@' "$APP_RSC_RSPACK_DIR/package.json"
 grep -q 'system!("pnpm install")' "$APP_RSC_RSPACK_DIR/bin/setup"
 expect_git_history "$APP_RSC_RSPACK_DIR" \
