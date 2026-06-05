@@ -1,31 +1,36 @@
 # frozen_string_literal: true
 
-# Renders a benchmark suite's results as a Markdown section: a pipe table whose
-# tracked-measure cells (RPS, p50) are bolded and tagged 🔴 (regression) / 🟢
-# (improvement) when the value crossed its t-test prediction interval in either
-# direction, driven by a BencherReport. Non-tracked columns (p90, Status) are
-# shown but never highlighted. Pure string building — no I/O.
+# Renders a benchmark suite's results as a Markdown section: a pipe table whose tracked
+# metric cells (RPS, p50, p90) show the value, a ▲/▼ delta vs the Bencher baseline, and
+# the baseline in parentheses. A value that crossed its t-test prediction interval is
+# bolded with the arrow replaced by 🔴 (regression) / 🟢 (improvement), driven by a
+# BencherReport. The benchmark name links to that benchmark's perf plot when the report
+# exposes one. Pure string building — no I/O.
 class BenchmarkTable
   REGRESSION = "🔴"
   IMPROVEMENT = "🟢"
+  UP = "▲"
+  DOWN = "▼"
 
-  # Display-order columns. A :measure + :direction makes the column highlightable
-  # and MUST match the tracked measure/side in track_benchmarks.rb THRESHOLDS
-  # (rps: higher-is-better/:lower; p50_latency and failed_pct: lower-is-better/:upper).
-  # Every THRESHOLDS measure has a highlightable column here (pinned both directions by
-  # track_benchmarks_spec.rb) so an alert on any tracked measure is visible in the
-  # table. Columns without :measure (p90, Status) are shown but never highlighted.
+  # Display-order columns. A :measure makes the cell carry a baseline delta; a :measure
+  # WITH a :direction also makes it highlightable and MUST match the tracked measure/side
+  # in track_benchmarks.rb THRESHOLDS (rps: higher-is-better/:lower; p50_latency:
+  # lower-is-better/:upper). Every THRESHOLDS-tracked-AND-displayed measure has a
+  # highlightable column here (pinned by track_benchmarks_spec.rb) so an alert on a
+  # displayed measure is visible. p90_latency has a baseline column but no :direction:
+  # it is sent to Bencher boundary-less (no threshold), so it shows a delta if a baseline
+  # exists but is never flagged significant. failed_pct stays tracked in THRESHOLDS for
+  # alerting but is intentionally NOT a column (redundant with Status — issue #3601 item 4).
   COLUMNS = [
     { header: "Benchmark", field: "name" },
     { header: "RPS", field: "rps", measure: "rps", direction: :lower },
     { header: "p50(ms)", field: "p50", measure: "p50_latency", direction: :upper },
-    { header: "p90(ms)", field: "p90" },
-    { header: "Fail%", field: "failed_pct", measure: "failed_pct", direction: :upper },
+    { header: "p90(ms)", field: "p90", measure: "p90_latency" },
     { header: "Status", field: "status" }
   ].freeze
 
-  LEGEND = "#{REGRESSION} significant regression · #{IMPROVEMENT} significant " \
-           "improvement (vs baseline; tracked measures only)".freeze
+  LEGEND = "#{UP}/#{DOWN} change vs baseline · #{REGRESSION} significant regression · " \
+           "#{IMPROVEMENT} significant improvement · (n) = baseline (tracked measures only)".freeze
 
   EMPTY = "_No benchmark results._"
 
@@ -63,17 +68,56 @@ class BenchmarkTable
   end
 
   def cell(row, col)
-    value = row[col[:field]]
-    text = render_value(value)
-    # Only tracked, numeric cells can be highlighted: a non-tracked column has no
-    # :measure, and a missing/failed value (nil) has nothing meaningful to flag.
-    return text unless col[:measure] && @report && value.is_a?(Numeric)
+    return name_cell(row) if col[:field] == "name"
 
-    case @report.significance(row["name"], col[:measure], col[:direction])
-    when :regression then "**#{text}** #{REGRESSION}"
-    when :improvement then "**#{text}** #{IMPROVEMENT}"
-    else text
+    value = row[col[:field]]
+    # Only tracked, numeric cells get a delta: a non-tracked column has no :measure, and a
+    # missing/failed value (nil or a "FAILED"/"MISSING" token) has no baseline to compare.
+    return render_value(value) unless col[:measure] && @report && value.is_a?(Numeric)
+
+    metric_cell(row["name"], col, value)
+  end
+
+  # The benchmark name, linked to its Bencher perf plot when the report exposes a URL.
+  # The link text is still escaped; benchmark names are controlled CI output (route paths,
+  # test names) with no [] so they can't break the link syntax.
+  def name_cell(row)
+    name = row["name"]
+    text = render_value(name)
+    url = @report&.perf_url(name)
+    url ? "[#{text}](#{url})" : text
+  end
+
+  # value + ▲/▼ delta + (baseline), with the arrow swapped for 🔴/🟢 and the value bolded
+  # when the measure crossed its boundary. No baseline (new benchmark / boundary-less p90)
+  # or an exact match → just the value.
+  def metric_cell(name, col, value)
+    text = render_value(value)
+    baseline = @report.boundary(name, col[:measure])&.baseline
+    # No baseline (new benchmark / boundary-less p90), an exact match, or a zero baseline
+    # (no meaningful percent, and it would divide by zero) → just the value.
+    return text if baseline.nil? || baseline.zero? || value == baseline
+
+    verdict = col[:direction] ? @report.significance(name, col[:measure], col[:direction]) : nil
+    value_text = verdict ? "**#{text}**" : text
+    "#{value_text} #{delta(verdict, value, baseline)} (#{format_number(baseline)})"
+  end
+
+  # "▲2.3%" / "▼1.4%" for a plain change; "🔴 8.4%" / "🟢 5.0%" for a significant one (the
+  # emoji gets a trailing space so it renders clear of the percent). The percent is the
+  # absolute change vs baseline; direction is conveyed by the arrow, or by the emoji plus
+  # the column's known better-direction.
+  def delta(verdict, value, baseline)
+    percent = ((value - baseline) / baseline * 100).abs.round(1)
+    case verdict
+    when :regression then "#{REGRESSION} #{percent}%"
+    when :improvement then "#{IMPROVEMENT} #{percent}%"
+    else "#{value > baseline ? UP : DOWN}#{percent}%"
     end
+  end
+
+  def format_number(number)
+    number.round(2)
   end
 
   def render_value(value)

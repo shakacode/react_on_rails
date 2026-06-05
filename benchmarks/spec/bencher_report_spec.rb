@@ -190,6 +190,76 @@ RSpec.describe BencherReport do
     end
   end
 
+  # Per-benchmark Bencher perf-plot URL (issue #3601 item 2). Built from the report's
+  # branch/head/testbed UUIDs (top-level), the per-benchmark UUID and its measure UUIDs,
+  # and the report UUID — matching the query shape Bencher's own PR-comment code emits
+  # (lib/bencher_comment perf_url + JsonPerfQuery: branches/heads/testbeds/benchmarks/
+  # measures comma-lists, then report=). These fields are NOT part of the documented
+  # contract, so extraction is lenient: any missing piece yields nil and the caller
+  # renders the benchmark name unlinked rather than failing the job.
+  describe "#perf_url" do
+    def bench(name:, uuid:, measure_uuids:)
+      measures = measure_uuids.each_with_index.map do |muuid, i|
+        { "measure" => { "slug" => "m#{i}", "name" => "m#{i}", "uuid" => muuid }, "metric" => { "value" => 1.0 } }
+      end
+      { "benchmark" => { "name" => name, "uuid" => uuid }, "measures" => measures }
+    end
+
+    def report_with(results:, **ctx)
+      head_uuid = ctx.fetch(:head_uuid, "H")
+      branch = { "uuid" => ctx.fetch(:branch_uuid, "B") }
+      branch["head"] = { "uuid" => head_uuid } if head_uuid
+      raw = {
+        "uuid" => ctx.fetch(:report_uuid, "R"),
+        "project" => { "slug" => ctx.fetch(:project_slug, "P") },
+        "branch" => branch,
+        "testbed" => { "uuid" => ctx.fetch(:testbed_uuid, "T") },
+        "results" => results, "alerts" => []
+      }
+      described_class.new(raw)
+    end
+
+    it "builds a per-benchmark perf URL from branch/head/testbed/benchmark/measures/report" do
+      report = report_with(results: [[bench(name: "/foo: Core", uuid: "BM", measure_uuids: %w[M1 M2])]])
+      expect(report.perf_url("/foo: Core")).to eq(
+        "https://bencher.dev/perf/P?branches=B&heads=H&testbeds=T&benchmarks=BM&measures=M1,M2&report=R"
+      )
+    end
+
+    it "returns nil for an unknown benchmark" do
+      report = report_with(results: [[bench(name: "/foo", uuid: "BM", measure_uuids: %w[M1])]])
+      expect(report.perf_url("/missing")).to be_nil
+    end
+
+    it "returns nil when a required id (testbed) is absent, so the name renders unlinked" do
+      raw = { "uuid" => "R", "project" => { "slug" => "P" },
+              "branch" => { "uuid" => "B", "head" => { "uuid" => "H" } },
+              "results" => [[bench(name: "/foo", uuid: "BM", measure_uuids: %w[M1])]], "alerts" => [] }
+      expect(described_class.new(raw).perf_url("/foo")).to be_nil
+    end
+
+    it "returns nil when the benchmark has no measure uuids" do
+      report = report_with(results: [[bench(name: "/foo", uuid: "BM", measure_uuids: [])]])
+      expect(report.perf_url("/foo")).to be_nil
+    end
+
+    it "omits the optional head param when the branch head uuid is absent" do
+      report = report_with(results: [[bench(name: "/foo", uuid: "BM", measure_uuids: %w[M1])]], head_uuid: nil)
+      expect(report.perf_url("/foo")).to eq(
+        "https://bencher.dev/perf/P?branches=B&testbeds=T&benchmarks=BM&measures=M1&report=R"
+      )
+    end
+
+    it "omits the optional report param when the report uuid is absent" do
+      raw = { "project" => { "slug" => "P" },
+              "branch" => { "uuid" => "B", "head" => { "uuid" => "H" } }, "testbed" => { "uuid" => "T" },
+              "results" => [[bench(name: "/foo", uuid: "BM", measure_uuids: %w[M1])]], "alerts" => [] }
+      expect(described_class.new(raw).perf_url("/foo")).to eq(
+        "https://bencher.dev/perf/P?branches=B&heads=H&testbeds=T&benchmarks=BM&measures=M1"
+      )
+    end
+  end
+
   describe "defensive parsing" do
     it "raises FormatError on invalid JSON" do
       expect { described_class.parse("{not json") }.to raise_error(BencherReport::FormatError, /not valid JSON/)
