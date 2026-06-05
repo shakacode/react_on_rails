@@ -12,6 +12,7 @@ import * as Authenticity from '../Authenticity.ts';
 import buildConsoleReplay, { consoleReplay } from '../buildConsoleReplay.ts';
 import reactHydrateOrRender from '../reactHydrateOrRender.ts';
 import createReactOutput from '../createReactOutput.ts';
+import componentRegistrationMetric from '../componentRegistrationMetric.ts';
 
 const DEFAULT_OPTIONS = {
   traceTurbolinks: false,
@@ -135,17 +136,7 @@ export function createCoreCapability(registries: Registries) {
         if (this.options.debugMode) {
           componentNames.forEach((name) => {
             const component = components[name];
-            const registrationMetric = (() => {
-              if (typeof component === 'function') {
-                return { label: 'source chars', value: component.toString().length };
-              }
-
-              try {
-                return { label: 'export keys', value: Object.keys(component as object).length };
-              } catch {
-                return { label: 'tag chars', value: Object.prototype.toString.call(component).length };
-              }
-            })();
+            const registrationMetric = componentRegistrationMetric(component);
             console.log(
               `[ReactOnRails] ✅ Registered: ${name} (${registrationMetric.value} ${registrationMetric.label})`,
             );

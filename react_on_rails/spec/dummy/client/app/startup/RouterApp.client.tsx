@@ -15,8 +15,8 @@ const routerFuture: ComponentProps<typeof BrowserRouter>['future'] = {
   v7_relativeSplatPath: true,
 };
 
-const RouterApp = (props: RouterAppProps) => (
-  <BrowserRouter {...props} future={routerFuture}>
+const RouterApp = ({ helloWorldData: _helloWorldData, ...routerProps }: RouterAppProps) => (
+  <BrowserRouter {...routerProps} future={routerFuture}>
     {routes}
   </BrowserRouter>
 );
