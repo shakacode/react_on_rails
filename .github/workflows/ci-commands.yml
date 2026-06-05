@@ -10,8 +10,10 @@ concurrency:
 
 jobs:
   handle-ci-command:
+    # `contains` is case-insensitive, matching the command parser below.
     if: |
       github.event.issue.pull_request &&
+      github.event.comment.user.type != 'Bot' &&
       contains(github.event.comment.body, '+ci-')
     runs-on: ubuntu-22.04
     permissions:
@@ -149,12 +151,14 @@ jobs:
             }
 
             async function listPullRequestFiles() {
-              return github.paginate(github.rest.pulls.listFiles, {
+              const files = await github.paginate(github.rest.pulls.listFiles, {
                 owner,
                 repo,
                 pull_number: issueNumber,
                 per_page: 100
               });
+
+              return files;
             }
 
             function isDocsOnly(files) {
@@ -171,11 +175,15 @@ jobs:
                 per_page: 100
               });
 
-              return comments.reverse().find((comment) =>
+              return [...comments].reverse().find((comment) =>
                 comment.user?.login === 'github-actions[bot]' &&
                 comment.user?.type === 'Bot' &&
                 (comment.body || '').startsWith(marker)
               );
+            }
+
+            function oneLine(value) {
+              return value.replace(/[\r\n]+/g, ' ').trim();
             }
 
             function helpBody() {
@@ -220,13 +228,10 @@ jobs:
                 'React on Rails Pro - Package Tests': 'pro-test-package-and-gem.yml'
               };
 
-              const succeeded = [];
-              const failed = [];
-
-              for (const workflowName of Object.keys(workflowMap)) {
-                const workflowFile = workflowMap[workflowName];
-                try {
-                  await github.rest.actions.createWorkflowDispatch({
+              const workflowEntries = Object.entries(workflowMap);
+              const dispatchResults = await Promise.allSettled(
+                workflowEntries.map(([workflowName, workflowFile]) =>
+                  github.rest.actions.createWorkflowDispatch({
                     owner,
                     repo,
                     workflow_id: workflowFile,
@@ -234,10 +239,21 @@ jobs:
                     inputs: {
                       force_run: 'true'
                     }
+                  }).then(() => ({ id: workflowFile, name: workflowName }))
+                )
+              );
+
+              const succeeded = [];
+              const failed = [];
+
+              for (const [index, result] of dispatchResults.entries()) {
+                if (result.status === 'fulfilled') {
+                  succeeded.push(result.value);
+                } else {
+                  failed.push({
+                    workflow: workflowEntries[index][0],
+                    error: result.reason?.message || String(result.reason)
                   });
-                  succeeded.push({ id: workflowFile, name: workflowName });
-                } catch (error) {
-                  failed.push({ workflow: workflowName, error: error.message });
                 }
               }
 
@@ -274,7 +290,7 @@ jobs:
 
             async function handleSkipFull(pr, args) {
               const removedFullCi = await removeFullCiLabel();
-              const reason = args || 'not provided';
+              const reason = oneLine(args) || 'not provided';
               const shortSha = pr.head.sha.slice(0, 12);
 
               await postComment([
