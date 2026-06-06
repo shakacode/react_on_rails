@@ -85,8 +85,8 @@ class BenchmarkTargetMonitor
   # preventing pre-measurement events from matching the post-run scan.
   def blank_existing_log_bytes
     File.open(@target_log, "r+b") do |file|
-      # Capture size after opening, so bytes appended before the open are blanked.
-      # Bytes appended after this point belong to the measured window.
+      # Capture size after opening; this size is the blanking boundary.
+      # Bytes appended after file.size returns belong to the measured window.
       remaining = file.size
       until remaining.zero?
         chunk_size = [remaining, BLANK_CHUNK_SIZE].min
@@ -128,7 +128,7 @@ class BenchmarkTargetMonitor
   end
 
   def unexpected_worker_restart_lines
-    File.readlines(@target_log, chomp: true).each_with_index.filter_map do |line, index|
+    File.foreach(@target_log, chomp: true).each_with_index.filter_map do |line, index|
       next unless line.include?(UNEXPECTED_WORKER_RESTART)
 
       "#{index + 1}:#{line}"
