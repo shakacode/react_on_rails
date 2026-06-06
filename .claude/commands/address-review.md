@@ -272,6 +272,8 @@ Do everything in `f` for `MUST-FIX` items, plus address all `OPTIONAL` items inl
 
 Present the requested items with full context and ask the user for a decision on each. If the user enters bare `d` with no item numbers, present all `DISCUSS` items. After the user decides, treat approved items as `MUST-FIX` (fix, reply, resolve) and declined items as `SKIPPED` (optionally reply with rationale if the user asks). For approved items that produce local changes, use the same commit/push-before-reply ordering as action `f`. After handling requested `d` items, re-offer the quick-action menu for remaining unaddressed items.
 
+`d` only accepts `DISCUSS` item numbers. If any selected number refers to an `OPTIONAL`, `MUST-FIX`, or `SKIPPED` item, do not proceed. Respond with "Item N is {tier} - use `{o|f|r}` instead" for each mismatched number and ask for a corrected selection.
+
 ### Action `o` — Optional items
 
 Present the requested items with full context. If the user enters bare `o`, present all `OPTIONAL` items for selection. For each selected optional item, treat it the same as a must-fix: make the code change, run relevant checks, reply, and resolve the thread. Use the same commit/push-before-reply ordering as action `f`. For optional items the user declines, offer a rationale reply via `r <nums>`.
@@ -311,7 +313,7 @@ Users can chain actions: e.g., `f+i` then `r7-9`. After the first action complet
 ### General rules for all actions
 
 Except for action `a`, when addressing items, after completing each selected item (whether `MUST-FIX`, `DISCUSS`, or `OPTIONAL`), reply to the original review comment explaining how it was addressed.
-If the user selects `DISCUSS` or `OPTIONAL` items to address, treat them the same as `MUST-FIX`: make the code change, reply, and resolve the thread.
+For actions other than `a`, if the user selects `DISCUSS` or `OPTIONAL` items to address, treat them the same as `MUST-FIX`: make the code change, reply, and resolve the thread.
 If the user selects skipped/declined items for rationale replies, post those replies too.
 
 **For issue comments (general PR comments):**
