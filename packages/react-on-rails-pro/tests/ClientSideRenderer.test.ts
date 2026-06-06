@@ -575,6 +575,46 @@ describe('ClientSideRenderer', () => {
     expect(rootUnmount).toHaveBeenCalledTimes(1);
   });
 
+  it('logs and continues cleanup when a framework-created React root throws during unmount', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const unmountError = new Error('root unmount boom');
+      const firstRootUnmount = jest.fn(() => {
+        throw unmountError;
+      });
+      const secondRootUnmount = jest.fn();
+      const thirdRootUnmount = jest.fn();
+      mockReactHydrateOrRender
+        .mockReturnValueOnce({ render: jest.fn(), unmount: firstRootUnmount })
+        .mockReturnValueOnce({ render: jest.fn(), unmount: secondRootUnmount })
+        .mockReturnValueOnce({ render: jest.fn(), unmount: thirdRootUnmount });
+      ComponentRegistry.register({
+        TestComponent: ({ greeting }: { greeting: string }) => React.createElement('div', null, greeting),
+      });
+      const firstComponentSpec = setupTestComponentDom('dom-id-root-unmount-throws');
+      const secondComponentSpec = setupTestComponentDom('dom-id-root-unmount-continues');
+      addRailsContext();
+
+      await renderOrHydrateComponent(firstComponentSpec);
+      await renderOrHydrateComponent(secondComponentSpec);
+
+      expect(() => unmountAll()).not.toThrow();
+      expect(firstRootUnmount).toHaveBeenCalledTimes(1);
+      expect(secondRootUnmount).toHaveBeenCalledTimes(1);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error calling root.unmount() for dom node "dom-id-root-unmount-throws":',
+        unmountError,
+      );
+
+      await renderOrHydrateComponent(firstComponentSpec);
+
+      expect(mockReactHydrateOrRender).toHaveBeenCalledTimes(3);
+      expect(thirdRootUnmount).not.toHaveBeenCalled();
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
   // Complements the no-teardown renderer test: a renderer that opts out of cleanup still owns its own
   // mount, so unmount() must take the renderer-owned path and NOT unmount a React root (it never
   // created one). With the default mock, a non-renderer mount would set `this.root`; a renderer mount
