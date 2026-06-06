@@ -95,7 +95,7 @@ module ReactOnRailsPro
         def without_random_values(js_code)
           # domNodeId are random to enable multiple instance of the same react component on a page.
           # See https://github.com/shakacode/react_on_rails_pro/issues/44
-          js_code.gsub(/domNodeId: '[\w-]*',/, "")
+          js_code.gsub(/domNodeId:\s*(["'])[\w-]*\1,/, "")
         end
 
         def cache_key(js_code, render_options)
