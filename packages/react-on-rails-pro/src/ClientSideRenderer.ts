@@ -296,8 +296,13 @@ You should return a React.Component always for the client side entry point.`);
     }
 
     if (supportsRootApi) {
-      this.root?.unmount();
-      this.root = undefined;
+      try {
+        this.root?.unmount();
+      } catch (e: unknown) {
+        console.error(`Error calling root.unmount() for dom node "${this.domNodeId}":`, e);
+      } finally {
+        this.root = undefined;
+      }
     } else {
       // Use the stored node first. During same-id replacement, document.getElementById(this.domNodeId)
       // already points at the new node, but the old legacy React tree is attached to this.domNode.
