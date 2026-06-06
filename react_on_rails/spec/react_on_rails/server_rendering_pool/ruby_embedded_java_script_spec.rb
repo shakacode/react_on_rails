@@ -139,6 +139,33 @@ module ReactOnRails
           end
         end
 
+        context "when an EPERM connect signature survives only as the error's #cause" do
+          let(:error) { wrapped_error(Errno::EPERM, "connect(2) for 127.0.0.1:3800", "renderer request failed") }
+
+          it "is classified as a connection failure via the cause message" do
+            message = render_error_for(error).message
+            expect(message).to include("could not connect to the Node renderer at 127.0.0.1:3800")
+            expect(message).not_to include("Check your webpack configuration")
+          end
+        end
+
+        context "when an HTTP-served server bundle cannot be loaded" do
+          let(:error) do
+            ReactOnRails::ServerBundleLoadError.new(
+              "You specified server rendering JS file: http://localhost:3035/server-bundle.js, " \
+              "but it cannot be read.\nError is: Failed to open TCP connection to localhost:3035"
+            )
+          end
+
+          it "preserves the bundle-load failure instead of reporting a renderer connection failure" do
+            raised_error = render_error_for(error)
+            expect(raised_error).to be_a(ReactOnRails::ServerBundleLoadError)
+            expect(raised_error.message).to include("server-bundle.js")
+            expect(raised_error.message).to include("cannot be read")
+            expect(raised_error.message).not_to include("could not connect to the Node renderer")
+          end
+        end
+
         context "when the renderer request times out (Pro 'Time out error on renderer request')" do
           let(:error) do
             StandardError.new(
@@ -271,6 +298,28 @@ module ReactOnRails
             expect(message).to include("Error evaluating server bundle. Check your webpack configuration.")
             expect(message).to include("code-splitting incorrectly enabled")
           end
+        end
+      end
+
+      describe ".read_bundle_js_code" do
+        it "raises a bundle-load error when an HTTP server bundle cannot be read" do
+          server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"
+
+          allow(ReactOnRails::Utils).to receive_messages(
+            server_bundle_js_file_path: server_bundle_url,
+            server_bundle_path_is_http?: true
+          )
+          allow(Net::HTTP).to receive(:get_response).and_raise(
+            Errno::ECONNREFUSED.new("connect(2) for localhost:3035")
+          )
+
+          expect do
+            described_class.read_bundle_js_code
+          end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+            expect(error.message).to include(server_bundle_url)
+            expect(error.message).to include("cannot be read")
+            expect(error.message).to include("connect(2) for localhost:3035")
+          }
         end
       end
     end

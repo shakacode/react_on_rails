@@ -228,7 +228,7 @@ describe ReactOnRailsPro::Request do
       expect(result).to eq(response_body)
     end
 
-    it "raises ReactOnRailsPro::Error when HTTP request fails" do
+    it "raises a bundle-load error when HTTP request fails" do
       allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("development"))
       allow(ReactOnRailsPro::RendererHttpClient).to receive(:get).and_raise(
         ReactOnRailsPro::RendererHttpClient::ConnectionError, "Connection refused"
@@ -236,10 +236,10 @@ describe ReactOnRailsPro::Request do
 
       expect do
         described_class.send(:get_form_body_for_file, url_path)
-      end.to raise_error(ReactOnRailsPro::Error, /#{Regexp.escape(url_path)}/)
+      end.to raise_error(ReactOnRails::ServerBundleLoadError, /#{Regexp.escape(url_path)}/)
     end
 
-    it "raises ReactOnRailsPro::Error when response has error status" do
+    it "raises a bundle-load error when response has error status" do
       error_response = instance_double(ReactOnRailsPro::RendererHttpClient::Response,
                                        error?: true, status: 404, body: "Not Found")
       allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("development"))
@@ -247,7 +247,7 @@ describe ReactOnRailsPro::Request do
 
       expect do
         described_class.send(:get_form_body_for_file, url_path)
-      end.to raise_error(ReactOnRailsPro::Error, /#{Regexp.escape(url_path)}/)
+      end.to raise_error(ReactOnRails::ServerBundleLoadError, /#{Regexp.escape(url_path)}/)
     end
   end
 

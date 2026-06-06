@@ -32,6 +32,69 @@ module ReactOnRailsPro
         end
       end
 
+      describe ".exec_server_render_js error classification" do
+        let(:js_code) { "console.log('x')" }
+        let(:render_path) { "/bundles/123/render/abc" }
+        let(:render_options) do
+          instance_double(
+            ReactOnRails::ReactComponent::RenderOptions,
+            trace: false,
+            streaming?: false
+          )
+        end
+
+        before do
+          allow(render_options).to receive(:set_option)
+          allow(described_class).to receive(:prepare_render_path).and_return(render_path)
+          allow(ReactOnRailsPro.configuration).to receive(:renderer_use_fallback_exec_js).and_return(false)
+        end
+
+        it "reports renderer request connection failures as renderer connection failures" do
+          renderer_error = ReactOnRailsPro::Error.new(
+            "Connection error on renderer request: #{render_path}.\n" \
+            "Original error:\nConnection refused - connect(2) for 127.0.0.1:3800\n"
+          )
+          allow(ReactOnRailsPro::Request).to receive(:render_code)
+            .with(render_path, js_code, false)
+            .and_raise(renderer_error)
+
+          expect do
+            described_class.exec_server_render_js(js_code, render_options)
+          end.to raise_error(ReactOnRails::Error) { |error|
+            expect(error).not_to be_a(ReactOnRails::ServerBundleLoadError)
+            expect(error.message).to include("could not connect to the Node renderer at 127.0.0.1:3800")
+            expect(error.message).not_to include("Check your webpack configuration")
+          }
+        end
+
+        it "preserves bundle-server fetch failures as bundle-load failures" do
+          send_bundle_response = instance_double(
+            ReactOnRailsPro::RendererHttpClient::Response,
+            status: ReactOnRailsPro::STATUS_SEND_BUNDLE,
+            body: "Bundle not found"
+          )
+          bundle_load_error = ReactOnRails::ServerBundleLoadError.new(
+            "Failed to fetch dev-server asset from http://localhost:3035/server-bundle.js: " \
+            "Connection refused - connect(2) for localhost:3035"
+          )
+
+          allow(ReactOnRailsPro::Request).to receive(:render_code)
+            .with(render_path, js_code, false)
+            .and_return(send_bundle_response)
+          allow(ReactOnRailsPro::Request).to receive(:render_code)
+            .with(render_path, js_code, true)
+            .and_raise(bundle_load_error)
+
+          expect do
+            described_class.exec_server_render_js(js_code, render_options)
+          end.to raise_error(ReactOnRails::ServerBundleLoadError) { |error|
+            expect(error.message).to include("Failed to fetch dev-server asset")
+            expect(error.message).to include("server-bundle.js")
+            expect(error.message).not_to include("could not connect to the Node renderer")
+          }
+        end
+      end
+
       describe ".prepare_incremental_render_path" do
         let(:js_code) { "console.log('test');" }
         let(:render_options) do

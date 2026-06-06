@@ -5,4 +5,7 @@ module ReactOnRails
 
   class Error < StandardError
   end
+
+  class ServerBundleLoadError < Error
+  end
 end

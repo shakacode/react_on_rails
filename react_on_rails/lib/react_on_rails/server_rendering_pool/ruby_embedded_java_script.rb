@@ -100,6 +100,8 @@ module ReactOnRails
                      else
                        js_evaluator.eval_js(js_code, render_options)
                      end
+          rescue ReactOnRails::ServerBundleLoadError
+            raise
           rescue StandardError => err
             msg = if renderer_connection_error?(err)
                     renderer_connection_error_message(err)
@@ -155,7 +157,7 @@ module ReactOnRails
           msg = "You specified server rendering JS file: #{server_js_file}, but it cannot be " \
                 "read. You may set the server_bundle_js_file in your configuration to be \"\" to " \
                 "avoid this warning.\nError is: #{e}\n\n#{Utils.default_troubleshooting_section}"
-          raise ReactOnRails::Error, msg
+          raise ReactOnRails::ServerBundleLoadError, msg
         end
 
         def create_js_context
@@ -253,8 +255,17 @@ module ReactOnRails
         # re-wraps the original Errno inside its own error; a narrow message check then
         # catches connection failures that only survive as text. See issue #3604.
         def renderer_connection_error?(err)
+          return false if server_bundle_load_error_in_chain?(err)
+
           connection_error_class_in_chain?(err) ||
-            err.message.to_s.match?(RENDERER_CONNECTION_ERROR_REGEX)
+            connection_error_message_in_chain?(err)
+        end
+
+        def server_bundle_load_error_in_chain?(err)
+          each_in_cause_chain(err) do |current|
+            return true if current.is_a?(ReactOnRails::ServerBundleLoadError)
+          end
+          false
         end
 
         # Walks err and its #cause chain looking for a known connection Errno, so a wrapped
@@ -263,6 +274,13 @@ module ReactOnRails
         def connection_error_class_in_chain?(err)
           each_in_cause_chain(err) do |current|
             return true if RENDERER_CONNECTION_ERROR_CLASSES.any? { |klass| current.is_a?(klass) }
+          end
+          false
+        end
+
+        def connection_error_message_in_chain?(err)
+          each_in_cause_chain(err) do |current|
+            return true if current.message.to_s.match?(RENDERER_CONNECTION_ERROR_REGEX)
           end
           false
         end
@@ -393,7 +411,7 @@ module ReactOnRails
           response.body.force_encoding(encoding_type)
         rescue StandardError => e
           msg = "file_url_to_string #{url} failed\nError is: #{e}\n\n#{Utils.default_troubleshooting_section}"
-          raise ReactOnRails::Error, msg
+          raise ReactOnRails::ServerBundleLoadError, msg
         end
 
         def parse_render_result(result_string, render_options)
