@@ -14,7 +14,12 @@
  * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import type { RegisteredComponent, Store, StoreGenerator } from 'react-on-rails/types';
+import type {
+  RegisteredComponent,
+  RegisteredComponentValue,
+  Store,
+  StoreGenerator,
+} from 'react-on-rails/types';
 import * as ProComponentRegistry from '../ComponentRegistry.ts';
 import * as ProStoreRegistry from '../StoreRegistry.ts';
 import { hydrateStore } from '../ClientSideRenderer.ts';
@@ -25,7 +30,7 @@ import { hydrateStore } from '../ClientSideRenderer.ts';
  */
 export function createProMethodCapability() {
   return {
-    getOrWaitForComponent(name: string): Promise<RegisteredComponent> {
+    getOrWaitForComponent(name: string): Promise<RegisteredComponent<RegisteredComponentValue>> {
       return ProComponentRegistry.getOrWaitForComponent(name);
     },
 
