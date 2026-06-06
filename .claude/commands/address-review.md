@@ -489,7 +489,7 @@ For `a`, do not post a GitHub PR summary comment automatically; return the local
 Rules for the summary comment:
 
 - Always post it as a general PR issue comment, never as a review-thread reply.
-- Include the exact marker `<!-- address-review-summary -->` on its own line near the top.
+- Include the exact marker `<!-- address-review-summary -->` as the first line of the comment.
 - Summarize `MUST-FIX` and `DISCUSS` items under a `Mattered` section, including whether each item was addressed, deferred, or left pending by user choice.
 - Summarize `OPTIONAL` items under an `Optional` section only when they were fixed by `a` or explicitly handled.
 - Summarize `SKIPPED` items under a `Skipped` section with short reasons.
