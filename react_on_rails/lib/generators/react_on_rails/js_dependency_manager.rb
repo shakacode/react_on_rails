@@ -140,10 +140,15 @@ module ReactOnRails
         react-on-rails-rsc
       ].freeze
 
-      # React peer-dependency range for RSC apps. This governs the `react` / `react-dom` installs
-      # (see add_react_dependencies) and is intentionally distinct from RSC_PACKAGE_VERSION_PIN below,
-      # which pins `react-on-rails-rsc`. The two track different versions during the RC window:
-      # react/react-dom stay on stable 19.0.x while react-on-rails-rsc rides an RC.
+      # React peer-dependency range for generated RSC apps. This governs the `react` / `react-dom`
+      # installs (see add_react_dependencies) and intentionally stays on the stable React 19.0.x
+      # line with a 19.0.4 minimum. Do not widen this to React 19.1/19.2 just because those releases
+      # are current on npm; React's RSC runtime and bundler integration can change between minors.
+      #
+      # This is intentionally distinct from RSC_PACKAGE_VERSION_PIN below, which pins
+      # `react-on-rails-rsc`. Coordination note for #3609: Pro package metadata may accept the
+      # prerelease RSC package broadly enough to keep `npm ls` healthy, but generator behavior still
+      # installs the tested React 19.0.x range and exact RSC package pin until both policies advance.
       RSC_REACT_VERSION_RANGE = "~19.0.4"
       # Pinned to 19.0.5-rc.6 because the discovery plugin export, native Rspack plugin, and
       # RSC manifest CSS fixes all ship in that prerelease.

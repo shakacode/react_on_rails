@@ -23,21 +23,19 @@ yarn add --exact react-on-rails-pro@VERSION
 bundle add react_on_rails_pro --version="= VERSION"
 ```
 
-Also, install version 19 of React, React DOM, and `react-on-rails-rsc`:
+Also, install React 19.0.x, React DOM 19.0.x, and the exact `react-on-rails-rsc` release candidate currently used by the generator:
 
 ```bash
-yarn add react@19.0.4 react-dom@19.0.4 react-on-rails-rsc@19.0.5-rc.6
-# npm install react@19.0.4 react-dom@19.0.4 react-on-rails-rsc@19.0.5-rc.6
-# pnpm add react@19.0.4 react-dom@19.0.4 react-on-rails-rsc@19.0.5-rc.6
-# bun add react@19.0.4 react-dom@19.0.4 react-on-rails-rsc@19.0.5-rc.6
+yarn add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5-rc.6
+# npm install react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5-rc.6
+# pnpm add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5-rc.6
+# bun add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5-rc.6
 ```
 
 > [!NOTE]
-> React on Rails Pro currently supports React 19 with a compatible `react-on-rails-rsc` version.
-> The example above pins `19.0.5-rc.6`, a release candidate. Once `react-on-rails-rsc@19.0.5`
-> stable is published, update to the latest stable `19.x` release that your `react-on-rails-rsc`
-> compatibility range allows. The RSC bundler APIs used internally can change between React minor
-> versions. See the [React documentation on Server Components](https://react.dev/reference/rsc/server-components#how-do-i-build-support-for-server-components) for details.
+> React on Rails Pro RSC currently supports React 19.0.x with patch >= 19.0.4. Do not upgrade generated RSC apps to React 19.1 or 19.2 just because those versions are newer on npm; the RSC bundler APIs used internally can change between React minor versions. See the [React documentation on Server Components](https://react.dev/reference/rsc/server-components#how-do-i-build-support-for-server-components) for details.
+>
+> The example above pins `react-on-rails-rsc@19.0.5-rc.6`, a release candidate. Keep that exact pin until a stable `react-on-rails-rsc@19.0.5` release is published and the generator/package metadata policy is reviewed together.
 
 2. Enable support for Server Components in React on Rails Pro configuration:
 
