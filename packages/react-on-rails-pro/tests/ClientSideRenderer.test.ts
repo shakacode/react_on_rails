@@ -407,12 +407,12 @@ describe('ClientSideRenderer', () => {
             },
           }) as unknown as Promise<void>,
       );
-      const TestRenderer: RendererFunction = (
+      const TestComponent: RendererFunction = (
         _props?: Record<string, unknown>,
         _railsContext?: RailsContext,
         _domNodeId?: string,
       ) => ({ teardown });
-      ComponentRegistry.register({ TestComponent: TestRenderer });
+      ComponentRegistry.register({ TestComponent });
       const componentSpec = setupTestComponentDom('dom-id-teardown-thenable-reject');
       addRailsContext();
 
@@ -420,8 +420,9 @@ describe('ClientSideRenderer', () => {
       unmountAll();
       expect(teardown).toHaveBeenCalledTimes(1);
 
-      await Promise.resolve(); // lets Promise.resolve(nonNativeThenable) settle
-      await Promise.resolve(); // lets the .catch() rejection handler run
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         'Error in renderer teardown for dom node "dom-id-teardown-thenable-reject":',
         rejection,

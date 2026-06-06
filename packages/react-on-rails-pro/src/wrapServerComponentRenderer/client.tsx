@@ -77,8 +77,9 @@ const wrapServerComponentRenderer = (
       : componentOrRenderFunction;
 
     // Preserve compatibility with existing 3-arg render functions: they are awaited before domNodeId
-    // validation; moving that check earlier is a future improvement. Keep this teardown-result guard
-    // before DOM checks so wrong-shaped render results get the clearer error.
+    // and DOM-node validation. TODO: move those DOM validation checks earlier only with tests proving
+    // existing renderers cannot depend on this ordering. Keep this teardown-result guard before DOM
+    // checks so wrong-shaped render results get the clearer error.
     if (isRendererTeardownResult(Component)) {
       throw new Error(
         `wrapServerComponentRenderer: render function for server component '${componentName}' ` +
