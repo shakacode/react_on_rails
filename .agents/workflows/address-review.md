@@ -151,7 +151,7 @@ Execution flow when terminal access is available:
    - Support range syntax: `N-M` expands to individual items (e.g., `3-5` → `3,4,5`). Ranges work everywhere: item selection, `d`, `o`, and `r`.
    - If a range is malformed, reversed, or out of bounds, show a validation message and ask the user to retry (do not silently coerce it).
    - Dynamic menu: generate `f`, `f+i`, `f+o`, and `a` descriptions using actual item numbers and deferred targets from the current triage set. Only show `f+o` and `o` when there is at least one `OPTIONAL` item. Show `a` when there is at least one `MUST-FIX`, `OPTIONAL`, or `DISCUSS` item. When there are no `DISCUSS`, `OPTIONAL`, or `SKIPPED` items, only show `f`, `a`, and direct item selection.
-   - Do not edit code yet.
+   - Do not edit code yet unless `AUTOPILOT` is set; autopilot executes action `a` immediately after triage.
    - `autopilot` is an initiation mode, not a post-triage menu choice. Initiate it by including `autopilot` before or after the PR reference, for example `address-review autopilot <PR>` or `address-review <PR> autopilot`. If the user initiated the review with `autopilot`, present the triage for transparency and immediately execute action `a` without waiting for another confirmation. A bare `a` is only the single-letter quick action shown after triage.
    - Do not post the PR summary checkpoint yet. Post it only after a chosen action reaches a stable stopping point so the summary reflects the new baseline.
 

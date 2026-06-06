@@ -199,7 +199,7 @@ Create a task list with TodoWrite containing **only the `MUST-FIX` items**:
 
 ## Step 7: Present Triage and Quick-Action Menu
 
-Present the triage to the user - **DO NOT automatically start addressing items**:
+Present the triage to the user. Do not automatically start addressing items unless `AUTOPILOT` is set:
 
 - Use a single sequential numbering across all categories (1, 2, 3, ...) so every item has a unique number the user can reference. Do not restart numbering at 1 for each category.
 - `MUST-FIX ({count})`: list the todos created
