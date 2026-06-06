@@ -8,8 +8,10 @@ Paste the prompt below into your coding assistant and replace `{{PR_REFERENCE}}`
 
 - A PR number, such as `12345`
 - A PR number plus override, such as `12345 check all reviews`
+- An autopilot full-history scan, such as `autopilot 12345 check all reviews`
 - A PR URL, such as `https://github.com/org/repo/pull/12345`
 - A PR URL plus override, such as `https://github.com/org/repo/pull/12345 check all reviews`
+- An autopilot full-history URL scan, such as `autopilot https://github.com/org/repo/pull/12345 check all reviews`
 - A specific review URL, such as `https://github.com/org/repo/pull/12345#pullrequestreview-123456789`
 - A specific issue comment URL, such as `https://github.com/org/repo/pull/12345#issuecomment-123456789`
 
@@ -43,8 +45,10 @@ Execution flow when terminal access is available:
    - Support:
      - PR number only
      - PR number plus `check all reviews`
+     - PR number plus `autopilot` and trailing `check all reviews`
      - PR URL
      - PR URL plus `check all reviews`
+     - PR URL plus `autopilot` and trailing `check all reviews`
      - Specific review URL with `#pullrequestreview-...`
      - Specific issue comment URL with `#issuecomment-...`
      - Optional standalone `autopilot` token before or after the PR reference

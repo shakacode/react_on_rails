@@ -28,9 +28,11 @@ Then extract the PR number and optional review/comment ID from the remaining inp
 - PR number only: `12345`
 - Autopilot PR number: `autopilot 12345` or `12345 autopilot`
 - PR number with override: `12345 check all reviews`
+- Autopilot PR number with override: `autopilot 12345 check all reviews`
 - PR URL: `https://github.com/org/repo/pull/12345`
 - Autopilot PR URL: `autopilot https://github.com/org/repo/pull/12345` or `https://github.com/org/repo/pull/12345 autopilot`
 - PR URL with override: `https://github.com/org/repo/pull/12345 check all reviews`
+- Autopilot PR URL with override: `autopilot https://github.com/org/repo/pull/12345 check all reviews`
 - Specific PR review: `https://github.com/org/repo/pull/12345#pullrequestreview-123456789`
 - Specific issue comment: `https://github.com/org/repo/pull/12345#issuecomment-123456789`
 
@@ -200,6 +202,7 @@ Create a task list with TodoWrite containing **only the `MUST-FIX` items**:
 - Subject: `"{file}:{line} - {comment_summary} (@{username})"`
 - For general comments: Parse the comment body and extract the must-fix action as the subject
 - Description: Include the full review comment text and any relevant context
+- Recommendation: Include a concrete fix sketch — specific file/line, code snippet, or approach — after reading the current code around the cited location. If the reviewer's claim needs inspection before a safe fix can be proposed, make the Recommendation the verification step, not a guessed patch.
 - All tasks should start with status: `"pending"`
 
 ## Step 7: Present Triage and Quick-Action Menu
@@ -207,7 +210,7 @@ Create a task list with TodoWrite containing **only the `MUST-FIX` items**:
 Present the triage to the user. Do not automatically start addressing items unless `AUTOPILOT` is set:
 
 - Use a single sequential numbering across all categories (1, 2, 3, ...) so every item has a unique number the user can reference. Do not restart numbering at 1 for each category.
-- `MUST-FIX ({count})`: list the todos created
+- `MUST-FIX ({count})`: list the todos created, with an indented `Recommendation:` sketch for each item
 - `DISCUSS ({count})`: list items needing user choice, with a short reason
 - `OPTIONAL ({count})`: list applicable polish items, with a short reason
 - `SKIPPED ({count})`: list skipped comments with a short reason, including duplicates and factually incorrect suggestions
@@ -320,6 +323,10 @@ Users can chain actions: e.g., `f+i` then `r7-9`. After the first action complet
 Except for action `a`, when addressing items, after completing each selected item (whether `MUST-FIX`, `DISCUSS`, or `OPTIONAL`), reply to the original review comment explaining how it was addressed.
 For actions other than `a`, if the user selects `DISCUSS` or `OPTIONAL` items to address, treat them the same as `MUST-FIX`: make the code change, reply, and resolve the thread.
 If the user selects skipped/declined items for rationale replies, post those replies too.
+
+Before committing or asking for push confirmation, run the self-review gate: review the combined fix diff for correctness bugs, style violations, and inconsistencies introduced by the fixes themselves. Fix critical issues immediately.
+
+When 2+ selected fixes touch different files with no logical dependency, process them in parallel if the environment supports it. Instruct parallel helpers not to commit; keep all changes unstaged until the combined diff passes the self-review gate.
 
 **For issue comments (general PR comments):**
 
