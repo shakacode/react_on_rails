@@ -153,7 +153,7 @@ gh api graphql --paginate -f owner="${OWNER}" -f name="${NAME}" -F pr="${PR_NUMB
 - Do not skip bot-generated comments by default. Many actionable review comments in this repository come from bots.
 - Deduplicate repeated bot comments and skip bot status posts, summaries, and acknowledgments that do not require a code or documentation change
 - Treat as actionable by default only: correctness bugs, regressions, security issues, missing tests, and clear inconsistencies with adjacent code
-- Treat as non-actionable by default: style nits, speculative suggestions, changelog wording, duplicate bot comments, and "could consider" feedback unless the user explicitly asks for polish work or invokes `a`/`autopilot`
+- Treat as non-actionable by default: style nits, speculative suggestions, changelog wording, duplicate bot comments, and "could consider" feedback unless the user explicitly asks for polish work, chooses `a` after triage, or initiates with `autopilot`
 - Focus on actionable feedback, not acknowledgments or thank-you messages
 
 **Error handling:**
@@ -206,7 +206,7 @@ After the triage list, present a **quick-action menu**:
 Quick actions:
   f     — Fix must-fix items, then confirm whether to reply/resolve skipped items before deciding discuss items
   f+i   — Fix must-fix + prepare one deferred-work bundle for discuss/non-trivial skipped items; optional polish is excluded unless explicitly promoted
-  a     — Autopilot: fix must-fix + optional items, stage files, and return detailed discuss recommendations
+  a     — Apply: fix must-fix + optional items, stage files, and return detailed discuss recommendations
   d     — Discuss specific items before deciding (e.g., "d2,4"). Bare "d" presents all DISCUSS items.
   r     — Reply with rationale to items (e.g., "r3,5", "r7-9", "r all skipped", "r all discuss"); add `+ resolve` to also resolve those threads
   m     — Skip code changes + prepare one deferred-work bundle for must-fix/discuss/non-trivial skipped items
@@ -219,17 +219,17 @@ If a range is malformed, reversed, or out of bounds, show a validation message a
 
 **Dynamic menu**: Generate `f`, `f+i`, and `a` descriptions dynamically using actual item numbers and deferred targets from the current triage set (e.g., "Fix #1, #3" instead of "Fix must-fix items"). Show `a` when there is at least one `MUST-FIX`, `OPTIONAL`, or `DISCUSS` item. When there are no `DISCUSS`, `OPTIONAL`, or `SKIPPED` items, only show `f`, `a`, and direct item selection.
 
-This Claude slash command normally keeps optional polish out of the main fix flow unless the user explicitly asks for it. Action `a` is that explicit opt-in: fix `MUST-FIX` and `OPTIONAL` items, but only recommend next steps for `DISCUSS`.
+This Claude slash command normally keeps optional polish out of the main fix flow unless the user explicitly asks for it. Post-triage action `a` is that explicit opt-in: fix `MUST-FIX` and `OPTIONAL` items, but only recommend next steps for `DISCUSS`.
 
-If the user initiated the review with `a` or `autopilot`, present the triage for transparency and immediately execute `a` without waiting for another confirmation. Otherwise, wait for the user to choose an action before proceeding.
+`autopilot` is an initiation mode, not a post-triage menu choice. If the user initiated the review with `autopilot`, present the triage for transparency and immediately execute action `a` without waiting for another confirmation. A bare `a` is only the single-letter quick action shown after triage. Otherwise, wait for the user to choose an action before proceeding.
 
 Do not post the PR summary checkpoint during this triage-only phase. Post it only after a chosen action reaches a stable stopping point so the summary reflects the new baseline.
 
 ## Step 8: Execute the Chosen Action
 
-### Action `a` / `autopilot` — Fix, stage, and recommend
+### Action `a` — Apply, stage, and recommend
 
-Fix all `MUST-FIX` and `OPTIONAL` items inline without waiting for another confirmation after triage. Run relevant checks and the self-review gate. Stage only the intended changed files with explicit `git add` paths instead of committing them. Do **not** commit, push, post GitHub replies, resolve review threads, create follow-up issues, or post the PR summary checkpoint. Return a local summary with: fixed `MUST-FIX` items, fixed `OPTIONAL` items, staged files, validation commands/results, unresolved/skipped items, and detailed `DISCUSS` recommendations. Each `DISCUSS` recommendation must include the reviewer/comment link, recommended decision (`fix now`, `defer`, `decline`, or `ask user`), rationale/evidence, risk/tradeoff, and concrete next step. If validation fails after reasonable local repair, still report the staged-file state clearly and mark the PR as not ready for commit/push.
+Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or automatically when `autopilot` was requested at initiation. Run relevant checks and the self-review gate. Stage only the intended changed files with explicit `git add` paths instead of committing them. Do **not** commit, push, post GitHub replies, resolve review threads, create follow-up issues, or post the PR summary checkpoint. Return a local summary with: fixed `MUST-FIX` items, fixed `OPTIONAL` items, staged files, validation commands/results, unresolved/skipped items, and detailed `DISCUSS` recommendations. Each `DISCUSS` recommendation must include the reviewer/comment link, recommended decision (`fix now`, `defer`, `decline`, or `ask user`), rationale/evidence, risk/tradeoff, and concrete next step. If validation fails after reasonable local repair, still report the staged-file state clearly and mark the PR as not ready for commit/push.
 
 ### Action `f` — Fix and merge-ready
 
@@ -552,7 +552,7 @@ SKIPPED (1):
 Quick actions:
   f     — Fix #1, then confirm whether to reply/resolve skipped items before deciding discuss items
   f+i   — Fix #1, prepare one deferred-work bundle for #2
-  a     — Autopilot: fix #1 plus optional items #3-4, stage files, and recommend a decision for #2
+  a     — Apply: fix #1 plus optional items #3-4, stage files, and recommend a decision for #2
   d     — Discuss specific items (e.g., "d2,4"). Bare "d" presents all DISCUSS items.
   r     — Reply with rationale (e.g., "r3,5", "r3-5", "r all skipped", "r all discuss"); add `+ resolve` to also resolve threads
   m     — No code changes, prepare one deferred-work bundle, merge-ready only when no must-fix items are deferred
