@@ -68,5 +68,23 @@ describe('buildCacheKey', () => {
       const key2 = buildCacheKey('build', 'id', [undefined]);
       expect(key1).not.toBe(key2);
     });
+
+    test('empty array and array with undefined produce different keys', () => {
+      const key1 = buildCacheKey('build', 'id', []);
+      const key2 = buildCacheKey('build', 'id', [undefined]);
+      expect(key1).not.toBe(key2);
+    });
+
+    test('Date arguments produce distinct keys for different dates', () => {
+      const key1 = buildCacheKey('build', 'id', [new Date('2026-01-01')]);
+      const key2 = buildCacheKey('build', 'id', [new Date('2026-02-01')]);
+      expect(key1).not.toBe(key2);
+    });
+
+    test('same Date arguments produce the same key', () => {
+      const key1 = buildCacheKey('build', 'id', [new Date('2026-01-01')]);
+      const key2 = buildCacheKey('build', 'id', [new Date('2026-01-01')]);
+      expect(key1).toBe(key2);
+    });
   });
 });

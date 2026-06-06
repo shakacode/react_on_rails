@@ -21,8 +21,10 @@ import { createHash } from 'crypto';
  * duplicate cache entries for semantically identical arguments.
  */
 function stableStringify(value: unknown): string {
-  if (value === null || value === undefined) return JSON.stringify(value);
+  if (value === undefined) return 'undefined';
+  if (value === null) return 'null';
   if (typeof value !== 'object') return JSON.stringify(value);
+  if (value instanceof Date) return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
 
   const sorted = Object.keys(value as Record<string, unknown>)
