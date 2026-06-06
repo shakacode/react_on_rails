@@ -521,6 +521,18 @@ RSpec.describe GeneratorHelper, type: :generator do
         <% end %>
       YAML
     end
+
+    it "detects raw active hooks inherited from anchored sections opened by repeated same-line ERB tags" do
+      expect(active_precompile_hook_configured?(<<~YAML)).to be(true)
+        <% if true %><% if true %>default: &default
+          precompile_hook: <%= false %>
+        <% end %><% end %>
+
+        test:
+          <<: *default
+          # precompile_hook: ~
+      YAML
+    end
   end
 
   describe "#raw_precompile_hook_value" do
