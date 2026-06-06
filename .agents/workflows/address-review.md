@@ -56,9 +56,29 @@ Execution flow when terminal access is available:
 2. Determine repository:
    - If step 1 extracted `org/repo` from a full GitHub URL, use that as `REPO`.
    - Otherwise run: `REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)`
+   - Set parsed identifiers before running later snippets:
+     ```bash
+     PR_NUMBER=<the PR number parsed in step 1>
+     COMMENT_ID=<the issue/review comment ID parsed in step 1, if any>
+     REVIEW_ID=<the pull request review ID parsed in step 1, if any>
+     ```
    - If `gh` is unavailable or unauthenticated, stop and tell me to fix that first.
 
 3. Determine scan window and summary cutoff:
+   - Before fetching full-PR review data, wait for any in-progress `claude-review` CI run on this PR so triage reflects the latest posted feedback. Skip this wait when the input targets a specific review URL or specific issue-comment URL. If `gh pr checks` is unavailable or returns an error, log a warning and continue without blocking.
+     ```bash
+     MAX_WAIT=180
+     WAITED=0
+     while [ "$(gh pr checks "${PR_NUMBER}" --repo "${REPO}" --json name,bucket 2>/dev/null \
+       | jq '[.[] | select((.name | test("claude.?review"; "i")) and (.bucket == "pending"))] | length' 2>/dev/null || echo 0)" -gt 0 ]; do
+       if [ "${WAITED}" -ge "${MAX_WAIT}" ]; then
+         echo "Timed out waiting for claude-review; continuing with currently available review data." >&2
+         break
+       fi
+       sleep 10
+       WAITED=$((WAITED + 10))
+     done
+     ```
    - For full-PR scans (plain PR number or PR URL with no specific review/comment anchor), default to reviewing only feedback posted after the latest PR summary comment created by this workflow.
    - The summary marker is a PR issue comment whose body starts with `<!-- address-review-summary -->` on its very first line. Requiring `startswith` (not `contains`) means a human comment that quotes or embeds the marker in prose is not mistaken for a checkpoint and cannot silently advance the cutoff.
    - If `CHECK_ALL_REVIEWS` is true, ignore the cutoff and scan the full PR history.
