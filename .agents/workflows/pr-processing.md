@@ -11,6 +11,8 @@ Run a Codex batch
 
 For assistants without skill support, follow the high-concurrency batch launch rules below before using the rest of this workflow.
 
+For post-merge audits after a concurrent batch or before a release candidate, use `.agents/skills/post-merge-audit/SKILL.md` when skills are available.
+
 ## Default Operating Model
 
 1. Resolve the work item:
@@ -41,7 +43,7 @@ Replace angle-bracket placeholders such as `<PR>` and `<PR_NUMBER>` with real va
 For a PR, gather current state before touching code:
 
 ```bash
-gh pr view <PR> --json number,title,body,state,isDraft,headRefName,baseRefName,mergeStateStatus,reviewDecision,statusCheckRollup,labels,url
+gh pr view <PR> --json number,title,body,state,isDraft,headRefName,baseRefName,mergeStateStatus,reviewDecision,statusCheckRollup,labels,url,reviews,comments
 gh pr diff <PR> --name-only
 gh pr checks <PR>
 ```
@@ -147,6 +149,8 @@ Lane: <machine/worker ownership and exclusions>.
 Mode: spawn worker subagents only after the target list and lane split are confirmed.
 
 For issue targets, create one focused branch and PR unless exact same-file overlap makes a bundle safer. Start new issue branches from updated origin/main. For existing PR, review-fix, or merge-readiness targets, work on the existing PR head branch and do not create replacement PRs; if the branch cannot be updated safely, report the blocker. Follow local validation, self-review, CI backpressure, and merge-readiness gates.
+
+Before merge, wait for requested or configured review agents such as Claude, CodeRabbit, Greptile, Cursor Bugbot, and Codex review to finish for the current head SHA. A completed check is not enough when review comments exist: classify and resolve or explicitly waive actionable findings before merging. Treat untriaged `Must Fix`, `MUST-FIX`, `Changes Requested`, correctness, security, regression, compatibility, and missing-changelog findings as merge blockers unless a maintainer explicitly waives them.
 
 For blocking questions, stop work on that target, surface the question to the coordinator or maintainer, and mark the issue/PR with the agreed pending-question state. For non-blocking questions where you make a decision and continue, record the decision in the PR description before review or merge.
 
@@ -316,6 +320,19 @@ Use `.agents/skills/address-review/SKILL.md` when skills are available; Claude C
 
 Do not let follow-up issues become a substitute for finishing the PR. Follow-up tracking is allowed only for real, non-blocking work that remains valuable outside the PR context.
 
+## Review Completion Gate
+
+Before marking a PR ready, asking for merge, or merging it:
+
+1. Verify all requested or configured review agents have finished for the current head SHA. This includes Claude review, CodeRabbit, Greptile, Cursor Bugbot, Codex review, and any repo-specific reviewer bot.
+2. Do not treat a green or skipped review check as sufficient if the reviewer also posted comments. Fetch PR reviews and comments, then classify actionable feedback.
+3. Do not merge while a relevant review check is queued, in progress, stale for an older head SHA, or known to be posting comments asynchronously.
+4. Treat untriaged `Must Fix`, `MUST-FIX`, `Changes Requested`, correctness, security, regression, compatibility, and missing-changelog findings as merge blockers unless a maintainer explicitly waives them with evidence.
+5. Treat `Should Fix`, `DISCUSS`, and similar non-blocking review concerns as requiring an explicit PR description decision, review reply, or maintainer waiver before merge.
+6. If any reviewer detects a missing changelog entry for a user-visible change, either update `CHANGELOG.md` before merge or document that `/update-changelog` must run before the next release candidate.
+
+Use `address-review` for actionable GitHub review comments instead of skimming them manually. If a PR was already merged before this gate ran, include it in the next post-merge audit.
+
 ## Follow-Up Tracking Policy
 
 Follow-up issues are expensive. Default to no new issue.
@@ -341,7 +358,7 @@ When tracking is warranted:
 Before saying a PR is ready to merge:
 
 ```bash
-gh pr view <PR> --json mergeStateStatus,reviewDecision,statusCheckRollup,isDraft,labels,latestReviews
+gh pr view <PR> --json headRefOid,mergeStateStatus,reviewDecision,statusCheckRollup,isDraft,labels,latestReviews,reviews,comments,mergedAt
 gh pr checks <PR>
 ```
 
@@ -351,6 +368,7 @@ Also verify:
 - `mergeStateStatus` is clean or the remaining instability is understood and non-required.
 - No current `CHANGES_REQUESTED` from a human or required reviewer; use `latestReviews` to verify the source before treating an advisory AI request as non-blocking. If an advisory AI system requested changes, triage the review content for confirmed blockers instead of treating the review state alone as a merge block.
 - No unresolved current review thread changes correctness, tests, security, or required scope.
+- No pending, stale, late, or untriaged configured review-agent feedback remains for the current head SHA.
 - Required checks are green, or the user has explicitly accepted an auditable waiver for full CI.
 - The PR body or latest agent comment includes exact local validation commands and results.
 
@@ -373,3 +391,20 @@ For a manual multi-PR landing plan:
 5. For blocked PRs, fix only the blocking cause, rerun targeted local checks, and batch one push.
 6. Do not create follow-up issues for ordinary review nits. Use one deferred bundle per PR only after explicit user approval.
 7. Use full CI sparingly: final readiness gate, high-risk changes, or maintainer request.
+
+## Post-Merge Batch Audit
+
+Use this section when reviewing already-merged PRs from concurrent agent work, especially before a release candidate.
+
+1. Resolve the base release candidate tag/commit and head SHA.
+2. List every PR merged in the range, then identify the batch subset by branch names, PR bodies, labels, comments, authors, merge timing, and linked issues.
+3. Ask for confirmation of included and excluded PRs before deep audit unless the user explicitly says to proceed.
+4. For each included PR, inspect reviews, comments, checks, merge time, changed files, validation evidence, changelog coverage, and cross-PR interactions.
+5. Flag review-gate violations:
+   - review checks, reviews, or comments that landed after merge
+   - review checks that were queued, in progress, stale, or asynchronous at merge time
+   - pre-merge `Must Fix`, `MUST-FIX`, `Should Fix`, `DISCUSS`, `Changes Requested`, or similar actionable comments with no later evidence they were fixed, waived, or classified
+6. Flag user-visible changes missing from `CHANGELOG.md`; if any are found, recommend running `/update-changelog` before the next release candidate.
+7. Return high-risk findings first, then cross-PR risks, missing changelog candidates, a PR-by-PR table, and exact commands/data sources.
+
+Do not create fixes, issues, comments, labels, changelog edits, reverts, or PRs until the user approves the audit report.
