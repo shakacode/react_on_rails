@@ -91,6 +91,9 @@ module ReactOnRails
                 }
               };
 
+              // These token checks are a compatibility gate, not a JavaScript parser. If either
+              // generated file no longer has the discovery-build markers, fall back to the broad
+              // scan with an upgrade warning instead of assuming the manifest will be produced.
               const fileContainsAll = (filePath, tokens) => {
                 try {
                   if (!existsSync(filePath)) return false;

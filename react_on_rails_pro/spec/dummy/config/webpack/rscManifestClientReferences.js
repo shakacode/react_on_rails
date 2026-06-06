@@ -83,6 +83,9 @@ function warnIfManifestStale(refsJson) {
 }
 
 function fileContainsAll(filePath, tokens) {
+  // These token checks intentionally mirror the generated helper's compatibility gate. If either
+  // generated file no longer carries the discovery-build markers, fall back to the broad scan with
+  // an upgrade warning instead of assuming the manifest will be produced.
   try {
     if (!fs.existsSync(filePath)) return false;
 
