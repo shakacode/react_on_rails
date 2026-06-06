@@ -2128,6 +2128,8 @@ describe InstallGenerator, type: :generator do
         expect(content).to include("serverWebpackConfig(true)")
         expect(content).to include("rsc-bundle")
         expect(content).to include("react-server")
+        expect(content).to include("process.env.REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH")
+        expect(content).to include("defaultServerComponentRegistrationEntry")
       end
     end
 
@@ -4347,6 +4349,12 @@ describe InstallGenerator, type: :generator do
 
       assert_file "bin/shakapacker-precompile-hook" do |content|
         expect(content).to include("generate_rsc_manifest_client_references_if_needed")
+        expect(content).to include("REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH")
+        expect(content).to include("configured_rsc_manifest_registration_entry")
+        expect(content).to include("valid_configured_rsc_registration_entry?")
+        expect(content).to include("EXPECTED_RSC_REGISTRATION_ENTRY_BASENAME")
+        expect(content).to include("File.file?(path)")
+        expect(content).to include("EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_COMPONENTS")
         expect(content).to include('ENV["RSC_REFERENCE_DISCOVERY_BUILD"] == "true"')
         expect(content).to include("ReactOnRailsPro::Utils.rsc_support_enabled?")
         expect(content).to include('"RSC_BUNDLE_ONLY" => "true"')
@@ -4427,6 +4435,7 @@ describe InstallGenerator, type: :generator do
       assert_file "bin/switch-bundler"
       assert_file "bin/shakapacker-precompile-hook" do |content|
         expect(content).to include('stale_manifest = Rails.root.join("ssr-generated", "rsc-client-references.json")')
+        expect(content).to include("REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH")
         expect(content).to include("clear_stale_rsc_manifest_client_references")
         expect(content).to include('shakapacker_bin = Rails.root.join("bin", "shakapacker")')
         expect(content).to include("bin/shakapacker is missing; cannot generate RSC manifest client references.")

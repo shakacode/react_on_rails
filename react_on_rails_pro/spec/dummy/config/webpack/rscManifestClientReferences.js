@@ -10,6 +10,8 @@ const { config } = require('shakapacker');
 // that must stay in sync on both sides:
 //   - override env var:   RSC_MANIFEST_CLIENT_REFERENCES_JSON (path.resolve'd; must exist, else throw
 //     "... is set but the file does not exist", then read)
+//   - registration entry: REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH (path.resolve'd; optional,
+//     used for staleness checks and precompile hints)
 //   - default manifest:   ssr-generated/rsc-client-references.json (resolved against the Rails root)
 //   - manifest shape:     { refs: [...] }, else throw "... to contain a refs array"
 //   - parse errors:       malformed JSON re-thrown as "Failed to parse RSC client references manifest ..."
@@ -39,11 +41,63 @@ const DEFAULT_CLIENT_REFERENCES = [
 // cwd-relative (the Rails root at webpack build time), matching the generated template's
 // `resolve('ssr-generated/rsc-client-references.json')` rather than coupling to this file's location.
 const DEFAULT_REFERENCES_JSON = path.resolve('ssr-generated/rsc-client-references.json');
-const SERVER_COMPONENT_REGISTRATION_ENTRY = path.resolve(
+const DEFAULT_SERVER_COMPONENT_REGISTRATION_ENTRY = path.resolve(
   config.source_path,
   config.source_entry_path,
   '../generated/server-component-registration-entry.js',
 );
+const EXPECTED_SERVER_COMPONENT_REGISTRATION_ENTRY = 'server-component-registration-entry.js';
+const EXCLUDED_REGISTRATION_ENTRY_PATH_COMPONENTS = [
+  '.git',
+  'log',
+  'node_modules',
+  'public',
+  'spec',
+  'test',
+  'tmp',
+  'vendor',
+];
+
+function registrationEntryPathComponents(entryPath) {
+  const rootRelativePath = path.relative(process.cwd(), entryPath);
+  const scopedPath =
+    rootRelativePath &&
+    rootRelativePath !== '..' &&
+    !rootRelativePath.startsWith('../') &&
+    !rootRelativePath.startsWith('..\\') &&
+    !path.isAbsolute(rootRelativePath)
+      ? rootRelativePath
+      : entryPath;
+
+  return scopedPath.split(/[\\/]+/).filter(Boolean);
+}
+
+function validServerComponentRegistrationEntry(entryPath) {
+  if (path.basename(entryPath) !== EXPECTED_SERVER_COMPONENT_REGISTRATION_ENTRY) return false;
+  if (
+    registrationEntryPathComponents(entryPath).some((component) =>
+      EXCLUDED_REGISTRATION_ENTRY_PATH_COMPONENTS.includes(component),
+    )
+  ) {
+    return false;
+  }
+
+  try {
+    return fs.statSync(entryPath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function serverComponentRegistrationEntry() {
+  const configuredRegistrationEntry = process.env.REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH;
+  if (configuredRegistrationEntry) {
+    const configuredEntry = path.resolve(configuredRegistrationEntry);
+    if (validServerComponentRegistrationEntry(configuredEntry)) return configuredEntry;
+  }
+
+  return DEFAULT_SERVER_COMPONENT_REGISTRATION_ENTRY;
+}
 
 function readManifestReferences(refsJson) {
   let payload;
@@ -64,12 +118,13 @@ function readManifestReferences(refsJson) {
 // is best-effort — it cannot detect a new 'use client' file reached by an unchanged server
 // component (that is the `--watch` snapshot limitation documented above).
 function warnIfManifestStale(refsJson) {
+  const registrationEntry = serverComponentRegistrationEntry();
   // Best-effort: statSync can race a file removed between the existsSync guard and here, so swallow
   // that rather than crash the build over a warning.
   try {
     if (
-      fs.existsSync(SERVER_COMPONENT_REGISTRATION_ENTRY) &&
-      fs.statSync(SERVER_COMPONENT_REGISTRATION_ENTRY).mtimeMs > fs.statSync(refsJson).mtimeMs
+      fs.existsSync(registrationEntry) &&
+      fs.statSync(registrationEntry).mtimeMs > fs.statSync(refsJson).mtimeMs
     ) {
       console.warn(
         `[react_on_rails] ${refsJson} is older than the server component ` +
@@ -128,7 +183,7 @@ function rscManifestClientReferences() {
     return readManifestReferences(DEFAULT_REFERENCES_JSON);
   }
 
-  if (fs.existsSync(SERVER_COMPONENT_REGISTRATION_ENTRY)) {
+  if (fs.existsSync(serverComponentRegistrationEntry())) {
     if (!rscConfigSupportsDiscovery()) {
       console.warn(
         `[react_on_rails] Missing ${DEFAULT_REFERENCES_JSON}, but this app's RSC webpack config ` +

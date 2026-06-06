@@ -85,6 +85,35 @@ RSpec.describe "Shakapacker precompile hook shared script" do
   end
 
   describe "rsc_manifest_registration_entry" do
+    it "uses an explicit registration entry path without scanning" do
+      Dir.mktmpdir(nil, "/tmp") do |rails_root|
+        configured_entry = File.join(rails_root, "client", "app", "generated", "server-component-registration-entry.js")
+        FileUtils.mkdir_p(File.dirname(configured_entry))
+        File.write(configured_entry, "// configured\n")
+
+        expect(Find).not_to receive(:find)
+
+        with_env(
+          "REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH" =>
+            "client/app/generated/server-component-registration-entry.js"
+        ) do
+          expect(rsc_manifest_registration_entry(rails_root)).to eq(configured_entry)
+        end
+      end
+    end
+
+    it "falls back to scanning when an explicit registration entry path is missing" do
+      Dir.mktmpdir(nil, "/tmp") do |rails_root|
+        app_entry = File.join(rails_root, "client", "app", "generated", "server-component-registration-entry.js")
+        FileUtils.mkdir_p(File.dirname(app_entry))
+        File.write(app_entry, "// app\n")
+
+        with_env("REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH" => "missing/server-component-registration-entry.js") do
+          expect(rsc_manifest_registration_entry(rails_root)).to eq(app_entry)
+        end
+      end
+    end
+
     it "finds app entries without traversing excluded directory trees" do
       Dir.mktmpdir(nil, "/tmp") do |rails_root|
         app_entry = File.join(rails_root, "client", "app", "generated", "server-component-registration-entry.js")

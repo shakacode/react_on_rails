@@ -26,6 +26,13 @@ const REGISTRATION_ENTRY = path.resolve(
   'packs',
   '../generated/server-component-registration-entry.js',
 );
+const OVERRIDE_REGISTRATION_ENTRY = path.resolve('tmp/custom-registration-entry.js');
+const VALID_OVERRIDE_REGISTRATION_ENTRY = path.resolve(
+  'client',
+  'app',
+  'generated',
+  'server-component-registration-entry.js',
+);
 
 describe('rscManifestClientReferences (Pro dummy) mirrors the generator resolution contract', () => {
   const originalEnv = process.env;
@@ -33,6 +40,7 @@ describe('rscManifestClientReferences (Pro dummy) mirrors the generator resoluti
   beforeEach(() => {
     process.env = { ...originalEnv };
     delete process.env.RSC_MANIFEST_CLIENT_REFERENCES_JSON;
+    delete process.env.REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH;
     delete process.env.RSC_REFERENCE_DISCOVERY_BUILD;
     delete process.env.RSC_BUNDLE_ONLY;
     fs.existsSync.mockReset();
@@ -202,6 +210,84 @@ describe('rscManifestClientReferences (Pro dummy) mirrors the generator resoluti
     try {
       expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx']);
       expect(warnSpy).toHaveBeenCalledWith(expect.stringMatching(/may be stale/));
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('uses the configured registration entry path for stale-manifest warnings', () => {
+    process.env.REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH =
+      'client/app/generated/server-component-registration-entry.js';
+    fs.existsSync.mockImplementation(
+      (p) => p === DEFAULT_MANIFEST || p === VALID_OVERRIDE_REGISTRATION_ENTRY,
+    );
+    fs.readFileSync.mockReturnValue(JSON.stringify({ refs: ['client/app/A.jsx'] }));
+    fs.statSync.mockImplementation((p) => ({
+      isFile: () => true,
+      mtimeMs: p === VALID_OVERRIDE_REGISTRATION_ENTRY ? 2000 : 1000,
+    }));
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx']);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringMatching(/may be stale/));
+      expect(fs.statSync).toHaveBeenCalledWith(VALID_OVERRIDE_REGISTRATION_ENTRY);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('falls back to the default registration entry when the configured path has the wrong filename', () => {
+    process.env.REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH =
+      'client/app/generated/custom-registration-entry.js';
+    fs.existsSync.mockImplementation((p) => p === DEFAULT_MANIFEST || p === REGISTRATION_ENTRY);
+    fs.readFileSync.mockReturnValue(JSON.stringify({ refs: ['client/app/A.jsx'] }));
+    fs.statSync.mockImplementation((p) => ({
+      isFile: () => p !== OVERRIDE_REGISTRATION_ENTRY,
+      mtimeMs: p === REGISTRATION_ENTRY ? 2000 : 1000,
+    }));
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx']);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringMatching(/may be stale/));
+      expect(fs.statSync).toHaveBeenCalledWith(REGISTRATION_ENTRY);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('falls back to the default registration entry when the configured path is under an excluded tree', () => {
+    process.env.REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH =
+      'node_modules/pkg/generated/server-component-registration-entry.js';
+    fs.existsSync.mockImplementation((p) => p === DEFAULT_MANIFEST || p === REGISTRATION_ENTRY);
+    fs.readFileSync.mockReturnValue(JSON.stringify({ refs: ['client/app/A.jsx'] }));
+    fs.statSync.mockImplementation((p) => ({
+      isFile: () => true,
+      mtimeMs: p === REGISTRATION_ENTRY ? 2000 : 1000,
+    }));
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx']);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringMatching(/may be stale/));
+      expect(fs.statSync).toHaveBeenCalledWith(REGISTRATION_ENTRY);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('falls back to the default registration entry when the configured path is missing', () => {
+    process.env.REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH = 'tmp/missing-registration-entry.js';
+    fs.existsSync.mockImplementation((p) => p === DEFAULT_MANIFEST || p === REGISTRATION_ENTRY);
+    fs.readFileSync.mockReturnValue(JSON.stringify({ refs: ['client/app/A.jsx'] }));
+    fs.statSync.mockImplementation((p) => ({ mtimeMs: p === REGISTRATION_ENTRY ? 2000 : 1000 }));
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      expect(rscManifestClientReferences()).toEqual(['client/app/A.jsx']);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringMatching(/may be stale/));
+      expect(fs.statSync).toHaveBeenCalledWith(REGISTRATION_ENTRY);
     } finally {
       warnSpy.mockRestore();
     }

@@ -22,6 +22,9 @@ require "json"
 unless defined?(EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_COMPONENTS)
   EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_COMPONENTS = %w[.git log node_modules public spec test tmp vendor].freeze
 end
+unless defined?(RSC_REGISTRATION_ENTRY_PATH_ENV)
+  RSC_REGISTRATION_ENTRY_PATH_ENV = "REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH"
+end
 
 # Find Rails root by walking upward looking for config/environment.rb
 def find_rails_root
@@ -147,7 +150,21 @@ def valid_rsc_registration_entry_path?(path, rails_root: nil)
   EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_COMPONENTS.none? { |component| path_components.include?(component) }
 end
 
+def configured_rsc_manifest_registration_entry(rails_root)
+  configured_path = ENV[RSC_REGISTRATION_ENTRY_PATH_ENV].to_s.strip
+  return nil if configured_path.empty?
+
+  path = File.expand_path(configured_path, rails_root)
+  return nil unless File.file?(path)
+  return nil unless File.basename(path) == "server-component-registration-entry.js"
+
+  path if valid_rsc_registration_entry_path?(path, rails_root: rails_root)
+end
+
 def rsc_manifest_registration_entry(rails_root)
+  configured_entry = configured_rsc_manifest_registration_entry(rails_root)
+  return configured_entry if configured_entry
+
   Find.find(rails_root) do |path|
     if File.directory?(path)
       Find.prune unless valid_rsc_registration_entry_path?(path, rails_root: rails_root)

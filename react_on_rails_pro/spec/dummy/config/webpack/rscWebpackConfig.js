@@ -1,5 +1,5 @@
-const { existsSync } = require('fs');
-const { dirname, resolve } = require('path');
+const { existsSync, statSync } = require('fs');
+const { basename, dirname, isAbsolute, relative, resolve } = require('path');
 const { config } = require('shakapacker');
 const { default: serverWebpackConfig, extractLoader } = require('./serverWebpackConfig');
 
@@ -22,10 +22,59 @@ const configureRsc = () => {
   const discoveryBuild = process.env.RSC_REFERENCE_DISCOVERY_BUILD === 'true';
 
   const sourceEntryDirectory = resolve(config.source_path, config.source_entry_path);
-  const serverComponentRegistrationEntry = resolve(
+  const defaultServerComponentRegistrationEntry = resolve(
     dirname(sourceEntryDirectory),
     'generated/server-component-registration-entry.js',
   );
+  const expectedServerComponentRegistrationEntry = 'server-component-registration-entry.js';
+  const excludedRegistrationEntryPathComponents = [
+    '.git',
+    'log',
+    'node_modules',
+    'public',
+    'spec',
+    'test',
+    'tmp',
+    'vendor',
+  ];
+  const registrationEntryPathComponents = (entryPath) => {
+    const rootRelativePath = relative(process.cwd(), entryPath);
+    const scopedPath =
+      rootRelativePath &&
+      rootRelativePath !== '..' &&
+      !rootRelativePath.startsWith('../') &&
+      !rootRelativePath.startsWith('..\\') &&
+      !isAbsolute(rootRelativePath)
+        ? rootRelativePath
+        : entryPath;
+
+    return scopedPath.split(/[\\/]+/).filter(Boolean);
+  };
+  const validServerComponentRegistrationEntry = (entryPath) => {
+    if (basename(entryPath) !== expectedServerComponentRegistrationEntry) return false;
+    if (
+      registrationEntryPathComponents(entryPath).some((component) =>
+        excludedRegistrationEntryPathComponents.includes(component),
+      )
+    ) {
+      return false;
+    }
+
+    try {
+      return statSync(entryPath).isFile();
+    } catch {
+      return false;
+    }
+  };
+  const serverComponentRegistrationEntry = (() => {
+    const configuredRegistrationEntry = process.env.REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH;
+    if (configuredRegistrationEntry) {
+      const configuredEntry = resolve(configuredRegistrationEntry);
+      if (validServerComponentRegistrationEntry(configuredEntry)) return configuredEntry;
+    }
+
+    return defaultServerComponentRegistrationEntry;
+  })();
 
   if (discoveryBuild) {
     if (!existsSync(serverComponentRegistrationEntry)) {

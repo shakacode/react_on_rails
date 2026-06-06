@@ -46,18 +46,68 @@ module ReactOnRails
             // The resolution cascade below is mirrored, branch for branch, by the Pro dummy's
             // hand-written rscManifestClientReferences.js and pinned on both sides by contract tests.
             const rscClientReferences = (() => {
-              // fs is required inside the IIFE rather than at the top of the file because the
-              // module-scope bindings 'resolve' (from 'path') and 'config' (from 'shakapacker') are
-              // already present — either pre-existing in the config or injected alongside this
-              // snippet by the generator — so only fs is pulled in here.
+              // Required inside the IIFE rather than at the top of the file because the module-scope
+              // bindings 'resolve' (from 'path') and 'config' (from 'shakapacker') are already
+              // present — either pre-existing in the config or injected alongside this snippet by
+              // the generator — so only extra helpers are pulled in here.
               const { existsSync, readFileSync, statSync } = require('fs');
+              const { basename, isAbsolute, relative } = require('path');
               const configuredRefsJson = process.env.RSC_MANIFEST_CLIENT_REFERENCES_JSON;
+              const configuredRegistrationEntry = process.env.REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH;
               const defaultRefsJson = resolve('ssr-generated/rsc-client-references.json');
-              const serverComponentRegistrationEntry = resolve(
+              const defaultServerComponentRegistrationEntry = resolve(
                 config.source_path,
                 config.source_entry_path,
                 '../generated/server-component-registration-entry.js',
               );
+              const expectedServerComponentRegistrationEntry = 'server-component-registration-entry.js';
+              const excludedRegistrationEntryPathComponents = [
+                '.git',
+                'log',
+                'node_modules',
+                'public',
+                'spec',
+                'test',
+                'tmp',
+                'vendor',
+              ];
+              const registrationEntryPathComponents = (entryPath) => {
+                const rootRelativePath = relative(process.cwd(), entryPath);
+                const scopedPath =
+                  rootRelativePath &&
+                  rootRelativePath !== '..' &&
+                  !rootRelativePath.startsWith('../') &&
+                  !rootRelativePath.startsWith('..\\') &&
+                  !isAbsolute(rootRelativePath)
+                    ? rootRelativePath
+                    : entryPath;
+
+                return scopedPath.split(/[\\/]+/).filter(Boolean);
+              };
+              const validServerComponentRegistrationEntry = (entryPath) => {
+                if (basename(entryPath) !== expectedServerComponentRegistrationEntry) return false;
+                if (
+                  registrationEntryPathComponents(entryPath).some((component) =>
+                    excludedRegistrationEntryPathComponents.includes(component),
+                  )
+                ) {
+                  return false;
+                }
+
+                try {
+                  return statSync(entryPath).isFile();
+                } catch {
+                  return false;
+                }
+              };
+              const serverComponentRegistrationEntry = (() => {
+                if (configuredRegistrationEntry) {
+                  const configuredEntry = resolve(configuredRegistrationEntry);
+                  if (validServerComponentRegistrationEntry(configuredEntry)) return configuredEntry;
+                }
+
+                return defaultServerComponentRegistrationEntry;
+              })();
 
               const readManifestReferences = (refsJson) => {
                 let payload;
