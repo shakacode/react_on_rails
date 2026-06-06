@@ -118,11 +118,11 @@ Use the `+ci-*` PR comment commands from the CI command workflow for full-CI dec
 
 ## Review Comment Handling
 
-Use `.agents/workflows/address-review.md` for detailed review-comment triage. The default stance is:
+For Claude Code, use `/address-review`. For Codex or other assistants, use `.agents/workflows/address-review.md`. The default stance is:
 
 - `MUST-FIX`: fix in the PR.
 - `DISCUSS`: ask the user or make a narrow, evidence-backed decision.
-- `OPTIONAL`: address inline only when the user opts in or the improvement is clearly worth the extra turn.
+- `OPTIONAL`: address inline only when the user opts in.
 - `SKIPPED`: reply with rationale only when useful; do not create work from noise.
 
 Do not let follow-up issues become a substitute for finishing the PR. Follow-up tracking is allowed only for real, non-blocking work that remains valuable outside the PR context.
