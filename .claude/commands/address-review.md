@@ -250,12 +250,12 @@ Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or au
 
 1. Do everything in `f` for `MUST-FIX` items. If there are no `MUST-FIX` items, skip the fix phase and continue with deferred-item handling.
 2. Prepare one deferred-work bundle for all `DISCUSS` items, `OPTIONAL` items worth tracking, and non-trivial `SKIPPED` items. Exclude weak "could consider" optional suggestions, trivial duplicates, factually incorrect suggestions, and status noise. Do not create a GitHub issue yet.
-3. Present the bundle and ask whether to link an existing issue, create one bundled follow-up issue, post a PR summary comment only, or drop the bundle as not worth tracking.
+3. Present the bundle and ask whether to link an existing issue, create one bundled follow-up issue, post a PR summary comment only, or drop the bundle as not worth tracking. Do not post replies or resolve bundled items until that tracking/drop outcome is chosen. If the bundle is dropped, explicitly confirm that each bundled `DISCUSS` item is declined or not tracked before resolving it or signaling merge-ready; otherwise leave those threads open and report that the PR is not merge-ready.
 4. For each deferred item in the chosen tracking outcome, post a reply in the original location referencing that outcome (use review-comment replies for inline comments and issue comments for review summaries/general comments), and resolve the thread when one exists and the conversation is complete. For general PR comments and review summary bodies (which have no thread), the reply alone is sufficient.
 5. For trivial `SKIPPED` items that are not included in the bundle (duplicates, factually incorrect suggestions, status noise), still post rationale replies and resolve those threads only when the user confirms.
 6. If there are zero deferred items, skip deferred tracking and continue `f`'s remaining decision flow. Do not signal merge-ready until `f`'s optional, skipped, and discuss prompts are complete.
 7. No additional commit is required unless later steps introduce local changes; if they do, commit and ask for push confirmation before pushing.
-8. Tell the user the PR is merge-ready only after the deferred bundle has an explicit tracking/drop decision; if there were zero deferred items, use the `f` merge-ready rule after `f`'s remaining prompts are complete.
+8. Tell the user the PR is merge-ready only after the deferred bundle has an explicit tracking/drop decision and any dropped `DISCUSS` items are explicitly declined/resolved; if there were zero deferred items, use the `f` merge-ready rule after `f`'s remaining prompts are complete.
 
 ### Action `f+o` — Fix must-fix and optional items inline
 
@@ -553,7 +553,7 @@ PR is NOT merge-ready because must-fix items were deferred.
 If the action was direct item selection and unresolved `MUST-FIX`/`DISCUSS` items remain, do not signal merge-ready. Re-offer the quick-action menu and ask whether to continue with `f`, `f+i`, `f+o`, `d`, `o`, `r`, or `m`.
 If the action was `d`, `o`, or `r` and unresolved `MUST-FIX`/`DISCUSS` items remain, do not signal merge-ready; re-offer the quick-action menu and ask whether to continue with `f`, `f+i`, `f+o`, `d`, `o`, `r`, or `m`.
 If the action was `f+o`, tell me the PR is merge-ready once all selected work is pushed and `DISCUSS` items are resolved or explicitly deferred. `OPTIONAL` items do not block merge-readiness because they were all addressed inline.
-If the action was `f+i` or `m`, do not signal merge-ready until the deferred bundle has an explicit tracking/drop decision; if there were zero deferred items, skip tracking and use the relevant no-deferred-items merge-ready rule after the remaining prompts for that action are complete.
+If the action was `f+i` or `m`, do not signal merge-ready until the deferred bundle has an explicit tracking/drop decision and any dropped `DISCUSS` items are explicitly declined/resolved; if there were zero deferred items, skip tracking and use the relevant no-deferred-items merge-ready rule after the remaining prompts for that action are complete.
 If the action was `a`, do not signal merge-ready automatically. Report that files are staged for review and list the remaining GitHub actions needed, such as commit, push, replies/resolutions, and decisions on `DISCUSS` recommendations.
 
 Do not automatically merge. Signal readiness (or non-readiness) and let the user decide.
