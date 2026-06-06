@@ -40,18 +40,22 @@ Then extract the PR number and optional review/comment ID from the remaining inp
 - Extract fragment ID after `#` (e.g., `pullrequestreview-123456789` → `123456789`)
 - If a full GitHub URL is provided, capture the URL's `org/repo` now so Step 2 can use it without calling `gh repo view`.
 
-## Step 2: Set Repository and PR Number
+## Step 2: Set Repository and Parsed IDs
 
 - If Step 1 extracted `org/repo` from a full GitHub URL, use that as `REPO`.
 - Otherwise, detect the repository from the current checkout.
 - Set `PR_NUMBER` to the number parsed in Step 1.
+- Set `COMMENT_ID` when Step 1 parsed a specific issue or review comment ID.
+- Set `REVIEW_ID` when Step 1 parsed a specific pull request review ID.
 
 ```bash
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)  # or the org/repo extracted from the PR URL in Step 1
 PR_NUMBER=<the PR number parsed in Step 1>
+COMMENT_ID=<the issue/review comment ID parsed in Step 1, if any>
+REVIEW_ID=<the pull request review ID parsed in Step 1, if any>
 ```
 
-Every subsequent snippet uses `${REPO}` and `${PR_NUMBER}` as shell variables; setting them once here means no manual substitution is required later. If `gh repo view` fails (and no URL was supplied), ensure `gh` CLI is installed and authenticated (`gh auth status`).
+Every subsequent snippet uses `${REPO}`, `${PR_NUMBER}`, `${COMMENT_ID}`, and `${REVIEW_ID}` as shell variables; setting them once here means no manual substitution is required later. If `gh repo view` fails (and no URL was supplied), ensure `gh` CLI is installed and authenticated (`gh auth status`).
 
 ## Step 3: Determine Scan Window and Summary Cutoff
 
@@ -105,17 +109,17 @@ done
 **If a specific issue comment ID is provided (`#issuecomment-...`):**
 
 ```bash
-gh api repos/${REPO}/issues/comments/{COMMENT_ID} | jq '{body: .body, user: .user.login, created_at: .created_at, html_url: .html_url}'
+gh api repos/${REPO}/issues/comments/${COMMENT_ID} | jq '{body: .body, user: .user.login, created_at: .created_at, html_url: .html_url}'
 ```
 
 **If a specific review ID is provided (`#pullrequestreview-...`):**
 
 ```bash
 # Review body (often contains summary feedback)
-gh api repos/${REPO}/pulls/${PR_NUMBER}/reviews/{REVIEW_ID} | jq '{id: .id, body: .body, state: .state, user: .user.login, created_at: .submitted_at, html_url: .html_url}'
+gh api repos/${REPO}/pulls/${PR_NUMBER}/reviews/${REVIEW_ID} | jq '{id: .id, body: .body, state: .state, user: .user.login, created_at: .submitted_at, html_url: .html_url}'
 
 # Inline comments for this review
-gh api --paginate repos/${REPO}/pulls/${PR_NUMBER}/reviews/{REVIEW_ID}/comments | jq -s '[.[].[] | {id: .id, node_id: .node_id, path: .path, body: .body, line: .line, start_line: .start_line, user: .user.login, in_reply_to_id: .in_reply_to_id, created_at: .created_at, html_url: .html_url}]'
+gh api --paginate repos/${REPO}/pulls/${PR_NUMBER}/reviews/${REVIEW_ID}/comments | jq -s '[.[].[] | {id: .id, node_id: .node_id, path: .path, body: .body, line: .line, start_line: .start_line, user: .user.login, in_reply_to_id: .in_reply_to_id, created_at: .created_at, html_url: .html_url}]'
 ```
 
 Include the review body as a general comment when it contains actionable feedback. When the review body contains actionable feedback, note that it cannot be replied to via the `/replies` endpoint — responses to review summary bodies must be posted as general PR comments (see Step 8).
@@ -325,7 +329,7 @@ gh api repos/${REPO}/issues/${PR_NUMBER}/comments -X POST -f body="<response>"
 **For PR review comments (file-specific, replying to a thread):**
 
 ```bash
-gh api repos/${REPO}/pulls/${PR_NUMBER}/comments/{COMMENT_ID}/replies -X POST -f body="<response>"
+gh api repos/${REPO}/pulls/${PR_NUMBER}/comments/${COMMENT_ID}/replies -X POST -f body="<response>"
 ```
 
 Use the `/replies` endpoint for all existing review comments, including standalone top-level comments.

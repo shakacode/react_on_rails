@@ -49,7 +49,7 @@ Execution flow when terminal access is available:
      - Specific issue comment URL with `#issuecomment-...`
      - Optional standalone `autopilot` token before or after the PR reference
    - Detect the standalone token `autopilot`, set an `AUTOPILOT` flag, and remove only that token before parsing the PR reference. Do not treat bare `a` as `autopilot`; `a` is only a post-triage quick action.
-   - Detect the exact phrase `check all reviews`, set a `CHECK_ALL_REVIEWS` flag, and remove only that phrase before parsing the PR reference.
+   - Detect the exact phrase `check all reviews` (case-insensitive, trailing position only — it must be the final tokens after the PR reference), set a `CHECK_ALL_REVIEWS` flag, and remove only that phrase before parsing the PR reference. If the phrase appears in any other position, do not treat it as an override; warn and ask me to retry with the trailing form.
    - If the input is a full GitHub URL, extract the URL's `org/repo` before running `gh repo view`.
    - Extract the PR number and optional review/comment ID.
 
