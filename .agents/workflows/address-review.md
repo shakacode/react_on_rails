@@ -205,7 +205,7 @@ Execution flow when terminal access is available:
    - Every new follow-up issue title must begin with the exact prefix `Follow-up:`. For this workflow, use title `Follow-up: Review feedback from PR #N`.
    - Build the issue body as a Markdown temp file and create the issue with `gh issue create --repo "${REPO}" --title "Follow-up: Review feedback from PR #N" --body-file "${issue_body_file}"`
    - Do not pass multi-line Markdown through `--body`; this can leak literal `\n` text into the GitHub issue.
-   - Before creating the issue, inspect the body file and fix or abort if it contains literal `\n` escape sequences instead of real newlines.
+   - Before creating the issue, inspect the body file and fix or abort if it contains literal `\n` escape sequences instead of real newlines, ignoring fenced code blocks and inline code spans.
    - For `f+i`, include discuss items, optional items worth tracking, and non-trivial skipped items (must-fix is already addressed)
    - For `m`, include deferred must-fix items, discuss items, optional items worth tracking, and non-trivial skipped items
    - Keep issue body structure consistent: use an optional `### Must-fix items (deferred)` section (for `m` only), then `### Discuss items`, then `### Optional items`, then `### Skipped items (non-trivial)`, plus the original PR link at the bottom
