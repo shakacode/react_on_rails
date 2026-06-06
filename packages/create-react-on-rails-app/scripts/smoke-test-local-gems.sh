@@ -183,7 +183,11 @@ verify_generated_app_runtime() {
 
   app_name="$(basename "$app_dir")"
   echo "Building test bundles for $app_name..."
-  if ! pushd "$app_dir" >/dev/null; then
+  if [[ ! -d "$app_dir" ]]; then
+    echo "Generated app directory is missing for $app_name: $app_dir" >&2
+    return 1
+  fi
+  if ! pushd "$app_dir" >/dev/null 2>&1; then
     echo "Cannot cd to generated app directory for $app_name: $app_dir" >&2
     return 1
   fi
