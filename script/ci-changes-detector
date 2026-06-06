@@ -260,7 +260,12 @@ while IFS= read -r file; do
     # (see the #3474 regression and the benchmarks-on-a-docs-PR case in #3597).
     #   - internal/**              : planning, contributor-info, testimonials, history docs
     #   - .github/ISSUE_TEMPLATE/** : GitHub issue templates (repo metadata, not CI infra)
-    *.md|*.mdx|*.markdown|*.rst|*.txt|docs/*|internal/*|internal/**/*|.github/ISSUE_TEMPLATE/*|.github/ISSUE_TEMPLATE/**/*|.lychee.toml)
+    #   - .claude/** .agents/** .cursor/** : agent/editor tooling (skills, prompts,
+    #     hooks, workflows). These run locally for coding agents, never in GitHub
+    #     Actions CI, so they don't affect the runtime, tests, or benchmarks. The
+    #     non-extension .claude/skills symlink is what slipped through the catch-all
+    #     and ran benchmarks on the docs-only PR #3717.
+    *.md|*.mdx|*.markdown|*.rst|*.txt|docs/*|internal/*|internal/**/*|.github/ISSUE_TEMPLATE/*|.github/ISSUE_TEMPLATE/**/*|.claude/*|.claude/**/*|.agents/*|.agents/**/*|.cursor/*|.cursor/**/*|.lychee.toml)
       # Don't change DOCS_ONLY flag, just continue
       ;;
 

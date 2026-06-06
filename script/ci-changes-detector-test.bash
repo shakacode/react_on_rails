@@ -253,6 +253,30 @@ test_docs_pr_with_internal_and_issue_template_yaml_is_non_runtime_only() {
   assert_contains "$out" '"benchmarks_changed": false' "docs PR output"
 }
 
+# Regression for PR #3717: agent/editor tooling under .claude/** and .agents/**
+# is non-runtime. The .claude/skills symlink (a tracked path with no extension)
+# used to miss every category and hit the catch-all, forcing the full test +
+# benchmark suite — Bencher even posted results on that docs-only PR.
+test_agent_tooling_changes_are_non_runtime_only() {
+  setup_repo
+  mkdir -p .agents/skills/verify .claude
+  printf 'verify skill\n' > .agents/skills/verify/SKILL.md
+  # Mirror the offending file: an extensionless path under .claude/ (the PR added
+  # it as a symlink; the detector categorizes purely by path, so a plain file at
+  # the same path exercises the same case branch).
+  printf '../.agents/skills\n' > .claude/skills
+  commit_change "convert claude commands to agent skills"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"docs_only": true' "agent tooling output"
+  assert_contains "$out" '"non_runtime_only": true' "agent tooling output"
+  assert_contains "$out" '"run_lint": false' "agent tooling output"
+  assert_contains "$out" '"run_ruby_tests": false' "agent tooling output"
+  assert_contains "$out" '"run_js_tests": false' "agent tooling output"
+  assert_contains "$out" '"benchmarks_changed": false' "agent tooling output"
+}
+
 test_ruby_comment_only_change_skips_heavy_tests_but_keeps_lint() {
   setup_repo
   perl -0pi -e 's/class Example/class Example\n    # Explain the fixture./' \
@@ -677,6 +701,7 @@ run_test test_docs_changes_are_non_runtime_only
 run_test test_internal_non_markdown_docs_are_non_runtime_only
 run_test test_issue_template_changes_are_non_runtime_only
 run_test test_docs_pr_with_internal_and_issue_template_yaml_is_non_runtime_only
+run_test test_agent_tooling_changes_are_non_runtime_only
 run_test test_ruby_comment_only_change_skips_heavy_tests_but_keeps_lint
 run_test test_ruby_block_comment_only_change_skips_heavy_tests_but_keeps_lint
 run_test test_wrapping_ruby_code_with_block_comment_delimiters_remains_runtime_affecting
