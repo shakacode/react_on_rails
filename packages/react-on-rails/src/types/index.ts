@@ -147,6 +147,8 @@ type RenderFunctionAsyncResult = Promise<
 
 type RenderFunctionResult = RenderFunctionSyncResult | RenderFunctionAsyncResult;
 
+type ReactComponentRenderFunctionResult = ReactComponent | Promise<ReactComponent>;
+
 /**
  * Optional cleanup callback that a renderer function (the 3-argument form
  * `(props, railsContext, domNodeId) => …`) may return inside a {@link RendererTeardownResult}.
@@ -214,6 +216,20 @@ interface RendererFunction extends RenderFunctionMarker {
   (props?: Record<string, unknown>, railsContext?: RailsContext, domNodeId?: string): RendererFunctionResult;
 }
 
+/**
+ * A render function variant for APIs that require a React component result, such as
+ * Pro server-component wrappers. Unlike {@link RenderFunction}, this does not allow
+ * server-render hashes/HTML, and unlike {@link RendererFunction}, this does not allow
+ * renderer teardown results.
+ *
+ * Runtime render-function detection still follows the regular React on Rails
+ * convention: declare at least two parameters, or set `renderFunction = true`
+ * on one-argument functions.
+ */
+interface ReactComponentRenderFunction<Props = any> extends RenderFunctionMarker {
+  (props?: Props, railsContext?: RailsContext, domNodeId?: string): ReactComponentRenderFunctionResult;
+}
+
 type StreamableComponentResult = ReactElement | Promise<ReactElement | string>;
 
 type AsyncPropsManager = {
@@ -273,6 +289,7 @@ export type {
   ReactComponentOrRenderFunction,
   RegisteredComponentValue,
   ReactComponent,
+  ReactComponentRenderFunction,
   AuthenticityHeaders,
   RenderFunction,
   RendererTeardown,
@@ -288,6 +305,7 @@ export type {
   CreateReactOutputAsyncResult,
   RenderFunctionSyncResult,
   RenderFunctionAsyncResult,
+  ReactComponentRenderFunctionResult,
   StreamableComponentResult,
   PipeableOrReadableStream,
 };

@@ -24,7 +24,7 @@
 import 'react-on-rails-rsc/client.browser';
 import * as React from 'react';
 import * as ReactDOMClient from 'react-dom/client';
-import { ReactComponent, ReactComponentOrRenderFunction, RendererFunction } from 'react-on-rails/types';
+import type { ReactComponent, ReactComponentRenderFunction, RendererFunction } from 'react-on-rails/types';
 import isRenderFunction from 'react-on-rails/isRenderFunction';
 import { isRendererTeardownResult } from 'react-on-rails/@internal/rendererTeardown';
 import { ensureReactUseAvailable } from 'react-on-rails/reactApis';
@@ -33,6 +33,8 @@ import getReactServerComponent from '../getReactServerComponent.client.ts';
 import handleRecoverableError from '../handleRecoverableError.client.ts';
 
 ensureReactUseAvailable();
+
+type ServerComponentRendererInput = ReactComponent | ReactComponentRenderFunction;
 
 /**
  * Wraps a client component with the necessary RSC context and handling for client-side operations.
@@ -54,7 +56,7 @@ ensureReactUseAvailable();
  * ```
  */
 const wrapServerComponentRenderer = (
-  componentOrRenderFunction: ReactComponentOrRenderFunction,
+  componentOrRenderFunction: ServerComponentRendererInput,
   componentName: string = 'Unknown',
 ) => {
   if (typeof componentOrRenderFunction !== 'function') {
@@ -68,12 +70,10 @@ const wrapServerComponentRenderer = (
   // mount leak this fix closes. Keep all three parameters declared.
   const wrapper: RendererFunction = async (props, railsContext, domNodeId) => {
     // A registerServerComponent render function is expected to resolve to the component to mount,
-    // not a renderer teardown. RendererFunction still accepts legacy render-function return shapes
-    // because older 3-arg renderers sometimes returned a component just to satisfy the old public
-    // type; this wrapper narrows to the expected component shape, and the guard below rejects
-    // anything else at runtime.
+    // not a renderer teardown. The wrapper input type encodes that invariant for TypeScript callers,
+    // and the guard below keeps the runtime error clear for JavaScript callers.
     const Component = isRenderFunction(componentOrRenderFunction)
-      ? ((await componentOrRenderFunction(props, railsContext, domNodeId)) as ReactComponent)
+      ? await componentOrRenderFunction(props, railsContext, domNodeId)
       : componentOrRenderFunction;
 
     // Preserve compatibility with existing 3-arg render functions: they are awaited before domNodeId

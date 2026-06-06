@@ -16,13 +16,15 @@ import * as React from 'react';
 import type {
   RailsContext,
   ReactComponent,
+  ReactComponentRenderFunction,
   RenderFunction,
-  ReactComponentOrRenderFunction,
 } from 'react-on-rails/types';
 import isRenderFunction from 'react-on-rails/isRenderFunction';
 import { assertRailsContextWithServerStreamingCapabilities } from 'react-on-rails/types';
 import getReactServerComponent from '../getReactServerComponent.server.ts';
 import { createRSCProvider } from '../RSCProvider.tsx';
+
+type ServerComponentRendererInput = ReactComponent | ReactComponentRenderFunction;
 
 /**
  * Wraps a client component with the necessary RSC context and handling for server-side operations.
@@ -44,7 +46,7 @@ import { createRSCProvider } from '../RSCProvider.tsx';
  * ```
  */
 const wrapServerComponentRenderer = (
-  componentOrRenderFunction: ReactComponentOrRenderFunction,
+  componentOrRenderFunction: ServerComponentRendererInput,
   componentName: string = 'Unknown',
 ) => {
   if (typeof componentOrRenderFunction !== 'function') {
@@ -75,12 +77,11 @@ const wrapServerComponentRenderer = (
       );
     }
 
-    // The 2-argument server render-function form is expected to resolve to the component to mount.
-    // RenderFunction can also yield an HTML/server-render result, so this narrows to the expected
-    // component shape and the `typeof Component !== 'function'` guard below rejects anything else at
-    // runtime.
+    // The server-component render-function form is expected to resolve to the component to mount.
+    // The wrapper input type encodes that invariant for TypeScript callers, and the
+    // `typeof Component !== 'function'` guard below keeps the runtime error clear for JavaScript callers.
     const Component = isRenderFunction(componentOrRenderFunction)
-      ? ((await componentOrRenderFunction(props, railsContext)) as ReactComponent)
+      ? await componentOrRenderFunction(props, railsContext)
       : componentOrRenderFunction;
 
     if (typeof Component !== 'function') {
