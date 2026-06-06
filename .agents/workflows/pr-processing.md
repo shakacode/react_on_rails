@@ -43,8 +43,10 @@ REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 OWNER=${REPO%/*}
 NAME=${REPO#*/}
 PR_NUMBER=<PR_NUMBER>
-gh api graphql --paginate -f owner="${OWNER}" -f name="${NAME}" -f pr="${PR_NUMBER}" -f query='query($owner:String!, $name:String!, $pr:Int!, $endCursor:String) { repository(owner:$owner, name:$name) { pullRequest(number:$pr) { reviewThreads(first:100, after:$endCursor) { nodes { id isResolved comments(first:100) { nodes { id databaseId body author { login } url path line } } } pageInfo { hasNextPage endCursor } } } } }'
+gh api graphql --paginate -f owner="${OWNER}" -f name="${NAME}" -F pr="${PR_NUMBER}" -f query='query($owner:String!, $name:String!, $pr:Int!, $endCursor:String) { repository(owner:$owner, name:$name) { pullRequest(number:$pr) { reviewThreads(first:100, after:$endCursor) { nodes { id isResolved comments(first:100) { nodes { id databaseId body author { login } url path line } } } pageInfo { hasNextPage endCursor } } } } }'
 ```
+
+Use `-F pr=...` intentionally here: `gh api graphql` needs a JSON integer for `$pr:Int!`, and raw `-f pr=...` sends a string.
 
 For an issue, gather enough context to avoid duplicate work:
 

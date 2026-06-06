@@ -125,7 +125,8 @@ Execution flow when terminal access is available:
    - For all review-comment paths, fetch thread metadata and match `thread_id` by `node_id`:
      `OWNER=${REPO%/*}`
      `NAME=${REPO#*/}`
-     `gh api graphql --paginate -f owner="${OWNER}" -f name="${NAME}" -f pr="${PR_NUMBER}" -f query='query($owner:String!, $name:String!, $pr:Int!, $endCursor:String) { repository(owner:$owner, name:$name) { pullRequest(number:$pr) { reviewThreads(first:100, after:$endCursor) { nodes { id isResolved comments(first:100) { nodes { id databaseId } } } pageInfo { hasNextPage endCursor } } } } }' | jq -s '[.[].data.repository.pullRequest.reviewThreads.nodes[] | {thread_id: .id, is_resolved: .isResolved, comments: [.comments.nodes[] | {node_id: .id, id: .databaseId}]}]'`
+     `gh api graphql --paginate -f owner="${OWNER}" -f name="${NAME}" -F pr="${PR_NUMBER}" -f query='query($owner:String!, $name:String!, $pr:Int!, $endCursor:String) { repository(owner:$owner, name:$name) { pullRequest(number:$pr) { reviewThreads(first:100, after:$endCursor) { nodes { id isResolved comments(first:100) { nodes { id databaseId } } } pageInfo { hasNextPage endCursor } } } } }' | jq -s '[.[].data.repository.pullRequest.reviewThreads.nodes[] | {thread_id: .id, is_resolved: .isResolved, comments: [.comments.nodes[] | {node_id: .id, id: .databaseId}]}]'`
+   - Use `-F pr=...` intentionally for the GraphQL `Int!` variable; raw `-f pr=...` sends a string.
 
 5. Filter comments:
    - Never triage a prior summary checkpoint comment. Skip any issue comment whose body starts with `<!-- address-review-summary -->` on its very first line.
