@@ -100,12 +100,7 @@ describe('RedisCacheHandler', () => {
       const entry = makeEntry({ revalidate: 120 });
       await handler.set('key1', entry);
 
-      expect(mockRedisInstance.set).toHaveBeenCalledWith(
-        'key1',
-        expect.any(Buffer),
-        'EX',
-        120,
-      );
+      expect(mockRedisInstance.set).toHaveBeenCalledWith('key1', expect.any(Buffer), 'EX', 120);
     });
 
     test('stores entry without TTL when revalidate is 0', async () => {
@@ -137,12 +132,10 @@ describe('RedisCacheHandler', () => {
     test('set then get preserves entry data', async () => {
       let storedBlob: Buffer | null = null;
 
-      mockRedisInstance.set.mockImplementation(
-        (_key: string, blob: Buffer) => {
-          storedBlob = blob;
-          return Promise.resolve('OK');
-        },
-      );
+      mockRedisInstance.set.mockImplementation((_key: string, blob: Buffer) => {
+        storedBlob = blob;
+        return Promise.resolve('OK');
+      });
 
       mockRedisInstance.getBuffer.mockImplementation(() => Promise.resolve(storedBlob));
 
@@ -167,12 +160,10 @@ describe('RedisCacheHandler', () => {
     test('handles empty Buffer array', async () => {
       let storedBlob: Buffer | null = null;
 
-      mockRedisInstance.set.mockImplementation(
-        (_key: string, blob: Buffer) => {
-          storedBlob = blob;
-          return Promise.resolve('OK');
-        },
-      );
+      mockRedisInstance.set.mockImplementation((_key: string, blob: Buffer) => {
+        storedBlob = blob;
+        return Promise.resolve('OK');
+      });
       mockRedisInstance.getBuffer.mockImplementation(() => Promise.resolve(storedBlob));
 
       const original = makeEntry({ value: [] });
@@ -186,12 +177,10 @@ describe('RedisCacheHandler', () => {
     test('handles large payloads', async () => {
       let storedBlob: Buffer | null = null;
 
-      mockRedisInstance.set.mockImplementation(
-        (_key: string, blob: Buffer) => {
-          storedBlob = blob;
-          return Promise.resolve('OK');
-        },
-      );
+      mockRedisInstance.set.mockImplementation((_key: string, blob: Buffer) => {
+        storedBlob = blob;
+        return Promise.resolve('OK');
+      });
       mockRedisInstance.getBuffer.mockImplementation(() => Promise.resolve(storedBlob));
 
       const largeChunk = Buffer.alloc(100_000, 0x42);
