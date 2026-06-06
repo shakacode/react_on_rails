@@ -264,7 +264,7 @@ Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or au
 3. Present the bundle and ask whether to link an existing issue, create one bundled follow-up issue, post a PR summary comment only, or drop the bundle as not worth tracking. Do not post replies or resolve bundled items until that tracking/drop outcome is chosen. If the bundle is dropped, explicitly confirm that each bundled `DISCUSS` item is declined or not tracked before resolving it or signaling merge-ready; otherwise leave those threads open and report that the PR is not merge-ready.
 4. For each deferred item in the chosen tracking outcome, post a reply in the original location referencing that outcome (use review-comment replies for inline comments and issue comments for review summaries/general comments), and resolve the thread when one exists and the conversation is complete. For general PR comments and review summary bodies (which have no thread), the reply alone is sufficient.
 5. For trivial `SKIPPED` items that are not included in the bundle (duplicates, factually incorrect suggestions, status noise), still post rationale replies and resolve those threads only when the user confirms.
-6. If there are zero deferred items, skip deferred tracking and continue with whichever of `f`'s remaining prompts have items: optional handling (if any `OPTIONAL` items exist), skipped rationale confirmation (if any `SKIPPED` items exist), then discuss decisions (if any `DISCUSS` items remain).
+6. If there are zero deferred items, tell the user if any optional items were excluded from the bundle as not worth tracking, then continue with whichever of `f`'s remaining prompts have items: optional handling (if any `OPTIONAL` items exist), skipped rationale confirmation (if any `SKIPPED` items exist), then discuss decisions (if any `DISCUSS` items remain).
 7. No additional commit is required unless later steps introduce local changes; if they do, commit and ask for push confirmation before pushing.
 8. Tell the user the PR is merge-ready only after the deferred bundle has an explicit tracking/drop decision and any dropped `DISCUSS` items are explicitly declined/resolved; if there were zero deferred items, use the `f` merge-ready rule after `f`'s remaining prompts are complete.
 
@@ -462,12 +462,24 @@ else
 
   if [ "${CREATE_FOLLOW_UP_ISSUE}" = "1" ]; then
     # Best-effort: catch broken newline escapes from escaped shell strings
-    # before posting an issue body. Fenced code blocks whose fences start with
-    # three or more backticks and inline code spans are ignored; build the body
-    # with printf/heredocs.
-    if matched_newline_escapes=$(sed '/^```/,/^```/d' "${issue_body_file}" | sed 's/`[^`]*`//g' | grep -nE '\\n'); then
+    # before posting an issue body. Fenced code blocks whose indented fences
+    # start with three or more backticks or tildes and inline code spans are
+    # ignored; build the body with printf/heredocs.
+    fence_count=$(grep -cE '^[[:space:]]*(`{3,}|~{3,})' "${issue_body_file}" || true)
+    if [ $((fence_count % 2)) -ne 0 ]; then
+      echo "Refusing to create issue: body has an unclosed fenced code block." >&2
+      echo "Inspect and fix ${issue_body_file} before retrying." >&2
+      exit 1
+    fi
+    if matched_newline_escapes=$(
+      sed '/^[[:space:]]*```/,/^[[:space:]]*```/d' "${issue_body_file}" \
+        | sed '/^[[:space:]]*~~~/,/^[[:space:]]*~~~/d' \
+        | sed 's/`[^`]*`//g' \
+        | grep -nE '\\n'
+    ); then
       echo "Refusing to create issue: body contains likely literal \\n escape sequences:" >&2
       printf '%s\n' "${matched_newline_escapes}" >&2
+      echo "Inspect and fix ${issue_body_file} before retrying." >&2
       exit 1
     fi
     FOLLOW_UP_URL=$(gh issue create --repo "${REPO}" --title "Follow-up: Review feedback from PR #${PR_NUMBER}" --body-file "${issue_body_file}" --json url -q .url)
@@ -544,7 +556,7 @@ trap _cleanup_addr_review EXIT
   printf 'Next default scan starts after this comment. Say `check all reviews` to rescan the full PR.\n'
 } > "${summary_body_file}"
 
-gh api repos/${REPO}/issues/${PR_NUMBER}/comments -X POST -f body=@"${summary_body_file}"
+gh api repos/${REPO}/issues/${PR_NUMBER}/comments -X POST -F body=@"${summary_body_file}"
 ```
 
 Use exact dates/timestamps in this comment when referring to the cutoff or scan window.

@@ -26,6 +26,8 @@ Use this workflow when an agent is assigned an issue, an existing PR, a PR revie
 
 ## Initial GitHub Commands
 
+Replace angle-bracket placeholders such as `<PR>` and `<PR_NUMBER>` with real values before running these commands.
+
 For a PR, gather current state before touching code:
 
 ```bash
