@@ -219,7 +219,7 @@ Execution flow when terminal access is available:
    - For `a`, do not post a GitHub PR summary comment automatically; return the local summary to the user with the staged-file list and detailed `DISCUSS` recommendations.
    - Include the exact marker `<!-- address-review-summary -->` as the first line of the comment.
    - Use a `Mattered` section for `MUST-FIX` and `DISCUSS` items, including whether each item was addressed, deferred, or left pending by user choice.
-   - Use an `Optional` section only when `OPTIONAL` items were fixed by `a` or explicitly handled, listing whether they were addressed inline, deferred to a follow-up issue, or declined.
+   - Use an `Optional` section only when `OPTIONAL` items were explicitly handled by the GitHub-summary-posting action, listing whether they were addressed inline, deferred to a follow-up issue, or declined.
    - Use a `Skipped` section for `SKIPPED` items with short reasons.
    - Mention any deferred-work tracking outcome and follow-up issue URL that was created.
    - Mention whether the run used the default cutoff or the explicit `check all reviews` override.

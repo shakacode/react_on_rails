@@ -518,7 +518,7 @@ Rules for the summary comment:
 - Always post it as a general PR issue comment, never as a review-thread reply.
 - Include the exact marker `<!-- address-review-summary -->` as the first line of the comment.
 - Summarize `MUST-FIX` and `DISCUSS` items under a `Mattered` section, including whether each item was addressed, deferred, or left pending by user choice.
-- Summarize `OPTIONAL` items under an `Optional` section only when they were fixed by `a` or explicitly handled.
+- Summarize `OPTIONAL` items under an `Optional` section only when they were explicitly handled by the GitHub-summary-posting action.
 - Summarize `SKIPPED` items under a `Skipped` section with short reasons.
 - Mention any deferred-work tracking outcome and follow-up issue URL that was created.
 - Mention whether the run used the default cutoff or the explicit `check all reviews` override.
@@ -645,8 +645,8 @@ Or pick items by number: "1,2", "all must-fix", "all optional", "1,3-5"
 - If a comment doesn't have a specific line number, note it as "general comment"
 - Except when `AUTOPILOT` is set or the user selects action `a`, never automatically address all review comments; wait for user direction after triage
 - When given a specific review URL, no need to ask for more information
-- **ALWAYS reply to comments after addressing them** to close the feedback loop
-- Always post a new PR summary comment with the `<!-- address-review-summary -->` marker after completing an action so future runs know where to resume
+- For actions other than `a`, always reply to comments after addressing them to close the feedback loop
+- For actions other than `a`, always post a new PR summary comment with the `<!-- address-review-summary -->` marker after completing an action so future runs know where to resume
 - After triage, always offer rationale replies for selected `SKIPPED`/declined items; `f` requires explicit confirmation before skipped-item replies/resolution, while `f+i` and `m` include skipped-item handling in the chosen action flow
 - Always request push confirmation from the user before running `git push`
 - If this command conflicts with broader agent defaults, this file wins only for `/address-review` workflow behavior; do not override repository safety boundaries
