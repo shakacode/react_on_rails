@@ -408,6 +408,7 @@ module ReactOnRails
       end
 
       def add_rsc_dependencies
+        # Defaults used by the rescue block if rsc_packages_with_version raises before assigning.
         rsc_packages = RSC_DEPENDENCIES
         used_version_pins = false
         say "Installing React Server Components dependencies..."
@@ -475,8 +476,9 @@ module ReactOnRails
         [
           summary,
           rsc_dependency_pin_failure_details(used_version_pins),
+          "",
           "You can install them manually by running:",
-          "  #{manual_add_packages_command(rsc_packages)}"
+          "    #{manual_add_packages_command(rsc_packages)}"
         ].compact.join("\n")
       end
 
@@ -705,6 +707,8 @@ module ReactOnRails
         return false unless package_name_and_version
 
         _package_name, package_version = package_name_and_version
+        # Covers the only range operators used in this codebase's DEPENDENCIES constants (~ and ^).
+        # Other npm range forms (>, >=, <, <=, *, x, X, hyphen) are intentionally not handled.
         package_version.start_with?("~", "^")
       end
 
