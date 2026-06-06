@@ -18,6 +18,7 @@ import type { ReactElement } from 'react';
 import type {
   RailsContext,
   RegisteredComponent,
+  RegisteredComponentValue,
   RendererFunction,
   RendererTeardown,
   Root,
@@ -79,9 +80,10 @@ function invokeRendererTeardown(teardown: RendererTeardown | undefined, domNodeI
 // carries the raw (possibly still-pending) RendererResult because it cannot await; the two
 // intentionally differ and are not meant to be unified.
 type DelegationResult = { delegated: false } | { delegated: true; teardown?: RendererTeardown };
+type RegisteredComponentEntry = RegisteredComponent<RegisteredComponentValue>;
 
 async function delegateToRenderer(
-  componentObj: RegisteredComponent,
+  componentObj: RegisteredComponentEntry,
   props: Record<string, unknown>,
   railsContext: RailsContext,
   domNodeId: string,
@@ -103,6 +105,10 @@ async function delegateToRenderer(
     // `as RendererFunction` is a runtime-invariant assertion guarded by `isRenderer` (not a
     // structural narrowing). The object wrapper picks out only explicit teardown returns without
     // confusing legacy bare function returns for cleanup.
+    if (typeof component !== 'function') {
+      throw new Error(`Registered renderer "${name}" must be a function.`);
+    }
+
     const result = await (component as RendererFunction)(props, railsContext, domNodeId);
     return {
       delegated: true,

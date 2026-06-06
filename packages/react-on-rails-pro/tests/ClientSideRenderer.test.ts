@@ -183,6 +183,28 @@ describe('ClientSideRenderer', () => {
     expect(reactElement.type).toBe(TestComponent);
   });
 
+  it('rejects non-callable renderer entries before invoking them', async () => {
+    const componentSpec = setupTestComponentDom('dom-id-non-callable-renderer');
+    addRailsContext();
+    const getOrWaitForComponentSpy = jest.spyOn(ComponentRegistry, 'getOrWaitForComponent');
+    getOrWaitForComponentSpy.mockResolvedValueOnce({
+      name: 'TestComponent',
+      component: { metadata: 'server_render_js payload' },
+      renderFunction: true,
+      isRenderer: true,
+    });
+
+    try {
+      await expect(renderOrHydrateComponent(componentSpec)).rejects.toThrow(
+        'ReactOnRails encountered an error while rendering component: TestComponent',
+      );
+      expect(console.error).toHaveBeenCalledWith('Registered renderer "TestComponent" must be a function.');
+      expect(mockReactHydrateOrRender).not.toHaveBeenCalled();
+    } finally {
+      getOrWaitForComponentSpy.mockRestore();
+    }
+  });
+
   it('passes the bailout-aware recoverable handler for hydrated default-provider roots', async () => {
     const TestComponent = ({ greeting }: { greeting: string }) => React.createElement('div', null, greeting);
     const defaultProviderFactory = jest.fn(({ reactElement }: DefaultRSCProviderFactoryArgs) => reactElement);

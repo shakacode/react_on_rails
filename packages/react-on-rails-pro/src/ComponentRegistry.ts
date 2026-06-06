@@ -12,15 +12,13 @@
  * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import {
-  type ReactComponentOrRenderFunction,
-  type RegisteredComponent,
-  type RegisteredComponentValue,
-} from 'react-on-rails/types';
+import { type RegisteredComponent, type RegisteredComponentValue } from 'react-on-rails/types';
 import isRenderFunction from 'react-on-rails/isRenderFunction';
 import CallbackRegistry from './CallbackRegistry.ts';
 
-const componentRegistry = new CallbackRegistry<RegisteredComponent>('component');
+type RegisteredComponentEntry = RegisteredComponent<RegisteredComponentValue>;
+
+const componentRegistry = new CallbackRegistry<RegisteredComponentEntry>('component');
 
 /**
  * @param components { component1: component1, component2: component2, etc. }
@@ -48,7 +46,7 @@ export function register(components: Record<string, RegisteredComponentValue>): 
 
     componentRegistry.set(name, {
       name,
-      component: component as ReactComponentOrRenderFunction,
+      component,
       renderFunction,
       isRenderer,
     });
@@ -59,9 +57,9 @@ export function register(components: Record<string, RegisteredComponentValue>): 
  * @param name
  * @returns { name, component, isRenderFunction, isRenderer }
  */
-export const get = (name: string): RegisteredComponent => componentRegistry.get(name);
+export const get = (name: string): RegisteredComponentEntry => componentRegistry.get(name);
 
-export const getOrWaitForComponent = (name: string): Promise<RegisteredComponent> =>
+export const getOrWaitForComponent = (name: string): Promise<RegisteredComponentEntry> =>
   componentRegistry.getOrWaitForItem(name);
 
 /**
@@ -70,7 +68,7 @@ export const getOrWaitForComponent = (name: string): Promise<RegisteredComponent
  * { name, component, renderFunction, isRenderer}
  * @public
  */
-export const components = (): Map<string, RegisteredComponent> => componentRegistry.getAll();
+export const components = (): Map<string, RegisteredComponentEntry> => componentRegistry.getAll();
 
 /** @internal Exported only for tests */
 export function clear(): void {
