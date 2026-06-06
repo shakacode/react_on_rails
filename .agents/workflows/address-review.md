@@ -58,11 +58,11 @@ Execution flow when terminal access is available:
 
 3. Determine scan window and summary cutoff:
    - For full-PR scans (plain PR number or PR URL with no specific review/comment anchor), default to reviewing only feedback posted after the latest PR summary comment created by this workflow.
-   - The summary marker is a PR issue comment whose body contains `<!-- address-review-summary -->`.
+   - The summary marker is a PR issue comment whose body starts with `<!-- address-review-summary -->` on its first line.
    - If `CHECK_ALL_REVIEWS` is true, ignore the cutoff and scan the full PR history.
    - If the input is a specific review URL or specific issue-comment URL, fetch that exact target even if it predates the latest summary comment.
    - Fetch the latest summary comment before collecting review data:
-     `gh api --paginate repos/${REPO}/issues/{PR_NUMBER}/comments | jq -s '[.[].[] | select(((.body // "") | contains("<!-- address-review-summary -->"))) | {id: .id, created_at: .created_at, html_url: .html_url}] | sort_by(.created_at) | last'`
+    `gh api --paginate repos/${REPO}/issues/{PR_NUMBER}/comments | jq -s '[.[].[] | select((.body // "") | startswith("<!-- address-review-summary -->")) | {id: .id, created_at: .created_at, html_url: .html_url}] | sort_by(.created_at) | last'`
    - If a summary comment exists and `CHECK_ALL_REVIEWS` is false, set `REVIEW_CUTOFF_AT` to that comment's `created_at`.
    - Use exact timestamps in user-facing status updates, for example `2026-04-01T20:14:33Z`.
    - If no items survive the cutoff, tell me no new review feedback was found since that summary comment and remind me I can say `check all reviews`.

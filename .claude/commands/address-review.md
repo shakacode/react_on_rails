@@ -282,11 +282,12 @@ Post rationale replies to the specified items explaining why they are being defe
 
 1. Prepare one deferred-work bundle for `MUST-FIX`, `DISCUSS`, `OPTIONAL` items worth tracking, and non-trivial `SKIPPED` items. Do not create a GitHub issue yet.
 2. Ask whether to link an existing issue, create one bundled follow-up issue, post a PR summary comment only, or drop the bundle.
-3. Post replies in the original location for each deferred item only after the user chooses the tracking outcome: use review-comment replies for inline comments and issue comments for review summaries/general comments.
-4. Resolve `DISCUSS`, `OPTIONAL`, and `SKIPPED` review threads after replying (resolve only when a thread exists and the conversation is complete).
-5. If any `MUST-FIX` items were deferred, keep those review threads open by default unless the user explicitly asks to close them.
-6. If any `MUST-FIX` items were deferred, explicitly tell the user the PR is **not merge-ready** without an override decision.
-7. Only signal merge-ready with no code changes when there are zero deferred `MUST-FIX` items and the deferred bundle has an explicit tracking/drop decision. If there are zero deferred items, skip tracking and use the no-must-fix merge-ready rule.
+3. If the bundle is dropped, explicitly confirm that each bundled `DISCUSS` item is declined or not tracked before resolving it or signaling merge-ready; otherwise leave those threads open and report that the PR is not merge-ready.
+4. Post replies in the original location for each deferred item only after the user chooses the tracking outcome: use review-comment replies for inline comments and issue comments for review summaries/general comments.
+5. Resolve `DISCUSS`, `OPTIONAL`, and `SKIPPED` review threads after replying (resolve only when a thread exists and the conversation is complete).
+6. If any `MUST-FIX` items were deferred, keep those review threads open by default unless the user explicitly asks to close them.
+7. If any `MUST-FIX` items were deferred, explicitly tell the user the PR is **not merge-ready** without an override decision.
+8. Only signal merge-ready with no code changes when there are zero deferred `MUST-FIX` items, the deferred bundle has an explicit tracking/drop decision, and any dropped `DISCUSS` items are explicitly declined/resolved. If there are zero deferred items, skip tracking and use the no-must-fix merge-ready rule.
 
 ### Direct item selection (e.g., "1,2", "all must-fix", "all optional", "1,3-5")
 
@@ -450,8 +451,9 @@ else
     # Best-effort: catch broken newline escapes from escaped shell strings
     # before posting an issue body. Fenced code blocks whose fences start with
     # three or more backticks are ignored; build the body with printf/heredocs.
-    if sed '/^```/,/^```/d' "${issue_body_file}" | grep -nE '(^|[^`])\\n'; then
-      echo "Refusing to create issue: body contains likely literal \\n escape sequences" >&2
+    if matched_newline_escapes=$(sed '/^```/,/^```/d' "${issue_body_file}" | grep -nE '(^|[^`])\\n'); then
+      echo "Refusing to create issue: body contains likely literal \\n escape sequences:" >&2
+      printf '%s\n' "${matched_newline_escapes}" >&2
       exit 1
     fi
     FOLLOW_UP_URL=$(gh issue create --repo "${REPO}" --title "Follow-up: Review feedback from PR #${PR_NUMBER}" --body-file "${issue_body_file}" --json url -q .url)
