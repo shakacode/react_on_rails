@@ -39,6 +39,7 @@ gh pr checks <PR>
 Fetch unresolved review threads when review comments matter:
 
 ```bash
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 OWNER=${REPO%/*}
 NAME=${REPO#*/}
 PR_NUMBER=<PR_NUMBER>
