@@ -8,6 +8,8 @@ module ReactOnRails
       DEFAULT_PRECOMPILE_HOOK_COMMAND = "bin/shakapacker-precompile-hook"
       COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER = /^(\s*)#\s*precompile_hook:\s*~\s*$/
       RAW_PRECOMPILE_HOOK_VALUE = /^\s+precompile_hook:\s*(.*?)\s*$/
+      TOP_LEVEL_SECTION_HEADER = /\A(?:<%.*?%>\s*)*([A-Za-z0-9_-]+):(?:\s|$)/
+      TOP_LEVEL_SECTION_ANCHOR = /\A(?:<%.*?%>\s*)*[A-Za-z0-9_-]+:\s*&([A-Za-z0-9_-]+)/
       # YAML boolean scalars, including truthy values, are not valid shell commands.
       UNQUOTED_INACTIVE_PRECOMPILE_HOOK_VALUE = /\A(?:|~|null|false|true|yes|no|on|off)\z/i
       SHAKAPACKER_YML_QUOTE_CHARACTERS = ['"', "'"].freeze
@@ -15,6 +17,7 @@ module ReactOnRails
       ShakapackerYmlDocument = Struct.new(:sections, :section_index, :anchor_index, keyword_init: true)
       private_constant :SHAKAPACKER_YML_PATH, :DEFAULT_PRECOMPILE_HOOK_COMMAND,
                        :COMMENTED_PRECOMPILE_HOOK_PLACEHOLDER, :RAW_PRECOMPILE_HOOK_VALUE,
+                       :TOP_LEVEL_SECTION_HEADER, :TOP_LEVEL_SECTION_ANCHOR,
                        :UNQUOTED_INACTIVE_PRECOMPILE_HOOK_VALUE, :SHAKAPACKER_YML_QUOTE_CHARACTERS,
                        :ShakapackerYmlErbError, :ShakapackerYmlDocument
 
@@ -106,8 +109,9 @@ module ReactOnRails
       end
 
       def shakapacker_yml_sections(content)
-        # Split at top-level YAML mapping keys. Top-level comments and document
-        # separators become harmless single-line sections with no recognized name.
+        # Split at top-level YAML mapping keys and standalone ERB wrapper lines.
+        # Top-level comments and document separators become harmless single-line
+        # sections with no recognized name.
         content.each_line.slice_before { |line| line.match?(/^\S/) }.map(&:join)
       end
 
@@ -117,7 +121,7 @@ module ReactOnRails
 
       def shakapacker_yml_anchor_index(sections)
         sections.filter_map do |section|
-          match = section.match(/\A[A-Za-z0-9_-]+:\s*&([A-Za-z0-9_-]+)/)
+          match = section.match(TOP_LEVEL_SECTION_ANCHOR)
           [match[1], shakapacker_yml_section_name(section)] if match
         end.to_h
       end
@@ -147,7 +151,7 @@ module ReactOnRails
       end
 
       def shakapacker_yml_section_name(section)
-        section.match(/\A([A-Za-z0-9_-]+):(?:\s|$)/)&.[](1)
+        section.match(TOP_LEVEL_SECTION_HEADER)&.[](1)
       end
 
       def raw_active_precompile_hook_in_section_tree?(section_name, section_index, anchor_index, visited = {})
