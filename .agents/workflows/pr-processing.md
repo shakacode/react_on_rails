@@ -11,7 +11,7 @@ Run a Codex batch
 
 For assistants without skill support, follow the high-concurrency batch launch rules below before using the rest of this workflow.
 
-For post-merge audits after a concurrent batch or before a release candidate, use `.agents/skills/post-merge-audit/SKILL.md` when skills are available.
+For post-merge audits after a concurrent batch or before a release candidate, use `.agents/skills/post-merge-audit/SKILL.md` when skills are available. Reusable audit, comparison, issue-creation, and Claude handoff prompts live in `.agents/workflows/post-merge-audit.md`.
 
 ## Default Operating Model
 
@@ -333,6 +333,20 @@ Before marking a PR ready, asking for merge, or merging it:
 
 Use `address-review` for actionable GitHub review comments instead of skimming them manually. If a PR was already merged before this gate ran, include it in the next post-merge audit.
 
+### Coordinating Claude Review
+
+Codex cannot assume that Claude Code slash commands are executable from the current Codex session. Treat Claude review as an explicit handoff unless the current environment actually provides a callable Claude command.
+
+When the user wants Claude as an independent PR reviewer:
+
+1. Create or update a draft PR first if the Claude command needs a GitHub PR URL.
+2. Ask Claude to run the configured review command, such as `/pr-review-toolkit:review-pr <PR_URL>`, or use the Claude handoff prompt in `.agents/workflows/post-merge-audit.md`.
+3. Keep Codex and Claude independent until Claude posts or returns its report.
+4. Fetch Claude review comments and classify them with `address-review`.
+5. Do not mark the PR ready or merge until Claude's `MUST-FIX`, `DISCUSS`, compatibility, security, regression, and missing-changelog findings are fixed, explicitly decided, or waived by a maintainer.
+
+For local pre-push review, use the configured local review tool such as `.agents/skills/autoreview/SKILL.md` or `codex review`. Use Claude PR review after a draft PR exists unless the Claude tooling explicitly supports local diff review.
+
 ## Follow-Up Tracking Policy
 
 Follow-up issues are expensive. Default to no new issue.
@@ -405,6 +419,12 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    - review checks that were queued, in progress, stale, or asynchronous at merge time
    - pre-merge `Must Fix`, `MUST-FIX`, `Should Fix`, `DISCUSS`, `Changes Requested`, or similar actionable comments with no later evidence they were fixed, waived, or classified
 6. Flag user-visible changes missing from `CHANGELOG.md`; if any are found, recommend running `/update-changelog` before the next release candidate.
-7. Return high-risk findings first, then cross-PR risks, missing changelog candidates, a PR-by-PR table, and exact commands/data sources.
+7. Produce a deduped issue plan for non-OK findings:
+   - no issue for OK, duplicates, or fully resolved findings
+   - one bundled changelog issue or a `/update-changelog` recommendation for missing changelog entries
+   - one child issue per independently actionable fix PR, revert consideration, maintainer question, or follow-up task
+   - one parent issue when there are two or more related child issues from the same audit
+   - hidden `post-merge-audit-finding` fingerprints so duplicate child issues can be detected
+8. Return high-risk findings first, then cross-PR risks, missing changelog candidates, the issue plan, a PR-by-PR table, and exact commands/data sources.
 
-Do not create fixes, issues, comments, labels, changelog edits, reverts, or PRs until the user approves the audit report.
+Do not create fixes, issues, comments, labels, changelog edits, reverts, or PRs until the user approves the audit report and issue plan.

@@ -12,6 +12,7 @@ The goal is not to copy React on Rails blindly. The goal is to copy the reusable
 - [.agents/skills/pr-batch/SKILL.md](../../.agents/skills/pr-batch/SKILL.md) - memorable entry point for multi-issue or multi-PR batches; interviews for missing targets, trust, permissions, concurrency, and `/goal` handoff details.
 - [.agents/skills/post-merge-audit/SKILL.md](../../.agents/skills/post-merge-audit/SKILL.md) - post-merge batch audit workflow for missed review gates, missing changelog entries, cross-PR interactions, and release risk.
 - [.agents/workflows/pr-processing.md](../../.agents/workflows/pr-processing.md) - default flow for assigned issues, existing PRs, review-fix passes, and multi-PR landing plans.
+- [.agents/workflows/post-merge-audit.md](../../.agents/workflows/post-merge-audit.md) - reusable prompts for completed-batch handoffs, independent Codex/Claude audits, comparison, approved issue creation, and Claude PR review handoffs.
 - [.agents/workflows/address-review.md](../../.agents/workflows/address-review.md) - generic non-Claude review-comment triage and fixing workflow.
 - [.agents/skills/autoreview/SKILL.md](../../.agents/skills/autoreview/SKILL.md) - independent review skill used before commits, pushes, PRs, or merge readiness.
 
@@ -46,6 +47,7 @@ Do not copy the CI workflow files as a bundle unless the target repo has the sam
    - Add `.agents/skills/pr-batch/SKILL.md`.
    - Add `.agents/skills/post-merge-audit/SKILL.md`.
    - Add `.agents/workflows/pr-processing.md`.
+   - Add `.agents/workflows/post-merge-audit.md`.
    - Add `.agents/workflows/address-review.md`.
    - Add `.agents/skills/autoreview/SKILL.md`, or replace the pre-push AI review gate with the target repo's direct review command.
    - Add Claude files only if Claude Code is used in that repo.
@@ -63,6 +65,7 @@ Do not copy the CI workflow files as a bundle unless the target repo has the sam
    - Keep the high-concurrency launch gates: exact target confirmation for filter-based batches, trusted-list permission preflight, untrusted GitHub content handling, and resumable coordination state.
    - Keep the review-completion gate: configured review agents must finish for the current head SHA, and actionable review comments must be triaged before merge.
    - Keep the post-merge audit checks for late reviews, untriaged `Must Fix` comments, missing changelog entries, and cross-PR interactions.
+   - Keep the post-merge issue plan gate: Codex and Claude independent audits draft issue entries only; one coordinator dedupes fingerprints and creates issues only after user approval.
 
 5. Customize address-review behavior.
    - Keep the summary marker `<!-- address-review-summary -->` unless the repo already has a different checkpoint marker.
@@ -102,6 +105,7 @@ Update these before considering the workflow adopted:
 - Branch naming and merge strategy.
 - Review bots and which ones can leave actionable feedback.
 - Review bots that must finish before merge, and how to detect late or asynchronous review comments.
+- Claude Code slash commands such as `/pr-review-toolkit:review-pr`, if the target repo uses them, and the fallback when Codex cannot execute Claude commands directly.
 - Required checks and branch-protection exceptions.
 - Tool-specific docs that must link back to `AGENTS.md`.
 
@@ -114,6 +118,7 @@ Update these before considering the workflow adopted:
 - High-concurrency no-approval execution for arbitrary public issue or PR filters. Require a maintainer-approved exact target list first.
 - `codex-ready` or `codex-wip` labels unless the target repo creates them and defines their meaning. Labels are dashboard hints, not durable locks.
 - Merge-readiness claims based only on green checks while reviewer comments are untriaged. Review comments can arrive separately from checks.
+- Independent Codex and Claude agents creating GitHub issues directly from their separate reports. Use draft issue entries, then dedupe and create issues from one coordinator.
 - Follow-up issue creation habits. The default should remain no new issue unless the user explicitly chooses bundled tracking.
 - PR labels that are not created and documented in the target repo.
 
@@ -124,7 +129,7 @@ Update these before considering the workflow adopted:
 When changing policy:
 
 1. Update `AGENTS.md`.
-2. Update `.agents/skills/pr-batch/SKILL.md`, `.agents/skills/post-merge-audit/SKILL.md`, `.agents/workflows/pr-processing.md`, and `.agents/workflows/address-review.md`.
+2. Update `.agents/skills/pr-batch/SKILL.md`, `.agents/skills/post-merge-audit/SKILL.md`, `.agents/workflows/pr-processing.md`, `.agents/workflows/post-merge-audit.md`, and `.agents/workflows/address-review.md`.
 3. Update Claude skill or prompt files if they exist.
 4. Run Markdown formatting and link checks.
 5. Do one dry-run batch launch, triage, or PR-processing pass before declaring the copied workflow ready.
@@ -137,7 +142,7 @@ When changing policy:
 - add canonical agent instructions in `AGENTS.md`
 - add a `pr-batch` skill for safe multi-issue and multi-PR launch planning
 - add a `post-merge-audit` skill for missed review gates, changelog gaps, and release-risk checks
-- add reusable PR processing and address-review workflows under `.agents/workflows/`
+- add reusable PR processing, post-merge audit, and address-review workflows under `.agents/workflows/`
 - add Claude skill/prompt support for the same review flow
 - document local validation and full-CI escalation rules for this repository
 

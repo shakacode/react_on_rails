@@ -15,6 +15,8 @@ $post-merge-audit
 Audit merged PRs since the last release candidate
 ```
 
+Use `.agents/workflows/post-merge-audit.md` for reusable copy-paste prompts, including independent Codex/Claude audits, comparison, approved issue creation, and Claude PR review handoff prompts.
+
 ## Scope Gate
 
 Start by resolving the exact audit range:
@@ -38,6 +40,16 @@ For each included PR:
 - Cross-PR interactions: compare changed files, shared behavior, assumptions, and release-sensitive areas across the batch.
 - Decision log: inspect any `Codex Decision Log` or equivalent section and verify the decisions still hold after the merge.
 
+## Codex And Claude Coordination
+
+When using both Codex and Claude:
+
+1. Give each agent the same audit id, base, head, and independent audit prompt.
+2. Do not share one agent's report with the other until both reports are complete.
+3. Instruct both agents to draft issue entries only. They must not create issues, comments, labels, branches, fixes, reverts, or PRs during the independent audit.
+4. Use one coordinator to compare both reports, verify disagreements against git/GitHub evidence, dedupe findings, and propose the issue plan.
+5. Create GitHub issues only after the user approves the deduped issue plan.
+
 ## Finding Classification
 
 Classify each PR:
@@ -49,6 +61,27 @@ Classify each PR:
 - **Needs fix PR**: a real defect, missing test, missing compatibility note, or bad interaction should be fixed before release.
 - **Needs revert consideration**: the merge appears risky enough that reverting may be safer than patching.
 
+## Issue Plan
+
+The audit should usually produce an issue plan for non-OK findings, but not create issues until approval.
+
+- **No issue**: for `OK`, duplicate findings, or findings fully resolved by the audit evidence.
+- **Changelog only**: for missing changelog entries; prefer one bundled changelog issue or a recommendation to run `/update-changelog`, not one issue per entry.
+- **One child issue**: for each independently actionable fix PR, revert consideration, maintainer question, or follow-up task.
+- **Parent issue**: create one parent issue when there are two or more related child issues from the same audit or when the audit spans a release-candidate readiness decision.
+
+Before creating an approved issue, search existing open issues for the affected PR number and hidden fingerprint:
+
+```markdown
+<!-- post-merge-audit-finding v1
+audit: 2026-06-06-post-rc
+fingerprint: pr-3724:changelog-server-bundle-load-error
+affected_prs: 3724
+-->
+```
+
+Only the coordinator should create issues. Independent Codex and Claude audits should draft issue entries with fingerprints so the coordinator can compare and dedupe them.
+
 ## Output
 
 Return high-risk findings first, then:
@@ -56,7 +89,8 @@ Return high-risk findings first, then:
 1. Review-gate violations, including PRs merged before requested reviews finished or before actionable review findings were triaged.
 2. Missing changelog candidates, with a single recommendation to run `/update-changelog` when any are found.
 3. Cross-PR interaction risks.
-4. A PR-by-PR table.
-5. Exact commands and data sources used.
+4. A deduped issue plan with parent/child recommendations and fingerprints.
+5. A PR-by-PR table.
+6. Exact commands and data sources used.
 
 Do not create fixes, comments, labels, issues, changelog edits, reverts, or PRs until the user approves the audit report.
