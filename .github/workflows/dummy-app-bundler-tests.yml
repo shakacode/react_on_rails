@@ -1,26 +1,19 @@
 name: Dummy App Bundler Tests
 
-# Reusable workflow: builds the dummy-app test bundles and runs the integration tests for a SINGLE
-# bundler's matrix (passed in via the `matrix` input). integration-tests.yml calls this once per
-# bundler (webpack, rspack), so each bundler gets its own build -> integration job chain.
+# Reusable workflow: builds the dummy-app test bundles and runs the integration tests for one
+# independent matrix (passed in via the `matrix` input). integration-tests.yml calls this once per
+# build -> integration chain: webpack latest, webpack minimum in full-matrix runs, and rspack latest.
 #
 # Why this exists (#3593, follow-up to #3481 / #3581): GitHub Actions `needs` gates job-to-job, not
-# matrix-leg-to-leg. When build + integration shared a single job each, a build failure in EITHER
-# bundler marked the whole build job failed and skipped EVERY integration leg — including the
-# bundler that built fine. Splitting the build/integration pair into a per-bundler reusable-workflow
-# call decouples the bundlers: a failed build here only skips THIS call's integration job; the other
-# bundler's separate call runs independently.
-#
-# Remaining (pre-existing, out of scope for #3593; tracked in #3622): within one call the build ->
-# integration `needs` still couples that bundler's own dependency-level legs (e.g. webpack latest +
-# minimum) — if either build leg fails, this call's integration job is skipped. Only the
-# webpack/rspack dimension is decoupled here; the latest/minimum coupling predates the bundler split.
+# matrix-leg-to-leg. Splitting the build/integration pair into separate reusable-workflow calls
+# decouples the chains: a failed build here only skips THIS call's integration job; the other
+# bundler/dependency-level calls run independently. Refs #3622 for the webpack latest/minimum split.
 
 on:
   workflow_call:
     inputs:
       matrix:
-        description: 'JSON matrix (an object with an `include` array) of legs to build + test for this bundler.'
+        description: 'JSON matrix (an object with an `include` array) of legs to build + test for one independent bundler/dependency-level chain.'
         required: true
         type: string
 
@@ -30,10 +23,10 @@ permissions:
 jobs:
   build-dummy-app-test-bundles:
     strategy:
-      # fail-fast: false keeps this bundler's own matrix legs independent: a failure in one leg
+      # fail-fast: false keeps this call's matrix legs independent: a failure in one leg
       # (e.g. webpack minimum) must not cancel the others (the default fail-fast: true would).
-      # Cross-bundler independence (a webpack failure not cancelling rspack) comes from the two
-      # callers being separate top-level jobs in integration-tests.yml, not from fail-fast. Refs #3481.
+      # Cross-chain independence comes from separate caller jobs in integration-tests.yml, not from
+      # fail-fast. Refs #3481 / #3622.
       fail-fast: false
       matrix: ${{ fromJson(inputs.matrix) }}
     runs-on: ubuntu-22.04
@@ -139,9 +132,8 @@ jobs:
           key: dummy-app-bundle-${{ steps.get-sha.outputs.sha }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}-${{ matrix.bundler }}
 
   dummy-app-integration-tests:
-    # Decoupled per-bundler (#3593): this job needs only THIS call's build job, so a build failure in
-    # the other bundler's separate reusable-workflow call cannot skip these tests. See the header
-    # comment for the remaining pre-existing latest/minimum coupling within a single call.
+    # Decoupled per chain (#3593 / #3622): this job needs only THIS call's build job, so a build
+    # failure in another bundler or dependency-level call cannot skip these tests.
     needs: build-dummy-app-test-bundles
     strategy:
       # Keep the legs reporting independently: a failure in one leg must not cancel the others (the
