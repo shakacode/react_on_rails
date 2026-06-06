@@ -52,7 +52,7 @@ Execution flow when terminal access is available:
      - Specific review URL with `#pullrequestreview-...`
      - Specific issue comment URL with `#issuecomment-...`
      - Optional standalone `autopilot` token before or after the PR reference
-   - Detect the standalone token `autopilot`, set an `AUTOPILOT` flag, and remove only that token before parsing the PR reference. Do not treat bare `a` as `autopilot`; `a` is only a post-triage quick action.
+   - Detect the standalone token `autopilot` (case-insensitive), set an `AUTOPILOT` flag, and remove only that token before parsing the PR reference. Do not treat bare `a` as `autopilot`; `a` is only a post-triage quick action.
    - Detect the exact phrase `check all reviews` (case-insensitive, trailing position only — it must be the final tokens after the PR reference), set a `CHECK_ALL_REVIEWS` flag, and remove only that phrase before parsing the PR reference. If the phrase appears in any other position, do not treat it as an override; warn and ask me to retry with the trailing form.
    - If the input is a full GitHub URL, extract the URL's `org/repo` before running `gh repo view`.
    - Extract the PR number and optional review/comment ID.
@@ -69,20 +69,6 @@ Execution flow when terminal access is available:
    - If `gh` is unavailable or unauthenticated, stop and tell me to fix that first.
 
 3. Determine scan window and summary cutoff:
-   - Before fetching full-PR review data, wait for any in-progress `claude-review` CI run on this PR so triage reflects the latest posted feedback. Skip this wait when the input targets a specific review URL or specific issue-comment URL. If `gh pr checks` is unavailable or returns an error, log a warning and continue without blocking.
-     ```bash
-     MAX_WAIT=180
-     WAITED=0
-     while [ "$(gh pr checks "${PR_NUMBER}" --repo "${REPO}" --json name,bucket 2>/dev/null \
-       | jq '[.[] | select((.name | test("claude.?review"; "i")) and (.bucket == "pending"))] | length' 2>/dev/null || echo 0)" -gt 0 ]; do
-       if [ "${WAITED}" -ge "${MAX_WAIT}" ]; then
-         echo "Timed out waiting for claude-review; continuing with currently available review data." >&2
-         break
-       fi
-       sleep 15
-       WAITED=$((WAITED + 15))
-     done
-     ```
    - For full-PR scans (plain PR number or PR URL with no specific review/comment anchor), default to reviewing only feedback posted after the latest PR summary comment created by this workflow.
    - The summary marker is a PR issue comment whose body starts with `<!-- address-review-summary -->` on its very first line. Requiring `startswith` (not `contains`) means a human comment that quotes or embeds the marker in prose is not mistaken for a checkpoint and cannot silently advance the cutoff.
    - Legacy summary comments where the marker appears after a blank line, heading, or byte-order mark are ignored by this rule. If the cutoff appears to miss an older checkpoint, use `check all reviews`; new summary checkpoints created by this workflow always place the marker on the first line.
@@ -102,6 +88,20 @@ Execution flow when terminal access is available:
    - If no items survive the cutoff, tell me no new review feedback was found since that summary comment and remind me I can say `check all reviews`.
 
 4. Fetch review data:
+   - Before fetching full-PR review data, wait for any in-progress `claude-review` CI run on this PR so triage reflects the latest posted feedback. Skip this wait when the input targets a specific review URL or specific issue-comment URL. If `gh pr checks` is unavailable or returns an error, log a warning and continue without blocking.
+     ```bash
+     MAX_WAIT=180
+     WAITED=0
+     while [ "$(gh pr checks "${PR_NUMBER}" --repo "${REPO}" --json name,bucket 2>/dev/null \
+       | jq '[.[] | select((.name | test("claude.?review"; "i")) and (.bucket == "pending"))] | length' 2>/dev/null || echo 0)" -gt 0 ]; do
+       if [ "${WAITED}" -ge "${MAX_WAIT}" ]; then
+         echo "Timed out waiting for claude-review; continuing with currently available review data." >&2
+         break
+       fi
+       sleep 15
+       WAITED=$((WAITED + 15))
+     done
+     ```
    - Specific issue comment:
      `gh api repos/${REPO}/issues/comments/${COMMENT_ID} | jq '{body: .body, user: .user.login, created_at: .created_at, html_url: .html_url}'`
    - Specific review:

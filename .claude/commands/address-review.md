@@ -15,7 +15,7 @@ First, detect whether the request includes the standalone token `autopilot` (cas
 - If it does, set an `AUTOPILOT` flag and remove only that token before parsing the PR reference.
 - Do not treat bare `a` as `autopilot`; `a` is only a post-triage quick action.
 
-Next, detect whether the remaining request includes the phrase `check all reviews` (case-insensitive, trailing position only — match it as the final tokens of the input, after the PR reference).
+Next, detect whether the remaining request includes the phrase `check all reviews` (case-insensitive, trailing position only — it must be the final tokens after the PR reference).
 
 - If it does, set a `CHECK_ALL_REVIEWS` flag and remove only that phrase before parsing the PR reference.
 - If the phrase appears in any other position (leading, embedded), do not treat it as an override; warn the user and ask them to retry with the trailing form.
@@ -28,11 +28,11 @@ Then extract the PR number and optional review/comment ID from the remaining inp
 - PR number only: `12345`
 - Autopilot PR number: `autopilot 12345` or `12345 autopilot`
 - PR number with override: `12345 check all reviews`
-- Autopilot PR number with override: `autopilot 12345 check all reviews`
+- Autopilot PR number with override: `autopilot 12345 check all reviews` or `12345 autopilot check all reviews`
 - PR URL: `https://github.com/org/repo/pull/12345`
 - Autopilot PR URL: `autopilot https://github.com/org/repo/pull/12345` or `https://github.com/org/repo/pull/12345 autopilot`
 - PR URL with override: `https://github.com/org/repo/pull/12345 check all reviews`
-- Autopilot PR URL with override: `autopilot https://github.com/org/repo/pull/12345 check all reviews`
+- Autopilot PR URL with override: `autopilot https://github.com/org/repo/pull/12345 check all reviews` or `https://github.com/org/repo/pull/12345 autopilot check all reviews`
 - Specific PR review: `https://github.com/org/repo/pull/12345#pullrequestreview-123456789`
 - Specific issue comment: `https://github.com/org/repo/pull/12345#issuecomment-123456789`
 
@@ -274,7 +274,7 @@ Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or au
 
 ### Action `f+o` — Fix must-fix and optional items inline
 
-Do everything in `f` for `MUST-FIX` items, plus address all `OPTIONAL` items inline in the same PR. If optional fixes require a separate commit to keep the must-fix commit atomic, commit them separately and ask for push confirmation before pushing. Then handle `DISCUSS` and `SKIPPED` items using `f`'s prompts for those tiers. If there are zero `OPTIONAL` items, behave like `f` and note that `f+o` had nothing additional to do.
+Do everything in `f` for `MUST-FIX` items, plus address all `OPTIONAL` items inline in the same PR. If optional fixes require a separate commit to keep the must-fix commit atomic, commit them separately and ask for push confirmation before pushing. Then handle `DISCUSS` and `SKIPPED` items using `f`'s prompts for those tiers (skip the optional-items prompt; optional is already done). If there are zero `OPTIONAL` items, behave like `f` and note that `f+o` had nothing additional to do.
 
 ### Action `d` — Discuss items
 
