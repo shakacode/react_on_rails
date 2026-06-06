@@ -34,8 +34,8 @@ Behavior rules:
 - For full-PR scans, default to feedback after the latest PR summary comment whose body contains `<!-- address-review-summary -->`.
 - If I say `check all reviews`, ignore that cutoff and rescan the full PR history.
 - If I give a specific review URL or specific issue-comment URL, fetch that exact target even if it predates the latest summary comment.
-- After selected items are addressed, reply to the original GitHub comments and resolve threads when appropriate.
-- After each completed action or action chain, post a new PR summary comment with the `<!-- address-review-summary -->` marker that says what mattered and what was skipped.
+- Except for action `a` (including `autopilot` initiation), after selected items are addressed, reply to the original GitHub comments and resolve threads when appropriate.
+- Except for action `a`, after each completed action or action chain, post a new PR summary comment with the `<!-- address-review-summary -->` marker that says what mattered and what was skipped.
 
 Execution flow when terminal access is available:
 
@@ -128,7 +128,7 @@ Execution flow when terminal access is available:
    - After the triage list, present this quick-action menu:
      ```
      Quick actions:
-      f     — Fix must-fix items, then prompt for optional/discuss handling and skipped rationale replies
+     f     — Fix must-fix items, then prompt for optional handling, skipped rationale replies, and discuss decisions
       f+i   — Fix must-fix + prepare one deferred-work bundle for discuss/optional items (and non-trivial skipped items)
       f+o   — Fix must-fix + address all optional items inline in the same PR
       a     — Apply: fix must-fix + optional items, stage files, and return detailed discuss recommendations
@@ -148,7 +148,7 @@ Execution flow when terminal access is available:
 
 8. Execute the chosen action:
    - **`a` — Apply, stage, and recommend**: Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or automatically when `autopilot` was requested at initiation. Run relevant checks and the self-review gate. Stage only the intended changed files with explicit `git add` paths instead of committing them. Do **not** commit, push, post GitHub replies, resolve review threads, create follow-up issues, or post the PR summary checkpoint. Return a local summary with: fixed `MUST-FIX` items, fixed `OPTIONAL` items, staged files, validation commands/results, unresolved/skipped items, and detailed `DISCUSS` recommendations. Each `DISCUSS` recommendation must include the reviewer/comment link, recommended decision (`fix now`, `defer`, `decline`, or `ask user`), rationale/evidence, risk/tradeoff, and concrete next step. If validation fails after reasonable local repair, still report the staged-file state clearly and mark the PR as not ready for commit/push.
-   - **`f`**: Fix all must-fix items (if none exist, skip fix phase). If local changes exist, commit, ask for push confirmation, then push; if no local changes, skip commit/push and continue decision flow. Then reply/resolve addressed must-fix threads. If `OPTIONAL` items exist, present them and prompt me to choose: `o <nums>` to address inline, `f+i` to prepare a deferred-work bundle, or `r all optional + resolve` to decline and close (do not auto-address or auto-resolve optional items in `f`). If skipped items exist, ask for explicit confirmation before posting rationale replies/resolving skipped threads. Keep discuss items for an explicit follow-up decision (`d`, `f+i`, or `r all discuss + resolve`). Tell me the PR is merge-ready after `DISCUSS` items are resolved or explicitly deferred; `OPTIONAL` items do not block merge-readiness.
+   - **`f`**: Fix all must-fix items (if none exist, skip fix phase). If local changes exist, commit, ask for push confirmation, then push; if no local changes, skip commit/push and continue decision flow. Then reply/resolve addressed must-fix threads. Run the remaining prompts in this order: optional handling, skipped rationale confirmation, then discuss decisions. If `OPTIONAL` items exist, present them and prompt me to choose: `o <nums>` to address inline, `f+i` to prepare a deferred-work bundle, or `r all optional + resolve` to decline and close (do not auto-address or auto-resolve optional items in `f`). If skipped items exist, ask for explicit confirmation before posting rationale replies/resolving skipped threads. Keep discuss items for an explicit follow-up decision (`d`, `f+i`, or `r all discuss + resolve`). Tell me the PR is merge-ready after `DISCUSS` items are resolved or explicitly deferred; `OPTIONAL` items do not block merge-readiness.
    - **`f+i`**: Same must-fix handling as `f`, then prepare one deferred-work bundle for discuss items, optional items worth tracking, and non-trivial skipped items (in distinct sections). Do not create a GitHub issue yet. Present the bundle and ask whether to link an existing issue, create one bundled follow-up issue, post a PR summary comment only, or drop the bundle as not worth tracking. Exclude weak "could consider" optional suggestions, trivial duplicates, factually incorrect suggestions, and status noise from the bundle. For trivial skipped items excluded from the bundle, ask whether to post rationale replies and resolve those threads; default is no replies unless I opt in. For general PR comments and review summary bodies (which have no thread), the reply alone is sufficient. If there are no deferred items, skip deferred tracking and continue `f`'s remaining decision flow; do not signal merge-ready until `f`'s optional, skipped, and discuss prompts are complete. No additional commit is needed unless later steps introduce local changes.
    - **`f+o`**: Same must-fix handling as `f`, plus address all `OPTIONAL` items inline in the same PR (make the code change, reply, resolve each thread). If optional fixes require a separate commit to keep the must-fix commit atomic, commit them and ask for push confirmation before pushing the additional commit. Then handle `DISCUSS` and `SKIPPED` items using `f`'s prompts for those tiers (skip the optional-items prompt; optional is already done). Tell me the PR is merge-ready once all selected work is pushed and `DISCUSS` items are resolved or explicitly deferred. If there are zero `OPTIONAL` items, behave like `f` and note that `f+o` had nothing additional to do.
    - **`d`**: Present requested items with full context, ask for a decision on each. Bare `d` presents all DISCUSS items. Approved → fix like must-fix (use the same commit/push-before-reply ordering as `f` when code changes occur). Declined → optionally reply with rationale. Note: `d` only accepts `DISCUSS` item numbers. If any selected number refers to an `OPTIONAL`, `MUST-FIX`, or `SKIPPED` item, do not proceed — respond with "Item N is {tier} — use `{o|f|r}` instead" for each mismatched number and ask for a corrected selection.
@@ -189,7 +189,7 @@ Execution flow when terminal access is available:
    - For `a`, do not post a GitHub PR summary comment automatically; return the local summary to the user with the staged-file list and detailed `DISCUSS` recommendations.
    - Include the exact marker `<!-- address-review-summary -->` on its own line near the top.
    - Use a `Mattered` section for `MUST-FIX` and `DISCUSS` items, including whether each item was addressed, deferred, or left pending by user choice.
-   - Use an `Optional` section listing `OPTIONAL` items and whether they were addressed inline, deferred to a follow-up issue, or declined.
+   - Use an `Optional` section only when `OPTIONAL` items were fixed by `a` or explicitly handled, listing whether they were addressed inline, deferred to a follow-up issue, or declined.
    - Use a `Skipped` section for `SKIPPED` items with short reasons.
    - Mention any deferred-work tracking outcome and follow-up issue URL that was created.
    - Mention whether the run used the default cutoff or the explicit `check all reviews` override.
@@ -225,7 +225,7 @@ SKIPPED (count):
 4. item - short reason
 
 Quick actions:
-  f     — Fix #N, then prompt for optional/discuss handling and skipped rationale replies
+  f     — Fix #N, then prompt for optional handling, skipped rationale replies, and discuss decisions
   f+i   — Fix #N, prepare one deferred-work bundle for discuss/optional/non-trivial skipped items
   f+o   — Fix #N plus address all optional items inline
   a     — Apply: fix must-fix + optional items, stage files, and return detailed discuss recommendations

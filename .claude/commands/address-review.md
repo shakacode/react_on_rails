@@ -204,7 +204,7 @@ After the triage list, present a **quick-action menu**:
 
 ```text
 Quick actions:
-  f     — Fix must-fix items, then confirm whether to reply/resolve skipped items before deciding discuss items
+  f     — Fix must-fix items, then prompt for optional handling, skipped rationale replies, and discuss decisions
   f+i   — Fix must-fix + prepare one deferred-work bundle for discuss/optional items (and non-trivial skipped items)
   f+o   — Fix must-fix + address all optional items inline in the same PR
   a     — Apply: fix must-fix + optional items, stage files, and return detailed discuss recommendations
@@ -235,15 +235,16 @@ Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or au
 
 ### Action `f` — Fix and merge-ready
 
-1. Address all `MUST-FIX` items (make code changes, run checks). If there are no `MUST-FIX` items, skip directly to discuss/skipped handling.
+1. Address all `MUST-FIX` items (make code changes, run checks). If there are no `MUST-FIX` items, skip directly to the remaining prompts.
 2. If local changes exist, commit and then ask for push confirmation before pushing. If there are no local changes, skip commit/push and continue decision flow.
 3. Reply to each addressed comment explaining the fix.
 4. Resolve the corresponding review threads.
-5. If `SKIPPED` items exist, ask for explicit confirmation before posting rationale replies and resolving those threads (for example: "Reply/resolve 3 skipped items? y/n").
-6. Do **not** auto-resolve `DISCUSS` items in `f`; after must-fix work, re-present discuss items and prompt the user to choose `d` (discuss), `f+i` (prepare a deferred-work bundle), or `r all discuss + resolve`. If `f` starts with zero `MUST-FIX` items, show this discuss decision menu immediately.
-7. If `OPTIONAL` items exist, present them and prompt the user to choose: `o <nums>` to address inline, `f+i` to prepare a deferred-work bundle, or `r all optional + resolve` to decline. Do not auto-address or auto-resolve optional items in `f`. `OPTIONAL` items do not block merge-readiness.
-8. Tell the user the PR is merge-ready only after `DISCUSS` items are resolved or explicitly deferred.
-9. If any `DISCUSS` items remain, explicitly prompt with the next action (for example: "DISCUSS items remain - use `d` to review, `f+i` to prepare a deferred-work bundle, or `r all discuss + resolve` to decline and close.").
+5. Run the remaining prompts in this order: optional handling, skipped rationale confirmation, then discuss decisions. If `f` starts with zero `MUST-FIX` items, show the remaining prompts in the same order immediately.
+6. If `OPTIONAL` items exist, present them and prompt the user to choose: `o <nums>` to address inline, `f+i` to prepare a deferred-work bundle, or `r all optional + resolve` to decline. Do not auto-address or auto-resolve optional items in `f`. `OPTIONAL` items do not block merge-readiness.
+7. If `SKIPPED` items exist, ask for explicit confirmation before posting rationale replies and resolving those threads (for example: "Reply/resolve 3 skipped items? y/n").
+8. Do **not** auto-resolve `DISCUSS` items in `f`; after must-fix work, re-present discuss items and prompt the user to choose `d` (discuss), `f+i` (prepare a deferred-work bundle), or `r all discuss + resolve`.
+9. Tell the user the PR is merge-ready only after `DISCUSS` items are resolved or explicitly deferred.
+10. If any `DISCUSS` items remain, explicitly prompt with the next action (for example: "DISCUSS items remain - use `d` to review, `f+i` to prepare a deferred-work bundle, or `r all discuss + resolve` to decline and close.").
 
 ### Action `f+i` — Fix, deferred-work bundle, and merge-ready
 
@@ -488,7 +489,7 @@ Rules for the summary comment:
 - Always post it as a general PR issue comment, never as a review-thread reply.
 - Include the exact marker `<!-- address-review-summary -->` on its own line near the top.
 - Summarize `MUST-FIX` and `DISCUSS` items under a `Mattered` section, including whether each item was addressed, deferred, or left pending by user choice.
-- Summarize `OPTIONAL` items under an `Optional` section when they were fixed by `a` or explicitly handled.
+- Summarize `OPTIONAL` items under an `Optional` section only when they were fixed by `a` or explicitly handled.
 - Summarize `SKIPPED` items under a `Skipped` section with short reasons.
 - Mention any deferred-work tracking outcome and follow-up issue URL that was created.
 - Mention whether the run used the default cutoff or the explicit `check all reviews` override.
@@ -507,14 +508,18 @@ trap _cleanup_addr_review EXIT
 # Set SCAN_SCOPE before this block, e.g.:
 #   SCAN_SCOPE="since previous summary at ${REVIEW_CUTOFF_AT}"  # cutoff active
 #   SCAN_SCOPE="full history via check all reviews"              # CHECK_ALL_REVIEWS set
+# Set OPTIONAL_OUTCOMES to bullets when optional items were fixed or explicitly handled.
+# Leave OPTIONAL_OUTCOMES empty to omit the Optional section.
 {
   printf '<!-- address-review-summary -->\n'
   printf '## Address-review summary\n\n'
   printf 'Scan scope: %s\n\n' "${SCAN_SCOPE}"
   printf '### Mattered\n'
   printf '%s\n\n' "<bullets for must-fix/discuss outcomes, or - None.>"
-  printf '### Optional\n'
-  printf '%s\n\n' "<bullets for optional outcomes, or - None.>"
+  if [ -n "${OPTIONAL_OUTCOMES:-}" ]; then
+    printf '### Optional\n'
+    printf '%s\n\n' "${OPTIONAL_OUTCOMES}"
+  fi
   printf '### Skipped\n'
   printf '%s\n\n' "<bullets for skipped items, or - None.>"
   if [ -n "${TRACKING_OUTCOME:-}" ]; then
@@ -587,7 +592,7 @@ SKIPPED (1):
 5. src/helper.rb:45 - Same nil guard issue (@greptile-apps[bot]) - duplicate of #1
 
 Quick actions:
-  f     — Fix #1, then confirm whether to reply/resolve skipped items before deciding discuss items
+  f     — Fix #1, then prompt for optional handling, skipped rationale replies, and discuss decisions
   f+i   — Fix #1, prepare one deferred-work bundle for #2 and optional items #3-4
   f+o   — Fix #1 plus address all optional items #3-4 inline
   a     — Apply: fix #1 plus optional items #3-4, stage files, and recommend a decision for #2
