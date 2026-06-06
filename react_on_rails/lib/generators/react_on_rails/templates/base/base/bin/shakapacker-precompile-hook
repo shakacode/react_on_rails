@@ -27,9 +27,33 @@ require "pathname"
 require "fileutils"
 require_relative "../config/environment"
 
+RSC_REGISTRATION_ENTRY_PATH_ENV = "REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH"
+
 def clear_stale_rsc_manifest_client_references
   stale_manifest = Rails.root.join("ssr-generated", "rsc-client-references.json")
   FileUtils.rm_f(stale_manifest)
+end
+
+def default_rsc_manifest_registration_entry
+  Rails.root.join(
+    Pathname(ReactOnRails::PackerUtils.packer_source_entry_path).parent,
+    "generated/server-component-registration-entry.js"
+  )
+end
+
+def configured_rsc_manifest_registration_entry
+  configured_path = ENV[RSC_REGISTRATION_ENTRY_PATH_ENV].to_s.strip
+  return nil if configured_path.empty?
+
+  path = Pathname.new(configured_path)
+  path.absolute? ? path : Rails.root.join(path)
+end
+
+def rsc_manifest_registration_entry
+  configured_entry = configured_rsc_manifest_registration_entry
+  return configured_entry if configured_entry && File.exist?(configured_entry)
+
+  default_rsc_manifest_registration_entry
 end
 
 # Keep this flow aligned with the standalone helper in
@@ -39,10 +63,7 @@ def generate_rsc_manifest_client_references_if_needed
   return unless defined?(ReactOnRailsPro)
   return unless ReactOnRailsPro::Utils.rsc_support_enabled?
 
-  registration_entry = Rails.root.join(
-    Pathname(ReactOnRails::PackerUtils.packer_source_entry_path).parent,
-    "generated/server-component-registration-entry.js"
-  )
+  registration_entry = rsc_manifest_registration_entry
   unless File.exist?(registration_entry)
     clear_stale_rsc_manifest_client_references
     return

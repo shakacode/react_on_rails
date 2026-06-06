@@ -52,12 +52,21 @@ module ReactOnRails
               // snippet by the generator — so only fs is pulled in here.
               const { existsSync, readFileSync, statSync } = require('fs');
               const configuredRefsJson = process.env.RSC_MANIFEST_CLIENT_REFERENCES_JSON;
+              const configuredRegistrationEntry = process.env.REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH;
               const defaultRefsJson = resolve('ssr-generated/rsc-client-references.json');
-              const serverComponentRegistrationEntry = resolve(
+              const defaultServerComponentRegistrationEntry = resolve(
                 config.source_path,
                 config.source_entry_path,
                 '../generated/server-component-registration-entry.js',
               );
+              const serverComponentRegistrationEntry = (() => {
+                if (configuredRegistrationEntry) {
+                  const configuredEntry = resolve(configuredRegistrationEntry);
+                  if (existsSync(configuredEntry)) return configuredEntry;
+                }
+
+                return defaultServerComponentRegistrationEntry;
+              })();
 
               const readManifestReferences = (refsJson) => {
                 let payload;

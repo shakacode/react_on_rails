@@ -22,10 +22,19 @@ const configureRsc = () => {
   const discoveryBuild = process.env.RSC_REFERENCE_DISCOVERY_BUILD === 'true';
 
   const sourceEntryDirectory = resolve(config.source_path, config.source_entry_path);
-  const serverComponentRegistrationEntry = resolve(
+  const defaultServerComponentRegistrationEntry = resolve(
     dirname(sourceEntryDirectory),
     'generated/server-component-registration-entry.js',
   );
+  const serverComponentRegistrationEntry = (() => {
+    const configuredRegistrationEntry = process.env.REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH;
+    if (configuredRegistrationEntry) {
+      const configuredEntry = resolve(configuredRegistrationEntry);
+      if (existsSync(configuredEntry)) return configuredEntry;
+    }
+
+    return defaultServerComponentRegistrationEntry;
+  })();
 
   if (discoveryBuild) {
     if (!existsSync(serverComponentRegistrationEntry)) {

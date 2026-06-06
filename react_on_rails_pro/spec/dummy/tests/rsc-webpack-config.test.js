@@ -14,4 +14,10 @@ describe('rscWebpackConfig discovery build contract', () => {
     expect(source).toContain('Missing react-on-rails-rsc/RSCReferenceDiscoveryPlugin');
     expect(source).toContain('Run bin/shakapacker-precompile-hook before bin/shakapacker.');
   });
+
+  it('honors the explicit registration entry path for discovery builds', () => {
+    expect(source).toContain('process.env.REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH');
+    expect(source).toContain('defaultServerComponentRegistrationEntry');
+    expect(source).toContain('return configuredEntry;');
+  });
 });

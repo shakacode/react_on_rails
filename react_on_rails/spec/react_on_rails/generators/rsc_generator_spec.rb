@@ -68,6 +68,8 @@ describe RscGenerator, type: :generator do
         expect(content).to include("const serverWebpackModule = require('./serverWebpackConfig');")
         expect(content).to include("require('react-on-rails-rsc/RSCReferenceDiscoveryPlugin')")
         expect(content).to include("Run bin/shakapacker-precompile-hook before bin/shakapacker.")
+        expect(content).to include("process.env.REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH")
+        expect(content).to include("defaultServerComponentRegistrationEntry")
       end
     end
 
@@ -3328,6 +3330,7 @@ describe RscGenerator, type: :generator do
       # side fails CI.
       assert_file "config/webpack/clientWebpackConfig.js" do |content|
         expect(content).to include("process.env.RSC_MANIFEST_CLIENT_REFERENCES_JSON")
+        expect(content).to include("process.env.REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH")
         expect(content).to include("ssr-generated/rsc-client-references.json")
         expect(content).to include("RSC_REFERENCE_DISCOVERY_BUILD")
         expect(content).to include("RSC_BUNDLE_ONLY")
@@ -3348,6 +3351,9 @@ describe RscGenerator, type: :generator do
         expect(content).to include("Failed to parse RSC client references manifest")
         # Configured overrides also get the best-effort staleness warning (mirror parity).
         expect(content).to include("warnIfManifestStale(resolvedRefsJson)")
+        # A configured registration entry path overrides the default staleness target.
+        expect(content).to include("const configuredRegistrationEntry")
+        expect(content).to include("defaultServerComponentRegistrationEntry")
         configured_refs_index = content.index("if (configuredRefsJson)")
         discovery_build_index = content.index("if (process.env.RSC_REFERENCE_DISCOVERY_BUILD")
         default_refs_index = content.index("if (existsSync(defaultRefsJson))")

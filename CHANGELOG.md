@@ -26,6 +26,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Added
 
+- **[Pro]** **RSC registration entry path override**: Generated RSC precompile hooks, discovery builds, and client-reference stale checks now honor `REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH` so apps that write `server-component-registration-entry.js` outside the default generated path can point React on Rails Pro at the exact entry while retaining the existing fallback scan and stale-manifest cleanup. Fixes [Issue 3621](https://github.com/shakacode/react_on_rails/issues/3621). [PR TBD](https://github.com/shakacode/react_on_rails/pull/TBD) by [justin808](https://github.com/justin808).
 - **[Pro]** **RSC manifest client reference discovery during precompile**: Generated RSC Webpack configs now run `RSCReferenceDiscoveryPlugin` through the Shakapacker precompile hook to emit `rsc-client-references.json`, use that manifest for RSC client-reference bundling, and warn when the selected manifest is stale. The generator now pins `react-on-rails-rsc` to `19.0.5-rc.6`, the prerelease containing the discovery plugin export and RSC manifest CSS fixes, and the Pro peer range explicitly accepts that prerelease. [PR 3556](https://github.com/shakacode/react_on_rails/pull/3556) by [ihabadham](https://github.com/ihabadham).
 
 #### Changed

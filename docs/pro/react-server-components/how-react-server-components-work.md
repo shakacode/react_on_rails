@@ -110,6 +110,10 @@ Let's search for the client component `ToggleContainer` that we built before in 
 
 This entry indicates that the `ToggleContainer` client component is included in the `client25` chunk. The `js/client25.js` file contains the client-side code for the `ToggleContainer` component. You can find the `client25` chunk in the `public/webpack/<environment>/js/client25.js` file. Also, the `id` field is the Webpack module ID for the `ToggleContainer` client component. It's used by react runtime to load and hydrate the component in the browser.
 
+### Registration Entry Path Override
+
+`bin/shakapacker-precompile-hook` normally finds the generated `server-component-registration-entry.js` at React on Rails' default generated path, with a pruned scan fallback for older generated apps. If your app writes that entry somewhere else, set `REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH` to the relative or absolute path before running the hook. The same value is also used by the RSC discovery build and by the webpack client-reference resolver when it checks whether `ssr-generated/rsc-client-references.json` is stale.
+
 ### CSS Links for `'use client'` Boundaries
 
 React on Rails Pro reads CSS metadata from the RSC client manifest and emits `<link rel="stylesheet" precedence="ror-rsc">` entries into the RSC payload. React hoists those links into `<head>` and delays committing the corresponding streamed content until the stylesheets are ready, which prevents a flash of unstyled content for client components behind RSC boundaries.
