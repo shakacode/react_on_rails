@@ -19,8 +19,6 @@ import { wrapElementInStrictMode } from '../../app/strictModeSupport';
 export default (props, _railsContext, domNodeId) => {
   const { prerender } = props;
   const render = prerender ? ReactDOM.hydrate : ReactDOM.render;
-  // eslint-disable-next-line no-param-reassign
-  delete props.prerender;
 
   const domNode = document.getElementById(domNodeId);
   if (!domNode) {

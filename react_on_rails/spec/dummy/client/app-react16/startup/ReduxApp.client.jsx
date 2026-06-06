@@ -23,10 +23,8 @@ import { wrapElementInStrictMode } from '../../app/strictModeSupport';
  *
  */
 export default (props, railsContext, domNodeId) => {
-  const { prerender } = props;
+  const { prerender, ...componentProps } = props;
   const render = prerender ? ReactDOM.hydrate : ReactDOM.render;
-  // eslint-disable-next-line no-param-reassign
-  delete props.prerender;
 
   const domNode = document.getElementById(domNodeId);
   if (!domNode) {
@@ -37,7 +35,7 @@ export default (props, railsContext, domNodeId) => {
   }
 
   const combinedReducer = combineReducers(reducers);
-  const combinedProps = composeInitialState(props, railsContext);
+  const combinedProps = composeInitialState(componentProps, railsContext);
 
   // This is where we'll put in the middleware for the async function. Placeholder.
   // store will have helloWorldData as a top level property
