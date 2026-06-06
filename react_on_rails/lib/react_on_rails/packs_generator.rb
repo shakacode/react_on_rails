@@ -854,6 +854,7 @@ module ReactOnRails
         React on Rails auto-bundling currently uses one public component name and one generated pack path per derived \
         component name.
         Rename one of these component files to have a unique base name, such as Admin#{name} or Public#{name}.
+        For more information, please see https://reactonrails.com/docs/core-concepts/auto-bundling/
       MSG
 
       raise ReactOnRails::Error, msg

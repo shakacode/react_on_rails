@@ -182,6 +182,7 @@ module ReactOnRails
             expect(error.message).to include(
               "Rename one of these component files to have a unique base name, such as AdminHeader or PublicHeader."
             )
+            expect(error.message).to include("https://reactonrails.com/docs/core-concepts/auto-bundling/")
           }
       end
     end
