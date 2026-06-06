@@ -65,6 +65,7 @@ Execution flow when terminal access is available:
      PR_NUMBER=<the PR number parsed in step 1>
      COMMENT_ID=<the issue/review comment ID parsed in step 1, if any>
      REVIEW_ID=<the pull request review ID parsed in step 1, if any>
+     SPECIFIC_TARGET=<0-or-1>
      ```
    - If `gh` is unavailable or unauthenticated, stop and tell me to fix that first.
 
@@ -90,17 +91,19 @@ Execution flow when terminal access is available:
 4. Fetch review data:
    - Before fetching full-PR review data, wait for any in-progress `claude-review` CI run on this PR so triage reflects the latest posted feedback. Skip this wait when the input targets a specific review URL or specific issue-comment URL. If `gh pr checks` is unavailable or returns an error, log a warning and continue without blocking.
      ```bash
-     MAX_WAIT=180
-     WAITED=0
-     while [ "$(gh pr checks "${PR_NUMBER}" --repo "${REPO}" --json name,bucket 2>/dev/null \
-       | jq '[.[] | select((.name | test("claude.?review"; "i")) and (.bucket == "pending"))] | length' 2>/dev/null || echo 0)" -gt 0 ]; do
-       if [ "${WAITED}" -ge "${MAX_WAIT}" ]; then
-         echo "Timed out waiting for claude-review; continuing with currently available review data." >&2
-         break
-       fi
-       sleep 15
-       WAITED=$((WAITED + 15))
-     done
+     if [ "${SPECIFIC_TARGET}" != "1" ]; then
+       MAX_WAIT=180
+       WAITED=0
+       while [ "$(gh pr checks "${PR_NUMBER}" --repo "${REPO}" --json name,bucket 2>/dev/null \
+         | jq '[.[] | select((.name | test("claude.?review"; "i")) and (.bucket == "pending"))] | length' 2>/dev/null || echo 0)" -gt 0 ]; do
+         if [ "${WAITED}" -ge "${MAX_WAIT}" ]; then
+           echo "Timed out waiting for claude-review; continuing with currently available review data." >&2
+           break
+         fi
+         sleep 15
+         WAITED=$((WAITED + 15))
+       done
+     fi
      ```
    - Specific issue comment:
      `gh api repos/${REPO}/issues/comments/${COMMENT_ID} | jq '{body: .body, user: .user.login, created_at: .created_at, html_url: .html_url}'`

@@ -49,15 +49,17 @@ Then extract the PR number and optional review/comment ID from the remaining inp
 - Set `PR_NUMBER` to the number parsed in Step 1.
 - Set `COMMENT_ID` when Step 1 parsed a specific issue or review comment ID.
 - Set `REVIEW_ID` when Step 1 parsed a specific pull request review ID.
+- Set `SPECIFIC_TARGET` to `1` when Step 1 parsed a specific review/comment URL, otherwise `0`.
 
 ```bash
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)  # or the org/repo extracted from the PR URL in Step 1
 PR_NUMBER=<the PR number parsed in Step 1>
 COMMENT_ID=<the issue/review comment ID parsed in Step 1, if any>
 REVIEW_ID=<the pull request review ID parsed in Step 1, if any>
+SPECIFIC_TARGET=<0-or-1>
 ```
 
-Every subsequent snippet uses `${REPO}`, `${PR_NUMBER}`, `${COMMENT_ID}`, and `${REVIEW_ID}` as shell variables; setting them once here means no manual substitution is required later. If `gh repo view` fails (and no URL was supplied), ensure `gh` CLI is installed and authenticated (`gh auth status`).
+Every subsequent snippet uses `${REPO}`, `${PR_NUMBER}`, `${COMMENT_ID}`, `${REVIEW_ID}`, and `${SPECIFIC_TARGET}` as shell variables; setting them once here means no manual substitution is required later. If `gh repo view` fails (and no URL was supplied), ensure `gh` CLI is installed and authenticated (`gh auth status`).
 
 ## Step 3: Determine Scan Window and Summary Cutoff
 
@@ -95,18 +97,20 @@ Before fetching, wait for any in-progress `claude-review` CI run on this PR so t
 # Pass --repo so cross-repo PR URLs target the parsed REPO, not the current checkout.
 # The fallback `|| echo 0` makes the loop exit gracefully if `gh pr checks` errors.
 # `MAX_WAIT` caps the total wait so a stalled runner cannot block triage indefinitely.
-MAX_WAIT=180
-WAITED=0
-while [ "$(gh pr checks "${PR_NUMBER}" --repo "${REPO}" --json name,bucket 2>/dev/null \
-  | jq '[.[] | select((.name | test("claude.?review"; "i")) and (.bucket == "pending"))] | length' 2>/dev/null || echo 0)" -gt 0 ]; do
-  if [ "${WAITED}" -ge "${MAX_WAIT}" ]; then
-    echo "Warning: claude-review CI still pending after ${MAX_WAIT}s — proceeding with triage anyway."
-    break
-  fi
-  echo "Waiting for in-progress claude-review CI to finish before triaging... (${WAITED}s elapsed)"
-  sleep 15
-  WAITED=$((WAITED + 15))
-done
+if [ "${SPECIFIC_TARGET}" != "1" ]; then
+  MAX_WAIT=180
+  WAITED=0
+  while [ "$(gh pr checks "${PR_NUMBER}" --repo "${REPO}" --json name,bucket 2>/dev/null \
+    | jq '[.[] | select((.name | test("claude.?review"; "i")) and (.bucket == "pending"))] | length' 2>/dev/null || echo 0)" -gt 0 ]; do
+    if [ "${WAITED}" -ge "${MAX_WAIT}" ]; then
+      echo "Warning: claude-review CI still pending after ${MAX_WAIT}s — proceeding with triage anyway."
+      break
+    fi
+    echo "Waiting for in-progress claude-review CI to finish before triaging... (${WAITED}s elapsed)"
+    sleep 15
+    WAITED=$((WAITED + 15))
+  done
+fi
 ```
 
 **If a specific issue comment ID is provided (`#issuecomment-...`):**
