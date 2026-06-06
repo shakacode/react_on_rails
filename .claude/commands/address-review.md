@@ -238,7 +238,7 @@ Do not post the PR summary checkpoint during this triage-only phase. Post it onl
 ### Action `f+i` — Fix, deferred-work bundle, and merge-ready
 
 1. Do everything in `f` for `MUST-FIX` items. If there are no `MUST-FIX` items, skip the fix phase and continue with deferred-item handling.
-2. Prepare one deferred-work bundle for all `DISCUSS` and non-trivial `SKIPPED` items. Do not create a GitHub issue yet.
+2. Prepare one deferred-work bundle for all `DISCUSS` and non-trivial `SKIPPED` items. Optional polish is excluded unless the user explicitly promoted it to `DISCUSS` or asked to fix it inline. Do not create a GitHub issue yet.
 3. Present the bundle and ask whether to link an existing issue, create one bundled follow-up issue, post a PR summary comment only, or drop the bundle as not worth tracking.
 4. For each deferred item in the chosen tracking outcome, post a reply in the original location referencing that outcome (use review-comment replies for inline comments and issue comments for review summaries/general comments), and resolve the thread when one exists and the conversation is complete. For general PR comments and review summary bodies (which have no thread), the reply alone is sufficient.
 5. For trivial `SKIPPED` items that are not included in the bundle (duplicates, factually incorrect suggestions, status noise), still post rationale replies and resolve those threads only when the user confirms.
