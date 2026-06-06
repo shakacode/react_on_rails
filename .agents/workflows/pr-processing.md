@@ -80,7 +80,7 @@ Before fixing a bug or behavior regression, verify the incorrect behavior where 
 Run the change detector first:
 
 ```bash
-script/ci-changes-detector origin/master
+script/ci-changes-detector origin/main
 ```
 
 Then run the recommended local CI or a tighter set that covers the same changed area:

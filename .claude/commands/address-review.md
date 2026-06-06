@@ -203,7 +203,7 @@ After the triage list, present a **quick-action menu**:
 ```text
 Quick actions:
   f     — Fix must-fix items, then confirm whether to reply/resolve skipped items before deciding discuss items
-  f+i   — Fix must-fix + prepare one deferred-work bundle for discuss/non-trivial skipped items
+  f+i   — Fix must-fix + prepare one deferred-work bundle for discuss/non-trivial skipped items; optional polish is excluded unless explicitly promoted
   d     — Discuss specific items before deciding (e.g., "d2,4"). Bare "d" presents all DISCUSS items.
   r     — Reply with rationale to items (e.g., "r3,5", "r7-9", "r all skipped", "r all discuss"); add `+ resolve` to also resolve those threads
   m     — Skip code changes + prepare one deferred-work bundle for must-fix/discuss/non-trivial skipped items
@@ -215,6 +215,8 @@ Or pick items by number: "1,2", "all must-fix", "1,3-5"
 If a range is malformed, reversed, or out of bounds, show a validation message and ask the user to retry (do not silently coerce it).
 
 **Dynamic menu**: Generate `f` and `f+i` descriptions dynamically using actual item numbers and deferred targets from the current triage set (e.g., "Fix #1, #3" instead of "Fix must-fix items"). When there are no `DISCUSS` or `SKIPPED` items, only show `f` and direct item selection.
+
+This Claude slash command intentionally does not maintain the shared workflow's separate `OPTIONAL` tier. Optional polish stays `SKIPPED` unless the user explicitly asks to promote it to `DISCUSS` or fix it inline.
 
 Wait for the user to choose an action before proceeding.
 
@@ -405,11 +407,14 @@ else
     printf 'Original PR: https://github.com/%s/pull/%s\n' "${REPO}" "${PR_NUMBER}"
   } > "${issue_body_file}"
 
-  if grep -n '\\n' "${issue_body_file}"; then
-    echo "Refusing to create issue: body contains literal \\n escapes" >&2
+  # Catch likely broken paragraph separators from escaped shell strings while allowing
+  # legitimate single \n examples in code text.
+  if grep -nE '(^|[^`])\\n\\n' "${issue_body_file}"; then
+    echo "Refusing to create issue: body contains likely literal \\n\\n paragraph separators" >&2
     exit 1
   fi
 
+  # Only run this command after the user chose "create one bundled follow-up issue".
   FOLLOW_UP_URL=$(gh issue create --repo "${REPO}" --title "Follow-up: Review feedback from PR #${PR_NUMBER}" --body-file "${issue_body_file}" --json url -q .url)
 fi
 ```
