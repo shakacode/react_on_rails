@@ -159,7 +159,7 @@ When `REVIEW_CUTOFF_AT` is set for a full-PR scan:
 ```bash
 OWNER=${REPO%/*}
 NAME=${REPO#*/}
-gh api graphql --paginate -f owner="${OWNER}" -f name="${NAME}" -F pr="${PR_NUMBER}" -f query='query($owner:String!, $name:String!, $pr:Int!, $endCursor:String) { repository(owner:$owner, name:$name) { pullRequest(number:$pr) { reviewThreads(first:100, after:$endCursor) { nodes { id isResolved comments(first:100) { nodes { id databaseId } } } pageInfo { hasNextPage endCursor } } } } }' | jq -s '[.[].data.repository.pullRequest.reviewThreads.nodes[] | {thread_id: .id, is_resolved: .isResolved, comments: [.comments.nodes[] | {node_id: .id, id: .databaseId}]}]'
+gh api graphql --paginate -f owner="${OWNER}" -f name="${NAME}" -f pr="${PR_NUMBER}" -f query='query($owner:String!, $name:String!, $pr:Int!, $endCursor:String) { repository(owner:$owner, name:$name) { pullRequest(number:$pr) { reviewThreads(first:100, after:$endCursor) { nodes { id isResolved comments(first:100) { nodes { id databaseId } } } pageInfo { hasNextPage endCursor } } } } }' | jq -s '[.[].data.repository.pullRequest.reviewThreads.nodes[] | {thread_id: .id, is_resolved: .isResolved, comments: [.comments.nodes[] | {node_id: .id, id: .databaseId}]}]'
 ```
 
 **Filtering comments:**
@@ -272,7 +272,7 @@ Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or au
 3. Present the bundle and ask whether to link an existing issue, create one bundled follow-up issue, post a PR summary comment only, or drop the bundle as not worth tracking. Do not post replies or resolve bundled items until that tracking/drop outcome is chosen. If the bundle is dropped, explicitly confirm that each bundled `DISCUSS` item is declined or not tracked before resolving it or signaling merge-ready; otherwise leave those threads open and report that the PR is not merge-ready.
 4. For each deferred item in the chosen tracking outcome, post a reply in the original location referencing that outcome (use review-comment replies for inline comments and issue comments for review summaries/general comments), and resolve the thread when one exists and the conversation is complete. For general PR comments and review summary bodies (which have no thread), the reply alone is sufficient.
 5. For trivial `SKIPPED` items that are not included in the bundle (duplicates, factually incorrect suggestions, status noise), still post rationale replies and resolve those threads only when the user confirms.
-6. If there are zero deferred items, tell the user if any optional items were excluded from the bundle as not worth tracking, then continue with whichever of `f`'s remaining prompts have items: optional handling (if any `OPTIONAL` items exist), skipped rationale confirmation (if any `SKIPPED` items exist), then discuss decisions (if any `DISCUSS` items remain).
+6. If there are zero deferred items, tell the user if any optional items were excluded from the bundle as not worth tracking, then continue with whichever of `f`'s remaining prompts still have actionable items. Skip the optional-handling prompt when every optional item was already explicitly excluded from the bundle as not worth tracking; otherwise prompt for any remaining `OPTIONAL` items. Continue with skipped rationale confirmation (if any `SKIPPED` items exist), then discuss decisions (if any `DISCUSS` items remain).
 7. No additional commit is required unless later steps introduce local changes; if they do, commit and ask for push confirmation before pushing.
 8. Tell the user the PR is merge-ready only after the deferred bundle has an explicit tracking/drop decision and any dropped `DISCUSS` items are explicitly declined/resolved; if there were zero deferred items, use the `f` merge-ready rule after `f`'s remaining prompts are complete.
 
@@ -393,7 +393,7 @@ Resolve the user's tracking-outcome choice before starting the shell block below
 
 The cleanup trap below is a named `_cleanup_addr_review` function rather than an inline `trap '...' EXIT` so Step 10's standalone path can redefine the same function without divergence. Installing the trap up front (rather than letting Step 10 replace it) closes the race window where an early exit between Step 9 and Step 10 would skip cleanup of the second temp file.
 
-````bash
+```bash
 # Template inputs: replace each <...> placeholder before running this snippet.
 # Set CREATE_FOLLOW_UP_ISSUE=1 only when the user chose "create one bundled follow-up issue".
 # For the other outcomes, set TRACKING_OUTCOME to the exact chosen result, such as:
@@ -477,15 +477,16 @@ else
     # before posting an issue body. Fenced code blocks whose indented fences
     # start with three or more backticks or tildes and inline code spans are
     # ignored; build the body with printf/heredocs.
-    fence_count=$(grep -cE '^[[:space:]]*(`{3,}|~{3,})' "${issue_body_file}" || true)
-    if [ $((fence_count % 2)) -ne 0 ]; then
+    backtick_fence_count=$(grep -cE '^[[:space:]]*`{3,}' "${issue_body_file}" || true)
+    tilde_fence_count=$(grep -cE '^[[:space:]]*~{3,}' "${issue_body_file}" || true)
+    if [ $((backtick_fence_count % 2)) -ne 0 ] || [ $((tilde_fence_count % 2)) -ne 0 ]; then
       echo "Refusing to create issue: body has an unclosed fenced code block." >&2
       echo "Inspect and fix ${issue_body_file} before retrying." >&2
       exit 1
     fi
     if matched_newline_escapes=$(
-      sed '/^[[:space:]]*```/,/^[[:space:]]*```/d' "${issue_body_file}" \
-        | sed '/^[[:space:]]*~~~/,/^[[:space:]]*~~~/d' \
+      sed -E '/^[[:space:]]*`{3,}/,/^[[:space:]]*`{3,}/d' "${issue_body_file}" \
+        | sed -E '/^[[:space:]]*~{3,}/,/^[[:space:]]*~{3,}/d' \
         | sed 's/``[^`]*``//g' \
         | sed 's/`[^`]*`//g' \
         | grep -nE '\\n'
@@ -499,7 +500,7 @@ else
     TRACKING_OUTCOME="new issue ${FOLLOW_UP_URL}"
   fi
 fi
-````
+```
 
 Rules for follow-up issues:
 
