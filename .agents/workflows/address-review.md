@@ -67,6 +67,7 @@ Execution flow when terminal access is available:
      REVIEW_ID=<the pull request review ID parsed in step 1, if any>
      SPECIFIC_TARGET=<0-or-1>
      ```
+   - Set `SPECIFIC_TARGET=1` when the input targets a specific review URL or issue-comment URL; otherwise set `SPECIFIC_TARGET=0`.
    - If `gh` is unavailable or unauthenticated, stop and tell me to fix that first.
 
 3. Determine scan window and summary cutoff:
@@ -169,7 +170,7 @@ Execution flow when terminal access is available:
       f     — Fix must-fix items, then prompt for optional handling, skipped rationale replies, and discuss decisions
       f+i   — Fix must-fix + prepare one deferred-work bundle for discuss/optional items (and non-trivial skipped items)
       f+o   — Fix must-fix + address all optional items inline in the same PR
-      a     — Apply: fix must-fix + optional items, stage files, and return detailed discuss recommendations
+      a     — Apply: fix must-fix + optional items, stage files, and return detailed discuss recommendations (local-only; no GitHub posts)
       d     — Discuss specific items before deciding (e.g., "d2,4"). Bare "d" presents all DISCUSS items.
       o     — Address specific optional items inline (e.g., "o6,7"). Bare "o" presents all OPTIONAL items for selection.
       r     — Reply with rationale to items (e.g., "r3,5", "r7-9", "r all skipped", "r all optional", "r all discuss"); add `+ resolve` to also resolve threads
@@ -266,7 +267,7 @@ Quick actions:
   f     — Fix #N, then prompt for optional handling, skipped rationale replies, and discuss decisions
   f+i   — Fix #N, prepare one deferred-work bundle for discuss/optional/non-trivial skipped items
   f+o   — Fix #N plus address all optional items inline
-  a     — Apply: fix must-fix + optional items, stage files, and return detailed discuss recommendations
+  a     — Apply: fix must-fix + optional items, stage files, and return detailed discuss recommendations (local-only; no GitHub posts)
   d     — Discuss specific items (e.g., "d2,4"). Bare "d" presents all DISCUSS items.
   o     — Address specific optional items inline (e.g., "o6,7"). Bare "o" presents all OPTIONAL items.
   r     — Reply with rationale (e.g., "r3,5", "r3-5", "r all skipped", "r all optional", "r all discuss"); add `+ resolve` to also resolve threads

@@ -228,7 +228,7 @@ Quick actions:
   f     — Fix must-fix items, then prompt for optional handling, skipped rationale replies, and discuss decisions
   f+i   — Fix must-fix + prepare one deferred-work bundle for discuss/optional items (and non-trivial skipped items)
   f+o   — Fix must-fix + address all optional items inline in the same PR
-  a     — Apply: fix must-fix + optional items, stage files, and return detailed discuss recommendations
+  a     — Apply: fix must-fix + optional items, stage files, and return detailed discuss recommendations (local-only — no GitHub posts)
   d     — Discuss specific items before deciding (e.g., "d2,4"). Bare "d" presents all DISCUSS items.
   o     — Address specific optional items inline (e.g., "o6,7"). Bare "o" presents all OPTIONAL items.
   r     — Reply with rationale to items (e.g., "r3,5", "r7-9", "r all skipped", "r all optional", "r all discuss"); add `+ resolve` to also resolve those threads
@@ -500,6 +500,12 @@ else
     fi
     FOLLOW_UP_URL=$(gh issue create --repo "${REPO}" --title "Follow-up: Review feedback from PR #${PR_NUMBER}" --body-file "${issue_body_file}" --json url -q .url)
     TRACKING_OUTCOME="new issue ${FOLLOW_UP_URL}"
+  fi
+
+  if [ -z "${TRACKING_OUTCOME}" ]; then
+    echo "Refusing to continue: deferred items exist but TRACKING_OUTCOME is not set." >&2
+    echo "Set TRACKING_OUTCOME to the chosen existing-issue, PR-summary-only, or dropped outcome before running this snippet." >&2
+    exit 1
   fi
 fi
 ```
