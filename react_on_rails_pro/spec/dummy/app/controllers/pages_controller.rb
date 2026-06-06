@@ -209,16 +209,20 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
   end
 
   def posts_page
-    posts = fetch_posts.as_json
-    posts.each do |post|
-      post_comments = fetch_post_comments(post, []).as_json
-      post_comments.each do |comment|
-        comment["user"] = fetch_comment_user(comment).as_json
-      end
-      post["comments"] = post_comments
-    end
+    posts_count = posts_page_posts_count
+    posts = fetch_posts.first(posts_count)
+    comments_by_post_id = posts_page_comments_by_post_id(posts)
 
-    @posts = posts
+    @posts = posts.map do |post|
+      post_hash = post.as_json
+      post_hash["comments"] = comments_by_post_id.fetch(post.id, []).map do |comment|
+        comment_hash = comment.as_json
+        comment_hash["user"] = comment.user.as_json
+        comment_hash
+      end
+      post_hash
+    end
+    @posts_count = posts_count
     render "/pages/posts_page"
   end
 
@@ -281,6 +285,26 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
   helper_method :read_async_props_from_redis
 
   private
+
+  def posts_page_posts_count
+    value = params[:posts_count]
+    return 2 if value.blank?
+
+    count = Integer(value, exception: false)
+    return 2 unless count
+
+    [count, 0].max
+  end
+
+  def posts_page_comments_by_post_id(posts)
+    post_ids = posts.map(&:id)
+    return {} if post_ids.empty?
+
+    Comment.with_delay(artificial_delay)
+           .includes(:user)
+           .where(post_id: post_ids)
+           .group_by(&:post_id)
+  end
 
   # Use the dummy-app-only RSC payload template so the async-props
   # incremental-rendering path can be exercised in tests without shipping

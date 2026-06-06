@@ -1,7 +1,7 @@
 <%= react_component("PostsPage",
     props: @app_props_server_render.merge(
       artificialDelay: params[:artificial_delay] || 0, 
-      postsCount: params[:posts_count] || 2,
+      postsCount: @posts_count,
       posts: @posts
     ),
     prerender: true,

@@ -61,6 +61,27 @@ RSpec.describe "Posts page", :server_rendering do
     expect(response.body).to include("Sentinel Post 2")
   end
 
+  it "only loads comments and users for the requested post count" do
+    sql_queries = []
+    subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") do |_, _, _, _, payload|
+      next if payload[:name] == "SCHEMA"
+
+      sql_queries << payload[:sql]
+    end
+
+    begin
+      get "/posts_page", params: { posts_count: 1 }
+    ensure
+      ActiveSupport::Notifications.unsubscribe(subscriber)
+    end
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Sentinel Post 1")
+    expect(response.body).not_to include("Sentinel Post 2")
+    expect(sql_queries.grep(/FROM "?comments"?/i).size).to eq(1)
+    expect(sql_queries.grep(/FROM "?users"?/i).size).to eq(1)
+  end
+
   it "returns 200 (not 500) when there are no posts to render" do
     Comment.delete_all
     Post.delete_all
