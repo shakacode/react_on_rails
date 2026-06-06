@@ -661,7 +661,18 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect(ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN).to eq("19.0.5-rc.6")
     end
 
-    it "pins react-on-rails-rsc to the React 19 compatibility track" do
+    it "keeps the generated RSC React policy on the 19.0.x patch track" do
+      range = ReactOnRails::Generators::JsDependencyManager::RSC_REACT_VERSION_RANGE
+      requirement = Gem::Requirement.new(range.sub(/\A~/, "~> "))
+
+      expect(requirement.satisfied_by?(Gem::Version.new("19.0.4"))).to be(true)
+      expect(requirement.satisfied_by?(Gem::Version.new("19.0.7"))).to be(true)
+      expect(requirement.satisfied_by?(Gem::Version.new("19.0.3"))).to be(false)
+      expect(requirement.satisfied_by?(Gem::Version.new("19.1.0"))).to be(false)
+      expect(requirement.satisfied_by?(Gem::Version.new("19.2.7"))).to be(false)
+    end
+
+    it "pins react-on-rails-rsc to the exact RSC package compatibility track" do
       expected_pin = ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN
       expect(instance.send(:rsc_packages_with_version)).to eq([["react-on-rails-rsc@#{expected_pin}"], true])
     end
