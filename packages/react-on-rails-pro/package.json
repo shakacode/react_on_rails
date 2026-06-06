@@ -73,13 +73,17 @@
     "react": ">= 16",
     "react-dom": ">= 16",
     "react-on-rails-rsc": "*",
-    "@tanstack/react-router": ">=1.139.0 <2.0.0"
+    "@tanstack/react-router": ">=1.139.0 <2.0.0",
+    "ioredis": ">= 5"
   },
   "peerDependenciesMeta": {
     "@tanstack/react-router": {
       "optional": true
     },
     "react-on-rails-rsc": {
+      "optional": true
+    },
+    "ioredis": {
       "optional": true
     }
   },
@@ -99,6 +103,7 @@
     "mock-fs": "^5.5.0",
     "react": "~19.0.4",
     "react-dom": "~19.0.4",
-    "react-on-rails-rsc": "19.0.5-rc.6"
+    "react-on-rails-rsc": "19.0.5-rc.6",
+    "ioredis": "5.11.1"
   }
 }

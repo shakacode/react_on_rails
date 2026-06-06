@@ -51,3 +51,38 @@ export function unstable_cache<TArgs extends unknown[]>(
 export function registerCacheHandler(kind: string, handler: CacheHandler): void {
   throw new Error(STUB_ERROR);
 }
+
+export type { RedisCacheHandlerOptions } from './RedisCacheHandler.ts';
+export type { TieredCacheHandlerOptions } from './TieredCacheHandler.ts';
+
+export class RedisCacheHandler implements CacheHandler {
+  constructor(_options?: unknown) {
+    throw new Error(STUB_ERROR);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async get(_key: string): Promise<CacheEntry | null> {
+    throw new Error(STUB_ERROR);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async set(_key: string, _entry: CacheEntry): Promise<void> {
+    throw new Error(STUB_ERROR);
+  }
+}
+
+export class TieredCacheHandler implements CacheHandler {
+  constructor(_l1: CacheHandler, _l2: CacheHandler, _opts?: unknown) {
+    throw new Error(STUB_ERROR);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async get(_key: string): Promise<CacheEntry | null> {
+    throw new Error(STUB_ERROR);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async set(_key: string, _entry: CacheEntry): Promise<void> {
+    throw new Error(STUB_ERROR);
+  }
+}

@@ -14,6 +14,23 @@
 
 import { createHash } from 'crypto';
 
+/**
+ * Deterministic JSON serialization that sorts object keys to ensure
+ * consistent cache keys across different workers and hosts.
+ * JSON.stringify does not guarantee key order, which can cause
+ * duplicate cache entries for semantically identical arguments.
+ */
+function stableStringify(value: unknown): string {
+  if (value === null || value === undefined) return JSON.stringify(value);
+  if (typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+
+  const sorted = Object.keys(value as Record<string, unknown>)
+    .sort()
+    .map((k) => `${JSON.stringify(k)}:${stableStringify((value as Record<string, unknown>)[k])}`);
+  return `{${sorted.join(',')}}`;
+}
+
 // eslint-disable-next-line import/prefer-default-export -- will grow with additional key utilities
 export function buildCacheKey(buildId: string, id: string, args: unknown[]): string {
   const hash = createHash('sha256');
@@ -21,6 +38,6 @@ export function buildCacheKey(buildId: string, id: string, args: unknown[]): str
   hash.update(':');
   hash.update(id);
   hash.update(':');
-  hash.update(JSON.stringify(args));
+  hash.update(stableStringify(args));
   return `rorp:rsc-cache:${hash.digest('hex')}`;
 }
