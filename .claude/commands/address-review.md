@@ -153,7 +153,7 @@ gh api graphql --paginate -f owner="${OWNER}" -f name="${NAME}" -F pr="${PR_NUMB
 - Do not skip bot-generated comments by default. Many actionable review comments in this repository come from bots.
 - Deduplicate repeated bot comments and skip bot status posts, summaries, and acknowledgments that do not require a code or documentation change
 - Treat as actionable by default only: correctness bugs, regressions, security issues, missing tests, and clear inconsistencies with adjacent code
-- Treat as non-actionable by default: style nits, speculative suggestions, changelog wording, duplicate bot comments, and "could consider" feedback unless the user explicitly asks for polish work
+- Treat as non-actionable by default: style nits, speculative suggestions, changelog wording, duplicate bot comments, and "could consider" feedback unless the user explicitly asks for polish work or invokes `a`/`autopilot`
 - Focus on actionable feedback, not acknowledgments or thank-you messages
 
 **Error handling:**
@@ -165,11 +165,12 @@ gh api graphql --paginate -f owner="${OWNER}" -f name="${NAME}" -F pr="${PR_NUMB
 
 ## Step 5: Triage Comments
 
-Before creating any todos, classify every review comment into one of three categories:
+Before creating any todos, classify every review comment into one of four categories:
 
 - `MUST-FIX`: correctness bugs, regressions, security issues, missing tests that could hide a real bug, and clear inconsistencies with adjacent code that would likely block merge
 - `DISCUSS`: reasonable suggestions that expand scope, architectural opinions that are not clearly right or wrong, and comments where the reviewer claim may be correct but needs a user decision
-- `SKIPPED`: style preferences, documentation nits, comment requests, test-shape preferences, speculative suggestions, changelog wording, duplicate comments, status posts, non-actionable summaries, and factually incorrect suggestions
+- `OPTIONAL`: style preferences, documentation nits, comment requests, test-shape preferences, speculative suggestions, and changelog wording that are applicable but not merge blockers
+- `SKIPPED`: duplicate comments, status posts, non-actionable summaries, factually incorrect suggestions, and optional polish the user did not ask to handle
 
 Triage rules:
 
@@ -196,6 +197,7 @@ Present the triage to the user - **DO NOT automatically start addressing items**
 - Use a single sequential numbering across all categories (1, 2, 3, ...) so every item has a unique number the user can reference. Do not restart numbering at 1 for each category.
 - `MUST-FIX ({count})`: list the todos created
 - `DISCUSS ({count})`: list items needing user choice, with a short reason
+- `OPTIONAL ({count})`: list applicable polish items, with a short reason
 - `SKIPPED ({count})`: list skipped comments with a short reason, including duplicates and factually incorrect suggestions
 
 After the triage list, present a **quick-action menu**:
@@ -204,6 +206,7 @@ After the triage list, present a **quick-action menu**:
 Quick actions:
   f     — Fix must-fix items, then confirm whether to reply/resolve skipped items before deciding discuss items
   f+i   — Fix must-fix + prepare one deferred-work bundle for discuss/non-trivial skipped items; optional polish is excluded unless explicitly promoted
+  a     — Autopilot: fix must-fix + optional items, stage files, and return detailed discuss recommendations
   d     — Discuss specific items before deciding (e.g., "d2,4"). Bare "d" presents all DISCUSS items.
   r     — Reply with rationale to items (e.g., "r3,5", "r7-9", "r all skipped", "r all discuss"); add `+ resolve` to also resolve those threads
   m     — Skip code changes + prepare one deferred-work bundle for must-fix/discuss/non-trivial skipped items
@@ -214,15 +217,19 @@ Or pick items by number: "1,2", "all must-fix", "1,3-5"
 **Range syntax**: Support `N-M` to expand into individual item numbers (e.g., `3-5` becomes `3,4,5`). Ranges work everywhere: item selection, `d`, and `r`.
 If a range is malformed, reversed, or out of bounds, show a validation message and ask the user to retry (do not silently coerce it).
 
-**Dynamic menu**: Generate `f` and `f+i` descriptions dynamically using actual item numbers and deferred targets from the current triage set (e.g., "Fix #1, #3" instead of "Fix must-fix items"). When there are no `DISCUSS` or `SKIPPED` items, only show `f` and direct item selection.
+**Dynamic menu**: Generate `f`, `f+i`, and `a` descriptions dynamically using actual item numbers and deferred targets from the current triage set (e.g., "Fix #1, #3" instead of "Fix must-fix items"). Show `a` when there is at least one `MUST-FIX`, `OPTIONAL`, or `DISCUSS` item. When there are no `DISCUSS`, `OPTIONAL`, or `SKIPPED` items, only show `f`, `a`, and direct item selection.
 
-This Claude slash command intentionally does not maintain the shared workflow's separate `OPTIONAL` tier. Optional polish stays `SKIPPED` unless the user explicitly asks to promote it to `DISCUSS` or fix it inline.
+This Claude slash command normally keeps optional polish out of the main fix flow unless the user explicitly asks for it. Action `a` is that explicit opt-in: fix `MUST-FIX` and `OPTIONAL` items, but only recommend next steps for `DISCUSS`.
 
-Wait for the user to choose an action before proceeding.
+If the user initiated the review with `a` or `autopilot`, present the triage for transparency and immediately execute `a` without waiting for another confirmation. Otherwise, wait for the user to choose an action before proceeding.
 
 Do not post the PR summary checkpoint during this triage-only phase. Post it only after a chosen action reaches a stable stopping point so the summary reflects the new baseline.
 
 ## Step 8: Execute the Chosen Action
+
+### Action `a` / `autopilot` — Fix, stage, and recommend
+
+Fix all `MUST-FIX` and `OPTIONAL` items inline without waiting for another confirmation after triage. Run relevant checks and the self-review gate. Stage only the intended changed files with explicit `git add` paths instead of committing them. Do **not** commit, push, post GitHub replies, resolve review threads, create follow-up issues, or post the PR summary checkpoint. Return a local summary with: fixed `MUST-FIX` items, fixed `OPTIONAL` items, staged files, validation commands/results, unresolved/skipped items, and detailed `DISCUSS` recommendations. Each `DISCUSS` recommendation must include the reviewer/comment link, recommended decision (`fix now`, `defer`, `decline`, or `ask user`), rationale/evidence, risk/tradeoff, and concrete next step. If validation fails after reasonable local repair, still report the staged-file state clearly and mark the PR as not ready for commit/push.
 
 ### Action `f` — Fix and merge-ready
 
@@ -281,7 +288,7 @@ Users can chain actions: e.g., `f+i` then `r7-9`. After the first action complet
 
 ### General rules for all actions
 
-When addressing items, after completing each selected item (whether `MUST-FIX` or `DISCUSS`), reply to the original review comment explaining how it was addressed.
+Except for action `a`, when addressing items, after completing each selected item (whether `MUST-FIX` or `DISCUSS`), reply to the original review comment explaining how it was addressed.
 If the user selects `DISCUSS` items to address, treat them the same as `MUST-FIX`: make the code change, reply, and resolve the thread.
 If the user selects skipped/declined items for rationale replies, post those replies too.
 
@@ -439,13 +446,16 @@ Rules for follow-up issues:
 
 ## Step 10: Post PR Summary Comment
 
-After any chosen action or completed action chain (`f`, `f+i`, `d`, `r`, `m`, or direct item selection), post a consolidated PR comment that becomes the next default review cutoff.
+After any chosen action or completed action chain except `a` (`f`, `f+i`, `d`, `r`, `m`, or direct item selection), post a consolidated PR comment that becomes the next default review cutoff.
+
+For `a`, do not post a GitHub PR summary comment automatically; return the local summary to the user with the staged-file list and detailed `DISCUSS` recommendations.
 
 Rules for the summary comment:
 
 - Always post it as a general PR issue comment, never as a review-thread reply.
 - Include the exact marker `<!-- address-review-summary -->` on its own line near the top.
 - Summarize `MUST-FIX` and `DISCUSS` items under a `Mattered` section, including whether each item was addressed, deferred, or left pending by user choice.
+- Summarize `OPTIONAL` items under an `Optional` section when they were fixed by `a` or explicitly handled.
 - Summarize `SKIPPED` items under a `Skipped` section with short reasons.
 - Mention any deferred-work tracking outcome and follow-up issue URL that was created.
 - Mention whether the run used the default cutoff or the explicit `check all reviews` override.
@@ -503,6 +513,7 @@ PR is NOT merge-ready because must-fix items were deferred.
 If the action was direct item selection and unresolved `MUST-FIX`/`DISCUSS` items remain, do not signal merge-ready. Re-offer the quick-action menu and ask whether to continue with `f`, `f+i`, `d`, `r`, or `m`.
 If the action was `d` or `r` and unresolved `MUST-FIX`/`DISCUSS` items remain, do not signal merge-ready; re-offer the quick-action menu and ask whether to continue with `f`, `f+i`, `d`, `r`, or `m`.
 If the action was `f+i` or `m`, do not signal merge-ready until the deferred bundle has an explicit tracking/drop decision.
+If the action was `a`, do not signal merge-ready automatically. Report that files are staged for review and list the remaining GitHub actions needed, such as commit, push, replies/resolutions, and decisions on `DISCUSS` recommendations.
 
 Do not automatically merge. Signal readiness (or non-readiness) and let the user decide.
 
@@ -531,14 +542,17 @@ DISCUSS (1):
 2. src/config.rb:12 - Extract this to a shared config constant (@reviewer1)
    Reason: reasonable suggestion, but it expands scope
 
-SKIPPED (3):
-3. src/helper.rb:50 - "Consider adding a comment" (@claude[bot]) - documentation nit
-4. src/helper.rb:45 - Same nil guard issue (@greptile-apps[bot]) - duplicate of #1
-5. spec/helper_spec.rb:20 - "Consolidate assertions" (@claude[bot]) - test style preference
+OPTIONAL (2):
+3. src/helper.rb:50 - "Consider adding a comment" (@claude[bot]) - documentation polish
+4. spec/helper_spec.rb:20 - "Consolidate assertions" (@claude[bot]) - test style preference
+
+SKIPPED (1):
+5. src/helper.rb:45 - Same nil guard issue (@greptile-apps[bot]) - duplicate of #1
 
 Quick actions:
   f     — Fix #1, then confirm whether to reply/resolve skipped items before deciding discuss items
   f+i   — Fix #1, prepare one deferred-work bundle for #2
+  a     — Autopilot: fix #1 plus optional items #3-4, stage files, and recommend a decision for #2
   d     — Discuss specific items (e.g., "d2,4"). Bare "d" presents all DISCUSS items.
   r     — Reply with rationale (e.g., "r3,5", "r3-5", "r all skipped", "r all discuss"); add `+ resolve` to also resolve threads
   m     — No code changes, prepare one deferred-work bundle, merge-ready only when no must-fix items are deferred
