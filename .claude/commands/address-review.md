@@ -486,6 +486,7 @@ else
     if matched_newline_escapes=$(
       sed '/^[[:space:]]*```/,/^[[:space:]]*```/d' "${issue_body_file}" \
         | sed '/^[[:space:]]*~~~/,/^[[:space:]]*~~~/d' \
+        | sed 's/``[^`]*``//g' \
         | sed 's/`[^`]*`//g' \
         | grep -nE '\\n'
     ); then
