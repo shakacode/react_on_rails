@@ -10,6 +10,7 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
 - `.agents/skills/`: agent skills; `.claude/skills` is a symlink here so Claude Code exposes the same workflows as slash commands
 - `.agents/workflows/`: shared prompt templates and reusable workflows for Codex, GPT, and other non-Claude tools
 - `internal/contributor-info/agent-workflow-adoption.md`: guide for copying these agent workflows into other repositories
+- When the user wants a multi-issue or multi-PR Codex batch, use `.agents/skills/pr-batch/SKILL.md`; a short invocation is `$pr-batch` or "Run a Codex batch"
 - When the user assigns an issue, PR, review-fix pass, or merge queue to an agent, follow `.agents/workflows/pr-processing.md`
 - When the user asks to address PR review comments, use `.agents/skills/address-review/SKILL.md`; `.agents/workflows/address-review.md` remains a copy/paste prompt for assistants without skill support
 

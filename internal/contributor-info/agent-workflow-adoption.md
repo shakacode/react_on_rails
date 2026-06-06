@@ -9,6 +9,7 @@ The goal is not to copy React on Rails blindly. The goal is to copy the reusable
 ### Required baseline
 
 - [AGENTS.md](../../AGENTS.md) - canonical agent entry point and repository policy.
+- [.agents/skills/pr-batch/SKILL.md](../../.agents/skills/pr-batch/SKILL.md) - memorable entry point for multi-issue or multi-PR batches; interviews for missing targets, trust, permissions, concurrency, and `/goal` handoff details.
 - [.agents/workflows/pr-processing.md](../../.agents/workflows/pr-processing.md) - default flow for assigned issues, existing PRs, review-fix passes, and multi-PR landing plans.
 - [.agents/workflows/address-review.md](../../.agents/workflows/address-review.md) - generic non-Claude review-comment triage and fixing workflow.
 - [.agents/skills/autoreview/SKILL.md](../../.agents/skills/autoreview/SKILL.md) - independent review skill used before commits, pushes, PRs, or merge readiness.
@@ -41,6 +42,7 @@ Do not copy the CI workflow files as a bundle unless the target repo has the sam
 
 2. Install the baseline docs.
    - Add or replace `AGENTS.md`.
+   - Add `.agents/skills/pr-batch/SKILL.md`.
    - Add `.agents/workflows/pr-processing.md`.
    - Add `.agents/workflows/address-review.md`.
    - Add `.agents/skills/autoreview/SKILL.md`, or replace the pre-push AI review gate with the target repo's direct review command.
@@ -56,6 +58,7 @@ Do not copy the CI workflow files as a bundle unless the target repo has the sam
    - Keep the self-review gate, reproduction/TDD gate, local-validation-first policy, batched pushes, and follow-up issue restraint.
    - Define the repo's high-risk categories so agents know when full CI or extra review is justified.
    - Treat high-risk categories (workflow, build-config, lockfiles, release tooling) as "Ask First" scope, not standing bans. Make any explicit grant or per-run prohibition a batch-prompt scope field so temporary lane restrictions are never inherited as permanent policy, and so the absence of a later prohibition never implies permission without a fresh grant.
+   - Keep the high-concurrency launch gates: exact target confirmation for filter-based batches, trusted-list permission preflight, untrusted GitHub content handling, and resumable coordination state.
 
 5. Customize address-review behavior.
    - Keep the summary marker `<!-- address-review-summary -->` unless the repo already has a different checkpoint marker.
@@ -71,6 +74,7 @@ Do not copy the CI workflow files as a bundle unless the target repo has the sam
 
 7. Validate with a dry run.
    - Ask an agent to process a low-risk issue and stop before opening a PR.
+   - Ask an agent to run `$pr-batch` with a filter-based request and confirm it stops with an exact target list and `/goal` prompt before spawning workers.
    - Ask an agent to triage one PR review and stop at the quick-action menu.
    - Confirm the agent uses the target repo's commands, does not invent missing tooling, does not create follow-up issues by default, and does not push before local validation.
 
@@ -87,6 +91,7 @@ Update these before considering the workflow adopted:
 - Local change detector or equivalent path-based CI guidance.
 - Manual developer-flow checks for app startup, generated apps, examples, or test fixtures.
 - PR labels such as `full-ci`, `benchmark`, and `ready-to-merge`.
+- Batch coordination labels such as `codex-ready` or `codex-wip`, if adopted; otherwise remove or replace those examples and rely on exact lane assignments plus structured claim comments.
 - Full-CI trigger mechanism if `+ci-*` is not installed.
 - Follow-up issue title convention. React on Rails uses `Follow-up:`.
 - Documentation boundaries: public docs, internal docs, generated docs, changelog policy.
@@ -101,6 +106,8 @@ Update these before considering the workflow adopted:
 - Ruby, Rails, Shakapacker, RSC, SSR, and Pro-specific rules unless the target repo uses those concepts.
 - Commands that do not exist in the target repo.
 - The `+ci-*` workflow without adapting workflow names, permissions, labels, and dispatch inputs.
+- High-concurrency no-approval execution for arbitrary public issue or PR filters. Require a maintainer-approved exact target list first.
+- `codex-ready` or `codex-wip` labels unless the target repo creates them and defines their meaning. Labels are dashboard hints, not durable locks.
 - Follow-up issue creation habits. The default should remain no new issue unless the user explicitly chooses bundled tracking.
 - PR labels that are not created and documented in the target repo.
 
@@ -111,10 +118,10 @@ Update these before considering the workflow adopted:
 When changing policy:
 
 1. Update `AGENTS.md`.
-2. Update `.agents/workflows/pr-processing.md` and `.agents/workflows/address-review.md`.
+2. Update `.agents/skills/pr-batch/SKILL.md`, `.agents/workflows/pr-processing.md`, and `.agents/workflows/address-review.md`.
 3. Update Claude skill or prompt files if they exist.
 4. Run Markdown formatting and link checks.
-5. Do one dry-run triage or PR-processing pass before declaring the copied workflow ready.
+5. Do one dry-run batch launch, triage, or PR-processing pass before declaring the copied workflow ready.
 
 ## Suggested Adoption PR Summary
 
@@ -122,6 +129,7 @@ When changing policy:
 ## Summary
 
 - add canonical agent instructions in `AGENTS.md`
+- add a `pr-batch` skill for safe multi-issue and multi-PR launch planning
 - add reusable PR processing and address-review workflows under `.agents/workflows/`
 - add Claude skill/prompt support for the same review flow
 - document local validation and full-CI escalation rules for this repository
