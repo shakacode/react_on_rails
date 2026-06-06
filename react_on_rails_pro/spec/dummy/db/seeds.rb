@@ -49,7 +49,7 @@ users.each_with_index do |user, user_index|
     seed = (user_index * 11) + post_index
     posts << user.posts.create!(
       title: lorem_sentence.call(3, seed),
-      body: Array.new(3) { |p| lorem_paragraph.call(4, seed + p) }.join("\n\n")
+      body: Array.new(3) { |paragraph_index| lorem_paragraph.call(4, seed + paragraph_index) }.join("\n\n")
     )
   end
 end
