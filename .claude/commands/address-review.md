@@ -10,7 +10,12 @@ Fetch review comments from a GitHub PR in this repository, triage them, and crea
 
 The user's input is: $ARGUMENTS
 
-First, detect whether the request includes the phrase `check all reviews` (case-insensitive, trailing position only — match it as the final tokens of the input, after the PR reference).
+First, detect whether the request includes the standalone token `autopilot` (case-insensitive) before or after the PR reference.
+
+- If it does, set an `AUTOPILOT` flag and remove only that token before parsing the PR reference.
+- Do not treat bare `a` as `autopilot`; `a` is only a post-triage quick action.
+
+Next, detect whether the remaining request includes the phrase `check all reviews` (case-insensitive, trailing position only — match it as the final tokens of the input, after the PR reference).
 
 - If it does, set a `CHECK_ALL_REVIEWS` flag and remove only that phrase before parsing the PR reference.
 - If the phrase appears in any other position (leading, embedded), do not treat it as an override; warn the user and ask them to retry with the trailing form.
@@ -21,8 +26,10 @@ Then extract the PR number and optional review/comment ID from the remaining inp
 **Supported formats:**
 
 - PR number only: `12345`
+- Autopilot PR number: `autopilot 12345` or `12345 autopilot`
 - PR number with override: `12345 check all reviews`
 - PR URL: `https://github.com/org/repo/pull/12345`
+- Autopilot PR URL: `autopilot https://github.com/org/repo/pull/12345` or `https://github.com/org/repo/pull/12345 autopilot`
 - PR URL with override: `https://github.com/org/repo/pull/12345 check all reviews`
 - Specific PR review: `https://github.com/org/repo/pull/12345#pullrequestreview-123456789`
 - Specific issue comment: `https://github.com/org/repo/pull/12345#issuecomment-123456789`
@@ -616,7 +623,7 @@ Or pick items by number: "1,2", "all must-fix", "all optional", "1,3-5"
 - Include file path and line number in each todo for easy navigation (when available)
 - Include the reviewer's username in the todo text
 - If a comment doesn't have a specific line number, note it as "general comment"
-- **NEVER automatically address all review comments** - always wait for user direction
+- Except when `AUTOPILOT` is set or the user selects action `a`, never automatically address all review comments; wait for user direction after triage
 - When given a specific review URL, no need to ask for more information
 - **ALWAYS reply to comments after addressing them** to close the feedback loop
 - Always post a new PR summary comment with the `<!-- address-review-summary -->` marker after completing an action so future runs know where to resume
