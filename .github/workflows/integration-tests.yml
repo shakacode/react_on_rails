@@ -82,52 +82,60 @@ jobs:
   setup-integration-matrix:
     needs: detect-changes
     runs-on: ubuntu-22.04
-    # Emit one matrix per bundler. Each is fed to a separate per-bundler reusable-workflow call
-    # (webpack-dummy-app-tests / rspack-dummy-app-tests) so the bundlers' build -> integration
-    # chains are fully decoupled: a build failure in one bundler can no longer skip the other
-    # bundler's integration tests. Refs #3593 (follow-up to #3481 / #3581).
+    # Emit one matrix per independent build -> integration chain. Webpack latest keeps the
+    # existing webpack-dummy-app-tests caller; full-matrix runs add a separate webpack minimum
+    # caller so dependency-level build failures cannot skip each other's integration tests.
+    # Rspack remains a single latest-only caller. Refs #3593 / #3622 (follow-up to #3481 / #3581).
     outputs:
       webpack_matrix: ${{ steps.set-matrix.outputs.webpack_matrix }}
+      webpack_minimum_matrix: ${{ steps.set-matrix.outputs.webpack_minimum_matrix }}
       rspack_matrix: ${{ steps.set-matrix.outputs.rspack_matrix }}
+      run_full_matrix: ${{ steps.set-matrix.outputs.run_full_matrix }}
     steps:
       - id: set-matrix
         run: |
           # Determine if we should run full matrix (main, workflow_dispatch, force_run, or full-ci label).
-          # Legs are built with `jq -nc` so the JSON stays readable/diffable (one leg per line) while
-          # still emitting compact single-line output for $GITHUB_OUTPUT. Refs #3481.
           if [[ "${{ github.ref }}" == "refs/heads/main" ]] || \
              [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
              [[ "${{ inputs.force_run }}" == "true" ]] || \
              [[ "${{ needs.detect-changes.outputs.has_full_ci_label }}" == "true" ]]; then
-            # Full matrix: test both latest and minimum supported versions for Webpack.
-            webpack_matrix="$(jq -nc '{
-              "include": [
-                {"ruby-version":"4.0","node-version":"22","dependency-level":"latest","bundler":"webpack"},
-                {"ruby-version":"3.3","node-version":"20","dependency-level":"minimum","bundler":"webpack"}
-              ]
-            }')"
+            run_full_matrix=true
           else
-            # PR matrix: test only latest versions for fast feedback.
-            webpack_matrix="$(jq -nc '{
-              "include": [
-                {"ruby-version":"4.0","node-version":"22","dependency-level":"latest","bundler":"webpack"}
-              ]
-            }')"
+            run_full_matrix=false
           fi
+          # Legs are built with `jq -nc` so the JSON stays readable/diffable (one leg per line) while
+          # still emitting compact single-line output for $GITHUB_OUTPUT. Refs #3481.
+          # Primary Webpack leg: test latest versions in both full and PR modes.
+          webpack_matrix="$(jq -nc '{
+            "include": [
+              {"ruby-version":"4.0","node-version":"22","dependency-level":"latest","bundler":"webpack"}
+            ]
+          }')"
+          # Full matrix only: test minimum supported versions for Webpack in its own reusable-workflow
+          # call so its build -> integration chain is independent from Webpack latest. Refs #3622.
+          webpack_minimum_matrix="$(jq -nc '{
+            "include": [
+              {"ruby-version":"3.3","node-version":"20","dependency-level":"minimum","bundler":"webpack"}
+            ]
+          }')"
           # Rspack runs the latest leg in both full and PR modes (it has no minimum-version leg yet).
           rspack_matrix="$(jq -nc '{
             "include": [
               {"ruby-version":"4.0","node-version":"22","dependency-level":"latest","bundler":"rspack"}
             ]
           }')"
-          echo "webpack_matrix=${webpack_matrix}" >> "$GITHUB_OUTPUT"
-          echo "rspack_matrix=${rspack_matrix}" >> "$GITHUB_OUTPUT"
+          {
+            echo "webpack_matrix=${webpack_matrix}"
+            echo "webpack_minimum_matrix=${webpack_minimum_matrix}"
+            echo "rspack_matrix=${rspack_matrix}"
+            echo "run_full_matrix=${run_full_matrix}"
+          } >> "$GITHUB_OUTPUT"
 
-  # One reusable-workflow call per bundler. Each call owns its own build -> integration job chain
-  # (see dummy-app-bundler-tests.yml) with a matched 1:1 `needs`, so a build failure in one bundler
-  # no longer skips the other bundler's integration tests. Refs #3593 (follow-up to #3481 / #3581).
-  # The gating `if:` below is identical for both calls; it preserves the prior skip behavior
-  # (docs/comment-only commits skip heavy jobs while main code changes always run full CI).
+  # One reusable-workflow call per independent bundler/dependency-level chain. Each call owns its
+  # own build -> integration job chain (see dummy-app-bundler-tests.yml), so a build failure in one
+  # chain no longer skips another chain's integration tests. Refs #3593 / #3622.
+  # The shared gating preserves the prior skip behavior (docs/comment-only commits skip heavy jobs
+  # while main code changes always run full CI). The webpack minimum call adds the full-matrix gate.
   webpack-dummy-app-tests:
     needs: [detect-changes, setup-integration-matrix]
     if: |
@@ -145,6 +153,24 @@ jobs:
     uses: ./.github/workflows/dummy-app-bundler-tests.yml
     with:
       matrix: ${{ needs.setup-integration-matrix.outputs.webpack_matrix }}
+
+  webpack-minimum-dummy-app-tests:
+    needs: [detect-changes, setup-integration-matrix]
+    if: |
+      needs.setup-integration-matrix.outputs.run_full_matrix == 'true' && !(
+        github.event_name == 'push' &&
+        github.ref == 'refs/heads/main' &&
+        needs.detect-changes.outputs.non_runtime_only == 'true'
+      ) && (
+        github.ref == 'refs/heads/main' ||
+        github.event_name == 'workflow_dispatch' ||
+        needs.detect-changes.outputs.run_dummy_tests == 'true'
+      )
+    permissions:
+      contents: read
+    uses: ./.github/workflows/dummy-app-bundler-tests.yml
+    with:
+      matrix: ${{ needs.setup-integration-matrix.outputs.webpack_minimum_matrix }}
 
   rspack-dummy-app-tests:
     needs: [detect-changes, setup-integration-matrix]
