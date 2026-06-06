@@ -63,7 +63,6 @@ export interface RedisCacheHandlerOptions {
   maxEntryBytes?: number;
 }
 
-// eslint-disable-next-line import/prefer-default-export -- designed for named import alongside the interface
 export class RedisCacheHandler implements CacheHandler {
   private redis: Redis;
 

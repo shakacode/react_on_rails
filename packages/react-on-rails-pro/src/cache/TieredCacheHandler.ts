@@ -23,7 +23,6 @@ export interface TieredCacheHandlerOptions {
   l1MaxTtlSeconds?: number;
 }
 
-// eslint-disable-next-line import/prefer-default-export -- designed for named import alongside the interface
 export class TieredCacheHandler implements CacheHandler {
   private l1: CacheHandler;
 
@@ -73,9 +72,7 @@ export class TieredCacheHandler implements CacheHandler {
     if (this.l1MaxTtlSeconds === undefined) return entry;
 
     const capped =
-      entry.revalidate > 0
-        ? Math.min(entry.revalidate, this.l1MaxTtlSeconds)
-        : this.l1MaxTtlSeconds;
+      entry.revalidate > 0 ? Math.min(entry.revalidate, this.l1MaxTtlSeconds) : this.l1MaxTtlSeconds;
 
     if (capped === entry.revalidate) return entry;
 
