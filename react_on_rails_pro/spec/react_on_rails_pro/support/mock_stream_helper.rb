@@ -112,6 +112,8 @@ module MockStreamHelper
     end
 
     ::Protocol::HTTP::Response[status, {}, body]
+  rescue RuntimeError => e
+    ::Protocol::HTTP::Response[500, {}, [e.message]]
   end
 
   def stub_renderer_client(origin, wrapped_endpoint)
