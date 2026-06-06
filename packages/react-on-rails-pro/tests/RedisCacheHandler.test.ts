@@ -59,7 +59,7 @@ describe('RedisCacheHandler', () => {
       for (const chunk of original.value) totalLen += 4 + chunk.length;
       const blob = Buffer.allocUnsafe(totalLen);
       blob.writeDoubleBE(original.timestamp, 0);
-      blob.writeFloatBE(original.revalidate, 8);
+      blob.writeInt32BE(original.revalidate, 8);
       let offset = 12;
       for (const chunk of original.value) {
         blob.writeUInt32BE(chunk.length, offset);
@@ -73,7 +73,7 @@ describe('RedisCacheHandler', () => {
 
       expect(result).not.toBeNull();
       expect(result!.timestamp).toBe(original.timestamp);
-      expect(Math.abs(result!.revalidate - original.revalidate)).toBeLessThan(0.01);
+      expect(result!.revalidate).toBe(original.revalidate);
       expect(result!.value).toHaveLength(2);
       expect(result!.value[0].toString()).toBe('chunk-one');
       expect(result!.value[1].toString()).toBe('chunk-two');
@@ -161,7 +161,7 @@ describe('RedisCacheHandler', () => {
       expect(result!.value[1].toString()).toBe('world');
       expect(result!.value[2].toString()).toBe('!');
       expect(result!.timestamp).toBe(1700000000000);
-      expect(Math.abs(result!.revalidate - 300)).toBeLessThan(0.1);
+      expect(result!.revalidate).toBe(300);
     });
 
     test('handles empty Buffer array', async () => {

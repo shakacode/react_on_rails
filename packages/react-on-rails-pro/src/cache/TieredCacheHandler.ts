@@ -51,7 +51,9 @@ export class TieredCacheHandler implements CacheHandler {
 
     if (l2Entry) {
       const promoted = this.applyL1Ttl(l2Entry);
-      void this.l1.set(key, promoted);
+      void this.l1.set(key, promoted).catch((err: unknown) => {
+        console.error('TieredCacheHandler: L1 promotion failed', err);
+      });
       return l2Entry;
     }
 

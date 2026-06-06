@@ -15,7 +15,7 @@
 import type { Redis, RedisOptions } from 'ioredis';
 import type { CacheEntry, CacheHandler } from './CacheHandler.ts';
 
-const HEADER_SIZE = 12; // 8 (timestamp float64) + 4 (revalidate float32)
+const HEADER_SIZE = 12; // 8 (timestamp float64) + 4 (revalidate int32)
 
 function serialize(entry: CacheEntry): Buffer {
   let totalLen = HEADER_SIZE;
@@ -23,7 +23,7 @@ function serialize(entry: CacheEntry): Buffer {
 
   const buf = Buffer.allocUnsafe(totalLen);
   buf.writeDoubleBE(entry.timestamp, 0);
-  buf.writeFloatBE(entry.revalidate, 8);
+  buf.writeInt32BE(entry.revalidate, 8);
 
   let offset = HEADER_SIZE;
   for (const chunk of entry.value) {
@@ -40,7 +40,7 @@ function deserialize(buf: Buffer): CacheEntry | null {
   if (buf.length < HEADER_SIZE) return null;
 
   const timestamp = buf.readDoubleBE(0);
-  const revalidate = buf.readFloatBE(8);
+  const revalidate = buf.readInt32BE(8);
   const chunks: Buffer[] = [];
 
   let offset = HEADER_SIZE;
