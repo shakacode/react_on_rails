@@ -97,7 +97,7 @@ bin/ci-local
 
 Use targeted checks when a full local run is too expensive, but explain the substitution:
 
-- Ruby gem code: `bundle exec rubocop`, `bundle exec rake run_rspec:gem`, and `bundle exec rake rbs:validate` when signatures changed.
+- Ruby gem code: `(cd react_on_rails && bundle exec rubocop)`, `bundle exec rake run_rspec:gem`, and `bundle exec rake rbs:validate` when signatures changed.
 - Dummy app or integration behavior: `bundle exec rake run_rspec:dummy` or the specific dummy spec.
 - JS/TS package code: `pnpm run lint`, `pnpm run test`, `pnpm run type-check`, and `pnpm start format.listDifferent`.
 - Generator changes: `rake run_rspec:shakapacker_examples_basic`, then broader generator specs when risk is high.
