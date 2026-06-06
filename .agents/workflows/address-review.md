@@ -81,6 +81,7 @@ Execution flow when terminal access is available:
      ```
    - For full-PR scans (plain PR number or PR URL with no specific review/comment anchor), default to reviewing only feedback posted after the latest PR summary comment created by this workflow.
    - The summary marker is a PR issue comment whose body starts with `<!-- address-review-summary -->` on its very first line. Requiring `startswith` (not `contains`) means a human comment that quotes or embeds the marker in prose is not mistaken for a checkpoint and cannot silently advance the cutoff.
+   - Legacy summary comments where the marker appears after a blank line, heading, or byte-order mark are ignored by this rule. If the cutoff appears to miss an older checkpoint, use `check all reviews`; new summary checkpoints created by this workflow always place the marker on the first line.
    - If `CHECK_ALL_REVIEWS` is true, ignore the cutoff and scan the full PR history.
    - If the input is a specific review URL or specific issue-comment URL, fetch that exact target even if it predates the latest summary comment.
    - Fetch the latest summary comment before collecting review data:
