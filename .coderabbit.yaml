@@ -1,0 +1,21 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+# CodeRabbit may suggest topical labels in its walkthrough, but it must not
+# apply labels automatically. CI-control labels such as `full-ci`, `run-full-ci`,
+# `benchmark`, and `run-benchmark` are intentionally absent from this allowlist
+# because labels with those names allocate expensive GitHub Actions runners.
+suggested_labels: true
+auto_apply_labels: false
+labeling_instructions:
+  - label: "ci-tooling"
+    instructions: "PRs touching GitHub Actions workflows, CI helper actions, or CI scripts."
+  - label: "testing"
+    instructions: "PRs touching test suites, test helpers, fixtures, CI test selection, or verification tooling."
+  - label: "performance-regression"
+    instructions: "PRs fixing or investigating a measured performance regression without requesting benchmark CI."
+  - label: "documentation"
+    instructions: "PRs whose primary change is documentation, examples, guides, or markdown-only repository metadata."
+  - label: "dependency"
+    instructions: "PRs touching dependency manifests, lockfiles, supported dependency ranges, or dependency update scripts."
+  - label: "runtime-fix"
+    instructions: "PRs fixing runtime behavior in the gem, npm package, dummy app, or React on Rails Pro."

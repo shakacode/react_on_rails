@@ -105,7 +105,7 @@ jobs:
             Returns to standard CI behavior (optimized suite, skips tests for unchanged code).
 
             **What it does:**
-            - Removes the \\\`full-ci\\\` label from the PR
+            - Removes the \\\`full-ci\\\`/\\\`run-full-ci\\\` labels from the PR
             - Future commits will use the fast feedback CI suite
             - Does NOT stop currently running workflows
 

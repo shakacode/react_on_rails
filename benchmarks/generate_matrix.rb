@@ -17,7 +17,7 @@ SUITES = [
     shard_total: 1,
     app_versions: %w[both core_only],
     run_output: "RUN_CORE_BENCHMARKS",
-    labels: %w[benchmark benchmark-core],
+    labels: %w[benchmark benchmark-core run-benchmark run-benchmark-core],
     app_directory: "react_on_rails/spec/dummy",
     artifact_name: "benchmark-core-results",
     benchmark_tool: "k6",
@@ -36,7 +36,7 @@ SUITES = [
     shard_total: 2,
     app_versions: %w[both pro_only pro_rails_only],
     run_output: "RUN_PRO_BENCHMARKS",
-    labels: %w[benchmark benchmark-pro],
+    labels: %w[benchmark benchmark-pro run-benchmark run-benchmark-pro],
     app_directory: "react_on_rails_pro/spec/dummy",
     artifact_name: "benchmark-pro-results",
     benchmark_tool: "k6",
@@ -55,7 +55,10 @@ SUITES = [
     shard_total: 1,
     app_versions: %w[both pro_only pro_node_renderer_only],
     run_output: "RUN_PRO_NODE_RENDERER_BENCHMARKS",
-    labels: %w[benchmark benchmark-pro benchmark-pro-node-renderer],
+    labels: %w[
+      benchmark benchmark-pro benchmark-pro-node-renderer
+      run-benchmark run-benchmark-pro run-benchmark-pro-node-renderer
+    ],
     app_directory: "react_on_rails_pro/spec/dummy",
     artifact_name: "benchmark-pro-node-renderer-results",
     benchmark_tool: "vegeta",

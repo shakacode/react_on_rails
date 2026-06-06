@@ -21,7 +21,7 @@ This command will trigger:
 - ✅ React on Rails Pro integration tests
 - ✅ React on Rails Pro package tests
 
-`+ci-run-full` dispatches this manually maintained workflow map:
+`+ci-run-full` dispatches this manually maintained workflow map and adds the `full-ci` label so future commits keep the full matrix enabled:
 
 - **Lint JS and Ruby** (`lint-js-and-ruby.yml`)
 - **JS unit tests for Renderer package** (`package-js-tests.yml`)
@@ -135,6 +135,15 @@ Many workflows use change detection to skip unnecessary jobs:
 
 - Runs all jobs on pushes to `main`
 - Runs only relevant jobs on PRs based on changed files
-- Can be overridden with `workflow_dispatch` or `+ci-run-full`
+- Can be overridden with `workflow_dispatch`, `+ci-run-full`, or trusted CI-control labels (`full-ci`)
 
 See `script/ci-changes-detector` for the change detection logic.
+
+### CI-Control Labels
+
+CI-control labels allocate expensive runner time and are intentionally separate from topical labels:
+
+- `full-ci` enables the full test matrix when applied by trusted humans or automation.
+- `benchmark` requests all benchmark suites when applied by trusted humans or automation.
+- Suite-specific `benchmark-core`, `benchmark-pro`, and `benchmark-pro-node-renderer` labels are also honored if maintainers create and use them.
+- CodeRabbit-applied CI-control labels are ignored. Use non-trigger labels such as `ci-tooling`, `testing`, `documentation`, or `performance-regression` for classification.

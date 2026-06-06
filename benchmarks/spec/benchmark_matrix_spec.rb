@@ -61,13 +61,22 @@ RSpec.describe "benchmark matrix generation" do
              )).to eq(%w[pro pro])
     end
 
-    it "selects suites by label intersection on a same-repo PR" do
+    it "selects suites by trusted legacy label intersection on a same-repo PR" do
       # benchmark-pro is shared by Pro and Pro-Node-Renderer, but not Core.
       expect(suite_ids_for(
                "BENCHMARK_EVENT_NAME" => "pull_request",
                "BENCHMARK_PULL_REQUEST_HEAD_REPO" => "shakacode/react_on_rails",
                "GITHUB_REPOSITORY" => "shakacode/react_on_rails",
                "BENCHMARK_PULL_REQUEST_LABELS" => '["benchmark-pro"]'
+             )).to eq(%w[pro pro pro-node-renderer])
+    end
+
+    it "selects suites by run-label alias intersection on a same-repo PR" do
+      expect(suite_ids_for(
+               "BENCHMARK_EVENT_NAME" => "pull_request",
+               "BENCHMARK_PULL_REQUEST_HEAD_REPO" => "shakacode/react_on_rails",
+               "GITHUB_REPOSITORY" => "shakacode/react_on_rails",
+               "BENCHMARK_PULL_REQUEST_LABELS" => '["run-benchmark-pro"]'
              )).to eq(%w[pro pro pro-node-renderer])
     end
 

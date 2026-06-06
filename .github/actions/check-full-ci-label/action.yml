@@ -1,19 +1,41 @@
 name: Check for full-ci label
-description: Checks if the PR has the full-ci label to enable full CI mode
+description: Checks if the PR has a trusted full-CI control label to enable full CI mode
 outputs:
   result:
-    description: 'Whether the full-ci label is present (string: "true" or "false")'
+    description: 'Whether a trusted full-CI control label is present (string: "true" or "false")'
     value: ${{ steps.check.outputs.result }}
 runs:
   using: composite
   steps:
-    - name: Check for full-ci label
+    - name: Check for trusted full-CI label
       id: check
       uses: actions/github-script@v7
       with:
         result-encoding: string
         retries: 3
         script: |
+          const controlLabels = ['full-ci', 'run-full-ci'];
+          const ignoredActorLogins = new Set(['coderabbitai', 'coderabbitai[bot]']);
+
+          function isIgnoredActor(actor) {
+            const login = actor?.login || '';
+            return ignoredActorLogins.has(login) || login.startsWith('coderabbitai');
+          }
+
+          function latestLabeledEvent(events, labelName) {
+            return events
+              .filter((event) => event.event === 'labeled' && event.label?.name === labelName)
+              .sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at))[0];
+          }
+
+          function payloadLabeledEvent(labelName) {
+            if (context.payload.action !== 'labeled' || context.payload.label?.name !== labelName) {
+              return null;
+            }
+
+            return { actor: context.payload.sender };
+          }
+
           // Only check labels on pull requests
           if (!context.payload.pull_request) {
             return 'false';
@@ -25,6 +47,35 @@ runs:
             issue_number: context.payload.pull_request.number
           });
 
-          const hasLabel = labels.some(label => label.name === 'full-ci');
-          console.log(`full-ci label present: ${hasLabel}`);
-          return hasLabel ? 'true' : 'false';
+          const presentControlLabels = controlLabels.filter((labelName) =>
+            labels.some((label) => label.name === labelName)
+          );
+
+          if (presentControlLabels.length === 0) {
+            console.log(`No full-CI control labels present. Checked: ${controlLabels.join(', ')}`);
+            return 'false';
+          }
+
+          const events = await github.paginate(github.rest.issues.listEvents, {
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.payload.pull_request.number,
+            per_page: 100
+          });
+
+          const trustedLabels = presentControlLabels.filter((labelName) => {
+            const latestEvent = latestLabeledEvent(events, labelName) || payloadLabeledEvent(labelName);
+
+            if (!latestEvent) {
+              console.log(`${labelName} is present, but no label event was found; treating as untrusted.`);
+              return false;
+            }
+
+            const actorLogin = latestEvent.actor?.login || '<unknown>';
+            const ignored = isIgnoredActor(latestEvent.actor);
+            console.log(`${labelName} latest label actor: ${actorLogin}; ignored: ${ignored}`);
+            return !ignored;
+          });
+
+          console.log(`Trusted full-CI labels: ${trustedLabels.join(', ') || '<none>'}`);
+          return trustedLabels.length > 0 ? 'true' : 'false';

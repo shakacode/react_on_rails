@@ -41,6 +41,44 @@ jobs:
               '+ci-status',
               '+ci-help'
             ];
+            const canonicalFullCiControlLabel = 'full-ci';
+            const fullCiControlLabels = [canonicalFullCiControlLabel, 'run-full-ci'];
+            const ignoredControlLabelActorLogins = new Set(['coderabbitai', 'coderabbitai[bot]']);
+
+            function isIgnoredControlLabelActor(labelActor) {
+              const login = labelActor?.login || '';
+              return ignoredControlLabelActorLogins.has(login) || login.startsWith('coderabbitai');
+            }
+
+            function latestLabeledEvent(events, labelName) {
+              return events
+                .filter((event) => event.event === 'labeled' && event.label?.name === labelName)
+                .sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at))[0];
+            }
+
+            function presentFullCiControlLabels(labels) {
+              return fullCiControlLabels.filter((labelName) => labels.includes(labelName));
+            }
+
+            function trustedFullCiControlLabels(labels, events) {
+              return presentFullCiControlLabels(labels).filter((labelName) => {
+                const latestEvent = latestLabeledEvent(events, labelName);
+
+                if (!latestEvent) {
+                  console.log(`${labelName} is present, but no label event was found; treating as untrusted.`);
+                  return false;
+                }
+
+                const actorLogin = latestEvent.actor?.login || '<unknown>';
+                const ignored = isIgnoredControlLabelActor(latestEvent.actor);
+                console.log(`${labelName} latest label actor: ${actorLogin}; ignored: ${ignored}`);
+                return !ignored;
+              });
+            }
+
+            function markdownLabels(labels) {
+              return labels.map((label) => `\`${label}\``).join(', ');
+            }
 
             function commandText(commentBody) {
               return commentBody
@@ -118,26 +156,30 @@ jobs:
                 owner,
                 repo,
                 issue_number: issueNumber,
-                labels: ['full-ci']
+                labels: [canonicalFullCiControlLabel]
               });
             }
 
             async function removeFullCiLabel() {
-              try {
-                await github.rest.issues.removeLabel({
-                  owner,
-                  repo,
-                  issue_number: issueNumber,
-                  name: 'full-ci'
-                });
-                return true;
-              } catch (error) {
-                if (error.status === 404) {
-                  return false;
-                }
+              const removedLabels = [];
 
-                throw error;
+              for (const name of fullCiControlLabels) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner,
+                    repo,
+                    issue_number: issueNumber,
+                    name
+                  });
+                  removedLabels.push(name);
+                } catch (error) {
+                  if (error.status !== 404) {
+                    throw error;
+                  }
+                }
               }
+
+              return removedLabels;
             }
 
             async function listPullRequestLabels() {
@@ -149,6 +191,15 @@ jobs:
               });
 
               return labels.map((label) => label.name);
+            }
+
+            async function listPullRequestEvents() {
+              return github.paginate(github.rest.issues.listEvents, {
+                owner,
+                repo,
+                issue_number: issueNumber,
+                per_page: 100
+              });
             }
 
             async function listPullRequestFiles() {
@@ -215,7 +266,7 @@ jobs:
                 'Post one CI command per comment; if multiple commands are present, only the first is handled.',
                 '',
                 '- `+ci-run-full` - run the expensive full CI matrix and add `full-ci` for future commits',
-                '- `+ci-stop-full` - remove `full-ci` so future commits return to optimized CI',
+                '- `+ci-stop-full` - remove `full-ci`/`run-full-ci` so future commits return to optimized CI',
                 '- `+ci-skip-full [reason]` - record a SHA-bound waiver for the expensive full CI matrix',
                 '- `+ci-status` - summarize the PR CI policy state',
                 '- `+ci-help` - show this help',
@@ -317,7 +368,7 @@ jobs:
             }
 
             async function handleSkipFull(pr, args) {
-              const removedFullCi = await removeFullCiLabel();
+              const removedFullCiLabels = await removeFullCiLabel();
               const reason = oneLine(args) || 'not provided';
               const shortSha = pr.head.sha.slice(0, 12);
 
@@ -330,32 +381,41 @@ jobs:
                 '',
                 'This waiver is bound to the current head SHA and does not apply after another push.',
                 'Standard optimized CI still applies for the files changed in this PR.',
-                ...(removedFullCi ? ['', 'Removed `full-ci` from this PR.'] : [])
+                ...(removedFullCiLabels.length > 0 ? ['', `Removed ${removedFullCiLabels.map((label) => `\`${label}\``).join(', ')} from this PR.`] : [])
               ].join('\n'));
             }
 
             async function handleStopFull() {
-              const removed = await removeFullCiLabel();
+              const removedLabels = await removeFullCiLabel();
               await postComment([
                 '## Full CI Mode Disabled',
                 '',
-                removed
-                  ? 'Removed `full-ci`. Future commits will use optimized path-based CI.'
-                  : '`full-ci` was not present. Future commits are already using optimized path-based CI.',
+                removedLabels.length > 0
+                  ? `Removed ${removedLabels.map((label) => `\`${label}\``).join(', ')}. Future commits will use optimized path-based CI.`
+                  : '`full-ci`/`run-full-ci` was not present. Future commits are already using optimized path-based CI.',
                 '',
                 'Use `+ci-run-full` to re-enable full CI mode.'
               ].join('\n'));
             }
 
             async function handleStatus(pr) {
-              const [labels, files, waiver] = await Promise.all([
+              const [labels, files, waiver, events] = await Promise.all([
                 listPullRequestLabels(),
                 listPullRequestFiles(),
-                findCurrentWaiver(pr.head.sha)
+                findCurrentWaiver(pr.head.sha),
+                listPullRequestEvents()
               ]);
 
               const docsOnly = isDocsOnly(files);
-              const hasFullCi = labels.includes('full-ci');
+              const presentFullCiLabels = presentFullCiControlLabels(labels);
+              const trustedFullCiLabels = trustedFullCiControlLabels(labels, events);
+              const untrustedFullCiLabels = presentFullCiLabels.filter((label) => !trustedFullCiLabels.includes(label));
+              const hasFullCi = trustedFullCiLabels.length > 0;
+              const fullCiControlStatus = hasFullCi
+                ? `enabled by trusted ${markdownLabels(trustedFullCiLabels)}`
+                : presentFullCiLabels.length > 0
+                  ? `ignored/unverified ${markdownLabels(untrustedFullCiLabels)}`
+                  : 'absent';
 
               await postComment([
                 '## CI Status',
@@ -363,7 +423,7 @@ jobs:
                 `Head SHA: \`${pr.head.sha.slice(0, 12)}\``,
                 `Changed files: ${files.length}`,
                 `Docs-only heuristic (matches ci-changes-detector metadata paths): ${docsOnly ? 'yes' : 'no'}`,
-                `\`full-ci\` label: ${hasFullCi ? 'present' : 'absent'}`,
+                `Full-CI control label: ${fullCiControlStatus}`,
                 `Current full-CI waiver: ${waiver ? 'present for this SHA' : 'not present for this SHA'}`,
                 '',
                 hasFullCi
