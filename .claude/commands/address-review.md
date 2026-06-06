@@ -333,6 +333,7 @@ If the user selects skipped/declined items for rationale replies, post those rep
 Before committing or asking for push confirmation, run the self-review gate: review the combined fix diff for correctness bugs, style violations, and inconsistencies introduced by the fixes themselves. Fix critical issues immediately.
 
 When 2+ selected fixes touch different files with no logical dependency, process them in parallel if the environment supports it. Instruct parallel helpers not to commit; keep all changes unstaged until the combined diff passes the self-review gate.
+After parallel fixes complete, verify no conflicts exist between the changes by checking whether any helpers touched the same files (`git diff --name-only`).
 
 **For issue comments (general PR comments):**
 
