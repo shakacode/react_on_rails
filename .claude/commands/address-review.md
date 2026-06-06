@@ -344,10 +344,10 @@ gh api repos/${REPO}/issues/${PR_NUMBER}/comments -X POST -f body="<response>"
 **For PR review comments (file-specific, replying to a thread):**
 
 ```bash
-gh api repos/${REPO}/pulls/${PR_NUMBER}/comments/${COMMENT_ID}/replies -X POST -f body="<response>"
+gh api repos/${REPO}/pulls/${PR_NUMBER}/comments/${REVIEW_COMMENT_ID}/replies -X POST -f body="<response>"
 ```
 
-Use the `/replies` endpoint for all existing review comments, including standalone top-level comments.
+Use the selected item's review comment `id` as `REVIEW_COMMENT_ID`; do not use the parsed input `COMMENT_ID` except for the specific-comment fetch path. Use the `/replies` endpoint for all existing review comments, including standalone top-level comments.
 
 **For review summary bodies (from `/pulls/{PR_NUMBER}/reviews/{REVIEW_ID}`):**
 

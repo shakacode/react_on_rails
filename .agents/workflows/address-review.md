@@ -198,7 +198,7 @@ Execution flow when terminal access is available:
    - Users can chain actions (e.g., `f+i` then `r7-9`).
    - Except for `a`, reply to each addressed review comment:
      - Issue comments: `gh api repos/${REPO}/issues/${PR_NUMBER}/comments -X POST -f body="<response>"`
-     - Review comment replies: `gh api repos/${REPO}/pulls/${PR_NUMBER}/comments/${COMMENT_ID}/replies -X POST -f body="<response>"`
+     - Review comment replies: use the selected item's review comment id, not the parsed input `COMMENT_ID`: `gh api repos/${REPO}/pulls/${PR_NUMBER}/comments/${REVIEW_COMMENT_ID}/replies -X POST -f body="<response>"`
      - Review summary body replies: `gh api repos/${REPO}/issues/${PR_NUMBER}/comments -X POST -f body="<response>"`
    - Resolve threads only when the issue is actually handled or explicitly declined with my approval:
      `gh api graphql -f query='mutation($threadId:ID!) { resolveReviewThread(input:{threadId:$threadId}) { thread { id isResolved } } }' -f threadId="<THREAD_ID>"`
