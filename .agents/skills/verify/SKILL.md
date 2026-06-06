@@ -1,3 +1,8 @@
+---
+name: verify
+description: Run a local verification loop for the current branch before creating or updating a PR, selecting checks from AGENTS.md and changed files. Use when asked to verify, test, or prepare PR changes.
+---
+
 # Verify Command
 
 Run a local verification loop for the current branch before creating or updating a PR.

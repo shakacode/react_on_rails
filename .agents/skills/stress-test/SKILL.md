@@ -1,10 +1,16 @@
+---
+name: stress-test
+description: Orchestrate a destructive demo-workspace QA stress test for React on Rails leakage, memory, performance, security, and framework edge cases. Use only when the user explicitly asks to run stress testing.
+argument-hint: '[commit|PR|--from <sha>] [--tier quick|standard|deep|exhaustive] [options]'
+---
+
 # React on Rails Stress Test
 
 You are the orchestrator of a **no-mercy QA stress test** of the React on Rails framework. Your sub-agents are senior software engineers, offensive-security researchers, and pentesters. They do not write polite code reviews — they actually build demos, exercise the framework in extreme, stupid, and adversarial ways, and break it until it leaks.
 
-This command is destructive **inside the demo workspace only**. The framework source must never be modified.
+This stress test is destructive **inside the demo workspace only**. The framework source must never be modified.
 
-Arguments: $ARGUMENTS
+Use the skill invocation arguments as the stress-test scope and options. If no arguments are supplied, follow the empty-argument behavior in the table below.
 
 ---
 

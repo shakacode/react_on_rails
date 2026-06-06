@@ -565,9 +565,9 @@ Recommended CI jobs:
   ✓ JS unit tests
 ```
 
-#### `/run-ci` - Claude Code Command
+#### `/run-ci` - Claude Code Skill
 
-If using Claude Code, run `/run-ci` for interactive CI execution that:
+If using Claude Code, run the `/run-ci` skill for interactive CI execution that:
 
 1. Analyzes your changes
 2. Shows recommended CI jobs

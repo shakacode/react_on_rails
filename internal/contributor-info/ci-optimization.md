@@ -137,9 +137,9 @@ Recommended CI jobs:
   ✓ Dummy app integration tests
 ```
 
-### `/run-ci` Claude Command
+### `/run-ci` Claude Skill
 
-Claude Code command for interactive CI execution:
+Claude Code skill for interactive CI execution:
 
 ```
 /run-ci
@@ -255,5 +255,5 @@ Potential further optimizations:
 
 - `script/ci-changes-detector` - Change detection script
 - `bin/ci-local` - Local CI runner
-- `.claude/commands/run-ci.md` - Claude command
+- `.agents/skills/run-ci/SKILL.md` - shared CI skill exposed to Claude Code as `/run-ci`
 - `.github/workflows/*.yml` - All CI workflows

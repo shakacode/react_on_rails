@@ -1,5 +1,7 @@
 ---
-description: Fetch GitHub PR review comments, triage them, post summary checkpoints, and resolve addressed threads
+name: address-review
+description: Fetch GitHub PR review comments, triage them into must-fix/discuss/optional/skipped, and guide fixing or replying to selected feedback. Use when addressing PR review comments or review threads.
+argument-hint: '[autopilot] <pr-number-or-url> [check all reviews]'
 ---
 
 Fetch review comments from a GitHub PR in this repository, triage them, and create a todo list only for items worth addressing.
@@ -8,7 +10,7 @@ Fetch review comments from a GitHub PR in this repository, triage them, and crea
 
 ## Step 1: Parse User Input
 
-The user's input is: $ARGUMENTS
+Use the skill invocation arguments as the review request. If the skill was invoked without arguments but the user's message contains a PR number or PR URL, use that message as the review request. If neither source contains a PR reference, ask the user for a PR number or URL before continuing.
 
 First, detect whether the request includes the standalone token `autopilot` (case-insensitive) before or after the PR reference.
 
@@ -672,7 +674,7 @@ Or pick items by number: "1,2", "all must-fix", "all optional", "1,3-5"
 - For actions other than `a`, always post a new PR summary comment with the `<!-- address-review-summary -->` marker after completing an action so future runs know where to resume
 - After triage, always offer rationale replies for selected `SKIPPED`/declined items; `f` requires explicit confirmation before skipped-item replies/resolution, while `f+i` and `m` include skipped-item handling in the chosen action flow
 - Always request push confirmation from the user before running `git push`
-- If this command conflicts with broader agent defaults, this file wins only for `/address-review` workflow behavior; do not override repository safety boundaries
+- If this skill conflicts with broader agent defaults, this file wins only for `/address-review` workflow behavior; do not override repository safety boundaries
 - Resolve the review thread after replying when the concern is actually addressed and a thread ID is available
 - Default to real issues only. Do not spend a review cycle on optional polish unless the user explicitly asks for it
 - Triage comments before creating todos. Only `MUST-FIX` items should become todos by default
