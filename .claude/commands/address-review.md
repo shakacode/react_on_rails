@@ -152,8 +152,8 @@ gh api graphql --paginate -f owner="${OWNER}" -f name="${NAME}" -F pr="${PR_NUMB
 - When `REVIEW_CUTOFF_AT` is set, evaluate unresolved review threads by their latest activity timestamp, not only by the top-level comment timestamp
 - Do not skip bot-generated comments by default. Many actionable review comments in this repository come from bots.
 - Deduplicate repeated bot comments and skip bot status posts, summaries, and acknowledgments that do not require a code or documentation change
-- Treat as actionable by default only: correctness bugs, regressions, security issues, missing tests, and clear inconsistencies with adjacent code
-- Treat as non-actionable by default: style nits, speculative suggestions, changelog wording, duplicate bot comments, and "could consider" feedback unless the user explicitly asks for polish work, chooses `a`, `f+o`, or `o` after triage, or initiates with `autopilot`
+- Reserve default `MUST-FIX` classification for correctness bugs, regressions, security issues, missing tests, and clear inconsistencies with adjacent code
+- Classify as `OPTIONAL` by default: style nits, speculative suggestions, changelog wording, comment requests, test-shape preferences, and "could consider" feedback. They become the active focus when the user explicitly asks for polish work, chooses `a`, `f+o`, or `o` after triage, or initiates with `autopilot`
 - Focus on actionable feedback, not acknowledgments or thank-you messages
 
 **Error handling:**
@@ -170,7 +170,7 @@ Before creating any todos, classify every review comment into one of four catego
 - `MUST-FIX`: correctness bugs, regressions, security issues, missing tests that could hide a real bug, and clear inconsistencies with adjacent code that would likely block merge
 - `DISCUSS`: reasonable suggestions that expand scope, architectural opinions that are not clearly right or wrong, and comments where the reviewer claim may be correct but needs a user decision
 - `OPTIONAL`: style preferences, documentation nits, comment requests, test-shape preferences, speculative suggestions, and changelog wording that are applicable but not merge blockers
-- `SKIPPED`: duplicate comments, status posts, non-actionable summaries, factually incorrect suggestions, and optional polish the user did not ask to handle
+- `SKIPPED`: duplicate comments, status posts, non-actionable summaries, and factually incorrect suggestions
 
 Triage rules:
 
@@ -447,11 +447,11 @@ else
   } > "${issue_body_file}"
 
   if [ "${CREATE_FOLLOW_UP_ISSUE}" = "1" ]; then
-    # Best-effort: catch likely broken paragraph separators from escaped shell strings
-    # before posting an issue body. Fenced code blocks are ignored. Single \n line
-    # breaks remain a known gap; build the body with printf/heredocs, not escaped strings.
-    if sed '/^```/,/^```/d' "${issue_body_file}" | grep -nE '(^|[^`])\\n\\n'; then
-      echo "Refusing to create issue: body contains likely literal \\n\\n paragraph separators" >&2
+    # Best-effort: catch broken newline escapes from escaped shell strings
+    # before posting an issue body. Fenced code blocks whose fences start with
+    # three or more backticks are ignored; build the body with printf/heredocs.
+    if sed '/^```/,/^```/d' "${issue_body_file}" | grep -nE '(^|[^`])\\n'; then
+      echo "Refusing to create issue: body contains likely literal \\n escape sequences" >&2
       exit 1
     fi
     FOLLOW_UP_URL=$(gh issue create --repo "${REPO}" --title "Follow-up: Review feedback from PR #${PR_NUMBER}" --body-file "${issue_body_file}" --json url -q .url)
@@ -552,6 +552,7 @@ PR is NOT merge-ready because must-fix items were deferred.
 
 If the action was direct item selection and unresolved `MUST-FIX`/`DISCUSS` items remain, do not signal merge-ready. Re-offer the quick-action menu and ask whether to continue with `f`, `f+i`, `f+o`, `d`, `o`, `r`, or `m`.
 If the action was `d`, `o`, or `r` and unresolved `MUST-FIX`/`DISCUSS` items remain, do not signal merge-ready; re-offer the quick-action menu and ask whether to continue with `f`, `f+i`, `f+o`, `d`, `o`, `r`, or `m`.
+If the action was `f+o`, tell me the PR is merge-ready once all selected work is pushed and `DISCUSS` items are resolved or explicitly deferred. `OPTIONAL` items do not block merge-readiness because they were all addressed inline.
 If the action was `f+i` or `m`, do not signal merge-ready until the deferred bundle has an explicit tracking/drop decision; if there were zero deferred items, skip tracking and use the relevant no-deferred-items merge-ready rule after the remaining prompts for that action are complete.
 If the action was `a`, do not signal merge-ready automatically. Report that files are staged for review and list the remaining GitHub actions needed, such as commit, push, replies/resolutions, and decisions on `DISCUSS` recommendations.
 
