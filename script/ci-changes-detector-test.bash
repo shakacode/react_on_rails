@@ -277,6 +277,86 @@ test_agent_tooling_changes_are_non_runtime_only() {
   assert_contains "$out" '"benchmarks_changed": false' "agent tooling output"
 }
 
+# Regression for PR #3697 (the exact file set): a CI-infrastructure PR — a
+# suite-specific workflow YAML plus the detector's own test harness — must still
+# run the relevant TEST suites to validate the change, but must NOT run any
+# benchmark suite. CI plumbing can't move runtime performance, so a Bencher run
+# is noise. The script/ harness lands in the CI-infra arm (all tests, no bench),
+# and pro-integration-tests.yml runs pro dummy tests but is guarded out of the
+# BENCH_* flags.
+test_ci_infrastructure_only_change_runs_tests_but_skips_benchmarks() {
+  setup_repo
+  mkdir -p .github/workflows script
+  printf 'name: Pro integration\non: [pull_request]\n' > .github/workflows/pro-integration-tests.yml
+  printf '# detector test harness tweak\n' >> script/ci-changes-detector-test.bash
+  commit_change "ci: fix pro dummy integration gating"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"docs_only": false' "ci infra output"
+  assert_contains "$out" '"non_runtime_only": false' "ci infra output"
+  # Tests still run to validate the CI change (script/ forces the full suite,
+  # pro-integration-tests.yml independently requests pro dummy tests) ...
+  assert_contains "$out" '"run_ruby_tests": true' "ci infra output"
+  assert_contains "$out" '"run_pro_dummy_tests": true' "ci infra output"
+  assert_contains "$out" '"run_pro_node_renderer_tests": true' "ci infra output"
+  # ... but every benchmark suite is off.
+  assert_contains "$out" '"run_core_benchmarks": false' "ci infra output"
+  assert_contains "$out" '"run_pro_benchmarks": false' "ci infra output"
+  assert_contains "$out" '"run_pro_node_renderer_benchmarks": false' "ci infra output"
+}
+
+# A suite-specific workflow YAML on its own runs that suite's TESTS (preserving
+# the targeted-CI optimization) but no benchmark — editing the workflow can't
+# move performance. This is the part of #3697 that the CI-infra arm doesn't cover.
+test_suite_workflow_file_runs_its_tests_but_no_benchmark() {
+  setup_repo
+  mkdir -p .github/workflows
+  printf 'name: Pro integration\non: [pull_request]\n' > .github/workflows/pro-integration-tests.yml
+  commit_change "tweak pro integration workflow"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"run_pro_dummy_tests": true' "workflow-only output"
+  assert_contains "$out" '"run_pro_benchmarks": false' "workflow-only output"
+  assert_contains "$out" '"run_pro_node_renderer_benchmarks": false' "workflow-only output"
+}
+
+# A CI-infra change mixed with a real runtime-source change DOES benchmark: the
+# genuine source edit sets the BENCH_* flags the workflow/script changes don't.
+test_ci_infra_plus_runtime_source_still_benchmarks() {
+  setup_repo
+  mkdir -p .github/workflows
+  printf 'name: Pro integration\non: [pull_request]\n' > .github/workflows/pro-integration-tests.yml
+  # A genuine executable edit (string value change, not a comment) to core gem code.
+  perl -0pi -e 's/"ok"/"changed"/' react_on_rails/lib/react_on_rails/example.rb
+  commit_change "ci tweak plus real source change"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"non_runtime_only": false' "mixed output"
+  assert_contains "$out" '"run_ruby_tests": true' "mixed output"
+  # Core gem source underlies all three benchmark suites.
+  assert_contains "$out" '"run_core_benchmarks": true' "mixed output"
+  assert_contains "$out" '"run_pro_benchmarks": true' "mixed output"
+  assert_contains "$out" '"run_pro_node_renderer_benchmarks": true' "mixed output"
+}
+
+# Genuine node-renderer package source must benchmark the node-renderer suite —
+# the case the spurious #3697 run pretended to cover.
+test_node_renderer_source_change_runs_node_renderer_benchmark() {
+  setup_repo
+  printf 'export const x = 1;\n' > packages/react-on-rails-pro-node-renderer/src/example.ts
+  commit_change "node renderer source change"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"run_pro_node_renderer_benchmarks": true' "node renderer output"
+  assert_contains "$out" '"run_pro_benchmarks": true' "node renderer output"
+  # Node renderer changes don't touch the core suite.
+  assert_contains "$out" '"run_core_benchmarks": false' "node renderer output"
+}
+
 test_ruby_comment_only_change_skips_heavy_tests_but_keeps_lint() {
   setup_repo
   perl -0pi -e 's/class Example/class Example\n    # Explain the fixture./' \
@@ -702,6 +782,10 @@ run_test test_internal_non_markdown_docs_are_non_runtime_only
 run_test test_issue_template_changes_are_non_runtime_only
 run_test test_docs_pr_with_internal_and_issue_template_yaml_is_non_runtime_only
 run_test test_agent_tooling_changes_are_non_runtime_only
+run_test test_ci_infrastructure_only_change_runs_tests_but_skips_benchmarks
+run_test test_suite_workflow_file_runs_its_tests_but_no_benchmark
+run_test test_ci_infra_plus_runtime_source_still_benchmarks
+run_test test_node_renderer_source_change_runs_node_renderer_benchmark
 run_test test_ruby_comment_only_change_skips_heavy_tests_but_keeps_lint
 run_test test_ruby_block_comment_only_change_skips_heavy_tests_but_keeps_lint
 run_test test_wrapping_ruby_code_with_block_comment_delimiters_remains_runtime_affecting
