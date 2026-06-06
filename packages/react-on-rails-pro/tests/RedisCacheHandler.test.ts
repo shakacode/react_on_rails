@@ -87,7 +87,7 @@ describe('RedisCacheHandler', () => {
     test('returns null for a truncated entry (chunk length exceeds buffer)', async () => {
       const blob = Buffer.alloc(20);
       blob.writeDoubleBE(Date.now(), 0);
-      blob.writeFloatBE(30, 8);
+      blob.writeInt32BE(30, 8);
       blob.writeUInt32BE(9999, 12); // chunk length far exceeds remaining bytes
       mockRedisInstance.getBuffer.mockResolvedValue(blob);
       expect(await handler.get('truncated')).toBeNull();

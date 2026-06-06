@@ -65,7 +65,10 @@ export class TieredCacheHandler implements CacheHandler {
     });
 
     const l1Entry = this.applyL1Ttl(entry);
-    await Promise.all([l2Write, this.l1.set(key, l1Entry)]);
+    const l1Write = this.l1.set(key, l1Entry).catch((err: unknown) => {
+      console.error('TieredCacheHandler: L1 set failed', err);
+    });
+    await Promise.all([l2Write, l1Write]);
   }
 
   private applyL1Ttl(entry: CacheEntry): CacheEntry {
