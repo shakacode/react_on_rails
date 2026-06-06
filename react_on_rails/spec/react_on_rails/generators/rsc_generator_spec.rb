@@ -70,6 +70,10 @@ describe RscGenerator, type: :generator do
         expect(content).to include("Run bin/shakapacker-precompile-hook before bin/shakapacker.")
         expect(content).to include("process.env.REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH")
         expect(content).to include("defaultServerComponentRegistrationEntry")
+        expect(content).to include("validServerComponentRegistrationEntry")
+        expect(content).to include("basename(entryPath) !== expectedServerComponentRegistrationEntry")
+        expect(content).to include("statSync(entryPath).isFile()")
+        expect(content).to include("excludedRegistrationEntryPathComponents")
       end
     end
 
@@ -3354,6 +3358,10 @@ describe RscGenerator, type: :generator do
         # A configured registration entry path overrides the default staleness target.
         expect(content).to include("const configuredRegistrationEntry")
         expect(content).to include("defaultServerComponentRegistrationEntry")
+        expect(content).to include("validServerComponentRegistrationEntry")
+        expect(content).to include("basename(entryPath) !== expectedServerComponentRegistrationEntry")
+        expect(content).to include("statSync(entryPath).isFile()")
+        expect(content).to include("excludedRegistrationEntryPathComponents")
         configured_refs_index = content.index("if (configuredRefsJson)")
         discovery_build_index = content.index("if (process.env.RSC_REFERENCE_DISCOVERY_BUILD")
         default_refs_index = content.index("if (existsSync(defaultRefsJson))")

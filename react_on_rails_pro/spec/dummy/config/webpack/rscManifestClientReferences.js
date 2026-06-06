@@ -46,12 +46,54 @@ const DEFAULT_SERVER_COMPONENT_REGISTRATION_ENTRY = path.resolve(
   config.source_entry_path,
   '../generated/server-component-registration-entry.js',
 );
+const EXPECTED_SERVER_COMPONENT_REGISTRATION_ENTRY = 'server-component-registration-entry.js';
+const EXCLUDED_REGISTRATION_ENTRY_PATH_COMPONENTS = [
+  '.git',
+  'log',
+  'node_modules',
+  'public',
+  'spec',
+  'test',
+  'tmp',
+  'vendor',
+];
+
+function registrationEntryPathComponents(entryPath) {
+  const rootRelativePath = path.relative(process.cwd(), entryPath);
+  const scopedPath =
+    rootRelativePath &&
+    rootRelativePath !== '..' &&
+    !rootRelativePath.startsWith('../') &&
+    !rootRelativePath.startsWith('..\\') &&
+    !path.isAbsolute(rootRelativePath)
+      ? rootRelativePath
+      : entryPath;
+
+  return scopedPath.split(/[\\/]+/).filter(Boolean);
+}
+
+function validServerComponentRegistrationEntry(entryPath) {
+  if (path.basename(entryPath) !== EXPECTED_SERVER_COMPONENT_REGISTRATION_ENTRY) return false;
+  if (
+    registrationEntryPathComponents(entryPath).some((component) =>
+      EXCLUDED_REGISTRATION_ENTRY_PATH_COMPONENTS.includes(component),
+    )
+  ) {
+    return false;
+  }
+
+  try {
+    return fs.statSync(entryPath).isFile();
+  } catch {
+    return false;
+  }
+}
 
 function serverComponentRegistrationEntry() {
   const configuredRegistrationEntry = process.env.REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH;
   if (configuredRegistrationEntry) {
     const configuredEntry = path.resolve(configuredRegistrationEntry);
-    if (fs.existsSync(configuredEntry)) return configuredEntry;
+    if (validServerComponentRegistrationEntry(configuredEntry)) return configuredEntry;
   }
 
   return DEFAULT_SERVER_COMPONENT_REGISTRATION_ENTRY;
