@@ -720,6 +720,10 @@ module ReactOnRails
     end
 
     def component_name_to_path(paths)
+      duplicate_name, duplicate_paths = paths.group_by { |path| component_name(path) }
+                                             .find { |_name, grouped_paths| grouped_paths.size > 1 }
+      raise_duplicate_component_name(duplicate_name, duplicate_paths) if duplicate_name
+
       paths.to_h { |path| [component_name(path), path] }
     end
 
@@ -832,6 +836,24 @@ module ReactOnRails
       msg = <<~MSG
         **ERROR** ReactOnRails: Component '#{component_name}' is missing a client specific file. For more \
         information, please see https://reactonrails.com/docs/core-concepts/auto-bundling/
+      MSG
+
+      raise ReactOnRails::Error, msg
+    end
+
+    def raise_duplicate_component_name(name, paths)
+      error_header = "**ERROR** ReactOnRails: Multiple auto-bundled component files resolve to the same public " \
+                     "component name \"#{name}\":"
+      formatted_paths = paths.map { |path| "  - #{path}" }.join("\n")
+
+      msg = <<~MSG
+        #{error_header}
+
+        #{formatted_paths}
+
+        React on Rails auto-bundling currently uses one public component name and one generated pack path per derived \
+        component name.
+        Rename one of these component files to have a unique base name, such as Admin#{name} or Public#{name}.
       MSG
 
       raise ReactOnRails::Error, msg
