@@ -17,10 +17,10 @@ The goal is not to copy React on Rails blindly. The goal is to copy the reusable
 Copy these when the target repo uses Claude Code:
 
 - [.claude/commands/address-review.md](../../.claude/commands/address-review.md) - Claude slash command implementation.
-- [.claude/prompts/address-review.md](../../.claude/prompts/address-review.md) - optional reusable prompt form; copy it only after verifying it matches the current `.agents/workflows/address-review.md` policy.
+- [.claude/prompts/address-review.md](../../.claude/prompts/address-review.md) - optional compatibility pointer to the canonical reusable prompt; copy it only if the target repo keeps Claude prompt aliases.
 - [.claude/skills/autoreview/SKILL.md](../../.claude/skills/autoreview/SKILL.md) - independent review skill used before commits, pushes, PRs, or merge readiness.
 
-Keep the Claude command and `.agents/workflows/address-review.md` behavior aligned. If the target repo also copies a reusable prompt file, verify it against the same policy before adoption. Tool syntax can differ; policy should not.
+Keep the Claude command and `.agents/workflows/address-review.md` behavior aligned. If the target repo also copies a reusable prompt file, make it point at the canonical shared workflow instead of carrying a second full workflow copy. Tool syntax can differ; policy should not.
 
 ### Optional CI command workflow
 
