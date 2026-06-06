@@ -48,6 +48,7 @@ jobs:
       non_runtime_only: ${{ steps.detect.outputs.non_runtime_only }}
       run_pro_lint: ${{ steps.detect.outputs.run_pro_lint }}
       run_pro_tests: ${{ steps.detect.outputs.run_pro_tests }}
+      run_pro_dummy_tests: ${{ steps.detect.outputs.run_pro_dummy_tests }}
       has_full_ci_label: ${{ steps.check-label.outputs.result }}
     steps:
       - uses: actions/checkout@v4
@@ -66,6 +67,7 @@ jobs:
             {
               echo "run_pro_lint=true"
               echo "run_pro_tests=true"
+              echo "run_pro_dummy_tests=true"
               echo "docs_only=false"
               echo "non_runtime_only=false"
             } >> "$GITHUB_OUTPUT"
@@ -93,7 +95,8 @@ jobs:
       ) && (
         github.ref == 'refs/heads/main' ||
         github.event_name == 'workflow_dispatch' ||
-        needs.detect-changes.outputs.run_pro_tests == 'true'
+        needs.detect-changes.outputs.run_pro_tests == 'true' ||
+        needs.detect-changes.outputs.run_pro_dummy_tests == 'true'
       )
     runs-on: ubuntu-22.04
     env:
@@ -193,7 +196,8 @@ jobs:
       ) && (
         github.ref == 'refs/heads/main' ||
         github.event_name == 'workflow_dispatch' ||
-        needs.detect-changes.outputs.run_pro_tests == 'true'
+        needs.detect-changes.outputs.run_pro_tests == 'true' ||
+        needs.detect-changes.outputs.run_pro_dummy_tests == 'true'
       )
     runs-on: ubuntu-22.04
     env:
@@ -369,7 +373,8 @@ jobs:
       ) && (
         github.ref == 'refs/heads/main' ||
         github.event_name == 'workflow_dispatch' ||
-        needs.detect-changes.outputs.run_pro_tests == 'true'
+        needs.detect-changes.outputs.run_pro_tests == 'true' ||
+        needs.detect-changes.outputs.run_pro_dummy_tests == 'true'
       )
     runs-on: ubuntu-22.04
     env:

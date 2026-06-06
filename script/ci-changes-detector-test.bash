@@ -96,6 +96,7 @@ setup_repo() {
   mkdir -p react_on_rails/spec/react_on_rails
   mkdir -p react_on_rails/app/helpers
   mkdir -p react_on_rails_pro/app/controllers/react_on_rails_pro/rolling_deploy
+  mkdir -p react_on_rails_pro/spec/dummy/spec/requests
   mkdir -p benchmarks/lib
   cat > docs/guide.md <<'DOC'
 # Guide
@@ -155,6 +156,13 @@ module ReactOnRailsPro
         "ok"
       end
     end
+  end
+end
+RUBY
+  cat > react_on_rails_pro/spec/dummy/spec/requests/posts_page_spec.rb <<'RUBY'
+RSpec.describe "posts page" do
+  it "renders" do
+    expect(true).to be(true)
   end
 end
 RUBY
@@ -454,6 +462,17 @@ test_pro_app_source_change_runs_pro_tests_only() {
   assert_contains "$out" '"run_js_tests": false' "pro app source output"
 }
 
+test_pro_dummy_only_change_runs_pro_dummy_tests_without_pro_unit_tests() {
+  setup_repo
+  perl -0pi -e 's/renders/renders seeded data/' react_on_rails_pro/spec/dummy/spec/requests/posts_page_spec.rb
+  commit_change "pro dummy spec"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"run_pro_dummy_tests": true' "pro dummy output"
+  assert_contains "$out" '"run_pro_tests": false' "pro dummy output"
+}
+
 test_pro_node_renderer_comment_only_change_runs_pro_lint_only() {
   setup_repo
   perl -0pi -e 's/export function/\/\/ Explains the Pro node renderer fixture.\nexport function/' \
@@ -674,6 +693,7 @@ run_test test_core_app_comment_only_change_skips_heavy_tests_but_keeps_lint
 run_test test_core_app_source_change_remains_runtime_affecting
 run_test test_pro_app_comment_only_change_runs_pro_lint_only
 run_test test_pro_app_source_change_runs_pro_tests_only
+run_test test_pro_dummy_only_change_runs_pro_dummy_tests_without_pro_unit_tests
 run_test test_pro_node_renderer_comment_only_change_runs_pro_lint_only
 run_test test_mixed_comment_and_code_change_remains_runtime_affecting
 run_test test_ruby_magic_comment_remains_runtime_affecting
