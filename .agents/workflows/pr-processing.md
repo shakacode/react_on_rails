@@ -124,7 +124,7 @@ Use the `+ci-*` PR comment commands from the CI command workflow for full-CI dec
 
 ## Review Comment Handling
 
-For Claude Code, use `/address-review`. For Codex or other assistants, use `.agents/workflows/address-review.md`. The default stance is:
+Use `.agents/skills/address-review/SKILL.md` when skills are available; Claude Code exposes the same workflow as `/address-review`. For assistants without skill support, use `.agents/workflows/address-review.md`. The default stance is:
 
 - `MUST-FIX`: fix in the PR.
 - `DISCUSS`: ask the user or make a narrow, evidence-backed decision.

@@ -1,10 +1,16 @@
+---
+name: update-changelog
+description: Analyze merged PRs and update CHANGELOG.md, optionally stamping release, rc, beta, or explicit version headers. Use before releases or when changelog entries are missing.
+argument-hint: '[release|rc|beta|version]'
+---
+
 # Update Changelog
 
 You are helping to add an entry to the CHANGELOG.md file for the React on Rails project.
 
 ## Arguments
 
-This command accepts an optional argument: `$ARGUMENTS`
+This skill accepts an optional mode argument from the invocation text:
 
 - **No argument** (`/update-changelog`): Add entries to `[Unreleased]` without stamping a version header. Use this during development.
 - **`release`** (`/update-changelog release`): Add entries and stamp a version header. Auto-compute the next version based on changes (breaking -> major, added features -> minor, fixes -> patch). Then `rake release` (with no args) will pick up this version automatically.
@@ -14,7 +20,7 @@ This command accepts an optional argument: `$ARGUMENTS`
 
 ## When to Use This
 
-This command serves three use cases at different points in the release lifecycle:
+This skill serves three use cases at different points in the release lifecycle:
 
 **During development** -- Add entries to `[Unreleased]` as PRs merge:
 
@@ -25,13 +31,13 @@ This command serves three use cases at different points in the release lifecycle
 
 - Run `/update-changelog release` (or `rc`, `beta`, or an explicit version like `16.5.0.rc.10`) to add entries AND stamp the version header
 - The version is auto-computed from changes (breaking -> major, features -> minor, fixes -> patch) — skipped when an explicit version is provided
-- The command automatically commits, pushes, and opens a PR — review and merge it
+- The skill automatically commits, pushes, and opens a PR — review and merge it
 - Then run `rake release` (no args needed -- it reads the version from CHANGELOG.md)
 - The release task automatically creates a GitHub release from the changelog section
 
 **After a release you forgot to update the changelog for** -- Catch-up mode:
 
-- The command can retroactively find commits between tags and add missing entries
+- The skill can retroactively find commits between tags and add missing entries
 - Ask the user whether to stamp a version header or add to `[Unreleased]`
 
 ### Why changelog comes BEFORE the release

@@ -19,7 +19,7 @@ clean" loop on top.
   it, such as `/code-review` or `/code-review ultra`. Treat these as environment-specific, not
   repo-local commands.
 - For PR-comment triage (reacting to review comments already on a GitHub PR), use
-  `/address-review` in Claude Code or `.agents/workflows/address-review.md` outside Claude Code.
+  `.agents/skills/address-review/SKILL.md`; Claude Code exposes it as `/address-review`.
 
 Use when:
 

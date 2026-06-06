@@ -16,11 +16,12 @@ The goal is not to copy React on Rails blindly. The goal is to copy the reusable
 
 Copy these when the target repo uses Claude Code:
 
-- [.claude/commands/address-review.md](../../.claude/commands/address-review.md) - Claude slash command implementation.
+- [.agents/skills/address-review/SKILL.md](../../.agents/skills/address-review/SKILL.md) - shared address-review skill exposed to Claude Code as `/address-review`.
 - [.claude/prompts/address-review.md](../../.claude/prompts/address-review.md) - optional compatibility pointer to the canonical reusable prompt; copy it only if the target repo keeps Claude prompt aliases.
-- [.claude/skills/autoreview/SKILL.md](../../.claude/skills/autoreview/SKILL.md) - independent review skill used before commits, pushes, PRs, or merge readiness.
+- [.agents/skills/autoreview/SKILL.md](../../.agents/skills/autoreview/SKILL.md) - independent review skill used before commits, pushes, PRs, or merge readiness.
+- `.claude/skills -> ../.agents/skills` - symlink that lets Claude Code load the shared agent skills.
 
-Keep the Claude command and `.agents/workflows/address-review.md` behavior aligned. If the target repo also copies a reusable prompt file, make it point at the canonical shared workflow instead of carrying a second full workflow copy. Tool syntax can differ; policy should not.
+Keep the shared skill and `.agents/workflows/address-review.md` behavior aligned. If the target repo also copies a reusable prompt file, make it point at the canonical shared workflow instead of carrying a second full workflow copy. Tool syntax can differ; policy should not.
 
 ### Optional CI command workflow
 
@@ -109,7 +110,7 @@ When changing policy:
 
 1. Update `AGENTS.md`.
 2. Update `.agents/workflows/pr-processing.md` and `.agents/workflows/address-review.md`.
-3. Update Claude command or prompt files if they exist.
+3. Update Claude skill or prompt files if they exist.
 4. Run Markdown formatting and link checks.
 5. Do one dry-run triage or PR-processing pass before declaring the copied workflow ready.
 
@@ -120,7 +121,7 @@ When changing policy:
 
 - add canonical agent instructions in `AGENTS.md`
 - add reusable PR processing and address-review workflows under `.agents/workflows/`
-- add Claude command/prompt support for the same review flow
+- add Claude skill/prompt support for the same review flow
 - document local validation and full-CI escalation rules for this repository
 
 ## Validation

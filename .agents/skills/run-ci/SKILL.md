@@ -1,10 +1,20 @@
+---
+name: run-ci
+description: Analyze current branch changes with the repo CI detector and run user-selected local CI jobs. Use when the user asks to run, reproduce, or choose local CI checks.
+argument-hint: '[base-ref]'
+---
+
 # Run CI Command
 
 Analyze the current branch changes and run appropriate CI checks locally.
 
+## Argument Handling
+
+This skill accepts an optional base-ref argument. If provided, use it instead of `origin/main` for both `script/ci-changes-detector` and `bin/ci-local`; otherwise default to `origin/main`.
+
 ## Instructions
 
-1. First, run `script/ci-changes-detector origin/main` to analyze what changed
+1. First, run `script/ci-changes-detector origin/main` to analyze what changed, substituting the optional base-ref argument when supplied
 2. Show the user what the detector recommends
 3. Ask the user if they want to:
    - Run the recommended CI jobs (`bin/ci-local`)
