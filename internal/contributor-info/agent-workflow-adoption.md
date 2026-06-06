@@ -9,7 +9,7 @@ The goal is not to copy React on Rails blindly. The goal is to copy the reusable
 ### Required baseline
 
 - [AGENTS.md](../../AGENTS.md) - canonical agent entry point and repository policy.
-- [.agents/workflows/pr-processing.md](../../.agents/workflows/pr-processing.md) - default flow for assigned issues, existing PRs, review-fix passes, and merge queues.
+- [.agents/workflows/pr-processing.md](../../.agents/workflows/pr-processing.md) - default flow for assigned issues, existing PRs, review-fix passes, and multi-PR landing plans.
 - [.agents/workflows/address-review.md](../../.agents/workflows/address-review.md) - generic non-Claude review-comment triage and fixing workflow.
 
 ### Claude support

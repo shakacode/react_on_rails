@@ -1,13 +1,13 @@
 # PR Processing Workflow
 
-Use this workflow when an agent is assigned an issue, an existing PR, a PR review-fix pass, or a multi-PR merge queue. The goal is to reduce review turns, CI churn, and follow-up issue noise by doing more local work before asking GitHub to spend reviewer or runner time.
+Use this workflow when an agent is assigned an issue, an existing PR, a PR review-fix pass, or a multi-PR landing plan. The goal is to reduce review turns, CI churn, and follow-up issue noise by doing more local work before asking GitHub to spend reviewer or runner time.
 
 ## Default Operating Model
 
 1. Resolve the work item:
    - Issue: fetch the issue body, comments, linked PRs, and acceptance criteria.
    - PR: fetch the PR body, changed files, review decision, checks, labels, unresolved review threads, and recent comments. Treat an assigned PR like an assigned issue whose implementation has already started; the same value, scope, testing, and readiness rules still apply.
-   - Merge queue: build a dependency map first; exclude WIP/draft PRs unless the user explicitly includes them.
+   - Multi-PR landing plan: build a dependency map first; exclude WIP/draft PRs unless the user explicitly includes them.
 2. Validate that the work is worth doing:
    - Confirm the issue or PR describes a real project benefit, not just speculative polish or churn.
    - Push back on poorly defined, low-value, or harmful requests before creating a PR.
@@ -167,9 +167,9 @@ Also verify:
 
 If approved and green but not merging immediately, use the repository's standard `ready-to-merge` label when available.
 
-## Multi-PR Merge Queue
+## Multi-PR Landing Plan
 
-For a queue like an open-PR merge plan:
+For a manual multi-PR landing plan:
 
 1. Exclude WIP/draft PRs unless the user opts them in.
 2. Build a dependency order from PR bodies, stacked branches, changed files, and review comments.
