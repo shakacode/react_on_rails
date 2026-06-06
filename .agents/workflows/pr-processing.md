@@ -41,7 +41,7 @@ Fetch unresolved review threads when review comments matter:
 ```bash
 OWNER=${REPO%/*}
 NAME=${REPO#*/}
-gh api graphql --paginate -f owner="${OWNER}" -f name="${NAME}" -F pr=<PR_NUMBER> -f query='query($owner:String!, $name:String!, $pr:Int!, $endCursor:String) { repository(owner:$owner, name:$name) { pullRequest(number:$pr) { reviewThreads(first:100, after:$endCursor) { nodes { id isResolved comments(first:100) { nodes { id databaseId body author { login } url path line } } } pageInfo { hasNextPage endCursor } } } } } }'
+gh api graphql --paginate -f owner="${OWNER}" -f name="${NAME}" -F pr=<PR_NUMBER> -f query='query($owner:String!, $name:String!, $pr:Int!, $endCursor:String) { repository(owner:$owner, name:$name) { pullRequest(number:$pr) { reviewThreads(first:100, after:$endCursor) { nodes { id isResolved comments(first:100) { nodes { id databaseId body author { login } url path line } } } pageInfo { hasNextPage endCursor } } } } }'
 ```
 
 For an issue, gather enough context to avoid duplicate work:
