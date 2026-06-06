@@ -101,6 +101,7 @@ The user should not need to write a long launch prompt. If the request is short,
 - Concurrency: one machine, multiple machines, or single-threaded.
 - Lane split: exact per-machine list, odd/even, labels, area, owner, or another explicit partition.
 - Permissions: whether the current session can run without blocking worker approval prompts.
+- Question handling: labels or comments to use for blocking questions, plus where non-blocking decisions should be recorded.
 - Completion states: usually merged PR, open PR waiting on checks/review, blocked needing user input, or no-PR with evidence.
 
 ### Permission Preflight
@@ -147,8 +148,30 @@ Mode: spawn worker subagents only after the target list and lane split are confi
 
 For issue targets, create one focused branch and PR unless exact same-file overlap makes a bundle safer. Start new issue branches from updated origin/main. For existing PR, review-fix, or merge-readiness targets, work on the existing PR head branch and do not create replacement PRs; if the branch cannot be updated safely, report the blocker. Follow local validation, self-review, CI backpressure, and merge-readiness gates.
 
+For blocking questions, stop work on that target, surface the question to the coordinator or maintainer, and mark the issue/PR with the agreed pending-question state. For non-blocking questions where you make a decision and continue, record the decision in the PR description before review or merge.
+
 Final state for every target must be one of: merged PR; open PR waiting on checks/review; blocked needing user input; or no-PR with an evidence-backed issue/PR comment.
 ```
+
+### Question And Decision Handling
+
+Classify every unresolved question before continuing:
+
+- **Blocking question**: the implementation, validation, or merge decision would be unsafe without maintainer input. Stop work on that target until answered. Subagents should return the blocking question to the coordinator instead of guessing. For multi-machine batches, post a structured issue or PR comment and, if the repo uses labels for this workflow, apply `codex-pending-question`.
+- **Non-blocking decision**: a reasonable local decision can be made without increasing merge risk. Continue work, but add a clearly formatted decision note to the PR description so later review across merged PRs can surface these items quickly.
+
+Suggested PR description section:
+
+```markdown
+## Codex Decision Log
+
+- **Non-blocking:** <question or fork in approach>
+  - **Decision:** <what was chosen>
+  - **Why:** <evidence or nearby pattern>
+  - **Review later:** <what a maintainer may want to revisit, or "None">
+```
+
+Before merge or final readiness, scan the PR description for the decision log and make sure each non-blocking decision is still accurate after review changes.
 
 ### Coordination State
 
