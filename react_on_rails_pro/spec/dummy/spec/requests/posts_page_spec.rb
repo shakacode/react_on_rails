@@ -129,6 +129,15 @@ RSpec.describe "Posts page", :server_rendering do
     expect(response.body).not_to include("Sentinel Post 2")
   end
 
+  it "clamps posts_count params without seeding benchmark-sized fixtures" do
+    expect(parsed_posts_page_posts_count(nil)).to eq(2)
+    expect(parsed_posts_page_posts_count("")).to eq(2)
+    expect(parsed_posts_page_posts_count("invalid")).to eq(2)
+    expect(parsed_posts_page_posts_count(-1)).to eq(0)
+    expect(parsed_posts_page_posts_count(1)).to eq(1)
+    expect(parsed_posts_page_posts_count(200)).to eq(100)
+  end
+
   it "returns 200 (not 500) when there are no posts to render" do
     Comment.delete_all
     Post.delete_all
@@ -157,5 +166,12 @@ RSpec.describe "Posts page", :server_rendering do
     allow(controller).to receive(:params).and_return(ActionController::Parameters.new(artificial_delay: value))
 
     controller.__send__(:posts_page_artificial_delay)
+  end
+
+  def parsed_posts_page_posts_count(value)
+    controller = PagesController.new
+    allow(controller).to receive(:params).and_return(ActionController::Parameters.new(posts_count: value))
+
+    controller.__send__(:posts_page_posts_count)
   end
 end
