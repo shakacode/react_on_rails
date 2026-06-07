@@ -129,6 +129,12 @@ test_normalize_base_ref_maps_zero_sha_to_origin_main() {
   assert_equals "origin/main" "$out" "zero SHA base ref"
 }
 
+test_normalize_base_ref_maps_short_zero_string_to_origin_main() {
+  local out
+  out="$(git_diff_base_normalize_base_ref "000")"
+  assert_equals "origin/main" "$out" "short zero string base ref"
+}
+
 test_normalize_base_ref_preserves_non_zero_ref() {
   local out
   out="$(git_diff_base_normalize_base_ref "origin/release")"
@@ -350,6 +356,35 @@ setup_repo_fixture() {
     || echo "  Warning: setup_repo_fixture: failed to fetch origin/main; some tests may fail unexpectedly" >&2
 }
 
+install_lefthook_fixture_scripts() {
+  local lefthook_source="$REPO_ROOT/bin/lefthook/get-changed-files"
+  local helper_source="$REPO_ROOT/script/lib/git-diff-base"
+
+  if [ ! -f "$lefthook_source" ]; then
+    fail "expected lefthook script at $lefthook_source"
+    return 1
+  fi
+
+  if [ ! -f "$helper_source" ]; then
+    fail "expected git-diff-base helper at $helper_source"
+    return 1
+  fi
+
+  mkdir -p bin/lefthook script/lib
+  ln -s "$lefthook_source" bin/lefthook/get-changed-files
+  ln -s "$helper_source" script/lib/git-diff-base
+
+  if [ ! -x bin/lefthook/get-changed-files ]; then
+    fail "lefthook fixture symlink is not executable"
+    return 1
+  fi
+
+  if [ ! -f script/lib/git-diff-base ]; then
+    fail "git-diff-base fixture symlink does not resolve"
+    return 1
+  fi
+}
+
 test_verify_ref_recognizes_existing_refs() {
   setup_repo_fixture full
   if ! git_diff_base_verify_ref HEAD; then
@@ -544,18 +579,29 @@ test_resolve_lenient_continues_after_initial_fetch_failure() {
     fail "lenient policy should succeed with cached history; stderr was: $(cat "$err_file")"
     return 1
   fi
+  assert_contains "$(cat "$err_file")" "continuing with cached local history" "lenient fetch warning"
   if ! git cat-file -e "$out^{commit}" 2>/dev/null; then
     fail "lenient path returned non-commit '$out'"
     return 1
   fi
 }
 
+test_lefthook_branch_defaults_to_origin_main() {
+  setup_repo_fixture full
+  install_lefthook_fixture_scripts || return 1
+
+  printf 'puts "changed"\n' > changed.rb
+  git add changed.rb
+  git commit -m "add changed ruby file" >/dev/null
+
+  local out
+  out="$(bin/lefthook/get-changed-files branch '\.rb$')"
+  assert_equals "changed.rb" "$out" "default lefthook branch changed files"
+}
+
 test_lefthook_branch_honors_base_ref() {
   setup_repo_fixture full
-
-  mkdir -p bin/lefthook script/lib
-  ln -s "$REPO_ROOT/bin/lefthook/get-changed-files" bin/lefthook/get-changed-files
-  ln -s "$REPO_ROOT/script/lib/git-diff-base" script/lib/git-diff-base
+  install_lefthook_fixture_scripts || return 1
 
   printf 'puts "release baseline"\n' > release_only.rb
   git add release_only.rb
@@ -662,6 +708,7 @@ ALL_TESTS=(
   test_remote_branch_rejects_non_origin
   test_normalize_base_ref_defaults_to_origin_main
   test_normalize_base_ref_maps_zero_sha_to_origin_main
+  test_normalize_base_ref_maps_short_zero_string_to_origin_main
   test_normalize_base_ref_preserves_non_zero_ref
   test_normalize_current_ref_defaults_to_head
   test_normalize_current_ref_preserves_explicit_ref
@@ -693,6 +740,7 @@ ALL_TESTS=(
   test_resolve_shallow_deepens_to_find_merge_base
   test_resolve_full_clone_missing_base_ref_errors
   test_resolve_lenient_continues_after_initial_fetch_failure
+  test_lefthook_branch_defaults_to_origin_main
   test_lefthook_branch_honors_base_ref
   test_resolve_unshallow_fallback_finds_merge_base
   test_resolve_logs_deepen_progress
