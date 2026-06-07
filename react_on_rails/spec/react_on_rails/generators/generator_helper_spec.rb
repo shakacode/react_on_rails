@@ -8,7 +8,7 @@ RSpec.describe GeneratorHelper, type: :generator do
   # The module is exercised in isolation here (without Thor::Shell),
   # so provide minimal shell methods used by generator helpers.
   def say(message = "", color = nil, force_new_line = nil)
-    say_calls << { message: message, color: color, force_new_line: force_new_line }
+    say_calls << { message:, color:, force_new_line: }
   end
 
   def say_calls
@@ -16,7 +16,7 @@ RSpec.describe GeneratorHelper, type: :generator do
   end
 
   def say_status(status, message, log_status = nil)
-    say_status_calls << { status: status, message: message, log_status: log_status }
+    say_status_calls << { status:, message:, log_status: }
   end
 
   def say_status_calls

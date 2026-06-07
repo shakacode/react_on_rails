@@ -44,8 +44,8 @@ module RendererHarness
       if opts[:smoke]
         apply_smoke_preset!(
           opts,
-          scenario_explicit: scenario_explicit,
-          duration_explicit: duration_explicit
+          scenario_explicit:,
+          duration_explicit:
         )
       end
       validate!(opts)

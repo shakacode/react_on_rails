@@ -189,7 +189,7 @@ describe ReactOnRailsHelper do
   end
 
   describe "#react_component" do
-    subject(:react_app) { react_component("App", props: props) }
+    subject(:react_app) { react_component("App", props:) }
 
     before { allow(SecureRandom).to receive(:uuid).and_return(0, 1, 2, 3) }
 
@@ -252,7 +252,7 @@ describe ReactOnRailsHelper do
       end
 
       it "merges clientProps into the component props JSON for client hydration" do
-        result = react_component("App", props: props, prerender: true)
+        result = react_component("App", props:, prerender: true)
 
         expect(result).to include('"name":"My Test Name"')
         expect(result).to include('"__tanstackRouterDehydratedState":{"url":"/products?category=tools"}')
@@ -329,14 +329,14 @@ describe ReactOnRailsHelper do
       allow(Rails.logger).to receive(:warn)
       ReactOnRails::Helper.reset_removed_immediate_hydration_warnings!
 
-      react_component("App", props: props, immediate_hydration: false)
-      react_component("App", props: props, immediate_hydration: false)
+      react_component("App", props:, immediate_hydration: false)
+      react_component("App", props:, immediate_hydration: false)
 
       expect(Rails.logger).to have_received(:warn).once.with(include("immediate_hydration"))
     end
 
     context "with 'random_dom_id' option set to false" do
-      subject(:react_app) { react_component("App", props: props, random_dom_id: false) }
+      subject(:react_app) { react_component("App", props:, random_dom_id: false) }
 
       let(:react_definition_script) do
         <<~SCRIPT
@@ -351,7 +351,7 @@ describe ReactOnRailsHelper do
     end
 
     context "with 'random_dom_id' option set to true" do
-      subject(:react_app) { react_component("App", props: props, random_dom_id: true) }
+      subject(:react_app) { react_component("App", props:, random_dom_id: true) }
 
       let(:react_definition_script) do
         <<~SCRIPT
@@ -366,7 +366,7 @@ describe ReactOnRailsHelper do
     end
 
     context "with 'random_dom_id' global" do
-      subject(:react_app) { react_component("App", props: props) }
+      subject(:react_app) { react_component("App", props:) }
 
       around do |example|
         ReactOnRails.configure { |config| config.random_dom_id = false }
@@ -387,7 +387,7 @@ describe ReactOnRailsHelper do
     end
 
     context "with 'id' option" do
-      subject(:react_app) { react_component("App", props: props, id: id) }
+      subject(:react_app) { react_component("App", props:, id:) }
 
       let(:id) { "shaka_div" }
 
@@ -462,7 +462,7 @@ describe ReactOnRailsHelper do
   end
 
   describe "#react_component_hash" do
-    subject(:react_app) { react_component_hash("App", props: props) }
+    subject(:react_app) { react_component_hash("App", props:) }
 
     let(:props) { { name: "My Test Name" } }
 
@@ -486,8 +486,8 @@ describe ReactOnRailsHelper do
       allow(Rails.logger).to receive(:warn)
       ReactOnRails::Helper.reset_removed_immediate_hydration_warnings!
 
-      react_component_hash("App", props: props, immediate_hydration: false)
-      react_component_hash("App", props: props, immediate_hydration: false)
+      react_component_hash("App", props:, immediate_hydration: false)
+      react_component_hash("App", props:, immediate_hydration: false)
 
       expect(Rails.logger).to have_received(:warn).once.with(include("immediate_hydration"))
     end
@@ -726,7 +726,7 @@ describe ReactOnRailsHelper do
   end
 
   describe "#redux_store" do
-    subject(:store) { redux_store("reduxStore", props: props) }
+    subject(:store) { redux_store("reduxStore", props:) }
 
     let(:props) do
       { name: "My Test Name" }
@@ -752,15 +752,15 @@ describe ReactOnRailsHelper do
       allow(Rails.logger).to receive(:warn)
       ReactOnRails::Helper.reset_removed_immediate_hydration_warnings!
 
-      redux_store("reduxStore", props: props, immediate_hydration: false)
-      redux_store("reduxStore", props: props, immediate_hydration: true)
+      redux_store("reduxStore", props:, immediate_hydration: false)
+      redux_store("reduxStore", props:, immediate_hydration: true)
 
       expect(Rails.logger).to have_received(:warn).once.with(include("immediate_hydration"))
     end
 
     it "raises an ArgumentError for unknown keywords" do
       expect do
-        redux_store("reduxStore", props: props, typo_option: true)
+        redux_store("reduxStore", props:, typo_option: true)
       end.to raise_error(ArgumentError, "unknown keyword: :typo_option")
     end
   end
@@ -890,12 +890,12 @@ describe ReactOnRailsHelper do
         end
 
         it "includes the Pro attribution comment in the rendered output" do
-          result = react_component("App", props: props)
+          result = react_component("App", props:)
           expect(result).to include("<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->")
         end
 
         it "includes the attribution comment only once" do
-          result = react_component("App", props: props)
+          result = react_component("App", props:)
           comment_count = result.scan("<!-- Powered by React on Rails Pro").length
           expect(comment_count).to eq(1)
         end
@@ -907,12 +907,12 @@ describe ReactOnRailsHelper do
         end
 
         it "includes the open source attribution comment in the rendered output" do
-          result = react_component("App", props: props)
+          result = react_component("App", props:)
           expect(result).to include("<!-- Powered by React on Rails (c) ShakaCode | Open Source -->")
         end
 
         it "includes the attribution comment only once" do
-          result = react_component("App", props: props)
+          result = react_component("App", props:)
           comment_count = result.scan("<!-- Powered by React on Rails").length
           expect(comment_count).to eq(1)
         end
@@ -928,12 +928,12 @@ describe ReactOnRailsHelper do
         end
 
         it "includes the Pro attribution comment in the rendered output" do
-          result = redux_store("TestStore", props: props)
+          result = redux_store("TestStore", props:)
           expect(result).to include("<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->")
         end
 
         it "includes the attribution comment only once" do
-          result = redux_store("TestStore", props: props)
+          result = redux_store("TestStore", props:)
           comment_count = result.scan("<!-- Powered by React on Rails Pro").length
           expect(comment_count).to eq(1)
         end
@@ -945,12 +945,12 @@ describe ReactOnRailsHelper do
         end
 
         it "includes the open source attribution comment in the rendered output" do
-          result = redux_store("TestStore", props: props)
+          result = redux_store("TestStore", props:)
           expect(result).to include("<!-- Powered by React on Rails (c) ShakaCode | Open Source -->")
         end
 
         it "includes the attribution comment only once" do
-          result = redux_store("TestStore", props: props)
+          result = redux_store("TestStore", props:)
           comment_count = result.scan("<!-- Powered by React on Rails").length
           expect(comment_count).to eq(1)
         end
@@ -975,12 +975,12 @@ describe ReactOnRailsHelper do
         end
 
         it "includes the Pro attribution comment in the componentHtml" do
-          result = react_component_hash("App", props: props, prerender: true)
+          result = react_component_hash("App", props:, prerender: true)
           expect(result["componentHtml"]).to include("<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->")
         end
 
         it "includes the attribution comment only once" do
-          result = react_component_hash("App", props: props, prerender: true)
+          result = react_component_hash("App", props:, prerender: true)
           comment_count = result["componentHtml"].scan("<!-- Powered by React on Rails Pro").length
           expect(comment_count).to eq(1)
         end
@@ -992,12 +992,12 @@ describe ReactOnRailsHelper do
         end
 
         it "includes the open source attribution comment in the componentHtml" do
-          result = react_component_hash("App", props: props, prerender: true)
+          result = react_component_hash("App", props:, prerender: true)
           expect(result["componentHtml"]).to include("<!-- Powered by React on Rails (c) ShakaCode | Open Source -->")
         end
 
         it "includes the attribution comment only once" do
-          result = react_component_hash("App", props: props, prerender: true)
+          result = react_component_hash("App", props:, prerender: true)
           comment_count = result["componentHtml"].scan("<!-- Powered by React on Rails").length
           expect(comment_count).to eq(1)
         end
@@ -1013,8 +1013,8 @@ describe ReactOnRailsHelper do
         end
 
         it "includes the attribution comment only once when calling multiple react_component helpers" do
-          result1 = react_component("App1", props: props)
-          result2 = react_component("App2", props: props)
+          result1 = react_component("App1", props:)
+          result2 = react_component("App2", props:)
           combined_result = result1 + result2
 
           comment_count = combined_result.scan("<!-- Powered by React on Rails Pro").length
@@ -1022,8 +1022,8 @@ describe ReactOnRailsHelper do
         end
 
         it "includes the attribution comment only once when calling mixed SSR helpers" do
-          component_result = react_component("App", props: props)
-          store_result = redux_store("TestStore", props: props)
+          component_result = react_component("App", props:)
+          store_result = redux_store("TestStore", props:)
           combined_result = component_result + store_result
 
           comment_count = combined_result.scan("<!-- Powered by React on Rails Pro").length
@@ -1031,7 +1031,7 @@ describe ReactOnRailsHelper do
         end
 
         it "includes the attribution comment only once when calling react_component multiple times" do
-          results = Array.new(5) { |i| react_component("App#{i}", props: props) }
+          results = Array.new(5) { |i| react_component("App#{i}", props:) }
           combined_result = results.join
 
           comment_count = combined_result.scan("<!-- Powered by React on Rails Pro").length
@@ -1045,8 +1045,8 @@ describe ReactOnRailsHelper do
         end
 
         it "includes the attribution comment only once when calling multiple react_component helpers" do
-          result1 = react_component("App1", props: props)
-          result2 = react_component("App2", props: props)
+          result1 = react_component("App1", props:)
+          result2 = react_component("App2", props:)
           combined_result = result1 + result2
 
           comment_count = combined_result.scan("<!-- Powered by React on Rails").length
@@ -1054,8 +1054,8 @@ describe ReactOnRailsHelper do
         end
 
         it "includes the attribution comment only once when calling mixed SSR helpers" do
-          component_result = react_component("App", props: props)
-          store_result = redux_store("TestStore", props: props)
+          component_result = react_component("App", props:)
+          store_result = redux_store("TestStore", props:)
           combined_result = component_result + store_result
 
           comment_count = combined_result.scan("<!-- Powered by React on Rails").length

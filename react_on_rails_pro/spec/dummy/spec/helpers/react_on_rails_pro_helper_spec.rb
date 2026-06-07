@@ -143,7 +143,7 @@ describe ReactOnRailsProHelper do
             props = { a: 1, b: 2 }
 
             expect do
-              cached_react_component("App", cache_key: "cache-key", props: props)
+              cached_react_component("App", cache_key: "cache-key", props:)
             end.to raise_error("Pass 'props' as a block if using caching")
           end
         end
@@ -217,7 +217,7 @@ describe ReactOnRailsProHelper do
         it "caches the content" do
           props = { a: 1, b: 2 }
 
-          render_result = react_component("RandomValue", props: props, prerender: true)
+          render_result = react_component("RandomValue", props:, prerender: true)
           # Ensure that the component is rendered correctly
           expect(render_result).to include("RandomValue:")
 
@@ -227,8 +227,8 @@ describe ReactOnRailsProHelper do
         it "doesn't rerender the component after the first render" do
           props = { a: 1, b: 2 }
 
-          first_render_result = react_component("RandomValue", props: props, prerender: true)
-          second_render_result = react_component("RandomValue", props: props, prerender: true)
+          first_render_result = react_component("RandomValue", props:, prerender: true)
+          second_render_result = react_component("RandomValue", props:, prerender: true)
           expect(first_render_result).to include("RandomValue:")
           expect(second_render_result).to include("RandomValue:")
 
@@ -243,7 +243,7 @@ describe ReactOnRailsProHelper do
           props = { a: 1, b: 2 }
           props2 = { a: 2, b: 3 }
 
-          first_render_result = react_component("RandomValue", props: props, prerender: true)
+          first_render_result = react_component("RandomValue", props:, prerender: true)
           second_render_result = react_component("RandomValue", props: props2, prerender: true)
 
           expect(first_render_result).to include("RandomValue:")
@@ -267,7 +267,7 @@ describe ReactOnRailsProHelper do
         it "doesn't cache the content" do
           props = { a: 1, b: 2 }
 
-          render_result = react_component("RandomValue", props: props, prerender: true)
+          render_result = react_component("RandomValue", props:, prerender: true)
           expect(render_result).to include("RandomValue:")
 
           expect(cache_data.keys.count).to eq(0)
@@ -276,8 +276,8 @@ describe ReactOnRailsProHelper do
         it "rerenders the component even if the props are the same" do
           props = { a: 1, b: 2 }
 
-          first_render_result = react_component("RandomValue", props: props, prerender: true)
-          second_render_result = react_component("RandomValue", props: props, prerender: true)
+          first_render_result = react_component("RandomValue", props:, prerender: true)
+          second_render_result = react_component("RandomValue", props:, prerender: true)
 
           expect(first_render_result).to include("RandomValue:")
           expect(second_render_result).to include("RandomValue:")
@@ -348,7 +348,7 @@ describe ReactOnRailsProHelper do
 
       chunks_read.clear
       mock_streaming_response(%r{http://localhost:3800/bundles/[a-f0-9]{32}-test/render/[a-f0-9]{32}}, 200,
-                              count: count) do |yielder|
+                              count:) do |yielder|
         if mock_chunks.is_a?(Async::Queue)
           loop do
             chunk = mock_chunks.dequeue
@@ -399,7 +399,7 @@ describe ReactOnRailsProHelper do
 
         stream_react_component(
           component_name,
-          props: props,
+          props:,
           immediate_hydration: false,
           **component_options
         )
@@ -409,7 +409,7 @@ describe ReactOnRailsProHelper do
 
       it "returns the component shell that exist in the initial chunk with the consoleReplayScript" do
         mock_request_and_response
-        initial_result = stream_react_component(component_name, props: props, **component_options)
+        initial_result = stream_react_component(component_name, props:, **component_options)
         expect(initial_result).to include(react_component_div_with_initial_chunk)
         # consoleReplayScript is now wrapped in a script tag with id="consoleReplayLog"
         if chunks.first[:consoleReplayScript].present?
@@ -424,7 +424,7 @@ describe ReactOnRailsProHelper do
 
       it "streams subsequent chunks to the output queue" do
         mock_request_and_response
-        initial_result = stream_react_component(component_name, props: props, **component_options)
+        initial_result = stream_react_component(component_name, props:, **component_options)
 
         # First chunk is returned synchronously
         expect(initial_result).to include(react_component_div_with_initial_chunk)
@@ -463,7 +463,7 @@ describe ReactOnRailsProHelper do
         ].map { |chunk| chunk.merge(consoleReplayScript: "") }
         mock_request_and_response(chunks_with_whitespaces)
 
-        initial_result = stream_react_component(component_name, props: props, **component_options)
+        initial_result = stream_react_component(component_name, props:, **component_options)
         expect(initial_result).to include(chunks_with_whitespaces.first[:html])
 
         # Wait for async task to complete
@@ -492,7 +492,7 @@ describe ReactOnRailsProHelper do
         allow(mocked_rails_stream).to receive(:closed?).and_return(false, true)
 
         # Start streaming - first chunk returned synchronously
-        initial_result = stream_react_component(component_name, props: props, **component_options)
+        initial_result = stream_react_component(component_name, props:, **component_options)
         expect(initial_result).to include("<div>Chunk 0</div>")
 
         # Wait for async task to complete
@@ -526,8 +526,8 @@ describe ReactOnRailsProHelper do
 
         stream_react_component(
           component_name,
-          props: props,
-          on_complete: on_complete,
+          props:,
+          on_complete:,
           **component_options
         )
 
@@ -548,7 +548,7 @@ describe ReactOnRailsProHelper do
         }
 
         expect do
-          stream_react_component(component_name, props: props, on_complete: on_complete, **component_options)
+          stream_react_component(component_name, props:, on_complete:, **component_options)
         end.to raise_error(StandardError, "node renderer crashed before first chunk")
 
         Async::Task.current.with_timeout(5) { @async_barrier.wait }
@@ -568,8 +568,8 @@ describe ReactOnRailsProHelper do
 
         stream_react_component(
           component_name,
-          props: props,
-          on_complete: on_complete,
+          props:,
+          on_complete:,
           **component_options
         )
 
@@ -591,7 +591,7 @@ describe ReactOnRailsProHelper do
         # Mock the render_to_string method and make it calls stream_react_component
         # stream_view_containing_react_components assumes it renders a view containing calls to stream_react_component
         allow(self).to receive(:render_to_string) do
-          render_result = stream_react_component(component_name, props: props, **component_options)
+          render_result = stream_react_component(component_name, props:, **component_options)
           <<-HTML
             <div>
               <h1>Header Rendered In View</h1>
@@ -703,7 +703,7 @@ describe ReactOnRailsProHelper do
       def render_with_cached_stream(**opts)
         stub_render_with_cached_stream(
           cache_key: ["stream-cache-spec", component_name],
-          props: props,
+          props:,
           **opts
         )
       end
@@ -720,7 +720,7 @@ describe ReactOnRailsProHelper do
         allow(self).to receive(:render_to_string) do
           render_result = cached_stream_react_component(
             component_name,
-            cache_key: cache_key,
+            cache_key:,
             id: "#{component_name}-react-component-0",
             trace: true,
             cache_options: { expires_in: 60 },
@@ -814,7 +814,7 @@ describe ReactOnRailsProHelper do
         expect do |props_block|
           stub_render_with_cached_stream(
             cache_key: ["stream-cache-spec", component_name],
-            props: props,
+            props:,
             &props_block
           )
           run_stream
@@ -867,7 +867,7 @@ describe ReactOnRailsProHelper do
           @async_barrier = Async::Barrier.new
           @main_output_queue = Async::Queue.new
 
-          result = cached_stream_react_component("RandomValue", cache_key: cache_key,
+          result = cached_stream_react_component("RandomValue", cache_key:,
                                                                 id: "RandomValue-react-component-0") do
             { a: 1, b: 2 }
           end
@@ -948,12 +948,12 @@ describe ReactOnRailsProHelper do
     end
 
     it "includes the Pro attribution comment in the rendered output" do
-      result = stream_react_component(component_name, props: props, **component_options)
+      result = stream_react_component(component_name, props:, **component_options)
       expect(result).to include("<!-- Powered by React on Rails Pro (c) ShakaCode")
     end
 
     it "includes the attribution comment only once" do
-      result = stream_react_component(component_name, props: props, **component_options)
+      result = stream_react_component(component_name, props:, **component_options)
       comment_count = result.scan("<!-- Powered by React on Rails Pro").length
       expect(comment_count).to eq(1)
     end
@@ -1067,11 +1067,11 @@ describe ReactOnRailsProHelper do
         cache_key = "async-cache-test-#{SecureRandom.hex(4)}"
 
         # First render
-        first_value = cached_async_react_component("RandomValue", cache_key: cache_key) { { a: 1 } }
+        first_value = cached_async_react_component("RandomValue", cache_key:) { { a: 1 } }
         first_html = first_value.value
 
         # Second render should return cached content
-        second_value = cached_async_react_component("RandomValue", cache_key: cache_key) { { a: 1 } }
+        second_value = cached_async_react_component("RandomValue", cache_key:) { { a: 1 } }
         second_html = second_value.value
 
         expect(second_html).to eq(first_html)
@@ -1081,12 +1081,12 @@ describe ReactOnRailsProHelper do
         cache_key = "async-block-test-#{SecureRandom.hex(4)}"
 
         # Prime the cache
-        first_value = cached_async_react_component("App", cache_key: cache_key) { { a: 1 } }
+        first_value = cached_async_react_component("App", cache_key:) { { a: 1 } }
         first_value.value
 
         # Second call should not yield
         expect do |block|
-          cached_async_react_component("App", cache_key: cache_key, &block)
+          cached_async_react_component("App", cache_key:, &block)
         end.not_to yield_control
       end
 
@@ -1094,10 +1094,10 @@ describe ReactOnRailsProHelper do
         cache_key = "async-if-test-#{SecureRandom.hex(4)}"
 
         # With if: false, should not cache
-        first_value = cached_async_react_component("RandomValue", cache_key: cache_key, if: false) { { a: 1 } }
+        first_value = cached_async_react_component("RandomValue", cache_key:, if: false) { { a: 1 } }
         first_html = first_value.value
 
-        second_value = cached_async_react_component("RandomValue", cache_key: cache_key, if: false) { { a: 1 } }
+        second_value = cached_async_react_component("RandomValue", cache_key:, if: false) { { a: 1 } }
         second_html = second_value.value
 
         # Both should be AsyncValue (not ImmediateAsyncValue) since caching is disabled
@@ -1112,10 +1112,10 @@ describe ReactOnRailsProHelper do
         cache_key = "async-unless-test-#{SecureRandom.hex(4)}"
 
         # With unless: true, should not cache
-        first_value = cached_async_react_component("RandomValue", cache_key: cache_key, unless: true) { { a: 1 } }
+        first_value = cached_async_react_component("RandomValue", cache_key:, unless: true) { { a: 1 } }
         first_html = first_value.value
 
-        second_value = cached_async_react_component("RandomValue", cache_key: cache_key, unless: true) { { a: 1 } }
+        second_value = cached_async_react_component("RandomValue", cache_key:, unless: true) { { a: 1 } }
         second_html = second_value.value
 
         expect(second_html).not_to eq(first_html)

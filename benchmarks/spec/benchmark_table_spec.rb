@@ -32,7 +32,7 @@ RSpec.describe BenchmarkTable do
   end
 
   def render(rows:, report:)
-    described_class.new(title: "Core Benchmark Summary", rows: rows, report: report).to_markdown
+    described_class.new(title: "Core Benchmark Summary", rows:, report:).to_markdown
   end
 
   it "renders title, header (no Fail% column), divider, one row per input, and a legend" do
@@ -56,7 +56,7 @@ RSpec.describe BenchmarkTable do
     report = fake_report(baselines: { ["/foo", "rps"] => 97.75, ["/foo", "p50_latency"] => 5.07 })
     markdown = render(
       rows: [row(name: "/foo", rps: 100.0, p50: 5.0, p90: 6.0, status: "200=100")],
-      report: report
+      report:
     )
 
     # rps rose 2.3% above baseline (▲), p50 fell 1.4% below baseline (▼).
@@ -68,7 +68,7 @@ RSpec.describe BenchmarkTable do
     report = fake_report(baselines: { ["/foo", "rps"] => 97.756 })
     markdown = render(
       rows: [row(name: "/foo", rps: 100.0, p50: 5.0, p90: 6.0, status: "200=100")],
-      report: report
+      report:
     )
 
     # baseline 97.756 -> (97.76); proves format_number's round(2) actually rounds.
@@ -79,7 +79,7 @@ RSpec.describe BenchmarkTable do
     report = fake_report(baselines: { ["/foo", "rps"] => 97.756 })
     markdown = render(
       rows: [row(name: "/foo", rps: 100.126, p50: 5.0, p90: 6.0, status: "200=100")],
-      report: report
+      report:
     )
 
     expect(markdown).to include("100.13 ▲2.4% (97.76)")
@@ -92,7 +92,7 @@ RSpec.describe BenchmarkTable do
     )
     markdown = render(
       rows: [row(name: "/foo", rps: 80.0, p50: 4.0, p90: 6.0, status: "200=100")],
-      report: report
+      report:
     )
 
     expect(markdown).to include("| /foo | **80.0** 🔴 20.0% (100.0) | **4.0** 🟢 20.0% (5.0) | 6.0 | 200=100 |")
@@ -107,7 +107,7 @@ RSpec.describe BenchmarkTable do
     )
     markdown = render(
       rows: [row(name: "/foo", rps: 100.0, p50: 5.0, p90: 6.0, status: "200=100")],
-      report: report
+      report:
     )
 
     expect(markdown).to include("6.0 ▲20.0% (5.0)")
@@ -128,7 +128,7 @@ RSpec.describe BenchmarkTable do
     report = fake_report(baselines: { ["/foo", "rps"] => 0.0 })
     markdown = render(
       rows: [row(name: "/foo", rps: 100.0, p50: 5.0, p90: 6.0, status: "200=100")],
-      report: report
+      report:
     )
 
     expect(markdown).to include("| /foo | 100.0 | 5.0 | 6.0 | 200=100 |")
@@ -138,7 +138,7 @@ RSpec.describe BenchmarkTable do
     report = fake_report(baselines: { ["/foo", "rps"] => 100.0 })
     markdown = render(
       rows: [row(name: "/foo", rps: 100.0, p50: 5.0, p90: 6.0, status: "200=100")],
-      report: report
+      report:
     )
 
     expect(markdown).to include("| /foo | 100.0 0.0% (100.0) | 5.0 | 6.0 | 200=100 |")
@@ -148,7 +148,7 @@ RSpec.describe BenchmarkTable do
     report = fake_report(baselines: { ["/foo", "rps"] => 100.0 })
     markdown = render(
       rows: [row(name: "/foo", rps: 100.00001, p50: 5.0, p90: 6.0, status: "200=100")],
-      report: report
+      report:
     )
 
     expect(markdown).to include("| /foo | 100.0 0.0% (100.0) | 5.0 | 6.0 | 200=100 |")
@@ -163,7 +163,7 @@ RSpec.describe BenchmarkTable do
     )
     markdown = render(
       rows: [row(name: "/foo", rps: 99.999, p50: 4.999, p90: 6.0, status: "200=100")],
-      report: report
+      report:
     )
 
     expect(markdown).to include(
@@ -177,7 +177,7 @@ RSpec.describe BenchmarkTable do
     report = fake_report(urls: { "/foo" => "https://bencher.dev/perf/p?benchmarks=BM" })
     markdown = render(
       rows: [row(name: "/foo", rps: 100.0, p50: 5.0, p90: 6.0, status: "200=100")],
-      report: report
+      report:
     )
 
     expect(markdown).to include("| [/foo](https://bencher.dev/perf/p?benchmarks=BM) | 100.0 |")
@@ -187,7 +187,7 @@ RSpec.describe BenchmarkTable do
     report = fake_report(urls: { "a[b]c" => "https://bencher.dev/perf/p?benchmarks=BM" })
     markdown = render(
       rows: [row(name: "a[b]c", rps: 100.0, p50: 5.0, p90: 6.0, status: "200=100")],
-      report: report
+      report:
     )
 
     # Brackets are backslash-escaped inside the link text, so the link wraps the whole name.
@@ -211,7 +211,7 @@ RSpec.describe BenchmarkTable do
     )
     markdown = render(
       rows: [row(name: "/broken", rps: "FAILED", p50: nil, p90: nil, status: "Connection refused")],
-      report: report
+      report:
     )
 
     expect(markdown).to include("| /broken | FAILED | — | — | Connection refused |")
@@ -222,7 +222,7 @@ RSpec.describe BenchmarkTable do
     report = fake_report(baselines: { ["/p", "p50_latency"] => 5.0 })
     markdown = render(
       rows: [row(name: "/p", rps: 100.0, p50: nil, p90: nil, status: "200=100")],
-      report: report
+      report:
     )
 
     expect(markdown).to include("| /p | 100.0 | — | — | 200=100 |")

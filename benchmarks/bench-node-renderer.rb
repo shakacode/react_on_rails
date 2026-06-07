@@ -261,7 +261,7 @@ def run_vegeta_suite(test_cases, bundle, label, bmf_collector, runner: method(:r
       # Add to BMF collector for Bencher output. p90 is sent to Bencher boundary-less
       # (recorded for a summary-table baseline but never thresholded) and also kept in the
       # display sidecar so the summary table can show it; see BmfCollector.
-      bmf_collector.add(name: test_label, rps: rps, p50: p50, p90: p90, status: status)
+      bmf_collector.add(name: test_label, rps:, p50:, p90:, status:)
     rescue StandardError => e
       # ::error:: must go to stdout — GitHub Actions only parses workflow commands
       # from stdout, not stderr, so writing here is what renders the UI annotation.
@@ -374,7 +374,7 @@ if __FILE__ == $PROGRAM_NAME
   if failed_tests.empty?
     begin
       # Append to existing Pro results and display sidecar rows.
-      write_benchmark_payload(bmf_collector, target_monitor: target_monitor, append: true)
+      write_benchmark_payload(bmf_collector, target_monitor:, append: true)
     rescue BenchmarkTargetMonitor::MonitorFailure => e
       $stdout.puts "::error::#{e.message}"
       exit 1

@@ -16,6 +16,6 @@ namespace :react_on_rails do
   DESC
   task locale: :environment do
     force = %w[true 1 yes].include?(ENV["force"]&.downcase)
-    ReactOnRails::Locales.compile(force: force)
+    ReactOnRails::Locales.compile(force:)
   end
 end

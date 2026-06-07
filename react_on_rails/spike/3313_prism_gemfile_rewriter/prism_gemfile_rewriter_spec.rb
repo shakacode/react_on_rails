@@ -13,7 +13,7 @@ require "prism_gemfile_rewriter"
 
 RSpec.describe ReactOnRails::Spike::PrismGemfileRewriter do
   let(:default_pro_version) { "~> 16.7" }
-  subject(:rewriter) { described_class.new(default_pro_version: default_pro_version) }
+  subject(:rewriter) { described_class.new(default_pro_version:) }
 
   def expect_parseable_ruby(content)
     parse_result = Prism.parse(content)

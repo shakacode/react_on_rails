@@ -107,7 +107,7 @@ module ReactOnRails
         package_manager = GeneratorMessages.detect_package_manager(app_root: destination_root)
         return unless package_manager
 
-        install_packages_with_fallback(regular_packages, dev: false, package_manager: package_manager)
+        install_packages_with_fallback(regular_packages, dev: false, package_manager:)
       end
 
       def add_redux_specific_messages

@@ -30,9 +30,9 @@ module ReactOnRails
         remove_if: "not using this i18n with React on Rails, or if you want to use all translation files"
       )
       if config.i18n_output_format&.downcase == "js"
-        ReactOnRails::Locales::ToJs.new(force: force)
+        ReactOnRails::Locales::ToJs.new(force:)
       else
-        ReactOnRails::Locales::ToJson.new(force: force)
+        ReactOnRails::Locales::ToJson.new(force:)
       end
     end
 

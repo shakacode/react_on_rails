@@ -24,7 +24,7 @@ module ReactOnRailsPro
       def render_code(path, js_code, send_bundle)
         Rails.logger.info { "[ReactOnRailsPro] Perform rendering request #{path}" }
         form = form_with_code(js_code, send_bundle)
-        perform_request(path, form: form)
+        perform_request(path, form:)
       end
 
       def render_code_as_stream(path, js_code, is_rsc_payload:)
@@ -44,7 +44,7 @@ module ReactOnRailsPro
           end
 
           form = form_with_code(js_code, false)
-          perform_request(path, form: form, stream: true)
+          perform_request(path, form:, stream: true)
         end
       end
 
@@ -149,7 +149,7 @@ module ReactOnRailsPro
         # backward compatibility safeguard.
         form["targetBundles"] = target_bundles
 
-        perform_request("/upload-assets", form: form)
+        perform_request("/upload-assets", form:)
       end
 
       def asset_exists_on_vm_renderer?(filename)
@@ -260,7 +260,7 @@ module ReactOnRailsPro
           bundle_path: ReactOnRails::Utils.server_bundle_js_file_path,
           bundle_file_name: pool.renderer_bundle_file_name,
           bundle_hash: pool.server_bundle_hash,
-          check_bundle: check_bundle
+          check_bundle:
         )
 
         if ReactOnRailsPro.configuration.enable_rsc_support
@@ -269,7 +269,7 @@ module ReactOnRailsPro
             bundle_path: ReactOnRailsPro::Utils.rsc_bundle_js_file_path,
             bundle_file_name: pool.rsc_renderer_bundle_file_name,
             bundle_hash: pool.rsc_bundle_hash,
-            check_bundle: check_bundle
+            check_bundle:
           )
         end
 
@@ -308,7 +308,7 @@ module ReactOnRailsPro
           begin
             form["assetsToCopy#{idx}"] = {
               body: get_form_body_for_file(asset_path),
-              content_type: content_type,
+              content_type:,
               filename: File.basename(asset_path)
             }
           rescue StandardError => e

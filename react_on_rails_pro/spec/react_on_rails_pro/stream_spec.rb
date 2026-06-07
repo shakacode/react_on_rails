@@ -38,7 +38,7 @@ RSpec.describe ReactOnRailsPro::Stream do
     def run_stream(controller, template: "ignored", **options)
       Sync do |parent|
         parent.async do
-          controller.stream_view_containing_react_components(template: template, **options)
+          controller.stream_view_containing_react_components(template:, **options)
         end
         yield(parent)
       end
@@ -46,7 +46,7 @@ RSpec.describe ReactOnRailsPro::Stream do
 
     def setup_stream_test(component_count: 2)
       component_queues = Array.new(component_count) { Async::Queue.new }
-      controller = StreamController.new(component_queues: component_queues)
+      controller = StreamController.new(component_queues:)
 
       mocked_response = instance_double(ActionController::Live::Response)
       mocked_stream = instance_double(ActionController::Live::Buffer)

@@ -16,7 +16,7 @@ class BenchmarkTargetMonitor
     new(
       target_pid: env["TARGET_PID"],
       target_log: env["TARGET_LOG"],
-      output_dir: output_dir
+      output_dir:
     )
   end
 

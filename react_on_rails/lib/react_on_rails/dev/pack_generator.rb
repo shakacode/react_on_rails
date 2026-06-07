@@ -65,9 +65,9 @@ module ReactOnRails
           # If we're already inside a Bundler context AND Rails is available (e.g., called from bin/dev),
           # we can directly require and run the task. Otherwise, use bundle exec.
           if should_run_directly?
-            run_rake_task_directly(silent: silent)
+            run_rake_task_directly(silent:)
           else
-            run_via_bundle_exec(silent: silent, verbose: verbose)
+            run_via_bundle_exec(silent:, verbose:)
           end
         ensure
           # Clean up environment variable
@@ -173,12 +173,12 @@ module ReactOnRails
 
         # DRY helper method for Bundler context switching with API compatibility
         # Supports both new (with_unbundled_env) and legacy (with_clean_env) Bundler APIs
-        def with_unbundled_context(&block)
+        def with_unbundled_context(&)
           if defined?(Bundler)
             if Bundler.respond_to?(:with_unbundled_env)
-              Bundler.with_unbundled_env(&block)
+              Bundler.with_unbundled_env(&)
             elsif Bundler.respond_to?(:with_clean_env)
-              Bundler.with_clean_env(&block)
+              Bundler.with_clean_env(&)
             else
               # Fallback if neither method is available (very old Bundler versions)
               yield

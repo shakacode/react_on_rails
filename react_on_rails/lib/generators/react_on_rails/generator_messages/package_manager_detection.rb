@@ -37,8 +37,8 @@ module GeneratorMessages
     # wants detection to fall through directly to lockfile heuristics.
     def detect_package_manager(app_root: Dir.pwd, package_json: PACKAGE_JSON_UNSET)
       detect_package_manager_with_source(
-        app_root: app_root,
-        package_json: package_json
+        app_root:,
+        package_json:
       ).first
     end
 
@@ -52,13 +52,13 @@ module GeneratorMessages
       return [env_package_manager, :env] if supported_package_manager?(env_package_manager)
 
       content = package_json_content(
-        app_root: app_root,
-        package_json: package_json
+        app_root:,
+        package_json:
       )
       pm_from_json = content ? package_manager_name_from_content(content) : nil
       return [pm_from_json, :package_json] if pm_from_json
 
-      pm_from_lockfile = detect_package_manager_from_lockfiles(app_root: app_root)
+      pm_from_lockfile = detect_package_manager_from_lockfiles(app_root:)
       return [pm_from_lockfile, :lockfile] if pm_from_lockfile
 
       ["npm", :default]
@@ -84,8 +84,8 @@ module GeneratorMessages
     # package_json: nil to preserve a cached missing/unreadable read.
     def package_manager_declared?(manager:, app_root: Dir.pwd, package_json: PACKAGE_JSON_UNSET)
       content = package_json_content(
-        app_root: app_root,
-        package_json: package_json
+        app_root:,
+        package_json:
       )
       return false unless content
 
@@ -99,12 +99,12 @@ module GeneratorMessages
     # that's not on disk (e.g. `packageManager: pnpm` without `pnpm-lock.yaml`, which
     # breaks `actions/setup-node`'s cache step).
     def lockfile_for_manager?(package_manager, app_root: Dir.pwd)
-      !lockfile_filename_for(package_manager, app_root: app_root).nil?
+      !lockfile_filename_for(package_manager, app_root:).nil?
     end
 
     def detect_package_manager_from_lockfiles(app_root: Dir.pwd)
       LOCKFILE_CANDIDATES_BY_MANAGER.keys.find do |pm|
-        lockfile_for_manager?(pm, app_root: app_root)
+        lockfile_for_manager?(pm, app_root:)
       end
     end
 

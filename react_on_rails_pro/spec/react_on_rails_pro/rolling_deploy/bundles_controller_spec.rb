@@ -108,7 +108,7 @@ describe ReactOnRailsPro::RollingDeploy::BundlesController do
       controller = described_class.new
       headers = {}
 
-      allow(controller).to receive(:response).and_return(instance_double(ActionDispatch::Response, headers: headers))
+      allow(controller).to receive(:response).and_return(instance_double(ActionDispatch::Response, headers:))
 
       controller.send(:set_no_store_headers)
 
@@ -192,7 +192,7 @@ describe ReactOnRailsPro::RollingDeploy::BundlesController do
 
     def stub_request_headers(headers)
       allow(controller).to receive(:request).and_return(
-        instance_double(ActionDispatch::Request, headers: headers)
+        instance_double(ActionDispatch::Request, headers:)
       )
     end
 

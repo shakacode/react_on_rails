@@ -478,7 +478,7 @@ module ReactOnRails
                   "npm"
                 end
 
-      PackageManagerDetection.new(manager: manager, lockfile_scan_blocked: false)
+      PackageManagerDetection.new(manager:, lockfile_scan_blocked: false)
     end
 
     def get_package_manager_version(manager)

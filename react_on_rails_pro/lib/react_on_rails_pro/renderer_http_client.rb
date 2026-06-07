@@ -147,10 +147,10 @@ module ReactOnRailsPro
         origin, path = split_url(url)
 
         new(
-          origin: origin,
+          origin:,
           pool_size: 1,
-          connect_timeout: connect_timeout,
-          read_timeout: read_timeout,
+          connect_timeout:,
+          read_timeout:,
           force_http2: false
         ).get(path)
       end
@@ -265,8 +265,8 @@ module ReactOnRailsPro
     end
 
     def post(path, form: nil, json: nil, stream: false)
-      headers, body = request_body(form: form, json: json)
-      build_response(stream: stream) do |yielder, status_assigner|
+      headers, body = request_body(form:, json:)
+      build_response(stream:) do |yielder, status_assigner|
         execute_request(:post, path, [headers, body], yielder, status_assigner)
       end
     end
@@ -328,9 +328,9 @@ module ReactOnRailsPro
       outer_scheduler = Fiber.scheduler
 
       Sync do
-        with_client(outer_scheduler: outer_scheduler) do |client|
+        with_client(outer_scheduler:) do |client|
           raw_response = if method == :post
-                           client.post(path, headers: Protocol::HTTP::Headers[headers], body: body)
+                           client.post(path, headers: Protocol::HTTP::Headers[headers], body:)
                          else
                            client.get(path, headers: Protocol::HTTP::Headers[headers])
                          end
@@ -345,7 +345,7 @@ module ReactOnRailsPro
       raise ConnectionError, e.message
     end
 
-    def with_client(outer_scheduler:, &block)
+    def with_client(outer_scheduler:, &)
       # Only use persistent mode if a scheduler existed BEFORE entering Sync.
       # If Sync created an ephemeral scheduler, use ephemeral clients to ensure cleanup.
       if outer_scheduler
@@ -355,7 +355,7 @@ module ReactOnRailsPro
       else
         # Ephemeral mode: no outer scheduler means either we're outside an Async context,
         # or Sync created an ephemeral scheduler. Use block-form to ensure cleanup.
-        with_ephemeral_client(&block)
+        with_ephemeral_client(&)
       end
     end
 
@@ -386,9 +386,9 @@ module ReactOnRailsPro
       client&.close
     end
 
-    def with_ephemeral_client(&block)
+    def with_ephemeral_client(&)
       endpoint = endpoint_for(@origin)
-      Async::HTTP::Client.open(endpoint, protocol: endpoint.protocol, retries: 0, limit: pool_limit, &block)
+      Async::HTTP::Client.open(endpoint, protocol: endpoint.protocol, retries: 0, limit: pool_limit, &)
     end
 
     def endpoint_for(origin)

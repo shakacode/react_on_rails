@@ -185,7 +185,7 @@ end
 
 def delete_stale_report_comments(before:)
   failed = 0
-  stale_comment_ids(before: before).each do |comment_id|
+  stale_comment_ids(before:).each do |comment_id|
     puts "Deleting stale #{SUITE_NAME} Bencher report comment #{comment_id}"
     next if GithubCli.run(
       "gh", "api", "-X", "DELETE", "repos/#{ENV.fetch('GITHUB_REPOSITORY')}/issues/comments/#{comment_id}",
@@ -255,7 +255,7 @@ def rendered_report(report, suite_name)
   rows = display_rows
   return "" if rows.empty?
 
-  BenchmarkTable.new(title: "#{suite_name} Benchmark Summary", rows: rows, report: report).to_markdown
+  BenchmarkTable.new(title: "#{suite_name} Benchmark Summary", rows:, report:).to_markdown
 end
 
 # Body for the report-regressions hand-off. Normally the rendered table; but if the

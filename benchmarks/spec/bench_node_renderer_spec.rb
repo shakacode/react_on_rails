@@ -22,7 +22,7 @@ RSpec.describe "bench-node-renderer" do
         end
 
         def add(name:, rps:, p50:, status:, p90: nil)
-          @added << { name: name, rps: rps, p50: p50, p90: p90, status: status }
+          @added << { name:, rps:, p50:, p90:, status: }
         end
       end.new
     end
@@ -40,7 +40,7 @@ RSpec.describe "bench-node-renderer" do
     it "returns no failures and records every test when all succeed" do
       runner = ->(_test_case, _bundle) { [100.0, 1.0, 2.0, "200=10"] }
 
-      failed = run_vegeta_suite(test_cases, "bundleX", "non-RSC", collector, runner: runner)
+      failed = run_vegeta_suite(test_cases, "bundleX", "non-RSC", collector, runner:)
 
       expect(failed).to be_empty
       expect(collector.added.map { |m| m[:name] }).to eq(["simple_eval (non-RSC)", "react_ssr (non-RSC)"])
@@ -57,7 +57,7 @@ RSpec.describe "bench-node-renderer" do
 
       failed = nil
       # ::error:: annotations go to stdout so GitHub Actions renders them.
-      expect { failed = run_vegeta_suite(test_cases, "bundleX", "RSC", collector, runner: runner) }
+      expect { failed = run_vegeta_suite(test_cases, "bundleX", "RSC", collector, runner:) }
         .to output(/::error::.*simple_eval/).to_stdout
 
       expect(failed).to eq(["simple_eval (RSC)"])
@@ -71,7 +71,7 @@ RSpec.describe "bench-node-renderer" do
       failed = nil
       # Pin both tests' ::error:: annotations (in order) on stdout rather than
       # accepting any output, so a dropped or reformatted annotation is caught.
-      expect { failed = run_vegeta_suite(test_cases, "bundleX", "non-RSC", collector, runner: runner) }
+      expect { failed = run_vegeta_suite(test_cases, "bundleX", "non-RSC", collector, runner:) }
         .to output(/::error::.*simple_eval.*::error::.*react_ssr/m).to_stdout
 
       expect(failed).to eq(["simple_eval (non-RSC)", "react_ssr (non-RSC)"])

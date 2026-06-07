@@ -1123,7 +1123,7 @@ RSpec.describe ReactOnRails::SystemChecker do
       before do
         allow(Rails).to receive(:root).and_return(rails_root)
         allow(ReactOnRails).to receive(:configuration).and_return(
-          instance_double(ReactOnRails::Configuration, node_modules_location: node_modules_location)
+          instance_double(ReactOnRails::Configuration, node_modules_location:)
         )
         allow(Dir).to receive(:exist?).with(rails_root.to_s).and_return(true)
         allow(Dir).to receive(:exist?).with(rails_root.join("client").to_s).and_return(true)

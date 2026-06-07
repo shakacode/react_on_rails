@@ -95,10 +95,10 @@ module ReactOnRails
       case server_rendered_html
       when String
         html = build_react_component_result_for_server_rendered_string(
-          server_rendered_html: server_rendered_html,
+          server_rendered_html:,
           component_specification_tag: internal_result[:tag],
-          console_script: console_script,
-          render_options: render_options
+          console_script:,
+          render_options:
         )
         html.html_safe
       when Hash
@@ -161,10 +161,10 @@ module ReactOnRails
 
       if server_rendered_html.is_a?(Hash)
         build_react_component_result_for_server_rendered_hash(
-          server_rendered_html: server_rendered_html,
+          server_rendered_html:,
           component_specification_tag: internal_result[:tag],
-          console_script: console_script,
-          render_options: render_options
+          console_script:,
+          render_options:
         )
 
       else
@@ -212,8 +212,8 @@ module ReactOnRails
       should_auto_load = auto_load_bundle.nil? ? ReactOnRails.configuration.auto_load_bundle : auto_load_bundle
       load_pack_for_generated_store(store_name, explicit_auto_load: auto_load_bundle == true) if should_auto_load
 
-      redux_store_data = { store_name: store_name,
-                           props: props }
+      redux_store_data = { store_name:,
+                           props: }
       if defer
         registered_stores_defer_render << redux_store_data
         "YOU SHOULD NOT SEE THIS ON YOUR VIEW -- Uses as a code block, like <% redux_store %> " \
@@ -248,7 +248,7 @@ module ReactOnRails
     # Options include:{ prerender:, trace:, raise_on_prerender_error:, throw_js_errors: }
     def server_render_js(js_expression, options = {})
       render_options = ReactOnRails::ReactComponent::RenderOptions
-                       .new(react_component_name: "generic-js", options: options)
+                       .new(react_component_name: "generic-js", options:)
 
       js_code = <<~JS
         (function() {
@@ -303,8 +303,8 @@ module ReactOnRails
       raw("#{html}#{console_script_tag}")
     rescue ExecJS::ProgramError => err
       raise ReactOnRails::PrerenderError.new(component_name: "N/A (server_render_js called)",
-                                             err: err,
-                                             js_code: js_code)
+                                             err:,
+                                             js_code:)
     end
 
     def json_safe_and_pretty(hash_or_string)
@@ -460,8 +460,8 @@ module ReactOnRails
         store_dependencies = registered_stores_including_deferred.map { |store| store[:store_name] }
         options = options.merge(store_dependencies: store_dependencies.presence)
       end
-      ReactOnRails::ReactComponent::RenderOptions.new(react_component_name: react_component_name,
-                                                      options: options)
+      ReactOnRails::ReactComponent::RenderOptions.new(react_component_name:,
+                                                      options:)
     end
 
     def generated_components_pack_path(component_name)
@@ -628,9 +628,9 @@ module ReactOnRails
       component_specification_tag = generate_component_script(render_options)
 
       {
-        render_options: render_options,
+        render_options:,
         tag: component_specification_tag,
-        result: result
+        result:
       }
     end
 
@@ -711,7 +711,7 @@ module ReactOnRails
         component_name: react_component_name,
         props: sanitized_props_string(props),
         err: rendering_error_from_result(json_result),
-        js_code: js_code,
+        js_code:,
         console_messages: json_result["consoleReplayScript"]
       )
     end
@@ -791,8 +791,8 @@ module ReactOnRails
         props_string: props_string(props).gsub("\u2028", '\u2028').gsub("\u2029", '\u2029'),
         rails_context: rails_context(server_side: true).to_json,
         redux_stores: initialize_redux_stores(render_options),
-        react_component_name: react_component_name,
-        render_options: render_options
+        react_component_name:,
+        render_options:
       )
 
       begin
@@ -802,8 +802,8 @@ module ReactOnRails
         raise ReactOnRails::PrerenderError.new(component_name: react_component_name,
                                                # Sanitize as this might be browser logged
                                                props: sanitized_props_string(props),
-                                               err: err,
-                                               js_code: js_code)
+                                               err:,
+                                               js_code:)
       end
 
       if render_options.streaming?
@@ -820,8 +820,8 @@ module ReactOnRails
           raise ReactOnRails::PrerenderError.new(component_name: react_component_name,
                                                  # Sanitize as this might be browser logged
                                                  props: sanitized_props_string(props),
-                                                 err: err,
-                                                 js_code: js_code)
+                                                 err:,
+                                                 js_code:)
         end
       elsif result["hasErrors"] && render_options.raise_on_prerender_error
         raise_prerender_error(result, react_component_name, props, js_code)

@@ -343,7 +343,7 @@ module ReactOnRailsPro
     private_class_method :cache_local_source?
 
     def self.stage_file(src, dest, mode, log_prefix)
-      RendererCacheHelpers.stage_file(src, dest, mode, log_prefix: log_prefix)
+      RendererCacheHelpers.stage_file(src, dest, mode, log_prefix:)
     end
     private_class_method :stage_file
 

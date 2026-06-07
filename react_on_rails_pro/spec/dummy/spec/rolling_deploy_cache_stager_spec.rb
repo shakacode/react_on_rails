@@ -32,7 +32,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     before { allow(ReactOnRailsPro.configuration).to receive(:rolling_deploy_adapter).and_return(nil) }
 
     it "is a no-op" do
-      expect { described_class.call(cache_dir: cache_dir, current_hashes: ["cur"], mode: :copy) }
+      expect { described_class.call(cache_dir:, current_hashes: ["cur"], mode: :copy) }
         .not_to raise_error
       expect(Dir.children(cache_dir)).to eq([])
     end
@@ -45,7 +45,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
 
     it "warns and skips seeding rather than crashing on nil adapter" do
-      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+      expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
         .to output(/no rolling_deploy_adapter is configured/).to_stderr
       expect(Dir.children(cache_dir)).to eq([])
     end
@@ -63,7 +63,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     it "copies bundle + assets into <cache>/<hash>/ in :copy mode" do
       bundle_dir = File.join(cache_dir, "abc123")
       promoted_bundle_dir = File.join(File.realpath(cache_dir), "abc123")
-      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+      expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
         .to output(/Staged previous bundle hash into #{Regexp.escape(promoted_bundle_dir)}/).to_stdout
 
       expect(File.exist?(File.join(bundle_dir, "abc123.js"))).to be(true)
@@ -72,12 +72,12 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
 
     it "logs a per-hash success message after promotion" do
-      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+      expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
         .to output(/Seeded previous bundle hash abc123 at/).to_stdout
     end
 
     it "creates relative symlinks in :symlink mode" do
-      described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :symlink)
+      described_class.call(cache_dir:, current_hashes: [], mode: :symlink)
 
       dest = File.join(cache_dir, "abc123", "abc123.js")
       expect(File.symlink?(dest)).to be(true)
@@ -86,7 +86,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
 
     it "deduplicates against the current hash" do
-      described_class.call(cache_dir: cache_dir, current_hashes: ["abc123"], mode: :copy)
+      described_class.call(cache_dir:, current_hashes: ["abc123"], mode: :copy)
       expect(adapter).not_to have_received(:fetch)
     end
   end
@@ -107,7 +107,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
 
     it "copies cache-local sources so promoted files cannot become self-referential symlinks" do
-      described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :symlink)
+      described_class.call(cache_dir:, current_hashes: [], mode: :symlink)
 
       expect(File.symlink?(existing_bundle)).to be(false)
       expect(File.symlink?(existing_asset)).to be(false)
@@ -127,7 +127,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
 
     it "skips previous_bundle_hashes discovery and uses the env list" do
-      described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy)
+      described_class.call(cache_dir:, current_hashes: [], mode: :copy)
       expect(adapter).not_to have_received(:previous_bundle_hashes)
       expect(File.exist?(File.join(cache_dir, "xyz999", "xyz999.js"))).to be(true)
     end
@@ -140,7 +140,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
 
     it "warns and continues" do
-      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+      expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
         .to output(/returned nil/).to_stderr
       expect(Dir.children(cache_dir)).to eq([])
     end
@@ -158,7 +158,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
 
     it "warns with bundle-file attribution and skips that hash" do
-      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+      expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
         .to output(/returned payload without a valid :bundle file path/).to_stderr
       expect(File.exist?(File.join(cache_dir, "directory-bundle"))).to be(false)
     end
@@ -171,7 +171,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
 
     it "warns with targeted fetch attribution and does not propagate" do
-      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+      expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
         .to output(/rolling_deploy_adapter#fetch\("broken-hash"\) raised StandardError: network exploded/).to_stderr
     end
   end
@@ -186,7 +186,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
 
     it "warns and continues rather than blocking" do
-      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+      expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
         .to output(/timed out after/).to_stderr
     end
   end
@@ -195,7 +195,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     before { allow(adapter).to receive(:previous_bundle_hashes).and_raise(StandardError, "discovery failed") }
 
     it "warns and skips seeding" do
-      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+      expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
         .to output(/previous_bundle_hashes raised/).to_stderr
     end
   end
@@ -207,7 +207,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
 
     it "warns and skips seeding rather than blocking" do
-      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+      expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
         .to output(/previous_bundle_hashes timed out after/).to_stderr
     end
   end
@@ -222,7 +222,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
 
     it "rejects the unsafe value with a warning and stages only the safe one" do
-      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+      expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
         .to output(/invalid hash values \(rejected\).*etc/m).to_stderr
 
       expect(adapter).not_to have_received(:fetch).with("../../../etc")
@@ -242,7 +242,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
 
     it "rejects the unsafe adapter hash before any file staging" do
-      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+      expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
         .to output(/previous_bundle_hashes returned invalid hash values \(rejected\): \["\.\."\]/).to_stderr
 
       expect(adapter).not_to have_received(:fetch).with("..")
@@ -263,7 +263,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
 
     it "rejects leading-dot hashes so they cannot create hidden cache subdirectories" do
-      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+      expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
         .to output(/invalid hash values \(rejected\): \["\.hidden"\]/).to_stderr
 
       expect(adapter).not_to have_received(:fetch).with(".hidden")
@@ -288,7 +288,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
 
     it "rejects the temp-like hash so stale-temp sweeping cannot delete a valid cache entry" do
-      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+      expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
         .to output(/invalid hash values \(rejected\): \["#{temp_like_hash}"\]/).to_stderr
 
       expect(adapter).not_to have_received(:fetch).with(temp_like_hash)
@@ -311,7 +311,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
       end
 
       it "stages the bundle without warning, since the file is not expected" do
-        expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+        expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
           .not_to output(/missing loadable-stats\.json/).to_stderr
 
         expect(File.exist?(File.join(cache_dir, "no-stats", "no-stats.js"))).to be(true)
@@ -324,7 +324,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
       end
 
       it "warns but still stages the bundle for adapters that intentionally omit it" do
-        expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+        expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
           .to output(/missing loadable-stats\.json/).to_stderr
 
         expect(File.exist?(File.join(cache_dir, "no-stats", "no-stats.js"))).to be(true)
@@ -343,17 +343,17 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
       end
 
       it "attributes the error to the loadable-stats lookup, not adapter#fetch" do
-        expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+        expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
           .to output(/Could not check loadable-stats\.json for "no-stats".*Errno::ENOENT/m).to_stderr
       end
 
       it "does not blame adapter#fetch for the loadable-stats lookup failure" do
-        expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+        expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
           .not_to output(/rolling_deploy_adapter#fetch.*raised/).to_stderr
       end
 
       it "still stages the bundle when the loadable-stats lookup fails" do
-        described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy)
+        described_class.call(cache_dir:, current_hashes: [], mode: :copy)
         expect(File.exist?(File.join(cache_dir, "no-stats", "no-stats.js"))).to be(true)
       end
     end
@@ -372,7 +372,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
 
     it "skips staging entirely so the renderer sees 410, not a bundle without manifests" do
       warning_pattern = /\A(?!.*missing loadable-stats\.json).*returned non-required asset path\(s\) that do not exist/m
-      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+      expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
         .to output(warning_pattern).to_stderr
 
       bundle_dir = File.join(cache_dir, "abc123")
@@ -393,7 +393,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
 
     it "warns and skips that hash before staging non-file assets" do
-      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :symlink) }
+      expect { described_class.call(cache_dir:, current_hashes: [], mode: :symlink) }
         .to output(/returned non-required asset path\(s\) that are not files/).to_stderr
 
       expect(File.exist?(File.join(cache_dir, "directory-asset"))).to be(false)
@@ -416,7 +416,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
 
     it "keeps the previous valid cache entry and removes only this attempt's temp directory" do
-      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+      expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
         .to output(/Failed to seed previous bundle hash abc123/).to_stderr
 
       expect(File.read(existing_bundle)).to eq("// existing bundle")
@@ -445,7 +445,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
 
     it "keeps the previous valid cache entry in place" do
-      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+      expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
         .to output(/Failed to seed previous bundle hash abc123/).to_stderr
 
       expect(File.read(existing_bundle)).to eq("// existing bundle")
@@ -477,7 +477,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
 
     it "warns instead of silently skipping backup restore" do
-      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+      expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
         .to output(/Could not restore previous rolling-deploy bundle directory/).to_stderr
 
       expect(Dir.children(cache_dir).grep(/abc123\.previous/)).not_to be_empty
@@ -508,7 +508,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
 
     it "keeps the concurrent writer's bundle and removes the nested backup" do
-      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+      expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
         .to output(/Cannot restore previous rolling-deploy bundle directory.*recreated during restore/m).to_stderr
 
       expect(File.read(existing_bundle)).to eq("// concurrent bundle")
@@ -545,7 +545,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     # the rescue path leaves the concurrent writer's directory intact rather
     # than evicting it while trying to restore our backup.
     it "aborts the promotion and keeps the concurrent writer's bundle in place" do
-      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+      expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
         .to output(/Failed to seed previous bundle hash abc123: ReactOnRailsPro::Error: Concurrent writer recreated/m)
         .to_stderr
 
@@ -579,7 +579,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
 
     it "detects the nested staging directory and removes only this attempt's staging files" do
-      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+      expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
         .to output(/Failed to seed previous bundle hash abc123: ReactOnRailsPro::Error: Concurrent writer recreated/m)
         .to_stderr
 
@@ -607,7 +607,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
 
     it "keeps the promoted bundle and leaves stale backup cleanup for a later sweep" do
-      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+      expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
         .to output(/Could not remove stale rolling-deploy backup directory/).to_stderr
 
       expect(File.read(existing_bundle)).to eq("// new bundle")
@@ -635,7 +635,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
 
     it "removes stale temp directories while preserving hash-like names outside the temp pattern" do
-      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+      expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
         .to output(/Removed stale rolling-deploy temp directory/).to_stderr
         .and output(/No previous bundle hashes/).to_stdout
 
@@ -652,7 +652,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
       FileUtils.mkdir_p(false_positive_dir)
       File.utime(Time.now - 120, Time.now - 120, false_positive_dir)
 
-      described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy)
+      described_class.call(cache_dir:, current_hashes: [], mode: :copy)
 
       expect(File.exist?(false_positive_dir)).to be(true)
     end
@@ -662,7 +662,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
       FileUtils.mkdir_p(pid1_staging_dir)
       File.utime(Time.now - 7200, Time.now - 7200, pid1_staging_dir)
 
-      described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy)
+      described_class.call(cache_dir:, current_hashes: [], mode: :copy)
 
       expect(File.exist?(pid1_staging_dir)).to be(false)
     end
@@ -681,7 +681,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     it "skips previous hashes that omit required RSC companion assets" do
       allow(adapter).to receive(:fetch).with("rsc-hash").and_return(bundle: src_bundle, assets: [])
 
-      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+      expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
         .to output(/missing required RSC companion asset/).to_stderr
 
       expect(File.exist?(File.join(cache_dir, "rsc-hash"))).to be(false)
@@ -695,7 +695,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
         assets: [missing_client_manifest, server_client_manifest]
       )
 
-      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+      expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
         .to output(/missing required RSC asset path/).to_stderr
 
       expect(File.exist?(File.join(cache_dir, "rsc-hash"))).to be(false)
@@ -713,7 +713,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
 
       combined_warning_pattern =
         /missing required RSC asset path.*react-client-manifest\.json.*non-required asset path.*unrelated-chunk\.js/m
-      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+      expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
         .to output(combined_warning_pattern).to_stderr
 
       expect(File.exist?(File.join(cache_dir, "rsc-hash"))).to be(false)
@@ -731,7 +731,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
 
       combined_warning_pattern =
         /non-file required RSC asset path.*react-client-manifest\.json.*non-required asset path.*unrelated-chunk\.js/m
-      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+      expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
         .to output(combined_warning_pattern).to_stderr
 
       expect(File.exist?(File.join(cache_dir, "rsc-hash"))).to be(false)
@@ -743,7 +743,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
         assets: [client_manifest, server_client_manifest]
       )
 
-      described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy)
+      described_class.call(cache_dir:, current_hashes: [], mode: :copy)
 
       bundle_dir = File.join(cache_dir, "rsc-hash")
       expect(File.exist?(File.join(bundle_dir, "rsc-hash.js"))).to be(true)
@@ -763,7 +763,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
 
     it "deduplicates before staging so a late failure can't rollback an earlier successful stage" do
-      described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy)
+      described_class.call(cache_dir:, current_hashes: [], mode: :copy)
 
       expect(adapter).to have_received(:fetch).with("dup-hash").once
       expect(File.exist?(File.join(cache_dir, "dup-hash", "dup-hash.js"))).to be(true)
@@ -777,7 +777,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
 
     it "warns and skips that hash" do
-      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+      expect { described_class.call(cache_dir:, current_hashes: [], mode: :copy) }
         .to output(/without.*valid :bundle file path/m).to_stderr
     end
   end

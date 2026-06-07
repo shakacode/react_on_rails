@@ -22,7 +22,7 @@ module ReactOnRailsProHelper
       if cache_hit
         render_options = ReactOnRails::ReactComponent::RenderOptions.new(
           react_component_name: component_name,
-          options: options
+          options:
         )
         load_pack_for_generated_component(component_name, render_options)
       end
@@ -136,7 +136,7 @@ module ReactOnRailsProHelper
     # Extract streaming-specific callback
     on_complete = options.delete(:on_complete)
 
-    consumer_stream_async(on_complete: on_complete) do
+    consumer_stream_async(on_complete:) do
       internal_stream_react_component(component_name, options)
     end
   end
@@ -221,7 +221,7 @@ module ReactOnRailsProHelper
     # Extract streaming-specific callback
     on_complete = options.delete(:on_complete)
 
-    consumer_stream_async(on_complete: on_complete) do
+    consumer_stream_async(on_complete:) do
       internal_rsc_payload_react_component(component_name, options)
     end
   end
@@ -273,7 +273,7 @@ module ReactOnRailsProHelper
       react_component(component_name, options)
     end
 
-    ReactOnRailsPro::AsyncValue.new(task: task)
+    ReactOnRailsPro::AsyncValue.new(task:)
   end
 
   # Renders a React component asynchronously with caching support.
@@ -311,11 +311,11 @@ module ReactOnRailsProHelper
 
   private
 
-  def fetch_stream_react_component(component_name, raw_options, &block)
+  def fetch_stream_react_component(component_name, raw_options, &)
     auto_load_bundle = ReactOnRails.configuration.auto_load_bundle || raw_options[:auto_load_bundle]
 
     unless ReactOnRailsPro::Cache.use_cache?(raw_options)
-      return render_stream_component_with_props(component_name, raw_options, auto_load_bundle, &block)
+      return render_stream_component_with_props(component_name, raw_options, auto_load_bundle, &)
     end
 
     # Compose a cache key consistent with non-stream helper semantics.
@@ -328,13 +328,13 @@ module ReactOnRailsProHelper
     end
 
     # MISS: evaluate props lazily, stream live, and write-through to view-level cache
-    handle_stream_cache_miss(component_name, raw_options, auto_load_bundle, view_cache_key, &block)
+    handle_stream_cache_miss(component_name, raw_options, auto_load_bundle, view_cache_key, &)
   end
 
   def handle_stream_cache_hit(component_name, raw_options, auto_load_bundle, cached_chunks)
     render_options = ReactOnRails::ReactComponent::RenderOptions.new(
       react_component_name: component_name,
-      options: { auto_load_bundle: auto_load_bundle }.merge(raw_options)
+      options: { auto_load_bundle: }.merge(raw_options)
     )
     load_pack_for_generated_component(component_name, render_options)
 
@@ -355,7 +355,7 @@ module ReactOnRailsProHelper
     initial_result
   end
 
-  def handle_stream_cache_miss(component_name, raw_options, auto_load_bundle, view_cache_key, &block)
+  def handle_stream_cache_miss(component_name, raw_options, auto_load_bundle, view_cache_key, &)
     cache_aware_options = raw_options.merge(
       on_complete: lambda { |chunks|
         Rails.cache.write(view_cache_key, chunks, raw_options[:cache_options] || {})
@@ -366,17 +366,17 @@ module ReactOnRailsProHelper
       component_name,
       cache_aware_options,
       auto_load_bundle,
-      &block
+      &
     )
   end
 
   def render_stream_component_with_props(component_name, raw_options, auto_load_bundle)
     props = yield
     options = raw_options.merge(
-      props: props,
+      props:,
       prerender: true,
       skip_prerender_cache: true,
-      auto_load_bundle: auto_load_bundle
+      auto_load_bundle:
     )
     stream_react_component(component_name, options)
   end
@@ -391,7 +391,7 @@ module ReactOnRailsProHelper
 
   # Async version of fetch_react_component. Handles cache lookup synchronously,
   # returns ImmediateAsyncValue on hit, AsyncValue on miss.
-  def fetch_async_react_component(component_name, raw_options, &block)
+  def fetch_async_react_component(component_name, raw_options, &)
     unless defined?(@react_on_rails_async_barrier) && @react_on_rails_async_barrier
       raise ReactOnRailsPro::Error,
             "cached_async_react_component requires AsyncRendering concern. " \
@@ -400,7 +400,7 @@ module ReactOnRailsProHelper
 
     # Check conditional caching (:if / :unless options)
     unless ReactOnRailsPro::Cache.use_cache?(raw_options)
-      return render_async_react_component_uncached(component_name, raw_options, &block)
+      return render_async_react_component_uncached(component_name, raw_options, &)
     end
 
     cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, raw_options)
@@ -420,23 +420,23 @@ module ReactOnRailsProHelper
     end
 
     Rails.logger.debug { "React on Rails Pro async cache MISS for #{cache_key.inspect}" }
-    render_async_react_component_with_cache(component_name, raw_options, cache_key, cache_options, &block)
+    render_async_react_component_with_cache(component_name, raw_options, cache_key, cache_options, &)
   end
 
   # Renders async without caching (when :if/:unless conditions disable cache)
-  def render_async_react_component_uncached(component_name, raw_options, &block)
-    options = prepare_async_render_options(raw_options, &block)
+  def render_async_react_component_uncached(component_name, raw_options, &)
+    options = prepare_async_render_options(raw_options, &)
 
     task = @react_on_rails_async_barrier.async do
       react_component(component_name, options)
     end
 
-    ReactOnRailsPro::AsyncValue.new(task: task)
+    ReactOnRailsPro::AsyncValue.new(task:)
   end
 
   # Renders async and writes to cache on completion
-  def render_async_react_component_with_cache(component_name, raw_options, cache_key, cache_options, &block)
-    options = prepare_async_render_options(raw_options, &block)
+  def render_async_react_component_with_cache(component_name, raw_options, cache_key, cache_options, &)
+    options = prepare_async_render_options(raw_options, &)
 
     task = @react_on_rails_async_barrier.async do
       result = react_component(component_name, options)
@@ -444,7 +444,7 @@ module ReactOnRailsProHelper
       result
     end
 
-    ReactOnRailsPro::AsyncValue.new(task: task)
+    ReactOnRailsPro::AsyncValue.new(task:)
   end
 
   def prepare_async_render_options(raw_options)
@@ -558,9 +558,9 @@ module ReactOnRailsProHelper
         is_first_chunk = false
         build_react_component_result_for_server_rendered_string(
           server_rendered_html: chunk_json_result["html"],
-          component_specification_tag: component_specification_tag,
+          component_specification_tag:,
           console_script: chunk_json_result["consoleReplayScript"],
-          render_options: render_options
+          render_options:
         )
       else
         console_script = chunk_json_result["consoleReplayScript"]

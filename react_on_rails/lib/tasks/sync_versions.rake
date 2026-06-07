@@ -18,6 +18,6 @@ namespace :react_on_rails do
 
     raise ReactOnRails::Error, "WRITE and DRY_RUN cannot both be true" if write && dry_run
 
-    ReactOnRails::VersionSynchronizer.new.sync(write: write)
+    ReactOnRails::VersionSynchronizer.new.sync(write:)
   end
 end

@@ -42,7 +42,7 @@ namespace :react_on_rails do
     verbose = ENV["VERBOSE"] == "true"
     fix = ENV["FIX"] == "true"
 
-    doctor = ReactOnRails::Doctor.new(verbose: verbose, fix: fix)
+    doctor = ReactOnRails::Doctor.new(verbose:, fix:)
     doctor.run_diagnosis
   end
 end

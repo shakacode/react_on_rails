@@ -98,8 +98,8 @@ RSpec.describe BencherReport do
       described_class.parse(
         report_json(results: [[benchmark_result(
           name: "/r",
-          measures: [measure_entry(slug: "rps", name: "rps", value: value,
-                                   baseline: baseline, lower_limit: lower_limit, upper_limit: nil)]
+          measures: [measure_entry(slug: "rps", name: "rps", value:,
+                                   baseline:, lower_limit:, upper_limit: nil)]
         )]])
       )
     end
@@ -122,8 +122,8 @@ RSpec.describe BencherReport do
       described_class.parse(
         report_json(results: [[benchmark_result(
           name: "/p",
-          measures: [measure_entry(slug: "p50-latency", name: "p50_latency", value: value,
-                                   baseline: baseline, lower_limit: nil, upper_limit: upper_limit)]
+          measures: [measure_entry(slug: "p50-latency", name: "p50_latency", value:,
+                                   baseline:, lower_limit: nil, upper_limit:)]
         )]])
       )
     end
@@ -171,7 +171,7 @@ RSpec.describe BencherReport do
       described_class.parse(
         report_json(results: [[benchmark_result(
           name: "/b",
-          measures: [measure_entry(slug: "rps", name: "rps", value: value,
+          measures: [measure_entry(slug: "rps", name: "rps", value:,
                                    baseline: 100.0, lower_limit: 90.0, upper_limit: 120.0)]
         )]])
       )

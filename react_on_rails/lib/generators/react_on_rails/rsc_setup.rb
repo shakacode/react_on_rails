@@ -240,7 +240,7 @@ module ReactOnRails
         layout_name = resolve_hello_server_layout_name
         template("templates/rsc/base/app/controllers/hello_server_controller.rb.tt",
                  controller_path,
-                 layout_name: layout_name)
+                 layout_name:)
 
         say "✅ Created #{controller_path}", :green
       end
@@ -469,12 +469,12 @@ module ReactOnRails
 
         full_path = File.join(destination_root, config_path)
         current_content = File.read(full_path)
-        return if new_rsc_plugin_setup_complete?(current_content, is_server: is_server)
+        return if new_rsc_plugin_setup_complete?(current_content, is_server:)
         return if current_content == original_content
 
         say_status(:revert, config_path, :yellow)
         File.write(full_path, original_content)
-        warn_incomplete_new_rsc_plugin_setup(config_path, is_server: is_server)
+        warn_incomplete_new_rsc_plugin_setup(config_path, is_server:)
       end
 
       def new_rsc_plugin_setup_complete?(content, is_server:)

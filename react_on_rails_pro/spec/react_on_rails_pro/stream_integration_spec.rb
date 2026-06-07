@@ -109,8 +109,8 @@ RSpec.describe "Streaming client disconnect integration" do
     buffer = StreamIntegrationHelpers::TestStreamBuffer.new
     response = StreamIntegrationHelpers::TestLiveResponse.new(buffer)
     controller = StreamIntegrationHelpers::TestStreamController.new(
-      response: response,
-      component_configs: component_configs
+      response:,
+      component_configs:
     )
 
     chunks_received = []
@@ -139,7 +139,7 @@ RSpec.describe "Streaming client disconnect integration" do
 
     reader_thread.join(timeout_seconds)
 
-    { chunks_received: chunks_received, stream_error: stream_error, reader_error: reader_error }
+    { chunks_received:, stream_error:, reader_error: }
   end
 
   # Runs a successful (no-disconnect) streaming operation to verify the server
@@ -151,8 +151,8 @@ RSpec.describe "Streaming client disconnect integration" do
     buffer = StreamIntegrationHelpers::TestStreamBuffer.new
     response = StreamIntegrationHelpers::TestLiveResponse.new(buffer)
     controller = StreamIntegrationHelpers::TestStreamController.new(
-      response: response,
-      component_configs: component_configs
+      response:,
+      component_configs:
     )
 
     chunks_received = []

@@ -362,7 +362,7 @@ module ReactOnRails
           context "with server file not in manifest", packer_type.to_sym do
             it "returns the private ssr-generated path for server bundles" do
               server_bundle_name = "server-bundle.js"
-              mock_bundle_configs(server_bundle_name: server_bundle_name)
+              mock_bundle_configs(server_bundle_name:)
               mock_missing_manifest_entry(server_bundle_name)
 
               path = described_class.server_bundle_js_file_path
@@ -373,7 +373,7 @@ module ReactOnRails
             context "with server_bundle_output_path configured and enforce_private_server_bundles=false" do
               it "returns the configured path directly without checking file existence" do
                 server_bundle_name = "server-bundle.js"
-                mock_bundle_configs(server_bundle_name: server_bundle_name)
+                mock_bundle_configs(server_bundle_name:)
                 mock_missing_manifest_entry(server_bundle_name)
                 # NOTE: mock_bundle_configs sets enforce_private_server_bundles to false
 

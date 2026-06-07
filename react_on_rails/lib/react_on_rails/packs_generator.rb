@@ -56,15 +56,15 @@ module ReactOnRails
       @server_bundle_entrypoint = nil
       verbose = ENV["REACT_ON_RAILS_VERBOSE"] == "true"
 
-      with_generated_packs_lock(verbose: verbose) do
+      with_generated_packs_lock(verbose:) do
         add_generated_pack_to_server_bundle
 
         if generated_files_present_and_up_to_date?
-          clean_non_generated_files_with_feedback(verbose: verbose)
+          clean_non_generated_files_with_feedback(verbose:)
           puts Rainbow("✅ Generated packs are up to date, no regeneration needed").green if verbose
         else
-          clean_generated_directories_with_feedback(verbose: verbose)
-          generate_packs(verbose: verbose)
+          clean_generated_directories_with_feedback(verbose:)
+          generate_packs(verbose:)
         end
       end
     ensure
@@ -91,7 +91,7 @@ module ReactOnRails
     def with_generated_packs_lock(verbose: false)
       lock_path = generated_packs_lock_path
       FileUtils.mkdir_p(lock_path.dirname)
-      clear_stale_generated_packs_lock(lock_path, verbose: verbose)
+      clear_stale_generated_packs_lock(lock_path, verbose:)
 
       File.open(lock_path, File::RDWR | File::CREAT, 0o644) do |lock_file|
         puts Rainbow("🔒 Acquiring generated packs lock at #{lock_path}").yellow if verbose
@@ -138,14 +138,14 @@ module ReactOnRails
       # Check for name conflicts between components and stores
       check_for_component_store_name_conflicts
 
-      common_component_to_path.each_value { |component_path| create_pack(component_path, verbose: verbose) }
-      client_component_to_path.each_value { |component_path| create_pack(component_path, verbose: verbose) }
+      common_component_to_path.each_value { |component_path| create_pack(component_path, verbose:) }
+      client_component_to_path.each_value { |component_path| create_pack(component_path, verbose:) }
 
       # Generate store packs if stores_subdirectory is configured
-      store_to_path.each_value { |store_path| create_store_pack(store_path, verbose: verbose) }
+      store_to_path.each_value { |store_path| create_store_pack(store_path, verbose:) }
 
-      create_server_pack(verbose: verbose) if ReactOnRails.configuration.server_bundle_js_file.present?
-      create_server_component_registration_entry(verbose: verbose) if ReactOnRails::Utils.rsc_support_enabled?
+      create_server_pack(verbose:) if ReactOnRails.configuration.server_bundle_js_file.present?
+      create_server_component_registration_entry(verbose:) if ReactOnRails::Utils.rsc_support_enabled?
 
       log_rsc_classification_summary if ReactOnRails::Utils.rsc_support_enabled?
     end
@@ -370,7 +370,7 @@ module ReactOnRails
       store_names = stores.keys
 
       build_server_pack_content(component_on_server_imports, server_components, client_components,
-                                store_imports: store_imports, store_names: store_names)
+                                store_imports:, store_names:)
     end
 
     def components_for_server_registration
@@ -503,10 +503,10 @@ module ReactOnRails
       puts Rainbow("🧹 Cleaning non-generated files...").yellow if verbose
 
       total_deleted = directories_to_clean.sum do |dir_path|
-        clean_unexpected_files_from_directory(dir_path, expected_files, verbose: verbose)
+        clean_unexpected_files_from_directory(dir_path, expected_files, verbose:)
       end
 
-      display_cleanup_summary(total_deleted, verbose: verbose) if verbose
+      display_cleanup_summary(total_deleted, verbose:) if verbose
     end
 
     def build_expected_files_set
@@ -537,7 +537,7 @@ module ReactOnRails
       unexpected_files = find_unexpected_files(existing_files, dir_path, expected_files)
 
       if unexpected_files.any?
-        delete_unexpected_files(unexpected_files, dir_path, verbose: verbose)
+        delete_unexpected_files(unexpected_files, dir_path, verbose:)
         unexpected_files.length
       else
         puts Rainbow("   No unexpected files found in #{dir_path}").cyan if verbose
@@ -585,7 +585,7 @@ module ReactOnRails
     def clean_generated_directories_with_feedback(verbose: false)
       puts Rainbow("🧹 Cleaning generated directories...").yellow if verbose
 
-      total_deleted = directories_to_clean.sum { |dir_path| clean_directory_with_feedback(dir_path, verbose: verbose) }
+      total_deleted = directories_to_clean.sum { |dir_path| clean_directory_with_feedback(dir_path, verbose:) }
 
       return unless verbose
 
@@ -597,7 +597,7 @@ module ReactOnRails
     end
 
     def clean_directory_with_feedback(dir_path, verbose: false)
-      return create_directory_with_feedback(dir_path, verbose: verbose) unless Dir.exist?(dir_path)
+      return create_directory_with_feedback(dir_path, verbose:) unless Dir.exist?(dir_path)
 
       files = Dir.glob("#{dir_path}/**/*").select { |f| File.file?(f) }
 

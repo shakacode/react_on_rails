@@ -33,11 +33,11 @@ describe ReactOnRailsPro::Request do
     FileUtils.mkdir_p(File.dirname(rsc_server_bundle_path))
     File.write(rsc_server_bundle_path, 'console.log("mock RSC bundle");')
 
-    allow(ReactOnRailsPro.configuration).to receive_messages(renderer_url: renderer_url, renderer_http_pool_size: 20)
+    allow(ReactOnRailsPro.configuration).to receive_messages(renderer_url:, renderer_http_pool_size: 20)
     allow(Rails).to receive(:logger).and_return(logger_mock)
 
     allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool).to receive_messages(
-      renderer_bundle_file_name: renderer_bundle_file_name, rsc_renderer_bundle_file_name: rsc_renderer_bundle_file_name
+      renderer_bundle_file_name:, rsc_renderer_bundle_file_name:
     )
     allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path).and_return(server_bundle_path)
     allow(ReactOnRailsPro::Utils).to receive(:rsc_bundle_js_file_path).and_return(rsc_server_bundle_path)
@@ -364,7 +364,7 @@ describe ReactOnRailsPro::Request do
       stream = described_class.render_code_with_incremental_updates(
         "/render-incremental",
         js_code,
-        async_props_block: async_props_block
+        async_props_block:
       )
 
       stream.each_chunk(&:itself)
@@ -379,7 +379,7 @@ describe ReactOnRailsPro::Request do
       stream = described_class.render_code_with_incremental_updates(
         "/render-incremental",
         js_code,
-        async_props_block: async_props_block
+        async_props_block:
       )
 
       stream.each_chunk(&:itself)
@@ -412,7 +412,7 @@ describe ReactOnRailsPro::Request do
 
       emitter_captured = nil
       allow(ReactOnRailsPro::AsyncPropsEmitter).to receive(:new) do |bundle_timestamp, output|
-        emitter_captured = { bundle_timestamp: bundle_timestamp, output: output }
+        emitter_captured = { bundle_timestamp:, output: }
         instance_double(
           ReactOnRailsPro::AsyncPropsEmitter,
           end_stream_chunk: { bundleTimestamp: bundle_timestamp, updateChunk: "mocked_js" }
@@ -422,7 +422,7 @@ describe ReactOnRailsPro::Request do
       stream = described_class.render_code_with_incremental_updates(
         "/render-incremental",
         js_code,
-        async_props_block: async_props_block
+        async_props_block:
       )
 
       stream.each_chunk(&:itself)

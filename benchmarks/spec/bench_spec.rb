@@ -22,7 +22,7 @@ RSpec.describe "bench" do
         end
 
         def add(name:, rps:, p50:, status:, p90: nil)
-          @added << { name: name, rps: rps, p50: p50, p90: p90, status: status }
+          @added << { name:, rps:, p50:, p90:, status: }
         end
       end.new
     end
@@ -41,7 +41,7 @@ RSpec.describe "bench" do
     it "returns no failures and records every route when all succeed" do
       runner = ->(_route) { [100.0, 1.0, 2.0, "200=10"] }
 
-      failed = run_benchmark_suite(%w[/a /b], collector, runner: runner)
+      failed = run_benchmark_suite(%w[/a /b], collector, runner:)
 
       expect(failed).to be_empty
       expect(collector.added.map { |m| m[:name] }).to eq(%w[/a /b])
@@ -56,7 +56,7 @@ RSpec.describe "bench" do
 
       failed = nil
       # ::error:: annotations go to stdout so GitHub Actions renders them.
-      expect { failed = run_benchmark_suite(%w[/a /bad /c], collector, runner: runner) }
+      expect { failed = run_benchmark_suite(%w[/a /bad /c], collector, runner:) }
         .to output(%r{::error::.*/bad}).to_stdout
 
       expect(failed).to eq(["/bad"])
@@ -75,7 +75,7 @@ RSpec.describe "bench" do
       # Pin both routes' ::error:: annotations (in order) rather than accepting
       # any stdout, so a dropped or reformatted annotation is caught. They go to
       # stdout so GitHub Actions renders them.
-      expect { failed = run_benchmark_suite(%w[/x /y], collector, runner: runner) }
+      expect { failed = run_benchmark_suite(%w[/x /y], collector, runner:) }
         .to output(%r{::error::.*/x.*::error::.*/y}m).to_stdout
 
       expect(failed).to eq(%w[/x /y])

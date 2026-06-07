@@ -42,8 +42,8 @@ RSpec.describe "rolling-deploy auto routes", type: :request do
       routes.prepend do
         ReactOnRailsPro::RollingDeploy::BundlesController.draw_routes(
           self,
-          path: path,
-          as_prefix: as_prefix
+          path:,
+          as_prefix:
         )
       end
     end
@@ -90,7 +90,7 @@ RSpec.describe "rolling-deploy auto routes", type: :request do
 
     expect do
       routes.draw do
-        ReactOnRailsPro::RollingDeploy::BundlesController.draw_routes(self, path: path)
+        ReactOnRailsPro::RollingDeploy::BundlesController.draw_routes(self, path:)
       end
     end.not_to raise_error
     expect(routes.named_routes.helper_names).to include(
@@ -165,7 +165,7 @@ RSpec.describe "rolling-deploy auto routes", type: :request do
     it "treats #{mount_path.inspect} mount path as an auto-mount opt-out" do
       configure_rolling_deploy_routes(
         adapter: ReactOnRailsPro::RollingDeployAdapters::Http,
-        mount_path: mount_path
+        mount_path:
       )
 
       expect { route_for("#{default_path}/manifest") }.to raise_error(ActionController::RoutingError)

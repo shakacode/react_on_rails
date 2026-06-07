@@ -294,7 +294,7 @@ module ReactOnRails
         package_json = GeneratorMessages.read_package_json(destination_root)
         package_manager = GeneratorMessages.detect_package_manager(
           app_root: destination_root,
-          package_json: package_json
+          package_json:
         )
         # Scope the lockfile check to the detected manager: a generic "any lockfile exists" check
         # would emit `cache: "pnpm"` in CI when only `yarn.lock` is on disk, breaking setup-node.
@@ -307,16 +307,16 @@ module ReactOnRails
                                 GeneratorMessages.package_manager_declared?(
                                   app_root: destination_root,
                                   manager: "pnpm",
-                                  package_json: package_json
+                                  package_json:
                                 )
         has_active_record = File.exist?(File.join(destination_root, "config/database.yml"))
         has_rspec = File.exist?(File.join(destination_root, "spec/rails_helper.rb")) ||
                     File.exist?(File.join(destination_root, "spec/spec_helper.rb"))
         template("templates/base/base/.github/workflows/ci.yml.tt", ci_path,
-                 { package_manager: package_manager, has_lockfile: has_lockfile,
-                   pnpm_version_declared: pnpm_version_declared,
+                 { package_manager:, has_lockfile:,
+                   pnpm_version_declared:,
                    pnpm_fallback_version: CI_PNPM_FALLBACK_VERSION,
-                   has_active_record: has_active_record, has_rspec: has_rspec,
+                   has_active_record:, has_rspec:,
                    precompile_hook_command: shakapacker_precompile_hook_command(environment: "test") })
         @ci_workflow_generated = true
       end
@@ -442,7 +442,7 @@ module ReactOnRails
         content = JSON.parse(original_text)
         content["scripts"] = existing_scripts.merge(scripts_to_add)
         indent = original_text[/\A\{\n(\s+)/, 1] || "  "
-        "#{JSON.pretty_generate(content, indent: indent)}\n"
+        "#{JSON.pretty_generate(content, indent:)}\n"
       end
 
       def ensure_jsx_in_js_compatibility
@@ -690,8 +690,8 @@ module ReactOnRails
         end
 
         GeneratorMessages.add_info(GeneratorMessages.helpful_message_after_installation(
-                                     component_name: component_name,
-                                     route: route,
+                                     component_name:,
+                                     route:,
                                      pro: use_pro?,
                                      rsc: use_rsc?,
                                      shakapacker_just_installed: shakapacker_just_installed?,
