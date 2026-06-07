@@ -35,6 +35,7 @@ For each included PR:
 - Review completion: find reviews, review comments, issue comments, and review/check runs from Claude, Codex, CodeRabbit, Greptile, Cursor Bugbot, and other configured reviewers.
 - Review timing: flag any reviewer check, review, or comment that was still queued/in-progress at merge time or landed after merge.
 - Review triage: flag any pre-merge review/comment with `Must Fix`, `MUST-FIX`, `Should Fix`, `DISCUSS`, `Changes Requested`, `blocking`, or similar actionable language when there is no later evidence it was fixed, waived, or explicitly classified.
+- Adversarial review: flag any requested adversarial review that finished after merge, reviewed an older head SHA, or left untriaged `BLOCKING` or `DISCUSS` findings.
 - Changelog: if the diff or PR body indicates a user-visible behavior, API, error message, configuration, performance, security, or breaking change, verify `CHANGELOG.md` has a matching entry. When entries are missing, recommend running `/update-changelog`.
 - Validation: compare changed areas with the validation evidence in the PR body or comments.
 - Cross-PR interactions: compare changed files, shared behavior, assumptions, and release-sensitive areas across the batch.
@@ -74,7 +75,7 @@ Before creating an approved issue, search existing open issues for the affected 
 
 ```markdown
 <!-- post-merge-audit-finding v1
-audit: 2026-06-06-post-rc
+audit: <AUDIT_ID>
 fingerprint: pr-3724:changelog-server-bundle-load-error
 affected_prs: 3724
 -->

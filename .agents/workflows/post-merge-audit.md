@@ -4,7 +4,8 @@ Use these prompts with `.agents/skills/post-merge-audit/SKILL.md` when auditing 
 
 ## Coordination Rules
 
-- Use one exact audit id, base, and head for every agent, for example `audit: 2026-06-06-post-rc`.
+- Use one exact audit id, base, and head for every agent, for example `audit: <YYYY-MM-DD>-post-rc`.
+- Format `<AUDIT_ID>` as `<YYYY-MM-DD>-<short-purpose>`, for example `<YYYY-MM-DD>-post-rc` or `<YYYY-MM-DD>-agent-batch-audit`.
 - Run Codex and Claude independently first. Do not give either agent the other agent's report until both reports are complete.
 - During independent audits, agents may draft issue bodies but must not create issues, comments, labels, fixes, reverts, branches, or PRs.
 - Use one coordinator to compare reports, dedupe findings, and propose the issue plan.
@@ -16,7 +17,7 @@ Suggested hidden fingerprint:
 
 ```markdown
 <!-- post-merge-audit-finding v1
-audit: 2026-06-06-post-rc
+audit: <AUDIT_ID>
 fingerprint: pr-3724:changelog-server-bundle-load-error
 affected_prs: 3724
 -->
@@ -53,7 +54,7 @@ Run an independent post-merge audit of merged PRs since the last release candida
 Use git and GitHub ground truth. Do not rely on prior chat memory.
 
 Scope:
-- Repository: shakacode/react_on_rails
+- Repository: <OWNER>/<REPO>
 - Base: resolve the most recent release candidate tag/commit unless I provide one explicitly
 - Head: current main
 - Focus: PRs that appear to be from recent high-concurrency agent/Codex/Claude batch work
@@ -76,6 +77,7 @@ After confirmation, audit each included PR for:
 - overlapping files or assumptions
 - undocumented non-blocking decisions
 - review-agent checks/reviews/comments that were late, pending, stale, or untriaged at merge time
+- requested adversarial reviews that were late, stale, missing, or left untriaged `BLOCKING`/`DISCUSS` findings
 - untriaged Must Fix, SHOULD-FIX, DISCUSS, Changes Requested, compatibility, security, regression, or missing-changelog review findings
 - changes touching CI, Pro, build config, generators, SSR, RSC, shared types, or release-sensitive docs
 - anything that could have bad consequences after merge
@@ -165,21 +167,22 @@ After creation, return:
 Use this when Codex is coordinating a PR and the user wants an independent Claude review before final readiness.
 
 ```text
-Please review this PR as an independent reviewer before it is marked ready or merged:
+Please run an adversarial PR review before this PR is marked ready or merged:
 
 <PR_URL>
 
-If this Claude Code environment provides `/pr-review-toolkit:review-pr`, run:
+If this Claude Code environment provides the repo-local skill, run:
 
-/pr-review-toolkit:review-pr <PR_URL>
+/adversarial-pr-review <PR_URL>
 
-Otherwise, perform an equivalent PR review using GitHub and local repo evidence.
+Otherwise, use `.agents/workflows/adversarial-pr-review.md`. If `/pr-review-toolkit:review-pr` is available, you may use it as one input, but it is not sufficient by itself.
 
-Focus on correctness bugs, missing tests, compatibility changes, missing changelog entries, release risk, and mismatches with AGENTS.md. Classify findings as:
-- MUST-FIX
+Focus on correctness bugs, missing tests, compatibility changes, missing changelog entries, release risk, late or stale review comments, changed agent instructions, and mismatches with AGENTS.md. Classify findings as:
+- BLOCKING
 - DISCUSS
-- OPTIONAL
-- SKIPPED/noise
+- FOLLOWUP
+- NON_BLOCKING_DECISION
+- NOISE
 
-Do not create commits, push, merge, create issues, or resolve threads unless explicitly asked. Return a concise report with evidence and exact files/lines where possible.
+Do not create commits, comments, labels, issues, pushes, merges, approvals, or thread resolutions unless explicitly asked. Return a concise report with evidence and exact files/lines where possible.
 ```

@@ -12,6 +12,7 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
 - `internal/contributor-info/agent-workflow-adoption.md`: guide for copying these agent workflows into other repositories
 - When the user wants a multi-issue or multi-PR Codex batch, use `.agents/skills/pr-batch/SKILL.md`; a short invocation is `$pr-batch` or "Run a Codex batch"
 - When the user wants to audit merged batch work, missed reviews, release-candidate risk, or possible bad merges, use `.agents/skills/post-merge-audit/SKILL.md`; reusable prompts live in `.agents/workflows/post-merge-audit.md`
+- When the user wants an adversarial PR review, red-team review, Claude/Codex comparison review, or a stricter pre-merge gate, use `.agents/skills/adversarial-pr-review/SKILL.md`; reusable prompts live in `.agents/workflows/adversarial-pr-review.md`
 - When the user assigns an issue, PR, review-fix pass, or merge queue to an agent, follow `.agents/workflows/pr-processing.md`
 - When the user asks to address PR review comments, use `.agents/skills/address-review/SKILL.md`; `.agents/workflows/address-review.md` remains a copy/paste prompt for assistants without skill support
 
@@ -209,7 +210,7 @@ For small, focused PRs (roughly 5 files changed or fewer and one clear purpose):
 - Use at most one AI reviewer that leaves inline comments. Additional AI tools should be summary-only or used manually.
 - Wait for the first full review pass to finish before pushing follow-up commits.
 - Before merge, wait for configured review agents such as Claude review, CodeRabbit, Greptile, Cursor Bugbot, and Codex review to finish for the current head SHA, then triage their reviews/comments. A green or skipped check is not enough if actionable comments exist.
-- If the user requests Claude review from a Codex-run PR process, coordinate an explicit Claude handoff such as `/pr-review-toolkit:review-pr <PR_URL>` after a draft PR exists, then classify and resolve or waive Claude's actionable findings before final readiness.
+- If the user requests Claude review from a Codex-run PR process, prefer the repo-local `/adversarial-pr-review <PR_URL>` handoff after a draft PR exists. `/pr-review-toolkit:review-pr` is useful input, but it is not by itself the merge gate. Classify and resolve or waive Claude's actionable findings before final readiness.
 - Batch review fixes into one follow-up push when practical. Do not create a new commit for each minor comment.
 - Treat as blocking only: correctness bugs, failing tests, regressions, and clear inconsistencies with adjacent code. Nits and style suggestions are optional unless a maintainer asks for them.
 - Verify language, runtime, and library claims locally before changing code in response to AI review comments.

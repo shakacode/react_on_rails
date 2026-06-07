@@ -13,6 +13,8 @@ For assistants without skill support, follow the high-concurrency batch launch r
 
 For post-merge audits after a concurrent batch or before a release candidate, use `.agents/skills/post-merge-audit/SKILL.md` when skills are available. Reusable audit, comparison, issue-creation, and Claude handoff prompts live in `.agents/workflows/post-merge-audit.md`.
 
+For adversarial pre-merge or post-merge PR review, use `.agents/skills/adversarial-pr-review/SKILL.md` when skills are available. Reusable Codex, Claude, and comparison prompts live in `.agents/workflows/adversarial-pr-review.md`.
+
 ## Default Operating Model
 
 1. Resolve the work item:
@@ -48,13 +50,20 @@ gh pr diff <PR> --name-only
 gh pr checks <PR>
 ```
 
-Fetch unresolved review threads when review comments matter:
+Fetch inline PR review comments separately; `gh pr view --json comments` is not
+enough for review-thread comments:
 
 ```bash
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 OWNER=${REPO%/*}
 NAME=${REPO#*/}
 PR_NUMBER=<PR_NUMBER>
+gh api "repos/${OWNER}/${NAME}/pulls/${PR_NUMBER}/comments" --paginate
+```
+
+Fetch unresolved review threads when review comments matter:
+
+```bash
 gh api graphql --paginate -f owner="${OWNER}" -f name="${NAME}" -F pr="${PR_NUMBER}" -f query='query($owner:String!, $name:String!, $pr:Int!, $endCursor:String) { repository(owner:$owner, name:$name) { pullRequest(number:$pr) { reviewThreads(first:100, after:$endCursor) { nodes { id isResolved comments(first:100) { nodes { id databaseId body author { login } url path line } } } pageInfo { hasNextPage endCursor } } } } }'
 ```
 
@@ -150,7 +159,7 @@ Mode: spawn worker subagents only after the target list and lane split are confi
 
 For issue targets, create one focused branch and PR unless exact same-file overlap makes a bundle safer. Start new issue branches from updated origin/main. For existing PR, review-fix, or merge-readiness targets, work on the existing PR head branch and do not create replacement PRs; if the branch cannot be updated safely, report the blocker. Follow local validation, self-review, CI backpressure, and merge-readiness gates.
 
-Before merge, wait for requested or configured review agents such as Claude, CodeRabbit, Greptile, Cursor Bugbot, and Codex review to finish for the current head SHA. A completed check is not enough when review comments exist: classify and resolve or explicitly waive actionable findings before merging. Treat untriaged `Must Fix`, `MUST-FIX`, `Changes Requested`, correctness, security, regression, compatibility, and missing-changelog findings as merge blockers unless a maintainer explicitly waives them.
+Before merge, wait for requested or configured review agents such as Claude, CodeRabbit, Greptile, Cursor Bugbot, and Codex review to finish for the current head SHA. For high-risk or concurrent-batch PRs, run or request the adversarial PR review workflow in `.agents/workflows/adversarial-pr-review.md`. A completed check is not enough when review comments exist: classify and resolve or explicitly waive actionable findings before merging. Treat untriaged `BLOCKING`, `Must Fix`, `MUST-FIX`, `Changes Requested`, correctness, security, regression, compatibility, and missing-changelog findings as merge blockers unless a maintainer explicitly waives them.
 
 For blocking questions, stop work on that target, surface the question to the coordinator or maintainer, and mark the issue/PR with the agreed pending-question state. For non-blocking questions where you make a decision and continue, record the decision in the PR description before review or merge.
 
@@ -187,12 +196,12 @@ Use exact lane assignments as the primary coordination mechanism. Labels are use
 
 ```markdown
 <!-- codex-claim v1
-batch: 2026-06-06-odd-issues
-machine: mac-studio-a
+batch: <BATCH_ID>
+machine: <MACHINE_ID>
 thread: <codex-thread-id>
-branch: jg-codex/issue-3667
+branch: <BRANCH_NAME>
 status: in_progress
-expires_at: 2026-06-06T20:00:00Z
+expires_at: <ISO8601_UTC>
 -->
 ```
 
@@ -327,11 +336,17 @@ Before marking a PR ready, asking for merge, or merging it:
 1. Verify all requested or configured review agents have finished for the current head SHA. This includes Claude review, CodeRabbit, Greptile, Cursor Bugbot, Codex review, and any repo-specific reviewer bot.
 2. Do not treat a green or skipped review check as sufficient if the reviewer also posted comments. Fetch PR reviews and comments, then classify actionable feedback.
 3. Do not merge while a relevant review check is queued, in progress, stale for an older head SHA, or known to be posting comments asynchronously.
-4. Treat untriaged `Must Fix`, `MUST-FIX`, `Changes Requested`, correctness, security, regression, compatibility, and missing-changelog findings as merge blockers unless a maintainer explicitly waives them with evidence.
+4. Treat untriaged `BLOCKING`, `Must Fix`, `MUST-FIX`, `Changes Requested`, correctness, security, regression, compatibility, and missing-changelog findings as merge blockers unless a maintainer explicitly waives them with evidence.
 5. Treat `Should Fix`, `DISCUSS`, and similar non-blocking review concerns as requiring an explicit PR description decision, review reply, or maintainer waiver before merge.
 6. If any reviewer detects a missing changelog entry for a user-visible change, either update `CHANGELOG.md` before merge or document that `/update-changelog` must run before the next release candidate.
 
 Use `address-review` for actionable GitHub review comments instead of skimming them manually. If a PR was already merged before this gate ran, include it in the next post-merge audit.
+
+### Adversarial Review Gate
+
+Use `.agents/skills/adversarial-pr-review/SKILL.md` for high-risk PRs, concurrent batch PRs, suspected bad merges, release-candidate risk, or when the user asks for a Claude/Codex red-team pass.
+
+The adversarial review is report-only by default. It must check inline review comments, review timing, missing changelog entries, changed agent instructions, validation gaps, untrusted PR content, and cross-PR interactions. All `BLOCKING` and `DISCUSS` findings must be fixed, explicitly decided, or waived before final readiness.
 
 ### Coordinating Claude Review
 
@@ -340,10 +355,11 @@ Codex cannot assume that Claude Code slash commands are executable from the curr
 When the user wants Claude as an independent PR reviewer:
 
 1. Create or update a draft PR first if the Claude command needs a GitHub PR URL.
-2. Ask Claude to run the configured review command, such as `/pr-review-toolkit:review-pr <PR_URL>`, or use the Claude handoff prompt in `.agents/workflows/post-merge-audit.md`.
-3. Keep Codex and Claude independent until Claude posts or returns its report.
-4. Fetch Claude review comments and classify them with `address-review`.
-5. Do not mark the PR ready or merge until Claude's `MUST-FIX`, `DISCUSS`, compatibility, security, regression, and missing-changelog findings are fixed, explicitly decided, or waived by a maintainer.
+2. Prefer the repo-local `/adversarial-pr-review <PR_URL>` skill, or use the handoff prompt in `.agents/workflows/adversarial-pr-review.md`.
+3. Use `/pr-review-toolkit:review-pr <PR_URL>` only as review input or when the user accepts that the command may interact with GitHub according to the active Claude permissions.
+4. Keep Codex and Claude independent until Claude posts or returns its report.
+5. Fetch Claude review comments and classify them with `address-review`.
+6. Do not mark the PR ready or merge until Claude's `BLOCKING`, `MUST-FIX`, `DISCUSS`, compatibility, security, regression, and missing-changelog findings are fixed, explicitly decided, or waived by a maintainer.
 
 For local pre-push review, use the configured local review tool such as `.agents/skills/autoreview/SKILL.md` or `codex review`. Use Claude PR review after a draft PR exists unless the Claude tooling explicitly supports local diff review.
 
@@ -383,6 +399,7 @@ Also verify:
 - No current `CHANGES_REQUESTED` from a human or required reviewer; use `latestReviews` to verify the source before treating an advisory AI request as non-blocking. If an advisory AI system requested changes, triage the review content for confirmed blockers instead of treating the review state alone as a merge block.
 - No unresolved current review thread changes correctness, tests, security, or required scope.
 - No pending, stale, late, or untriaged configured review-agent feedback remains for the current head SHA.
+- No requested adversarial review has unresolved `BLOCKING` or `DISCUSS` findings.
 - Required checks are green, or the user has explicitly accepted an auditable waiver for full CI.
 - The PR body or latest agent comment includes exact local validation commands and results.
 
@@ -418,6 +435,7 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    - review checks, reviews, or comments that landed after merge
    - review checks that were queued, in progress, stale, or asynchronous at merge time
    - pre-merge `Must Fix`, `MUST-FIX`, `Should Fix`, `DISCUSS`, `Changes Requested`, or similar actionable comments with no later evidence they were fixed, waived, or classified
+   - requested adversarial review that did not finish before merge, finished on an older head SHA, or left untriaged `BLOCKING`/`DISCUSS` findings
 6. Flag user-visible changes missing from `CHANGELOG.md`; if any are found, recommend running `/update-changelog` before the next release candidate.
 7. Produce a deduped issue plan for non-OK findings:
    - no issue for OK, duplicates, or fully resolved findings
