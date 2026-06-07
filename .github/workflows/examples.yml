@@ -171,6 +171,7 @@ jobs:
           # Minimum-dependency legs intentionally install with frozen=false after script/convert,
           # matching the historical bundle install behavior for converted dependency files.
           frozen: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
+          install-libyaml: 'false'
       - name: Ensure minimum required Chrome version
         run: |
           echo -e "Already installed $(google-chrome --version)\n"
