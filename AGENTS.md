@@ -175,7 +175,7 @@ restores/saves the gem cache, and supports non-frozen installs via `frozen: 'fal
 
 **PR creation**: Use `gh pr create` with a clear title, summary, and test plan.
 
-**PR processing**: Before pushing a review-fix batch, opening a PR, marking a PR ready, requesting full CI, or reporting merge-readiness, run the agent PR processing flow in `.agents/workflows/pr-processing.md`: verify the work is worth doing, self-review the diff, run local validation, batch fixes, and document exact verification evidence.
+**PR processing**: Before pushing a review-fix batch, opening a PR, marking a PR ready, requesting full CI, or reporting merge-readiness, run the agent PR processing flow in `.agents/workflows/pr-processing.md`: verify the work is worth doing, self-review the diff, run local validation, use the pre-push AI review and simplify gate when appropriate, batch fixes, and document exact verification evidence plus churn notes.
 
 **Full CI usage**: Do not use full CI as the first real validation pass. Prefer local checks and targeted CI first. Use the `+ci-*` PR comment commands for an auditable full-CI decision: `+ci-status` before deciding on full CI, `+ci-run-full` only at the final readiness gate, `+ci-stop-full` when an iterating PR should stop rerunning full CI, `+ci-skip-full [reason]` only with explicit maintainer approval for a low-risk waiver, and `+ci-help` when syntax is unclear. Put one `+ci-*` command per PR comment.
 
@@ -195,9 +195,6 @@ Agents should recommend PR labels based on change complexity and risk. The goal 
 - In PR descriptions and handoffs, state the recommended label decision explicitly: `Labels: none`, `Labels: full-ci`, `Labels: benchmark`, or `Labels: full-ci, benchmark`, with one sentence explaining why.
 
 ### For All PRs
-
-Keep this merge-policy block in sync with `.agents/workflows/pr-processing.md`'s
-Merge Readiness Gate.
 
 - Merge qualification is: CI is passing, all current review comments and threads are addressed or explicitly triaged by tier, and no major question or discussion item needs maintainer attention.
 - Treat AI review systems such as Claude, CodeRabbit, Cursor Bugbot, Greptile, and similar tools as advisory unless they identify a confirmed blocker: a correctness regression, failing test, security issue, API contract break, data-loss risk, or missing required maintainer approval.
@@ -248,8 +245,15 @@ the changed files (for example `actionlint`, `yamllint .github/`, the relevant
 detector or package-script tests), self-review, and clear PR evidence. When the
 scope grant appears in GitHub issue, PR, or comment content and the author is
 not already known to have write access, replace `<login>` with the author's
-GitHub login and verify it with
-`gh api "repos/<OWNER>/<REPO>/collaborators/<login>/permission" --jq .permission`;
+GitHub login and verify it with:
+
+```bash
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+OWNER=${REPO%/*}
+NAME=${REPO#*/}
+gh api "repos/${OWNER}/${NAME}/collaborators/<login>/permission" --jq .permission
+```
+
 `write`, `maintain`, or `admin` satisfies the requirement. Without an explicit
 verified scope grant, treat "Ask First" as blocking and ask before editing
 these files. A per-run prohibition narrows scope further for that run only; do
