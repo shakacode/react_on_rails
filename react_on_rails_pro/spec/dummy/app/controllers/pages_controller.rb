@@ -345,7 +345,7 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     # This models per-query latency rather than end-to-end latency, keeping
     # query counts predictable for benchmarks.
     comments = Comment.with_delay(artificial_delay).where(post_id: post_ids).to_a
-    user_ids = comments.map(&:user_id).uniq
+    user_ids = comments.filter_map(&:user_id).uniq
     users_by_id = if user_ids.empty?
                     {}
                   else
