@@ -31,7 +31,7 @@ This makes `React.cache()` a natural per-request store:
 ```jsx
 // lib/getIntl.js
 import { cache } from 'react';
-import { createIntl } from 'react-intl/server';
+import { createIntl } from '@formatjs/intl';
 import messages from './messages';
 
 const getIntl = cache((locale) => {
@@ -67,14 +67,14 @@ export default function GreetingSection({ locale }) {
 
 ## Scenario 1: Internationalization (i18n)
 
-The most common use case. Server Components cannot use `react-intl`'s `useIntl()` hook or `<IntlProvider>` Context. Instead, use `createIntl` from `react-intl/server` wrapped in `React.cache()`.
+The most common use case. Server Components cannot use `react-intl`'s `useIntl()` hook or `<IntlProvider>` Context. Instead, use `createIntl` from `@formatjs/intl` wrapped in `React.cache()`.
 
 ### Step 1: Create a cached intl factory
 
 ```jsx
 // app/i18n/getIntl.js
 import { cache } from 'react';
-import { createIntl } from 'react-intl/server';
+import { createIntl } from '@formatjs/intl';
 import messages from './messages';
 
 const getIntl = cache((locale) => {
@@ -88,7 +88,7 @@ export default getIntl;
 ```
 
 > [!NOTE]
-> Import `createIntl` from `react-intl/server` (not the main `react-intl` entry, which includes `'use client'`). The `/server` subpath provides the same formatting engine without React Context or client directives: `pnpm add react-intl`.
+> Install `@formatjs/intl` for the context-free `createIntl` API. It provides the same formatting engine as `react-intl` without React Context dependencies: `pnpm add @formatjs/intl`. In Next.js projects, you can alternatively import from `react-intl/server` — a subpath export (added in react-intl v8.2.0) that avoids the `'use client'` directive present in the main `react-intl` entry.
 
 ### Step 2: Define your message catalogs
 
@@ -551,7 +551,7 @@ client/app/
 ```jsx
 // i18n/getIntl.js
 import { cache } from 'react';
-import { createIntl } from 'react-intl/server';
+import { createIntl } from '@formatjs/intl';
 import messages from './messages';
 
 const getIntl = cache((locale) => {

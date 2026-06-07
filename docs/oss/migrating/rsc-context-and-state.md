@@ -388,16 +388,16 @@ export default function ProductPage({ locale, messages, ...props }) {
 
 > **Limitation:** This only works for **pre-formatted strings** — plain text with no interpolation, pluralization, or number/date formatting. React on Rails' build-time locale system converts Rails `%{variable}` placeholders to ICU `{variable}` syntax, so `messages['greeting']` would render the literal text `{name}` instead of a substituted value. For anything beyond plain strings, use `createIntl` or Rails pre-formatting (both described below).
 
-#### Server Components: `createIntl` from `react-intl/server` (recommended)
+#### Server Components: `createIntl` from `@formatjs/intl` (recommended)
 
-Import `createIntl` from `react-intl/server` for a **context-free API** that provides full interpolation, pluralization, and date/number formatting without React Context. This is the recommended approach for i18n in Server Components. The `/server` subpath avoids the `'use client'` directive present in the main `react-intl` entry.
+Import `createIntl` from `@formatjs/intl` for a **context-free API** that provides full interpolation, pluralization, and date/number formatting without React Context. This is the recommended approach for i18n in Server Components. Unlike the main `react-intl` entry (which includes `'use client'`), `@formatjs/intl` has no React dependency and works in any server-side context.
 
 > [!TIP]
 > When multiple Server Components need the same intl instance, wrap `createIntl` in `React.cache()` to avoid recreating it in every component. See [Sharing Per-Request Data in Server Components](../../pro/react-server-components/per-request-data.md) for the complete pattern with `React.cache()`, including i18n, auth, feature flags, and other per-request scenarios.
 
 ```jsx
 // ProductPage.jsx -- Server Component
-import { createIntl, createIntlCache } from 'react-intl/server';
+import { createIntl, createIntlCache } from '@formatjs/intl';
 import I18nProvider from './I18nProvider';
 
 // Module-level cache — safe because it only caches Intl constructors, not request data
@@ -544,7 +544,7 @@ const greeting = messages['greeting'];
 
 ```jsx
 // GOOD: Use createIntl to format with variable substitution
-import { createIntl, createIntlCache } from 'react-intl/server';
+import { createIntl, createIntlCache } from '@formatjs/intl';
 const cache = createIntlCache();
 const intl = createIntl({ locale, messages }, cache);
 const greeting = intl.formatMessage({ id: 'greeting' }, { name: 'John' });

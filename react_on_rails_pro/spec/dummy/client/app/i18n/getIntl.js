@@ -1,5 +1,5 @@
 import { cache } from 'react';
-import { createIntl } from 'react-intl/server';
+import { createIntl } from '@formatjs/intl';
 import messages from './messages';
 
 const getIntl = cache((locale) => {
