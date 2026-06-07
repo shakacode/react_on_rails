@@ -326,6 +326,7 @@ test_suite_workflow_file_runs_its_tests_but_no_benchmark() {
   assert_contains "$out" '"run_pro_tests": false' "workflow-only output"
   assert_contains "$out" '"run_pro_dummy_tests": true' "workflow-only output"
   assert_contains "$out" '"run_pro_node_renderer_tests": false' "workflow-only output"
+  assert_contains "$out" '"run_core_benchmarks": false' "workflow-only output"
   assert_contains "$out" '"run_pro_benchmarks": false' "workflow-only output"
   assert_contains "$out" '"run_pro_node_renderer_benchmarks": false' "workflow-only output"
 }
