@@ -235,6 +235,8 @@ class RegressionIssueReporter
     return cache_regression_issue_number(issue_number) unless issue_number.empty?
 
     create_regression_issue.tap do |created_issue_number|
+      # nil means create_regression_issue already stored ISSUE_NUMBER_UNKNOWN_AFTER_CREATE;
+      # this no-ops for nil so later suites still avoid duplicate issue creation.
       cache_regression_issue_number(created_issue_number)
     end
   end
@@ -281,7 +283,7 @@ class RegressionIssueReporter
       report_comment_id_cache&.store(comment_marker, COMMENT_ID_UNKNOWN_AFTER_CREATE)
       Github.warning(
         "Created regression report comment on issue ##{issue_number} but could not parse its id; " \
-        "later suite sections will not create duplicate comments in this run."
+        "this suite and later suites in this run will be marked as failed to avoid duplicate comments."
       )
       return false
     end

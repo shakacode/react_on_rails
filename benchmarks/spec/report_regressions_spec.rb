@@ -138,6 +138,8 @@ RSpec.describe "benchmark regression reporting" do
         expect(calls.count("comment list")).to eq(1)
         expect(calls.count("comment create")).to eq(1)
         expect(calls).to include("comment patch")
+        expect(posted_bodies.fetch("comment patch")).to include("Core regressed")
+        expect(posted_bodies.fetch("comment patch")).to include("Pro regressed")
       end
 
       it "does not create duplicate same-run comments after a comment id parse miss" do
