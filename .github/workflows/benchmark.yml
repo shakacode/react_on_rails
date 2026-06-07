@@ -146,14 +146,9 @@ jobs:
       # Only pay the Bundler setup when benchmarks will run or the scripts
       # themselves changed; unrelated PRs keep this job stdlib-only and fast.
       # TODO: when fixing #2214 this should switch to the new root Gemfile.
-      - name: Install libyaml-dev
-        # Must precede any gem install/load: psych links libyaml dynamically. On warm caches the
-        # missing-lib failure is silent; cold runs hit it.
-        if: steps.benchmark-matrices.outputs.run_benchmark_suites == 'true' || steps.detect.outputs.benchmarks_changed == 'true'
-        run: sudo apt-get install -y libyaml-dev
       - name: Setup Ruby
         if: steps.benchmark-matrices.outputs.run_benchmark_suites == 'true' || steps.detect.outputs.benchmarks_changed == 'true'
-        uses: ruby/setup-ruby@v1
+        uses: ./.github/actions/setup-ruby
         with:
           ruby-version: ${{ env.RUBY_VERSION }}
       # The benchmark specs only need rspec, which the root Gemfile provides (it
@@ -224,11 +219,6 @@ jobs:
           mkdir -p ~/bin
           echo "$HOME/bin" >> "$GITHUB_PATH"
 
-      - name: Install libyaml-dev
-        # Must precede any gem install/load: psych links libyaml dynamically. On warm caches the
-        # missing-lib failure is silent; cold runs hit it.
-        run: sudo apt-get install -y libyaml-dev
-
       - name: Setup k6
         if: matrix.benchmark_tool == 'k6'
         uses: grafana/setup-k6-action@v1
@@ -253,7 +243,7 @@ jobs:
           mv vegeta ~/bin/
 
       - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ./.github/actions/setup-ruby
         with:
           ruby-version: ${{ env.RUBY_VERSION }}
 
@@ -341,6 +331,7 @@ jobs:
         with:
           working-directory: ${{ matrix.app_directory }}
           ruby-version: ${{ env.RUBY_VERSION }}
+          install-libyaml: 'false'
 
       - name: Generate file-system based entrypoints for Pro
         if: matrix.generate_packs == 'true'

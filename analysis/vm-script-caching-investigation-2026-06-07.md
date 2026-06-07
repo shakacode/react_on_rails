@@ -159,12 +159,14 @@ Adding `vm.Script` caching would:
 
 ## Artifacts
 
-Benchmark scripts were run during the original investigation. The raw benchmark summary is included below;
-the local experiment directory was not committed.
+Benchmark scripts and raw data are captured in this committed analysis note:
+
+- Raw benchmark output: see the two sections below.
+- Original local experiment bundle: intentionally not retained because it was an ephemeral `tmp/` path.
 
 ### Raw Benchmark Output (Summary)
 
-```
+```text
 vm.Script Caching Benchmark
 ===========================
 Node: v22.12.0
@@ -181,7 +183,7 @@ Platform: darwin arm64
 
 ### Compilation Cost Analysis
 
-```
+```text
 Heavy Parse Patterns Test
 ============================================================
 Pattern                        |    Chars |  Compile

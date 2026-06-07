@@ -123,6 +123,7 @@ jobs:
         with:
           working-directory: react_on_rails/spec/dummy
           ruby-version: '4.0'
+          install-libyaml: 'false'
       - name: Build ReScript files
         run: pnpm --filter "react_on_rails" run build:rescript
       - name: Generate file system-based packs
