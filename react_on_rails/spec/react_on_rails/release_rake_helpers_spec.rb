@@ -866,7 +866,11 @@ RSpec.describe "release.rake helper methods" do
     # to "no required checks configured" so tests that don't care about the
     # gate behave as before; tests that exercise the gate override this stub.
     before do
-      allow(self).to receive(:required_check_names_for_main).and_return(nil)
+      allow(self).to receive_messages(
+        fetch_main_commit_statuses: [],
+        github_repo_slug: "shakacode/react_on_rails",
+        required_check_names_for_main: nil
+      )
     end
 
     def required_checks(contexts: [], checks: [])
@@ -1348,17 +1352,7 @@ RSpec.describe "release.rake helper methods" do
           .and_return(sha: sha, repo_slug: "shakacode/react_on_rails", check_runs: [wrong_app_run, required_app_run])
         allow(self).to receive(:required_check_names_for_main)
           .with(monorepo_root: monorepo_root, repo_slug: "shakacode/react_on_rails")
-          .and_return(required_checks(contexts: ["Lint"], checks: [required_check("Lint", app_id: 123)]))
-        allow(self).to receive(:fetch_main_commit_statuses)
-          .with(repo_slug: "shakacode/react_on_rails", sha: sha, allow_override: false, dry_run: false)
-          .and_return([
-                        {
-                          "id" => 1,
-                          "context" => "Lint",
-                          "state" => "success",
-                          "target_url" => "https://ci.example.com/lint"
-                        }
-                      ])
+          .and_return(required_checks(checks: [required_check("Lint", app_id: 123)]))
 
         expect do
           validate_main_ci_status!(
@@ -1367,7 +1361,7 @@ RSpec.describe "release.rake helper methods" do
             allow_override: false,
             dry_run: false
           )
-        end.to output(/Main CI is healthy on #{short_sha} \(2 required checks\)/).to_stdout
+        end.to output(/Main CI is healthy on #{short_sha} \(1 required check\)/).to_stdout
       end
     end
 
@@ -1554,13 +1548,13 @@ RSpec.describe "release.rake helper methods" do
         end.to raise_error(SystemExit) { |error| expect(error.message).not_to include("api.github.com") }
       end
 
-      it "reports a failed legacy status before same-label missing modern checks" do
+      it "reports a failed legacy status for a wildcard required check" do
         allow(self).to receive(:fetch_main_ci_checks)
           .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
           .and_return(sha: sha, repo_slug: "shakacode/react_on_rails", check_runs: [])
         allow(self).to receive(:required_check_names_for_main)
           .with(monorepo_root: monorepo_root, repo_slug: "shakacode/react_on_rails")
-          .and_return(required_checks(contexts: ["Travis"], checks: [required_check("Travis")]))
+          .and_return(required_checks(checks: [required_check("Travis")]))
         allow(self).to receive(:fetch_main_commit_statuses)
           .with(repo_slug: "shakacode/react_on_rails", sha: sha, allow_override: false, dry_run: false)
           .and_return([
@@ -1610,13 +1604,13 @@ RSpec.describe "release.rake helper methods" do
         end.to raise_error(SystemExit, %r{CI on origin/main is not healthy.*Travis}m)
       end
 
-      it "reports same-label legacy success plus missing wildcard modern check as partially missing" do
+      it "uses a legacy status to satisfy a wildcard required check" do
         allow(self).to receive(:fetch_main_ci_checks)
           .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
           .and_return(sha: sha, repo_slug: "shakacode/react_on_rails", check_runs: [])
         allow(self).to receive(:required_check_names_for_main)
           .with(monorepo_root: monorepo_root, repo_slug: "shakacode/react_on_rails")
-          .and_return(required_checks(contexts: ["Travis"], checks: [required_check("Travis")]))
+          .and_return(required_checks(checks: [required_check("Travis")]))
         allow(self).to receive(:fetch_main_commit_statuses)
           .with(repo_slug: "shakacode/react_on_rails", sha: sha, allow_override: false, dry_run: false)
           .and_return([
@@ -1635,20 +1629,17 @@ RSpec.describe "release.rake helper methods" do
             allow_override: false,
             dry_run: false
           )
-        end.to raise_error(SystemExit) { |error|
-          expect(error.message).to match(/Some required CI checks are missing.*Missing:\s*Travis/m)
-          expect(error.message).to include("Required: Travis (2 gates)")
-        }
+        end.to output(/Main CI is healthy on #{short_sha} \(1 required check\)/).to_stdout
       end
 
-      it "reports duplicate same-label requirements in the missing list" do
+      it "reports a missing mirrored wildcard check once" do
         allow(self).to receive(:fetch_main_ci_checks)
           .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
           .and_return(sha: sha, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Build")])
         allow(self).to receive(:required_check_names_for_main)
           .with(monorepo_root: monorepo_root, repo_slug: "shakacode/react_on_rails")
           .and_return(
-            required_checks(contexts: ["Travis"], checks: [required_check("Travis"), required_check("Build")])
+            required_checks(checks: [required_check("Travis"), required_check("Build")])
           )
         allow(self).to receive(:fetch_main_commit_statuses)
           .with(repo_slug: "shakacode/react_on_rails", sha: sha, allow_override: false, dry_run: false)
@@ -1662,28 +1653,19 @@ RSpec.describe "release.rake helper methods" do
             dry_run: false
           )
         end.to raise_error(SystemExit) { |error|
-          expect(error.message).to include("Required: Travis (2 gates), Build")
-          expect(error.message).to include("Missing: Travis (2 gates)")
+          expect(error.message).to include("Required: Travis, Build")
+          expect(error.message).to include("Missing: Travis")
+          expect(error.message).not_to include("2 gates")
         }
       end
 
       it "does not let a legacy status satisfy an app-pinned modern check" do
         allow(self).to receive(:fetch_main_ci_checks)
           .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, repo_slug: "shakacode/react_on_rails", check_runs: [])
+          .and_return(sha: sha, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Other")])
         allow(self).to receive(:required_check_names_for_main)
           .with(monorepo_root: monorepo_root, repo_slug: "shakacode/react_on_rails")
-          .and_return(required_checks(contexts: ["Travis"], checks: [required_check("Travis", app_id: 123)]))
-        allow(self).to receive(:fetch_main_commit_statuses)
-          .with(repo_slug: "shakacode/react_on_rails", sha: sha, allow_override: false, dry_run: false)
-          .and_return([
-                        {
-                          "id" => 1,
-                          "context" => "Travis",
-                          "state" => "success",
-                          "target_url" => "https://ci.example.com/travis"
-                        }
-                      ])
+          .and_return(required_checks(checks: [required_check("Travis", app_id: 123)]))
 
         expect do
           validate_main_ci_status!(
@@ -1692,7 +1674,7 @@ RSpec.describe "release.rake helper methods" do
             allow_override: false,
             dry_run: false
           )
-        end.to raise_error(SystemExit, /Some required CI checks are missing.*Missing:\s*Travis \(app_id: 123\)/m)
+        end.to raise_error(SystemExit, /No required CI check runs found.*Required: Travis \(app_id: 123\)/m)
       end
     end
 
@@ -1905,7 +1887,7 @@ RSpec.describe "release.rake helper methods" do
                     ])
 
       expect(required_check_names_for_main(monorepo_root: monorepo_root)).to eq(
-        contexts: %w[Lint Test],
+        contexts: %w[Test],
         checks: [
           { context: "CodeQL", app_id: -1 },
           { context: "Lint", app_id: nil }

@@ -709,8 +709,9 @@ end
 def normalize_required_checks_payload(parsed)
   return nil unless parsed.is_a?(Hash)
 
-  contexts = Array(parsed["contexts"]).map(&:to_s).reject(&:empty?).uniq
   checks = normalize_required_check_entries(parsed["checks"])
+  check_contexts = checks.map { |check| check[:context] }
+  contexts = Array(parsed["contexts"]).map(&:to_s).reject(&:empty?).uniq - check_contexts
 
   # No required names parseable is treated the same as "no branch protection
   # visible" — fail-safe to evaluating every check run.
@@ -756,8 +757,10 @@ def required_check_matches_run?(required_check, run)
     (required_check_app_wildcard?(required_check[:app_id]) || required_check[:app_id] == check_run_app_id(run))
 end
 
-def required_check_present?(required_check:, check_runs:)
-  check_runs.any? { |run| required_check_matches_run?(required_check, run) }
+def required_check_present?(required_check:, check_runs:, legacy_status_runs:)
+  check_runs.any? { |run| required_check_matches_run?(required_check, run) } ||
+    (required_check_app_wildcard?(required_check[:app_id]) &&
+      legacy_status_runs.any? { |run| run["name"] == required_check[:context] })
 end
 
 def legacy_context_check_run_matches?(context:, run:, required_checks:)
@@ -801,7 +804,8 @@ def missing_required_checks(required_checks:, check_runs:, legacy_status_runs:)
   missing_modern = required_checks[:checks].reject do |required_check|
     required_check_present?(
       required_check: required_check,
-      check_runs: check_runs
+      check_runs: check_runs,
+      legacy_status_runs: legacy_status_runs
     )
   end
   missing_legacy = required_checks[:contexts].reject do |context|
@@ -813,19 +817,32 @@ def missing_required_checks(required_checks:, check_runs:, legacy_status_runs:)
     )
   end
 
-  # Keep the raw count separate from display labels: a legacy context and a
-  # modern wildcard check may share one label but remain distinct requirements.
+  # Keep the raw count separate from display labels for deliberately duplicated
+  # names; mirrored branch-protection contexts are removed during normalization.
   {
     count: missing_legacy.length + missing_modern.length,
     labels: format_required_check_labels(missing_legacy + missing_modern.map { |check| required_check_label(check) })
   }
 end
 
+def legacy_status_contexts_for_required_checks(required_checks)
+  wildcard_check_contexts = required_checks[:checks]
+                            .select { |check| required_check_app_wildcard?(check[:app_id]) }
+                            .map { |check| check[:context] }
+
+  (
+    required_checks[:contexts] +
+    wildcard_check_contexts
+  ).uniq
+end
+
 def legacy_status_runs_for_required_contexts(required_checks:, statuses:)
-  # Keep same-name statuses even when a check run exists; branch protection can
-  # require both a legacy status context and a modern check run to pass.
+  status_contexts = legacy_status_contexts_for_required_checks(required_checks)
+
+  # App-wildcard required checks can be satisfied by either Checks API runs or
+  # legacy commit statuses. App-pinned checks still require a matching check run.
   latest_commit_statuses(statuses)
-    .select { |status| required_checks[:contexts].include?(status["context"]) }
+    .select { |status| status_contexts.include?(status["context"]) }
     .map { |status| normalize_status_as_check_run(status) }
 end
 
@@ -925,8 +942,9 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
   required_args = { monorepo_root: monorepo_root }
   required_args[:repo_slug] = repo_slug if repo_slug
   required_names = required_check_names_for_main(**required_args)
+  required_status_contexts = required_names ? legacy_status_contexts_for_required_checks(required_names) : []
   legacy_status_runs = []
-  if required_names && required_names[:contexts].any?
+  if required_status_contexts.any?
     statuses = fetch_main_commit_statuses(
       repo_slug: repo_slug || github_repo_slug(monorepo_root),
       sha: sha,
