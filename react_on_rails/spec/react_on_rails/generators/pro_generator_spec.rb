@@ -154,8 +154,8 @@ describe ProGenerator, type: :generator do
         captured_original_gemfile_content = original_gemfile_content
         generator.send(
           :rollback_gemfile_after_failed_bundle_install,
-          gemfile_path: gemfile_path,
-          original_gemfile_content: original_gemfile_content
+          gemfile_path:,
+          original_gemfile_content:
         )
         false
       end
@@ -1024,7 +1024,7 @@ describe ProGenerator, type: :generator do
 
       generator.send(
         :bundle_install_after_gem_swap,
-        gemfile_path: gemfile_path,
+        gemfile_path:,
         original_gemfile_content: original_content
       )
 

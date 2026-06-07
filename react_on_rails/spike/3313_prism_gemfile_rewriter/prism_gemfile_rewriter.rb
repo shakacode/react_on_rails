@@ -194,7 +194,7 @@ module ReactOnRails
         end
 
         start_offset, end_offset = statement_byte_range(source, node)
-        { start_offset: start_offset, end_offset: end_offset, replacement: "" }
+        { start_offset:, end_offset:, replacement: "" }
       end
 
       def inline_conditional_with_sibling_branch?(call, parent_map)
@@ -620,8 +620,8 @@ module ReactOnRails
         return nil if start_offset == end_offset
 
         {
-          start_offset: start_offset,
-          end_offset: end_offset,
+          start_offset:,
+          end_offset:,
           replacement: ""
         }
       end

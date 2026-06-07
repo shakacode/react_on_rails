@@ -8,11 +8,11 @@ describe InstallGenerator, type: :generator do
   destination File.expand_path("../dummy-for-generators", __dir__)
 
   def base_generator_fixture(options = {})
-    ReactOnRails::Generators::BaseGenerator.new([], options, destination_root: destination_root)
+    ReactOnRails::Generators::BaseGenerator.new([], options, destination_root:)
   end
 
   def install_generator_fixture(options = {})
-    described_class.new([], options, destination_root: destination_root)
+    described_class.new([], options, destination_root:)
   end
 
   def gem_root_ci_workflow_path
@@ -773,8 +773,8 @@ describe InstallGenerator, type: :generator do
         module.exports = webpackConfig
       JS
 
-      base_generator = ReactOnRails::Generators::BaseGenerator.new([], {}, destination_root: destination_root)
-      generator = described_class.new([], {}, destination_root: destination_root)
+      base_generator = ReactOnRails::Generators::BaseGenerator.new([], {}, destination_root:)
+      generator = described_class.new([], {}, destination_root:)
       Dir.chdir(destination_root) do
         base_generator.send(:copy_base_files)
         generator.send(:add_package_json_scripts)
@@ -830,7 +830,7 @@ describe InstallGenerator, type: :generator do
         module.exports = webpackConfig
       JS
 
-      generator = described_class.new([], {}, destination_root: destination_root)
+      generator = described_class.new([], {}, destination_root:)
       Dir.chdir(destination_root) do
         generator.send(:add_package_json_scripts)
         generator.send(:add_ci_workflow)
@@ -875,8 +875,8 @@ describe InstallGenerator, type: :generator do
         module.exports = webpackConfig
       JS
 
-      base_generator = ReactOnRails::Generators::BaseGenerator.new([], {}, destination_root: destination_root)
-      generator = described_class.new([], {}, destination_root: destination_root)
+      base_generator = ReactOnRails::Generators::BaseGenerator.new([], {}, destination_root:)
+      generator = described_class.new([], {}, destination_root:)
       Dir.chdir(destination_root) do
         base_generator.send(:copy_base_files)
         generator.send(:add_package_json_scripts)
@@ -928,7 +928,7 @@ describe InstallGenerator, type: :generator do
         module.exports = webpackConfig
       JS
 
-      generator = described_class.new([], {}, destination_root: destination_root)
+      generator = described_class.new([], {}, destination_root:)
       Dir.chdir(destination_root) do
         generator.send(:add_package_json_scripts)
         generator.send(:add_ci_workflow)
@@ -2200,7 +2200,7 @@ describe InstallGenerator, type: :generator do
   end
 
   describe "#add_rsc_dependencies" do
-    let(:install_generator) { described_class.new([], { rsc: true }, destination_root: destination_root) }
+    let(:install_generator) { described_class.new([], { rsc: true }, destination_root:) }
     let(:rsc_pin) { ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN }
     let(:rsc_stable_target) { install_generator.send(:rsc_stable_package_version_target) }
 
@@ -4229,7 +4229,7 @@ describe InstallGenerator, type: :generator do
   end
 
   describe "#seed_package_manager_in_package_json_from_lockfile!" do
-    let(:install_generator) { described_class.new([], {}, destination_root: destination_root) }
+    let(:install_generator) { described_class.new([], {}, destination_root:) }
     let(:success_status) { instance_double(Process::Status, success?: true) }
 
     before do
@@ -4277,7 +4277,7 @@ describe InstallGenerator, type: :generator do
   end
 
   describe "#resolve_browserslist_conflict_after_shakapacker_install" do
-    let(:install_generator) { described_class.new([], {}, destination_root: destination_root) }
+    let(:install_generator) { described_class.new([], {}, destination_root:) }
 
     before do
       prepare_destination
@@ -4303,7 +4303,7 @@ describe InstallGenerator, type: :generator do
   end
 
   describe "#ensure_jsx_in_js_compatibility" do
-    let(:install_generator) { described_class.new([], {}, destination_root: destination_root) }
+    let(:install_generator) { described_class.new([], {}, destination_root:) }
 
     before do
       prepare_destination
@@ -4336,7 +4336,7 @@ describe InstallGenerator, type: :generator do
   end
 
   describe "#add_bin_scripts" do
-    let(:install_generator) { described_class.new([], {}, destination_root: destination_root) }
+    let(:install_generator) { described_class.new([], {}, destination_root:) }
 
     before do
       prepare_destination
@@ -4436,7 +4436,7 @@ describe InstallGenerator, type: :generator do
     end
 
     it "keeps stock bin/dev when run with --skip" do
-      skip_generator = described_class.new([], { skip: true }, destination_root: destination_root)
+      skip_generator = described_class.new([], { skip: true }, destination_root:)
 
       Dir.chdir(destination_root) do
         skip_generator.send(:add_bin_scripts)
@@ -4447,7 +4447,7 @@ describe InstallGenerator, type: :generator do
 
     it "keeps custom bin/dev when run with --force" do
       custom_bin_dev = "#!/usr/bin/env ruby\nputs 'custom'\n"
-      force_generator = described_class.new([], { force: true }, destination_root: destination_root)
+      force_generator = described_class.new([], { force: true }, destination_root:)
 
       simulate_existing_file("bin/dev", custom_bin_dev)
 
@@ -4482,7 +4482,7 @@ describe InstallGenerator, type: :generator do
     end
 
     it "warns instead of rewriting custom bin/dev files for --rsc installs" do
-      rsc_install_generator = described_class.new([], { rsc: true }, destination_root: destination_root)
+      rsc_install_generator = described_class.new([], { rsc: true }, destination_root:)
       custom_bin_dev = <<~RUBY
         #!/usr/bin/env ruby
         DEFAULT_ROUTE = "hello_world"

@@ -259,7 +259,7 @@ module ReactOnRailsPro
           end
 
           assets = extracted_assets(dir)
-          { bundle: bundle_path, assets: assets }
+          { bundle: bundle_path, assets: }
         end
 
         def extracted_assets(dir)
@@ -287,11 +287,11 @@ module ReactOnRailsPro
         # connection pooling would force us to manage lifecycle / cleanup
         # across threads.
         def http_get(uri, read_timeout: DEFAULT_READ_TIMEOUT_SECONDS)
-          http_for(uri, read_timeout: read_timeout).request(build_request(uri))
+          http_for(uri, read_timeout:).request(build_request(uri))
         end
 
-        def http_stream(uri, read_timeout: DEFAULT_READ_TIMEOUT_SECONDS, &block)
-          http_for(uri, read_timeout: read_timeout).request(build_request(uri), &block)
+        def http_stream(uri, read_timeout: DEFAULT_READ_TIMEOUT_SECONDS, &)
+          http_for(uri, read_timeout:).request(build_request(uri), &)
         end
 
         def build_request(uri)

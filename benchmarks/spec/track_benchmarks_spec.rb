@@ -199,7 +199,7 @@ RSpec.describe "track_benchmarks" do
     def parse_thresholds(argv)
       thresholds = []
       OptionParser.new do |opts|
-        opts.on("--threshold-measure=MEASURE") { |measure| thresholds << { measure: measure } }
+        opts.on("--threshold-measure=MEASURE") { |measure| thresholds << { measure: } }
         opts.on("--threshold-lower-boundary=BOUNDARY") { |boundary| thresholds.last[:lower] = boundary }
         opts.on("--threshold-upper-boundary=BOUNDARY") { |boundary| thresholds.last[:upper] = boundary }
         opts.on("--threshold-test=TEST")

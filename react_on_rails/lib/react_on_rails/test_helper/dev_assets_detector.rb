@@ -111,7 +111,7 @@ module ReactOnRails
         manifest_path = dev_output[:dev_full_path].join("manifest.json")
         return nil unless manifest_usable?(manifest_path)
 
-        dev_output.merge(manifest_path: manifest_path)
+        dev_output.merge(manifest_path:)
       end
 
       private
@@ -141,9 +141,9 @@ module ReactOnRails
         return nil if dev_full_path == test_full_path
 
         {
-          dev_output_relative: dev_output_relative,
-          dev_public_root_relative: dev_public_root_relative,
-          dev_full_path: dev_full_path
+          dev_output_relative:,
+          dev_public_root_relative:,
+          dev_full_path:
         }
       end
 

@@ -121,7 +121,7 @@ module ReactOnRailsPro
     end
 
     def self.create(first_chunk_warn_callback: nil, &request_block)
-      StreamDecorator.new(new(first_chunk_warn_callback: first_chunk_warn_callback, &request_block))
+      StreamDecorator.new(new(first_chunk_warn_callback:, &request_block))
     end
 
     private

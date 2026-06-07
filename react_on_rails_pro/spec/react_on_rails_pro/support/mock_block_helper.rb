@@ -6,8 +6,8 @@ module MockBlockHelper
       @callback = callback
     end
 
-    def call(*args, &inner_block)
-      @callback&.call(*args, &inner_block)
+    def call(*args, &)
+      @callback&.call(*args, &)
     end
 
     def block

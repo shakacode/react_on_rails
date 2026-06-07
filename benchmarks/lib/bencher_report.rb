@@ -161,10 +161,10 @@ class BencherReport
   def parse_boundary(measure_entry)
     value = dig_number(measure_entry, "metric", "value")
     raw = measure_entry["boundary"]
-    return Boundary.new(value: value, baseline: nil, lower_limit: nil, upper_limit: nil) if raw.nil?
+    return Boundary.new(value:, baseline: nil, lower_limit: nil, upper_limit: nil) if raw.nil?
     raise FormatError, "boundary is not an object (got #{raw.class})" unless raw.is_a?(Hash)
 
-    Boundary.new(value: value, baseline: optional_number(raw, "baseline"),
+    Boundary.new(value:, baseline: optional_number(raw, "baseline"),
                  lower_limit: optional_number(raw, "lower_limit"), upper_limit: optional_number(raw, "upper_limit"))
   end
 

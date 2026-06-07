@@ -81,7 +81,7 @@ module ReactOnRails
 
       {
         quote: gem_name_match[1],
-        line_index: line_index,
+        line_index:,
         match_end: fragment_offset + gem_name_match.end(0)
       }
     end
@@ -136,7 +136,7 @@ module ReactOnRails
       end
 
       trailing_suffix = lines[start_index][match_end..].to_s + declaration_lines.drop(1).join
-      { trailing_suffix: trailing_suffix, next_index: line_index }
+      { trailing_suffix:, next_index: line_index }
     end
 
     def line_continues_with_comma?(line)

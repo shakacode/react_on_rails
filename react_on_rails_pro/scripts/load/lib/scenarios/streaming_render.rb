@@ -33,9 +33,9 @@ module RendererHarness
               bytes_in += chunk_bytesize(chunk)
             end
             status = stream.http_status
-            stream_payload(stream, bytes_in: bytes_in, bytes_out: js.bytesize, status: status)
+            stream_payload(stream, bytes_in:, bytes_out: js.bytesize, status:)
           rescue StandardError => e
-            failure_stream_payload(stream, bytes_in: bytes_in, bytes_out: js.bytesize, error: e)
+            failure_stream_payload(stream, bytes_in:, bytes_out: js.bytesize, error: e)
           end
         end
       end
@@ -43,7 +43,7 @@ module RendererHarness
       private
 
       def failure_stream_payload(stream, bytes_in:, bytes_out:, error:)
-        stream_payload(stream, bytes_in: bytes_in, bytes_out: bytes_out, status: stream&.http_status).merge(
+        stream_payload(stream, bytes_in:, bytes_out:, status: stream&.http_status).merge(
           ok: false,
           error: error.message
         )

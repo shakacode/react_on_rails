@@ -20,7 +20,7 @@ RSpec.describe "benchmark target monitoring" do
     it "builds from TARGET_PID and TARGET_LOG in an injected environment" do
       with_log_file("startup complete\n") do |log_path, output_dir|
         monitor = described_class.from_env(
-          output_dir: output_dir,
+          output_dir:,
           env: { "TARGET_PID" => Process.pid.to_s, "TARGET_LOG" => log_path }
         )
 
@@ -43,7 +43,7 @@ RSpec.describe "benchmark target monitoring" do
 
     it "preserves startup logs and blanks the live log before the measured window" do
       with_log_file("booting\nWorker 1 died UNEXPECTEDLY :(, restarting\nready\n") do |log_path, output_dir|
-        monitor = described_class.new(target_log: log_path, output_dir: output_dir)
+        monitor = described_class.new(target_log: log_path, output_dir:)
 
         monitor.start_measurement!
 
@@ -56,7 +56,7 @@ RSpec.describe "benchmark target monitoring" do
 
     it "does not re-preserve or blank measured log content when measurement starts twice" do
       with_log_file("startup complete\n") do |log_path, output_dir|
-        monitor = described_class.new(target_log: log_path, output_dir: output_dir)
+        monitor = described_class.new(target_log: log_path, output_dir:)
         measured_restart = "Worker 2 died UNEXPECTEDLY :(, restarting\n"
 
         monitor.start_measurement!
@@ -100,7 +100,7 @@ RSpec.describe "benchmark target monitoring" do
       Dir.mktmpdir do |dir|
         log_path = File.join(dir, "target.log")
         output_dir = File.join(dir, "bench_results")
-        monitor = described_class.new(target_log: log_path, output_dir: output_dir)
+        monitor = described_class.new(target_log: log_path, output_dir:)
 
         expect { monitor.start_measurement! }
           .to output(/BenchmarkTargetMonitor: TARGET_LOG=.*target\.log.*worker-restart checks will be skipped/)
@@ -113,7 +113,7 @@ RSpec.describe "benchmark target monitoring" do
 
     it "blanks bytes appended after log preservation but before opening the log for overwrite" do
       with_log_file("booting\nready\n") do |log_path, output_dir|
-        monitor = described_class.new(target_log: log_path, output_dir: output_dir)
+        monitor = described_class.new(target_log: log_path, output_dir:)
         late_log_line = "Worker 2 died UNEXPECTEDLY :(, restarting\n"
 
         allow(File).to receive(:open).and_wrap_original do |original_open, path, mode, *args, &block|
@@ -139,7 +139,7 @@ RSpec.describe "benchmark target monitoring" do
 
     it "fails when the node renderer master logs an unexpected worker restart during measurement" do
       with_log_file("startup complete\n") do |log_path, output_dir|
-        monitor = described_class.new(target_log: log_path, output_dir: output_dir)
+        monitor = described_class.new(target_log: log_path, output_dir:)
         monitor.start_measurement!
         File.open(log_path, "a") { |file| file.puts("Worker 2 died UNEXPECTEDLY :(, restarting") }
 
@@ -153,7 +153,7 @@ RSpec.describe "benchmark target monitoring" do
 
     it "fails with a monitor error when the target log disappears before verification" do
       with_log_file("startup complete\n") do |log_path, output_dir|
-        monitor = described_class.new(target_log: log_path, output_dir: output_dir)
+        monitor = described_class.new(target_log: log_path, output_dir:)
         monitor.start_measurement!
         FileUtils.rm_f(log_path)
 
@@ -176,7 +176,7 @@ RSpec.describe "benchmark target monitoring" do
 
     it "fails before liveness checks when the benchmark target PID is non-positive" do
       pid_alive = ->(_pid) { raise "pid liveness check should not run" }
-      monitor = described_class.new(target_pid: "0", pid_alive: pid_alive)
+      monitor = described_class.new(target_pid: "0", pid_alive:)
 
       monitor.start_measurement!
 
@@ -186,7 +186,7 @@ RSpec.describe "benchmark target monitoring" do
 
     it "fails when TARGET_PID is not an integer string" do
       pid_alive = ->(_pid) { raise "pid liveness check should not run" }
-      monitor = described_class.new(target_pid: "abc", pid_alive: pid_alive)
+      monitor = described_class.new(target_pid: "abc", pid_alive:)
 
       monitor.start_measurement!
 

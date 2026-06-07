@@ -52,7 +52,7 @@ RSpec.describe "BencherReport + BenchmarkTable integration" do
   end
 
   it "links the name, bolds/tags the regressed RPS and improved p50 with deltas, and shows a plain p90 delta" do
-    markdown = BenchmarkTable.new(title: "Core Benchmark Summary", rows: rows, report: report).to_markdown
+    markdown = BenchmarkTable.new(title: "Core Benchmark Summary", rows:, report:).to_markdown
 
     # No Fail% column (dropped); p90 shows a ▲ delta vs its boundary-less baseline but is
     # never bolded/tagged; the name links to the perf plot.

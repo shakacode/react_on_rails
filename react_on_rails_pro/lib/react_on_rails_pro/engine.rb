@@ -69,8 +69,8 @@ module ReactOnRailsPro
       def log_problematic_compression_middleware_warnings(logger: Rails.logger,
                                                           middlewares: Rails.application.middleware,
                                                           root: Rails.root)
-        CompressionMiddlewareGuard.new(middlewares: middlewares, logger: logger)
-                                  .warning_messages(root: root)
+        CompressionMiddlewareGuard.new(middlewares:, logger:)
+                                  .warning_messages(root:)
                                   .each { |message| logger.warn(message) }
       end
 

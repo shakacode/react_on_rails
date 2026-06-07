@@ -33,15 +33,15 @@ module ReactOnRails
 
       apply_changes!(package_json_data, changes, original_content) if write && changes.any?
       print_summary(changes,
-                    unsupported_specs: unsupported_specs,
-                    missing_source_specs: missing_source_specs,
-                    write: write)
+                    unsupported_specs:,
+                    missing_source_specs:,
+                    write:)
 
       changed_files = write && changes.any? ? [package_json_path] : []
-      Result.new(changes: changes,
-                 changed_files: changed_files,
-                 unsupported_specs: unsupported_specs,
-                 missing_source_specs: missing_source_specs)
+      Result.new(changes:,
+                 changed_files:,
+                 unsupported_specs:,
+                 missing_source_specs:)
     end
 
     private
@@ -70,14 +70,14 @@ module ReactOnRails
         next unless dependencies.is_a?(Hash)
 
         PACKAGE_VERSION_SOURCES.each do |package_name, source_key|
-          process_package_dependency(section: section,
-                                     dependencies: dependencies,
-                                     package_name: package_name,
-                                     source_key: source_key,
-                                     expected_versions: expected_versions,
-                                     changes: changes,
-                                     unsupported_specs: unsupported_specs,
-                                     missing_source_specs: missing_source_specs)
+          process_package_dependency(section:,
+                                     dependencies:,
+                                     package_name:,
+                                     source_key:,
+                                     expected_versions:,
+                                     changes:,
+                                     unsupported_specs:,
+                                     missing_source_specs:)
         end
       end
 
@@ -91,18 +91,18 @@ module ReactOnRails
       current_version = dependencies[package_name]
       parsed_spec = parse_supported_spec(current_version)
       unless parsed_spec
-        unsupported_specs << { section: section, package: package_name, version: current_version }
+        unsupported_specs << { section:, package: package_name, version: current_version }
         return
       end
 
       expected_version = expected_versions[source_key]
       unless expected_version
-        missing_source_specs << { section: section, package: package_name, source: source_key }
+        missing_source_specs << { section:, package: package_name, source: source_key }
         return
       end
 
       if parsed_spec[:lower_bound] && expected_below_lower_bound?(expected_version, parsed_spec[:lower_bound])
-        unsupported_specs << { section: section, package: package_name, version: current_version }
+        unsupported_specs << { section:, package: package_name, version: current_version }
         return
       end
 
@@ -110,7 +110,7 @@ module ReactOnRails
       return if normalized_current_version == expected_version && parsed_spec[:exact]
 
       changes << {
-        section: section,
+        section:,
         package: package_name,
         from: current_version,
         to: rewritten_spec(parsed_spec, expected_version)
@@ -148,7 +148,7 @@ module ReactOnRails
       if changes.empty?
         print_no_changes_summary
       else
-        print_changes_summary(changes, write: write)
+        print_changes_summary(changes, write:)
       end
 
       print_unsupported_specs(unsupported_specs)
@@ -204,14 +204,14 @@ module ReactOnRails
 
       alias_version = version_spec[(at_index + 1)..]
       prefix = version_spec[0..at_index]
-      return { version: alias_version, prefix: prefix, exact: true, lower_bound: nil } if exact_version?(alias_version)
+      return { version: alias_version, prefix:, exact: true, lower_bound: nil } if exact_version?(alias_version)
 
       # Try stripping range prefix from alias version (e.g., npm:@scope/pkg@^16.5.0)
       stripped = strip_range_prefix(alias_version)
       if stripped
         return {
           version: stripped,
-          prefix: prefix,
+          prefix:,
           exact: false,
           lower_bound: greater_or_equal_lower_bound(alias_version)
         }

@@ -39,8 +39,8 @@ describe "Incremental Rendering Integration", :integration do
     WebMock::HttpLibAdapters::AsyncHttpClientAdapter.disable!
 
     allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool).to receive_messages(
-      server_bundle_hash: server_bundle_hash,
-      rsc_bundle_hash: rsc_bundle_hash,
+      server_bundle_hash:,
+      rsc_bundle_hash:,
       renderer_bundle_file_name: "#{server_bundle_hash}.js",
       rsc_renderer_bundle_file_name: "#{rsc_bundle_hash}.js"
     )

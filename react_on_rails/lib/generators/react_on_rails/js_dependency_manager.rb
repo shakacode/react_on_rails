@@ -542,7 +542,7 @@ module ReactOnRails
       # @param dev [Boolean] Whether to add as dev dependency
       # @return [Boolean] true if successful, false otherwise
       def add_package(package, dev: false)
-        add_packages([package], dev: dev)
+        add_packages([package], dev:)
       end
 
       # Add multiple dependencies.
@@ -554,10 +554,10 @@ module ReactOnRails
       # @param dev [Boolean] Whether to add as dev dependencies
       # @return [Boolean] true if successful, false otherwise
       def add_packages(packages, dev: false)
-        return true if add_npm_dependencies(packages, dev: dev)
-        return true if install_packages_with_fallback(packages, dev: dev)
+        return true if add_npm_dependencies(packages, dev:)
+        return true if install_packages_with_fallback(packages, dev:)
 
-        write_versioned_package_specs_to_package_json(packages, dev: dev)
+        write_versioned_package_specs_to_package_json(packages, dev:)
         false
       end
 

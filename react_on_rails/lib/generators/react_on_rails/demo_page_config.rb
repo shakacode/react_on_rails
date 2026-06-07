@@ -5,12 +5,12 @@ module ReactOnRails
     module DemoPageConfig # rubocop:disable Metrics/ModuleLength
       def build_hello_world_view_config(component_name:, source_path:, landing_page:, redux:, rsc_demo:)
         {
-          component_name: component_name,
+          component_name:,
           title: redux ? "Redux SSR Demo" : "React SSR Demo",
-          intro: hello_world_intro(redux: redux),
-          highlights: hello_world_highlights(redux: redux),
-          file_hints: hello_world_file_hints(source_path: source_path, redux: redux),
-          quick_links: hello_world_quick_links(landing_page: landing_page, rsc_demo: rsc_demo),
+          intro: hello_world_intro(redux:),
+          highlights: hello_world_highlights(redux:),
+          file_hints: hello_world_file_hints(source_path:, redux:),
+          quick_links: hello_world_quick_links(landing_page:, rsc_demo:),
           learning_links: hello_world_learning_links
         }
       end
@@ -22,7 +22,7 @@ module ReactOnRails
                  "component response while only client islands ship JavaScript to the browser.",
           highlights: hello_server_highlights,
           file_hints: hello_server_file_hints,
-          quick_links: hello_server_quick_links(landing_page: landing_page, redux_demo: redux_demo),
+          quick_links: hello_server_quick_links(landing_page:, redux_demo:),
           learning_links: hello_server_learning_links
         }
       end

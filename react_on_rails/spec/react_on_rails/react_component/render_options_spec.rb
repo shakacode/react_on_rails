@@ -13,8 +13,8 @@ describe ReactOnRails::ReactComponent::RenderOptions do
 
   def the_attrs(react_component_name: "App", options: {})
     {
-      react_component_name: react_component_name,
-      options: options
+      react_component_name:,
+      options:
     }
   end
 
@@ -59,7 +59,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
     context "with props Hash" do
       it "returns props" do
         props = { a_prop: 2 }
-        attrs = the_attrs(options: { props: props })
+        attrs = the_attrs(options: { props: })
 
         opts = described_class.new(**attrs)
 
@@ -71,7 +71,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
   describe "#react_component_name" do
     it "returns react_component_name with correct format" do
       react_component_name = "some_app"
-      attrs = the_attrs(react_component_name: react_component_name)
+      attrs = the_attrs(react_component_name:)
 
       opts = described_class.new(**attrs)
 
@@ -117,7 +117,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
     context "with id option" do
       it "returns given id" do
         options = { id: "im-an-id" }
-        attrs = the_attrs(options: options)
+        attrs = the_attrs(options:)
 
         opts = described_class.new(**attrs)
 
@@ -141,8 +141,8 @@ describe ReactOnRails::ReactComponent::RenderOptions do
     context "with html_options" do
       it "returns html options" do
         html_options = { id: 2 }
-        options = { html_options: html_options }
-        attrs = the_attrs(options: options)
+        options = { html_options: }
+        attrs = the_attrs(options:)
 
         opts = described_class.new(**attrs)
 
@@ -222,7 +222,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
         it "returns #{option}" do
           options = {}
           options[option] = false
-          attrs = the_attrs(options: options)
+          attrs = the_attrs(options:)
           if option == :prerender
             with_prerender_env_override_cleared do
               opts = described_class.new(**attrs)

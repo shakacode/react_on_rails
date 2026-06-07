@@ -26,9 +26,9 @@ describe ReactOnRails::TestHelper::WebpackAssetsStatusChecker do
     let(:client_bundle_js_file) { File.join(generated_assets_full_path, "client-bundle.js") }
     let(:checker) do
       described_class
-        .new(generated_assets_full_path: generated_assets_full_path,
-             source_path: source_path,
-             webpack_generated_files: webpack_generated_files)
+        .new(generated_assets_full_path:,
+             source_path:,
+             webpack_generated_files:)
     end
 
     before do

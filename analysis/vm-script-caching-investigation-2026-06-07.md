@@ -159,9 +159,8 @@ Adding `vm.Script` caching would:
 
 ## Artifacts
 
-Benchmark scripts and raw data available at:
-
-- Original experiment: `vm-script-cache/tmp/experiments/20260607T083551Z-vm-script-cache/`
+Benchmark scripts were run during the original investigation. The raw benchmark summary is included below;
+the local experiment directory was not committed.
 
 ### Raw Benchmark Output (Summary)
 

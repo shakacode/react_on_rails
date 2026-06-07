@@ -132,7 +132,7 @@ def parse_changelog_sections(changelog)
   headers = []
   lines.each_with_index do |line, index|
     match = line.match(/^### \[([^\]]+)\].*$/)
-    headers << { index: index, version: match[1], header: line } if match
+    headers << { index:, version: match[1], header: line } if match
   end
 
   return { prefix: changelog, sections: [] } if headers.empty?
@@ -152,7 +152,7 @@ def parse_changelog_sections(changelog)
     }
   end
 
-  { prefix: prefix, sections: sections }
+  { prefix:, sections: }
 end
 
 def render_changelog_sections(prefix, sections)

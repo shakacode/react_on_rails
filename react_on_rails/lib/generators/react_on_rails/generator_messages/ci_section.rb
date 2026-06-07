@@ -15,7 +15,7 @@ module GeneratorMessages
       # Read package.json once and reuse for both package-manager detection and the
       # build:test script presence check to avoid a second I/O pass.
       package_json = read_package_json(app_root)
-      package_manager = detect_package_manager(app_root: app_root, package_json: package_json)
+      package_manager = detect_package_manager(app_root:, package_json:)
       ci_status = if ci_workflow_generated
                     "A GitHub Actions workflow has been generated at .github/workflows/ci.yml."
                   else
@@ -30,7 +30,7 @@ module GeneratorMessages
                         end
       manual_build_command = shakapacker_build_command(
         env: "RAILS_ENV=test NODE_ENV=test",
-        app_root: app_root,
+        app_root:,
         environment: "test"
       )
 

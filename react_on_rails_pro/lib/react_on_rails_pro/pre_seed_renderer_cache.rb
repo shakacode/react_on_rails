@@ -66,7 +66,7 @@ module ReactOnRailsPro
 
       # Optionally seed previous deploys' bundle hashes for rolling-deploy safety.
       # No-op when neither config.rolling_deploy_adapter nor PREVIOUS_BUNDLE_HASHES is set.
-      RollingDeployCacheStager.call(cache_dir: cache_dir, current_hashes: current_hashes, mode: mode)
+      RollingDeployCacheStager.call(cache_dir:, current_hashes:, mode:)
     end
 
     # Validates the cache-dir env var (raises in production-like copy mode when
@@ -129,7 +129,7 @@ module ReactOnRailsPro
     private_class_method :stage_bundle
 
     def self.stage_file(src, dest, mode, log_prefix)
-      RendererCacheHelpers.stage_file(src, dest, mode, log_prefix: log_prefix)
+      RendererCacheHelpers.stage_file(src, dest, mode, log_prefix:)
     end
     private_class_method :stage_file
 

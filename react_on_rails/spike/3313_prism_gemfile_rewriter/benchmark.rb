@@ -148,8 +148,8 @@ results = GEMFILES.map do |label, src|
   prism_seconds = measure(ITERATIONS) { prism.rewrite(src) }
   {
     label: "#{label} (#{src.lines.size}l)",
-    scanner_seconds: scanner_seconds,
-    prism_seconds: prism_seconds
+    scanner_seconds:,
+    prism_seconds:
   }
 end
 

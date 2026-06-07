@@ -12,7 +12,7 @@ module Mutations
     def resolve(user_id:, new_name:)
       user = User.find(user_id)
       user.update!(name: new_name)
-      { user: user }
+      { user: }
     end
   end
 end

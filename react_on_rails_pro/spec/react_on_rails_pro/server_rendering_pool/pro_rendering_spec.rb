@@ -38,11 +38,11 @@ RSpec.describe ReactOnRailsPro::ServerRenderingPool::ProRendering do
   def build_render_options(request_digest: nil, random_dom_id: true, streaming: false, prerender: true,
                            internal_options: {})
     render_options_class.new(
-      request_digest: request_digest,
-      random_dom_id: random_dom_id,
-      streaming: streaming,
-      prerender: prerender,
-      internal_options: internal_options
+      request_digest:,
+      random_dom_id:,
+      streaming:,
+      prerender:,
+      internal_options:
     )
   end
 
@@ -97,7 +97,7 @@ RSpec.describe ReactOnRailsPro::ServerRenderingPool::ProRendering do
 
       digest = request_digest_for(
         render_js(dom_node_id: "CacheProbe-react-component-1", quote: :double),
-        render_options: render_options
+        render_options:
       )
 
       expect(digest).to eq("already-set")
@@ -273,7 +273,7 @@ RSpec.describe ReactOnRailsPro::ServerRenderingPool::ProRendering do
 
       it "wraps cache misses and forwards cache options" do
         cache_options = { expires_in: 60.seconds }
-        render_options = build_render_options(streaming: true, internal_options: { cache_options: cache_options })
+        render_options = build_render_options(streaming: true, internal_options: { cache_options: })
         upstream_stream = instance_double(stream_result_class)
         wrapped_stream = instance_double(stream_result_class)
         allow(pool).to receive(:exec_server_render_js).and_return(upstream_stream)
@@ -285,7 +285,7 @@ RSpec.describe ReactOnRailsPro::ServerRenderingPool::ProRendering do
         expect(ReactOnRailsPro::StreamCache).to have_received(:wrap_and_cache)
           .with(["ror_pro_rendered_html", "test", render_options.request_digest],
                 upstream_stream,
-                cache_options: cache_options)
+                cache_options:)
         expect(pool).to have_received(:exec_server_render_js).with(js_code, render_options).once
       end
     end

@@ -32,7 +32,7 @@ module RendererHarness
       scenario = scenario_class.new(@config)
 
       sampler = MemorySampler.new(pids: { rails: Process.pid, renderer: @config.renderer_pid })
-      runner = Runner.new(scenario: scenario, config: @config)
+      runner = Runner.new(scenario:, config: @config)
 
       begin
         # Upload the server bundle to the renderer before running so that the

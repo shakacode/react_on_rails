@@ -54,9 +54,9 @@ RSpec.describe "Pro dummy bin/prod" do
 
       {
         command_log: File.exist?(command_log_path) ? File.read(command_log_path) : nil,
-        status: status,
-        stderr: stderr,
-        stdout: stdout
+        status:,
+        stderr:,
+        stdout:
       }
     end
   end

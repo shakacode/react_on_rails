@@ -34,10 +34,10 @@ module ReactOnRails
       allow(ReactOnRails::PackerUtils).to receive_messages(
         manifest_exists?: true,
         nested_entries?: true,
-        packer_source_entry_path: packer_source_entry_path
+        packer_source_entry_path:
       )
       allow(ReactOnRails::Utils).to receive_messages(generated_assets_full_path: packer_source_entry_path,
-                                                     server_bundle_js_file_path: server_bundle_js_file_path)
+                                                     server_bundle_js_file_path:)
       if ReactOnRails::Utils.instance_variable_defined?(:@rsc_support_enabled)
         ReactOnRails::Utils.remove_instance_variable(:@rsc_support_enabled)
       end
@@ -109,8 +109,8 @@ module ReactOnRails
       let(:component_pack) { "#{generated_directory}/#{component_name}.js" }
 
       before do
-        stub_packer_source_path(component_name: component_name,
-                                packer_source_path: packer_source_path)
+        stub_packer_source_path(component_name:,
+                                packer_source_path:)
         described_class.instance.generate_packs_if_stale
       end
 
@@ -164,7 +164,7 @@ module ReactOnRails
 
       before do
         stub_packer_source_path(component_name: components_directory,
-                                packer_source_path: packer_source_path)
+                                packer_source_path:)
       end
 
       it "raises an error that lists the conflicting component files" do
@@ -192,8 +192,8 @@ module ReactOnRails
       let(:component_pack) { "#{generated_directory}/#{component_name}.js" }
 
       before do
-        stub_packer_source_path(component_name: component_name,
-                                packer_source_path: packer_source_path)
+        stub_packer_source_path(component_name:,
+                                packer_source_path:)
       end
 
       it "raises an error for definition override" do
@@ -232,8 +232,8 @@ module ReactOnRails
       let(:component_pack) { "#{generated_directory}/#{component_name}.js" }
 
       before do
-        stub_packer_source_path(component_name: component_name,
-                                packer_source_path: packer_source_path)
+        stub_packer_source_path(component_name:,
+                                packer_source_path:)
       end
 
       it "raises an error for definition override" do
@@ -247,8 +247,8 @@ module ReactOnRails
       let(:component_pack) { "#{generated_directory}/#{component_name}.js" }
 
       before do
-        stub_packer_source_path(component_name: component_name,
-                                packer_source_path: packer_source_path)
+        stub_packer_source_path(component_name:,
+                                packer_source_path:)
       end
 
       it "raises missing client file error" do
@@ -266,8 +266,8 @@ module ReactOnRails
       let(:component_pack) { "#{generated_directory}/#{component_name}.js" }
 
       before do
-        stub_packer_source_path(component_name: component_name,
-                                packer_source_path: packer_source_path)
+        stub_packer_source_path(component_name:,
+                                packer_source_path:)
         described_class.instance.generate_packs_if_stale
       end
 
@@ -305,7 +305,7 @@ module ReactOnRails
 
       before do
         stub_packer_source_path(component_name: components_directory,
-                                packer_source_path: packer_source_path)
+                                packer_source_path:)
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
         stub_const("ReactOnRailsPro::Utils", Class.new do
           def self.rsc_support_enabled?
@@ -781,8 +781,8 @@ module ReactOnRails
       let(:component_pack) { "#{generated_directory}/#{component_name}.js" }
 
       before do
-        stub_packer_source_path(component_name: component_name,
-                                packer_source_path: packer_source_path)
+        stub_packer_source_path(component_name:,
+                                packer_source_path:)
         FileUtils.mkdir_p(generated_directory)
         File.write(component_pack, "wat")
         File.write(generated_server_bundle_file_path, "wat")
@@ -1041,8 +1041,8 @@ module ReactOnRails
 
       before do
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
-        stub_packer_source_path(component_name: component_name,
-                                packer_source_path: packer_source_path)
+        stub_packer_source_path(component_name:,
+                                packer_source_path:)
         described_class.instance.generate_packs_if_stale
       end
 
@@ -1070,8 +1070,8 @@ module ReactOnRails
       let(:css_module_pack_glob_pattern) { "#{generated_directory}/#{component_name}.module*" }
 
       before do
-        stub_packer_source_path(component_name: component_name,
-                                packer_source_path: packer_source_path)
+        stub_packer_source_path(component_name:,
+                                packer_source_path:)
         described_class.instance.generate_packs_if_stale
       end
 
@@ -1181,7 +1181,7 @@ module ReactOnRails
 
       it "does not attempt to generate store packs" do
         component_name = "ComponentWithCommonOnly"
-        stub_packer_source_path(component_name: component_name, packer_source_path: packer_source_path)
+        stub_packer_source_path(component_name:, packer_source_path:)
 
         # Should not raise any errors even without stores
         expect { described_class.instance.generate_packs_if_stale }.not_to raise_error
@@ -1619,7 +1619,7 @@ module ReactOnRails
 
       before do
         stub_packer_source_path(component_name: components_directory,
-                                packer_source_path: packer_source_path)
+                                packer_source_path:)
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
         stub_const("ReactOnRailsPro::Utils", Class.new do
           def self.rsc_support_enabled?

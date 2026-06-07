@@ -96,11 +96,11 @@ RSpec.describe "benchmark regression reporting" do
     def report_with_cache(suite_name, issue_number_cache, report_comment_id_cache = nil)
       described_class.report(
         summary: "#{suite_name} regressed",
-        suite_name: suite_name,
+        suite_name:,
         github_run_url: "https://github.com/run/1",
         bencher_url: "https://bencher.dev/dash",
-        issue_number_cache: issue_number_cache,
-        report_comment_id_cache: report_comment_id_cache
+        issue_number_cache:,
+        report_comment_id_cache:
       )
     end
 
@@ -309,7 +309,7 @@ RSpec.describe "benchmark regression reporting" do
     def write_payload(dir, artifact:, suite:, shard_label: "1/1", summary: nil, regressed: nil)
       artifact_dir = File.join(dir, artifact)
       FileUtils.mkdir_p(artifact_dir)
-      payload = { suite_name: suite, shard_label: shard_label,
+      payload = { suite_name: suite, shard_label:,
                   summary: summary || "#{suite} #{shard_label} regressed" }
       # Omit the key entirely when regressed is nil so the "older writer" fail-safe path
       # (payload without REGRESSED_BENCHMARKS) stays covered by the existing examples.

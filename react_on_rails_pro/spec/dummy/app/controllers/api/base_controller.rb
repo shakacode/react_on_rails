@@ -7,7 +7,7 @@ module Api
     private
 
     def render_error(message, status = :unprocessable_entity)
-      render json: { error: message }, status: status
+      render json: { error: message }, status:
     end
   end
 end

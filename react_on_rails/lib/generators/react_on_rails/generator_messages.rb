@@ -58,13 +58,13 @@ module GeneratorMessages
                                            rsc: false, shakapacker_just_installed: false, landing_page: false,
                                            ci_workflow_generated: false, app_root: Dir.pwd)
       process_manager_section = build_process_manager_section
-      testing_section = build_testing_section(app_root: app_root)
-      ci_section = build_ci_section(app_root: app_root, ci_workflow_generated: ci_workflow_generated)
-      package_manager = detect_package_manager(app_root: app_root)
-      shakapacker_status = build_shakapacker_status_section(shakapacker_just_installed: shakapacker_just_installed,
-                                                            app_root: app_root)
-      render_example = build_render_example(component_name: component_name, route: route, rsc: rsc)
-      render_label = build_render_label(route: route, rsc: rsc)
+      testing_section = build_testing_section(app_root:)
+      ci_section = build_ci_section(app_root:, ci_workflow_generated:)
+      package_manager = detect_package_manager(app_root:)
+      shakapacker_status = build_shakapacker_status_section(shakapacker_just_installed:,
+                                                            app_root:)
+      render_example = build_render_example(component_name:, route:, rsc:)
+      render_label = build_render_label(route:, rsc:)
       normalized_route = route.to_s.sub(%r{\A/+}, "")
       visit_url = if landing_page || normalized_route.empty?
                     "http://localhost:3000"

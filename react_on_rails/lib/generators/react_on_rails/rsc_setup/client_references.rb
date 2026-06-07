@@ -246,10 +246,10 @@ module ReactOnRails
             config_path,
             content,
             existing_imports_content,
-            is_server: is_server,
+            is_server:,
             plugin_pending: true
           )
-            return inject_rsc_plugin_import(config_path, content, is_server: is_server) ? :unscoped : :failed
+            return inject_rsc_plugin_import(config_path, content, is_server:) ? :unscoped : :failed
           end
 
           # `rsc_client_references_defined?` covers both scoped and unscoped declarations.
@@ -259,17 +259,17 @@ module ReactOnRails
           # plugin-import-only path and let downstream callers honor the scoped/unscoped
           # state of whatever the user already wrote.
           if rsc_client_references_defined?(content)
-            return prepare_existing_rsc_client_references_plugin_import(config_path, content, is_server: is_server)
+            return prepare_existing_rsc_client_references_plugin_import(config_path, content, is_server:)
           end
 
-          return :failed unless inject_rsc_imports(config_path, content, existing_imports_content, is_server: is_server)
+          return :failed unless inject_rsc_imports(config_path, content, existing_imports_content, is_server:)
           return :scoped if rsc_client_references_setup_ready?(config_path, plugin_pending: true)
 
           :failed
         end
 
         def prepare_existing_rsc_client_references_plugin_import(config_path, content, is_server:)
-          return :failed unless inject_rsc_plugin_import(config_path, content, is_server: is_server)
+          return :failed unless inject_rsc_plugin_import(config_path, content, is_server:)
 
           content = read_current_rsc_config(config_path, fallback: content)
           if object_literal_rsc_client_references_defined?(content)
@@ -312,17 +312,17 @@ module ReactOnRails
             content = normalized_content
           end
 
-          return unless rsc_plugin_sections_safe_to_rewrite?(config_path, content, is_server: is_server)
+          return unless rsc_plugin_sections_safe_to_rewrite?(config_path, content, is_server:)
 
-          return if rsc_plugin_uses_scoped_client_references?(content, is_server: is_server)
-          return unless prepare_rsc_client_references_rewrite!(config_path, content, is_server: is_server)
+          return if rsc_plugin_uses_scoped_client_references?(content, is_server:)
+          return unless prepare_rsc_client_references_rewrite!(config_path, content, is_server:)
 
-          return if rewrite_rsc_plugin_client_references(config_path, is_server: is_server)
+          return if rewrite_rsc_plugin_client_references(config_path, is_server:)
 
           # Normalization above is committed independently. If clientReferences migration fails,
           # rollback restores to the normalized plugin state rather than the original legacy plugin.
           rollback_incomplete_rsc_client_references_setup(config_path, content)
-          warn_missing_rsc_plugin_target(config_path, is_server: is_server)
+          warn_missing_rsc_plugin_target(config_path, is_server:)
         end
 
         def normalize_rsc_plugin_for_active_bundler(config_path, content)
@@ -461,18 +461,18 @@ module ReactOnRails
           # This prepares the rewrite and returns whether it should continue. When it returns true,
           # the scoped helper may already have been injected on disk so
           # `rewrite_rsc_plugin_client_references` can re-read fresh content with valid offsets.
-          if rsc_plugin_references_any_scoped_client_references?(content, is_server: is_server)
-            return false unless ensure_rsc_client_references_setup(config_path, content, is_server: is_server)
+          if rsc_plugin_references_any_scoped_client_references?(content, is_server:)
+            return false unless ensure_rsc_client_references_setup(config_path, content, is_server:)
 
-            return rsc_plugin_needs_client_references_rewrite?(content, is_server: is_server)
+            return rsc_plugin_needs_client_references_rewrite?(content, is_server:)
           end
 
-          rewritable_rsc_plugin?(config_path, content, is_server: is_server) &&
-            ensure_rsc_client_references_setup(config_path, content, is_server: is_server)
+          rewritable_rsc_plugin?(config_path, content, is_server:) &&
+            ensure_rsc_client_references_setup(config_path, content, is_server:)
         end
 
         def rsc_plugin_needs_client_references_rewrite?(content, is_server:)
-          any_rsc_plugin_section_without_client_references?(content, is_server: is_server)
+          any_rsc_plugin_section_without_client_references?(content, is_server:)
         end
 
         # Detects RSCWebpackPlugin option blocks that the lightweight JS scanner could not parse
@@ -482,7 +482,7 @@ module ReactOnRails
         def rsc_plugin_sections_safe_to_rewrite?(config_path, content, is_server:)
           # `:unparseable` is file-wide: the partitioner increments it before filtering parseable
           # sections by the current `is_server` target.
-          unparseable = rsc_plugin_option_sections_partition(content, is_server: is_server).fetch(:unparseable)
+          unparseable = rsc_plugin_option_sections_partition(content, is_server:).fetch(:unparseable)
           return true if unparseable.zero?
 
           warn_unparseable_rsc_plugin_sections(config_path, unparseable)
@@ -492,9 +492,9 @@ module ReactOnRails
         def rewritable_rsc_plugin?(config_path, content, is_server:)
           # Mixed same-target plugins are still rewritable: the later rewrite only updates plugins
           # missing clientReferences and leaves sibling custom clientReferences untouched.
-          return true if any_rsc_plugin_section_without_client_references?(content, is_server: is_server)
+          return true if any_rsc_plugin_section_without_client_references?(content, is_server:)
 
-          if rsc_plugin_defines_client_references?(content, is_server: is_server)
+          if rsc_plugin_defines_client_references?(content, is_server:)
             GeneratorMessages.add_warning(
               "Skipped scoped clientReferences migration for #{config_path} because all matching " \
               "#{rsc_plugin_class_name} instances already define clientReferences (some may already be " \
@@ -503,7 +503,7 @@ module ReactOnRails
             return false
           end
 
-          warn_missing_rsc_plugin_target(config_path, is_server: is_server)
+          warn_missing_rsc_plugin_target(config_path, is_server:)
           false
         end
 
@@ -541,17 +541,17 @@ module ReactOnRails
             return false
           end
 
-          unless rsc_client_references_setup_anchor?(content, is_server: is_server)
+          unless rsc_client_references_setup_anchor?(content, is_server:)
             warn_missing_rsc_client_references_anchor(config_path)
             return false
           end
 
-          existing_imports_content = content_through_rsc_setup_anchor(content, is_server: is_server)
+          existing_imports_content = content_through_rsc_setup_anchor(content, is_server:)
           return false if rsc_setup_blocked_by_later_imports?(config_path, content, existing_imports_content,
-                                                              is_server: is_server)
+                                                              is_server:)
 
           return false unless add_rsc_client_references_setup(config_path, content, existing_imports_content,
-                                                              is_server: is_server)
+                                                              is_server:)
           return true if options[:skip]
 
           rsc_client_references_setup_ready?(config_path)
@@ -566,11 +566,11 @@ module ReactOnRails
 
         def rsc_plugin_uses_scoped_client_references?(content, is_server:)
           generated_rsc_client_references_defined?(content) &&
-            rsc_plugin_references_scoped_client_references?(content, is_server: is_server)
+            rsc_plugin_references_scoped_client_references?(content, is_server:)
         end
 
         def rsc_plugin_references_scoped_client_references?(content, is_server:)
-          sections = rsc_plugin_option_sections(content, is_server: is_server)
+          sections = rsc_plugin_option_sections(content, is_server:)
           return false if sections.empty?
 
           sections.all? do |section|
@@ -579,13 +579,13 @@ module ReactOnRails
         end
 
         def rsc_plugin_references_any_scoped_client_references?(content, is_server:)
-          rsc_plugin_option_sections(content, is_server: is_server).any? do |section|
+          rsc_plugin_option_sections(content, is_server:).any? do |section|
             rsc_plugin_body_has_top_level_scoped_client_references?(section.fetch(:body))
           end
         end
 
         def rsc_plugin_client_references_configured?(content, is_server:)
-          sections = rsc_plugin_option_sections(content, is_server: is_server)
+          sections = rsc_plugin_option_sections(content, is_server:)
           # No parseable `isServer: <bool>` section means this file's plugin call sits outside
           # what the generator's scanner can match (e.g. options are computed at runtime, or the
           # plugin is invoked without an options object). Verification callers intentionally
@@ -629,7 +629,7 @@ module ReactOnRails
         end
 
         def rsc_plugin_defines_client_references?(content, is_server:)
-          rsc_plugin_option_sections(content, is_server: is_server).any? do |section|
+          rsc_plugin_option_sections(content, is_server:).any? do |section|
             rsc_plugin_body_has_top_level_key?(section.fetch(:body), "clientReferences")
           end
         end
@@ -640,7 +640,7 @@ module ReactOnRails
         # complements when multiple plugin sections exist — a file with one configured plugin and
         # one unconfigured plugin returns true from both.
         def any_rsc_plugin_section_without_client_references?(content, is_server:)
-          rsc_plugin_option_sections(content, is_server: is_server).any? do |section|
+          rsc_plugin_option_sections(content, is_server:).any? do |section|
             !rsc_plugin_body_has_top_level_key?(section.fetch(:body), "clientReferences")
           end
         end
@@ -686,7 +686,7 @@ module ReactOnRails
         # (a few hundred lines, a handful of plugins); if this scanner is ever reused on larger
         # inputs, carry scanner state forward between iterations before adopting it.
         def rsc_plugin_option_sections(content, is_server:)
-          rsc_plugin_option_sections_partition(content, is_server: is_server).fetch(:safe)
+          rsc_plugin_option_sections_partition(content, is_server:).fetch(:safe)
         end
 
         # Returns the matching plugin sections plus a count of `RSCWebpackPlugin(` invocations
@@ -729,13 +729,13 @@ module ReactOnRails
             end
 
             body = content[(options_start + 1)...options_end]
-            if rsc_plugin_is_server_match?(body, is_server: is_server)
-              safe << { body: body, body_start: options_start + 1, body_end: options_end }
+            if rsc_plugin_is_server_match?(body, is_server:)
+              safe << { body:, body_start: options_start + 1, body_end: options_end }
             end
             search_from = options_end + 1
           end
 
-          { safe: safe, unparseable: unparseable }
+          { safe:, unparseable: }
         end
 
         # Walks forward from the assumed closing `}` of an options object, skipping whitespace
@@ -1115,14 +1115,14 @@ module ReactOnRails
           # Re-read because ensure_rsc_client_references_setup may have just inserted the helper,
           # making the caller's in-memory body_start/body_end offsets stale.
           content = File.read(full_path)
-          rewrites = rsc_plugin_option_sections(content, is_server: is_server).filter_map do |candidate|
+          rewrites = rsc_plugin_option_sections(content, is_server:).filter_map do |candidate|
             body = candidate.fetch(:body)
             # Depth-aware check: a nested `clientReferences:` (e.g. inside a sibling object
             # literal) must not be mistaken for a configured top-level option, or we'd skip
             # the migration and leave the real plugin unscoped.
             next if rsc_plugin_body_has_top_level_key?(body, "clientReferences")
 
-            rewritten_body = add_client_references_to_rsc_plugin_body(body, is_server: is_server)
+            rewritten_body = add_client_references_to_rsc_plugin_body(body, is_server:)
             next if rewritten_body == body
 
             [candidate, rewritten_body]
@@ -1174,7 +1174,7 @@ module ReactOnRails
         end
 
         def inject_rsc_plugin_import(config_path, content, is_server:)
-          replace_rsc_client_references_setup_anchor(config_path, content, is_server: is_server) do |anchor|
+          replace_rsc_client_references_setup_anchor(config_path, content, is_server:) do |anchor|
             join_rsc_client_references_setup(
               content,
               [
@@ -1294,7 +1294,7 @@ module ReactOnRails
 
           content_without_comments = rsc_plugin_options_without_comments(content).rstrip
           needs_comma = !content_without_comments.end_with?(",")
-          prefix = build_splice_prefix(content, needs_comma: needs_comma)
+          prefix = build_splice_prefix(content, needs_comma:)
 
           "#{prefix}#{line_ending}#{indent}clientReferences: rscClientReferences,#{trailing}"
         end
@@ -1365,7 +1365,7 @@ module ReactOnRails
         end
 
         def rsc_client_references_setup_anchor?(content, is_server:)
-          !!rsc_client_references_setup_anchor_match(content, is_server: is_server)
+          !!rsc_client_references_setup_anchor_match(content, is_server:)
         end
 
         # Called from the existing-config migration path, which is only reached after the
@@ -1378,7 +1378,7 @@ module ReactOnRails
         # duplicate `const rscClientReferences` declaration and leave the user's webpack config with
         # a Node SyntaxError at load time.
         def add_rsc_client_references_setup(config_path, content, existing_imports_content, is_server:)
-          replace_rsc_client_references_setup_anchor(config_path, content, is_server: is_server) do |anchor|
+          replace_rsc_client_references_setup_anchor(config_path, content, is_server:) do |anchor|
             join_rsc_client_references_setup(
               content,
               [
@@ -1412,7 +1412,7 @@ module ReactOnRails
         end
 
         def replace_rsc_client_references_setup_anchor(config_path, content, is_server:)
-          anchor_match = rsc_client_references_setup_anchor_match(content, is_server: is_server)
+          anchor_match = rsc_client_references_setup_anchor_match(content, is_server:)
           return unless anchor_match
 
           updated_content = content.dup
@@ -1573,14 +1573,14 @@ module ReactOnRails
         # helpers) check whether required imports appear up to and including the anchor line.
         # Anything past the anchor is considered "later" and disqualifies an otherwise-valid import.
         def content_through_rsc_setup_anchor(content, is_server:)
-          anchor = rsc_client_references_setup_anchor_match(content, is_server: is_server)
+          anchor = rsc_client_references_setup_anchor_match(content, is_server:)
           return "" unless anchor
 
           content[0...anchor.end(0)]
         end
 
         def rsc_client_references_setup_anchor_match(content, is_server:)
-          pattern = rsc_client_references_setup_import_pattern(is_server: is_server)
+          pattern = rsc_client_references_setup_import_pattern(is_server:)
           content.to_enum(:scan, pattern).each do
             match = Regexp.last_match
             return match if js_code_position?(content, match.begin(0))
@@ -1595,7 +1595,7 @@ module ReactOnRails
           is_server:,
           plugin_pending: false
         )
-          reason = rsc_setup_blocker_reason(content, existing_imports_content, is_server: is_server)
+          reason = rsc_setup_blocker_reason(content, existing_imports_content, is_server:)
           return false unless reason
 
           manual_action =
@@ -1621,7 +1621,7 @@ module ReactOnRails
         # the cause from a generic "imports unavailable" warning.
         def rsc_setup_blocker_reason(content, existing_imports_content, is_server:)
           path_resolve_blocker_reason(content, existing_imports_content) ||
-            shakapacker_config_blocker_reason(content, existing_imports_content, is_server: is_server)
+            shakapacker_config_blocker_reason(content, existing_imports_content, is_server:)
         end
 
         def path_resolve_blocker_reason(content, existing_imports_content)
@@ -1697,9 +1697,9 @@ module ReactOnRails
         end
 
         def rsc_client_references_setup_anchor_available?(config_path, content, is_server:, plugin_pending: false)
-          return true if rsc_client_references_setup_anchor?(content, is_server: is_server)
+          return true if rsc_client_references_setup_anchor?(content, is_server:)
 
-          warn_missing_rsc_client_references_anchor(config_path, plugin_pending: plugin_pending)
+          warn_missing_rsc_client_references_anchor(config_path, plugin_pending:)
           false
         end
 
@@ -1713,7 +1713,7 @@ module ReactOnRails
           return true if options[:skip]
           return true if generated_rsc_client_references_defined?(File.read(File.join(destination_root, config_path)))
 
-          warn_rsc_client_references_injection_failed(config_path, plugin_pending: plugin_pending)
+          warn_rsc_client_references_injection_failed(config_path, plugin_pending:)
           false
         end
 
@@ -1724,7 +1724,7 @@ module ReactOnRails
             "templates emit; backtick template-literal require paths and Rspack-only server configs without " \
             "the webpack fallback ternary must be migrated manually). " \
             "If your config uses ESM `import` syntax, the generator cannot migrate it automatically. " \
-            "#{manual_rsc_plugin_action(config_path, plugin_pending: plugin_pending)}"
+            "#{manual_rsc_plugin_action(config_path, plugin_pending:)}"
           )
         end
 
@@ -1732,7 +1732,7 @@ module ReactOnRails
           GeneratorMessages.add_warning(
             "Could not inject rscClientReferences into #{config_path}: expected webpack import anchor was found, " \
             "but the generated scoped helper setup was not written. " \
-            "#{manual_rsc_plugin_action(config_path, plugin_pending: plugin_pending)}"
+            "#{manual_rsc_plugin_action(config_path, plugin_pending:)}"
           )
         end
 

@@ -27,7 +27,7 @@ module RendererHarness
             bytes_in: body.bytesize,
             bytes_out: js.bytesize,
             ok: error.nil?,
-            error: error
+            error:
           }
         end
       end

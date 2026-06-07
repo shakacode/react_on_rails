@@ -224,9 +224,9 @@ module ReactOnRailsPro
 
     def stage_file(src, dest, mode, log_prefix:)
       if mode == :copy
-        copy_file_atomically(src, dest, log_prefix: log_prefix)
+        copy_file_atomically(src, dest, log_prefix:)
       else
-        make_relative_symlink(src, dest, log_prefix: log_prefix)
+        make_relative_symlink(src, dest, log_prefix:)
       end
     end
 

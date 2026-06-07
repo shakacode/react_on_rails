@@ -20,7 +20,7 @@ module ReactOnRails
             return cached_override[:value] if cached_override && cached_override[:raw_value] == raw_value
 
             parsed_value = parse_prerender_env_override(raw_value)
-            @prerender_env_override_cache = { raw_value: raw_value, value: parsed_value }
+            @prerender_env_override_cache = { raw_value:, value: parsed_value }
             parsed_value
           end
         end

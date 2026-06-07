@@ -46,12 +46,12 @@ module MockStreamHelper
     end
 
     def post(path, form: nil, json: nil, stream: false)
-      request = MockRequest.new(url: full_url(path), path: path, form: form, json: json, stream: stream)
+      request = MockRequest.new(url: full_url(path), path:, form:, json:, stream:)
       build_response(request)
     end
 
     def get(path)
-      request = MockRequest.new(url: full_url(path), path: path, form: nil, json: nil, stream: false)
+      request = MockRequest.new(url: full_url(path), path:, form: nil, json: nil, stream: false)
       build_response(request)
     end
 
@@ -72,7 +72,7 @@ module MockStreamHelper
       request_data[:request] = request
 
       if request.stream
-        return ReactOnRailsPro::RendererHttpClient::Response.new(status: status) do |yielder, _status_assigner|
+        return ReactOnRailsPro::RendererHttpClient::Response.new(status:) do |yielder, _status_assigner|
           # The mock pre-sets status above; pass the request so specs can assert on the captured payload.
           block.call(->(value) { yielder.call(value) }, request)
         end
@@ -86,7 +86,7 @@ module MockStreamHelper
         error = e
       end
 
-      ReactOnRailsPro::RendererHttpClient::Response.new(status: status, body: chunks, error: error)
+      ReactOnRailsPro::RendererHttpClient::Response.new(status:, body: chunks, error:)
     end
   end
 
@@ -113,10 +113,10 @@ module MockStreamHelper
 
         request_data = { request: nil }
         mock_responses[url] << {
-          status: status,
-          block: block,
+          status:,
+          block:,
           remaining: count,
-          request_data: request_data
+          request_data:
         }
         request_data
       end
@@ -153,8 +153,8 @@ module MockStreamHelper
     end
   end
 
-  def mock_streaming_response(url, status = 200, count: 1, &block)
-    MockStream.mock_streaming_response(url, status, count: count, &block)
+  def mock_streaming_response(url, status = 200, count: 1, &)
+    MockStream.mock_streaming_response(url, status, count:, &)
   end
 
   def clear_stream_mocks

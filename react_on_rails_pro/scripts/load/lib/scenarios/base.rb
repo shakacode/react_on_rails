@@ -65,10 +65,10 @@ module RendererHarness
         ok = !status.nil? && !http_error_status?(status)
         {
           http_status: status,
-          ok: ok,
+          ok:,
           error: ok ? nil : stream_error_message(status),
-          bytes_in: bytes_in,
-          bytes_out: bytes_out
+          bytes_in:,
+          bytes_out:
         }
       end
 
@@ -119,12 +119,12 @@ module RendererHarness
           latency_ms: monotonic_ms - start_ms,
           bytes_in: payload[:bytes_in] || 0,
           bytes_out: payload[:bytes_out] || 0,
-          ok: ok,
-          error: error,
-          http_status: http_status,
+          ok:,
+          error:,
+          http_status:,
           scenario: name,
           thread_id: Thread.current.object_id,
-          t_started_ms: t_started_ms
+          t_started_ms:
         )
       end
 
@@ -138,7 +138,7 @@ module RendererHarness
           http_status: nil,
           scenario: name,
           thread_id: Thread.current.object_id,
-          t_started_ms: t_started_ms
+          t_started_ms:
         )
       end
 

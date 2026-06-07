@@ -24,7 +24,7 @@ module ReactOnRails
       private
 
       def shakapacker_build_command(env:, environment: "production", app_root: shakapacker_hook_app_root)
-        hook_command = shakapacker_precompile_hook_command(app_root: app_root, environment: environment)
+        hook_command = shakapacker_precompile_hook_command(app_root:, environment:)
         shakapacker_command = "#{env} bin/shakapacker"
         return shakapacker_command unless hook_command
 
@@ -39,7 +39,7 @@ module ReactOnRails
         hook_command = normalize_precompile_hook(effective_precompile_hook(config, environment))
         return hook_command if hook_command == DEFAULT_PRECOMPILE_HOOK_COMMAND
 
-        return unless generated_precompile_hook_will_be_configured?(shakapacker_config_path, environment: environment)
+        return unless generated_precompile_hook_will_be_configured?(shakapacker_config_path, environment:)
 
         DEFAULT_PRECOMPILE_HOOK_COMMAND
       end
@@ -102,7 +102,7 @@ module ReactOnRails
       def shakapacker_yml_document(content)
         sections = shakapacker_yml_sections(content)
         ShakapackerYmlDocument.new(
-          sections: sections,
+          sections:,
           section_index: shakapacker_yml_section_index(sections),
           anchor_index: shakapacker_yml_anchor_index(sections)
         )

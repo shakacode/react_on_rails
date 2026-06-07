@@ -185,7 +185,7 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
       pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
       allow(pool).to receive_messages(
         server_bundle_hash: bundle_hash,
-        rsc_bundle_hash: rsc_bundle_hash
+        rsc_bundle_hash:
       )
 
       FileUtils.mkdir_p(File.dirname(rsc_bundle_path))

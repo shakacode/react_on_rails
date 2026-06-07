@@ -267,7 +267,7 @@ module RendererHarness
         errors << e
       end
 
-      raise_worker_errors(errors, ignore_measurement_aborted: ignore_measurement_aborted) if errors.any?
+      raise_worker_errors(errors, ignore_measurement_aborted:) if errors.any?
     end
 
     def join_thread(thread, deadline)

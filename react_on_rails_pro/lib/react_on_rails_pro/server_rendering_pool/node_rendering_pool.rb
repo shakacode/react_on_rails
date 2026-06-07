@@ -62,7 +62,7 @@ module ReactOnRailsPro
             ReactOnRailsPro::Request.render_code_with_incremental_updates(
               path,
               js_code,
-              async_props_block: async_props_block
+              async_props_block:
             )
           else
             # Use standard streaming when no async props block
@@ -70,7 +70,7 @@ module ReactOnRailsPro
             ReactOnRailsPro::Request.render_code_as_stream(
               path,
               js_code,
-              is_rsc_payload: is_rsc_payload
+              is_rsc_payload:
             )
           end
         end

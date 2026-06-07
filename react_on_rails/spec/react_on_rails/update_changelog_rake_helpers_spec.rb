@@ -13,7 +13,7 @@ RSpec.describe "update_changelog.rake helper methods" do
   end
 
   def run_git!(*args, chdir:)
-    output, status = Open3.capture2e("git", *args, chdir: chdir)
+    output, status = Open3.capture2e("git", *args, chdir:)
     raise "git #{args.join(' ')} failed:\n#{output}" unless status.success?
 
     output.strip

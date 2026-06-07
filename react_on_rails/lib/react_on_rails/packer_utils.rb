@@ -128,9 +128,9 @@ module ReactOnRails
       webpack_generated_files = ReactOnRails.configuration.webpack_generated_files
 
       @webpack_assets_status_checker ||= ReactOnRails::TestHelper::WebpackAssetsStatusChecker.new(
-        source_path: source_path,
-        generated_assets_full_path: generated_assets_full_path,
-        webpack_generated_files: webpack_generated_files
+        source_path:,
+        generated_assets_full_path:,
+        webpack_generated_files:
       )
     end
 
