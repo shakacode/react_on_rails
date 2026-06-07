@@ -9,6 +9,12 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
 
   XSS_PAYLOAD = { "<script>window.alert('xss1');</script>" => '<script>window.alert("xss2");</script>' }.freeze
   PROPS_NAME = "Mr. Server Side Rendering"
+  POSTS_PAGE_DEFAULT_ARTIFICIAL_DELAY = 0
+  POSTS_PAGE_DEFAULT_POSTS_COUNT = 2
+  POSTS_PAGE_MAX_ARTIFICIAL_DELAY = 10_000
+  POSTS_PAGE_MAX_POSTS_COUNT = 100
+  private_constant :POSTS_PAGE_DEFAULT_ARTIFICIAL_DELAY, :POSTS_PAGE_DEFAULT_POSTS_COUNT,
+                   :POSTS_PAGE_MAX_ARTIFICIAL_DELAY, :POSTS_PAGE_MAX_POSTS_COUNT
   APP_PROPS_SERVER_RENDER = {
     helloWorldData: {
       name: PROPS_NAME
@@ -210,19 +216,23 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
 
   def posts_page
     posts_count = posts_page_posts_count
-    posts = fetch_posts.first(posts_count)
-    comments_by_post_id = posts_page_comments_by_post_id(posts)
+    artificial_delay = posts_page_artificial_delay
+    posts = posts_page_posts(posts_count, artificial_delay)
+    comments_by_post_id, users_by_id = posts_page_comments_and_users(posts, artificial_delay)
 
     @posts = posts.map do |post|
       post_hash = post.as_json
       post_hash["comments"] = comments_by_post_id.fetch(post.id, []).map do |comment|
         comment_hash = comment.as_json
-        comment_hash["user"] = comment.user.as_json
+        # Deleted comment authors render as nil instead of failing this benchmark route.
+        comment_hash["user"] = users_by_id[comment.user_id]&.as_json
         comment_hash
       end
       post_hash
     end
-    @posts_count = posts_count
+    @artificial_delay = artificial_delay
+    # React receives the actual rendered count, not the requested posts_count param.
+    @posts_count = @posts.size
     render "/pages/posts_page"
   end
 
@@ -288,22 +298,58 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
 
   def posts_page_posts_count
     value = params[:posts_count]
-    return 2 if value.blank?
+    return POSTS_PAGE_DEFAULT_POSTS_COUNT if value.blank?
 
     count = Integer(value, exception: false)
-    return 2 unless count
+    return POSTS_PAGE_DEFAULT_POSTS_COUNT unless count
 
-    [count, 0].max
+    # Numeric out-of-range params are clamped, so probes can request an empty
+    # render with 0 while blank/invalid params keep the benchmark default.
+    count.clamp(0, POSTS_PAGE_MAX_POSTS_COUNT)
   end
 
-  def posts_page_comments_by_post_id(posts)
-    post_ids = posts.map(&:id)
-    return {} if post_ids.empty?
+  def posts_page_artificial_delay
+    value = params[:artificial_delay]
+    return POSTS_PAGE_DEFAULT_ARTIFICIAL_DELAY if value.blank?
 
-    Comment.with_delay(artificial_delay)
-           .includes(:user)
-           .where(post_id: post_ids)
-           .group_by(&:post_id)
+    delay = Integer(value, exception: false)
+    return POSTS_PAGE_DEFAULT_ARTIFICIAL_DELAY unless delay
+
+    delay.clamp(POSTS_PAGE_DEFAULT_ARTIFICIAL_DELAY, POSTS_PAGE_MAX_ARTIFICIAL_DELAY)
+  end
+
+  def posts_page_posts(posts_count, artificial_delay)
+    return [] if posts_count.zero?
+
+    post_ids = Post.select(Arel.sql("MIN(id)"))
+                   .group(:user_id)
+                   .order(Arel.sql("MIN(id) ASC"))
+                   .limit(posts_count)
+
+    # PostgreSQL/SQLite honor ORDER BY + LIMIT in this subquery; MySQL has
+    # historically not, so revisit this if the benchmark DB adapter changes.
+    # The outer order(:id) re-applies display ordering because WHERE IN does not.
+    Post.with_delay(artificial_delay).where(id: post_ids).order(:id).to_a
+  end
+
+  def posts_page_comments_and_users(posts, artificial_delay)
+    post_ids = posts.map(&:id)
+    # Early return when posts is empty; avoids an unnecessary WHERE IN (empty) query.
+    return [{}, {}] if post_ids.empty?
+
+    # artificial_delay sleeps once per batched query (posts, comments, users),
+    # so total sleep = 3 * delay ms. This intentionally models per-query latency
+    # rather than end-to-end latency, which keeps query counts predictable for
+    # benchmark comparisons.
+    comments = Comment.with_delay(artificial_delay).where(post_id: post_ids).to_a
+    user_ids = comments.map(&:user_id).uniq
+    users_by_id = if user_ids.empty?
+                    {}
+                  else
+                    User.with_delay(artificial_delay).where(id: user_ids).index_by(&:id)
+                  end
+
+    [comments.group_by(&:post_id), users_by_id]
   end
 
   # Use the dummy-app-only RSC payload template so the async-props
