@@ -27,6 +27,7 @@ import {
 declare global {
   interface Window {
     REACT_ON_RAILS_RSC_PAYLOADS?: Record<string, string[]>;
+    REACT_ON_RAILS_RSC_ERRORS?: Record<string, Record<string, unknown>>;
   }
 }
 
@@ -240,20 +241,24 @@ const createRSCStreamFromArray = (payloads: string[]) => {
  * @param componentName - Name of the server component, used for error context
  * @returns A Promise resolving to the rendered React element
  */
-const createFromPreloadedPayloads = (payloads: string[], componentName: string) => {
+/** @internal Exported only for tests */
+export const createFromPreloadedPayloads = (
+  payloads: string[],
+  componentName: string,
+  getDiagnosticMetadata?: () => Record<string, unknown> | undefined,
+) => {
   const stream = createRSCStreamFromArray(payloads);
   const renderPromise = createFromReadableStream<React.ReactNode>(stream);
   return wrapInNewPromise(renderPromise).catch((error: unknown) => {
-    // Preloaded payloads carry only raw Flight data — the server consumes the length-prefixed
-    // `renderingError` metadata during injection (see injectRSCPayload), so there is no RSC
-    // bundle diagnostic to merge here. Still, name the failing component (and preserve the
-    // original error as `cause`) so a hydration failure is attributable instead of surfacing a
-    // bare React error.
+    const diagnosticMetadata = getDiagnosticMetadata?.();
+    const rscDiagnosticError = diagnosticMetadata
+      ? buildRSCStreamDiagnosticError(diagnosticMetadata, { componentName })
+      : undefined;
     const wrapper: Error & { cause?: unknown } = new Error(
       `Failed to hydrate preloaded RSC payload for component "${componentName}": ${extractErrorMessage(error)}`,
     );
     wrapper.cause = error;
-    throw wrapper;
+    throw mergeRSCStreamDiagnosticError(wrapper, rscDiagnosticError);
   });
 };
 
@@ -296,7 +301,11 @@ const getReactServerComponent =
       const rscPayloadKey = createRSCPayloadKey(componentName, componentProps, domNodeId);
       const payloads = window.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey];
       if (payloads) {
-        return createFromPreloadedPayloads(payloads, componentName);
+        return createFromPreloadedPayloads(
+          payloads,
+          componentName,
+          () => window.REACT_ON_RAILS_RSC_ERRORS?.[rscPayloadKey],
+        );
       }
     }
     return fetchRSC({ componentName, componentProps, railsContext });

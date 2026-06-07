@@ -36,6 +36,10 @@ function cacheKeyJSArray(cacheKey: string) {
   return `(self.REACT_ON_RAILS_RSC_PAYLOADS||={})[${JSON.stringify(cacheKey)}]||=[]`;
 }
 
+function cacheKeyDiagnosticObject(cacheKey: string) {
+  return `(self.REACT_ON_RAILS_RSC_ERRORS||={})[${JSON.stringify(cacheKey)}]`;
+}
+
 function nonceAttribute(sanitizedNonce?: string) {
   return sanitizedNonce ? ` nonce="${sanitizedNonce}"` : '';
 }
@@ -50,6 +54,19 @@ function createRSCPayloadInitializationScript(cacheKey: string, sanitizedNonce?:
 
 function createRSCPayloadChunk(chunk: string, cacheKey: string, sanitizedNonce?: string) {
   return createScriptTag(`(${cacheKeyJSArray(cacheKey)}).push(${JSON.stringify(chunk)})`, sanitizedNonce);
+}
+
+function createRSCDiagnosticScript(
+  metadata: Record<string, unknown>,
+  cacheKey: string,
+  sanitizedNonce?: string,
+) {
+  const { hasErrors, renderingError } = metadata;
+  if (hasErrors !== true && !renderingError) return undefined;
+  return createScriptTag(
+    `${cacheKeyDiagnosticObject(cacheKey)}||=${JSON.stringify({ hasErrors, renderingError })}`,
+    sanitizedNonce,
+  );
 }
 
 /**
@@ -319,6 +336,10 @@ export default function injectRSCPayload(
               const chunkBuf = chunk instanceof Uint8Array ? chunk : new TextEncoder().encode(chunk);
               parser.feed(chunkBuf, (content, metadata) => {
                 const flightData = textDecoder.decode(content);
+                const diagnosticScript = createRSCDiagnosticScript(metadata, rscPayloadKey, sanitizedNonce);
+                if (diagnosticScript) {
+                  rscPayloadBuffers.push(Buffer.from(diagnosticScript));
+                }
                 const payloadScript = createRSCPayloadChunk(flightData, rscPayloadKey, sanitizedNonce);
                 rscPayloadBuffers.push(Buffer.from(payloadScript));
 

@@ -10,11 +10,16 @@ const toLengthPrefixed = (content: string): string => {
   return `${metadata}\t${contentBuf.length.toString(16).padStart(8, '0')}\n${content}`;
 };
 
+const toLengthPrefixedWithMetadata = (content: string, metadata: Record<string, unknown>): string => {
+  const contentBuf = Buffer.from(content, 'utf8');
+  return `${JSON.stringify(metadata)}\t${contentBuf.length.toString(16).padStart(8, '0')}\n${content}`;
+};
+
 // Shared utilities — createMockRSCStream wraps content in length-prefixed format,
 // createMockHTMLStream passes HTML through as-is.
 const createMockRSCStream = (chunks: string[] | { [key: number]: string | string[] }) => {
   if (Array.isArray(chunks)) {
-    return Readable.from(chunks.map((chunk) => new TextEncoder().encode(toLengthPrefixed(chunk))));
+    return createMockRSCStream({ 0: chunks });
   }
   const passThrough = new PassThrough();
   const entries = Object.entries(chunks);
@@ -30,6 +35,15 @@ const createMockRSCStream = (chunks: string[] | { [key: number]: string | string
       }
     }, +delay);
   });
+  return passThrough;
+};
+
+const createMockRSCStreamWithMetadata = (content: string, metadata: Record<string, unknown>) => {
+  const passThrough = new PassThrough();
+  setTimeout(() => {
+    passThrough.push(new TextEncoder().encode(toLengthPrefixedWithMetadata(content, metadata)));
+    passThrough.push(null);
+  }, 0);
   return passThrough;
 };
 
@@ -101,6 +115,31 @@ describe('injectRSCPayload', () => {
     expect(resultStr).toContain(
       `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"test\\": \\"data2\\"}")</script>`,
     );
+  });
+
+  it('injects RSC diagnostic metadata without exposing unrelated stream metadata', async () => {
+    const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
+      hasErrors: true,
+      renderingError: {
+        message: 'useState is not a function',
+        stack: 'TypeError: useState is not a function\n    at Broken (/app/components/Broken.server.tsx:7:3)',
+      },
+      consoleReplayScript: '<script>console.log("replay")</script>',
+      serializedProps: { token: 'do-not-serialize' },
+    });
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('REACT_ON_RAILS_RSC_ERRORS');
+    expect(resultStr).toContain('["test-{}-test-node"]||=');
+    expect(resultStr).toContain('useState is not a function');
+    expect(resultStr).toContain('/app/components/Broken.server.tsx');
+    expect(resultStr).toContain('REACT_ON_RAILS_RSC_PAYLOADS');
+    expect(resultStr).not.toContain('serializedProps');
+    expect(resultStr).not.toContain('do-not-serialize');
   });
 
   it('should add all ready html chunks before adding RSC payloads', async () => {
