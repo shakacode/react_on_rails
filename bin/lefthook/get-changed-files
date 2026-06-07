@@ -20,7 +20,9 @@ case "$CONTEXT" in
     source "$repo_root/script/lib/git-diff-base"
 
     # BASE_REF is trusted developer-local environment input here, not a GitHub
-    # event payload; downstream git calls still quote the normalized ref.
+    # event payload. The helper's branch-name validation is for PR-controlled
+    # refs; this path keeps downstream git calls quoted and requires a resolved
+    # merge base before diffing.
     base="$(git_diff_base_normalize_base_ref "${BASE_REF:-}")"
     # Lefthook runs in developer clones that may be shallow or missing refs, so
     # use lenient fetch handling and fail only if no usable merge base remains.

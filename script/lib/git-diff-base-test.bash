@@ -379,7 +379,7 @@ install_lefthook_fixture_scripts() {
     return 1
   fi
 
-  if [ ! -f script/lib/git-diff-base ]; then
+  if [ ! -f script/lib/git-diff-base ]; then # -f follows symlinks and catches a dangling target.
     fail "git-diff-base fixture symlink does not resolve"
     return 1
   fi
