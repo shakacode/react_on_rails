@@ -22,7 +22,10 @@ inputs:
     required: false
     default: '0'
   install-libyaml:
-    description: Whether setup-ruby should install libyaml-dev before Ruby/Bundler steps.
+    description: >
+      Whether setup-ruby should install libyaml-dev before Ruby/Bundler steps.
+      Pass 'false' if a prior setup-ruby step in this job already installed libyaml-dev;
+      only takes effect on Linux runners.
     required: false
     default: 'true'
 
