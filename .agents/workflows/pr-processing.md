@@ -24,6 +24,17 @@ Use this workflow when an agent is assigned an issue, an existing PR, a PR revie
 7. Update the PR body, issue, or one concise PR comment with exact verification evidence and remaining gaps.
 8. Only then request review, full CI, or merge readiness.
 
+## Workflow And Build-Config Scope
+
+Workflow and build-configuration edits are sensitive, but they are not categorically excluded from agent work.
+When the assigned issue, PR, or maintainer-approved batch instructions explicitly include GitHub Actions,
+benchmark workflow control flow, package scripts, lockfiles, webpack configuration, or related build configuration,
+process that scope with a focused branch, targeted validation, self-review, and clear PR evidence.
+
+If a specific lane temporarily prohibits workflow or build-configuration changes, treat that as a lane-specific
+restriction only. Do not carry it forward as a standing rule, and do not skip a future target solely because it
+touches workflow or build configuration when that future target's approved scope includes those files.
+
 ## Initial GitHub Commands
 
 Replace angle-bracket placeholders such as `<PR>` and `<PR_NUMBER>` with real values before running these commands.
