@@ -81,8 +81,19 @@ PRO_JS_CHANGED=false
 PRO_DUMMY_CHANGED=false
 PRO_NODE_RENDERER_CHANGED=false
 UNCATEGORIZED_CHANGED=false
+CI_INFRA_CHANGED=false
 SOURCE_COMMENT_ONLY_CHANGED=false
 PRO_SOURCE_COMMENT_ONLY_CHANGED=false
+# Benchmark relevance, tracked separately from the test-selection flags above.
+# Benchmarks measure runtime performance, so they must fire ONLY when genuine
+# product SOURCE changes — never on CI plumbing (scripts, actions) or the
+# suite-specific workflow YAML files, which change how the suite runs but cannot
+# move performance (the Bencher-on-a-config-PR noise in #3697). These three drive
+# run_core_benchmarks / run_pro_benchmarks / run_pro_node_renderer_benchmarks,
+# which benchmark.yml reads directly.
+BENCH_CORE_CHANGED=false
+BENCH_PRO_CHANGED=false
+BENCH_PRO_NODE_RENDERER_CHANGED=false
 
 comment_line_is_runtime_directive() {
   local line="$1"
@@ -243,6 +254,18 @@ source_file_comment_only_change() {
   [ "$saw_changed_line" = true ]
 }
 
+# Suite-specific workflow YAML files are test selectors, not benchmark inputs.
+# Some of them live in source/spec arms so the right tests still run, but a
+# workflow edit cannot move runtime performance (#3697). Plain CI plumbing
+# (script/, bin/, .github/actions/, .lefthook.yml) lands in the CI-infrastructure
+# arm instead, which sets no BENCH_* flag at all.
+is_benchmark_irrelevant_path() {
+  case "$1" in
+    .github/workflows/*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 # Analyze each changed file
 while IFS= read -r file; do
   # A here-string yields a single empty line for empty input, so skip blank lines —
@@ -260,7 +283,12 @@ while IFS= read -r file; do
     # (see the #3474 regression and the benchmarks-on-a-docs-PR case in #3597).
     #   - internal/**              : planning, contributor-info, testimonials, history docs
     #   - .github/ISSUE_TEMPLATE/** : GitHub issue templates (repo metadata, not CI infra)
-    *.md|*.mdx|*.markdown|*.rst|*.txt|docs/*|internal/*|internal/**/*|.github/ISSUE_TEMPLATE/*|.github/ISSUE_TEMPLATE/**/*|.lychee.toml)
+    #   - .claude/** .agents/** .cursor/** : agent/editor tooling (skills, prompts,
+    #     hooks, workflows). These run locally for coding agents, never in GitHub
+    #     Actions CI, so they don't affect the runtime, tests, or benchmarks. The
+    #     non-extension .claude/skills symlink is what slipped through the catch-all
+    #     and ran benchmarks on the docs-only PR #3717.
+    *.md|*.mdx|*.markdown|*.rst|*.txt|docs/*|internal/*|internal/**/*|.github/ISSUE_TEMPLATE/*|.github/ISSUE_TEMPLATE/**/*|.claude/*|.claude/**/*|.agents/*|.agents/**/*|.cursor/*|.cursor/**/*|.lychee.toml)
       # Don't change DOCS_ONLY flag, just continue
       ;;
 
@@ -271,6 +299,11 @@ while IFS= read -r file; do
         SOURCE_COMMENT_ONLY_CHANGED=true
       else
         GENERATORS_CHANGED=true
+        # Generator source feeds the core dummy app the core+pro suites benchmark.
+        if ! is_benchmark_irrelevant_path "$file"; then
+          BENCH_CORE_CHANGED=true
+          BENCH_PRO_CHANGED=true
+        fi
       fi
       ;;
 
@@ -281,6 +314,11 @@ while IFS= read -r file; do
         SOURCE_COMMENT_ONLY_CHANGED=true
       else
         RUBY_CORE_CHANGED=true
+        # Core gem code underlies every suite (Pro depends on core, the node
+        # renderer renders core output), so it benchmarks all three.
+        BENCH_CORE_CHANGED=true
+        BENCH_PRO_CHANGED=true
+        BENCH_PRO_NODE_RENDERER_CHANGED=true
       fi
       ;;
 
@@ -291,6 +329,13 @@ while IFS= read -r file; do
         SOURCE_COMMENT_ONLY_CHANGED=true
       else
         RSPEC_CHANGED=true
+        # Mirrors the existing benchmark behavior: a core gem-spec change runs the
+        # core+pro suites (run_ruby_tests fed them). The gem-tests.yml workflow in
+        # this arm is guarded out — editing it can't move performance.
+        if ! is_benchmark_irrelevant_path "$file"; then
+          BENCH_CORE_CHANGED=true
+          BENCH_PRO_CHANGED=true
+        fi
       fi
       ;;
 
@@ -314,6 +359,11 @@ while IFS= read -r file; do
         SOURCE_COMMENT_ONLY_CHANGED=true
       else
         JS_CHANGED=true
+        # Core JS package code drives the core+pro suites' bundles.
+        if ! is_benchmark_irrelevant_path "$file"; then
+          BENCH_CORE_CHANGED=true
+          BENCH_PRO_CHANGED=true
+        fi
       fi
       ;;
 
@@ -324,6 +374,12 @@ while IFS= read -r file; do
         SOURCE_COMMENT_ONLY_CHANGED=true
       else
         SPEC_DUMMY_CHANGED=true
+        # The core suite benchmarks this dummy app; the pro suite shares core. The
+        # integration-tests.yml workflow in this arm is guarded out.
+        if ! is_benchmark_irrelevant_path "$file"; then
+          BENCH_CORE_CHANGED=true
+          BENCH_PRO_CHANGED=true
+        fi
       fi
       ;;
 
@@ -334,6 +390,9 @@ while IFS= read -r file; do
         PRO_SOURCE_COMMENT_ONLY_CHANGED=true
       else
         PRO_RUBY_CORE_CHANGED=true
+        if ! is_benchmark_irrelevant_path "$file"; then
+          BENCH_PRO_CHANGED=true
+        fi
       fi
       ;;
 
@@ -344,6 +403,9 @@ while IFS= read -r file; do
         PRO_SOURCE_COMMENT_ONLY_CHANGED=true
       else
         PRO_JS_CHANGED=true
+        # Pro JS is bundled by both the Pro Rails suite and the node renderer.
+        BENCH_PRO_CHANGED=true
+        BENCH_PRO_NODE_RENDERER_CHANGED=true
       fi
       ;;
 
@@ -354,6 +416,10 @@ while IFS= read -r file; do
         PRO_SOURCE_COMMENT_ONLY_CHANGED=true
       else
         PRO_RSPEC_CHANGED=true
+        # pro-gem-tests.yml in this arm is guarded out (a workflow edit can't move perf).
+        if ! is_benchmark_irrelevant_path "$file"; then
+          BENCH_PRO_CHANGED=true
+        fi
       fi
       ;;
 
@@ -364,6 +430,12 @@ while IFS= read -r file; do
         PRO_SOURCE_COMMENT_ONLY_CHANGED=true
       else
         PRO_DUMMY_CHANGED=true
+        # The Pro Rails suite benchmarks this dummy app. pro-integration-tests.yml
+        # in this arm is guarded out — that workflow edit (PR #3697) is exactly
+        # what spuriously triggered the Pro benchmark.
+        if ! is_benchmark_irrelevant_path "$file"; then
+          BENCH_PRO_CHANGED=true
+        fi
       fi
       ;;
 
@@ -374,6 +446,12 @@ while IFS= read -r file; do
         PRO_SOURCE_COMMENT_ONLY_CHANGED=true
       else
         PRO_NODE_RENDERER_CHANGED=true
+        # Node renderer source drives the node-renderer suite and the Pro suite.
+        # node-renderer-tests.yml in this arm is guarded out.
+        if ! is_benchmark_irrelevant_path "$file"; then
+          BENCH_PRO_CHANGED=true
+          BENCH_PRO_NODE_RENDERER_CHANGED=true
+        fi
       fi
       ;;
 
@@ -389,18 +467,19 @@ while IFS= read -r file; do
       PRO_LINT_CONFIG_CHANGED=true
       ;;
 
-    # CI infrastructure files (scripts, workflows, CI configs)
-    # Changes to CI infrastructure should trigger tests to validate the changes work
+    # CI infrastructure files (scripts, workflows, CI configs).
+    # These change HOW the suite runs but never the gem/package runtime, so they
+    # trigger the full TEST suite to validate the change (see the CI_INFRA_CHANGED
+    # run-flag block below) WITHOUT triggering benchmarks: performance cannot move
+    # when only CI plumbing changes, so a benchmark run here is pure Bencher noise
+    # (see the CI-workflow-edit case in #3697). The 'benchmark' PR label still
+    # forces a run for workflow self-tests (benchmarks/generate_matrix.rb honors
+    # labels independently of these change-detection flags).
+    # NOTE: keep this as its own flag rather than setting the source *_CHANGED
+    # flags directly — that conflation is exactly what made benchmarks run here.
     script/*|script/**/*|bin/*|bin/**/*|.github/workflows/*|.github/actions/*|.github/actions/**/*|.lefthook.yml)
       DOCS_ONLY=false
-      RUBY_CORE_CHANGED=true  # Trigger all tests for CI infrastructure changes
-      JS_CHANGED=true
-      SPEC_DUMMY_CHANGED=true
-      GENERATORS_CHANGED=true
-      PRO_RUBY_CORE_CHANGED=true
-      PRO_JS_CHANGED=true
-      PRO_DUMMY_CHANGED=true
-      PRO_NODE_RENDERER_CHANGED=true
+      CI_INFRA_CHANGED=true
       ;;
 
     # Catch-all: any file not explicitly categorized above
@@ -409,6 +488,11 @@ while IFS= read -r file; do
     *)
       DOCS_ONLY=false
       UNCATEGORIZED_CHANGED=true
+      # Unknown file: benchmark every suite too (safety, matching the full-suite
+      # test run below). A new runtime path must never silently skip benchmarks.
+      BENCH_CORE_CHANGED=true
+      BENCH_PRO_CHANGED=true
+      BENCH_PRO_NODE_RENDERER_CHANGED=true
       ;;
   esac
 done <<< "$CHANGED_FILES"
@@ -430,6 +514,7 @@ elif [ "$SOURCE_COMMENT_ONLY_CHANGED" = true ] || [ "$PRO_SOURCE_COMMENT_ONLY_CH
     [ "$PRO_JS_CHANGED" = false ] &&
     [ "$PRO_DUMMY_CHANGED" = false ] &&
     [ "$PRO_NODE_RENDERER_CHANGED" = false ] &&
+    [ "$CI_INFRA_CHANGED" = false ] &&
     [ "$UNCATEGORIZED_CHANGED" = false ]; then
     NON_RUNTIME_ONLY=true
   fi
@@ -456,6 +541,9 @@ if [ "$DOCS_ONLY" = true ]; then
     "run_pro_tests:false"
     "run_pro_dummy_tests:false"
     "run_pro_node_renderer_tests:false"
+    "run_core_benchmarks:false"
+    "run_pro_benchmarks:false"
+    "run_pro_node_renderer_benchmarks:false"
     "benchmarks_changed:false"
   )
 
@@ -507,6 +595,7 @@ echo "Changed file categories:"
 [ "$PRO_LINT_CONFIG_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro lint configuration${NC}"
 [ "$SOURCE_COMMENT_ONLY_CHANGED" = true ] && echo -e "${YELLOW}  • Source comments only${NC}"
 [ "$PRO_SOURCE_COMMENT_ONLY_CHANGED" = true ] && echo -e "${YELLOW}  • React on Rails Pro source comments only${NC}"
+[ "$CI_INFRA_CHANGED" = true ] && echo -e "${YELLOW}  • CI infrastructure (full test suite, no benchmarks)${NC}"
 [ "$UNCATEGORIZED_CHANGED" = true ] && echo -e "${YELLOW}  • Uncategorized changes (running full suite for safety)${NC}"
 
 echo ""
@@ -584,6 +673,24 @@ if [ "$PRO_NODE_RENDERER_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ] || [ 
   RUN_PRO_NODE_RENDERER_TESTS=true
 fi
 
+# CI infrastructure changes run the full TEST suite to validate the change. Unlike
+# the uncategorized catch-all below, they set no BENCH_* flag, so the benchmark
+# outputs stay false: CI plumbing can't move runtime performance, so a Bencher run
+# here is noise (#3697). This block requests every test job while benchmarks stay
+# off.
+if [ "$CI_INFRA_CHANGED" = true ]; then
+  RUN_LINT=true
+  RUN_RUBY_TESTS=true
+  RUN_JS_TESTS=true
+  RUN_DUMMY_TESTS=true
+  RUN_GENERATORS=true
+  RUN_E2E_TESTS=true
+  RUN_PRO_LINT=true
+  RUN_PRO_TESTS=true
+  RUN_PRO_DUMMY_TESTS=true
+  RUN_PRO_NODE_RENDERER_TESTS=true
+fi
+
 # If we encounter a change that isn't explicitly categorized, default to running everything
 if [ "$UNCATEGORIZED_CHANGED" = true ]; then
   RUN_LINT=true
@@ -598,6 +705,16 @@ if [ "$UNCATEGORIZED_CHANGED" = true ]; then
   RUN_PRO_NODE_RENDERER_TESTS=true
 fi
 
+# Benchmark suite selection (consumed by .github/workflows/benchmark.yml). One
+# output per suite, driven purely by the BENCH_* source-relevance flags set in
+# the categorization above — never by the test run_* flags, which CI plumbing and
+# the suite-workflow YAML files inflate. This keeps Bencher off docs-only (#3717)
+# and CI-config-only (#3697) PRs. On push to main / workflow_dispatch the suites
+# run regardless (generate_matrix.rb), so these only gate PR runs.
+RUN_CORE_BENCHMARKS=$BENCH_CORE_CHANGED
+RUN_PRO_BENCHMARKS=$BENCH_PRO_CHANGED
+RUN_PRO_NODE_RENDERER_BENCHMARKS=$BENCH_PRO_NODE_RENDERER_CHANGED
+
 [ "$RUN_LINT" = true ] && echo "  ✓ Lint (Ruby + JS)"
 [ "$RUN_RUBY_TESTS" = true ] && echo "  ✓ RSpec gem tests"
 [ "$RUN_JS_TESTS" = true ] && echo "  ✓ JS unit tests"
@@ -608,6 +725,9 @@ fi
 [ "$RUN_PRO_TESTS" = true ] && echo "  ✓ React on Rails Pro RSpec unit tests (Ruby + JS)"
 [ "$RUN_PRO_DUMMY_TESTS" = true ] && echo "  ✓ React on Rails Pro Dummy app integration tests"
 [ "$RUN_PRO_NODE_RENDERER_TESTS" = true ] && echo "  ✓ React on Rails Pro Node Renderer tests"
+[ "$RUN_CORE_BENCHMARKS" = true ] && echo "  ✓ Core benchmarks"
+[ "$RUN_PRO_BENCHMARKS" = true ] && echo "  ✓ React on Rails Pro benchmarks"
+[ "$RUN_PRO_NODE_RENDERER_BENCHMARKS" = true ] && echo "  ✓ React on Rails Pro Node Renderer benchmarks"
 
 # Export as GitHub Actions outputs if running in CI
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
@@ -624,6 +744,9 @@ if [ -n "${GITHUB_OUTPUT:-}" ]; then
     echo "run_pro_tests=$RUN_PRO_TESTS"
     echo "run_pro_dummy_tests=$RUN_PRO_DUMMY_TESTS"
     echo "run_pro_node_renderer_tests=$RUN_PRO_NODE_RENDERER_TESTS"
+    echo "run_core_benchmarks=$RUN_CORE_BENCHMARKS"
+    echo "run_pro_benchmarks=$RUN_PRO_BENCHMARKS"
+    echo "run_pro_node_renderer_benchmarks=$RUN_PRO_NODE_RENDERER_BENCHMARKS"
     echo "benchmarks_changed=$BENCHMARKS_CHANGED"
   } >> "$GITHUB_OUTPUT"
 fi
@@ -644,6 +767,9 @@ if [ "${CI_JSON_OUTPUT:-}" = "1" ]; then
   "run_pro_tests": $RUN_PRO_TESTS,
   "run_pro_dummy_tests": $RUN_PRO_DUMMY_TESTS,
   "run_pro_node_renderer_tests": $RUN_PRO_NODE_RENDERER_TESTS,
+  "run_core_benchmarks": $RUN_CORE_BENCHMARKS,
+  "run_pro_benchmarks": $RUN_PRO_BENCHMARKS,
+  "run_pro_node_renderer_benchmarks": $RUN_PRO_NODE_RENDERER_BENCHMARKS,
   "benchmarks_changed": $BENCHMARKS_CHANGED
 }
 EOF

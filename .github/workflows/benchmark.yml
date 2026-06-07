@@ -110,37 +110,8 @@ jobs:
         with:
           docs-only: ${{ steps.detect.outputs.docs_only }}
           previous-sha: ${{ github.event.before }}
-      - name: Set benchmark outputs
-        id: benchmark-outputs
-        if: steps.detect.outputs.non_runtime_only != 'true'
-        run: |
-          RUN_CORE_BENCHMARKS=false
-          RUN_PRO_BENCHMARKS=false
-          RUN_PRO_NODE_RENDERER_BENCHMARKS=false
-
-          if [ "${{ steps.detect.outputs.run_ruby_tests }}" = "true" ] ||
-             [ "${{ steps.detect.outputs.run_js_tests }}" = "true" ] ||
-             [ "${{ steps.detect.outputs.run_dummy_tests }}" = "true" ]; then
-            RUN_CORE_BENCHMARKS=true
-            RUN_PRO_BENCHMARKS=true
-          fi
-
-          if [ "${{ steps.detect.outputs.run_pro_tests }}" = "true" ] ||
-             [ "${{ steps.detect.outputs.run_pro_dummy_tests }}" = "true" ]; then
-            RUN_PRO_BENCHMARKS=true
-          fi
-
-          if [ "${{ steps.detect.outputs.run_pro_node_renderer_tests }}" = "true" ]; then
-            RUN_PRO_BENCHMARKS=true
-            RUN_PRO_NODE_RENDERER_BENCHMARKS=true
-          fi
-
-          {
-            echo "run_core_benchmarks=$RUN_CORE_BENCHMARKS"
-            echo "run_pro_benchmarks=$RUN_PRO_BENCHMARKS"
-            echo "run_pro_node_renderer_benchmarks=$RUN_PRO_NODE_RENDERER_BENCHMARKS"
-          } >> "$GITHUB_OUTPUT"
-        shell: bash
+      # script/ci-changes-detector owns benchmark-suite selection via
+      # run_core_benchmarks / run_pro_benchmarks / run_pro_node_renderer_benchmarks.
       - name: Set benchmark matrices
         id: benchmark-matrices
         # Always runs. GitHub Actions evaluates `strategy.matrix` for downstream jobs at
@@ -157,9 +128,9 @@ jobs:
           BENCHMARK_PULL_REQUEST_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name || '' }}
           BENCHMARK_PULL_REQUEST_LABELS: ${{ github.event_name == 'pull_request' && toJSON(github.event.pull_request.labels.*.name) || '[]' }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          RUN_CORE_BENCHMARKS: ${{ steps.benchmark-outputs.outputs.run_core_benchmarks || 'false' }}
-          RUN_PRO_BENCHMARKS: ${{ steps.benchmark-outputs.outputs.run_pro_benchmarks || 'false' }}
-          RUN_PRO_NODE_RENDERER_BENCHMARKS: ${{ steps.benchmark-outputs.outputs.run_pro_node_renderer_benchmarks || 'false' }}
+          RUN_CORE_BENCHMARKS: ${{ steps.detect.outputs.run_core_benchmarks || 'false' }}
+          RUN_PRO_BENCHMARKS: ${{ steps.detect.outputs.run_pro_benchmarks || 'false' }}
+          RUN_PRO_NODE_RENDERER_BENCHMARKS: ${{ steps.detect.outputs.run_pro_node_renderer_benchmarks || 'false' }}
         run: |
           BENCHMARK_MATRIX=$(ruby benchmarks/generate_matrix.rb)
           export BENCHMARK_MATRIX
