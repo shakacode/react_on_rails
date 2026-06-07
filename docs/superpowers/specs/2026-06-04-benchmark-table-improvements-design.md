@@ -61,13 +61,14 @@ it. Issue #3601 asks for four improvements; all four are in scope for this work.
 1. **`lib/bmf_helpers.rb`** — `to_bmf` emits `p90_latency` (boundary-less: Bencher
    records history, never alerts). Drop the now-unused `failed_pct` from
    `display_rows`. Update the p90 "summary-only" comment (it now reaches Bencher).
-2. **`lib/bencher_report.rb`** — leniently extract perf-URL primitives (project slug,
-   branch + testbed UUIDs, per-benchmark + per-measure UUIDs, start/end time) and add
-   `perf_url(benchmark_name)` that builds the URL defensively (returns `nil` if any
-   primitive is missing → name renders unlinked). Strict regression/boundary parsing is
-   untouched; URL fields follow the existing "informational → read leniently, never
-   raise" rule. Expose the per-(name, measure) baseline for the renderer (via the
-   existing `boundary`).
+2. **`lib/bencher_perf_url.rb` / `lib/bencher_report.rb`** — leniently extract
+   perf-URL primitives (project slug, branch + testbed UUIDs, per-benchmark +
+   per-measure UUIDs, start/end time) in `BencherPerfUrl`, while `BencherReport`
+   wires it in via `perf_url(benchmark_name)`. URL building is defensive (returns
+   `nil` if any primitive is missing → name renders unlinked). Strict
+   regression/boundary parsing is untouched; URL fields follow the existing
+   "informational → read leniently, never raise" rule. Expose the per-(name,
+   measure) baseline for the renderer (via the existing `boundary`).
 3. **`lib/benchmark_table.rb`** — `COLUMNS` drops Fail%, gives p90 a `p90_latency`
    measure key (baseline lookup only — never significant, no threshold). Name cell links
    via `perf_url`; metric cells render value + delta + `(baseline)` from
@@ -75,7 +76,8 @@ it. Issue #3601 asks for four improvements; all four are in scope for this work.
    the existing Markdown escaping.
 4. **`track_benchmarks.rb`** — `THRESHOLDS` **unchanged** (rps, p50_latency, failed_pct
    still alert; p90 not added). No display column for failed_pct.
-5. **Specs / fixtures** — update `benchmark_table_spec`, `bencher_report_spec`
+5. **Specs / fixtures** — update `benchmark_table_spec`, `bencher_report_spec`,
+   `bencher_perf_url_spec`
    (+ `fixtures/bencher_report_sample.json` gains a p90 measure and URL primitives),
    `bmf_collector_spec` (p90 in BMF, display-row shape), `report_table_integration_spec`,
    and the `track_benchmarks_spec` lockstep test → `failed_pct` is
