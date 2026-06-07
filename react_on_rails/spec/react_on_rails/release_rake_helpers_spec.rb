@@ -1752,7 +1752,7 @@ RSpec.describe "release.rake helper methods" do
         end.to output(/Main CI is healthy on #{short_sha} \(1 check\)/).to_stdout
       end
 
-      it "uses created_at as a tiebreaker for same-context legacy statuses" do
+      it "uses the newest same-context legacy status" do
         allow(self).to receive(:fetch_main_ci_checks)
           .with(monorepo_root:, allow_override: false, dry_run: false)
           .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [])
@@ -1770,7 +1770,7 @@ RSpec.describe "release.rake helper methods" do
                           "target_url" => "https://ci.example.com/travis"
                         },
                         {
-                          "id" => 1,
+                          "id" => 2,
                           "context" => "Travis",
                           "state" => "success",
                           "created_at" => "2026-06-07T20:00:01Z",

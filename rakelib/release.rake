@@ -702,7 +702,7 @@ def latest_commit_statuses(statuses)
     .group_by { |status| status["context"] }
     .map do |_context, context_statuses|
       # GitHub emits ISO 8601 UTC `created_at` values, which sort chronologically as strings.
-      context_statuses.max_by { |status| [status["id"].to_i, status["created_at"].to_s] }
+      context_statuses.max_by { |status| [status["created_at"].to_s, status["id"].to_i] }
     end
 end
 
@@ -757,6 +757,7 @@ end
 
 def check_run_app_id(run)
   app_id = run.dig("app", "id")
+  # nil is the branch-protection wildcard; GitHub check-run app IDs are integers.
   app_id&.to_i
 end
 
@@ -775,16 +776,12 @@ def required_check_present?(required_check:, check_runs:, legacy_status_runs:)
       legacy_status_runs.any? { |run| run["name"] == required_check[:context] })
 end
 
-def context_name_matches?(context:, run:)
-  run["name"] == context
-end
-
 def legacy_context_present?(context:, check_runs:, legacy_status_runs:)
   matching_check_run = check_runs.any? do |run|
-    context_name_matches?(context:, run:)
+    run["name"] == context
   end
 
-  matching_check_run || legacy_status_runs.any? { |run| context_name_matches?(context:, run:) }
+  matching_check_run || legacy_status_runs.any? { |run| run["name"] == context }
 end
 
 def required_check_label(required_check)
@@ -846,8 +843,9 @@ def legacy_status_runs_for_required_contexts(required_checks:, statuses:)
 
   # App-wildcard required checks can be satisfied by either Checks API runs or
   # legacy commit statuses. App-pinned checks still require a matching check run.
-  latest_commit_statuses(statuses)
+  statuses
     .select { |status| status_contexts.include?(status["context"]) }
+    .then { |relevant_statuses| latest_commit_statuses(relevant_statuses) }
     .map { |status| normalize_status_as_check_run(status) }
 end
 
@@ -990,9 +988,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
 
   evaluated = if is_prerelease && required_names
                 check_runs.select do |run|
-                  required_names[:contexts].any? do |context|
-                    context_name_matches?(context:, run:)
-                  end ||
+                  required_names[:contexts].include?(run["name"]) ||
                     required_names[:checks].any? { |required_check| required_check_matches_run?(required_check, run) }
                 end + legacy_status_runs
               else
