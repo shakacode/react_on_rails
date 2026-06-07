@@ -170,7 +170,7 @@ jobs:
 
             // Verify workflows are queued/running
             const verified = [];
-            let notFound = [];
+            let notFound = [...succeeded];
 
             if (succeeded.length > 0) {
               const maxVerificationAttempts = 3;
@@ -183,10 +183,10 @@ jobs:
                 );
                 await new Promise(resolve => setTimeout(resolve, delayMs));
 
-                verified.length = 0;
+                const toVerify = notFound;
                 notFound = [];
 
-                for (const workflow of succeeded) {
+                for (const workflow of toVerify) {
                   const runs = await github.rest.actions.listWorkflowRuns({
                     owner: context.repo.owner,
                     repo: context.repo.repo,
@@ -198,11 +198,8 @@ jobs:
                     created: `>${dispatchStartedAt}`
                   });
 
-                  const found = runs.data.workflow_runs.some(run =>
-                    run.path === `.github/workflows/${workflow.id}` &&
-                    run.head_sha === prData.sha &&
-                    run.event === 'workflow_dispatch'
-                  );
+                  // The API filters identify the dispatched run; path may include a ref suffix.
+                  const found = runs.data.workflow_runs.length > 0;
 
                   if (found) {
                     verified.push(workflow);
