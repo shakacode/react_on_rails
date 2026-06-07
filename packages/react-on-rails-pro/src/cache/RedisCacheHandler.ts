@@ -23,7 +23,7 @@ function serialize(entry: CacheEntry): Buffer {
 
   const buf = Buffer.allocUnsafe(totalLen);
   buf.writeDoubleBE(entry.timestamp, 0);
-  buf.writeInt32BE(entry.revalidate, 8);
+  buf.writeInt32BE(Math.ceil(entry.revalidate), 8);
 
   let offset = HEADER_SIZE;
   for (const chunk of entry.value) {
