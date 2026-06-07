@@ -1,7 +1,6 @@
 name: Setup Bundler dependencies
 description: >
-  Setup Ruby, cache, and install gems for a Bundler project. On Linux,
-  ensure libyaml-dev is already present or install it before calling this action.
+  Setup Ruby, cache, and install gems for a Bundler project.
 
 inputs:
   working-directory:
@@ -36,14 +35,11 @@ runs:
         fi
 
     - name: Setup Ruby and install cached gems
-      uses: ruby/setup-ruby@v1
-      env:
-        BUNDLE_FROZEN: ${{ inputs.frozen }}
-        BUNDLE_RETRY: '3'
-        BUNDLE_JOBS: '4'
+      uses: ./.github/actions/setup-ruby
       with:
         ruby-version: ${{ inputs.ruby-version }}
         working-directory: ${{ inputs.working-directory }}
-        bundler: ${{ inputs.bundler-version }}
+        bundler-version: ${{ inputs.bundler-version }}
         bundler-cache: true
+        frozen: ${{ inputs.frozen }}
         cache-version: ${{ inputs.cache-version }}
