@@ -30,7 +30,9 @@ inputs:
     required: false
     default: '0'
   install-libyaml:
-    description: Whether to install libyaml-dev before Ruby/Bundler steps.
+    description: >
+      Whether to install libyaml-dev before Ruby/Bundler steps.
+      Only takes effect on Linux runners; silently ignored elsewhere.
     required: false
     default: 'true'
 

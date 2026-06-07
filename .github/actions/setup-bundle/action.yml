@@ -21,6 +21,10 @@ inputs:
     description: Arbitrary cache-version value passed through to ruby/setup-ruby.
     required: false
     default: '0'
+  install-libyaml:
+    description: Whether setup-ruby should install libyaml-dev before Ruby/Bundler steps.
+    required: false
+    default: 'true'
 
 runs:
   using: composite
@@ -43,3 +47,4 @@ runs:
         bundler-cache: true
         frozen: ${{ inputs.frozen }}
         cache-version: ${{ inputs.cache-version }}
+        install-libyaml: ${{ inputs.install-libyaml }}

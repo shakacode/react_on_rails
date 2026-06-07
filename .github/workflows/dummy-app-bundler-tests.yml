@@ -79,6 +79,7 @@ jobs:
           working-directory: react_on_rails/spec/dummy
           ruby-version: ${{ matrix.ruby-version }}
           frozen: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
+          install-libyaml: 'false'
       - name: generate file system-based packs
         env:
           SHAKAPACKER_ASSETS_BUNDLER: ${{ matrix.bundler }}
@@ -199,12 +200,14 @@ jobs:
           working-directory: react_on_rails
           ruby-version: ${{ matrix.ruby-version }}
           frozen: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
+          install-libyaml: 'false'
       - name: Install Ruby Gems for dummy app
         uses: ./.github/actions/setup-bundle
         with:
           working-directory: react_on_rails/spec/dummy
           ruby-version: ${{ matrix.ruby-version }}
           frozen: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
+          install-libyaml: 'false'
       - name: Ensure minimum required Chrome version
         run: |
           echo -e "Already installed $(google-chrome --version)\n"

@@ -84,12 +84,14 @@ jobs:
         with:
           working-directory: react_on_rails_pro
           ruby-version: ${{ env.RUBY_VERSION }}
+          install-libyaml: 'false'
 
       - name: Install Ruby Gems for Pro dummy app
         uses: ./.github/actions/setup-bundle
         with:
           working-directory: react_on_rails_pro/spec/dummy
           ruby-version: ${{ env.RUBY_VERSION }}
+          install-libyaml: 'false'
 
       - name: Build Pro JavaScript packages
         run: |

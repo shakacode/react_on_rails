@@ -331,6 +331,7 @@ jobs:
         with:
           working-directory: ${{ matrix.app_directory }}
           ruby-version: ${{ env.RUBY_VERSION }}
+          install-libyaml: 'false'
 
       - name: Generate file-system based entrypoints for Pro
         if: matrix.generate_packs == 'true'

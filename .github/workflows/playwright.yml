@@ -88,6 +88,7 @@ jobs:
         with:
           working-directory: react_on_rails/spec/dummy
           ruby-version: '3.3'
+          install-libyaml: 'false'
 
       - name: Install Playwright browsers
         working-directory: react_on_rails/spec/dummy
