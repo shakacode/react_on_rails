@@ -1,18 +1,18 @@
 # Benchmark summary table improvements (#3601)
 
-Status: Implemented (PR #3627)
-Date: 2026-06-04
-Follows: #3586 (Consume Bencher reports as JSON for summary-table significance)
-Related: #3602 (Fix `PostsPage` Pro route — drives the Fail% decision)
+- **Status:** Implemented ([PR #3627](https://github.com/shakacode/react_on_rails/pull/3627))
+- **Date:** 2026-06-04
+- **Follows:** [#3586](https://github.com/shakacode/react_on_rails/issues/3586) — Consume Bencher reports as JSON for summary-table significance
+- **Related:** [#3602](https://github.com/shakacode/react_on_rails/issues/3602) — Fix `PostsPage` Pro route (drives the Fail% decision)
 
 ## Background
 
 After #3586 the Pro/Core benchmark summary table renders:
 
-```
-| Benchmark | RPS | p50(ms) | p90(ms) | Fail% | Status |
-| --- | --- | --- | --- | --- | --- |
-| Pro Node Renderer: simple_eval (non-RSC) | 2895.81 | 3.13 | 3.99 | 0.0 | 200=86878 |
+```markdown
+| Benchmark                                | RPS     | p50(ms) | p90(ms) | Fail% | Status    |
+| ---------------------------------------- | ------- | ------- | ------- | ----- | --------- |
+| Pro Node Renderer: simple_eval (non-RSC) | 2895.81 | 3.13    | 3.99    | 0.0   | 200=86878 |
 ```
 
 It bolds + tags 🔴/🟢 only the tracked cells that crossed a Bencher boundary. Each
@@ -31,11 +31,11 @@ it. Issue #3601 asks for four improvements; all four are in scope for this work.
 
 ## Final rendered table
 
-```
-| Benchmark | RPS | p50(ms) | p90(ms) | Status |
-| --- | --- | --- | --- | --- |
-| [simple_eval (non-RSC)](perf_url) | 2895.81 ▲2.3% (2830.0) | 3.13 ▼1.3% (3.17) | 3.99 | 200=86878 |
-| [react_ssr (non-RSC)](perf_url) | **2472.91** 🔴 8.4% (2700.0) | 3.65 ▲1.0% (3.61) | 4.70 | 200=74197 |
+```markdown
+| Benchmark                         | RPS                          | p50(ms)           | p90(ms) | Status    |
+| --------------------------------- | ---------------------------- | ----------------- | ------- | --------- |
+| [simple_eval (non-RSC)](perf_url) | 2895.81 ▲2.3% (2830.0)       | 3.13 ▼1.3% (3.17) | 3.99    | 200=86878 |
+| [react_ssr (non-RSC)](perf_url)   | **2472.91** 🔴 8.4% (2700.0) | 3.65 ▲1.0% (3.61) | 4.70    | 200=74197 |
 ```
 
 ## Cell rendering rules (RPS, p50, p90)
@@ -47,14 +47,14 @@ it. Issue #3601 asks for four improvements; all four are in scope for this work.
 | numeric, **no baseline** in report   | value only (e.g. `3.99`) — the expected p90 case                                                      |
 | numeric, baseline, not significant   | `value ▲N.N% (baseline)` — ▲ up / ▼ down; `%` = magnitude                                             |
 | numeric, baseline, **significant**   | `**value** 🔴 N.N% (baseline)` (regression) / `🟢` (improvement) — emoji replaces arrow, value bolded |
-| value == baseline exactly            | value only (skip a meaningless `0.0%`)                                                                |
+| value == baseline exactly            | `value 0.0% (baseline)` — explicit exact/near-zero match, no misleading arrow                         |
 
 - Delta `%` rounded to 1 decimal; baseline rounded to 2.
 - Arrow/emoji marks the **direction of the raw value change** (▲ = value rose). For a
   significant move the 🔴/🟢 replaces the arrow; combined with the column's
   known direction (RPS higher-is-better, latency lower-is-better) it implies up/down.
 - The **benchmark name** is the only linked cell → that benchmark's Bencher perf plot.
-- Legend: `▲/▼ change vs baseline · 🔴 significant regression · 🟢 significant improvement · (n) = baseline`.
+- Legend: `▲/▼ non-zero change vs baseline · 0.0% exact/near-zero match · 🔴 significant regression · 🟢 significant improvement (tracked measures) · (n) = baseline`.
 
 ## Code changes (all under `benchmarks/`)
 
