@@ -2,9 +2,20 @@
 
 require_relative "simplecov_helper"
 require_relative "spec_helper"
+require "stringio"
 require "tmpdir"
 
 RSpec.describe "release.rake helper methods" do
+  def capture_stdout
+    original_stdout = $stdout
+    output = StringIO.new
+    $stdout = output
+    yield
+    output.string
+  ensure
+    $stdout = original_stdout
+  end
+
   before do
     next if Object.instance_variable_defined?(:@release_rake_helpers_loaded)
 
@@ -1527,7 +1538,32 @@ RSpec.describe "release.rake helper methods" do
         end.to output(%r{DRY RUN: .*CI on origin/main is not healthy.*DRY RUN:.*Lint}m).to_stdout
       end
 
-      it "aborts if strict legacy status fetch unexpectedly returns nil" do
+      it "does not print green when required legacy status data is unavailable in dry-run" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: true)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Travis")])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
+          .and_return(required_checks(contexts: ["Travis"], checks: []))
+        allow(self).to receive(:fetch_main_commit_statuses) do
+          puts "⚠️ DRY RUN: Required legacy status fetch failed."
+          nil
+        end
+
+        output = capture_stdout do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: true
+          )
+        end
+
+        expect(output).to include("DRY RUN: Required legacy status fetch failed.")
+        expect(output).not_to include("Main CI is healthy")
+      end
+
+      it "raises if strict legacy status fetch unexpectedly returns nil" do
         allow(self).to receive(:fetch_main_ci_checks)
           .with(monorepo_root:, allow_override: false, dry_run: false)
           .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Lint")])

@@ -948,6 +948,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
   required_names = required_check_names_for_main(**required_args)
   required_status_contexts = required_names ? legacy_status_contexts_for_required_checks(required_names) : []
   legacy_status_runs = []
+  legacy_status_fetch_unknown = false
   if required_status_contexts.any?
     statuses = fetch_main_commit_statuses(
       repo_slug: repo_slug || github_repo_slug(monorepo_root),
@@ -967,6 +968,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
 
       # Only dry-run/override mode reaches the fallback; strict mode aborts inside
       # the fetch helper after surfacing the violation.
+      legacy_status_fetch_unknown = true
       statuses = []
     end
 
@@ -1073,6 +1075,10 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
     )
     return
   end
+
+  # The fetch helper already warned in dry-run/override mode. Do not print a
+  # green status when required legacy status data was unavailable.
+  return if legacy_status_fetch_unknown
 
   # Only label the count "required" when `evaluated` was actually filtered to
   # the required subset (prerelease + branch protection visible). On stable
