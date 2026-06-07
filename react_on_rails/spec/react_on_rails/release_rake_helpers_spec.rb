@@ -1478,6 +1478,34 @@ RSpec.describe "release.rake helper methods" do
         end.to raise_error(SystemExit, /CI is still in progress.*Travis/m)
       end
 
+      it "treats an unknown legacy commit status state as failed" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
+          .and_return(sha: sha, repo_slug: "shakacode/react_on_rails", check_runs: [])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root: monorepo_root, repo_slug: "shakacode/react_on_rails")
+          .and_return(required_checks(contexts: ["Travis"], checks: []))
+        allow(self).to receive(:fetch_main_commit_statuses)
+          .with(repo_slug: "shakacode/react_on_rails", sha: sha, allow_override: false, dry_run: false)
+          .and_return([
+                        {
+                          "id" => 1,
+                          "context" => "Travis",
+                          "state" => "unexpected",
+                          "target_url" => "https://ci.example.com/travis"
+                        }
+                      ])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root: monorepo_root,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to raise_error(SystemExit, %r{CI on origin/main is not healthy.*Travis}m)
+      end
+
       it "keeps evaluating fetched check runs when legacy status fetch is skipped in dry-run" do
         allow(self).to receive(:fetch_main_ci_checks)
           .with(monorepo_root: monorepo_root, allow_override: false, dry_run: true)
@@ -1517,7 +1545,7 @@ RSpec.describe "release.rake helper methods" do
             allow_override: false,
             dry_run: false
           )
-        end.to raise_error(RuntimeError, /fetch_main_commit_statuses returned nil in strict mode/)
+        end.to raise_error(RuntimeError, /Unexpected nil response from fetch_main_commit_statuses in strict mode/)
       end
 
       it "does not print the commit-status API URL as a browser link" do

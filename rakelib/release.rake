@@ -672,11 +672,12 @@ end
 
 def normalize_status_as_check_run(status)
   state = status["state"]
+  conclusion = normalize_status_conclusion(state)
   {
     "id" => status["id"],
     "name" => status["context"],
-    "status" => state == "pending" ? "pending" : "completed",
-    "conclusion" => normalize_status_conclusion(state),
+    "status" => conclusion.nil? ? "pending" : "completed",
+    "conclusion" => conclusion,
     "html_url" => status["target_url"]
   }
 end
@@ -687,15 +688,19 @@ def normalize_status_conclusion(state)
     "success"
   when "pending"
     nil
+  when "failure", "error"
+    state
   else
-    # GitHub documents error/failure/pending/success; anything else should block.
-    state || "error"
+    # GitHub documents error/failure/pending/success; unknown values should block.
+    "error"
   end
 end
 
 def latest_commit_statuses(statuses)
   statuses
     .group_by { |status| status["context"] }
+    # GitHub status ids are monotonically increasing for a commit/context, so
+    # the highest id is the most recent status returned by the paginated API.
     .map { |_context, context_statuses| context_statuses.max_by { |status| status["id"].to_i } }
 end
 
@@ -765,19 +770,13 @@ def required_check_present?(required_check:, check_runs:, legacy_status_runs:)
       legacy_status_runs.any? { |run| run["name"] == required_check[:context] })
 end
 
-def legacy_context_check_run_matches?(context:, run:, required_checks:)
-  return false unless run["name"] == context
-
-  # Same-name modern checks with pinned apps constrain the legacy-status rail too.
-  pinned_checks = required_checks[:checks].select do |required_check|
-    required_check[:context] == context && !required_check_app_wildcard?(required_check[:app_id])
-  end
-  pinned_checks.empty? || pinned_checks.any? { |required_check| required_check_matches_run?(required_check, run) }
+def legacy_context_check_run_matches?(context:, run:)
+  run["name"] == context
 end
 
-def legacy_context_present?(context:, check_runs:, legacy_status_runs:, required_checks:)
+def legacy_context_present?(context:, check_runs:, legacy_status_runs:)
   matching_check_run = check_runs.any? do |run|
-    legacy_context_check_run_matches?(context: context, run: run, required_checks: required_checks)
+    legacy_context_check_run_matches?(context: context, run: run)
   end
 
   matching_check_run || legacy_status_runs.any? { |run| run["name"] == context }
@@ -814,8 +813,7 @@ def missing_required_checks(required_checks:, check_runs:, legacy_status_runs:)
     legacy_context_present?(
       context: context,
       check_runs: check_runs,
-      legacy_status_runs: legacy_status_runs,
-      required_checks: required_checks
+      legacy_status_runs: legacy_status_runs
     )
   end
 
@@ -954,7 +952,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
       dry_run: dry_run
     )
     if statuses.nil?
-      raise "BUG: fetch_main_commit_statuses returned nil in strict mode" unless allow_override || dry_run
+      raise "Unexpected nil response from fetch_main_commit_statuses in strict mode" unless allow_override || dry_run
 
       # Only dry-run/override mode reaches the fallback; strict mode aborts inside
       # the fetch helper after surfacing the violation.
@@ -979,7 +977,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
   evaluated = if is_prerelease && required_names
                 check_runs.select do |run|
                   required_names[:contexts].any? do |context|
-                    legacy_context_check_run_matches?(context: context, run: run, required_checks: required_names)
+                    legacy_context_check_run_matches?(context: context, run: run)
                   end ||
                     required_names[:checks].any? { |required_check| required_check_matches_run?(required_check, run) }
                 end + legacy_status_runs
