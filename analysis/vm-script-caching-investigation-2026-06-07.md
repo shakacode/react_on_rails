@@ -165,7 +165,7 @@ Benchmark scripts and raw data available at:
 
 ### Raw Benchmark Output (Summary)
 
-```
+```text
 vm.Script Caching Benchmark
 ===========================
 Node: v22.12.0
@@ -182,7 +182,7 @@ Platform: darwin arm64
 
 ### Compilation Cost Analysis
 
-```
+```text
 Heavy Parse Patterns Test
 ============================================================
 Pattern                        |    Chars |  Compile
