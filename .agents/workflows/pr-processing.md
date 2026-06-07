@@ -14,7 +14,7 @@ Use this workflow when an agent is assigned an issue, an existing PR, a PR revie
    - For assigned issues, an acceptable outcome may be an issue comment explaining why no PR should be created.
 3. Isolate the work:
    - Use the current checkout for one focused task.
-   - For multiple independent PRs or lanes, use one worktree per PR branch so agents do not overlap edits.
+   - For multiple independent PRs or lanes (independent work streams with separate branch/worktree ownership), use one worktree per PR branch so agents do not overlap edits.
 4. Make a local batch:
    - Fix all clear blockers in one local pass.
    - Batch review fixes into one follow-up push when practical.
@@ -29,14 +29,15 @@ Use this workflow when an agent is assigned an issue, an existing PR, a PR revie
 Follow the canonical rule in `AGENTS.md` → Boundaries → "Ask First": workflow and
 build-configuration edits (GitHub Actions, benchmark workflow control flow, package
 scripts, lockfiles, webpack configuration) are sensitive but not categorically excluded.
-When the assigned issue, PR, or maintainer-approved batch instructions explicitly include
-that scope, process it with a focused branch, targeted validation, self-review, and clear
-PR evidence. That explicit scope inclusion satisfies the `AGENTS.md` "Ask First"
-requirement for the assigned work.
+When an issue, PR, or batch from a maintainer or collaborator with write access
+explicitly includes that scope, process it with a focused branch, targeted validation,
+self-review, and clear PR evidence. That explicit scope inclusion satisfies the
+`AGENTS.md` "Ask First" requirement for the assigned work.
 
-A per-run instruction that prohibits these edits restricts scope for that run only. Do not
-carry it forward as a standing rule, and do not treat it as permission in a later run where
-no explicit workflow or build-configuration scope grant was given.
+A per-run instruction that prohibits these edits restricts scope for that run only. Do
+not carry it forward as a standing rule, but also do not treat its absence in a later run
+as permission. Absent a fresh explicit workflow or build-configuration scope grant, ask
+before editing.
 
 ## Initial GitHub Commands
 
@@ -190,10 +191,14 @@ Merge qualification is CI passing plus review feedback handled at the right tier
 - `MUST-FIX` comments are fixed before merge.
 - `DISCUSS` comments are decided, explicitly deferred, or confirmed not to need maintainer input.
 - `OPTIONAL`, nit, style-only, duplicate, stale, or noisy comments do not block merge once triaged.
-- AI review systems such as Claude, CodeRabbit, Cursor Bugbot, Greptile, and similar tools are advisory unless they report a real actionable blocker. Do not require approval from every AI system, and do not block solely because an advisory AI check was skipped, neutral, pending beyond the useful review window, or left non-blocking comments after another reviewer has approved. Security-category findings still require investigation before dismissal, regardless of source.
+- AI review systems such as Claude, CodeRabbit, Cursor Bugbot, Greptile, and similar tools are advisory unless they report a confirmed blocker.
+- A confirmed blocker is a correctness regression, failing test, security issue, or other merge-blocking defect.
+- Do not require approval from every AI system, and do not block solely because an advisory AI check was skipped, neutral, pending beyond the useful review window, or left non-blocking comments after another reviewer has approved.
+- Security-category findings still require investigation before dismissal, regardless of source.
 
 Comment tiers (`MUST-FIX`, `DISCUSS`, `OPTIONAL`, `SKIPPED`) are assigned by
-`.agents/skills/address-review/SKILL.md` or `.agents/workflows/address-review.md`.
+`.agents/skills/address-review/SKILL.md` when skills are available; otherwise use
+`.agents/workflows/address-review.md` as the fallback.
 
 If approved and green but not merging immediately, use the repository's standard `ready-to-merge` label when available.
 

@@ -54,7 +54,7 @@ Do not copy the CI workflow files as a bundle unless the target repo has the sam
    - Replace `script/ci-changes-detector origin/main`, `bin/ci-local`, and the targeted command list with the target repo's real local validation commands.
    - Keep the self-review gate, reproduction/TDD gate, local-validation-first policy, batched pushes, and follow-up issue restraint.
    - Define the repo's high-risk categories so agents know when full CI or extra review is justified.
-   - Treat high-risk categories (workflow, build-config, lockfiles, release tooling) as "Ask First" scope, not standing bans. Make any per-run prohibition an explicit batch-prompt scope field so a temporary lane restriction is never inherited as permanent policy.
+   - Treat high-risk categories (workflow, build-config, lockfiles, release tooling) as "Ask First" scope, not standing bans. Make any explicit grant or per-run prohibition a batch-prompt scope field so temporary lane restrictions are never inherited as permanent policy, and so the absence of a later prohibition never implies permission without a fresh grant.
 
 5. Customize address-review behavior.
    - Keep the summary marker `<!-- address-review-summary -->` unless the repo already has a different checkpoint marker.
