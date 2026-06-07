@@ -195,6 +195,8 @@ jobs:
                     owner: context.repo.owner,
                     repo: context.repo.repo,
                     workflow_id: workflow.id,
+                    // Narrow the workflow-run search to this PR ref first;
+                    // head_sha still pins the exact dispatched commit.
                     branch: prData.ref,
                     event: 'workflow_dispatch',
                     head_sha: prData.sha,
