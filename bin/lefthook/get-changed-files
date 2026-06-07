@@ -14,13 +14,22 @@ case "$CONTEXT" in
     (git diff --cached --name-only --diff-filter=ACMR; git diff --name-only --diff-filter=ACMR; git ls-files --others --exclude-standard) | sort -u | grep -E "$PATTERN" || true
     ;;
   branch)
-    # Compare against main for this repo's default-branch workflow.
-    base="origin/main"
-    if ! git rev-parse --verify --quiet "$base" >/dev/null; then
-      echo "Error: ${base} not found. Run: git fetch origin main" >&2
+    # Compare against BASE_REF (default: origin/main) using a merge-base diff.
+    repo_root="$(git rev-parse --show-toplevel)"
+    # shellcheck source=script/lib/git-diff-base
+    source "$repo_root/script/lib/git-diff-base"
+
+    # BASE_REF is trusted developer-local environment input here, not a GitHub
+    # event payload. The helper's branch-name validation is for PR-controlled
+    # refs; this path keeps downstream git calls quoted and requires a resolved
+    # merge base before diffing.
+    base="$(git_diff_base_normalize_base_ref "${BASE_REF:-}")"
+    # Lefthook runs in developer clones that may be shallow or missing refs, so
+    # use lenient fetch handling and fail only if no usable merge base remains.
+    if ! merge_base="$(git_diff_base_resolve "$base" HEAD lenient)"; then
       exit 1
     fi
-    git diff --name-only --diff-filter=ACMR "$base"...HEAD | grep -E "$PATTERN" || true
+    git diff --name-only --diff-filter=ACMR "$merge_base" HEAD | grep -E "$PATTERN" || true
     ;;
   *)
     echo "Usage: $0 {staged|all-changed|branch} [pattern]" >&2
