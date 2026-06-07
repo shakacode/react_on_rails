@@ -6,6 +6,7 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # shellcheck source=script/lib/git-diff-base
 source "$SCRIPT_DIR/git-diff-base"
 
@@ -113,6 +114,30 @@ test_remote_branch_rejects_non_origin() {
     fail "expected non-zero for refs/heads/main"
     return 1
   fi
+}
+
+test_normalize_base_ref_defaults_to_origin_main() {
+  local out
+  out="$(git_diff_base_normalize_base_ref "")"
+  assert_equals "origin/main" "$out" "default base ref"
+}
+
+test_normalize_base_ref_maps_zero_sha_to_origin_main() {
+  local out
+  out="$(git_diff_base_normalize_base_ref "0000000000000000000000000000000000000000")"
+  assert_equals "origin/main" "$out" "zero SHA base ref"
+}
+
+test_normalize_base_ref_preserves_non_zero_ref() {
+  local out
+  out="$(git_diff_base_normalize_base_ref "origin/release")"
+  assert_equals "origin/release" "$out" "explicit base ref"
+}
+
+test_normalize_current_ref_defaults_to_head() {
+  local out
+  out="$(git_diff_base_normalize_current_ref "")"
+  assert_equals "HEAD" "$out" "default current ref"
 }
 
 test_fetch_refspec_format() {
@@ -518,6 +543,28 @@ test_resolve_lenient_continues_after_initial_fetch_failure() {
   fi
 }
 
+test_lefthook_branch_honors_base_ref() {
+  setup_repo_fixture full
+
+  mkdir -p bin/lefthook script/lib
+  ln -s "$REPO_ROOT/bin/lefthook/get-changed-files" bin/lefthook/get-changed-files
+  ln -s "$REPO_ROOT/script/lib/git-diff-base" script/lib/git-diff-base
+
+  printf 'puts "release baseline"\n' > release_only.rb
+  git add release_only.rb
+  git commit -m "add release baseline" >/dev/null
+  git push origin HEAD:refs/heads/release >/dev/null 2>&1
+  git fetch origin release:refs/remotes/origin/release >/dev/null 2>&1
+
+  printf 'puts "changed"\n' > changed.rb
+  git add changed.rb
+  git commit -m "add changed ruby file" >/dev/null
+
+  local out
+  out="$(BASE_REF=origin/release bin/lefthook/get-changed-files branch '\.rb$')"
+  assert_equals "changed.rb" "$out" "lefthook branch changed files"
+}
+
 test_resolve_unshallow_fallback_finds_merge_base() {
   # Force the deepen budget to exhaust without finding the merge base, so the
   # --unshallow fallback runs. The fixture adds 10 extra commits on main after
@@ -600,6 +647,10 @@ test_resolve_cross_repo_sha_hint_appears() {
 ALL_TESTS=(
   test_remote_branch_strips_origin_prefix
   test_remote_branch_rejects_non_origin
+  test_normalize_base_ref_defaults_to_origin_main
+  test_normalize_base_ref_maps_zero_sha_to_origin_main
+  test_normalize_base_ref_preserves_non_zero_ref
+  test_normalize_current_ref_defaults_to_head
   test_fetch_refspec_format
   test_fetch_depth_uses_default_when_unset
   test_fetch_depth_accepts_valid_env
@@ -628,6 +679,7 @@ ALL_TESTS=(
   test_resolve_shallow_deepens_to_find_merge_base
   test_resolve_full_clone_missing_base_ref_errors
   test_resolve_lenient_continues_after_initial_fetch_failure
+  test_lefthook_branch_honors_base_ref
   test_resolve_unshallow_fallback_finds_merge_base
   test_resolve_logs_deepen_progress
   test_resolve_cross_repo_sha_hint_appears
