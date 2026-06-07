@@ -214,9 +214,13 @@ const createRSCStreamFromArray = (payloads: string[]) => {
   });
 
   if (typeof document !== 'undefined' && document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      streamController?.close();
-    });
+    document.addEventListener(
+      'DOMContentLoaded',
+      () => {
+        streamController?.close();
+      },
+      { once: true },
+    );
   } else {
     streamController?.close();
   }

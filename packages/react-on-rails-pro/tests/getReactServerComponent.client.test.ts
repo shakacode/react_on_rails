@@ -1,5 +1,13 @@
 import { RSC_STREAM_DIAGNOSTIC_ERROR_NAME } from '../src/rscDiagnostics.ts';
 
+const setDocumentReadyState = (readyState: DocumentReadyState) => {
+  Object.defineProperty(document, 'readyState', {
+    value: readyState,
+    configurable: true,
+    writable: true,
+  });
+};
+
 describe('getReactServerComponent preloaded payload diagnostics', () => {
   beforeAll(() => {
     const webpackWindow = window as unknown as Window & {
@@ -17,7 +25,7 @@ describe('getReactServerComponent preloaded payload diagnostics', () => {
     let diagnosticMetadata: Record<string, unknown> | undefined;
     const payloads: string[] = [];
     const originalReadyState = document.readyState;
-    Object.defineProperty(document, 'readyState', { value: 'loading', writable: true });
+    setDocumentReadyState('loading');
 
     const renderPromise = createFromPreloadedPayloads(payloads, 'TestComponent', () => diagnosticMetadata);
     diagnosticMetadata = {
@@ -30,7 +38,7 @@ describe('getReactServerComponent preloaded payload diagnostics', () => {
       },
     };
     payloads.push('not valid Flight data\n');
-    Object.defineProperty(document, 'readyState', { value: 'complete', writable: true });
+    setDocumentReadyState('complete');
     document.dispatchEvent(new Event('DOMContentLoaded'));
 
     try {
@@ -45,7 +53,35 @@ describe('getReactServerComponent preloaded payload diagnostics', () => {
       expect(caughtError.message).toContain('Original error: useState is not a function');
       expect(caughtError.message).toContain('React stream error: Failed to hydrate preloaded RSC payload');
     } finally {
-      Object.defineProperty(document, 'readyState', { value: originalReadyState });
+      setDocumentReadyState(originalReadyState);
+    }
+  });
+
+  it('wraps preloaded hydration errors without diagnostics when no metadata is available', async () => {
+    expect.assertions(5);
+    const { createFromPreloadedPayloads } = await import('../src/getReactServerComponent.client.ts');
+    const payloads: string[] = [];
+    const originalReadyState = document.readyState;
+    setDocumentReadyState('loading');
+
+    const renderPromise = createFromPreloadedPayloads(payloads, 'TestComponent');
+    payloads.push('not valid Flight data\n');
+    setDocumentReadyState('complete');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+
+    try {
+      await renderPromise;
+    } catch (error) {
+      const caughtError = error as Error;
+      expect(caughtError).toBeInstanceOf(Error);
+      expect(caughtError.name).toBe('Error');
+      expect(caughtError.name).not.toBe(RSC_STREAM_DIAGNOSTIC_ERROR_NAME);
+      expect(caughtError.message).toContain(
+        'Failed to hydrate preloaded RSC payload for component "TestComponent"',
+      );
+      expect(caughtError.message).not.toContain('[ReactOnRails] RSC bundle rendering failed.');
+    } finally {
+      setDocumentReadyState(originalReadyState);
     }
   });
 });
