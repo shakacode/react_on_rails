@@ -145,6 +145,8 @@ jobs:
               console.log('ℹ️  No skipped checks found - triggering all workflows to ensure full coverage');
             }
 
+            const dispatchStartedAt = new Date(Math.floor(Date.now() / 1000) * 1000 - 2000).toISOString();
+
             // Trigger each workflow
             for (const workflowName of workflowsToTrigger) {
               const workflowFile = workflowMap[workflowName];
@@ -166,35 +168,55 @@ jobs:
               }
             }
 
-            // Wait a bit for workflows to queue
-            if (succeeded.length > 0) {
-              console.log('Waiting 5 seconds for workflows to queue...');
-              await new Promise(resolve => setTimeout(resolve, 5000));
-            }
-
             // Verify workflows are queued/running
             const verified = [];
-            const notFound = [];
+            let notFound = [];
 
             if (succeeded.length > 0) {
-              const runs = await github.rest.actions.listWorkflowRunsForRepo({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                per_page: 100,
-                created: `>${new Date(Date.now() - 60000).toISOString()}`
-              });
+              const maxVerificationAttempts = 3;
+              const baseDelayMs = 5000;
 
-              for (const workflow of succeeded) {
-                const found = runs.data.workflow_runs.some(run =>
-                  run.path === `.github/workflows/${workflow.id}` &&
-                  run.head_sha === prData.sha &&
-                  run.event === 'workflow_dispatch'
+              for (let attempt = 1; attempt <= maxVerificationAttempts; attempt++) {
+                const delayMs = baseDelayMs * attempt;
+                console.log(
+                  `Waiting ${delayMs / 1000} seconds before verification attempt ${attempt}/${maxVerificationAttempts}...`
                 );
+                await new Promise(resolve => setTimeout(resolve, delayMs));
 
-                if (found) {
-                  verified.push(workflow);
-                } else {
-                  notFound.push(workflow);
+                verified.length = 0;
+                notFound = [];
+
+                for (const workflow of succeeded) {
+                  const runs = await github.rest.actions.listWorkflowRuns({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    workflow_id: workflow.id,
+                    branch: prData.ref,
+                    event: 'workflow_dispatch',
+                    head_sha: prData.sha,
+                    per_page: 20,
+                    created: `>${dispatchStartedAt}`
+                  });
+
+                  const found = runs.data.workflow_runs.some(run =>
+                    run.path === `.github/workflows/${workflow.id}` &&
+                    run.head_sha === prData.sha &&
+                    run.event === 'workflow_dispatch'
+                  );
+
+                  if (found) {
+                    verified.push(workflow);
+                  } else {
+                    notFound.push(workflow);
+                  }
+                }
+
+                if (notFound.length === 0) {
+                  break;
+                }
+
+                if (attempt < maxVerificationAttempts) {
+                  console.log(`Still waiting to verify: ${notFound.map(workflow => workflow.name).join(', ')}`);
                 }
               }
             }
