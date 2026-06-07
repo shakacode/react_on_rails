@@ -158,7 +158,7 @@ Use the 15-minute rule from `AGENTS.md`: if another short local check would like
 
 ## Review Churn Measurement
 
-For the next batch after this workflow change, add lightweight churn notes to the PR body or latest
+For each non-trivial or high-risk batch, add lightweight churn notes to the PR body or latest
 agent comment so the team can tell whether the stronger pre-push gate helped:
 
 - Pre-push review gate used: manual self-review, `codex review`, Claude review, `/simplify`, or skipped with reason.

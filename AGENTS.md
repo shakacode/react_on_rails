@@ -198,7 +198,7 @@ Agents should recommend PR labels based on change complexity and risk. The goal 
 
 - Merge qualification is: CI is passing, all current review comments and threads are addressed or explicitly triaged by tier, and no major question or discussion item needs maintainer attention.
 - Treat AI review systems such as Claude, CodeRabbit, Cursor Bugbot, Greptile, and similar tools as advisory unless they identify a confirmed blocker: a correctness regression, failing test, security issue, API contract break, data-loss risk, or missing required maintainer approval.
-- Do not wait for CodeRabbit.ai, Claude, or every other AI system to approve when CI is green, blocking review feedback is addressed, and no major question or discussion item remains.
+- Do not wait for CodeRabbit.ai, Claude, or any other AI system to approve when CI is green, blocking review feedback is addressed, and no major question or discussion item remains.
 - If branch protection still reports `REVIEW_REQUIRED`, verify whether a formal GitHub approving review is missing. Positive AI issue comments such as "LGTM" or "Ready to merge" support triage but do not satisfy a required review.
 - Security-category findings such as XSS, injection, exposed secrets, or auth bypass still require investigation before dismissal, regardless of source.
 
@@ -251,10 +251,11 @@ GitHub login and verify it with:
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 OWNER=${REPO%/*}
 NAME=${REPO#*/}
-gh api "repos/${OWNER}/${NAME}/collaborators/<login>/permission" --jq .permission
+gh api "repos/${OWNER}/${NAME}/collaborators/<login>/permission" --jq .permission 2>/dev/null || echo "none"
 ```
 
-`write`, `maintain`, or `admin` satisfies the requirement. Without an explicit
+`write`, `maintain`, or `admin` satisfies the requirement. A 404 or `none`
+result means the author is not a repository collaborator. Without an explicit
 verified scope grant, treat "Ask First" as blocking and ask before editing
 these files. A per-run prohibition narrows scope further for that run only; do
 not promote it to a standing rule, but also do not treat its absence in a later
