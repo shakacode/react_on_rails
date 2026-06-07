@@ -259,12 +259,15 @@ test_docs_pr_with_internal_and_issue_template_yaml_is_non_runtime_only() {
 # benchmark suite — Bencher even posted results on that docs-only PR.
 test_agent_tooling_changes_are_non_runtime_only() {
   setup_repo
-  mkdir -p .agents/skills/verify .claude
+  mkdir -p .agents/skills/verify .claude .cursor
   printf 'verify skill\n' > .agents/skills/verify/SKILL.md
   # Mirror the offending file: an extensionless path under .claude/ (the PR added
   # it as a symlink; the detector categorizes purely by path, so a plain file at
   # the same path exercises the same case branch).
   printf '../.agents/skills\n' > .claude/skills
+  # Exercise extensionless files under the other agent/editor tooling globs too.
+  printf 'entry\n' > .agents/skills/verify/run
+  printf 'rules\n' > .cursor/rules
   commit_change "convert claude commands to agent skills"
 
   local out
@@ -748,6 +751,9 @@ test_benchmark_source_change_lints_and_flags_benchmarks_only() {
   assert_contains "$out" '"run_dummy_tests": false' "benchmark source output"
   assert_contains "$out" '"run_e2e_tests": false' "benchmark source output"
   assert_contains "$out" '"run_pro_tests": false' "benchmark source output"
+  assert_contains "$out" '"run_core_benchmarks": false' "benchmark source output"
+  assert_contains "$out" '"run_pro_benchmarks": false' "benchmark source output"
+  assert_contains "$out" '"run_pro_node_renderer_benchmarks": false' "benchmark source output"
 }
 
 test_benchmark_comment_only_change_is_non_runtime_but_keeps_lint() {
