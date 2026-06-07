@@ -98,8 +98,8 @@ The view helper is `stream_react_component_with_async_props`, which yields an em
 
 ```erb
 <%= stream_react_component_with_async_props("Dashboard") do |emit|
-      # Sequential: posts waits for users. For parallel queries, see the fan-out pattern below.
-      # Treat users as the slow source here; fast data can use ordinary synchronous props.
+      # Sequential: both values are emitted asynchronously, one after the other.
+      # Put fast values in `props:`; use emit for values you want to stream.
       emit.call("users", User.active.limit(50).as_json(only: [:id, :name]))
       emit.call("posts", Post.recent.limit(20).as_json(only: [:id, :title]))
     end %>
@@ -118,7 +118,7 @@ sequenceDiagram
     autonumber
     participant Renderer as Node Renderer
     participant Rails as Rails API
-    participant Data as Rails data
+    participant Data as DB / Models
     Note over Renderer: Discouraged — usually let Rails pass the data instead
     Renderer->>Rails: Ask Rails API for data
     Rails->>Data: Load and authorize data
