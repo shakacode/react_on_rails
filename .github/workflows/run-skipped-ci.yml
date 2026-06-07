@@ -187,6 +187,7 @@ jobs:
                 );
                 await new Promise(resolve => setTimeout(resolve, delayMs));
 
+                // Drain the retry queue; only workflows pushed back below are retried.
                 const toVerify = notFound.splice(0);
 
                 for (const workflow of toVerify) {
