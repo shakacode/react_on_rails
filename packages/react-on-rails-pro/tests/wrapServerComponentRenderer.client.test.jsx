@@ -59,19 +59,11 @@ const loadWrappedRendererWithMocks = () => {
   return { wrapServerComponentRenderer, createRoot, hydrateRoot, render, unmount, getReactServerComponent };
 };
 
-const cleanupWrappedRendererMocks = () => {
-  document.body.innerHTML = '';
-};
-
 describe('wrapServerComponentRenderer/client validation (issue #3647)', () => {
   const railsContext = { rscPayloadGenerationUrlPath: '/rsc_payload' };
 
   beforeEach(() => {
     document.body.innerHTML = '';
-  });
-
-  afterEach(() => {
-    cleanupWrappedRendererMocks();
   });
 
   it('rejects with an explicit message when domNodeId is missing', async () => {
@@ -109,7 +101,8 @@ describe('wrapServerComponentRenderer/client validation (issue #3647)', () => {
     const renderFunction = (_props, _railsContext, _domNodeId) => ({ teardown: jest.fn() });
     const WrappedComponent = wrapServerComponentRenderer(renderFunction, 'TeardownResultComponent');
 
-    // No DOM node needed; the teardown-result guard throws before getElementById is called.
+    // Current compatibility ordering invokes 3-arg render functions and checks their return shape
+    // before DOM lookup/validation, so no DOM node is needed for this guard.
     await expect(WrappedComponent({}, railsContext, 'nonexistent-dom-id')).rejects.toThrow(
       "wrapServerComponentRenderer: render function for server component 'TeardownResultComponent' " +
         'returned a renderer teardown result; expected a React component.',
