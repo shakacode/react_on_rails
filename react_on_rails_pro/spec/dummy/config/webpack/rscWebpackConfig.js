@@ -123,13 +123,21 @@ const configureRsc = () => {
   // Drop the client-only StrictMode shim so RSC imports of `react-on-rails-pro/client` don't pull
   // in a browser entry point inside the React server bundle.
   delete rscAliases['react-on-rails-pro/client$'];
+  // Remove the base `react` directory alias (from alias.js) so our exact-match `react$` below is
+  // the sole React alias. Without this, the prefix-match `react` from alias.js would still intercept
+  // subpath imports like `react/jsx-runtime` from within node_modules.
+  delete rscAliases.react;
+  delete rscAliases['react/jsx-runtime'];
+  delete rscAliases['react/jsx-dev-runtime'];
   rscConfig.resolve = {
     ...rscConfig.resolve,
     conditionNames: ['react-server', '...'],
     alias: {
       ...rscAliases,
-      // Override React aliases to use react-server entry points
-      react: resolve(rootNodeModules, 'react', 'react.react-server.js'),
+      // Override React aliases to use react-server entry points.
+      // The trailing $ makes this an exact match so `react/jsx-runtime` is NOT
+      // intercepted — it falls through to its own alias below.
+      react$: resolve(rootNodeModules, 'react', 'react.react-server.js'),
       'react/jsx-runtime': resolve(rootNodeModules, 'react', 'jsx-runtime.react-server.js'),
       'react/jsx-dev-runtime': resolve(rootNodeModules, 'react', 'jsx-dev-runtime.react-server.js'),
       // Ignore import of react-dom/server in rsc bundle
