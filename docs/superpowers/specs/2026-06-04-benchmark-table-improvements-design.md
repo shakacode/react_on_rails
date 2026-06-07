@@ -21,13 +21,13 @@ it. Issue #3601 asks for four improvements; all four are in scope for this work.
 
 ## Decisions
 
-| Decision     | Choice                                                                          |
-| ------------ | ------------------------------------------------------------------------------- |
-| Scope        | All four issue items in one PR                                                  |
-| Layout       | Baseline + delta **inline in the same cell** (no column doubling)               |
-| Links        | **One perf link per benchmark name** (not per metric cell)                      |
-| p90 baseline | Send `p90_latency` to Bencher **boundary-less**; value-only fallback            |
-| Fail%        | **Drop the display column, keep the `failed_pct` threshold** (alert safety net) |
+| Decision     | Choice                                                                                                                           |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| Scope        | All four issue items in one PR                                                                                                   |
+| Layout       | Baseline + delta **inline in the same cell** (no column doubling)                                                                |
+| Links        | **One perf link per benchmark name** (not per metric cell)                                                                       |
+| p90 baseline | Send `p90_latency` to Bencher **boundary-less**; value-only fallback                                                             |
+| Fail%        | **Drop the display column, keep the `failed_pct` threshold** (alert safety net; #3602 made Fail% unreliable as a visible column) |
 
 ## Final rendered table
 
@@ -56,32 +56,37 @@ it. Issue #3601 asks for four improvements; all four are in scope for this work.
 - The **benchmark name** is the only linked cell → that benchmark's Bencher perf plot.
 - Legend: `▲/▼ non-zero change vs baseline · 0.0% exact/near-zero match · 🔴 significant regression · 🟢 significant improvement (tracked measures) · (n) = baseline`.
 
-## Code changes (all under `benchmarks/`)
+## Code changes
 
-1. **`lib/bmf_helpers.rb`** — `to_bmf` emits `p90_latency` (boundary-less: Bencher
-   records history, never alerts). Drop the now-unused `failed_pct` from
-   `display_rows`. Update the p90 "summary-only" comment (it now reaches Bencher).
-2. **`lib/bencher_perf_url.rb` / `lib/bencher_report.rb`** — leniently extract
-   perf-URL primitives (project slug, branch + testbed UUIDs, per-benchmark +
-   per-measure UUIDs, start/end time) in `BencherPerfUrl`, while `BencherReport`
-   wires it in via `perf_url(benchmark_name)`. URL building is defensive (returns
-   `nil` if any primitive is missing → name renders unlinked). Strict
-   regression/boundary parsing is untouched; URL fields follow the existing
+1. **`benchmarks/lib/bmf_helpers.rb`** — `to_bmf` emits `p90_latency`
+   (boundary-less: Bencher records history, never alerts). Drop the now-unused
+   `failed_pct` from `display_rows`. Update the p90 "summary-only" comment (it
+   now reaches Bencher).
+2. **`benchmarks/lib/bencher_perf_url.rb` / `benchmarks/lib/bencher_report.rb`** —
+   leniently extract perf-URL primitives (project slug, branch + testbed UUIDs,
+   per-benchmark + per-measure UUIDs, start/end time) in `BencherPerfUrl`, while
+   `BencherReport` wires it in via `perf_url(benchmark_name)`. URL building is
+   defensive (returns `nil` if any primitive is missing → name renders unlinked).
+   Strict regression/boundary parsing is untouched; URL fields follow the existing
    "informational → read leniently, never raise" rule. Expose the per-(name,
    measure) baseline for the renderer (via the existing `boundary`).
-3. **`lib/benchmark_table.rb`** — `COLUMNS` drops Fail%, gives p90 a `p90_latency`
-   measure key (baseline lookup only — never significant, no threshold). Name cell links
-   via `perf_url`; metric cells render value + delta + `(baseline)` from
-   `boundary(name, measure).baseline` and `significance(...)`. Update legend. Keep
-   the existing Markdown escaping.
-4. **`track_benchmarks.rb`** — `THRESHOLDS` **unchanged** (rps, p50_latency, failed_pct
-   still alert; p90 not added). No display column for failed_pct.
-5. **Specs / fixtures** — update `benchmark_table_spec`, `bencher_report_spec`,
-   `bencher_perf_url_spec`
-   (+ `fixtures/bencher_report_sample.json` gains a p90 measure and URL primitives),
-   `bmf_collector_spec` (p90 in BMF, display-row shape), `report_table_integration_spec`,
-   and the `track_benchmarks_spec` lockstep test → `failed_pct` is
-   **tracked-but-not-displayed** (intentional; rps/p50 still require a highlightable column).
+3. **`benchmarks/lib/benchmark_table.rb`** — `COLUMNS` drops Fail%, gives p90 a
+   `p90_latency` measure key (baseline lookup only — never significant, no
+   threshold). Name cell links via `perf_url`; metric cells render value + delta +
+   `(baseline)` from `boundary(name, measure).baseline` and `significance(...)`.
+   Update legend. Keep the existing Markdown escaping.
+4. **`benchmarks/track_benchmarks.rb`** — `THRESHOLDS` **unchanged** (rps,
+   p50_latency, failed_pct still alert; p90 not added). No display column for
+   failed_pct.
+5. **Specs / fixtures** — update `benchmarks/spec/benchmark_table_spec.rb`,
+   `benchmarks/spec/bencher_report_spec.rb`,
+   `benchmarks/spec/bencher_perf_url_spec.rb`
+   (+ `benchmarks/spec/fixtures/bencher_report_sample.json` gains a p90 measure
+   and URL primitives), `benchmarks/spec/bmf_collector_spec.rb` (p90 in BMF,
+   display-row shape), `benchmarks/spec/report_table_integration_spec.rb`, and
+   the `benchmarks/spec/track_benchmarks_spec.rb` lockstep test → `failed_pct` is
+   **tracked-but-not-displayed** (intentional; rps/p50 still require a
+   highlightable column).
 6. **`.github/workflows/benchmark.yml`** — no functional change; comment only if the
    p90/Fail% rationale needs noting.
 
