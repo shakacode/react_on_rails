@@ -36,6 +36,14 @@ function cacheKeyJSArray(cacheKey: string) {
   return `(self.REACT_ON_RAILS_RSC_PAYLOADS||={})[${JSON.stringify(cacheKey)}]||=[]`;
 }
 
+function cacheKeyDiagnosticObject(cacheKey: string) {
+  return `(self.REACT_ON_RAILS_RSC_ERRORS||={})[${JSON.stringify(cacheKey)}]`;
+}
+
+function resetCacheKeyDiagnosticObject(cacheKey: string) {
+  return `delete (self.REACT_ON_RAILS_RSC_ERRORS||={})[${JSON.stringify(cacheKey)}]`;
+}
+
 function nonceAttribute(sanitizedNonce?: string) {
   return sanitizedNonce ? ` nonce="${sanitizedNonce}"` : '';
 }
@@ -45,11 +53,40 @@ function createScriptTag(script: string, sanitizedNonce?: string) {
 }
 
 function createRSCPayloadInitializationScript(cacheKey: string, sanitizedNonce?: string) {
-  return createScriptTag(cacheKeyJSArray(cacheKey), sanitizedNonce);
+  return createScriptTag(
+    `${resetCacheKeyDiagnosticObject(cacheKey)};${cacheKeyJSArray(cacheKey)}`,
+    sanitizedNonce,
+  );
 }
 
 function createRSCPayloadChunk(chunk: string, cacheKey: string, sanitizedNonce?: string) {
   return createScriptTag(`(${cacheKeyJSArray(cacheKey)}).push(${JSON.stringify(chunk)})`, sanitizedNonce);
+}
+
+function nonEmptyMetadataString(value: unknown) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function hasRenderingErrorSignal(renderingError: unknown) {
+  if (typeof renderingError !== 'object' || renderingError === null) return false;
+
+  const { message, stack } = renderingError as { message?: unknown; stack?: unknown };
+  return nonEmptyMetadataString(message) || nonEmptyMetadataString(stack);
+}
+
+function createRSCDiagnosticScript(
+  metadata: Record<string, unknown>,
+  cacheKey: string,
+  sanitizedNonce?: string,
+) {
+  const { hasErrors, renderingError } = metadata;
+  // `hasErrors` is a boolean per the server wire contract; renderingError only carries
+  // a useful diagnostic when the server provided a non-blank message or stack.
+  if (hasErrors !== true && !hasRenderingErrorSignal(renderingError)) return undefined;
+  return createScriptTag(
+    `${cacheKeyDiagnosticObject(cacheKey)}||=${JSON.stringify({ hasErrors, renderingError })}`,
+    sanitizedNonce,
+  );
 }
 
 /**
@@ -302,7 +339,8 @@ export default function injectRSCPayload(
         // This ensures the array exists before the component's HTML is rendered and sent.
         // Client-side hydration depends on this array being present in the page.
         //
-        // The initialization script creates: (self.REACT_ON_RAILS_RSC_PAYLOADS||={})[cacheKey]||=[]
+        // The initialization script clears stale diagnostics, then creates:
+        // (self.REACT_ON_RAILS_RSC_PAYLOADS||={})[cacheKey]||=[]
         // This creates a global array that the client-side RSCProvider monitors for new chunks.
         const initializationScript = createRSCPayloadInitializationScript(rscPayloadKey, sanitizedNonce);
         rscInitializationBuffers.push(Buffer.from(initializationScript));
@@ -315,22 +353,31 @@ export default function injectRSCPayload(
           (async () => {
             const parser = new LengthPrefixedStreamParser();
             const textDecoder = new TextDecoder();
+            let hasEmittedDiagnosticScript = false;
+            const handleParsedChunk = (content: Uint8Array, metadata: Record<string, unknown>) => {
+              const flightData = textDecoder.decode(content);
+              if (!hasEmittedDiagnosticScript) {
+                const diagnosticScript = createRSCDiagnosticScript(metadata, rscPayloadKey, sanitizedNonce);
+                if (diagnosticScript) {
+                  rscPayloadBuffers.push(Buffer.from(diagnosticScript));
+                  hasEmittedDiagnosticScript = true;
+                }
+              }
+              const payloadScript = createRSCPayloadChunk(flightData, rscPayloadKey, sanitizedNonce);
+              rscPayloadBuffers.push(Buffer.from(payloadScript));
+
+              // Emit console replay as a separate <script> tag (not inside the payload)
+              const consoleScript = metadata.consoleReplayScript as string;
+              if (consoleScript) {
+                rscPayloadBuffers.push(Buffer.from(createScriptTag(consoleScript, sanitizedNonce)));
+              }
+              // Primary flush is handled by React's flush() callback (see above).
+              // Schedule fallback in case flush() is never called.
+              scheduleFlushFallback();
+            };
             for await (const chunk of stream ?? []) {
               const chunkBuf = chunk instanceof Uint8Array ? chunk : new TextEncoder().encode(chunk);
-              parser.feed(chunkBuf, (content, metadata) => {
-                const flightData = textDecoder.decode(content);
-                const payloadScript = createRSCPayloadChunk(flightData, rscPayloadKey, sanitizedNonce);
-                rscPayloadBuffers.push(Buffer.from(payloadScript));
-
-                // Emit console replay as a separate <script> tag (not inside the payload)
-                const consoleScript = metadata.consoleReplayScript as string;
-                if (consoleScript) {
-                  rscPayloadBuffers.push(Buffer.from(createScriptTag(consoleScript, sanitizedNonce)));
-                }
-                // Primary flush is handled by React's flush() callback (see above).
-                // Schedule fallback in case flush() is never called.
-                scheduleFlushFallback();
-              });
+              parser.feed(chunkBuf, handleParsedChunk);
             }
           })(),
         );
