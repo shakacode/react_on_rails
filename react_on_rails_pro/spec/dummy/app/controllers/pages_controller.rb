@@ -326,8 +326,9 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
                    .order(Arel.sql("MIN(id) ASC"))
                    .limit(posts_count)
 
-    # PostgreSQL/SQLite honor ORDER BY + LIMIT in this subquery; MySQL has
-    # historically not, so revisit this if the benchmark DB adapter changes.
+    # PostgreSQL/SQLite honor ORDER BY + LIMIT in this WHERE IN subquery. MySQL
+    # can ignore that LIMIT in this shape, so revisit this if the benchmark DB
+    # adapter changes instead of assuming the clamp still limits rows loaded.
     # The outer order(:id) re-applies display ordering because WHERE IN does not.
     Post.with_delay(artificial_delay).where(id: post_ids).order(:id).to_a
   end

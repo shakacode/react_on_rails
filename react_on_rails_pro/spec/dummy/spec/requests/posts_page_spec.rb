@@ -87,10 +87,12 @@ RSpec.describe "Posts page", :server_rendering do
     # SQL limit, so this guards the deterministic post selection explicitly.
     expect(response.body).to include(seeded_posts.first.title)
     expect(response.body).not_to include(seeded_posts.second.title)
+    # Rails names AR load notifications by model, so model names are more stable
+    # than matching SQL text across adapters. These names come from
+    # ActiveRecord::LogSubscriber rather than a public API, so this spec should be
+    # revisited if a Rails upgrade changes the notification naming convention.
     comments_queries = sql_events.select { |payload| payload[:name] == "Comment Load" }
     users_queries = sql_events.select { |payload| payload[:name] == "User Load" }
-    # Rails names AR load notifications by model, so model names are more stable
-    # than matching SQL text across adapters.
     # Exact counts guard the batching contract; extra loads would reintroduce
     # the overfetching/N+1 behavior this benchmark route is meant to catch.
     expect(comments_queries.size).to eq(1), "expected one batched comments load for seeded commented posts"
@@ -161,6 +163,8 @@ RSpec.describe "Posts page", :server_rendering do
     expect(parsed_posts_page_artificial_delay(99_999)).to eq(10_000)
   end
 
+  # Keep these local to the request spec while the parsing logic is only used by
+  # this benchmark route; move them to controller-level coverage if they grow.
   def parsed_posts_page_artificial_delay(value)
     controller = PagesController.new
     allow(controller).to receive(:params).and_return(ActionController::Parameters.new(artificial_delay: value))
