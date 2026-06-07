@@ -202,7 +202,7 @@ are not special approval gates.
 - `OPTIONAL`, nit, style-only, duplicate, stale, or noisy comments do not block merge once triaged.
 - If GitHub reports `REVIEW_REQUIRED`, distinguish a missing formal approving review from advisory AI comments. A Claude, CodeRabbit, Cursor, or Greptile issue comment saying the PR is ready is useful evidence, but it is not a required GitHub review object.
 - AI review systems such as Claude, CodeRabbit, Cursor Bugbot, Greptile, and similar tools are advisory unless they report a confirmed blocker.
-- Use the confirmed-blocker definition in `AGENTS.md` instead of treating advisory bot review state as a merge blocker by itself.
+- Use the confirmed-blocker definition in `AGENTS.md` (Labels -> "For all PRs") instead of treating advisory bot review state as a merge blocker by itself.
 - Do not require approval from every AI system, and do not block solely because an advisory AI check was skipped, neutral, pending beyond the useful review window, or left non-blocking comments after another reviewer has approved.
 - Security-category findings still require investigation before dismissal, regardless of source.
 
