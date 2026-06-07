@@ -207,7 +207,7 @@ RSpec.describe "release.rake helper methods" do
         changelog_path = File.join(dir, "CHANGELOG.md")
         File.write(changelog_path, changelog)
 
-        section = extract_changelog_section(changelog_path: changelog_path, version: "16.4.0")
+        section = extract_changelog_section(changelog_path:, version: "16.4.0")
         expect(section).to include("Feature A")
         expect(section).not_to include("### [16.4.0] - 2026-03-08")
         expect(section).not_to include("Bug B")
@@ -231,7 +231,7 @@ RSpec.describe "release.rake helper methods" do
         changelog_path = File.join(dir, "CHANGELOG.md")
         File.write(changelog_path, changelog)
 
-        section = extract_changelog_section(changelog_path: changelog_path, version: "16.4.0")
+        section = extract_changelog_section(changelog_path:, version: "16.4.0")
         expect(section).to be_nil
       end
     end
@@ -319,7 +319,7 @@ RSpec.describe "release.rake helper methods" do
 
     it "dispatches the workflow on the release ref and watches the matching run" do
       allow(self).to receive(:fetch_shakaperf_release_gate_runs)
-        .with(repo_slug: repo_slug, ref: "release-branch")
+        .with(repo_slug:, ref: "release-branch")
         .and_return([{ "databaseId" => 999_999, "headSha" => head_sha }])
       allow(self).to receive(:capture_gh_output)
         .with(
@@ -330,9 +330,9 @@ RSpec.describe "release.rake helper methods" do
         .and_return(["", success_status])
       allow(self).to receive(:wait_for_shakaperf_release_gate_run!)
         .with(
-          repo_slug: repo_slug,
+          repo_slug:,
           ref: "release-branch",
-          head_sha: head_sha,
+          head_sha:,
           ignored_run_ids: ["999999"],
           earliest_created_at: kind_of(Time)
         )
@@ -346,9 +346,9 @@ RSpec.describe "release.rake helper methods" do
 
       expect do
         run_shakaperf_release_gate!(
-          monorepo_root: monorepo_root,
+          monorepo_root:,
           ref: "release-branch",
-          head_sha: head_sha,
+          head_sha:,
           allow_override: false,
           dry_run: false
         )
@@ -361,9 +361,9 @@ RSpec.describe "release.rake helper methods" do
         )
       expect(self).to have_received(:wait_for_shakaperf_release_gate_run!)
         .with(
-          repo_slug: repo_slug,
+          repo_slug:,
           ref: "release-branch",
-          head_sha: head_sha,
+          head_sha:,
           ignored_run_ids: ["999999"],
           earliest_created_at: kind_of(Time)
         )
@@ -379,9 +379,9 @@ RSpec.describe "release.rake helper methods" do
 
       expect do
         run_shakaperf_release_gate!(
-          monorepo_root: monorepo_root,
+          monorepo_root:,
           ref: "release-branch",
-          head_sha: head_sha,
+          head_sha:,
           allow_override: true,
           dry_run: false
         )
@@ -393,9 +393,9 @@ RSpec.describe "release.rake helper methods" do
 
       expect do
         run_shakaperf_release_gate!(
-          monorepo_root: monorepo_root,
+          monorepo_root:,
           ref: "release-branch",
-          head_sha: head_sha,
+          head_sha:,
           allow_override: false,
           dry_run: true
         )
@@ -404,7 +404,7 @@ RSpec.describe "release.rake helper methods" do
 
     it "aborts when workflow dispatch fails" do
       allow(self).to receive(:fetch_shakaperf_release_gate_runs)
-        .with(repo_slug: repo_slug, ref: "release-branch")
+        .with(repo_slug:, ref: "release-branch")
         .and_return([])
       allow(self).to receive(:capture_gh_output)
         .with(
@@ -416,9 +416,9 @@ RSpec.describe "release.rake helper methods" do
 
       expect do
         run_shakaperf_release_gate!(
-          monorepo_root: monorepo_root,
+          monorepo_root:,
           ref: "release-branch",
-          head_sha: head_sha,
+          head_sha:,
           allow_override: false,
           dry_run: false
         )
@@ -427,7 +427,7 @@ RSpec.describe "release.rake helper methods" do
 
     it "aborts when the matching gate run fails" do
       allow(self).to receive(:fetch_shakaperf_release_gate_runs)
-        .with(repo_slug: repo_slug, ref: "release-branch")
+        .with(repo_slug:, ref: "release-branch")
         .and_return([])
       allow(self).to receive(:capture_gh_output)
         .with(
@@ -438,9 +438,9 @@ RSpec.describe "release.rake helper methods" do
         .and_return(["", success_status])
       allow(self).to receive(:wait_for_shakaperf_release_gate_run!)
         .with(
-          repo_slug: repo_slug,
+          repo_slug:,
           ref: "release-branch",
-          head_sha: head_sha,
+          head_sha:,
           ignored_run_ids: [],
           earliest_created_at: kind_of(Time)
         )
@@ -454,9 +454,9 @@ RSpec.describe "release.rake helper methods" do
 
       expect do
         run_shakaperf_release_gate!(
-          monorepo_root: monorepo_root,
+          monorepo_root:,
           ref: "release-branch",
-          head_sha: head_sha,
+          head_sha:,
           allow_override: false,
           dry_run: false
         )
@@ -465,7 +465,7 @@ RSpec.describe "release.rake helper methods" do
 
     it "aborts when watching the matching gate run times out" do
       allow(self).to receive(:fetch_shakaperf_release_gate_runs)
-        .with(repo_slug: repo_slug, ref: "release-branch")
+        .with(repo_slug:, ref: "release-branch")
         .and_return([])
       allow(self).to receive(:capture_gh_output)
         .with(
@@ -476,9 +476,9 @@ RSpec.describe "release.rake helper methods" do
         .and_return(["", success_status])
       allow(self).to receive(:wait_for_shakaperf_release_gate_run!)
         .with(
-          repo_slug: repo_slug,
+          repo_slug:,
           ref: "release-branch",
-          head_sha: head_sha,
+          head_sha:,
           ignored_run_ids: [],
           earliest_created_at: kind_of(Time)
         )
@@ -492,9 +492,9 @@ RSpec.describe "release.rake helper methods" do
 
       expect do
         run_shakaperf_release_gate!(
-          monorepo_root: monorepo_root,
+          monorepo_root:,
           ref: "release-branch",
-          head_sha: head_sha,
+          head_sha:,
           allow_override: false,
           dry_run: false
         )
@@ -504,11 +504,11 @@ RSpec.describe "release.rake helper methods" do
     it "finds the workflow_dispatch run for the pushed head SHA" do
       matching_run = { "databaseId" => 2, "headSha" => head_sha }
       allow(self).to receive(:fetch_shakaperf_release_gate_runs)
-        .with(repo_slug: repo_slug, ref: "release-branch")
+        .with(repo_slug:, ref: "release-branch")
         .and_return([{ "databaseId" => 1, "headSha" => "old" }, matching_run])
 
       expect(
-        wait_for_shakaperf_release_gate_run!(repo_slug: repo_slug, ref: "release-branch", head_sha: head_sha)
+        wait_for_shakaperf_release_gate_run!(repo_slug:, ref: "release-branch", head_sha:)
       ).to eq(matching_run)
     end
 
@@ -516,14 +516,14 @@ RSpec.describe "release.rake helper methods" do
       stale_run = { "databaseId" => 1, "headSha" => head_sha }
       matching_run = { "databaseId" => 2, "headSha" => head_sha }
       allow(self).to receive(:fetch_shakaperf_release_gate_runs)
-        .with(repo_slug: repo_slug, ref: "release-branch")
+        .with(repo_slug:, ref: "release-branch")
         .and_return([stale_run, matching_run])
 
       expect(
         wait_for_shakaperf_release_gate_run!(
-          repo_slug: repo_slug,
+          repo_slug:,
           ref: "release-branch",
-          head_sha: head_sha,
+          head_sha:,
           ignored_run_ids: [1]
         )
       ).to eq(matching_run)
@@ -533,14 +533,14 @@ RSpec.describe "release.rake helper methods" do
       stale_run = { "databaseId" => 1, "headSha" => head_sha, "createdAt" => "2026-06-05T01:00:00Z" }
       matching_run = { "databaseId" => 2, "headSha" => head_sha, "createdAt" => "2026-06-05T01:00:10Z" }
       allow(self).to receive(:fetch_shakaperf_release_gate_runs)
-        .with(repo_slug: repo_slug, ref: "release-branch")
+        .with(repo_slug:, ref: "release-branch")
         .and_return([stale_run, matching_run])
 
       expect(
         wait_for_shakaperf_release_gate_run!(
-          repo_slug: repo_slug,
+          repo_slug:,
           ref: "release-branch",
-          head_sha: head_sha,
+          head_sha:,
           earliest_created_at: Time.iso8601("2026-06-05T01:00:05Z")
         )
       ).to eq(matching_run)
@@ -550,14 +550,14 @@ RSpec.describe "release.rake helper methods" do
       allow(Time).to receive(:now).and_return(Time.iso8601("2026-06-05T01:00:05.900Z"))
       newly_dispatched_run = { "databaseId" => 1, "headSha" => head_sha, "createdAt" => "2026-06-05T01:00:05Z" }
       allow(self).to receive(:fetch_shakaperf_release_gate_runs)
-        .with(repo_slug: repo_slug, ref: "release-branch")
+        .with(repo_slug:, ref: "release-branch")
         .and_return([newly_dispatched_run])
 
       expect(
         wait_for_shakaperf_release_gate_run!(
-          repo_slug: repo_slug,
+          repo_slug:,
           ref: "release-branch",
-          head_sha: head_sha,
+          head_sha:,
           earliest_created_at: shakaperf_release_gate_dispatch_started_at
         )
       ).to eq(newly_dispatched_run)
@@ -565,15 +565,15 @@ RSpec.describe "release.rake helper methods" do
 
     it "aborts when no matching workflow_dispatch run appears before the deadline" do
       allow(self).to receive(:fetch_shakaperf_release_gate_runs)
-        .with(repo_slug: repo_slug, ref: "release-branch")
+        .with(repo_slug:, ref: "release-branch")
         .and_return([{ "databaseId" => 1, "headSha" => "other" }])
       stub_const("SHAKAPERF_RELEASE_GATE_START_TIMEOUT_SECONDS", -1)
 
       expect do
         wait_for_shakaperf_release_gate_run!(
-          repo_slug: repo_slug,
+          repo_slug:,
           ref: "release-branch",
-          head_sha: head_sha
+          head_sha:
         )
       end.to raise_error(SystemExit, /Timed out waiting for ShakaPerf release gate workflow to start/)
     end
@@ -874,11 +874,11 @@ RSpec.describe "release.rake helper methods" do
     end
 
     def required_checks(contexts: [], checks: [])
-      { contexts: contexts, checks: checks }
+      { contexts:, checks: }
     end
 
     def required_check(context, app_id: nil)
-      { context: context, app_id: app_id }
+      { context:, app_id: }
     end
 
     def next_check_run_id
@@ -926,12 +926,12 @@ RSpec.describe "release.rake helper methods" do
     context "when all check runs pass" do
       it "logs success and returns without raising" do
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, check_runs: [passing_run("Lint"), passing_run("Test")])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, check_runs: [passing_run("Lint"), passing_run("Test")])
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: false,
             allow_override: false,
             dry_run: false
@@ -943,12 +943,12 @@ RSpec.describe "release.rake helper methods" do
     context "when a check has failed on a stable release" do
       it "aborts with the failing check name and link" do
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, check_runs: [passing_run("Lint"), failing_run("JS unit tests")])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, check_runs: [passing_run("Lint"), failing_run("JS unit tests")])
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: false,
             allow_override: false,
             dry_run: false
@@ -960,14 +960,14 @@ RSpec.describe "release.rake helper methods" do
     context "when a non-required check fails on a prerelease" do
       it "passes because only required checks gate prereleases" do
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, check_runs: [passing_run("Lint"), failing_run("Benchmark Workflow")])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, check_runs: [passing_run("Lint"), failing_run("Benchmark Workflow")])
         allow(self).to receive(:required_check_names_for_main)
-          .with(monorepo_root: monorepo_root).and_return(required_checks(checks: [required_check("Lint")]))
+          .with(monorepo_root:).and_return(required_checks(checks: [required_check("Lint")]))
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: true,
             allow_override: false,
             dry_run: false
@@ -979,14 +979,14 @@ RSpec.describe "release.rake helper methods" do
     context "when a required check fails on a prerelease" do
       it "aborts because the required check gates prereleases" do
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, check_runs: [failing_run("Lint"), passing_run("Benchmark Workflow")])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, check_runs: [failing_run("Lint"), passing_run("Benchmark Workflow")])
         allow(self).to receive(:required_check_names_for_main)
-          .with(monorepo_root: monorepo_root).and_return(required_checks(checks: [required_check("Lint")]))
+          .with(monorepo_root:).and_return(required_checks(checks: [required_check("Lint")]))
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: true,
             allow_override: false,
             dry_run: false
@@ -998,12 +998,12 @@ RSpec.describe "release.rake helper methods" do
     context "when a check is still in progress" do
       it "aborts with the in-progress message and link" do
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, check_runs: [passing_run("Lint"), in_progress_run("Slow test")])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, check_runs: [passing_run("Lint"), in_progress_run("Slow test")])
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: false,
             allow_override: false,
             dry_run: false
@@ -1015,12 +1015,12 @@ RSpec.describe "release.rake helper methods" do
     context "when there are both failed and in-progress checks" do
       it "reports the failure first so the operator does not wait on an already-broken main" do
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, check_runs: [failing_run("JS unit tests"), in_progress_run("Slow test")])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, check_runs: [failing_run("JS unit tests"), in_progress_run("Slow test")])
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: false,
             allow_override: false,
             dry_run: false
@@ -1038,12 +1038,12 @@ RSpec.describe "release.rake helper methods" do
         old_failed = failing_run("Lint").merge("id" => 1, "check_suite" => { "id" => 100 })
         new_passed = passing_run("Lint").merge("id" => 2, "check_suite" => { "id" => 100 })
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, check_runs: [old_failed, new_passed])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, check_runs: [old_failed, new_passed])
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: false,
             allow_override: false,
             dry_run: false
@@ -1061,12 +1061,12 @@ RSpec.describe "release.rake helper methods" do
           "id" => 2, "check_suite" => { "id" => 200 }
         )
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, check_runs: [workflow_a_passing, workflow_b_failing])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, check_runs: [workflow_a_passing, workflow_b_failing])
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: false,
             allow_override: false,
             dry_run: false
@@ -1078,12 +1078,12 @@ RSpec.describe "release.rake helper methods" do
     context "when same-named checks do not include check_suite data" do
       it "keeps helper-generated runs distinct by default" do
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, check_runs: [passing_run("Lint"), failing_run("Lint")])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, check_runs: [passing_run("Lint"), failing_run("Lint")])
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: false,
             allow_override: false,
             dry_run: false
@@ -1104,12 +1104,12 @@ RSpec.describe "release.rake helper methods" do
           "id" => 2, "check_suite" => { "id" => 200 }
         )
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, check_runs: [suite_a_old_failed, suite_a_new_passed, suite_b_passing])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, check_runs: [suite_a_old_failed, suite_a_new_passed, suite_b_passing])
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: false,
             allow_override: false,
             dry_run: false
@@ -1121,12 +1121,12 @@ RSpec.describe "release.rake helper methods" do
     context "when there are zero check runs visible" do
       it "aborts with a 'no CI data' message" do
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, check_runs: [])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, check_runs: [])
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: false,
             allow_override: false,
             dry_run: false
@@ -1138,12 +1138,12 @@ RSpec.describe "release.rake helper methods" do
     context "when override is set on a failing main" do
       it "warns and returns instead of aborting" do
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: true, dry_run: false)
-          .and_return(sha: sha, check_runs: [failing_run("Lint")])
+          .with(monorepo_root:, allow_override: true, dry_run: false)
+          .and_return(sha:, check_runs: [failing_run("Lint")])
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: false,
             allow_override: true,
             dry_run: false
@@ -1155,12 +1155,12 @@ RSpec.describe "release.rake helper methods" do
     context "when running in dry-run mode on a failing main" do
       it "warns and returns instead of aborting" do
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: true)
-          .and_return(sha: sha, check_runs: [failing_run("Lint")])
+          .with(monorepo_root:, allow_override: false, dry_run: true)
+          .and_return(sha:, check_runs: [failing_run("Lint")])
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: false,
             allow_override: false,
             dry_run: true
@@ -1172,12 +1172,12 @@ RSpec.describe "release.rake helper methods" do
     context "when fetch surfaces a violation via override/dry-run (returns nil)" do
       it "returns without raising and without trying to inspect the data" do
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: true)
+          .with(monorepo_root:, allow_override: false, dry_run: true)
           .and_return(nil)
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: false,
             allow_override: false,
             dry_run: true
@@ -1189,14 +1189,14 @@ RSpec.describe "release.rake helper methods" do
     context "when branch protection is not queryable on a prerelease" do
       it "falls back to evaluating all checks (fail-safe)" do
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, check_runs: [passing_run("Lint"), failing_run("Optional Check")])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, check_runs: [passing_run("Lint"), failing_run("Optional Check")])
         allow(self).to receive(:required_check_names_for_main)
-          .with(monorepo_root: monorepo_root).and_return(nil)
+          .with(monorepo_root:).and_return(nil)
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: true,
             allow_override: false,
             dry_run: false
@@ -1208,14 +1208,14 @@ RSpec.describe "release.rake helper methods" do
     context "when no check runs match the required names on a prerelease" do
       it "aborts with a 'no required check runs' message" do
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, check_runs: [passing_run("Lint")])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, check_runs: [passing_run("Lint")])
         allow(self).to receive(:required_check_names_for_main)
-          .with(monorepo_root: monorepo_root).and_return(required_checks(checks: [required_check("DoesNotExist")]))
+          .with(monorepo_root:).and_return(required_checks(checks: [required_check("DoesNotExist")]))
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: true,
             allow_override: false,
             dry_run: false
@@ -1227,15 +1227,15 @@ RSpec.describe "release.rake helper methods" do
     context "when some required checks are present but others are missing on a prerelease" do
       it "aborts and lists the missing required check names" do
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, check_runs: [passing_run("Lint"), passing_run("Test")])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, check_runs: [passing_run("Lint"), passing_run("Test")])
         allow(self).to receive(:required_check_names_for_main)
-          .with(monorepo_root: monorepo_root)
+          .with(monorepo_root:)
           .and_return(required_checks(checks: %w[Lint Test Build].map { |context| required_check(context) }))
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: true,
             allow_override: false,
             dry_run: false
@@ -1250,15 +1250,15 @@ RSpec.describe "release.rake helper methods" do
     context "when some required checks are missing on a stable release" do
       it "aborts on stable too (branch protection would refuse the merge)" do
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, check_runs: [passing_run("Lint"), passing_run("Test")])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, check_runs: [passing_run("Lint"), passing_run("Test")])
         allow(self).to receive(:required_check_names_for_main)
-          .with(monorepo_root: monorepo_root)
+          .with(monorepo_root:)
           .and_return(required_checks(checks: %w[Lint Test Build].map { |context| required_check(context) }))
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: false,
             allow_override: false,
             dry_run: false
@@ -1274,12 +1274,12 @@ RSpec.describe "release.rake helper methods" do
       it "treats the ambiguity as a failure rather than silently passing through" do
         weird_run = passing_run("Future Status").merge("status" => "scheduled", "conclusion" => nil)
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, check_runs: [passing_run("Lint"), weird_run])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, check_runs: [passing_run("Lint"), weird_run])
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: false,
             allow_override: false,
             dry_run: false
@@ -1290,12 +1290,12 @@ RSpec.describe "release.rake helper methods" do
       it "treats a nil status as a failure too" do
         weird_run = passing_run("Malformed").merge("status" => nil, "conclusion" => nil)
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, check_runs: [passing_run("Lint"), weird_run])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, check_runs: [passing_run("Lint"), weird_run])
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: false,
             allow_override: false,
             dry_run: false
@@ -1308,15 +1308,15 @@ RSpec.describe "release.rake helper methods" do
       it "does not let a same-named check from another app satisfy the requirement" do
         wrong_app_run = passing_run("Lint", app_id: 999)
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, check_runs: [wrong_app_run])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, check_runs: [wrong_app_run])
         allow(self).to receive(:required_check_names_for_main)
-          .with(monorepo_root: monorepo_root)
+          .with(monorepo_root:)
           .and_return(required_checks(checks: [required_check("Lint", app_id: 123)]))
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: true,
             allow_override: false,
             dry_run: false
@@ -1328,15 +1328,15 @@ RSpec.describe "release.rake helper methods" do
         wrong_app_run = passing_run("Lint", app_id: 999)
         required_app_run = failing_run("Lint", app_id: 123)
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, check_runs: [wrong_app_run, required_app_run])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, check_runs: [wrong_app_run, required_app_run])
         allow(self).to receive(:required_check_names_for_main)
-          .with(monorepo_root: monorepo_root)
+          .with(monorepo_root:)
           .and_return(required_checks(checks: [required_check("Lint", app_id: 123)]))
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: true,
             allow_override: false,
             dry_run: false
@@ -1348,15 +1348,15 @@ RSpec.describe "release.rake helper methods" do
         wrong_app_run = failing_run("Lint", app_id: 999)
         required_app_run = passing_run("Lint", app_id: 123)
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, repo_slug: "shakacode/react_on_rails", check_runs: [wrong_app_run, required_app_run])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [wrong_app_run, required_app_run])
         allow(self).to receive(:required_check_names_for_main)
-          .with(monorepo_root: monorepo_root, repo_slug: "shakacode/react_on_rails")
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
           .and_return(required_checks(checks: [required_check("Lint", app_id: 123)]))
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: true,
             allow_override: false,
             dry_run: false
@@ -1368,13 +1368,13 @@ RSpec.describe "release.rake helper methods" do
     context "when branch protection includes legacy status contexts" do
       it "uses commit statuses to satisfy legacy contexts when no check runs are visible" do
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, repo_slug: "shakacode/react_on_rails", check_runs: [])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [])
         allow(self).to receive(:required_check_names_for_main)
-          .with(monorepo_root: monorepo_root, repo_slug: "shakacode/react_on_rails")
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
           .and_return(required_checks(contexts: ["Travis"], checks: []))
         allow(self).to receive(:fetch_main_commit_statuses)
-          .with(repo_slug: "shakacode/react_on_rails", sha: sha, allow_override: false, dry_run: false)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
           .and_return([
                         {
                           "id" => 1,
@@ -1386,7 +1386,7 @@ RSpec.describe "release.rake helper methods" do
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: true,
             allow_override: false,
             dry_run: false
@@ -1396,13 +1396,13 @@ RSpec.describe "release.rake helper methods" do
 
       it "blocks when the legacy commit status has failed" do
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, repo_slug: "shakacode/react_on_rails", check_runs: [])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [])
         allow(self).to receive(:required_check_names_for_main)
-          .with(monorepo_root: monorepo_root, repo_slug: "shakacode/react_on_rails")
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
           .and_return(required_checks(contexts: ["Travis"], checks: []))
         allow(self).to receive(:fetch_main_commit_statuses)
-          .with(repo_slug: "shakacode/react_on_rails", sha: sha, allow_override: false, dry_run: false)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
           .and_return([
                         {
                           "id" => 1,
@@ -1414,7 +1414,7 @@ RSpec.describe "release.rake helper methods" do
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: true,
             allow_override: false,
             dry_run: false
@@ -1424,13 +1424,13 @@ RSpec.describe "release.rake helper methods" do
 
       it "blocks when a same-named legacy status fails even if a check run passes" do
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Travis")])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Travis")])
         allow(self).to receive(:required_check_names_for_main)
-          .with(monorepo_root: monorepo_root, repo_slug: "shakacode/react_on_rails")
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
           .and_return(required_checks(contexts: ["Travis"], checks: []))
         allow(self).to receive(:fetch_main_commit_statuses)
-          .with(repo_slug: "shakacode/react_on_rails", sha: sha, allow_override: false, dry_run: false)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
           .and_return([
                         {
                           "id" => 1,
@@ -1442,7 +1442,7 @@ RSpec.describe "release.rake helper methods" do
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: true,
             allow_override: false,
             dry_run: false
@@ -1452,13 +1452,13 @@ RSpec.describe "release.rake helper methods" do
 
       it "treats a pending legacy commit status as in progress" do
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, repo_slug: "shakacode/react_on_rails", check_runs: [])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [])
         allow(self).to receive(:required_check_names_for_main)
-          .with(monorepo_root: monorepo_root, repo_slug: "shakacode/react_on_rails")
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
           .and_return(required_checks(contexts: ["Travis"], checks: []))
         allow(self).to receive(:fetch_main_commit_statuses)
-          .with(repo_slug: "shakacode/react_on_rails", sha: sha, allow_override: false, dry_run: false)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
           .and_return([
                         {
                           "id" => 1,
@@ -1470,7 +1470,7 @@ RSpec.describe "release.rake helper methods" do
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: true,
             allow_override: false,
             dry_run: false
@@ -1480,13 +1480,13 @@ RSpec.describe "release.rake helper methods" do
 
       it "treats an unknown legacy commit status state as failed" do
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, repo_slug: "shakacode/react_on_rails", check_runs: [])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [])
         allow(self).to receive(:required_check_names_for_main)
-          .with(monorepo_root: monorepo_root, repo_slug: "shakacode/react_on_rails")
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
           .and_return(required_checks(contexts: ["Travis"], checks: []))
         allow(self).to receive(:fetch_main_commit_statuses)
-          .with(repo_slug: "shakacode/react_on_rails", sha: sha, allow_override: false, dry_run: false)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
           .and_return([
                         {
                           "id" => 1,
@@ -1498,7 +1498,7 @@ RSpec.describe "release.rake helper methods" do
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: true,
             allow_override: false,
             dry_run: false
@@ -1508,18 +1508,18 @@ RSpec.describe "release.rake helper methods" do
 
       it "keeps evaluating fetched check runs when legacy status fetch is skipped in dry-run" do
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: true)
-          .and_return(sha: sha, repo_slug: "shakacode/react_on_rails", check_runs: [failing_run("Lint")])
+          .with(monorepo_root:, allow_override: false, dry_run: true)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [failing_run("Lint")])
         allow(self).to receive(:required_check_names_for_main)
-          .with(monorepo_root: monorepo_root, repo_slug: "shakacode/react_on_rails")
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
           .and_return(required_checks(contexts: ["Travis"], checks: []))
         allow(self).to receive(:fetch_main_commit_statuses)
-          .with(repo_slug: "shakacode/react_on_rails", sha: sha, allow_override: false, dry_run: true)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: true)
           .and_return(nil)
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: false,
             allow_override: false,
             dry_run: true
@@ -1529,18 +1529,18 @@ RSpec.describe "release.rake helper methods" do
 
       it "raises if strict legacy status fetch unexpectedly returns nil" do
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Lint")])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Lint")])
         allow(self).to receive(:required_check_names_for_main)
-          .with(monorepo_root: monorepo_root, repo_slug: "shakacode/react_on_rails")
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
           .and_return(required_checks(contexts: ["Travis"], checks: []))
         allow(self).to receive(:fetch_main_commit_statuses)
-          .with(repo_slug: "shakacode/react_on_rails", sha: sha, allow_override: false, dry_run: false)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
           .and_return(nil)
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: true,
             allow_override: false,
             dry_run: false
@@ -1550,13 +1550,13 @@ RSpec.describe "release.rake helper methods" do
 
       it "does not print the commit-status API URL as a browser link" do
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, repo_slug: "shakacode/react_on_rails", check_runs: [])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [])
         allow(self).to receive(:required_check_names_for_main)
-          .with(monorepo_root: monorepo_root, repo_slug: "shakacode/react_on_rails")
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
           .and_return(required_checks(contexts: ["Travis"], checks: []))
         allow(self).to receive(:fetch_main_commit_statuses)
-          .with(repo_slug: "shakacode/react_on_rails", sha: sha, allow_override: false, dry_run: false)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
           .and_return([
                         {
                           "id" => 1,
@@ -1568,7 +1568,7 @@ RSpec.describe "release.rake helper methods" do
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: true,
             allow_override: false,
             dry_run: false
@@ -1578,13 +1578,13 @@ RSpec.describe "release.rake helper methods" do
 
       it "reports a failed legacy status for a wildcard required check" do
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, repo_slug: "shakacode/react_on_rails", check_runs: [])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [])
         allow(self).to receive(:required_check_names_for_main)
-          .with(monorepo_root: monorepo_root, repo_slug: "shakacode/react_on_rails")
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
           .and_return(required_checks(checks: [required_check("Travis")]))
         allow(self).to receive(:fetch_main_commit_statuses)
-          .with(repo_slug: "shakacode/react_on_rails", sha: sha, allow_override: false, dry_run: false)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
           .and_return([
                         {
                           "id" => 1,
@@ -1596,7 +1596,7 @@ RSpec.describe "release.rake helper methods" do
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: true,
             allow_override: false,
             dry_run: false
@@ -1606,13 +1606,13 @@ RSpec.describe "release.rake helper methods" do
 
       it "blocks a stable release when a legacy commit status has failed" do
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Lint")])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Lint")])
         allow(self).to receive(:required_check_names_for_main)
-          .with(monorepo_root: monorepo_root, repo_slug: "shakacode/react_on_rails")
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
           .and_return(required_checks(contexts: ["Travis"], checks: []))
         allow(self).to receive(:fetch_main_commit_statuses)
-          .with(repo_slug: "shakacode/react_on_rails", sha: sha, allow_override: false, dry_run: false)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
           .and_return([
                         {
                           "id" => 1,
@@ -1624,7 +1624,7 @@ RSpec.describe "release.rake helper methods" do
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: false,
             allow_override: false,
             dry_run: false
@@ -1634,13 +1634,13 @@ RSpec.describe "release.rake helper methods" do
 
       it "uses a legacy status to satisfy a wildcard required check" do
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, repo_slug: "shakacode/react_on_rails", check_runs: [])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [])
         allow(self).to receive(:required_check_names_for_main)
-          .with(monorepo_root: monorepo_root, repo_slug: "shakacode/react_on_rails")
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
           .and_return(required_checks(checks: [required_check("Travis")]))
         allow(self).to receive(:fetch_main_commit_statuses)
-          .with(repo_slug: "shakacode/react_on_rails", sha: sha, allow_override: false, dry_run: false)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
           .and_return([
                         {
                           "id" => 1,
@@ -1652,7 +1652,7 @@ RSpec.describe "release.rake helper methods" do
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: true,
             allow_override: false,
             dry_run: false
@@ -1662,20 +1662,20 @@ RSpec.describe "release.rake helper methods" do
 
       it "reports a missing mirrored wildcard check once" do
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Build")])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Build")])
         allow(self).to receive(:required_check_names_for_main)
-          .with(monorepo_root: monorepo_root, repo_slug: "shakacode/react_on_rails")
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
           .and_return(
             required_checks(checks: [required_check("Travis"), required_check("Build")])
           )
         allow(self).to receive(:fetch_main_commit_statuses)
-          .with(repo_slug: "shakacode/react_on_rails", sha: sha, allow_override: false, dry_run: false)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
           .and_return([])
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: true,
             allow_override: false,
             dry_run: false
@@ -1689,15 +1689,15 @@ RSpec.describe "release.rake helper methods" do
 
       it "does not let a legacy status satisfy an app-pinned modern check" do
         allow(self).to receive(:fetch_main_ci_checks)
-          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
-          .and_return(sha: sha, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Other")])
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Other")])
         allow(self).to receive(:required_check_names_for_main)
-          .with(monorepo_root: monorepo_root, repo_slug: "shakacode/react_on_rails")
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
           .and_return(required_checks(checks: [required_check("Travis", app_id: 123)]))
 
         expect do
           validate_main_ci_status!(
-            monorepo_root: monorepo_root,
+            monorepo_root:,
             is_prerelease: true,
             allow_override: false,
             dry_run: false
@@ -1708,7 +1708,7 @@ RSpec.describe "release.rake helper methods" do
 
     it "raises when asked to format an unknown CI violation kind" do
       expect do
-        format_main_ci_status_violation(kind: :typo, short_sha: short_sha, runs: [])
+        format_main_ci_status_violation(kind: :typo, short_sha:, runs: [])
       end.to raise_error(ArgumentError, /Unknown CI violation kind: :typo/)
     end
   end
@@ -1724,7 +1724,7 @@ RSpec.describe "release.rake helper methods" do
         .and_return(["fetch failed: network down", failure_status])
 
       expect do
-        fetch_main_ci_checks(monorepo_root: monorepo_root)
+        fetch_main_ci_checks(monorepo_root:)
       end.to raise_error(SystemExit, %r{Unable to fetch origin/main})
     end
 
@@ -1735,7 +1735,7 @@ RSpec.describe "release.rake helper methods" do
 
       result = nil
       expect do
-        result = fetch_main_ci_checks(monorepo_root: monorepo_root, allow_override: true)
+        result = fetch_main_ci_checks(monorepo_root:, allow_override: true)
       end.to output(%r{CI STATUS OVERRIDE enabled.*Unable to fetch origin/main}m).to_stdout
       expect(result).to be_nil
     end
@@ -1747,7 +1747,7 @@ RSpec.describe "release.rake helper methods" do
 
       result = nil
       expect do
-        result = fetch_main_ci_checks(monorepo_root: monorepo_root, dry_run: true)
+        result = fetch_main_ci_checks(monorepo_root:, dry_run: true)
       end.to output(%r{DRY RUN.*Unable to fetch origin/main}m).to_stdout
       expect(result).to be_nil
     end
@@ -1766,7 +1766,7 @@ RSpec.describe "release.rake helper methods" do
         .and_return(["HTTP 401: unauthorized", failure_status])
 
       expect do
-        fetch_main_ci_checks(monorepo_root: monorepo_root)
+        fetch_main_ci_checks(monorepo_root:)
       end.to raise_error(SystemExit, /Unable to query GitHub Checks API.*HTTP 401/m)
     end
 
@@ -1784,7 +1784,7 @@ RSpec.describe "release.rake helper methods" do
         .and_raise(Errno::ENOENT)
 
       expect do
-        fetch_main_ci_checks(monorepo_root: monorepo_root)
+        fetch_main_ci_checks(monorepo_root:)
       end.to raise_error(SystemExit, /GitHub CLI .* is not installed/)
     end
 
@@ -1803,7 +1803,7 @@ RSpec.describe "release.rake helper methods" do
 
       result = nil
       expect do
-        result = fetch_main_ci_checks(monorepo_root: monorepo_root, dry_run: true)
+        result = fetch_main_ci_checks(monorepo_root:, dry_run: true)
       end.to output(/DRY RUN.*GitHub CLI .* is not installed/m).to_stdout
       expect(result).to be_nil
     end
@@ -1823,7 +1823,7 @@ RSpec.describe "release.rake helper methods" do
 
       result = nil
       expect do
-        result = fetch_main_ci_checks(monorepo_root: monorepo_root, dry_run: true)
+        result = fetch_main_ci_checks(monorepo_root:, dry_run: true)
       end.to output(/DRY RUN.*Failed to parse check_runs response/m).to_stdout
       expect(result).to be_nil
     end
@@ -1845,7 +1845,7 @@ RSpec.describe "release.rake helper methods" do
               "repos/shakacode/react_on_rails/commits/abc1234def/check-runs")
         .and_return([jsonl, success_status])
 
-      result = fetch_main_ci_checks(monorepo_root: monorepo_root)
+      result = fetch_main_ci_checks(monorepo_root:)
       expect(result[:sha]).to eq("abc1234def")
       expect(result[:repo_slug]).to eq("shakacode/react_on_rails")
       expect(result[:check_runs].length).to eq(2)
@@ -1869,7 +1869,7 @@ RSpec.describe "release.rake helper methods" do
               "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks")
         .and_return([{ contexts: %w[Lint Test], checks: [] }.to_json, success_status])
 
-      expect(required_check_names_for_main(monorepo_root: monorepo_root)).to eq(
+      expect(required_check_names_for_main(monorepo_root:)).to eq(
         contexts: %w[Lint Test],
         checks: []
       )
@@ -1890,7 +1890,7 @@ RSpec.describe "release.rake helper methods" do
                       success_status
                     ])
 
-      expect(required_check_names_for_main(monorepo_root: monorepo_root)).to eq(
+      expect(required_check_names_for_main(monorepo_root:)).to eq(
         contexts: [],
         checks: [
           { context: "CodeQL", app_id: 15_368 },
@@ -1914,7 +1914,7 @@ RSpec.describe "release.rake helper methods" do
                       success_status
                     ])
 
-      expect(required_check_names_for_main(monorepo_root: monorepo_root)).to eq(
+      expect(required_check_names_for_main(monorepo_root:)).to eq(
         contexts: %w[Test],
         checks: [
           { context: "CodeQL", app_id: -1 },
@@ -1929,7 +1929,7 @@ RSpec.describe "release.rake helper methods" do
               "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks")
         .and_return(["HTTP 404: Branch not protected", failure_status])
 
-      expect(required_check_names_for_main(monorepo_root: monorepo_root)).to be_nil
+      expect(required_check_names_for_main(monorepo_root:)).to be_nil
     end
 
     it "returns nil when the protection response yields an empty array (fail-safe)" do
@@ -1942,7 +1942,7 @@ RSpec.describe "release.rake helper methods" do
               "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks")
         .and_return([{ contexts: [], checks: [] }.to_json, success_status])
 
-      expect(required_check_names_for_main(monorepo_root: monorepo_root)).to be_nil
+      expect(required_check_names_for_main(monorepo_root:)).to be_nil
     end
   end
 end
