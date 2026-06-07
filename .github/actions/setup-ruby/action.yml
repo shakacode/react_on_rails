@@ -14,7 +14,7 @@ inputs:
     required: false
     default: default
   working-directory:
-    description: Working directory passed through to ruby/setup-ruby.
+    description: Working directory passed through to ruby/setup-ruby for both cache and non-cache setup paths.
     required: false
     default: .
   bundler-cache:
@@ -22,7 +22,7 @@ inputs:
     required: false
     default: 'false'
   frozen:
-    description: Whether to run Bundler in frozen mode when bundler-cache is enabled.
+    description: Whether to run Bundler in frozen mode when bundler-cache is enabled; has no effect otherwise.
     required: false
     default: 'true'
   cache-version:
