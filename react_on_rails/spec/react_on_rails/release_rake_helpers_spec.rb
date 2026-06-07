@@ -1620,6 +1620,32 @@ RSpec.describe "release.rake helper methods" do
         }
       end
 
+      it "reports duplicate same-label requirements in the missing list" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
+          .and_return(sha: sha, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Build")])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root: monorepo_root, repo_slug: "shakacode/react_on_rails")
+          .and_return(
+            required_checks(contexts: ["Travis"], checks: [required_check("Travis"), required_check("Build")])
+          )
+        allow(self).to receive(:fetch_main_commit_statuses)
+          .with(repo_slug: "shakacode/react_on_rails", sha: sha, allow_override: false, dry_run: false)
+          .and_return([])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root: monorepo_root,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to raise_error(SystemExit) { |error|
+          expect(error.message).to include("Required: Travis (2 gates), Build")
+          expect(error.message).to include("Missing: Travis (2 gates)")
+        }
+      end
+
       it "does not let a legacy status satisfy an app-pinned modern check" do
         allow(self).to receive(:fetch_main_ci_checks)
           .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)

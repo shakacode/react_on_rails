@@ -191,8 +191,9 @@ summary=$(echo "${checks_json}" | jq -r --argjson required_names "${required_jso
       missing_required: (
         if $required_names == null then []
         else
-          # NOTE: commit statuses are not fetched here; this hook is a fail-open
-          # display tool. The Ruby release gate owns legacy status enforcement.
+          # NOTE: legacy contexts are intentionally app-agnostic here. Commit
+          # statuses are not fetched here; this hook is a fail-open display
+          # tool. The Ruby release gate owns app-pinned legacy enforcement.
           (($required_names.contexts // [])
             | map(select(. as $context | ($all | any(.name == $context) | not))))
           +

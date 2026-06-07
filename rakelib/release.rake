@@ -686,7 +686,8 @@ def normalize_status_conclusion(state)
   when "pending"
     nil
   else
-    state || "error" # Undocumented states are treated as failures (fail-safe).
+    # GitHub documents error/failure/pending/success; anything else should block.
+    state || "error"
   end
 end
 
@@ -782,9 +783,13 @@ def required_check_label(required_check)
   "#{required_check[:context]} (app_id: #{required_check[:app_id]})"
 end
 
+def format_required_check_labels(labels)
+  labels.tally.map { |label, count| count > 1 ? "#{label} (#{count} gates)" : label }
+end
+
 def required_check_labels(required_checks)
   labels = required_checks[:contexts] + required_checks[:checks].map { |check| required_check_label(check) }
-  labels.tally.map { |label, count| count > 1 ? "#{label} (#{count} gates)" : label }
+  format_required_check_labels(labels)
 end
 
 def required_check_count(required_checks)
@@ -811,7 +816,7 @@ def missing_required_checks(required_checks:, check_runs:, legacy_status_runs:)
   # modern wildcard check may share one label but remain distinct requirements.
   {
     count: missing_legacy.length + missing_modern.length,
-    labels: (missing_legacy + missing_modern.map { |check| required_check_label(check) }).uniq
+    labels: format_required_check_labels(missing_legacy + missing_modern.map { |check| required_check_label(check) })
   }
 end
 
@@ -928,10 +933,8 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
       dry_run: dry_run
     )
     if statuses.nil?
-      # The fetch helper only returns nil after surfacing a dry-run/override
-      # warning; strict mode aborts before this point.
-      return unless allow_override || dry_run
-
+      # Only dry-run/override mode reaches this point; strict mode aborts inside
+      # the fetch helper after surfacing the violation.
       statuses = []
     end
 
