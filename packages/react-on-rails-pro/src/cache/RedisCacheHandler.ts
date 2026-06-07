@@ -112,8 +112,9 @@ export class RedisCacheHandler implements CacheHandler {
         return;
       }
 
-      if (entry.revalidate > 0) {
-        await this.redis.set(key, blob, 'EX', Math.ceil(entry.revalidate));
+      const ttl = Number.isFinite(entry.revalidate) ? Math.ceil(entry.revalidate) : 0;
+      if (ttl > 0) {
+        await this.redis.set(key, blob, 'EX', ttl);
       } else {
         await this.redis.set(key, blob);
       }
