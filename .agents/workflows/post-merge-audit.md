@@ -60,15 +60,17 @@ Scope:
 - Focus: PRs that appear to be from recent high-concurrency agent/Codex/Claude batch work
 - Audit id: <AUDIT_ID>
 
-First, produce the exact PR inclusion list:
+First, produce the exact merged-PR range and batch-subset list:
 - merged PR number and URL
 - merge commit
 - branch name
 - author
 - linked issue
+- included or excluded from the batch subset
 - why you think it is or is not part of the batch
 
-Ask me to confirm the list before deep audit.
+List every PR merged between base and head, not only the PRs that look like
+batch work. Ask me to confirm the included and excluded PRs before deep audit.
 
 After confirmation, audit each included PR for:
 - risky behavior change

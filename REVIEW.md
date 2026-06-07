@@ -4,6 +4,11 @@ Use these instructions for automated PR review, including Claude Code Review.
 `AGENTS.md` remains the canonical repository policy. If this file conflicts
 with `AGENTS.md`, follow `AGENTS.md`.
 
+This file is intended for automated PR review tools that are configured to load
+`REVIEW.md`, including managed Claude Code Review when it discovers this file by
+convention. Local coding agents should start from `AGENTS.md` and use this file
+only when performing an automated PR review.
+
 ## Adversarial Stance
 
 Review for release risk, not style polish. Prioritize concrete problems that

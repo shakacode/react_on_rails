@@ -410,6 +410,11 @@ gh pr view <PR> --json headRefOid,mergeStateStatus,reviewDecision,statusCheckRol
 gh pr checks <PR>
 ```
 
+Before evaluating review feedback at this gate, also fetch inline PR review
+comments and unresolved review threads using the commands in
+[Initial GitHub Commands](#initial-github-commands). `gh pr view --json
+comments` returns issue-level PR comments, not inline review-thread comments.
+
 Also verify:
 
 - PR is not draft unless the user is only asking for readiness work.
