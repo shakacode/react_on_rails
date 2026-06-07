@@ -192,7 +192,7 @@ jobs:
 
             // Verify workflows are queued/running
             const verified = [];
-            let notFound = [...succeeded];
+            const notFound = [...succeeded];
 
             if (succeeded.length > 0) {
               const maxVerificationAttempts = 3;
