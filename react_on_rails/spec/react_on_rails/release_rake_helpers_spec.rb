@@ -1306,7 +1306,7 @@ RSpec.describe "release.rake helper methods" do
 
     context "when a required check is pinned to a GitHub App" do
       it "does not let a same-named check from another app satisfy the requirement" do
-        wrong_app_run = passing_run("Lint").merge("app" => { "id" => 999 })
+        wrong_app_run = passing_run("Lint", app_id: 999)
         allow(self).to receive(:fetch_main_ci_checks)
           .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
           .and_return(sha: sha, check_runs: [wrong_app_run])

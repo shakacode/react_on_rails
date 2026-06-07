@@ -590,6 +590,8 @@ def fetch_main_ci_checks(monorepo_root:, allow_override: false, dry_run: false)
       "gh", "api", "--paginate", "--jq", ".check_runs[]", api_path
     )
   rescue Errno::ENOENT
+    # validate_main_ci_status! normally checks `gh` first, but keep this helper
+    # defensive for direct calls and focused tests.
     handle_main_ci_status_violation!(
       message: "❌ GitHub CLI (`gh`) is not installed. Install it from https://cli.github.com/ and retry.",
       allow_override: allow_override,
