@@ -1724,6 +1724,34 @@ RSpec.describe "release.rake helper methods" do
         end.to output(/Main CI is healthy on #{short_sha} \(1 required check\)/).to_stdout
       end
 
+      it "counts a mirrored wildcard required check once on stable releases" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Travis")])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
+          .and_return(required_checks(checks: [required_check("Travis")]))
+        allow(self).to receive(:fetch_main_commit_statuses)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
+          .and_return([
+                        {
+                          "id" => 1,
+                          "context" => "Travis",
+                          "state" => "success",
+                          "target_url" => "https://ci.example.com/travis"
+                        }
+                      ])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: false,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to output(/Main CI is healthy on #{short_sha} \(1 check\)/).to_stdout
+      end
+
       it "uses created_at as a tiebreaker for same-context legacy statuses" do
         allow(self).to receive(:fetch_main_ci_checks)
           .with(monorepo_root:, allow_override: false, dry_run: false)

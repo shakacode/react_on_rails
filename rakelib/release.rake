@@ -701,6 +701,7 @@ def latest_commit_statuses(statuses)
   statuses
     .group_by { |status| status["context"] }
     .map do |_context, context_statuses|
+      # GitHub emits ISO 8601 UTC `created_at` values, which sort chronologically as strings.
       context_statuses.max_by { |status| [status["id"].to_i, status["created_at"].to_s] }
     end
 end
@@ -1080,13 +1081,11 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
   # green status when required legacy status data was unavailable.
   return if legacy_status_fetch_unknown
 
-  # Only label the count "required" when `evaluated` was actually filtered to
-  # the required subset (prerelease + branch protection visible). On stable
-  # releases we keep evaluating every check_run, so the count includes
-  # non-required runs and labelling them "required" would misrepresent the
-  # gate.
+  # Stable releases still evaluated every visible run above for failures, but
+  # when branch protection is visible the success count should report required
+  # gates so mirrored Checks/Statuses API entries are not counted twice.
   qualifier = is_prerelease && required_names ? "required " : ""
-  healthy_count = is_prerelease && required_names ? required_check_count(required_names) : evaluated.length
+  healthy_count = required_names ? required_check_count(required_names) : evaluated.length
   noun = healthy_count == 1 ? "check" : "checks"
   puts "✓ Main CI is healthy on #{short_sha} (#{healthy_count} #{qualifier}#{noun})"
 end
