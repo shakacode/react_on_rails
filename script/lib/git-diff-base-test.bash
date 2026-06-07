@@ -570,6 +570,8 @@ test_lefthook_branch_honors_base_ref() {
   local out
   out="$(BASE_REF=origin/release bin/lefthook/get-changed-files branch '\.rb$')"
   assert_equals "changed.rb" "$out" "lefthook branch changed files"
+  # Defense in depth: keep verifying the BASE_REF-only file is absent if the
+  # exact-output assertion above is ever relaxed.
   if grep -qx "release_only.rb" <<<"$out"; then
     fail "lefthook branch output should not include files already on BASE_REF"
     return 1
