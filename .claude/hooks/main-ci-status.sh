@@ -158,17 +158,17 @@ checks_jsonl=$(gh api \
 # that each define a `detect-changes` job). Mirrors the Ruby dedup in
 # `validate_main_ci_status!` (rakelib/release.rake). Keep the two in sync.
 checks_json=$(echo "${checks_jsonl}" | jq -s '
-  [.[] | {id, name, status, conclusion, html_url, suite_id: (.check_suite.id // .id)}]
-  | group_by([.suite_id, .name])
+  [.[] | {id, name, status, conclusion, html_url, suite_id: (.check_suite.id // .id), app_id: (.app.id // null)}]
+  | group_by([.suite_id, .name, .app_id])
   | map(max_by(.id))
 ' 2>/dev/null) || fail_open "jq slurp failed"
 
 required_json=$(gh api \
   "repos/${repo_slug}/branches/main/protection/required_status_checks" \
-  --jq '(.contexts // []) + (.checks // [] | map(.context)) | unique' \
+  --jq '{contexts: (.contexts // []), checks: (.checks // [] | map({context, app_id}))}' \
   2>/dev/null || echo "null")
 case "${required_json}" in
-  \[*\]) ;;
+  \{*\}) ;;
   *) required_json="null" ;;
 esac
 
@@ -176,14 +176,31 @@ esac
 # Anything completed with another conclusion is a failure. Anything not yet
 # completed is in_progress.
 summary=$(echo "${checks_json}" | jq -r --argjson required_names "${required_json}" '
+  def app_wildcard($app_id): $app_id == null or $app_id == -1;
+  def check_matches($required):
+    .name == $required.context and (app_wildcard($required.app_id) or .app_id == $required.app_id);
+  def required_check_label:
+    if app_wildcard(.app_id) then .context else "\(.context) (app_id: \(.app_id))" end;
+
   . as $all
-  | ($all | map(.name)) as $observed_names
   | {
       total: length,
       passed: [.[] | select(.status == "completed" and (.conclusion | IN("success", "skipped", "neutral")))] | length,
       failed: [.[] | select(.status == "completed" and (.conclusion | IN("success", "skipped", "neutral") | not))],
       in_progress: [.[] | select(.status != "completed")],
-      missing_required: (if $required_names == null then [] else ($required_names - $observed_names) end)
+      missing_required: (
+        if $required_names == null then []
+        else
+          # NOTE: commit statuses are not fetched here; this hook is a fail-open
+          # display tool. The Ruby release gate owns legacy status enforcement.
+          (($required_names.contexts // [])
+            | map(select(. as $context | ($all | any(.name == $context) | not))))
+          +
+          (($required_names.checks // [])
+            | map(select(. as $required | ($all | any(check_matches($required)) | not)))
+            | map(required_check_label))
+        end
+      )
     }
   | "TOTAL=\(.total)",
     "PASSED=\(.passed)",
