@@ -199,6 +199,7 @@ For all PRs:
 - Merge qualification is: CI is passing, all current review comments and threads are addressed or explicitly triaged by tier, and no major question or discussion item needs maintainer attention.
 - Treat AI review systems such as Claude, CodeRabbit, Cursor Bugbot, Greptile, and similar tools as advisory unless they identify a confirmed blocker: a correctness regression, failing test, security issue, API contract break, data-loss risk, or missing required maintainer approval.
 - Do not wait for CodeRabbit.ai, Claude, or every other AI system to approve when CI is green, blocking review feedback is addressed, and no major question or discussion item remains.
+- If branch protection still reports `REVIEW_REQUIRED`, verify whether a formal GitHub approving review is missing. Positive AI issue comments such as "LGTM" or "Ready to merge" support triage but do not satisfy a required review.
 - Security-category findings such as XSS, injection, exposed secrets, or auth bypass still require investigation before dismissal, regardless of source.
 
 For small, focused PRs (roughly 5 files changed or fewer and one clear purpose):
