@@ -321,16 +321,16 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
   def posts_page_posts(posts_count, artificial_delay)
     return [] if posts_count.zero?
 
-    post_ids = Post.select(Arel.sql("MIN(id)"))
-                   .group(:user_id)
-                   .order(Arel.sql("MIN(id) ASC"))
-                   .limit(posts_count)
+    post_id_subquery = Post.select(Arel.sql("MIN(id)"))
+                           .group(:user_id)
+                           .order(Arel.sql("MIN(id) ASC"))
+                           .limit(posts_count)
 
     # PostgreSQL/SQLite honor ORDER BY + LIMIT in this WHERE IN subquery. MySQL
     # can ignore that LIMIT in this shape, so revisit this if the benchmark DB
     # adapter changes instead of assuming the clamp still limits rows loaded.
     # The outer order(:id) re-applies display ordering because WHERE IN does not.
-    Post.with_delay(artificial_delay).where(id: post_ids).order(:id).to_a
+    Post.with_delay(artificial_delay).where(id: post_id_subquery).order(:id).to_a
   end
 
   def posts_page_comments_and_users(posts, artificial_delay)
@@ -338,10 +338,10 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     # Early return when posts is empty; avoids an unnecessary WHERE IN (empty) query.
     return [{}, {}] if post_ids.empty?
 
-    # artificial_delay sleeps once per batched query (posts, comments, users),
-    # so total sleep = 3 * delay ms. This intentionally models per-query latency
-    # rather than end-to-end latency, which keeps query counts predictable for
-    # benchmark comparisons.
+    # artificial_delay sleeps once per batched query (posts, comments, and when
+    # comment authors exist, users), so total sleep = 2-3 * delay ms. This
+    # intentionally models per-query latency rather than end-to-end latency,
+    # which keeps query counts predictable for benchmark comparisons.
     comments = Comment.with_delay(artificial_delay).where(post_id: post_ids).to_a
     user_ids = comments.map(&:user_id).uniq
     users_by_id = if user_ids.empty?

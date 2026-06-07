@@ -35,6 +35,8 @@ RSpec.describe "Posts page", :server_rendering do
     User.delete_all
   end
 
+  # Lazy: call `seeded_posts` explicitly in each example that requires DB rows.
+  # Examples that test the empty-table path intentionally omit it.
   let(:seeded_posts) do
     Array.new(2) do |i|
       user = User.create!(name: "User #{i + 1}", email: "user-#{i + 1}@example.com")
