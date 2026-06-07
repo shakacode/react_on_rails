@@ -173,7 +173,7 @@ When tracking is warranted:
 Before saying a PR is ready to merge:
 
 ```bash
-gh pr view <PR> --json mergeStateStatus,reviewDecision,statusCheckRollup,isDraft,labels
+gh pr view <PR> --json mergeStateStatus,reviewDecision,statusCheckRollup,isDraft,labels,reviews
 gh pr checks <PR>
 ```
 
@@ -181,7 +181,7 @@ Also verify:
 
 - PR is not draft unless the user is only asking for readiness work.
 - `mergeStateStatus` is clean or the remaining instability is understood and non-required.
-- No current `CHANGES_REQUESTED`.
+- No current `CHANGES_REQUESTED` from a human or required reviewer; use `reviews` to verify the source before treating an advisory AI request as non-blocking. If an advisory AI system requested changes, triage the review content for confirmed blockers instead of treating the review state alone as a merge block.
 - No unresolved current review thread changes correctness, tests, security, or required scope.
 - Required checks are green, or the user has explicitly accepted an auditable waiver for full CI.
 - The PR body or latest agent comment includes exact local validation commands and results.
