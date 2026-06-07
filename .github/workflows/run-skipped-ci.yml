@@ -191,21 +191,27 @@ jobs:
                 const toVerify = notFound.splice(0);
 
                 for (const workflow of toVerify) {
-                  const runs = await github.rest.actions.listWorkflowRuns({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    workflow_id: workflow.id,
-                    // Narrow the workflow-run search to this PR ref first;
-                    // head_sha still pins the exact dispatched commit.
-                    branch: prData.ref,
-                    event: 'workflow_dispatch',
-                    head_sha: prData.sha,
-                    per_page: 20,
-                    created: `>${dispatchStartedAt}`
-                  });
-
-                  // The API filters identify the dispatched run; path may include a ref suffix.
-                  const found = runs.data.workflow_runs.length > 0;
+                  let found = false;
+                  try {
+                    console.log(
+                      `Searching for ${workflow.name} dispatched on SHA ${prData.sha} after ${dispatchStartedAt}...`
+                    );
+                    const runs = await github.rest.actions.listWorkflowRuns({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      workflow_id: workflow.id,
+                      // Narrow the workflow-run search to this PR ref first;
+                      // head_sha still pins the exact dispatched commit.
+                      branch: prData.ref,
+                      event: 'workflow_dispatch',
+                      head_sha: prData.sha,
+                      per_page: 20,
+                      created: `>${dispatchStartedAt}`
+                    });
+                    found = runs.data.workflow_runs.length > 0;
+                  } catch (error) {
+                    console.log(`API error verifying ${workflow.name}: ${error.message}; will retry`);
+                  }
 
                   if (found) {
                     verified.push(workflow);
