@@ -276,7 +276,9 @@ jobs:
             // Don't list individual checks - keep it simple
             const skippedChecksList = '';
             const verifiedList = '';
-            const notFoundList = '';
+            const notFoundList = notFound.length > 0
+              ? `\n\n**Unverified (may still be queuing):**\n${notFound.map(workflow => `- ⏳ ${workflow.name}`).join('\n')}`
+              : '';
             const failedList = failed.length > 0 ? `\n\n**Failed to trigger:**\n${failed.map(f => `- ❌ ${f.workflow}: ${f.error}`).join('\n')}` : '';
 
             const body = `🚀 **Full CI Mode Enabled**
