@@ -676,6 +676,7 @@ def normalize_status_as_check_run(status)
   {
     "id" => status["id"],
     "name" => status["context"],
+    # `pending` must stay in CI_INCOMPLETE_STATUSES so commit statuses still block as in-progress.
     "status" => conclusion.nil? ? "pending" : "completed",
     "conclusion" => conclusion,
     "html_url" => status["target_url"]
