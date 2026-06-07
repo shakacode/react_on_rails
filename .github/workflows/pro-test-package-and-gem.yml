@@ -145,6 +145,7 @@ jobs:
         with:
           working-directory: react_on_rails_pro
           ruby-version: ${{ env.RUBY_VERSION }}
+          install-libyaml: 'false'
 
       - name: Install Node modules with pnpm
         working-directory: .
@@ -158,6 +159,7 @@ jobs:
         with:
           working-directory: react_on_rails_pro/spec/dummy
           ruby-version: ${{ env.RUBY_VERSION }}
+          install-libyaml: 'false'
 
       - name: Generate file-system based entrypoints
         run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
@@ -260,6 +262,7 @@ jobs:
         with:
           working-directory: react_on_rails_pro/spec/dummy
           ruby-version: ${{ env.RUBY_VERSION }}
+          install-libyaml: 'false'
 
       - name: Generate file-system based entrypoints
         run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
@@ -428,6 +431,7 @@ jobs:
         with:
           working-directory: react_on_rails_pro
           ruby-version: ${{ matrix.ruby-version }}
+          install-libyaml: 'false'
 
       - name: Run RSpec tests for Pro package
         run: bundle exec rspec spec/react_on_rails_pro
