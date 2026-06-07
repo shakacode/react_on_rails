@@ -590,11 +590,14 @@ def fetch_main_ci_checks(monorepo_root:, allow_override: false, dry_run: false)
       "gh", "api", "--paginate", "--jq", ".check_runs[]", api_path
     )
   rescue Errno::ENOENT
+    # validate_main_ci_status! normally checks `gh` first, but keep this helper
+    # defensive for direct calls and focused tests.
     handle_main_ci_status_violation!(
       message: "❌ GitHub CLI (`gh`) is not installed. Install it from https://cli.github.com/ and retry.",
       allow_override:,
       dry_run:
     )
+    # Only reached in override/dry-run mode; strict mode aborts above.
     return nil
   end
 
@@ -604,13 +607,12 @@ def fetch_main_ci_checks(monorepo_root:, allow_override: false, dry_run: false)
       allow_override:,
       dry_run:
     )
+    # Only reached in override/dry-run mode; strict mode aborts above.
     return nil
   end
 
   begin
-    check_runs = output.lines.reject { |line| line.strip.empty? }.map do |line|
-      JSON.parse(line)
-    end
+    check_runs = parse_gh_jsonl(output)
   rescue JSON::ParserError => e
     handle_main_ci_status_violation!(
       message: "❌ Failed to parse check_runs response from gh: #{e.message}\n\nOutput:\n#{output}",
@@ -624,14 +626,117 @@ def fetch_main_ci_checks(monorepo_root:, allow_override: false, dry_run: false)
 end
 # rubocop:enable Metrics/MethodLength
 
+def parse_gh_jsonl(output)
+  output.lines.reject { |line| line.strip.empty? }.map do |line|
+    JSON.parse(line)
+  end
+end
+
+def fetch_main_commit_statuses(repo_slug:, sha:, allow_override:, dry_run:)
+  api_path = "repos/#{repo_slug}/commits/#{sha}/statuses"
+
+  begin
+    output, status = Open3.capture2e(
+      "gh", "api", "--paginate", "--jq", ".[]", api_path
+    )
+  rescue Errno::ENOENT
+    handle_main_ci_status_violation!(
+      message: "❌ GitHub CLI (`gh`) is not installed. Install it from https://cli.github.com/ and retry.",
+      allow_override:,
+      dry_run:
+    )
+    return nil
+  end
+
+  unless status.success?
+    handle_main_ci_status_violation!(
+      message: "❌ Unable to query GitHub Statuses API for #{sha}.\n\n#{output}",
+      allow_override:,
+      dry_run:
+    )
+    return nil
+  end
+
+  begin
+    parse_gh_jsonl(output)
+  rescue JSON::ParserError => e
+    handle_main_ci_status_violation!(
+      message: "❌ Failed to parse statuses response from gh: #{e.message}\n\nOutput:\n#{output}",
+      allow_override:,
+      dry_run:
+    )
+    # Only reached in override/dry-run mode; strict mode aborts above.
+    nil
+  end
+end
+
+def normalize_status_as_check_run(status)
+  state = status["state"]
+  conclusion = normalize_status_conclusion(state)
+  {
+    "id" => status["id"],
+    "name" => status["context"],
+    # `pending` must stay in CI_INCOMPLETE_STATUSES so commit statuses still block as in-progress.
+    "status" => conclusion.nil? ? "pending" : "completed",
+    "conclusion" => conclusion,
+    "html_url" => status["target_url"]
+  }
+end
+
+def normalize_status_conclusion(state)
+  case state
+  when "success"
+    "success"
+  when "pending"
+    nil
+  when "failure", "error"
+    state
+  else
+    # GitHub documents error/failure/pending/success; unknown values should block.
+    "error"
+  end
+end
+
+def latest_commit_statuses(statuses)
+  statuses
+    .group_by { |status| status["context"] }
+    .map do |_context, context_statuses|
+      # GitHub emits ISO 8601 UTC `created_at` values, which sort chronologically as strings.
+      context_statuses.max_by { |status| [status["created_at"].to_s, status["id"].to_i] }
+    end
+end
+
+def normalize_required_check_entries(checks)
+  Array(checks).filter_map do |check|
+    context = check["context"].to_s
+    next if context.empty?
+
+    { context:, app_id: check["app_id"]&.to_i }
+  end.uniq
+end
+
+def normalize_required_checks_payload(parsed)
+  return nil unless parsed.is_a?(Hash)
+
+  checks = normalize_required_check_entries(parsed["checks"])
+  check_contexts = checks.map { |check| check[:context] }
+  # GitHub mirrors required status-check names into both `contexts` and `checks`.
+  # Keep the modern `checks` entry when names overlap so one required gate is
+  # evaluated once, with its app pin preserved.
+  contexts = Array(parsed["contexts"]).map(&:to_s).reject(&:empty?).uniq - check_contexts
+
+  # No required names parseable is treated the same as "no branch protection
+  # visible" — fail-safe to evaluating every check run.
+  contexts.empty? && checks.empty? ? nil : { contexts:, checks: }
+end
+
 def required_check_names_for_main(monorepo_root:, repo_slug: nil)
   repo_slug ||= github_repo_slug(monorepo_root)
   api_path = "repos/#{repo_slug}/branches/main/protection/required_status_checks"
-  # Combine the legacy `contexts` list (older protection rules) with the newer
-  # `checks[].context` list. Branch protection set up via the `checks` API
-  # leaves `contexts` as `[]`, so reading only `contexts` would yield an empty
-  # array and trip the `:no_required_checks` abort path even when CI is green.
-  jq_query = "(.contexts // []) + (.checks // [] | map(.context)) | unique"
+  # Keep legacy `contexts` separate from modern `checks` entries. Modern
+  # required checks can be pinned to a GitHub App via `app_id`; legacy contexts
+  # may be satisfied by either a Checks API run or a commit-status context.
+  jq_query = "{contexts: (.contexts // []), checks: (.checks // [] | map({context, app_id}))}"
   # Precondition: `fetch_main_ci_checks` already verified `gh` is installed
   # before `validate_main_ci_status!` calls this helper. The remaining failure
   # mode here is "branch protection unknown", which returns nil so the caller
@@ -644,14 +749,111 @@ def required_check_names_for_main(monorepo_root:, repo_slug: nil)
 
   begin
     parsed = JSON.parse(output)
-    return nil unless parsed.is_a?(Array)
-
-    # Empty array (no required names parseable) is treated the same as "no
-    # branch protection visible" — fail-safe to evaluating every check run.
-    parsed.empty? ? nil : parsed
+    normalize_required_checks_payload(parsed)
   rescue JSON::ParserError
     nil
   end
+end
+
+def check_run_app_id(run)
+  app_id = run.dig("app", "id")
+  # nil is the branch-protection wildcard; GitHub check-run app IDs are integers.
+  app_id&.to_i
+end
+
+def required_check_app_wildcard?(app_id)
+  app_id.nil? || app_id == -1
+end
+
+def required_check_matches_run?(required_check, run)
+  required_check[:context] == run["name"] &&
+    (required_check_app_wildcard?(required_check[:app_id]) || required_check[:app_id] == check_run_app_id(run))
+end
+
+def required_check_present?(required_check:, check_runs:, legacy_status_runs:)
+  check_runs.any? { |run| required_check_matches_run?(required_check, run) } ||
+    (required_check_app_wildcard?(required_check[:app_id]) &&
+      legacy_status_runs.any? { |run| run["name"] == required_check[:context] })
+end
+
+def legacy_context_present?(context:, check_runs:, legacy_status_runs:)
+  matching_check_run = check_runs.any? do |run|
+    run["name"] == context
+  end
+
+  matching_check_run || legacy_status_runs.any? { |run| run["name"] == context }
+end
+
+def required_check_label(required_check)
+  return required_check[:context] if required_check_app_wildcard?(required_check[:app_id])
+
+  "#{required_check[:context]} (app_id: #{required_check[:app_id]})"
+end
+
+def format_required_check_labels(labels)
+  labels.tally.map { |label, count| count > 1 ? "#{label} (#{count} gates)" : label }
+end
+
+def required_check_labels(required_checks)
+  labels = required_checks[:contexts] + required_checks[:checks].map { |check| required_check_label(check) }
+  format_required_check_labels(labels)
+end
+
+def required_check_count(required_checks)
+  required_checks[:contexts].length + required_checks[:checks].length
+end
+
+def missing_required_checks(required_checks:, check_runs:, legacy_status_runs:)
+  missing_modern = required_checks[:checks].reject do |required_check|
+    required_check_present?(
+      required_check:,
+      check_runs:,
+      legacy_status_runs:
+    )
+  end
+  missing_legacy = required_checks[:contexts].reject do |context|
+    legacy_context_present?(
+      context:,
+      check_runs:,
+      legacy_status_runs:
+    )
+  end
+
+  # Keep the raw count separate from display labels for deliberately duplicated
+  # names; mirrored branch-protection contexts are removed during normalization.
+  {
+    count: missing_legacy.length + missing_modern.length,
+    labels: format_required_check_labels(missing_legacy + missing_modern.map { |check| required_check_label(check) })
+  }
+end
+
+def legacy_status_contexts_for_required_checks(required_checks)
+  wildcard_check_contexts = required_checks[:checks]
+                            .select { |check| required_check_app_wildcard?(check[:app_id]) }
+                            .map { |check| check[:context] }
+
+  (
+    required_checks[:contexts] +
+    wildcard_check_contexts
+  ).uniq
+end
+
+def legacy_status_runs_for_required_contexts(required_checks:, statuses:)
+  status_contexts = legacy_status_contexts_for_required_checks(required_checks)
+
+  # App-wildcard required checks can be satisfied by either Checks API runs or
+  # legacy commit statuses. App-pinned checks still require a matching check run.
+  statuses
+    .select { |status| status_contexts.include?(status["context"]) }
+    .then { |relevant_statuses| latest_commit_statuses(relevant_statuses) }
+    .map { |status| normalize_status_as_check_run(status) }
+end
+
+def format_ci_status_run_line(run, kind:)
+  icon = kind == :in_progress ? "⏳" : "❌"
+  detail = kind == :in_progress ? (run["status"] || "in_progress") : (run["conclusion"] || "incomplete")
+  url = run["html_url"].to_s
+  url.strip.empty? ? "  #{icon} #{detail}: #{run['name']}" : "  #{icon} #{detail}: #{run['name']}\n      #{url}"
 end
 
 def format_main_ci_status_violation(kind:, short_sha:, runs:) # rubocop:disable Metrics/CyclomaticComplexity
@@ -675,11 +877,7 @@ def format_main_ci_status_violation(kind:, short_sha:, runs:) # rubocop:disable 
            end
   return header if runs.nil? || runs.empty?
 
-  lines = runs.map do |run|
-    icon = kind == :in_progress ? "⏳" : "❌"
-    detail = kind == :in_progress ? (run["status"] || "in_progress") : (run["conclusion"] || "incomplete")
-    "  #{icon} #{detail}: #{run['name']}\n      #{run['html_url']}"
-  end
+  lines = runs.map { |run| format_ci_status_run_line(run, kind:) }
   "#{header}\n\n#{lines.join("\n")}"
 end
 
@@ -721,15 +919,6 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
   repo_slug = data[:repo_slug]
   check_runs = data[:check_runs]
 
-  if check_runs.empty?
-    handle_main_ci_status_violation!(
-      message: format_main_ci_status_violation(kind: :no_checks, short_sha:, runs: nil),
-      allow_override:,
-      dry_run:
-    )
-    return
-  end
-
   # Collapse multiple runs per (check_suite_id, name) to the most recent
   # attempt (highest check_run id). The key intentionally includes
   # check_suite_id so we only collapse *true* reruns (same workflow run,
@@ -745,7 +934,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
   # another. The GitHub Actions Checks API always populates `check_suite`,
   # so this only matters for external check integrations.
   check_runs = check_runs
-               .group_by { |run| [run.dig("check_suite", "id") || run["id"], run["name"]] }
+               .group_by { |run| [run.dig("check_suite", "id") || run["id"], run["name"], check_run_app_id(run)] }
                .map { |_key, runs| runs.max_by { |run| run["id"].to_i } }
 
   # Always query branch-protection required checks (when configured) so the
@@ -756,46 +945,60 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
   required_args = { monorepo_root: }
   required_args[:repo_slug] = repo_slug if repo_slug
   required_names = required_check_names_for_main(**required_args)
-  evaluated = if is_prerelease && required_names
-                check_runs.select { |run| required_names.include?(run["name"]) }
-              else
-                check_runs
-              end
+  required_status_contexts = required_names ? legacy_status_contexts_for_required_checks(required_names) : []
+  legacy_status_runs = []
+  legacy_status_fetch_unknown = false
+  if required_status_contexts.any?
+    statuses = fetch_main_commit_statuses(
+      repo_slug: repo_slug || github_repo_slug(monorepo_root),
+      sha:,
+      allow_override:,
+      dry_run:
+    )
+    if statuses.nil?
+      unless allow_override || dry_run
+        handle_main_ci_status_violation!(
+          message: "❌ Internal error: legacy status fetch returned nil unexpectedly in strict mode.",
+          allow_override:,
+          dry_run:
+        )
+        return
+      end
 
-  # When branch protection lists required checks, treat any missing required
-  # check as blocking — for stable AND prerelease. Branch protection would
-  # refuse the merge in this state, so a release that ignored the gap would
-  # ship against a commit GitHub itself considers unverified.
-  # `:no_required_checks` covers the all-missing case (typically: CI hasn't
-  # started yet); `:missing_required_checks` covers the partial case (some
-  # required workflows ran, others never registered — usually a renamed or
-  # deleted workflow that branch protection still requires).
-  unless required_names.nil?
-    observed_names = check_runs.map { |run| run["name"] }
-    missing_names = required_names - observed_names
-    if missing_names.length == required_names.length
-      handle_main_ci_status_violation!(
-        message: format_main_ci_status_violation(kind: :no_required_checks, short_sha:, runs: nil) +
-                 "\nRequired: #{required_names.join(', ')}",
-        allow_override:,
-        dry_run:
-      )
-      return
-    elsif missing_names.any?
-      handle_main_ci_status_violation!(
-        message: format_main_ci_status_violation(kind: :missing_required_checks, short_sha:, runs: nil) +
-                 "\nRequired: #{required_names.join(', ')}\nMissing: #{missing_names.join(', ')}",
-        allow_override:,
-        dry_run:
-      )
-      return
+      # Only dry-run/override mode reaches the fallback; strict mode aborts inside
+      # the fetch helper after surfacing the violation.
+      legacy_status_fetch_unknown = true
+      statuses = []
     end
+
+    legacy_status_runs = legacy_status_runs_for_required_contexts(
+      required_checks: required_names,
+      statuses:
+    )
   end
 
-  # Report failures before in-progress runs. If both are present, the operator
-  # needs to know about the failure right away — telling them to "wait or
-  # override" would just make them wait and re-run before seeing the real
-  # blocker.
+  if check_runs.empty? && legacy_status_runs.empty?
+    handle_main_ci_status_violation!(
+      message: format_main_ci_status_violation(kind: :no_checks, short_sha:, runs: nil),
+      allow_override:,
+      dry_run:
+    )
+    return
+  end
+
+  evaluated = if is_prerelease && required_names
+                check_runs.select do |run|
+                  required_names[:contexts].include?(run["name"]) ||
+                    required_names[:checks].any? { |required_check| required_check_matches_run?(required_check, run) }
+                end + legacy_status_runs
+              else
+                check_runs + legacy_status_runs
+              end
+
+  # Report visible failures before missing/in-progress runs. If both are
+  # present, the operator needs to know about the failure right away; this also
+  # prevents same-label legacy/modern required checks from hiding a failed
+  # legacy status behind a "missing required" message.
   failed = evaluated.select do |run|
     run["status"] == "completed" && !CI_PASSING_CONCLUSIONS.include?(run["conclusion"])
   end
@@ -806,6 +1009,41 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
       dry_run:
     )
     return
+  end
+
+  # When branch protection lists required checks, treat any missing required
+  # check as blocking — for stable AND prerelease. Branch protection would
+  # refuse the merge in this state, so a release that ignored the gap would
+  # ship against a commit GitHub itself considers unverified.
+  # `:no_required_checks` covers the all-missing case (typically: CI hasn't
+  # started yet); `:missing_required_checks` covers the partial case (some
+  # required workflows ran, others never registered — usually a renamed or
+  # deleted workflow that branch protection still requires).
+  unless required_names.nil?
+    required_labels = required_check_labels(required_names)
+    missing_required = missing_required_checks(
+      required_checks: required_names,
+      check_runs:,
+      legacy_status_runs:
+    )
+    missing_names = missing_required[:labels]
+    if missing_required[:count] == required_check_count(required_names)
+      handle_main_ci_status_violation!(
+        message: format_main_ci_status_violation(kind: :no_required_checks, short_sha:, runs: nil) +
+                 "\nRequired: #{required_labels.join(', ')}",
+        allow_override:,
+        dry_run:
+      )
+      return
+    elsif missing_names.any?
+      handle_main_ci_status_violation!(
+        message: format_main_ci_status_violation(kind: :missing_required_checks, short_sha:, runs: nil) +
+                 "\nRequired: #{required_labels.join(', ')}\nMissing: #{missing_names.join(', ')}",
+        allow_override:,
+        dry_run:
+      )
+      return
+    end
   end
 
   in_progress = evaluated.select { |run| CI_INCOMPLETE_STATUSES.include?(run["status"]) }
@@ -835,14 +1073,17 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
     return
   end
 
-  # Only label the count "required" when `evaluated` was actually filtered to
-  # the required subset (prerelease + branch protection visible). On stable
-  # releases we keep evaluating every check_run, so the count includes
-  # non-required runs and labelling them "required" would misrepresent the
-  # gate.
+  # The fetch helper already warned in dry-run/override mode. Do not print a
+  # green status when required legacy status data was unavailable.
+  return if legacy_status_fetch_unknown
+
+  # Stable releases still evaluated every visible run above for failures, but
+  # when branch protection is visible the success count should report required
+  # gates so mirrored Checks/Statuses API entries are not counted twice.
   qualifier = is_prerelease && required_names ? "required " : ""
-  noun = evaluated.length == 1 ? "check" : "checks"
-  puts "✓ Main CI is healthy on #{short_sha} (#{evaluated.length} #{qualifier}#{noun})"
+  healthy_count = required_names ? required_check_count(required_names) : evaluated.length
+  noun = healthy_count == 1 ? "check" : "checks"
+  puts "✓ Main CI is healthy on #{short_sha} (#{healthy_count} #{qualifier}#{noun})"
 end
 # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
