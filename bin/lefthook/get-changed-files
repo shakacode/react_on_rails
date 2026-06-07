@@ -20,6 +20,8 @@ case "$CONTEXT" in
     source "$repo_root/script/lib/git-diff-base"
 
     base="$(git_diff_base_normalize_base_ref "${BASE_REF:-}")"
+    # Lefthook runs in developer clones that may be shallow or missing refs, so
+    # use lenient fetch handling and fail only if no usable merge base remains.
     if ! merge_base="$(git_diff_base_resolve "$base" HEAD lenient)"; then
       exit 1
     fi

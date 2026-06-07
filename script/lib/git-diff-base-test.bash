@@ -6,6 +6,7 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# This test harness lives under script/lib/, so ../.. resolves to the repo root.
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # shellcheck source=script/lib/git-diff-base
 source "$SCRIPT_DIR/git-diff-base"
@@ -569,6 +570,10 @@ test_lefthook_branch_honors_base_ref() {
   local out
   out="$(BASE_REF=origin/release bin/lefthook/get-changed-files branch '\.rb$')"
   assert_equals "changed.rb" "$out" "lefthook branch changed files"
+  if grep -qx "release_only.rb" <<<"$out"; then
+    fail "lefthook branch output should not include files already on BASE_REF"
+    return 1
+  fi
 }
 
 test_resolve_unshallow_fallback_finds_merge_base() {
