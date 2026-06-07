@@ -14,7 +14,7 @@ case "$CONTEXT" in
     (git diff --cached --name-only --diff-filter=ACMR; git diff --name-only --diff-filter=ACMR; git ls-files --others --exclude-standard) | sort -u | grep -E "$PATTERN" || true
     ;;
   branch)
-    # Compare against main for this repo's default-branch workflow.
+    # Compare against BASE_REF (default: origin/main) using a merge-base diff.
     repo_root="$(git rev-parse --show-toplevel)"
     # shellcheck source=script/lib/git-diff-base
     source "$repo_root/script/lib/git-diff-base"

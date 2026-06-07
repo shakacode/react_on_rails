@@ -140,6 +140,12 @@ test_normalize_current_ref_defaults_to_head() {
   assert_equals "HEAD" "$out" "default current ref"
 }
 
+test_normalize_current_ref_preserves_explicit_ref() {
+  local out
+  out="$(git_diff_base_normalize_current_ref "abc123")"
+  assert_equals "abc123" "$out" "explicit current ref"
+}
+
 test_fetch_refspec_format() {
   local out
   out="$(git_diff_base_fetch_refspec "main")"
@@ -651,6 +657,7 @@ ALL_TESTS=(
   test_normalize_base_ref_maps_zero_sha_to_origin_main
   test_normalize_base_ref_preserves_non_zero_ref
   test_normalize_current_ref_defaults_to_head
+  test_normalize_current_ref_preserves_explicit_ref
   test_fetch_refspec_format
   test_fetch_depth_uses_default_when_unset
   test_fetch_depth_accepts_valid_env
