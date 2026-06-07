@@ -253,7 +253,7 @@ All major date libraries work in Server Components since they are pure utility f
 
 | Library                     | RSC Pattern                                                                                                                                                                                                                                            | Notes                                                                                        |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| **Rails I18n + react-intl** | Pass translations from Rails controller as props. Server Components use `createIntl` from `react-intl` for full formatting (interpolation, pluralization, dates); Client Components use `<IntlProvider>` + `useIntl()`.                                | Recommended for React on Rails. See [Context guide](rsc-context-and-state.md#i18n-provider). |
+| **Rails I18n + react-intl** | Pass translations from Rails controller as props. Server Components use `createIntl` from `react-intl/server` for full formatting (interpolation, pluralization, dates); Client Components use `<IntlProvider>` + `useIntl()`.                                | Recommended for React on Rails. See [Context guide](rsc-context-and-state.md#i18n-provider). |
 | **i18next / react-i18next** | `react-i18next` hooks (`useTranslation`) require `'use client'`. For Server Components, `i18next` can be initialized per-request via `i18next.createInstance()` and used without hooks — but you must manage locale/namespace initialization yourself. | Requires per-request setup; not used in this codebase.                                       |
 
 ## Authentication
@@ -364,7 +364,7 @@ Use `client-only` for:
 | **Charts**        | Nivo (SSR support)                                             | Recharts, Tremor, Chart.js                   | --                                                 |
 | **Data Fetching** | React on Rails Pro streaming, bundled or injected HTTP clients | TanStack Query (with hydration), Apollo, SWR | --                                                 |
 | **State**         | Server Component props, `React.cache`                          | Zustand, Jotai (v2.6+), Redux Toolkit        | Recoil (discontinued)                              |
-| **i18n**          | Rails I18n + `createIntl` (Server), `IntlProvider` (Client)    | react-i18next (hooks require `'use client'`) | --                                                 |
+| **i18n**          | Rails I18n + `react-intl/server` (Server), `IntlProvider` (Client) | react-i18next (hooks require `'use client'`) | --                                                 |
 | **Auth**          | Rails auth (Devise, etc.) via controller props                 | --                                           | --                                                 |
 | **Date Utils**    | date-fns, dayjs (pure functions)                               | --                                           | Moment.js (not tree-shakable)                      |
 
