@@ -145,6 +145,8 @@ jobs:
               console.log('ℹ️  No skipped checks found - triggering all workflows to ensure full coverage');
             }
 
+            // GitHub workflow-run timestamps are second-precision; subtract 2 s so
+            // a run created just before dispatch returns is still included.
             const dispatchStartedAt = new Date(Math.floor(Date.now() / 1000) * 1000 - 2000).toISOString();
 
             // Trigger each workflow
@@ -174,6 +176,8 @@ jobs:
 
             if (succeeded.length > 0) {
               const maxVerificationAttempts = 3;
+              // Linear backoff: 5 s / 10 s / 15 s (30 s max) covers typical
+              // GitHub queue latency without over-waiting this helper job.
               const baseDelayMs = 5000;
 
               for (let attempt = 1; attempt <= maxVerificationAttempts; attempt++) {
@@ -214,6 +218,10 @@ jobs:
 
                 if (attempt < maxVerificationAttempts) {
                   console.log(`Still waiting to verify: ${notFound.map(workflow => workflow.name).join(', ')}`);
+                } else {
+                  console.log(
+                    `Verification incomplete after ${maxVerificationAttempts} attempts. Unverified: ${notFound.map(workflow => workflow.name).join(', ')}`
+                  );
                 }
               }
             }
