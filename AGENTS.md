@@ -194,7 +194,10 @@ Agents should recommend PR labels based on change complexity and risk. The goal 
 - **Record intentional full-CI waivers** with `+ci-skip-full [optional reason]`. This is especially important for admins: the comment creates a SHA-bound audit trail without forcing docs-only or low-risk PRs to run the full matrix.
 - In PR descriptions and handoffs, state the recommended label decision explicitly: `Labels: none`, `Labels: full-ci`, `Labels: benchmark`, or `Labels: full-ci, benchmark`, with one sentence explaining why.
 
-For all PRs:
+### For All PRs
+
+Keep this merge-policy block in sync with `.agents/workflows/pr-processing.md`'s
+Merge Readiness Gate.
 
 - Merge qualification is: CI is passing, all current review comments and threads are addressed or explicitly triaged by tier, and no major question or discussion item needs maintainer attention.
 - Treat AI review systems such as Claude, CodeRabbit, Cursor Bugbot, Greptile, and similar tools as advisory unless they identify a confirmed blocker: a correctness regression, failing test, security issue, API contract break, data-loss risk, or missing required maintainer approval.
