@@ -87,4 +87,42 @@ describe('buildCacheKey', () => {
       expect(key1).toBe(key2);
     });
   });
+
+  describe('special number handling', () => {
+    test('NaN produces a distinct key from null', () => {
+      const key1 = buildCacheKey('build', 'id', [NaN]);
+      const key2 = buildCacheKey('build', 'id', [null]);
+      expect(key1).not.toBe(key2);
+    });
+
+    test('Infinity produces a distinct key from null', () => {
+      const key1 = buildCacheKey('build', 'id', [Infinity]);
+      const key2 = buildCacheKey('build', 'id', [null]);
+      expect(key1).not.toBe(key2);
+    });
+
+    test('-Infinity produces a distinct key from Infinity', () => {
+      const key1 = buildCacheKey('build', 'id', [-Infinity]);
+      const key2 = buildCacheKey('build', 'id', [Infinity]);
+      expect(key1).not.toBe(key2);
+    });
+
+    test('-0 produces a distinct key from 0', () => {
+      const key1 = buildCacheKey('build', 'id', [-0]);
+      const key2 = buildCacheKey('build', 'id', [0]);
+      expect(key1).not.toBe(key2);
+    });
+
+    test('NaN is deterministic', () => {
+      const key1 = buildCacheKey('build', 'id', [NaN]);
+      const key2 = buildCacheKey('build', 'id', [NaN]);
+      expect(key1).toBe(key2);
+    });
+
+    test('special numbers inside nested objects produce distinct keys', () => {
+      const key1 = buildCacheKey('build', 'id', [{ val: NaN }]);
+      const key2 = buildCacheKey('build', 'id', [{ val: null }]);
+      expect(key1).not.toBe(key2);
+    });
+  });
 });

@@ -23,6 +23,12 @@ import { createHash } from 'crypto';
 function stableStringify(value: unknown): string {
   if (value === undefined) return 'undefined';
   if (value === null) return 'null';
+  if (typeof value === 'number') {
+    if (Number.isNaN(value)) return 'NaN';
+    if (!Number.isFinite(value)) return value > 0 ? 'Infinity' : '-Infinity';
+    if (Object.is(value, -0)) return '-0';
+    return JSON.stringify(value);
+  }
   if (typeof value !== 'object') return JSON.stringify(value);
   if (value instanceof Date) return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
