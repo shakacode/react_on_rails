@@ -187,8 +187,7 @@ jobs:
                 );
                 await new Promise(resolve => setTimeout(resolve, delayMs));
 
-                const toVerify = notFound;
-                notFound = [];
+                const toVerify = notFound.splice(0);
 
                 for (const workflow of toVerify) {
                   const runs = await github.rest.actions.listWorkflowRuns({
@@ -222,7 +221,7 @@ jobs:
                   console.log(`Still waiting to verify: ${notFound.map(workflow => workflow.name).join(', ')}`);
                 } else {
                   console.log(
-                    `Verification incomplete after ${maxVerificationAttempts} attempts. Unverified: ${notFound.map(workflow => workflow.name).join(', ')}`
+                    `Verification incomplete after ${maxVerificationAttempts} attempts. Unverified: ${notFound.map(workflow => workflow.name).join(', ')}. If this repeats, confirm the PR branch was not force-pushed during dispatch; the lookup pins runs to the PR SHA captured at job start.`
                   );
                 }
               }
