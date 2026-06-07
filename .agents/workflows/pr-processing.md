@@ -99,8 +99,8 @@ asking GitHub reviewers or CI to spend another cycle.
 
 1. Commit the intended implementation batch locally first so every later suggestion has a
    clean before/after diff. Do not push only to trigger review.
-2. Run `.agents/skills/autoreview/SKILL.md` on the committed branch diff. The default engine is
-   `codex review --base origin/main` or the PR's real base.
+2. Apply the autoreview skill (`.agents/skills/autoreview/SKILL.md`) on the committed branch diff.
+   The default engine is `codex review --base origin/main` or the PR's real base.
 3. When the user asks for Claude review, or when the change falls into the `full-ci` or
    `benchmark` risk categories, run one additional Claude Code review pass if the current
    environment provides it, for example `/code-review` or `/code-review ultra`. If Claude review

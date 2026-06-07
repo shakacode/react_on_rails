@@ -252,10 +252,11 @@ REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 OWNER=${REPO%/*}
 NAME=${REPO#*/}
 gh api "repos/${OWNER}/${NAME}/collaborators/<login>/permission" --jq .permission 2>/dev/null || echo "none"
+# Returns "none" for both 404 (not a collaborator) and 403 (token lacks collaborator-list scope).
+# Either way, the safe default is to ask before editing.
 ```
 
-`write`, `maintain`, or `admin` satisfies the requirement. A 404 or `none`
-result means the author is not a repository collaborator. Without an explicit
+`write`, `maintain`, or `admin` satisfies the requirement. Without an explicit
 verified scope grant, treat "Ask First" as blocking and ask before editing
 these files. A per-run prohibition narrows scope further for that run only; do
 not promote it to a standing rule, but also do not treat its absence in a later
