@@ -699,9 +699,9 @@ end
 def latest_commit_statuses(statuses)
   statuses
     .group_by { |status| status["context"] }
-    # GitHub status ids are monotonically increasing for a commit/context, so
-    # the highest id is the most recent status returned by the paginated API.
-    .map { |_context, context_statuses| context_statuses.max_by { |status| status["id"].to_i } }
+    .map do |_context, context_statuses|
+      context_statuses.max_by { |status| [status["id"].to_i, status["created_at"].to_s] }
+    end
 end
 
 def normalize_required_check_entries(checks)
@@ -773,16 +773,16 @@ def required_check_present?(required_check:, check_runs:, legacy_status_runs:)
       legacy_status_runs.any? { |run| run["name"] == required_check[:context] })
 end
 
-def legacy_context_check_run_matches?(context:, run:)
+def context_name_matches?(context:, run:)
   run["name"] == context
 end
 
 def legacy_context_present?(context:, check_runs:, legacy_status_runs:)
   matching_check_run = check_runs.any? do |run|
-    legacy_context_check_run_matches?(context:, run:)
+    context_name_matches?(context:, run:)
   end
 
-  matching_check_run || legacy_status_runs.any? { |run| legacy_context_check_run_matches?(context:, run:) }
+  matching_check_run || legacy_status_runs.any? { |run| context_name_matches?(context:, run:) }
 end
 
 def required_check_label(required_check)
@@ -853,7 +853,7 @@ def format_ci_status_run_line(run, kind:)
   icon = kind == :in_progress ? "⏳" : "❌"
   detail = kind == :in_progress ? (run["status"] || "in_progress") : (run["conclusion"] || "incomplete")
   url = run["html_url"].to_s
-  url.empty? ? "  #{icon} #{detail}: #{run['name']}" : "  #{icon} #{detail}: #{run['name']}\n      #{url}"
+  url.strip.empty? ? "  #{icon} #{detail}: #{run['name']}" : "  #{icon} #{detail}: #{run['name']}\n      #{url}"
 end
 
 def format_main_ci_status_violation(kind:, short_sha:, runs:) # rubocop:disable Metrics/CyclomaticComplexity
@@ -955,7 +955,14 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
       dry_run:
     )
     if statuses.nil?
-      raise "Unexpected nil response from fetch_main_commit_statuses in strict mode" unless allow_override || dry_run
+      unless allow_override || dry_run
+        handle_main_ci_status_violation!(
+          message: "❌ Internal error: legacy status fetch returned nil unexpectedly in strict mode.",
+          allow_override:,
+          dry_run:
+        )
+        return
+      end
 
       # Only dry-run/override mode reaches the fallback; strict mode aborts inside
       # the fetch helper after surfacing the violation.
@@ -980,7 +987,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
   evaluated = if is_prerelease && required_names
                 check_runs.select do |run|
                   required_names[:contexts].any? do |context|
-                    legacy_context_check_run_matches?(context:, run:)
+                    context_name_matches?(context:, run:)
                   end ||
                     required_names[:checks].any? { |required_check| required_check_matches_run?(required_check, run) }
                 end + legacy_status_runs
@@ -1072,8 +1079,9 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
   # non-required runs and labelling them "required" would misrepresent the
   # gate.
   qualifier = is_prerelease && required_names ? "required " : ""
-  noun = evaluated.length == 1 ? "check" : "checks"
-  puts "✓ Main CI is healthy on #{short_sha} (#{evaluated.length} #{qualifier}#{noun})"
+  healthy_count = is_prerelease && required_names ? required_check_count(required_names) : evaluated.length
+  noun = healthy_count == 1 ? "check" : "checks"
+  puts "✓ Main CI is healthy on #{short_sha} (#{healthy_count} #{qualifier}#{noun})"
 end
 # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 

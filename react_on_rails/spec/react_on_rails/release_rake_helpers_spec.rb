@@ -1527,7 +1527,7 @@ RSpec.describe "release.rake helper methods" do
         end.to output(%r{DRY RUN: .*CI on origin/main is not healthy.*DRY RUN:.*Lint}m).to_stdout
       end
 
-      it "raises if strict legacy status fetch unexpectedly returns nil" do
+      it "aborts if strict legacy status fetch unexpectedly returns nil" do
         allow(self).to receive(:fetch_main_ci_checks)
           .with(monorepo_root:, allow_override: false, dry_run: false)
           .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Lint")])
@@ -1545,7 +1545,7 @@ RSpec.describe "release.rake helper methods" do
             allow_override: false,
             dry_run: false
           )
-        end.to raise_error(RuntimeError, /Unexpected nil response from fetch_main_commit_statuses in strict mode/)
+        end.to raise_error(SystemExit, /Internal error: legacy status fetch returned nil unexpectedly in strict mode/)
       end
 
       it "does not print the commit-status API URL as a browser link" do
@@ -1646,6 +1646,70 @@ RSpec.describe "release.rake helper methods" do
                           "id" => 1,
                           "context" => "Travis",
                           "state" => "success",
+                          "target_url" => "https://ci.example.com/travis"
+                        }
+                      ])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to output(/Main CI is healthy on #{short_sha} \(1 required check\)/).to_stdout
+      end
+
+      it "counts a mirrored wildcard required check once when both APIs report it" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Travis")])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
+          .and_return(required_checks(checks: [required_check("Travis")]))
+        allow(self).to receive(:fetch_main_commit_statuses)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
+          .and_return([
+                        {
+                          "id" => 1,
+                          "context" => "Travis",
+                          "state" => "success",
+                          "target_url" => "https://ci.example.com/travis"
+                        }
+                      ])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to output(/Main CI is healthy on #{short_sha} \(1 required check\)/).to_stdout
+      end
+
+      it "uses created_at as a tiebreaker for same-context legacy statuses" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
+          .and_return(required_checks(contexts: ["Travis"], checks: []))
+        allow(self).to receive(:fetch_main_commit_statuses)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
+          .and_return([
+                        {
+                          "id" => 1,
+                          "context" => "Travis",
+                          "state" => "failure",
+                          "created_at" => "2026-06-07T20:00:00Z",
+                          "target_url" => "https://ci.example.com/travis"
+                        },
+                        {
+                          "id" => 1,
+                          "context" => "Travis",
+                          "state" => "success",
+                          "created_at" => "2026-06-07T20:00:01Z",
                           "target_url" => "https://ci.example.com/travis"
                         }
                       ])

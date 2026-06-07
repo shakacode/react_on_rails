@@ -181,6 +181,7 @@ summary=$(echo "${checks_json}" | jq -r --argjson required_names "${required_jso
     .name == $required.context and (app_wildcard($required.app_id) or .app_id == $required.app_id);
   def required_check_label:
     if app_wildcard(.app_id) then .context else "\(.context) (app_id: \(.app_id))" end;
+  def modern_contexts: ($required_names.checks // []) | map(.context);
 
   . as $all
   | {
@@ -194,7 +195,9 @@ summary=$(echo "${checks_json}" | jq -r --argjson required_names "${required_jso
           # NOTE: legacy contexts are intentionally app-agnostic here. Commit
           # statuses are not fetched here; this hook is a fail-open display
           # tool. The Ruby release gate owns app-pinned legacy enforcement.
-          (($required_names.contexts // [])
+          # GitHub mirrors modern required checks into legacy `contexts`; remove
+          # those mirror names here so the display count matches the release gate.
+          ((($required_names.contexts // []) - modern_contexts)
             | map(select(. as $context | ($all | any(.name == $context) | not))))
           +
           (($required_names.checks // [])
