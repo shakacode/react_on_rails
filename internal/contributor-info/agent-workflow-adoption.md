@@ -11,6 +11,7 @@ The goal is not to copy React on Rails blindly. The goal is to copy the reusable
 - [AGENTS.md](../../AGENTS.md) - canonical agent entry point and repository policy.
 - [.agents/workflows/pr-processing.md](../../.agents/workflows/pr-processing.md) - default flow for assigned issues, existing PRs, review-fix passes, and multi-PR landing plans.
 - [.agents/workflows/address-review.md](../../.agents/workflows/address-review.md) - generic non-Claude review-comment triage and fixing workflow.
+- [.agents/skills/autoreview/SKILL.md](../../.agents/skills/autoreview/SKILL.md) - independent review skill used before commits, pushes, PRs, or merge readiness.
 
 ### Claude support
 
@@ -18,7 +19,6 @@ Copy these when the target repo uses Claude Code:
 
 - [.agents/skills/address-review/SKILL.md](../../.agents/skills/address-review/SKILL.md) - shared address-review skill exposed to Claude Code as `/address-review`.
 - [.claude/prompts/address-review.md](../../.claude/prompts/address-review.md) - optional compatibility pointer to the canonical reusable prompt; copy it only if the target repo keeps Claude prompt aliases.
-- [.agents/skills/autoreview/SKILL.md](../../.agents/skills/autoreview/SKILL.md) - independent review skill used before commits, pushes, PRs, or merge readiness.
 - `.claude/skills -> ../.agents/skills` - symlink that lets Claude Code load the shared agent skills.
 
 Keep the shared skill and `.agents/workflows/address-review.md` behavior aligned. If the target repo also copies a reusable prompt file, make it point at the canonical shared workflow instead of carrying a second full workflow copy. Tool syntax can differ; policy should not.
@@ -43,6 +43,7 @@ Do not copy the CI workflow files as a bundle unless the target repo has the sam
    - Add or replace `AGENTS.md`.
    - Add `.agents/workflows/pr-processing.md`.
    - Add `.agents/workflows/address-review.md`.
+   - Add `.agents/skills/autoreview/SKILL.md`, or replace the pre-push AI review gate with the target repo's direct review command.
    - Add Claude files only if Claude Code is used in that repo.
 
 3. Rewrite `AGENTS.md` first.
@@ -54,6 +55,7 @@ Do not copy the CI workflow files as a bundle unless the target repo has the sam
    - Replace `script/ci-changes-detector origin/main`, `bin/ci-local`, and the targeted command list with the target repo's real local validation commands.
    - Keep the self-review gate, reproduction/TDD gate, local-validation-first policy, batched pushes, and follow-up issue restraint.
    - Define the repo's high-risk categories so agents know when full CI or extra review is justified.
+   - Treat high-risk categories (workflow, build-config, lockfiles, release tooling) as "Ask First" scope, not standing bans. Make any explicit grant or per-run prohibition a batch-prompt scope field so temporary lane restrictions are never inherited as permanent policy, and so the absence of a later prohibition never implies permission without a fresh grant.
 
 5. Customize address-review behavior.
    - Keep the summary marker `<!-- address-review-summary -->` unless the repo already has a different checkpoint marker.
