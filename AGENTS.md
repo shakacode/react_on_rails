@@ -200,6 +200,7 @@ For small, focused PRs (roughly 5 files changed or fewer and one clear purpose):
 - Wait for the first full review pass to finish before pushing follow-up commits.
 - Batch review fixes into one follow-up push when practical. Do not create a new commit for each minor comment.
 - Treat as blocking only: correctness bugs, failing tests, regressions, and clear inconsistencies with adjacent code. Nits and style suggestions are optional unless a maintainer asks for them.
+- Treat AI review systems such as Claude, CodeRabbit, Cursor Bugbot, Greptile, and similar tools as advisory unless they identify a real blocking issue. Do not wait for every AI system to approve when CI is green, blocking review feedback is addressed, and no major question or discussion item remains.
 - Verify language, runtime, and library claims locally before changing code in response to AI review comments.
 - Deduplicate repeated bot comments before acting on them. Fix the underlying issue once, then resolve the duplicates.
 - Rebase or merge `main` once, near the end of the review cycle. For `CHANGELOG.md` conflicts, prefer resolving them as the final step before merge.

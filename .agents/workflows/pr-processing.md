@@ -184,6 +184,13 @@ Also verify:
 - Required checks are green, or the user has explicitly accepted an auditable waiver for full CI.
 - The PR body or latest agent comment includes exact local validation commands and results.
 
+Merge qualification is CI passing plus review feedback handled at the right tier:
+
+- `MUST-FIX` comments are fixed before merge.
+- `DISCUSS` comments are decided, explicitly deferred, or confirmed not to need maintainer input.
+- `OPTIONAL`, nit, style-only, duplicate, stale, or noisy comments do not block merge once triaged.
+- AI review systems such as Claude, CodeRabbit, Cursor Bugbot, Greptile, and similar tools are advisory unless they report a real actionable blocker. Do not require approval from every AI system, and do not block solely because an advisory AI check was skipped, neutral, pending beyond the useful review window, or left non-blocking comments after another reviewer has approved.
+
 If approved and green but not merging immediately, use the repository's standard `ready-to-merge` label when available.
 
 ## Multi-PR Landing Plan
