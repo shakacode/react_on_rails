@@ -26,14 +26,16 @@ Use this workflow when an agent is assigned an issue, an existing PR, a PR revie
 
 ## Workflow And Build-Config Scope
 
-Workflow and build-configuration edits are sensitive, but they are not categorically excluded from agent work.
-When the assigned issue, PR, or maintainer-approved batch instructions explicitly include GitHub Actions,
-benchmark workflow control flow, package scripts, lockfiles, webpack configuration, or related build configuration,
-process that scope with a focused branch, targeted validation, self-review, and clear PR evidence.
+Follow the canonical rule in `AGENTS.md` → Boundaries → "Ask First": workflow and
+build-configuration edits (GitHub Actions, benchmark workflow control flow, package
+scripts, lockfiles, webpack configuration) are sensitive but not categorically excluded.
+When the assigned issue, PR, or maintainer-approved batch instructions explicitly include
+that scope, process it with a focused branch, targeted validation, self-review, and clear
+PR evidence.
 
-If a specific lane temporarily prohibits workflow or build-configuration changes, treat that as a lane-specific
-restriction only. Do not carry it forward as a standing rule, and do not skip a future target solely because it
-touches workflow or build configuration when that future target's approved scope includes those files.
+A per-run instruction that prohibits these edits is a temporary, lane-specific restriction
+only. Do not carry it forward as a standing rule, and do not skip a future in-scope target
+because it touches workflow or build configuration.
 
 ## Initial GitHub Commands
 

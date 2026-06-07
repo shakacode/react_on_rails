@@ -229,6 +229,15 @@ For small, focused PRs (roughly 5 files changed or fewer and one clear purpose):
 - Changes to CI workflows (`.github/workflows/`)
 - Changes to build configuration (`package.json` scripts, webpack config)
 
+"Ask First" is scoped approval, not a ban. When an assigned issue, PR, or
+maintainer-approved batch explicitly puts workflow or build-config files in
+scope, that approval is the "ask" — process them with a focused diff, targeted
+validation for the changed files (for example `actionlint`, `yamllint
+.github/`, the relevant detector or package-script tests), self-review, and
+clear PR evidence. A per-run instruction that prohibits these edits is a
+temporary, lane-specific restriction: never promote it to a standing rule, and
+never skip a future in-scope target because it touches these files.
+
 ### Never
 
 - Skip pre-commit hooks (`--no-verify`)
