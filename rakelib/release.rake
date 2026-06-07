@@ -763,6 +763,7 @@ end
 def legacy_context_check_run_matches?(context:, run:, required_checks:)
   return false unless run["name"] == context
 
+  # Same-name modern checks with pinned apps constrain the legacy-status rail too.
   pinned_checks = required_checks[:checks].select do |required_check|
     required_check[:context] == context && !required_check_app_wildcard?(required_check[:app_id])
   end
@@ -933,7 +934,9 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
       dry_run: dry_run
     )
     if statuses.nil?
-      # Only dry-run/override mode reaches this point; strict mode aborts inside
+      raise "BUG: fetch_main_commit_statuses returned nil in strict mode" unless allow_override || dry_run
+
+      # Only dry-run/override mode reaches the fallback; strict mode aborts inside
       # the fetch helper after surfacing the violation.
       statuses = []
     end

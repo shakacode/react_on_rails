@@ -1505,6 +1505,27 @@ RSpec.describe "release.rake helper methods" do
         end.to output(%r{DRY RUN: .*CI on origin/main is not healthy.*DRY RUN:.*Lint}m).to_stdout
       end
 
+      it "raises if strict legacy status fetch unexpectedly returns nil" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
+          .and_return(sha: sha, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Lint")])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root: monorepo_root, repo_slug: "shakacode/react_on_rails")
+          .and_return(required_checks(contexts: ["Travis"], checks: []))
+        allow(self).to receive(:fetch_main_commit_statuses)
+          .with(repo_slug: "shakacode/react_on_rails", sha: sha, allow_override: false, dry_run: false)
+          .and_return(nil)
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root: monorepo_root,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to raise_error(RuntimeError, /fetch_main_commit_statuses returned nil in strict mode/)
+      end
+
       it "does not print the commit-status API URL as a browser link" do
         allow(self).to receive(:fetch_main_ci_checks)
           .with(monorepo_root: monorepo_root, allow_override: false, dry_run: false)
