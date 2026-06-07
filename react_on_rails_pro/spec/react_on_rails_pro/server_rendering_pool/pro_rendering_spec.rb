@@ -2,131 +2,289 @@
 
 require_relative "../spec_helper"
 
-module ReactOnRailsPro
-  module ServerRenderingPool
-    RSpec.describe ProRendering do
-      describe ".set_request_digest_on_render_options" do
-        let(:logger_mock) { instance_double(ActiveSupport::Logger).as_null_object }
-        let(:render_options_class) do
-          Struct.new(:request_digest, keyword_init: true) do
-            def random_dom_id?
-              true
-            end
-
-            def react_component_name
-              "CacheProbe"
-            end
-
-            def internal_option(_name)
-              nil
-            end
-
-            def streaming?
-              false
-            end
-
-            def prerender
-              true
-            end
-          end
-        end
-
-        before do
-          allow(Rails).to receive(:logger).and_return(logger_mock)
-        end
-
-        def request_digest_for(js_code)
-          render_options = render_options_class.new
-
-          described_class.set_request_digest_on_render_options(js_code, render_options)
-
-          render_options.request_digest
-        end
-
-        def render_js(dom_node_id:, quote:, props: '{"name":"same"}')
-          quoted_dom_node_id = quote == :single ? "'#{dom_node_id}'" : dom_node_id.to_json
-
-          <<~JS
-            return ReactOnRails['serverRenderReactComponent']({
-              name: "CacheProbe",
-              domNodeId: #{quoted_dom_node_id},
-              props: #{props},
-              trace: false,
-              railsContext: {},
-            });
-          JS
-        end
-
-        it "ignores single-quoted random domNodeId values when calculating the request digest" do
-          first_digest = request_digest_for(render_js(dom_node_id: "CacheProbe-react-component-1", quote: :single))
-          second_digest = request_digest_for(render_js(dom_node_id: "CacheProbe-react-component-2", quote: :single))
-
-          expect(first_digest).to eq(second_digest)
-        end
-
-        it "ignores double-quoted random domNodeId values when calculating the request digest" do
-          first_digest = request_digest_for(render_js(dom_node_id: "CacheProbe-react-component-1", quote: :double))
-          second_digest = request_digest_for(render_js(dom_node_id: "CacheProbe-react-component-2", quote: :double))
-
-          expect(first_digest).to eq(second_digest)
-        end
-
-        it "still changes the request digest when non-random render input changes" do
-          first_digest = request_digest_for(
-            render_js(dom_node_id: "CacheProbe-react-component-1", quote: :double, props: '{"name":"first"}')
-          )
-          second_digest = request_digest_for(
-            render_js(dom_node_id: "CacheProbe-react-component-1", quote: :double, props: '{"name":"second"}')
-          )
-
-          expect(first_digest).not_to eq(second_digest)
-        end
-
-        context "with prerender caching enabled" do
-          let(:pool) do
-            Class.new do
-              def exec_server_render_js(_js_code, _render_options)
-                { html: "rendered" }
-              end
-            end.new
-          end
-          let(:cache_store) do
-            Class.new do
-              def initialize
-                @store = {}
-              end
-
-              def fetch(key)
-                return @store[key] if @store.key?(key)
-
-                @store[key] = yield
-              end
-            end.new
-          end
-
-          before do
-            allow(pool).to receive(:exec_server_render_js).and_call_original
-            allow(described_class).to receive(:pool).and_return(pool)
-            allow(Rails).to receive(:cache).and_return(cache_store)
-            allow(ReactOnRailsPro.configuration).to receive(:prerender_caching).and_return(true)
-            allow(ReactOnRailsPro::Cache).to receive(:base_cache_key).and_return(%w[ror_pro_rendered_html test])
-            allow(ReactOnRailsPro::Utils).to receive(:with_trace).and_yield
-          end
-
-          it "reuses the cached render for current double-quoted random domNodeId values" do
-            described_class.exec_server_render_js(
-              render_js(dom_node_id: "CacheProbe-react-component-1", quote: :double),
-              render_options_class.new
-            )
-            described_class.exec_server_render_js(
-              render_js(dom_node_id: "CacheProbe-react-component-2", quote: :double),
-              render_options_class.new
-            )
-
-            expect(pool).to have_received(:exec_server_render_js).once
-          end
-        end
+RSpec.describe ReactOnRailsPro::ServerRenderingPool::ProRendering do
+  let(:logger_mock) { instance_double(ActiveSupport::Logger).as_null_object }
+  let(:render_options_class) do
+    Struct.new(
+      :request_digest,
+      :random_dom_id,
+      :streaming,
+      :prerender,
+      :internal_options,
+      keyword_init: true
+    ) do
+      def random_dom_id?
+        random_dom_id
       end
+
+      def react_component_name
+        "CacheProbe"
+      end
+
+      def internal_option(name)
+        internal_options.fetch(name, nil)
+      end
+
+      def streaming?
+        streaming
+      end
+    end
+  end
+
+  before do
+    allow(Rails).to receive(:logger).and_return(logger_mock)
+  end
+
+  def build_render_options(request_digest: nil, random_dom_id: true, streaming: false, prerender: true,
+                           internal_options: {})
+    render_options_class.new(
+      request_digest: request_digest,
+      random_dom_id: random_dom_id,
+      streaming: streaming,
+      prerender: prerender,
+      internal_options: internal_options
+    )
+  end
+
+  def render_js(dom_node_id:, quote:, props: '{"name":"same"}')
+    quoted_dom_node_id = quote == :single ? "'#{dom_node_id}'" : dom_node_id.to_json
+
+    <<~JS
+      return ReactOnRails['serverRenderReactComponent']({
+        name: "CacheProbe",
+        domNodeId: #{quoted_dom_node_id},
+        props: #{props},
+        trace: false,
+        railsContext: {},
+      });
+    JS
+  end
+
+  describe ".set_request_digest_on_render_options" do
+    def request_digest_for(js_code, render_options: build_render_options)
+      described_class.set_request_digest_on_render_options(js_code, render_options)
+
+      render_options.request_digest
+    end
+
+    it "ignores single-quoted random domNodeId values when calculating the request digest" do
+      first_digest = request_digest_for(render_js(dom_node_id: "CacheProbe-react-component-1", quote: :single))
+      second_digest = request_digest_for(render_js(dom_node_id: "CacheProbe-react-component-2", quote: :single))
+
+      expect(first_digest).to eq(second_digest)
+    end
+
+    it "ignores double-quoted random domNodeId values when calculating the request digest" do
+      first_digest = request_digest_for(render_js(dom_node_id: "CacheProbe-react-component-1", quote: :double))
+      second_digest = request_digest_for(render_js(dom_node_id: "CacheProbe-react-component-2", quote: :double))
+
+      expect(first_digest).to eq(second_digest)
+    end
+
+    it "still changes the request digest when non-random render input changes" do
+      first_digest = request_digest_for(
+        render_js(dom_node_id: "CacheProbe-react-component-1", quote: :double, props: '{"name":"first"}')
+      )
+      second_digest = request_digest_for(
+        render_js(dom_node_id: "CacheProbe-react-component-1", quote: :double, props: '{"name":"second"}')
+      )
+
+      expect(first_digest).not_to eq(second_digest)
+    end
+
+    it "keeps an existing request digest without recalculating it" do
+      render_options = build_render_options(request_digest: "already-set")
+
+      digest = request_digest_for(
+        render_js(dom_node_id: "CacheProbe-react-component-1", quote: :double),
+        render_options: render_options
+      )
+
+      expect(digest).to eq("already-set")
+    end
+
+    it "hashes the full JavaScript when dom IDs are not random" do
+      first_js = render_js(dom_node_id: "CacheProbe-react-component", quote: :double)
+      second_js = render_js(dom_node_id: "other-cache-probe-node", quote: :double)
+
+      first_digest = request_digest_for(first_js, render_options: build_render_options(random_dom_id: false))
+      second_digest = request_digest_for(second_js, render_options: build_render_options(random_dom_id: false))
+
+      expect(first_digest).to eq(Digest::MD5.hexdigest(first_js))
+      expect(first_digest).not_to eq(second_digest)
+    end
+  end
+
+  describe ".exec_server_render_js" do
+    let(:pool_class) do
+      Class.new do
+        def exec_server_render_js(_js_code, _render_options); end
+      end
+    end
+    let(:stream_class) { Class.new }
+    let(:pool) { instance_double(pool_class) }
+    let(:cache_store) do
+      Class.new do
+        attr_reader :fetch_calls
+
+        def initialize
+          @store = {}
+          @fetch_calls = []
+        end
+
+        def fetch(key)
+          @fetch_calls << key
+          return @store[key] if @store.key?(key)
+
+          @store[key] = yield
+        end
+      end.new
+    end
+    let(:js_code) { render_js(dom_node_id: "CacheProbe-react-component-1", quote: :double) }
+
+    before do
+      allow(pool).to receive(:exec_server_render_js).and_return({ html: "rendered" })
+      allow(described_class).to receive(:pool).and_return(pool)
+      allow(Rails).to receive(:cache).and_return(cache_store)
+      allow(ReactOnRailsPro::Cache).to receive(:base_cache_key).and_return(%w[ror_pro_rendered_html test])
+      allow(ReactOnRailsPro::Utils).to receive(:with_trace).and_yield
+    end
+
+    context "when prerender caching is disabled" do
+      before do
+        allow(ReactOnRailsPro.configuration).to receive(:prerender_caching).and_return(false)
+      end
+
+      it "renders directly through the selected pool without touching Rails.cache" do
+        render_options = build_render_options
+
+        result = described_class.exec_server_render_js(js_code, render_options)
+
+        expect(result).to eq({ html: "rendered" })
+        expect(pool).to have_received(:exec_server_render_js).with(js_code, render_options).once
+        expect(cache_store.fetch_calls).to be_empty
+      end
+    end
+
+    context "when skip_prerender_cache is set" do
+      before do
+        allow(ReactOnRailsPro.configuration).to receive(:prerender_caching).and_return(true)
+      end
+
+      it "renders directly through the selected pool" do
+        render_options = build_render_options(internal_options: { skip_prerender_cache: true })
+
+        result = described_class.exec_server_render_js(js_code, render_options)
+
+        expect(result).to eq({ html: "rendered" })
+        expect(pool).to have_received(:exec_server_render_js).with(js_code, render_options).once
+        expect(cache_store.fetch_calls).to be_empty
+      end
+    end
+
+    context "when prerender caching is enabled for non-streaming renders" do
+      before do
+        allow(ReactOnRailsPro.configuration).to receive(:prerender_caching).and_return(true)
+      end
+
+      it "renders cache misses through the selected pool and stores the result" do
+        render_options = build_render_options
+
+        result = described_class.exec_server_render_js(js_code, render_options)
+
+        expect(result[:html]).to eq("rendered")
+        expect(result[:RORP_CACHE_HIT]).to be(false)
+        expect(result[:RORP_CACHE_KEY]).to eq(["ror_pro_rendered_html", "test", render_options.request_digest])
+        expect(pool).to have_received(:exec_server_render_js).with(js_code, render_options).once
+        expect(cache_store.fetch_calls).to eq([result[:RORP_CACHE_KEY]])
+      end
+
+      it "returns cached render results for different random domNodeId values without rendering again" do
+        first_options = build_render_options
+        second_options = build_render_options
+        first_js = render_js(dom_node_id: "CacheProbe-react-component-1", quote: :double)
+        second_js = render_js(dom_node_id: "CacheProbe-react-component-2", quote: :double)
+
+        described_class.exec_server_render_js(first_js, first_options)
+        result = described_class.exec_server_render_js(second_js, second_options)
+
+        expect(result[:html]).to eq("rendered")
+        expect(result[:RORP_CACHE_HIT]).to be(true)
+        expect(result[:RORP_CACHE_KEY]).to eq(["ror_pro_rendered_html", "test", second_options.request_digest])
+        expect(pool).to have_received(:exec_server_render_js).once
+      end
+
+      it "does not inject cache metadata into non-hash render results" do
+        allow(pool).to receive(:exec_server_render_js).and_return("rendered")
+
+        result = described_class.exec_server_render_js(js_code, build_render_options)
+
+        expect(result).to eq("rendered")
+      end
+    end
+
+    context "when prerender caching is enabled for streaming renders" do
+      before do
+        allow(ReactOnRailsPro.configuration).to receive(:prerender_caching).and_return(true)
+      end
+
+      it "returns cached streams directly without rendering through the selected pool" do
+        render_options = build_render_options(streaming: true)
+        cached_stream = instance_double(stream_class)
+        allow(ReactOnRailsPro::StreamCache).to receive(:fetch_stream).and_return(cached_stream)
+        allow(ReactOnRailsPro::StreamCache).to receive(:wrap_and_cache)
+
+        result = described_class.exec_server_render_js(js_code, render_options)
+
+        expect(result).to eq(cached_stream)
+        expect(pool).not_to have_received(:exec_server_render_js)
+        expect(ReactOnRailsPro::StreamCache).not_to have_received(:wrap_and_cache)
+      end
+
+      it "wraps cache misses and forwards cache options" do
+        cache_options = { expires_in: 60.seconds }
+        render_options = build_render_options(streaming: true, internal_options: { cache_options: cache_options })
+        upstream_stream = instance_double(stream_class)
+        wrapped_stream = instance_double(stream_class)
+        allow(pool).to receive(:exec_server_render_js).and_return(upstream_stream)
+        allow(ReactOnRailsPro::StreamCache).to receive_messages(fetch_stream: nil, wrap_and_cache: wrapped_stream)
+
+        result = described_class.exec_server_render_js(js_code, render_options)
+
+        expect(result).to eq(wrapped_stream)
+        expect(ReactOnRailsPro::StreamCache).to have_received(:wrap_and_cache)
+          .with(["ror_pro_rendered_html", "test", render_options.request_digest],
+                upstream_stream,
+                cache_options: cache_options)
+      end
+    end
+  end
+
+  describe ".pool" do
+    before do
+      clear_memoized_pool
+    end
+
+    after do
+      clear_memoized_pool
+    end
+
+    def clear_memoized_pool
+      return unless described_class.instance_variable_defined?(:@pool)
+
+      described_class.remove_instance_variable(:@pool)
+    end
+
+    it "chooses the Node renderer pool when configured" do
+      allow(ReactOnRailsPro.configuration).to receive(:node_renderer?).and_return(true)
+
+      expect(described_class.pool).to eq(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool)
+    end
+
+    it "chooses the Ruby embedded JavaScript pool when the Node renderer is disabled" do
+      allow(ReactOnRailsPro.configuration).to receive(:node_renderer?).and_return(false)
+
+      expect(described_class.pool).to eq(ReactOnRails::ServerRenderingPool::RubyEmbeddedJavaScript)
     end
   end
 end
