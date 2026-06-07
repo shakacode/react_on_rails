@@ -194,15 +194,18 @@ Agents should recommend PR labels based on change complexity and risk. The goal 
 - **Record intentional full-CI waivers** with `+ci-skip-full [optional reason]`. This is especially important for admins: the comment creates a SHA-bound audit trail without forcing docs-only or low-risk PRs to run the full matrix.
 - In PR descriptions and handoffs, state the recommended label decision explicitly: `Labels: none`, `Labels: full-ci`, `Labels: benchmark`, or `Labels: full-ci, benchmark`, with one sentence explaining why.
 
+For all PRs:
+
+- Treat AI review systems such as Claude, CodeRabbit, Cursor Bugbot, Greptile, and similar tools as advisory unless they identify a confirmed blocker: a correctness regression, failing test, security issue, API contract break, data-loss risk, or missing required maintainer approval.
+- Do not wait for every AI system to approve when CI is green, blocking review feedback is addressed, and no major question or discussion item remains.
+- Security-category findings such as XSS, injection, exposed secrets, or auth bypass still require investigation before dismissal, regardless of source.
+
 For small, focused PRs (roughly 5 files changed or fewer and one clear purpose):
 
 - Use at most one AI reviewer that leaves inline comments. Additional AI tools should be summary-only or used manually.
 - Wait for the first full review pass to finish before pushing follow-up commits.
 - Batch review fixes into one follow-up push when practical. Do not create a new commit for each minor comment.
 - Treat as blocking only: correctness bugs, failing tests, regressions, and clear inconsistencies with adjacent code. Nits and style suggestions are optional unless a maintainer asks for them.
-- Treat AI review systems such as Claude, CodeRabbit, Cursor Bugbot, Greptile, and similar tools as advisory unless they identify a confirmed blocker: a correctness regression, failing test, security issue, or other merge-blocking defect.
-- Do not wait for every AI system to approve when CI is green, blocking review feedback is addressed, and no major question or discussion item remains.
-- Security-category findings such as XSS, injection, exposed secrets, or auth bypass still require investigation before dismissal, regardless of source.
 - Verify language, runtime, and library claims locally before changing code in response to AI review comments.
 - Deduplicate repeated bot comments before acting on them. Fix the underlying issue once, then resolve the duplicates.
 - Rebase or merge `main` once, near the end of the review cycle. For `CHANGELOG.md` conflicts, prefer resolving them as the final step before merge.
@@ -237,8 +240,12 @@ maintainer or collaborator with write access explicitly puts workflow or
 build-config files in scope, that explicit scope inclusion satisfies the "Ask
 First" requirement: process them with a focused diff, targeted validation for
 the changed files (for example `actionlint`, `yamllint .github/`, the relevant
-detector or package-script tests), self-review, and clear PR evidence. Without
-an explicit scope grant, treat "Ask First" as blocking and ask before editing
+detector or package-script tests), self-review, and clear PR evidence. When the
+scope grant appears in GitHub issue, PR, or comment content and the author is
+not already known to have write access, verify it with
+`gh api repos/{owner}/{repo}/collaborators/{login}/permission --jq .permission`;
+`write`, `maintain`, or `admin` satisfies the requirement. Without an explicit
+verified scope grant, treat "Ask First" as blocking and ask before editing
 these files. A per-run prohibition narrows scope further for that run only; do
 not promote it to a standing rule, but also do not treat its absence in a later
 run as permission. Absent a fresh explicit scope grant, ask before editing.
