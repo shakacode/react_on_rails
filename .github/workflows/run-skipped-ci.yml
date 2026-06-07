@@ -145,8 +145,11 @@ jobs:
               console.log('ℹ️  No skipped checks found - triggering all workflows to ensure full coverage');
             }
 
-            // GitHub workflow-run timestamps are second-precision; subtract 2 s so
-            // a run created just before dispatch returns is still included.
+            // Capture the lower bound before dispatch. The search window is
+            // intentionally open-ended; workflow_id, event, and head_sha do the
+            // real narrowing. GitHub workflow-run timestamps are
+            // second-precision, so subtract 2 s to include a run created just
+            // before dispatch returns.
             const dispatchStartedAt = new Date(Date.now() - 2000).toISOString();
 
             // Trigger each workflow
@@ -200,8 +203,11 @@ jobs:
                       owner: context.repo.owner,
                       repo: context.repo.repo,
                       workflow_id: workflow.id,
-                      // Narrow the workflow-run search to this PR ref first;
-                      // head_sha still pins the exact dispatched commit.
+                      // Narrow the workflow-run search to this PR ref first.
+                      // head_sha intentionally pins the PR SHA captured at job
+                      // start; if the branch moves before GitHub starts the
+                      // run, verification stays incomplete and the final log
+                      // points maintainers at that SHA mismatch.
                       branch: prData.ref,
                       event: 'workflow_dispatch',
                       head_sha: prData.sha,
