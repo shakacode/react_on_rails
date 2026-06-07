@@ -42,9 +42,10 @@ RSpec.describe "benchmark regression reporting" do
     let(:posted_bodies) { {} }
 
     before do
-      allow(GithubCli).to receive(:capture_success) do |*args, **_kwargs|
+      allow(GithubCli).to receive(:capture_success) do |*args, **kwargs|
         key = capture_key(args)
         calls << key
+        posted_bodies[key] = extract_body(args, kwargs)
         capture_responses.fetch(key) { raise "unexpected capture_success: #{key}" }
       end
 
@@ -69,6 +70,7 @@ RSpec.describe "benchmark regression reporting" do
     def capture_key(args)
       return "issue list" if args[1..2] == %w[issue list]
       return "issue create" if args[1..2] == %w[issue create]
+      return "comment create" if args[1..3] == %w[api -X POST]
       return "comment list" if args[1] == "api" && args[2].match?(%r{/issues/\d+/comments\z})
       return "comment body" if args[1] == "api" && args[2].match?(%r{/issues/comments/\d+\z})
 
@@ -77,7 +79,6 @@ RSpec.describe "benchmark regression reporting" do
 
     def run_key(args)
       return "label create" if args[1..2] == %w[label create]
-      return "issue comment" if args[1..2] == %w[issue comment]
       return "comment patch" if args[1..3] == %w[api -X PATCH]
 
       raise "unrecognized run args: #{args.inspect}"
@@ -92,16 +93,64 @@ RSpec.describe "benchmark regression reporting" do
       )
     end
 
+    def report_with_cache(suite_name, issue_number_cache, report_comment_id_cache = nil)
+      described_class.report(
+        summary: "#{suite_name} regressed",
+        suite_name: suite_name,
+        github_run_url: "https://github.com/run/1",
+        bencher_url: "https://bencher.dev/dash",
+        issue_number_cache: issue_number_cache,
+        report_comment_id_cache: report_comment_id_cache
+      )
+    end
+
     context "when no regression issue exists yet" do
       before do
         capture_responses["issue list"] = ""
         capture_responses["issue create"] = "https://github.com/shakacode/react_on_rails/issues/123\n"
         capture_responses["comment list"] = ""
+        capture_responses["comment create"] = "999\n"
       end
 
       it "creates the issue, parses the number from the URL, and posts the first comment" do
         expect(report).to eq("123")
-        expect(calls).to eq(["label create", "issue list", "issue create", "comment list", "issue comment"])
+        expect(calls).to eq(["label create", "issue list", "issue create", "comment list", "comment create"])
+      end
+
+      it "reuses a just-created issue number for later suites in the same reporter run" do
+        issue_number_cache = {}
+
+        expect(report_with_cache("Core", issue_number_cache)).to eq("123")
+        expect(report_with_cache("Pro", issue_number_cache)).to eq("123")
+
+        expect(calls.count("issue list")).to eq(1)
+        expect(calls.count("issue create")).to eq(1)
+      end
+
+      it "reuses a just-created report comment for later suites in the same reporter run" do
+        issue_number_cache = {}
+        report_comment_id_cache = {}
+        capture_responses["comment body"] = "Core regressed"
+
+        expect(report_with_cache("Core", issue_number_cache, report_comment_id_cache)).to eq("123")
+        expect(report_with_cache("Pro", issue_number_cache, report_comment_id_cache)).to eq("123")
+
+        expect(calls.count("comment list")).to eq(1)
+        expect(calls.count("comment create")).to eq(1)
+        expect(calls).to include("comment patch")
+      end
+
+      it "does not create duplicate same-run comments after a comment id parse miss" do
+        issue_number_cache = {}
+        report_comment_id_cache = {}
+        capture_responses["comment create"] = "\n"
+
+        expect(report_with_cache("Core", issue_number_cache, report_comment_id_cache)).to eq("")
+        expect(report_with_cache("Pro", issue_number_cache, report_comment_id_cache)).to eq("")
+
+        expect(calls.count("comment list")).to eq(1)
+        expect(calls.count("comment create")).to eq(1)
+        expect(calls).not_to include("comment patch")
       end
     end
 
@@ -163,7 +212,7 @@ RSpec.describe "benchmark regression reporting" do
 
       it "aborts without posting a duplicate comment" do
         expect(report).to eq("")
-        expect(calls).not_to include("issue comment")
+        expect(calls).not_to include("comment create")
         expect(calls).not_to include("comment patch")
       end
     end
@@ -205,6 +254,16 @@ RSpec.describe "benchmark regression reporting" do
           .and output("").to_stderr
         expect(calls).not_to include("comment list")
       end
+
+      it "does not create duplicate same-run issues after the parse miss" do
+        issue_number_cache = {}
+
+        expect(report_with_cache("Core", issue_number_cache)).to eq("")
+        expect(report_with_cache("Pro", issue_number_cache)).to eq("")
+
+        expect(calls.count("issue list")).to eq(1)
+        expect(calls.count("issue create")).to eq(1)
+      end
     end
   end
 
@@ -221,11 +280,13 @@ RSpec.describe "benchmark regression reporting" do
       #!/usr/bin/env bash
       if [ "$1" = "issue" ] && [ "$2" = "create" ]; then
         echo "https://github.com/shakacode/react_on_rails/issues/7"
+      elif [ "$1" = "api" ] && [ "$2" = "-X" ] && [ "$3" = "POST" ]; then
+        echo "777"
       fi
       exit 0
     BASH
 
-    def run_script(script, artifacts_dir, gh_stub:)
+    def run_script(script, artifacts_dir, gh_stub:, extra_env: {})
       Dir.mktmpdir do |bin_dir|
         File.write(File.join(bin_dir, "gh"), gh_stub)
         File.chmod(0o755, File.join(bin_dir, "gh"))
@@ -238,7 +299,7 @@ RSpec.describe "benchmark regression reporting" do
           "GITHUB_RUN_ID" => "999",
           "GITHUB_RUN_NUMBER" => "42",
           "GITHUB_ACTOR" => "octocat"
-        }
+        }.merge(extra_env)
         Open3.capture2e(env, "ruby", script, artifacts_dir)
       end
     end
@@ -272,6 +333,51 @@ RSpec.describe "benchmark regression reporting" do
         expect(output).to match(/Filing regression report for Core \(1 shard report\(s\)\)/)
         expect(output).to match(/Filing regression report for Pro \(1 shard report\(s\)\)/)
         expect(output).to match(/issue #7/)
+      end
+    end
+
+    it "creates only one issue for multiple suites even when live issue lookup stays empty" do
+      Dir.mktmpdir do |dir|
+        write_payload(dir, artifact: "regression-core", suite: "Core")
+        write_payload(dir, artifact: "regression-pro", suite: "Pro")
+
+        call_log = File.join(dir, "gh-calls.log")
+        counting_gh = <<~BASH
+          #!/usr/bin/env bash
+          printf '%s\\n' "$*" >> "$GH_CALL_LOG"
+          if [ "$1" = "issue" ] && [ "$2" = "create" ]; then
+            echo "https://github.com/shakacode/react_on_rails/issues/7"
+          elif [ "$1" = "api" ] && [ "$2" = "-X" ] && [ "$3" = "POST" ]; then
+            echo "777"
+          fi
+          exit 0
+        BASH
+
+        output, status = run_script(script, dir, gh_stub: counting_gh, extra_env: { "GH_CALL_LOG" => call_log })
+
+        expect(status).to be_success
+        expect(output).to match(/issue #7/)
+        expect(File.readlines(call_log).count { |line| line.start_with?("issue create") }).to eq(1)
+        expect(File.readlines(call_log).count { |line| line.start_with?("api -X POST") }).to eq(1)
+      end
+    end
+
+    it "shares one issue-number cache across suite reports in the same run" do
+      Dir.mktmpdir do |dir|
+        write_payload(dir, artifact: "regression-core", suite: "Core")
+        write_payload(dir, artifact: "regression-pro", suite: "Pro")
+
+        caches = []
+        allow(Github).to receive(:run_url).and_return("https://github.com/run/1")
+        allow(RegressionIssueReporter).to receive(:report) do |issue_number_cache:, **_attributes|
+          caches << issue_number_cache
+          issue_number_cache["created"] = "7"
+          "7"
+        end
+
+        expect(report_regressions(dir)).to be(true)
+        expect(caches.size).to eq(2)
+        expect(caches[0]).to equal(caches[1])
       end
     end
 

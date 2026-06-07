@@ -45,15 +45,20 @@ IGNORED_REGRESSION_BENCHMARKS = ["/posts_page: Pro"].freeze
 # rubocop:disable Metrics/ClassLength
 class RegressionIssueReporter
   LABEL = "performance-regression"
+  CACHE_MISS = :cache_miss
+  ISSUE_NUMBER_UNKNOWN_AFTER_CREATE = :issue_number_unknown_after_create
+  COMMENT_ID_UNKNOWN_AFTER_CREATE = :comment_id_unknown_after_create
 
   def self.report(summary:, **attributes)
     new(**attributes).report(summary)
   end
 
-  def initialize(suite_name:, github_run_url:, bencher_url:)
+  def initialize(suite_name:, github_run_url:, bencher_url:, issue_number_cache: nil, report_comment_id_cache: nil)
     @suite_name = suite_name
     @github_run_url = github_run_url
     @bencher_url = bencher_url
+    @issue_number_cache = issue_number_cache
+    @report_comment_id_cache = report_comment_id_cache
     @commit_short = ENV.fetch("GITHUB_SHA")[0, 7]
   end
 
@@ -71,7 +76,7 @@ class RegressionIssueReporter
 
   private
 
-  attr_reader :suite_name, :github_run_url, :bencher_url, :commit_short
+  attr_reader :suite_name, :github_run_url, :bencher_url, :issue_number_cache, :report_comment_id_cache, :commit_short
 
   def ensure_regression_label
     GithubCli.run(
@@ -127,6 +132,9 @@ class RegressionIssueReporter
   end
 
   def regression_comment_id(issue_number)
+    cached_comment_id = cached_regression_comment_id
+    return cached_comment_id unless cached_comment_id == CACHE_MISS
+
     stdout = GithubCli.capture_success(
       "gh", "api", "repos/#{github_repository}/issues/#{issue_number}/comments",
       "--paginate",
@@ -138,7 +146,9 @@ class RegressionIssueReporter
     # existing report comment yet (caller should create one).
     return nil unless stdout
 
-    stdout.lines.first.to_s.strip
+    stdout.lines.first.to_s.strip.tap do |comment_id|
+      cache_regression_comment_id(comment_id) unless comment_id.empty?
+    end
   end
 
   def regression_comment_body(comment_id)
@@ -197,10 +207,7 @@ class RegressionIssueReporter
 
     if comment_id.empty?
       body = "#{comment_header}#{section}"
-      return GithubCli.run(
-        "gh", "issue", "comment", issue_number, "--body", body,
-        error_message: "Failed to create regression report comment on issue ##{issue_number}"
-      )
+      return create_regression_comment(issue_number, body)
     end
 
     existing_body = regression_comment_body(comment_id)
@@ -219,11 +226,68 @@ class RegressionIssueReporter
   end
 
   def find_or_create_regression_issue
+    cached_issue_number = cached_regression_issue_number
+    return cached_issue_number unless cached_issue_number == CACHE_MISS
+
     issue_number = existing_regression_issue
     return nil if issue_number.nil?
-    return issue_number unless issue_number.empty?
 
-    create_regression_issue
+    return cache_regression_issue_number(issue_number) unless issue_number.empty?
+
+    create_regression_issue.tap do |created_issue_number|
+      cache_regression_issue_number(created_issue_number)
+    end
+  end
+
+  def cached_regression_issue_number
+    return CACHE_MISS unless issue_number_cache
+
+    issue_number_cache.fetch(issue_title, CACHE_MISS).then do |cached_issue_number|
+      cached_issue_number == ISSUE_NUMBER_UNKNOWN_AFTER_CREATE ? nil : cached_issue_number
+    end
+  end
+
+  def cache_regression_issue_number(issue_number)
+    issue_number_cache&.store(issue_title, issue_number) unless issue_number.to_s.empty?
+    issue_number
+  end
+
+  def cached_regression_comment_id
+    return CACHE_MISS unless report_comment_id_cache
+
+    report_comment_id_cache.fetch(comment_marker, CACHE_MISS).then do |cached_comment_id|
+      cached_comment_id == COMMENT_ID_UNKNOWN_AFTER_CREATE ? nil : cached_comment_id
+    end
+  end
+
+  def cache_regression_comment_id(comment_id)
+    report_comment_id_cache&.store(comment_marker, comment_id) unless comment_id.to_s.empty?
+    comment_id
+  end
+
+  def create_regression_comment(issue_number, body)
+    stdout = GithubCli.capture_success(
+      "gh", "api", "-X", "POST",
+      "repos/#{github_repository}/issues/#{issue_number}/comments",
+      "--input", "-",
+      "--jq", ".id",
+      error_message: "Failed to create regression report comment on issue ##{issue_number}",
+      stdin_data: JSON.generate(body: body)
+    )
+    return false unless stdout
+
+    comment_id = stdout.lines.first.to_s.strip
+    if comment_id.empty?
+      report_comment_id_cache&.store(comment_marker, COMMENT_ID_UNKNOWN_AFTER_CREATE)
+      Github.warning(
+        "Created regression report comment on issue ##{issue_number} but could not parse its id; " \
+        "later suite sections will not create duplicate comments in this run."
+      )
+      return false
+    end
+
+    cache_regression_comment_id(comment_id)
+    true
   end
 
   def create_regression_issue
@@ -244,6 +308,7 @@ class RegressionIssueReporter
     # so a parse miss is a warning, not an error.
     number = stdout[%r{/issues/(\d+)}, 1]
     unless number
+      issue_number_cache&.store(issue_title, ISSUE_NUMBER_UNKNOWN_AFTER_CREATE)
       Github.warning(
         "Created the issue but could not parse its number from gh output " \
         "(#{stdout.strip.inspect}); its comment section may be missing"
@@ -362,13 +427,22 @@ def report_regressions(artifacts_dir)
   # One section per suite: a sharded suite emits one payload per shard, so combine
   # them rather than filing a section per shard. Suites sorted for stable output.
   by_suite = readable.group_by { |payload| payload.fetch(RegressionReport::SUITE_NAME) }
-  reported_ok = by_suite.keys.sort.map { |suite_name| report_suite(suite_name, by_suite.fetch(suite_name)) }.all?
+  issue_number_cache = {}
+  report_comment_id_cache = {}
+  reported_ok = by_suite.keys.sort.map do |suite_name|
+    report_suite(
+      suite_name,
+      by_suite.fetch(suite_name),
+      issue_number_cache: issue_number_cache,
+      report_comment_id_cache: report_comment_id_cache
+    )
+  end.all?
 
   # Fail if any payload was unreadable: a lost report must not pass as success.
   reported_ok && readable.size == payloads.size
 end
 
-def report_suite(suite_name, payloads)
+def report_suite(suite_name, payloads, issue_number_cache: nil, report_comment_id_cache: nil)
   # Order shard summaries by shard number ("2/5" before "10/5"); each already
   # self-labels with its shard in its headers, so concatenation reads cleanly.
   summary = payloads
@@ -381,7 +455,9 @@ def report_suite(suite_name, payloads)
     suite_name: suite_name,
     github_run_url: Github.run_url,
     bencher_url: BENCHER_URL,
-    summary: summary
+    summary: summary,
+    issue_number_cache: issue_number_cache,
+    report_comment_id_cache: report_comment_id_cache
   )
 
   if issue_number.empty?
