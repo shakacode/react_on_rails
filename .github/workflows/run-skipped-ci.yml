@@ -79,8 +79,7 @@ jobs:
               pull_number: context.issue.number
             });
             return {
-              ref: pr.data.head.ref,
-              sha: pr.data.head.sha
+              ref: pr.data.head.ref
             };
 
       - name: Get skipped checks and trigger workflows
@@ -96,6 +95,22 @@ jobs:
               repo: context.repo.repo,
               pull_number: context.issue.number
             });
+
+            const repoFullName = `${context.repo.owner}/${context.repo.repo}`;
+            if (pr.head.repo.full_name !== repoFullName) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: [
+                  'Unable to run full CI from `/run-skipped-ci` because the PR branch is from a fork.',
+                  '',
+                  'A maintainer should push the branch to this repository or trigger the required workflows manually.'
+                ].join('\n')
+              });
+              core.setFailed('Cannot trigger skipped-CI workflows for fork PR branches');
+              return;
+            }
 
             const checks = await github.rest.checks.listForRef({
               owner: context.repo.owner,
@@ -147,8 +162,8 @@ jobs:
 
             // Capture the lower bound before any dispatch is issued. The -2 s
             // buffer accounts for clock skew between the runner and GitHub's
-            // servers. workflow_id, event, branch, and head_sha do the real
-            // narrowing.
+            // servers. workflow_id, event, branch, and created timestamp do the
+            // real narrowing.
             const dispatchStartedAt = new Date(Date.now() - 2000).toISOString();
 
             // Trigger each workflow
@@ -214,22 +229,17 @@ jobs:
                   let found = false;
                   try {
                     console.log(
-                      `Searching for ${workflow.name} dispatched on SHA ${prData.sha} after ${dispatchStartedAt}...`
+                      `Searching for ${workflow.name} dispatched on ${prData.ref} after ${dispatchStartedAt}...`
                     );
                     const runs = await github.rest.actions.listWorkflowRuns({
                       owner: context.repo.owner,
                       repo: context.repo.repo,
                       workflow_id: workflow.id,
-                      // Narrow the workflow-run search to this PR ref first.
-                      // head_sha intentionally pins the PR SHA captured at job
-                      // start; GitHub records a dispatched run's head_sha from
-                      // the ref at queue time. If those SHAs differ because the
-                      // branch moved or GitHub queued the run late, verification
-                      // stays incomplete and the warning below points
-                      // maintainers at that mismatch.
+                      // Narrow to workflow_dispatch runs for this PR branch after
+                      // dispatch began. Avoid head_sha because GitHub records it
+                      // from the ref at queue time, which can differ after a push.
                       branch: prData.ref,
                       event: 'workflow_dispatch',
-                      head_sha: prData.sha,
                       per_page: 20,
                       created: `>${dispatchStartedAt}`
                     });
@@ -253,7 +263,7 @@ jobs:
                   console.log(`Still waiting to verify: ${notFound.map(workflow => workflow.name).join(', ')}`);
                 } else {
                   core.warning(
-                    `Verification incomplete after ${maxVerificationAttempts} attempts. Unverified: ${notFound.map(workflow => workflow.name).join(', ')}. If this repeats, confirm the PR branch was not force-pushed during dispatch; the lookup pins runs to the PR SHA captured at job start.`
+                    `Verification incomplete after ${maxVerificationAttempts} attempts. Unverified: ${notFound.map(workflow => workflow.name).join(', ')}. If this repeats, confirm GitHub accepted the workflow dispatches and the workflow map still matches the workflow file names.`
                   );
                 }
               }
@@ -274,8 +284,6 @@ jobs:
             }
 
             // Don't list individual checks - keep it simple
-            const skippedChecksList = '';
-            const verifiedList = '';
             const notFoundList = notFound.length > 0
               ? `\n\n**Unverified (may still be queuing):**\n${notFound.map(workflow => `- ⏳ ${workflow.name}`).join('\n')}`
               : '';
@@ -284,8 +292,7 @@ jobs:
             const body = `🚀 **Full CI Mode Enabled**
 
             ${status}
-            ${skippedChecksList}
-            ${verifiedList}${notFoundList}${failedList}
+            ${notFoundList}${failedList}
 
             ${labelAdded && succeeded.length > 0 ? `\n**Note:** Added the \`full-ci\` label to this PR. All future commits will run the full CI suite (including minimum dependency tests) until the label is removed.
 
