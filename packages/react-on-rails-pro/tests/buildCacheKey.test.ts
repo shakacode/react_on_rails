@@ -125,4 +125,130 @@ describe('buildCacheKey', () => {
       expect(key1).not.toBe(key2);
     });
   });
+
+  describe('BigInt handling', () => {
+    test('BigInt produces a distinct key from number', () => {
+      const key1 = buildCacheKey('build', 'id', [BigInt(42)]);
+      const key2 = buildCacheKey('build', 'id', [42]);
+      expect(key1).not.toBe(key2);
+    });
+
+    test('different BigInt values produce different keys', () => {
+      const key1 = buildCacheKey('build', 'id', [BigInt(1)]);
+      const key2 = buildCacheKey('build', 'id', [BigInt(2)]);
+      expect(key1).not.toBe(key2);
+    });
+
+    test('same BigInt values produce the same key', () => {
+      const key1 = buildCacheKey('build', 'id', [BigInt(999)]);
+      const key2 = buildCacheKey('build', 'id', [BigInt(999)]);
+      expect(key1).toBe(key2);
+    });
+  });
+
+  describe('Map and Set handling', () => {
+    test('Maps with same entries in different insertion order produce the same key', () => {
+      const map1 = new Map([
+        ['b', 2],
+        ['a', 1],
+      ]);
+      const map2 = new Map([
+        ['a', 1],
+        ['b', 2],
+      ]);
+      const key1 = buildCacheKey('build', 'id', [map1]);
+      const key2 = buildCacheKey('build', 'id', [map2]);
+      expect(key1).toBe(key2);
+    });
+
+    test('Maps with different entries produce different keys', () => {
+      const map1 = new Map([['a', 1]]);
+      const map2 = new Map([['a', 2]]);
+      expect(buildCacheKey('build', 'id', [map1])).not.toBe(buildCacheKey('build', 'id', [map2]));
+    });
+
+    test('Map produces a distinct key from a plain object', () => {
+      const map = new Map([['a', 1]]);
+      const obj = { a: 1 };
+      expect(buildCacheKey('build', 'id', [map])).not.toBe(buildCacheKey('build', 'id', [obj]));
+    });
+
+    test('Sets with same values in different insertion order produce the same key', () => {
+      const set1 = new Set([3, 1, 2]);
+      const set2 = new Set([1, 2, 3]);
+      const key1 = buildCacheKey('build', 'id', [set1]);
+      const key2 = buildCacheKey('build', 'id', [set2]);
+      expect(key1).toBe(key2);
+    });
+
+    test('Sets with different values produce different keys', () => {
+      const set1 = new Set([1, 2]);
+      const set2 = new Set([1, 3]);
+      expect(buildCacheKey('build', 'id', [set1])).not.toBe(buildCacheKey('build', 'id', [set2]));
+    });
+
+    test('Set produces a distinct key from an array', () => {
+      const set = new Set([1, 2]);
+      const arr = [1, 2];
+      expect(buildCacheKey('build', 'id', [set])).not.toBe(buildCacheKey('build', 'id', [arr]));
+    });
+  });
+
+  describe('string dollar-sign escaping', () => {
+    test('string starting with $ does not collide with $undefined marker', () => {
+      const key1 = buildCacheKey('build', 'id', ['$undefined']);
+      const key2 = buildCacheKey('build', 'id', [undefined]);
+      expect(key1).not.toBe(key2);
+    });
+
+    test('string starting with $ does not collide with $NaN marker', () => {
+      const key1 = buildCacheKey('build', 'id', ['$NaN']);
+      const key2 = buildCacheKey('build', 'id', [NaN]);
+      expect(key1).not.toBe(key2);
+    });
+
+    test('string starting with $ does not collide with $D date marker', () => {
+      const date = new Date('2026-01-01');
+      const key1 = buildCacheKey('build', 'id', [`$D${date.toISOString()}`]);
+      const key2 = buildCacheKey('build', 'id', [date]);
+      expect(key1).not.toBe(key2);
+    });
+  });
+
+  describe('circular reference detection', () => {
+    test('throws on circular object reference', () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const obj: any = { a: 1 };
+      obj.self = obj;
+      expect(() => buildCacheKey('build', 'id', [obj])).toThrow('Circular references');
+    });
+
+    test('throws on nested circular reference', () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const a: any = {};
+      const b = { ref: a };
+      a.ref = b;
+      expect(() => buildCacheKey('build', 'id', [a])).toThrow('Circular references');
+    });
+
+    test('allows shared references (DAG) without throwing', () => {
+      const shared = { x: 1 };
+      const obj = { a: shared, b: shared };
+      expect(() => buildCacheKey('build', 'id', [obj])).not.toThrow();
+    });
+  });
+
+  describe('unsupported types', () => {
+    test('throws for function arguments', () => {
+      expect(() => buildCacheKey('build', 'id', [() => {}])).toThrow('not supported');
+    });
+
+    test('throws for symbol arguments', () => {
+      expect(() => buildCacheKey('build', 'id', [Symbol('test')])).toThrow('not supported');
+    });
+
+    test('throws for class instances', () => {
+      expect(() => buildCacheKey('build', 'id', [/regex/])).toThrow('Only plain objects');
+    });
+  });
 });
