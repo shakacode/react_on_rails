@@ -4,7 +4,9 @@
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 
+import type { ReactNode } from 'react';
 import { setBuildId } from '../src/cache/buildIdProvider';
+import type { CacheEntry, CacheHandler } from '../src/cache/CacheHandler';
 import { registerCacheHandler } from '../src/cache/cacheHandlerRegistry';
 import { InMemoryLRUCacheHandler } from '../src/cache/InMemoryLRUCacheHandler';
 
@@ -172,6 +174,43 @@ describe('unstable_cache', () => {
 
     expect(String(result)).toBe('still-works');
     expect(consoleSpy).toHaveBeenCalledWith('unstable_cache: failed to store cache entry', expect.any(Error));
+
+    consoleSpy.mockRestore();
+  });
+
+  test('does not cache RSC payloads that contain render errors', async () => {
+    class RecordingCacheHandler implements CacheHandler {
+      get = jest.fn<Promise<CacheEntry | null>, [string]>().mockResolvedValue(null);
+
+      set = jest.fn<Promise<void>, [string, CacheEntry]>().mockResolvedValue(undefined);
+    }
+
+    function ThrowingServerComponent(): ReactNode {
+      throw new Error('boom during RSC render');
+    }
+
+    const handler = new RecordingCacheHandler();
+    registerCacheHandler('recording-error-rsc', handler);
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    let callCount = 0;
+    const cachedFn = unstable_cache(
+      () => {
+        callCount += 1;
+        return <ThrowingServerComponent />;
+      },
+      { id: 'rsc-render-error', kind: 'recording-error-rsc' },
+    );
+
+    await expect(cachedFn()).rejects.toThrow('boom during RSC render');
+    await new Promise((resolve) => setImmediate(resolve));
+
+    await expect(cachedFn()).rejects.toThrow('boom during RSC render');
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(handler.get).toHaveBeenCalledTimes(2);
+    expect(handler.set).not.toHaveBeenCalled();
+    expect(callCount).toBe(2);
 
     consoleSpy.mockRestore();
   });
