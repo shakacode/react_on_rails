@@ -309,8 +309,8 @@ test_ci_infrastructure_only_change_runs_tests_but_skips_benchmarks() {
   assert_contains "$out" '"run_pro_node_renderer_benchmarks": false' "ci infra output"
 }
 
-# A suite-specific workflow YAML on its own runs that suite's TESTS (preserving
-# the targeted-CI optimization) but no benchmark — editing the workflow can't
+# A suite-specific workflow YAML on its own runs only that suite's tests, not the
+# full CI-infrastructure suite, and never benchmarks — editing the workflow can't
 # move performance. This is the part of #3697 that the CI-infra arm doesn't cover.
 test_suite_workflow_file_runs_its_tests_but_no_benchmark() {
   setup_repo
@@ -320,7 +320,12 @@ test_suite_workflow_file_runs_its_tests_but_no_benchmark() {
 
   local out
   out="$(detector_output)"
+  assert_contains "$out" '"run_ruby_tests": false' "workflow-only output"
+  assert_contains "$out" '"run_js_tests": false' "workflow-only output"
+  assert_contains "$out" '"run_dummy_tests": false' "workflow-only output"
+  assert_contains "$out" '"run_pro_tests": false' "workflow-only output"
   assert_contains "$out" '"run_pro_dummy_tests": true' "workflow-only output"
+  assert_contains "$out" '"run_pro_node_renderer_tests": false' "workflow-only output"
   assert_contains "$out" '"run_pro_benchmarks": false' "workflow-only output"
   assert_contains "$out" '"run_pro_node_renderer_benchmarks": false' "workflow-only output"
 }

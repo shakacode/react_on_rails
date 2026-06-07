@@ -254,13 +254,11 @@ source_file_comment_only_change() {
   [ "$saw_changed_line" = true ]
 }
 
-# A file that selects a test suite but is NOT itself benchmark-relevant: the
-# suite-specific workflow YAML files (gem-tests.yml, integration-tests.yml, …).
-# They share a case arm with their source dirs so editing the workflow re-runs
-# that suite's tests, but they must not flip the BENCH_* flags — a workflow edit
-# can't move runtime performance (#3697). Plain CI plumbing (script/, bin/,
-# .github/actions/, .lefthook.yml) never reaches a source arm; it lands in the
-# CI-infrastructure arm, which sets no BENCH_* flag at all.
+# Suite-specific workflow YAML files are test selectors, not benchmark inputs.
+# Some of them live in source/spec arms so the right tests still run, but a
+# workflow edit cannot move runtime performance (#3697). Plain CI plumbing
+# (script/, bin/, .github/actions/, .lefthook.yml) lands in the CI-infrastructure
+# arm instead, which sets no BENCH_* flag at all.
 is_benchmark_irrelevant_path() {
   case "$1" in
     .github/workflows/*) return 0 ;;
@@ -392,7 +390,9 @@ while IFS= read -r file; do
         PRO_SOURCE_COMMENT_ONLY_CHANGED=true
       else
         PRO_RUBY_CORE_CHANGED=true
-        BENCH_PRO_CHANGED=true
+        if ! is_benchmark_irrelevant_path "$file"; then
+          BENCH_PRO_CHANGED=true
+        fi
       fi
       ;;
 

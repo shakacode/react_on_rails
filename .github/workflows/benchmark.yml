@@ -110,16 +110,8 @@ jobs:
         with:
           docs-only: ${{ steps.detect.outputs.docs_only }}
           previous-sha: ${{ github.event.before }}
-      # Which benchmark suites to run is now decided entirely by the change
-      # detector (script/ci-changes-detector emits run_core_benchmarks /
-      # run_pro_benchmarks / run_pro_node_renderer_benchmarks). Those are driven by
-      # genuine product-SOURCE changes only — never by CI plumbing (scripts,
-      # actions, or the suite-specific workflow YAML files), which change how the
-      # suite runs but cannot move runtime performance. That is what stops Bencher
-      # from posting on docs-only (#3717) and CI-config-only (#3697) PRs. On push
-      # to main and workflow_dispatch, generate_matrix.rb runs every suite
-      # regardless; the 'benchmark' PR label still forces a run for workflow
-      # self-tests.
+      # script/ci-changes-detector owns benchmark-suite selection via
+      # run_core_benchmarks / run_pro_benchmarks / run_pro_node_renderer_benchmarks.
       - name: Set benchmark matrices
         id: benchmark-matrices
         # Always runs. GitHub Actions evaluates `strategy.matrix` for downstream jobs at
