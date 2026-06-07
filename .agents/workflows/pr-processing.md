@@ -31,11 +31,12 @@ build-configuration edits (GitHub Actions, benchmark workflow control flow, pack
 scripts, lockfiles, webpack configuration) are sensitive but not categorically excluded.
 When the assigned issue, PR, or maintainer-approved batch instructions explicitly include
 that scope, process it with a focused branch, targeted validation, self-review, and clear
-PR evidence.
+PR evidence. That explicit scope inclusion satisfies the `AGENTS.md` "Ask First"
+requirement for the assigned work.
 
-A per-run instruction that prohibits these edits is a temporary, lane-specific restriction
-only. Do not carry it forward as a standing rule, and do not skip a future in-scope target
-because it touches workflow or build configuration.
+A per-run instruction that prohibits these edits restricts scope for that run only. Do not
+carry it forward as a standing rule, and do not treat it as permission in a later run where
+no explicit workflow or build-configuration scope grant was given.
 
 ## Initial GitHub Commands
 
@@ -189,7 +190,10 @@ Merge qualification is CI passing plus review feedback handled at the right tier
 - `MUST-FIX` comments are fixed before merge.
 - `DISCUSS` comments are decided, explicitly deferred, or confirmed not to need maintainer input.
 - `OPTIONAL`, nit, style-only, duplicate, stale, or noisy comments do not block merge once triaged.
-- AI review systems such as Claude, CodeRabbit, Cursor Bugbot, Greptile, and similar tools are advisory unless they report a real actionable blocker. Do not require approval from every AI system, and do not block solely because an advisory AI check was skipped, neutral, pending beyond the useful review window, or left non-blocking comments after another reviewer has approved.
+- AI review systems such as Claude, CodeRabbit, Cursor Bugbot, Greptile, and similar tools are advisory unless they report a real actionable blocker. Do not require approval from every AI system, and do not block solely because an advisory AI check was skipped, neutral, pending beyond the useful review window, or left non-blocking comments after another reviewer has approved. Security-category findings still require investigation before dismissal, regardless of source.
+
+Comment tiers (`MUST-FIX`, `DISCUSS`, `OPTIONAL`, `SKIPPED`) are assigned by
+`.agents/skills/address-review/SKILL.md` or `.agents/workflows/address-review.md`.
 
 If approved and green but not merging immediately, use the repository's standard `ready-to-merge` label when available.
 
