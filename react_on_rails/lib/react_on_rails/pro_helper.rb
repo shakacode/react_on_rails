@@ -25,7 +25,7 @@ module ReactOnRails
                    # Escape dom_id for JavaScript context
                    escaped_dom_id = escape_javascript(render_options.dom_id)
                    nonce = csp_nonce
-                   script_options = nonce.present? ? { nonce: nonce } : {}
+                   script_options = nonce.present? ? { nonce: } : {}
                    immediate_script = content_tag(:script, %(
           typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('#{escaped_dom_id}');
         ).html_safe, script_options)
@@ -50,7 +50,7 @@ module ReactOnRails
                                   # Escape store_name for JavaScript context
                                   escaped_store_name = escape_javascript(redux_store_data[:store_name])
                                   nonce = csp_nonce
-                                  script_options = nonce.present? ? { nonce: nonce } : {}
+                                  script_options = nonce.present? ? { nonce: } : {}
                                   immediate_script = content_tag(
                                     :script,
                                     <<~JS.html_safe,

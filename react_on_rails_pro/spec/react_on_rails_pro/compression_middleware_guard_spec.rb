@@ -146,7 +146,7 @@ RSpec.describe ReactOnRailsPro::CompressionMiddlewareGuard do
 
       guard = described_class.new(
         middlewares: [middleware_entry_class.new(Rack::Deflater, [{ if: condition }])],
-        logger: logger
+        logger:
       )
 
       expect(guard.findings).to be_empty
@@ -161,7 +161,7 @@ RSpec.describe ReactOnRailsPro::CompressionMiddlewareGuard do
 
       guard = described_class.new(
         middlewares: [middleware_entry_class.new(Rack::Deflater, [{ if: condition }])],
-        logger: logger
+        logger:
       )
 
       expect(guard.findings).to be_empty

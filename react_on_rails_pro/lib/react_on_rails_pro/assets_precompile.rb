@@ -205,7 +205,7 @@ module ReactOnRailsPro
 
     def self.upload_bundle(adapter, hash, bundle, assets)
       Timeout.timeout(UPLOAD_TIMEOUT_SECONDS) do
-        adapter.upload(hash, bundle: bundle, assets: assets)
+        adapter.upload(hash, bundle:, assets:)
       end
       puts "[ReactOnRailsPro] Published bundle hash #{hash} via rolling_deploy_adapter"
     rescue Timeout::Error

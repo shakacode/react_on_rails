@@ -75,9 +75,9 @@ module ReactOnRails
         webpack_generated_files ||= ReactOnRails.configuration.webpack_generated_files
 
         webpack_assets_status_checker ||=
-          WebpackAssetsStatusChecker.new(source_path: source_path,
-                                         generated_assets_full_path: generated_assets_full_path,
-                                         webpack_generated_files: webpack_generated_files)
+          WebpackAssetsStatusChecker.new(source_path:,
+                                         generated_assets_full_path:,
+                                         webpack_generated_files:)
 
         unless @printed_once
           puts
@@ -101,8 +101,8 @@ module ReactOnRails
       webpack_assets_compiler ||= WebpackAssetsCompiler.new
 
       ReactOnRails::TestHelper::EnsureAssetsCompiled.new(
-        webpack_assets_status_checker: webpack_assets_status_checker,
-        webpack_assets_compiler: webpack_assets_compiler
+        webpack_assets_status_checker:,
+        webpack_assets_compiler:
       ).call
     end
   end

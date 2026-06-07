@@ -53,7 +53,7 @@ module ReactOnRailsPro
         # Render template - components will start streaming immediately.
         # If a shell error occurs, consumer_stream_async raises PrerenderError here
         # (BEFORE the response is committed), enabling a proper HTTP redirect.
-        template_string = render_to_string(template: template, **render_options)
+        template_string = render_to_string(template:, **render_options)
         # View may contain extra newlines, chunk already contains a newline
         # Having multiple newlines between chunks causes hydration errors
         # So we strip extra newlines from the template string and add a single newline

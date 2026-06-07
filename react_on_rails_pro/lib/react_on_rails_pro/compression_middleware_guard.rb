@@ -36,7 +36,7 @@ module ReactOnRailsPro
     def warning_messages(root:)
       findings.map do |finding|
         "[React on Rails Pro] #{finding.middleware_name} has a custom `:if` callback" \
-          "#{formatted_source_location(finding, root: root)} that calls `body.each`. " \
+          "#{formatted_source_location(finding, root:)} that calls `body.each`. " \
           "This is incompatible with streaming SSR/RSC and can deadlock `ActionController::Live` responses. " \
           "Remove the custom `:if`, or guard it with " \
           "`return true unless body.respond_to?(:to_ary)` before iterating. " \

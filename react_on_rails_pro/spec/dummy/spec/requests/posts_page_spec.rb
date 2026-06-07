@@ -41,7 +41,7 @@ RSpec.describe "Posts page", :server_rendering do
     Array.new(2) do |i|
       user = User.create!(name: "User #{i + 1}", email: "user-#{i + 1}@example.com")
       post = user.posts.create!(title: "Sentinel Post #{i + 1}", body: "Body of sentinel post #{i + 1}.")
-      post.comments.create!(user: user, body: "Comment on sentinel post #{i + 1}.")
+      post.comments.create!(user:, body: "Comment on sentinel post #{i + 1}.")
       post
     end
   end

@@ -165,11 +165,11 @@ module ReactOnRails
 
         # DRY helper method for Bundler context switching with API compatibility
         # Supports both new (with_unbundled_env) and legacy (with_clean_env) Bundler APIs
-        def with_unbundled_context(&block)
+        def with_unbundled_context(&)
           if Bundler.respond_to?(:with_unbundled_env)
-            Bundler.with_unbundled_env(&block)
+            Bundler.with_unbundled_env(&)
           elsif Bundler.respond_to?(:with_clean_env)
-            Bundler.with_clean_env(&block)
+            Bundler.with_clean_env(&)
           else
             # Fallback if neither method is available (very old Bundler versions)
             yield

@@ -23,8 +23,8 @@ module ReactOnRails
 
       ReactOnRails::Helper.warn_removed_immediate_hydration_option("redux_store") if immediate_hydration_present
 
-      redux_store_data = { store_name: store_name,
-                           props: props }
+      redux_store_data = { store_name:,
+                           props: }
       @registered_stores_defer_render ||= []
       @registered_stores_defer_render << redux_store_data
     end

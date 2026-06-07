@@ -104,7 +104,7 @@ describe GeneratorMessages do
       # Calls the private build_ci_section directly to isolate the read-once invariant;
       # going through the public `helpful_message_after_installation` path would mix in
       # other helpers' reads and obscure which call site reopens package.json.
-      message = described_class.send(:build_ci_section, app_root: app_root, ci_workflow_generated: true)
+      message = described_class.send(:build_ci_section, app_root:, ci_workflow_generated: true)
 
       expect(message).to include("CI / BUILD ORDERING")
     end
@@ -121,7 +121,7 @@ describe GeneratorMessages do
           <<: *default
       YAML
 
-      message = described_class.send(:build_ci_section, app_root: app_root, ci_workflow_generated: true)
+      message = described_class.send(:build_ci_section, app_root:, ci_workflow_generated: true)
 
       expect(message).to include(
         "RAILS_ENV=test NODE_ENV=test bin/shakapacker-precompile-hook && " \
@@ -142,7 +142,7 @@ describe GeneratorMessages do
           precompile_hook: 'bundle exec rake react_on_rails:test_locale'
       YAML
 
-      message = described_class.send(:build_ci_section, app_root: app_root, ci_workflow_generated: true)
+      message = described_class.send(:build_ci_section, app_root:, ci_workflow_generated: true)
 
       expect(message).to include("RAILS_ENV=test NODE_ENV=test bin/shakapacker")
       expect(message).not_to include("react_on_rails:test_locale")
@@ -161,7 +161,7 @@ describe GeneratorMessages do
           compile: true
       YAML
 
-      message = described_class.send(:build_ci_section, app_root: app_root, ci_workflow_generated: true)
+      message = described_class.send(:build_ci_section, app_root:, ci_workflow_generated: true)
 
       expect(message).to include("RAILS_ENV=test NODE_ENV=test bin/shakapacker")
       expect(message).not_to include("bin/shakapacker-precompile-hook")
@@ -180,7 +180,7 @@ describe GeneratorMessages do
           compile: true
       YAML
 
-      message = described_class.send(:build_ci_section, app_root: app_root, ci_workflow_generated: true)
+      message = described_class.send(:build_ci_section, app_root:, ci_workflow_generated: true)
 
       expect(message).to include("RAILS_ENV=test NODE_ENV=test bin/shakapacker")
       expect(message).not_to include("bin/shakapacker-precompile-hook")
@@ -200,7 +200,7 @@ describe GeneratorMessages do
           compile: true
       YAML
 
-      message = described_class.send(:build_ci_section, app_root: app_root, ci_workflow_generated: true)
+      message = described_class.send(:build_ci_section, app_root:, ci_workflow_generated: true)
 
       expect(message).to include(
         "RAILS_ENV=test NODE_ENV=test bin/shakapacker-precompile-hook && " \
@@ -401,33 +401,33 @@ describe GeneratorMessages do
         "npm" => "package-lock.json"
       }.each do |pm, lockfile|
         FileUtils.touch(File.join(app_root, lockfile))
-        expect(described_class.lockfile_filename_for(pm, app_root: app_root)).to eq(lockfile)
+        expect(described_class.lockfile_filename_for(pm, app_root:)).to eq(lockfile)
         File.delete(File.join(app_root, lockfile))
       end
     end
 
     it "returns nil when the lockfile is not on disk for yarn/pnpm/npm" do
       %w[yarn pnpm npm].each do |pm|
-        expect(described_class.lockfile_filename_for(pm, app_root: app_root)).to be_nil
+        expect(described_class.lockfile_filename_for(pm, app_root:)).to be_nil
       end
     end
 
     it "resolves bun.lock when only bun.lock exists" do
       FileUtils.touch(File.join(app_root, "bun.lock"))
-      expect(described_class.lockfile_filename_for("bun", app_root: app_root)).to eq("bun.lock")
+      expect(described_class.lockfile_filename_for("bun", app_root:)).to eq("bun.lock")
     end
 
     it "resolves bun.lockb when only bun.lockb exists" do
       FileUtils.touch(File.join(app_root, "bun.lockb"))
-      expect(described_class.lockfile_filename_for("bun", app_root: app_root)).to eq("bun.lockb")
+      expect(described_class.lockfile_filename_for("bun", app_root:)).to eq("bun.lockb")
     end
 
     it "returns nil for bun when neither bun.lock nor bun.lockb is on disk" do
-      expect(described_class.lockfile_filename_for("bun", app_root: app_root)).to be_nil
+      expect(described_class.lockfile_filename_for("bun", app_root:)).to be_nil
     end
 
     it "returns nil for an unsupported package manager" do
-      expect(described_class.lockfile_filename_for("foo", app_root: app_root)).to be_nil
+      expect(described_class.lockfile_filename_for("foo", app_root:)).to be_nil
     end
   end
 

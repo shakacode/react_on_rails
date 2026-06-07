@@ -146,7 +146,7 @@ def rsc_registration_entry_path_components(path, rails_root: nil)
 end
 
 def valid_rsc_registration_entry_path?(path, rails_root: nil)
-  path_components = rsc_registration_entry_path_components(path, rails_root: rails_root)
+  path_components = rsc_registration_entry_path_components(path, rails_root:)
   EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_COMPONENTS.none? { |component| path_components.include?(component) }
 end
 
@@ -158,7 +158,7 @@ def configured_rsc_manifest_registration_entry(rails_root)
   return nil unless File.file?(path)
   return nil unless File.basename(path) == "server-component-registration-entry.js"
 
-  path if valid_rsc_registration_entry_path?(path, rails_root: rails_root)
+  path if valid_rsc_registration_entry_path?(path, rails_root:)
 end
 
 def rsc_manifest_registration_entry(rails_root)
@@ -167,14 +167,14 @@ def rsc_manifest_registration_entry(rails_root)
 
   Find.find(rails_root) do |path|
     if File.directory?(path)
-      Find.prune unless valid_rsc_registration_entry_path?(path, rails_root: rails_root)
+      Find.prune unless valid_rsc_registration_entry_path?(path, rails_root:)
       next
     end
 
     next unless File.basename(path) == "server-component-registration-entry.js"
     next unless File.basename(File.dirname(path)) == "generated"
 
-    return path if valid_rsc_registration_entry_path?(path, rails_root: rails_root)
+    return path if valid_rsc_registration_entry_path?(path, rails_root:)
   end
 
   nil

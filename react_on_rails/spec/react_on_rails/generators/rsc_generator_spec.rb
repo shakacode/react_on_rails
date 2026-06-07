@@ -1130,7 +1130,7 @@ describe RscGenerator, type: :generator do
   end
 
   describe "existing RSC webpack config migration helpers" do
-    let(:generator) { described_class.new([], {}, { destination_root: destination_root }) }
+    let(:generator) { described_class.new([], {}, { destination_root: }) }
 
     before do
       prepare_destination
@@ -2957,7 +2957,7 @@ describe RscGenerator, type: :generator do
 
     it "does not write plugin rewrites in pretend mode" do
       config_path = "config/webpack/clientWebpackConfig.js"
-      pretend_generator = described_class.new([], { pretend: true }, { destination_root: destination_root })
+      pretend_generator = described_class.new([], { pretend: true }, { destination_root: })
       simulate_existing_file(
         config_path,
         <<~JS
@@ -2975,7 +2975,7 @@ describe RscGenerator, type: :generator do
 
     it "does not write plugin rewrites in skip mode" do
       config_path = "config/webpack/clientWebpackConfig.js"
-      skip_generator = described_class.new([], { skip: true }, { destination_root: destination_root })
+      skip_generator = described_class.new([], { skip: true }, { destination_root: })
       simulate_existing_file(
         config_path,
         <<~JS
@@ -2992,7 +2992,7 @@ describe RscGenerator, type: :generator do
 
     it "continues planning later setup steps after scoped helper setup in pretend mode" do
       config_path = "config/webpack/clientWebpackConfig.js"
-      pretend_generator = described_class.new([], { pretend: true }, { destination_root: destination_root })
+      pretend_generator = described_class.new([], { pretend: true }, { destination_root: })
       simulate_existing_file(
         config_path,
         <<~JS
@@ -3060,7 +3060,7 @@ describe RscGenerator, type: :generator do
 
     it "does not inject scoped helper setup in skip mode" do
       config_path = "config/webpack/clientWebpackConfig.js"
-      skip_generator = described_class.new([], { skip: true }, { destination_root: destination_root })
+      skip_generator = described_class.new([], { skip: true }, { destination_root: })
       simulate_existing_file(
         config_path,
         <<~JS
@@ -3088,7 +3088,7 @@ describe RscGenerator, type: :generator do
 
     it "treats skipped from-scratch scoped helper setup as ready" do
       config_path = "config/webpack/clientWebpackConfig.js"
-      skip_generator = described_class.new([], { skip: true }, { destination_root: destination_root })
+      skip_generator = described_class.new([], { skip: true }, { destination_root: })
       simulate_existing_file(config_path, base_client_webpack_content)
 
       expect(skip_generator.send(:rsc_client_references_setup_ready?, config_path)).to be(true)

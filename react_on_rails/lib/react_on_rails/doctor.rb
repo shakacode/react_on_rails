@@ -821,7 +821,7 @@ module ReactOnRails
       package_json_path = package_json_path_for("package version auto-sync")
       return unless package_json_path
 
-      synchronizer = ReactOnRails::VersionSynchronizer.new(package_json_path: package_json_path, io: StringIO.new)
+      synchronizer = ReactOnRails::VersionSynchronizer.new(package_json_path:, io: StringIO.new)
       result = synchronizer.sync(write: true)
 
       report_sync_changes(result)

@@ -261,9 +261,9 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
     def double_package_version(raw: nil, semver_wildcard: false,
                                parts: nil, local_path_or_url: false)
       instance_double(VersionChecker::NodePackageVersion,
-                      raw: raw,
+                      raw:,
                       semver_wildcard?: semver_wildcard,
-                      parts: parts,
+                      parts:,
                       local_path_or_url?: local_path_or_url,
                       package_json: "/fake/path/package.json")
     end

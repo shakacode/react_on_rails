@@ -24,7 +24,7 @@ describe ReactOnRails::RenderingStrategy::ExecJsStrategy do
       instance_double(
         ReactOnRails::RenderRequest,
         to_js: "(function() { return 'test'; })()",
-        render_options: render_options
+        render_options:
       )
     end
 

@@ -71,7 +71,7 @@ namespace :run_rspec do
     env_vars_array << "DISABLE_TURBOLINKS=TRUE"
     env_vars = env_vars_array.join(" ")
     run_tests_in(spec_dummy_dir,
-                 env_vars: env_vars,
+                 env_vars:,
                  command_name: "dummy_no_turbolinks")
   end
 

@@ -36,22 +36,22 @@ module ReactOnRails
                   skip_database_check: false, open_browser: false, open_browser_once: false)
           case mode
           when :production_like
-            run_production_like(_verbose: verbose, route: route, rails_env: rails_env,
-                                skip_database_check: skip_database_check,
-                                open_browser: open_browser,
-                                open_browser_once: open_browser_once)
+            run_production_like(_verbose: verbose, route:, rails_env:,
+                                skip_database_check:,
+                                open_browser:,
+                                open_browser_once:)
           when :static
             procfile ||= "Procfile.dev-static-assets"
-            run_static_development(procfile, verbose: verbose, route: route,
-                                             skip_database_check: skip_database_check,
-                                             open_browser: open_browser,
-                                             open_browser_once: open_browser_once)
+            run_static_development(procfile, verbose:, route:,
+                                             skip_database_check:,
+                                             open_browser:,
+                                             open_browser_once:)
           when :development, :hmr
             procfile ||= "Procfile.dev"
-            run_development(procfile, verbose: verbose, route: route,
-                                      skip_database_check: skip_database_check,
-                                      open_browser: open_browser,
-                                      open_browser_once: open_browser_once)
+            run_development(procfile, verbose:, route:,
+                                      skip_database_check:,
+                                      open_browser:,
+                                      open_browser_once:)
           else
             raise ArgumentError, "Unknown mode: #{mode}"
           end
@@ -894,7 +894,7 @@ module ReactOnRails
           # NOTE: Pack generation happens automatically during assets:precompile
           # either via precompile hook or via the configuration.rb adjust_precompile_task
 
-          print_procfile_info(procfile, route: route)
+          print_procfile_info(procfile, route:)
 
           # Check database setup before starting
           exit 1 unless DatabaseChecker.check_database(skip: skip_database_check)
@@ -906,7 +906,7 @@ module ReactOnRails
             "🏭 Starting production-like development server...",
             features,
             procfile_port(procfile),
-            route: route
+            route:
           )
 
           # Precompile assets with production bundler optimizations (includes pack generation automatically)
@@ -952,9 +952,9 @@ module ReactOnRails
             puts "✅ Assets precompiled successfully"
             ensure_default_port(procfile)
             schedule_browser_open_if_requested(procfile,
-                                               route: route,
-                                               open_browser: open_browser,
-                                               open_browser_once: open_browser_once)
+                                               route:,
+                                               open_browser:,
+                                               open_browser_once:)
             ProcessManager.ensure_procfile(procfile)
             ProcessManager.run_with_process_manager(procfile)
           else
@@ -1038,7 +1038,7 @@ module ReactOnRails
 
           # Configure ports before printing so the banner shows the correct URL
           configure_ports
-          print_procfile_info(procfile, route: route)
+          print_procfile_info(procfile, route:)
 
           features = [
             "Using shakapacker --watch (no HMR)",
@@ -1056,15 +1056,15 @@ module ReactOnRails
             "⚡ Starting development server with static assets...",
             features,
             procfile_port(procfile),
-            route: route
+            route:
           )
 
-          PackGenerator.generate(verbose: verbose)
+          PackGenerator.generate(verbose:)
           ensure_default_port(procfile)
           schedule_browser_open_if_requested(procfile,
-                                             route: route,
-                                             open_browser: open_browser,
-                                             open_browser_once: open_browser_once)
+                                             route:,
+                                             open_browser:,
+                                             open_browser_once:)
           ProcessManager.ensure_procfile(procfile)
           ProcessManager.run_with_process_manager(procfile)
         end
@@ -1079,14 +1079,14 @@ module ReactOnRails
 
           # Configure ports before printing so the banner shows the correct URL
           configure_ports
-          print_procfile_info(procfile, route: route)
+          print_procfile_info(procfile, route:)
 
-          PackGenerator.generate(verbose: verbose)
+          PackGenerator.generate(verbose:)
           ensure_default_port(procfile)
           schedule_browser_open_if_requested(procfile,
-                                             route: route,
-                                             open_browser: open_browser,
-                                             open_browser_once: open_browser_once)
+                                             route:,
+                                             open_browser:,
+                                             open_browser_once:)
           ProcessManager.ensure_procfile(procfile)
           ProcessManager.run_with_process_manager(procfile)
         end
@@ -1528,8 +1528,8 @@ module ReactOnRails
           # --open-browser is an explicit user request and bypasses TTY gating.
           # --open-browser-once is an auto-open and respects TTY/CI guards.
           explicit = open_browser && !open_browser_once
-          schedule_browser_open(procfile_port(procfile), route: route, once: open_browser_once,
-                                                         explicit: explicit)
+          schedule_browser_open(procfile_port(procfile), route:, once: open_browser_once,
+                                                         explicit:)
         end
 
         def build_local_url(port, route)
@@ -1551,7 +1551,7 @@ module ReactOnRails
         end
 
         def schedule_browser_open(port, route:, once:, explicit: false)
-          return unless browser_auto_open_allowed?(explicit: explicit)
+          return unless browser_auto_open_allowed?(explicit:)
 
           url = build_local_url(port, route)
           request_path = build_request_path(route)

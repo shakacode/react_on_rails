@@ -41,7 +41,7 @@ module RscPostsPageOverRedisHelper
 
   def fetch_post_comments(post, all_posts_comments)
     post_id = post["id"]
-    post_comments = Comment.with_delay(artificial_delay).where(post_id: post_id)
+    post_comments = Comment.with_delay(artificial_delay).where(post_id:)
     all_posts_comments.concat(post_comments)
     post_comments
   end

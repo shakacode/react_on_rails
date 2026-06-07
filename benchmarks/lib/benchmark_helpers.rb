@@ -43,7 +43,7 @@ def server_responding?(uri)
   success = response.is_a?(Net::HTTPSuccess) || response.is_a?(Net::HTTPRedirection)
   info = "HTTP #{response.code} #{response.message}"
   info += " -> #{response['location']}" if response.is_a?(Net::HTTPRedirection) && response["location"]
-  { success: success, info: info }
+  { success:, info: }
 rescue StandardError => e
   { success: false, info: "#{e.class.name}: #{e.message}" }
 end
@@ -105,6 +105,6 @@ end
 # Requires BENCHMARK_JSON and DISPLAY_JSON constants from benchmark_config.rb.
 def write_benchmark_payload(bmf_collector, target_monitor:, append: false)
   target_monitor.verify_after_measurement!
-  bmf_collector.write_bmf_json(BENCHMARK_JSON, append: append)
-  bmf_collector.write_display_json(DISPLAY_JSON, append: append)
+  bmf_collector.write_bmf_json(BENCHMARK_JSON, append:)
+  bmf_collector.write_display_json(DISPLAY_JSON, append:)
 end

@@ -221,7 +221,7 @@ class RegressionIssueReporter
       "repos/#{github_repository}/issues/comments/#{comment_id}",
       "--input", "-",
       error_message: "Failed to update regression report comment #{comment_id}",
-      stdin_data: JSON.generate(body: body)
+      stdin_data: JSON.generate(body:)
     )
   end
 
@@ -274,7 +274,7 @@ class RegressionIssueReporter
       "--input", "-",
       "--jq", ".id",
       error_message: "Failed to create regression report comment on issue ##{issue_number}",
-      stdin_data: JSON.generate(body: body)
+      stdin_data: JSON.generate(body:)
     )
     return false unless stdout
 
@@ -435,8 +435,8 @@ def report_regressions(artifacts_dir)
     report_suite(
       suite_name,
       by_suite.fetch(suite_name),
-      issue_number_cache: issue_number_cache,
-      report_comment_id_cache: report_comment_id_cache
+      issue_number_cache:,
+      report_comment_id_cache:
     )
   end.all?
 
@@ -454,12 +454,12 @@ def report_suite(suite_name, payloads, issue_number_cache: nil, report_comment_i
   puts "Filing regression report for #{suite_name} (#{payloads.size} shard report(s))"
 
   issue_number = RegressionIssueReporter.report(
-    suite_name: suite_name,
+    suite_name:,
     github_run_url: Github.run_url,
     bencher_url: BENCHER_URL,
-    summary: summary,
-    issue_number_cache: issue_number_cache,
-    report_comment_id_cache: report_comment_id_cache
+    summary:,
+    issue_number_cache:,
+    report_comment_id_cache:
   )
 
   if issue_number.empty?

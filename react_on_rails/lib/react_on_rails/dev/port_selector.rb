@@ -66,7 +66,7 @@ module ReactOnRails
         #   port-in-use warning so OSS apps without a node renderer don't
         #   see "port X (renderer)" noise on a coincidentally-bound base+2.
         def select_ports!(pro_renderer: true)
-          base = base_port_ports(pro_renderer: pro_renderer)
+          base = base_port_ports(pro_renderer:)
           return base if base
 
           rails_port   = explicit_rails_port
@@ -91,8 +91,8 @@ module ReactOnRails
         # to `select_ports` before the rename. The bang form is preferred — it
         # surfaces the ENV-mutation side effect at the call site, which was
         # the whole point of the rename. Remove in a future major release.
-        def select_ports(**kwargs)
-          select_ports!(**kwargs)
+        def select_ports(**)
+          select_ports!(**)
         end
 
         # Public so it can be stubbed in tests.
@@ -138,7 +138,7 @@ module ReactOnRails
           renderer_segment = pro_renderer ? ", renderer :#{ports[:renderer]}" : ""
           puts "Base port #{bp} detected via #{source}#{source_note}. Using Rails :#{ports[:rails]}, " \
                "webpack :#{ports[:webpack]}#{renderer_segment}"
-          warn_if_derived_ports_in_use(bp, ports, source: source, pro_renderer: pro_renderer)
+          warn_if_derived_ports_in_use(bp, ports, source:, pro_renderer:)
           ports
         end
 

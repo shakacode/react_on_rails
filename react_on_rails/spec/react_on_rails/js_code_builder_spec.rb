@@ -23,7 +23,7 @@ describe ReactOnRails::JsCodeBuilder do
       props_string: '{"greeting":"Hi"}',
       rails_context_json: '{"railsEnv":"test"}',
       store_initializations: "ReactOnRails.clearHydratedStores();",
-      render_options: render_options
+      render_options:
     )
   end
 
@@ -74,7 +74,7 @@ describe ReactOnRails::JsCodeBuilder do
           props_string: '{"greeting":"Hi"}',
           rails_context_json: '{"railsEnv":"test"}',
           store_initializations: nil,
-          render_options: render_options
+          render_options:
         )
       end
 

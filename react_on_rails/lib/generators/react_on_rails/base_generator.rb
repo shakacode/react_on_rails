@@ -380,8 +380,8 @@ module ReactOnRails
                    end
 
         {
-          app_name: app_name,
-          docs_url: docs_url,
+          app_name:,
+          docs_url:,
           examples: home_page_examples,
           file_hints: home_page_file_hints,
           stack_badges: home_page_stack_badges,
@@ -1018,13 +1018,13 @@ module ReactOnRails
         expected_configs = shakapacker_default_configs
 
         # Check if the content matches any of the known default configurations
-        expected_configs.any? { |config| content_matches_template?(content, config, strip_comments: strip_comments) }
+        expected_configs.any? { |config| content_matches_template?(content, config, strip_comments:) }
       end
 
       def content_matches_template?(content, template, strip_comments: false)
         # Normalize whitespace and compare
-        normalize_config_content(content, strip_comments: strip_comments) ==
-          normalize_config_content(template, strip_comments: strip_comments)
+        normalize_config_content(content, strip_comments:) ==
+          normalize_config_content(template, strip_comments:)
       end
 
       def normalize_config_content(content, strip_comments: false)

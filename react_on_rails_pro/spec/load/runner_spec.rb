@@ -62,7 +62,7 @@ RSpec.describe RendererHarness::Runner do
   it "starts elapsed timing after all workers finish warmup" do
     scenario = build_scenario
     runner = described_class.new(
-      scenario: scenario,
+      scenario:,
       config: build_config(requests: 2, concurrency: 2, warmup: 1)
     )
     warmup_counts_at_clock_reads = []
@@ -82,7 +82,7 @@ RSpec.describe RendererHarness::Runner do
   it "sets the duration deadline after warmup completes" do
     scenario = build_scenario
     runner = described_class.new(
-      scenario: scenario,
+      scenario:,
       config: build_config(requests: nil, duration: 1.0, concurrency: 1, warmup: 1)
     )
     main_thread = Thread.current
@@ -128,7 +128,7 @@ RSpec.describe RendererHarness::Runner do
       RendererHarness::RequestResult.new(latency_ms: 20.0, ok: true)
     end
     runner = described_class.new(
-      scenario: scenario,
+      scenario:,
       config: build_config(requests: nil, duration: 0.08, concurrency: 1)
     )
 
@@ -143,7 +143,7 @@ RSpec.describe RendererHarness::Runner do
       sleep 0.03
       RendererHarness::RequestResult.new(latency_ms: 20.0, ok: true)
     end
-    runner = described_class.new(scenario: scenario, config: build_config(requests: 3))
+    runner = described_class.new(scenario:, config: build_config(requests: 3))
 
     expect { runner.run }.not_to raise_error
     expect(runner.results.size).to eq(3)
@@ -171,7 +171,7 @@ RSpec.describe RendererHarness::Runner do
     scenario = build_scenario
     allow(scenario).to receive(:warmup).and_raise("warmup failed")
     runner = described_class.new(
-      scenario: scenario,
+      scenario:,
       config: build_config(requests: 2, concurrency: 2, warmup: 1)
     )
 
@@ -184,7 +184,7 @@ RSpec.describe RendererHarness::Runner do
     scenario = build_scenario
     allow(scenario).to receive(:warmup) { sleep 0.05 }
     runner = described_class.new(
-      scenario: scenario,
+      scenario:,
       config: build_config(requests: 1, warmup: 1, start_gate_timeout: 0.01)
     )
 
@@ -208,7 +208,7 @@ RSpec.describe RendererHarness::Runner do
       raise "worker failure #{Thread.current.object_id}"
     end
     runner = described_class.new(
-      scenario: scenario,
+      scenario:,
       config: build_config(requests: 2, concurrency: 2)
     )
 
@@ -228,7 +228,7 @@ RSpec.describe RendererHarness::Runner do
       RendererHarness::RequestResult.new(latency_ms: 1.0, ok: true)
     end
     runner = described_class.new(
-      scenario: scenario,
+      scenario:,
       config: build_config(requests: 2, concurrency: 1)
     )
     allow(runner).to receive(:append_results).and_raise("append failed")
@@ -243,7 +243,7 @@ RSpec.describe RendererHarness::Runner do
     scenario = build_scenario
     allow(scenario).to receive(:perform_request) { sleep 1 }
     runner = described_class.new(
-      scenario: scenario,
+      scenario:,
       config: build_config(requests: nil, duration: 0.01)
     )
 
@@ -254,7 +254,7 @@ RSpec.describe RendererHarness::Runner do
     stub_const("#{described_class}::WORKER_JOIN_TIMEOUT_SECONDS", 0.01)
     scenario = build_scenario
     allow(scenario).to receive(:perform_request) { sleep 1 }
-    runner = described_class.new(scenario: scenario, config: build_config(requests: 1))
+    runner = described_class.new(scenario:, config: build_config(requests: 1))
 
     expect { runner.run }.to raise_error(described_class::WorkerJoinTimeout, /did not finish/)
   end
@@ -263,7 +263,7 @@ RSpec.describe RendererHarness::Runner do
     stub_const("#{described_class}::WORKER_JOIN_TIMEOUT_SECONDS", 0.01)
     scenario = build_scenario
     allow(scenario).to receive(:perform_request) { sleep 1 }
-    runner = described_class.new(scenario: scenario, config: build_config(requests: 2))
+    runner = described_class.new(scenario:, config: build_config(requests: 2))
 
     expect { runner.run }.to raise_error(described_class::WorkerJoinTimeout, /did not finish/)
   end

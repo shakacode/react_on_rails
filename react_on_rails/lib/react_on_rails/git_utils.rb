@@ -24,11 +24,11 @@ module ReactOnRails
     MSG
 
     def self.uncommitted_changes?(message_handler, git_installed: true)
-      report_worktree_issues(message_handler, git_installed: git_installed, as_error: true)
+      report_worktree_issues(message_handler, git_installed:, as_error: true)
     end
 
     def self.warn_if_uncommitted_changes(message_handler, git_installed: true)
-      report_worktree_issues(message_handler, git_installed: git_installed, as_error: false)
+      report_worktree_issues(message_handler, git_installed:, as_error: false)
     end
 
     def self.skip_worktree_check?
@@ -57,7 +57,7 @@ module ReactOnRails
       status = git_installed ? worktree_status : :git_not_installed
       return false if status == :clean
 
-      msg = worktree_message(status, as_error: as_error)
+      msg = worktree_message(status, as_error:)
       as_error ? message_handler.add_error(msg) : message_handler.add_warning(msg)
       true
     end

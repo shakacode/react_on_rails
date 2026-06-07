@@ -13,7 +13,7 @@ module ReactOnRails
     let(:io) { StringIO.new }
     let(:tmpdir) { Dir.mktmpdir }
     let(:package_json_path) { File.join(tmpdir, "package.json") }
-    let(:synchronizer) { described_class.new(package_json_path: package_json_path, io: io) }
+    let(:synchronizer) { described_class.new(package_json_path:, io:) }
 
     before do
       stub_gem_version("16.4.0.rc.5")

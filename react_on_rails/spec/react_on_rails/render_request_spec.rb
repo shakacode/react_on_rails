@@ -7,9 +7,9 @@ describe ReactOnRails::RenderRequest do
     described_class.new(
       component_name: "MyComponent",
       props: { name: "World" },
-      rails_context: rails_context,
-      store_initializations: store_initializations,
-      render_options: render_options
+      rails_context:,
+      store_initializations:,
+      render_options:
     )
   end
 
@@ -67,9 +67,9 @@ describe ReactOnRails::RenderRequest do
         described_class.new(
           component_name: "MyComponent",
           props: '{"name":"World"}',
-          rails_context: rails_context,
-          store_initializations: store_initializations,
-          render_options: render_options
+          rails_context:,
+          store_initializations:,
+          render_options:
         )
       end
 
@@ -83,9 +83,9 @@ describe ReactOnRails::RenderRequest do
         described_class.new(
           component_name: "MyComponent",
           props: { text: "hello\u2028world\u2029" },
-          rails_context: rails_context,
-          store_initializations: store_initializations,
-          render_options: render_options
+          rails_context:,
+          store_initializations:,
+          render_options:
         )
       end
 

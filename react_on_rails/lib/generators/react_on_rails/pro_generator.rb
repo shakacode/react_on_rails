@@ -144,11 +144,11 @@ module ReactOnRails
         if updated_content == gemfile_content
           unless base_gem_entry_found || had_pro_gem_entry_before_prerequisites
             rollback_message = rollback_gemfile_after_failed_swap_precondition(
-              gemfile_path: gemfile_path,
+              gemfile_path:,
               original_gemfile_content: original_gemfile_content_for_rollback,
               current_gemfile_content: gemfile_content
             )
-            add_missing_react_on_rails_gem_warning(rollback_message: rollback_message)
+            add_missing_react_on_rails_gem_warning(rollback_message:)
             return false
           end
 
@@ -172,8 +172,8 @@ module ReactOnRails
           say "✅ Replaced react_on_rails with react_on_rails_pro in Gemfile", :green
         end
         bundle_install_after_gem_swap(
-          gemfile_path: gemfile_path,
-          original_gemfile_content: original_gemfile_content
+          gemfile_path:,
+          original_gemfile_content:
         )
       rescue StandardError => e
         add_gemfile_update_warning(gemfile_path, e)
@@ -223,16 +223,16 @@ module ReactOnRails
         return true if install_status&.success?
 
         rollback_message = rollback_gemfile_after_failed_bundle_install(
-          gemfile_path: gemfile_path,
-          original_gemfile_content: original_gemfile_content
+          gemfile_path:,
+          original_gemfile_content:
         )
 
         add_bundle_install_failure_warning(install_status, rollback_message)
         false
       rescue StandardError => e
         rollback_message = rollback_gemfile_after_failed_bundle_install(
-          gemfile_path: gemfile_path,
-          original_gemfile_content: original_gemfile_content
+          gemfile_path:,
+          original_gemfile_content:
         )
 
         GeneratorMessages.add_warning(<<~MSG.strip)
@@ -450,7 +450,7 @@ module ReactOnRails
 
         content.lines.map do |line|
           stripped = line.lstrip
-          line_for_template_literal_state = line_for_template_literal_tracking(line, in_block_comment: in_block_comment)
+          line_for_template_literal_state = line_for_template_literal_tracking(line, in_block_comment:)
           line_contains_unescaped_backtick =
             line_has_unescaped_backtick?(line, line_for_tracking: line_for_template_literal_state)
 
@@ -475,7 +475,7 @@ module ReactOnRails
                   line,
                   pending_multiline_module_call_depth,
                   pending_multiline_static_import_specifier,
-                  in_block_comment: in_block_comment
+                  in_block_comment:
                 ) { |line_fragment| yield line_fragment }
               in_multiline_template_literal = updated_template_literal_state
               in_block_comment = unclosed_block_comment_starts?(rewritten_line)
@@ -699,7 +699,7 @@ module ReactOnRails
         line_without_quoted_literals = line.gsub(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/, "")
         line_for_comment_aware_template_tracking(
           line_without_quoted_literals,
-          in_block_comment: in_block_comment
+          in_block_comment:
         )
       end
 
@@ -790,7 +790,7 @@ module ReactOnRails
         pending_multiline_static_import_specifier,
         in_block_comment: false
       )
-        opening_index = opening_backtick_index_for_multiline_start(line, in_block_comment: in_block_comment)
+        opening_index = opening_backtick_index_for_multiline_start(line, in_block_comment:)
         return [line, pending_depth, pending_multiline_static_import_specifier] unless opening_index&.positive?
 
         line_prefix = line[0, opening_index]
@@ -808,7 +808,7 @@ module ReactOnRails
       end
 
       def opening_backtick_index_for_multiline_start(line, in_block_comment: false)
-        backtick_indexes = unescaped_backtick_indexes(line, in_block_comment: in_block_comment)
+        backtick_indexes = unescaped_backtick_indexes(line, in_block_comment:)
         return nil if backtick_indexes.empty? || backtick_indexes.length.even?
 
         backtick_indexes.last

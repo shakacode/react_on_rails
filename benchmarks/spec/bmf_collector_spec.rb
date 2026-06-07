@@ -63,7 +63,7 @@ RSpec.describe BmfCollector do
   describe "failed_pct" do
     def failed_pct(status)
       collector = described_class.new
-      collector.add(name: "/x", rps: 1.0, p50: 1.0, status: status)
+      collector.add(name: "/x", rps: 1.0, p50: 1.0, status:)
       collector.to_bmf.dig("/x", "failed_pct", "value")
     end
 

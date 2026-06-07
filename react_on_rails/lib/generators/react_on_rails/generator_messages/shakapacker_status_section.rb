@@ -7,7 +7,7 @@ module GeneratorMessages
     private
 
     def build_shakapacker_status_section(shakapacker_just_installed: false, app_root: Dir.pwd)
-      version_warning = check_shakapacker_version_warning(app_root: app_root)
+      version_warning = check_shakapacker_version_warning(app_root:)
       if shakapacker_just_installed
         base = <<~SHAKAPACKER
 

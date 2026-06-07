@@ -18,7 +18,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
         @add_npm_dependencies_called = true
         @add_npm_dependencies_dev = dev
         @add_npm_dependencies_calls ||= []
-        @add_npm_dependencies_calls << { packages: packages, dev: dev }
+        @add_npm_dependencies_calls << { packages:, dev: }
         @add_npm_dependencies_result
       end
 
@@ -30,12 +30,12 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
       def say(message = "", color = nil, force_new_line = nil)
         @say_calls ||= []
-        @say_calls << { message: message, color: color, force_new_line: force_new_line }
+        @say_calls << { message:, color:, force_new_line: }
       end
 
       def say_status(status, message, log_status = nil)
         @say_status_calls ||= []
-        @say_status_calls << { status: status, message: message, log_status: log_status }
+        @say_status_calls << { status:, message:, log_status: }
       end
 
       def system(*args)

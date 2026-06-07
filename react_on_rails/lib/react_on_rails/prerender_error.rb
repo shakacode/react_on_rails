@@ -34,11 +34,11 @@ module ReactOnRails
 
     def to_error_context
       result = {
-        component_name: component_name,
-        err: err,
-        props: props,
-        js_code: js_code,
-        console_messages: console_messages
+        component_name:,
+        err:,
+        props:,
+        js_code:,
+        console_messages:
       }
 
       result.merge!(err.to_error_context) if err.respond_to?(:to_error_context)

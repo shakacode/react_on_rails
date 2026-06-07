@@ -40,10 +40,10 @@ class BmfCollector
     # numeric-rps filter lives in #to_bmf so only valid measures reach Bencher.
     @results << {
       name: "#{@prefix}#{name}#{@suffix}",
-      rps: rps,
+      rps:,
       p50: p50.is_a?(Numeric) ? p50 : nil,
       p90: p90.is_a?(Numeric) ? p90 : nil,
-      status: status,
+      status:,
       failed_pct: calculate_failed_percentage(status)
     }
   end
