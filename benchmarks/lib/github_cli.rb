@@ -12,8 +12,8 @@ module GithubCli
     [stdout, status]
   end
 
-  def capture_success(*args, error_message:, env: {})
-    stdout, status = capture(*args, env: env, error_message: error_message)
+  def capture_success(*args, error_message:, env: {}, stdin_data: nil)
+    stdout, status = capture(*args, env: env, error_message: error_message, stdin_data: stdin_data)
     return stdout if status.success?
 
     nil

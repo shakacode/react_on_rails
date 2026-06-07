@@ -35,8 +35,12 @@ flowchart LR
         N2 --> N5["Worker N<br/>renders HTML"]
     end
     style Exec fill:#fff4e5,stroke:#e0a000,color:#000
+    style E1 fill:#fff4e5,stroke:#e0a000,color:#000
+    style E2 fill:#fff4e5,stroke:#e0a000,color:#000
     style E3 fill:#ffe5e5,stroke:#d1242f,color:#000
     style Node fill:#e6f0ff,stroke:#2c6ecb,color:#000
+    style N1 fill:#e6f0ff,stroke:#2c6ecb,color:#000
+    style N2 fill:#e6ffed,stroke:#2da44e,color:#000
     style N3 fill:#e6ffed,stroke:#2da44e,color:#000
     style N4 fill:#e6ffed,stroke:#2da44e,color:#000
     style N5 fill:#e6ffed,stroke:#2da44e,color:#000
@@ -110,9 +114,9 @@ flowchart TB
         L3 -- "yes" --> Exec["Run JavaScript<br/>to make HTML"]
         L3 -- "no" --> L4{"Is the JS bundle<br/>saved on disk?"}
         L4 -- "yes" --> Exec
-        L4 -- "no" --> Upload["Rails sends<br/>the bundle once"]
-        Upload --> Exec
     end
+    L4 -- "no" --> Upload["Rails uploads<br/>the bundle"]
+    Upload --> Exec
     Exec --> Done
     Exec -. "during one render" .-> L5["Repeated data reads<br/>share one result"]
     Browser["Browser starts the page"] -. "later" .-> L6["Browser code chunks<br/>cached by the browser"]
@@ -488,8 +492,9 @@ As a trace, the spans nest under the root `ror.ssr.request`. On the warm path th
 ```mermaid
 flowchart TB
     Root["One server-render trace"]
-    Root --> Warm["Warm path<br/>load bundle -> run JavaScript -> prepare result"]
-    Root -. "cold start" .-> Cold["Upload bundle first<br/>then load it"]
+    Root --> Warm["Load bundle -> run JavaScript -> prepare result"]
+    Root -. "cold start" .-> Cold["Upload bundle<br/>and build cache-miss VM"]
+    Cold -- "then continue" --> Warm
     Warm -. "if JavaScript fetches data" .-> Http["Data-fetch spans"]
     Root -. "if slow data is streamed" .-> Inc["Streaming-data spans"]
     Inc --> Chunk["One span for each<br/>incoming data chunk"]

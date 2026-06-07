@@ -10,11 +10,25 @@ const toLengthPrefixed = (content: string): string => {
   return `${metadata}\t${contentBuf.length.toString(16).padStart(8, '0')}\n${content}`;
 };
 
+const toLengthPrefixedWithMetadata = (content: string, metadata: Record<string, unknown>): string => {
+  const contentBuf = Buffer.from(content, 'utf8');
+  return `${JSON.stringify(metadata)}\t${contentBuf.length.toString(16).padStart(8, '0')}\n${content}`;
+};
+
+const rscPayloadKey = 'test-{}-test-node';
+const rscPayloadKeyReference = `[${JSON.stringify(rscPayloadKey)}]`;
+const expectedInitializationScript = `<script>delete (self.REACT_ON_RAILS_RSC_ERRORS||={})${rscPayloadKeyReference};(self.REACT_ON_RAILS_RSC_PAYLOADS||={})${rscPayloadKeyReference}||=[]</script>`;
+const expectedPayloadPushScript = (chunk: string) =>
+  `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})${rscPayloadKeyReference}||=[]).push(${JSON.stringify(
+    chunk,
+  )})</script>`;
+
 // Shared utilities — createMockRSCStream wraps content in length-prefixed format,
 // createMockHTMLStream passes HTML through as-is.
 const createMockRSCStream = (chunks: string[] | { [key: number]: string | string[] }) => {
   if (Array.isArray(chunks)) {
-    return Readable.from(chunks.map((chunk) => new TextEncoder().encode(toLengthPrefixed(chunk))));
+    // Tests that need per-delay streaming behavior should pass the object form.
+    return createMockRSCStream({ 0: chunks });
   }
   const passThrough = new PassThrough();
   const entries = Object.entries(chunks);
@@ -31,6 +45,23 @@ const createMockRSCStream = (chunks: string[] | { [key: number]: string | string
     }, +delay);
   });
   return passThrough;
+};
+
+const createMockRSCStreamWithMetadataChunks = (
+  chunks: Array<{ content: string; metadata: Record<string, unknown> }>,
+) => {
+  const passThrough = new PassThrough();
+  setTimeout(() => {
+    chunks.forEach(({ content, metadata }) => {
+      passThrough.push(new TextEncoder().encode(toLengthPrefixedWithMetadata(content, metadata)));
+    });
+    passThrough.push(null);
+  }, 0);
+  return passThrough;
+};
+
+const createMockRSCStreamWithMetadata = (content: string, metadata: Record<string, unknown>) => {
+  return createMockRSCStreamWithMetadataChunks([{ content, metadata }]);
 };
 
 const createMockHTMLStream = (chunks: string[] | { [key: number]: string | string[] }) => {
@@ -82,9 +113,8 @@ describe('injectRSCPayload', () => {
     const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
     const resultStr = await collectStreamData(result);
 
-    expect(resultStr).toContain(
-      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"test\\": \\"data\\"}")</script>`,
-    );
+    expect(resultStr).toContain(expectedInitializationScript);
+    expect(resultStr).toContain(expectedPayloadPushScript('{"test": "data"}'));
   });
 
   it('should handle multiple RSC payloads', async () => {
@@ -95,12 +125,88 @@ describe('injectRSCPayload', () => {
     const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
     const resultStr = await collectStreamData(result);
 
-    expect(resultStr).toContain(
-      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"test\\": \\"data\\"}")</script>`,
-    );
-    expect(resultStr).toContain(
-      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"test\\": \\"data2\\"}")</script>`,
-    );
+    expect(resultStr).toContain(expectedPayloadPushScript('{"test": "data"}'));
+    expect(resultStr).toContain(expectedPayloadPushScript('{"test": "data2"}'));
+  });
+
+  it('injects RSC diagnostic metadata without exposing unrelated stream metadata', async () => {
+    const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
+      hasErrors: true,
+      renderingError: {
+        message: 'useState is not a function',
+        stack: 'TypeError: useState is not a function\n    at Broken (/app/components/Broken.server.tsx:7:3)',
+      },
+      consoleReplayScript: '<script>console.log("replay")</script>',
+      serializedProps: { token: 'do-not-serialize' },
+    });
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('REACT_ON_RAILS_RSC_ERRORS');
+    expect(resultStr).toContain('["test-{}-test-node"]||=');
+    expect(resultStr).toContain('useState is not a function');
+    expect(resultStr).toContain('/app/components/Broken.server.tsx');
+    expect(resultStr).toContain('REACT_ON_RAILS_RSC_PAYLOADS');
+    expect(resultStr).not.toContain('serializedProps');
+    expect(resultStr).not.toContain('do-not-serialize');
+    expect(resultStr).not.toContain('consoleReplayScript');
+  });
+
+  it('keeps the first RSC diagnostic metadata for a payload key', async () => {
+    const mockRSC = createMockRSCStreamWithMetadataChunks([
+      {
+        content: '{"first": "payload"}',
+        metadata: {
+          hasErrors: true,
+          renderingError: {
+            message: 'First error',
+            stack: 'Error: First error\n    at First (/app/components/First.server.tsx:1:1)',
+          },
+        },
+      },
+      {
+        content: '{"second": "payload"}',
+        metadata: {
+          hasErrors: true,
+          renderingError: {
+            message: 'Second error',
+            stack: 'Error: Second error\n    at Second (/app/components/Second.server.tsx:1:1)',
+          },
+        },
+      },
+    ]);
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('First error');
+    expect(resultStr).not.toContain('Second error');
+    expect(resultStr).toContain(expectedPayloadPushScript('{"first": "payload"}'));
+    expect(resultStr).toContain(expectedPayloadPushScript('{"second": "payload"}'));
+  });
+
+  it('does not inject diagnostic metadata for blank rendering errors without hasErrors', async () => {
+    const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
+      hasErrors: false,
+      renderingError: {
+        message: '   ',
+        stack: '',
+      },
+    });
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).not.toContain(`(self.REACT_ON_RAILS_RSC_ERRORS||={})${rscPayloadKeyReference}||=`);
+    expect(resultStr).not.toContain('renderingError');
+    expect(resultStr).toContain(expectedPayloadPushScript('{"test": "data"}'));
   });
 
   it('should add all ready html chunks before adding RSC payloads', async () => {
@@ -115,11 +221,11 @@ describe('injectRSCPayload', () => {
     const resultStr = await collectStreamData(result);
 
     expect(resultStr).toEqual(
-      '<script>(self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]</script>' +
+      expectedInitializationScript +
         '<html><body><div>Hello, world!</div></body></html>' +
         '<div>Next chunk</div>' +
-        '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"test\\": \\"data\\"}")</script>' +
-        '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"test\\": \\"data2\\"}")</script>',
+        expectedPayloadPushScript('{"test": "data"}') +
+        expectedPayloadPushScript('{"test": "data2"}'),
     );
   });
 
@@ -135,10 +241,10 @@ describe('injectRSCPayload', () => {
     const resultStr = await collectStreamData(result);
 
     expect(resultStr).toEqual(
-      '<script>(self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]</script>' +
+      expectedInitializationScript +
         '<html><body><div>Hello, world!</div></body></html>' +
-        '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"test\\": \\"data\\"}")</script>' +
-        '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"test\\": \\"data2\\"}")</script>' +
+        expectedPayloadPushScript('{"test": "data"}') +
+        expectedPayloadPushScript('{"test": "data2"}') +
         '<div>Next chunk</div>',
     );
   });
@@ -158,11 +264,11 @@ describe('injectRSCPayload', () => {
     const resultStr = await collectStreamData(result);
 
     expect(resultStr).toEqual(
-      '<script>(self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]</script>' +
+      expectedInitializationScript +
         '<html><body><div>Hello, world!</div></body></html>' +
         '<div>Next chunk</div>' +
-        '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"test\\": \\"data\\"}")</script>' +
-        '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"test\\": \\"data2\\"}")</script>' +
+        expectedPayloadPushScript('{"test": "data"}') +
+        expectedPayloadPushScript('{"test": "data2"}') +
         '<div>Third chunk</div>',
     );
   });
@@ -180,9 +286,7 @@ describe('injectRSCPayload', () => {
     const resultStr = await collectStreamData(result);
 
     expect(resultStr).toContain('<html><body>Hello</body></html>');
-    expect(resultStr).toContain(
-      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"late\\": \\"rsc_data\\"}")</script>`,
-    );
+    expect(resultStr).toContain(expectedPayloadPushScript('{"late": "rsc_data"}'));
   });
 
   it('should include all RSC payloads arriving at different times after HTML stream finishes', async () => {
@@ -199,12 +303,8 @@ describe('injectRSCPayload', () => {
     const resultStr = await collectStreamData(result);
 
     expect(resultStr).toContain('<div>content</div>');
-    expect(resultStr).toContain(
-      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"first\\": \\"chunk\\"}")</script>`,
-    );
-    expect(resultStr).toContain(
-      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"second\\": \\"chunk\\"}")</script>`,
-    );
+    expect(resultStr).toContain(expectedPayloadPushScript('{"first": "chunk"}'));
+    expect(resultStr).toContain(expectedPayloadPushScript('{"second": "chunk"}'));
   });
 
   it('adds sanitized nonce attribute to injected RSC script tags', async () => {
