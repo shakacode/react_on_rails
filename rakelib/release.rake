@@ -718,6 +718,9 @@ def normalize_required_checks_payload(parsed)
 
   checks = normalize_required_check_entries(parsed["checks"])
   check_contexts = checks.map { |check| check[:context] }
+  # GitHub mirrors required status-check names into both `contexts` and `checks`.
+  # Keep the modern `checks` entry when names overlap so one required gate is
+  # evaluated once, with its app pin preserved.
   contexts = Array(parsed["contexts"]).map(&:to_s).reject(&:empty?).uniq - check_contexts
 
   # No required names parseable is treated the same as "no branch protection
@@ -779,7 +782,7 @@ def legacy_context_present?(context:, check_runs:, legacy_status_runs:)
     legacy_context_check_run_matches?(context:, run:)
   end
 
-  matching_check_run || legacy_status_runs.any? { |run| run["name"] == context }
+  matching_check_run || legacy_status_runs.any? { |run| legacy_context_check_run_matches?(context:, run:) }
 end
 
 def required_check_label(required_check)
