@@ -11,6 +11,14 @@ describe InstallGenerator, type: :generator do
     ReactOnRails::Generators::BaseGenerator.new([], options, destination_root: destination_root)
   end
 
+  def install_generator_fixture(options = {})
+    described_class.new([], options, destination_root: destination_root)
+  end
+
+  def gem_root_ci_workflow_path
+    File.expand_path("../../../.github/workflows/ci.yml", __dir__)
+  end
+
   def render_stock_webpack_template(template_path, options = {})
     base_generator_fixture(options).send(:rendered_template_for_cleanup, template_path)
   end
@@ -74,6 +82,21 @@ describe InstallGenerator, type: :generator do
         expect(rendered).to include("RSCRspackPlugin")
         expect(rendered).to include("react-on-rails-rsc/RspackPlugin")
       end
+    end
+  end
+
+  describe "manual generator fixtures" do
+    it "keep CI workflow generation inside the generator spec destination" do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+
+      Dir.chdir(File.expand_path("../../..", __dir__)) do
+        install_generator_fixture(force: true).send(:add_ci_workflow)
+      end
+
+      assert_file ".github/workflows/ci.yml"
+      expect(File).not_to exist(gem_root_ci_workflow_path)
     end
   end
 
@@ -2003,10 +2026,9 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when Procfile.dev already contains node-renderer" do
-    let(:install_generator) { described_class.new([], { pro: true }) }
+    let(:install_generator) { described_class.new([], { pro: true }, destination_root: "/fake/path") }
 
     before do
-      allow(install_generator).to receive(:destination_root).and_return("/fake/path")
       allow(File).to receive(:exist?).and_call_original
       allow(File).to receive(:exist?).with("/fake/path/Procfile.dev").and_return(true)
       allow(File).to receive(:exist?).with("/fake/path/Procfile.dev-static-assets").and_return(false)
@@ -2022,10 +2044,9 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when Procfile.dev exists without node-renderer" do
-    let(:install_generator) { described_class.new([], { pro: true }) }
+    let(:install_generator) { described_class.new([], { pro: true }, destination_root: "/fake/path") }
 
     before do
-      allow(install_generator).to receive(:destination_root).and_return("/fake/path")
       allow(File).to receive(:exist?).and_call_original
       allow(File).to receive(:exist?).with("/fake/path/Procfile.dev").and_return(true)
       allow(File).to receive(:exist?).with("/fake/path/Procfile.dev-static-assets").and_return(false)
@@ -2041,10 +2062,9 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when Procfile.dev contains an unrelated renderer process" do
-    let(:install_generator) { described_class.new([], { pro: true }) }
+    let(:install_generator) { described_class.new([], { pro: true }, destination_root: "/fake/path") }
 
     before do
-      allow(install_generator).to receive(:destination_root).and_return("/fake/path")
       allow(File).to receive(:exist?).and_call_original
       allow(File).to receive(:exist?).with("/fake/path/Procfile.dev").and_return(true)
       allow(File).to receive(:exist?).with("/fake/path/Procfile.dev-static-assets").and_return(false)
@@ -2060,10 +2080,9 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when Procfile.dev has a node-renderer entry that is missing RENDERER_PORT" do
-    let(:install_generator) { described_class.new([], { pro: true }) }
+    let(:install_generator) { described_class.new([], { pro: true }, destination_root: "/fake/path") }
 
     before do
-      allow(install_generator).to receive(:destination_root).and_return("/fake/path")
       allow(File).to receive(:exist?).and_call_original
       allow(File).to receive(:exist?).with("/fake/path/Procfile.dev").and_return(true)
       allow(File).to receive(:exist?).with("/fake/path/Procfile.dev-static-assets").and_return(false)
@@ -2741,10 +2760,9 @@ describe InstallGenerator, type: :generator do
   # CI template renders, defeating the "no lockfile" scenario.
 
   context "when Procfile.dev already contains RSC watcher" do
-    let(:install_generator) { described_class.new([], { rsc: true }) }
+    let(:install_generator) { described_class.new([], { rsc: true }, destination_root: "/fake/path") }
 
     before do
-      allow(install_generator).to receive(:destination_root).and_return("/fake/path")
       allow(File).to receive(:exist?).and_call_original
       allow(File).to receive(:exist?).with("/fake/path/Procfile.dev").and_return(true)
       procfile_content = "rails: bundle exec rails s\nrsc-bundle: RSC_BUNDLE_ONLY=true bin/shakapacker\n"
@@ -2796,7 +2814,7 @@ describe InstallGenerator, type: :generator do
     end
 
     specify "run_generators adds post-install messaging for redux installs" do
-      install_generator = described_class.new([], { redux: true })
+      install_generator = install_generator_fixture(redux: true)
       allow(install_generator).to receive(:installation_prerequisites_met?).and_return(true)
       allow(install_generator).to receive(:invoke_generators)
       allow(install_generator).to receive(:add_bin_scripts)
@@ -2807,7 +2825,7 @@ describe InstallGenerator, type: :generator do
     end
 
     specify "shows incomplete-installation guidance when shakapacker setup fails" do
-      install_generator = described_class.new
+      install_generator = install_generator_fixture
       install_generator.instance_variable_set(:@shakapacker_setup_incomplete, true)
 
       install_generator.send(:add_post_install_message)
@@ -2824,7 +2842,7 @@ describe InstallGenerator, type: :generator do
     end
 
     specify "incomplete-installation guidance uses detected package manager install command" do
-      install_generator = described_class.new
+      install_generator = install_generator_fixture
       install_generator.instance_variable_set(:@shakapacker_setup_incomplete, true)
       allow(GeneratorMessages).to receive(:detect_package_manager).and_return("pnpm")
 
@@ -2835,7 +2853,7 @@ describe InstallGenerator, type: :generator do
     end
 
     specify "incomplete-installation guidance preserves original install flags" do
-      install_generator = described_class.new([], { redux: true, typescript: true, rspack: true, rsc: true })
+      install_generator = install_generator_fixture(redux: true, typescript: true, rspack: true, rsc: true)
       install_generator.instance_variable_set(:@shakapacker_setup_incomplete, true)
 
       install_generator.send(:add_post_install_message)
@@ -2848,7 +2866,7 @@ describe InstallGenerator, type: :generator do
     end
 
     specify "post-install message disables landing-page hints when root route is unavailable" do
-      install_generator = described_class.new([], { new_app: true })
+      install_generator = install_generator_fixture(new_app: true)
       allow(install_generator).to receive_messages(
         shakapacker_setup_incomplete?: false,
         new_app_root_route_available?: false,
@@ -2870,10 +2888,16 @@ describe InstallGenerator, type: :generator do
     end
 
     specify "recovery_install_command keeps meaningful flags only" do
-      install_generator = described_class.new(
-        [],
-        { redux: true, typescript: true, rspack: true, rsc: true, pro: true, ignore_warnings: true,
-          force: true, skip: true, pretend: true }
+      install_generator = install_generator_fixture(
+        redux: true,
+        typescript: true,
+        rspack: true,
+        rsc: true,
+        pro: true,
+        ignore_warnings: true,
+        force: true,
+        skip: true,
+        pretend: true
       )
 
       command = install_generator.send(:recovery_install_command)
@@ -2887,7 +2911,7 @@ describe InstallGenerator, type: :generator do
     end
 
     specify "recovery_install_command includes --pro when requested without --rsc" do
-      install_generator = described_class.new([], { pro: true })
+      install_generator = install_generator_fixture(pro: true)
 
       command = install_generator.send(:recovery_install_command)
 
@@ -2895,7 +2919,7 @@ describe InstallGenerator, type: :generator do
     end
 
     specify "recovery_install_command normalizes the --webpack alias to --no-rspack" do
-      install_generator = described_class.new([], { webpack: true })
+      install_generator = install_generator_fixture(webpack: true)
 
       command = install_generator.send(:recovery_install_command)
 
@@ -2903,7 +2927,7 @@ describe InstallGenerator, type: :generator do
     end
 
     specify "shakapacker install error preserves original install flags" do
-      install_generator = described_class.new([], { redux: true, typescript: true, ignore_warnings: true })
+      install_generator = install_generator_fixture(redux: true, typescript: true, ignore_warnings: true)
 
       install_generator.send(:handle_shakapacker_install_error)
       output_text = GeneratorMessages.output.join("\n")
@@ -2915,7 +2939,7 @@ describe InstallGenerator, type: :generator do
     specify "shakapacker gemfile error preserves original install flags" do
       # ignore_warnings: true is required so handle_shakapacker_gemfile_error logs
       # the error instead of raising Thor::Error, which lets this example inspect output.
-      install_generator = described_class.new([], { rspack: true, pro: true, ignore_warnings: true })
+      install_generator = install_generator_fixture(rspack: true, pro: true, ignore_warnings: true)
 
       install_generator.send(:handle_shakapacker_gemfile_error)
       output_text = GeneratorMessages.output.join("\n")
@@ -2940,8 +2964,8 @@ describe InstallGenerator, type: :generator do
   end
 
   describe "--pretend mode behavior" do
-    let(:install_generator) { described_class.new([], { pretend: true }) }
-    let(:typescript_install_generator) { described_class.new([], { pretend: true, typescript: true }) }
+    let(:install_generator) { install_generator_fixture(pretend: true) }
+    let(:typescript_install_generator) { install_generator_fixture(pretend: true, typescript: true) }
 
     it "skips automatic shakapacker installation commands" do
       allow(install_generator).to receive(:shakapacker_configured?).and_return(false)
@@ -3018,7 +3042,7 @@ describe InstallGenerator, type: :generator do
     end
 
     it "forwards pretend mode to redux, pro, and rsc generators" do
-      redux_pro_rsc_install_generator = described_class.new([], { pretend: true, redux: true, pro: true, rsc: true })
+      redux_pro_rsc_install_generator = install_generator_fixture(pretend: true, redux: true, pro: true, rsc: true)
 
       allow(redux_pro_rsc_install_generator).to receive(:ensure_shakapacker_installed)
       allow(redux_pro_rsc_install_generator).to receive(:setup_react_dependencies)
@@ -3038,7 +3062,7 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when detecting node availability" do
-    let(:install_generator) { described_class.new }
+    let(:install_generator) { install_generator_fixture }
 
     specify "missing_node? returns false when node is on PATH" do
       allow(ReactOnRails::Utils).to receive(:command_available?).with("node").and_return(true)
@@ -3059,7 +3083,7 @@ describe InstallGenerator, type: :generator do
   # finalize_shakapacker_setup — the runtime path that fires during a real
   # `rails g react_on_rails:install` when Shakapacker wasn't pre-configured.
   describe "ensure_shakapacker_installed detection path" do
-    let(:install_generator) { described_class.new }
+    let(:install_generator) { install_generator_fixture }
 
     before do
       allow(install_generator).to receive(:print_shakapacker_setup_banner)
@@ -3146,7 +3170,7 @@ describe InstallGenerator, type: :generator do
   end
 
   describe "#shakapacker_configured?" do
-    let(:install_generator) { described_class.new }
+    let(:install_generator) { install_generator_fixture }
 
     before do
       allow(File).to receive(:exist?).and_call_original
@@ -3494,7 +3518,7 @@ describe InstallGenerator, type: :generator do
     end
 
     context "when --rspack option is provided" do
-      let(:install_generator) { described_class.new([], { rspack: true }) }
+      let(:install_generator) { install_generator_fixture(rspack: true) }
 
       it "returns true" do
         expect(install_generator.send(:using_rspack?)).to be true
@@ -3502,7 +3526,7 @@ describe InstallGenerator, type: :generator do
     end
 
     context "when --no-rspack is passed" do
-      let(:install_generator) { described_class.new([], { rspack: false }) }
+      let(:install_generator) { install_generator_fixture(rspack: false) }
 
       # --rspack declares no default, so options.key?(:rspack) is true only when the flag
       # is explicitly passed. --no-rspack sets it to false, selecting Webpack.
@@ -3512,7 +3536,7 @@ describe InstallGenerator, type: :generator do
     end
 
     context "when --webpack is passed (alias for --no-rspack)" do
-      let(:install_generator) { described_class.new([], { webpack: true }) }
+      let(:install_generator) { install_generator_fixture(webpack: true) }
 
       it "returns false" do
         expect(install_generator.send(:using_rspack?)).to be false
@@ -3520,7 +3544,7 @@ describe InstallGenerator, type: :generator do
     end
 
     context "when --no-webpack is passed" do
-      let(:install_generator) { described_class.new([], { webpack: false }) }
+      let(:install_generator) { install_generator_fixture(webpack: false) }
 
       it "returns true" do
         expect(install_generator.send(:using_rspack?)).to be true
@@ -3528,7 +3552,7 @@ describe InstallGenerator, type: :generator do
     end
 
     context "when --rspack and --webpack contradict each other" do
-      let(:install_generator) { described_class.new([], { rspack: true, webpack: true }) }
+      let(:install_generator) { install_generator_fixture(rspack: true, webpack: true) }
 
       it "raises a Thor::Error" do
         expect { install_generator.send(:using_rspack?) }
@@ -3537,7 +3561,7 @@ describe InstallGenerator, type: :generator do
     end
 
     context "when --no-rspack and --webpack agree (both Webpack)" do
-      let(:install_generator) { described_class.new([], { rspack: false, webpack: true }) }
+      let(:install_generator) { install_generator_fixture(rspack: false, webpack: true) }
 
       it "returns false without raising" do
         expect(install_generator.send(:using_rspack?)).to be false
@@ -3545,7 +3569,7 @@ describe InstallGenerator, type: :generator do
     end
 
     context "when no bundler flag is passed (fresh install)" do
-      let(:install_generator) { described_class.new }
+      let(:install_generator) { install_generator_fixture }
 
       # With no flag and no existing bundler choice, the default resolves to Rspack when
       # Shakapacker supports it (Rspack landed in 9.0).
@@ -3570,7 +3594,7 @@ describe InstallGenerator, type: :generator do
 
   describe "#destination_config_path" do
     context "with --rspack" do
-      let(:install_generator) { described_class.new([], { rspack: true }) }
+      let(:install_generator) { install_generator_fixture(rspack: true) }
 
       it "remaps config/webpack/ to config/rspack/" do
         expect(install_generator.send(:destination_config_path, "config/webpack/serverWebpackConfig.js"))
@@ -3584,7 +3608,7 @@ describe InstallGenerator, type: :generator do
     end
 
     context "with --no-rspack" do
-      let(:install_generator) { described_class.new([], { rspack: false }) }
+      let(:install_generator) { install_generator_fixture(rspack: false) }
 
       it "returns path unchanged" do
         expect(install_generator.send(:destination_config_path, "config/webpack/serverWebpackConfig.js"))
@@ -3599,7 +3623,7 @@ describe InstallGenerator, type: :generator do
   describe "bundler environment isolation" do
     # Pin to Webpack (--no-rspack) so shakapacker:install runs with an empty env hash here;
     # the SHAKAPACKER_ASSETS_BUNDLER=rspack env is covered by the dedicated example below.
-    let(:install_generator) { described_class.new([], { rspack: false }) }
+    let(:install_generator) { install_generator_fixture(rspack: false) }
 
     it "clears BUNDLE_GEMFILE when running bundle add" do
       allow(install_generator).to receive(:shakapacker_in_gemfile?).and_return(false)
@@ -3624,7 +3648,7 @@ describe InstallGenerator, type: :generator do
     end
 
     it "passes SHAKAPACKER_ASSETS_BUNDLER=rspack to shakapacker:install when --rspack is set" do
-      rspack_generator = described_class.new([], { rspack: true })
+      rspack_generator = install_generator_fixture(rspack: true)
       allow(Bundler).to receive(:with_unbundled_env).and_yield
       allow(rspack_generator).to receive(:system).with("bundle install").and_return(true)
       allow(rspack_generator).to receive(:system)
@@ -3694,7 +3718,7 @@ describe InstallGenerator, type: :generator do
   # Pro/RSC prerequisite validation tests
 
   context "when using --pro flag without Pro gem installed" do
-    let(:install_generator) { described_class.new([], { pro: true }) }
+    let(:install_generator) { install_generator_fixture(pro: true) }
     # Pin to a stable version so this test exercises the pessimistic (~>) branch
     # of pro_gem_version_requirement regardless of whether the live VERSION is a
     # prerelease (the prerelease branch is covered by a separate context below).
@@ -3724,7 +3748,7 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when using --rsc flag without Pro gem installed" do
-    let(:install_generator) { described_class.new([], { rsc: true }) }
+    let(:install_generator) { install_generator_fixture(rsc: true) }
     let(:fake_pid) { 12_345 }
 
     before do
@@ -3746,7 +3770,7 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when using --rsc flag with a prerelease ReactOnRails version" do
-    let(:install_generator) { described_class.new([], { rsc: true }) }
+    let(:install_generator) { install_generator_fixture(rsc: true) }
     let(:fake_pid) { 12_345 }
 
     before do
@@ -3774,7 +3798,7 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when auto-installing Pro gem succeeds" do
-    let(:install_generator) { described_class.new([], { pro: true }) }
+    let(:install_generator) { install_generator_fixture(pro: true) }
     let(:fake_pid) { 12_345 }
 
     before do
@@ -3804,7 +3828,7 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when auto-install times out" do
-    let(:install_generator) { described_class.new([], { pro: true }) }
+    let(:install_generator) { install_generator_fixture(pro: true) }
     let(:fake_pid) { 12_345 }
 
     before do
@@ -3822,7 +3846,7 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when auto-install raises an error" do
-    let(:install_generator) { described_class.new([], { pro: true }) }
+    let(:install_generator) { install_generator_fixture(pro: true) }
 
     before do
       allow(Gem).to receive(:loaded_specs).and_return({})
@@ -3836,7 +3860,7 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when using --pro flag with Pro gem in Gem.loaded_specs" do
-    let(:install_generator) { described_class.new([], { pro: true }) }
+    let(:install_generator) { install_generator_fixture(pro: true) }
 
     specify "missing_pro_gem? returns false" do
       allow(Gem).to receive(:loaded_specs).and_return({ "react_on_rails_pro" => double })
@@ -3846,7 +3870,7 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when using --pro flag with Pro gem in Gemfile.lock" do
-    let(:install_generator) { described_class.new([], { pro: true }) }
+    let(:install_generator) { install_generator_fixture(pro: true) }
 
     specify "missing_pro_gem? returns false" do
       allow(Gem).to receive(:loaded_specs).and_return({})
@@ -3857,7 +3881,7 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when not using --pro or --rsc flags" do
-    let(:install_generator) { described_class.new }
+    let(:install_generator) { install_generator_fixture }
 
     specify "missing_pro_gem? returns false without checking gem" do
       expect(install_generator.send(:missing_pro_gem?)).to be false
@@ -3865,7 +3889,7 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when the selected JavaScript package manager is unavailable" do
-    let(:install_generator) { described_class.new }
+    let(:install_generator) { install_generator_fixture }
 
     before do
       allow(GeneratorMessages).to receive(:detect_package_manager_with_source).and_return(["pnpm", :package_json])
@@ -3890,7 +3914,7 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when the detection source picks the missing package manager" do
-    let(:install_generator) { described_class.new }
+    let(:install_generator) { install_generator_fixture }
 
     before do
       allow(GeneratorMessages).to receive(:package_manager_executable_available?) { |command| command == "npm" }
@@ -3944,7 +3968,7 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when no JavaScript package manager is available at all" do
-    let(:install_generator) { described_class.new }
+    let(:install_generator) { install_generator_fixture }
 
     before do
       allow(GeneratorMessages).to receive_messages(
@@ -3964,7 +3988,7 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when no JavaScript package manager is available but the user had configured one" do
-    let(:install_generator) { described_class.new }
+    let(:install_generator) { install_generator_fixture }
 
     before do
       allow(GeneratorMessages).to receive_messages(
@@ -3985,7 +4009,7 @@ describe InstallGenerator, type: :generator do
   describe "#warn_if_unsupported_env_package_manager" do
     include_context "with clean REACT_ON_RAILS_PACKAGE_MANAGER env"
 
-    let(:install_generator) { described_class.new }
+    let(:install_generator) { install_generator_fixture }
 
     specify "warns when REACT_ON_RAILS_PACKAGE_MANAGER is set to an unsupported value" do
       ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = "rush"
@@ -4023,7 +4047,7 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when force-checking Pro gem without pro-related flags" do
-    let(:install_generator) { described_class.new([], { pro: false, rsc: false }) }
+    let(:install_generator) { install_generator_fixture(pro: false, rsc: false) }
     let(:fake_pid) { 12_345 }
 
     before do
@@ -4045,7 +4069,7 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when --pro flag used on a dirty worktree without pro gem" do
-    let(:install_generator) { described_class.new([], { pro: true }) }
+    let(:install_generator) { install_generator_fixture(pro: true) }
 
     before do
       allow(ReactOnRails::GitUtils).to receive(:warn_if_uncommitted_changes).and_return(true)
@@ -4065,7 +4089,7 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when --rsc flag used on a dirty worktree without pro gem" do
-    let(:install_generator) { described_class.new([], { rsc: true }) }
+    let(:install_generator) { install_generator_fixture(rsc: true) }
 
     before do
       allow(ReactOnRails::GitUtils).to receive(:warn_if_uncommitted_changes).and_return(true)
@@ -4085,7 +4109,7 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when --pro flag used on a dirty worktree with pro gem installed" do
-    let(:install_generator) { described_class.new([], { pro: true }) }
+    let(:install_generator) { install_generator_fixture(pro: true) }
 
     before do
       allow(ReactOnRails::GitUtils).to receive(:warn_if_uncommitted_changes).and_return(true)
@@ -4103,7 +4127,7 @@ describe InstallGenerator, type: :generator do
   # React version detection tests
 
   context "when package.json has standard React version" do
-    let(:install_generator) { described_class.new }
+    let(:install_generator) { install_generator_fixture }
 
     specify "detect_react_version extracts version" do
       allow(install_generator).to receive(:package_json).and_return({ "dependencies" => { "react" => "19.0.3" } })
@@ -4113,7 +4137,7 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when package.json has React version with caret prefix" do
-    let(:install_generator) { described_class.new }
+    let(:install_generator) { install_generator_fixture }
 
     specify "detect_react_version extracts version without prefix" do
       allow(install_generator).to receive(:package_json).and_return({ "dependencies" => { "react" => "^19.0.3" } })
@@ -4123,7 +4147,7 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when package.json has React as workspace protocol" do
-    let(:install_generator) { described_class.new }
+    let(:install_generator) { install_generator_fixture }
 
     specify "detect_react_version returns nil" do
       allow(install_generator).to receive(:package_json).and_return({ "dependencies" => { "react" => "workspace:*" } })
@@ -4133,7 +4157,7 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when package.json is not available" do
-    let(:install_generator) { described_class.new }
+    let(:install_generator) { install_generator_fixture }
 
     specify "detect_react_version returns nil" do
       allow(install_generator).to receive(:package_json).and_return(nil)
@@ -4145,7 +4169,7 @@ describe InstallGenerator, type: :generator do
   # RSC React version warning tests
 
   context "when using --rsc with React 19.0.4" do
-    let(:install_generator) { described_class.new([], { rsc: true }) }
+    let(:install_generator) { install_generator_fixture(rsc: true) }
 
     specify "warn_about_react_version_for_rsc does not add warning" do
       allow(install_generator).to receive(:detect_react_version).and_return("19.0.4")
@@ -4156,7 +4180,7 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when using --rsc with React 19.1.0" do
-    let(:install_generator) { described_class.new([], { rsc: true }) }
+    let(:install_generator) { install_generator_fixture(rsc: true) }
 
     specify "warn_about_react_version_for_rsc adds version incompatibility warning" do
       allow(install_generator).to receive(:detect_react_version).and_return("19.1.0")
@@ -4169,7 +4193,7 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when using --rsc with React 18.2.0" do
-    let(:install_generator) { described_class.new([], { rsc: true }) }
+    let(:install_generator) { install_generator_fixture(rsc: true) }
 
     specify "warn_about_react_version_for_rsc adds version incompatibility warning" do
       allow(install_generator).to receive(:detect_react_version).and_return("18.2.0")
@@ -4181,7 +4205,7 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when using --rsc with React 19.0.0" do
-    let(:install_generator) { described_class.new([], { rsc: true }) }
+    let(:install_generator) { install_generator_fixture(rsc: true) }
 
     specify "warn_about_react_version_for_rsc adds minimum version warning" do
       allow(install_generator).to receive(:detect_react_version).and_return("19.0.0")
@@ -4194,7 +4218,7 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when not using --rsc flag" do
-    let(:install_generator) { described_class.new }
+    let(:install_generator) { install_generator_fixture }
 
     specify "warn_about_react_version_for_rsc does not run" do
       allow(install_generator).to receive(:detect_react_version).and_return("18.2.0")
