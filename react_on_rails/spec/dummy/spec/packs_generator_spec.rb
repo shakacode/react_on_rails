@@ -153,6 +153,40 @@ module ReactOnRails
       end
     end
 
+    context "when multiple component files resolve to the same public component name" do
+      let(:components_directory) { "ComponentWithDuplicateNames" }
+      let(:admin_header_path) do
+        "#{packer_source_path}/components/#{components_directory}/admin/ror_components/Header.jsx"
+      end
+      let(:public_header_path) do
+        "#{packer_source_path}/components/#{components_directory}/public/ror_components/Header.tsx"
+      end
+
+      before do
+        stub_packer_source_path(component_name: components_directory,
+                                packer_source_path: packer_source_path)
+      end
+
+      it "raises an error that lists the conflicting component files" do
+        expected_header = "**ERROR** ReactOnRails: Multiple auto-bundled component files resolve to the same public " \
+                          'component name "Header":'
+
+        expect { described_class.instance.generate_packs_if_stale }
+          .to raise_error(ReactOnRails::Error) { |error|
+            expect(error.message).to include(expected_header)
+            expect(error.message).to include("  - #{admin_header_path}")
+            expect(error.message).to include("  - #{public_header_path}")
+            expect(error.message).to include(
+              "React on Rails auto-bundling currently uses one public component name"
+            )
+            expect(error.message).to include(
+              "Rename one of these component files to have a unique base name, such as AdminHeader or PublicHeader."
+            )
+            expect(error.message).to include("https://reactonrails.com/docs/core-concepts/auto-bundling/")
+          }
+      end
+    end
+
     context "when component with client and common File" do
       let(:component_name) { "ComponentWithClientAndCommon" }
       let(:component_pack) { "#{generated_directory}/#{component_name}.js" }
