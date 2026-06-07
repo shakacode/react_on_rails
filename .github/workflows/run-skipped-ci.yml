@@ -147,7 +147,7 @@ jobs:
 
             // GitHub workflow-run timestamps are second-precision; subtract 2 s so
             // a run created just before dispatch returns is still included.
-            const dispatchStartedAt = new Date(Math.floor(Date.now() / 1000) * 1000 - 2000).toISOString();
+            const dispatchStartedAt = new Date(Date.now() - 2000).toISOString();
 
             // Trigger each workflow
             for (const workflowName of workflowsToTrigger) {
