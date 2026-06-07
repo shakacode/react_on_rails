@@ -22,7 +22,7 @@ RSpec.describe ReactOnRailsPro::ServerRenderingPool::ProRendering do
       end
 
       def internal_option(name)
-        internal_options.fetch(name, nil)
+        internal_options&.fetch(name, nil)
       end
 
       def streaming?
@@ -121,7 +121,11 @@ RSpec.describe ReactOnRailsPro::ServerRenderingPool::ProRendering do
         def exec_server_render_js(_js_code, _render_options); end
       end
     end
-    let(:stream_class) { Class.new }
+    let(:stream_result_class) do
+      Class.new do
+        def each; end
+      end
+    end
     let(:pool) { instance_double(pool_class) }
     let(:cache_store) do
       Class.new do
@@ -136,7 +140,12 @@ RSpec.describe ReactOnRailsPro::ServerRenderingPool::ProRendering do
           @fetch_calls << key
           return @store[key] if @store.key?(key)
 
+          # Store the original object reference so the spec catches cache metadata mutation leaks.
           @store[key] = yield
+        end
+
+        def value_for(key)
+          @store.fetch(key)
         end
       end.new
     end
@@ -180,6 +189,16 @@ RSpec.describe ReactOnRailsPro::ServerRenderingPool::ProRendering do
         expect(pool).to have_received(:exec_server_render_js).with(js_code, render_options).once
         expect(cache_store.fetch_calls).to be_empty
       end
+
+      it "bypasses cache when skip_prerender_cache is any non-nil value, including false" do
+        render_options = build_render_options(internal_options: { skip_prerender_cache: false })
+
+        result = described_class.exec_server_render_js(js_code, render_options)
+
+        expect(result).to eq({ html: "rendered" })
+        expect(pool).to have_received(:exec_server_render_js).with(js_code, render_options).once
+        expect(cache_store.fetch_calls).to be_empty
+      end
     end
 
     context "when prerender caching is enabled for non-streaming renders" do
@@ -199,6 +218,16 @@ RSpec.describe ReactOnRailsPro::ServerRenderingPool::ProRendering do
         expect(cache_store.fetch_calls).to eq([result[:RORP_CACHE_KEY]])
       end
 
+      it "does not write response-only cache metadata back into the stored value" do
+        render_options = build_render_options
+
+        result = described_class.exec_server_render_js(js_code, render_options)
+        stored = cache_store.value_for(result[:RORP_CACHE_KEY])
+
+        expect(stored).to eq({ html: "rendered" })
+        expect(stored.keys).not_to include(:RORP_CACHE_KEY, :RORP_CACHE_HIT)
+      end
+
       it "returns cached render results for different random domNodeId values without rendering again" do
         first_options = build_render_options
         second_options = build_render_options
@@ -212,6 +241,7 @@ RSpec.describe ReactOnRailsPro::ServerRenderingPool::ProRendering do
         expect(result[:RORP_CACHE_HIT]).to be(true)
         expect(result[:RORP_CACHE_KEY]).to eq(["ror_pro_rendered_html", "test", second_options.request_digest])
         expect(pool).to have_received(:exec_server_render_js).once
+        expect(cache_store.value_for(result[:RORP_CACHE_KEY])).to eq({ html: "rendered" })
       end
 
       it "does not inject cache metadata into non-hash render results" do
@@ -230,7 +260,7 @@ RSpec.describe ReactOnRailsPro::ServerRenderingPool::ProRendering do
 
       it "returns cached streams directly without rendering through the selected pool" do
         render_options = build_render_options(streaming: true)
-        cached_stream = instance_double(stream_class)
+        cached_stream = instance_double(stream_result_class)
         allow(ReactOnRailsPro::StreamCache).to receive(:fetch_stream).and_return(cached_stream)
         allow(ReactOnRailsPro::StreamCache).to receive(:wrap_and_cache)
 
@@ -244,8 +274,8 @@ RSpec.describe ReactOnRailsPro::ServerRenderingPool::ProRendering do
       it "wraps cache misses and forwards cache options" do
         cache_options = { expires_in: 60.seconds }
         render_options = build_render_options(streaming: true, internal_options: { cache_options: cache_options })
-        upstream_stream = instance_double(stream_class)
-        wrapped_stream = instance_double(stream_class)
+        upstream_stream = instance_double(stream_result_class)
+        wrapped_stream = instance_double(stream_result_class)
         allow(pool).to receive(:exec_server_render_js).and_return(upstream_stream)
         allow(ReactOnRailsPro::StreamCache).to receive_messages(fetch_stream: nil, wrap_and_cache: wrapped_stream)
 
@@ -256,6 +286,7 @@ RSpec.describe ReactOnRailsPro::ServerRenderingPool::ProRendering do
           .with(["ror_pro_rendered_html", "test", render_options.request_digest],
                 upstream_stream,
                 cache_options: cache_options)
+        expect(pool).to have_received(:exec_server_render_js).with(js_code, render_options).once
       end
     end
   end

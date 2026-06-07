@@ -72,6 +72,7 @@ module ReactOnRailsPro
 
           # Pass back the cache key in the results only if the result is a Hash
           if result.is_a?(Hash)
+            result = result.dup # Prevent response-only metadata from mutating the cached hash
             result[:RORP_CACHE_KEY] = prerender_cache_key
             result[:RORP_CACHE_HIT] = prerender_cache_hit
           end
