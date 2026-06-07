@@ -327,9 +327,10 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
                            .limit(posts_count)
 
     # PostgreSQL/SQLite honor ORDER BY + LIMIT in this WHERE IN subquery. MySQL
-    # can ignore that LIMIT in this shape, so revisit this if the benchmark DB
-    # adapter changes instead of assuming the clamp still limits rows loaded.
-    # The outer order(:id) re-applies display ordering because WHERE IN does not.
+    # rejects LIMIT inside a subquery used with IN (5.x syntax error; MySQL 8
+    # support is incomplete), so rewrite this query if the benchmark DB adapter
+    # changes. The outer order(:id) re-applies display ordering because WHERE IN
+    # does not preserve subquery order.
     Post.with_delay(artificial_delay).where(id: post_id_subquery).order(:id).to_a
   end
 
@@ -338,10 +339,11 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     # Early return when posts is empty; avoids an unnecessary WHERE IN (empty) query.
     return [{}, {}] if post_ids.empty?
 
-    # artificial_delay sleeps once per batched query (posts, comments, and when
-    # comment authors exist, users), so total sleep = 2-3 * delay ms. This
-    # intentionally models per-query latency rather than end-to-end latency,
-    # which keeps query counts predictable for benchmark comparisons.
+    # artificial_delay sleeps once per batched query issued here: comments, and
+    # when comment authors exist, users (1-2 sleeps total in this method). The
+    # posts sleep is in posts_page_posts, so the full action sleeps 2-3 times.
+    # This models per-query latency rather than end-to-end latency, keeping
+    # query counts predictable for benchmarks.
     comments = Comment.with_delay(artificial_delay).where(post_id: post_ids).to_a
     user_ids = comments.map(&:user_id).uniq
     users_by_id = if user_ids.empty?

@@ -102,7 +102,7 @@ RSpec.describe "Posts page", :server_rendering do
   end
 
   it "returns an empty page when posts_count is zero" do
-    seeded_posts
+    seeded_posts # rows exist; posts_count=0 must still produce an empty render
 
     get "/posts_page", params: { posts_count: 0 }
 
