@@ -57,7 +57,11 @@ function serialize(value: unknown, seen: WeakSet<object>): string {
         if (value instanceof Map) {
           const entries = [...value]
             .map(([k, v]): [string, string] => [serialize(k, seen), serialize(v, seen)])
-            .sort(([a], [b]) => a.localeCompare(b));
+            .sort(([a], [b]) => {
+              if (a < b) return -1;
+              if (a > b) return 1;
+              return 0;
+            });
           return `["$Q",[${entries.map(([k, v]) => `[${k},${v}]`).join(',')}]]`;
         }
 

@@ -53,7 +53,7 @@ export class TieredCacheHandler implements CacheHandler {
       void this.l1.set(key, promoted).catch((err: unknown) => {
         console.error('TieredCacheHandler: L1 promotion failed', err);
       });
-      return l2Entry;
+      return l2Entry; // Return original entry (full TTL); only L1 gets the capped TTL
     }
 
     return null;

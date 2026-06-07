@@ -73,7 +73,10 @@ export class RedisCacheHandler implements CacheHandler {
 
     // Lazy-import ioredis to avoid hard dependency at module load time.
     // eslint-disable-next-line @typescript-eslint/no-require-imports, global-require -- lazy load for optional dependency
-    const IORedis = require('ioredis').default as typeof import('ioredis').default;
+    const mod = require('ioredis') as {
+      default?: typeof import('ioredis').default;
+    } & typeof import('ioredis').default;
+    const IORedis = mod.default ?? mod;
 
     const clientOpts: RedisOptions =
       typeof redisUrl === 'string'
@@ -101,15 +104,20 @@ export class RedisCacheHandler implements CacheHandler {
   async set(key: string, entry: CacheEntry): Promise<void> {
     try {
       const blob = serialize(entry);
-      if (blob.length > this.maxEntryBytes) return;
+      if (blob.length > this.maxEntryBytes) {
+        console.debug(
+          `[RedisCacheHandler] Skipping oversized entry for key "${key}": ${blob.length} bytes > maxEntryBytes (${this.maxEntryBytes}).`,
+        );
+        return;
+      }
 
       if (entry.revalidate > 0) {
         await this.redis.set(key, blob, 'EX', Math.ceil(entry.revalidate));
       } else {
         await this.redis.set(key, blob);
       }
-    } catch {
-      // Redis down -> silently skip caching
+    } catch (err) {
+      console.warn('[RedisCacheHandler] set failed, skipping cache write:', (err as Error).message);
     }
   }
 }
