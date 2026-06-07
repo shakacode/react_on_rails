@@ -2,9 +2,20 @@
 
 require_relative "simplecov_helper"
 require_relative "spec_helper"
+require "stringio"
 require "tmpdir"
 
 RSpec.describe "release.rake helper methods" do
+  def capture_stdout
+    original_stdout = $stdout
+    output = StringIO.new
+    $stdout = output
+    yield
+    output.string
+  ensure
+    $stdout = original_stdout
+  end
+
   before do
     next if Object.instance_variable_defined?(:@release_rake_helpers_loaded)
 
@@ -866,8 +877,19 @@ RSpec.describe "release.rake helper methods" do
     # to "no required checks configured" so tests that don't care about the
     # gate behave as before; tests that exercise the gate override this stub.
     before do
-      allow(self).to receive(:required_check_names_for_main)
-        .with(monorepo_root:).and_return(nil)
+      allow(self).to receive_messages(
+        fetch_main_commit_statuses: [],
+        github_repo_slug: "shakacode/react_on_rails",
+        required_check_names_for_main: nil
+      )
+    end
+
+    def required_checks(contexts: [], checks: [])
+      { contexts:, checks: }
+    end
+
+    def required_check(context, app_id: nil)
+      { context:, app_id: }
     end
 
     def next_check_run_id
@@ -878,24 +900,28 @@ RSpec.describe "release.rake helper methods" do
     # Distinct defaults keep same-named helper-generated runs from collapsing
     # in the nil-check_suite dedup path. Tests can still pin an id to model a
     # specific GitHub payload.
-    def passing_run(name, id: next_check_run_id)
-      {
+    def passing_run(name, id: next_check_run_id, app_id: nil)
+      run = {
         "id" => id,
         "name" => name,
         "status" => "completed",
         "conclusion" => "success",
         "html_url" => "https://github.com/shakacode/react_on_rails/runs/#{name.gsub(/\W/, '_')}"
       }
+      run["app"] = { "id" => app_id } if app_id
+      run
     end
 
-    def failing_run(name, conclusion: "failure", id: next_check_run_id)
-      {
+    def failing_run(name, conclusion: "failure", id: next_check_run_id, app_id: nil)
+      run = {
         "id" => id,
         "name" => name,
         "status" => "completed",
         "conclusion" => conclusion,
         "html_url" => "https://github.com/shakacode/react_on_rails/runs/#{name.gsub(/\W/, '_')}"
       }
+      run["app"] = { "id" => app_id } if app_id
+      run
     end
 
     def in_progress_run(name, id: next_check_run_id)
@@ -948,7 +974,7 @@ RSpec.describe "release.rake helper methods" do
           .with(monorepo_root:, allow_override: false, dry_run: false)
           .and_return(sha:, check_runs: [passing_run("Lint"), failing_run("Benchmark Workflow")])
         allow(self).to receive(:required_check_names_for_main)
-          .with(monorepo_root:).and_return(["Lint"])
+          .with(monorepo_root:).and_return(required_checks(checks: [required_check("Lint")]))
 
         expect do
           validate_main_ci_status!(
@@ -967,7 +993,7 @@ RSpec.describe "release.rake helper methods" do
           .with(monorepo_root:, allow_override: false, dry_run: false)
           .and_return(sha:, check_runs: [failing_run("Lint"), passing_run("Benchmark Workflow")])
         allow(self).to receive(:required_check_names_for_main)
-          .with(monorepo_root:).and_return(["Lint"])
+          .with(monorepo_root:).and_return(required_checks(checks: [required_check("Lint")]))
 
         expect do
           validate_main_ci_status!(
@@ -1196,7 +1222,7 @@ RSpec.describe "release.rake helper methods" do
           .with(monorepo_root:, allow_override: false, dry_run: false)
           .and_return(sha:, check_runs: [passing_run("Lint")])
         allow(self).to receive(:required_check_names_for_main)
-          .with(monorepo_root:).and_return(["DoesNotExist"])
+          .with(monorepo_root:).and_return(required_checks(checks: [required_check("DoesNotExist")]))
 
         expect do
           validate_main_ci_status!(
@@ -1215,7 +1241,8 @@ RSpec.describe "release.rake helper methods" do
           .with(monorepo_root:, allow_override: false, dry_run: false)
           .and_return(sha:, check_runs: [passing_run("Lint"), passing_run("Test")])
         allow(self).to receive(:required_check_names_for_main)
-          .with(monorepo_root:).and_return(%w[Lint Test Build])
+          .with(monorepo_root:)
+          .and_return(required_checks(checks: %w[Lint Test Build].map { |context| required_check(context) }))
 
         expect do
           validate_main_ci_status!(
@@ -1237,7 +1264,8 @@ RSpec.describe "release.rake helper methods" do
           .with(monorepo_root:, allow_override: false, dry_run: false)
           .and_return(sha:, check_runs: [passing_run("Lint"), passing_run("Test")])
         allow(self).to receive(:required_check_names_for_main)
-          .with(monorepo_root:).and_return(%w[Lint Test Build])
+          .with(monorepo_root:)
+          .and_return(required_checks(checks: %w[Lint Test Build].map { |context| required_check(context) }))
 
         expect do
           validate_main_ci_status!(
@@ -1284,6 +1312,525 @@ RSpec.describe "release.rake helper methods" do
             dry_run: false
           )
         end.to raise_error(SystemExit, /Check run\(s\) with unrecognized status.*Malformed/m)
+      end
+    end
+
+    context "when a required check is pinned to a GitHub App" do
+      it "does not let a same-named check from another app satisfy the requirement" do
+        wrong_app_run = passing_run("Lint", app_id: 999)
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, check_runs: [wrong_app_run])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root:)
+          .and_return(required_checks(checks: [required_check("Lint", app_id: 123)]))
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to raise_error(SystemExit, /No required CI check runs found.*Lint \(app_id: 123\)/m)
+      end
+
+      it "evaluates the same-named check from the required app" do
+        wrong_app_run = passing_run("Lint", app_id: 999)
+        required_app_run = failing_run("Lint", app_id: 123)
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, check_runs: [wrong_app_run, required_app_run])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root:)
+          .and_return(required_checks(checks: [required_check("Lint", app_id: 123)]))
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to raise_error(SystemExit, %r{CI on origin/main is not healthy.*Lint}m)
+      end
+
+      it "does not let a same-name check from a different app block a prerelease" do
+        wrong_app_run = failing_run("Lint", app_id: 999)
+        required_app_run = passing_run("Lint", app_id: 123)
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [wrong_app_run, required_app_run])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
+          .and_return(required_checks(checks: [required_check("Lint", app_id: 123)]))
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to output(/Main CI is healthy on #{short_sha} \(1 required check\)/).to_stdout
+      end
+    end
+
+    context "when branch protection includes legacy status contexts" do
+      it "uses commit statuses to satisfy legacy contexts when no check runs are visible" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
+          .and_return(required_checks(contexts: ["Travis"], checks: []))
+        allow(self).to receive(:fetch_main_commit_statuses)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
+          .and_return([
+                        {
+                          "id" => 1,
+                          "context" => "Travis",
+                          "state" => "success",
+                          "target_url" => "https://ci.example.com/travis"
+                        }
+                      ])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to output(/Main CI is healthy on #{short_sha} \(1 required check\)/).to_stdout
+      end
+
+      it "blocks when the legacy commit status has failed" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
+          .and_return(required_checks(contexts: ["Travis"], checks: []))
+        allow(self).to receive(:fetch_main_commit_statuses)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
+          .and_return([
+                        {
+                          "id" => 1,
+                          "context" => "Travis",
+                          "state" => "failure",
+                          "target_url" => "https://ci.example.com/travis"
+                        }
+                      ])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to raise_error(SystemExit, %r{CI on origin/main is not healthy.*Travis}m)
+      end
+
+      it "blocks when a same-named legacy status fails even if a check run passes" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Travis")])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
+          .and_return(required_checks(contexts: ["Travis"], checks: []))
+        allow(self).to receive(:fetch_main_commit_statuses)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
+          .and_return([
+                        {
+                          "id" => 1,
+                          "context" => "Travis",
+                          "state" => "failure",
+                          "target_url" => "https://ci.example.com/travis"
+                        }
+                      ])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to raise_error(SystemExit, %r{CI on origin/main is not healthy.*Travis}m)
+      end
+
+      it "treats a pending legacy commit status as in progress" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
+          .and_return(required_checks(contexts: ["Travis"], checks: []))
+        allow(self).to receive(:fetch_main_commit_statuses)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
+          .and_return([
+                        {
+                          "id" => 1,
+                          "context" => "Travis",
+                          "state" => "pending",
+                          "target_url" => "https://ci.example.com/travis"
+                        }
+                      ])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to raise_error(SystemExit, /CI is still in progress.*Travis/m)
+      end
+
+      it "treats an unknown legacy commit status state as failed" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
+          .and_return(required_checks(contexts: ["Travis"], checks: []))
+        allow(self).to receive(:fetch_main_commit_statuses)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
+          .and_return([
+                        {
+                          "id" => 1,
+                          "context" => "Travis",
+                          "state" => "unexpected",
+                          "target_url" => "https://ci.example.com/travis"
+                        }
+                      ])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to raise_error(SystemExit, %r{CI on origin/main is not healthy.*Travis}m)
+      end
+
+      it "keeps evaluating fetched check runs when legacy status fetch is skipped in dry-run" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: true)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [failing_run("Lint")])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
+          .and_return(required_checks(contexts: ["Travis"], checks: []))
+        allow(self).to receive(:fetch_main_commit_statuses)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: true)
+          .and_return(nil)
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: false,
+            allow_override: false,
+            dry_run: true
+          )
+        end.to output(%r{DRY RUN: .*CI on origin/main is not healthy.*DRY RUN:.*Lint}m).to_stdout
+      end
+
+      it "does not print green when required legacy status data is unavailable in dry-run" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: true)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Travis")])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
+          .and_return(required_checks(contexts: ["Travis"], checks: []))
+        allow(self).to receive(:fetch_main_commit_statuses) do
+          puts "⚠️ DRY RUN: Required legacy status fetch failed."
+          nil
+        end
+
+        output = capture_stdout do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: true
+          )
+        end
+
+        expect(output).to include("DRY RUN: Required legacy status fetch failed.")
+        expect(output).not_to include("Main CI is healthy")
+      end
+
+      it "raises if strict legacy status fetch unexpectedly returns nil" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Lint")])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
+          .and_return(required_checks(contexts: ["Travis"], checks: []))
+        allow(self).to receive(:fetch_main_commit_statuses)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
+          .and_return(nil)
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to raise_error(SystemExit, /Internal error: legacy status fetch returned nil unexpectedly in strict mode/)
+      end
+
+      it "does not print the commit-status API URL as a browser link" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
+          .and_return(required_checks(contexts: ["Travis"], checks: []))
+        allow(self).to receive(:fetch_main_commit_statuses)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
+          .and_return([
+                        {
+                          "id" => 1,
+                          "context" => "Travis",
+                          "state" => "failure",
+                          "url" => "https://api.github.com/repos/shakacode/react_on_rails/statuses/#{sha}"
+                        }
+                      ])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to raise_error(SystemExit) { |error| expect(error.message).not_to include("api.github.com") }
+      end
+
+      it "reports a failed legacy status for a wildcard required check" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
+          .and_return(required_checks(checks: [required_check("Travis")]))
+        allow(self).to receive(:fetch_main_commit_statuses)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
+          .and_return([
+                        {
+                          "id" => 1,
+                          "context" => "Travis",
+                          "state" => "failure",
+                          "target_url" => "https://ci.example.com/travis"
+                        }
+                      ])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to raise_error(SystemExit, %r{CI on origin/main is not healthy.*Travis}m)
+      end
+
+      it "blocks a stable release when a legacy commit status has failed" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Lint")])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
+          .and_return(required_checks(contexts: ["Travis"], checks: []))
+        allow(self).to receive(:fetch_main_commit_statuses)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
+          .and_return([
+                        {
+                          "id" => 1,
+                          "context" => "Travis",
+                          "state" => "failure",
+                          "target_url" => "https://ci.example.com/travis"
+                        }
+                      ])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: false,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to raise_error(SystemExit, %r{CI on origin/main is not healthy.*Travis}m)
+      end
+
+      it "uses a legacy status to satisfy a wildcard required check" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
+          .and_return(required_checks(checks: [required_check("Travis")]))
+        allow(self).to receive(:fetch_main_commit_statuses)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
+          .and_return([
+                        {
+                          "id" => 1,
+                          "context" => "Travis",
+                          "state" => "success",
+                          "target_url" => "https://ci.example.com/travis"
+                        }
+                      ])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to output(/Main CI is healthy on #{short_sha} \(1 required check\)/).to_stdout
+      end
+
+      it "counts a mirrored wildcard required check once when both APIs report it" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Travis")])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
+          .and_return(required_checks(checks: [required_check("Travis")]))
+        allow(self).to receive(:fetch_main_commit_statuses)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
+          .and_return([
+                        {
+                          "id" => 1,
+                          "context" => "Travis",
+                          "state" => "success",
+                          "target_url" => "https://ci.example.com/travis"
+                        }
+                      ])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to output(/Main CI is healthy on #{short_sha} \(1 required check\)/).to_stdout
+      end
+
+      it "counts a mirrored wildcard required check once on stable releases" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Travis")])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
+          .and_return(required_checks(checks: [required_check("Travis")]))
+        allow(self).to receive(:fetch_main_commit_statuses)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
+          .and_return([
+                        {
+                          "id" => 1,
+                          "context" => "Travis",
+                          "state" => "success",
+                          "target_url" => "https://ci.example.com/travis"
+                        }
+                      ])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: false,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to output(/Main CI is healthy on #{short_sha} \(1 check\)/).to_stdout
+      end
+
+      it "uses the newest same-context legacy status" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
+          .and_return(required_checks(contexts: ["Travis"], checks: []))
+        allow(self).to receive(:fetch_main_commit_statuses)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
+          .and_return([
+                        {
+                          "id" => 1,
+                          "context" => "Travis",
+                          "state" => "failure",
+                          "created_at" => "2026-06-07T20:00:00Z",
+                          "target_url" => "https://ci.example.com/travis"
+                        },
+                        {
+                          "id" => 2,
+                          "context" => "Travis",
+                          "state" => "success",
+                          "created_at" => "2026-06-07T20:00:01Z",
+                          "target_url" => "https://ci.example.com/travis"
+                        }
+                      ])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to output(/Main CI is healthy on #{short_sha} \(1 required check\)/).to_stdout
+      end
+
+      it "reports a missing mirrored wildcard check once" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Build")])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
+          .and_return(
+            required_checks(checks: [required_check("Travis"), required_check("Build")])
+          )
+        allow(self).to receive(:fetch_main_commit_statuses)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
+          .and_return([])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to raise_error(SystemExit) { |error|
+          expect(error.message).to include("Required: Travis, Build")
+          expect(error.message).to include("Missing: Travis")
+          expect(error.message).not_to include("2 gates")
+        }
+      end
+
+      it "does not let a legacy status satisfy an app-pinned modern check" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false)
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Other")])
+        allow(self).to receive(:required_check_names_for_main)
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails")
+          .and_return(required_checks(checks: [required_check("Travis", app_id: 123)]))
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to raise_error(SystemExit, /No required CI check runs found.*Required: Travis \(app_id: 123\)/m)
       end
     end
 
@@ -1438,7 +1985,7 @@ RSpec.describe "release.rake helper methods" do
     let(:monorepo_root) { "/tmp/repo" }
     let(:success_status) { instance_double(Process::Status, success?: true) }
     let(:failure_status) { instance_double(Process::Status, success?: false) }
-    let(:expected_jq) { "(.contexts // []) + (.checks // [] | map(.context)) | unique" }
+    let(:expected_jq) { "{contexts: (.contexts // []), checks: (.checks // [] | map({context, app_id}))}" }
 
     before do
       allow(self).to receive(:github_repo_slug).with(monorepo_root).and_return("shakacode/react_on_rails")
@@ -1448,27 +1995,60 @@ RSpec.describe "release.rake helper methods" do
       allow(Open3).to receive(:capture2e)
         .with("gh", "api", "--jq", expected_jq,
               "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks")
-        .and_return([%w[Lint Test].to_json, success_status])
+        .and_return([{ contexts: %w[Lint Test], checks: [] }.to_json, success_status])
 
-      expect(required_check_names_for_main(monorepo_root:)).to eq(%w[Lint Test])
+      expect(required_check_names_for_main(monorepo_root:)).to eq(
+        contexts: %w[Lint Test],
+        checks: []
+      )
     end
 
-    it "returns modern required check contexts when branch protection uses checks" do
+    it "returns modern required check contexts and app IDs when branch protection uses checks" do
       allow(Open3).to receive(:capture2e)
         .with("gh", "api", "--jq", expected_jq,
               "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks")
-        .and_return([%w[CodeQL Lint].to_json, success_status])
+        .and_return([
+                      {
+                        contexts: [],
+                        checks: [
+                          { context: "CodeQL", app_id: 15_368 },
+                          { context: "Lint", app_id: nil }
+                        ]
+                      }.to_json,
+                      success_status
+                    ])
 
-      expect(required_check_names_for_main(monorepo_root:)).to eq(%w[CodeQL Lint])
+      expect(required_check_names_for_main(monorepo_root:)).to eq(
+        contexts: [],
+        checks: [
+          { context: "CodeQL", app_id: 15_368 },
+          { context: "Lint", app_id: nil }
+        ]
+      )
     end
 
-    it "returns the deduplicated union when branch protection has contexts and checks" do
+    it "returns legacy contexts and modern checks separately when both are configured" do
       allow(Open3).to receive(:capture2e)
         .with("gh", "api", "--jq", expected_jq,
               "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks")
-        .and_return([%w[CodeQL Lint Test].to_json, success_status])
+        .and_return([
+                      {
+                        contexts: %w[Lint Test],
+                        checks: [
+                          { context: "CodeQL", app_id: -1 },
+                          { context: "Lint", app_id: nil }
+                        ]
+                      }.to_json,
+                      success_status
+                    ])
 
-      expect(required_check_names_for_main(monorepo_root:)).to eq(%w[CodeQL Lint Test])
+      expect(required_check_names_for_main(monorepo_root:)).to eq(
+        contexts: %w[Test],
+        checks: [
+          { context: "CodeQL", app_id: -1 },
+          { context: "Lint", app_id: nil }
+        ]
+      )
     end
 
     it "returns nil when the branch protection endpoint returns an error" do
@@ -1488,7 +2068,7 @@ RSpec.describe "release.rake helper methods" do
       allow(Open3).to receive(:capture2e)
         .with("gh", "api", "--jq", expected_jq,
               "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks")
-        .and_return(["[]", success_status])
+        .and_return([{ contexts: [], checks: [] }.to_json, success_status])
 
       expect(required_check_names_for_main(monorepo_root:)).to be_nil
     end

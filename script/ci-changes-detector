@@ -15,13 +15,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=script/lib/git-diff-base
 source "$SCRIPT_DIR/lib/git-diff-base"
 
-BASE_REF="${1:-origin/main}"
-CURRENT_REF="${2:-HEAD}"
-
-# Handle initial commits where before SHA is all zeros
-if [[ "$BASE_REF" =~ ^0+$ ]]; then
-  BASE_REF="origin/main"
-fi
+BASE_REF="$(git_diff_base_normalize_base_ref "${1:-}")"
+CURRENT_REF="$(git_diff_base_normalize_current_ref "${2:-}")"
 
 # Colors for output
 RED='\033[0;31m'
