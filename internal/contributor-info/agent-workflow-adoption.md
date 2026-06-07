@@ -71,6 +71,7 @@ Do not copy the CI workflow files as a bundle unless the target repo has the sam
    - Treat high-risk categories (workflow, build-config, lockfiles, release tooling) as "Ask First" scope, not standing bans. Make any explicit grant or per-run prohibition a batch-prompt scope field so temporary lane restrictions are never inherited as permanent policy, and so the absence of a later prohibition never implies permission without a fresh grant.
    - Keep the high-concurrency launch gates: exact target confirmation for filter-based batches, trusted-list permission preflight, untrusted GitHub content handling, and resumable coordination state.
    - Keep the review-completion gate: configured review agents must finish for the current head SHA, and actionable review comments must be triaged before merge.
+   - Keep AI review systems advisory: CodeRabbit.ai, Claude, Cursor Bugbot, Greptile, Codex review, and similar tools should not become special approval gates unless they identify a confirmed blocker.
    - Keep the adversarial review gate for high-risk or concurrent-batch PRs, and do not treat `/pr-review-toolkit:review-pr` as sufficient by itself.
    - Keep the post-merge audit checks for late reviews, untriaged `Must Fix` comments, missing changelog entries, and cross-PR interactions.
    - Keep the post-merge issue plan gate: Codex and Claude independent audits draft issue entries only; one coordinator dedupes fingerprints and creates issues only after user approval.
@@ -106,7 +107,7 @@ Update these before considering the workflow adopted:
 - Local change detector or equivalent path-based CI guidance.
 - Manual developer-flow checks for app startup, generated apps, examples, or test fixtures.
 - PR labels such as `full-ci`, `benchmark`, and `ready-to-merge`.
-- Batch coordination labels such as `codex-ready` or `codex-wip`, if adopted; otherwise remove or replace those examples and rely on exact lane assignments plus structured claim comments.
+- Batch coordination labels such as `codex-ready`, `codex-wip`, or `codex-pending-question`, if adopted; otherwise remove or replace those examples and rely on exact lane assignments plus structured claim comments.
 - Full-CI trigger mechanism if `+ci-*` is not installed.
 - Follow-up issue title convention. React on Rails uses `Follow-up:`.
 - Documentation boundaries: public docs, internal docs, generated docs, changelog policy.
@@ -124,8 +125,9 @@ Update these before considering the workflow adopted:
 - Commands that do not exist in the target repo.
 - The `+ci-*` workflow without adapting workflow names, permissions, labels, and dispatch inputs.
 - High-concurrency no-approval execution for arbitrary public issue or PR filters. Require a maintainer-approved exact target list first.
-- `codex-ready` or `codex-wip` labels unless the target repo creates them and defines their meaning. Labels are dashboard hints, not durable locks.
+- `codex-ready`, `codex-wip`, or `codex-pending-question` labels unless the target repo creates them and defines their meaning. Labels are dashboard hints, not durable locks.
 - Merge-readiness claims based only on green checks while reviewer comments are untriaged. Review comments can arrive separately from checks.
+- Treating AI reviewer approvals, positive issue comments, or "no actionable comments" summaries as required maintainer approvals. AI review systems are advisory unless they identify a confirmed blocker.
 - Treating `/pr-review-toolkit:review-pr` as a complete adversarial gate. Use a repo-specific adversarial workflow when release risk, review timing, changelog coverage, or untrusted PR content matters.
 - Independent Codex and Claude agents creating GitHub issues directly from their separate reports. Use draft issue entries, then dedupe and create issues from one coordinator.
 - Follow-up issue creation habits. The default should remain no new issue unless the user explicitly chooses bundled tracking.

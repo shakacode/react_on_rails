@@ -35,6 +35,7 @@ For each included PR:
 - Review completion: find reviews, review comments, issue comments, and review/check runs from Claude, Codex, CodeRabbit, Greptile, Cursor Bugbot, and other configured reviewers.
 - Review timing: flag any reviewer check, review, or comment that was still queued/in-progress at merge time or landed after merge.
 - Review triage: flag any pre-merge review/comment with `Must Fix`, `MUST-FIX`, `Should Fix`, `DISCUSS`, `Changes Requested`, `blocking`, or similar actionable language when there is no later evidence it was fixed, waived, or explicitly classified.
+- Approval semantics: flag any merge that treated an AI reviewer approval, positive issue comment, or "no actionable comments" summary as required maintainer approval or a special approval gate. Also flag any AI finding that was ignored even though it identified a confirmed blocker such as a correctness regression, failing test, security issue, API contract break, data-loss risk, or missing required maintainer approval.
 - Adversarial review: flag any requested adversarial review that finished after merge, reviewed an older head SHA, or left untriaged `BLOCKING` or `DISCUSS` findings.
 - Changelog: if the diff or PR body indicates a user-visible behavior, API, error message, configuration, performance, security, or breaking change, verify `CHANGELOG.md` has a matching entry. When entries are missing, recommend running `/update-changelog`.
 - Validation: compare changed areas with the validation evidence in the PR body or comments.
@@ -87,7 +88,7 @@ Only the coordinator should create issues. Independent Codex and Claude audits s
 
 Return high-risk findings first, then:
 
-1. Review-gate violations, including PRs merged before requested reviews finished or before actionable review findings were triaged.
+1. Review-gate violations, including PRs merged before requested reviews finished, before actionable review findings were triaged, or with AI review systems incorrectly counted as approval gates.
 2. Missing changelog candidates, with a single recommendation to run `/update-changelog` when any are found.
 3. Cross-PR interaction risks.
 4. A deduped issue plan with parent/child recommendations and fingerprints.

@@ -77,6 +77,8 @@ After confirmation, audit each included PR for:
 - overlapping files or assumptions
 - undocumented non-blocking decisions
 - review-agent checks/reviews/comments that were late, pending, stale, or untriaged at merge time
+- AI reviewer approvals, positive issue comments, or "no actionable comments" summaries that were incorrectly treated as required maintainer approval or special approval gates
+- AI review findings that were ignored even though they identified a confirmed blocker such as a correctness regression, failing test, security issue, API contract break, data-loss risk, or missing required maintainer approval
 - requested adversarial reviews that were late, stale, missing, or left untriaged `BLOCKING`/`DISCUSS` findings
 - untriaged Must Fix, SHOULD-FIX, DISCUSS, Changes Requested, compatibility, security, regression, or missing-changelog review findings
 - changes touching CI, Pro, build config, generators, SSR, RSC, shared types, or release-sensitive docs
@@ -124,6 +126,7 @@ Pay special attention to disagreements:
 - different PR inclusion lists
 - different release-candidate base
 - different interpretation of validation evidence
+- different interpretation of whether AI review evidence was advisory, blocking, or incorrectly counted as approval
 - cross-PR interactions only one agent noticed
 - issue drafts that duplicate the same underlying fix
 

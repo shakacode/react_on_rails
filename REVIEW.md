@@ -1,7 +1,8 @@
 # Review Instructions
 
 Use these instructions for automated PR review, including Claude Code Review.
-`AGENTS.md` remains the canonical repository policy.
+`AGENTS.md` remains the canonical repository policy. If this file conflicts
+with `AGENTS.md`, follow `AGENTS.md`.
 
 ## Adversarial Stance
 
@@ -32,6 +33,23 @@ Classify findings clearly:
 
 Do not spend reviewer attention on nits unless they mask a real bug or conflict
 with an explicit repository rule.
+
+## Output And Approval Semantics
+
+Automated reviewers may leave inline comments, top-level summaries, or
+report-only findings depending on the tool. Classify every actionable finding
+with the labels above so the coordinator can triage it before merge.
+
+AI review systems such as CodeRabbit.ai, Claude, Cursor Bugbot, Greptile, and
+Codex review are advisory unless they identify a confirmed blocker: correctness
+regression, failing test, security issue, API contract break, data-loss risk, or
+missing required maintainer approval. Positive AI issue comments, "no
+actionable comments" summaries, and AI approval review objects are useful
+evidence, but they do not count as required maintainer approval.
+
+For small focused PRs, prefer at most one AI reviewer that leaves inline
+comments. Additional AI review should be summary-only or used manually so the PR
+does not accumulate duplicate advisory threads.
 
 ## Changelog And Review Timing
 

@@ -210,6 +210,7 @@ For small, focused PRs (roughly 5 files changed or fewer and one clear purpose):
 - Use at most one AI reviewer that leaves inline comments. Additional AI tools should be summary-only or used manually.
 - Wait for the first full review pass to finish before pushing follow-up commits.
 - Before merge, wait for configured review agents such as Claude review, CodeRabbit, Greptile, Cursor Bugbot, and Codex review to finish for the current head SHA, then triage their reviews/comments. A green or skipped check is not enough if actionable comments exist.
+- Treat AI review systems as advisory unless they identify a confirmed blocker: correctness regression, failing test, security issue, API contract break, data-loss risk, or missing required maintainer approval. AI approvals, positive issue comments, and "no actionable comments" summaries are useful evidence, but they are not required maintainer approvals or special merge gates.
 - If the user requests Claude review from a Codex-run PR process, prefer the repo-local `/adversarial-pr-review <PR_URL>` handoff after a draft PR exists. `/pr-review-toolkit:review-pr` is useful input, but it is not by itself the merge gate. Classify and resolve or waive Claude's actionable findings before final readiness.
 - Batch review fixes into one follow-up push when practical. Do not create a new commit for each minor comment.
 - Treat as blocking only: correctness bugs, failing tests, regressions, and clear inconsistencies with adjacent code. Nits and style suggestions are optional unless a maintainer asks for them.

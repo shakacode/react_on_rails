@@ -69,6 +69,9 @@ If the user is in `/plan` or asks for a plan-to-goal handoff, stop after the `/g
 
 ## Goal Prompt Template
 
+Keep this template aligned with the matching plan-to-goal prompt in
+`.agents/workflows/pr-processing.md`.
+
 Use this template when creating the `/goal` text:
 
 ```text
@@ -82,7 +85,7 @@ Mode: spawn worker subagents only after the target list and lane split are confi
 
 For issue targets, create one focused branch and PR unless exact same-file overlap makes a bundle safer. Start new issue branches from updated origin/main. For existing PR, review-fix, or merge-readiness targets, work on the existing PR head branch and do not create replacement PRs; if the branch cannot be updated safely, report the blocker. Follow local validation, self-review, CI backpressure, and merge-readiness gates.
 
-Before merge, wait for requested or configured review agents such as Claude, CodeRabbit, Greptile, Cursor Bugbot, and Codex review to finish for the current head SHA. For high-risk or concurrent-batch PRs, run or request the adversarial PR review workflow in `.agents/workflows/adversarial-pr-review.md`. A completed check is not enough when review comments exist: classify and resolve or explicitly waive actionable findings before merging. Treat untriaged `BLOCKING`, `Must Fix`, `MUST-FIX`, `Changes Requested`, correctness, security, regression, compatibility, and missing-changelog findings as merge blockers unless a maintainer explicitly waives them.
+Before merge, wait for requested or configured review agents such as Claude, CodeRabbit, Greptile, Cursor Bugbot, and Codex review to finish for the current head SHA. AI review systems are advisory unless they identify a confirmed blocker: correctness regression, failing test, security issue, API contract break, data-loss risk, or missing required maintainer approval. Their approvals, positive issue comments, and "no actionable comments" summaries are useful evidence, but they do not count as required GitHub approval objects. For high-risk or concurrent-batch PRs, run or request the adversarial PR review workflow in `.agents/workflows/adversarial-pr-review.md`. A completed check is not enough when review comments exist: classify and resolve or explicitly waive actionable findings before merging. Treat untriaged `BLOCKING`, `Must Fix`, `MUST-FIX`, `Changes Requested`, correctness, security, regression, compatibility, and missing-changelog findings as merge blockers unless a maintainer explicitly waives them.
 
 For blocking questions, stop work on that target, surface the question to the coordinator or maintainer, and mark the issue/PR with the agreed pending-question state. For non-blocking questions where you make a decision and continue, record the decision in the PR description before review or merge.
 
@@ -127,6 +130,12 @@ status: in_progress
 expires_at: <ISO8601_UTC>
 -->
 ```
+
+Use any stable session, thread, or machine identifier that lets a restarted
+coordinator recognize its own work; if none exists, use `thread: unavailable`
+and rely on the machine, branch, and batch fields. Set `expires_at` to a short
+bounded lease, usually 2-4 hours for an active batch or no later than the known
+batch window. Refresh the claim when continuing beyond that window.
 
 On restart, search for existing claim comments. Resume your own live claim, skip another live claim, or treat expired claims as recoverable after reporting the takeover.
 
