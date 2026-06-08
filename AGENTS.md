@@ -193,7 +193,7 @@ Use the current release tracker to decide whether PRs are in normal development,
 
 - An active tracker is an open release gate issue, usually found by the existing `release` and `TRACKING` labels or the `Release gate:` title. The mode must be recorded in the issue body, not encoded by adding more labels.
 - Valid tracker modes are `development`, `accelerated-rc`, `strict-rc`, and `final-release`.
-- If no active tracker exists, assume `development` mode. This is not a blocker; it means the repo is moving toward the next beta/RC/final. If a release tracker was closed within the last 7 days and lacks a closing label/comment containing `Released` or `Superseded`, report `release-mode-stale-tracker` and do not auto-merge until a maintainer confirms the mode. A maintainer can resolve the stale signal with a PR or tracker comment such as `No active release, proceed`.
+- If no active tracker exists, assume `development` mode. This is not a blocker; it means the repo is moving toward the next beta/RC/final. If a release tracker was closed within the last 7 days and lacks a closing label/comment containing `Released` or `Superseded`, report `release-mode-stale-tracker` and do not auto-merge until a maintainer confirms the mode. A maintainer can resolve the stale signal with a PR or tracker comment such as `No active release, proceed`; verify the comment author has `write`, `maintain`, or `admin` permission before treating it as maintainer confirmation.
 - If exactly one active tracker exists, read its `Agent Release Mode` block from the issue body. If the block is absent, use `strict-rc` and report the missing block.
 - If multiple active trackers disagree about final release target, mode, or canonical status, report `release-mode-conflict` and do not auto-merge until resolved.
 - For duplicate trackers with the same final release target (the eventual semver without prerelease suffix, for example `v1.2.0.rc.1` and `v1.2.0.rc.2` share the `v1.2.0` target) and no conflicting mode, the oldest open tracker is canonical unless it explicitly says it is superseded by another tracker. Agents may close clean duplicates only after preserving non-conflicting useful information in the canonical tracker and posting a closing comment that links to the canonical issue.
@@ -202,13 +202,13 @@ Use the current release tracker to decide whether PRs are in normal development,
 
 During `accelerated-rc`, affected areas such as SSR, RSC, hydration, package release, generators, CI, benchmarks, and Pro/core boundaries do not cap confidence by themselves. They choose the validation checklist. Actual uncertainty, missing proof, failed checks, or unresolved findings lower confidence.
 
-Auto-merge during accelerated RC requires a finalized PR-body confidence block. The authoring agent may draft it, but a separate coordinator, finalizer, or review agent must finalize it. The finalizer must be a different GitHub account or named GitHub check/app identity than the PR authoring agent, verifiable from the git log or GitHub review/check record. Two sessions running under the same GitHub account do not satisfy this requirement. Before auto-merge, verify the `Finalized by` identity against that record, not only the PR body text. Keep only the latest finalized block in the PR body. Once `Finalized by:` is populated, any later confidence-block edit must first post a PR comment with a `Confidence Block Updated:` header, the previous score/finalizer, and the reason for the edit.
+Auto-merge during accelerated RC requires a finalized PR-body confidence block. The authoring agent may draft it, but a separate coordinator, finalizer, or review agent must finalize it. The finalizer must be a different GitHub account or named GitHub check/app identity than the PR authoring agent, verifiable from the git log or GitHub review/check record. Two sessions running under the same GitHub account, including separate invocations of the same GitHub App bot, do not satisfy this requirement. Before auto-merge, verify the `Finalized by` identity against that record, not only the PR body text. Keep only the latest finalized block in the PR body. Once `Finalized by:` is populated, any later confidence-block edit must first post a PR comment with a `Confidence Block Updated:` header, the previous score/finalizer, and the reason for the edit.
 
 ```text
 ## Agent Merge Confidence
 
 Mode: accelerated-rc
-Score: 8/10
+Score: X/10
 Auto-merge recommendation: yes
 Affected areas: RSC, Pro/core boundary, CI
 CI detector: `script/ci-changes-detector origin/main` -> <summary>
@@ -305,8 +305,8 @@ gh api "repos/${OWNER}/${NAME}/collaborators/<login>/permission" --jq .permissio
 ```
 
 This prints `none` for both 404 (not a collaborator) and 403 (the token cannot
-list collaborators). Treat `none` as unverified and look for another trusted
-assignment source before widening scope.
+list collaborators). Treat `none` as unverified for GitHub-originated assignments
+and look for another trusted assignment source before widening scope.
 
 ### Destructive Git Requires Confirmation
 

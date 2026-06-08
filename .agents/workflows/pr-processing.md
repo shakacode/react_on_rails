@@ -570,7 +570,7 @@ Auto-merge requires all of the following:
 
 - The PR body contains the latest finalized `Agent Merge Confidence` block; do not rely on a PR comment for the final state.
 - Once `Finalized by:` is populated, any later confidence-block edit also has a PR comment with a `Confidence Block Updated:` header, the previous score/finalizer, and the reason for the edit.
-- The authoring agent did not finalize its own `8/10` or higher score. The `Finalized by` value names a different GitHub account or named GitHub check/app identity, verifiable from the git log or GitHub review/check record. Two sessions running under the same GitHub account do not satisfy this requirement.
+- The authoring agent did not finalize its own `8/10` or higher score. The `Finalized by` value names a different GitHub account or named GitHub check/app identity, verifiable from the git log or GitHub review/check record. Two sessions running under the same GitHub account, including separate invocations of the same GitHub App bot, do not satisfy this requirement.
 - Score is at least `8/10`; `7/10` permits human merge after review, but not auto-merge.
 - Before triggering auto-merge, the merge actor verifies `Finalized by` against the GitHub review record, checks, or git log, not only the PR body text.
 - All GitHub checks for the current head SHA are complete. Skipped checks count as complete only when CI selector output explains them or a maintainer explicitly waives them.
