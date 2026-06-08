@@ -1,10 +1,8 @@
 <h1>React Intl RSC Demo</h1>
-<p>This page demonstrates i18n in React Server Components using <code>React.cache()</code> and <code>@formatjs/intl</code>.</p>
+<p>This page demonstrates i18n in React Server Components using <code>React.cache()</code> and <code>react-intl/server</code>.</p>
 <p>The language switcher below triggers a new RSC payload request for each locale change.</p>
 <hr/>
 
 <%= stream_react_component("ReactIntlRscDemoPage",
                     props: { locale: params[:locale].presence || "en" },
-                    prerender: true,
-                    trace: true,
                     id: "ReactIntlRscDemoPage-react-component-0") %>

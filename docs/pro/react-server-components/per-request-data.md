@@ -182,8 +182,7 @@ end
 <%# app/views/products/index.html.erb %>
 <%= stream_react_component("ProductPage",
       props: { locale: params[:locale] || I18n.locale.to_s,
-               products: @products.as_json(only: [:id, :name, :price, :stock]) },
-      prerender: true) %>
+               products: @products.as_json(only: [:id, :name, :price, :stock]) }) %>
 ```
 
 ### Step 5: Client Components use the same locale with react-intl Context
@@ -249,7 +248,7 @@ The `intl` object returned by `getIntl()` provides the full formatting API:
 
 ## Scenario 2: Current User / Auth Context
 
-Access the authenticated user in any Server Component without passing it through every level.
+Deduplicate user object processing across Server Components. `React.cache()` ensures `Object.freeze` runs once even when multiple components receive the same `user` prop. For truly zero-prop access, see [Seed Once, Read Anywhere](#pattern-seed-once-read-anywhere) below.
 
 ### Create a cached user accessor
 
@@ -298,7 +297,7 @@ export default function Dashboard({ user, stats }) {
 
 ## Scenario 3: Feature Flags
 
-Check feature flags in deeply nested Server Components without threading them through every component.
+Deduplicate feature flag processing across Server Components. Like Scenario 2, `React.cache()` ensures the freeze runs once when the same `featureFlags` reference is passed. For zero-prop access, see [Seed Once, Read Anywhere](#pattern-seed-once-read-anywhere) below.
 
 ```jsx
 // lib/getFeatureFlags.js
@@ -430,6 +429,11 @@ export function seedRequestStore({ user, locale, featureFlags }) {
 export function getRequestStore() {
   return _getStore();
 }
+// NOTE: seedRequestStore mutates the cached {} — this is safe because seeding
+// always runs once in the root component before any reader executes (top-down
+// rendering order). This is NOT the same as the "Don't mutate cached values"
+// pitfall below, which warns against mutating *after* readers have already
+// consumed the value.
 ```
 
 ```jsx
@@ -534,7 +538,7 @@ This example demonstrates a complete setup with a Client Component language swit
 
 ### File structure
 
-```
+```text
 client/app/
   i18n/
     getIntl.js          # React.cache() wrapper
@@ -657,6 +661,9 @@ export default wrapServerComponentRenderer(ProductPage);
 
 ```jsx
 // ror-auto-load-components/ProductPage.server.jsx
+// 'use client' is intentional here: this is the React on Rails Pro wrapper for
+// the server-bundle entry point (wrapServerComponentRenderer), not the Server
+// Component itself.
 'use client';
 import wrapServerComponentRenderer from 'react-on-rails-pro/wrapServerComponentRenderer/server';
 import ProductPage from '../components/ProductPage';
@@ -680,8 +687,7 @@ end
 ```erb
 <%# app/views/products/index.html.erb %>
 <%= stream_react_component("ProductPage",
-      props: { locale: params[:locale] || I18n.locale.to_s },
-      prerender: true) %>
+      props: { locale: params[:locale] || I18n.locale.to_s }) %>
 ```
 
 ### How it works

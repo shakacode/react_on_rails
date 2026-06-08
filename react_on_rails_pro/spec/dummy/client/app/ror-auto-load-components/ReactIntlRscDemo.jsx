@@ -452,7 +452,7 @@ function Footer({ locale, componentCount }) {
   );
 }
 
-const COMPONENT_COUNT = 10;
+const COMPONENT_COUNT = 14;
 
 const ReactIntlRscDemo = ({ locale = 'en' }) => {
   const intl = getIntl(locale);
