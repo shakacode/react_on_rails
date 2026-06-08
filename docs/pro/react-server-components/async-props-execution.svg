@@ -149,11 +149,6 @@
       </g>
     </g>
 
-    <!-- Parallel bracket -->
-    <g transform="translate(16, 56)">
-      <path d="M 222 42 L 230 42 L 230 74 L 222 74" fill="none" stroke="#3B82F6" stroke-width="1.5"/>
-      <text x="238" y="62" font-family="ui-monospace, monospace" font-size="8" fill="#3B82F6">async</text>
-    </g>
   </g>
 
   <!-- === REACT CODE PANEL === -->
@@ -226,14 +221,19 @@
       <text x="22" y="126" font-family="ui-monospace, monospace" font-size="9" fill="#7DD3FC">Suspense</text>
       <text x="70" y="126" font-family="ui-monospace, monospace" font-size="9" fill="#F8FAFC">&gt;</text>
 
+      <!-- Parallel await bracket on React side -->
+      <path d="M 170 56 L 178 56 L 178 130 L 170 130" fill="none" stroke="#3B82F6" stroke-width="1.5"/>
+      <text x="185" y="88" font-family="ui-monospace, monospace" font-size="7" fill="#3B82F6">await</text>
+      <text x="185" y="98" font-family="ui-monospace, monospace" font-size="7" fill="#3B82F6">in //</text>
+
       <!-- Animated highlight for first Suspense (Reviews) -->
-      <rect x="-2" y="54" width="175" height="40" rx="3" fill="none" stroke="#61DAFB" stroke-width="2" class="react-hl-1"/>
+      <rect x="-2" y="54" width="168" height="40" rx="3" fill="none" stroke="#61DAFB" stroke-width="2" class="react-hl-1"/>
       <g class="react-hl-1">
         <polygon points="-12,74 -4,70 -4,78" fill="#61DAFB" class="pointer"/>
       </g>
 
       <!-- Animated highlight for second Suspense (Recs) resolving -->
-      <rect x="-2" y="92" width="165" height="40" rx="3" fill="none" stroke="#22C55E" stroke-width="2" class="react-hl-2"/>
+      <rect x="-2" y="92" width="168" height="40" rx="3" fill="none" stroke="#22C55E" stroke-width="2" class="react-hl-2"/>
       <g class="react-hl-2">
         <polygon points="-12,112 -4,108 -4,116" fill="#22C55E" class="pointer"/>
       </g>
