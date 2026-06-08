@@ -54,6 +54,37 @@ requests before measured requests begin. All workers must finish warmup before m
 `--start-gate-timeout` controls how long to wait for them (default: 30 seconds). If bundle upload is
 slow on a cold renderer, adjust `--upload-timeout` (default: 10 seconds).
 
+### Transport Probe For Fastify/Native HTTP/2/UDS
+
+Issues #3582 and #3583 need benchmark evidence before any production renderer
+transport change. The benchmark-only transport probe starts a tiny local Node
+server with equivalent probe endpoints over:
+
+- Fastify h2c over TCP loopback.
+- Native `node:http2` h2c over TCP loopback.
+- Native `node:http2` over a Unix domain socket.
+
+It does not change the production renderer, the Rails HTTP client, or the
+default h2c-over-TCP transport.
+
+Run from `react_on_rails_pro/` after workspace Node dependencies are installed:
+
+```bash
+bundle exec ruby scripts/load/transport_probe.rb --requests 3000 --warmup 300
+```
+
+For environments where Unix sockets are unavailable:
+
+```bash
+bundle exec ruby scripts/load/transport_probe.rb --skip-uds
+```
+
+The probe writes `transport_probe_summary.json` under
+`tmp/load-tests/transport-probe/<timestamp>/`. Treat this as Phase 0 evidence
+only: a production UDS transport still needs Linux/topology validation against
+the real renderer harness (`bin/renderer-harness`) before adding socket-path
+configuration or runtime transport plumbing.
+
 ### Tracking the node-renderer process
 
 To include the node-renderer RSS in `memory.csv`, pass its PID:
