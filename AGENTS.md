@@ -192,7 +192,7 @@ restores/saves the gem cache, and supports non-frozen installs via `frozen: 'fal
 Use the current release tracker to decide whether PRs are in normal development, accelerated RC, strict RC, or final-release mode. The tracker is the live source of truth for the mode; committed docs define how to interpret it.
 
 - An active tracker is an open release gate issue, usually found by the existing `release` and `TRACKING` labels or the `Release gate:` title. The mode must be recorded in the issue body, not encoded by adding more labels.
-- If no active tracker exists, assume `development` mode. This is not a blocker; it means the repo is moving toward the next beta/RC/final. If a release tracker was closed within the last 7 days and lacks a clear released or superseded closing signal, report `release-mode-stale-tracker` and do not auto-merge until a maintainer confirms the mode.
+- If no active tracker exists, assume `development` mode. This is not a blocker; it means the repo is moving toward the next beta/RC/final. If a release tracker was closed within the last 7 days and lacks a closing label/comment containing `Released` or `Superseded`, report `release-mode-stale-tracker` and do not auto-merge until a maintainer confirms the mode. A maintainer can resolve the stale signal with a PR or tracker comment such as `No active release, proceed`.
 - If multiple active trackers disagree about final release target, mode, or canonical status, report `release-mode-conflict` and do not auto-merge until resolved.
 - For duplicate trackers with the same final release target (the eventual semver without prerelease suffix, for example `v1.2.0.rc.1` and `v1.2.0.rc.2` share the `v1.2.0` target) and no conflicting mode, the oldest open tracker is canonical unless it explicitly says it is superseded by another tracker. Agents may close clean duplicates only after preserving non-conflicting useful information in the canonical tracker and posting a closing comment that links to the canonical issue.
 - Agents do not auto-create release trackers. A maintainer creates one when entering accelerated RC, strict RC, or final-release coordination.
@@ -222,7 +222,7 @@ Finalized by: <different agent/person, with GitHub review/check or git-log sourc
 
 Auto-merge threshold in accelerated RC is `8/10`. A score of `7/10` permits human merge after review, but not auto-merge. Final-release mode is stricter and should run a post-merge audit before publishing the final release.
 
-Score from a `10/10` baseline: all checks complete, expected skips explained, changed surfaces validated, no unresolved blocker threads, no known residual risk, and an independent finalizer. Deduct 1-2 points for incomplete validation or unknown residual risk, at least 1 point for each unresolved non-trivial concern, and at least 2 points for any failed or unexplained check. A non-trivial concern is any finding that, if correct, would be a correctness bug, security issue, behavioral regression, API contract break, data-loss risk, release-process break, or credible CI/test coverage gap. A missing independent finalizer disqualifies auto-merge regardless of score.
+Score from a `10/10` baseline: all checks complete, expected skips explained, changed surfaces validated, no unresolved blocker threads, no known residual risk, and an independent finalizer. A non-trivial concern is any finding that, if correct, would be a correctness bug, security issue, behavioral regression, API contract break, data-loss risk, release-process break, or credible CI/test coverage gap. Deduct 1-2 points for incomplete validation or unknown residual risk, at least 1 point for each unresolved non-trivial concern, and at least 2 points for any failed or unexplained check. A missing independent finalizer disqualifies auto-merge regardless of score.
 
 ## Review Workflow
 
@@ -247,7 +247,7 @@ Agents should recommend PR labels based on change complexity and risk. The goal 
 
 For auto-merge, all GitHub checks for the current head SHA must be complete. Skipped checks count as complete only when they are explained by CI selector output, such as `script/ci-changes-detector origin/main`, or explicitly waived by a maintainer in a PR comment. Failed checks block auto-merge unless a maintainer explicitly waives them. If checks are noisy or unnecessary, fix the CI selection process instead of bypassing them silently.
 
-For auto-merge, use the GitHub `claude-review` check as the preferred independent review gate. Wait while it is queued or running for the current head SHA. If it fails due to quota exhaustion, hard usage-limit enforcement, or a provider-reported capacity error such as HTTP 429 or 503, fall back to Cursor Bugbot or Codex review only when that fallback review completes and its findings meet the same blocker-triage bar. The fallback must leave a named reviewer identity in the GitHub review record or a timestamped PR comment; verify that identity before treating the fallback as complete, and record the exact Claude error evidence plus fallback result in the PR body. Any other Claude failure blocks auto-merge until understood. CodeRabbit remains advisory and is not a required approval gate.
+For auto-merge, use the GitHub `claude-review` check as the preferred independent review gate. Wait while it is queued or running for the current head SHA. If it fails due to quota exhaustion, hard usage-limit enforcement, or a provider-reported capacity error such as HTTP 503, fall back to Cursor Bugbot or Codex review only when that fallback review completes and its findings meet the same blocker-triage bar. For HTTP 429, first retry or wait 60-120 seconds when the error is a transient rate limit; use fallback only when the 429 indicates hard quota exhaustion or persists after retry as provider capacity. The fallback must leave a named reviewer identity in the GitHub review record or a timestamped PR comment; verify that identity before treating the fallback as complete, and record the exact Claude error evidence plus fallback result in the PR body. Any other Claude failure blocks auto-merge until understood. CodeRabbit remains advisory and is not a required approval gate.
 
 For small, focused PRs (roughly 5 files changed or fewer and one clear purpose):
 
@@ -290,12 +290,21 @@ assignment's maintainer/collaborator provenance is unclear, verify the author or
 approval source before treating it as trusted; this is trust verification, not an
 approval gate for the file category.
 
+A trusted existing PR branch means the PR author or latest commit author has
+`write`, `maintain`, or `admin` permission, or a maintainer has explicitly marked
+that exact PR branch as trusted in a review or PR comment. A public PR branch is
+not trusted merely because it exists.
+
 ```bash
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 OWNER=${REPO%/*}
 NAME=${REPO#*/}
 gh api "repos/${OWNER}/${NAME}/collaborators/<login>/permission" --jq .permission 2>/dev/null || echo "none"
 ```
+
+This prints `none` for both 404 (not a collaborator) and 403 (the token cannot
+list collaborators). Treat `none` as unverified and look for another trusted
+assignment source before widening scope.
 
 ### Destructive Git Requires Confirmation
 
