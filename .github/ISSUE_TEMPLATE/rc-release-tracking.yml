@@ -44,11 +44,11 @@ body:
         Auto-merge threshold: not enabled unless Mode is intentionally changed to accelerated-rc
         Confidence finalized by: independent agent or maintainer
         Auto-merge checks: wait for all GitHub checks on the current head SHA
-        Claude review: required unless quota/usage-limit fallback to Cursor or Codex review is recorded
+        Claude review: required unless quota/usage-limit/capacity fallback to Cursor or Codex review is recorded with exact error evidence
         Affected areas choose validation and do not cap confidence by themselves: SSR, RSC, hydration, package release, generators, CI, benchmarks, Pro/core boundary
         Final release audit before publishing: required
 
-        Tracker update rule: agents should prefer append-only comments for concurrent per-PR updates. Re-read this issue immediately before editing the body; if the body changed and the update cannot be merged safely, post the intended update as a comment instead.
+        Tracker update rule: agents should prefer append-only comments for concurrent per-PR updates. Re-read this issue immediately before editing the body; if the body changed and the update cannot be merged safely, post the intended update as a Tracker Update comment instead.
     validations:
       required: true
 
