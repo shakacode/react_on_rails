@@ -31,7 +31,7 @@ Plan a PR batch
 3. Shape
    - Exclude closed or merged items unless the user explicitly asked to audit them.
    - Separate independent work from dependency-ordered work.
-   - Cap scope when independent items exceed roughly 8-10 or share risky files; propose a smaller first batch.
+   - Cap at 8 with shared/risky files, else 10 independent items; propose a smaller first batch.
    - For PRs with review feedback, route the worker to use the repo review workflow before code changes.
    - For issues, define the expected deliverable: fix, investigation, reproduction, docs update, or no-PR audit.
 
@@ -39,7 +39,7 @@ Plan a PR batch
    - Return a concise "Batch Plan" and a fenced "Goal Prompt for pr-batch".
    - Keep the fenced goal prompt under 4000 characters total so bulky audit detail stays in the Batch Plan.
    - If the batch will not fit, split it into smaller goals and output only the first ready goal.
-   - Do not start `$pr-batch` unless the user explicitly asks to run it; when they do, hand them the fenced goal prompt and tell them to run `$pr-batch` with it.
+   - Do not start `$pr-batch` unless the user asks; then hand them the fenced goal prompt and tell them to run `$pr-batch` with it.
 
 ## Batch Plan Format
 
