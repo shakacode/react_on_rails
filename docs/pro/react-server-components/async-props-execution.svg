@@ -38,10 +38,13 @@
       .react-hl-1 { opacity: 0; animation: rcth1 12s infinite; }
       .react-hl-2 { opacity: 0; animation: rcth2 12s infinite; }
       .react-hl-3 { opacity: 0; animation: rcth3 12s infinite; }
+      .suspense-parallel { opacity: 0; animation: suspPar 12s infinite; }
 
       @keyframes rcth1 { 0%, 20% { opacity: 0; } 21%, 30% { opacity: 1; } 31%, 100% { opacity: 0; } }
       @keyframes rcth2 { 0%, 55% { opacity: 0; } 56%, 65% { opacity: 1; } 66%, 100% { opacity: 0; } }
       @keyframes rcth3 { 0%, 80% { opacity: 0; } 81%, 92% { opacity: 1; } 93%, 100% { opacity: 0; } }
+      /* Visible while both Suspense boundaries show fallbacks (during loading) */
+      @keyframes suspPar { 0%, 20% { opacity: 0; } 21%, 55% { opacity: 1; } 56%, 100% { opacity: 0; } }
 
       /* Browser states - 5 states */
       .browser-blank { opacity: 1; animation: bb 12s infinite; }
@@ -300,6 +303,13 @@
     <text x="128" y="238" font-family="monospace" font-size="9" fill="#F8FAFC">&gt;&lt;/</text>
     <text x="150" y="238" font-family="monospace" font-size="9" fill="#7DD3FC">div</text>
     <text x="170" y="238" font-family="monospace" font-size="9" fill="#F8FAFC">&gt;)}</text>
+
+    <!-- Parallel suspension bracket for both Suspense boundaries - visible during loading phase -->
+    <g class="suspense-parallel">
+      <path d="M 56 150 L 52 150 L 52 244 L 56 244" fill="none" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"/>
+      <text x="30" y="200" font-family="system-ui" font-size="9" fill="#F59E0B" font-weight="600">⏳</text>
+      <text x="30" y="212" font-family="system-ui" font-size="9" fill="#F59E0B" font-weight="600">⏳</text>
+    </g>
 
     <!-- Animated highlights - adjusted for new line positions -->
     <rect x="35" y="130" width="335" height="64" rx="4" fill="none" stroke="#61DAFB" stroke-width="3" class="react-hl-1"/>
