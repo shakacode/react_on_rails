@@ -1,13 +1,86 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520">
   <defs>
+    <!-- Gradients -->
+    <linearGradient id="railsGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#CC0000"/>
+      <stop offset="100%" style="stop-color:#990000"/>
+    </linearGradient>
+    <linearGradient id="reactGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#61DAFB"/>
+      <stop offset="100%" style="stop-color:#21A0C8"/>
+    </linearGradient>
+    <linearGradient id="browserGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4A90D9"/>
+      <stop offset="100%" style="stop-color:#2E5A8A"/>
+    </linearGradient>
+
+    <!-- Drop shadow -->
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="2" dy="3" stdDeviation="4" flood-opacity="0.12"/>
+    </filter>
+    <filter id="shadowDark" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="2" dy="3" stdDeviation="4" flood-opacity="0.4"/>
+    </filter>
+
     <style>
-      /* Next.js/Vercel inspired design system */
-      @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-      @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+      /* ========== THEME COLORS ========== */
+      /* Light mode (default) */
+      .bg { fill: #F8FAFC; }
+      .card { fill: white; stroke: #E2E8F0; }
+      .card-inner { fill: #F1F5F9; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .text-primary { fill: #475569; }
+      .text-secondary { fill: #64748B; }
+      .text-code { fill: #0F172A; }
+      .text-keyword { fill: #0891B2; }
+      .text-string { fill: #16A34A; }
+      .text-label { fill: #DC2626; }
+      .step-inactive { fill: #E2E8F0; }
+      .step-text { fill: #1E293B; }
+      .divider { stroke: #E2E8F0; }
+      .loading-box { fill: white; stroke: #FCD34D; }
+      .loading-text { fill: #92400E; }
+      .loaded-box { fill: #D1FAE5; stroke: #22C55E; }
+      .loaded-text { fill: #166534; }
+      .loaded-sub { fill: #15803D; }
+      .header-box { fill: #DBEAFE; stroke: #93C5FD; }
+      .header-text { fill: #1E40AF; }
+      .timeline-bar { fill: #E2E8F0; }
+      .check-bg { fill: #22C55E; }
+      .check-text { fill: white; }
+      .benefit-text { fill: #334155; }
 
-      /* 10-second animation cycle */
+      /* Dark mode */
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .card { fill: #1E293B; stroke: #334155; }
+        .card-inner { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .text-primary { fill: #CBD5E1; }
+        .text-secondary { fill: #94A3B8; }
+        .text-code { fill: #F1F5F9; }
+        .text-keyword { fill: #67E8F9; }
+        .text-string { fill: #4ADE80; }
+        .text-label { fill: #F87171; }
+        .step-inactive { fill: #334155; }
+        .step-text { fill: #E2E8F0; }
+        .divider { stroke: #334155; }
+        .loading-box { fill: #1E293B; stroke: #FBBF24; }
+        .loading-text { fill: #FCD34D; }
+        .loaded-box { fill: #064E3B; stroke: #10B981; }
+        .loaded-text { fill: #6EE7B7; }
+        .loaded-sub { fill: #34D399; }
+        .header-box { fill: #1E3A5F; stroke: #3B82F6; }
+        .header-text { fill: #93C5FD; }
+        .timeline-bar { fill: #334155; }
+        .check-bg { fill: #10B981; }
+        .check-text { fill: white; }
+        .benefit-text { fill: #E2E8F0; }
+      }
 
-      /* Phase indicators */
+      /* ========== ANIMATIONS ========== */
       .phase-1 { opacity: 1; animation: p1 10s ease infinite; }
       .phase-2 { opacity: 0; animation: p2 10s ease infinite; }
       .phase-3 { opacity: 0; animation: p3 10s ease infinite; }
@@ -18,261 +91,222 @@
       @keyframes p3 { 0%, 45% { opacity: 0; } 46%, 75% { opacity: 1; } 76%, 100% { opacity: 0; } }
       @keyframes p4 { 0%, 75% { opacity: 0; } 76%, 100% { opacity: 1; } }
 
-      /* Individual suspension indicators */
       .loading-reviews { opacity: 0; animation: lr 10s ease infinite; }
       .loading-recs { opacity: 0; animation: lc 10s ease infinite; }
-
       @keyframes lr { 0%, 15% { opacity: 0; } 16%, 45% { opacity: 1; } 46%, 100% { opacity: 0; } }
       @keyframes lc { 0%, 15% { opacity: 0; } 16%, 75% { opacity: 1; } 76%, 100% { opacity: 0; } }
 
-      /* Checkmarks appear when loaded */
-      .check-reviews { opacity: 0; animation: cr 10s ease infinite; }
-      .check-recs { opacity: 0; animation: cc 10s ease infinite; }
-
-      @keyframes cr { 0%, 45% { opacity: 0; } 46%, 100% { opacity: 1; } }
-      @keyframes cc { 0%, 75% { opacity: 0; } 76%, 100% { opacity: 1; } }
-
-      /* Step highlight */
-      .step-active-1 { animation: sa1 10s ease infinite; }
-      .step-active-2 { animation: sa2 10s ease infinite; }
-      .step-active-3 { animation: sa3 10s ease infinite; }
-      .step-active-4 { animation: sa4 10s ease infinite; }
-
-      @keyframes sa1 { 0%, 15% { fill: #0070F3; } 16%, 100% { fill: #262626; } }
-      @keyframes sa2 { 0%, 15% { fill: #262626; } 16%, 45% { fill: #0070F3; } 46%, 100% { fill: #262626; } }
-      @keyframes sa3 { 0%, 45% { fill: #262626; } 46%, 75% { fill: #0070F3; } 76%, 100% { fill: #262626; } }
-      @keyframes sa4 { 0%, 75% { fill: #262626; } 76%, 100% { fill: #0070F3; } }
+      .step-1 { animation: s1 10s ease infinite; }
+      .step-2 { animation: s2 10s ease infinite; }
+      .step-3 { animation: s3 10s ease infinite; }
+      .step-4 { animation: s4 10s ease infinite; }
+      @keyframes s1 { 0%, 15% { fill: #3B82F6; } 16%, 100% { fill: var(--step-inactive, #E2E8F0); } }
+      @keyframes s2 { 0%, 15% { fill: var(--step-inactive, #E2E8F0); } 16%, 45% { fill: #3B82F6; } 46%, 100% { fill: var(--step-inactive, #E2E8F0); } }
+      @keyframes s3 { 0%, 45% { fill: var(--step-inactive, #E2E8F0); } 46%, 75% { fill: #3B82F6; } 76%, 100% { fill: var(--step-inactive, #E2E8F0); } }
+      @keyframes s4 { 0%, 75% { fill: var(--step-inactive, #E2E8F0); } 76%, 100% { fill: #3B82F6; } }
 
       .spinner { animation: spin 1s linear infinite; transform-origin: center; }
       @keyframes spin { to { transform: rotate(360deg); } }
     </style>
   </defs>
 
-  <!-- Background - Vercel dark -->
-  <rect width="960" height="600" fill="#0A0A0A"/>
+  <!-- Background -->
+  <rect width="900" height="520" class="bg"/>
 
   <!-- Title -->
-  <text x="480" y="36" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="600" fill="#FAFAFA" letter-spacing="-0.02em">Async Props Streaming</text>
+  <text x="450" y="32" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="700" class="title">Async Props: Independent Streaming</text>
+  <text x="450" y="52" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" class="subtitle">Each Suspense boundary fills when its data arrives</text>
 
-  <!-- Step indicators - minimal pills -->
-  <g transform="translate(200, 56)">
-    <rect x="0" y="0" width="80" height="28" rx="14" class="step-active-1"/>
-    <text x="40" y="18" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="500" fill="#FAFAFA">Start</text>
+  <!-- Phase pills -->
+  <g transform="translate(250, 68)">
+    <rect x="0" y="0" width="70" height="24" rx="12" class="step-1"/>
+    <text x="35" y="16" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="500" class="step-text">Start</text>
 
-    <rect x="100" y="0" width="80" height="28" rx="14" class="step-active-2"/>
-    <text x="140" y="18" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="500" fill="#FAFAFA">Loading</text>
+    <rect x="85" y="0" width="70" height="24" rx="12" class="step-2"/>
+    <text x="120" y="16" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="500" class="step-text">Loading</text>
 
-    <rect x="200" y="0" width="80" height="28" rx="14" class="step-active-3"/>
-    <text x="240" y="18" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="500" fill="#FAFAFA">Partial</text>
+    <rect x="170" y="0" width="70" height="24" rx="12" class="step-3"/>
+    <text x="205" y="16" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="500" class="step-text">Partial</text>
 
-    <rect x="300" y="0" width="80" height="28" rx="14" class="step-active-4"/>
-    <text x="340" y="18" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="500" fill="#FAFAFA">Complete</text>
-
-    <!-- Connecting lines -->
-    <line x1="80" y1="14" x2="100" y2="14" stroke="#262626" stroke-width="1"/>
-    <line x1="180" y1="14" x2="200" y2="14" stroke="#262626" stroke-width="1"/>
-    <line x1="280" y1="14" x2="300" y2="14" stroke="#262626" stroke-width="1"/>
+    <rect x="255" y="0" width="70" height="24" rx="12" class="step-4"/>
+    <text x="290" y="16" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="500" class="step-text">Complete</text>
   </g>
 
   <!-- === CODE PANEL === -->
-  <g transform="translate(24, 100)">
-    <!-- Panel border -->
-    <rect x="0" y="0" width="440" height="240" rx="8" fill="#0A0A0A" stroke="#262626" stroke-width="1"/>
-
-    <!-- Header -->
-    <rect x="0" y="0" width="440" height="36" rx="8" fill="#171717"/>
-    <rect x="0" y="28" width="440" height="8" fill="#171717"/>
-    <circle cx="20" cy="18" r="5" fill="#EF4444"/>
-    <circle cx="36" cy="18" r="5" fill="#F59E0B"/>
-    <circle cx="52" cy="18" r="5" fill="#22C55E"/>
-    <text x="220" y="22" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="500" fill="#737373">Code</text>
+  <g transform="translate(20, 105)">
+    <rect x="0" y="0" width="420" height="210" rx="12" class="card" stroke-width="2" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="420" height="36" rx="12" fill="url(#railsGrad)"/>
+    <rect x="0" y="24" width="420" height="12" fill="url(#railsGrad)"/>
+    <text x="210" y="24" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="600" fill="white">Code</text>
 
     <!-- Code content -->
-    <g transform="translate(16, 52)">
-      <!-- Rails -->
-      <text x="0" y="0" font-family="ui-monospace, monospace" font-size="10" fill="#737373">// Rails</text>
-      <text x="0" y="18" font-family="ui-monospace, monospace" font-size="11" fill="#A1A1AA">stream_react_component(</text>
-      <text x="0" y="34" font-family="ui-monospace, monospace" font-size="11" fill="#A1A1AA">  </text>
-      <text x="12" y="34" font-family="ui-monospace, monospace" font-size="11" fill="#0070F3">props:</text>
-      <text x="55" y="34" font-family="ui-monospace, monospace" font-size="11" fill="#A1A1AA">{ </text>
-      <text x="68" y="34" font-family="ui-monospace, monospace" font-size="11" fill="#FAFAFA">title</text>
-      <text x="98" y="34" font-family="ui-monospace, monospace" font-size="11" fill="#A1A1AA">: </text>
-      <text x="108" y="34" font-family="ui-monospace, monospace" font-size="11" fill="#22C55E">"Header"</text>
-      <text x="168" y="34" font-family="ui-monospace, monospace" font-size="11" fill="#A1A1AA"> }</text>
-      <text x="200" y="34" font-family="ui-monospace, monospace" font-size="9" fill="#0070F3">← instant</text>
+    <g transform="translate(16, 48)">
+      <text x="0" y="12" font-family="ui-monospace, monospace" font-size="10" class="text-secondary">// Rails — emit async props</text>
+      <text x="0" y="30" font-family="ui-monospace, monospace" font-size="11" class="text-primary">stream_component(</text>
+      <text x="10" y="46" font-family="ui-monospace, monospace" font-size="11" class="text-keyword">props:</text>
+      <text x="55" y="46" font-family="ui-monospace, monospace" font-size="11" class="text-primary">{ </text>
+      <text x="68" y="46" font-family="ui-monospace, monospace" font-size="11" class="text-code">title</text>
+      <text x="98" y="46" font-family="ui-monospace, monospace" font-size="11" class="text-primary">: </text>
+      <text x="108" y="46" font-family="ui-monospace, monospace" font-size="11" class="text-string">"Header"</text>
+      <text x="168" y="46" font-family="ui-monospace, monospace" font-size="11" class="text-primary"> }</text>
+      <text x="200" y="46" font-family="ui-monospace, monospace" font-size="9" class="text-label">← sync (instant)</text>
 
-      <text x="0" y="56" font-family="ui-monospace, monospace" font-size="11" fill="#A1A1AA">) { |emit|</text>
-      <text x="0" y="74" font-family="ui-monospace, monospace" font-size="11" fill="#A1A1AA">  emit(</text>
-      <text x="42" y="74" font-family="ui-monospace, monospace" font-size="11" fill="#22C55E">"reviews"</text>
-      <text x="105" y="74" font-family="ui-monospace, monospace" font-size="11" fill="#A1A1AA">, data)</text>
-      <text x="200" y="74" font-family="ui-monospace, monospace" font-size="9" fill="#737373">// after 1s</text>
-      <text x="0" y="92" font-family="ui-monospace, monospace" font-size="11" fill="#A1A1AA">  emit(</text>
-      <text x="42" y="92" font-family="ui-monospace, monospace" font-size="11" fill="#22C55E">"recs"</text>
-      <text x="78" y="92" font-family="ui-monospace, monospace" font-size="11" fill="#A1A1AA">, data)</text>
-      <text x="200" y="92" font-family="ui-monospace, monospace" font-size="9" fill="#737373">// after 3s</text>
-      <text x="0" y="110" font-family="ui-monospace, monospace" font-size="11" fill="#A1A1AA">}</text>
+      <text x="0" y="64" font-family="ui-monospace, monospace" font-size="11" class="text-primary">) { |emit|</text>
+      <text x="10" y="80" font-family="ui-monospace, monospace" font-size="11" class="text-primary">emit(</text>
+      <text x="45" y="80" font-family="ui-monospace, monospace" font-size="11" class="text-string">"reviews"</text>
+      <text x="110" y="80" font-family="ui-monospace, monospace" font-size="11" class="text-primary">, data)</text>
+      <text x="200" y="80" font-family="ui-monospace, monospace" font-size="9" class="text-secondary">// after 1s</text>
+      <text x="10" y="96" font-family="ui-monospace, monospace" font-size="11" class="text-primary">emit(</text>
+      <text x="45" y="96" font-family="ui-monospace, monospace" font-size="11" class="text-string">"recs"</text>
+      <text x="82" y="96" font-family="ui-monospace, monospace" font-size="11" class="text-primary">, data)</text>
+      <text x="200" y="96" font-family="ui-monospace, monospace" font-size="9" class="text-secondary">// after 3s</text>
+      <text x="0" y="112" font-family="ui-monospace, monospace" font-size="11" class="text-primary">}</text>
 
-      <!-- Divider -->
-      <line x1="0" y1="124" x2="408" y2="124" stroke="#262626" stroke-width="1"/>
+      <line x1="0" y1="124" x2="388" y2="124" class="divider" stroke-width="1"/>
 
-      <!-- React -->
-      <text x="0" y="142" font-family="ui-monospace, monospace" font-size="10" fill="#737373">// React — both promises created in parallel</text>
-      <text x="0" y="160" font-family="ui-monospace, monospace" font-size="11" fill="#A1A1AA">reviews = </text>
-      <text x="72" y="160" font-family="ui-monospace, monospace" font-size="11" fill="#0070F3">getAsyncProp</text>
-      <text x="150" y="160" font-family="ui-monospace, monospace" font-size="11" fill="#A1A1AA">(</text>
-      <text x="157" y="160" font-family="ui-monospace, monospace" font-size="11" fill="#22C55E">'reviews'</text>
-      <text x="218" y="160" font-family="ui-monospace, monospace" font-size="11" fill="#A1A1AA">)</text>
-      <text x="0" y="178" font-family="ui-monospace, monospace" font-size="11" fill="#A1A1AA">recs    = </text>
-      <text x="72" y="178" font-family="ui-monospace, monospace" font-size="11" fill="#0070F3">getAsyncProp</text>
-      <text x="150" y="178" font-family="ui-monospace, monospace" font-size="11" fill="#A1A1AA">(</text>
-      <text x="157" y="178" font-family="ui-monospace, monospace" font-size="11" fill="#22C55E">'recs'</text>
-      <text x="195" y="178" font-family="ui-monospace, monospace" font-size="11" fill="#A1A1AA">)</text>
+      <text x="0" y="142" font-family="ui-monospace, monospace" font-size="10" class="text-secondary">// React — both promises start immediately</text>
+      <text x="0" y="158" font-family="ui-monospace, monospace" font-size="11" class="text-primary">reviews = </text>
+      <text x="72" y="158" font-family="ui-monospace, monospace" font-size="11" class="text-keyword">getAsyncProp</text>
+      <text x="150" y="158" font-family="ui-monospace, monospace" font-size="11" class="text-primary">(</text>
+      <text x="157" y="158" font-family="ui-monospace, monospace" font-size="11" class="text-string">'reviews'</text>
+      <text x="218" y="158" font-family="ui-monospace, monospace" font-size="11" class="text-primary">)</text>
+      <text x="0" y="174" font-family="ui-monospace, monospace" font-size="11" class="text-primary">recs    = </text>
+      <text x="72" y="174" font-family="ui-monospace, monospace" font-size="11" class="text-keyword">getAsyncProp</text>
+      <text x="150" y="174" font-family="ui-monospace, monospace" font-size="11" class="text-primary">(</text>
+      <text x="157" y="174" font-family="ui-monospace, monospace" font-size="11" class="text-string">'recs'</text>
+      <text x="195" y="174" font-family="ui-monospace, monospace" font-size="11" class="text-primary">)</text>
 
-      <!-- Parallel indicator -->
-      <path d="M -8 152 L -12 152 L -12 184 L -8 184" fill="none" stroke="#0070F3" stroke-width="1.5" opacity="0.6"/>
+      <path d="M -6 150 L -10 150 L -10 180 L -6 180" fill="none" stroke="#3B82F6" stroke-width="1.5"/>
+      <text x="235" y="166" font-family="ui-monospace, monospace" font-size="9" fill="#3B82F6">parallel!</text>
     </g>
   </g>
 
   <!-- === BROWSER PANEL === -->
-  <g transform="translate(496, 100)">
-    <!-- Panel border -->
-    <rect x="0" y="0" width="440" height="240" rx="8" fill="#0A0A0A" stroke="#262626" stroke-width="1"/>
-
-    <!-- Header -->
-    <rect x="0" y="0" width="440" height="36" rx="8" fill="#171717"/>
-    <rect x="0" y="28" width="440" height="8" fill="#171717"/>
+  <g transform="translate(460, 105)">
+    <rect x="0" y="0" width="420" height="210" rx="12" class="card" stroke-width="2" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="420" height="36" rx="12" fill="url(#browserGrad)"/>
+    <rect x="0" y="24" width="420" height="12" fill="url(#browserGrad)"/>
     <circle cx="20" cy="18" r="5" fill="#EF4444"/>
     <circle cx="36" cy="18" r="5" fill="#F59E0B"/>
     <circle cx="52" cy="18" r="5" fill="#22C55E"/>
-    <text x="220" y="22" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="500" fill="#737373">Browser</text>
+    <text x="210" y="24" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="600" fill="white">Browser</text>
 
-    <!-- Content area -->
-    <rect x="12" y="44" width="416" height="184" rx="6" fill="#171717"/>
+    <rect x="12" y="44" width="396" height="154" rx="8" class="card-inner"/>
 
     <!-- Phase 1: Waiting -->
     <g class="phase-1">
-      <text x="220" y="145" text-anchor="middle" font-family="system-ui" font-size="13" fill="#525252">Waiting for server...</text>
+      <text x="210" y="130" text-anchor="middle" font-family="system-ui" font-size="14" class="subtitle">Waiting for server...</text>
     </g>
 
-    <!-- Phase 2: Loading (header shown, both loading) -->
+    <!-- Phase 2: Loading -->
     <g class="phase-2">
-      <!-- Header - instant -->
-      <rect x="20" y="52" width="400" height="32" rx="4" fill="#262626"/>
-      <text x="220" y="73" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="500" fill="#FAFAFA">Header</text>
-      <text x="380" y="73" font-family="system-ui" font-size="10" fill="#22C55E">✓</text>
+      <rect x="20" y="52" width="380" height="28" rx="6" class="header-box" stroke-width="1"/>
+      <text x="210" y="71" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="500" class="header-text">Header</text>
+      <text x="370" y="71" font-family="system-ui" font-size="10" fill="#16A34A">✓</text>
 
-      <!-- Reviews loading -->
-      <rect x="20" y="92" width="400" height="60" rx="4" fill="none" stroke="#262626" stroke-width="1" stroke-dasharray="4 2"/>
-      <text x="200" y="127" text-anchor="middle" font-family="system-ui" font-size="12" fill="#525252">Reviews</text>
-      <g transform="translate(260, 118)" class="loading-reviews">
-        <circle cx="0" cy="0" r="8" fill="none" stroke="#0070F3" stroke-width="2" stroke-dasharray="16 8" class="spinner"/>
+      <rect x="20" y="88" width="380" height="48" rx="6" class="loading-box" stroke-width="2" stroke-dasharray="6 3"/>
+      <text x="190" y="117" text-anchor="middle" font-family="system-ui" font-size="12" class="loading-text">Reviews</text>
+      <g transform="translate(250, 108)" class="loading-reviews">
+        <circle cx="0" cy="0" r="8" fill="none" stroke="#F59E0B" stroke-width="2" stroke-dasharray="16 8" class="spinner"/>
       </g>
 
-      <!-- Recs loading -->
-      <rect x="20" y="160" width="400" height="60" rx="4" fill="none" stroke="#262626" stroke-width="1" stroke-dasharray="4 2"/>
-      <text x="200" y="195" text-anchor="middle" font-family="system-ui" font-size="12" fill="#525252">Recommendations</text>
-      <g transform="translate(290, 186)" class="loading-recs">
-        <circle cx="0" cy="0" r="8" fill="none" stroke="#0070F3" stroke-width="2" stroke-dasharray="16 8" class="spinner"/>
+      <rect x="20" y="144" width="380" height="48" rx="6" class="loading-box" stroke-width="2" stroke-dasharray="6 3"/>
+      <text x="190" y="173" text-anchor="middle" font-family="system-ui" font-size="12" class="loading-text">Recommendations</text>
+      <g transform="translate(290, 164)" class="loading-recs">
+        <circle cx="0" cy="0" r="8" fill="none" stroke="#F59E0B" stroke-width="2" stroke-dasharray="16 8" class="spinner"/>
       </g>
     </g>
 
-    <!-- Phase 3: Partial (reviews loaded) -->
+    <!-- Phase 3: Partial -->
     <g class="phase-3">
-      <!-- Header -->
-      <rect x="20" y="52" width="400" height="32" rx="4" fill="#262626"/>
-      <text x="220" y="73" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="500" fill="#FAFAFA">Header</text>
-      <text x="380" y="73" font-family="system-ui" font-size="10" fill="#22C55E">✓</text>
+      <rect x="20" y="52" width="380" height="28" rx="6" class="header-box" stroke-width="1"/>
+      <text x="210" y="71" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="500" class="header-text">Header</text>
+      <text x="370" y="71" font-family="system-ui" font-size="10" fill="#16A34A">✓</text>
 
-      <!-- Reviews loaded -->
-      <rect x="20" y="92" width="400" height="60" rx="4" fill="#0A2540" stroke="#0070F3" stroke-width="1"/>
-      <text x="200" y="120" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="500" fill="#FAFAFA">⭐⭐⭐⭐⭐ Reviews</text>
-      <text x="200" y="138" text-anchor="middle" font-family="system-ui" font-size="10" fill="#0070F3">Loaded at 1s</text>
-      <text x="380" y="127" font-family="system-ui" font-size="10" fill="#22C55E">✓</text>
+      <rect x="20" y="88" width="380" height="48" rx="6" class="loaded-box" stroke-width="2"/>
+      <text x="200" y="112" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="500" class="loaded-text">⭐⭐⭐⭐⭐ Reviews</text>
+      <text x="200" y="128" text-anchor="middle" font-family="system-ui" font-size="10" class="loaded-sub">Loaded at 1s</text>
+      <text x="370" y="117" font-family="system-ui" font-size="10" fill="#16A34A">✓</text>
 
-      <!-- Recs still loading -->
-      <rect x="20" y="160" width="400" height="60" rx="4" fill="none" stroke="#262626" stroke-width="1" stroke-dasharray="4 2"/>
-      <text x="200" y="195" text-anchor="middle" font-family="system-ui" font-size="12" fill="#525252">Recommendations</text>
-      <g transform="translate(290, 186)" class="loading-recs">
-        <circle cx="0" cy="0" r="8" fill="none" stroke="#0070F3" stroke-width="2" stroke-dasharray="16 8" class="spinner"/>
+      <rect x="20" y="144" width="380" height="48" rx="6" class="loading-box" stroke-width="2" stroke-dasharray="6 3"/>
+      <text x="190" y="173" text-anchor="middle" font-family="system-ui" font-size="12" class="loading-text">Recommendations</text>
+      <g transform="translate(290, 164)" class="loading-recs">
+        <circle cx="0" cy="0" r="8" fill="none" stroke="#F59E0B" stroke-width="2" stroke-dasharray="16 8" class="spinner"/>
       </g>
     </g>
 
     <!-- Phase 4: Complete -->
     <g class="phase-4">
-      <!-- Header -->
-      <rect x="20" y="52" width="400" height="32" rx="4" fill="#262626"/>
-      <text x="220" y="73" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="500" fill="#FAFAFA">Header</text>
-      <text x="380" y="73" font-family="system-ui" font-size="10" fill="#22C55E">✓</text>
+      <rect x="20" y="52" width="380" height="28" rx="6" class="header-box" stroke-width="1"/>
+      <text x="210" y="71" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="500" class="header-text">Header</text>
+      <text x="370" y="71" font-family="system-ui" font-size="10" fill="#16A34A">✓</text>
 
-      <!-- Reviews loaded -->
-      <rect x="20" y="92" width="400" height="60" rx="4" fill="#0A2540" stroke="#0070F3" stroke-width="1"/>
-      <text x="200" y="120" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="500" fill="#FAFAFA">⭐⭐⭐⭐⭐ Reviews</text>
-      <text x="200" y="138" text-anchor="middle" font-family="system-ui" font-size="10" fill="#0070F3">Loaded at 1s</text>
-      <text x="380" y="127" font-family="system-ui" font-size="10" fill="#22C55E">✓</text>
+      <rect x="20" y="88" width="380" height="48" rx="6" class="loaded-box" stroke-width="2"/>
+      <text x="200" y="112" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="500" class="loaded-text">⭐⭐⭐⭐⭐ Reviews</text>
+      <text x="200" y="128" text-anchor="middle" font-family="system-ui" font-size="10" class="loaded-sub">Loaded at 1s</text>
+      <text x="370" y="117" font-family="system-ui" font-size="10" fill="#16A34A">✓</text>
 
-      <!-- Recs loaded -->
-      <rect x="20" y="160" width="400" height="60" rx="4" fill="#0A2540" stroke="#0070F3" stroke-width="1"/>
-      <text x="200" y="188" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="500" fill="#FAFAFA">🎯 Recommendations</text>
-      <text x="200" y="206" text-anchor="middle" font-family="system-ui" font-size="10" fill="#0070F3">Loaded at 3s</text>
-      <text x="380" y="195" font-family="system-ui" font-size="10" fill="#22C55E">✓</text>
+      <rect x="20" y="144" width="380" height="48" rx="6" class="loaded-box" stroke-width="2"/>
+      <text x="200" y="168" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="500" class="loaded-text">🎯 Recommendations</text>
+      <text x="200" y="184" text-anchor="middle" font-family="system-ui" font-size="10" class="loaded-sub">Loaded at 3s</text>
+      <text x="370" y="173" font-family="system-ui" font-size="10" fill="#16A34A">✓</text>
     </g>
   </g>
 
   <!-- === TIMELINE === -->
-  <g transform="translate(24, 360)">
-    <rect x="0" y="0" width="912" height="220" rx="8" fill="#0A0A0A" stroke="#262626" stroke-width="1"/>
+  <g transform="translate(20, 335)">
+    <rect x="0" y="0" width="860" height="165" rx="12" class="card" stroke-width="2" filter="url(#shadow)"/>
 
-    <text x="456" y="28" text-anchor="middle" font-family="system-ui" font-size="14" font-weight="600" fill="#FAFAFA">How It Works</text>
+    <text x="430" y="28" text-anchor="middle" font-family="system-ui" font-size="15" font-weight="600" class="title">Timeline: What the User Sees</text>
 
-    <!-- Timeline bar -->
-    <g transform="translate(56, 56)">
-      <line x1="0" y1="20" x2="800" y2="20" stroke="#262626" stroke-width="2"/>
+    <g transform="translate(60, 50)">
+      <rect x="0" y="16" width="740" height="8" rx="4" class="timeline-bar"/>
 
-      <!-- 0s -->
-      <circle cx="0" cy="20" r="6" fill="#262626" stroke="#525252" stroke-width="1"/>
-      <text x="0" y="48" text-anchor="middle" font-family="ui-monospace" font-size="10" fill="#525252">0s</text>
-      <text x="0" y="62" text-anchor="middle" font-family="system-ui" font-size="10" fill="#737373">Start</text>
+      <rect x="0" y="16" width="50" height="8" rx="4" fill="#FCA5A5"/>
+      <rect x="50" y="16" width="200" height="8" fill="#67E8F9"/>
+      <rect x="250" y="16" width="300" height="8" fill="#FCD34D"/>
+      <rect x="550" y="16" width="190" height="8" rx="4" fill="#86EFAC"/>
 
-      <!-- Instant: Header -->
-      <circle cx="50" cy="20" r="6" fill="#22C55E"/>
-      <text x="50" y="6" text-anchor="middle" font-family="system-ui" font-size="10" fill="#22C55E">Header ✓</text>
-      <text x="50" y="48" text-anchor="middle" font-family="ui-monospace" font-size="9" fill="#525252">instant</text>
-
-      <!-- 1s: Reviews -->
-      <circle cx="300" cy="20" r="6" fill="#0070F3"/>
-      <text x="300" y="6" text-anchor="middle" font-family="system-ui" font-size="10" fill="#0070F3">Reviews ✓</text>
-      <text x="300" y="48" text-anchor="middle" font-family="ui-monospace" font-size="10" fill="#525252">1s</text>
-
-      <!-- 3s: Recs -->
-      <circle cx="700" cy="20" r="6" fill="#0070F3"/>
-      <text x="700" y="6" text-anchor="middle" font-family="system-ui" font-size="10" fill="#0070F3">Recs ✓</text>
-      <text x="700" y="48" text-anchor="middle" font-family="ui-monospace" font-size="10" fill="#525252">3s</text>
-
-      <!-- Loading indicators on timeline -->
-      <g class="loading-reviews">
-        <line x1="50" y1="20" x2="300" y2="20" stroke="#0070F3" stroke-width="2" stroke-dasharray="4 4" opacity="0.5"/>
+      <g transform="translate(0, 0)">
+        <circle cx="0" cy="20" r="8" fill="#DC2626" stroke="white" stroke-width="2"/>
+        <text x="0" y="50" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="600" class="text-primary">0s</text>
+        <text x="0" y="64" text-anchor="middle" font-family="system-ui" font-size="10" class="text-secondary">Start</text>
       </g>
-      <g class="loading-recs">
-        <line x1="50" y1="20" x2="700" y2="20" stroke="#0070F3" stroke-width="2" stroke-dasharray="4 4" opacity="0.3"/>
+
+      <g transform="translate(50, 0)">
+        <circle cx="0" cy="20" r="8" fill="#16A34A" stroke="white" stroke-width="2"/>
+        <text x="0" y="6" text-anchor="middle" font-family="system-ui" font-size="10" fill="#16A34A">Header ✓</text>
+        <text x="0" y="50" text-anchor="middle" font-family="system-ui" font-size="10" class="text-secondary">instant</text>
+      </g>
+
+      <g transform="translate(250, 0)">
+        <circle cx="0" cy="20" r="8" fill="#0891B2" stroke="white" stroke-width="2"/>
+        <text x="0" y="6" text-anchor="middle" font-family="system-ui" font-size="10" fill="#0891B2">Reviews ✓</text>
+        <text x="0" y="50" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="600" class="text-primary">1s</text>
+      </g>
+
+      <g transform="translate(550, 0)">
+        <circle cx="0" cy="20" r="8" fill="#0891B2" stroke="white" stroke-width="2"/>
+        <text x="0" y="6" text-anchor="middle" font-family="system-ui" font-size="10" fill="#0891B2">Recs ✓</text>
+        <text x="0" y="50" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="600" class="text-primary">3s</text>
       </g>
     </g>
 
-    <!-- Key points -->
-    <g transform="translate(56, 140)">
+    <g transform="translate(40, 115)">
       <g>
-        <rect x="0" y="0" width="260" height="56" rx="6" fill="#171717"/>
-        <text x="16" y="22" font-family="system-ui" font-size="11" font-weight="500" fill="#FAFAFA">Parallel Promises</text>
-        <text x="16" y="42" font-family="system-ui" font-size="10" fill="#525252">Both start waiting immediately</text>
+        <circle cx="10" cy="10" r="10" class="check-bg"/>
+        <text x="10" y="14" text-anchor="middle" font-family="system-ui" font-size="10" font-weight="700" class="check-text">✓</text>
+        <text x="28" y="14" font-family="system-ui" font-size="12" class="benefit-text">Parallel Promises — both start immediately</text>
       </g>
-      <g transform="translate(276, 0)">
-        <rect x="0" y="0" width="260" height="56" rx="6" fill="#171717"/>
-        <text x="16" y="22" font-family="system-ui" font-size="11" font-weight="500" fill="#FAFAFA">Independent Suspense</text>
-        <text x="16" y="42" font-family="system-ui" font-size="10" fill="#525252">Each boundary fills when ready</text>
+      <g transform="translate(300, 0)">
+        <circle cx="10" cy="10" r="10" class="check-bg"/>
+        <text x="10" y="14" text-anchor="middle" font-family="system-ui" font-size="10" font-weight="700" class="check-text">✓</text>
+        <text x="28" y="14" font-family="system-ui" font-size="12" class="benefit-text">Independent Suspense — each fills when ready</text>
       </g>
-      <g transform="translate(552, 0)">
-        <rect x="0" y="0" width="260" height="56" rx="6" fill="#171717"/>
-        <text x="16" y="22" font-family="system-ui" font-size="11" font-weight="500" fill="#FAFAFA">First Wins</text>
-        <text x="16" y="42" font-family="system-ui" font-size="10" fill="#525252">No waiting for slowest query</text>
+      <g transform="translate(620, 0)">
+        <circle cx="10" cy="10" r="10" class="check-bg"/>
+        <text x="10" y="14" text-anchor="middle" font-family="system-ui" font-size="10" font-weight="700" class="check-text">✓</text>
+        <text x="28" y="14" font-family="system-ui" font-size="12" class="benefit-text">First Wins — no waiting</text>
       </g>
     </g>
   </g>
