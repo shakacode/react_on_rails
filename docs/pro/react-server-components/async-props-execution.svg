@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 780">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 680">
   <defs>
     <linearGradient id="railsHeader" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop offset="0%" style="stop-color:#CC0000"/>
@@ -18,10 +18,10 @@
     </filter>
 
     <style>
-      /* 12-second animation cycle for two async props */
+      /* 12-second animation cycle */
       @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
 
-      /* Rails highlights - 7 phases */
+      /* Rails highlights */
       .rails-hl-1 { opacity: 0; animation: rh1 12s infinite; }
       .rails-hl-2 { opacity: 0; animation: rh2 12s infinite; }
       .rails-hl-3 { opacity: 0; animation: rh3 12s infinite; }
@@ -38,15 +38,21 @@
       .react-hl-1 { opacity: 0; animation: rcth1 12s infinite; }
       .react-hl-2 { opacity: 0; animation: rcth2 12s infinite; }
       .react-hl-3 { opacity: 0; animation: rcth3 12s infinite; }
-      .suspense-parallel { opacity: 0; animation: suspPar 12s infinite; }
 
       @keyframes rcth1 { 0%, 20% { opacity: 0; } 21%, 30% { opacity: 1; } 31%, 100% { opacity: 0; } }
       @keyframes rcth2 { 0%, 55% { opacity: 0; } 56%, 65% { opacity: 1; } 66%, 100% { opacity: 0; } }
       @keyframes rcth3 { 0%, 80% { opacity: 0; } 81%, 92% { opacity: 1; } 93%, 100% { opacity: 0; } }
-      /* Visible while both Suspense boundaries show fallbacks (during loading) */
-      @keyframes suspPar { 0%, 20% { opacity: 0; } 21%, 55% { opacity: 1; } 56%, 100% { opacity: 0; } }
 
-      /* Browser states - 5 states */
+      /* Individual suspension indicators - disappear when each component resolves */
+      .susp-reviews { opacity: 0; animation: suspR 12s infinite; }
+      .susp-recs { opacity: 0; animation: suspC 12s infinite; }
+
+      /* Reviews: visible 21-55%, disappears when reviews arrive (step 5) */
+      @keyframes suspR { 0%, 20% { opacity: 0; } 21%, 55% { opacity: 1; } 56%, 100% { opacity: 0; } }
+      /* Recs: visible 21-80%, disappears when recs arrive (step 6) */
+      @keyframes suspC { 0%, 20% { opacity: 0; } 21%, 80% { opacity: 1; } 81%, 100% { opacity: 0; } }
+
+      /* Browser states */
       .browser-blank { opacity: 1; animation: bb 12s infinite; }
       .browser-loading { opacity: 0; animation: bl 12s infinite; }
       .browser-partial { opacity: 0; animation: bp 12s infinite; }
@@ -57,31 +63,19 @@
       @keyframes bp { 0%, 55% { opacity: 0; } 56%, 80% { opacity: 1; } 81%, 100% { opacity: 0; } }
       @keyframes bd { 0%, 80% { opacity: 0; } 81%, 100% { opacity: 1; } }
 
-      /* Step indicators - 7 steps */
+      /* Step indicators */
       .step-1 { animation: s1 12s infinite; }
       .step-2 { animation: s2 12s infinite; }
       .step-3 { animation: s3 12s infinite; }
       .step-4 { animation: s4 12s infinite; }
       .step-5 { animation: s5 12s infinite; }
-      .step-6 { animation: s6 12s infinite; }
-      .step-7 { animation: s7 12s infinite; }
 
-      @keyframes s1 { 0%, 10% { fill: #22C55E; } 11%, 100% { fill: #CBD5E1; } }
-      @keyframes s2 { 0%, 10% { fill: #CBD5E1; } 11%, 20% { fill: #22C55E; } 21%, 100% { fill: #CBD5E1; } }
-      @keyframes s3 { 0%, 20% { fill: #CBD5E1; } 21%, 30% { fill: #61DAFB; } 31%, 100% { fill: #CBD5E1; } }
-      @keyframes s4 { 0%, 30% { fill: #CBD5E1; } 31%, 45% { fill: #F59E0B; } 46%, 100% { fill: #CBD5E1; } }
-      @keyframes s5 { 0%, 45% { fill: #CBD5E1; } 46%, 55% { fill: #22C55E; } 56%, 100% { fill: #CBD5E1; } }
-      @keyframes s6 { 0%, 65% { fill: #CBD5E1; } 66%, 80% { fill: #22C55E; } 81%, 100% { fill: #CBD5E1; } }
-      @keyframes s7 { 0%, 80% { fill: #CBD5E1; } 81%, 100% { fill: #22C55E; } }
+      @keyframes s1 { 0%, 20% { fill: #22C55E; } 21%, 100% { fill: #CBD5E1; } }
+      @keyframes s2 { 0%, 20% { fill: #CBD5E1; } 21%, 55% { fill: #F59E0B; } 56%, 100% { fill: #CBD5E1; } }
+      @keyframes s3 { 0%, 55% { fill: #CBD5E1; } 56%, 80% { fill: #22C55E; } 81%, 100% { fill: #CBD5E1; } }
+      @keyframes s4 { 0%, 80% { fill: #CBD5E1; } 81%, 100% { fill: #22C55E; } }
 
       .pointer { animation: pulse 0.8s ease-in-out infinite; }
-
-      .dot-1 { animation: d1 1.5s infinite; }
-      .dot-2 { animation: d2 1.5s infinite; }
-      .dot-3 { animation: d3 1.5s infinite; }
-      @keyframes d1 { 0%, 33% { opacity: 1; } 34%, 100% { opacity: 0.3; } }
-      @keyframes d2 { 0%, 33% { opacity: 0.3; } 34%, 66% { opacity: 1; } 67%, 100% { opacity: 0.3; } }
-      @keyframes d3 { 0%, 66% { opacity: 0.3; } 67%, 100% { opacity: 1; } }
 
       .spinner { transform-origin: 0px 0px; animation: spin 1.2s linear infinite; }
       @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
@@ -89,364 +83,265 @@
   </defs>
 
   <!-- Background -->
-  <rect width="1200" height="780" fill="#F1F5F9"/>
+  <rect width="1100" height="680" fill="#F1F5F9"/>
 
   <!-- Title -->
-  <text x="600" y="30" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="700" fill="#0F172A">Async Props Execution Flow</text>
-  <text x="600" y="50" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" fill="#64748B">Two async props streaming independently — each Suspense boundary fills at its own pace</text>
+  <text x="550" y="28" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="700" fill="#0F172A">Async Props — Independent Streaming</text>
 
-  <!-- Step indicators - 7 steps -->
-  <g transform="translate(65, 68)">
-    <g><circle cx="0" cy="0" r="13" class="step-1"/><text x="0" y="4" text-anchor="middle" font-family="system-ui" font-size="10" font-weight="700" fill="white">1</text><text x="0" y="20" text-anchor="middle" font-family="system-ui" font-size="8" fill="#64748B">Call</text></g>
-    <line x1="18" y1="0" x2="120" y2="0" stroke="#E2E8F0" stroke-width="2"/>
-    <g transform="translate(138, 0)"><circle cx="0" cy="0" r="13" class="step-2"/><text x="0" y="4" text-anchor="middle" font-family="system-ui" font-size="10" font-weight="700" fill="white">2</text><text x="0" y="20" text-anchor="middle" font-family="system-ui" font-size="8" fill="#64748B">Props</text></g>
-    <line x1="156" y1="0" x2="258" y2="0" stroke="#E2E8F0" stroke-width="2"/>
-    <g transform="translate(276, 0)"><circle cx="0" cy="0" r="13" class="step-3"/><text x="0" y="4" text-anchor="middle" font-family="system-ui" font-size="10" font-weight="700" fill="white">3</text><text x="0" y="20" text-anchor="middle" font-family="system-ui" font-size="8" fill="#64748B">Render</text></g>
-    <line x1="294" y1="0" x2="396" y2="0" stroke="#E2E8F0" stroke-width="2"/>
-    <g transform="translate(414, 0)"><circle cx="0" cy="0" r="13" class="step-4"/><text x="0" y="4" text-anchor="middle" font-family="system-ui" font-size="10" font-weight="700" fill="white">4</text><text x="0" y="20" text-anchor="middle" font-family="system-ui" font-size="8" fill="#64748B">Sleep</text></g>
-    <line x1="432" y1="0" x2="534" y2="0" stroke="#E2E8F0" stroke-width="2"/>
-    <g transform="translate(552, 0)"><circle cx="0" cy="0" r="13" class="step-5"/><text x="0" y="4" text-anchor="middle" font-family="system-ui" font-size="10" font-weight="700" fill="white">5</text><text x="0" y="20" text-anchor="middle" font-family="system-ui" font-size="8" fill="#64748B">Emit 1</text></g>
-    <line x1="570" y1="0" x2="672" y2="0" stroke="#E2E8F0" stroke-width="2"/>
-    <g transform="translate(690, 0)"><circle cx="0" cy="0" r="13" class="step-6"/><text x="0" y="4" text-anchor="middle" font-family="system-ui" font-size="10" font-weight="700" fill="white">6</text><text x="0" y="20" text-anchor="middle" font-family="system-ui" font-size="8" fill="#64748B">Emit 2</text></g>
-    <line x1="708" y1="0" x2="810" y2="0" stroke="#E2E8F0" stroke-width="2"/>
-    <g transform="translate(828, 0)"><circle cx="0" cy="0" r="13" class="step-7"/><text x="0" y="4" text-anchor="middle" font-family="system-ui" font-size="10" font-weight="700" fill="white">7</text><text x="0" y="20" text-anchor="middle" font-family="system-ui" font-size="8" fill="#64748B">Done</text></g>
+  <!-- Step indicators - simplified to 4 key steps -->
+  <g transform="translate(200, 52)">
+    <g><circle cx="0" cy="0" r="12" class="step-1"/><text x="0" y="4" text-anchor="middle" font-family="system-ui" font-size="9" font-weight="700" fill="white">1</text><text x="0" y="18" text-anchor="middle" font-family="system-ui" font-size="8" fill="#64748B">Start</text></g>
+    <line x1="16" y1="0" x2="160" y2="0" stroke="#E2E8F0" stroke-width="2"/>
+    <g transform="translate(176, 0)"><circle cx="0" cy="0" r="12" class="step-2"/><text x="0" y="4" text-anchor="middle" font-family="system-ui" font-size="9" font-weight="700" fill="white">2</text><text x="0" y="18" text-anchor="middle" font-family="system-ui" font-size="8" fill="#64748B">Loading</text></g>
+    <line x1="192" y1="0" x2="336" y2="0" stroke="#E2E8F0" stroke-width="2"/>
+    <g transform="translate(352, 0)"><circle cx="0" cy="0" r="12" class="step-3"/><text x="0" y="4" text-anchor="middle" font-family="system-ui" font-size="9" font-weight="700" fill="white">3</text><text x="0" y="18" text-anchor="middle" font-family="system-ui" font-size="8" fill="#64748B">Partial</text></g>
+    <line x1="368" y1="0" x2="512" y2="0" stroke="#E2E8F0" stroke-width="2"/>
+    <g transform="translate(528, 0)"><circle cx="0" cy="0" r="12" class="step-4"/><text x="0" y="4" text-anchor="middle" font-family="system-ui" font-size="9" font-weight="700" fill="white">4</text><text x="0" y="18" text-anchor="middle" font-family="system-ui" font-size="8" fill="#64748B">Done</text></g>
   </g>
 
   <!-- === RAILS CODE PANEL === -->
-  <g transform="translate(20, 100)">
-    <rect x="0" y="0" width="385" height="320" rx="10" fill="white" stroke="#E2E8F0" stroke-width="2" filter="url(#shadow)"/>
-    <rect x="0" y="0" width="385" height="32" rx="10" fill="url(#railsHeader)"/>
-    <rect x="0" y="22" width="385" height="10" fill="url(#railsHeader)"/>
-    <text x="192" y="21" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="600" fill="white">🛤️ Rails View (ERB)</text>
+  <g transform="translate(15, 80)">
+    <rect x="0" y="0" width="350" height="260" rx="8" fill="white" stroke="#E2E8F0" stroke-width="2" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="350" height="28" rx="8" fill="url(#railsHeader)"/>
+    <rect x="0" y="20" width="350" height="8" fill="url(#railsHeader)"/>
+    <text x="175" y="18" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="600" fill="white">🛤️ Rails</text>
 
     <!-- Code block -->
-    <rect x="8" y="40" width="369" height="270" rx="6" fill="#1E293B"/>
+    <rect x="6" y="34" width="338" height="220" rx="5" fill="#1E293B"/>
 
-    <!-- Line 1 -->
-    <text x="20" y="62" font-family="monospace" font-size="10" fill="#64748B">1</text>
-    <text x="38" y="62" font-family="monospace" font-size="9" fill="#94A3B8">&lt;%=</text>
-    <text x="60" y="62" font-family="monospace" font-size="9" fill="#F8FAFC">stream_react_component</text>
+    <!-- Simplified code -->
+    <text x="16" y="54" font-family="monospace" font-size="9" fill="#94A3B8">&lt;%= stream_react_component</text>
+    <text x="16" y="68" font-family="monospace" font-size="9" fill="#F8FAFC">    _with_async_props(</text>
+    <text x="150" y="68" font-family="monospace" font-size="9" fill="#86EFAC">"Page"</text>
+    <text x="195" y="68" font-family="monospace" font-size="9" fill="#F8FAFC">) do |emit|</text>
 
-    <!-- Line 2 -->
-    <text x="20" y="78" font-family="monospace" font-size="10" fill="#64748B">2</text>
-    <text x="50" y="78" font-family="monospace" font-size="9" fill="#F8FAFC">_with_async_props(</text>
-    <text x="160" y="78" font-family="monospace" font-size="9" fill="#86EFAC">"Page"</text>
-    <text x="200" y="78" font-family="monospace" font-size="9" fill="#F8FAFC">,</text>
+    <text x="16" y="92" font-family="monospace" font-size="9" fill="#F8FAFC">  sleep</text>
+    <text x="55" y="92" font-family="monospace" font-size="9" fill="#FCD34D">1</text>
+    <text x="16" y="106" font-family="monospace" font-size="9" fill="#F8FAFC">  emit.call(</text>
+    <text x="85" y="106" font-family="monospace" font-size="9" fill="#86EFAC">"reviews"</text>
+    <text x="148" y="106" font-family="monospace" font-size="9" fill="#F8FAFC">, data)</text>
 
-    <!-- Line 3 -->
-    <text x="20" y="94" font-family="monospace" font-size="10" fill="#64748B">3</text>
-    <text x="50" y="94" font-family="monospace" font-size="9" fill="#FCD34D">props:</text>
-    <text x="90" y="94" font-family="monospace" font-size="9" fill="#F8FAFC">{</text>
-    <text x="98" y="94" font-family="monospace" font-size="9" fill="#7DD3FC">title:</text>
-    <text x="135" y="94" font-family="monospace" font-size="9" fill="#86EFAC">"Header"</text>
-    <text x="190" y="94" font-family="monospace" font-size="9" fill="#F8FAFC">})</text>
-    <text x="208" y="94" font-family="monospace" font-size="9" fill="#F472B6">do</text>
-    <text x="225" y="94" font-family="monospace" font-size="9" fill="#F8FAFC">|emit|</text>
+    <text x="16" y="130" font-family="monospace" font-size="9" fill="#F8FAFC">  sleep</text>
+    <text x="55" y="130" font-family="monospace" font-size="9" fill="#FCD34D">3</text>
+    <text x="16" y="144" font-family="monospace" font-size="9" fill="#F8FAFC">  emit.call(</text>
+    <text x="85" y="144" font-family="monospace" font-size="9" fill="#86EFAC">"recs"</text>
+    <text x="128" y="144" font-family="monospace" font-size="9" fill="#F8FAFC">, data)</text>
 
-    <!-- Line 4: blank -->
-    <text x="20" y="110" font-family="monospace" font-size="10" fill="#64748B">4</text>
-
-    <!-- Line 5: sleep 1 -->
-    <text x="20" y="126" font-family="monospace" font-size="10" fill="#64748B">5</text>
-    <text x="50" y="126" font-family="monospace" font-size="9" fill="#F8FAFC">sleep</text>
-    <text x="85" y="126" font-family="monospace" font-size="9" fill="#FCD34D">1</text>
-    <text x="100" y="126" font-family="monospace" font-size="9" fill="#64748B"># fast query</text>
-
-    <!-- Line 6: emit reviews -->
-    <text x="20" y="142" font-family="monospace" font-size="10" fill="#64748B">6</text>
-    <text x="50" y="142" font-family="monospace" font-size="9" fill="#F8FAFC">emit.call(</text>
-    <text x="110" y="142" font-family="monospace" font-size="9" fill="#86EFAC">"reviews"</text>
-    <text x="175" y="142" font-family="monospace" font-size="9" fill="#F8FAFC">, reviews)</text>
-
-    <!-- Line 7: blank -->
-    <text x="20" y="158" font-family="monospace" font-size="10" fill="#64748B">7</text>
-
-    <!-- Line 8: sleep 3 -->
-    <text x="20" y="174" font-family="monospace" font-size="10" fill="#64748B">8</text>
-    <text x="50" y="174" font-family="monospace" font-size="9" fill="#F8FAFC">sleep</text>
-    <text x="85" y="174" font-family="monospace" font-size="9" fill="#FCD34D">3</text>
-    <text x="100" y="174" font-family="monospace" font-size="9" fill="#64748B"># slow recommendation engine</text>
-
-    <!-- Line 9: emit recommendations -->
-    <text x="20" y="190" font-family="monospace" font-size="10" fill="#64748B">9</text>
-    <text x="50" y="190" font-family="monospace" font-size="9" fill="#F8FAFC">emit.call(</text>
-    <text x="110" y="190" font-family="monospace" font-size="9" fill="#86EFAC">"recs"</text>
-    <text x="150" y="190" font-family="monospace" font-size="9" fill="#F8FAFC">, recs)</text>
-
-    <!-- Line 10: blank -->
-    <text x="20" y="206" font-family="monospace" font-size="10" fill="#64748B">10</text>
-
-    <!-- Line 11: end -->
-    <text x="20" y="222" font-family="monospace" font-size="10" fill="#64748B">11</text>
-    <text x="42" y="222" font-family="monospace" font-size="9" fill="#F472B6">end</text>
-    <text x="62" y="222" font-family="monospace" font-size="9" fill="#94A3B8">%&gt;</text>
+    <text x="16" y="168" font-family="monospace" font-size="9" fill="#F472B6">end</text>
+    <text x="35" y="168" font-family="monospace" font-size="9" fill="#94A3B8">%&gt;</text>
 
     <!-- Animated highlights -->
-    <rect x="35" y="50" width="335" height="48" rx="4" fill="none" stroke="#FBBF24" stroke-width="3" class="rails-hl-1"/>
-    <rect x="35" y="82" width="335" height="16" rx="4" fill="none" stroke="#22C55E" stroke-width="3" class="rails-hl-2"/>
-    <rect x="35" y="114" width="335" height="16" rx="4" fill="none" stroke="#F59E0B" stroke-width="3" class="rails-hl-3"/>
-    <rect x="35" y="130" width="335" height="16" rx="4" fill="none" stroke="#22C55E" stroke-width="3" class="rails-hl-4"/>
-    <rect x="35" y="178" width="335" height="16" rx="4" fill="none" stroke="#22C55E" stroke-width="3" class="rails-hl-5"/>
+    <rect x="12" y="44" width="326" height="30" rx="3" fill="none" stroke="#FBBF24" stroke-width="2" class="rails-hl-1"/>
+    <rect x="12" y="82" width="326" height="30" rx="3" fill="none" stroke="#22C55E" stroke-width="2" class="rails-hl-4"/>
+    <rect x="12" y="120" width="326" height="30" rx="3" fill="none" stroke="#22C55E" stroke-width="2" class="rails-hl-5"/>
 
-    <!-- Animated pointers -->
-    <g class="rails-hl-1"><polygon points="12,73 24,66 24,80" fill="#FBBF24" class="pointer"/></g>
-    <g class="rails-hl-2"><polygon points="12,90 24,83 24,97" fill="#22C55E" class="pointer"/></g>
-    <g class="rails-hl-3">
-      <polygon points="12,122 24,115 24,129" fill="#F59E0B" class="pointer"/>
-      <g transform="translate(355, 122)"><circle cx="0" cy="0" r="8" fill="none" stroke="#F59E0B" stroke-width="2" stroke-dasharray="12 16" class="spinner"/></g>
-    </g>
-    <g class="rails-hl-4"><polygon points="12,138 24,131 24,145" fill="#22C55E" class="pointer"/></g>
-    <g class="rails-hl-5"><polygon points="12,186 24,179 24,193" fill="#22C55E" class="pointer"/></g>
+    <!-- Pointers -->
+    <g class="rails-hl-1"><polygon points="8,58 0,52 0,64" fill="#FBBF24" class="pointer"/></g>
+    <g class="rails-hl-4"><polygon points="8,96 0,90 0,102" fill="#22C55E" class="pointer"/></g>
+    <g class="rails-hl-5"><polygon points="8,134 0,128 0,140" fill="#22C55E" class="pointer"/></g>
+
+    <!-- Timeline labels -->
+    <text x="300" y="98" font-family="system-ui" font-size="8" fill="#22C55E" class="rails-hl-4">1s</text>
+    <text x="300" y="136" font-family="system-ui" font-size="8" fill="#22C55E" class="rails-hl-5">3s</text>
   </g>
 
   <!-- === REACT CODE PANEL === -->
-  <g transform="translate(415, 100)">
-    <rect x="0" y="0" width="385" height="320" rx="10" fill="white" stroke="#E2E8F0" stroke-width="2" filter="url(#shadow)"/>
-    <rect x="0" y="0" width="385" height="32" rx="10" fill="url(#reactHeader)"/>
-    <rect x="0" y="22" width="385" height="10" fill="url(#reactHeader)"/>
-    <text x="192" y="21" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="600" fill="white">⚛️ React Component</text>
+  <g transform="translate(375, 80)">
+    <rect x="0" y="0" width="350" height="260" rx="8" fill="white" stroke="#E2E8F0" stroke-width="2" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="350" height="28" rx="8" fill="url(#reactHeader)"/>
+    <rect x="0" y="20" width="350" height="8" fill="url(#reactHeader)"/>
+    <text x="175" y="18" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="600" fill="white">⚛️ React</text>
 
     <!-- Code block -->
-    <rect x="8" y="40" width="369" height="270" rx="6" fill="#1E293B"/>
+    <rect x="6" y="34" width="338" height="220" rx="5" fill="#1E293B"/>
 
-    <!-- Line 1: function signature with full prop name -->
-    <text x="20" y="62" font-family="monospace" font-size="10" fill="#64748B">1</text>
-    <text x="38" y="62" font-family="monospace" font-size="9" fill="#F472B6">function</text>
-    <text x="88" y="62" font-family="monospace" font-size="9" fill="#7DD3FC">Page</text>
-    <text x="115" y="62" font-family="monospace" font-size="9" fill="#F8FAFC">({ title,</text>
-    <text x="175" y="62" font-family="monospace" font-size="9" fill="#7DD3FC">getReactOnRailsAsyncProp</text>
-    <text x="343" y="62" font-family="monospace" font-size="9" fill="#F8FAFC">}) {</text>
+    <!-- Simplified code -->
+    <text x="16" y="54" font-family="monospace" font-size="9" fill="#F472B6">function</text>
+    <text x="62" y="54" font-family="monospace" font-size="9" fill="#7DD3FC">Page</text>
+    <text x="88" y="54" font-family="monospace" font-size="9" fill="#F8FAFC">({ getAsyncProp }) {</text>
 
-    <!-- Line 2: comment showing parallel await -->
-    <text x="20" y="78" font-family="monospace" font-size="10" fill="#64748B">2</text>
-    <text x="48" y="78" font-family="monospace" font-size="9" fill="#64748B">// Both awaited in parallel — whichever resolves first renders</text>
+    <text x="16" y="72" font-family="monospace" font-size="9" fill="#F472B6">const</text>
+    <text x="48" y="72" font-family="monospace" font-size="9" fill="#F8FAFC">reviews =</text>
+    <text x="105" y="72" font-family="monospace" font-size="9" fill="#7DD3FC">getAsyncProp</text>
+    <text x="185" y="72" font-family="monospace" font-size="9" fill="#F8FAFC">(</text>
+    <text x="192" y="72" font-family="monospace" font-size="9" fill="#86EFAC">'reviews'</text>
+    <text x="252" y="72" font-family="monospace" font-size="9" fill="#F8FAFC">)</text>
+    <text x="16" y="86" font-family="monospace" font-size="9" fill="#F472B6">const</text>
+    <text x="48" y="86" font-family="monospace" font-size="9" fill="#F8FAFC">recs =</text>
+    <text x="88" y="86" font-family="monospace" font-size="9" fill="#7DD3FC">getAsyncProp</text>
+    <text x="168" y="86" font-family="monospace" font-size="9" fill="#F8FAFC">(</text>
+    <text x="175" y="86" font-family="monospace" font-size="9" fill="#86EFAC">'recs'</text>
+    <text x="215" y="86" font-family="monospace" font-size="9" fill="#F8FAFC">)</text>
 
-    <!-- Line 3: first async prop -->
-    <text x="20" y="94" font-family="monospace" font-size="10" fill="#64748B">3</text>
-    <text x="48" y="94" font-family="monospace" font-size="9" fill="#F472B6">const</text>
-    <text x="83" y="94" font-family="monospace" font-size="9" fill="#F8FAFC">reviews =</text>
-    <text x="145" y="94" font-family="monospace" font-size="9" fill="#7DD3FC">getReactOnRailsAsyncProp</text>
-    <text x="310" y="94" font-family="monospace" font-size="9" fill="#F8FAFC">(</text>
-    <text x="317" y="94" font-family="monospace" font-size="9" fill="#86EFAC">'reviews'</text>
-    <text x="365" y="94" font-family="monospace" font-size="9" fill="#F8FAFC">)</text>
+    <!-- Parallel bracket -->
+    <path d="M 13 64 L 10 64 L 10 92 L 13 92" fill="none" stroke="#F59E0B" stroke-width="1.5"/>
+    <text x="4" y="80" font-family="monospace" font-size="6" fill="#F59E0B">||</text>
 
-    <!-- Line 4: second async prop -->
-    <text x="20" y="110" font-family="monospace" font-size="10" fill="#64748B">4</text>
-    <text x="48" y="110" font-family="monospace" font-size="9" fill="#F472B6">const</text>
-    <text x="83" y="110" font-family="monospace" font-size="9" fill="#F8FAFC">recs =</text>
-    <text x="125" y="110" font-family="monospace" font-size="9" fill="#7DD3FC">getReactOnRailsAsyncProp</text>
-    <text x="290" y="110" font-family="monospace" font-size="9" fill="#F8FAFC">(</text>
-    <text x="297" y="110" font-family="monospace" font-size="9" fill="#86EFAC">'recs'</text>
-    <text x="333" y="110" font-family="monospace" font-size="9" fill="#F8FAFC">)</text>
+    <text x="16" y="106" font-family="monospace" font-size="9" fill="#F472B6">return</text>
+    <text x="55" y="106" font-family="monospace" font-size="9" fill="#F8FAFC">(</text>
 
-    <!-- Parallel bracket indicator -->
-    <path d="M 46 82 L 42 82 L 42 118 L 46 118" fill="none" stroke="#F59E0B" stroke-width="1.5" stroke-linecap="round"/>
-    <text x="30" y="103" font-family="monospace" font-size="7" fill="#F59E0B">||</text>
+    <!-- Suspense 1 with individual indicator -->
+    <text x="20" y="124" font-family="monospace" font-size="9" fill="#F8FAFC">&lt;</text>
+    <text x="27" y="124" font-family="monospace" font-size="9" fill="#7DD3FC">Suspense</text>
+    <text x="80" y="124" font-family="monospace" font-size="9" fill="#FCD34D">fallback</text>
+    <text x="128" y="124" font-family="monospace" font-size="9" fill="#F8FAFC">=</text>
+    <text x="135" y="124" font-family="monospace" font-size="9" fill="#86EFAC">"Loading..."</text>
+    <text x="205" y="124" font-family="monospace" font-size="9" fill="#F8FAFC">&gt;</text>
+    <text x="28" y="138" font-family="monospace" font-size="9" fill="#F8FAFC">&lt;</text>
+    <text x="35" y="138" font-family="monospace" font-size="9" fill="#7DD3FC">Reviews</text>
+    <text x="85" y="138" font-family="monospace" font-size="9" fill="#FCD34D">data</text>
+    <text x="108" y="138" font-family="monospace" font-size="9" fill="#F8FAFC">={reviews} /&gt;</text>
+    <text x="20" y="152" font-family="monospace" font-size="9" fill="#F8FAFC">&lt;/</text>
+    <text x="32" y="152" font-family="monospace" font-size="9" fill="#7DD3FC">Suspense</text>
+    <text x="85" y="152" font-family="monospace" font-size="9" fill="#F8FAFC">&gt;</text>
 
-    <!-- Line 5: return -->
-    <text x="20" y="126" font-family="monospace" font-size="10" fill="#64748B">5</text>
-    <text x="48" y="126" font-family="monospace" font-size="9" fill="#F472B6">return</text>
-    <text x="90" y="126" font-family="monospace" font-size="9" fill="#F8FAFC">(</text>
-
-    <!-- Line 6: div + h1 -->
-    <text x="20" y="142" font-family="monospace" font-size="10" fill="#64748B">6</text>
-    <text x="55" y="142" font-family="monospace" font-size="9" fill="#F8FAFC">&lt;</text>
-    <text x="62" y="142" font-family="monospace" font-size="9" fill="#7DD3FC">div</text>
-    <text x="82" y="142" font-family="monospace" font-size="9" fill="#F8FAFC">&gt;&lt;</text>
-    <text x="97" y="142" font-family="monospace" font-size="9" fill="#7DD3FC">h1</text>
-    <text x="112" y="142" font-family="monospace" font-size="9" fill="#F8FAFC">&gt;{title}&lt;/</text>
-    <text x="175" y="142" font-family="monospace" font-size="9" fill="#7DD3FC">h1</text>
-    <text x="190" y="142" font-family="monospace" font-size="9" fill="#F8FAFC">&gt;</text>
-
-    <!-- Line 7: Suspense 1 -->
-    <text x="20" y="158" font-family="monospace" font-size="10" fill="#64748B">7</text>
-    <text x="60" y="158" font-family="monospace" font-size="9" fill="#F8FAFC">&lt;</text>
-    <text x="67" y="158" font-family="monospace" font-size="9" fill="#7DD3FC">Suspense</text>
-    <text x="125" y="158" font-family="monospace" font-size="9" fill="#FCD34D">fallback</text>
-    <text x="178" y="158" font-family="monospace" font-size="9" fill="#F8FAFC">={</text>
-    <text x="193" y="158" font-family="monospace" font-size="9" fill="#86EFAC">"Loading reviews..."</text>
-    <text x="320" y="158" font-family="monospace" font-size="9" fill="#F8FAFC">}&gt;</text>
-
-    <!-- Line 8: Reviews -->
-    <text x="20" y="174" font-family="monospace" font-size="10" fill="#64748B">8</text>
-    <text x="70" y="174" font-family="monospace" font-size="9" fill="#F8FAFC">&lt;</text>
-    <text x="77" y="174" font-family="monospace" font-size="9" fill="#7DD3FC">Reviews</text>
-    <text x="130" y="174" font-family="monospace" font-size="9" fill="#FCD34D">p</text>
-    <text x="138" y="174" font-family="monospace" font-size="9" fill="#F8FAFC">={reviews} /&gt;</text>
-
-    <!-- Line 9: close Suspense -->
-    <text x="20" y="190" font-family="monospace" font-size="10" fill="#64748B">9</text>
-    <text x="60" y="190" font-family="monospace" font-size="9" fill="#F8FAFC">&lt;/</text>
-    <text x="75" y="190" font-family="monospace" font-size="9" fill="#7DD3FC">Suspense</text>
-    <text x="133" y="190" font-family="monospace" font-size="9" fill="#F8FAFC">&gt;</text>
-
-    <!-- Line 10: Suspense 2 -->
-    <text x="20" y="206" font-family="monospace" font-size="10" fill="#64748B">10</text>
-    <text x="60" y="206" font-family="monospace" font-size="9" fill="#F8FAFC">&lt;</text>
-    <text x="67" y="206" font-family="monospace" font-size="9" fill="#7DD3FC">Suspense</text>
-    <text x="125" y="206" font-family="monospace" font-size="9" fill="#FCD34D">fallback</text>
-    <text x="178" y="206" font-family="monospace" font-size="9" fill="#F8FAFC">={</text>
-    <text x="193" y="206" font-family="monospace" font-size="9" fill="#86EFAC">"Loading recs..."</text>
-    <text x="298" y="206" font-family="monospace" font-size="9" fill="#F8FAFC">}&gt;</text>
-
-    <!-- Line 11: Recs -->
-    <text x="20" y="222" font-family="monospace" font-size="10" fill="#64748B">11</text>
-    <text x="70" y="222" font-family="monospace" font-size="9" fill="#F8FAFC">&lt;</text>
-    <text x="77" y="222" font-family="monospace" font-size="9" fill="#7DD3FC">Recs</text>
-    <text x="105" y="222" font-family="monospace" font-size="9" fill="#FCD34D">p</text>
-    <text x="113" y="222" font-family="monospace" font-size="9" fill="#F8FAFC">={recs} /&gt;</text>
-
-    <!-- Line 12: close -->
-    <text x="20" y="238" font-family="monospace" font-size="10" fill="#64748B">12</text>
-    <text x="55" y="238" font-family="monospace" font-size="9" fill="#F8FAFC">&lt;/</text>
-    <text x="70" y="238" font-family="monospace" font-size="9" fill="#7DD3FC">Suspense</text>
-    <text x="128" y="238" font-family="monospace" font-size="9" fill="#F8FAFC">&gt;&lt;/</text>
-    <text x="150" y="238" font-family="monospace" font-size="9" fill="#7DD3FC">div</text>
-    <text x="170" y="238" font-family="monospace" font-size="9" fill="#F8FAFC">&gt;)}</text>
-
-    <!-- Parallel suspension bracket for both Suspense boundaries - visible during loading phase -->
-    <g class="suspense-parallel">
-      <path d="M 56 150 L 52 150 L 52 244 L 56 244" fill="none" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"/>
-      <text x="30" y="200" font-family="system-ui" font-size="9" fill="#F59E0B" font-weight="600">⏳</text>
-      <text x="30" y="212" font-family="system-ui" font-size="9" fill="#F59E0B" font-weight="600">⏳</text>
+    <!-- Individual ⏳ for Reviews - disappears at step 3 (55%) -->
+    <g class="susp-reviews">
+      <text x="320" y="138" font-family="system-ui" font-size="14" fill="#F59E0B">⏳</text>
     </g>
 
-    <!-- Animated highlights - adjusted for new line positions -->
-    <rect x="35" y="130" width="335" height="64" rx="4" fill="none" stroke="#61DAFB" stroke-width="3" class="react-hl-1"/>
-    <rect x="35" y="162" width="335" height="16" rx="4" fill="none" stroke="#22C55E" stroke-width="3" class="react-hl-2"/>
-    <rect x="35" y="210" width="335" height="16" rx="4" fill="none" stroke="#22C55E" stroke-width="3" class="react-hl-3"/>
+    <!-- Suspense 2 with individual indicator -->
+    <text x="20" y="170" font-family="monospace" font-size="9" fill="#F8FAFC">&lt;</text>
+    <text x="27" y="170" font-family="monospace" font-size="9" fill="#7DD3FC">Suspense</text>
+    <text x="80" y="170" font-family="monospace" font-size="9" fill="#FCD34D">fallback</text>
+    <text x="128" y="170" font-family="monospace" font-size="9" fill="#F8FAFC">=</text>
+    <text x="135" y="170" font-family="monospace" font-size="9" fill="#86EFAC">"Loading..."</text>
+    <text x="205" y="170" font-family="monospace" font-size="9" fill="#F8FAFC">&gt;</text>
+    <text x="28" y="184" font-family="monospace" font-size="9" fill="#F8FAFC">&lt;</text>
+    <text x="35" y="184" font-family="monospace" font-size="9" fill="#7DD3FC">Recs</text>
+    <text x="60" y="184" font-family="monospace" font-size="9" fill="#FCD34D">data</text>
+    <text x="83" y="184" font-family="monospace" font-size="9" fill="#F8FAFC">={recs} /&gt;</text>
+    <text x="20" y="198" font-family="monospace" font-size="9" fill="#F8FAFC">&lt;/</text>
+    <text x="32" y="198" font-family="monospace" font-size="9" fill="#7DD3FC">Suspense</text>
+    <text x="85" y="198" font-family="monospace" font-size="9" fill="#F8FAFC">&gt;</text>
 
-    <!-- Animated pointers - adjusted for new line positions -->
-    <g class="react-hl-1"><polygon points="12,161 24,154 24,168" fill="#61DAFB" class="pointer"/></g>
-    <g class="react-hl-2"><polygon points="12,170 24,163 24,177" fill="#22C55E" class="pointer"/></g>
-    <g class="react-hl-3"><polygon points="12,218 24,211 24,225" fill="#22C55E" class="pointer"/></g>
+    <!-- Individual ⏳ for Recs - disappears at step 4 (80%) -->
+    <g class="susp-recs">
+      <text x="320" y="184" font-family="system-ui" font-size="14" fill="#F59E0B">⏳</text>
+    </g>
+
+    <text x="16" y="216" font-family="monospace" font-size="9" fill="#F8FAFC">)}</text>
+
+    <!-- Animated highlights -->
+    <rect x="12" y="114" width="326" height="44" rx="3" fill="none" stroke="#61DAFB" stroke-width="2" class="react-hl-1"/>
+    <rect x="12" y="128" width="326" height="16" rx="3" fill="none" stroke="#22C55E" stroke-width="2" class="react-hl-2"/>
+    <rect x="12" y="174" width="326" height="16" rx="3" fill="none" stroke="#22C55E" stroke-width="2" class="react-hl-3"/>
   </g>
 
   <!-- === BROWSER PREVIEW === -->
-  <g transform="translate(810, 100)">
-    <rect x="0" y="0" width="370" height="320" rx="10" fill="white" stroke="#E2E8F0" stroke-width="2" filter="url(#shadow)"/>
-    <rect x="0" y="0" width="370" height="32" rx="10" fill="url(#browserHeader)"/>
-    <rect x="0" y="22" width="370" height="10" fill="url(#browserHeader)"/>
-    <text x="185" y="21" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="600" fill="white">🌐 Browser Preview</text>
+  <g transform="translate(735, 80)">
+    <rect x="0" y="0" width="350" height="260" rx="8" fill="white" stroke="#E2E8F0" stroke-width="2" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="350" height="28" rx="8" fill="url(#browserHeader)"/>
+    <rect x="0" y="20" width="350" height="8" fill="url(#browserHeader)"/>
+    <text x="175" y="18" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="600" fill="white">🌐 Browser</text>
 
     <!-- Browser chrome -->
-    <rect x="8" y="40" width="354" height="270" rx="6" fill="#F8FAFC" stroke="#E2E8F0"/>
-    <rect x="16" y="48" width="338" height="20" rx="4" fill="white" stroke="#CBD5E1"/>
-    <text x="30" y="62" font-family="monospace" font-size="8" fill="#64748B">localhost:3000/page</text>
-    <circle cx="26" cy="80" r="3" fill="#EF4444"/><circle cx="38" cy="80" r="3" fill="#F59E0B"/><circle cx="50" cy="80" r="3" fill="#22C55E"/>
+    <rect x="6" y="34" width="338" height="220" rx="5" fill="#F8FAFC" stroke="#E2E8F0"/>
+    <circle cx="20" cy="46" r="4" fill="#EF4444"/><circle cx="34" cy="46" r="4" fill="#F59E0B"/><circle cx="48" cy="46" r="4" fill="#22C55E"/>
 
     <!-- Content area -->
-    <rect x="16" y="88" width="338" height="212" rx="4" fill="white" stroke="#E2E8F0"/>
+    <rect x="12" y="56" width="326" height="192" rx="4" fill="white" stroke="#E2E8F0"/>
 
     <!-- State: Blank -->
     <g class="browser-blank">
-      <rect x="24" y="96" width="322" height="196" rx="4" fill="#F8FAFC"/>
-      <text x="185" y="200" text-anchor="middle" font-family="system-ui" font-size="13" fill="#94A3B8">Waiting for server...</text>
+      <text x="175" y="155" text-anchor="middle" font-family="system-ui" font-size="12" fill="#94A3B8">Waiting...</text>
     </g>
 
     <!-- State: Loading (both loading) -->
     <g class="browser-loading">
-      <rect x="24" y="96" width="322" height="32" rx="4" fill="#DBEAFE"/>
-      <text x="185" y="117" text-anchor="middle" font-family="system-ui" font-size="14" font-weight="600" fill="#1E40AF">Header ✓</text>
+      <rect x="20" y="64" width="310" height="85" rx="4" fill="#FEF3C7" stroke="#FCD34D" stroke-width="1.5" stroke-dasharray="4,2"/>
+      <text x="175" y="100" text-anchor="middle" font-family="system-ui" font-size="11" fill="#92400E">Reviews</text>
+      <text x="175" y="116" text-anchor="middle" font-family="system-ui" font-size="18" fill="#F59E0B">⏳</text>
 
-      <rect x="24" y="134" width="322" height="70" rx="4" fill="#FEF3C7" stroke="#FCD34D" stroke-width="1.5" stroke-dasharray="5,3"/>
-      <text x="125" y="173" text-anchor="middle" font-family="system-ui" font-size="11" fill="#92400E">Loading reviews</text>
-      <text x="175" y="173" font-family="system-ui" font-size="11" fill="#92400E" class="dot-1">.</text>
-      <text x="180" y="173" font-family="system-ui" font-size="11" fill="#92400E" class="dot-2">.</text>
-      <text x="185" y="173" font-family="system-ui" font-size="11" fill="#92400E" class="dot-3">.</text>
-
-      <rect x="24" y="210" width="322" height="70" rx="4" fill="#FEF3C7" stroke="#FCD34D" stroke-width="1.5" stroke-dasharray="5,3"/>
-      <text x="115" y="249" text-anchor="middle" font-family="system-ui" font-size="11" fill="#92400E">Loading recs</text>
-      <text x="155" y="249" font-family="system-ui" font-size="11" fill="#92400E" class="dot-1">.</text>
-      <text x="160" y="249" font-family="system-ui" font-size="11" fill="#92400E" class="dot-2">.</text>
-      <text x="165" y="249" font-family="system-ui" font-size="11" fill="#92400E" class="dot-3">.</text>
+      <rect x="20" y="155" width="310" height="85" rx="4" fill="#FEF3C7" stroke="#FCD34D" stroke-width="1.5" stroke-dasharray="4,2"/>
+      <text x="175" y="191" text-anchor="middle" font-family="system-ui" font-size="11" fill="#92400E">Recommendations</text>
+      <text x="175" y="207" text-anchor="middle" font-family="system-ui" font-size="18" fill="#F59E0B">⏳</text>
     </g>
 
     <!-- State: Partial (reviews loaded, recs loading) -->
     <g class="browser-partial">
-      <rect x="24" y="96" width="322" height="32" rx="4" fill="#DBEAFE"/>
-      <text x="185" y="117" text-anchor="middle" font-family="system-ui" font-size="14" font-weight="600" fill="#1E40AF">Header ✓</text>
+      <rect x="20" y="64" width="310" height="85" rx="4" fill="#D1FAE5" stroke="#22C55E" stroke-width="2"/>
+      <text x="175" y="100" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="500" fill="#166534">⭐⭐⭐⭐⭐ Reviews</text>
+      <text x="175" y="118" text-anchor="middle" font-family="system-ui" font-size="10" fill="#15803D">✓ Loaded at 1s</text>
 
-      <rect x="24" y="134" width="322" height="70" rx="4" fill="#D1FAE5" stroke="#22C55E" stroke-width="2"/>
-      <text x="185" y="165" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="500" fill="#166534">⭐⭐⭐⭐⭐ Reviews ✓</text>
-      <text x="185" y="185" text-anchor="middle" font-family="system-ui" font-size="10" fill="#15803D">Streamed after 1s</text>
-
-      <rect x="24" y="210" width="322" height="70" rx="4" fill="#FEF3C7" stroke="#FCD34D" stroke-width="1.5" stroke-dasharray="5,3"/>
-      <text x="115" y="249" text-anchor="middle" font-family="system-ui" font-size="11" fill="#92400E">Loading recs</text>
-      <text x="155" y="249" font-family="system-ui" font-size="11" fill="#92400E" class="dot-1">.</text>
-      <text x="160" y="249" font-family="system-ui" font-size="11" fill="#92400E" class="dot-2">.</text>
-      <text x="165" y="249" font-family="system-ui" font-size="11" fill="#92400E" class="dot-3">.</text>
+      <rect x="20" y="155" width="310" height="85" rx="4" fill="#FEF3C7" stroke="#FCD34D" stroke-width="1.5" stroke-dasharray="4,2"/>
+      <text x="175" y="191" text-anchor="middle" font-family="system-ui" font-size="11" fill="#92400E">Recommendations</text>
+      <text x="175" y="207" text-anchor="middle" font-family="system-ui" font-size="18" fill="#F59E0B">⏳</text>
     </g>
 
     <!-- State: Done -->
     <g class="browser-done">
-      <rect x="24" y="96" width="322" height="32" rx="4" fill="#DBEAFE"/>
-      <text x="185" y="117" text-anchor="middle" font-family="system-ui" font-size="14" font-weight="600" fill="#1E40AF">Header ✓</text>
+      <rect x="20" y="64" width="310" height="85" rx="4" fill="#D1FAE5" stroke="#22C55E" stroke-width="2"/>
+      <text x="175" y="100" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="500" fill="#166534">⭐⭐⭐⭐⭐ Reviews</text>
+      <text x="175" y="118" text-anchor="middle" font-family="system-ui" font-size="10" fill="#15803D">✓ Loaded at 1s</text>
 
-      <rect x="24" y="134" width="322" height="70" rx="4" fill="#D1FAE5" stroke="#22C55E" stroke-width="2"/>
-      <text x="185" y="165" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="500" fill="#166534">⭐⭐⭐⭐⭐ Reviews ✓</text>
-      <text x="185" y="185" text-anchor="middle" font-family="system-ui" font-size="10" fill="#15803D">Streamed after 1s</text>
-
-      <rect x="24" y="210" width="322" height="70" rx="4" fill="#D1FAE5" stroke="#22C55E" stroke-width="2"/>
-      <text x="185" y="241" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="500" fill="#166534">🎯 Recommendations ✓</text>
-      <text x="185" y="261" text-anchor="middle" font-family="system-ui" font-size="10" fill="#15803D">Streamed after 3s</text>
+      <rect x="20" y="155" width="310" height="85" rx="4" fill="#D1FAE5" stroke="#22C55E" stroke-width="2"/>
+      <text x="175" y="191" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="500" fill="#166534">🎯 Recommendations</text>
+      <text x="175" y="209" text-anchor="middle" font-family="system-ui" font-size="10" fill="#15803D">✓ Loaded at 3s</text>
     </g>
   </g>
 
-  <!-- === TIMELINE LEGEND === -->
-  <g transform="translate(20, 435)">
-    <rect x="0" y="0" width="1160" height="330" rx="12" fill="white" stroke="#E2E8F0" stroke-width="2" filter="url(#shadow)"/>
-    <text x="580" y="26" text-anchor="middle" font-family="system-ui" font-size="15" font-weight="700" fill="#0F172A">Execution Timeline — Two Async Props</text>
+  <!-- === KEY INSIGHT (simplified) === -->
+  <g transform="translate(15, 355)">
+    <rect x="0" y="0" width="1070" height="310" rx="10" fill="white" stroke="#E2E8F0" stroke-width="2" filter="url(#shadow)"/>
 
-    <!-- Timeline steps in 2 columns -->
-    <g transform="translate(30, 48)">
-      <g>
-        <circle cx="14" cy="12" r="14" fill="#FBBF24"/><text x="14" y="17" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="700" fill="white">1</text>
-        <text x="38" y="9" font-family="system-ui" font-size="11" font-weight="600" fill="#1E293B">Rails: stream_react_component_with_async_props</text>
-        <text x="38" y="23" font-family="system-ui" font-size="10" fill="#64748B">Streaming response starts immediately</text>
-      </g>
-      <g transform="translate(0, 38)">
-        <circle cx="14" cy="12" r="14" fill="#22C55E"/><text x="14" y="17" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="700" fill="white">2</text>
-        <text x="38" y="9" font-family="system-ui" font-size="11" font-weight="600" fill="#1E293B">Rails: Fast props sent instantly</text>
-        <text x="38" y="23" font-family="system-ui" font-size="10" fill="#64748B">props: { title: "Header" } — no waiting</text>
-      </g>
-      <g transform="translate(0, 76)">
-        <circle cx="14" cy="12" r="14" fill="#61DAFB"/><text x="14" y="17" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="700" fill="white">3</text>
-        <text x="38" y="9" font-family="system-ui" font-size="11" font-weight="600" fill="#1E293B">React: Renders with two Suspense fallbacks</text>
-        <text x="38" y="23" font-family="system-ui" font-size="10" fill="#64748B">Header visible, both data areas show "Loading..."</text>
-      </g>
-      <g transform="translate(0, 114)">
-        <circle cx="14" cy="12" r="14" fill="#F59E0B"/><text x="14" y="17" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="700" fill="white">4</text>
-        <text x="38" y="9" font-family="system-ui" font-size="11" font-weight="600" fill="#1E293B">Rails: sleep 1 — fast query executes</text>
-        <text x="38" y="23" font-family="system-ui" font-size="10" fill="#64748B">Page is interactive! Users can scroll, click header...</text>
-      </g>
+    <!-- Title -->
+    <text x="535" y="28" text-anchor="middle" font-family="system-ui" font-size="14" font-weight="700" fill="#0F172A">How It Works</text>
+
+    <!-- Three columns explanation -->
+    <g transform="translate(30, 50)">
+      <!-- Column 1 -->
+      <rect x="0" y="0" width="320" height="110" rx="6" fill="#FEF3C7"/>
+      <text x="160" y="24" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="600" fill="#92400E">1. Parallel Promises</text>
+      <text x="160" y="48" text-anchor="middle" font-family="monospace" font-size="10" fill="#78350F">reviews = getAsyncProp('reviews')</text>
+      <text x="160" y="64" text-anchor="middle" font-family="monospace" font-size="10" fill="#78350F">recs = getAsyncProp('recs')</text>
+      <text x="160" y="88" text-anchor="middle" font-family="system-ui" font-size="10" fill="#92400E">Both start waiting immediately</text>
     </g>
 
-    <g transform="translate(580, 48)">
-      <g>
-        <circle cx="14" cy="12" r="14" fill="#22C55E"/><text x="14" y="17" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="700" fill="white">5</text>
-        <text x="38" y="9" font-family="system-ui" font-size="11" font-weight="600" fill="#1E293B">Rails: emit("reviews", data) — first prop streams</text>
-        <text x="38" y="23" font-family="system-ui" font-size="10" fill="#64748B">Reviews appear instantly! Recs still loading...</text>
-      </g>
-      <g transform="translate(0, 38)">
-        <circle cx="14" cy="12" r="14" fill="#22C55E"/><text x="14" y="17" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="700" fill="white">6</text>
-        <text x="38" y="9" font-family="system-ui" font-size="11" font-weight="600" fill="#1E293B">Rails: emit("recs", data) — second prop streams</text>
-        <text x="38" y="23" font-family="system-ui" font-size="10" fill="#64748B">Recommendations fill in after 3s total</text>
-      </g>
-      <g transform="translate(0, 76)">
-        <circle cx="14" cy="12" r="14" fill="#22C55E"/><text x="14" y="17" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="700" fill="white">7</text>
-        <text x="38" y="9" font-family="system-ui" font-size="11" font-weight="600" fill="#1E293B">Complete: Both Suspense boundaries filled</text>
-        <text x="38" y="23" font-family="system-ui" font-size="10" fill="#64748B">Full page rendered — each section streamed independently</text>
-      </g>
+    <g transform="translate(370, 50)">
+      <!-- Column 2 -->
+      <rect x="0" y="0" width="320" height="110" rx="6" fill="#DBEAFE"/>
+      <text x="160" y="24" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="600" fill="#1E40AF">2. Independent Suspense</text>
+      <text x="160" y="48" text-anchor="middle" font-family="system-ui" font-size="10" fill="#1E40AF">Each &lt;Suspense&gt; boundary</text>
+      <text x="160" y="64" text-anchor="middle" font-family="system-ui" font-size="10" fill="#1E40AF">shows fallback independently</text>
+      <text x="160" y="88" text-anchor="middle" font-family="system-ui" font-size="10" fill="#1E40AF">⏳ disappears when data arrives</text>
     </g>
 
-    <!-- Key insight box -->
-    <g transform="translate(30, 205)">
-      <rect x="0" y="0" width="1100" height="110" rx="8" fill="#F0FDF4" stroke="#86EFAC" stroke-width="1.5"/>
-      <text x="25" y="24" font-family="system-ui" font-size="14" font-weight="700" fill="#166534">✨ Key Insight: Parallel Await, Independent Streaming</text>
-      <text x="25" y="48" font-family="system-ui" font-size="12" fill="#15803D">Both props are awaited in parallel — whichever resolves first renders first! Reviews fill in at 1s, recommendations at 3s.</text>
-      <text x="25" y="68" font-family="system-ui" font-size="12" fill="#15803D">Users see partial content immediately and can interact with it. No need to wait for the slowest query.</text>
-      <text x="25" y="92" font-family="system-ui" font-size="12" fill="#15803D">This is progressive enhancement at its best — fast data streams when ready, slow data follows independently.</text>
+    <g transform="translate(710, 50)">
+      <!-- Column 3 -->
+      <rect x="0" y="0" width="320" height="110" rx="6" fill="#D1FAE5"/>
+      <text x="160" y="24" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="600" fill="#166534">3. First Wins</text>
+      <text x="160" y="48" text-anchor="middle" font-family="system-ui" font-size="10" fill="#166534">Reviews arrives at 1s → renders</text>
+      <text x="160" y="64" text-anchor="middle" font-family="system-ui" font-size="10" fill="#166534">Recs arrives at 3s → renders</text>
+      <text x="160" y="88" text-anchor="middle" font-family="system-ui" font-size="10" fill="#166534">No waiting for slowest query!</text>
+    </g>
+
+    <!-- Visual flow -->
+    <g transform="translate(30, 175)">
+      <rect x="0" y="0" width="1010" height="120" rx="6" fill="#F0FDF4" stroke="#86EFAC"/>
+      <text x="505" y="24" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="600" fill="#166534">Timeline</text>
+
+      <!-- Timeline visualization -->
+      <line x1="50" y1="60" x2="960" y2="60" stroke="#CBD5E1" stroke-width="2"/>
+
+      <!-- 0s mark -->
+      <circle cx="50" cy="60" r="6" fill="#22C55E"/>
+      <text x="50" y="85" text-anchor="middle" font-family="system-ui" font-size="9" fill="#64748B">0s</text>
+      <text x="50" y="100" text-anchor="middle" font-family="system-ui" font-size="8" fill="#64748B">Start</text>
+
+      <!-- 1s mark - Reviews -->
+      <circle cx="350" cy="60" r="6" fill="#22C55E"/>
+      <text x="350" y="45" text-anchor="middle" font-family="system-ui" font-size="9" font-weight="500" fill="#166534">Reviews ✓</text>
+      <text x="350" y="85" text-anchor="middle" font-family="system-ui" font-size="9" fill="#64748B">1s</text>
+
+      <!-- 3s mark - Recs -->
+      <circle cx="850" cy="60" r="6" fill="#22C55E"/>
+      <text x="850" y="45" text-anchor="middle" font-family="system-ui" font-size="9" font-weight="500" fill="#166534">Recs ✓</text>
+      <text x="850" y="85" text-anchor="middle" font-family="system-ui" font-size="9" fill="#64748B">3s</text>
+
+      <!-- Waiting indicators -->
+      <text x="200" y="45" text-anchor="middle" font-family="system-ui" font-size="16" fill="#F59E0B">⏳⏳</text>
+      <text x="600" y="45" text-anchor="middle" font-family="system-ui" font-size="16" fill="#F59E0B">⏳</text>
     </g>
   </g>
 </svg>
