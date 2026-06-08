@@ -18,6 +18,7 @@ Run a Codex batch
 Use `.agents/workflows/pr-processing.md` as the deeper operating model for each issue, PR, review-fix pass, or merge-readiness item.
 If the target scope is not verified yet, use `.agents/skills/plan-pr-batch/SKILL.md` first.
 For release-mode coordination, auto-merge confidence, and shared release tracker updates, follow `AGENTS.md` and the release-mode sections of `.agents/workflows/pr-processing.md`; do not invent new labels or overwrite tracker issue bodies from stale reads.
+If any target's value, priority, or proposed fix scope is unclear, use `.agents/skills/evaluate-issue/SKILL.md` before assigning implementation workers.
 
 ## Non-Negotiable Safety Rules
 
@@ -69,7 +70,8 @@ Before implementation or worker launch, produce:
    - assigned machine or worker
 4. A permission and trust preflight result.
 5. A conflict check for overlapping files or dependent PRs.
-6. A final `/goal` prompt when the user asked for Goal mode.
+6. An issue-value check for speculative, AI/code-analysis-only, or over-scoped candidates.
+7. A final `/goal` prompt when the user asked for Goal mode.
 
 If the user is in `/plan` or asks for a plan-to-goal handoff, stop after the `/goal` prompt. Do not begin implementation from plan approval unless the user explicitly says to launch now.
 
