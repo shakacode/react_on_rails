@@ -84,10 +84,14 @@ Before merge readiness or auto-merge decisions, resolve the current release mode
 
 1. Search for open release gate trackers, usually issues with the existing `release` and `TRACKING` labels or a `Release gate:` title. Also search closed release gate issues updated within the last 7 days before defaulting to `development`, so stale trackers are not missed.
 2. Valid tracker modes are `development`, `accelerated-rc`, `strict-rc`, and `final-release`.
-3. If no active tracker exists, use `development` mode. This is not a blocker. If a release tracker was closed within the last 7 days and lacks a closing label/comment containing `Released` or `Superseded`, report `release-mode-stale-tracker` and do not auto-merge until a maintainer confirms the mode. If a PR or tracker comment such as `No active release, proceed` resolves the stale signal, verify the comment author has `write`, `maintain`, or `admin` permission before treating it as maintainer confirmation.
+3. If no active tracker exists, use `development` mode. This is not a blocker. If a release tracker was closed within the last 7 days and lacks a closing label/comment containing `Released` or `Superseded`, report `release-mode-stale-tracker` and do not auto-merge until a maintainer confirms the mode. Inspect tracker labels and comments with `gh issue view <tracker> --comments --json labels,comments` before deciding that the closing signal is absent. If a PR or tracker comment such as `No active release, proceed` resolves the stale signal, verify the comment author has `write`, `maintain`, or `admin` permission before treating it as maintainer confirmation.
 4. If exactly one active tracker exists, read its `Agent Release Mode` block from the issue body. If the block is absent, use `strict-rc` and report the missing block.
-5. If multiple active trackers exist for the same final release target and agree on mode, use the oldest open tracker unless it explicitly says it was superseded. The same final release target means the eventual semver without prerelease suffix; for example, `v1.2.0.rc.1` and `v1.2.0.rc.2` share the `v1.2.0` target. Preserve useful non-conflicting information, then close clean duplicates with a closing comment that links to the canonical tracker.
+5. If multiple active trackers exist for the same final release target and agree on mode, use the oldest open tracker unless it explicitly says it was superseded. The same final release target means the eventual semver without prerelease suffix; for example, `v1.2.0.rc.1` and `v1.2.0.rc.2` share the `v1.2.0` target. If same-target trackers disagree about mode or canonical status, report `release-mode-conflict` and do not auto-merge. Preserve useful non-conflicting information, then close clean duplicates with a closing comment that links to the canonical tracker.
 6. If multiple active trackers have different final release targets, select the tracker matching the PR's target only when the target is unambiguous from the PR body, linked issue, branch, or release/changelog text. If the PR target is unclear, or if trackers for the selected target disagree about mode or canonical status, report `release-mode-conflict` and do not auto-merge. Do not let unrelated final-release targets block each other when the PR target is clear.
+
+Reporting `release-mode-stale-tracker`, `release-mode-conflict`, or a missing
+release-mode block means posting a PR comment with a `Release Mode Block:`
+header, the signal name, relevant tracker URLs, and the current decision.
 
 In `development` and `strict-rc` modes, apply the standard merge qualification in `AGENTS.md`; the accelerated-RC confidence block and auto-merge threshold do not apply.
 
@@ -159,6 +163,7 @@ permission API as an auditable signal:
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 OWNER=${REPO%/*}
 NAME=${REPO#*/}
+GITHUB_LOGIN_TO_VERIFY=theirlogin # Replace with the GitHub login being verified.
 : "${GITHUB_LOGIN_TO_VERIFY:?Set this to the GitHub login being verified}"
 gh api "repos/${OWNER}/${NAME}/collaborators/${GITHUB_LOGIN_TO_VERIFY}/permission" --jq .permission 2>/dev/null || echo "none"
 ```
