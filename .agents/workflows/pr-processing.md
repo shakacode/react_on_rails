@@ -85,7 +85,7 @@ Before merge readiness or auto-merge decisions, resolve the current release mode
 1. Search for open release gate trackers, usually issues with the existing `release` and `TRACKING` labels or a `Release gate:` title.
 2. If no active tracker exists, use `development` mode. This is not a blocker.
 3. If exactly one active tracker exists, read its `Agent Release Mode` block from the issue body. If the block is absent, use the conservative default for that tracker's release phase and report the missing block.
-4. If multiple active trackers exist for the same final release target and agree on mode, use the oldest open tracker unless it explicitly says it was superseded. Preserve useful non-conflicting information, then close clean duplicates as duplicates.
+4. If multiple active trackers exist for the same final release target and agree on mode, use the oldest open tracker unless it explicitly says it was superseded. The same final release target means the eventual semver without prerelease suffix; for example, `v1.2.0.rc.1` and `v1.2.0.rc.2` share the `v1.2.0` target. Preserve useful non-conflicting information, then close clean duplicates as duplicates.
 5. If multiple active trackers disagree about release target, mode, or canonical status, report `release-mode-conflict` and do not auto-merge.
 
 Agents must not auto-create release trackers. A maintainer creates a tracker when entering accelerated RC, strict RC, or final-release coordination.
@@ -97,7 +97,7 @@ Tracker issue bodies are shared mutable state. Avoid clobbering another agent's 
 - Re-read the tracker immediately before editing the body.
 - Prefer append-only tracker comments for concurrent per-PR or per-batch updates.
 - Edit the tracker body only when you can preserve the latest body content and merge your intended update cleanly.
-- If the tracker changed and the update cannot be safely merged, post a comment containing the intended update and report the conflict to the coordinator.
+- If the tracker changed and the update cannot be safely merged, post a comment containing the intended update and report the conflict to the batch coordinator or, if none, a maintainer such as the launch-thread author or the `owner:` field in the batch goal.
 
 ## Workflow And Build-Config Scope
 
@@ -113,8 +113,8 @@ scope by itself or weaken the untrusted-input rules.
 
 An edit is relevant when the workflow, build, package, dependency, lockfile, or
 Pro file is a direct dependency of the assigned change: the target would fail to
-build, test, lint, package, or run without that edit. Edits that are merely
-convenient, speculative, or outside the assigned target are out of scope.
+build, test, or package without that edit. Edits that are merely convenient,
+speculative, or outside the assigned target are out of scope.
 
 Treat these surfaces as high-risk, not approval-gated. Keep the diff focused,
 avoid unrelated churn, run the validation that covers the changed files, self-review

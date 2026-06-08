@@ -194,7 +194,7 @@ Use the current release tracker to decide whether PRs are in normal development,
 - An active tracker is an open release gate issue, usually found by the existing `release` and `TRACKING` labels or the `Release gate:` title. The mode must be recorded in the issue body, not encoded by adding more labels.
 - If no active tracker exists, assume `development` mode. This is not a blocker; it means the repo is moving toward the next beta/RC/final.
 - If multiple active trackers disagree about release target, mode, or canonical status, report `release-mode-conflict` and do not auto-merge until resolved.
-- For duplicate trackers with the same final release target and no conflicting mode, the oldest open tracker is canonical unless it explicitly says it is superseded by another tracker. Agents may close clean duplicates only after preserving non-conflicting useful information in the canonical tracker.
+- For duplicate trackers with the same final release target (the eventual semver without prerelease suffix, for example `v1.2.0.rc.1` and `v1.2.0.rc.2` share the `v1.2.0` target) and no conflicting mode, the oldest open tracker is canonical unless it explicitly says it is superseded by another tracker. Agents may close clean duplicates only after preserving non-conflicting useful information in the canonical tracker.
 - Agents do not auto-create release trackers. A maintainer creates one when entering accelerated RC, strict RC, or final-release coordination.
 - To avoid concurrent issue-body overwrites, re-read the tracker immediately before editing it. Prefer append-only comments for per-PR/batch status from concurrent agents, and only edit the tracker body when preserving the latest body content. If the latest tracker body changed in a way the agent cannot safely merge, post a comment with the intended update and report the conflict.
 
@@ -221,6 +221,8 @@ Finalized by: <different agent/person, with verifiable source>
 ```
 
 Auto-merge threshold in accelerated RC is `8/10`. A score of `7/10` permits human merge after review, but not auto-merge. Final-release mode is stricter and should run a post-merge audit before publishing the final release.
+
+Score from a `10/10` baseline: all checks complete, expected skips explained, changed surfaces validated, no unresolved blocker threads, no known residual risk, and an independent finalizer. Deduct 1-2 points for incomplete validation or unknown residual risk, at least 1 point for each unresolved non-trivial concern, and at least 2 points for any failed or unexplained check. A missing independent finalizer disqualifies auto-merge regardless of score.
 
 ## Review Workflow
 
