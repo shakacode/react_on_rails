@@ -221,7 +221,7 @@ function Page({ title, getReactOnRailsAsyncProp }) {
 
 async function SlowData({ dataPromise }) {
   const data = await dataPromise; // Resolves when Rails emits it
-  return <p>{data}</p>;
+  return <p>{data.message}</p>;
 }
 ```
 
@@ -236,7 +236,7 @@ The server starts streaming immediately, it doesn't wait for SlowData to finish:
 At this point chunk 1 is not resolved yet. The client renders the div and h1 immediately and shows the Suspense fallback. When Rails emits the async prop, the server sends:
 
 ```rsc
-1:["$","p",null,{"children":"slow data from Rails"}]
+1:["$","p",null,{"children":"Loaded after 2 seconds"}]
 ```
 
 Now chunk 1 is resolved and the `$L1` lazy reference is complete. React replace the fallback with the actual content. This is how streaming works, you don't need the whole tree to be ready before sending the first byte to the client.

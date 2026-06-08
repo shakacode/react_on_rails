@@ -137,7 +137,7 @@ Now, let's use the `ToggleContainer` component to wrap the post image.
 // app/javascript/components/Posts.jsx
 import ToggleContainer from './ToggleContainer';
 
-const Posts = async ({ posts }) => {
+const Posts = ({ posts }) => {
   // existing code..
 
   return (

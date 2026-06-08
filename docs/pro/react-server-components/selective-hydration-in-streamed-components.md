@@ -35,7 +35,7 @@ Then create a component that awaits the async prop:
 // The async component awaits the slow data promise
 async function LongWaitingComponent({ dataPromise }) {
   const data = await dataPromise; // Resolves when Rails emits it
-  return <div>Loaded: {data}</div>;
+  return <div>Loaded: {data.message}</div>;
 }
 ```
 
