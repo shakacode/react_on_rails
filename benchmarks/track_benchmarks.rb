@@ -359,8 +359,19 @@ def load_candidate(dir)
   end
 
   parsed = JSON.parse(File.read(path))
+  unless parsed.is_a?(Hash)
+    warn "::error::Confirmation candidate #{path} is not a JSON object (got #{parsed.class}); " \
+         "treating the confirmation as inconclusive."
+    return [nil, ""]
+  end
+
   alerts = parsed[RegressionReport::ALERTS]
-  alerts = [] unless alerts.is_a?(Array)
+  unless alerts.is_a?(Array) && !alerts.empty?
+    warn "::error::Confirmation candidate #{path} has empty or missing " \
+         "#{RegressionReport::ALERTS}; treating the confirmation as inconclusive."
+    return [nil, parsed[RegressionReport::SUMMARY].to_s]
+  end
+
   [alerts, parsed[RegressionReport::SUMMARY].to_s]
 rescue StandardError => e
   warn "::error::Could not read confirmation candidate #{path} (#{e.class}: #{e.message}); " \

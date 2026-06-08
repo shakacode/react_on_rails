@@ -180,6 +180,17 @@ RSpec.describe "plan_confirmation" do
       end
     end
 
+    it "fails (no confirmations) when a candidate has the wrong JSON shape" do
+      Dir.mktmpdir do |dir|
+        malformed_payload = JSON.generate(%w[not a hash])
+        write_candidate(dir, artifact: "regression-candidate-core", suite: "Core", raw: malformed_payload)
+        result, outputs, _stdout = run_plan(dir, default_matrix)
+
+        expect(result).to be(false)
+        expect(outputs["has_confirmations"]).to eq("false")
+      end
+    end
+
     it "fails when a candidate matches no benchmark matrix row" do
       Dir.mktmpdir do |dir|
         write_candidate(dir, artifact: "regression-candidate-ghost", suite: "Ghost", regressed: ["/x: Ghost"])

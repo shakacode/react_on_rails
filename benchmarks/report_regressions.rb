@@ -364,7 +364,17 @@ def confirmed_payload_paths(artifacts_dir)
 end
 
 def load_payload(path)
-  JSON.parse(File.read(path))
+  parsed = JSON.parse(File.read(path))
+  required_keys = [
+    RegressionReport::SUITE_NAME,
+    RegressionReport::FIRST_RUN_SUMMARY,
+    RegressionReport::CONFIRMATION_SUMMARY
+  ]
+  unless parsed.is_a?(Hash) && required_keys.all? { |key| parsed.key?(key) }
+    raise "expected a JSON object with #{required_keys.join(', ')}"
+  end
+
+  parsed
 rescue StandardError => e
   # A regression was confirmed but its report is unreadable/corrupt. Surface it and
   # let the caller fail rather than silently dropping the suite from the issue.

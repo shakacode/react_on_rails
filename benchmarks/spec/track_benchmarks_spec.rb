@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require "optparse"
+require "fileutils"
+require "tmpdir"
 require_relative "spec_helper"
 require_relative "../track_benchmarks"
 require_relative "../lib/bmf_helpers"
@@ -152,6 +154,50 @@ RSpec.describe "track_benchmarks" do
           )
         )
         expect(regressed_alert_pairs(report)).to eq([{ "benchmark" => "/x: Pro", "measure" => "rps" }])
+      end
+    end
+
+    describe "#load_candidate" do
+      def write_candidate(dir, payload)
+        artifact_dir = File.join(dir, "candidate")
+        FileUtils.mkdir_p(artifact_dir)
+        File.write(
+          File.join(artifact_dir, RegressionReport::CANDIDATE_FILENAME),
+          JSON.generate(payload)
+        )
+      end
+
+      it "returns alerts and summary for a valid candidate" do
+        Dir.mktmpdir do |dir|
+          alerts = [{ "benchmark" => "/x: Pro", "measure" => "rps" }]
+          write_candidate(dir, RegressionReport::ALERTS => alerts, RegressionReport::SUMMARY => "first run")
+
+          expect(load_candidate(dir)).to eq([alerts, "first run"])
+        end
+      end
+
+      it "treats missing alerts as inconclusive" do
+        Dir.mktmpdir do |dir|
+          write_candidate(dir, RegressionReport::SUMMARY => "first run")
+
+          expect(load_candidate(dir)).to eq([nil, "first run"])
+        end
+      end
+
+      it "treats non-array alerts as inconclusive" do
+        Dir.mktmpdir do |dir|
+          write_candidate(dir, RegressionReport::ALERTS => "not an array", RegressionReport::SUMMARY => "first run")
+
+          expect(load_candidate(dir)).to eq([nil, "first run"])
+        end
+      end
+
+      it "treats empty alerts as inconclusive" do
+        Dir.mktmpdir do |dir|
+          write_candidate(dir, RegressionReport::ALERTS => [], RegressionReport::SUMMARY => "first run")
+
+          expect(load_candidate(dir)).to eq([nil, "first run"])
+        end
       end
     end
 

@@ -31,7 +31,13 @@ def candidate_payload_paths(artifacts_dir)
 end
 
 def load_candidate_payload(path)
-  JSON.parse(File.read(path))
+  parsed = JSON.parse(File.read(path))
+  required_keys = [RegressionReport::SUITE_NAME, RegressionReport::SHARD_LABEL]
+  unless parsed.is_a?(Hash) && required_keys.all? { |key| parsed.key?(key) }
+    raise "expected a JSON object with #{required_keys.join(', ')}"
+  end
+
+  parsed
 rescue StandardError => e
   warn "::error::Failed to read regression candidate #{path}: #{e.class}: #{e.message}"
   nil

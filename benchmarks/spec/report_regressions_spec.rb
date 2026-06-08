@@ -452,5 +452,21 @@ RSpec.describe "benchmark regression reporting" do
         )
       end
     end
+
+    it "reports valid payloads but still fails when one payload has the wrong JSON shape" do
+      Dir.mktmpdir do |dir|
+        write_payload(dir, artifact: "regression-confirmed-core", suite: "Core")
+        invalid = File.join(dir, "regression-confirmed-pro")
+        FileUtils.mkdir_p(invalid)
+        File.write(File.join(invalid, RegressionReport::CONFIRMED_FILENAME), JSON.generate(%w[not a hash]))
+
+        output, status = run_script(script, dir, gh_stub: fake_gh)
+        expect(status).not_to be_success
+        expect(output).to match(/Filing confirmed regression report for Core/)
+        expect(output).to match(
+          %r{::error::Failed to read confirmed regression payload .*/regression-confirmed-pro/}
+        )
+      end
+    end
   end
 end
