@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "optparse"
 require_relative "spec_helper"
 require_relative "../track_benchmarks"
 require_relative "../lib/bmf_helpers"
@@ -163,59 +162,6 @@ RSpec.describe "track_benchmarks" do
       summary = regression_handoff_summary("")
       expect(summary).not_to be_empty
       expect(summary).to include("https://github.test/run/1")
-    end
-  end
-
-  # The boundary/side mapping is a silent safety control: a flipped side or wrong
-  # value would stop regressions from alerting while CI stays green, so pin it.
-  describe "#threshold_args" do
-    it "puts the boundary on the lower side for higher-is-better measures" do
-      expect(threshold_args("rps", :lower, "0.9995")).to eq(
-        %w[--threshold-measure rps --threshold-test t_test
-           --threshold-max-sample-size 64
-           --threshold-lower-boundary 0.9995 --threshold-upper-boundary _]
-      )
-    end
-
-    it "puts the boundary on the upper side for lower-is-better measures" do
-      expect(threshold_args("p50_latency", :upper, "0.9999")).to eq(
-        %w[--threshold-measure p50_latency --threshold-test t_test
-           --threshold-max-sample-size 64
-           --threshold-lower-boundary _ --threshold-upper-boundary 0.9999]
-      )
-    end
-  end
-
-  describe "#bencher_args" do
-    it "requests the JSON report format (so the report can be parsed, not grepped)" do
-      args = bencher_args("my-branch", [])
-      expect(args.each_cons(2)).to include(%w[--format json])
-      expect(args).not_to include("html")
-    end
-
-    # Parse only the threshold tail: OptionParser raises InvalidOption on any flag it
-    # doesn't declare, and the leading `bencher run` flags aren't declared here, so
-    # drop everything before the first --threshold-measure.
-    def parse_thresholds(argv)
-      thresholds = []
-      OptionParser.new do |opts|
-        opts.on("--threshold-measure=MEASURE") { |measure| thresholds << { measure: } }
-        opts.on("--threshold-lower-boundary=BOUNDARY") { |boundary| thresholds.last[:lower] = boundary }
-        opts.on("--threshold-upper-boundary=BOUNDARY") { |boundary| thresholds.last[:upper] = boundary }
-        opts.on("--threshold-test=TEST")
-        opts.on("--threshold-max-sample-size=SIZE")
-      end.parse(argv.drop_while { |arg| arg != "--threshold-measure" })
-      thresholds
-    end
-
-    it "tracks exactly rps/p50_latency/failed_pct with their tuned boundaries and sides" do
-      expect(parse_thresholds(bencher_args("my-branch", []))).to eq(
-        [
-          { measure: "rps", lower: "0.9995", upper: "_" },
-          { measure: "p50_latency", lower: "_", upper: "0.9999" },
-          { measure: "failed_pct", lower: "_", upper: "0.95" }
-        ]
-      )
     end
   end
 

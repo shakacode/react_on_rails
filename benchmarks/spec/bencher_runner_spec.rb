@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "optparse"
+
 require_relative "spec_helper"
 require_relative "../lib/bencher_runner"
 
@@ -32,6 +34,31 @@ RSpec.describe BencherRunner do
       expect(args.each_cons(2)).to include(["--file", "bench.json"])
       expect(args.each_cons(2)).to include(["--format", "json"])
       expect(args).to include("--start-point", "main")
+    end
+
+    # Parse only the threshold tail: OptionParser raises InvalidOption on any flag it
+    # doesn't declare, and the leading `bencher run` flags aren't declared here, so
+    # drop everything before the first --threshold-measure.
+    def parse_thresholds(argv)
+      thresholds = []
+      OptionParser.new do |opts|
+        opts.on("--threshold-measure=MEASURE") { |measure| thresholds << { measure: } }
+        opts.on("--threshold-lower-boundary=BOUNDARY") { |boundary| thresholds.last[:lower] = boundary }
+        opts.on("--threshold-upper-boundary=BOUNDARY") { |boundary| thresholds.last[:upper] = boundary }
+        opts.on("--threshold-test=TEST")
+        opts.on("--threshold-max-sample-size=SIZE")
+      end.parse(argv.drop_while { |arg| arg != "--threshold-measure" })
+      thresholds
+    end
+
+    it "tracks exactly rps/p50_latency/failed_pct with their tuned boundaries and sides" do
+      expect(parse_thresholds(runner.args("my-branch", []))).to eq(
+        [
+          { measure: "rps", lower: "0.9995", upper: "_" },
+          { measure: "p50_latency", lower: "_", upper: "0.9999" },
+          { measure: "failed_pct", lower: "_", upper: "0.95" }
+        ]
+      )
     end
   end
 
@@ -83,6 +110,16 @@ RSpec.describe BencherRunner do
 
       expect { runner.run("branch", []) }
         .to output(/::warning::Bencher report listed benchmarks but no perf-link context/).to_stdout
+    end
+
+    it "raises a testable error when Bencher emits malformed JSON" do
+      status = instance_double(Process::Status, exitstatus: 0)
+
+      allow(Open3).to receive(:capture3).and_return(["{}", "", status])
+      allow(File).to receive(:write).with("report.json", "{}")
+
+      expect { runner.run("branch", []) }
+        .to raise_error(BencherRunner::ReportParseError, /Bencher JSON report has an unexpected shape/)
     end
   end
 end

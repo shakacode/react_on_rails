@@ -8,6 +8,8 @@ require_relative "github"
 
 # Builds and runs the Bencher CLI invocation for benchmark tracking.
 class BencherRunner
+  class ReportParseError < StandardError; end
+
   MAX_SAMPLE = "64"
   # Per-measure t-test boundaries (the confidence level Bencher uses for its
   # prediction interval). Tuned from a sweep of recent main-branch reports so fewer
@@ -86,9 +88,9 @@ class BencherRunner
   def parse_report(stdout)
     BencherReport.parse(stdout)
   rescue BencherReport::FormatError => e
-    warn "::error::Bencher JSON report has an unexpected shape — re-verify against " \
-         "benchmarks/spec/bencher_report_spec.rb before bumping the CLI pin. #{e.message}"
-    exit 1
+    raise ReportParseError,
+          "Bencher JSON report has an unexpected shape — re-verify against " \
+          "benchmarks/spec/bencher_report_spec.rb before bumping the CLI pin. #{e.message}"
   end
 
   def warn_on_missing_perf_link_context(report)

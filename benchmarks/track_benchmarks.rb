@@ -73,14 +73,6 @@ def branch_and_start_point_args
   end
 end
 
-def threshold_args(measure, direction, boundary)
-  bencher_runner.threshold_args(measure, direction, boundary)
-end
-
-def bencher_args(branch, start_point_args)
-  bencher_runner.args(branch, start_point_args)
-end
-
 def run_bencher(branch, start_point_args)
   bencher_runner.run(branch, start_point_args)
 end
@@ -98,14 +90,6 @@ end
 
 def bencher_runner
   @bencher_runner ||= BencherRunner.new(benchmark_json: BENCHMARK_JSON, report_json: REPORT_JSON)
-end
-
-def stale_comment_ids(before:)
-  pr_report_poster.stale_comment_ids(before:)
-end
-
-def delete_stale_report_comments(before:)
-  pr_report_poster.delete_stale_comments(before:)
 end
 
 def replace_pr_comments(markdown)
@@ -211,7 +195,12 @@ if __FILE__ == $PROGRAM_NAME
   env!("BENCHER_API_TOKEN")
 
   branch, start_point_args = branch_and_start_point_args
-  stderr, bencher_exit_code, report = run_bencher(branch, start_point_args)
+  begin
+    stderr, bencher_exit_code, report = run_bencher(branch, start_point_args)
+  rescue BencherRunner::ReportParseError => e
+    warn "::error::#{e.message}"
+    exit 1
+  end
 
   if retry_without_start_point_hash?(stderr, bencher_exit_code, report)
     retry_args = start_point_args.dup
@@ -222,7 +211,12 @@ if __FILE__ == $PROGRAM_NAME
     Github.warning("Start-point hash not found in Bencher; falling back to latest baseline for comparison")
     # The retry's stderr is unused: regression classification reads the JSON report,
     # and this path only triggers when the first run had no regression.
-    _retry_stderr, bencher_exit_code, report = run_bencher(branch, retry_args)
+    begin
+      _retry_stderr, bencher_exit_code, report = run_bencher(branch, retry_args)
+    rescue BencherRunner::ReportParseError => e
+      warn "::error::#{e.message}"
+      exit 1
+    end
   end
 
   # Build the Markdown summary table once; the same body feeds the job summary, the
