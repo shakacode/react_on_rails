@@ -97,11 +97,7 @@ export const createRSCProvider = ({
     );
 
     const markSuccessfulPromise = useCallback(
-      (
-        key: string,
-        promise: Promise<ReactNode>,
-        { notifyRoutes = false }: { notifyRoutes?: boolean } = {},
-      ) => {
+      (key: string, promise: Promise<ReactNode>, notifyRoutes = false) => {
         if (fetchRSCPromisesRef.current[key] !== promise) {
           return;
         }
@@ -152,12 +148,12 @@ export const createRSCProvider = ({
           }
 
           const lastSuccessfulPromise = lastSuccessfulRSCPromisesRef.current[key];
-          if (lastSuccessfulPromise !== undefined) {
+          // eslint-disable-next-line @typescript-eslint/no-misused-promises
+          if (lastSuccessfulPromise) {
             fetchRSCPromisesRef.current[key] = lastSuccessfulPromise;
           } else {
-            fetchRSCPromisesRef.current = Object.fromEntries(
-              Object.entries(fetchRSCPromisesRef.current).filter(([cacheKey]) => cacheKey !== key),
-            );
+            // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+            delete fetchRSCPromisesRef.current[key];
           }
 
           startTransition(() => {
@@ -180,7 +176,7 @@ export const createRSCProvider = ({
                   restoreLastSuccessfulPromise();
                 }
               } else {
-                markSuccessfulPromise(key, promise, { notifyRoutes: true });
+                markSuccessfulPromise(key, promise, true);
               }
               return payload;
             },
