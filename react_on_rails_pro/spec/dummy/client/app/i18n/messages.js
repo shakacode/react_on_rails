@@ -15,7 +15,7 @@ const messages = {
     'page.section.footer': 'Footer',
 
     // Greeting
-    'greeting': 'Hello! Welcome to our store.',
+    greeting: 'Hello! Welcome to our store.',
 
     // Stats
     'stats.visitors': '{count, plural, one {# visitor} other {# visitors}} today',
@@ -97,17 +97,22 @@ const messages = {
     'display.selfLanguage': 'This page language',
 
     // Advanced ICU
-    'advanced.gender': '{gender, select, male {He} female {She} other {They}} ordered {count, plural, one {# item} other {# items}}.',
-    'advanced.ordinal': 'You finished in {place, selectordinal, one {#st} two {#nd} few {#rd} other {#th}} place!',
-    'advanced.nested': '{hostCount, plural, one {{host} is hosting} other {{host} and {otherCount, plural, one {# other} other {# others}} are hosting}} the event.',
+    'advanced.gender':
+      '{gender, select, male {He} female {She} other {They}} ordered {count, plural, one {# item} other {# items}}.',
+    'advanced.ordinal':
+      'You finished in {place, selectordinal, one {#st} two {#nd} few {#rd} other {#th}} place!',
+    'advanced.nested':
+      '{hostCount, plural, one {{host} is hosting} other {{host} and {otherCount, plural, one {# other} other {# others}} are hosting}} the event.',
     'advanced.richText': 'Read our <link>terms of service</link> and <bold>privacy policy</bold>.',
     'advanced.escape': "It's {percent} off — don't miss out!",
 
     // Footer
     'footer.rendered_at': 'Server-rendered at {time}',
     'footer.locale': 'Current locale: {locale}',
-    'footer.cache_note': 'The intl instance is created once per request via React.cache() — all components share it.',
-    'footer.components': '{count, plural, one {# component} other {# components}} rendered on the server using the same cached intl instance.',
+    'footer.cache_note':
+      'The intl instance is created once per request via React.cache() — all components share it.',
+    'footer.components':
+      '{count, plural, one {# component} other {# components}} rendered on the server using the same cached intl instance.',
   },
   ar: {
     'page.title': 'عرض React Intl RSC',
@@ -123,10 +128,12 @@ const messages = {
     'page.section.advanced': 'أنماط ICU المتقدمة',
     'page.section.footer': 'التذييل',
 
-    'greeting': 'مرحباً! أهلاً بكم في متجرنا.',
+    greeting: 'مرحباً! أهلاً بكم في متجرنا.',
 
-    'stats.visitors': '{count, plural, zero {لا زوار} one {زائر واحد} two {زائران} few {# زوار} many {# زائرًا} other {# زائر}} اليوم',
-    'stats.orders': '{count, plural, zero {لا طلبات} one {طلب واحد} two {طلبان} few {# طلبات} many {# طلبًا} other {# طلب}} هذا الأسبوع',
+    'stats.visitors':
+      '{count, plural, zero {لا زوار} one {زائر واحد} two {زائران} few {# زوار} many {# زائرًا} other {# زائر}} اليوم',
+    'stats.orders':
+      '{count, plural, zero {لا طلبات} one {طلب واحد} two {طلبان} few {# طلبات} many {# طلبًا} other {# طلب}} هذا الأسبوع',
     'stats.rating': 'متوسط التقييم: {rating}/5',
     'stats.revenue': 'إيرادات هذا الشهر',
     'stats.conversion': 'معدل التحويل',
@@ -139,7 +146,8 @@ const messages = {
     'product.sensor.name': 'مستشعر نانو',
     'product.sensor.description': 'مستشعر فائق الدقة للمراقبة الصناعية.',
     'product.price': 'السعر: {price}',
-    'product.stock': '{count, plural, zero {نفد المخزون} one {وحدة واحدة} two {وحدتان} few {# وحدات} many {# وحدة} other {# وحدة}} في المخزون',
+    'product.stock':
+      '{count, plural, zero {نفد المخزون} one {وحدة واحدة} two {وحدتان} few {# وحدات} many {# وحدة} other {# وحدة}} في المخزون',
     'product.badge.new': 'جديد',
     'product.badge.sale': 'تخفيض',
     'product.badge.popular': 'رائج',
@@ -197,16 +205,19 @@ const messages = {
     'display.script': 'اسم الخط',
     'display.selfLanguage': 'لغة هذه الصفحة',
 
-    'advanced.gender': '{gender, select, male {هو طلب} female {هي طلبت} other {طلبوا}} {count, plural, zero {لا شيء} one {منتج واحد} two {منتجين} few {# منتجات} many {# منتجًا} other {# منتج}}.',
+    'advanced.gender':
+      '{gender, select, male {هو طلب} female {هي طلبت} other {طلبوا}} {count, plural, zero {لا شيء} one {منتج واحد} two {منتجين} few {# منتجات} many {# منتجًا} other {# منتج}}.',
     'advanced.ordinal': 'أنهيت في المركز {place, selectordinal, other {#}}!',
-    'advanced.nested': '{hostCount, plural, one {{host} يستضيف} other {{host} و{otherCount, plural, one {آخر واحد} two {آخران} few {# آخرين} many {# آخرًا} other {# آخر}} يستضيفون}} الحدث.',
+    'advanced.nested':
+      '{hostCount, plural, one {{host} يستضيف} other {{host} و{otherCount, plural, one {آخر واحد} two {آخران} few {# آخرين} many {# آخرًا} other {# آخر}} يستضيفون}} الحدث.',
     'advanced.richText': 'اقرأ <link>شروط الخدمة</link> و<bold>سياسة الخصوصية</bold>.',
-    'advanced.escape': "خصم {percent} — لا تفوّت الفرصة!",
+    'advanced.escape': 'خصم {percent} — لا تفوّت الفرصة!',
 
     'footer.rendered_at': 'تم العرض من الخادم في {time}',
     'footer.locale': 'اللغة الحالية: {locale}',
     'footer.cache_note': 'يتم إنشاء مثيل intl مرة واحدة لكل طلب عبر React.cache() — تتشاركه جميع المكونات.',
-    'footer.components': '{count, plural, zero {لا مكونات} one {مكون واحد} two {مكونان} few {# مكونات} many {# مكونًا} other {# مكون}} تم عرضها على الخادم باستخدام نفس مثيل intl المخزن مؤقتًا.',
+    'footer.components':
+      '{count, plural, zero {لا مكونات} one {مكون واحد} two {مكونان} few {# مكونات} many {# مكونًا} other {# مكون}} تم عرضها على الخادم باستخدام نفس مثيل intl المخزن مؤقتًا.',
   },
   es: {
     'page.title': 'Demo React Intl RSC',
@@ -222,7 +233,7 @@ const messages = {
     'page.section.advanced': 'Patrones ICU avanzados',
     'page.section.footer': 'Pie de página',
 
-    'greeting': '¡Hola! Bienvenido a nuestra tienda.',
+    greeting: '¡Hola! Bienvenido a nuestra tienda.',
 
     'stats.visitors': '{count, plural, one {# visitante} other {# visitantes}} hoy',
     'stats.orders': '{count, plural, one {# pedido} other {# pedidos}} esta semana',
@@ -296,16 +307,21 @@ const messages = {
     'display.script': 'Nombre del script',
     'display.selfLanguage': 'Idioma de esta página',
 
-    'advanced.gender': '{gender, select, male {Él pidió} female {Ella pidió} other {Pidieron}} {count, plural, one {# artículo} other {# artículos}}.',
+    'advanced.gender':
+      '{gender, select, male {Él pidió} female {Ella pidió} other {Pidieron}} {count, plural, one {# artículo} other {# artículos}}.',
     'advanced.ordinal': '¡Terminaste en el puesto {place, selectordinal, other {#º}}!',
-    'advanced.nested': '{hostCount, plural, one {{host} organiza} other {{host} y {otherCount, plural, one {# más} other {# más}} organizan}} el evento.',
-    'advanced.richText': 'Lee nuestros <link>términos de servicio</link> y la <bold>política de privacidad</bold>.',
-    'advanced.escape': "¡{percent} de descuento — no te lo pierdas!",
+    'advanced.nested':
+      '{hostCount, plural, one {{host} organiza} other {{host} y {otherCount, plural, one {# más} other {# más}} organizan}} el evento.',
+    'advanced.richText':
+      'Lee nuestros <link>términos de servicio</link> y la <bold>política de privacidad</bold>.',
+    'advanced.escape': '¡{percent} de descuento — no te lo pierdas!',
 
     'footer.rendered_at': 'Renderizado en el servidor a las {time}',
     'footer.locale': 'Idioma actual: {locale}',
-    'footer.cache_note': 'La instancia intl se crea una vez por solicitud mediante React.cache() — todos los componentes la comparten.',
-    'footer.components': '{count, plural, one {# componente} other {# componentes}} renderizados en el servidor usando la misma instancia intl en caché.',
+    'footer.cache_note':
+      'La instancia intl se crea una vez por solicitud mediante React.cache() — todos los componentes la comparten.',
+    'footer.components':
+      '{count, plural, one {# componente} other {# componentes}} renderizados en el servidor usando la misma instancia intl en caché.',
   },
 };
 

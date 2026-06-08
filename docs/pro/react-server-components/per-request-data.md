@@ -58,12 +58,12 @@ export default function GreetingSection({ locale }) {
 
 **Key properties of `React.cache()`:**
 
-| Property | Detail |
-|---|---|
-| Scope | One server render (one request). No cross-request leakage. |
-| Argument comparison | `Object.is` — use primitives (strings, numbers), not objects |
-| Definition location | Module level. Never inside a component body. |
-| Availability | Server Components only. Not available in Client Components or `renderToString`. |
+| Property            | Detail                                                                          |
+| ------------------- | ------------------------------------------------------------------------------- |
+| Scope               | One server render (one request). No cross-request leakage.                      |
+| Argument comparison | `Object.is` — use primitives (strings, numbers), not objects                    |
+| Definition location | Module level. Never inside a component body.                                    |
+| Availability        | Server Components only. Not available in Client Components or `renderToString`. |
 
 ## Scenario 1: Internationalization (i18n)
 
@@ -96,13 +96,13 @@ export default getIntl;
 // app/i18n/messages.js
 const messages = {
   en: {
-    'greeting': 'Hello! Welcome to our store.',
+    greeting: 'Hello! Welcome to our store.',
     'stats.visitors': '{count, plural, one {# visitor} other {# visitors}} today',
     'product.price': 'Price: {price}',
     'product.stock': '{count, plural, one {# unit} other {# units}} in stock',
   },
   es: {
-    'greeting': '¡Hola! Bienvenido a nuestra tienda.',
+    greeting: '¡Hola! Bienvenido a nuestra tienda.',
     'stats.visitors': '{count, plural, one {# visitante} other {# visitantes}} hoy',
     'product.price': 'Precio: {price}',
     'product.stock': '{count, plural, one {# unidad} other {# unidades}} en stock',
@@ -132,9 +132,7 @@ import getIntl from '../i18n/getIntl';
 
 export default function StatsSection({ locale, visitorCount }) {
   const intl = getIntl(locale);
-  return (
-    <p>{intl.formatMessage({ id: 'stats.visitors' }, { count: visitorCount })}</p>
-  );
+  return <p>{intl.formatMessage({ id: 'stats.visitors' }, { count: visitorCount })}</p>;
 }
 ```
 
@@ -149,7 +147,7 @@ export default function ProductCard({ locale, product }) {
       <strong>
         {intl.formatMessage(
           { id: 'product.price' },
-          { price: intl.formatNumber(product.price, { style: 'currency', currency: 'USD' }) }
+          { price: intl.formatNumber(product.price, { style: 'currency', currency: 'USD' }) },
         )}
       </strong>
       <span>{intl.formatMessage({ id: 'product.stock' }, { count: product.stock })}</span>
@@ -238,16 +236,16 @@ export default function I18nProvider({ locale, messages, children }) {
 
 The `intl` object returned by `getIntl()` provides the full formatting API:
 
-| Method | Example |
-|---|---|
-| `intl.formatMessage(descriptor, values)` | `intl.formatMessage({ id: 'greeting' }, { name: 'Alice' })` |
-| `intl.formatNumber(value, options)` | `intl.formatNumber(29.99, { style: 'currency', currency: 'USD' })` |
-| `intl.formatDate(value, options)` | `intl.formatDate(new Date(), { dateStyle: 'long' })` |
-| `intl.formatTime(value, options)` | `intl.formatTime(new Date(), { timeStyle: 'medium' })` |
-| `intl.formatRelativeTime(value, unit)` | `intl.formatRelativeTime(-5, 'minute')` |
-| `intl.formatList(items, options)` | `intl.formatList(['Red', 'Blue'], { type: 'conjunction' })` |
-| `intl.formatDisplayName(code, options)` | `intl.formatDisplayName('en', { type: 'language' })` |
-| `intl.formatDateTimeRange(from, to, options)` | `intl.formatDateTimeRange(start, end, { dateStyle: 'medium' })` |
+| Method                                        | Example                                                            |
+| --------------------------------------------- | ------------------------------------------------------------------ |
+| `intl.formatMessage(descriptor, values)`      | `intl.formatMessage({ id: 'greeting' }, { name: 'Alice' })`        |
+| `intl.formatNumber(value, options)`           | `intl.formatNumber(29.99, { style: 'currency', currency: 'USD' })` |
+| `intl.formatDate(value, options)`             | `intl.formatDate(new Date(), { dateStyle: 'long' })`               |
+| `intl.formatTime(value, options)`             | `intl.formatTime(new Date(), { timeStyle: 'medium' })`             |
+| `intl.formatRelativeTime(value, unit)`        | `intl.formatRelativeTime(-5, 'minute')`                            |
+| `intl.formatList(items, options)`             | `intl.formatList(['Red', 'Blue'], { type: 'conjunction' })`        |
+| `intl.formatDisplayName(code, options)`       | `intl.formatDisplayName('en', { type: 'language' })`               |
+| `intl.formatDateTimeRange(from, to, options)` | `intl.formatDateTimeRange(start, end, { dateStyle: 'medium' })`    |
 
 ## Scenario 2: Current User / Auth Context
 
@@ -401,7 +399,9 @@ export default function TopSellersCard({ products }) {
   const { topSellers } = getProductAnalytics(products);
   return (
     <ul>
-      {topSellers.map(p => <li key={p.id}>{p.name}</li>)}
+      {topSellers.map((p) => (
+        <li key={p.id}>{p.name}</li>
+      ))}
     </ul>
   );
 }
@@ -458,12 +458,12 @@ export default function UserGreeting() {
 
 ## When to Use Each Approach
 
-| Approach | Use when | Example |
-|---|---|---|
+| Approach                    | Use when                                                           | Example                              |
+| --------------------------- | ------------------------------------------------------------------ | ------------------------------------ |
 | `React.cache(fn)` with args | Multiple components call the same function with the same arguments | `getIntl(locale)`, `getUser(userId)` |
-| Seed once, read anywhere | You want Context-like zero-argument access across the tree | `getRequestStore().locale` |
-| Props from Rails | Data is used by a single component or a small subtree | `<ProductCard product={product} />` |
-| Client Component Context | Interactive components need reactive state | `<IntlProvider>`, `<ThemeProvider>` |
+| Seed once, read anywhere    | You want Context-like zero-argument access across the tree         | `getRequestStore().locale`           |
+| Props from Rails            | Data is used by a single component or a small subtree              | `<ProductCard product={product} />`  |
+| Client Component Context    | Interactive components need reactive state                         | `<IntlProvider>`, `<ThemeProvider>`  |
 
 ## Rules and Pitfalls
 
@@ -518,8 +518,12 @@ const greeting = intl.formatMessage({ id: 'greeting' });
 // BAD — leaks between requests in the Node renderer
 let currentLocale = 'en';
 
-export function setLocale(l) { currentLocale = l; }
-export function getLocale() { return currentLocale; }
+export function setLocale(l) {
+  currentLocale = l;
+}
+export function getLocale() {
+  return currentLocale;
+}
 ```
 
 Module-level variables persist across requests in the Node renderer process. One request's data would bleed into the next. Always use `React.cache()` for per-request state.
@@ -596,11 +600,7 @@ export default function ProductPage({ locale: initialLocale }) {
         </button>
       ))}
       <Suspense fallback={<div>Loading...</div>}>
-        <RSCRoute
-          componentName="ProductContent"
-          componentProps={{ locale }}
-          ssr={true}
-        />
+        <RSCRoute componentName="ProductContent" componentProps={{ locale }} ssr={true} />
       </Suspense>
     </div>
   );
@@ -622,7 +622,7 @@ function ProductList({ locale, products }) {
   const intl = getIntl(locale);
   return (
     <ul>
-      {products.map(p => (
+      {products.map((p) => (
         <li key={p.id}>
           {p.name} — {intl.formatNumber(p.price, { style: 'currency', currency: 'USD' })}
         </li>
@@ -696,6 +696,6 @@ end
 
 ## Next Steps
 
-- [i18n Provider guide](../../oss/migrating/rsc-context-and-state.md#i18n-provider) — alternative `createIntl` patterns and comparison with Rails pre-formatting
+- [i18n Provider guide](../../oss/migrating/rsc-context-and-state.md#i18n-provider) — `createIntl` patterns for Server Components and `IntlProvider` for Client Components
 - [Data Fetching Migration](../../oss/migrating/rsc-data-fetching.md#request-deduplication-with-reactcache) — `React.cache()` for data fetching deduplication
 - [Module-level state and memory leaks](../js-memory-leaks.md) — why module-level variables are unsafe in the Node renderer

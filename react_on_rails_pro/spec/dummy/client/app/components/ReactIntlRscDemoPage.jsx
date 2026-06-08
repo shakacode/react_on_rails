@@ -9,7 +9,7 @@ const LOCALES = [
   { code: 'es', label: 'Español', flag: '🇪🇸' },
 ];
 
-const VALID_LOCALE_CODES = new Set(LOCALES.map(l => l.code));
+const VALID_LOCALE_CODES = new Set(LOCALES.map((l) => l.code));
 const BASE_PATH = '/react_intl_rsc_demo';
 
 const ReactIntlRscDemoPage = ({ locale: initialLocale }) => {
@@ -24,19 +24,22 @@ const ReactIntlRscDemoPage = ({ locale: initialLocale }) => {
 
   return (
     <div style={{ fontFamily: 'system-ui, sans-serif', maxWidth: 700, margin: '0 auto', padding: 20 }}>
-      <div style={{
-        display: 'flex',
-        gap: 8,
-        marginBottom: 24,
-        padding: 16,
-        background: '#f0f9ff',
-        borderRadius: 8,
-        border: '1px solid #bae6fd',
-        alignItems: 'center',
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          gap: 8,
+          marginBottom: 24,
+          padding: 16,
+          background: '#f0f9ff',
+          borderRadius: 8,
+          border: '1px solid #bae6fd',
+          alignItems: 'center',
+        }}
+      >
         <span style={{ fontWeight: 'bold', marginRight: 8 }}>Language:</span>
         {LOCALES.map(({ code, label, flag }) => (
           <button
+            type="button"
             key={code}
             onClick={() => handleLocaleChange(code)}
             style={{
@@ -58,15 +61,11 @@ const ReactIntlRscDemoPage = ({ locale: initialLocale }) => {
       <Suspense
         fallback={
           <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>
-            Loading server component for locale "{locale}"...
+            Loading server component for locale &ldquo;{locale}&rdquo;...
           </div>
         }
       >
-        <RSCRoute
-          componentName="ReactIntlRscDemo"
-          componentProps={{ locale }}
-          ssr={true}
-        />
+        <RSCRoute componentName="ReactIntlRscDemo" componentProps={{ locale }} ssr />
       </Suspense>
     </div>
   );

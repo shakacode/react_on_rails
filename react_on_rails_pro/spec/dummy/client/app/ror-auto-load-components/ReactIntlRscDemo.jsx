@@ -1,14 +1,42 @@
 import React from 'react';
 import getIntl from '../i18n/getIntl';
 
-const SECTION = { marginBottom: 32, padding: 20, background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb' };
-const SECTION_TITLE = { fontSize: 18, fontWeight: 700, marginBottom: 16, paddingBottom: 8, borderBottom: '2px solid #2563eb', color: '#1e3a5f' };
+const SECTION = {
+  marginBottom: 32,
+  padding: 20,
+  background: '#fff',
+  borderRadius: 12,
+  border: '1px solid #e5e7eb',
+};
+const SECTION_TITLE = {
+  fontSize: 18,
+  fontWeight: 700,
+  marginBottom: 16,
+  paddingBottom: 8,
+  borderBottom: '2px solid #2563eb',
+  color: '#1e3a5f',
+};
 const GRID2 = { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 };
 const GRID3 = { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 };
 const CELL = { background: '#f8fafc', borderRadius: 8, padding: 14 };
-const LABEL = { fontSize: 11, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 };
+const LABEL = {
+  fontSize: 11,
+  color: '#6b7280',
+  textTransform: 'uppercase',
+  letterSpacing: '0.05em',
+  marginBottom: 4,
+};
 const VALUE = { fontSize: 15, fontWeight: 500, color: '#111827' };
-const BADGE = (bg, color) => ({ display: 'inline-block', padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 600, background: bg, color, marginLeft: 8 });
+const BADGE = (bg, color) => ({
+  display: 'inline-block',
+  padding: '2px 8px',
+  borderRadius: 999,
+  fontSize: 11,
+  fontWeight: 600,
+  background: bg,
+  color,
+  marginLeft: 8,
+});
 
 function GreetingSection({ locale }) {
   const intl = getIntl(locale);
@@ -26,8 +54,14 @@ function StatsSection({ locale }) {
     { label: intl.formatMessage({ id: 'stats.visitors' }, { count: 1234 }), icon: '👥' },
     { label: intl.formatMessage({ id: 'stats.orders' }, { count: 42 }), icon: '📦' },
     { label: `${intl.formatMessage({ id: 'stats.rating' }, { rating: 4.8 })} ⭐`, icon: '' },
-    { label: `${intl.formatMessage({ id: 'stats.revenue' })}: ${intl.formatNumber(128750.5, { style: 'currency', currency: 'USD' })}`, icon: '💰' },
-    { label: `${intl.formatMessage({ id: 'stats.conversion' })}: ${intl.formatNumber(0.0342, { style: 'percent', minimumFractionDigits: 1 })}`, icon: '📈' },
+    {
+      label: `${intl.formatMessage({ id: 'stats.revenue' })}: ${intl.formatNumber(128750.5, { style: 'currency', currency: 'USD' })}`,
+      icon: '💰',
+    },
+    {
+      label: `${intl.formatMessage({ id: 'stats.conversion' })}: ${intl.formatNumber(0.0342, { style: 'percent', minimumFractionDigits: 1 })}`,
+      icon: '📈',
+    },
   ];
   return (
     <div style={SECTION}>
@@ -57,7 +91,10 @@ function ProductCard({ locale, nameKey, descKey, price, stock, badgeKey, badgeCo
       <p style={{ color: '#666', margin: '8px 0' }}>{intl.formatMessage({ id: descKey })}</p>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <strong style={{ fontSize: 20, color: '#2563eb' }}>
-          {intl.formatMessage({ id: 'product.price' }, { price: intl.formatNumber(price, { style: 'currency', currency: 'USD' }) })}
+          {intl.formatMessage(
+            { id: 'product.price' },
+            { price: intl.formatNumber(price, { style: 'currency', currency: 'USD' }) },
+          )}
         </strong>
         <span style={{ fontSize: 13, color: '#6b7280' }}>
           {intl.formatMessage({ id: 'product.stock' }, { count: stock })}
@@ -70,14 +107,37 @@ function ProductCard({ locale, nameKey, descKey, price, stock, badgeKey, badgeCo
 function ProductsSection({ locale }) {
   const intl = getIntl(locale);
   const products = [
-    { nameKey: 'product.widget.name', descKey: 'product.widget.description', price: 29.99, stock: 156, badgeKey: 'product.badge.popular', badgeColor: ['#fef3c7', '#92400e'] },
-    { nameKey: 'product.gadget.name', descKey: 'product.gadget.description', price: 49.99, stock: 1, badgeKey: 'product.badge.new', badgeColor: ['#d1fae5', '#065f46'] },
-    { nameKey: 'product.sensor.name', descKey: 'product.sensor.description', price: 199.99, stock: 23, badgeKey: 'product.badge.sale', badgeColor: ['#fee2e2', '#991b1b'] },
+    {
+      nameKey: 'product.widget.name',
+      descKey: 'product.widget.description',
+      price: 29.99,
+      stock: 156,
+      badgeKey: 'product.badge.popular',
+      badgeColor: ['#fef3c7', '#92400e'],
+    },
+    {
+      nameKey: 'product.gadget.name',
+      descKey: 'product.gadget.description',
+      price: 49.99,
+      stock: 1,
+      badgeKey: 'product.badge.new',
+      badgeColor: ['#d1fae5', '#065f46'],
+    },
+    {
+      nameKey: 'product.sensor.name',
+      descKey: 'product.sensor.description',
+      price: 199.99,
+      stock: 23,
+      badgeKey: 'product.badge.sale',
+      badgeColor: ['#fee2e2', '#991b1b'],
+    },
   ];
   return (
     <div style={SECTION}>
       <div style={SECTION_TITLE}>{intl.formatMessage({ id: 'page.section.products' })}</div>
-      {products.map((p, i) => <ProductCard key={i} locale={locale} {...p} />)}
+      {products.map((p, i) => (
+        <ProductCard key={i} locale={locale} {...p} />
+      ))}
     </div>
   );
 }
@@ -93,9 +153,18 @@ function DatesSection({ locale }) {
     [intl.formatMessage({ id: 'dates.timeOnly' }), intl.formatTime(now, { timeStyle: 'medium' })],
     [intl.formatMessage({ id: 'dates.weekday' }), intl.formatDate(now, { weekday: 'long' })],
     [intl.formatMessage({ id: 'dates.era' }), intl.formatDate(now, { year: 'numeric', era: 'long' })],
-    [intl.formatMessage({ id: 'dates.eventStart' }), intl.formatDate(now, { dateStyle: 'medium', timeStyle: 'short' })],
-    [intl.formatMessage({ id: 'dates.eventEnd' }), intl.formatDate(eventEnd, { dateStyle: 'medium', timeStyle: 'short' })],
-    [intl.formatMessage({ id: 'dates.dateRange' }), intl.formatDateTimeRange(now, eventEnd, { dateStyle: 'medium' })],
+    [
+      intl.formatMessage({ id: 'dates.eventStart' }),
+      intl.formatDate(now, { dateStyle: 'medium', timeStyle: 'short' }),
+    ],
+    [
+      intl.formatMessage({ id: 'dates.eventEnd' }),
+      intl.formatDate(eventEnd, { dateStyle: 'medium', timeStyle: 'short' }),
+    ],
+    [
+      intl.formatMessage({ id: 'dates.dateRange' }),
+      intl.formatDateTimeRange(now, eventEnd, { dateStyle: 'medium' }),
+    ],
   ];
   return (
     <div style={SECTION}>
@@ -115,7 +184,10 @@ function DatesSection({ locale }) {
 function RelativeTimeSection({ locale }) {
   const intl = getIntl(locale);
   const items = [
-    [intl.formatMessage({ id: 'relative.justNow' }), intl.formatRelativeTime(-3, 'second', { numeric: 'auto' })],
+    [
+      intl.formatMessage({ id: 'relative.justNow' }),
+      intl.formatRelativeTime(-3, 'second', { numeric: 'auto' }),
+    ],
     [intl.formatMessage({ id: 'relative.minutesAgo' }), intl.formatRelativeTime(-12, 'minute')],
     [intl.formatMessage({ id: 'relative.hoursAgo' }), intl.formatRelativeTime(-5, 'hour')],
     [intl.formatMessage({ id: 'relative.daysAgo' }), intl.formatRelativeTime(-30, 'day')],
@@ -141,17 +213,47 @@ function NumbersSection({ locale }) {
   const intl = getIntl(locale);
   const rows = [
     [intl.formatMessage({ id: 'numbers.integer' }), intl.formatNumber(8425000)],
-    [intl.formatMessage({ id: 'numbers.decimal' }), intl.formatNumber(3.14159265, { maximumFractionDigits: 6 })],
+    [
+      intl.formatMessage({ id: 'numbers.decimal' }),
+      intl.formatNumber(3.14159265, { maximumFractionDigits: 6 }),
+    ],
     [intl.formatMessage({ id: 'numbers.percent' }), intl.formatNumber(0.87, { style: 'percent' })],
-    [intl.formatMessage({ id: 'numbers.currency' }), intl.formatNumber(12500.75, { style: 'currency', currency: 'USD' })],
-    [intl.formatMessage({ id: 'numbers.currencyAccounting' }), intl.formatNumber(-3200, { style: 'currency', currency: 'USD', currencySign: 'accounting' })],
-    [intl.formatMessage({ id: 'numbers.compact' }), intl.formatNumber(8000000000, { notation: 'compact', compactDisplay: 'long' })],
-    [intl.formatMessage({ id: 'numbers.scientific' }), intl.formatNumber(299792458, { notation: 'scientific' })],
-    [intl.formatMessage({ id: 'numbers.unit.speed' }), intl.formatNumber(25.4, { style: 'unit', unit: 'kilometer-per-hour', unitDisplay: 'long' })],
-    [intl.formatMessage({ id: 'numbers.unit.temp' }), intl.formatNumber(22.5, { style: 'unit', unit: 'celsius' })],
-    [intl.formatMessage({ id: 'numbers.unit.data' }), intl.formatNumber(1.54, { style: 'unit', unit: 'gigabyte', unitDisplay: 'long' })],
-    [intl.formatMessage({ id: 'numbers.unit.weight' }), intl.formatNumber(2.3, { style: 'unit', unit: 'kilogram', unitDisplay: 'long' })],
-    [intl.formatMessage({ id: 'numbers.signDisplay' }), intl.formatNumber(2.47, { style: 'percent', signDisplay: 'always' })],
+    [
+      intl.formatMessage({ id: 'numbers.currency' }),
+      intl.formatNumber(12500.75, { style: 'currency', currency: 'USD' }),
+    ],
+    [
+      intl.formatMessage({ id: 'numbers.currencyAccounting' }),
+      intl.formatNumber(-3200, { style: 'currency', currency: 'USD', currencySign: 'accounting' }),
+    ],
+    [
+      intl.formatMessage({ id: 'numbers.compact' }),
+      intl.formatNumber(8000000000, { notation: 'compact', compactDisplay: 'long' }),
+    ],
+    [
+      intl.formatMessage({ id: 'numbers.scientific' }),
+      intl.formatNumber(299792458, { notation: 'scientific' }),
+    ],
+    [
+      intl.formatMessage({ id: 'numbers.unit.speed' }),
+      intl.formatNumber(25.4, { style: 'unit', unit: 'kilometer-per-hour', unitDisplay: 'long' }),
+    ],
+    [
+      intl.formatMessage({ id: 'numbers.unit.temp' }),
+      intl.formatNumber(22.5, { style: 'unit', unit: 'celsius' }),
+    ],
+    [
+      intl.formatMessage({ id: 'numbers.unit.data' }),
+      intl.formatNumber(1.54, { style: 'unit', unit: 'gigabyte', unitDisplay: 'long' }),
+    ],
+    [
+      intl.formatMessage({ id: 'numbers.unit.weight' }),
+      intl.formatNumber(2.3, { style: 'unit', unit: 'kilogram', unitDisplay: 'long' }),
+    ],
+    [
+      intl.formatMessage({ id: 'numbers.signDisplay' }),
+      intl.formatNumber(2.47, { style: 'percent', signDisplay: 'always' }),
+    ],
   ];
   return (
     <div style={SECTION}>
@@ -170,9 +272,15 @@ function NumbersSection({ locale }) {
 
 function ListsSection({ locale }) {
   const intl = getIntl(locale);
-  const colors = ['lists.color.red', 'lists.color.blue', 'lists.color.green', 'lists.color.black'].map(id => intl.formatMessage({ id }));
-  const payments = ['lists.pay.card', 'lists.pay.paypal', 'lists.pay.crypto'].map(id => intl.formatMessage({ id }));
-  const features = ['lists.feat.fast', 'lists.feat.secure', 'lists.feat.support', 'lists.feat.api'].map(id => intl.formatMessage({ id }));
+  const colors = ['lists.color.red', 'lists.color.blue', 'lists.color.green', 'lists.color.black'].map((id) =>
+    intl.formatMessage({ id }),
+  );
+  const payments = ['lists.pay.card', 'lists.pay.paypal', 'lists.pay.crypto'].map((id) =>
+    intl.formatMessage({ id }),
+  );
+  const features = ['lists.feat.fast', 'lists.feat.secure', 'lists.feat.support', 'lists.feat.api'].map(
+    (id) => intl.formatMessage({ id }),
+  );
   return (
     <div style={SECTION}>
       <div style={SECTION_TITLE}>{intl.formatMessage({ id: 'page.section.lists' })}</div>
@@ -197,15 +305,42 @@ function ListsSection({ locale }) {
 function DisplayNamesSection({ locale }) {
   const intl = getIntl(locale);
   const rows = [
-    [intl.formatMessage({ id: 'display.selfLanguage' }), intl.formatDisplayName(locale, { type: 'language' })],
-    [intl.formatMessage({ id: 'display.language' }) + ' (en)', intl.formatDisplayName('en', { type: 'language' })],
-    [intl.formatMessage({ id: 'display.language' }) + ' (ja)', intl.formatDisplayName('ja', { type: 'language' })],
-    [intl.formatMessage({ id: 'display.language' }) + ' (zh)', intl.formatDisplayName('zh', { type: 'language' })],
-    [intl.formatMessage({ id: 'display.region' }) + ' (US)', intl.formatDisplayName('US', { type: 'region' })],
-    [intl.formatMessage({ id: 'display.region' }) + ' (JP)', intl.formatDisplayName('JP', { type: 'region' })],
-    [intl.formatMessage({ id: 'display.region' }) + ' (SA)', intl.formatDisplayName('SA', { type: 'region' })],
-    [intl.formatMessage({ id: 'display.currency' }) + ' (EUR)', intl.formatDisplayName('EUR', { type: 'currency' })],
-    [intl.formatMessage({ id: 'display.currency' }) + ' (JPY)', intl.formatDisplayName('JPY', { type: 'currency' })],
+    [
+      intl.formatMessage({ id: 'display.selfLanguage' }),
+      intl.formatDisplayName(locale, { type: 'language' }),
+    ],
+    [
+      intl.formatMessage({ id: 'display.language' }) + ' (en)',
+      intl.formatDisplayName('en', { type: 'language' }),
+    ],
+    [
+      intl.formatMessage({ id: 'display.language' }) + ' (ja)',
+      intl.formatDisplayName('ja', { type: 'language' }),
+    ],
+    [
+      intl.formatMessage({ id: 'display.language' }) + ' (zh)',
+      intl.formatDisplayName('zh', { type: 'language' }),
+    ],
+    [
+      intl.formatMessage({ id: 'display.region' }) + ' (US)',
+      intl.formatDisplayName('US', { type: 'region' }),
+    ],
+    [
+      intl.formatMessage({ id: 'display.region' }) + ' (JP)',
+      intl.formatDisplayName('JP', { type: 'region' }),
+    ],
+    [
+      intl.formatMessage({ id: 'display.region' }) + ' (SA)',
+      intl.formatDisplayName('SA', { type: 'region' }),
+    ],
+    [
+      intl.formatMessage({ id: 'display.currency' }) + ' (EUR)',
+      intl.formatDisplayName('EUR', { type: 'currency' }),
+    ],
+    [
+      intl.formatMessage({ id: 'display.currency' }) + ' (JPY)',
+      intl.formatDisplayName('JPY', { type: 'currency' }),
+    ],
   ];
   return (
     <div style={SECTION}>
@@ -259,10 +394,13 @@ function AdvancedICUSection({ locale }) {
     },
     {
       label: 'rich text',
-      value: intl.formatMessage({ id: 'advanced.richText' }, {
-        link: (chunks) => `[${chunks}]`,
-        bold: (chunks) => `**${chunks}**`,
-      }),
+      value: intl.formatMessage(
+        { id: 'advanced.richText' },
+        {
+          link: (chunks) => `[${chunks}]`,
+          bold: (chunks) => `**${chunks}**`,
+        },
+      ),
     },
     {
       label: 'escaped apostrophes',
@@ -287,9 +425,23 @@ function AdvancedICUSection({ locale }) {
 function Footer({ locale, componentCount }) {
   const intl = getIntl(locale);
   return (
-    <footer style={{ marginTop: 32, padding: 20, background: '#1f2937', color: '#9ca3af', borderRadius: 12, fontSize: 13 }}>
+    <footer
+      style={{
+        marginTop: 32,
+        padding: 20,
+        background: '#1f2937',
+        color: '#9ca3af',
+        borderRadius: 12,
+        fontSize: 13,
+      }}
+    >
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24 }}>
-        <span>{intl.formatMessage({ id: 'footer.rendered_at' }, { time: intl.formatTime(new Date(), { timeStyle: 'medium' }) })}</span>
+        <span>
+          {intl.formatMessage(
+            { id: 'footer.rendered_at' },
+            { time: intl.formatTime(new Date(), { timeStyle: 'medium' }) },
+          )}
+        </span>
         <span>{intl.formatMessage({ id: 'footer.locale' }, { locale })}</span>
         <span>{intl.formatMessage({ id: 'footer.components' }, { count: componentCount })}</span>
       </div>
@@ -306,7 +458,17 @@ const ReactIntlRscDemo = ({ locale = 'en' }) => {
   const intl = getIntl(locale);
   const dir = locale === 'ar' ? 'rtl' : 'ltr';
   return (
-    <div dir={dir} style={{ fontFamily: 'system-ui, sans-serif', maxWidth: 800, margin: '0 auto', padding: 20, background: '#f3f4f6', minHeight: '100vh' }}>
+    <div
+      dir={dir}
+      style={{
+        fontFamily: 'system-ui, sans-serif',
+        maxWidth: 800,
+        margin: '0 auto',
+        padding: 20,
+        background: '#f3f4f6',
+        minHeight: '100vh',
+      }}
+    >
       <div style={{ textAlign: 'center', marginBottom: 32 }}>
         <h1 style={{ fontSize: 28, marginBottom: 4 }}>{intl.formatMessage({ id: 'page.title' })}</h1>
         <p style={{ color: '#6b7280', margin: 0 }}>{intl.formatMessage({ id: 'page.subtitle' })}</p>
