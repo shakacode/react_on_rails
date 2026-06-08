@@ -67,8 +67,8 @@ function StatsSection({ locale }) {
     <div style={SECTION}>
       <div style={SECTION_TITLE}>{intl.formatMessage({ id: 'page.section.stats' })}</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-        {stats.map((s, i) => (
-          <div key={i} style={{ ...CELL, textAlign: 'center' }}>
+        {stats.map((s) => (
+          <div key={s.label} style={{ ...CELL, textAlign: 'center' }}>
             {s.icon && <div style={{ fontSize: 24, marginBottom: 4 }}>{s.icon}</div>}
             <span style={{ fontSize: 14 }}>{s.label}</span>
           </div>
@@ -135,8 +135,8 @@ function ProductsSection({ locale }) {
   return (
     <div style={SECTION}>
       <div style={SECTION_TITLE}>{intl.formatMessage({ id: 'page.section.products' })}</div>
-      {products.map((p, i) => (
-        <ProductCard key={i} locale={locale} {...p} />
+      {products.map((p) => (
+        <ProductCard key={p.nameKey} locale={locale} {...p} />
       ))}
     </div>
   );
@@ -170,8 +170,8 @@ function DatesSection({ locale }) {
     <div style={SECTION}>
       <div style={SECTION_TITLE}>{intl.formatMessage({ id: 'page.section.dates' })}</div>
       <div style={GRID2}>
-        {rows.map(([label, value], i) => (
-          <div key={i} style={CELL}>
+        {rows.map(([label, value]) => (
+          <div key={label} style={CELL}>
             <div style={LABEL}>{label}</div>
             <div style={VALUE}>{value}</div>
           </div>
@@ -198,8 +198,8 @@ function RelativeTimeSection({ locale }) {
     <div style={SECTION}>
       <div style={SECTION_TITLE}>{intl.formatMessage({ id: 'page.section.relative' })}</div>
       <div style={GRID3}>
-        {items.map(([label, value], i) => (
-          <div key={i} style={CELL}>
+        {items.map(([label, value]) => (
+          <div key={label} style={CELL}>
             <div style={LABEL}>{label}</div>
             <div style={VALUE}>{value}</div>
           </div>
@@ -259,8 +259,8 @@ function NumbersSection({ locale }) {
     <div style={SECTION}>
       <div style={SECTION_TITLE}>{intl.formatMessage({ id: 'page.section.numbers' })}</div>
       <div style={GRID3}>
-        {rows.map(([label, value], i) => (
-          <div key={i} style={CELL}>
+        {rows.map(([label, value]) => (
+          <div key={label} style={CELL}>
             <div style={LABEL}>{label}</div>
             <div style={{ ...VALUE, fontFamily: 'monospace' }}>{value}</div>
           </div>
@@ -306,39 +306,48 @@ function DisplayNamesSection({ locale }) {
   const intl = getIntl(locale);
   const rows = [
     [
+      'selfLanguage',
       intl.formatMessage({ id: 'display.selfLanguage' }),
       intl.formatDisplayName(locale, { type: 'language' }),
     ],
     [
-      intl.formatMessage({ id: 'display.language' }) + ' (en)',
+      'language-en',
+      `${intl.formatMessage({ id: 'display.language' })} (en)`,
       intl.formatDisplayName('en', { type: 'language' }),
     ],
     [
-      intl.formatMessage({ id: 'display.language' }) + ' (ja)',
+      'language-ja',
+      `${intl.formatMessage({ id: 'display.language' })} (ja)`,
       intl.formatDisplayName('ja', { type: 'language' }),
     ],
     [
-      intl.formatMessage({ id: 'display.language' }) + ' (zh)',
+      'language-zh',
+      `${intl.formatMessage({ id: 'display.language' })} (zh)`,
       intl.formatDisplayName('zh', { type: 'language' }),
     ],
     [
-      intl.formatMessage({ id: 'display.region' }) + ' (US)',
+      'region-US',
+      `${intl.formatMessage({ id: 'display.region' })} (US)`,
       intl.formatDisplayName('US', { type: 'region' }),
     ],
     [
-      intl.formatMessage({ id: 'display.region' }) + ' (JP)',
+      'region-JP',
+      `${intl.formatMessage({ id: 'display.region' })} (JP)`,
       intl.formatDisplayName('JP', { type: 'region' }),
     ],
     [
-      intl.formatMessage({ id: 'display.region' }) + ' (SA)',
+      'region-SA',
+      `${intl.formatMessage({ id: 'display.region' })} (SA)`,
       intl.formatDisplayName('SA', { type: 'region' }),
     ],
     [
-      intl.formatMessage({ id: 'display.currency' }) + ' (EUR)',
+      'currency-EUR',
+      `${intl.formatMessage({ id: 'display.currency' })} (EUR)`,
       intl.formatDisplayName('EUR', { type: 'currency' }),
     ],
     [
-      intl.formatMessage({ id: 'display.currency' }) + ' (JPY)',
+      'currency-JPY',
+      `${intl.formatMessage({ id: 'display.currency' })} (JPY)`,
       intl.formatDisplayName('JPY', { type: 'currency' }),
     ],
   ];
@@ -346,8 +355,8 @@ function DisplayNamesSection({ locale }) {
     <div style={SECTION}>
       <div style={SECTION_TITLE}>{intl.formatMessage({ id: 'page.section.displayNames' })}</div>
       <div style={GRID3}>
-        {rows.map(([label, value], i) => (
-          <div key={i} style={CELL}>
+        {rows.map(([id, label, value]) => (
+          <div key={id} style={CELL}>
             <div style={LABEL}>{label}</div>
             <div style={VALUE}>{value}</div>
           </div>
@@ -411,8 +420,8 @@ function AdvancedICUSection({ locale }) {
     <div style={SECTION}>
       <div style={SECTION_TITLE}>{intl.formatMessage({ id: 'page.section.advanced' })}</div>
       <div style={GRID2}>
-        {examples.map((ex, i) => (
-          <div key={i} style={CELL}>
+        {examples.map((ex) => (
+          <div key={ex.label} style={CELL}>
             <div style={LABEL}>{ex.label}</div>
             <div style={VALUE}>{ex.value}</div>
           </div>
