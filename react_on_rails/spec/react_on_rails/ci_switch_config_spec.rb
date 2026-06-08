@@ -61,6 +61,44 @@ RSpec.describe "bin/ci-switch-config" do
     expect(stdout).not_to include("workspace:~10.1.0")
   end
 
+  it "restores the latest tool-version profile saved from the current git head" do
+    with_ci_switch_tool_versions_repo do |tmpdir, harness_path|
+      local_versions = "ruby 4.1.0\nnodejs 23.0.0\n"
+
+      File.write(File.join(tmpdir, ".tool-versions"), local_versions)
+
+      run_ci_switch_tool_versions(harness_path, "minimum-tool-versions", chdir: tmpdir)
+
+      expect(File.read(File.join(tmpdir, ".maximum.tool-versions"))).to eq(local_versions)
+      expect(File.read(File.join(tmpdir, ".maximum.tool-versions.head")).strip).to eq(git_head(tmpdir))
+      expect(File.read(File.join(tmpdir, ".tool-versions"))).to eq(
+        File.read(File.join(tmpdir, ".minimum.tool-versions"))
+      )
+
+      run_ci_switch_tool_versions(harness_path, "latest-tool-versions", chdir: tmpdir)
+
+      expect(File.read(File.join(tmpdir, ".tool-versions"))).to eq(local_versions)
+      expect(File).not_to exist(File.join(tmpdir, ".maximum.tool-versions"))
+      expect(File).not_to exist(File.join(tmpdir, ".maximum.tool-versions.head"))
+    end
+  end
+
+  it "ignores a stale saved latest tool-version profile from another git head" do
+    with_ci_switch_tool_versions_repo do |tmpdir, harness_path|
+      committed_versions = File.read(File.join(tmpdir, ".tool-versions"))
+
+      File.write(File.join(tmpdir, ".tool-versions"), File.read(File.join(tmpdir, ".minimum.tool-versions")))
+      File.write(File.join(tmpdir, ".maximum.tool-versions"), "ruby 4.0.4\nnodejs 22.11.0\n")
+      File.write(File.join(tmpdir, ".maximum.tool-versions.head"), "stale-head\n")
+
+      run_ci_switch_tool_versions(harness_path, "latest-tool-versions", chdir: tmpdir)
+
+      expect(File.read(File.join(tmpdir, ".tool-versions"))).to eq(committed_versions)
+      expect(File).not_to exist(File.join(tmpdir, ".maximum.tool-versions"))
+      expect(File).not_to exist(File.join(tmpdir, ".maximum.tool-versions.head"))
+    end
+  end
+
   def ci_switch_status(dependencies)
     Dir.mktmpdir do |tmpdir|
       fake_script_path = File.join(tmpdir, "bin/ci-switch-config")
@@ -69,11 +107,73 @@ RSpec.describe "bin/ci-switch-config" do
       FileUtils.mkdir_p(File.dirname(fake_script_path))
       FileUtils.mkdir_p(File.dirname(package_json_path))
       FileUtils.cp(source_script_path, fake_script_path)
+      FileUtils.cp(File.join(repo_root, ".tool-versions"), File.join(tmpdir, ".tool-versions"))
+      FileUtils.cp(File.join(repo_root, ".minimum.tool-versions"), File.join(tmpdir, ".minimum.tool-versions"))
       FileUtils.chmod("+x", fake_script_path)
 
       File.write(package_json_path, JSON.pretty_generate("dependencies" => dependencies))
 
       Open3.capture3(fake_script_path, "status", chdir: tmpdir)
     end
+  end
+
+  def with_ci_switch_tool_versions_repo
+    Dir.mktmpdir do |tmpdir|
+      harness_path = File.join(tmpdir, "bin/ci-switch-tool-versions")
+
+      FileUtils.mkdir_p(File.dirname(harness_path))
+      File.write(harness_path, ci_switch_tool_versions_harness)
+      FileUtils.cp(File.join(repo_root, ".tool-versions"), File.join(tmpdir, ".tool-versions"))
+      FileUtils.cp(File.join(repo_root, ".minimum.tool-versions"), File.join(tmpdir, ".minimum.tool-versions"))
+      FileUtils.chmod("+x", harness_path)
+
+      run_git(tmpdir, "init")
+      run_git(tmpdir, "config", "user.email", "codex@example.com")
+      run_git(tmpdir, "config", "user.name", "Codex")
+      run_git(tmpdir, "add", "-f", ".tool-versions", ".minimum.tool-versions", "bin/ci-switch-tool-versions")
+      run_git(tmpdir, "commit", "-m", "Initial tool versions")
+
+      yield tmpdir, harness_path
+    end
+  end
+
+  def ci_switch_tool_versions_harness
+    script_body = File.read(source_script_path).split("\n# Main script\n").first
+
+    [
+      script_body,
+      'case "${1:-}" in',
+      "  minimum-tool-versions)",
+      "    set_tool_versions_to_minimum",
+      "    ;;",
+      "  latest-tool-versions)",
+      "    restore_tool_versions_to_latest",
+      "    ;;",
+      "  *)",
+      '    echo "Usage: $0 {minimum-tool-versions|latest-tool-versions}" >&2',
+      "    exit 1",
+      "    ;;",
+      "esac",
+      ""
+    ].join("\n")
+  end
+
+  def run_ci_switch_tool_versions(harness_path, command, chdir:)
+    stdout, stderr, status = Open3.capture3(harness_path, command, chdir:)
+
+    expect(status).to be_success, "#{stdout}\n#{stderr}"
+  end
+
+  def run_git(chdir, *args)
+    stdout, stderr, status = Open3.capture3("git", *args, chdir:)
+
+    expect(status).to be_success, "#{stdout}\n#{stderr}"
+  end
+
+  def git_head(chdir)
+    stdout, stderr, status = Open3.capture3("git", "rev-parse", "HEAD", chdir:)
+
+    expect(status).to be_success, stderr
+    stdout.strip
   end
 end

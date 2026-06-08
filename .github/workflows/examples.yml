@@ -88,19 +88,39 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
       - id: set-matrix
         run: |
+          latest_ruby_version="${{ steps.tool-versions.outputs.ruby-minor-version }}"
+          minimum_ruby_version="${{ steps.tool-versions.outputs.minimum-ruby-minor-version }}"
+
           # Determine if we should run full matrix (main, workflow_dispatch, force_run, or full-ci label)
           if [[ "${{ github.ref }}" == "refs/heads/main" ]] || \
              [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
              [[ "${{ inputs.force_run }}" == "true" ]] || \
              [[ "${{ needs.detect-changes.outputs.has_full_ci_label }}" == "true" ]]; then
             # Full matrix: test both latest and minimum supported versions
-            echo 'matrix={"include":[{"ruby-version":"4.0","dependency-level":"latest"},{"ruby-version":"3.3","dependency-level":"minimum"}]}' >> "$GITHUB_OUTPUT"
+            matrix="$(jq -nc \
+              --arg latest_ruby_version "$latest_ruby_version" \
+              --arg minimum_ruby_version "$minimum_ruby_version" \
+              '{
+                "include": [
+                  {"ruby-version": $latest_ruby_version, "dependency-level": "latest"},
+                  {"ruby-version": $minimum_ruby_version, "dependency-level": "minimum"}
+                ]
+              }')"
           else
             # PR matrix: test only latest versions for fast feedback
-            echo 'matrix={"include":[{"ruby-version":"4.0","dependency-level":"latest"}]}' >> "$GITHUB_OUTPUT"
+            matrix="$(jq -nc \
+              --arg latest_ruby_version "$latest_ruby_version" \
+              '{"include": [{"ruby-version": $latest_ruby_version, "dependency-level": "latest"}]}')"
           fi
+          echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
 
   examples:
     needs: [detect-changes, setup-matrix]
@@ -130,7 +150,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .minimum.tool-versions
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
       - name: Get pnpm store directory

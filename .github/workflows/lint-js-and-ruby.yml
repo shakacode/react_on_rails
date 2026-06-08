@@ -87,9 +87,9 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          # Pin to 22.12.0 (Shakapacker 10.1 floor) to avoid V8 bug in 22.21.0
+          # Pin lives in .tool-versions (Shakapacker 10.1 floor) to avoid V8 bug in 22.21.0
           # https://github.com/nodejs/node/issues/56010
-          node-version: '22.12.0'
+          node-version-file: .tool-versions
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
       - name: Install Node modules with pnpm
@@ -118,16 +118,19 @@ jobs:
           # No need for history in lint job
           fetch-depth: 1
           persist-credentials: false
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
       - name: Setup Ruby
         uses: ./.github/actions/setup-ruby
         with:
-          ruby-version: '4.0'
+          ruby-version: ${{ steps.tool-versions.outputs.ruby-minor-version }}
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          # Pin to 22.12.0 (Shakapacker 10.1 floor) to avoid V8 bug in 22.21.0
+          # Pin lives in .tool-versions (Shakapacker 10.1 floor) to avoid V8 bug in 22.21.0
           # https://github.com/nodejs/node/issues/56010
-          node-version: '22.12.0'
+          node-version-file: .tool-versions
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
       - name: Get pnpm store directory
@@ -155,7 +158,7 @@ jobs:
         uses: ./.github/actions/setup-bundle
         with:
           working-directory: react_on_rails
-          ruby-version: '4.0'
+          ruby-version: ${{ steps.tool-versions.outputs.ruby-minor-version }}
           install-libyaml: 'false'
       - name: Install Node modules with pnpm
         run: pnpm install --frozen-lockfile
@@ -184,7 +187,7 @@ jobs:
         uses: ./.github/actions/setup-bundle
         with:
           working-directory: react_on_rails/spec/dummy
-          ruby-version: '4.0'
+          ruby-version: ${{ steps.tool-versions.outputs.ruby-minor-version }}
           install-libyaml: 'false'
       - name: generate file system-based packs
         run: cd react_on_rails/spec/dummy && RAILS_ENV="test" bundle exec rake react_on_rails:generate_packs

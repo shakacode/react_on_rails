@@ -31,9 +31,6 @@ defaults:
   run:
     working-directory: react_on_rails_pro
 
-env:
-  RUBY_VERSION: 3.3.7
-
 jobs:
   detect-changes:
     # Skip Dependabot PRs — they can't access the Pro license secret.
@@ -101,19 +98,22 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
 
       - name: Setup Ruby
         uses: ./.github/actions/setup-ruby
         with:
-          ruby-version: ${{ env.RUBY_VERSION }}
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
           bundler-version: 2.5.4
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          # Pin to 22.12.0 (Shakapacker 10.1 floor) to avoid V8 bug in 22.21.0
+          # Pin lives in .tool-versions (Shakapacker 10.1 floor) to avoid V8 bug in 22.21.0
           # https://github.com/nodejs/node/issues/56010
-          node-version: '22.12.0'
+          node-version-file: .tool-versions
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -144,7 +144,7 @@ jobs:
         uses: ./.github/actions/setup-bundle
         with:
           working-directory: react_on_rails_pro
-          ruby-version: ${{ env.RUBY_VERSION }}
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
           install-libyaml: 'false'
 
       - name: Install Node modules with pnpm
@@ -158,7 +158,7 @@ jobs:
         uses: ./.github/actions/setup-bundle
         with:
           working-directory: react_on_rails_pro/spec/dummy
-          ruby-version: ${{ env.RUBY_VERSION }}
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
           install-libyaml: 'false'
 
       - name: Generate file-system based entrypoints
@@ -204,19 +204,22 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
 
       - name: Setup Ruby
         uses: ./.github/actions/setup-ruby
         with:
-          ruby-version: ${{ env.RUBY_VERSION }}
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
           bundler-version: 2.5.4
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          # Pin to 22.12.0 (Shakapacker 10.1 floor) to avoid V8 bug in 22.21.0
+          # Pin lives in .tool-versions (Shakapacker 10.1 floor) to avoid V8 bug in 22.21.0
           # https://github.com/nodejs/node/issues/56010
-          node-version: '22.12.0'
+          node-version-file: .tool-versions
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -261,7 +264,7 @@ jobs:
         uses: ./.github/actions/setup-bundle
         with:
           working-directory: react_on_rails_pro/spec/dummy
-          ruby-version: ${{ env.RUBY_VERSION }}
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
           install-libyaml: 'false'
 
       - name: Generate file-system based entrypoints
@@ -320,9 +323,9 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          # Pin to 22.12.0 (Shakapacker 10.1 floor) to avoid V8 bug in 22.21.0
+          # Pin lives in .tool-versions (Shakapacker 10.1 floor) to avoid V8 bug in 22.21.0
           # https://github.com/nodejs/node/issues/56010
-          node-version: '22.12.0'
+          node-version-file: .tool-versions
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -401,9 +404,6 @@ jobs:
         github.event_name == 'workflow_dispatch' ||
         needs.detect-changes.outputs.run_pro_tests == 'true'
       )
-    strategy:
-      matrix:
-        ruby-version: ['3.3.7']
     runs-on: ubuntu-22.04
     env:
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
@@ -411,11 +411,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
 
       - name: Setup Ruby
         uses: ./.github/actions/setup-ruby
         with:
-          ruby-version: ${{ matrix.ruby-version }}
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
           bundler-version: 2.5.4
 
       - name: Print system information
@@ -430,7 +433,7 @@ jobs:
         uses: ./.github/actions/setup-bundle
         with:
           working-directory: react_on_rails_pro
-          ruby-version: ${{ matrix.ruby-version }}
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
           install-libyaml: 'false'
 
       - name: Run RSpec tests for Pro package
@@ -440,12 +443,12 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: pro-rspec-package-results-ruby${{ matrix.ruby-version }}
+          name: pro-rspec-package-results-ruby${{ steps.tool-versions.outputs.minimum-ruby-version }}
           path: ~/rspec
 
       - name: Store test log
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: pro-rspec-package-log-ruby${{ matrix.ruby-version }}
+          name: pro-rspec-package-log-ruby${{ steps.tool-versions.outputs.minimum-ruby-version }}
           path: react_on_rails_pro/log/test.log

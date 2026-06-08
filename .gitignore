@@ -27,6 +27,12 @@ tmp/
 .ruby-version
 .ruby-gemset
 
+# CI runtime version files
+!/.tool-versions
+!/.minimum.tool-versions
+/.maximum.tool-versions
+/.maximum.tool-versions.head
+
 node_modules
 
 /node_package/lib

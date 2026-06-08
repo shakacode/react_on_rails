@@ -92,8 +92,19 @@ jobs:
       rspack_matrix: ${{ steps.set-matrix.outputs.rspack_matrix }}
       run_full_matrix: ${{ steps.set-matrix.outputs.run_full_matrix }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
       - id: set-matrix
         run: |
+          latest_ruby_version="${{ steps.tool-versions.outputs.ruby-minor-version }}"
+          latest_node_version="${{ steps.tool-versions.outputs.node-major-version }}"
+          minimum_ruby_version="${{ steps.tool-versions.outputs.minimum-ruby-minor-version }}"
+          minimum_node_version="${{ steps.tool-versions.outputs.minimum-node-major-version }}"
+
           # Determine if we should run full matrix (main, workflow_dispatch, force_run, or full-ci label).
           if [[ "${{ github.ref }}" == "refs/heads/main" ]] || \
              [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
@@ -106,22 +117,46 @@ jobs:
           # Legs are built with `jq -nc` so the JSON stays readable/diffable (one leg per line) while
           # still emitting compact single-line output for $GITHUB_OUTPUT. Refs #3481.
           # Primary Webpack leg: test latest versions in both full and PR modes.
-          webpack_matrix="$(jq -nc '{
+          webpack_matrix="$(jq -nc \
+            --arg latest_ruby_version "$latest_ruby_version" \
+            --arg latest_node_version "$latest_node_version" \
+            '{
             "include": [
-              {"ruby-version":"4.0","node-version":"22","dependency-level":"latest","bundler":"webpack"}
+              {
+                "ruby-version": $latest_ruby_version,
+                "node-version": $latest_node_version,
+                "dependency-level": "latest",
+                "bundler": "webpack"
+              }
             ]
           }')"
           # Full matrix only: test minimum supported versions for Webpack in its own reusable-workflow
           # call so its build -> integration chain is independent from Webpack latest. Refs #3622.
-          webpack_minimum_matrix="$(jq -nc '{
+          webpack_minimum_matrix="$(jq -nc \
+            --arg minimum_ruby_version "$minimum_ruby_version" \
+            --arg minimum_node_version "$minimum_node_version" \
+            '{
             "include": [
-              {"ruby-version":"3.3","node-version":"20","dependency-level":"minimum","bundler":"webpack"}
+              {
+                "ruby-version": $minimum_ruby_version,
+                "node-version": $minimum_node_version,
+                "dependency-level": "minimum",
+                "bundler": "webpack"
+              }
             ]
           }')"
           # Rspack runs the latest leg in both full and PR modes (it has no minimum-version leg yet).
-          rspack_matrix="$(jq -nc '{
+          rspack_matrix="$(jq -nc \
+            --arg latest_ruby_version "$latest_ruby_version" \
+            --arg latest_node_version "$latest_node_version" \
+            '{
             "include": [
-              {"ruby-version":"4.0","node-version":"22","dependency-level":"latest","bundler":"rspack"}
+              {
+                "ruby-version": $latest_ruby_version,
+                "node-version": $latest_node_version,
+                "dependency-level": "latest",
+                "bundler": "rspack"
+              }
             ]
           }')"
           {

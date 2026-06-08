@@ -10,15 +10,84 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+MINIMUM_TOOL_VERSIONS_FILE="$PROJECT_ROOT/.minimum.tool-versions"
+MAXIMUM_TOOL_VERSIONS_FILE="$PROJECT_ROOT/.maximum.tool-versions"
+MAXIMUM_TOOL_VERSIONS_HEAD_FILE="$PROJECT_ROOT/.maximum.tool-versions.head"
 
-MINIMUM_RUBY_VERSION="3.3.7" # Update when a newer 3.3.x patch is released.
+read_tool_version() {
+  local file="$1"
+  local tool="$2"
+  local version
+
+  if [ ! -f "$file" ]; then
+    echo "Missing $file" >&2
+    exit 1
+  fi
+
+  version="$(awk -v tool="$tool" '$1 == tool { print $2; exit }' "$file")"
+  if [ -z "$version" ]; then
+    echo "Missing $tool version in $file" >&2
+    exit 1
+  fi
+
+  echo "$version"
+}
+
+current_git_head() {
+  git -C "$PROJECT_ROOT" rev-parse HEAD 2>/dev/null || true
+}
+
+saved_tool_versions_match_current_head() {
+  if [ ! -f "$MAXIMUM_TOOL_VERSIONS_FILE" ]; then
+    return 1
+  fi
+
+  if [ -f "$MAXIMUM_TOOL_VERSIONS_HEAD_FILE" ]; then
+    local current_head
+    local saved_head
+
+    current_head="$(current_git_head)"
+    saved_head="$(cat "$MAXIMUM_TOOL_VERSIONS_HEAD_FILE")"
+    if [ -n "$saved_head" ] && [ "$saved_head" = "$current_head" ]; then
+      return 0
+    fi
+  fi
+
+  git -C "$PROJECT_ROOT" show HEAD:.tool-versions 2>/dev/null | cmp -s "$MAXIMUM_TOOL_VERSIONS_FILE" -
+}
+
+read_committed_tool_version() {
+  local tool="$1"
+  local version
+
+  version="$(git -C "$PROJECT_ROOT" show HEAD:.tool-versions 2>/dev/null |
+    awk -v tool="$tool" '$1 == tool { print $2; exit }' || true)"
+  if [ -n "$version" ]; then
+    echo "$version"
+    return
+  fi
+
+  read_tool_version "$PROJECT_ROOT/.tool-versions" "$tool"
+}
+
+read_latest_tool_version() {
+  local tool="$1"
+
+  if saved_tool_versions_match_current_head; then
+    read_tool_version "$MAXIMUM_TOOL_VERSIONS_FILE" "$tool"
+  else
+    read_committed_tool_version "$tool"
+  fi
+}
+
+MINIMUM_RUBY_VERSION="$(read_tool_version "$MINIMUM_TOOL_VERSIONS_FILE" ruby)"
 MINIMUM_RUBY_MINOR_VERSION="${MINIMUM_RUBY_VERSION%.*}"
-MINIMUM_NODE_VERSION="20.18.1" # Update when minimum CI moves to a newer Node patch.
+MINIMUM_NODE_VERSION="$(read_tool_version "$MINIMUM_TOOL_VERSIONS_FILE" nodejs)"
 MINIMUM_REACT_VERSION="18.0.0" # Update when minimum CI moves to a newer React version.
 MINIMUM_REACT_MAJOR_VERSION="${MINIMUM_REACT_VERSION%%.*}"
-LATEST_RUBY_VERSION="4.0.5" # Update when a newer 4.0.x patch is released.
+LATEST_RUBY_VERSION="$(read_latest_tool_version ruby)"
 LATEST_RUBY_MINOR_VERSION="${LATEST_RUBY_VERSION%.*}"
-LATEST_NODE_VERSION="22.12.0" # Update when latest CI moves to a newer Node patch.
+LATEST_NODE_VERSION="$(read_latest_tool_version nodejs)"
 LATEST_SHAKAPACKER_VERSION="10.1.0" # Update when latest CI moves to a newer Shakapacker.
 LATEST_REACT_VERSION="19.0.0" # Update when latest CI moves to a newer React version.
 LATEST_REACT_MAJOR_VERSION="${LATEST_REACT_VERSION%%.*}"
@@ -186,6 +255,43 @@ set_node_version() {
   esac
 }
 
+set_tool_versions_to_minimum() {
+  print_header "Setting runtime versions in .tool-versions"
+
+  if [ -f "$PROJECT_ROOT/.tool-versions" ] &&
+    ! cmp -s "$PROJECT_ROOT/.tool-versions" "$PROJECT_ROOT/.minimum.tool-versions"; then
+    local current_head
+
+    cp "$PROJECT_ROOT/.tool-versions" "$MAXIMUM_TOOL_VERSIONS_FILE"
+    current_head="$(current_git_head)"
+    if [ -n "$current_head" ]; then
+      echo "$current_head" > "$MAXIMUM_TOOL_VERSIONS_HEAD_FILE"
+    else
+      rm -f "$MAXIMUM_TOOL_VERSIONS_HEAD_FILE"
+    fi
+  fi
+
+  cp "$PROJECT_ROOT/.minimum.tool-versions" "$PROJECT_ROOT/.tool-versions"
+  print_success "Copied .minimum.tool-versions to .tool-versions"
+}
+
+restore_tool_versions_to_latest() {
+  print_header "Setting runtime versions in .tool-versions"
+
+  if saved_tool_versions_match_current_head; then
+    cp "$MAXIMUM_TOOL_VERSIONS_FILE" "$PROJECT_ROOT/.tool-versions"
+  else
+    git -C "$PROJECT_ROOT" restore -- .tool-versions
+  fi
+  rm -f "$MAXIMUM_TOOL_VERSIONS_FILE" "$MAXIMUM_TOOL_VERSIONS_HEAD_FILE"
+
+  LATEST_RUBY_VERSION="$(read_tool_version "$PROJECT_ROOT/.tool-versions" ruby)"
+  LATEST_RUBY_MINOR_VERSION="${LATEST_RUBY_VERSION%.*}"
+  LATEST_NODE_VERSION="$(read_tool_version "$PROJECT_ROOT/.tool-versions" nodejs)"
+
+  print_success "Restored .tool-versions with Ruby $LATEST_RUBY_VERSION and Node $LATEST_NODE_VERSION"
+}
+
 install_bundle_to_vendor() {
   local bundle_dir="${1:-$PWD}"
   local lockfile="$bundle_dir/Gemfile.lock"
@@ -302,15 +408,9 @@ switch_to_minimum() {
   fi
 
   # Set Ruby and Node versions
+  set_tool_versions_to_minimum
+
   case "$VERSION_MANAGER" in
-    mise|asdf)
-      print_header "Setting runtime versions in .tool-versions"
-      cat > "$PROJECT_ROOT/.tool-versions" <<EOF
-ruby ${MINIMUM_RUBY_VERSION}
-nodejs ${MINIMUM_NODE_VERSION}
-EOF
-      print_success "Created .tool-versions with Ruby $MINIMUM_RUBY_VERSION and Node $MINIMUM_NODE_VERSION"
-      ;;
     rvm|rvm+nvm)
       print_header "Creating .ruby-version for rvm"
       echo "$MINIMUM_RUBY_VERSION" > "$PROJECT_ROOT/.ruby-version"
@@ -444,15 +544,9 @@ restore_to_latest() {
   fi
 
   # Set Ruby and Node versions
+  restore_tool_versions_to_latest
+
   case "$VERSION_MANAGER" in
-    mise|asdf)
-      print_header "Setting runtime versions in .tool-versions"
-      cat > "$PROJECT_ROOT/.tool-versions" <<EOF
-ruby ${LATEST_RUBY_VERSION}
-nodejs ${LATEST_NODE_VERSION}
-EOF
-      print_success "Created .tool-versions with Ruby $LATEST_RUBY_VERSION and Node $LATEST_NODE_VERSION"
-      ;;
     rvm|rvm+nvm)
       print_header "Creating .ruby-version for rvm"
       echo "$LATEST_RUBY_VERSION" > "$PROJECT_ROOT/.ruby-version"

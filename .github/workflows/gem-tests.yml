@@ -75,9 +75,15 @@ jobs:
           BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}"
           script/ci-changes-detector "$BASE_REF"
         shell: bash
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
       - name: Set gem tests matrix
         id: set-matrix
         run: |
+          latest_ruby_version="${{ steps.tool-versions.outputs.ruby-minor-version }}"
+          minimum_ruby_version="${{ steps.tool-versions.outputs.minimum-ruby-minor-version }}"
+
           # Determine if we should run full matrix (main or full-ci label)
           # Each Ruby version / dependency level is split into two shards:
           #   generators – spec/react_on_rails/generators (heavy filesystem I/O)
@@ -86,11 +92,29 @@ jobs:
              [[ "${{ steps.check-label.outputs.result }}" == "true" ]] || \
              [[ "${{ inputs.force_run }}" == "true" ]]; then
             # Full matrix: test both latest and minimum supported versions × 2 shards
-            echo 'matrix={"include":[{"ruby-version":"4.0","dependency-level":"latest","shard":"generators"},{"ruby-version":"4.0","dependency-level":"latest","shard":"unit"},{"ruby-version":"3.3","dependency-level":"minimum","shard":"generators"},{"ruby-version":"3.3","dependency-level":"minimum","shard":"unit"}]}' >> "$GITHUB_OUTPUT"
+            matrix="$(jq -nc \
+              --arg latest_ruby_version "$latest_ruby_version" \
+              --arg minimum_ruby_version "$minimum_ruby_version" \
+              '{
+                "include": [
+                  {"ruby-version": $latest_ruby_version, "dependency-level": "latest", "shard": "generators"},
+                  {"ruby-version": $latest_ruby_version, "dependency-level": "latest", "shard": "unit"},
+                  {"ruby-version": $minimum_ruby_version, "dependency-level": "minimum", "shard": "generators"},
+                  {"ruby-version": $minimum_ruby_version, "dependency-level": "minimum", "shard": "unit"}
+                ]
+              }')"
           else
             # PR matrix: test only latest versions for fast feedback × 2 shards
-            echo 'matrix={"include":[{"ruby-version":"4.0","dependency-level":"latest","shard":"generators"},{"ruby-version":"4.0","dependency-level":"latest","shard":"unit"}]}' >> "$GITHUB_OUTPUT"
+            matrix="$(jq -nc \
+              --arg latest_ruby_version "$latest_ruby_version" \
+              '{
+                "include": [
+                  {"ruby-version": $latest_ruby_version, "dependency-level": "latest", "shard": "generators"},
+                  {"ruby-version": $latest_ruby_version, "dependency-level": "latest", "shard": "unit"}
+                ]
+              }')"
           fi
+          echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
       - name: Guard docs-only main pushes
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: ./.github/actions/ensure-main-docs-safety

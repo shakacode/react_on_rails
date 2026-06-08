@@ -9,6 +9,7 @@ on:
       - 'packages/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
+      - '.tool-versions'
       - '.size-limit.json'
       - '.github/workflows/bundle-size.yml'
       - '.bundle-size-skip-branch'
@@ -46,19 +47,19 @@ jobs:
     env:
       CI_JOB_NUMBER: 1
     steps:
+      # 1. Get PR's size-limit config first (base branch may not have it)
+      - name: Checkout PR branch for config
+        uses: actions/checkout@v4
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: .tool-versions
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 10.33.4
-
-      # 1. Get PR's size-limit config first (base branch may not have it)
-      - name: Checkout PR branch for config
-        uses: actions/checkout@v4
 
       - name: Save size-limit config
         run: cp .size-limit.json /tmp/size-limit-config.json
