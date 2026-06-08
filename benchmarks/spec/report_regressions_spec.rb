@@ -270,8 +270,10 @@ RSpec.describe "benchmark regression reporting" do
   end
 
   # These drive the script end-to-end as a subprocess with a fake `gh` on PATH (no
-  # network), pinning the artifact scan, the per-suite shard combining, and the
-  # exit status.
+  # network), pinning the confirmed-artifact scan, the per-suite shard combining, the
+  # first-run/confirmation evidence rendering, and the exit status. A confirmed
+  # regression fails the workflow (exit 1) even though the issue was filed successfully —
+  # this job owns the final pass/fail.
   describe "report_regressions.rb (script)" do
     script = File.expand_path("../report_regressions.rb", __dir__)
 
@@ -306,42 +308,49 @@ RSpec.describe "benchmark regression reporting" do
       end
     end
 
-    def write_payload(dir, artifact:, suite:, shard_label: "1/1", summary: nil, regressed: nil)
+    # Writes a CONFIRMED regression payload (the only thing report_regressions consumes
+    # now). first_run/confirmation default to recognizable strings so the side-by-side
+    # rendering can be asserted.
+    def write_payload(dir, artifact:, suite:, shard_label: "1/1", first_run: nil, confirmation: nil)
       artifact_dir = File.join(dir, artifact)
       FileUtils.mkdir_p(artifact_dir)
-      payload = { suite_name: suite, shard_label:,
-                  summary: summary || "#{suite} #{shard_label} regressed" }
-      # Omit the key entirely when regressed is nil so the "older writer" fail-safe path
-      # (payload without REGRESSED_BENCHMARKS) stays covered by the existing examples.
-      payload[RegressionReport::REGRESSED_BENCHMARKS] = regressed unless regressed.nil?
-      File.write(File.join(artifact_dir, RegressionReport::FILENAME), JSON.generate(payload))
+      payload = {
+        RegressionReport::SUITE_NAME => suite,
+        RegressionReport::SHARD_LABEL => shard_label,
+        RegressionReport::FIRST_RUN_SUMMARY => first_run || "#{suite} #{shard_label} first run",
+        RegressionReport::CONFIRMATION_SUMMARY => confirmation || "#{suite} #{shard_label} confirmation",
+        RegressionReport::REGRESSED_BENCHMARKS => ["/x: #{suite}"]
+      }
+      File.write(File.join(artifact_dir, RegressionReport::CONFIRMED_FILENAME), JSON.generate(payload))
     end
 
-    it "exits 0 and reports nothing when no payloads are present" do
+    it "exits 0 and reports nothing when no confirmed payloads are present" do
       Dir.mktmpdir do |dir|
         output, status = run_script(script, dir, gh_stub: fake_gh)
         expect(status).to be_success
-        expect(output).to match(/No benchmark regressions/)
+        expect(output).to match(/No confirmed benchmark regressions/)
       end
     end
 
-    it "files one report per suite for distinct suites (nested arbitrarily deep)" do
+    it "files one report per suite for distinct suites (nested arbitrarily deep) and fails the run" do
       Dir.mktmpdir do |dir|
-        write_payload(dir, artifact: "regression-core", suite: "Core")
-        write_payload(dir, artifact: "regression-pro", suite: "Pro")
+        write_payload(dir, artifact: "regression-confirmed-core", suite: "Core")
+        write_payload(dir, artifact: "regression-confirmed-pro", suite: "Pro")
 
         output, status = run_script(script, dir, gh_stub: fake_gh)
-        expect(status).to be_success
-        expect(output).to match(/Filing regression report for Core \(1 shard report\(s\)\)/)
-        expect(output).to match(/Filing regression report for Pro \(1 shard report\(s\)\)/)
+        # A confirmed regression fails the workflow even though filing succeeded.
+        expect(status).not_to be_success
+        expect(output).to match(/Filing confirmed regression report for Core \(1 shard report\(s\)\)/)
+        expect(output).to match(/Filing confirmed regression report for Pro \(1 shard report\(s\)\)/)
         expect(output).to match(/issue #7/)
+        expect(output).to match(/Confirmed benchmark regression/)
       end
     end
 
     it "creates only one issue for multiple suites even when live issue lookup stays empty" do
       Dir.mktmpdir do |dir|
-        write_payload(dir, artifact: "regression-core", suite: "Core")
-        write_payload(dir, artifact: "regression-pro", suite: "Pro")
+        write_payload(dir, artifact: "regression-confirmed-core", suite: "Core")
+        write_payload(dir, artifact: "regression-confirmed-pro", suite: "Pro")
 
         call_log = File.join(dir, "gh-calls.log")
         counting_gh = <<~BASH
@@ -355,19 +364,42 @@ RSpec.describe "benchmark regression reporting" do
           exit 0
         BASH
 
-        output, status = run_script(script, dir, gh_stub: counting_gh, extra_env: { "GH_CALL_LOG" => call_log })
+        output, _status = run_script(script, dir, gh_stub: counting_gh, extra_env: { "GH_CALL_LOG" => call_log })
 
-        expect(status).to be_success
         expect(output).to match(/issue #7/)
         expect(File.readlines(call_log).count { |line| line.start_with?("issue create") }).to eq(1)
         expect(File.readlines(call_log).count { |line| line.start_with?("api -X POST") }).to eq(1)
       end
     end
 
+    it "renders the first-run and confirmation summaries side by side" do
+      Dir.mktmpdir do |dir|
+        write_payload(dir, artifact: "regression-confirmed-core", suite: "Core",
+                           first_run: "FIRST RUN TABLE", confirmation: "CONFIRMATION TABLE")
+
+        posted = File.join(dir, "posted-body.txt")
+        capturing_gh = <<~BASH
+          #!/usr/bin/env bash
+          if [ "$1" = "issue" ] && [ "$2" = "create" ]; then
+            echo "https://github.com/shakacode/react_on_rails/issues/7"
+          elif [ "$1" = "api" ] && [ "$2" = "-X" ] && [ "$3" = "POST" ]; then
+            cat > "$POSTED_BODY"
+            echo "777"
+          fi
+          exit 0
+        BASH
+
+        run_script(script, dir, gh_stub: capturing_gh, extra_env: { "POSTED_BODY" => posted })
+        body = JSON.parse(File.read(posted)).fetch("body")
+        expect(body).to include("First run").and include("FIRST RUN TABLE")
+        expect(body).to include("Confirmation run").and include("CONFIRMATION TABLE")
+      end
+    end
+
     it "shares one issue-number cache across suite reports in the same run" do
       Dir.mktmpdir do |dir|
-        write_payload(dir, artifact: "regression-core", suite: "Core")
-        write_payload(dir, artifact: "regression-pro", suite: "Pro")
+        write_payload(dir, artifact: "regression-confirmed-core", suite: "Core")
+        write_payload(dir, artifact: "regression-confirmed-pro", suite: "Pro")
 
         caches = []
         allow(Github).to receive(:run_url).and_return("https://github.com/run/1")
@@ -377,7 +409,7 @@ RSpec.describe "benchmark regression reporting" do
           "7"
         end
 
-        expect(report_regressions(dir)).to be(true)
+        expect(report_regressions(dir)).to eq(:filed)
         expect(caches.size).to eq(2)
         expect(caches[0]).to equal(caches[1])
       end
@@ -385,99 +417,55 @@ RSpec.describe "benchmark regression reporting" do
 
     it "combines a sharded suite's payloads into a single report" do
       Dir.mktmpdir do |dir|
-        write_payload(dir, artifact: "regression-pro-shard-1", suite: "Pro", shard_label: "1/2")
-        write_payload(dir, artifact: "regression-pro-shard-2", suite: "Pro", shard_label: "2/2")
+        write_payload(dir, artifact: "regression-confirmed-pro-shard-1", suite: "Pro", shard_label: "1/2")
+        write_payload(dir, artifact: "regression-confirmed-pro-shard-2", suite: "Pro", shard_label: "2/2")
 
         output, status = run_script(script, dir, gh_stub: fake_gh)
-        expect(status).to be_success
-        expect(output).to match(/Filing regression report for Pro \(2 shard report\(s\)\)/)
-        expect(output.scan("Filing regression report for Pro").size).to eq(1)
+        expect(status).not_to be_success
+        expect(output).to match(/Filing confirmed regression report for Pro \(2 shard report\(s\)\)/)
+        expect(output.scan("Filing confirmed regression report for Pro").size).to eq(1)
       end
     end
 
     it "exits non-zero when filing an issue fails" do
       failing_gh = "#!/usr/bin/env bash\nexit 1\n"
       Dir.mktmpdir do |dir|
-        write_payload(dir, artifact: "regression-core", suite: "Core")
+        write_payload(dir, artifact: "regression-confirmed-core", suite: "Core")
         output, status = run_script(script, dir, gh_stub: failing_gh)
         expect(status).not_to be_success
         expect(output).to match(/Failed to file regression issue for Core/)
       end
     end
 
-    # The temporary /posts_page: Pro suppression (IGNORED_REGRESSION_BENCHMARKS). These
-    # examples (and the constant) should be deleted when that suppression is lifted.
-    it "suppresses the issue when every regressed benchmark is ignored" do
-      ignored = IGNORED_REGRESSION_BENCHMARKS.first
-      Dir.mktmpdir do |dir|
-        write_payload(dir, artifact: "regression-pro", suite: "Pro", regressed: [ignored])
-        output, status = run_script(script, dir, gh_stub: fake_gh)
-        expect(status).to be_success
-        expect(output).to match(/temporarily ignored/)
-        expect(output).not_to match(/Filing regression report/)
-      end
-    end
-
-    it "reports only the ignored benchmarks that actually regressed in the suppression notice" do
-      ignored = IGNORED_REGRESSION_BENCHMARKS.first
-      unused_ignored = "/unused_route: Pro"
-      stub_const("IGNORED_REGRESSION_BENCHMARKS", [ignored, unused_ignored].freeze)
-
-      Dir.mktmpdir do |dir|
-        write_payload(dir, artifact: "regression-pro", suite: "Pro", regressed: [ignored])
-        expect do
-          expect(report_regressions(dir)).to be(true)
-        end.to output(
-          satisfy do |text|
-            text.include?("temporarily ignored (#{ignored})") && !text.include?(unused_ignored)
-          end
-        ).to_stdout
-      end
-    end
-
-    it "still files when a non-ignored benchmark also regressed alongside an ignored one" do
-      ignored = IGNORED_REGRESSION_BENCHMARKS.first
-      Dir.mktmpdir do |dir|
-        write_payload(dir, artifact: "regression-pro", suite: "Pro",
-                           regressed: [ignored, "/some_other_route: Pro"])
-        output, status = run_script(script, dir, gh_stub: fake_gh)
-        expect(status).to be_success
-        expect(output).to match(/Filing regression report for Pro/)
-      end
-    end
-
-    it "still files when another suite regressed even if this suite's regression is ignored" do
-      ignored = IGNORED_REGRESSION_BENCHMARKS.first
-      Dir.mktmpdir do |dir|
-        write_payload(dir, artifact: "regression-pro", suite: "Pro", regressed: [ignored])
-        write_payload(dir, artifact: "regression-core", suite: "Core", regressed: ["/hello: Core"])
-        output, status = run_script(script, dir, gh_stub: fake_gh)
-        expect(status).to be_success
-        expect(output).to match(/Filing regression report for Core/)
-        expect(output).to match(/Filing regression report for Pro/)
-      end
-    end
-
-    it "files normally when a payload omits the regressed-benchmarks list (fail-safe)" do
-      Dir.mktmpdir do |dir|
-        write_payload(dir, artifact: "regression-pro", suite: "Pro") # no regressed key
-        output, status = run_script(script, dir, gh_stub: fake_gh)
-        expect(status).to be_success
-        expect(output).to match(/Filing regression report for Pro/)
-      end
-    end
-
     it "reports valid payloads but still fails when one payload is corrupt" do
       Dir.mktmpdir do |dir|
-        write_payload(dir, artifact: "regression-core", suite: "Core")
-        corrupt = File.join(dir, "regression-pro")
+        write_payload(dir, artifact: "regression-confirmed-core", suite: "Core")
+        corrupt = File.join(dir, "regression-confirmed-pro")
         FileUtils.mkdir_p(corrupt)
-        File.write(File.join(corrupt, RegressionReport::FILENAME), "{ not valid json")
+        File.write(File.join(corrupt, RegressionReport::CONFIRMED_FILENAME), "{ not valid json")
 
         output, status = run_script(script, dir, gh_stub: fake_gh)
         expect(status).not_to be_success
-        expect(output).to match(/Filing regression report for Core/)
-        expect(output).to match(%r{::error::Failed to read regression payload .*/regression-pro/regression\.json})
+        expect(output).to match(/Filing confirmed regression report for Core/)
+        expect(output).to match(
+          %r{::error::Failed to read confirmed regression payload .*/regression-confirmed-pro/}
+        )
+      end
+    end
+
+    it "reports valid payloads but still fails when one payload has the wrong JSON shape" do
+      Dir.mktmpdir do |dir|
+        write_payload(dir, artifact: "regression-confirmed-core", suite: "Core")
+        invalid = File.join(dir, "regression-confirmed-pro")
+        FileUtils.mkdir_p(invalid)
+        File.write(File.join(invalid, RegressionReport::CONFIRMED_FILENAME), JSON.generate(%w[not a hash]))
+
+        output, status = run_script(script, dir, gh_stub: fake_gh)
+        expect(status).not_to be_success
+        expect(output).to match(/Filing confirmed regression report for Core/)
+        expect(output).to match(
+          %r{::error::Failed to read confirmed regression payload .*/regression-confirmed-pro/}
+        )
       end
     end
   end
