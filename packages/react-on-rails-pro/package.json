@@ -44,6 +44,12 @@
       "types": "./lib/tanstack-router.d.ts",
       "default": "./lib/tanstack-router.js"
     },
+    "./rscPayloadNode": {
+      "types": "./lib/createRscPayloadNode.client.d.ts",
+      "react-server": "./lib/createRscPayloadNode.server.js",
+      "node": "./lib/createRscPayloadNode.server.js",
+      "default": "./lib/createRscPayloadNode.client.js"
+    },
     "./registerServerComponent/client": "./lib/registerServerComponent/client.js",
     "./registerDefaultRSCProvider/client": "./lib/registerDefaultRSCProvider.client.js",
     "./registerServerComponent/server": {

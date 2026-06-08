@@ -19,6 +19,25 @@ describe('refetch stress dummy app conventions', () => {
       types: './lib/RSCRoute.d.ts',
       default: './lib/RSCRoute.js',
     });
+    expect(proPackageJson.exports['./rscPayloadNode']).toEqual({
+      types: './lib/createRscPayloadNode.client.d.ts',
+      'react-server': './lib/createRscPayloadNode.server.js',
+      node: './lib/createRscPayloadNode.server.js',
+      default: './lib/createRscPayloadNode.client.js',
+    });
+  });
+
+  it('keeps the rscPayloadNode server export browser-runtime free', async () => {
+    const { createRscPayloadNode } = await import('../src/createRscPayloadNode.server.ts');
+
+    await expect(
+      createRscPayloadNode({
+        componentName: 'DashboardPanel',
+        payloadPath: '/rsc_payload',
+      }),
+    ).rejects.toThrow(
+      'createRscPayloadNode is browser-only. Use it only from client-only route loaders or set ssr: false for the route.',
+    );
   });
 
   it('keeps client-only helpers behind .client.tsx file suffixes', () => {

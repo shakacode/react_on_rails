@@ -37,6 +37,15 @@ export type ClientGetReactServerComponentProps = {
   enforceRefetch?: boolean;
 };
 
+export type FetchRSCOptions = {
+  componentName: string;
+  componentProps: unknown;
+  rscPayloadGenerationUrlPath?: string;
+  cspNonce?: string;
+  fetchOptions?: Pick<RequestInit, 'credentials' | 'headers' | 'signal'>;
+  replayConsoleScripts?: boolean;
+};
+
 /**
  * Replays a consoleReplayScript by injecting it as a <script> element.
  */
@@ -60,17 +69,19 @@ const replayConsole = (consoleReplayScript: string, nonce?: string) => {
  *
  * Wire format per chunk: <metadata JSON>\t<hex content length>\n<raw Flight data>
  *
- * Extracts raw Flight data for React, replays console from metadata.
+ * Extracts raw Flight data for React and optionally replays console metadata.
  */
 const createFromFetch = async (
   fetchPromise: Promise<Response>,
   {
     componentName,
     cspNonce,
+    replayConsoleScripts = true,
     source,
   }: {
     componentName: string;
     cspNonce?: string;
+    replayConsoleScripts?: boolean;
     source: string;
   },
 ) => {
@@ -104,7 +115,7 @@ const createFromFetch = async (
               reportDiagnosticError(metadata);
               controller.enqueue(content);
               const consoleScript = (metadata.consoleReplayScript as string) ?? '';
-              if (consoleScript) {
+              if (replayConsoleScripts && consoleScript) {
                 replayConsole(consoleScript, nonce);
               }
             });
@@ -129,6 +140,12 @@ const createFromFetch = async (
   });
 };
 
+const isAbortError = (error: unknown): boolean =>
+  typeof error === 'object' &&
+  error !== null &&
+  'name' in error &&
+  (error as { name?: unknown }).name === 'AbortError';
+
 /**
  * Fetches an RSC payload via HTTP request.
  *
@@ -142,17 +159,21 @@ const createFromFetch = async (
  *
  * @param componentName - Name of the server component
  * @param componentProps - Props for the server component
- * @param railsContext - The Rails context containing configuration
+ * @param rscPayloadGenerationUrlPath - Base Rails path where RSC payloads are fetched
+ * @param cspNonce - Optional nonce for legacy console replay script injection
+ * @param fetchOptions - Narrow fetch controls for callers that need credentials, headers, or cancellation
+ * @param replayConsoleScripts - Whether console replay metadata should be materialized as script tags
  * @returns A Promise resolving to the rendered React element
  * @throws Error if RSC payload generation URL path is not configured or network request fails
  */
-const fetchRSC = ({
+export const fetchRSC = ({
   componentName,
   componentProps,
-  railsContext,
-}: ClientGetReactServerComponentProps & { railsContext: RailsContext }) => {
-  const { rscPayloadGenerationUrlPath } = railsContext;
-
+  rscPayloadGenerationUrlPath,
+  cspNonce,
+  fetchOptions,
+  replayConsoleScripts,
+}: FetchRSCOptions) => {
   if (!rscPayloadGenerationUrlPath) {
     throw new Error(
       `Cannot fetch RSC payload for component "${componentName}": rscPayloadGenerationUrlPath is not configured. ` +
@@ -166,10 +187,12 @@ const fetchRSC = ({
     const encodedParams = new URLSearchParams({ props: propsString }).toString();
     const sourcePath = `/${strippedUrlPath}/${componentName}`;
     const fetchUrl = `${sourcePath}?${encodedParams}`;
+    const fetchPromise = fetchOptions ? fetch(fetchUrl, fetchOptions) : fetch(fetchUrl);
 
-    return createFromFetch(fetch(fetchUrl), {
+    return createFromFetch(fetchPromise, {
       componentName,
-      cspNonce: railsContext.cspNonce,
+      cspNonce,
+      replayConsoleScripts,
       // Keep `source` query-string free so serialized props aren't echoed into error messages
       // or attached error-monitoring events. The outer wrapper below retains `fetchUrl` for reproducibility.
       source: sourcePath,
@@ -177,6 +200,7 @@ const fetchRSC = ({
       // RSC stream diagnostic errors already carry component/source context — preserve them
       // (including .cause and the merged stack) instead of flattening to a plain Error.
       if (error instanceof Error && error.name === RSC_STREAM_DIAGNOSTIC_ERROR_NAME) throw error;
+      if (isAbortError(error)) throw error;
       const wrapper: Error & { cause?: unknown } = new Error(
         `Failed to fetch RSC payload for component "${componentName}" from "${fetchUrl}": ${extractErrorMessage(error)}`,
       );
@@ -312,7 +336,12 @@ const getReactServerComponent =
         );
       }
     }
-    return fetchRSC({ componentName, componentProps, railsContext });
+    return fetchRSC({
+      componentName,
+      componentProps,
+      rscPayloadGenerationUrlPath: railsContext.rscPayloadGenerationUrlPath,
+      cspNonce: railsContext.cspNonce,
+    });
   };
 
 export default getReactServerComponent;
