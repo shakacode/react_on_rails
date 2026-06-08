@@ -47,12 +47,8 @@ body:
         Mode: strict-rc
         Allowed modes: development, accelerated-rc, strict-rc, final-release
         Auto-merge threshold: not enabled unless Mode is intentionally changed to accelerated-rc
-        Recent close guard: if this tracker is closed, use Released or Superseded in the closing label/comment when it should stop being authoritative
-        Confidence finalized by: independent agent or maintainer
-        Auto-merge checks: wait for all GitHub checks on the current head SHA
-        Claude review: required unless quota/usage-limit/capacity fallback to Cursor or Codex review is recorded with exact error evidence
-        Affected areas choose validation and do not cap confidence by themselves: SSR, RSC, hydration, package release, generators, CI, benchmarks, Pro/core boundary
-        Final release audit before publishing: required
+        Recent close guard: use Released or Superseded by #NNN in the closing label/comment
+        Full interpretation rules: AGENTS.md -> Release Mode And Auto-Merge Coordination
     validations:
       required: true
 
