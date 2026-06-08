@@ -93,7 +93,7 @@ Reporting `release-mode-stale-tracker`, `release-mode-conflict`, or a missing
 release-mode block means posting a PR comment with a `Release Mode Block:`
 header, the signal name, relevant tracker URLs, and the current decision.
 
-In `development` and `strict-rc` modes, apply the standard merge qualification in `AGENTS.md`; the accelerated-RC confidence block and auto-merge threshold do not apply.
+In `development` and `strict-rc` modes, apply the standard merge qualification in `AGENTS.md`; the accelerated-RC confidence block and auto-merge threshold do not apply. In `final-release` mode, do not auto-merge; apply standard merge qualification plus the final-release audit and explicit maintainer release decision in `AGENTS.md`.
 
 Agents must not auto-create release trackers. A maintainer creates a tracker when entering accelerated RC, strict RC, or final-release coordination.
 
@@ -163,8 +163,7 @@ permission API as an auditable signal:
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 OWNER=${REPO%/*}
 NAME=${REPO#*/}
-GITHUB_LOGIN_TO_VERIFY=theirlogin # Replace with the GitHub login being verified.
-: "${GITHUB_LOGIN_TO_VERIFY:?Set this to the GitHub login being verified}"
+GITHUB_LOGIN_TO_VERIFY=${GITHUB_LOGIN_TO_VERIFY:?Set GITHUB_LOGIN_TO_VERIFY to the GitHub login being verified before running this snippet}
 gh api "repos/${OWNER}/${NAME}/collaborators/${GITHUB_LOGIN_TO_VERIFY}/permission" --jq .permission 2>/dev/null || echo "none"
 ```
 
