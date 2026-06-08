@@ -18,3 +18,7 @@ export type { UnstableCacheOptions } from './unstable_cache.ts';
 /* eslint-enable camelcase */
 export type { CacheHandler, CacheEntry } from './CacheHandler.ts';
 export { registerCacheHandler } from './cacheHandlerRegistry.ts';
+export { RedisCacheHandler } from './RedisCacheHandler.ts';
+export type { RedisCacheHandlerOptions } from './RedisCacheHandler.ts';
+export { TieredCacheHandler } from './TieredCacheHandler.ts';
+export type { TieredCacheHandlerOptions } from './TieredCacheHandler.ts';

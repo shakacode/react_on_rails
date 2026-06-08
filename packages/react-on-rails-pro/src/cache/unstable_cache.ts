@@ -48,6 +48,10 @@ function bufferNodeStream(stream: PassThrough): Promise<Buffer[]> {
   });
 }
 
+// Per-worker single-flight map: prevents duplicate renders for the same cache key
+// within a single worker process when concurrent requests arrive simultaneously.
+const inFlightRenders = new Map<string, Promise<void>>();
+
 // eslint-disable-next-line camelcase -- matches Next.js API naming convention
 export function unstable_cache<TArgs extends unknown[]>(
   originalFn: (...args: TArgs) => Promise<ReactNode> | ReactNode,
@@ -67,16 +71,45 @@ export function unstable_cache<TArgs extends unknown[]>(
       return createFromNodeStream<ReactNode>(replayStream);
     }
 
-    // --- MISS path ---
-    const reactTree = await originalFn(...args);
-    const { renderToPipeableStream } = await getServerRenderer();
-    let renderHadError = false;
-    const rscPipeable = renderToPipeableStream(reactTree, {
-      onError: (err) => {
-        renderHadError = true;
-        console.error(err);
-      },
+    // --- Single-flight: wait for any in-progress render of this key ---
+    // Loop handles the case where the in-flight render fails: waiters re-check
+    // whether another waiter has already started a new render before falling
+    // through to the MISS path themselves. Capped to avoid unbounded waiting
+    // when new requests continuously arrive and all renders fail.
+    const MAX_INFLIGHT_RETRIES = 3;
+    for (let attempt = 0; attempt < MAX_INFLIGHT_RETRIES && inFlightRenders.has(cacheKey); attempt += 1) {
+      await inFlightRenders.get(cacheKey); // eslint-disable-line no-await-in-loop
+      const retryEntry = await handler.get(cacheKey); // eslint-disable-line no-await-in-loop
+      if (retryEntry) {
+        const replayStream = chunksToNodeStream(retryEntry.value);
+        const { createFromNodeStream } = await getClientRenderer(); // eslint-disable-line no-await-in-loop
+        return createFromNodeStream<ReactNode>(replayStream);
+      }
+    }
+
+    // --- MISS path: render and populate cache ---
+    let resolveInflight!: () => void;
+    const inflightPromise = new Promise<void>((resolve) => {
+      resolveInflight = resolve;
     });
+    inFlightRenders.set(cacheKey, inflightPromise);
+
+    let renderHadError = false;
+    let rscPipeable: ReturnType<Awaited<ReturnType<typeof getServerRenderer>>['renderToPipeableStream']>;
+    try {
+      const reactTree = await originalFn(...args);
+      const { renderToPipeableStream } = await getServerRenderer();
+      rscPipeable = renderToPipeableStream(reactTree, {
+        onError: (err) => {
+          renderHadError = true;
+          console.error(err);
+        },
+      });
+    } catch (err) {
+      inFlightRenders.delete(cacheKey);
+      resolveInflight();
+      throw err;
+    }
 
     const source = new PassThrough();
     const forCache = new PassThrough();
@@ -109,6 +142,10 @@ export function unstable_cache<TArgs extends unknown[]>(
       })
       .catch((err: unknown) => {
         console.error('unstable_cache: failed to store cache entry', err);
+      })
+      .finally(() => {
+        inFlightRenders.delete(cacheKey);
+        resolveInflight();
       });
 
     const { createFromNodeStream } = await getClientRenderer();
