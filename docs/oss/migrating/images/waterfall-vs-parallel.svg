@@ -1,0 +1,193 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 440" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>Data Fetching: Waterfall vs Parallel</title>
+  <desc>Animated comparison showing client-side waterfall data fetching (sequential fetch-render cycles) versus Server Component data fetching where data is already available as props — eliminating loading states, useEffect, and multiple round trips.</desc>
+  <defs>
+    <filter id="shadow">
+      <feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/>
+    </filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .card { fill: white; stroke: #E2E8F0; }
+      .label-text { fill: #334155; }
+      .label-sub { fill: #64748B; }
+      .bad-header { fill: #FEE2E2; stroke: #FECACA; }
+      .bad-text { fill: #991B1B; }
+      .good-header { fill: #D1FAE5; stroke: #86EFAC; }
+      .good-text { fill: #166534; }
+      .track-bg { fill: #F1F5F9; }
+      .track-fetch { fill: #FECACA; }
+      .track-render { fill: #93C5FD; }
+      .track-wait { fill: #E2E8F0; }
+      .track-done { fill: #86EFAC; }
+      .track-data { fill: #22C55E; }
+      .code-bg { fill: #1E293B; }
+      .code-text { fill: #E2E8F0; }
+      .code-keyword { fill: #67E8F9; }
+      .code-fn { fill: #C4B5FD; }
+      .code-string { fill: #4ADE80; }
+      .code-comment { fill: #64748B; }
+      .code-removed { fill: #F87171; }
+      .marker-line { stroke: #94A3B8; }
+      .time-text { fill: #64748B; }
+      .note-box { fill: #EFF6FF; stroke: #93C5FD; }
+      .note-text { fill: #1E40AF; }
+
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .card { fill: #1E293B; stroke: #334155; }
+        .label-text { fill: #CBD5E1; }
+        .label-sub { fill: #94A3B8; }
+        .bad-header { fill: #450A0A; stroke: #F87171; }
+        .bad-text { fill: #FCA5A5; }
+        .good-header { fill: #052E16; stroke: #10B981; }
+        .good-text { fill: #6EE7B7; }
+        .track-bg { fill: #1E293B; }
+        .track-fetch { fill: #7F1D1D; }
+        .track-render { fill: #1D4ED8; }
+        .track-wait { fill: #334155; }
+        .track-done { fill: #16A34A; }
+        .track-data { fill: #22C55E; }
+        .code-bg { fill: #0F172A; }
+        .marker-line { stroke: #64748B; }
+        .time-text { fill: #94A3B8; }
+        .note-box { fill: #172554; stroke: #3B82F6; }
+        .note-text { fill: #93C5FD; }
+      }
+
+      .timeline-a { opacity: 1; animation: toggleA 14s ease infinite; }
+      .timeline-b { opacity: 0; animation: toggleB 14s ease infinite; }
+
+      @keyframes toggleA {
+        0%, 42% { opacity: 1; } 48%, 90% { opacity: 0; } 96%, 100% { opacity: 1; }
+      }
+      @keyframes toggleB {
+        0%, 42% { opacity: 0; } 48%, 90% { opacity: 1; } 96%, 100% { opacity: 0; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * { animation: none !important; }
+        .timeline-a, .timeline-b { opacity: 1 !important; }
+      }
+    </style>
+  </defs>
+
+  <rect width="900" height="440" class="bg"/>
+  <text x="450" y="28" text-anchor="middle" font-size="18" font-weight="700" class="title">Data Fetching: Client Waterfall vs Server Components</text>
+  <text x="450" y="46" text-anchor="middle" font-size="11" class="subtitle">Server Components eliminate fetch waterfalls — data is available at render time</text>
+
+  <!-- ============ PHASE A: Client Waterfall ============ -->
+  <g class="timeline-a">
+    <rect x="30" y="58" width="840" height="186" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="30" y="58" width="840" height="28" rx="12" class="bad-header" stroke-width="1"/>
+    <rect x="30" y="74" width="840" height="12" class="bad-header"/>
+    <text x="450" y="78" text-anchor="middle" font-size="12" font-weight="700" class="bad-text">❌ Client-Side Fetching (waterfall)</text>
+
+    <!-- Time axis -->
+    <line x1="180" y1="228" x2="820" y2="228" class="marker-line" stroke-width="1"/>
+    <text x="180" y="240" text-anchor="middle" font-size="8" class="time-text">0ms</text>
+    <text x="340" y="240" text-anchor="middle" font-size="8" class="time-text">200ms</text>
+    <text x="500" y="240" text-anchor="middle" font-size="8" class="time-text">500ms</text>
+    <text x="660" y="240" text-anchor="middle" font-size="8" class="time-text">750ms</text>
+    <text x="820" y="240" text-anchor="middle" font-size="8" class="time-text">1000ms</text>
+
+    <!-- Row labels -->
+    <text x="170" y="106" text-anchor="end" font-size="10" font-weight="600" class="label-text">mount</text>
+    <text x="170" y="130" text-anchor="end" font-size="10" font-weight="600" class="label-text">fetch /api/user</text>
+    <text x="170" y="154" text-anchor="end" font-size="10" font-weight="600" class="label-text">render user</text>
+    <text x="170" y="178" text-anchor="end" font-size="10" font-weight="600" class="label-text">fetch /api/posts</text>
+    <text x="170" y="202" text-anchor="end" font-size="10" font-weight="600" class="label-text">render posts</text>
+
+    <!-- Mount -->
+    <rect x="180" y="96" width="60" height="14" rx="3" class="track-render"/>
+
+    <!-- Fetch user (depends on mount) -->
+    <rect x="240" y="120" width="200" height="14" rx="3" class="track-fetch"/>
+
+    <!-- Render user (depends on fetch) -->
+    <rect x="440" y="144" width="60" height="14" rx="3" class="track-render"/>
+
+    <!-- Fetch posts (depends on render user — waterfall!) -->
+    <rect x="500" y="168" width="200" height="14" rx="3" class="track-fetch"/>
+
+    <!-- Render posts -->
+    <rect x="700" y="192" width="60" height="14" rx="3" class="track-render"/>
+
+    <!-- Waterfall annotation -->
+    <line x1="440" y1="100" x2="440" y2="185" class="marker-line" stroke-width="1" stroke-dasharray="3 2"/>
+    <line x1="500" y1="100" x2="500" y2="185" class="marker-line" stroke-width="1" stroke-dasharray="3 2"/>
+    <text x="470" y="94" text-anchor="middle" font-size="7" class="bad-text">blocked</text>
+    <text x="770" y="210" font-size="9" font-weight="600" class="bad-text">~750ms total</text>
+  </g>
+
+  <!-- ============ PHASE B: Server Components ============ -->
+  <g class="timeline-b">
+    <rect x="30" y="58" width="840" height="186" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="30" y="58" width="840" height="28" rx="12" class="good-header" stroke-width="1"/>
+    <rect x="30" y="74" width="840" height="12" class="good-header"/>
+    <text x="450" y="78" text-anchor="middle" font-size="12" font-weight="700" class="good-text">✅ Server Component (parallel on server)</text>
+
+    <!-- Time axis -->
+    <line x1="180" y1="228" x2="820" y2="228" class="marker-line" stroke-width="1"/>
+    <text x="180" y="240" text-anchor="middle" font-size="8" class="time-text">0ms</text>
+    <text x="340" y="240" text-anchor="middle" font-size="8" class="time-text">100ms</text>
+    <text x="500" y="240" text-anchor="middle" font-size="8" class="time-text">200ms</text>
+    <text x="660" y="240" text-anchor="middle" font-size="8" class="time-text">300ms</text>
+
+    <!-- Row labels -->
+    <text x="170" y="106" text-anchor="end" font-size="10" font-weight="600" class="label-text">Rails controller</text>
+    <text x="170" y="130" text-anchor="end" font-size="10" font-weight="600" class="label-text">fetch user</text>
+    <text x="170" y="154" text-anchor="end" font-size="10" font-weight="600" class="label-text">fetch posts</text>
+    <text x="170" y="178" text-anchor="end" font-size="10" font-weight="600" class="label-text">render all</text>
+    <text x="170" y="202" text-anchor="end" font-size="10" font-weight="600" class="label-text">stream HTML</text>
+
+    <!-- Parallel server-side fetches -->
+    <rect x="180" y="96" width="40" height="14" rx="3" class="track-render"/>
+    <rect x="220" y="120" width="200" height="14" rx="3" class="track-data"/>
+    <rect x="220" y="144" width="200" height="14" rx="3" class="track-data"/>
+    <rect x="420" y="168" width="60" height="14" rx="3" class="track-render"/>
+    <rect x="480" y="192" width="80" height="14" rx="3" class="track-done"/>
+
+    <!-- Parallel annotation -->
+    <text x="320" y="112" text-anchor="middle" font-size="7" class="good-text">parallel!</text>
+    <text x="560" y="200" font-size="9" font-weight="600" class="good-text">~300ms total</text>
+    <text x="560" y="216" font-size="8" class="label-sub">Data already available as props — no fetch needed</text>
+  </g>
+
+  <!-- Legend -->
+  <g transform="translate(30, 256)">
+    <rect x="0" y="0" width="840" height="28" rx="8" class="track-bg" stroke-width="0"/>
+    <rect x="20" y="8" width="30" height="10" rx="3" class="track-render"/>
+    <text x="58" y="17" font-size="9" class="label-text">Render</text>
+    <rect x="120" y="8" width="30" height="10" rx="3" class="track-fetch"/>
+    <text x="158" y="17" font-size="9" class="label-text">Client fetch</text>
+    <rect x="240" y="8" width="30" height="10" rx="3" class="track-data"/>
+    <text x="278" y="17" font-size="9" class="label-text">Server fetch</text>
+    <rect x="370" y="8" width="30" height="10" rx="3" class="track-done"/>
+    <text x="408" y="17" font-size="9" class="label-text">Stream</text>
+  </g>
+
+  <!-- Code comparison -->
+  <rect x="30" y="296" width="410" height="100" rx="8" class="code-bg"/>
+  <text x="235" y="312" text-anchor="middle" font-size="10" font-weight="600" class="code-removed">Client Component (before)</text>
+  <text x="46" y="330" font-family="ui-monospace, monospace" font-size="9" class="code-removed">const [user, setUser] = useState(null)</text>
+  <text x="46" y="346" font-family="ui-monospace, monospace" font-size="9" class="code-removed">const [loading, setLoading] = useState(true)</text>
+  <text x="46" y="362" font-family="ui-monospace, monospace" font-size="9" class="code-removed">useEffect(() =&gt; fetch('/api/users')...)</text>
+  <text x="46" y="378" font-family="ui-monospace, monospace" font-size="9" class="code-removed">if (loading) return &lt;Spinner /&gt;</text>
+
+  <rect x="460" y="296" width="410" height="100" rx="8" class="code-bg"/>
+  <text x="665" y="312" text-anchor="middle" font-size="10" font-weight="600" class="code-string">Server Component (after)</text>
+  <text x="476" y="334" font-family="ui-monospace, monospace" font-size="9" class="code-keyword">export default function</text>
+  <text x="670" y="334" font-family="ui-monospace, monospace" font-size="9" class="code-fn"> UserProfile</text>
+  <text x="476" y="352" font-family="ui-monospace, monospace" font-size="9" class="code-text">  ({ user }) {</text>
+  <text x="476" y="370" font-family="ui-monospace, monospace" font-size="9" class="code-keyword">  return</text>
+  <text x="520" y="370" font-family="ui-monospace, monospace" font-size="9" class="code-text"> &lt;div&gt;{user.name}&lt;/div&gt;</text>
+  <text x="476" y="386" font-family="ui-monospace, monospace" font-size="9" class="code-text">}</text>
+
+  <!-- Bottom callout -->
+  <rect x="100" y="410" width="700" height="24" rx="6" class="note-box" stroke-width="1"/>
+  <text x="450" y="426" text-anchor="middle" font-size="10" font-weight="600" class="note-text">Server Components eliminate: useState, useEffect, loading states, error handlers, fetch calls</text>
+</svg>

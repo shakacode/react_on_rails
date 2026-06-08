@@ -1,0 +1,164 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>Barrel File Contamination</title>
+  <desc>Static diagram showing how a single barrel file (index.js) with 'use client' contaminates all re-exports, and the fix using separate server/client barrels to keep imports isolated.</desc>
+  <defs>
+    <filter id="shadow">
+      <feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/>
+    </filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .card { fill: white; stroke: #E2E8F0; }
+      .label-text { fill: #334155; }
+      .label-sub { fill: #64748B; }
+      .bad-header { fill: #FEE2E2; stroke: #FECACA; }
+      .bad-text { fill: #991B1B; }
+      .good-header { fill: #D1FAE5; stroke: #86EFAC; }
+      .good-text { fill: #166534; }
+      .file-box { fill: #F1F5F9; stroke: #CBD5E1; }
+      .file-text { fill: #334155; }
+      .server-file { fill: #ECFDF5; stroke: #22C55E; }
+      .server-text { fill: #166534; }
+      .client-file { fill: #FFF7ED; stroke: #F97316; }
+      .client-text { fill: #9A3412; }
+      .barrel-bad { fill: #FEE2E2; stroke: #EF4444; }
+      .barrel-bad-text { fill: #991B1B; }
+      .barrel-good-s { fill: #D1FAE5; stroke: #22C55E; }
+      .barrel-good-c { fill: #FEF3C7; stroke: #FCD34D; }
+      .import-line { stroke: #94A3B8; }
+      .contamination-line { stroke: #EF4444; }
+      .clean-line { stroke: #22C55E; }
+      .note-box { fill: #EFF6FF; stroke: #93C5FD; }
+      .note-text { fill: #1E40AF; }
+      .code-bg { fill: #1E293B; }
+      .code-text { fill: #E2E8F0; }
+      .code-keyword { fill: #67E8F9; }
+      .code-string { fill: #4ADE80; }
+
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .card { fill: #1E293B; stroke: #334155; }
+        .label-text { fill: #CBD5E1; }
+        .label-sub { fill: #94A3B8; }
+        .bad-header { fill: #450A0A; stroke: #F87171; }
+        .bad-text { fill: #FCA5A5; }
+        .good-header { fill: #052E16; stroke: #10B981; }
+        .good-text { fill: #6EE7B7; }
+        .file-box { fill: #1E293B; stroke: #475569; }
+        .file-text { fill: #CBD5E1; }
+        .server-file { fill: #052E16; stroke: #10B981; }
+        .server-text { fill: #6EE7B7; }
+        .client-file { fill: #431407; stroke: #F97316; }
+        .client-text { fill: #FDBA74; }
+        .barrel-bad { fill: #450A0A; stroke: #F87171; }
+        .barrel-bad-text { fill: #FCA5A5; }
+        .barrel-good-s { fill: #052E16; stroke: #10B981; }
+        .barrel-good-c { fill: #422006; stroke: #F59E0B; }
+        .import-line { stroke: #64748B; }
+        .contamination-line { stroke: #F87171; }
+        .clean-line { stroke: #10B981; }
+        .note-box { fill: #172554; stroke: #3B82F6; }
+        .note-text { fill: #93C5FD; }
+        .code-bg { fill: #0F172A; }
+      }
+    </style>
+  </defs>
+
+  <rect width="800" height="400" class="bg"/>
+  <text x="400" y="26" text-anchor="middle" font-size="18" font-weight="700" class="title">Barrel File Contamination</text>
+  <text x="400" y="44" text-anchor="middle" font-size="11" class="subtitle">A single 'use client' barrel makes all re-exports client code — use separate barrels instead</text>
+
+  <!-- ============ LEFT: Problem ============ -->
+  <rect x="20" y="58" width="360" height="290" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="20" y="58" width="360" height="28" rx="12" class="bad-header" stroke-width="1"/>
+  <rect x="20" y="74" width="360" height="12" class="bad-header"/>
+  <text x="200" y="78" text-anchor="middle" font-size="12" font-weight="700" class="bad-text">❌ Single Barrel</text>
+
+  <!-- index.js barrel -->
+  <rect x="100" y="98" width="180" height="36" rx="6" class="barrel-bad" stroke-width="2"/>
+  <text x="190" y="114" text-anchor="middle" font-size="10" font-weight="600" class="barrel-bad-text">components/index.js</text>
+  <text x="190" y="128" text-anchor="middle" font-size="8" class="barrel-bad-text">'use client'</text>
+
+  <!-- Lines to exports -->
+  <line x1="140" y1="134" x2="100" y2="156" class="contamination-line" stroke-width="2" stroke-dasharray="4 2"/>
+  <line x1="190" y1="134" x2="200" y2="156" class="contamination-line" stroke-width="2" stroke-dasharray="4 2"/>
+  <line x1="240" y1="134" x2="300" y2="156" class="contamination-line" stroke-width="2" stroke-dasharray="4 2"/>
+
+  <!-- ServerHeader — contaminated -->
+  <rect x="40" y="156" width="130" height="28" rx="6" class="client-file" stroke-width="1.5"/>
+  <text x="105" y="174" text-anchor="middle" font-size="9" class="client-text">ServerHeader</text>
+
+  <!-- ClientSearch — correctly client -->
+  <rect x="140" y="196" width="130" height="28" rx="6" class="client-file" stroke-width="1.5"/>
+  <text x="205" y="214" text-anchor="middle" font-size="9" class="client-text">ClientSearch</text>
+
+  <!-- ServerFooter — contaminated -->
+  <rect x="240" y="156" width="130" height="28" rx="6" class="client-file" stroke-width="1.5"/>
+  <text x="305" y="174" text-anchor="middle" font-size="9" class="client-text">ServerFooter</text>
+
+  <text x="200" y="250" text-anchor="middle" font-size="9" class="bad-text">ALL exports become client code —</text>
+  <text x="200" y="266" text-anchor="middle" font-size="9" class="bad-text">even ServerHeader and ServerFooter</text>
+  <text x="200" y="282" text-anchor="middle" font-size="9" class="bad-text">that don't need interactivity</text>
+
+  <!-- Import example -->
+  <rect x="40" y="296" width="320" height="36" rx="6" class="code-bg"/>
+  <text x="56" y="312" font-family="ui-monospace, monospace" font-size="9" class="code-keyword">import</text>
+  <text x="96" y="312" font-family="ui-monospace, monospace" font-size="9" class="code-text"> { ServerHeader } </text>
+  <text x="234" y="312" font-family="ui-monospace, monospace" font-size="9" class="code-keyword">from</text>
+  <text x="268" y="312" font-family="ui-monospace, monospace" font-size="9" class="code-string"> './components'</text>
+  <text x="56" y="326" font-family="ui-monospace, monospace" font-size="8" class="code-text">// ↑ pulls in 'use client' from barrel!</text>
+
+  <!-- ============ RIGHT: Fix ============ -->
+  <rect x="420" y="58" width="360" height="290" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="420" y="58" width="360" height="28" rx="12" class="good-header" stroke-width="1"/>
+  <rect x="420" y="74" width="360" height="12" class="good-header"/>
+  <text x="600" y="78" text-anchor="middle" font-size="12" font-weight="700" class="good-text">✅ Separate Barrels</text>
+
+  <!-- Server barrel -->
+  <rect x="440" y="98" width="150" height="36" rx="6" class="barrel-good-s" stroke-width="2"/>
+  <text x="515" y="114" text-anchor="middle" font-size="9" font-weight="600" class="server-text">server/index.js</text>
+  <text x="515" y="128" text-anchor="middle" font-size="8" class="server-text">(no directive)</text>
+
+  <!-- Client barrel -->
+  <rect x="620" y="98" width="150" height="36" rx="6" class="barrel-good-c" stroke-width="2"/>
+  <text x="695" y="114" text-anchor="middle" font-size="9" font-weight="600" class="client-text">client/index.js</text>
+  <text x="695" y="128" text-anchor="middle" font-size="8" class="client-text">'use client'</text>
+
+  <!-- Server exports -->
+  <line x1="480" y1="134" x2="480" y2="156" class="clean-line" stroke-width="1.5"/>
+  <line x1="550" y1="134" x2="550" y2="156" class="clean-line" stroke-width="1.5"/>
+
+  <rect x="440" y="156" width="100" height="28" rx="6" class="server-file" stroke-width="1.5"/>
+  <text x="490" y="174" text-anchor="middle" font-size="9" class="server-text">ServerHeader</text>
+
+  <rect x="500" y="196" width="100" height="28" rx="6" class="server-file" stroke-width="1.5"/>
+  <text x="550" y="214" text-anchor="middle" font-size="9" class="server-text">ServerFooter</text>
+
+  <!-- Client exports -->
+  <line x1="695" y1="134" x2="695" y2="156" class="contamination-line" stroke-width="1.5"/>
+
+  <rect x="650" y="156" width="110" height="28" rx="6" class="client-file" stroke-width="1.5"/>
+  <text x="705" y="174" text-anchor="middle" font-size="9" class="client-text">ClientSearch</text>
+
+  <text x="600" y="250" text-anchor="middle" font-size="9" class="good-text">Server components stay server —</text>
+  <text x="600" y="266" text-anchor="middle" font-size="9" class="good-text">only ClientSearch becomes client code</text>
+
+  <!-- Import examples -->
+  <rect x="440" y="282" width="330" height="52" rx="6" class="code-bg"/>
+  <text x="456" y="298" font-family="ui-monospace, monospace" font-size="9" class="code-keyword">import</text>
+  <text x="496" y="298" font-family="ui-monospace, monospace" font-size="9" class="code-text"> { ServerHeader } </text>
+  <text x="634" y="298" font-family="ui-monospace, monospace" font-size="9" class="code-keyword">from</text>
+  <text x="668" y="298" font-family="ui-monospace, monospace" font-size="9" class="code-string"> './server'</text>
+  <text x="456" y="316" font-family="ui-monospace, monospace" font-size="9" class="code-keyword">import</text>
+  <text x="496" y="316" font-family="ui-monospace, monospace" font-size="9" class="code-text"> { ClientSearch } </text>
+  <text x="638" y="316" font-family="ui-monospace, monospace" font-size="9" class="code-keyword">from</text>
+  <text x="672" y="316" font-family="ui-monospace, monospace" font-size="9" class="code-string"> './client'</text>
+  <text x="456" y="328" font-family="ui-monospace, monospace" font-size="8" class="code-text">// ↑ clean separation, no contamination</text>
+
+  <!-- Bottom callout -->
+  <rect x="100" y="366" width="600" height="26" rx="8" class="note-box" stroke-width="1.5"/>
+  <text x="400" y="384" text-anchor="middle" font-size="10" font-weight="600" class="note-text">Never put 'use client' on a barrel that re-exports server components</text>
+</svg>

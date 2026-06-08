@@ -54,6 +54,10 @@ import numeral from 'numeral'; // ~25KB
 
 ### [Selective Hydration](https://github.com/reactwg/react-18/discussions/37) Benefits
 
+<p align="center">
+  <img src="images/selective-hydration-timeline.svg" alt="Animated timeline showing how selective hydration works with streamed RSC components. With async script loading, components hydrate independently as they stream in — the page becomes interactive before slow components finish loading. Compares defer (all-or-nothing) vs async (progressive) loading strategies." width="840" />
+</p>
+
 React's selective hydration is a powerful feature that significantly improves page interactivity by:
 
 1. **Independent Component Hydration**

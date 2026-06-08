@@ -16,12 +16,9 @@ This means the placement of `'use client'` directly determines your bundle size.
 
 A common misconception is that every component using hooks or browser APIs needs `'use client'`. It doesn't. You only need the directive at the **boundary** — the file where code transitions from server to client. Everything imported below that boundary is automatically client code:
 
-```text
-ServerPage.jsx (Server Component)
-└── imports SearchBar.jsx ('use client')   ← boundary — needs the directive
-    └── imports SearchInput.jsx            ← automatically client, NO directive needed
-    └── imports SearchResults.jsx          ← automatically client, NO directive needed
-```
+<p align="center">
+  <img src="images/use-client-module-boundary.svg" alt="Static diagram showing how the 'use client' directive works at the module (file) level. Once a file has the directive, all its imports automatically become client code — no additional directive needed in child modules." width="840" />
+</p>
 
 `SearchInput` and `SearchResults` use hooks and event handlers, but they don't need `'use client'` because `SearchBar` already established the boundary. Adding it would be redundant.
 
@@ -30,7 +27,7 @@ ServerPage.jsx (Server Component)
 Start from the top of each component tree and work downward:
 
 <p align="center">
-  <img src="images/top-down-migration.svg" alt="Animated diagram showing the three phases of top-down RSC migration: Phase 1 marks the root as client, Phase 2 pushes the client boundary down to leaf components, and Phase 3 splits mixed components into server and client parts." width="840" />
+  <img src="images/top-down-migration.svg" alt="Animated three-phase diagram showing RSC migration strategy: Phase 1 marks the root as 'use client' (100% client bundle), Phase 2 pushes the boundary down to child components (~40% client), Phase 3 splits mixed components into server+client leaves (~15% client). Each phase reveals progressively with staggered animation." width="840" />
 </p>
 
 > **React on Rails multi-root note:** Unlike single-page apps with one root component, React on Rails renders multiple independent component trees on a page -- each `stream_react_component` call in your view is a separate root. This is actually an advantage for migration: you can migrate **one registered component at a time**, leaving the rest untouched.
@@ -102,25 +99,9 @@ Choose one registered component to migrate. The ideal first candidate is a compo
 
 **Step 3: Push `'use client'` down to interactive children.** Identify child components that don't use hooks or browser APIs. Those can stay as server-rendered. Add `'use client'` only to the children that need interactivity.
 
-```text
-Before (all client):
-ProductPage ('use client')       <-- Entry point, registered with ReactOnRails.register
-├── ProductHeader
-│   ├── ProductImage
-│   └── ShareButton
-├── ProductSpecs
-├── ReviewList
-└── AddToCartButton
-
-After (migrated):
-ProductPage                      <-- Server Component, registered with registerServerComponent
-├── ProductHeader                <-- Server Component (no hooks)
-│   ├── ProductImage             <-- Server Component (display only)
-│   └── ShareButton ('use client')  <-- Needs onClick handler
-├── ProductSpecs                 <-- Server Component (display only)
-├── ReviewList                   <-- Server Component (display only)
-└── AddToCartButton ('use client')  <-- Needs useState + onClick
-```
+<p align="center">
+  <img src="images/push-boundary-down.svg" alt="Static before-and-after diagram showing how to migrate a React component tree by pushing the 'use client' directive from the root down to only the leaf components that truly need interactivity. Before: the entire tree is client code. After: only interactive leaves are client components." width="840" />
+</p>
 
 Repeat for each registered component you want to migrate.
 

@@ -8,6 +8,10 @@ Let's create a `Posts` React Server Component. It receives its `posts` from Rail
 
 For **progressive loading** — where slow data streams in while the rest of the page is already interactive — you need [async props](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently), which require SSR. That pattern is covered in [Server-Side Rendering](./server-side-rendering.md) and [Selective Hydration](./selective-hydration-in-streamed-components.md).
 
+<p align="center">
+  <img src="images/async-suspense-streaming.svg" alt="Diagram showing how async Server Components work with Suspense: the shell and fallback render immediately, the async component resolves server-side, streams to the browser, and the fallback is replaced with real content." width="840" />
+</p>
+
 ```js
 // app/javascript/components/Posts.jsx
 import React from 'react';
@@ -162,6 +166,10 @@ Now when you visit the page, you'll see a "Toggle" button for each post. Clickin
 The `ToggleContainer` is marked with [`'use client'`](https://react.dev/reference/rsc/use-client) directive, indicating it runs on the client-side and can handle user interactions. It uses the `useState` hook to maintain the visibility state of its children. Meanwhile, the parent `Posts` component remains a server component, rendering the Rails-provided posts data on the server.
 
 It's important to note that while client components (like `ToggleContainer`) cannot directly import server components, they can receive server components as props (like children in this case). This is why we can pass the server-rendered image element as a child to our client-side `ToggleContainer` component. This pattern allows for flexible composition while maintaining the boundaries between server and client code.
+
+<p align="center">
+  <img src="images/donut-composition.svg" alt="Static diagram showing the donut or children-as-props composition pattern: a Client Component wraps Server Component children passed as props. The children stay server-rendered and are NOT included in the client bundle. Blue zones indicate server-rendered content, orange zones indicate client-rendered content." width="840" />
+</p>
 
 This pattern allows us to optimize performance by keeping most of the component logic on the server while selectively adding interactivity where needed on the client.
 

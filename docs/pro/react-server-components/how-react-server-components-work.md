@@ -12,6 +12,10 @@ The `react-on-rails-rsc/WebpackLoader` is a custom loader that removes the clien
 
 The RSC Webpack Loader works when it finds a file with the `'use client'` directive on top of it.
 
+<p align="center">
+  <img src="images/webpack-loader-transform.svg" alt="Animated before/after diagram showing how the RSC Webpack Loader transforms a 'use client' file: the original file with component implementations is replaced with ClientReference proxy stubs that point to the client bundle entry." width="840" />
+</p>
+
 ```js
 // app/javascript/client/app/components/HomePage.jsx
 'use client';
@@ -143,6 +147,10 @@ end
 ```
 
 ## React Server Component Payload (RSC Payload)
+
+<p align="center">
+  <img src="images/flight-payload-streaming.svg" alt="Animated diagram showing how React Server Components serialize the element tree into Flight protocol wire-format chunks that stream to the client, where React reconstructs the component tree. Shows hint chunks, import chunks, model chunks, and streaming promise resolution." width="840" />
+</p>
 
 The React Server Component Payload (RSC Payload) is a mechanism that allows you to pass the rendered server components from the server to the client. You can use the `rsc_payload_react_component` helper function to embed the RSC payload of any component in your Rails views. Let's try to embed the RSC payload of the `ReactServerComponentPage` component in the `app/views/pages/react_server_component_page_rsc_payload.html.erb` view.
 

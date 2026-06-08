@@ -358,14 +358,9 @@ module.exports = webpackConfig;
 
 Add the RSC bundle watcher to your `Procfile.dev`:
 
-```text
-# Procfile.dev
-rails: rails s -p 3000
-webpack-dev-server: HMR=true bin/shakapacker-dev-server
-rails-server-assets: HMR=true SERVER_BUNDLE_ONLY=true bin/shakapacker --watch
-rails-rsc-assets: HMR=true RSC_BUNDLE_ONLY=true bin/shakapacker --watch
-node-renderer: RENDERER_PORT=${RENDERER_PORT:-3800} node renderer/node-renderer.js
-```
+<p align="center">
+  <img src="images/build-pipeline-bundles.svg" alt="Static diagram showing the RSC build pipeline with three parallel webpack bundle processes (client, server, RSC) plus the Node renderer, as defined in Procfile.dev. Each bundle targets different environments and entry points." width="840" />
+</p>
 
 > **For full webpack configuration details**, including the technical background on how the RSC loader, plugin, and manifests work together, see [How React Server Components Work](../../pro/react-server-components/how-react-server-components-work.md).
 

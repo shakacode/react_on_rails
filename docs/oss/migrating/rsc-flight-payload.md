@@ -22,6 +22,10 @@ In one benchmark of a Tailwind-heavy app with repeated card/list components, the
 | **Structural JSON**   | ~25%              | The `["$","div",null,{...}]` wrappers around every element            |
 | **Content data**      | ~27%              | Actual text, numbers, and data values                                 |
 
+<p align="center">
+  <img src="images/flight-payload-breakdown.svg" alt="Animated diagram showing what makes up the RSC Flight payload: className strings (~48%), structural JSON (~25%), and content data (~27%). Includes expansion ratio benchmarks for real components like StarRating (16:1) and ReviewSnippets (9.3:1)." width="840" />
+</p>
+
 In contrast, when a Client Component is referenced from a Server Component, the payload contains only a lightweight **client reference** (module ID + chunk metadata) plus the serialized props. The browser renders the element tree locally from the JavaScript bundle it already has.
 
 ## Why "All Display-Only = Server" Is an Oversimplification
@@ -237,20 +241,9 @@ For larger Flight payloads, this double-encoding can add meaningful overhead. Se
 
 Use this flowchart when deciding whether a presentational component should be a Server or Client Component:
 
-```text
-Is the component interactive (hooks, events, browser APIs)?
-├── Yes → Client Component (standard RSC rule)
-└── No → Does it access server-only resources (DB, API keys, server-only imports)?
-    ├── Yes → Server Component (cannot be a Client Component)
-    └── No → Is it repeated many times on the page?
-        ├── No → Server Component (standard RSC rule)
-        └── Yes → Is the element tree much larger than the data props?
-            ├── No → Server Component
-            └── Yes → Will moving to client keep JS bundle increase small?
-                ├── No → Server Component (bundle cost outweighs payload savings)
-                └── Yes → Consider Client Component (this optimization)
-                    └── Measure payload before/after to confirm savings
-```
+<p align="center">
+  <img src="images/server-client-decision-flowchart.svg" alt="Static flowchart guiding developers through the decision of whether a component should be a Server Component or Client Component, based on interactivity, server-only resources, repetition ratio, expansion ratio, and bundle cost." width="840" />
+</p>
 
 ## Summary
 

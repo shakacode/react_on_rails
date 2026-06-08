@@ -152,13 +152,9 @@ The `'use client'` directive operates at the **module level**. Once a file is ma
 
 ### The Problem
 
-```text
-ClientComponent.jsx ('use client')
-├── imports utils.js          → becomes client code
-│   └── imports heavy-lib.js  → becomes client code (100KB wasted)
-├── imports helpers.js        → becomes client code
-│   └── imports db-utils.js   → becomes client code (SECURITY RISK)
-```
+<p align="center">
+  <img src="images/import-chain-contamination.svg" alt="Static diagram showing how a small 'use client' component can inherit large chunk groups from heavier import paths, and the fix using a thin wrapper file to isolate the dependency tree." width="840" />
+</p>
 
 ### How to Detect It
 
@@ -184,6 +180,10 @@ If someone imports `db-utils.js` from a Client Component (directly or transitive
 ## Chunk Contamination
 
 When a component with `'use client'` is statically imported by both a small RSC path and a heavier client path, the RSC page can inherit chunks from both paths. The impact can be severe (for example, 382 KB instead of 8 KB).
+
+<p align="center">
+  <img src="images/chunk-contamination-fix.svg" alt="Animated before/after showing how a shared import between a heavy page and a small component drags vendor chunks into the RSC page bundle, and the fix that shrinks it by isolating the import." width="840" />
+</p>
 
 ### How to Detect It
 

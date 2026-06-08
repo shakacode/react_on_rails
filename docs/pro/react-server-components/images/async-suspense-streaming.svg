@@ -1,0 +1,176 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 480" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <title>Async Server Components with Suspense Streaming</title>
+  <desc>Animated diagram showing how async Server Components work with Suspense: the shell and fallback render immediately, the async component resolves server-side, streams to the browser, and the fallback is replaced with real content. Demonstrates that async does not mean waiting — it streams.</desc>
+  <defs>
+    <filter id="shadow">
+      <feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/>
+    </filter>
+    <style>
+      .bg { fill: #F8FAFC; }
+      .title { fill: #0F172A; }
+      .subtitle { fill: #64748B; }
+      .card { fill: white; stroke: #E2E8F0; }
+      .card-inner { fill: #F8FAFC; stroke: #E2E8F0; }
+      .label-text { fill: #334155; }
+      .label-sub { fill: #64748B; }
+      .shell-box { fill: #DBEAFE; stroke: #93C5FD; }
+      .shell-text { fill: #1E40AF; }
+      .fallback-box { fill: #FEF3C7; stroke: #FCD34D; }
+      .fallback-text { fill: #92400E; }
+      .loaded-box { fill: #D1FAE5; stroke: #22C55E; }
+      .loaded-text { fill: #166534; }
+      .stream-box { fill: #ECFDF5; stroke: #86EFAC; }
+      .stream-text { fill: #166534; }
+      .step-num { fill: white; }
+      .step-circle-blue { fill: #3B82F6; }
+      .step-circle-amber { fill: #F59E0B; }
+      .step-circle-green { fill: #22C55E; }
+      .timeline-bar { fill: #E2E8F0; }
+      .timeline-fast { fill: #93C5FD; }
+      .timeline-wait { fill: #FCD34D; }
+      .timeline-done { fill: #86EFAC; }
+      .callout-box { fill: #EFF6FF; stroke: #93C5FD; }
+      .callout-text { fill: #1E40AF; }
+
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0F172A; }
+        .title { fill: #F1F5F9; }
+        .subtitle { fill: #94A3B8; }
+        .card { fill: #1E293B; stroke: #334155; }
+        .card-inner { fill: #0F172A; stroke: #334155; }
+        .label-text { fill: #CBD5E1; }
+        .label-sub { fill: #94A3B8; }
+        .shell-box { fill: #172554; stroke: #3B82F6; }
+        .shell-text { fill: #93C5FD; }
+        .fallback-box { fill: #422006; stroke: #F59E0B; }
+        .fallback-text { fill: #FCD34D; }
+        .loaded-box { fill: #052E16; stroke: #10B981; }
+        .loaded-text { fill: #6EE7B7; }
+        .stream-box { fill: #052E16; stroke: #10B981; }
+        .stream-text { fill: #6EE7B7; }
+        .timeline-bar { fill: #334155; }
+        .callout-box { fill: #172554; stroke: #3B82F6; }
+        .callout-text { fill: #93C5FD; }
+      }
+
+      .p1 { opacity: 1; animation: phase1 12s ease infinite; }
+      .p2 { opacity: 0; animation: phase2 12s ease infinite; }
+      .p3 { opacity: 0; animation: phase3 12s ease infinite; }
+
+      @keyframes phase1 {
+        0%, 25% { opacity: 1; } 30%, 100% { opacity: 0; }
+      }
+      @keyframes phase2 {
+        0%, 25% { opacity: 0; } 30%, 60% { opacity: 1; } 65%, 100% { opacity: 0; }
+      }
+      @keyframes phase3 {
+        0%, 60% { opacity: 0; } 65%, 92% { opacity: 1; } 97%, 100% { opacity: 0; }
+      }
+
+      .spinner { animation: spin 1s linear infinite; transform-origin: center; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      @media (prefers-reduced-motion: reduce) {
+        * { animation: none !important; opacity: 1 !important; }
+      }
+    </style>
+  </defs>
+
+  <rect width="900" height="480" class="bg"/>
+  <text x="450" y="30" text-anchor="middle" font-size="18" font-weight="700" class="title">Async Server Components + Suspense Streaming</text>
+  <text x="450" y="48" text-anchor="middle" font-size="11" class="subtitle">Async does not mean waiting — the shell renders immediately, content streams when ready</text>
+
+  <!-- Steps indicators -->
+  <g>
+    <circle cx="235" cy="74" r="12" class="step-circle-blue"/>
+    <text x="235" y="78" text-anchor="middle" font-size="10" font-weight="700" class="step-num">1</text>
+    <text x="260" y="78" font-size="10" font-weight="600" class="label-text">Shell + Fallback</text>
+
+    <circle cx="445" cy="74" r="12" class="step-circle-amber"/>
+    <text x="445" y="78" text-anchor="middle" font-size="10" font-weight="700" class="step-num">2</text>
+    <text x="470" y="78" font-size="10" font-weight="600" class="label-text">Async Resolves</text>
+
+    <circle cx="655" cy="74" r="12" class="step-circle-green"/>
+    <text x="655" y="78" text-anchor="middle" font-size="10" font-weight="700" class="step-num">3</text>
+    <text x="680" y="78" font-size="10" font-weight="600" class="label-text">Content Streams In</text>
+  </g>
+
+  <!-- Browser mockup frame -->
+  <rect x="100" y="96" width="700" height="260" rx="12" class="card" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="100" y="96" width="700" height="30" rx="12" class="card-inner" stroke-width="1"/>
+  <rect x="100" y="114" width="700" height="12" class="card-inner"/>
+  <circle cx="120" cy="111" r="5" fill="#EF4444"/>
+  <circle cx="136" cy="111" r="5" fill="#F59E0B"/>
+  <circle cx="152" cy="111" r="5" fill="#22C55E"/>
+  <text x="450" y="115" text-anchor="middle" font-size="9" class="label-sub">localhost:3000/page</text>
+
+  <!-- Phase 1: Shell + Fallback -->
+  <g class="p1">
+    <!-- Header (immediate) -->
+    <rect x="120" y="140" width="660" height="40" rx="6" class="shell-box" stroke-width="1.5"/>
+    <text x="450" y="165" text-anchor="middle" font-size="13" font-weight="600" class="shell-text">React Server Component Demo</text>
+
+    <!-- Fallback (loading state) -->
+    <rect x="120" y="192" width="660" height="140" rx="6" class="fallback-box" stroke-width="2" stroke-dasharray="8 4"/>
+    <text x="420" y="268" text-anchor="middle" font-size="14" class="fallback-text">Loading...</text>
+    <g transform="translate(480, 260)">
+      <circle cx="0" cy="0" r="10" fill="none" stroke="#F59E0B" stroke-width="2.5" stroke-dasharray="20 12" class="spinner"/>
+    </g>
+
+    <text x="450" y="346" text-anchor="middle" font-size="9" class="label-sub">Suspense fallback shows while the async component resolves server-side</text>
+  </g>
+
+  <!-- Phase 2: Async resolves on server -->
+  <g class="p2">
+    <rect x="120" y="140" width="660" height="40" rx="6" class="shell-box" stroke-width="1.5"/>
+    <text x="450" y="165" text-anchor="middle" font-size="13" font-weight="600" class="shell-text">React Server Component Demo</text>
+
+    <rect x="120" y="192" width="660" height="140" rx="6" class="fallback-box" stroke-width="2" stroke-dasharray="8 4"/>
+
+    <!-- Streaming overlay -->
+    <rect x="125" y="197" width="650" height="130" rx="4" class="stream-box" stroke-width="1" opacity="0.6"/>
+    <text x="450" y="250" text-anchor="middle" font-size="12" font-weight="600" class="stream-text">Server resolved async data...</text>
+    <text x="450" y="270" text-anchor="middle" font-size="10" class="stream-text">Streaming replacement chunk to browser</text>
+    <text x="450" y="310" text-anchor="middle" font-size="10" class="label-sub">▸▸▸ streaming ▸▸▸</text>
+
+    <text x="450" y="346" text-anchor="middle" font-size="9" class="label-sub">The server sends the resolved component as a streaming chunk</text>
+  </g>
+
+  <!-- Phase 3: Content loaded -->
+  <g class="p3">
+    <rect x="120" y="140" width="660" height="40" rx="6" class="shell-box" stroke-width="1.5"/>
+    <text x="450" y="165" text-anchor="middle" font-size="13" font-weight="600" class="shell-text">React Server Component Demo</text>
+
+    <rect x="120" y="192" width="660" height="140" rx="6" class="loaded-box" stroke-width="2"/>
+    <text x="450" y="224" text-anchor="middle" font-size="12" font-weight="600" class="loaded-text">Post: Getting Started with RSC</text>
+    <text x="450" y="244" text-anchor="middle" font-size="10" class="loaded-text">React Server Components enable server-side rendering with streaming...</text>
+    <text x="450" y="268" text-anchor="middle" font-size="10" class="loaded-text">Created 2 hours ago</text>
+    <rect x="350" y="280" width="200" height="40" rx="4" class="card-inner" stroke-width="1"/>
+    <text x="450" y="305" text-anchor="middle" font-size="9" class="label-sub">[ Toggle Image ]</text>
+
+    <text x="450" y="346" text-anchor="middle" font-size="9" class="label-sub">Fallback seamlessly replaced — React swapped the content without page reload</text>
+  </g>
+
+  <!-- Timeline -->
+  <g>
+    <text x="450" y="380" text-anchor="middle" font-size="13" font-weight="600" class="label-text">Timeline</text>
+
+    <rect x="100" y="394" width="700" height="8" rx="4" class="timeline-bar"/>
+    <rect x="100" y="394" width="100" height="8" rx="4" class="timeline-fast"/>
+    <rect x="200" y="394" width="300" height="8" class="timeline-wait"/>
+    <rect x="500" y="394" width="300" height="8" rx="4" class="timeline-done"/>
+
+    <text x="150" y="420" text-anchor="middle" font-size="9" font-weight="600" class="shell-text">Shell renders</text>
+    <text x="150" y="432" text-anchor="middle" font-size="8" class="label-sub">instant</text>
+
+    <text x="350" y="420" text-anchor="middle" font-size="9" font-weight="600" class="fallback-text">Fallback visible</text>
+    <text x="350" y="432" text-anchor="middle" font-size="8" class="label-sub">while async resolves</text>
+
+    <text x="650" y="420" text-anchor="middle" font-size="9" font-weight="600" class="loaded-text">Content streamed in</text>
+    <text x="650" y="432" text-anchor="middle" font-size="8" class="label-sub">fallback replaced</text>
+  </g>
+
+  <!-- Key insight -->
+  <rect x="200" y="448" width="500" height="24" rx="6" class="callout-box" stroke-width="1"/>
+  <text x="450" y="464" text-anchor="middle" font-size="10" font-weight="600" class="callout-text">User sees content immediately — async data streams in without blocking</text>
+</svg>

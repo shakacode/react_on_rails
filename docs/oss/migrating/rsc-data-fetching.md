@@ -61,6 +61,10 @@ Rails prepares the data in the controller and passes it as props. The component 
 - No loading spinner needed in the component itself
 - No JavaScript ships to the client for this component
 
+<p align="center">
+  <img src="images/waterfall-vs-parallel.svg" alt="Animated comparison showing client-side waterfall data fetching (sequential fetch-render cycles) versus Server Component data fetching where data is already available as props — eliminating loading states, useEffect, and multiple round trips." width="840" />
+</p>
+
 For pages with multiple data sources, use [`stream_react_component`](#data-fetching-in-react-on-rails-pro) to
 stream the rendered HTML to the browser as React renders the component tree. When slower data sources should resolve
 independently behind Suspense boundaries, use `stream_react_component_with_async_props`.

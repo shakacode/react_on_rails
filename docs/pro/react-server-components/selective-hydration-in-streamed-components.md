@@ -13,6 +13,10 @@ With selective hydration, React can now hydrate different parts of the page inde
 
 This approach significantly improves both perceived and actual performance by making the most relevant parts interactive first.
 
+<p align="center">
+  <img src="images/selective-hydration-timeline.svg" alt="Animated timeline showing how selective hydration works with streamed RSC components. With async script loading, components hydrate independently as they stream in — the page becomes interactive before slow components finish loading. Compares defer (all-or-nothing) vs async (progressive) loading strategies." width="840" />
+</p>
+
 ## Try Selective Hydration with React Server Component Page
 
 Let's try selective hydration with the React Server Component Page we created in the [SSR React Server Components](./server-side-rendering.md).
