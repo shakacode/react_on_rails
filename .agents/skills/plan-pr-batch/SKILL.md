@@ -1,12 +1,12 @@
 ---
 name: plan-pr-batch
-description: Use when the user wants to choose GitHub issues or pull requests for a PR batch, prepare a subagent batch plan, or produce a ready goal prompt that invokes pr-batch.
+description: Use when choosing GitHub issues or PRs for a PR batch, preparing a subagent batch plan, or producing a ready goal prompt that invokes pr-batch.
 argument-hint: '[issue/PR numbers, labels, milestone, or search query]'
 ---
 
 # Plan PR Batch
 
-Create a verified scope and a goal prompt for a later `$pr-batch` run. Do not implement items while using this skill.
+Create verified scope and a goal prompt for `$pr-batch`. Do not implement items here.
 
 Memorable invocation:
 
@@ -19,7 +19,7 @@ Plan a PR batch
 
 1. Intake
    - If the user has not named the batch members, ask one question: "Which PRs, issues, labels, milestones, or search query should this batch include?"
-   - Also ask for hard constraints in that question only when needed: max items, priority, excluded areas, deadline, or whether code changes are allowed.
+   - Also ask for hard constraints when boundaries are missing or the batch appears over five items: max items, priority, excluded areas, deadline, or code-change permission.
    - Accept refs like `#123`, PR/issue URLs, label/milestone/search filters, or a pasted list.
 
 2. Verify
@@ -37,7 +37,7 @@ Plan a PR batch
 
 4. Output
    - Return a concise "Batch Plan" and a fenced "Goal Prompt for pr-batch".
-   - Keep the fenced goal prompt under 4000 characters total.
+   - Keep the fenced goal prompt under 4000 characters total so bulky audit detail stays in the Batch Plan.
    - If the batch will not fit, split it into smaller goals and output only the first ready goal.
    - Do not start `$pr-batch` unless the user explicitly asks to run it; when they do, hand them the fenced goal prompt.
 
@@ -76,12 +76,10 @@ Items:
   Done when: ...
 
 Execution rules:
-- Dispatch one subagent per independent item; group dependent items only when a single worker needs shared context.
+- Follow `.agents/skills/pr-batch/SKILL.md` "Goal Prompt Template"; if skill autoloading is unavailable, copy its safety, review, /simplify, CI, and readiness gates before running.
+- Dispatch one subagent per independent item; group dependent items only when shared context is required.
 - Each subagent must verify current GitHub state before edits and report UNKNOWN for unverifiable facts.
-- Follow repo agent instructions and local safety rules.
-- Prefer local verification over CI iteration.
-- Summarize each subagent result with links, tests run, remaining blockers, and next action.
-- Produce a final batch handoff with merged/ready/blocked/deferred/UNKNOWN sections.
+- Final handoff must include links, tests, blockers, next action, and merged/ready/blocked/deferred/UNKNOWN sections.
 ```
 
 ## Common Mistakes

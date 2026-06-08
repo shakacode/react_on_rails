@@ -2,4 +2,4 @@
 interface:
   display_name: "Plan PR Batch"
   short_description: "Prepare scoped PR batch goals"
-  default_prompt: "Use $plan-pr-batch to plan a subagent batch for these PRs and issues."
+  default_prompt: "Use $plan-pr-batch to plan a subagent batch. Specify which PRs or issues to include."
