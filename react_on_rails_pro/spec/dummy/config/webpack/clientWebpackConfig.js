@@ -1,4 +1,8 @@
-const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+const { config } = require('shakapacker');
+const RSCManifestPlugin =
+  config.assets_bundler === 'rspack'
+    ? require('react-on-rails-rsc/RspackPlugin').RSCRspackPlugin
+    : require('react-on-rails-rsc/WebpackPlugin').RSCWebpackPlugin;
 const LoadablePlugin = require('@loadable/webpack-plugin');
 const commonWebpackConfig = require('./commonWebpackConfig');
 const rscManifestClientReferences = require('./rscManifestClientReferences');
@@ -15,7 +19,7 @@ const configureClient = () => {
   delete clientConfig.entry['server-bundle'];
 
   clientConfig.plugins.push(
-    new RSCWebpackPlugin({
+    new RSCManifestPlugin({
       isServer: false,
       clientReferences: rscManifestClientReferences(),
     }),
@@ -27,6 +31,7 @@ const configureClient = () => {
 
   clientConfig.resolve.fallback = {
     fs: false,
+    module: false,
     path: false,
     stream: false,
   };

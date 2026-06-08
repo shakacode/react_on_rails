@@ -94,14 +94,31 @@ const configureRsc = () => {
     };
   }
 
-  // Add the RSC loader before the babel loader
+  // Add the RSC loader before the JavaScript loader.
   const { rules } = rscConfig.module;
   rules.forEach((rule) => {
-    if (Array.isArray(rule.use)) {
-      // Ensure this loader runs before the JS loader (Babel loader in this case) to properly exclude client components from the RSC bundle.
-      // If your project uses a different JS loader, insert it before that loader instead.
-      const babelLoader = extractLoader(rule, 'babel-loader');
-      if (babelLoader) {
+    if (typeof rule.use === 'function') {
+      const originalUse = rule.use;
+      // eslint-disable-next-line no-param-reassign
+      rule.use = function rscLoaderWrapper(data) {
+        const result = originalUse.call(this, data);
+        let resultArray = [];
+        if (Array.isArray(result)) {
+          resultArray = result;
+        } else if (result) {
+          resultArray = [result];
+        }
+        const resolvedRule = { use: resultArray };
+        const jsLoader =
+          extractLoader(resolvedRule, 'babel-loader') || extractLoader(resolvedRule, 'swc-loader');
+        if (jsLoader) {
+          return [...resultArray, { loader: 'react-on-rails-rsc/WebpackLoader' }];
+        }
+        return result;
+      };
+    } else if (Array.isArray(rule.use)) {
+      const jsLoader = extractLoader(rule, 'babel-loader') || extractLoader(rule, 'swc-loader');
+      if (jsLoader) {
         rule.use.push({
           loader: 'react-on-rails-rsc/WebpackLoader',
         });

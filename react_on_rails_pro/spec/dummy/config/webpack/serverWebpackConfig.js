@@ -1,6 +1,10 @@
 /* eslint-disable no-param-reassign */
-const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
-const webpack = require('webpack');
+const { config } = require('shakapacker');
+const bundler = config.assets_bundler === 'rspack' ? require('@rspack/core') : require('webpack');
+const RSCManifestPlugin =
+  config.assets_bundler === 'rspack'
+    ? require('react-on-rails-rsc/RspackPlugin').RSCRspackPlugin
+    : require('react-on-rails-rsc/WebpackPlugin').RSCWebpackPlugin;
 const path = require('path');
 const commonWebpackConfig = require('./commonWebpackConfig');
 const rscManifestClientReferences = require('./rscManifestClientReferences');
@@ -83,13 +87,13 @@ const configureServer = (rscBundle = false) => {
 
   if (!rscBundle) {
     serverWebpackConfig.plugins.push(
-      new RSCWebpackPlugin({
+      new RSCManifestPlugin({
         isServer: true,
         clientReferences: rscManifestClientReferences(),
       }),
     );
   }
-  serverWebpackConfig.plugins.unshift(new webpack.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
+  serverWebpackConfig.plugins.unshift(new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
   // Custom output for the server-bundle that matches the config in
   // config/initializers/react_on_rails.rb
   serverWebpackConfig.output = {
@@ -107,6 +111,7 @@ const configureServer = (rscBundle = false) => {
   serverWebpackConfig.plugins = serverWebpackConfig.plugins.filter(
     (plugin) =>
       plugin.constructor.name !== 'WebpackAssetsManifest' &&
+      plugin.constructor.name !== 'RspackManifestPlugin' &&
       plugin.constructor.name !== 'MiniCssExtractPlugin' &&
       plugin.constructor.name !== 'ForkTsCheckerWebpackPlugin',
   );

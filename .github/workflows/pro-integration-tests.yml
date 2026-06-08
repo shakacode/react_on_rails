@@ -536,3 +536,154 @@ jobs:
         with:
           name: pro-playwright-report
           path: react_on_rails_pro/spec/dummy/playwright-report
+
+  # Layer 2 Rspack + RSC runtime gate: build client/server/RSC bundles, boot Rails
+  # and the Pro Node renderer, then prove RSC client-boundary routes hydrate.
+  dummy-app-rspack-rsc-runtime-gate:
+    needs:
+      - detect-changes
+    if: |
+      !(
+        github.event_name == 'push' &&
+        github.ref == 'refs/heads/main' &&
+        needs.detect-changes.outputs.non_runtime_only == 'true'
+      ) && (
+        github.ref == 'refs/heads/main' ||
+        github.event_name == 'workflow_dispatch' ||
+        needs.detect-changes.outputs.run_pro_tests == 'true' ||
+        needs.detect-changes.outputs.run_pro_dummy_tests == 'true'
+      )
+    runs-on: ubuntu-22.04
+    env:
+      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+      SHAKAPACKER_ASSETS_BUNDLER: rspack
+    services:
+      redis:
+        image: cimg/redis:6.2.6
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Ruby
+        uses: ./.github/actions/setup-ruby
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
+          bundler-version: 2.5.4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          # Pin to 22.12.0 (Shakapacker 10.1 floor) to avoid V8 bug in 22.21.0
+          # https://github.com/nodejs/node/issues/56010
+          node-version: '22.12.0'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Print system information
+        run: |
+          echo "Linux release: "; cat /etc/issue
+          echo "Current user: "; whoami
+          echo "Current directory: "; pwd
+          echo "Ruby version: "; ruby -v
+          echo "Node version: "; node -v
+          echo "pnpm version: "; pnpm --version
+          echo "Bundler version: "; bundle --version
+
+      - name: Install Ruby Gems for Pro dummy app
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: react_on_rails_pro/spec/dummy
+          ruby-version: ${{ env.RUBY_VERSION }}
+          install-libyaml: 'false'
+
+      - name: Install Node modules with pnpm
+        working-directory: .
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace packages
+        working-directory: .
+        run: pnpm run build
+
+      - name: Ensure minimum required Chrome version
+        run: |
+          echo -e "Installed $(google-chrome --version)\n"
+          MINIMUM_REQUIRED_CHROME_VERSION=75
+          INSTALLED_CHROME_MAJOR_VERSION="$(google-chrome --version | tr ' .' '\t' | cut -f3)"
+          if [[ $INSTALLED_CHROME_MAJOR_VERSION -lt $MINIMUM_REQUIRED_CHROME_VERSION ]]; then
+            wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+            sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
+            sudo apt-get update
+            sudo apt-get install google-chrome-stable
+            echo -e "\nInstalled $(google-chrome --version)"
+          fi
+
+      - name: Generate file-system based entrypoints
+        run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
+
+      - name: Build Rspack RSC test bundles for Pro dummy app
+        run: cd spec/dummy && pnpm run build:test:rspack
+
+      - name: Run Pro Node renderer in background
+        run: |
+          cd spec/dummy
+          pnpm run node-renderer &
+
+      - name: Run Rails server in background
+        run: |
+          cd spec/dummy
+          RAILS_ENV="test" bundle exec rails server &
+
+      - name: Wait for Rails server to start
+        run: |
+          timeout=300
+          elapsed=0
+          while ! curl -s http://localhost:3000 > /dev/null; do
+            sleep 1
+            elapsed=$((elapsed + 1))
+            if [ $elapsed -ge $timeout ]; then
+              echo "Timeout waiting for Rails server to start after ${timeout}s"
+              exit 1
+            fi
+          done
+          echo "Rails server started after ${elapsed}s"
+
+      - name: Install Playwright dependencies
+        run: cd spec/dummy && npx playwright install --with-deps
+
+      - name: Run RSC Playwright E2E tests for Pro dummy app
+        run: cd spec/dummy && pnpm e2e-test:rsc
+
+      - name: Store test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pro-rspack-rsc-playwright-test-results
+          path: react_on_rails_pro/spec/dummy/test-results/results.xml
+
+      - name: Store Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pro-rspack-rsc-playwright-report
+          path: react_on_rails_pro/spec/dummy/playwright-report
