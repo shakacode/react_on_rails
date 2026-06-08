@@ -95,7 +95,7 @@ For issue targets, create one focused branch and PR unless exact same-file overl
 
 For non-trivial, high-risk, `full-ci`, `benchmark`, workflow/build-config, dependency/runtime-version, or broad refactor PRs, commit the intended implementation locally before pushing so there is a clean branch diff. Run repo-specific validation, formatter/lint/type checks as applicable, then run the primary local/adversarial self-review gate, normally `codex review --base origin/<base>` or the PR's real base, before PR creation or update. When requested by a maintainer or when the change is high-risk, `full-ci`, `benchmark`, workflow/build-config, dependency/runtime-version, or broad refactor scoped, run one additional Claude Code review pass if available, such as `/code-review` or `/code-review ultra`.
 
-For high-risk cases above, run Claude's `/simplify` after the primary review gate is clean and before the final push or readiness report.
+For high-risk cases above, run Claude's `/simplify` after all required review passes for that case are clean, including Claude Code review when required, and before the final push or readiness report.
 
 - Preferred invocation: `claude -p '/simplify origin/<base>' --model claude-opus-4-8 --max-budget-usd 20`, adjusting `<base>` to the PR's real base branch and using it only when that command targets the current branch diff. This is the maintainer-requested pinned default; do not silently substitute another model.
 - Fallback target form: if the preferred command cannot target the diff correctly, use the local Claude-supported range form, such as `/simplify origin/<base>...HEAD`. The target must be the PR/branch diff, for example `origin/main...HEAD`, not an empty uncommitted diff.
