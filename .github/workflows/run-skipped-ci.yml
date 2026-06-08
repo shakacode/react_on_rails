@@ -80,7 +80,8 @@ jobs:
             });
             return {
               ref: pr.data.head.ref,
-              sha: pr.data.head.sha
+              sha: pr.data.head.sha,
+              headRepoFullName: pr.data.head.repo?.full_name ?? ''
             };
 
       - name: Get skipped checks and trigger workflows
@@ -90,23 +91,32 @@ jobs:
           script: |
             const prData = ${{ steps.pr.outputs.result }};
 
-            // Fetch PR checks to find skipped ones
-            const { data: pr } = await github.rest.pulls.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number
-            });
+            const repoFullName = `${context.repo.owner}/${context.repo.repo}`;
+            if (prData.headRepoFullName !== repoFullName) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: [
+                  'Unable to run full CI from `/run-skipped-ci` because the PR branch is from a fork.',
+                  '',
+                  'A maintainer should push the branch to this repository or trigger the required workflows manually.'
+                ].join('\n')
+              });
+              core.setFailed('Cannot trigger skipped-CI workflows for fork PR branches');
+              return;
+            }
 
             const checks = await github.rest.checks.listForRef({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              ref: pr.head.sha,
+              ref: prData.sha,
               per_page: 100
             });
 
             // Find all skipped checks
             const skippedChecks = checks.data.check_runs.filter(check =>
-              check.conclusion === 'SKIPPED' && check.status === 'COMPLETED'
+              check.conclusion === 'skipped' && check.status === 'completed'
             );
 
             console.log(`Found ${skippedChecks.length} skipped checks:`);
@@ -133,7 +143,6 @@ jobs:
 
             const succeeded = [];
             const failed = [];
-            const notApplicable = [];
 
             // If no skipped checks found, trigger ALL workflows in the map
             // This handles the case where workflows haven't run yet (e.g., Pro tests on fresh PRs)
@@ -144,6 +153,12 @@ jobs:
             if (uniqueWorkflows.size === 0) {
               console.log('ℹ️  No skipped checks found - triggering all workflows to ensure full coverage');
             }
+
+            // Capture the lower bound before any dispatch is issued. The -2 s
+            // buffer accounts for clock skew between the runner and GitHub's
+            // servers. workflow_id, event, branch, and created timestamp do the
+            // real narrowing.
+            const dispatchStartedAt = new Date(Date.now() - 2000).toISOString();
 
             // Trigger each workflow
             for (const workflowName of workflowsToTrigger) {
@@ -166,35 +181,84 @@ jobs:
               }
             }
 
-            // Wait a bit for workflows to queue
+            // Add full-ci as soon as any dispatch succeeds so a new push during
+            // verification still runs the full matrix.
+            let labelAdded = false;
             if (succeeded.length > 0) {
-              console.log('Waiting 5 seconds for workflows to queue...');
-              await new Promise(resolve => setTimeout(resolve, 5000));
+              try {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  labels: ['full-ci']
+                });
+                labelAdded = true;
+                console.log('✅ Added full-ci label to PR');
+              } catch (error) {
+                console.error('⚠️  Failed to add label:', error.message);
+              }
             }
 
             // Verify workflows are queued/running
-            const verified = [];
-            const notFound = [];
+            // Seed the retry queue with each successfully dispatched workflow.
+            const notFound = [...succeeded];
 
             if (succeeded.length > 0) {
-              const runs = await github.rest.actions.listWorkflowRunsForRepo({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                per_page: 100,
-                created: `>${new Date(Date.now() - 60000).toISOString()}`
-              });
+              const maxVerificationAttempts = 3;
+              // Linear backoff: 5 s / 10 s / 15 s (30 s max) covers typical
+              // GitHub queue latency without over-waiting this helper job.
+              const baseDelayMs = 5000;
 
-              for (const workflow of succeeded) {
-                const found = runs.data.workflow_runs.some(run =>
-                  run.path === `.github/workflows/${workflow.id}` &&
-                  run.head_sha === prData.sha &&
-                  run.event === 'workflow_dispatch'
+              for (let attempt = 1; attempt <= maxVerificationAttempts; attempt++) {
+                const delayMs = baseDelayMs * attempt;
+                console.log(
+                  `Waiting ${delayMs / 1000} seconds before verification attempt ${attempt}/${maxVerificationAttempts}...`
                 );
+                await new Promise(resolve => setTimeout(resolve, delayMs));
 
-                if (found) {
-                  verified.push(workflow);
+                // Drain the retry queue; only workflows pushed back below are retried.
+                const toVerify = notFound.splice(0);
+
+                for (const workflow of toVerify) {
+                  let found = false;
+                  try {
+                    console.log(
+                      `Searching for ${workflow.name} dispatched on ${prData.ref} after ${dispatchStartedAt}...`
+                    );
+                    const runs = await github.rest.actions.listWorkflowRuns({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      workflow_id: workflow.id,
+                      // Narrow to workflow_dispatch runs for this PR branch after
+                      // dispatch began. Avoid head_sha because GitHub records it
+                      // from the ref at queue time, which can differ after a push.
+                      branch: prData.ref,
+                      event: 'workflow_dispatch',
+                      per_page: 20,
+                      created: `>${dispatchStartedAt}`
+                    });
+                    found = runs.data.workflow_runs.length > 0;
+                  } catch (error) {
+                    console.log(`API error verifying ${workflow.name}: ${error.message}; will retry`);
+                  }
+
+                  if (found) {
+                    console.log(`Verified ${workflow.name} workflow dispatch`);
+                  } else {
+                    notFound.push(workflow);
+                  }
+                }
+
+                if (notFound.length === 0) {
+                  break;
+                }
+
+                if (attempt < maxVerificationAttempts) {
+                  console.log(`Still waiting to verify: ${notFound.map(workflow => workflow.name).join(', ')}`);
                 } else {
-                  notFound.push(workflow);
+                  core.warning(
+                    `Verification incomplete after ${maxVerificationAttempts} attempts. Unverified: ${notFound.map(workflow => workflow.name).join(', ')}. If this repeats, confirm GitHub accepted the workflow dispatches and the workflow map still matches the workflow file names.`
+                  );
                 }
               }
             }
@@ -214,31 +278,15 @@ jobs:
             }
 
             // Don't list individual checks - keep it simple
-            const skippedChecksList = '';
-            const verifiedList = '';
-            const notFoundList = '';
+            const notFoundList = notFound.length > 0
+              ? `\n\n**Unverified (may still be queuing):**\n${notFound.map(workflow => `- ⏳ ${workflow.name}`).join('\n')}`
+              : '';
             const failedList = failed.length > 0 ? `\n\n**Failed to trigger:**\n${failed.map(f => `- ❌ ${f.workflow}: ${f.error}`).join('\n')}` : '';
-
-            // Add full-ci label only if we actually triggered workflows or if checks are already running
-            let labelAdded = false;
-            try {
-              await github.rest.issues.addLabels({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                labels: ['full-ci']
-              });
-              labelAdded = true;
-              console.log('✅ Added full-ci label to PR');
-            } catch (error) {
-              console.error('⚠️  Failed to add label:', error.message);
-            }
 
             const body = `🚀 **Full CI Mode Enabled**
 
             ${status}
-            ${skippedChecksList}
-            ${verifiedList}${notFoundList}${failedList}
+            ${notFoundList}${failedList}
 
             ${labelAdded && succeeded.length > 0 ? `\n**Note:** Added the \`full-ci\` label to this PR. All future commits will run the full CI suite (including minimum dependency tests) until the label is removed.
 
