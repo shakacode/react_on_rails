@@ -103,6 +103,9 @@ export const createRSCProvider = ({
         }
 
         lastSuccessfulRSCPromisesRef.current[key] = promise;
+        // Initial loads establish the fallback baseline without notifying every
+        // route. Only successful refetches need to clear mounted recoverable
+        // errors for the same cache key.
         if (!notifyRoutes) {
           return;
         }
@@ -141,6 +144,8 @@ export const createRSCProvider = ({
       ) => {
         const key = createRSCPayloadKey(componentName, componentProps);
         refetchVersionsRef.current[key] = (refetchVersionsRef.current[key] ?? 0) + 1;
+        // The restore callback only runs from async handlers after this block
+        // assigns `promise`; TypeScript cannot see that ordering.
         let promise!: Promise<ReactNode>;
         const restoreLastSuccessfulPromise = () => {
           if (fetchRSCPromisesRef.current[key] !== promise) {
@@ -158,6 +163,9 @@ export const createRSCProvider = ({
             delete fetchRSCPromisesRef.current[key];
           }
 
+          // The failed refetch already bumped `versions` when it wrote the
+          // failed promise. Bump again after recovery so routes read the
+          // restored or deleted cache entry.
           startTransition(() => {
             setVersions((v) => ({ ...v, [key]: (v[key] ?? 0) + 1 }));
           });

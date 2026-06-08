@@ -29,6 +29,7 @@ import {
   useLayoutEffect,
   useMemo,
   useRef,
+  useState,
   type ReactNode,
 } from 'react';
 import { useRSC } from './RSCProvider.tsx';
@@ -172,7 +173,7 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
       [componentName, componentProps],
     );
     const successfulVersion = getSuccessfulVersion(componentName, componentProps);
-    const [refetchErrorState, setRefetchErrorState] = React.useState<RefetchErrorState | null>(null);
+    const [refetchErrorState, setRefetchErrorState] = useState<RefetchErrorState | null>(null);
     const refetchError = refetchErrorState?.[0] === currentRouteKey ? refetchErrorState[1] : null;
 
     // Read the latest committed props in `refetch`, even when a descendant
@@ -228,6 +229,8 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
             const [latestName, latestProps] = latestPropsRef.current;
             const latestRouteKey = createRSCPayloadKey(latestName, latestProps);
             if (
+              // requestId handles overlapping refetches from this instance;
+              // sharedRefetchVersion handles same-key refetches from siblings.
               isMountedRef.current &&
               latestRefetchRequestRef.current === requestId &&
               getRefetchVersion(n, p) === sharedRefetchVersion &&
