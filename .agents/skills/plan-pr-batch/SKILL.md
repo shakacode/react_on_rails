@@ -18,8 +18,7 @@ Plan a PR batch
 ## Workflow
 
 1. Intake
-   - If the user has not named the batch members, ask one question: "Which PRs, issues, labels, milestones, or search query should this batch include?"
-   - Also ask for hard constraints when boundaries are missing or the batch appears over five items: max items, priority, excluded areas, deadline, or code-change permission.
+   - If the user has not named the batch members, ask for the batch scope and, when boundaries are missing or the batch appears over five items, ask for hard constraints: max items, priority, excluded areas, deadline, or code-change permission.
    - Accept refs like `#123`, PR/issue URLs, label/milestone/search filters, or a pasted list.
 
 2. Verify

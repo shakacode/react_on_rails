@@ -179,7 +179,9 @@ For non-trivial, high-risk, `full-ci`, `benchmark`, workflow/build-config, depen
 
 For high-risk cases above, run Claude's `/simplify` after all required review passes for that case are clean, including Claude Code review when required, and before the final push or readiness report.
 
-- Preferred invocation: `claude -p '/simplify origin/<base>' --model claude-opus-4-8 --max-budget-usd 20`, adjusting `<base>` to the PR's real base branch and using it only when that command targets the current branch diff. This maintainer-requested default pins Opus for deep simplification; update it only by maintainer request and do not silently substitute another model.
+<!-- Keep this /simplify block in sync with .agents/skills/pr-batch/SKILL.md and its Goal Prompt Template. -->
+
+- Preferred invocation: `claude -p '/simplify origin/<base>' --model <default-simplify-model> --max-budget-usd 20`, substituting the Default simplify model from `AGENTS.md`, adjusting `<base>` to the PR's real base branch, and using it only when that command targets the current branch diff. This maintainer-requested default pins Opus for deep simplification; update it only by maintainer request and do not silently substitute another model.
 - Fallback target form: if the preferred command cannot target the diff correctly, use the local Claude-supported range form, such as `/simplify origin/<base>...HEAD`. The target must be the PR/branch diff, for example `origin/main...HEAD`, not an empty uncommitted diff.
 - Mode: do not use plan mode unless the surrounding workflow explicitly requires a no-edit review-only run.
 - Acceptance: treat `/simplify` output as advisory. Accept only simplifications that reduce real complexity without changing behavior or widening scope; reject speculative rewrites, style churn, broad abstractions, and changes outside the PR's target issue/scope.
@@ -285,8 +287,9 @@ asking GitHub reviewers or CI to spend another cycle.
    refactors, and style churn.
 5. For those high-risk cases, run `/simplify` after all required review passes for that case are
    clean, including Claude Code review when required, and before the final push or readiness report.
-   Preferred invocation: `claude -p '/simplify origin/<base>' --model claude-opus-4-8 --max-budget-usd 20`, adjusting
-   `<base>` to the PR's real base branch and only if the command targets the current branch diff.
+   Keep this checklist summary in sync with the canonical `/simplify` block above. Preferred
+   invocation: `claude -p '/simplify origin/<base>' --model <default-simplify-model> --max-budget-usd 20`,
+   substituting the Default simplify model from `AGENTS.md`, adjusting `<base>` to the PR's real base branch, and only if the command targets the current branch diff.
    Otherwise use a local range form such as `/simplify origin/<base>...HEAD`. Accept only
    behavior-preserving simplifications that reduce real complexity; record unavailable, timed-out,
    over-budget, stale-model, or bad-target runs as skipped with exact evidence.
