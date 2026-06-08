@@ -284,8 +284,8 @@ asking GitHub reviewers or CI to spend another cycle.
    blockers or clear simplifications that preserve behavior; reject speculative rewrites, broad
    refactors, and style churn.
 5. For those high-risk cases, run `/simplify` after all required review passes for that case are
-   clean, including Claude Code review when required, and before the final push or readiness report. Prefer
-   `claude -p '/simplify origin/<base>' --model claude-opus-4-8 --max-budget-usd 20`, adjusting
+   clean, including Claude Code review when required, and before the final push or readiness report.
+   Preferred invocation: `claude -p '/simplify origin/<base>' --model claude-opus-4-8 --max-budget-usd 20`, adjusting
    `<base>` to the PR's real base branch and only if the command targets the current branch diff.
    Otherwise use a local range form such as `/simplify origin/<base>...HEAD`. Accept only
    behavior-preserving simplifications that reduce real complexity; record unavailable, timed-out,

@@ -9,7 +9,7 @@ Use this guide when deciding between the planning and execution skills for Codex
 | `$plan-pr-batch` | The user wants to choose, verify, or shape issues/PRs before launching workers.       | A concise Batch Plan plus a ready `$pr-batch` goal prompt under 4000 characters. |
 | `$pr-batch`      | The target list is exact, trusted, and ready to run or convert into a `/goal` prompt. | A launch plan, worker split, or final `/goal` prompt for processing the batch.   |
 
-The `agents/openai.yaml` file under a skill is optional Codex UI metadata for skill picker display text and the default prompt. Add it only for skills that need Codex picker metadata; it is not required for every skill.
+The `.agents/skills/plan-pr-batch/agents/openai.yaml` file under a skill is optional Codex UI metadata for skill picker display text and the default prompt. Add it only for skills that need Codex picker metadata; it is not required for every skill.
 
 ## Default Flow
 
