@@ -73,8 +73,11 @@ class RSCRouteErrorBoundary extends Component<
  *
  * In production, client-control refetch failures are recoverable: the last
  * successful route content stays visible, `refetchError` is set, and `retry()`
- * can explicitly attempt the refetch again. Outside production, failures still
- * throw through the route so development diagnostics stay loud.
+ * re-fetches the route's current component name and props. If props changed
+ * after the failure, `retry()` attempts the new request; call
+ * `clearRefetchError()` to dismiss the old error without fetching. Outside
+ * production, failures still throw through the route so development diagnostics
+ * stay loud.
  *
  * Behavior caveats:
  * - **Concurrent refetches:** only the most-recent cache write wins; earlier
@@ -177,6 +180,7 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
     // Read the latest committed props in `refetch`, even when a descendant
     // captured the handle at an earlier render.
     const latestPropsRef = useRef({ componentName, componentProps });
+    const onRefetchErrorRef = useRef(onRefetchError);
     const latestRefetchRequestRef = useRef(0);
     const isMountedRef = useRef(false);
     useLayoutEffect(() => {
@@ -189,10 +193,10 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
       latestPropsRef.current = { componentName, componentProps };
     }, [componentName, componentProps]);
     useLayoutEffect(() => {
-      setRefetchErrorState((state) => (state?.key === currentRouteKey ? state : null));
-    }, [currentRouteKey]);
+      onRefetchErrorRef.current = onRefetchError;
+    }, [onRefetchError]);
     useLayoutEffect(() => {
-      setRefetchErrorState((state) => (state?.key === currentRouteKey ? null : state));
+      setRefetchErrorState(null);
     }, [currentRouteKey, successfulVersion]);
 
     const refetch = useCallback((): Promise<ReactNode> => {
@@ -229,13 +233,12 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
               latestRouteKey === requestKey
             ) {
               setRefetchErrorState({ key: requestKey, error: serverComponentFetchError });
-              onRefetchError?.(serverComponentFetchError);
             }
           }
           throw serverComponentFetchError;
         },
       );
-    }, [getRefetchVersion, onRefetchError, refetchComponent]);
+    }, [getRefetchVersion, refetchComponent]);
 
     const clearRefetchError = useCallback(() => {
       if (isMountedRef.current) {
@@ -248,6 +251,11 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
       [clearRefetchError, refetch, refetchError],
     );
     useImperativeHandle(ref, () => handle, [handle]);
+    useLayoutEffect(() => {
+      if (refetchError) {
+        onRefetchErrorRef.current?.(refetchError);
+      }
+    }, [refetchError]);
 
     const componentPromise = getComponent(componentName, componentProps);
     return (

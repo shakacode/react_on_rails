@@ -70,6 +70,9 @@ export const createRSCProvider = ({
 }) => {
   return ({ children }: { children: ReactNode }) => {
     const fetchRSCPromisesRef = useRef<Record<string, Promise<ReactNode>>>({});
+    // TODO(#3564): these provider-lifetime caches grow with each unique
+    // componentName+props key. Add LRU/TTL eviction when high-cardinality route
+    // props become common enough for the retained ReactNode promises to matter.
     const lastSuccessfulRSCPromisesRef = useRef<Record<string, Promise<ReactNode>>>({});
     const refetchVersionsRef = useRef<Record<string, number>>({});
     // `versions` is a per-cache-key counter held in React state. Bumping it on
@@ -94,12 +97,20 @@ export const createRSCProvider = ({
     );
 
     const markSuccessfulPromise = useCallback(
-      (key: string, promise: Promise<ReactNode>) => {
+      (
+        key: string,
+        promise: Promise<ReactNode>,
+        { notifyRoutes = false }: { notifyRoutes?: boolean } = {},
+      ) => {
         if (fetchRSCPromisesRef.current[key] !== promise) {
           return;
         }
 
         lastSuccessfulRSCPromisesRef.current[key] = promise;
+        if (!notifyRoutes) {
+          return;
+        }
+
         startTransition(() => {
           setSuccessfulVersions((v) => ({ ...v, [key]: (v[key] ?? 0) + 1 }));
         });
@@ -169,7 +180,7 @@ export const createRSCProvider = ({
                   restoreLastSuccessfulPromise();
                 }
               } else {
-                markSuccessfulPromise(key, promise);
+                markSuccessfulPromise(key, promise, { notifyRoutes: true });
               }
               return payload;
             },
@@ -189,9 +200,11 @@ export const createRSCProvider = ({
       [markSuccessfulPromise, startTransition],
     );
 
-    // `versions` is intentionally listed in deps so the value identity changes
-    // on each refetch. Trade-off: every useRSC() consumer re-renders on any
-    // refetch, even when its cache key is unaffected. Each extra render is a
+    // `versions` and `successfulVersions` are intentionally load-bearing deps:
+    // refetch writes bump `versions` so routes read the new cache promise, and
+    // successful refetches bump `successfulVersions` so routes can clear
+    // recoverable error state. Trade-off: each bump re-renders every useRSC()
+    // consumer even when its cache key is unaffected. Each extra render is a
     // cache hit, but use a per-key subscription if this becomes a bottleneck.
     const contextValue = useMemo(
       () => ({ getComponent, refetchComponent, getRefetchVersion, getSuccessfulVersion }),

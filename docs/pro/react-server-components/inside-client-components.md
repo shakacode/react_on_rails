@@ -480,7 +480,7 @@ function Dashboard() {
 
 `ref.current.refetch()` returns a `Promise<ReactNode>` that resolves with the new tree and rejects with `ServerComponentFetchError` when the refetch fails. If you don't await the promise, attach a `.catch(...)` as shown so failed refetches don't become unhandled rejections. The `<RSCRoute>` still updates on its own, and the current content stays visible while the new payload streams in (no Suspense fallback flash) thanks to an internal React transition.
 
-In production, failed client-control refetches are recoverable: the last successful route content remains visible, `ref.current.refetchError` is set, and `ref.current.retry()` explicitly attempts the same refetch again. Pass `onRefetchError` to `<RSCRoute>` when a parent or sibling needs to report the failure or update its own error UI. In development, the failed refetch still throws through the route so the real `ServerComponentFetchError` and component context are visible.
+In production, failed client-control refetches are recoverable: the last successful route content remains visible, `ref.current.refetchError` is set, and `ref.current.retry()` fetches the route's current `componentName` and `componentProps`. If props changed after the failure, `retry()` attempts the new request; call `clearRefetchError()` to dismiss the old error without fetching. Pass `onRefetchError` to `<RSCRoute>` when a parent or sibling needs to report the failure or update its own error UI. The callback receives the error after the handle's `refetchError` state has committed. In development, the failed refetch still throws through the route so the real `ServerComponentFetchError` and component context are visible.
 
 ### `useCurrentRSCRoute()` from inside the RSC subtree
 

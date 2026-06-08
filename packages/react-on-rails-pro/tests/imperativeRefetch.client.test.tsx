@@ -292,8 +292,11 @@ class CapturingErrorBoundary extends React.Component<
         <RecoverableInlineControls />
       </div>,
     ]);
-    const onRefetchError = jest.fn();
     const ref = React.createRef<RSCRouteHandle>();
+    let callbackRefetchError: RSCRouteHandle['refetchError'] = null;
+    const onRefetchError = jest.fn((_: unknown) => {
+      callbackRefetchError = ref.current?.refetchError ?? null;
+    });
 
     await renderInAct(
       <TestHarness>
@@ -326,6 +329,7 @@ class CapturingErrorBoundary extends React.Component<
     expect(ref.current!.refetchError?.originalError).toBe(refetchError);
     expect(onRefetchError).toHaveBeenCalledTimes(1);
     expect(onRefetchError.mock.calls[0][0]).toBe(ref.current!.refetchError);
+    expect(callbackRefetchError).toBe(ref.current!.refetchError);
 
     await act(async () => {
       fireEvent.click(screen.getByTestId('inline-retry'));
