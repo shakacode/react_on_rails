@@ -22,7 +22,10 @@ describe('refetch stress dummy app conventions', () => {
     expect(proPackageJson.exports['./rscPayloadNode']).toEqual({
       types: './lib/createRscPayloadNode.client.d.ts',
       'react-server': './lib/createRscPayloadNode.server.js',
-      node: './lib/createRscPayloadNode.server.js',
+      node: {
+        types: './lib/createRscPayloadNode.server.d.ts',
+        default: './lib/createRscPayloadNode.server.js',
+      },
       default: './lib/createRscPayloadNode.client.js',
     });
   });
