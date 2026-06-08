@@ -35,6 +35,24 @@ body:
       required: true
 
   - type: textarea
+    id: agent-release-mode
+    attributes:
+      label: Agent Release Mode
+      description: |
+        Live coordination block for Codex/Claude agents. Keep exactly one active tracker per final release target.
+        Canonical interpretation rules are in AGENTS.md -> Release Mode And Auto-Merge Coordination.
+        If this block is incomplete, agents should use strict-rc and report the missing block.
+        Tracker update rule: agents should prefer append-only comments for concurrent per-PR updates. Re-read this issue immediately before editing the body; if the body changed and the update cannot be merged safely, post the intended update as a Tracker Update comment instead.
+      value: |
+        Mode: strict-rc
+        Allowed modes: development, accelerated-rc, strict-rc, final-release
+        Auto-merge threshold: not enabled unless Mode is intentionally changed to accelerated-rc
+        Recent close guard: use Released or Superseded by #NNN in the closing label/comment
+        Full interpretation rules: AGENTS.md -> Release Mode And Auto-Merge Coordination
+    validations:
+      required: true
+
+  - type: textarea
     id: hard-gates
     attributes:
       label: Hard gates
