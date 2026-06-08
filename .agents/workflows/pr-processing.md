@@ -159,14 +159,18 @@ permission API as an auditable signal:
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 OWNER=${REPO%/*}
 NAME=${REPO#*/}
-gh api "repos/${OWNER}/${NAME}/collaborators/<login>/permission" --jq .permission 2>/dev/null || echo "none"
+: "${GITHUB_LOGIN_TO_VERIFY:?Set this to the GitHub login being verified}"
+gh api "repos/${OWNER}/${NAME}/collaborators/${GITHUB_LOGIN_TO_VERIFY}/permission" --jq .permission 2>/dev/null || echo "none"
 ```
 
 This prints `none` for both 404 (not a collaborator) and 403 (the token cannot
 list collaborators). Treat `none` as unverified and look for another trusted
 assignment source before widening scope. If `none` is unexpected for a known
 maintainer, report a possible token-scope limitation to the batch coordinator or
-maintainer; do not auto-merge from that signal.
+maintainer; do not auto-merge from that signal. For direct in-session user
+instructions, this collaborator check is not the trust source; the current
+session message is. For GitHub-originated assignments, an unverified `none`
+result blocks scope widening unless another trusted assignment source exists.
 
 ## High-Concurrency Batch Launch
 
@@ -584,7 +588,7 @@ Auto-merge requires all of the following:
 - Score is at least `8/10`; `7/10` permits human merge after review, but not auto-merge.
 - Before triggering auto-merge, the merge actor verifies `Finalized by` against the GitHub review record, checks, or git log, not only the PR body text.
 - All GitHub checks for the current head SHA are complete. Skipped checks count as complete only when CI selector output explains them or a maintainer explicitly waives them.
-- The GitHub `claude-review` check is complete for the current head SHA, or it failed because of quota exhaustion, hard usage-limit enforcement, provider-reported capacity such as HTTP 503, or persistent HTTP 429 after one 60-second retry, and Cursor Bugbot or Codex review completed as the fallback with the same blocker-triage bar and exact error evidence recorded in the PR body.
+- The GitHub `claude-review` check is complete for the current head SHA, or it failed because of quota exhaustion, hard usage-limit enforcement, provider-reported capacity such as HTTP 503, or persistent HTTP 429 after one 60-second retry, and Cursor Bugbot or Codex review (`codex review --base origin/main`, or the PR's real base branch) completed as the fallback with the same blocker-triage bar and exact error evidence recorded in the PR body.
 - Any fallback review leaves a named reviewer identity in the GitHub review record or a timestamped PR comment. Before treating the fallback as complete, the merge actor confirms the reviewer is either a named GitHub check/app identity visible in the Checks API for the current head SHA or a collaborator with `write`, `maintain`, or `admin` permission.
 - Claude failures not caused by capacity limits are understood before merge.
 - CodeRabbit approval is not required, but concrete CodeRabbit findings still need normal blocker triage.

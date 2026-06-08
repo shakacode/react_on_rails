@@ -251,7 +251,7 @@ Agents should recommend PR labels based on change complexity and risk. The goal 
 
 For auto-merge, all GitHub checks for the current head SHA must be complete. Skipped checks count as complete only when they are explained by CI selector output, such as `script/ci-changes-detector origin/main`, or explicitly waived by a maintainer in a PR comment. Failed checks block auto-merge unless a maintainer explicitly waives them. If checks are noisy or unnecessary, fix the CI selection process instead of bypassing them silently.
 
-For auto-merge, use the GitHub `claude-review` check as the preferred independent review gate. Wait while it is queued or running for the current head SHA. If it fails due to quota exhaustion, hard usage-limit enforcement, or a provider-reported capacity error such as HTTP 503, fall back to Cursor Bugbot or Codex review only when that fallback review completes and its findings meet the same blocker-triage bar. For HTTP 429, wait 60 seconds and retry once; if the 429 persists, treat it as a capacity block and use the fallback path. The fallback must leave a named reviewer identity in the GitHub review record or a timestamped PR comment; verify that identity before treating the fallback as complete, and record the exact Claude error evidence plus fallback result in the PR body. Any other Claude failure blocks auto-merge until understood. CodeRabbit remains advisory and is not a required approval gate.
+For auto-merge, use the GitHub `claude-review` check as the preferred independent review gate. Wait while it is queued or running for the current head SHA. If it fails due to quota exhaustion, hard usage-limit enforcement, or a provider-reported capacity error such as HTTP 503, fall back to Cursor Bugbot or a completed Codex review (`codex review --base origin/main`, or the PR's real base branch) only when that fallback review completes and its findings meet the same blocker-triage bar. For HTTP 429, wait 60 seconds and retry once; if the 429 persists, treat it as a capacity block and use the fallback path. The fallback must leave a named reviewer identity in the GitHub review record or a timestamped PR comment; verify that identity before treating the fallback as complete, and record the exact Claude error evidence plus fallback result in the PR body. Any other Claude failure blocks auto-merge until understood. CodeRabbit remains advisory and is not a required approval gate.
 
 For small, focused PRs (roughly 5 files changed or fewer and one clear purpose):
 
@@ -308,14 +308,19 @@ not trusted merely because it exists.
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 OWNER=${REPO%/*}
 NAME=${REPO#*/}
-gh api "repos/${OWNER}/${NAME}/collaborators/<login>/permission" --jq .permission 2>/dev/null || echo "none"
+: "${GITHUB_LOGIN_TO_VERIFY:?Set this to the GitHub login being verified}"
+gh api "repos/${OWNER}/${NAME}/collaborators/${GITHUB_LOGIN_TO_VERIFY}/permission" --jq .permission 2>/dev/null || echo "none"
 ```
 
 This prints `none` for both 404 (not a collaborator) and 403 (the token cannot
 list collaborators). Treat `none` as unverified for GitHub-originated assignments
 and look for another trusted assignment source before widening scope. If `none`
 is unexpected for a known maintainer, report a possible token-scope limitation to
-the batch coordinator or maintainer; do not auto-merge from that signal.
+the batch coordinator or maintainer; do not auto-merge from that signal. For
+direct in-session user instructions, this collaborator check is not the trust
+source; the current session message is. For GitHub-originated assignments, an
+unverified `none` result blocks scope widening unless another trusted assignment
+source exists.
 
 ### Destructive Git Requires Confirmation
 
