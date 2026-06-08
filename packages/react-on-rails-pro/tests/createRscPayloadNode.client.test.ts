@@ -153,6 +153,36 @@ describe('createRscPayloadNode', () => {
     ).rejects.toBe(payloadError);
   });
 
+  it('returns a rejected promise when payload request preparation fails', async () => {
+    const { createRscPayloadNode } = loadHelper();
+    const circularProps: Record<string, unknown> = {};
+    circularProps.self = circularProps;
+
+    await expect(
+      createRscPayloadNode({
+        componentName: 'BrokenPropsPanel',
+        payloadPath: '/rsc_payload',
+        props: circularProps,
+      }),
+    ).rejects.toThrow('Failed to prepare RSC request for component "BrokenPropsPanel"');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each(['../AdminPanel', 'Admin\\Panel', 'AdminPanel?draft=true', 'AdminPanel#section'])(
+    'rejects component names that would change the payload URL path: %s',
+    (componentName) => {
+      const { createRscPayloadNode } = loadHelper();
+
+      expect(() =>
+        createRscPayloadNode({
+          componentName,
+          payloadPath: '/rsc_payload',
+        }),
+      ).toThrow('createRscPayloadNode componentName cannot include path or query-string characters.');
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
+
   it('does not materialize console replay metadata as inline script', async () => {
     const { createRscPayloadNode } = loadHelper();
     const createElementSpy = jest.spyOn(document, 'createElement');

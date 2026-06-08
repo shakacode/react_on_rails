@@ -50,7 +50,7 @@ createRscPayloadNode(options): Promise<React.ReactNode>
 
 | Option          | Required | Description                                                                                                                                                      |
 | --------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `componentName` | Yes      | Registered Server Component name served by the Pro RSC payload route.                                                                                            |
+| `componentName` | Yes      | Registered Server Component name served by the Pro RSC payload route. Because it is appended to the request path, it must not include `/`, `\`, `?`, or `#`.     |
 | `payloadPath`   | Yes      | Rails path configured with `rsc_payload_route`, for example `/rsc_payload`. The helper appends `/<componentName>?props=<json>` using the same Pro payload route. |
 | `props`         | No       | Props serialized into the `props` query parameter. Defaults to `{}`.                                                                                             |
 | `headers`       | No       | Additional request headers. Keep these application-specific, for example tracing headers or a conventional `X-Requested-With` header.                            |

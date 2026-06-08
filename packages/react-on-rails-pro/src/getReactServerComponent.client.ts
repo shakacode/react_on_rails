@@ -140,6 +140,8 @@ const createFromFetch = async (
   });
 };
 
+// Duck type instead of `instanceof DOMException`: cross-realm AbortErrors
+// have the correct name but fail instanceof checks across realm boundaries.
 const isAbortError = (error: unknown): boolean =>
   typeof error === 'object' &&
   error !== null &&

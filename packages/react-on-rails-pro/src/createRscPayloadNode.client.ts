@@ -50,8 +50,12 @@ export type CreateRscPayloadNodeOptions = {
   signal?: AbortSignal;
 };
 
+const INVALID_COMPONENT_NAME_PATH_CHARS = /[/\\?#]/;
+
 const rejectErrorPayload = (promise: Promise<ReactNode>): Promise<ReactNode> =>
   promise.then((payload) => {
+    // React's RSC parser can resolve serialized server failures as Error instances.
+    // Treat those as route-loader failures while preserving all other ReactNode values.
     if (payload instanceof Error) {
       throw payload;
     }
@@ -74,6 +78,10 @@ export const createRscPayloadNode = ({
   if (typeof componentName !== 'string' || !componentName.trim()) {
     throw new Error('createRscPayloadNode requires a componentName.');
   }
+  const normalizedComponentName = componentName.trim();
+  if (INVALID_COMPONENT_NAME_PATH_CHARS.test(normalizedComponentName)) {
+    throw new Error('createRscPayloadNode componentName cannot include path or query-string characters.');
+  }
   if (typeof payloadPath !== 'string' || !payloadPath.trim()) {
     throw new Error('createRscPayloadNode requires a payloadPath.');
   }
@@ -82,15 +90,20 @@ export const createRscPayloadNode = ({
   if (headers) fetchOptions.headers = headers;
   if (signal) fetchOptions.signal = signal;
 
-  return rejectErrorPayload(
-    fetchRSC({
-      componentName,
+  let fetchPromise: Promise<ReactNode>;
+  try {
+    fetchPromise = fetchRSC({
+      componentName: normalizedComponentName,
       componentProps: props,
       fetchOptions,
       rscPayloadGenerationUrlPath: payloadPath,
       // Route-data payloads must be safe under strict CSP; renderer console replay
       // metadata is intentionally ignored instead of materialized as inline script.
       replayConsoleScripts: false,
-    }),
-  );
+    });
+  } catch (error) {
+    fetchPromise = Promise.reject(error instanceof Error ? error : new Error(String(error)));
+  }
+
+  return rejectErrorPayload(fetchPromise);
 };
