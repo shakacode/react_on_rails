@@ -77,6 +77,8 @@ describe RscGenerator, type: :generator do
         expect(content).to include("const reactPackageRoot = dirname(require.resolve('react/package.json'))")
         expect(content).to include("delete rscAliases.react")
         expect(content).to include("delete rscAliases['react$']")
+        expect(content).to include("delete rscAliases['react/jsx-runtime$']")
+        expect(content).to include("delete rscAliases['react-dom/server$']")
         expect(content).to include("react$: resolve(reactPackageRoot, 'react.react-server.js')")
         expect(content).to include("'react/jsx-runtime': resolve(reactPackageRoot, 'jsx-runtime.react-server.js')")
         expect(content).to include(
