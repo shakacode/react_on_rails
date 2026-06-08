@@ -59,12 +59,24 @@ const parseArgs = () => {
   return options;
 };
 
-const readRequestBody = async (stream) => {
+const readRequestBody = async (stream, maxBytes) => {
   let bytes = 0;
+  const chunks = [];
+  let exceededLimit = false;
   for await (const chunk of stream) {
     bytes += chunk.length;
+    if (bytes > maxBytes) {
+      exceededLimit = true;
+    } else {
+      chunks.push(chunk);
+    }
   }
-  return bytes;
+  if (exceededLimit) {
+    const error = new Error(`request body exceeded --body-bytes limit (${maxBytes})`);
+    error.statusCode = 413;
+    throw error;
+  }
+  return Buffer.concat(chunks, bytes);
 };
 
 const streamChunks = (bytesTotal) => {
@@ -86,7 +98,7 @@ const writeJson = (stream, status, payload) => {
   stream.end(body);
 };
 
-const handleNativeStream = (stream, headers, streamBytes) => {
+const handleNativeStream = (stream, headers, { bodyBytes, streamBytes }) => {
   const path = headers[':path'];
   const method = headers[':method'];
 
@@ -101,32 +113,29 @@ const handleNativeStream = (stream, headers, streamBytes) => {
   }
 
   if (path === '/probe/unary') {
-    readRequestBody(stream)
-      .then((bytes) => writeJson(stream, 200, { ok: true, receivedBytes: bytes }))
-      .catch((error) => writeJson(stream, 500, { ok: false, error: error.message }));
+    readRequestBody(stream, bodyBytes)
+      .then((body) => writeJson(stream, 200, { ok: true, receivedBytes: body.length }))
+      .catch((error) => writeJson(stream, error.statusCode || 500, { ok: false, error: error.message }));
     return;
   }
 
   if (path === '/probe/stream') {
-    readRequestBody(stream)
+    readRequestBody(stream, bodyBytes)
       .then(() => {
         stream.respond({ ':status': 200, 'content-type': 'application/octet-stream' });
         streamChunks(streamBytes).pipe(stream);
       })
-      .catch((error) => writeJson(stream, 500, { ok: false, error: error.message }));
+      .catch((error) => writeJson(stream, error.statusCode || 500, { ok: false, error: error.message }));
     return;
   }
 
   writeJson(stream, 404, { ok: false, error: 'not found' });
 };
 
-const removeStaleSocket = async (socketPath) => {
+const assertSocketPathAvailable = async (socketPath) => {
   try {
-    const stat = await fs.lstat(socketPath);
-    if (!stat.isSocket()) {
-      throw new Error(`socket path exists and is not a socket: ${socketPath}`);
-    }
-    await fs.rm(socketPath, { force: true });
+    await fs.lstat(socketPath);
+    throw new Error(`socket path already exists: ${socketPath}`);
   } catch (error) {
     if (error.code === 'ENOENT') {
       return;
@@ -135,13 +144,13 @@ const removeStaleSocket = async (socketPath) => {
   }
 };
 
-const listenNative = async ({ host, port, socketPath, streamBytes }) => {
+const listenNative = async ({ bodyBytes, host, port, socketPath, streamBytes }) => {
   if (socketPath) {
-    await removeStaleSocket(socketPath);
+    await assertSocketPathAvailable(socketPath);
   }
 
   const server = http2.createServer();
-  server.on('stream', (stream, headers) => handleNativeStream(stream, headers, streamBytes));
+  server.on('stream', (stream, headers) => handleNativeStream(stream, headers, { bodyBytes, streamBytes }));
 
   await new Promise((resolve, reject) => {
     server.once('error', reject);
@@ -173,9 +182,18 @@ const listenFastify = async ({ bodyBytes, host, port, streamBytes }) => {
 };
 
 const closeServer = async (server) => {
-  if (typeof server.close === 'function') {
-    await server.close();
+  if (typeof server.close !== 'function') {
+    return;
   }
+
+  if (typeof server.address === 'function') {
+    await new Promise((resolve, reject) => {
+      server.close((error) => (error ? reject(error) : resolve()));
+    });
+    return;
+  }
+
+  await server.close();
 };
 
 const main = async () => {
@@ -196,7 +214,7 @@ const main = async () => {
   }
 
   if (scenarios.includes('native_tcp')) {
-    const nativeTcpServer = await listenNative({ host, port: 0, streamBytes });
+    const nativeTcpServer = await listenNative({ bodyBytes, host, port: 0, streamBytes });
     servers.push(nativeTcpServer);
     endpoints.push({
       name: 'native_tcp',
@@ -206,7 +224,7 @@ const main = async () => {
   }
 
   if (scenarios.includes('native_uds')) {
-    const nativeUdsServer = await listenNative({ socketPath, streamBytes });
+    const nativeUdsServer = await listenNative({ bodyBytes, socketPath, streamBytes });
     nativeUdsSocketCreated = true;
     servers.push(nativeUdsServer);
     endpoints.push({

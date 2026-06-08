@@ -141,11 +141,31 @@ RSpec.describe RendererHarness::TransportProbe do
   end
 
   describe "transport_probe_server.mjs" do
+    def post_native_probe(origin, body)
+      endpoint = Async::HTTP::Endpoint.parse(origin, protocol: Async::HTTP::Protocol::HTTP2)
+      response = nil
+      Sync do
+        Async::HTTP::Client.open(endpoint, protocol: Async::HTTP::Protocol::HTTP2, retries: 0) do |client|
+          response = client.post(
+            "/probe/unary",
+            headers: Protocol::HTTP::Headers[[["content-type", "application/octet-stream"]]],
+            body:
+          )
+          response_body = +""
+          response.body&.each { |chunk| response_body << chunk }
+          [response.status, JSON.parse(response_body)]
+        ensure
+          response&.body&.close
+        end
+      end
+    end
+
     it "does not remove the custom socket path when native_uds is not running" do
       Dir.mktmpdir do |dir|
         socket_path = File.join(dir, "custom.sock")
         File.write(socket_path, "keep me")
         server_script = RendererHarness::TransportProbe::Config.send(:default_server_script)
+        stdin = stdout = stderr = wait_thread = nil
         stdin, stdout, stderr, wait_thread = Open3.popen3(
           "node",
           server_script,
@@ -170,11 +190,47 @@ RSpec.describe RendererHarness::TransportProbe do
       end
     end
 
+    it "applies the body byte limit to native_tcp request bodies" do
+      Dir.mktmpdir do |dir|
+        server_script = RendererHarness::TransportProbe::Config.send(:default_server_script)
+        stdin = stdout = stderr = wait_thread = nil
+        stdin, stdout, stderr, wait_thread = Open3.popen3(
+          "node",
+          server_script,
+          "--scenarios",
+          "native_tcp",
+          "--socket-path",
+          File.join(dir, "unused.sock"),
+          "--body-bytes",
+          "4"
+        )
+
+        ready = Timeout.timeout(5) { JSON.parse(stdout.gets) }
+        native_endpoint = ready.fetch("endpoints").find { |endpoint| endpoint.fetch("name") == "native_tcp" }
+
+        status, payload = post_native_probe(native_endpoint.fetch("origin"), "12345")
+
+        expect(status).to eq(413)
+        expect(payload).to include(
+          "ok" => false,
+          "error" => include("request body exceeded --body-bytes limit (4)")
+        )
+      ensure
+        stdin&.close unless stdin&.closed?
+        stdout&.close unless stdout&.closed?
+        stderr&.close unless stderr&.closed?
+        Process.kill("TERM", wait_thread.pid) if wait_thread&.alive?
+        wait_thread&.join(5)
+        Process.kill("KILL", wait_thread.pid) if wait_thread&.alive?
+      end
+    end
+
     it "fails without removing a regular file used as the native_uds socket path" do
       Dir.mktmpdir do |dir|
         socket_path = File.join(dir, "custom.sock")
         File.write(socket_path, "keep me")
         server_script = RendererHarness::TransportProbe::Config.send(:default_server_script)
+        stdin = stdout = stderr = wait_thread = nil
         stdin, stdout, stderr, wait_thread = Open3.popen3(
           "node",
           server_script,
@@ -188,7 +244,7 @@ RSpec.describe RendererHarness::TransportProbe do
         status = Timeout.timeout(5) { wait_thread.value }
 
         expect(status).not_to be_success
-        expect(stderr.read).to include("socket path exists and is not a socket")
+        expect(stderr.read).to include("socket path already exists")
         expect(File.read(socket_path)).to eq("keep me")
       ensure
         stdin&.close unless stdin&.closed?

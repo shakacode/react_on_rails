@@ -155,7 +155,7 @@ module RendererHarness
       private
 
       def uds_requested_without_support?
-        @config.scenarios.include?("native_uds") && !IO::Endpoint.respond_to?(:unix)
+        @config.scenarios.include?("native_uds") && !(defined?(IO::Endpoint) && IO::Endpoint.respond_to?(:unix))
       end
 
       def selected_endpoints
@@ -173,7 +173,11 @@ module RendererHarness
         failures = 0
         elapsed = with_client(endpoint) do |client|
           body = "x" * @config.body_bytes
-          @config.warmup.times { perform_request(client, path, body) }
+          @config.warmup.times do
+            perform_request(client, path, body)
+          rescue StandardError => e
+            raise UserError, "warmup request failed for #{endpoint.fetch('name')} #{path}: #{e.message}"
+          end
 
           start = monotonic
           @config.requests.times do
