@@ -31,7 +31,15 @@ import { createRSCPayloadKey } from './utils.ts';
 type RSCContextType = {
   getComponent: (componentName: string, componentProps: unknown) => Promise<ReactNode>;
 
-  refetchComponent: (componentName: string, componentProps: unknown) => Promise<ReactNode>;
+  refetchComponent: (
+    componentName: string,
+    componentProps: unknown,
+    options?: { recoverOnError?: boolean },
+  ) => Promise<ReactNode>;
+
+  getRefetchVersion: (componentName: string, componentProps: unknown) => number;
+
+  getSuccessfulVersion: (componentName: string, componentProps: unknown) => number;
 };
 
 const RSCContext = createContext<RSCContextType | undefined>(undefined);
@@ -62,39 +70,123 @@ export const createRSCProvider = ({
 }) => {
   return ({ children }: { children: ReactNode }) => {
     const fetchRSCPromisesRef = useRef<Record<string, Promise<ReactNode>>>({});
+    const lastSuccessfulRSCPromisesRef = useRef<Record<string, Promise<ReactNode>>>({});
+    const refetchVersionsRef = useRef<Record<string, number>>({});
     // `versions` is a per-cache-key counter held in React state. Bumping it on
     // refetch (inside startTransition) is what makes <RSCRoute> consumers re-
     // render with the new promise from the cache while React keeps the old
     // tree visible until the new payload resolves.
     const [versions, setVersions] = useState<Record<string, number>>({});
+    const [successfulVersions, setSuccessfulVersions] = useState<Record<string, number>>({});
     const [, startTransition] = useTransition();
 
-    const getComponent = useCallback((componentName: string, componentProps: unknown) => {
+    const getRefetchVersion = useCallback((componentName: string, componentProps: unknown) => {
       const key = createRSCPayloadKey(componentName, componentProps);
-      if (key in fetchRSCPromisesRef.current) {
-        return fetchRSCPromisesRef.current[key];
-      }
-
-      const promise = getServerComponent({ componentName, componentProps });
-      fetchRSCPromisesRef.current[key] = promise;
-      return promise;
+      return refetchVersionsRef.current[key] ?? 0;
     }, []);
 
-    const refetchComponent = useCallback(
+    const getSuccessfulVersion = useCallback(
       (componentName: string, componentProps: unknown) => {
         const key = createRSCPayloadKey(componentName, componentProps);
-        const promise = getServerComponent({
-          componentName,
-          componentProps,
-          enforceRefetch: true,
+        return successfulVersions[key] ?? 0;
+      },
+      [successfulVersions],
+    );
+
+    const markSuccessfulPromise = useCallback(
+      (key: string, promise: Promise<ReactNode>) => {
+        if (fetchRSCPromisesRef.current[key] !== promise) {
+          return;
+        }
+
+        lastSuccessfulRSCPromisesRef.current[key] = promise;
+        startTransition(() => {
+          setSuccessfulVersions((v) => ({ ...v, [key]: (v[key] ?? 0) + 1 }));
         });
+      },
+      [startTransition],
+    );
+
+    const getComponent = useCallback(
+      (componentName: string, componentProps: unknown) => {
+        const key = createRSCPayloadKey(componentName, componentProps);
+        if (key in fetchRSCPromisesRef.current) {
+          return fetchRSCPromisesRef.current[key];
+        }
+
+        const promise = getServerComponent({ componentName, componentProps }).then((payload) => {
+          if (!(payload instanceof Error)) {
+            markSuccessfulPromise(key, promise);
+          }
+          return payload;
+        });
+        fetchRSCPromisesRef.current[key] = promise;
+        return promise;
+      },
+      [markSuccessfulPromise],
+    );
+
+    const refetchComponent = useCallback(
+      (
+        componentName: string,
+        componentProps: unknown,
+        { recoverOnError = false }: { recoverOnError?: boolean } = {},
+      ) => {
+        const key = createRSCPayloadKey(componentName, componentProps);
+        refetchVersionsRef.current[key] = (refetchVersionsRef.current[key] ?? 0) + 1;
+        let promise!: Promise<ReactNode>;
+        const restoreLastSuccessfulPromise = () => {
+          if (fetchRSCPromisesRef.current[key] !== promise) {
+            return;
+          }
+
+          const lastSuccessfulPromise = lastSuccessfulRSCPromisesRef.current[key];
+          if (lastSuccessfulPromise !== undefined) {
+            fetchRSCPromisesRef.current[key] = lastSuccessfulPromise;
+          } else {
+            fetchRSCPromisesRef.current = Object.fromEntries(
+              Object.entries(fetchRSCPromisesRef.current).filter(([cacheKey]) => cacheKey !== key),
+            );
+          }
+
+          startTransition(() => {
+            setVersions((v) => ({ ...v, [key]: (v[key] ?? 0) + 1 }));
+          });
+        };
+
+        promise = Promise.resolve()
+          .then(() =>
+            getServerComponent({
+              componentName,
+              componentProps,
+              enforceRefetch: true,
+            }),
+          )
+          .then(
+            (payload) => {
+              if (payload instanceof Error) {
+                if (recoverOnError) {
+                  restoreLastSuccessfulPromise();
+                }
+              } else {
+                markSuccessfulPromise(key, promise);
+              }
+              return payload;
+            },
+            (error: unknown) => {
+              if (recoverOnError) {
+                restoreLastSuccessfulPromise();
+              }
+              throw error;
+            },
+          );
         fetchRSCPromisesRef.current[key] = promise;
         startTransition(() => {
           setVersions((v) => ({ ...v, [key]: (v[key] ?? 0) + 1 }));
         });
         return promise;
       },
-      [startTransition],
+      [markSuccessfulPromise, startTransition],
     );
 
     // `versions` is intentionally listed in deps so the value identity changes
@@ -102,9 +194,9 @@ export const createRSCProvider = ({
     // refetch, even when its cache key is unaffected. Each extra render is a
     // cache hit, but use a per-key subscription if this becomes a bottleneck.
     const contextValue = useMemo(
-      () => ({ getComponent, refetchComponent }),
+      () => ({ getComponent, refetchComponent, getRefetchVersion, getSuccessfulVersion }),
       // eslint-disable-next-line react-hooks/exhaustive-deps
-      [getComponent, refetchComponent, versions],
+      [getComponent, refetchComponent, getRefetchVersion, getSuccessfulVersion, versions],
     );
 
     return <RSCContext.Provider value={contextValue}>{children}</RSCContext.Provider>;
