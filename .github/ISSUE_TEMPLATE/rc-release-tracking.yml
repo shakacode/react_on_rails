@@ -42,6 +42,7 @@ body:
       value: |
         Mode: strict-rc
         Auto-merge threshold: not enabled unless Mode is intentionally changed to accelerated-rc
+        Recent close guard: if this tracker is closed, use Released or Superseded in the closing signal when it should stop being authoritative
         Confidence finalized by: independent agent or maintainer
         Auto-merge checks: wait for all GitHub checks on the current head SHA
         Claude review: required unless quota/usage-limit/capacity fallback to Cursor or Codex review is recorded with exact error evidence
