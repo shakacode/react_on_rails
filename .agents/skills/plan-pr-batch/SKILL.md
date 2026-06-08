@@ -1,11 +1,19 @@
 ---
 name: plan-pr-batch
 description: Use when the user wants to choose GitHub issues or pull requests for a PR batch, prepare a subagent batch plan, or produce a ready goal prompt that invokes pr-batch.
+argument-hint: '[issue/PR numbers, labels, milestone, or search query]'
 ---
 
 # Plan PR Batch
 
 Create a verified scope and a goal prompt for a later `$pr-batch` run. Do not implement items while using this skill.
+
+Memorable invocation:
+
+```text
+$plan-pr-batch
+Plan a PR batch
+```
 
 ## Workflow
 
@@ -31,7 +39,7 @@ Create a verified scope and a goal prompt for a later `$pr-batch` run. Do not im
    - Return a concise "Batch Plan" and a fenced "Goal Prompt for pr-batch".
    - Keep the fenced goal prompt under 4000 characters total.
    - If the batch will not fit, split it into smaller goals and output only the first ready goal.
-   - Do not start `$pr-batch` unless the user explicitly asks to run it.
+   - Do not start `$pr-batch` unless the user explicitly asks to run it; when they do, hand them the fenced goal prompt.
 
 ## Batch Plan Format
 
@@ -45,13 +53,12 @@ Create a verified scope and a goal prompt for a later `$pr-batch` run. Do not im
 - Verification expectations:
 - Open questions:
 
-## Goal Prompt For pr-batch
+## Goal Prompt for pr-batch
 
 Use this template and fill it with the verified items:
 
 ```text
 Use $pr-batch to complete this batch with subagents.
-Keep this goal under 4000 characters total.
 
 Repository: OWNER/REPO
 Batch objective: ...

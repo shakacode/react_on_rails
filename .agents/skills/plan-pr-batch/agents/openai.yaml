@@ -1,3 +1,4 @@
+# Codex UI metadata for skill picker display text and default prompt.
 interface:
   display_name: "Plan PR Batch"
   short_description: "Prepare scoped PR batch goals"
