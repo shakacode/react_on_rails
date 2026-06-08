@@ -72,7 +72,7 @@ export const createRSCProvider = ({
     const fetchRSCPromisesRef = useRef<Record<string, Promise<ReactNode>>>({});
     // TODO(#3564): these provider-lifetime caches grow with each unique
     // componentName+props key. Add LRU/TTL eviction when high-cardinality route
-    // props become common enough for the retained ReactNode promises to matter.
+    // props make retained ReactNode promises or refetch-version counters matter.
     const lastSuccessfulRSCPromisesRef = useRef<Record<string, Promise<ReactNode>>>({});
     const refetchVersionsRef = useRef<Record<string, number>>({});
     // `versions` is a per-cache-key counter held in React state. Bumping it on
@@ -152,6 +152,8 @@ export const createRSCProvider = ({
           if (lastSuccessfulPromise) {
             fetchRSCPromisesRef.current[key] = lastSuccessfulPromise;
           } else {
+            // No prior success to restore; drop the key so the next getComponent
+            // call retries the initial fetch path from scratch.
             // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
             delete fetchRSCPromisesRef.current[key];
           }
@@ -205,7 +207,7 @@ export const createRSCProvider = ({
     const contextValue = useMemo(
       () => ({ getComponent, refetchComponent, getRefetchVersion, getSuccessfulVersion }),
       // eslint-disable-next-line react-hooks/exhaustive-deps
-      [getComponent, refetchComponent, getRefetchVersion, getSuccessfulVersion, versions],
+      [getComponent, refetchComponent, getRefetchVersion, getSuccessfulVersion, versions, successfulVersions],
     );
 
     return <RSCContext.Provider value={contextValue}>{children}</RSCContext.Provider>;

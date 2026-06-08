@@ -61,6 +61,8 @@ class CapturingErrorBoundary extends React.Component<
 (getNodeVersion() >= 18 ? describe : describe.skip)('imperative refetch API', () => {
   let getServerComponent: jest.Mock<Promise<React.ReactNode>, [GetServerComponentArgs]>;
   let RSCProvider: React.FC<{ children: React.ReactNode }>;
+  // NODE_ENV is process-global; keep these mutations local to this serial test file
+  // and restore after each case so production/development branches do not leak.
   const originalNodeEnv = process.env.NODE_ENV;
 
   const TestHarness: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -327,7 +329,7 @@ class CapturingErrorBoundary extends React.Component<
     expect(ref.current!.refetchError?.serverComponentName).toBe('UserCard');
     expect(ref.current!.refetchError?.serverComponentProps).toEqual({ id: 1 });
     expect(ref.current!.refetchError?.originalError).toBe(refetchError);
-    expect(onRefetchError).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onRefetchError).toHaveBeenCalledTimes(1));
     expect(onRefetchError.mock.calls[0][0]).toBe(ref.current!.refetchError);
     expect(callbackRefetchError).toBe(ref.current!.refetchError);
 
@@ -384,7 +386,7 @@ class CapturingErrorBoundary extends React.Component<
     expect(screen.getByTestId('card')).toHaveTextContent('Card v1');
     expect(screen.queryByTestId('route-error')).not.toBeInTheDocument();
     expect(ref.current!.refetchError?.originalError).toBe(refetchError);
-    expect(onRefetchError).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onRefetchError).toHaveBeenCalledTimes(1));
   });
 
   it('1e. production ignores recoverable refetch errors from stale route props', async () => {
@@ -635,7 +637,7 @@ class CapturingErrorBoundary extends React.Component<
     await waitFor(() =>
       expect(leftRef.current!.refetchError?.message).toBe('recoverable sibling refetch failed'),
     );
-    expect(onLeftRefetchError).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onLeftRefetchError).toHaveBeenCalledTimes(1));
 
     await act(async () => {
       const successfulRefetch = rightRef.current!.refetch();
@@ -646,6 +648,42 @@ class CapturingErrorBoundary extends React.Component<
 
     await waitFor(() => expect(screen.getAllByText('Shared v2')).toHaveLength(2));
     expect(leftRef.current!.refetchError).toBeNull();
+  });
+
+  it('1j. production clearRefetchError() dismisses error without fetching', async () => {
+    process.env.NODE_ENV = 'production';
+    setupSequencedFetcher([
+      <div data-testid="card">
+        Card v1
+        <RecoverableInlineControls />
+      </div>,
+      rejectWith(new Error('refetch failed')),
+    ]);
+    const ref = React.createRef<RSCRouteHandle>();
+
+    await renderInAct(
+      <TestHarness>
+        <RSCRoute ref={ref} componentName="UserCard" componentProps={{ id: 1 }} />
+      </TestHarness>,
+    );
+
+    expect(screen.getByTestId('card')).toHaveTextContent('Card v1');
+
+    await act(async () => {
+      await expect(ref.current!.refetch()).rejects.toThrow('refetch failed');
+    });
+    await waitFor(() => expect(ref.current!.refetchError?.message).toBe('refetch failed'));
+    expect(screen.getByTestId('recoverable-error')).toHaveTextContent('refetch failed');
+
+    const callCountBeforeClear = getServerComponent.mock.calls.length;
+    await act(async () => {
+      ref.current!.clearRefetchError();
+    });
+
+    await waitFor(() => expect(ref.current!.refetchError).toBeNull());
+    expect(screen.queryByTestId('recoverable-error')).not.toBeInTheDocument();
+    expect(screen.getByTestId('card')).toHaveTextContent('Card v1');
+    expect(getServerComponent).toHaveBeenCalledTimes(callCountBeforeClear);
   });
 
   it('2. captured refetch reflects latest props after a re-render', async () => {

@@ -24,6 +24,7 @@ import {
   use,
   useCallback,
   useContext,
+  useEffect,
   useImperativeHandle,
   useLayoutEffect,
   useMemo,
@@ -73,11 +74,11 @@ class RSCRouteErrorBoundary extends Component<
  *
  * In production, client-control refetch failures are recoverable: the last
  * successful route content stays visible, `refetchError` is set, and `retry()`
- * re-fetches the route's current component name and props. If props changed
- * after the failure, `retry()` attempts the new request; call
- * `clearRefetchError()` to dismiss the old error without fetching. Outside
- * production, failures still throw through the route so development diagnostics
- * stay loud.
+ * aliases `refetch()` for error UI. Both methods re-fetch the route's current
+ * component name and props. If props changed after the failure, `retry()`
+ * attempts the new request; call `clearRefetchError()` to dismiss the old error
+ * without fetching. Outside production, failures still throw through the route
+ * so development diagnostics stay loud.
  *
  * Behavior caveats:
  * - **Concurrent refetches:** only the most-recent cache write wins; earlier
@@ -209,6 +210,8 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
       const refetchPromise = refetchComponent(n, p, {
         recoverOnError,
       });
+      // Capture this call's post-bump refetch version. Any later same-key refetch
+      // increments past it, so stale failures cannot pass the equality check.
       const sharedRefetchVersion = getRefetchVersion(n, p);
       return rejectErrorPayload(refetchPromise).then(
         (payload) => {
@@ -245,11 +248,12 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
     }, [currentRouteKey]);
 
     const handle = useMemo<RSCRouteHandle>(
+      // retry is the same implementation as refetch; the distinction is semantic for error UI.
       () => ({ refetch, retry: refetch, refetchError, clearRefetchError }),
       [clearRefetchError, refetch, refetchError],
     );
     useImperativeHandle(ref, () => handle, [handle]);
-    useLayoutEffect(() => {
+    useEffect(() => {
       if (refetchError) {
         onRefetchErrorRef.current?.(refetchError);
       }
