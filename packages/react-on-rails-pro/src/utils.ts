@@ -25,6 +25,25 @@ export const createRSCPayloadKey = (componentName: string, componentProps: unkno
   return `${componentName}-${JSON.stringify(componentProps)}${domNodeId ? `-${domNodeId}` : ''}`;
 };
 
+/* eslint-disable no-bitwise, no-plusplus */
+function djb2Hash(input: string): string {
+  let hash = 5381;
+  for (let i = 0; i < input.length; i++) {
+    hash = ((hash << 5) + hash + input.charCodeAt(i)) | 0;
+  }
+  return (hash >>> 0).toString(36);
+}
+/* eslint-enable no-bitwise, no-plusplus */
+
+export const createEmbeddedPayloadKey = (
+  componentName: string,
+  componentProps: unknown,
+  domNodeId?: string,
+) => {
+  const propsHash = djb2Hash(JSON.stringify(componentProps));
+  return domNodeId ? `${componentName}-${propsHash}-${domNodeId}` : `${componentName}-${propsHash}`;
+};
+
 /**
  * Wraps a promise from react-server-dom-webpack in a standard JavaScript Promise.
  *

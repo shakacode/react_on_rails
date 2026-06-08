@@ -15,7 +15,7 @@
 import * as React from 'react';
 import { createFromReadableStream } from 'react-on-rails-rsc/client.browser';
 import { RailsContext } from 'react-on-rails/types';
-import { createRSCPayloadKey, fetch, wrapInNewPromise, extractErrorMessage } from './utils.ts';
+import { createEmbeddedPayloadKey, fetch, wrapInNewPromise, extractErrorMessage } from './utils.ts';
 import sanitizeNonce from 'react-on-rails/@internal/sanitizeNonce';
 import LengthPrefixedStreamParser from './parseLengthPrefixedStream.ts';
 import {
@@ -302,7 +302,7 @@ const getReactServerComponent =
   (domNodeId: string, railsContext: RailsContext) =>
   ({ componentName, componentProps, enforceRefetch = false }: ClientGetReactServerComponentProps) => {
     if (!enforceRefetch && window.REACT_ON_RAILS_RSC_PAYLOADS) {
-      const rscPayloadKey = createRSCPayloadKey(componentName, componentProps, domNodeId);
+      const rscPayloadKey = createEmbeddedPayloadKey(componentName, componentProps, domNodeId);
       const payloads = window.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey];
       if (payloads) {
         return createFromPreloadedPayloads(
