@@ -51,12 +51,39 @@ export type CreateRscPayloadNodeOptions = {
 };
 
 const INVALID_COMPONENT_NAME_PATH_CHARS = /[/\\?#%]/;
+const INVALID_PAYLOAD_PATH_CHARS = /[\\?#%:]/;
+
+const isErrorLike = (payload: unknown): payload is Error =>
+  payload instanceof Error ||
+  (typeof payload === 'object' &&
+    payload !== null &&
+    typeof (payload as { message?: unknown }).message === 'string' &&
+    typeof (payload as { name?: unknown }).name === 'string');
+
+const normalizePayloadPath = (payloadPath: string): string => {
+  const trimmedPayloadPath = payloadPath.trim();
+  if (!trimmedPayloadPath) {
+    throw new Error('createRscPayloadNode requires a payloadPath.');
+  }
+  const pathSegments = trimmedPayloadPath.split('/').filter(Boolean);
+  if (
+    pathSegments.length === 0 ||
+    INVALID_PAYLOAD_PATH_CHARS.test(trimmedPayloadPath) ||
+    pathSegments.some((segment) => segment === '.' || segment === '..')
+  ) {
+    throw new Error(
+      'createRscPayloadNode payloadPath must be a Rails path without traversal, URL, query, hash, or encoded path characters.',
+    );
+  }
+
+  return `/${pathSegments.join('/')}`;
+};
 
 const rejectErrorPayload = (promise: Promise<ReactNode>): Promise<ReactNode> =>
   promise.then((payload) => {
     // React's RSC parser can resolve serialized server failures as Error instances.
     // Treat those as route-loader failures while preserving all other ReactNode values.
-    if (payload instanceof Error) {
+    if (isErrorLike(payload)) {
       throw payload;
     }
     return payload;
@@ -82,10 +109,10 @@ export const createRscPayloadNode = ({
   if (INVALID_COMPONENT_NAME_PATH_CHARS.test(normalizedComponentName)) {
     throw new Error('createRscPayloadNode componentName cannot include path or query-string characters.');
   }
-  if (typeof payloadPath !== 'string' || !payloadPath.trim()) {
+  if (typeof payloadPath !== 'string') {
     throw new Error('createRscPayloadNode requires a payloadPath.');
   }
-  const normalizedPayloadPath = payloadPath.trim();
+  const normalizedPayloadPath = normalizePayloadPath(payloadPath);
 
   const fetchOptions: Pick<RequestInit, 'credentials' | 'headers' | 'signal'> = { credentials };
   if (headers) fetchOptions.headers = headers;

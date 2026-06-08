@@ -176,6 +176,7 @@ const isAbortError = (error: unknown): boolean =>
  * @param replayConsoleScripts - Whether console replay metadata should be materialized as script tags
  * @returns A Promise resolving to the rendered React element
  * @throws Error if RSC payload generation URL path is not configured or network request fails
+ * @internal Shared implementation for Pro client helpers; prefer exported package entry points.
  */
 export const fetchRSC = ({
   componentName,

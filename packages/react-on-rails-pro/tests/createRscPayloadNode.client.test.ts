@@ -33,6 +33,14 @@ const responseFromText = (text: string) =>
     statusText: 'OK',
   }) as Response;
 
+const responseWithStatus = (text: string, status: number, statusText: string) =>
+  ({
+    body: streamFromText(text),
+    ok: status >= 200 && status < 300,
+    status,
+    statusText,
+  }) as Response;
+
 const readFlightStream = async (stream: ReadableStream<Uint8Array>) => {
   const reader = stream.getReader();
   const chunks: Uint8Array[] = [];
@@ -143,6 +151,10 @@ describe('createRscPayloadNode', () => {
         signal: abortController.signal,
       }),
     ).rejects.toBe(abortError);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/rsc_payload/DashboardPanel?${new URLSearchParams({ props: JSON.stringify({}) })}`,
+      { credentials: 'same-origin', signal: abortController.signal },
+    );
   });
 
   it('rejects serialized Error payloads for route error boundaries', async () => {
@@ -157,6 +169,35 @@ describe('createRscPayloadNode', () => {
         payloadPath: '/rsc_payload',
       }),
     ).rejects.toBe(payloadError);
+  });
+
+  it('rejects cross-realm-style Error payloads for route error boundaries', async () => {
+    const { createFromReadableStream, createRscPayloadNode } = loadHelper();
+    const payloadError = { name: 'Error', message: 'server component failed in another realm' } as Error;
+    fetchMock.mockResolvedValue(responseFromText(frame('serialized error payload')));
+    (createFromReadableStream as jest.Mock).mockResolvedValueOnce(payloadError);
+
+    await expect(
+      createRscPayloadNode({
+        componentName: 'BrokenPanel',
+        payloadPath: '/rsc_payload',
+      }),
+    ).rejects.toBe(payloadError);
+  });
+
+  it('rejects non-ok HTTP responses from payload routes', async () => {
+    const { createFromReadableStream, createRscPayloadNode } = loadHelper();
+    fetchMock.mockResolvedValue(responseWithStatus('<html>Not found</html>', 404, 'Not Found'));
+
+    await expect(
+      createRscPayloadNode({
+        componentName: 'MissingPanel',
+        payloadPath: '/rsc_payload',
+      }),
+    ).rejects.toThrow(
+      'Failed to fetch RSC payload for component "MissingPanel" from "/rsc_payload/MissingPanel?props=%7B%7D": RSC payload request for component "MissingPanel" from "/rsc_payload/MissingPanel" failed with HTTP 404 Not Found.',
+    );
+    expect(createFromReadableStream).not.toHaveBeenCalled();
   });
 
   it('returns a rejected promise when payload request preparation fails', async () => {
@@ -189,6 +230,27 @@ describe('createRscPayloadNode', () => {
         payloadPath: '/rsc_payload',
       }),
     ).toThrow('createRscPayloadNode componentName cannot include path or query-string characters.');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    '/rsc_payload/../admin',
+    '/rsc_payload/%2e%2e/admin',
+    '/rsc_payload?preview=true',
+    '/rsc_payload#fragment',
+    'https://example.test/rsc_payload',
+    'rsc\\payload',
+  ])('rejects payload paths that would escape the configured Rails path: %s', (payloadPath) => {
+    const { createRscPayloadNode } = loadHelper();
+
+    expect(() =>
+      createRscPayloadNode({
+        componentName: 'DashboardPanel',
+        payloadPath,
+      }),
+    ).toThrow(
+      'createRscPayloadNode payloadPath must be a Rails path without traversal, URL, query, hash, or encoded path characters.',
+    );
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
