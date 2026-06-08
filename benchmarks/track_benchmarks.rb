@@ -1,36 +1,18 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require "fileutils"
 require "json"
-require "open3"
-require "time"
 
 require_relative "lib/github"
 require_relative "lib/github_cli"
 require_relative "lib/regression_report"
+require_relative "lib/bencher_runner"
 require_relative "lib/bencher_report"
 require_relative "lib/benchmark_table"
+require_relative "lib/pr_report_poster"
 
-MAX_SAMPLE = "64"
-# Per-measure t-test boundaries (the confidence level Bencher uses for its
-# prediction interval). Tuned from a sweep of recent main-branch reports so fewer
-# than 1/20 commits raise a false regression across all benchmarks: rps and p50
-# individually need ~0.9995 / ~0.9999 to clear that bar. failed_pct stays at 0.95
-# because healthy runs sit at ~0 with near-zero variance, so its boundary rarely
-# matters.
-# Bencher's t-test threshold is a prediction interval, so each one-sided boundary B
-# gives a per-test false-positive rate of ~(1 - B):
-# https://bencher.dev/docs/explanation/thresholds/
-# Direction: :lower for "regression = drop" measures (rps), :upper for
-# "regression = climb" measures (latency, failure rate).
-# p90/p99/max are intentionally NOT tracked: their tail noise can't meet the 1/20
-# target at any usable boundary. p90 stays in the summary table for visibility only.
-THRESHOLDS = [
-  ["rps", :lower, "0.9995"],
-  ["p50_latency", :upper, "0.9999"],
-  ["failed_pct", :upper, "0.95"]
-].freeze
+MAX_SAMPLE = BencherRunner::MAX_SAMPLE
+THRESHOLDS = BencherRunner::THRESHOLDS
 
 def env!(key)
   ENV.fetch(key) do
@@ -92,68 +74,15 @@ def branch_and_start_point_args
 end
 
 def threshold_args(measure, direction, boundary)
-  # "_" is Bencher's sentinel for "no boundary on this side".
-  lower, upper = direction == :lower ? [boundary, "_"] : ["_", boundary]
-  [
-    "--threshold-measure", measure,
-    "--threshold-test", "t_test",
-    "--threshold-max-sample-size", MAX_SAMPLE,
-    "--threshold-lower-boundary", lower,
-    "--threshold-upper-boundary", upper
-  ]
+  bencher_runner.threshold_args(measure, direction, boundary)
 end
 
 def bencher_args(branch, start_point_args)
-  [
-    "bencher", "run",
-    "--project", "react-on-rails-t8a9ncxo",
-    "--branch", branch,
-    *start_point_args,
-    "--testbed", "github-actions",
-    "--adapter", "json",
-    "--file", BENCHMARK_JSON,
-    "--err",
-    "--quiet",
-    "--format", "json",
-    *THRESHOLDS.flat_map { |measure, direction, boundary| threshold_args(measure, direction, boundary) }
-  ]
+  bencher_runner.args(branch, start_point_args)
 end
 
 def run_bencher(branch, start_point_args)
-  stdout, stderr, status = Open3.capture3(*bencher_args(branch, start_point_args))
-  warn stderr unless stderr.empty?
-  # Bencher prints the JSON report to stdout, including on a non-zero "alert" exit
-  # (a real regression, which we still want to publish). An empty stdout means an
-  # operational failure with no report, so clear any stale file rather than
-  # persisting/posting garbage or leaving a previous attempt's report behind.
-  if stdout.empty?
-    FileUtils.rm_f(REPORT_JSON)
-    report = nil
-  else
-    File.write(REPORT_JSON, stdout)
-    # Parse defensively: an unexpected shape raises BencherReport::FormatError. Fail
-    # the job loudly, but with a targeted ::error:: annotation instead of a raw Ruby
-    # backtrace so the failure is triageable in CI logs. This covers both the initial
-    # run and the start-point-hash retry, since both go through run_bencher.
-    begin
-      report = BencherReport.parse(stdout)
-    rescue BencherReport::FormatError => e
-      warn "::error::Bencher JSON report has an unexpected shape — re-verify against " \
-           "benchmarks/spec/bencher_report_spec.rb before bumping the CLI pin. #{e.message}"
-      exit 1
-    end
-    # Cosmetic-but-diagnostic: if the report lists benchmarks but no shared perf-link
-    # context, EVERY name renders unlinked (likely a report-shape drift). Surface it as a
-    # ::warning:: — not a failure — so it is noticed without breaking the job over a link.
-    if report.perf_links_unavailable?
-      Github.warning(
-        "Bencher report listed benchmarks but no perf-link context " \
-        "(project/branch/testbed uuid); benchmark names will render unlinked. Re-verify the " \
-        "report shape against benchmarks/spec/bencher_perf_url_spec.rb before bumping the CLI pin."
-      )
-    end
-  end
-  [stderr, status.exitstatus, report]
+  bencher_runner.run(branch, start_point_args)
 end
 
 def append_step_summary(markdown)
@@ -167,63 +96,26 @@ def post_report_to_summary(markdown)
   append_step_summary(markdown)
 end
 
-def stale_comment_ids(before:)
-  # Marker + cutoff are passed via env so the jq filter reads them through `env.X`,
-  # avoiding the Ruby-#dump vs jq-string-escape mismatch that interpolated strings invite.
-  # The cutoff makes the GC skip comments the current run just posted (same marker).
-  stdout, status = GithubCli.capture(
-    "gh", "api", "repos/#{ENV.fetch('GITHUB_REPOSITORY')}/issues/#{ENV.fetch('PR_NUMBER')}/comments",
-    "--paginate",
-    "--jq", ".[] | select(.body | startswith(env.MARKER)) | select(.created_at < env.CUTOFF_TS) | .id",
-    env: { "MARKER" => REPORT_MARKER, "CUTOFF_TS" => before },
-    error_message: "Failed to list stale #{SUITE_NAME} Bencher report comments"
-  )
-  return [] unless status.success?
+def bencher_runner
+  @bencher_runner ||= BencherRunner.new(benchmark_json: BENCHMARK_JSON, report_json: REPORT_JSON)
+end
 
-  stdout.lines.map(&:strip).reject(&:empty?)
+def stale_comment_ids(before:)
+  pr_report_poster.stale_comment_ids(before:)
 end
 
 def delete_stale_report_comments(before:)
-  failed = 0
-  stale_comment_ids(before:).each do |comment_id|
-    puts "Deleting stale #{SUITE_NAME} Bencher report comment #{comment_id}"
-    next if GithubCli.run(
-      "gh", "api", "-X", "DELETE", "repos/#{ENV.fetch('GITHUB_REPOSITORY')}/issues/comments/#{comment_id}",
-      error_message: "Failed to delete stale #{SUITE_NAME} Bencher report comment #{comment_id}"
-    )
-
-    failed += 1
-  end
-  return if failed.zero?
-
-  Github.warning(
-    "Failed to delete #{failed} stale #{SUITE_NAME} Bencher report comment(s); " \
-    "they may remain visible."
-  )
+  pr_report_poster.delete_stale_comments(before:)
 end
 
 def replace_pr_comments(markdown)
   return unless ENV.fetch("GITHUB_EVENT_NAME") == "pull_request"
-  return if markdown.empty?
 
-  body = "#{REPORT_MARKER}\n#{markdown}"
-  # Capture cutoff before posting so the GC sweeps only pre-existing comments and
-  # leaves the one this run just posted intact. If the post fails the GC is skipped
-  # entirely and the prior run's comment stays visible.
-  cutoff_ts = Time.now.utc.iso8601
-  # Send the body over stdin (--body-file -) rather than as a CLI argument so a
-  # large report can't hit the OS argument-length limit.
-  posted = GithubCli.run(
-    "gh", "pr", "comment", ENV.fetch("PR_NUMBER"), "--body-file", "-",
-    error_message: "Failed to post #{SUITE_NAME} benchmark report comment",
-    stdin_data: body
-  )
+  pr_report_poster.replace(markdown)
+end
 
-  if posted
-    delete_stale_report_comments(before: cutoff_ts)
-  else
-    Github.warning("Failed to post #{SUITE_NAME} benchmark report comment; keeping prior comments in place.")
-  end
+def pr_report_poster
+  PrReportPoster.from_env(suite_name: SUITE_NAME, marker: REPORT_MARKER)
 end
 
 # The display rows written by the bench scripts (BmfCollector#write_display_json).
