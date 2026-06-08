@@ -38,7 +38,11 @@ body:
     id: agent-release-mode
     attributes:
       label: Agent Release Mode
-      description: Live coordination block for Codex/Claude agents. Keep exactly one active tracker per final release target. Canonical interpretation rules are in AGENTS.md -> Release Mode And Auto-Merge Coordination. If this block is incomplete, agents should use strict-rc and report the missing block.
+      description: |
+        Live coordination block for Codex/Claude agents. Keep exactly one active tracker per final release target.
+        Canonical interpretation rules are in AGENTS.md -> Release Mode And Auto-Merge Coordination.
+        If this block is incomplete, agents should use strict-rc and report the missing block.
+        Tracker update rule: agents should prefer append-only comments for concurrent per-PR updates. Re-read this issue immediately before editing the body; if the body changed and the update cannot be merged safely, post the intended update as a Tracker Update comment instead.
       value: |
         Mode: strict-rc
         Allowed modes: development, accelerated-rc, strict-rc, final-release
@@ -49,8 +53,6 @@ body:
         Claude review: required unless quota/usage-limit/capacity fallback to Cursor or Codex review is recorded with exact error evidence
         Affected areas choose validation and do not cap confidence by themselves: SSR, RSC, hydration, package release, generators, CI, benchmarks, Pro/core boundary
         Final release audit before publishing: required
-
-        Tracker update rule: agents should prefer append-only comments for concurrent per-PR updates. Re-read this issue immediately before editing the body; if the body changed and the update cannot be merged safely, post the intended update as a Tracker Update comment instead.
     validations:
       required: true
 
