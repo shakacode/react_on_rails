@@ -233,10 +233,10 @@ The server starts streaming immediately, it doesn't wait for SlowData to finish:
 0:["$","div",null,{"children":[["$","h1",null,{"children":"Fast Header"}],["$","$Sreact.suspense",null,{"fallback":["$","p",null,{"children":"Loading..."}],"children":"$L1"}]]}]
 ```
 
-At this point chunk 1 is not resolved yet. The client render the div and h1 immediately and show the Suspense fallback. When the fetch finish, the server send:
+At this point chunk 1 is not resolved yet. The client renders the div and h1 immediately and shows the Suspense fallback. When Rails emits the async prop, the server sends:
 
 ```rsc
-1:["$","p",null,{"children":"fetched data here"}]
+1:["$","p",null,{"children":"slow data from Rails"}]
 ```
 
 Now chunk 1 is resolved and the `$L1` lazy reference is complete. React replace the fallback with the actual content. This is how streaming works, you don't need the whole tree to be ready before sending the first byte to the client.

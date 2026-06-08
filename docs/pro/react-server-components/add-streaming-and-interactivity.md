@@ -2,17 +2,11 @@
 
 Before reading this document, please read the [Create React Server Component without SSR](./create-without-ssr.md) document.
 
-## Make the React Server Component Page Progressively Load
+## Add a Posts Component
 
-React Server Components support progressive loading, which means they can be built as asynchronous functions that resolve and render after the initial HTML is sent to the client. This enables a better user experience by:
+Let's create a `Posts` React Server Component. It receives its `posts` from Rails as a prop and renders synchronously — the component doesn't fetch its own data (see the [React on Rails note](#where-the-data-comes-from) below).
 
-1. Showing initial content quickly while async data loads;
-2. Maintaining interactivity while loading;
-3. Streaming updates to the page as server components resolve.
-
-This progressive enhancement approach lets React Server Components render and stream their output to the client without blocking the initial page load.
-
-Let's create a React Server Component that will be progressively loaded. It receives its `posts` from Rails as a prop — the component doesn't fetch its own data (see the [React on Rails note](#where-the-data-comes-from) below).
+For **progressive loading** — where slow data streams in while the rest of the page is already interactive — you need [async props](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently), which require SSR. That pattern is covered in [Server-Side Rendering](./server-side-rendering.md) and [Selective Hydration](./selective-hydration-in-streamed-components.md).
 
 ```js
 // app/javascript/components/Posts.jsx
@@ -101,7 +95,7 @@ http://localhost:3000/react_server_component_without_ssr
 
 When you open the page, you'll see both the React Server Component and the Posts component render with the data passed from Rails.
 
-## How The Streaming Works
+## How the Page Loads
 
 The page loads through the `rsc_payload/ReactServerComponentPage` fetch request that React on Rails Pro initiates. In this synchronous example, all data is available immediately so the entire page renders at once.
 
