@@ -4,10 +4,11 @@ const MIXED_ROUTE_PATH = '/server_router/mixed-ssr-and-deferred-server-component
 const UNWRAPPED_ROUTE_PATH = '/unwrapped_rsc_route_client_render';
 const UNWRAPPED_STREAM_ROUTE_PATH = '/unwrapped_rsc_route_stream_render';
 const NORMAL_CLIENT_ROUTE_PATH = '/client_side_hello_world';
-const DEFAULT_PAYLOAD_KEY = 'MyServerComponent-{}-ServerComponentRouter-react-component-0';
-const DEFERRED_PAYLOAD_KEY = 'SimpleComponent-{}-ServerComponentRouter-react-component-0';
-const UNWRAPPED_PAYLOAD_KEY = 'SimpleComponent-{}-UnwrappedRSCRouteDemo-react-component-0';
-const UNWRAPPED_STREAM_PAYLOAD_KEY = 'SimpleComponent-{}-UnwrappedStreamRSCRouteDemo-react-component-0';
+const DEFAULT_PAYLOAD_KEY = 'MyServerComponent-fun4a7ngv9-ServerComponentRouter-react-component-0';
+const DEFERRED_PAYLOAD_KEY = 'SimpleComponent-fun4a7ngv9-ServerComponentRouter-react-component-0';
+const UNWRAPPED_PAYLOAD_KEY = 'SimpleComponent-fun4a7ngv9-UnwrappedRSCRouteDemo-react-component-0';
+const UNWRAPPED_STREAM_PAYLOAD_KEY =
+  'SimpleComponent-fun4a7ngv9-UnwrappedStreamRSCRouteDemo-react-component-0';
 const RSC_ROUTE_SSR_FALSE_BAILOUT_DIGEST = 'REACT_ON_RAILS_RSC_ROUTE_SSR_FALSE_BAILOUT';
 
 test.describe('RSCRoute ssr=false', () => {
