@@ -13,12 +13,9 @@
  */
 
 import type { ReactNode } from 'react';
-import type { CreateRscPayloadNodeOptions } from './createRscPayloadNode.client.ts';
+import type { CreateRscPayloadNodeOptions } from './createRscPayloadNode.types.ts';
 
-export type {
-  CreateRscPayloadNodeOptions,
-  RscPayloadNodeCredentials,
-} from './createRscPayloadNode.client.ts';
+export type { CreateRscPayloadNodeOptions, RscPayloadNodeCredentials } from './createRscPayloadNode.types.ts';
 
 export const createRscPayloadNode = (_options: CreateRscPayloadNodeOptions): Promise<ReactNode> => {
   return Promise.reject(

@@ -1,31 +1,11 @@
 import { enableFetchMocks } from 'jest-fetch-mock';
 import type { RailsContext } from 'react-on-rails/types';
 import { RSC_STREAM_DIAGNOSTIC_ERROR_NAME } from '../src/rscDiagnostics.ts';
+import { createWebResponseFromText } from './testUtils.ts';
 
 enableFetchMocks();
 
-const encoder = new TextEncoder();
-
-const streamFromText = (text: string) =>
-  new ReadableStream<Uint8Array>({
-    start(controller) {
-      controller.enqueue(encoder.encode(text));
-      controller.close();
-    },
-  });
-
-const responseFromText = (
-  text: string,
-  responseOverrides: Pick<Response, 'ok' | 'status' | 'statusText'> = {
-    ok: true,
-    status: 200,
-    statusText: 'OK',
-  },
-) =>
-  ({
-    body: streamFromText(text),
-    ...responseOverrides,
-  }) as Response;
+const responseFromText = createWebResponseFromText;
 
 const loadClientModule = async (createFromReadableStream = jest.fn()) => {
   jest.resetModules();

@@ -1,4 +1,5 @@
 import { enableFetchMocks } from 'jest-fetch-mock';
+import { createWebResponseFromText } from './testUtils.ts';
 
 enableFetchMocks();
 
@@ -17,29 +18,10 @@ const frame = (content: string, metadata: Record<string, unknown> = {}) => {
   })}\t${contentBytes.length.toString(16).padStart(8, '0')}\n${content}`;
 };
 
-const streamFromText = (text: string) =>
-  new ReadableStream<Uint8Array>({
-    start(controller) {
-      controller.enqueue(encoder.encode(text));
-      controller.close();
-    },
-  });
-
-const responseFromText = (text: string) =>
-  ({
-    body: streamFromText(text),
-    ok: true,
-    status: 200,
-    statusText: 'OK',
-  }) as Response;
+const responseFromText = (text: string) => createWebResponseFromText(text);
 
 const responseWithStatus = (text: string, status: number, statusText: string) =>
-  ({
-    body: streamFromText(text),
-    ok: status >= 200 && status < 300,
-    status,
-    statusText,
-  }) as Response;
+  createWebResponseFromText(text, { ok: status >= 200 && status < 300, status, statusText });
 
 const readFlightStream = async (stream: ReadableStream<Uint8Array>) => {
   const reader = stream.getReader();

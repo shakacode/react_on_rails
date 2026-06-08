@@ -40,7 +40,7 @@ export type ClientGetReactServerComponentProps = {
 export type FetchRSCOptions = {
   componentName: string;
   componentProps: unknown;
-  rscPayloadGenerationUrlPath?: string;
+  rscPayloadGenerationUrlPath: string;
   cspNonce?: string;
   fetchOptions?: Pick<RequestInit, 'credentials' | 'headers' | 'signal'>;
   replayConsoleScripts?: boolean;
@@ -348,6 +348,15 @@ const getReactServerComponent =
         );
       }
     }
+    if (!railsContext.rscPayloadGenerationUrlPath) {
+      return Promise.reject(
+        new Error(
+          `Cannot fetch RSC payload for component "${componentName}": rscPayloadGenerationUrlPath is not configured. ` +
+            'Please ensure React Server Components support is properly enabled and configured.',
+        ),
+      );
+    }
+
     return fetchRSC({
       componentName,
       componentProps,

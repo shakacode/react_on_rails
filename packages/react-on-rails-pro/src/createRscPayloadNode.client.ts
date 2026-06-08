@@ -14,41 +14,9 @@
 
 import type { ReactNode } from 'react';
 import { fetchRSC } from './getReactServerComponent.client.ts';
+import type { CreateRscPayloadNodeOptions } from './createRscPayloadNode.types.ts';
 
-export type RscPayloadNodeCredentials = Extract<RequestCredentials, 'same-origin' | 'include'>;
-
-export type CreateRscPayloadNodeOptions = {
-  /**
-   * Registered React Server Component name served by the Pro RSC payload route.
-   */
-  componentName: string;
-
-  /**
-   * Rails path configured with `rsc_payload_route`, for example `/rsc_payload`.
-   */
-  payloadPath: string;
-
-  /**
-   * Props serialized into the payload request's `props` query parameter.
-   */
-  props?: unknown;
-
-  /**
-   * Additional request headers, such as application-specific tracing headers.
-   */
-  headers?: HeadersInit;
-
-  /**
-   * Fetch credentials mode. Defaults to `same-origin` so Rails session cookies
-   * continue to accompany same-origin payload requests.
-   */
-  credentials?: RscPayloadNodeCredentials;
-
-  /**
-   * Optional cancellation signal for route loaders.
-   */
-  signal?: AbortSignal;
-};
+export type { CreateRscPayloadNodeOptions, RscPayloadNodeCredentials } from './createRscPayloadNode.types.ts';
 
 const INVALID_COMPONENT_NAME_PATH_CHARS = /[/\\?#%]/;
 const INVALID_PAYLOAD_PATH_CHARS = /[\\?#%:]/;
