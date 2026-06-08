@@ -26,7 +26,8 @@ const isErrorLike = (payload: unknown): payload is Error =>
   (typeof payload === 'object' &&
     payload !== null &&
     typeof (payload as { message?: unknown }).message === 'string' &&
-    typeof (payload as { name?: unknown }).name === 'string');
+    typeof (payload as { name?: unknown }).name === 'string' &&
+    typeof (payload as { stack?: unknown }).stack === 'string');
 
 const normalizePayloadPath = (payloadPath: string): string => {
   const trimmedPayloadPath = payloadPath.trim();

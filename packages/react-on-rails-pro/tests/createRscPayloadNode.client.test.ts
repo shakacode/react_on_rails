@@ -155,7 +155,11 @@ describe('createRscPayloadNode', () => {
 
   it('rejects cross-realm-style Error payloads for route error boundaries', async () => {
     const { createFromReadableStream, createRscPayloadNode } = loadHelper();
-    const payloadError = { name: 'Error', message: 'server component failed in another realm' } as Error;
+    const payloadError = {
+      name: 'Error',
+      message: 'server component failed in another realm',
+      stack: 'Error: server component failed in another realm',
+    } as Error;
     fetchMock.mockResolvedValue(responseFromText(frame('serialized error payload')));
     (createFromReadableStream as jest.Mock).mockResolvedValueOnce(payloadError);
 
@@ -165,6 +169,20 @@ describe('createRscPayloadNode', () => {
         payloadPath: '/rsc_payload',
       }),
     ).rejects.toBe(payloadError);
+  });
+
+  it('returns plain object payloads that only resemble validation errors', async () => {
+    const { createFromReadableStream, createRscPayloadNode } = loadHelper();
+    const validationPayload = { name: 'ValidationError', message: 'Input too short', code: 422 };
+    fetchMock.mockResolvedValue(responseFromText(frame('plain object payload')));
+    (createFromReadableStream as jest.Mock).mockResolvedValueOnce(validationPayload);
+
+    await expect(
+      createRscPayloadNode({
+        componentName: 'ValidationPanel',
+        payloadPath: '/rsc_payload',
+      }),
+    ).resolves.toBe(validationPayload);
   });
 
   it('rejects non-ok HTTP responses from payload routes', async () => {
