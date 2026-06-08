@@ -58,8 +58,6 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10.33.4
 
       - name: Save size-limit config
         run: cp .size-limit.json /tmp/size-limit-config.json
