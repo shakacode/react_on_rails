@@ -612,9 +612,9 @@ describe ReactOnRailsProHelper do
 
       def execute_stream_view_containing_react_components
         queue = Async::Queue.new
-        mock_request_and_response(queue)
 
         Sync do |parent|
+          mock_request_and_response(queue)
           parent.async { stream_view_containing_react_components(template: template_path) }
 
           chunks_to_write = chunks.dup
@@ -684,7 +684,7 @@ describe ReactOnRailsProHelper do
         original_prerender_caching = ReactOnRailsPro.configuration.prerender_caching
         ReactOnRailsPro.configuration.prerender_caching = true
         Rails.cache.clear
-        example.run
+        Sync { example.run }
       ensure
         ReactOnRailsPro.configuration.prerender_caching = original_prerender_caching
         Rails.cache.clear

@@ -2,94 +2,9 @@
 
 require "json"
 require "uri"
+require "async/http/mock"
 
 module MockStreamHelper
-  class MockRequest
-    attr_reader :url, :path, :form, :json, :stream
-
-    def initialize(url:, path:, form:, json:, stream:)
-      @url = url
-      @path = path
-      @form = form
-      @json = json
-      @stream = stream
-    end
-
-    def body
-      if form
-        URI.encode_www_form(flat_form)
-      elsif json
-        JSON.generate(json)
-      else
-        ""
-      end
-    end
-
-    private
-
-    def flat_form
-      form.each_with_object([]) do |(key, value), pairs|
-        next pairs << [key, "[file]"] if value.is_a?(Hash) && value.key?(:body)
-
-        if value.is_a?(Array)
-          value.each { |item| pairs << ["#{key}[]", item] }
-        else
-          pairs << [key, value]
-        end
-      end
-    end
-  end
-
-  class MockClient
-    def initialize(origin)
-      @origin = origin
-    end
-
-    def post(path, form: nil, json: nil, stream: false)
-      request = MockRequest.new(url: full_url(path), path:, form:, json:, stream:)
-      build_response(request)
-    end
-
-    def get(path)
-      request = MockRequest.new(url: full_url(path), path:, form: nil, json: nil, stream: false)
-      build_response(request)
-    end
-
-    def post_bidi(_path, headers: [])
-      raise NotImplementedError, "MockClient does not support post_bidi; use a real renderer for incremental tests"
-    end
-
-    def close; end
-
-    private
-
-    def full_url(path)
-      "#{@origin}#{path}"
-    end
-
-    def build_response(request)
-      status, block, request_data = MockStream.next_response(request.url)
-      request_data[:request] = request
-
-      if request.stream
-        return ReactOnRailsPro::RendererHttpClient::Response.new(status:) do |yielder, _status_assigner|
-          # The mock pre-sets status above; pass the request so specs can assert on the captured payload.
-          block.call(->(value) { yielder.call(value) }, request)
-        end
-      end
-
-      chunks = []
-      error = nil
-      begin
-        block.call(->(value) { chunks << value }, request)
-      rescue StandardError => e
-        error = e
-      end
-
-      ReactOnRailsPro::RendererHttpClient::Response.new(status:, body: chunks, error:)
-    end
-  end
-
   module MockStream
     class << self
       def mock_responses
@@ -163,7 +78,50 @@ module MockStreamHelper
 
   def install_renderer_http_client_mock(origin)
     ReactOnRailsPro::Request.instance_variable_set(:@connection, nil)
-    allow(ReactOnRailsPro::Request).to receive(:create_connection).and_return(MockClient.new(origin))
+
+    mock_endpoint = Async::HTTP::Mock::Endpoint.new
+    real_endpoint = Async::HTTP::Endpoint.parse(origin)
+    wrapped_endpoint = mock_endpoint.wrap(real_endpoint)
+
+    start_mock_server(mock_endpoint)
+    stub_renderer_client(origin, wrapped_endpoint)
+  end
+
+  private
+
+  def start_mock_server(mock_endpoint)
+    Async(transient: true) do
+      mock_endpoint.run do |request|
+        handle_mock_request(request)
+      end
+    end
+  end
+
+  def handle_mock_request(request)
+    url = "#{request.scheme}://#{request.authority}#{request.path}"
+    status, block, request_data = MockStream.next_response(url)
+    request_data[:request] = request
+
+    body = Protocol::HTTP::Body::Writable.new
+    Async do
+      block.call(->(value) { body.write(value) })
+    rescue StandardError => e
+      body.close(e)
+    else
+      body.close_write
+    end
+
+    ::Protocol::HTTP::Response[status, {}, body]
+  rescue RuntimeError => e
+    ::Protocol::HTTP::Response[500, {}, [e.message]]
+  end
+
+  def stub_renderer_client(origin, wrapped_endpoint)
+    client = ReactOnRailsPro::RendererHttpClient.new(
+      origin:, pool_size: 1, connect_timeout: 5, read_timeout: 5, force_http2: false
+    )
+    allow(client).to receive(:endpoint_for).and_return(wrapped_endpoint)
+    allow(ReactOnRailsPro::Request).to receive(:create_connection).and_return(client)
   end
 end
 
