@@ -1420,14 +1420,32 @@ module ReactOnRails
         it { is_expected.to eq "MyComponent" }
       end
 
+      context "with snake_case component file" do
+        let(:file_path) { "/path/to/ror_components/my_component.jsx" }
+
+        it { is_expected.to eq "MyComponent" }
+      end
+
       context "with client component file" do
         let(:file_path) { "/path/to/MyComponent.client.jsx" }
 
         it { is_expected.to eq "MyComponent" }
       end
 
+      context "with snake_case client component file" do
+        let(:file_path) { "/path/to/ror_components/my_component.client.jsx" }
+
+        it { is_expected.to eq "MyComponent" }
+      end
+
       context "with server component file" do
         let(:file_path) { "/path/to/MyComponent.server.jsx" }
+
+        it { is_expected.to eq "MyComponent" }
+      end
+
+      context "with snake_case server component file" do
+        let(:file_path) { "/path/to/ror_components/my_component.server.jsx" }
 
         it { is_expected.to eq "MyComponent" }
       end

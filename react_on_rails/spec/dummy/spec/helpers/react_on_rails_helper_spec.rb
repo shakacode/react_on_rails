@@ -61,20 +61,23 @@ describe ReactOnRailsHelper do
   end
 
   describe "#load_pack_for_generated_component" do
+    let(:react_component_name) { "component_name" }
+    let(:generated_component_name) { "ComponentName" }
     let(:render_options) do
-      ReactOnRails::ReactComponent::RenderOptions.new(react_component_name: "component_name",
+      ReactOnRails::ReactComponent::RenderOptions.new(react_component_name:,
                                                       options: {})
     end
 
     it "appends js/css pack tag" do
       allow(helper).to receive(:append_javascript_pack_tag)
       allow(helper).to receive(:append_stylesheet_pack_tag)
-      expect { helper.load_pack_for_generated_component("component_name", render_options) }.not_to raise_error
+      expect { helper.load_pack_for_generated_component(react_component_name, render_options) }.not_to raise_error
 
       # Default loading strategy is now always :defer to prevent race conditions
       # between component registration and hydration, regardless of async support
-      expect(helper).to have_received(:append_javascript_pack_tag).with("generated/component_name", { defer: true })
-      expect(helper).to have_received(:append_stylesheet_pack_tag).with("generated/component_name")
+      expect(helper).to have_received(:append_javascript_pack_tag).with("generated/#{generated_component_name}",
+                                                                        { defer: true })
+      expect(helper).to have_received(:append_stylesheet_pack_tag).with("generated/#{generated_component_name}")
     end
 
     context "when async loading is enabled" do
@@ -95,12 +98,12 @@ describe ReactOnRailsHelper do
 
           allow(helper).to receive(:append_javascript_pack_tag)
           allow(helper).to receive(:append_stylesheet_pack_tag)
-          expect { helper.load_pack_for_generated_component("component_name", render_options) }.not_to raise_error
+          expect { helper.load_pack_for_generated_component(react_component_name, render_options) }.not_to raise_error
           expect(helper).to have_received(:append_javascript_pack_tag).with(
-            "generated/component_name",
+            "generated/#{generated_component_name}",
             { defer: false, async: true }
           )
-          expect(helper).to have_received(:append_stylesheet_pack_tag).with("generated/component_name")
+          expect(helper).to have_received(:append_stylesheet_pack_tag).with("generated/#{generated_component_name}")
         ensure
           helper.define_singleton_method(:append_javascript_pack_tag, original_append_javascript_pack_tag)
         end
@@ -115,15 +118,20 @@ describe ReactOnRailsHelper do
       it "appends the defer attribute to the script tag" do
         allow(helper).to receive(:append_javascript_pack_tag)
         allow(helper).to receive(:append_stylesheet_pack_tag)
-        expect { helper.load_pack_for_generated_component("component_name", render_options) }.not_to raise_error
-        expect(helper).to have_received(:append_javascript_pack_tag).with("generated/component_name", { defer: true })
-        expect(helper).to have_received(:append_stylesheet_pack_tag).with("generated/component_name")
+        expect { helper.load_pack_for_generated_component(react_component_name, render_options) }.not_to raise_error
+        expect(helper).to have_received(:append_javascript_pack_tag).with("generated/#{generated_component_name}",
+                                                                          { defer: true })
+        expect(helper).to have_received(:append_stylesheet_pack_tag).with("generated/#{generated_component_name}")
       end
     end
 
     it "throws an error in development if generated component isn't found" do
+      missing_render_options = ReactOnRails::ReactComponent::RenderOptions.new(
+        react_component_name: "nonexisting_component",
+        options: {}
+      )
       allow(Rails.env).to receive(:development?).and_return(true)
-      expect { helper.load_pack_for_generated_component("nonexisting_component", render_options) }
+      expect { helper.load_pack_for_generated_component("nonexisting_component", missing_render_options) }
         .to raise_error(ReactOnRails::SmartError, /Auto-loaded Bundle Missing/)
     end
   end
