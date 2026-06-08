@@ -86,6 +86,15 @@ const createFromFetch = async (
   },
 ) => {
   const response = await fetchPromise;
+  if (!response.ok) {
+    const statusDescription = response.statusText
+      ? `${response.status} ${response.statusText}`
+      : `${response.status}`;
+    throw new Error(
+      `RSC payload request for component "${componentName}" from "${source}" failed with HTTP ${statusDescription}.`,
+    );
+  }
+
   const { body } = response;
   if (!body) {
     throw new Error('No stream found in response');

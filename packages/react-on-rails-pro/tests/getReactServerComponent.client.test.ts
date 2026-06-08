@@ -1,4 +1,43 @@
+import { enableFetchMocks } from 'jest-fetch-mock';
+import type { RailsContext } from 'react-on-rails/types';
 import { RSC_STREAM_DIAGNOSTIC_ERROR_NAME } from '../src/rscDiagnostics.ts';
+
+enableFetchMocks();
+
+const encoder = new TextEncoder();
+
+const streamFromText = (text: string) =>
+  new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(encoder.encode(text));
+      controller.close();
+    },
+  });
+
+const responseFromText = (
+  text: string,
+  responseOverrides: Pick<Response, 'ok' | 'status' | 'statusText'> = {
+    ok: true,
+    status: 200,
+    statusText: 'OK',
+  },
+) =>
+  ({
+    body: streamFromText(text),
+    ...responseOverrides,
+  }) as Response;
+
+const loadClientModule = async (createFromReadableStream = jest.fn()) => {
+  jest.resetModules();
+  jest.doMock('react-on-rails-rsc/client.browser', () => ({
+    createFromReadableStream,
+  }));
+
+  const clientModule = await import('../src/getReactServerComponent.client.ts');
+  return { createFromReadableStream, ...clientModule };
+};
+
+const fetchMock = fetch as jest.MockedFunction<typeof fetch>;
 
 const setDocumentReadyState = (readyState: DocumentReadyState) => {
   Object.defineProperty(document, 'readyState', {
@@ -7,6 +46,66 @@ const setDocumentReadyState = (readyState: DocumentReadyState) => {
     writable: true,
   });
 };
+
+describe('fetchRSC HTTP responses', () => {
+  afterEach(() => {
+    fetchMock.mockReset();
+    jest.dontMock('react-on-rails-rsc/client.browser');
+    jest.resetModules();
+  });
+
+  it('rejects non-ok HTTP responses before parsing the RSC stream', async () => {
+    const { createFromReadableStream, fetchRSC } = await loadClientModule();
+    const componentProps = { id: 1 };
+    const fetchUrl = `/rsc_payload/MissingPanel?${new URLSearchParams({
+      props: JSON.stringify(componentProps),
+    })}`;
+    fetchMock.mockResolvedValue(
+      responseFromText('<html>Not found</html>', {
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+      }),
+    );
+
+    await expect(
+      fetchRSC({
+        componentName: 'MissingPanel',
+        componentProps,
+        rscPayloadGenerationUrlPath: '/rsc_payload',
+      }),
+    ).rejects.toThrow(
+      `Failed to fetch RSC payload for component "MissingPanel" from "${fetchUrl}": RSC payload request for component "MissingPanel" from "/rsc_payload/MissingPanel" failed with HTTP 404 Not Found.`,
+    );
+    expect(createFromReadableStream).not.toHaveBeenCalled();
+  });
+
+  it('propagates non-ok HTTP responses through the getReactServerComponent fetch path', async () => {
+    const { createFromReadableStream, default: getReactServerComponent } = await loadClientModule();
+    fetchMock.mockResolvedValue(
+      responseFromText('unauthorized', {
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+      }),
+    );
+
+    const getComponent = getReactServerComponent('dom-node-id', {
+      rscPayloadGenerationUrlPath: '/rsc_payload',
+    } as RailsContext);
+
+    await expect(
+      getComponent({
+        componentName: 'AccountPanel',
+        componentProps: {},
+        enforceRefetch: true,
+      }),
+    ).rejects.toThrow(
+      'RSC payload request for component "AccountPanel" from "/rsc_payload/AccountPanel" failed with HTTP 401 Unauthorized.',
+    );
+    expect(createFromReadableStream).not.toHaveBeenCalled();
+  });
+});
 
 describe('getReactServerComponent preloaded payload diagnostics', () => {
   beforeAll(() => {

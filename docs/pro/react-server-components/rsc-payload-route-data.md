@@ -48,14 +48,14 @@ function ServerPanel({ nodePromise }: { nodePromise: Promise<React.ReactNode> })
 createRscPayloadNode(options): Promise<React.ReactNode>
 ```
 
-| Option          | Required | Description                                                                                                                                                      |
-| --------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `componentName` | Yes      | Registered Server Component name served by the Pro RSC payload route. Because it is appended to the request path, it must not include `/`, `\`, `?`, or `#`.     |
-| `payloadPath`   | Yes      | Rails path configured with `rsc_payload_route`, for example `/rsc_payload`. The helper appends `/<componentName>?props=<json>` using the same Pro payload route. |
-| `props`         | No       | Props serialized into the `props` query parameter. Defaults to `{}`.                                                                                             |
-| `headers`       | No       | Additional request headers. Keep these application-specific, for example tracing headers or a conventional `X-Requested-With` header.                            |
-| `credentials`   | No       | Fetch credentials mode. Defaults to `same-origin` so Rails session cookies accompany same-origin payload requests. Use `include` only when your app requires it. |
-| `signal`        | No       | Optional `AbortSignal` from a router loader or navigation cancellation path.                                                                                     |
+| Option          | Required | Description                                                                                                                                                       |
+| --------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `componentName` | Yes      | Registered Server Component name served by the Pro RSC payload route. Because it is appended to the request path, it must not include `/`, `\`, `?`, `#`, or `%`. |
+| `payloadPath`   | Yes      | Rails path configured with `rsc_payload_route`, for example `/rsc_payload`. The helper appends `/<componentName>?props=<json>` using the same Pro payload route.  |
+| `props`         | No       | Props serialized into the `props` query parameter. Defaults to `{}`.                                                                                              |
+| `headers`       | No       | Additional request headers. Keep these application-specific, for example tracing headers or a conventional `X-Requested-With` header.                             |
+| `credentials`   | No       | Fetch credentials mode. Defaults to `same-origin` so Rails session cookies accompany same-origin payload requests. Use `include` only when your app requires it.  |
+| `signal`        | No       | Optional `AbortSignal` from a router loader or navigation cancellation path.                                                                                      |
 
 The helper returns a normal promise that resolves to a React node. It hides the Pro length-prefixed payload parser and React Flight stream construction; application code should not import `react-on-rails-rsc/client.browser` or parse the payload wire format.
 

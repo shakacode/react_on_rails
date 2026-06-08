@@ -50,7 +50,7 @@ export type CreateRscPayloadNodeOptions = {
   signal?: AbortSignal;
 };
 
-const INVALID_COMPONENT_NAME_PATH_CHARS = /[/\\?#]/;
+const INVALID_COMPONENT_NAME_PATH_CHARS = /[/\\?#%]/;
 
 const rejectErrorPayload = (promise: Promise<ReactNode>): Promise<ReactNode> =>
   promise.then((payload) => {

@@ -25,7 +25,13 @@ const streamFromText = (text: string) =>
     },
   });
 
-const responseFromText = (text: string) => ({ body: streamFromText(text) }) as Response;
+const responseFromText = (text: string) =>
+  ({
+    body: streamFromText(text),
+    ok: true,
+    status: 200,
+    statusText: 'OK',
+  }) as Response;
 
 const readFlightStream = async (stream: ReadableStream<Uint8Array>) => {
   const reader = stream.getReader();
@@ -168,20 +174,23 @@ describe('createRscPayloadNode', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it.each(['../AdminPanel', 'Admin\\Panel', 'AdminPanel?draft=true', 'AdminPanel#section'])(
-    'rejects component names that would change the payload URL path: %s',
-    (componentName) => {
-      const { createRscPayloadNode } = loadHelper();
+  it.each([
+    '../AdminPanel',
+    'Admin\\Panel',
+    'AdminPanel?draft=true',
+    'AdminPanel#section',
+    'AdminPanel%2FEdit',
+  ])('rejects component names that would change the payload URL path: %s', (componentName) => {
+    const { createRscPayloadNode } = loadHelper();
 
-      expect(() =>
-        createRscPayloadNode({
-          componentName,
-          payloadPath: '/rsc_payload',
-        }),
-      ).toThrow('createRscPayloadNode componentName cannot include path or query-string characters.');
-      expect(fetchMock).not.toHaveBeenCalled();
-    },
-  );
+    expect(() =>
+      createRscPayloadNode({
+        componentName,
+        payloadPath: '/rsc_payload',
+      }),
+    ).toThrow('createRscPayloadNode componentName cannot include path or query-string characters.');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 
   it('does not materialize console replay metadata as inline script', async () => {
     const { createRscPayloadNode } = loadHelper();
