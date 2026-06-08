@@ -20,6 +20,7 @@ type StateProps = Record<string, unknown> & {
 };
 
 type ReduxAppState = StateProps & {
+  // combineReducers indexes state slices by reducer key; keep RailsContext fields while allowing that lookup.
   railsContext: RailsContext & Record<string, unknown>;
 };
 
