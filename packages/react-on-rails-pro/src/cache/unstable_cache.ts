@@ -70,7 +70,13 @@ export function unstable_cache<TArgs extends unknown[]>(
     // --- MISS path ---
     const reactTree = await originalFn(...args);
     const { renderToPipeableStream } = await getServerRenderer();
-    const rscPipeable = renderToPipeableStream(reactTree);
+    let renderHadError = false;
+    const rscPipeable = renderToPipeableStream(reactTree, {
+      onError: (err) => {
+        renderHadError = true;
+        console.error(err);
+      },
+    });
 
     const source = new PassThrough();
     const forCache = new PassThrough();
@@ -92,6 +98,8 @@ export function unstable_cache<TArgs extends unknown[]>(
 
     bufferNodeStream(forCache)
       .then((chunks) => {
+        if (renderHadError) return undefined;
+
         const newEntry: CacheEntry = {
           value: chunks,
           revalidate,
