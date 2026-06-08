@@ -72,7 +72,7 @@ RSpec.describe "Ruby version support" do
     )
     expect(tool_versions(".minimum.tool-versions")).to include(
       "ruby" => "3.3.7",
-      "nodejs" => "20.18.1"
+      "nodejs" => "20.19.0"
     )
   end
 

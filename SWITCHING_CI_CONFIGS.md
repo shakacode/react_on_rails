@@ -291,8 +291,8 @@ rvm install 3.3.7   # or 4.0.5
 rvm use 3.3.7
 
 # Install and use specific Node version
-nvm install 20.18.1  # or 22.12.0
-nvm use 20.18.1
+nvm install 20.19.0  # or 22.12.0
+nvm use 20.19.0
 
 # Verify versions
 ruby --version
