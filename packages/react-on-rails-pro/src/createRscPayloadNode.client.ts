@@ -85,6 +85,7 @@ export const createRscPayloadNode = ({
   if (typeof payloadPath !== 'string' || !payloadPath.trim()) {
     throw new Error('createRscPayloadNode requires a payloadPath.');
   }
+  const normalizedPayloadPath = payloadPath.trim();
 
   const fetchOptions: Pick<RequestInit, 'credentials' | 'headers' | 'signal'> = { credentials };
   if (headers) fetchOptions.headers = headers;
@@ -96,7 +97,7 @@ export const createRscPayloadNode = ({
       componentName: normalizedComponentName,
       componentProps: props,
       fetchOptions,
-      rscPayloadGenerationUrlPath: payloadPath,
+      rscPayloadGenerationUrlPath: normalizedPayloadPath,
       // Route-data payloads must be safe under strict CSP; renderer console replay
       // metadata is intentionally ignored instead of materialized as inline script.
       replayConsoleScripts: false,

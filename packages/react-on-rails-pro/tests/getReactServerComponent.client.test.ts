@@ -101,7 +101,7 @@ describe('fetchRSC HTTP responses', () => {
         enforceRefetch: true,
       }),
     ).rejects.toThrow(
-      'RSC payload request for component "AccountPanel" from "/rsc_payload/AccountPanel" failed with HTTP 401 Unauthorized.',
+      'Failed to fetch RSC payload for component "AccountPanel" from "/rsc_payload/AccountPanel?props=%7B%7D": RSC payload request for component "AccountPanel" from "/rsc_payload/AccountPanel" failed with HTTP 401 Unauthorized.',
     );
     expect(createFromReadableStream).not.toHaveBeenCalled();
   });

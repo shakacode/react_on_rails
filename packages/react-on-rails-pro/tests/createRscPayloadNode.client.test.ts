@@ -92,7 +92,7 @@ describe('createRscPayloadNode', () => {
     await expect(
       createRscPayloadNode({
         componentName: 'RscShowcaseServerPanel',
-        payloadPath: '/rsc_payload/',
+        payloadPath: ' /rsc_payload/ ',
         props,
       }),
     ).resolves.toBe('firstsecond');
