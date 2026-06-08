@@ -29,6 +29,8 @@ Create a verified scope and a goal prompt for a later `$pr-batch` run. Do not im
 
 4. Output
    - Return a concise "Batch Plan" and a fenced "Goal Prompt for pr-batch".
+   - Keep the fenced goal prompt under 4000 characters total.
+   - If the batch will not fit, split it into smaller goals and output only the first ready goal.
    - Do not start `$pr-batch` unless the user explicitly asks to run it.
 
 ## Batch Plan Format
@@ -49,6 +51,7 @@ Use this template and fill it with the verified items:
 
 ```text
 Use $pr-batch to complete this batch with subagents.
+Keep this goal under 4000 characters total.
 
 Repository: OWNER/REPO
 Batch objective: ...
@@ -78,3 +81,4 @@ Execution rules:
 - Do not batch unrelated risky changes just because they are small.
 - Do not hide missing GitHub data; say `UNKNOWN`.
 - Do not omit links; use GitHub URLs for every item.
+- Do not put full audit evidence in the goal prompt; put bulky details in the Batch Plan outside the goal.
