@@ -62,19 +62,14 @@ const parseArgs = () => {
 const readRequestBody = async (stream, maxBytes) => {
   let bytes = 0;
   const chunks = [];
-  let exceededLimit = false;
-  for await (const chunk of stream) {
+  for await (const chunk of stream.iterator({ destroyOnReturn: false })) {
     bytes += chunk.length;
     if (bytes > maxBytes) {
-      exceededLimit = true;
-    } else {
-      chunks.push(chunk);
+      const error = new Error(`request body exceeded --body-bytes limit (${maxBytes})`);
+      error.statusCode = 413;
+      throw error;
     }
-  }
-  if (exceededLimit) {
-    const error = new Error(`request body exceeded --body-bytes limit (${maxBytes})`);
-    error.statusCode = 413;
-    throw error;
+    chunks.push(chunk);
   }
   return Buffer.concat(chunks, bytes);
 };
@@ -89,13 +84,44 @@ const streamChunks = (bytesTotal) => {
 };
 
 const writeJson = (stream, status, payload) => {
+  if (stream.closed || stream.destroyed || stream.session?.closed || stream.session?.destroyed) {
+    return;
+  }
+
   const body = Buffer.from(JSON.stringify(payload));
-  stream.respond({
-    ':status': status,
-    'content-type': 'application/json',
-    'content-length': body.length,
-  });
-  stream.end(body);
+  try {
+    stream.respond({
+      ':status': status,
+      'content-type': 'application/json',
+      'content-length': body.length,
+    });
+    stream.end(body);
+  } catch (error) {
+    if (error.code !== 'ERR_HTTP2_INVALID_STREAM') {
+      throw error;
+    }
+  }
+};
+
+const closeStream = (stream) => {
+  if (stream.closed || stream.destroyed) {
+    return;
+  }
+
+  try {
+    stream.close(http2.constants.NGHTTP2_CANCEL);
+  } catch (error) {
+    if (error.code !== 'ERR_HTTP2_INVALID_STREAM') {
+      throw error;
+    }
+  }
+};
+
+const writeReadError = (stream, error) => {
+  writeJson(stream, error.statusCode || 500, { ok: false, error: error.message });
+  if (error.statusCode === 413) {
+    closeStream(stream);
+  }
 };
 
 const handleNativeStream = (stream, headers, { bodyBytes, streamBytes }) => {
@@ -115,7 +141,7 @@ const handleNativeStream = (stream, headers, { bodyBytes, streamBytes }) => {
   if (path === '/probe/unary') {
     readRequestBody(stream, bodyBytes)
       .then((body) => writeJson(stream, 200, { ok: true, receivedBytes: body.length }))
-      .catch((error) => writeJson(stream, error.statusCode || 500, { ok: false, error: error.message }));
+      .catch((error) => writeReadError(stream, error));
     return;
   }
 
@@ -125,7 +151,7 @@ const handleNativeStream = (stream, headers, { bodyBytes, streamBytes }) => {
         stream.respond({ ':status': 200, 'content-type': 'application/octet-stream' });
         streamChunks(streamBytes).pipe(stream);
       })
-      .catch((error) => writeJson(stream, error.statusCode || 500, { ok: false, error: error.message }));
+      .catch((error) => writeReadError(stream, error));
     return;
   }
 

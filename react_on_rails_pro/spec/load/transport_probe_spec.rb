@@ -225,6 +225,63 @@ RSpec.describe RendererHarness::TransportProbe do
       end
     end
 
+    it "keeps native_tcp alive when an oversized request is aborted" do
+      Dir.mktmpdir do |dir|
+        server_script = RendererHarness::TransportProbe::Config.send(:default_server_script)
+        stdin = stdout = stderr = wait_thread = nil
+        stdin, stdout, stderr, wait_thread = Open3.popen3(
+          "node",
+          server_script,
+          "--scenarios",
+          "native_tcp",
+          "--socket-path",
+          File.join(dir, "unused.sock"),
+          "--body-bytes",
+          "4"
+        )
+
+        ready = Timeout.timeout(5) { JSON.parse(stdout.gets) }
+        native_endpoint = ready.fetch("endpoints").find { |endpoint| endpoint.fetch("name") == "native_tcp" }
+        abort_script = <<~JS
+          const http2 = require("node:http2");
+          const client = http2.connect(process.argv[1]);
+          const request = client.request({
+            ":method": "POST",
+            ":path": "/probe/unary",
+            "content-type": "application/octet-stream",
+          });
+          request.on("error", () => {});
+          request.write(Buffer.alloc(5, "x"));
+          request.close(http2.constants.NGHTTP2_CANCEL);
+          setTimeout(() => client.close(), 50);
+          setTimeout(() => process.exit(0), 100);
+        JS
+
+        _stdout, client_stderr, client_status = Open3.capture3(
+          "node",
+          "-e",
+          abort_script,
+          native_endpoint.fetch("origin")
+        )
+        expect(client_status).to be_success, client_stderr
+        sleep 0.2
+
+        expect(wait_thread).to be_alive
+        status, payload = post_native_probe(native_endpoint.fetch("origin"), "1234")
+        expect(status).to eq(200)
+        expect(payload).to include("ok" => true, "receivedBytes" => 4)
+      ensure
+        stdin&.close unless stdin&.closed?
+        stdout&.close unless stdout&.closed?
+        stderr&.close unless stderr&.closed?
+        term_pid = wait_thread&.pid if wait_thread&.alive?
+        Process.kill("TERM", term_pid) if term_pid
+        wait_thread&.join(5)
+        kill_pid = wait_thread&.pid if wait_thread&.alive?
+        Process.kill("KILL", kill_pid) if kill_pid
+      end
+    end
+
     it "fails without removing a regular file used as the native_uds socket path" do
       Dir.mktmpdir do |dir|
         socket_path = File.join(dir, "custom.sock")
