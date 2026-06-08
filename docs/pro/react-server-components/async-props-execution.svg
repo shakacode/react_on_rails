@@ -80,7 +80,7 @@
       @keyframes d2 { 0%, 33% { opacity: 0.3; } 34%, 66% { opacity: 1; } 67%, 100% { opacity: 0.3; } }
       @keyframes d3 { 0%, 66% { opacity: 0.3; } 67%, 100% { opacity: 1; } }
 
-      .spinner { transform-origin: center; animation: spin 1.2s linear infinite; }
+      .spinner { transform-origin: 0px 0px; animation: spin 1.2s linear infinite; }
       @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     </style>
   </defs>
@@ -206,100 +206,110 @@
     <!-- Code block -->
     <rect x="8" y="40" width="369" height="270" rx="6" fill="#1E293B"/>
 
-    <!-- Line 1 -->
+    <!-- Line 1: function signature with full prop name -->
     <text x="20" y="62" font-family="monospace" font-size="10" fill="#64748B">1</text>
     <text x="38" y="62" font-family="monospace" font-size="9" fill="#F472B6">function</text>
     <text x="88" y="62" font-family="monospace" font-size="9" fill="#7DD3FC">Page</text>
-    <text x="115" y="62" font-family="monospace" font-size="9" fill="#F8FAFC">({ title, getAsync }) {</text>
+    <text x="115" y="62" font-family="monospace" font-size="9" fill="#F8FAFC">({ title,</text>
+    <text x="175" y="62" font-family="monospace" font-size="9" fill="#7DD3FC">getReactOnRailsAsyncProp</text>
+    <text x="343" y="62" font-family="monospace" font-size="9" fill="#F8FAFC">}) {</text>
 
-    <!-- Line 2 -->
+    <!-- Line 2: comment showing parallel await -->
     <text x="20" y="78" font-family="monospace" font-size="10" fill="#64748B">2</text>
-    <text x="48" y="78" font-family="monospace" font-size="9" fill="#F472B6">const</text>
-    <text x="83" y="78" font-family="monospace" font-size="9" fill="#F8FAFC">reviews =</text>
-    <text x="145" y="78" font-family="monospace" font-size="9" fill="#7DD3FC">getAsync</text>
-    <text x="200" y="78" font-family="monospace" font-size="9" fill="#F8FAFC">(</text>
-    <text x="207" y="78" font-family="monospace" font-size="9" fill="#86EFAC">'reviews'</text>
-    <text x="270" y="78" font-family="monospace" font-size="9" fill="#F8FAFC">)</text>
+    <text x="48" y="78" font-family="monospace" font-size="9" fill="#64748B">// Both awaited in parallel — whichever resolves first renders</text>
 
-    <!-- Line 3 -->
+    <!-- Line 3: first async prop -->
     <text x="20" y="94" font-family="monospace" font-size="10" fill="#64748B">3</text>
     <text x="48" y="94" font-family="monospace" font-size="9" fill="#F472B6">const</text>
-    <text x="83" y="94" font-family="monospace" font-size="9" fill="#F8FAFC">recs =</text>
-    <text x="125" y="94" font-family="monospace" font-size="9" fill="#7DD3FC">getAsync</text>
-    <text x="180" y="94" font-family="monospace" font-size="9" fill="#F8FAFC">(</text>
-    <text x="187" y="94" font-family="monospace" font-size="9" fill="#86EFAC">'recs'</text>
-    <text x="225" y="94" font-family="monospace" font-size="9" fill="#F8FAFC">)</text>
+    <text x="83" y="94" font-family="monospace" font-size="9" fill="#F8FAFC">reviews =</text>
+    <text x="145" y="94" font-family="monospace" font-size="9" fill="#7DD3FC">getReactOnRailsAsyncProp</text>
+    <text x="310" y="94" font-family="monospace" font-size="9" fill="#F8FAFC">(</text>
+    <text x="317" y="94" font-family="monospace" font-size="9" fill="#86EFAC">'reviews'</text>
+    <text x="365" y="94" font-family="monospace" font-size="9" fill="#F8FAFC">)</text>
 
-    <!-- Line 4 -->
+    <!-- Line 4: second async prop -->
     <text x="20" y="110" font-family="monospace" font-size="10" fill="#64748B">4</text>
-    <text x="48" y="110" font-family="monospace" font-size="9" fill="#F472B6">return</text>
-    <text x="90" y="110" font-family="monospace" font-size="9" fill="#F8FAFC">(</text>
+    <text x="48" y="110" font-family="monospace" font-size="9" fill="#F472B6">const</text>
+    <text x="83" y="110" font-family="monospace" font-size="9" fill="#F8FAFC">recs =</text>
+    <text x="125" y="110" font-family="monospace" font-size="9" fill="#7DD3FC">getReactOnRailsAsyncProp</text>
+    <text x="290" y="110" font-family="monospace" font-size="9" fill="#F8FAFC">(</text>
+    <text x="297" y="110" font-family="monospace" font-size="9" fill="#86EFAC">'recs'</text>
+    <text x="333" y="110" font-family="monospace" font-size="9" fill="#F8FAFC">)</text>
 
-    <!-- Line 5 -->
+    <!-- Parallel bracket indicator -->
+    <path d="M 46 82 L 42 82 L 42 118 L 46 118" fill="none" stroke="#F59E0B" stroke-width="1.5" stroke-linecap="round"/>
+    <text x="30" y="103" font-family="monospace" font-size="7" fill="#F59E0B">||</text>
+
+    <!-- Line 5: return -->
     <text x="20" y="126" font-family="monospace" font-size="10" fill="#64748B">5</text>
-    <text x="55" y="126" font-family="monospace" font-size="9" fill="#F8FAFC">&lt;</text>
-    <text x="62" y="126" font-family="monospace" font-size="9" fill="#7DD3FC">div</text>
-    <text x="82" y="126" font-family="monospace" font-size="9" fill="#F8FAFC">&gt;&lt;</text>
-    <text x="97" y="126" font-family="monospace" font-size="9" fill="#7DD3FC">h1</text>
-    <text x="112" y="126" font-family="monospace" font-size="9" fill="#F8FAFC">&gt;{title}&lt;/</text>
-    <text x="175" y="126" font-family="monospace" font-size="9" fill="#7DD3FC">h1</text>
-    <text x="190" y="126" font-family="monospace" font-size="9" fill="#F8FAFC">&gt;</text>
+    <text x="48" y="126" font-family="monospace" font-size="9" fill="#F472B6">return</text>
+    <text x="90" y="126" font-family="monospace" font-size="9" fill="#F8FAFC">(</text>
 
-    <!-- Line 6: Suspense 1 -->
+    <!-- Line 6: div + h1 -->
     <text x="20" y="142" font-family="monospace" font-size="10" fill="#64748B">6</text>
-    <text x="60" y="142" font-family="monospace" font-size="9" fill="#F8FAFC">&lt;</text>
-    <text x="67" y="142" font-family="monospace" font-size="9" fill="#7DD3FC">Suspense</text>
-    <text x="125" y="142" font-family="monospace" font-size="9" fill="#FCD34D">fallback</text>
-    <text x="178" y="142" font-family="monospace" font-size="9" fill="#F8FAFC">={</text>
-    <text x="193" y="142" font-family="monospace" font-size="9" fill="#86EFAC">"Loading reviews..."</text>
-    <text x="320" y="142" font-family="monospace" font-size="9" fill="#F8FAFC">}&gt;</text>
+    <text x="55" y="142" font-family="monospace" font-size="9" fill="#F8FAFC">&lt;</text>
+    <text x="62" y="142" font-family="monospace" font-size="9" fill="#7DD3FC">div</text>
+    <text x="82" y="142" font-family="monospace" font-size="9" fill="#F8FAFC">&gt;&lt;</text>
+    <text x="97" y="142" font-family="monospace" font-size="9" fill="#7DD3FC">h1</text>
+    <text x="112" y="142" font-family="monospace" font-size="9" fill="#F8FAFC">&gt;{title}&lt;/</text>
+    <text x="175" y="142" font-family="monospace" font-size="9" fill="#7DD3FC">h1</text>
+    <text x="190" y="142" font-family="monospace" font-size="9" fill="#F8FAFC">&gt;</text>
 
-    <!-- Line 7: Reviews -->
+    <!-- Line 7: Suspense 1 -->
     <text x="20" y="158" font-family="monospace" font-size="10" fill="#64748B">7</text>
-    <text x="70" y="158" font-family="monospace" font-size="9" fill="#F8FAFC">&lt;</text>
-    <text x="77" y="158" font-family="monospace" font-size="9" fill="#7DD3FC">Reviews</text>
-    <text x="130" y="158" font-family="monospace" font-size="9" fill="#FCD34D">p</text>
-    <text x="138" y="158" font-family="monospace" font-size="9" fill="#F8FAFC">={reviews} /&gt;</text>
+    <text x="60" y="158" font-family="monospace" font-size="9" fill="#F8FAFC">&lt;</text>
+    <text x="67" y="158" font-family="monospace" font-size="9" fill="#7DD3FC">Suspense</text>
+    <text x="125" y="158" font-family="monospace" font-size="9" fill="#FCD34D">fallback</text>
+    <text x="178" y="158" font-family="monospace" font-size="9" fill="#F8FAFC">={</text>
+    <text x="193" y="158" font-family="monospace" font-size="9" fill="#86EFAC">"Loading reviews..."</text>
+    <text x="320" y="158" font-family="monospace" font-size="9" fill="#F8FAFC">}&gt;</text>
 
-    <!-- Line 8: close Suspense -->
+    <!-- Line 8: Reviews -->
     <text x="20" y="174" font-family="monospace" font-size="10" fill="#64748B">8</text>
-    <text x="60" y="174" font-family="monospace" font-size="9" fill="#F8FAFC">&lt;/</text>
-    <text x="75" y="174" font-family="monospace" font-size="9" fill="#7DD3FC">Suspense</text>
-    <text x="133" y="174" font-family="monospace" font-size="9" fill="#F8FAFC">&gt;</text>
+    <text x="70" y="174" font-family="monospace" font-size="9" fill="#F8FAFC">&lt;</text>
+    <text x="77" y="174" font-family="monospace" font-size="9" fill="#7DD3FC">Reviews</text>
+    <text x="130" y="174" font-family="monospace" font-size="9" fill="#FCD34D">p</text>
+    <text x="138" y="174" font-family="monospace" font-size="9" fill="#F8FAFC">={reviews} /&gt;</text>
 
-    <!-- Line 9: Suspense 2 -->
+    <!-- Line 9: close Suspense -->
     <text x="20" y="190" font-family="monospace" font-size="10" fill="#64748B">9</text>
-    <text x="60" y="190" font-family="monospace" font-size="9" fill="#F8FAFC">&lt;</text>
-    <text x="67" y="190" font-family="monospace" font-size="9" fill="#7DD3FC">Suspense</text>
-    <text x="125" y="190" font-family="monospace" font-size="9" fill="#FCD34D">fallback</text>
-    <text x="178" y="190" font-family="monospace" font-size="9" fill="#F8FAFC">={</text>
-    <text x="193" y="190" font-family="monospace" font-size="9" fill="#86EFAC">"Loading recs..."</text>
-    <text x="298" y="190" font-family="monospace" font-size="9" fill="#F8FAFC">}&gt;</text>
+    <text x="60" y="190" font-family="monospace" font-size="9" fill="#F8FAFC">&lt;/</text>
+    <text x="75" y="190" font-family="monospace" font-size="9" fill="#7DD3FC">Suspense</text>
+    <text x="133" y="190" font-family="monospace" font-size="9" fill="#F8FAFC">&gt;</text>
 
-    <!-- Line 10: Recs -->
+    <!-- Line 10: Suspense 2 -->
     <text x="20" y="206" font-family="monospace" font-size="10" fill="#64748B">10</text>
-    <text x="70" y="206" font-family="monospace" font-size="9" fill="#F8FAFC">&lt;</text>
-    <text x="77" y="206" font-family="monospace" font-size="9" fill="#7DD3FC">Recs</text>
-    <text x="105" y="206" font-family="monospace" font-size="9" fill="#FCD34D">p</text>
-    <text x="113" y="206" font-family="monospace" font-size="9" fill="#F8FAFC">={recs} /&gt;</text>
+    <text x="60" y="206" font-family="monospace" font-size="9" fill="#F8FAFC">&lt;</text>
+    <text x="67" y="206" font-family="monospace" font-size="9" fill="#7DD3FC">Suspense</text>
+    <text x="125" y="206" font-family="monospace" font-size="9" fill="#FCD34D">fallback</text>
+    <text x="178" y="206" font-family="monospace" font-size="9" fill="#F8FAFC">={</text>
+    <text x="193" y="206" font-family="monospace" font-size="9" fill="#86EFAC">"Loading recs..."</text>
+    <text x="298" y="206" font-family="monospace" font-size="9" fill="#F8FAFC">}&gt;</text>
 
-    <!-- Line 11: close -->
+    <!-- Line 11: Recs -->
     <text x="20" y="222" font-family="monospace" font-size="10" fill="#64748B">11</text>
-    <text x="55" y="222" font-family="monospace" font-size="9" fill="#F8FAFC">&lt;/</text>
-    <text x="70" y="222" font-family="monospace" font-size="9" fill="#7DD3FC">Suspense</text>
-    <text x="128" y="222" font-family="monospace" font-size="9" fill="#F8FAFC">&gt;&lt;/</text>
-    <text x="150" y="222" font-family="monospace" font-size="9" fill="#7DD3FC">div</text>
-    <text x="170" y="222" font-family="monospace" font-size="9" fill="#F8FAFC">&gt;)}</text>
+    <text x="70" y="222" font-family="monospace" font-size="9" fill="#F8FAFC">&lt;</text>
+    <text x="77" y="222" font-family="monospace" font-size="9" fill="#7DD3FC">Recs</text>
+    <text x="105" y="222" font-family="monospace" font-size="9" fill="#FCD34D">p</text>
+    <text x="113" y="222" font-family="monospace" font-size="9" fill="#F8FAFC">={recs} /&gt;</text>
 
-    <!-- Animated highlights -->
-    <rect x="35" y="114" width="335" height="64" rx="4" fill="none" stroke="#61DAFB" stroke-width="3" class="react-hl-1"/>
-    <rect x="35" y="146" width="335" height="16" rx="4" fill="none" stroke="#22C55E" stroke-width="3" class="react-hl-2"/>
-    <rect x="35" y="194" width="335" height="16" rx="4" fill="none" stroke="#22C55E" stroke-width="3" class="react-hl-3"/>
+    <!-- Line 12: close -->
+    <text x="20" y="238" font-family="monospace" font-size="10" fill="#64748B">12</text>
+    <text x="55" y="238" font-family="monospace" font-size="9" fill="#F8FAFC">&lt;/</text>
+    <text x="70" y="238" font-family="monospace" font-size="9" fill="#7DD3FC">Suspense</text>
+    <text x="128" y="238" font-family="monospace" font-size="9" fill="#F8FAFC">&gt;&lt;/</text>
+    <text x="150" y="238" font-family="monospace" font-size="9" fill="#7DD3FC">div</text>
+    <text x="170" y="238" font-family="monospace" font-size="9" fill="#F8FAFC">&gt;)}</text>
 
-    <!-- Animated pointers -->
-    <g class="react-hl-1"><polygon points="12,145 24,138 24,152" fill="#61DAFB" class="pointer"/></g>
-    <g class="react-hl-2"><polygon points="12,154 24,147 24,161" fill="#22C55E" class="pointer"/></g>
-    <g class="react-hl-3"><polygon points="12,202 24,195 24,209" fill="#22C55E" class="pointer"/></g>
+    <!-- Animated highlights - adjusted for new line positions -->
+    <rect x="35" y="130" width="335" height="64" rx="4" fill="none" stroke="#61DAFB" stroke-width="3" class="react-hl-1"/>
+    <rect x="35" y="162" width="335" height="16" rx="4" fill="none" stroke="#22C55E" stroke-width="3" class="react-hl-2"/>
+    <rect x="35" y="210" width="335" height="16" rx="4" fill="none" stroke="#22C55E" stroke-width="3" class="react-hl-3"/>
+
+    <!-- Animated pointers - adjusted for new line positions -->
+    <g class="react-hl-1"><polygon points="12,161 24,154 24,168" fill="#61DAFB" class="pointer"/></g>
+    <g class="react-hl-2"><polygon points="12,170 24,163 24,177" fill="#22C55E" class="pointer"/></g>
+    <g class="react-hl-3"><polygon points="12,218 24,211 24,225" fill="#22C55E" class="pointer"/></g>
   </g>
 
   <!-- === BROWSER PREVIEW === -->
@@ -423,10 +433,10 @@
     <!-- Key insight box -->
     <g transform="translate(30, 205)">
       <rect x="0" y="0" width="1100" height="110" rx="8" fill="#F0FDF4" stroke="#86EFAC" stroke-width="1.5"/>
-      <text x="25" y="24" font-family="system-ui" font-size="14" font-weight="700" fill="#166534">✨ Key Insight: Independent Streaming</text>
-      <text x="25" y="48" font-family="system-ui" font-size="12" fill="#15803D">Each async prop streams independently — reviews appear after 1s while recommendations are still loading!</text>
+      <text x="25" y="24" font-family="system-ui" font-size="14" font-weight="700" fill="#166534">✨ Key Insight: Parallel Await, Independent Streaming</text>
+      <text x="25" y="48" font-family="system-ui" font-size="12" fill="#15803D">Both props are awaited in parallel — whichever resolves first renders first! Reviews fill in at 1s, recommendations at 3s.</text>
       <text x="25" y="68" font-family="system-ui" font-size="12" fill="#15803D">Users see partial content immediately and can interact with it. No need to wait for the slowest query.</text>
-      <text x="25" y="92" font-family="system-ui" font-size="12" fill="#15803D">This is progressive enhancement at its best — fast data arrives fast, slow data streams in when ready.</text>
+      <text x="25" y="92" font-family="system-ui" font-size="12" fill="#15803D">This is progressive enhancement at its best — fast data streams when ready, slow data follows independently.</text>
     </g>
   </g>
 </svg>
