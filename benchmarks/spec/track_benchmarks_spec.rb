@@ -103,6 +103,109 @@ RSpec.describe "track_benchmarks" do
     end
   end
 
+  # Confirmation mode (BENCHMARK_MODE=confirm): a fresh-runner rerun of a main-push
+  # candidate. These pin the synthetic-branch/reset-baseline targeting, the structured
+  # alert pairs handed off to the confirmation, and the confirmed/cleared/inconclusive
+  # classification that decides whether an issue is filed.
+  describe "confirmation mode" do
+    around do |example|
+      snapshot = ENV.to_h
+      example.run
+    ensure
+      ENV.replace(snapshot)
+    end
+
+    describe "#slugify / #confirmation_branch" do
+      it "builds a branch-safe, never-main name unique per run and suite/shard" do
+        expect(slugify("Pro (shard 1/2)")).to eq("pro-shard-1-2")
+        expect(confirmation_branch("12345", "Pro (shard 1/2)")).to eq("confirm-main-12345-pro-shard-1-2")
+      end
+    end
+
+    describe "#branch_and_start_point_args" do
+      it "targets a throwaway branch and re-tests against main without polluting its series" do
+        ENV["BENCHMARK_MODE"] = "confirm"
+        ENV["GITHUB_RUN_ID"] = "777"
+        ENV["BENCHMARK_SUITE_NAME"] = "Core"
+
+        branch, start_point_args = branch_and_start_point_args
+        expect(branch).to eq("confirm-main-777-core")
+        expect(branch).not_to eq("main")
+        expect(start_point_args).to eq(
+          %w[--start-point main --start-point-clone-thresholds --start-point-reset]
+        )
+      end
+    end
+
+    describe "#regressed_alert_pairs" do
+      it "returns deduped benchmark+measure pairs from active alerts, dropping nameless ones" do
+        report = BencherReport.parse(
+          JSON.generate(
+            "results" => [],
+            "alerts" => [
+              { "benchmark" => { "name" => "/x: Pro" },
+                "threshold" => { "measure" => { "slug" => "rps" } }, "status" => "active" },
+              { "benchmark" => { "name" => "/x: Pro" },
+                "threshold" => { "measure" => { "slug" => "rps" } }, "status" => "active" },
+              { "threshold" => { "measure" => { "slug" => "rps" } }, "status" => "active" }
+            ]
+          )
+        )
+        expect(regressed_alert_pairs(report)).to eq([{ "benchmark" => "/x: Pro", "measure" => "rps" }])
+      end
+    end
+
+    describe "#confirmation_outcome" do
+      def pair(benchmark, measure)
+        { "benchmark" => benchmark, "measure" => measure }
+      end
+
+      it "is inconclusive when there is no parseable report" do
+        expect(confirmation_outcome(nil, 1, [pair("/x: Pro", "rps")])).to eq([:inconclusive, []])
+      end
+
+      it "is inconclusive on a non-zero exit with no alert (operational failure)" do
+        expect(confirmation_outcome(report_without_alert, 1, [pair("/x: Pro", "rps")])).to eq([:inconclusive, []])
+      end
+
+      it "is confirmed when the same benchmark+measure re-alerts" do
+        report = BencherReport.parse(
+          JSON.generate(
+            "results" => [],
+            "alerts" => [{ "benchmark" => { "name" => "/x: Pro" },
+                           "threshold" => { "measure" => { "slug" => "rps" } }, "status" => "active" }]
+          )
+        )
+        status, confirmed = confirmation_outcome(report, 1, [pair("/x: Pro", "rps")])
+        expect(status).to eq(:confirmed)
+        expect(confirmed).to eq([pair("/x: Pro", "rps")])
+      end
+
+      it "is cleared when a different benchmark/measure alerts than the candidate's" do
+        report = BencherReport.parse(
+          JSON.generate(
+            "results" => [],
+            "alerts" => [{ "benchmark" => { "name" => "/y: Pro" },
+                           "threshold" => { "measure" => { "slug" => "rps" } }, "status" => "active" }]
+          )
+        )
+        expect(confirmation_outcome(report, 1, [pair("/x: Pro", "rps")])).to eq([:cleared, []])
+      end
+
+      it "ignores a candidate alert on a temporarily-ignored benchmark" do
+        ignored = RegressionReport::IGNORED_REGRESSION_BENCHMARKS.first
+        report = BencherReport.parse(
+          JSON.generate(
+            "results" => [],
+            "alerts" => [{ "benchmark" => { "name" => ignored },
+                           "threshold" => { "measure" => { "slug" => "rps" } }, "status" => "active" }]
+          )
+        )
+        expect(confirmation_outcome(report, 1, [pair(ignored, "rps")])).to eq([:cleared, []])
+      end
+    end
+  end
+
   describe "#run_bencher" do
     it "emits the perf-link context warning to stdout so GitHub Actions annotates it" do
       status = instance_double(Process::Status, exitstatus: 0)

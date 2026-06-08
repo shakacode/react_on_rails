@@ -1,16 +1,22 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# Files a single GitHub issue for benchmark regressions detected on main.
+# Files a single GitHub issue for benchmark regressions CONFIRMED on main.
 #
-# Each benchmark matrix suite runs in its own parallel job; on a regression it
-# records a regression.json payload (see track_benchmarks.rb) that the workflow
-# uploads as an artifact. This script runs once, after the matrix, reads every
-# payload, and reports them serially through RegressionIssueReporter. Doing it in
-# one process is what makes the dedup/upsert safe: parallel suites reporting
-# directly would create duplicate issues and clobber the shared comment.
+# A main-push alert is non-fatal until a fresh-runner confirmation rerun re-alerts on
+# the same benchmark+measure (see track_benchmarks.rb confirmation mode). Each confirmed
+# suite/shard records a regression-confirmed.json payload (see regression_report.rb) that
+# the workflow uploads as an artifact. This script runs once, after the confirmation
+# matrix, reads every confirmed payload, and reports them serially through
+# RegressionIssueReporter. Doing it in one process is what makes the dedup/upsert safe:
+# parallel suites reporting directly would create duplicate issues and clobber the shared
+# comment.
 #
-# Usage: ruby benchmarks/report_regressions.rb <artifacts-dir>
+# This job owns the final pass/fail: a confirmed regression fails the workflow (exit 1)
+# AND files the issue; no confirmed payloads means every first-run alert was cleared as
+# noise (or short-circuited as ignored upstream), so it exits 0.
+#
+# Usage: ruby benchmarks/report_regressions.rb <confirmed-artifacts-dir>
 
 require "json"
 
@@ -19,25 +25,6 @@ require_relative "lib/github_cli"
 require_relative "lib/regression_report"
 
 BENCHER_URL = "https://bencher.dev/perf/react-on-rails-t8a9ncxo"
-
-# TEMPORARY — benchmarks whose regressions must NOT open an issue, by the exact
-# benchmark name Bencher reports (the leading-slash name shown in the summary table,
-# matched against RegressionReport::REGRESSED_BENCHMARKS in each suite's payload).
-#
-# /posts_page: Pro spent weeks hard-500ing on every request (failed_pct = 100), so the
-# route was effectively an instant error and Bencher built its rps/latency baseline
-# from those bogus-fast failure responses. Now that the route is fixed, its real
-# (slower) timings read as large regressions against that fast baseline and would file
-# a spurious regression issue on every main push. We can't surgically delete just this
-# benchmark's history in Bencher (the delete is blocked by a FOREIGN KEY constraint
-# from its reports/alerts), so we suppress its issue here instead.
-#
-# REMOVE this entry (restoring unconditional filing) once the failure-era samples have
-# rolled out of Bencher's 64-run t-test window for /posts_page: Pro on main — i.e. once
-# the dashboard baseline reflects real timings again. After that a regression for it is
-# genuine and must be reported. Tracking issue + full revert steps:
-# https://github.com/shakacode/react_on_rails/issues/3669
-IGNORED_REGRESSION_BENCHMARKS = ["/posts_page: Pro"].freeze
 
 # Creates (or updates) the single per-commit regression issue and upserts one
 # section per suite into a shared comment. Only safe to drive from a single
@@ -324,7 +311,9 @@ class RegressionIssueReporter
       ## Performance Regression Detected on main
 
       Statistically significant benchmark regressions were detected by [Bencher](#{bencher_url})
-      using a Student's t-test (95% confidence interval, up to 64 sample history).
+      using a Student's t-test (95% confidence interval, up to 64 sample history), and
+      **confirmed by a second run on a fresh runner** (re-tested against main's baseline)
+      that re-alerted on the same benchmark+measure — so this is unlikely to be runner noise.
 
       | Detail | Value |
       |--------|-------|
@@ -368,63 +357,53 @@ class RegressionIssueReporter
 end
 # rubocop:enable Metrics/ClassLength
 
-def regression_payload_paths(artifacts_dir)
+def confirmed_payload_paths(artifacts_dir)
   # Recursive glob so it works regardless of how download-artifact nests each
   # suite's artifact under the download path.
-  Dir.glob(File.join(artifacts_dir, "**", RegressionReport::FILENAME))
+  Dir.glob(File.join(artifacts_dir, "**", RegressionReport::CONFIRMED_FILENAME))
 end
 
 def load_payload(path)
   JSON.parse(File.read(path))
 rescue StandardError => e
-  # A regression was detected but its report is unreadable/corrupt. Surface it and
+  # A regression was confirmed but its report is unreadable/corrupt. Surface it and
   # let the caller fail rather than silently dropping the suite from the issue.
-  warn "::error::Failed to read regression payload #{path}: #{e.class}: #{e.message}"
+  warn "::error::Failed to read confirmed regression payload #{path}: #{e.class}: #{e.message}"
   nil
 end
 
-# Returns the regressed benchmarks to suppress only when every payload reports its
-# regressed benchmarks AND all of them are in IGNORED_REGRESSION_BENCHMARKS. Fails
-# safe toward filing: no payloads, a payload missing the list (older writer / hand-off
-# that couldn't name them), an empty list, or any non-ignored benchmark returns nil.
-def suppressed_regressed_benchmarks(payloads)
-  return nil if payloads.empty?
+# The per-shard evidence block for one confirmed payload: the first-run table and the
+# confirmation-run table side by side (the comparison is what a reader wants).
+def shard_summary(payload)
+  shard_label = payload.fetch(RegressionReport::SHARD_LABEL, "").to_s
+  heading = shard_label.empty? ? "" : "#### Shard #{shard_label}\n\n"
+  first_run = payload.fetch(RegressionReport::FIRST_RUN_SUMMARY, "").to_s
+  confirmation = payload.fetch(RegressionReport::CONFIRMATION_SUMMARY, "").to_s
+  <<~MARKDOWN
+    #{heading}**First run**
 
-  per_payload = payloads.map { |payload| payload[RegressionReport::REGRESSED_BENCHMARKS] }
-  return nil unless per_payload.all? { |names| names.is_a?(Array) && !names.empty? }
+    #{first_run}
 
-  regressed_benchmarks = per_payload.flatten.uniq
-  return nil unless regressed_benchmarks.all? { |name| IGNORED_REGRESSION_BENCHMARKS.include?(name) }
+    **Confirmation run** (fresh runner, re-tested against main's baseline)
 
-  regressed_benchmarks
+    #{confirmation}
+  MARKDOWN
 end
 
+# Reports the confirmed regressions. Returns:
+#   :clean  — no confirmed payloads (every first-run alert cleared as noise / ignored)
+#   :filed  — at least one confirmed regression filed/updated successfully
+#   :error  — a payload was unreadable or filing the issue failed (operational failure)
 def report_regressions(artifacts_dir)
-  paths = regression_payload_paths(artifacts_dir)
+  paths = confirmed_payload_paths(artifacts_dir)
 
   if paths.empty?
-    puts "No benchmark regressions were reported by any suite."
-    return true
+    puts "No confirmed benchmark regressions to report."
+    return :clean
   end
 
   payloads = paths.map { |path| load_payload(path) }
   readable = payloads.compact
-
-  # Skip filing when every regressed benchmark is temporarily ignored. Gated on all
-  # payloads being readable: an unreadable payload is an unknown regression that could
-  # be anything, so fall through and let the normal flow file (and then fail) rather
-  # than suppress it.
-  suppressed_benchmarks = suppressed_regressed_benchmarks(readable) if readable.size == payloads.size
-  if suppressed_benchmarks
-    # Surface as a run-summary notice (not a plain log line) so it is visible that the
-    # suppression is active and still needs removing once the baseline recovers.
-    Github.notice(
-      "Benchmark regression issue suppressed: the only regressed benchmark(s) are " \
-      "temporarily ignored (#{suppressed_benchmarks.join(', ')}). Remove " \
-      "IGNORED_REGRESSION_BENCHMARKS in report_regressions.rb once their Bencher baseline recovers."
-    )
-    return true
-  end
 
   # One section per suite: a sharded suite emits one payload per shard, so combine
   # them rather than filing a section per shard. Suites sorted for stable output.
@@ -441,7 +420,9 @@ def report_regressions(artifacts_dir)
   end.all?
 
   # Fail if any payload was unreadable: a lost report must not pass as success.
-  reported_ok && readable.size == payloads.size
+  return :error unless reported_ok && readable.size == payloads.size
+
+  :filed
 end
 
 def report_suite(suite_name, payloads, issue_number_cache: nil, report_comment_id_cache: nil)
@@ -449,9 +430,9 @@ def report_suite(suite_name, payloads, issue_number_cache: nil, report_comment_i
   # self-labels with its shard in its headers, so concatenation reads cleanly.
   summary = payloads
             .sort_by { |payload| payload.fetch(RegressionReport::SHARD_LABEL, "").split("/").first.to_i }
-            .map { |payload| payload.fetch(RegressionReport::SUMMARY) }
+            .map { |payload| shard_summary(payload) }
             .join("\n")
-  puts "Filing regression report for #{suite_name} (#{payloads.size} shard report(s))"
+  puts "Filing confirmed regression report for #{suite_name} (#{payloads.size} shard report(s))"
 
   issue_number = RegressionIssueReporter.report(
     suite_name:,
@@ -467,11 +448,21 @@ def report_suite(suite_name, payloads, issue_number_cache: nil, report_comment_i
     return false
   end
 
-  puts "Reported #{suite_name} regression to issue ##{issue_number}"
+  puts "Reported #{suite_name} confirmed regression to issue ##{issue_number}"
   true
 end
 
 if __FILE__ == $PROGRAM_NAME
-  artifacts_dir = ARGV.fetch(0, "regression-artifacts")
-  exit 1 unless report_regressions(artifacts_dir)
+  artifacts_dir = ARGV.fetch(0, "confirmed-artifacts")
+  case report_regressions(artifacts_dir)
+  when :clean
+    exit 0
+  when :filed
+    # A regression was confirmed on a fresh runner and the issue filed/updated. This
+    # job owns the final pass/fail, so fail the workflow to surface the regression.
+    warn "::error::Confirmed benchmark regression(s) on main; see the filed performance-regression issue."
+    exit 1
+  else
+    exit 1
+  end
 end
