@@ -262,5 +262,5 @@
   <text x="220" y="472" font-size="9" class="legend-text">Client Component</text>
   <rect x="360" y="460" width="40" height="14" rx="4" class="bar-client"/>
   <text x="408" y="472" font-size="9" class="legend-text">Client bundle size</text>
-  <text x="620" y="472" font-size="9" font-weight="600" class="phase-title">Goal: push 'use client' to the smallest leaf components possible</text>
+  <text x="620" y="472" font-size="8" font-weight="600" class="phase-title">Goal: push 'use client' to the smallest leaf components</text>
 </svg>

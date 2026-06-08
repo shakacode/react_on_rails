@@ -151,7 +151,7 @@
   <line x1="672" y1="287" x2="712" y2="287" class="arrow-line" stroke-width="2"/>
   <polygon points="712,283 724,287 712,291" class="arrow-body"/>
 
-  <text x="718" y="284" font-size="8" class="label-sub">stream</text>
+  <text x="692" y="278" text-anchor="middle" font-size="8" class="label-sub">stream</text>
 
   <rect x="726" y="272" width="120" height="30" rx="6" class="client-bundle" stroke-width="1.5"/>
   <text x="786" y="292" text-anchor="middle" font-size="9" font-weight="600" class="client-text">Browser (hydrate)</text>

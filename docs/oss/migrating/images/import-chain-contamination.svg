@@ -158,9 +158,9 @@
   <text x="716" y="312" font-family="ui-monospace, monospace" font-size="9" class="code-text">;</text>
 
   <!-- Size callout -->
-  <rect x="560" y="334" width="280" height="32" rx="8" class="light-box" stroke-width="2"/>
-  <text x="700" y="350" text-anchor="middle" font-size="12" font-weight="700" class="light-text">Result: 8 KB download</text>
-  <text x="700" y="366" text-anchor="middle" font-size="9" class="good-text">Only the component's own code — no contamination</text>
+  <rect x="560" y="334" width="280" height="38" rx="8" class="light-box" stroke-width="2"/>
+  <text x="700" y="352" text-anchor="middle" font-size="12" font-weight="700" class="light-text">Result: 8 KB download</text>
+  <text x="700" y="366" text-anchor="middle" font-size="8" class="good-text">Only the component's own code — no contamination</text>
 
   <!-- Bottom callout -->
   <rect x="100" y="416" width="700" height="34" rx="8" class="note-box" stroke-width="1.5" filter="url(#shadow)"/>
