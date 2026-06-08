@@ -26,6 +26,7 @@ export const createRSCPayloadKey = (componentName: string, componentProps: unkno
 };
 
 /* eslint-disable no-bitwise */
+// Dual-FNV-1a: two independent 32-bit FNV-1a streams combined into a 52-bit output.
 function hashString(input: string): string {
   let h1 = 0x811c9dc5 | 0;
   let h2 = 0x050c5d1f | 0;
