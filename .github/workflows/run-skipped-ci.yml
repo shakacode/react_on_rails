@@ -81,7 +81,7 @@ jobs:
             return {
               ref: pr.data.head.ref,
               sha: pr.data.head.sha,
-              headRepoFullName: pr.data.head.repo.full_name
+              headRepoFullName: pr.data.head.repo?.full_name ?? ''
             };
 
       - name: Get skipped checks and trigger workflows
@@ -116,7 +116,7 @@ jobs:
 
             // Find all skipped checks
             const skippedChecks = checks.data.check_runs.filter(check =>
-              check.conclusion === 'SKIPPED' && check.status === 'COMPLETED'
+              check.conclusion === 'skipped' && check.status === 'completed'
             );
 
             console.log(`Found ${skippedChecks.length} skipped checks:`);
@@ -143,7 +143,6 @@ jobs:
 
             const succeeded = [];
             const failed = [];
-            const notApplicable = [];
 
             // If no skipped checks found, trigger ALL workflows in the map
             // This handles the case where workflows haven't run yet (e.g., Pro tests on fresh PRs)
