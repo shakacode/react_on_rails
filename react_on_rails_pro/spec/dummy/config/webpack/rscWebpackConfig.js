@@ -130,7 +130,7 @@ const configureRsc = () => {
     conditionNames: ['react-server', '...'],
     alias: {
       ...rscAliases,
-      // Force all RSC-bundle imports to share one React server package instance.
+      // Canonicalize RSC-bundle React imports to one React server package instance.
       // Without these aliases, symlinked/hoisted packages can bundle one React copy
       // for react-on-rails-rsc and another for app Server Components. React.cache()
       // then sees no active RSC dispatcher and silently skips request-local dedupe.
