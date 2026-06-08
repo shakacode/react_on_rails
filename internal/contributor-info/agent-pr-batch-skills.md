@@ -9,11 +9,13 @@ Use this guide when deciding between the planning and execution skills for Codex
 | `$plan-pr-batch` | The user wants to choose, verify, or shape issues/PRs before launching workers.       | A concise Batch Plan plus a ready `$pr-batch` goal prompt under 4000 characters. |
 | `$pr-batch`      | The target list is exact, trusted, and ready to run or convert into a `/goal` prompt. | A launch plan, worker split, or final `/goal` prompt for processing the batch.   |
 
+The `agents/openai.yaml` file under a skill is optional Codex UI metadata for skill picker display text and the default prompt. Add it only for skills that need Codex picker metadata; it is not required for every skill.
+
 ## Default Flow
 
 1. Start with `$plan-pr-batch` when the target scope is a filter, label, milestone, pasted list, or ambiguous bare number.
 2. Verify every candidate through GitHub. Use `UNKNOWN` for facts that cannot be checked.
-3. Shape the batch into independent worker lanes. If there are more than roughly 8-10 independent items, risky shared files, or unclear dependencies, propose a smaller first batch.
+3. Shape the batch into independent worker lanes. Cap at 8 items when files or risk overlap, or 10 fully independent items; otherwise propose a smaller first batch.
 4. Give the user the Batch Plan and fenced `$pr-batch` goal prompt. Do not launch workers yet.
 5. When the user says to run it, use `$pr-batch` with the fenced goal prompt.
 
