@@ -180,7 +180,9 @@ jobs:
     with:
       matrix_row: ${{ toJSON(matrix) }}
       mode: initial
-    secrets: inherit
+    secrets:
+      REACT_ON_RAILS_PRO_LICENSE_V2: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+      BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
 
   # The confirmation gate. Reads the first-run candidates, drops the ones whose only
   # regressed benchmarks are temporarily ignored (no rerun, no issue), and emits a matrix
@@ -235,14 +237,14 @@ jobs:
       matrix: ${{ fromJSON(needs.plan-confirmation.outputs.confirmation_matrix || '{"include":[]}') }}
     permissions:
       contents: read
-      issues: write
-      pull-requests: write
       checks: write
     uses: ./.github/workflows/benchmark-suite.yml
     with:
       matrix_row: ${{ toJSON(matrix) }}
       mode: confirm
-    secrets: inherit
+    secrets:
+      REACT_ON_RAILS_PRO_LICENSE_V2: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+      BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
 
   # Files a single GitHub issue for any CONFIRMED benchmark regressions, with the first
   # run and confirmation summaries side by side. Runs once after confirmation (always(),

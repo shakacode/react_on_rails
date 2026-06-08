@@ -24,6 +24,11 @@ on:
         required: false
         default: 'initial'
         type: string
+    secrets:
+      REACT_ON_RAILS_PRO_LICENSE_V2:
+        required: true
+      BENCHER_API_TOKEN:
+        required: true
 
 # Same benchmark parameters as benchmark.yml's top-level env: a reusable workflow does
 # NOT inherit the caller's env, but it DOES see the caller's github context, so the
@@ -45,11 +50,8 @@ env:
 jobs:
   run-suite:
     runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      issues: write
-      pull-requests: write
-      checks: write
+    # Token permissions are set by each caller in benchmark.yml: initial mode can
+    # update PR comments, while confirm mode only reads the candidate and writes checks.
     env:
       SECRET_KEY_BASE: 'dummy-secret-key-for-ci-testing-not-used-in-production'
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
