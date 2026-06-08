@@ -70,11 +70,11 @@ RSpec.describe BencherRunner do
       allow(Open3).to receive(:capture3).and_return([report_json, "", status])
       allow(File).to receive(:write).with("report.json", report_json)
 
-      stderr, exit_code, report = runner.run("branch", [])
+      result = runner.run("branch", [])
 
-      expect(stderr).to eq("")
-      expect(exit_code).to eq(0)
-      expect(report).to be_a(BencherReport)
+      expect(result.stderr).to eq("")
+      expect(result.exit_code).to eq(0)
+      expect(result.report).to be_a(BencherReport)
     end
 
     it "removes a stale report and returns nil when Bencher emits no JSON" do
@@ -83,13 +83,13 @@ RSpec.describe BencherRunner do
       allow(Open3).to receive(:capture3).and_return(["", "auth failed", status])
       allow(FileUtils).to receive(:rm_f).with("report.json")
 
-      stderr, exit_code, report = nil
-      expect { stderr, exit_code, report = runner.run("branch", []) }
+      result = nil
+      expect { result = runner.run("branch", []) }
         .to output("auth failed\n").to_stderr
 
-      expect(stderr).to eq("auth failed")
-      expect(exit_code).to eq(2)
-      expect(report).to be_nil
+      expect(result.stderr).to eq("auth failed")
+      expect(result.exit_code).to eq(2)
+      expect(result.report).to be_nil
     end
 
     it "emits the perf-link context warning to stdout so GitHub Actions annotates it" do

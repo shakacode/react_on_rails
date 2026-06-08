@@ -35,21 +35,6 @@ class PrReportPoster
     end
   end
 
-  def stale_comment_ids(before:)
-    # Marker + cutoff are passed via env so the jq filter reads them through `env.X`,
-    # avoiding Ruby/JQ escaping mismatches from interpolated strings.
-    stdout, status = GithubCli.capture(
-      "gh", "api", "repos/#{repository}/issues/#{pr_number}/comments",
-      "--paginate",
-      "--jq", ".[] | select(.body | startswith(env.MARKER)) | select(.created_at < env.CUTOFF_TS) | .id",
-      env: { "MARKER" => marker, "CUTOFF_TS" => before },
-      error_message: "Failed to list stale #{suite_name} Bencher report comments"
-    )
-    return [] unless status.success?
-
-    stdout.lines.map(&:strip).reject(&:empty?)
-  end
-
   def delete_stale_comments(before:)
     failed = 0
     stale_comment_ids(before:).each do |comment_id|
@@ -72,6 +57,21 @@ class PrReportPoster
   private
 
   attr_reader :repository, :pr_number, :suite_name, :marker
+
+  def stale_comment_ids(before:)
+    # Marker + cutoff are passed via env so the jq filter reads them through `env.X`,
+    # avoiding Ruby/JQ escaping mismatches from interpolated strings.
+    stdout, status = GithubCli.capture(
+      "gh", "api", "repos/#{repository}/issues/#{pr_number}/comments",
+      "--paginate",
+      "--jq", ".[] | select(.body | startswith(env.MARKER)) | select(.created_at < env.CUTOFF_TS) | .id",
+      env: { "MARKER" => marker, "CUTOFF_TS" => before },
+      error_message: "Failed to list stale #{suite_name} Bencher report comments"
+    )
+    return [] unless status.success?
+
+    stdout.lines.map(&:strip).reject(&:empty?)
+  end
 
   def post_comment(markdown)
     # Send the body over stdin (--body-file -) rather than as a CLI argument so a

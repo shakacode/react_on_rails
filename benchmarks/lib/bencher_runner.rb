@@ -10,6 +10,8 @@ require_relative "github"
 class BencherRunner
   class ReportParseError < StandardError; end
 
+  Result = Struct.new(:stderr, :exit_code, :report, keyword_init: true)
+
   MAX_SAMPLE = "64"
   # Per-measure t-test boundaries (the confidence level Bencher uses for its
   # prediction interval). Tuned from a sweep of recent main-branch reports so fewer
@@ -70,7 +72,7 @@ class BencherRunner
     warn stderr unless stderr.empty?
     report = persist_report(stdout)
     warn_on_missing_perf_link_context(report)
-    [stderr, status.exitstatus, report]
+    Result.new(stderr:, exit_code: status.exitstatus, report:)
   end
 
   private

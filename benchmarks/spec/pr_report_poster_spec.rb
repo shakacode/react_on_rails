@@ -61,31 +61,6 @@ RSpec.describe PrReportPoster do
     end
   end
 
-  describe "#stale_comment_ids" do
-    it "lists older comments matching the marker" do
-      status = instance_double(Process::Status, success?: true)
-
-      allow(GithubCli).to receive(:capture).and_return(["111\n\n222\n", status])
-
-      expect(poster.stale_comment_ids(before: "2026-06-07T12:00:00Z")).to eq(%w[111 222])
-      expect(GithubCli).to have_received(:capture).with(
-        "gh", "api", "repos/shakacode/react_on_rails/issues/123/comments",
-        "--paginate",
-        "--jq", ".[] | select(.body | startswith(env.MARKER)) | select(.created_at < env.CUTOFF_TS) | .id",
-        env: { "MARKER" => "<!-- BENCHER CORE -->", "CUTOFF_TS" => "2026-06-07T12:00:00Z" },
-        error_message: "Failed to list stale Core Bencher report comments"
-      )
-    end
-
-    it "returns no ids when the listing command fails" do
-      status = instance_double(Process::Status, success?: false)
-
-      allow(GithubCli).to receive(:capture).and_return(["111\n", status])
-
-      expect(poster.stale_comment_ids(before: "2026-06-07T12:00:00Z")).to eq([])
-    end
-  end
-
   describe "#delete_stale_comments" do
     it "deletes each stale comment id" do
       status = instance_double(Process::Status, success?: true)
@@ -102,6 +77,16 @@ RSpec.describe PrReportPoster do
         "gh", "api", "-X", "DELETE", "repos/shakacode/react_on_rails/issues/comments/222",
         error_message: "Failed to delete stale Core Bencher report comment 222"
       )
+    end
+
+    it "does not delete anything when the stale comment listing command fails" do
+      status = instance_double(Process::Status, success?: false)
+
+      allow(GithubCli).to receive_messages(capture: ["111\n", status], run: true)
+
+      poster.delete_stale_comments(before: "cutoff")
+
+      expect(GithubCli).not_to have_received(:run)
     end
 
     it "warns when stale comment deletion fails" do

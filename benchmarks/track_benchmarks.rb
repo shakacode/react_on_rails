@@ -77,6 +77,13 @@ def run_bencher(branch, start_point_args)
   bencher_runner.run(branch, start_point_args)
 end
 
+def run_bencher_or_exit(branch, start_point_args)
+  run_bencher(branch, start_point_args)
+rescue BencherRunner::ReportParseError => e
+  warn "::error::#{e.message}"
+  exit 1
+end
+
 def append_step_summary(markdown)
   File.open(ENV.fetch("GITHUB_STEP_SUMMARY"), "a") { |file| file.write(markdown) }
 end
@@ -195,12 +202,10 @@ if __FILE__ == $PROGRAM_NAME
   env!("BENCHER_API_TOKEN")
 
   branch, start_point_args = branch_and_start_point_args
-  begin
-    stderr, bencher_exit_code, report = run_bencher(branch, start_point_args)
-  rescue BencherRunner::ReportParseError => e
-    warn "::error::#{e.message}"
-    exit 1
-  end
+  bencher_result = run_bencher_or_exit(branch, start_point_args)
+  stderr = bencher_result.stderr
+  bencher_exit_code = bencher_result.exit_code
+  report = bencher_result.report
 
   if retry_without_start_point_hash?(stderr, bencher_exit_code, report)
     retry_args = start_point_args.dup
@@ -211,12 +216,9 @@ if __FILE__ == $PROGRAM_NAME
     Github.warning("Start-point hash not found in Bencher; falling back to latest baseline for comparison")
     # The retry's stderr is unused: regression classification reads the JSON report,
     # and this path only triggers when the first run had no regression.
-    begin
-      _retry_stderr, bencher_exit_code, report = run_bencher(branch, retry_args)
-    rescue BencherRunner::ReportParseError => e
-      warn "::error::#{e.message}"
-      exit 1
-    end
+    retry_result = run_bencher_or_exit(branch, retry_args)
+    bencher_exit_code = retry_result.exit_code
+    report = retry_result.report
   end
 
   # Build the Markdown summary table once; the same body feeds the job summary, the
