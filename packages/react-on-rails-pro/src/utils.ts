@@ -25,22 +25,25 @@ export const createRSCPayloadKey = (componentName: string, componentProps: unkno
   return `${componentName}-${JSON.stringify(componentProps)}${domNodeId ? `-${domNodeId}` : ''}`;
 };
 
-/* eslint-disable no-bitwise, no-plusplus */
-function djb2Hash(input: string): string {
-  let hash = 5381;
-  for (let i = 0; i < input.length; i++) {
-    hash = ((hash << 5) + hash + input.charCodeAt(i)) | 0;
+/* eslint-disable no-bitwise */
+function hashString(input: string): string {
+  let h1 = 0x811c9dc5 | 0;
+  let h2 = 0x050c5d1f | 0;
+  for (let i = 0; i < input.length; i += 1) {
+    const c = input.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 0x01000193);
+    h2 = Math.imul(h2 ^ c, 0x0100019d);
   }
-  return (hash >>> 0).toString(36);
+  return (((h1 >>> 0) & 0xfffff) * 0x100000000 + (h2 >>> 0)).toString(36);
 }
-/* eslint-enable no-bitwise, no-plusplus */
+/* eslint-enable no-bitwise */
 
 export const createEmbeddedPayloadKey = (
   componentName: string,
   componentProps: unknown,
   domNodeId?: string,
 ) => {
-  const propsHash = djb2Hash(JSON.stringify(componentProps));
+  const propsHash = hashString(JSON.stringify(componentProps) ?? 'undefined');
   return domNodeId ? `${componentName}-${propsHash}-${domNodeId}` : `${componentName}-${propsHash}`;
 };
 
