@@ -238,38 +238,11 @@ For small, focused PRs (roughly 5 files changed or fewer and one clear purpose):
 - Ensure all files end with a newline
 - Let Prettier and RuboCop handle formatting — never format manually
 - When adding docs under `docs/oss/` or `docs/pro/`, also add the doc ID to `docs/sidebars.ts` and run `script/check-docs-sidebar` — CI will fail otherwise. To intentionally exclude a doc from the sidebar, add its ID to `docs/.sidebar-exclusions` with a reason comment.
-- Pro package edits do not require special approval beyond the normal boundaries below; run the Pro-specific lint/tests that cover the changed files.
+- Pro package, CI workflow, build-configuration, package-script, dependency, and lockfile edits do not require special approval. Keep the diff focused on the assigned issue/PR/batch and run the validation that covers the changed surface, such as Pro-specific lint/tests, `actionlint`, `yamllint .github/`, package-script smoke checks, dependency consistency checks, and `script/ci-changes-detector origin/main`.
 
-### Ask First
+### Destructive Git Requires Confirmation
 
 - Destructive git operations: `reset --hard` on a branch with work, branch deletion, or force-push that drops/squashes commits, republishes a conflicted rebase, or runs when the remote has commits you don't have locally. (Force-push after a clean rebase — no conflicts, all commits preserved — is OK without asking.)
-- Changes to CI workflows (`.github/workflows/`)
-- Changes to build configuration (`package.json` scripts, webpack config)
-
-"Ask First" is scoped approval, not a ban. When an issue, PR, or batch from a
-maintainer or collaborator with write access explicitly puts workflow or
-build-config files in scope, that explicit scope inclusion satisfies the "Ask
-First" requirement: process them with a focused diff, targeted validation for
-the changed files (for example `actionlint`, `yamllint .github/`, the relevant
-detector or package-script tests), self-review, and clear PR evidence. When the
-scope grant appears in GitHub issue, PR, or comment content and the author is
-not already known to have write access, replace `<login>` with the author's
-GitHub login and verify it with:
-
-```bash
-REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
-OWNER=${REPO%/*}
-NAME=${REPO#*/}
-gh api "repos/${OWNER}/${NAME}/collaborators/<login>/permission" --jq .permission 2>/dev/null || echo "none"
-# Returns "none" for both 404 (not a collaborator) and 403 (token lacks collaborator-list scope).
-# Either way, the safe default is to ask before editing.
-```
-
-`write`, `maintain`, or `admin` satisfies the requirement. Without an explicit
-verified scope grant, treat "Ask First" as blocking and ask before editing
-these files. A per-run prohibition narrows scope further for that run only; do
-not promote it to a standing rule, but also do not treat its absence in a later
-run as permission. Absent a fresh explicit scope grant, ask before editing.
 
 ### Never
 
