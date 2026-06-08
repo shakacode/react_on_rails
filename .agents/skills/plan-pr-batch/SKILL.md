@@ -39,7 +39,7 @@ Plan a PR batch
    - Return a concise "Batch Plan" and a fenced "Goal Prompt for pr-batch".
    - Keep the fenced goal prompt under 4000 characters total so bulky audit detail stays in the Batch Plan.
    - If the batch will not fit, split it into smaller goals and output only the first ready goal.
-   - Do not start `$pr-batch` unless the user explicitly asks to run it; when they do, hand them the fenced goal prompt.
+   - Do not start `$pr-batch` unless the user explicitly asks to run it; when they do, hand them the fenced goal prompt and tell them to run `$pr-batch` with it.
 
 ## Batch Plan Format
 
