@@ -78,6 +78,27 @@ gh issue list --search "<key terms from issue>" --state open
 gh pr list --search "<key terms from issue>" --state open
 ```
 
+## Release Mode Preflight
+
+Before merge readiness or auto-merge decisions, resolve the current release mode from the live release tracker.
+
+1. Search for open release gate trackers, usually issues with the existing `release` and `TRACKING` labels or a `Release gate:` title.
+2. If no active tracker exists, use `development` mode. This is not a blocker.
+3. If exactly one active tracker exists, read its `Agent Release Mode` block from the issue body. If the block is absent, use the conservative default for that tracker's release phase and report the missing block.
+4. If multiple active trackers exist for the same final release target, use the oldest open tracker unless it explicitly says it was superseded. Preserve useful non-conflicting information, then close clean duplicates as duplicates.
+5. If multiple active trackers exist for different final release targets or conflicting modes, report `release-mode-conflict` and do not auto-merge.
+
+Agents must not auto-create release trackers. A maintainer creates a tracker when entering accelerated RC, strict RC, or final-release coordination.
+
+### Tracker Update Safety
+
+Tracker issue bodies are shared mutable state. Avoid clobbering another agent's update:
+
+- Re-read the tracker immediately before editing the body.
+- Prefer append-only tracker comments for concurrent per-PR or per-batch updates.
+- Edit the tracker body only when you can preserve the latest body content and merge your intended update cleanly.
+- If the tracker changed and the update cannot be safely merged, post a comment containing the intended update and report the conflict to the coordinator.
+
 ## Workflow And Build-Config Scope
 
 Workflow, build-configuration, package-script, dependency, lockfile, and Pro
@@ -492,11 +513,54 @@ Also verify:
 
 Merge qualification follows the canonical rule in `AGENTS.md` -> Review Workflow -> For All PRs: CI is passing, all current review comments and threads are addressed or explicitly triaged by tier, no major question or discussion item needs maintainer attention, and advisory AI systems such as CodeRabbit.ai are not special approval gates.
 
+### Accelerated RC Auto-Merge
+
+In `accelerated-rc` mode, affected areas such as SSR, RSC, hydration, package
+release, generators, CI, benchmarks, and Pro/core boundaries do not cap the
+score by themselves. They choose the validation checklist. Missing validation,
+real uncertainty, failed checks, or unresolved findings lower the score.
+
+Auto-merge requires all of the following:
+
+- The PR body contains the latest finalized `Agent Merge Confidence` block; do not rely on a PR comment for the final state.
+- The authoring agent did not finalize its own `8/10` or higher score.
+- Score is at least `8/10`; `7/10` permits human merge after review, but not auto-merge.
+- All GitHub checks for the current head SHA are complete. Skipped checks count as complete when the PR body explains why they were expected. Failed checks block unless a maintainer explicitly waives them.
+- The GitHub `claude-review` check is complete for the current head SHA, or it failed because of quota, usage limit, unavailable model, or equivalent capacity failure and Cursor Bugbot or Codex review completed as the fallback.
+- Claude failures not caused by capacity limits are understood before merge.
+- CodeRabbit approval is not required, but concrete CodeRabbit findings still need normal blocker triage.
+- Any non-trivial advisory concern that is not obviously wrong is fixed, disproven with evidence, or explicitly waived.
+
+Suggested PR body block:
+
+```text
+## Agent Merge Confidence
+
+Mode: accelerated-rc
+Score: 8/10
+Auto-merge recommendation: yes
+Affected areas: RSC, Pro/core boundary, CI
+CI detector: `script/ci-changes-detector origin/main` -> <summary>
+Validation run:
+- <command> -> <result>
+Review/check gate:
+- Claude review: complete for <head SHA>, no confirmed blocker
+- Fallback review, if Claude quota-limited: <Cursor or Codex result>
+- GitHub checks: complete for <head SHA>, failures/skips explained
+Known residual risk: <none or concise risk>
+Finalized by: <agent/person>
+```
+
 Comment tiers (`MUST-FIX`, `DISCUSS`, `OPTIONAL`, `SKIPPED`) are assigned by
 `.agents/skills/address-review/SKILL.md` when skills are available; otherwise use
 `.agents/workflows/address-review.md` as the fallback.
 
 If approved and green but not merging immediately, use the repository's standard `ready-to-merge` label when available.
+
+After an accelerated RC auto-merge, do a lightweight post-merge check: confirm
+the PR landed on `main`, check `main` status, and update the active release
+tracker if one exists. Reserve full post-merge audit for final-release readiness
+or suspected bad merges.
 
 ## Multi-PR Landing Plan
 

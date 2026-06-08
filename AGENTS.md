@@ -187,6 +187,41 @@ restores/saves the gem cache, and supports non-frozen installs via `frozen: 'fal
 
 **GitHub follow-up issues**: Follow-up issues are the exception. Prefer fixing or declining review feedback in the PR. If deferred work remains valuable, present one bundled deferred-work summary and ask whether to track it. Prefer an existing issue; otherwise create at most one bundled issue per PR unless the user explicitly approves more. New follow-up issue titles must begin with `Follow-up:`. Build multi-line issue bodies as Markdown files and pass them with `gh issue create --body-file`; do not pass escaped newline strings through `--body`.
 
+## Release Mode And Auto-Merge Coordination
+
+Use the current release tracker to decide whether PRs are in normal development, accelerated RC, strict RC, or final-release mode. The tracker is the live source of truth for the mode; committed docs define how to interpret it.
+
+- An active tracker is an open release gate issue, usually found by the existing `release` and `TRACKING` labels or the `Release gate:` title. The mode must be recorded in the issue body, not encoded by adding more labels.
+- If no active tracker exists, assume `development` mode. This is not a blocker; it means the repo is moving toward the next beta/RC/final.
+- If multiple active trackers exist for different release targets or conflicting modes, report `release-mode-conflict` and do not auto-merge until resolved.
+- For duplicate trackers with the same final release target, the oldest open tracker is canonical unless it explicitly says it is superseded by another tracker. Agents may close clean duplicates only after preserving non-conflicting useful information in the canonical tracker.
+- Agents do not auto-create release trackers. A maintainer creates one when entering accelerated RC, strict RC, or final-release coordination.
+- To avoid concurrent issue-body overwrites, re-read the tracker immediately before editing it. Prefer append-only comments for per-PR/batch status from concurrent agents, and only edit the tracker body when preserving the latest body content. If the latest tracker body changed in a way the agent cannot safely merge, post a comment with the intended update and report the conflict.
+
+During `accelerated-rc`, affected areas such as SSR, RSC, hydration, package release, generators, CI, benchmarks, and Pro/core boundaries do not cap confidence by themselves. They choose the validation checklist. Actual uncertainty, missing proof, failed checks, or unresolved findings lower confidence.
+
+Auto-merge during accelerated RC requires a finalized PR-body confidence block. The authoring agent may draft it, but a separate coordinator, finalizer, or review agent must finalize it. Keep only the latest finalized block in the PR body.
+
+```text
+## Agent Merge Confidence
+
+Mode: accelerated-rc
+Score: 8/10
+Auto-merge recommendation: yes
+Affected areas: RSC, Pro/core boundary, CI
+CI detector: `script/ci-changes-detector origin/main` -> <summary>
+Validation run:
+- <command> -> <result>
+Review/check gate:
+- Claude review: complete for <head SHA>, no confirmed blocker
+- Fallback review, if Claude quota-limited: <Cursor or Codex result>
+- GitHub checks: complete for <head SHA>, failures/skips explained
+Known residual risk: <none or concise risk>
+Finalized by: <agent/person>
+```
+
+Auto-merge threshold in accelerated RC is `8/10`. A score of `7/10` permits human merge after review, but not auto-merge. Final-release mode is stricter and should run a post-merge audit before publishing the final release.
+
 ## Review Workflow
 
 ### PR CI Labels
@@ -207,6 +242,10 @@ Agents should recommend PR labels based on change complexity and risk. The goal 
 - Do not wait for CodeRabbit.ai, Claude, or any other AI system to approve when CI is green, blocking review feedback is addressed, and no major question or discussion item remains.
 - If branch protection still reports `REVIEW_REQUIRED`, verify whether a formal GitHub approving review is missing. Positive AI issue comments such as "LGTM" or "Ready to merge" support triage but do not satisfy a required review.
 - Security-category findings such as XSS, injection, exposed secrets, or auth bypass still require investigation before dismissal, regardless of source.
+
+For auto-merge, all GitHub checks for the current head SHA must be complete. Skipped checks count as complete when the PR body explains why they are expected. Failed checks block auto-merge unless a maintainer explicitly waives them. If checks are noisy or unnecessary, fix the CI selection process instead of bypassing them silently.
+
+For auto-merge, use the GitHub `claude-review` check as the preferred independent review gate. Wait while it is queued or running for the current head SHA. If it fails due to quota, usage limit, unavailable model, or equivalent capacity failure, fall back to Cursor Bugbot or Codex review and record that fallback in the PR body. Other Claude failures block until understood. CodeRabbit remains advisory and is not a required approval gate.
 
 For small, focused PRs (roughly 5 files changed or fewer and one clear purpose):
 

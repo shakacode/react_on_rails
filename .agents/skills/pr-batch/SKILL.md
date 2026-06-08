@@ -17,6 +17,7 @@ Run a Codex batch
 
 Use `.agents/workflows/pr-processing.md` as the deeper operating model for each issue, PR, review-fix pass, or merge-readiness item.
 If the target scope is not verified yet, use `.agents/skills/plan-pr-batch/SKILL.md` first.
+For release-mode coordination, auto-merge confidence, and shared release tracker updates, follow `AGENTS.md` and the release-mode sections of `.agents/workflows/pr-processing.md`; do not invent new labels or overwrite tracker issue bodies from stale reads.
 
 ## Non-Negotiable Safety Rules
 
