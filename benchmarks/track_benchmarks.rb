@@ -115,7 +115,7 @@ def replace_pr_comments(markdown)
 end
 
 def pr_report_poster
-  PrReportPoster.from_env(suite_name: SUITE_NAME, marker: REPORT_MARKER)
+  @pr_report_poster ||= PrReportPoster.from_env(suite_name: SUITE_NAME, marker: REPORT_MARKER)
 end
 
 # The display rows written by the bench scripts (BmfCollector#write_display_json).
