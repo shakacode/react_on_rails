@@ -132,44 +132,44 @@
     <rect x="0" y="24" width="420" height="12" fill="url(#railsGrad)"/>
     <text x="210" y="24" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="600" fill="white">Code</text>
 
-    <g transform="translate(16, 48)">
+    <g transform="translate(16, 46)">
       <text x="0" y="12" font-family="ui-monospace, monospace" font-size="10" class="text-secondary">// Rails — emit async props</text>
-      <text x="0" y="30" font-family="ui-monospace, monospace" font-size="11" class="text-primary">stream_component(</text>
-      <text x="10" y="46" font-family="ui-monospace, monospace" font-size="11" class="text-keyword">props:</text>
-      <text x="55" y="46" font-family="ui-monospace, monospace" font-size="11" class="text-primary">{ </text>
-      <text x="68" y="46" font-family="ui-monospace, monospace" font-size="11" class="text-code">title</text>
-      <text x="98" y="46" font-family="ui-monospace, monospace" font-size="11" class="text-primary">: </text>
-      <text x="108" y="46" font-family="ui-monospace, monospace" font-size="11" class="text-string">"Header"</text>
-      <text x="168" y="46" font-family="ui-monospace, monospace" font-size="11" class="text-primary"> }</text>
-      <text x="200" y="46" font-family="ui-monospace, monospace" font-size="9" class="text-label">← sync (instant)</text>
+      <text x="0" y="27" font-family="ui-monospace, monospace" font-size="11" class="text-primary">stream_component(</text>
+      <text x="10" y="41" font-family="ui-monospace, monospace" font-size="11" class="text-keyword">props:</text>
+      <text x="55" y="41" font-family="ui-monospace, monospace" font-size="11" class="text-primary">{ </text>
+      <text x="68" y="41" font-family="ui-monospace, monospace" font-size="11" class="text-code">title</text>
+      <text x="98" y="41" font-family="ui-monospace, monospace" font-size="11" class="text-primary">: </text>
+      <text x="108" y="41" font-family="ui-monospace, monospace" font-size="11" class="text-string">"Header"</text>
+      <text x="168" y="41" font-family="ui-monospace, monospace" font-size="11" class="text-primary"> }</text>
+      <text x="200" y="41" font-family="ui-monospace, monospace" font-size="9" class="text-label">← sync</text>
 
-      <text x="0" y="64" font-family="ui-monospace, monospace" font-size="11" class="text-primary">) { |emit|</text>
-      <text x="10" y="80" font-family="ui-monospace, monospace" font-size="11" class="text-primary">emit(</text>
-      <text x="45" y="80" font-family="ui-monospace, monospace" font-size="11" class="text-string">"reviews"</text>
-      <text x="110" y="80" font-family="ui-monospace, monospace" font-size="11" class="text-primary">, data)</text>
-      <text x="200" y="80" font-family="ui-monospace, monospace" font-size="9" class="text-secondary">// after 1s</text>
-      <text x="10" y="96" font-family="ui-monospace, monospace" font-size="11" class="text-primary">emit(</text>
-      <text x="45" y="96" font-family="ui-monospace, monospace" font-size="11" class="text-string">"recs"</text>
-      <text x="82" y="96" font-family="ui-monospace, monospace" font-size="11" class="text-primary">, data)</text>
-      <text x="200" y="96" font-family="ui-monospace, monospace" font-size="9" class="text-secondary">// after 3s</text>
-      <text x="0" y="112" font-family="ui-monospace, monospace" font-size="11" class="text-primary">}</text>
+      <text x="0" y="56" font-family="ui-monospace, monospace" font-size="11" class="text-primary">) { |emit|</text>
+      <text x="10" y="70" font-family="ui-monospace, monospace" font-size="11" class="text-primary">emit(</text>
+      <text x="45" y="70" font-family="ui-monospace, monospace" font-size="11" class="text-string">"reviews"</text>
+      <text x="110" y="70" font-family="ui-monospace, monospace" font-size="11" class="text-primary">, data)</text>
+      <text x="200" y="70" font-family="ui-monospace, monospace" font-size="9" class="text-secondary">// 1s</text>
+      <text x="10" y="84" font-family="ui-monospace, monospace" font-size="11" class="text-primary">emit(</text>
+      <text x="45" y="84" font-family="ui-monospace, monospace" font-size="11" class="text-string">"recs"</text>
+      <text x="82" y="84" font-family="ui-monospace, monospace" font-size="11" class="text-primary">, data)</text>
+      <text x="200" y="84" font-family="ui-monospace, monospace" font-size="9" class="text-secondary">// 3s</text>
+      <text x="0" y="98" font-family="ui-monospace, monospace" font-size="11" class="text-primary">}</text>
 
-      <line x1="0" y1="124" x2="388" y2="124" class="divider" stroke-width="1"/>
+      <line x1="0" y1="110" x2="388" y2="110" class="divider" stroke-width="1"/>
 
-      <text x="0" y="142" font-family="ui-monospace, monospace" font-size="10" class="text-secondary">// React — both promises start immediately</text>
-      <text x="0" y="158" font-family="ui-monospace, monospace" font-size="11" class="text-primary">reviews = </text>
-      <text x="72" y="158" font-family="ui-monospace, monospace" font-size="11" class="text-keyword">getAsyncProp</text>
-      <text x="150" y="158" font-family="ui-monospace, monospace" font-size="11" class="text-primary">(</text>
-      <text x="157" y="158" font-family="ui-monospace, monospace" font-size="11" class="text-string">'reviews'</text>
-      <text x="218" y="158" font-family="ui-monospace, monospace" font-size="11" class="text-primary">)</text>
-      <text x="0" y="174" font-family="ui-monospace, monospace" font-size="11" class="text-primary">recs    = </text>
-      <text x="72" y="174" font-family="ui-monospace, monospace" font-size="11" class="text-keyword">getAsyncProp</text>
-      <text x="150" y="174" font-family="ui-monospace, monospace" font-size="11" class="text-primary">(</text>
-      <text x="157" y="174" font-family="ui-monospace, monospace" font-size="11" class="text-string">'recs'</text>
-      <text x="195" y="174" font-family="ui-monospace, monospace" font-size="11" class="text-primary">)</text>
+      <text x="0" y="126" font-family="ui-monospace, monospace" font-size="10" class="text-secondary">// React — promises start in parallel</text>
+      <text x="0" y="142" font-family="ui-monospace, monospace" font-size="11" class="text-primary">reviews = </text>
+      <text x="72" y="142" font-family="ui-monospace, monospace" font-size="11" class="text-keyword">getAsyncProp</text>
+      <text x="150" y="142" font-family="ui-monospace, monospace" font-size="11" class="text-primary">(</text>
+      <text x="157" y="142" font-family="ui-monospace, monospace" font-size="11" class="text-string">'reviews'</text>
+      <text x="218" y="142" font-family="ui-monospace, monospace" font-size="11" class="text-primary">)</text>
+      <text x="0" y="156" font-family="ui-monospace, monospace" font-size="11" class="text-primary">recs    = </text>
+      <text x="72" y="156" font-family="ui-monospace, monospace" font-size="11" class="text-keyword">getAsyncProp</text>
+      <text x="150" y="156" font-family="ui-monospace, monospace" font-size="11" class="text-primary">(</text>
+      <text x="157" y="156" font-family="ui-monospace, monospace" font-size="11" class="text-string">'recs'</text>
+      <text x="195" y="156" font-family="ui-monospace, monospace" font-size="11" class="text-primary">)</text>
 
-      <path d="M -6 150 L -10 150 L -10 180 L -6 180" fill="none" stroke="#3B82F6" stroke-width="1.5"/>
-      <text x="235" y="166" font-family="ui-monospace, monospace" font-size="9" fill="#3B82F6">parallel!</text>
+      <path d="M -6 134 L -10 134 L -10 162 L -6 162" fill="none" stroke="#3B82F6" stroke-width="1.5"/>
+      <text x="235" y="149" font-family="ui-monospace, monospace" font-size="9" fill="#3B82F6">parallel!</text>
     </g>
   </g>
 
