@@ -135,8 +135,8 @@ const configureRsc = () => {
       // for react-on-rails-rsc and another for app Server Components. React.cache()
       // then sees no active RSC dispatcher and silently skips request-local dedupe.
       react$: resolve(reactPackageRoot, 'react.react-server.js'),
-      'react/jsx-runtime': resolve(reactPackageRoot, 'jsx-runtime.react-server.js'),
-      'react/jsx-dev-runtime': resolve(reactPackageRoot, 'jsx-dev-runtime.react-server.js'),
+      'react/jsx-runtime$': resolve(reactPackageRoot, 'jsx-runtime.react-server.js'),
+      'react/jsx-dev-runtime$': resolve(reactPackageRoot, 'jsx-dev-runtime.react-server.js'),
       // Ignore react-dom/server in RSC bundle - it's not needed for RSC payload generation.
       // Not removing it will cause a runtime error.
       'react-dom/server': false,

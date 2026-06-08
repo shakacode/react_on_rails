@@ -32,8 +32,8 @@ describe('rscWebpackConfig discovery build contract', () => {
     expect(config.resolve.conditionNames).toContain('react-server');
     expect(aliases.react).toBeUndefined();
     expect(aliases.react$).toMatch(/react[\\/]react\.react-server\.js$/);
-    expect(aliases['react/jsx-runtime']).toMatch(/react[\\/]jsx-runtime\.react-server\.js$/);
-    expect(aliases['react/jsx-dev-runtime']).toMatch(/react[\\/]jsx-dev-runtime\.react-server\.js$/);
+    expect(aliases['react/jsx-runtime$']).toMatch(/react[\\/]jsx-runtime\.react-server\.js$/);
+    expect(aliases['react/jsx-dev-runtime$']).toMatch(/react[\\/]jsx-dev-runtime\.react-server\.js$/);
     expect(aliases['react-dom/server']).toBe(false);
   });
 });

@@ -217,8 +217,8 @@ const configureRsc = () => {
       // Keep the RSC renderer and app Server Components on the same React
       // server package instance so React.cache() sees the active dispatcher.
       react$: resolve(reactPackageRoot, 'react.react-server.js'),
-      'react/jsx-runtime': resolve(reactPackageRoot, 'jsx-runtime.react-server.js'),
-      'react/jsx-dev-runtime': resolve(reactPackageRoot, 'jsx-dev-runtime.react-server.js'),
+      'react/jsx-runtime$': resolve(reactPackageRoot, 'jsx-runtime.react-server.js'),
+      'react/jsx-dev-runtime$': resolve(reactPackageRoot, 'jsx-dev-runtime.react-server.js'),
       // Ignore react-dom/server in RSC bundle -- it's not needed for
       // RSC payload generation and importing it causes a runtime error
       'react-dom/server': false,
