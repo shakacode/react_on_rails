@@ -197,7 +197,8 @@ In React on Rails, slow data is streamed using [async props](../../oss/migrating
 <%# Rails view: stream slow data as an async prop %>
 <%= stream_react_component_with_async_props("Page",
       props: { title: "Fast Header" }) do |emit|
-  emit.call("slowData", SlowService.fetch_data)  # Emitted when ready
+  sleep 2  # Simulate slow database query (demo only)
+  emit.call("slowData", { message: "Loaded after 2 seconds" })
 end %>
 ```
 

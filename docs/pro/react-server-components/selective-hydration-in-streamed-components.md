@@ -23,9 +23,9 @@ Let's add a component that loads slow data using [async props](../../oss/migrati
 <%# app/views/pages/react_server_component_with_ssr.html.erb %>
 <%= stream_react_component_with_async_props("ReactServerComponentPage",
       props: { posts: @posts }) do |emit|
-  # This slow query is emitted as an async prop — the page streams immediately
-  # while this resolves in the background
-  emit.call("slowData", SlowService.fetch_expensive_data)
+  # Simulate a slow query — the page streams immediately while this resolves
+  sleep 5  # Demo only: replace with your actual slow query
+  emit.call("slowData", { message: "Loaded after 5 seconds" })
 end %>
 ```
 
