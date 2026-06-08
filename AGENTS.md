@@ -211,7 +211,7 @@ Auto-merge during accelerated RC requires a finalized PR-body confidence block. 
 
 Mode: accelerated-rc
 Score: X/10
-Auto-merge recommendation: yes
+Auto-merge recommendation: <yes if score is at least 8/10, else no>
 Affected areas: RSC, Pro/core boundary, CI
 CI detector: `script/ci-changes-detector origin/main` -> <summary>
 Validation run:
