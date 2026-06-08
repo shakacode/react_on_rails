@@ -21,6 +21,7 @@ Let's add a component that is very slow to load into the page.
 
 ```jsx
 const LongWaitingComponent = async () => {
+  // ⚠️ DEMO ONLY — simulates slow component. For real slow data, use async props.
   await new Promise((resolve) => setTimeout(resolve, 5000));
   return <div>Long waiting component</div>;
 };

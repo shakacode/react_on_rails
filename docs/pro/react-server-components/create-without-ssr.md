@@ -232,8 +232,8 @@ import lodash from 'lodash';
 // your Rails controller, which passes the results to the component as props (see note below).
 import os from 'os';
 
-// This async component demonstrates server-side functionality
-async function ReactServerComponent() {
+// This component demonstrates server-side functionality
+function ReactServerComponent() {
   console.log('Hello from ReactServerComponent');
 
   // Using moment.js for complex date calculations

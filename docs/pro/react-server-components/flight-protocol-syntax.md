@@ -194,6 +194,7 @@ When a server component is async (for example it await a fetch call), flight han
 For example imagine a page with fast and slow parts:
 
 ```jsx
+// ⚠️ Illustrative only — in React on Rails, use Rails props or async props (see note below)
 async function SlowData() {
   const data = await fetch('/api/slow');
   return <p>{data}</p>;

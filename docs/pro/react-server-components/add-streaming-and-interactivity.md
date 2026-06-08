@@ -21,7 +21,7 @@ import _ from 'lodash';
 import moment from 'moment';
 
 const Posts = async ({ posts }) => {
-  // Artificial delay to simulate a slow render and demonstrate streaming
+  // ⚠️ DEMO ONLY — simulates slow render. For real slow data, use async props (after adding SSR).
   await new Promise((resolve) => setTimeout(resolve, 1000));
 
   const postsByUser = _.groupBy(posts, 'user_id');
