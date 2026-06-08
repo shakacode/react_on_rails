@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const rscWebpackConfigPath = path.resolve(__dirname, '../config/webpack/rscWebpackConfig.js');
+const rscWebpackConfig = require('../config/webpack/rscWebpackConfig');
 
 describe('rscWebpackConfig discovery build contract', () => {
   const source = fs.readFileSync(rscWebpackConfigPath, 'utf8');
@@ -23,5 +24,16 @@ describe('rscWebpackConfig discovery build contract', () => {
     expect(source).toContain('statSync(entryPath).isFile()');
     expect(source).toContain('excludedRegistrationEntryPathComponents');
     expect(source).toContain('return configuredEntry;');
+  });
+  it('pins React server imports to one package instance for React.cache dispatcher sharing', () => {
+    const config = rscWebpackConfig();
+    const aliases = config.resolve.alias;
+
+    expect(config.resolve.conditionNames).toContain('react-server');
+    expect(aliases.react).toBeUndefined();
+    expect(aliases.react$).toMatch(/react[\\/]react\.react-server\.js$/);
+    expect(aliases['react/jsx-runtime']).toMatch(/react[\\/]jsx-runtime\.react-server\.js$/);
+    expect(aliases['react/jsx-dev-runtime']).toMatch(/react[\\/]jsx-dev-runtime\.react-server\.js$/);
+    expect(aliases['react-dom/server']).toBe(false);
   });
 });

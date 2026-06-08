@@ -76,7 +76,9 @@ Create a new file `config/webpack/rscWebpackConfig.js`:
 
 ```js
 // use the same config as serverWebpackConfig.js but add the RSC loader
+const { dirname, resolve } = require('path');
 const serverWebpackConfig = require('./serverWebpackConfig');
+const reactPackageRoot = dirname(require.resolve('react/package.json'));
 
 // Function that extracts a specific loader from a webpack rule
 function extractLoader(rule, loaderName) {
@@ -117,12 +119,28 @@ const configureRsc = () => {
     }
   });
 
-  // Add the `react-server` condition to the resolve config
-  // This condition is used by React and React on Rails to know that this bundle is a React Server Component bundle
-  // The `...` tells webpack to retain the default Webpack conditions (In this case will keep the `node` condition because the bundle targets node)
+  // Add the `react-server` condition to the resolve config.
+  // This condition is used by React and React on Rails to identify RSC bundles.
+  // The `...` tells webpack to retain default conditions such as `node`.
+  const rscAliases = { ...(rscConfig.resolve?.alias || {}) };
+  delete rscAliases.react;
+  delete rscAliases['react$'];
+  delete rscAliases['react/jsx-runtime'];
+  delete rscAliases['react/jsx-dev-runtime'];
+
   rscConfig.resolve = {
     ...rscConfig.resolve,
     conditionNames: ['react-server', '...'],
+    alias: {
+      ...rscAliases,
+      // Keep the RSC renderer and app Server Components on the same React
+      // server package instance so React.cache() sees the active dispatcher.
+      react$: resolve(reactPackageRoot, 'react.react-server.js'),
+      'react/jsx-runtime': resolve(reactPackageRoot, 'jsx-runtime.react-server.js'),
+      'react/jsx-dev-runtime': resolve(reactPackageRoot, 'jsx-dev-runtime.react-server.js'),
+      // RSC payload generation does not use react-dom/server.
+      'react-dom/server': false,
+    },
   };
 
   // Update the output bundle name to be `rsc-bundle.js` instead of `server-bundle.js`

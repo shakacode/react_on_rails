@@ -125,7 +125,8 @@ RSC requires a **third webpack bundle** alongside your existing client and serve
 
 1. **Add `react-on-rails-rsc/WebpackLoader`** to the JavaScript loader chain (after babel-loader or swc-loader). This loader intercepts files containing `'use client'` and replaces their exports with lightweight client reference stubs instead of actual component code. This is what keeps client code out of the RSC bundle.
 2. **Add `react-server` to `resolve.conditionNames`**. This tells webpack to use the `react-server` export condition from `package.json` when resolving modules -- React itself ships different entry points for the RSC environment vs the normal server environment.
-3. **Alias `react-dom/server` to `false`**. The RSC bundle generates RSC payloads (a serialization format), not HTML. Importing `react-dom/server` in the RSC environment causes a runtime error, so it must be excluded.
+3. **Force React server imports to one package instance**. Every import of `react`, `react/jsx-runtime`, and `react/jsx-dev-runtime` inside the RSC bundle must resolve to the same React server files. This keeps React's request-local cache dispatcher shared between the RSC renderer and app Server Components, so `React.cache()` works correctly.
+4. **Alias `react-dom/server` to `false`**. The RSC bundle generates RSC payloads (a serialization format), not HTML. Importing `react-dom/server` in the RSC environment causes a runtime error, so it must be excluded.
 
 The entry point should be the **same file** as your server bundle (typically `server-bundle.js`), just with a different output filename (`rsc-bundle.js`). Do **not** add `RSCWebpackPlugin` to this config -- only the client and server bundles need it.
 
@@ -136,12 +137,14 @@ Create `config/webpack/rscWebpackConfig.js`:
 // Creates the RSC bundle based on the server webpack config
 // See: ../../pro/react-server-components/how-react-server-components-work.md
 
+const { dirname, resolve } = require('path');
 const serverWebpackModule = require('./serverWebpackConfig');
 
 // Backward compatibility:
 // - New Pro config exports: { default: configureServer, extractLoader }
 // - Legacy config exports: module.exports = configureServer
 const serverWebpackConfig = serverWebpackModule.default || serverWebpackModule;
+const reactPackageRoot = dirname(require.resolve('react/package.json'));
 const extractLoader =
   serverWebpackModule.extractLoader ||
   ((rule, loaderName) => {
@@ -197,11 +200,22 @@ const configureRsc = () => {
   // Add the `react-server` condition to the resolve config.
   // This tells webpack (and React) that this bundle targets the RSC environment.
   // The `...` retains default conditions (e.g., `node` for server target).
+  const rscAliases = { ...(rscConfig.resolve?.alias || {}) };
+  delete rscAliases.react;
+  delete rscAliases['react$'];
+  delete rscAliases['react/jsx-runtime'];
+  delete rscAliases['react/jsx-dev-runtime'];
+
   rscConfig.resolve = {
     ...rscConfig.resolve,
     conditionNames: ['react-server', '...'],
     alias: {
-      ...rscConfig.resolve?.alias,
+      ...rscAliases,
+      // Keep the RSC renderer and app Server Components on the same React
+      // server package instance so React.cache() sees the active dispatcher.
+      react$: resolve(reactPackageRoot, 'react.react-server.js'),
+      'react/jsx-runtime': resolve(reactPackageRoot, 'jsx-runtime.react-server.js'),
+      'react/jsx-dev-runtime': resolve(reactPackageRoot, 'jsx-dev-runtime.react-server.js'),
       // Ignore react-dom/server in RSC bundle -- it's not needed for
       // RSC payload generation and importing it causes a runtime error
       'react-dom/server': false,
@@ -219,17 +233,7 @@ module.exports = configureRsc;
 
 > **Mutation safety note:** This example assumes `serverWebpackConfig(true)` returns a fresh config object per call. If your setup reuses shared config objects, clone `module.rules` / `rule.use` before mutating them in `configureRsc`.
 >
-> **React aliases note:** If your webpack config deduplicates React with aliases (common in pnpm/monorepo setups), you must override those aliases in the RSC config to point to the react-server entry files. Directory-path aliases bypass webpack's `conditionNames` resolution. Add these to the `alias` block above:
->
-> ```js
-> alias: {
->   ...rscConfig.resolve?.alias,
->   react: require.resolve('react/react.react-server.js'),
->   'react/jsx-runtime': require.resolve('react/jsx-runtime.react-server.js'),
->   'react/jsx-dev-runtime': require.resolve('react/jsx-dev-runtime.react-server.js'),
->   'react-dom/server': false,
-> },
-> ```
+> **React aliases note:** Do not alias `react` to a package directory in the RSC bundle. Directory aliases can bypass the `react-server` condition or create duplicate React server modules. The exact file aliases in the example above keep `React.cache()` request-local memoization connected to the RSC renderer dispatcher.
 
 ### 4b. Add RSCWebpackPlugin to the server webpack config
 

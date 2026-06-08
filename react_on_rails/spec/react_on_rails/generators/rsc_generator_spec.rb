@@ -74,6 +74,14 @@ describe RscGenerator, type: :generator do
         expect(content).to include("basename(entryPath) !== expectedServerComponentRegistrationEntry")
         expect(content).to include("statSync(entryPath).isFile()")
         expect(content).to include("excludedRegistrationEntryPathComponents")
+        expect(content).to include("const reactPackageRoot = dirname(require.resolve('react/package.json'))")
+        expect(content).to include("delete rscAliases.react")
+        expect(content).to include("delete rscAliases['react$']")
+        expect(content).to include("react$: resolve(reactPackageRoot, 'react.react-server.js')")
+        expect(content).to include("'react/jsx-runtime': resolve(reactPackageRoot, 'jsx-runtime.react-server.js')")
+        expect(content).to include(
+          "'react/jsx-dev-runtime': resolve(reactPackageRoot, 'jsx-dev-runtime.react-server.js')"
+        )
       end
     end
 
@@ -4148,6 +4156,7 @@ describe RscGenerator, type: :generator do
       it "rscWebpackConfig.js aliases react-dom/server to false for RSC bundle" do
         assert_file "config/rspack/rscWebpackConfig.js" do |content|
           expect(content).to include("'react-dom/server': false")
+          expect(content).to include("react$: resolve(reactPackageRoot, 'react.react-server.js')")
         end
       end
 
