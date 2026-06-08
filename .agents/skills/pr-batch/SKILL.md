@@ -16,6 +16,7 @@ Run a Codex batch
 ```
 
 Use `.agents/workflows/pr-processing.md` as the deeper operating model for each issue, PR, review-fix pass, or merge-readiness item.
+If the target scope is not verified yet, use `.agents/skills/plan-pr-batch/SKILL.md` first.
 
 ## Non-Negotiable Safety Rules
 
