@@ -17,11 +17,11 @@ describe('createEmbeddedPayloadKey', () => {
   });
 
   it('handles undefined props', () => {
-    expect(createEmbeddedPayloadKey('Comp', undefined, 'node-1')).toMatch(/^Comp-[a-z0-9]+-node-1$/);
+    expect(createEmbeddedPayloadKey('Comp', undefined, 'node-1')).toBe('Comp-4naxctcn8d-node-1');
   });
 
   it('handles null props', () => {
-    expect(createEmbeddedPayloadKey('Comp', null, 'node-1')).toMatch(/^Comp-[a-z0-9]+-node-1$/);
+    expect(createEmbeddedPayloadKey('Comp', null, 'node-1')).toBe('Comp-k7whjxr9t4-node-1');
   });
 
   it('omits domNodeId when not provided', () => {
