@@ -84,7 +84,7 @@ class BencherReport
     raise FormatError, "report is not a JSON object (got #{raw.class})" unless raw.is_a?(Hash)
 
     @boundaries = index_boundaries(raw)
-    @alerts = parse_alerts(raw)
+    @alerts, @filtered_alerts = parse_alerts(raw).partition { |alert| current_regression_alert?(alert) }
     # Per-benchmark perf links are informational (they only decide whether a name links
     # out), so they live in a separate, fully-lenient builder — a missing field yields an
     # unlinked name, never a FormatError that would fail the job over a cosmetic link.
@@ -93,9 +93,9 @@ class BencherReport
 
   attr_reader :alerts
 
-  def regression?
-    !@alerts.empty?
-  end
+  def regression? = !@alerts.empty?
+
+  def filtered_alert? = !@filtered_alerts.empty?
 
   # Boundary for a benchmark+measure, or nil if absent from the report.
   def boundary(benchmark_name, measure_key)
@@ -118,9 +118,7 @@ class BencherReport
   # plain name. A single benchmark missing its own uuid stays silent (a per-row cosmetic
   # miss); losing the shared context instead is a likely report-contract drift, so the
   # caller surfaces it as a ::warning:: — never a FormatError (the links are cosmetic).
-  def perf_links_unavailable?
-    @perf_urls.any_benchmarks? && !@perf_urls.context_ready?
-  end
+  def perf_links_unavailable? = @perf_urls.any_benchmarks? && !@perf_urls.context_ready?
 
   private
 
@@ -188,6 +186,31 @@ class BencherReport
       )
     end
   end
+
+  # rubocop:disable Metrics/CyclomaticComplexity
+  def current_regression_alert?(alert)
+    return true unless alert.benchmark
+
+    direction = { "lower" => :lower, "upper" => :upper }[normalize(alert.limit)]
+    return true unless direction
+
+    unless alert.measure
+      matching_boundaries = @boundaries.fetch(alert.benchmark, {}).values.select do |boundary|
+        threshold_side?(boundary, direction)
+      end
+      return true if matching_boundaries.empty?
+
+      return matching_boundaries.any? { |boundary| boundary.significance(direction) == :regression }
+    end
+
+    boundary = boundary(alert.benchmark, alert.measure)
+    return true unless boundary && threshold_side?(boundary, direction)
+
+    boundary.significance(direction) == :regression
+  end
+  # rubocop:enable Metrics/CyclomaticComplexity
+
+  def threshold_side?(boundary, direction) = direction == :lower ? boundary.lower_limit : boundary.upper_limit
 
   def normalize(key)
     key.to_s.downcase.gsub(/[-\s]+/, "_")
