@@ -142,6 +142,7 @@ def bencher_runner
 end
 
 def replace_pr_comments(markdown)
+  return if markdown.empty?
   return unless ENV.fetch("GITHUB_EVENT_NAME") == "pull_request"
 
   pr_report_poster.replace(markdown)

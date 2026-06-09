@@ -89,14 +89,14 @@ class BencherRunner
     end
 
     tmp_report_json = "#{report_json}.tmp"
+    report_persisted = false
     begin
       File.write(tmp_report_json, stdout)
       FileUtils.mv(tmp_report_json, report_json)
-    rescue StandardError
-      FileUtils.rm_f(report_json)
-      raise
+      report_persisted = true
     ensure
       FileUtils.rm_f(tmp_report_json)
+      FileUtils.rm_f(report_json) unless report_persisted
     end
     parse_report(stdout)
   rescue ReportParseError

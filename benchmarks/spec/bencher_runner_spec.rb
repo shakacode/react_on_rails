@@ -181,7 +181,7 @@ RSpec.describe BencherRunner do
       expect(FileUtils).to have_received(:rm_f).with("report.json")
     end
 
-    it "removes the temporary report when moving the report is interrupted" do
+    it "removes the temporary and final reports when moving the report is interrupted" do
       status = instance_double(Process::Status, exitstatus: 0)
 
       allow(Open3).to receive(:capture3).and_return([JSON.generate("results" => [], "alerts" => []), "", status])
@@ -191,6 +191,7 @@ RSpec.describe BencherRunner do
 
       expect { runner.run("branch", []) }.to raise_error(Interrupt)
       expect(FileUtils).to have_received(:rm_f).with("report.json.tmp")
+      expect(FileUtils).to have_received(:rm_f).with("report.json")
     end
   end
 end
