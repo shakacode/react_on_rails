@@ -119,7 +119,7 @@ def run_bencher!(branch, start_point_args)
 rescue BencherRunner::ReportParseError => e
   warn "::error::#{e.message}"
   exit 1
-rescue SystemCallError, RuntimeError => e
+rescue BencherRunner::PersistenceError => e
   warn "::error::Benchmark report persistence failed: #{e.message}"
   exit 1
 end
@@ -147,9 +147,8 @@ def bencher_runner
 end
 
 def replace_pr_comments(markdown)
-  # Short-circuit on empty markdown before the env-var lookup; most main-branch pushes take this path.
-  return if markdown.empty?
   return unless ENV.fetch("GITHUB_EVENT_NAME") == "pull_request"
+  return if markdown.empty?
 
   pr_report_poster.replace(markdown)
 end

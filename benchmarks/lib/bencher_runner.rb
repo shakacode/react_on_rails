@@ -9,6 +9,7 @@ require_relative "github"
 # Builds and runs the Bencher CLI invocation for benchmark tracking.
 class BencherRunner
   class ReportParseError < StandardError; end
+  class PersistenceError < RuntimeError; end
 
   Result = Struct.new(:stderr, :exit_code, :report, keyword_init: true)
   private_constant :Result
@@ -101,6 +102,8 @@ class BencherRunner
     begin
       File.write(tmp_report_json, stdout)
       FileUtils.mv(tmp_report_json, report_json)
+    rescue SystemCallError, IOError, RuntimeError => e
+      raise PersistenceError, e.message
     ensure
       # Always runs. After a successful mv the tmp file is already renamed, so
       # rm_f is a no-op; if write or mv raised it performs the cleanup.

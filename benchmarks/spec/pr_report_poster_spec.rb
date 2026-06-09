@@ -15,6 +15,19 @@ RSpec.describe PrReportPoster do
     )
   end
 
+  describe "#initialize" do
+    it "rejects non-numeric pull request numbers before building GitHub paths" do
+      expect do
+        described_class.new(
+          repository: "shakacode/react_on_rails",
+          pr_number: "main/456",
+          suite_name: "Core",
+          marker: "<!-- BENCHER CORE -->"
+        )
+      end.to raise_error(ArgumentError, 'pr_number must be numeric, got: "main/456"')
+    end
+  end
+
   describe ".from_env" do
     it "wires the repository and pull request number from GitHub Actions env" do
       status = instance_double(Process::Status, success?: true)
@@ -42,7 +55,7 @@ RSpec.describe PrReportPoster do
       with_env("GITHUB_REPOSITORY" => "shakacode/react_on_rails", "PR_NUMBER" => "main/456") do
         expect do
           described_class.from_env(suite_name: "Pro", marker: "<!-- BENCHER PRO -->")
-        end.to raise_error(ArgumentError, 'PR_NUMBER must be numeric, got: "main/456"')
+        end.to raise_error(ArgumentError, 'pr_number must be numeric, got: "main/456"')
       end
     end
   end

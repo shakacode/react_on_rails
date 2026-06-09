@@ -129,10 +129,10 @@ RSpec.describe "track_benchmarks" do
   end
 
   describe "#run_bencher!" do
-    it "formats system benchmark report I/O failures as GitHub Actions errors" do
+    it "formats benchmark report persistence failures as GitHub Actions errors" do
       runner = instance_double(BencherRunner)
       allow(self).to receive(:bencher_runner).and_return(runner)
-      allow(runner).to receive(:run).and_raise(Errno::ENOSPC, "report.json")
+      allow(runner).to receive(:run).and_raise(BencherRunner::PersistenceError, "No space")
 
       expect do
         run_bencher!("branch", [])
@@ -142,17 +142,14 @@ RSpec.describe "track_benchmarks" do
       )
     end
 
-    it "formats non-system benchmark report write failures as GitHub Actions errors" do
+    it "does not relabel unexpected runtime failures as report persistence errors" do
       runner = instance_double(BencherRunner)
       allow(self).to receive(:bencher_runner).and_return(runner)
-      allow(runner).to receive(:run).and_raise(RuntimeError, "disk layer failed")
+      allow(runner).to receive(:run).and_raise(RuntimeError, "parser bug")
 
       expect do
         run_bencher!("branch", [])
-      end.to(
-        output(/::error::Benchmark report persistence failed: disk layer failed/).to_stderr
-          .and(raise_error(SystemExit) { |e| expect(e.status).to eq(1) })
-      )
+      end.to raise_error(RuntimeError, "parser bug")
     end
   end
 

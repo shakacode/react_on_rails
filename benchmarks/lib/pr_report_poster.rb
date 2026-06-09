@@ -9,6 +9,9 @@ require_relative "github_cli"
 # older comments with the same marker.
 class PrReportPoster
   def initialize(repository:, pr_number:, suite_name:, marker:)
+    pr_number = pr_number.to_s
+    raise ArgumentError, "pr_number must be numeric, got: #{pr_number.inspect}" unless pr_number.match?(/\A\d+\z/)
+
     @repository = repository
     @pr_number = pr_number
     @suite_name = suite_name
@@ -18,12 +21,9 @@ class PrReportPoster
   # GitHub Actions sets GITHUB_REPOSITORY natively. The workflow step must set
   # PR_NUMBER from the pull request event; ENV.fetch raises KeyError if either is absent.
   def self.from_env(suite_name:, marker:)
-    pr_number = ENV.fetch("PR_NUMBER")
-    raise ArgumentError, "PR_NUMBER must be numeric, got: #{pr_number.inspect}" unless pr_number.match?(/\A\d+\z/)
-
     new(
       repository: ENV.fetch("GITHUB_REPOSITORY"),
-      pr_number:,
+      pr_number: ENV.fetch("PR_NUMBER"),
       suite_name:,
       marker:
     )

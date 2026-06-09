@@ -185,7 +185,7 @@ RSpec.describe BencherRunner do
       allow(File).to receive(:write).with("report.json.tmp", anything).and_raise(Errno::ENOSPC)
       allow(FileUtils).to receive(:rm_f)
 
-      expect { runner.run(branch: "branch", start_point_args: []) }.to raise_error(Errno::ENOSPC)
+      expect { runner.run(branch: "branch", start_point_args: []) }.to raise_error(BencherRunner::PersistenceError)
       expect(FileUtils).to have_received(:rm_f).with("report.json.tmp")
       expect(FileUtils).not_to have_received(:rm_f).with("report.json")
     end
@@ -197,7 +197,9 @@ RSpec.describe BencherRunner do
       allow(File).to receive(:write).with("report.json.tmp", anything).and_raise(RuntimeError, "disk layer failed")
       allow(FileUtils).to receive(:rm_f)
 
-      expect { runner.run(branch: "branch", start_point_args: []) }.to raise_error(RuntimeError, "disk layer failed")
+      expect { runner.run(branch: "branch", start_point_args: []) }.to raise_error(
+        BencherRunner::PersistenceError, "disk layer failed"
+      )
       expect(FileUtils).to have_received(:rm_f).with("report.json.tmp")
       expect(FileUtils).not_to have_received(:rm_f).with("report.json")
     end
