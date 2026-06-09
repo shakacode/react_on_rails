@@ -1,4 +1,4 @@
-# Issue And Fix Evaluation
+# Issue and Fix Evaluation
 
 Use these principles before implementing, batching, or assigning issues. The goal is to spend engineering and CI time on work that matters, not on every plausible gap.
 

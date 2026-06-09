@@ -32,7 +32,7 @@ AI-found gaps are leads, not priorities. Prioritize real customer reports, verif
    - A valid issue can still have an over-scoped fix.
    - Prefer narrow guards, clearer errors, docs, or workarounds when they solve the real risk.
    - Be skeptical of broad identity, runtime, CI, workflow, dependency, or Pro/RSC changes unless impact justifies the complexity.
-   - Split complex fixes into prerequisites and decision points.
+   - Split complex fixes into prerequisites and decision points; do not let a polished RFC imply immediate priority.
 
 5. Recommend disposition:
    - `fix now / P0`
@@ -79,4 +79,4 @@ Next action:
 
 ## Batch Integration
 
-Before `$plan-pr-batch` or `$pr-batch`, evaluate candidates whose value is unclear. Exclude `park`, `close`, and `product decision` items from implementation batches unless the batch is explicitly audit/comment-only. Convert low-value assigned issues into no-PR evidence comments rather than speculative PRs.
+For exact issue or PR candidates, evaluate unclear value before implementation or worker launch. For filters, labels, milestones, pasted lists, or other unverified batch scope, run `$plan-pr-batch` first to resolve exact candidates, then evaluate unclear items before `$pr-batch`. Exclude `park`, `close`, and `product decision` items from implementation batches unless the batch is explicitly audit/comment-only. Convert low-value assigned issues into no-PR evidence comments rather than speculative PRs.

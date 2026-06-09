@@ -18,6 +18,8 @@ Is this issue worth fixing?
 
 Use this before assigning implementation work when candidate issues may be low-value, speculative, over-scoped, or better handled with a no-PR evidence comment. If the user named exact issues or PRs, evaluate them directly; if the user gave filters or an unverified batch scope, let `$plan-pr-batch` resolve exact targets first, then evaluate unclear candidates before `$pr-batch` worker launch.
 
+If you update this skill, keep `.agents/workflows/evaluate-issue.md` aligned for agents without skill support.
+
 ## Core Principle
 
 AI-found gaps are leads, not priorities. Prioritize real customer reports, verified regressions, security/correctness issues, and migration blockers over hypothetical issues found by code analysis.

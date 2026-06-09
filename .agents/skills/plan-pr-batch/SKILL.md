@@ -7,7 +7,6 @@ argument-hint: '[issue/PR numbers, labels, milestone, or search query]'
 # Plan PR Batch
 
 Create verified scope and a goal prompt for `$pr-batch`. Do not implement items here.
-For filters or unverified batch scope, resolve exact candidates here first. If any candidate may be low-value, speculative, AI/code-analysis-only, or over-scoped, use `.agents/skills/evaluate-issue/SKILL.md` before assigning implementation work.
 
 Memorable invocation:
 
