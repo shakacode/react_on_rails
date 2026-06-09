@@ -16,6 +16,20 @@ RSpec.describe PrReportPoster do
   end
 
   describe "#initialize" do
+    it "rejects repositories that are not owner/repo slugs before building GitHub paths" do
+      expect do
+        described_class.new(
+          repository: "shakacode/react_on_rails/issues",
+          pr_number: "123",
+          suite_name: "Core",
+          marker: "<!-- BENCHER CORE -->"
+        )
+      end.to raise_error(
+        ArgumentError,
+        'repository must be in owner/repo format, got: "shakacode/react_on_rails/issues"'
+      )
+    end
+
     it "rejects non-numeric pull request numbers before building GitHub paths" do
       expect do
         described_class.new(

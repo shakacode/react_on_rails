@@ -33,7 +33,10 @@ module BenchmarkEnvHelper
   def with_env(vars)
     snapshot = ENV.to_h
     GATING_ENV_KEYS.each { |key| ENV.delete(key) }
-    vars.each { |key, value| ENV[key.to_s] = value.to_s }
+    vars.each do |key, value|
+      env_key = key.to_s
+      value.nil? ? ENV.delete(env_key) : ENV[env_key] = value.to_s
+    end
     yield
   ensure
     ENV.replace(snapshot)

@@ -9,12 +9,17 @@ require_relative "github_cli"
 # older comments with the same marker.
 class PrReportPoster
   def initialize(repository:, pr_number:, suite_name:, marker:)
+    normalized_repository = repository.to_s
+    unless normalized_repository.match?(%r{\A[\w.-]+/[\w.-]+\z})
+      raise ArgumentError, "repository must be in owner/repo format, got: #{normalized_repository.inspect}"
+    end
+
     normalized_pr_number = pr_number.to_s
     unless normalized_pr_number.match?(/\A\d+\z/)
       raise ArgumentError, "pr_number must be numeric, got: #{normalized_pr_number.inspect}"
     end
 
-    @repository = repository
+    @repository = normalized_repository
     @pr_number = normalized_pr_number
     @suite_name = suite_name
     @marker = marker
