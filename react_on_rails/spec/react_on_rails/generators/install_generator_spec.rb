@@ -2147,8 +2147,12 @@ describe InstallGenerator, type: :generator do
         expect(content).to include("serverWebpackConfig(true)")
         expect(content).to include("rsc-bundle")
         expect(content).to include("react-server")
+        expect(content).to include("const reactPackageRoot = dirname(require.resolve('react/package.json'))")
         expect(content).to include("react$: resolve(reactPackageRoot, 'react.react-server.js')")
         expect(content).to include("'react/jsx-runtime$': resolve(reactPackageRoot, 'jsx-runtime.react-server.js')")
+        expect(content).to include(
+          "'react/jsx-dev-runtime$': resolve(reactPackageRoot, 'jsx-dev-runtime.react-server.js')"
+        )
         expect(content).to include("process.env.REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH")
         expect(content).to include("defaultServerComponentRegistrationEntry")
       end

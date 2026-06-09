@@ -116,6 +116,8 @@ const configureRsc = () => {
   // The `...` tells webpack to retain the default conditions (e.g., `node` for server target).
   const rscAliases = { ...(rscConfig.resolve?.alias || {}) };
   delete rscAliases['react-on-rails-pro$'];
+  // Strip client-only StrictMode shim so RSC imports of `react-on-rails-pro/client`
+  // do not pull a browser entry point into the React server bundle.
   delete rscAliases['react-on-rails-pro/client$'];
   delete rscAliases.react;
   delete rscAliases.react$;
@@ -123,6 +125,7 @@ const configureRsc = () => {
   delete rscAliases['react/jsx-runtime$'];
   delete rscAliases['react/jsx-dev-runtime'];
   delete rscAliases['react/jsx-dev-runtime$'];
+  delete rscAliases['react-dom/server'];
   delete rscAliases['react-dom/server$'];
 
   rscConfig.resolve = {
