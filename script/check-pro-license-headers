@@ -9,6 +9,7 @@
 #
 # Usage:
 #   script/check-pro-license-headers           # check; non-zero exit lists offenders
+#   script/check-pro-license-headers --check-staged  # check staged/index contents
 #   script/check-pro-license-headers --fix     # insert/upgrade headers in place
 #   script/check-pro-license-headers --list    # print the in-scope file set and exit
 #   script/check-pro-license-headers --self-test  # run the in-memory unit tests
@@ -236,6 +237,13 @@ def tracked_in_scope_files
   out.split("\x00").reject(&:empty?).select { |p| in_scope?(p) }.sort
 end
 
+def index_file_content(path)
+  out, status = Open3.capture2("git", "show", ":#{path}")
+  abort "git show :#{path} failed" unless status.success?
+
+  out
+end
+
 def run_check
   files = tracked_in_scope_files
   missing = files.reject { |p| File.read(p).include?(render_header(comment_style(p))) }
@@ -248,6 +256,21 @@ def run_check
   missing.each { |p| warn "  #{p}" }
   warn ""
   warn "Run `script/check-pro-license-headers --fix` to insert/upgrade them."
+  1
+end
+
+def run_check_staged
+  files = tracked_in_scope_files
+  missing = files.reject { |p| index_file_content(p).include?(render_header(comment_style(p))) }
+  if missing.empty?
+    puts "All #{files.size} staged/index in-scope Pro files have the current license header."
+    return 0
+  end
+
+  warn "Missing or outdated Pro license header in #{missing.size} staged/index file(s):"
+  missing.each { |p| warn "  #{p}" }
+  warn ""
+  warn "Run `script/check-pro-license-headers --fix`, then stage the updated files."
   1
 end
 
@@ -389,10 +412,11 @@ if $PROGRAM_NAME == __FILE__
     when "--fix" then run_fix
     when "--list" then run_list
     when "--self-test" then run_self_test
+    when "--check-staged" then run_check_staged
     when nil, "--check" then run_check
     else
       warn "Unknown option: #{ARGV[0]}"
-      warn "Usage: script/check-pro-license-headers [--check|--fix|--list|--self-test]"
+      warn "Usage: script/check-pro-license-headers [--check|--check-staged|--fix|--list|--self-test]"
       2
     end
   )

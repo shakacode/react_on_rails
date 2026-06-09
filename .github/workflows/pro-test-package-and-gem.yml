@@ -108,6 +108,15 @@ jobs:
           ruby-version: ${{ env.RUBY_VERSION }}
           bundler-version: 2.5.4
 
+      # Dependency-free guard (just git + ruby): every proprietary Pro file must
+      # carry the non-MIT license header. See script/check-pro-license-headers.
+      # Keep this early so missing headers fail before Node, pnpm, gems, or build.
+      - name: Check Pro license headers
+        working-directory: .
+        run: |
+          ruby script/check-pro-license-headers --self-test
+          ruby script/check-pro-license-headers --check
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -167,14 +176,6 @@ jobs:
       - name: Build react-on-rails-pro package
         working-directory: .
         run: pnpm --filter react-on-rails-pro build
-
-      # Dependency-free guard (just git + ruby): every proprietary Pro file must
-      # carry the non-MIT license header. See script/check-pro-license-headers.
-      - name: Check Pro license headers
-        working-directory: .
-        run: |
-          ruby script/check-pro-license-headers --self-test
-          ruby script/check-pro-license-headers --check
 
       # These steps need the Pro package Gemfile (which carries rubocop/rbs),
       # so pin it via absolute path — robust to changes in defaults.run.
