@@ -131,15 +131,7 @@ describe('Pro dummy RSC rspack config', () => {
       resolve: { alias: {} },
     };
     const configureServer = jest.fn(() => serverConfig);
-    // Local copy for the mocked server config: this test only needs the array rule
-    // lookup that rscLoaderWrapper performs after resolving a function-shaped rule.
-    const extractLoader = (rule, loaderName) =>
-      Array.isArray(rule.use)
-        ? rule.use.find((item) => {
-            const testValue = typeof item === 'string' ? item : (item?.loader ?? '');
-            return testValue.includes(loaderName);
-          })
-        : null;
+    const { extractLoader } = jest.requireActual(serverConfigPath);
 
     jest.doMock(serverConfigPath, () => ({
       default: configureServer,

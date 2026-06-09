@@ -738,12 +738,62 @@ jobs:
               elapsed=$((elapsed + 1))
               if [ $elapsed -ge $timeout ]; then
                 echo "Timeout waiting for ${name} to start after ${timeout}s"
+                echo "::group::${name} h2c readiness diagnostics"
+                for authority in "$@"; do
+                  echo "GET ${authority}${path}"
+                  node - "$authority" "$path" <<'NODE' || true
+          const http2 = require('node:http2');
+
+          const [authority, path] = process.argv.slice(2);
+          const client = http2.connect(authority);
+          let body = '';
+          const timeout = setTimeout(() => {
+            console.error('diagnostic timeout without response');
+            client.destroy();
+            process.exit(1);
+          }, 5000);
+
+          const finish = (exitCode) => {
+            clearTimeout(timeout);
+            client.close();
+            process.exit(exitCode);
+          };
+
+          client.on('error', (error) => {
+            console.error(`connect error: ${error.message}`);
+            finish(1);
+          });
+          const request = client.request({ ':method': 'GET', ':path': path });
+          request.on('response', (headers) => {
+            console.log(`response headers: ${JSON.stringify(headers)}`);
+          });
+          request.on('data', (chunk) => {
+            body += chunk.toString();
+            body = body.slice(0, 500);
+          });
+          request.on('end', () => {
+            if (body) console.log(`response body: ${body}`);
+            finish(0);
+          });
+          request.on('error', (error) => {
+            console.error(`request error: ${error.message}`);
+            client.destroy();
+            process.exit(1);
+          });
+          request.end();
+          NODE
+                done
+                echo "::endgroup::"
                 exit 1
               fi
             done
           }
 
+          # Both processes are already running; sequential waits keep the logs easier
+          # to read while the renderer can continue booting during the Rails poll.
           wait_for_service "Rails server" "http://localhost:3000/empty"
+          # Single IPv4 authority is intentional: RENDERER_HOST binds h2c to
+          # 127.0.0.1. Add ::1 here only if the renderer binding changes.
           wait_for_h2c_service "Node renderer" "/info" "http://127.0.0.1:3800"
 
       - name: Install Playwright dependencies

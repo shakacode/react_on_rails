@@ -17,11 +17,11 @@
 const { config } = require('shakapacker');
 // The bundler choice is read at module load; tests that switch bundlers must
 // set SHAKAPACKER_ASSETS_BUNDLER before requiring this file or reset the cache.
-const bundler = config.assets_bundler === 'rspack' ? require('@rspack/core') : require('webpack');
-const RSCManifestPlugin =
-  config.assets_bundler === 'rspack'
-    ? require('react-on-rails-rsc/RspackPlugin').RSCRspackPlugin
-    : require('react-on-rails-rsc/WebpackPlugin').RSCWebpackPlugin;
+const isRspack = config.assets_bundler === 'rspack';
+const bundler = isRspack ? require('@rspack/core') : require('webpack');
+const RSCManifestPlugin = isRspack
+  ? require('react-on-rails-rsc/RspackPlugin').RSCRspackPlugin
+  : require('react-on-rails-rsc/WebpackPlugin').RSCWebpackPlugin;
 const path = require('path');
 const commonWebpackConfig = require('./commonWebpackConfig');
 const rscManifestClientReferences = require('./rscManifestClientReferences');
