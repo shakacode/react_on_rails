@@ -706,11 +706,22 @@ jobs:
           const client = http2.connect(authority);
           const request = client.request({ ':method': 'GET', ':path': path });
           let status;
+          let timeout;
+          let completed = false;
 
-          const fail = () => {
-            client.destroy();
-            process.exit(1);
+          const finish = (exitCode, destroyClient = false) => {
+            if (completed) return;
+            completed = true;
+            clearTimeout(timeout);
+            if (destroyClient) {
+              client.destroy();
+            } else {
+              client.close();
+            }
+            process.exit(exitCode);
           };
+
+          const fail = () => finish(1, true);
 
           client.on('error', fail);
           request.on('error', fail);
@@ -719,11 +730,10 @@ jobs:
           });
           request.on('data', () => {});
           request.on('end', () => {
-            client.close();
-            process.exit(status >= 200 && status < 300 ? 0 : 1);
+            finish(status >= 200 && status < 300 ? 0 : 1);
           });
           request.end();
-          setTimeout(fail, 2000);
+          timeout = setTimeout(fail, 10000);
           NODE
                 then
                   echo "${name} started at ${authority}${path} after ${elapsed}s"
