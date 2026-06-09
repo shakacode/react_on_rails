@@ -114,9 +114,9 @@ Before merge, wait for requested or configured review agents such as Claude, Cod
 
 At the final review/readiness gate, after local validation, PR creation or update, review-thread triage, and the final push for the current head SHA, request full CI with `+ci-run-full` if you are unsure whether path-selected CI is enough. Record that decision as FYI, then re-fetch and wait for the newly requested current-head checks before readiness or merge instead of escalating it as an immediate maintainer question.
 
-<!-- Keep this closeout summary in sync with `.agents/workflows/pr-processing.md` and its Coordinator Closeout Lane. -->
-
-After workers finish, the coordinator must keep working through the live finalize/merge lane instead of stopping at PR creation: re-fetch live PR status, wait for current-head checks and reviews, triage/resolve or explicitly waive current unresolved review threads, update stale release-mode classification or accelerated-RC confidence block, request full CI when uncertainty remains, re-fetch and wait for the newly requested current-head checks, and merge eligible ready PRs when authorized under the current release mode.
+See the coordinator closeout summary in
+`.agents/workflows/pr-processing.md` under the goal-prompt section and the
+canonical Coordinator Closeout Lane.
 
 For blocking questions, stop work on that target, surface a structured question to the coordinator or maintainer, and mark the issue/PR with the agreed pending-question state. Report the question/comment URL as `blocked needing user input`; do not open a speculative PR. For non-blocking questions where you make a decision and continue, record the decision in the PR description before review or merge.
 
@@ -129,6 +129,8 @@ Classify every unresolved question before continuing:
 
 - **Blocking question**: the implementation, validation, or merge decision would be unsafe without maintainer input. Stop work on that target until answered. Subagents should return the blocking question to the coordinator instead of guessing. For multi-machine batches, post a structured issue or PR comment and, if the repo uses labels for this workflow, apply `codex-pending-question`. A worker handoff should include the question/comment URL as that target's blocked final state.
 - **Non-blocking decision**: a reasonable local decision can be made without increasing merge risk. Continue work, but add a clearly formatted decision note to the PR description so later review across merged PRs can surface these items quickly.
+
+<!-- Keep this full-CI uncertainty rule in sync with `.agents/workflows/pr-processing.md`. -->
 
 Full-CI uncertainty at the final readiness gate after local validation and the
 final push is a non-blocking decision. Request full CI with `+ci-run-full`,
@@ -196,9 +198,9 @@ When worker subagents are explicitly authorized:
 
 ## Coordinator Closeout Lane
 
-The prose above is a goal-prompt summary. For the complete numbered sequence,
-follow the canonical closeout lane in `.agents/workflows/pr-processing.md`
-instead of stopping at PR creation. The coordinator owns the live re-fetch,
-current-head checks and review-thread triage, release-mode or accelerated-RC
-confidence refresh, full-CI request and waitback when uncertainty remains, and
-any authorized ready/merge action.
+The goal-prompt pointer above names the closeout source. For the complete
+numbered sequence, follow the canonical closeout lane in
+`.agents/workflows/pr-processing.md` instead of stopping at PR creation. The
+coordinator owns the live re-fetch, current-head checks and review-thread
+triage, release-mode or accelerated-RC confidence refresh, full-CI request and
+waitback when uncertainty remains, and any authorized ready/merge action.

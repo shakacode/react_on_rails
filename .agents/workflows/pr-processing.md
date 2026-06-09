@@ -292,6 +292,8 @@ Classify every unresolved question before continuing:
 - **Blocking question**: the implementation, validation, or merge decision would be unsafe without maintainer input. Stop work on that target until answered. Subagents should return the blocking question to the coordinator instead of guessing. For multi-machine batches, post a structured issue or PR comment and, if the repo uses labels for this workflow, apply `codex-pending-question`. A worker handoff should include the question/comment URL as that target's blocked final state.
 - **Non-blocking decision**: a reasonable local decision can be made without increasing merge risk. Continue work, but add a clearly formatted decision note to the PR description so later review across merged PRs can surface these items quickly.
 
+<!-- Keep this full-CI uncertainty rule in sync with `.agents/skills/pr-batch/SKILL.md`. -->
+
 Full-CI uncertainty at the final readiness gate after local validation and the
 final push is a non-blocking decision. Request full CI with `+ci-run-full`,
 record the reason, re-fetch and wait for the newly requested current-head checks,
