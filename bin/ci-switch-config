@@ -61,6 +61,7 @@ saved_tool_versions_valid_for_restore() {
       # content equality with the committed profile so stale or locally-bumped
       # runtime versions cannot persist across branch updates or pulls.
       saved_tool_versions_match_committed_profile
+      return
     else
       # A stale sidecar is intentionally authoritative: do not fall through to
       # legacy content comparison when a backup advertises a different HEAD.

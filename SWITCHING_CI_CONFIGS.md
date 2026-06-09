@@ -204,8 +204,8 @@ matches the current git head (or from git if no current saved profile exists), a
 from git.
 
 Keep `.tool-versions` and `.minimum.tool-versions` to plain `tool version` lines with no comments so both mise and
-asdf can parse them. The latest Node profile intentionally stays at `22.12.0` until the Node `22.21.0` startup
-regression tracked in nodejs/node#56010 is avoided.
+asdf can parse them. The latest Node profile should stay pinned below the Node startup regression tracked in
+nodejs/node#56010 until that fix reaches an LTS patch.
 
 ## Common Workflows
 
