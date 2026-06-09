@@ -36,7 +36,8 @@ type VersionTuple = [number, number, number];
 const parseTuple = (version: string): VersionTuple => {
   // `resolveVersion` is a public injection point, so tolerate a leading `v`/`=` (e.g. `v19.0.4`).
   const normalized = version.replace(/^[v=]+/, '');
-  const [core = ''] = normalized.split('+', 1)[0]?.split('-', 1) ?? [];
+  const [withoutBuild = ''] = normalized.split('+', 1);
+  const [core = ''] = withoutBuild.split('-', 1);
   const parts = core.split('.');
   return [Number(parts[0]) || 0, Number(parts[1]) || 0, Number(parts[2]) || 0];
 };

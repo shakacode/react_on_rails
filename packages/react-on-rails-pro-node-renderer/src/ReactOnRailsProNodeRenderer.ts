@@ -1,11 +1,12 @@
 import cluster from 'cluster';
 import fastifyPackageJson from 'fastify/package.json';
 import { Config, buildConfig } from './shared/configBuilder.js';
+import log from './shared/log.js';
+import packageJson from './shared/packageJson.js';
+import { runRscPeerCompatibilityCheck } from './shared/runRscPeerCompatibilityCheck.js';
+import { majorVersion } from './shared/utils.js';
 
 const { version: fastifyVersion } = fastifyPackageJson;
-import log from './shared/log.js';
-import { majorVersion } from './shared/utils.js';
-import { runRscPeerCompatibilityCheck } from './shared/runRscPeerCompatibilityCheck.js';
 
 export function parseWorkersCount(value: string | null | undefined): number | null {
   if (value == null) return null;
@@ -20,7 +21,7 @@ export function parseWorkersCount(value: string | null | undefined): number | nu
 export async function reactOnRailsProNodeRenderer(config: Partial<Config> = {}) {
   // Fail fast if the app's react-on-rails-rsc / React is incompatible with this Pro
   // version, instead of misbehaving silently on the RSC path.
-  runRscPeerCompatibilityCheck();
+  runRscPeerCompatibilityCheck({ proVersion: packageJson.version });
 
   const fastify5Supported = majorVersion(process.versions.node) >= 20;
   const fastify5OrNewer = majorVersion(fastifyVersion) >= 5;

@@ -55,22 +55,16 @@ export function runRscPeerCompatibilityCheck(options: RunRscPeerCompatibilityChe
   const result = checkRscPeerCompatibility({ rscVersion, reactVersion, proVersion: options.proVersion });
   if (result.level === 'ok') return;
 
-  if (env[DISABLE_ENV]) {
-    log.warn(`${result.message}\n(Version check downgraded to a warning via ${DISABLE_ENV}.)`);
-    return;
-  }
-
   if (result.level === 'warn') {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-ok results always carry a message
     log.warn(result.message!);
     return;
   }
 
-  throw new Error(result.message);
-}
+  if (env[DISABLE_ENV] === '1') {
+    log.warn(`${result.message}\n(Version check downgraded to a warning via ${DISABLE_ENV}.)`);
+    return;
+  }
 
-// Test-only: reset the once-per-process memoization.
-// eslint-disable-next-line no-underscore-dangle
-export function __resetRscPeerCompatibilityCheckForTests(): void {
-  alreadyRan = false;
+  throw new Error(result.message);
 }
