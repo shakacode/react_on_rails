@@ -98,12 +98,13 @@ RSpec.describe PrReportPoster do
         .to output(/::warning::Failed to delete 1 stale Core Bencher report comment/).to_stdout
     end
 
-    it "ignores non-numeric stale comment ids" do
+    it "warns about mixed non-numeric stale comment ids while deleting numeric ids" do
       status = instance_double(Process::Status, success?: true)
 
       allow(GithubCli).to receive_messages(capture: ["111\nnot-an-id\n222\n", status], run: true)
 
-      poster.send(:delete_stale_comments, before: "cutoff")
+      expect { poster.send(:delete_stale_comments, before: "cutoff") }
+        .to output(/::warning::Stale Core Bencher report comment listing returned 1 non-numeric ID/).to_stdout
 
       expect(GithubCli).to have_received(:run).twice
       expect(GithubCli).not_to have_received(:run).with(

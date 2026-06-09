@@ -15,8 +15,8 @@ class PrReportPoster
     @marker = marker
   end
 
-  # Requires GITHUB_REPOSITORY and PR_NUMBER in ENV. GitHub Actions sets both
-  # during pull_request events; ENV.fetch raises KeyError if either is absent.
+  # GitHub Actions sets GITHUB_REPOSITORY natively. The workflow step must set
+  # PR_NUMBER from the pull request event; ENV.fetch raises KeyError if either is absent.
   def self.from_env(suite_name:, marker:)
     new(
       repository: ENV.fetch("GITHUB_REPOSITORY"),
@@ -74,10 +74,16 @@ class PrReportPoster
 
     comment_ids = stdout.lines.map(&:strip).reject(&:empty?)
     numeric_comment_ids = comment_ids.grep(/\A\d+\z/)
-    if comment_ids.any? && numeric_comment_ids.empty?
+    non_numeric_comment_ids = comment_ids - numeric_comment_ids
+    if non_numeric_comment_ids.any? && numeric_comment_ids.empty?
       Github.warning(
         "Stale #{suite_name} Bencher report comment listing returned no numeric IDs; " \
         "skipping cleanup so current comments are preserved."
+      )
+    elsif non_numeric_comment_ids.any?
+      Github.warning(
+        "Stale #{suite_name} Bencher report comment listing returned " \
+        "#{non_numeric_comment_ids.size} non-numeric ID(s); ignoring those entries."
       )
     end
 

@@ -43,7 +43,7 @@ class BencherRunner
     stdout, stderr, status = Open3.capture3(*args(branch, start_point_args))
     warn stderr unless stderr.empty?
     report = persist_report(stdout)
-    warn_on_missing_perf_link_context(report)
+    warn_on_missing_perf_link_context(report) if report
     Result.new(stderr:, exit_code: status.exitstatus, report:)
   end
 
@@ -90,9 +90,10 @@ class BencherRunner
       File.write(tmp_report_json, stdout)
       FileUtils.mv(tmp_report_json, report_json)
     rescue StandardError
-      FileUtils.rm_f(tmp_report_json)
       FileUtils.rm_f(report_json)
       raise
+    ensure
+      FileUtils.rm_f(tmp_report_json)
     end
     parse_report(stdout)
   rescue ReportParseError

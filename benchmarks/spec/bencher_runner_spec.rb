@@ -150,7 +150,7 @@ RSpec.describe BencherRunner do
       allow(Open3).to receive(:capture3).and_return(["{}", "", status])
       allow(File).to receive(:write).with("report.json.tmp", "{}")
       allow(FileUtils).to receive(:mv).with("report.json.tmp", "report.json")
-      allow(FileUtils).to receive(:rm_f).with("report.json")
+      allow(FileUtils).to receive(:rm_f)
 
       expect { runner.run("branch", []) }
         .to raise_error(BencherRunner::ReportParseError, /Bencher JSON report has an unexpected shape/)
@@ -179,6 +179,18 @@ RSpec.describe BencherRunner do
       expect { runner.run("branch", []) }.to raise_error(RuntimeError, "disk layer failed")
       expect(FileUtils).to have_received(:rm_f).with("report.json.tmp")
       expect(FileUtils).to have_received(:rm_f).with("report.json")
+    end
+
+    it "removes the temporary report when moving the report is interrupted" do
+      status = instance_double(Process::Status, exitstatus: 0)
+
+      allow(Open3).to receive(:capture3).and_return([JSON.generate("results" => [], "alerts" => []), "", status])
+      allow(File).to receive(:write).with("report.json.tmp", anything)
+      allow(FileUtils).to receive(:mv).with("report.json.tmp", "report.json").and_raise(Interrupt)
+      allow(FileUtils).to receive(:rm_f)
+
+      expect { runner.run("branch", []) }.to raise_error(Interrupt)
+      expect(FileUtils).to have_received(:rm_f).with("report.json.tmp")
     end
   end
 end
