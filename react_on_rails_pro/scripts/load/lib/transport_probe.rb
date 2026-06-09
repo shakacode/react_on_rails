@@ -29,6 +29,7 @@ module RendererHarness
       "small_unary" => { path: "/probe/unary" },
       "stream_16kb" => { path: "/probe/stream" }
     }.freeze
+    DELTA_PERCENTILES = %i[p50 p95 p99].freeze
 
     Config = Struct.new(
       :requests,
@@ -219,18 +220,20 @@ module RendererHarness
       end
 
       def perform_request(client, path, body)
+        response_body = nil
         response = client.post(
           path,
           headers: Protocol::HTTP::Headers[[["content-type", "application/octet-stream"]]],
           body:
         )
         bytes = 0
-        response.body&.each { |chunk| bytes += chunk.bytesize }
+        response_body = response.body
+        response_body&.each { |chunk| bytes += chunk.bytesize }
         raise "HTTP #{response.status}" unless response.status == 200
 
         bytes
       ensure
-        response&.body&.close
+        response_body&.close
       end
 
       def measure_ms
@@ -287,12 +290,21 @@ module RendererHarness
           next if scenario == baseline_name
 
           memo[scenario] = PROBE_CASES.keys.each_with_object({}) do |case_name, case_memo|
-            baseline_p95 = baseline.dig(case_name, :latency_ms, :p95)
-            scenario_p95 = scenario_results.dig(case_name, :latency_ms, :p95)
-            next unless baseline_p95 && scenario_p95
-
-            case_memo[case_name] = { p95_ms_vs_baseline: scenario_p95 - baseline_p95 }
+            deltas = latency_deltas(baseline[case_name], scenario_results[case_name])
+            case_memo[case_name] = deltas unless deltas.empty?
           end
+        end
+      end
+
+      def latency_deltas(baseline_case, scenario_case)
+        return {} unless baseline_case && scenario_case
+
+        DELTA_PERCENTILES.each_with_object({}) do |percentile, memo|
+          baseline_value = baseline_case.dig(:latency_ms, percentile)
+          scenario_value = scenario_case.dig(:latency_ms, percentile)
+          next unless baseline_value && scenario_value
+
+          memo[:"#{percentile}_ms_vs_baseline"] = scenario_value - baseline_value
         end
       end
 

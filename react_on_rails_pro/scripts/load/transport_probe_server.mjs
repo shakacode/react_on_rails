@@ -23,6 +23,13 @@ const parseArgs = () => {
     }
     return value;
   };
+  const readPositiveInteger = (index, flag) => {
+    const value = readValue(index, flag);
+    if (!/^[1-9]\d*$/.test(value)) {
+      throw new Error(`${flag} must be a positive integer`);
+    }
+    return Number(value);
+  };
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -36,10 +43,10 @@ const parseArgs = () => {
       options.socketPath = readValue(index, arg);
       index += 1;
     } else if (arg === '--body-bytes') {
-      options.bodyBytes = Number(readValue(index, arg));
+      options.bodyBytes = readPositiveInteger(index, arg);
       index += 1;
     } else if (arg === '--stream-bytes') {
-      options.streamBytes = Number(readValue(index, arg));
+      options.streamBytes = readPositiveInteger(index, arg);
       index += 1;
     } else {
       throw new Error(`Unknown argument: ${arg}`);

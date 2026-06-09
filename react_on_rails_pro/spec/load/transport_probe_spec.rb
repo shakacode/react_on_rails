@@ -98,16 +98,16 @@ RSpec.describe RendererHarness::TransportProbe do
       expect(summary.fetch(:latency_ms)).to include(p50: 2.0, max: 3.0)
     end
 
-    it "computes p95 deltas against the Fastify TCP baseline" do
+    it "computes latency deltas against the Fastify TCP baseline" do
       runner = described_class.new(config)
       results = {
         "fastify_tcp" => {
-          "small_unary" => { latency_ms: { p95: 2.0 } },
-          "stream_16kb" => { latency_ms: { p95: 4.0 } }
+          "small_unary" => { latency_ms: { p50: 1.0, p95: 2.0, p99: 3.0 } },
+          "stream_16kb" => { latency_ms: { p50: 2.0, p95: 4.0, p99: 6.0 } }
         },
         "native_tcp" => {
-          "small_unary" => { latency_ms: { p95: 1.5 } },
-          "stream_16kb" => { latency_ms: { p95: 3.0 } }
+          "small_unary" => { latency_ms: { p50: 0.75, p95: 1.5, p99: 2.25 } },
+          "stream_16kb" => { latency_ms: { p50: 1.5, p95: 3.0, p99: 4.5 } }
         }
       }
 
@@ -115,8 +115,8 @@ RSpec.describe RendererHarness::TransportProbe do
 
       expect(deltas).to eq(
         "native_tcp" => {
-          "small_unary" => { p95_ms_vs_baseline: -0.5 },
-          "stream_16kb" => { p95_ms_vs_baseline: -1.0 }
+          "small_unary" => { p50_ms_vs_baseline: -0.25, p95_ms_vs_baseline: -0.5, p99_ms_vs_baseline: -0.75 },
+          "stream_16kb" => { p50_ms_vs_baseline: -0.5, p95_ms_vs_baseline: -1.0, p99_ms_vs_baseline: -1.5 }
         }
       )
     end
@@ -258,6 +258,26 @@ RSpec.describe RendererHarness::TransportProbe do
         )
       ensure
         close_probe_server(stdin, stdout, stderr, wait_thread, signal: "TERM")
+      end
+    end
+
+    it "rejects non-decimal body byte values" do
+      Dir.mktmpdir do |dir|
+        server_script = RendererHarness::TransportProbe::Config.send(:default_server_script)
+
+        _stdout, stderr, status = Open3.capture3(
+          "node",
+          server_script,
+          "--scenarios",
+          "native_tcp",
+          "--socket-path",
+          File.join(dir, "unused.sock"),
+          "--body-bytes",
+          "1e6"
+        )
+
+        expect(status).not_to be_success
+        expect(stderr).to include("--body-bytes must be a positive integer")
       end
     end
 
