@@ -124,14 +124,15 @@ export const createRSCProvider = ({
           return fetchRSCPromisesRef.current[key];
         }
 
-        let promise!: Promise<ReactNode>;
+        const promiseRef: { current?: Promise<ReactNode> } = {};
         const markPayloadIfSuccessful = (payload: ReactNode) => {
-          if (!(payload instanceof Error)) {
-            markSuccessfulPromise(key, promise);
+          if (!(payload instanceof Error) && promiseRef.current) {
+            markSuccessfulPromise(key, promiseRef.current);
           }
           return payload;
         };
-        promise = getServerComponent({ componentName, componentProps }).then(markPayloadIfSuccessful);
+        const promise = getServerComponent({ componentName, componentProps }).then(markPayloadIfSuccessful);
+        promiseRef.current = promise;
         fetchRSCPromisesRef.current[key] = promise;
         return promise;
       },
@@ -146,11 +147,10 @@ export const createRSCProvider = ({
       ) => {
         const key = createRSCPayloadKey(componentName, componentProps);
         refetchVersionsRef.current[key] = (refetchVersionsRef.current[key] ?? 0) + 1;
-        // The restore callback only runs from async handlers after this block
-        // assigns `promise`; TypeScript cannot see that ordering.
-        let promise!: Promise<ReactNode>;
+        const promiseRef: { current?: Promise<ReactNode> } = {};
         const restoreLastSuccessfulPromise = () => {
-          if (fetchRSCPromisesRef.current[key] !== promise) {
+          const promise = promiseRef.current;
+          if (!promise || fetchRSCPromisesRef.current[key] !== promise) {
             return;
           }
 
@@ -171,7 +171,7 @@ export const createRSCProvider = ({
           });
         };
 
-        promise = Promise.resolve()
+        const promise = Promise.resolve()
           .then(() =>
             getServerComponent({
               componentName,
@@ -186,7 +186,10 @@ export const createRSCProvider = ({
                   restoreLastSuccessfulPromise();
                 }
               } else {
-                markSuccessfulPromise(key, promise, true);
+                const currentPromise = promiseRef.current;
+                if (currentPromise) {
+                  markSuccessfulPromise(key, currentPromise, true);
+                }
               }
               return payload;
             },
@@ -197,6 +200,7 @@ export const createRSCProvider = ({
               throw error;
             },
           );
+        promiseRef.current = promise;
         fetchRSCPromisesRef.current[key] = promise;
         startTransition(() => {
           setVersions((v) => ({ ...v, [key]: (v[key] ?? 0) + 1 }));
