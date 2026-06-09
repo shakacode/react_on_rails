@@ -306,7 +306,10 @@ const main = async () => {
       return;
     }
     shuttingDown = true;
-    void shutdown();
+    void shutdown().catch((error) => {
+      process.stderr.write(`transport_probe_server shutdown: ${error.stack || error.message}\n`);
+      process.exit(1);
+    });
   };
 
   process.once('SIGTERM', guardedShutdown);

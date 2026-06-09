@@ -192,14 +192,10 @@ module RendererHarness
         summarize(samples, failures:, elapsed:)
       end
 
-      def with_client(endpoint, &block)
+      def with_client(endpoint, &)
         endpoint_obj, options = client_options(endpoint)
         Sync do
-          Async::HTTP::Client.open(endpoint_obj, **options) do |client|
-            # rubocop:disable Performance/RedundantBlockCall
-            block.call(client)
-            # rubocop:enable Performance/RedundantBlockCall
-          end
+          Async::HTTP::Client.open(endpoint_obj, **options, &)
         end
       end
 
