@@ -16,7 +16,7 @@ MAXIMUM_TOOL_VERSIONS_HEAD_FILE="$PROJECT_ROOT/.maximum.tool-versions.head"
 
 require_minimum_tool_versions_file() {
   if [ ! -f "$MINIMUM_TOOL_VERSIONS_FILE" ]; then
-    echo "Error: $MINIMUM_TOOL_VERSIONS_FILE not found. This file is required and should be committed." >&2
+    echo "Error: $MINIMUM_TOOL_VERSIONS_FILE not found. This file is required at script load time and should be committed." >&2
     exit 1
   fi
 }
@@ -355,6 +355,9 @@ restore_tool_versions_to_latest() {
       [ -n "$git_err" ] && echo "  git: $git_err" >&2
       exit 1
     }
+    if [ -f "$MAXIMUM_TOOL_VERSIONS_FILE" ]; then
+      print_warning "Local runtime-version backup was stale or mismatched; restored .tool-versions from git."
+    fi
   fi
   rm -f "$MAXIMUM_TOOL_VERSIONS_FILE" "$MAXIMUM_TOOL_VERSIONS_HEAD_FILE"
 

@@ -214,7 +214,7 @@ RSpec.describe "bin/ci-switch-config" do
 
       expect(status).not_to be_success
       expect(stderr).to include("Error: #{File.join(tmpdir, '.minimum.tool-versions')} not found.")
-      expect(stderr).to include("This file is required and should be committed.")
+      expect(stderr).to include("This file is required at script load time and should be committed.")
     end
   end
 
