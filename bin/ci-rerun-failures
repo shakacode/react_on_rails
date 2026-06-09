@@ -52,19 +52,6 @@ ensure_oss_dependencies() {
   OSS_DEPS_READY=true
 }
 
-# Keep this list in sync with run_command() below. Every branch that uses
-# bundle_command "$OSS_GEMFILE" needs an entry here so OSS dependencies install first.
-requires_oss_bundle() {
-  case "$1" in
-    "rspec-package-tests"|"dummy-app-integration-tests"|"examples")
-      return 0
-      ;;
-    *)
-      return 1
-      ;;
-  esac
-}
-
 # Show help
 show_help() {
   cat << EOF
@@ -245,15 +232,18 @@ run_command() {
         pnpm start format.listDifferent
       ;;
     "rspec-package-tests")
+      ensure_oss_dependencies
       (cd "$ROOT_DIR/react_on_rails" && bundle_command "$OSS_GEMFILE" bundle exec rake run_rspec:gem)
       ;;
     "package-js-tests")
       pnpm test
       ;;
     "dummy-app-integration-tests")
+      ensure_oss_dependencies
       (cd "$ROOT_DIR/react_on_rails" && bundle_command "$OSS_GEMFILE" bundle exec rake run_rspec:all_dummy)
       ;;
     "examples")
+      ensure_oss_dependencies
       (cd "$ROOT_DIR/react_on_rails" && bundle_command "$OSS_GEMFILE" bundle exec rake run_rspec:shakapacker_examples)
       ;;
     *)
@@ -348,13 +338,6 @@ if [ ! -d "node_modules" ] || ! bundle_command "$ROOT_GEMFILE" bundle check >/de
   bundle_command "$ROOT_GEMFILE" bundle install && pnpm install
   echo ""
 fi
-
-for cmd_id in "${!COMMANDS_TO_RUN[@]}"; do
-  if requires_oss_bundle "$cmd_id"; then
-    ensure_oss_dependencies
-    break
-  fi
-done
 
 # Run commands
 FAILED_COMMANDS=()

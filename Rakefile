@@ -69,6 +69,7 @@ def root_bundle_exec_in(directory, *command)
 end
 
 def root_rubocop_paths
+  # Root lint covers repo-root tooling only; package-owned rakelib files stay under package RuboCop.
   %w[Gemfile Rakefile rakelib]
 end
 
@@ -167,7 +168,9 @@ end
 ].each { |task_name| define_package_task(task_name) }
 
 desc "Run root-bundle RuboCop only; full lint: cd react_on_rails && bundle exec rake lint"
-task lint: ["lint:rubocop"]
+task lint: ["lint:rubocop"] do
+  puts "For full package lint: cd react_on_rails && bundle exec rake lint"
+end
 
 desc "Auto-fix full package lint; broader than root rake lint (ESLint, Prettier, Stylelint, RuboCop)"
 task autofix: ["lint:autofix"]

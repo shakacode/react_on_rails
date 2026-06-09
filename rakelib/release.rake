@@ -37,6 +37,7 @@ def current_monorepo_root
 end
 
 def release_truthy?(value)
+  # Includes "t" to preserve the former ReactOnRails::Utils.object_to_boolean contract.
   [true, "true", "yes", 1, "1", "t"].include?(value.instance_of?(String) ? value.downcase : value)
 end
 
