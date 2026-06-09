@@ -460,6 +460,8 @@ if __FILE__ == $PROGRAM_NAME
     # The retry's stderr is unused: regression classification reads the JSON report,
     # and this path only triggers when the first run had no regression.
     retry_result = run_bencher!(branch, retry_args)
+    # Intentionally leave retry_result.stderr unused, preserving the old _retry_stderr
+    # clarity: only the retry's exit code and parsed report affect the final outcome.
     bencher_exit_code = retry_result.exit_code
     report = retry_result.report
   end

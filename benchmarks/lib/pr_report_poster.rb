@@ -91,10 +91,6 @@ class PrReportPoster
   end
 
   def post_comment(markdown)
-    # Private helper still guards empty reports so direct future callers cannot
-    # post a marker-only comment.
-    return false if markdown.empty?
-
     # Send the body over stdin (--body-file -) rather than as a CLI argument so a
     # large report can't hit the OS argument-length limit.
     GithubCli.run(

@@ -40,6 +40,10 @@ class BencherRunner
   end
 
   def run(branch, start_point_args)
+    # This Bencher CLI call is not wrapped in Timeout.timeout because that can leak
+    # child processes. In CI it is bounded by the GitHub Actions job timeout for
+    # .github/workflows/benchmark-suite.yml; the benchmark execution step has its
+    # own narrower timeout-minutes before this reporting step runs.
     stdout, stderr, status = Open3.capture3(*args(branch, start_point_args))
     warn stderr unless stderr.empty?
     report = persist_report(stdout)
@@ -95,7 +99,9 @@ class BencherRunner
       File.write(tmp_report_json, stdout)
       FileUtils.mv(tmp_report_json, report_json)
       moved = true
-      parse_report(stdout).tap { report_verified = true }
+      result = parse_report(stdout)
+      report_verified = true
+      result
     ensure
       FileUtils.rm_f(tmp_report_json)
       FileUtils.rm_f(report_json) if moved && !report_verified
