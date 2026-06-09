@@ -52,7 +52,7 @@ module RendererHarness
           parser.on("--body-bytes N", Integer) { |v| opts[:body_bytes] = v }
           parser.on("--stream-bytes N", Integer) { |v| opts[:stream_bytes] = v }
           parser.on("--scenarios LIST", String) { |v| opts[:scenarios] = parse_scenarios(v) }
-          parser.on("--skip-uds") { opts[:scenarios] -= ["native_uds"] }
+          parser.on("--skip-uds") { opts[:skip_uds] = true }
           parser.on("--node-bin PATH", String) { |v| opts[:node_bin] = v }
           parser.on("--server-script PATH", String) { |v| opts[:server_script] = v }
           parser.on("--socket-path PATH", String) { |v| opts[:socket_path] = v }
@@ -64,6 +64,7 @@ module RendererHarness
           end
         end.parse!(argv)
 
+        opts[:scenarios] -= ["native_uds"] if opts.delete(:skip_uds)
         validate!(opts)
         new(**opts).freeze
       end

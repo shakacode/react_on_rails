@@ -58,6 +58,9 @@ const config: KnipConfig = {
         // Used by the release gate workflow via `pnpm exec shaka-perf`; Knip does
         // not detect that CLI usage from the GitHub Actions shell command.
         'shaka-perf',
+        // Used by react_on_rails_pro/scripts/load/transport_probe_server.mjs, which is ignored
+        // from the root workspace scan because Pro package code is handled separately.
+        'fastify',
       ],
     },
 

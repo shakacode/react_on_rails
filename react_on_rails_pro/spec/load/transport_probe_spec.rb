@@ -25,6 +25,12 @@ RSpec.describe RendererHarness::TransportProbe do
       expect(config.scenarios).to eq(%w[fastify_tcp native_tcp])
     end
 
+    it "applies UDS skipping after all scenario options are parsed" do
+      config = described_class.parse(["--skip-uds", "--scenarios", "fastify_tcp,native_tcp,native_uds"])
+
+      expect(config.scenarios).to eq(%w[fastify_tcp native_tcp])
+    end
+
     it "rejects unknown scenarios" do
       expect do
         described_class.parse(["--scenarios", "fastify_tcp,missing"])
