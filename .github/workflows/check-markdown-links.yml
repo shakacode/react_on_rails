@@ -12,6 +12,7 @@ on:
       - '.lychee.toml'
       - '.prettierignore'
       - '.prettierrc'
+      - '.tool-versions'
       - 'pnpm-lock.yaml'
   pull_request:
     paths:
@@ -20,6 +21,7 @@ on:
       - '.lychee.toml'
       - '.prettierignore'
       - '.prettierrc'
+      - '.tool-versions'
       - 'pnpm-lock.yaml'
   schedule:
     # Run daily at 3am UTC to catch stale cached links
@@ -39,7 +41,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          # Pin lives in .tool-versions (Shakapacker 10.1 floor) to avoid V8 bug in 22.21.0
+          # Node pin lives in .tool-versions to avoid the V8 bug in 22.21.0.
           node-version-file: .tool-versions
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
