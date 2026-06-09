@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "optparse"
 require "fileutils"
 require "tmpdir"
 require_relative "spec_helper"
@@ -14,6 +13,8 @@ require_relative "../lib/bmf_helpers"
 # mutually exclusive by design: an alert must never trigger a start-point-hash retry,
 # or a real regression would be silently re-measured against the wrong baseline.
 RSpec.describe "track_benchmarks" do
+  include BenchmarkEnvHelper
+
   def result(name, measures)
     { "benchmark" => { "name" => name }, "measures" => measures }
   end
@@ -126,6 +127,62 @@ RSpec.describe "track_benchmarks" do
     it "is false on success and for unrelated non-zero failures" do
       expect(retry_without_start_point_hash?("Head Version abc123 not found", 0, report_without_alert)).to be(false)
       expect(retry_without_start_point_hash?("some other error", 1, report_without_alert)).to be(false)
+    end
+  end
+
+  describe "#replace_pr_comments" do
+    it "does not require CI event env outside pull requests" do
+      with_env("GITHUB_EVENT_NAME" => nil) do
+        expect(PrReportPoster).not_to receive(:from_env)
+
+        expect { replace_pr_comments("report") }.not_to raise_error
+      end
+    end
+
+    it "does not require PR comment env for an empty pull request report" do
+      with_env("GITHUB_EVENT_NAME" => "pull_request") do
+        expect(PrReportPoster).not_to receive(:from_env)
+
+        expect { replace_pr_comments("") }.not_to raise_error
+      end
+    end
+  end
+
+  describe "#run_bencher!" do
+    it "formats benchmark report persistence failures as GitHub Actions errors" do
+      runner = instance_double(BencherRunner)
+      allow(self).to receive(:bencher_runner).and_return(runner)
+      allow(runner).to receive(:run).and_raise(BencherRunner::PersistenceError, "No space")
+
+      expect do
+        run_bencher!("branch", [])
+      end.to(
+        output(/::error::Benchmark report persistence failed: No space/).to_stderr
+          .and(raise_error(SystemExit) { |e| expect(e.status).to eq(1) })
+      )
+    end
+
+    it "formats Bencher report parse failures as GitHub Actions errors" do
+      runner = instance_double(BencherRunner)
+      allow(self).to receive(:bencher_runner).and_return(runner)
+      allow(runner).to receive(:run).and_raise(BencherRunner::ReportParseError, "unexpected shape")
+
+      expect do
+        run_bencher!("branch", [])
+      end.to(
+        output(/::error::unexpected shape/).to_stderr
+          .and(raise_error(SystemExit) { |e| expect(e.status).to eq(1) })
+      )
+    end
+
+    it "does not relabel unexpected runtime failures as report persistence errors" do
+      runner = instance_double(BencherRunner)
+      allow(self).to receive(:bencher_runner).and_return(runner)
+      allow(runner).to receive(:run).and_raise(RuntimeError, "parser bug")
+
+      expect do
+        run_bencher!("branch", [])
+      end.to raise_error(RuntimeError, "parser bug")
     end
   end
 
@@ -284,45 +341,7 @@ RSpec.describe "track_benchmarks" do
     end
   end
 
-  describe "#run_bencher" do
-    it "emits the perf-link context warning to stdout so GitHub Actions annotates it" do
-      status = instance_double(Process::Status, exitstatus: 0)
-      report_json = JSON.generate(
-        "results" => [[{
-          "benchmark" => { "name" => "/foo", "uuid" => "bench-uuid" },
-          "measures" => [{
-            "measure" => { "slug" => "rps", "name" => "rps", "uuid" => "rps-uuid" },
-            "metric" => { "value" => 1.0 }
-          }]
-        }]],
-        "alerts" => []
-      )
-
-      allow(Open3).to receive(:capture3).and_return([report_json, "", status])
-      allow(File).to receive(:write).with(REPORT_JSON, report_json)
-
-      expect { run_bencher("branch", []) }
-        .to output(/::warning::Bencher report listed benchmarks but no perf-link context/).to_stdout
-    end
-
-    it "preserves the original alert exit so retry handling can run first" do
-      status = instance_double(Process::Status, exitstatus: 1)
-      report_json = JSON.generate(
-        "results" => [[result("/x", [rps_measure(value: 95.0)])]],
-        "alerts" => [active_alert]
-      )
-
-      allow(Open3).to receive(:capture3).and_return([report_json, "", status])
-      allow(File).to receive(:write).with(REPORT_JSON, report_json)
-
-      _stderr, exit_code, report = run_bencher("branch", [])
-
-      expect(exit_code).to eq(1)
-      expect(report).not_to be_regression
-      expect(report.filtered_alert?).to be(true)
-      expect(retry_without_start_point_hash?("Head Version abc123 not found", exit_code, report)).to be(true)
-    end
-
+  describe "#normalized_bencher_exit_code" do
     it "normalizes an alert exit to success after retry handling when every active alert is stale" do
       report = BencherReport.parse(
         JSON.generate(
@@ -380,59 +399,6 @@ RSpec.describe "track_benchmarks" do
     end
   end
 
-  # The boundary/side mapping is a silent safety control: a flipped side or wrong
-  # value would stop regressions from alerting while CI stays green, so pin it.
-  describe "#threshold_args" do
-    it "puts the boundary on the lower side for higher-is-better measures" do
-      expect(threshold_args("rps", :lower, "0.9995")).to eq(
-        %w[--threshold-measure rps --threshold-test t_test
-           --threshold-max-sample-size 64
-           --threshold-lower-boundary 0.9995 --threshold-upper-boundary _]
-      )
-    end
-
-    it "puts the boundary on the upper side for lower-is-better measures" do
-      expect(threshold_args("p50_latency", :upper, "0.9999")).to eq(
-        %w[--threshold-measure p50_latency --threshold-test t_test
-           --threshold-max-sample-size 64
-           --threshold-lower-boundary _ --threshold-upper-boundary 0.9999]
-      )
-    end
-  end
-
-  describe "#bencher_args" do
-    it "requests the JSON report format (so the report can be parsed, not grepped)" do
-      args = bencher_args("my-branch", [])
-      expect(args.each_cons(2)).to include(%w[--format json])
-      expect(args).not_to include("html")
-    end
-
-    # Parse only the threshold tail: OptionParser raises InvalidOption on any flag it
-    # doesn't declare, and the leading `bencher run` flags aren't declared here, so
-    # drop everything before the first --threshold-measure.
-    def parse_thresholds(argv)
-      thresholds = []
-      OptionParser.new do |opts|
-        opts.on("--threshold-measure=MEASURE") { |measure| thresholds << { measure: } }
-        opts.on("--threshold-lower-boundary=BOUNDARY") { |boundary| thresholds.last[:lower] = boundary }
-        opts.on("--threshold-upper-boundary=BOUNDARY") { |boundary| thresholds.last[:upper] = boundary }
-        opts.on("--threshold-test=TEST")
-        opts.on("--threshold-max-sample-size=SIZE")
-      end.parse(argv.drop_while { |arg| arg != "--threshold-measure" })
-      thresholds
-    end
-
-    it "tracks exactly rps/p50_latency/failed_pct with their tuned boundaries and sides" do
-      expect(parse_thresholds(bencher_args("my-branch", []))).to eq(
-        [
-          { measure: "rps", lower: "0.9995", upper: "_" },
-          { measure: "p50_latency", lower: "_", upper: "0.9999" },
-          { measure: "failed_pct", lower: "_", upper: "0.95" }
-        ]
-      )
-    end
-  end
-
   # A threshold on a measure that no metric reports is a silent no-op, so every tracked
   # measure must be among what BmfCollector emits. The reverse is NOT exact equality:
   # BmfCollector also emits p90_latency boundary-less (recorded for a summary baseline but
@@ -445,12 +411,12 @@ RSpec.describe "track_benchmarks" do
     end
 
     it "are all emitted by BmfCollector (so no threshold is a silent no-op)" do
-      expect(emitted).to include(*THRESHOLDS.map(&:first))
+      expect(emitted).to include(*BencherRunner::THRESHOLDS.map(&:first))
     end
 
     it "exclude p90_latency, which BmfCollector emits boundary-less (recorded but never alerted)" do
       expect(emitted).to include("p90_latency")
-      expect(THRESHOLDS.map(&:first)).not_to include("p90_latency")
+      expect(BencherRunner::THRESHOLDS.map(&:first)).not_to include("p90_latency")
     end
   end
 
@@ -468,7 +434,7 @@ RSpec.describe "track_benchmarks" do
     display_suppressed = %w[failed_pct].freeze
 
     it "use measures and directions that exist in THRESHOLDS" do
-      thresholds = THRESHOLDS.to_h { |measure, direction, _boundary| [measure, direction] }
+      thresholds = BencherRunner::THRESHOLDS.to_h { |measure, direction, _boundary| [measure, direction] }
 
       BenchmarkTable::COLUMNS.select { |col| col[:direction] }.each do |col|
         expect(thresholds).to include(col[:measure])
@@ -483,7 +449,7 @@ RSpec.describe "track_benchmarks" do
       highlightable = BenchmarkTable::COLUMNS.select { |col| col[:direction] }
                                              .to_h { |col| [col[:measure], col[:direction]] }
 
-      THRESHOLDS.each do |measure, direction, _boundary|
+      BencherRunner::THRESHOLDS.each do |measure, direction, _boundary|
         if display_suppressed.include?(measure)
           expect(highlightable).not_to include(measure)
         else
@@ -501,7 +467,7 @@ RSpec.describe "track_benchmarks" do
 
       expect(p90).not_to be_nil
       expect(p90[:direction]).to be_nil
-      expect(THRESHOLDS.map(&:first)).not_to include("p90_latency")
+      expect(BencherRunner::THRESHOLDS.map(&:first)).not_to include("p90_latency")
     end
   end
 end

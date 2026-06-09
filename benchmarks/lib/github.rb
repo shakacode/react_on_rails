@@ -16,6 +16,10 @@ module Github
     $stdout.puts "::notice::#{escape_workflow_command_data(message)}"
   end
 
+  def debug(message)
+    $stdout.puts "::debug::#{escape_workflow_command_data(message)}"
+  end
+
   def escape_workflow_command_data(value)
     value.to_s
          # Escape percent first so the percent signs introduced below are not double-encoded.
