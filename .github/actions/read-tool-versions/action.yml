@@ -42,6 +42,11 @@ runs:
           local tool="$2"
           local version
 
+          if [ ! -f "$file" ]; then
+            echo "::error file=$file::Missing $file"
+            exit 1
+          fi
+
           version="$(
             awk -v tool="$tool" '$1 == tool { print $2; exit }' "$file"
           )"

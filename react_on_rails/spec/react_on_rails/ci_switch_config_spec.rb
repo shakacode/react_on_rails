@@ -118,6 +118,26 @@ RSpec.describe "bin/ci-switch-config" do
     end
   end
 
+  it "does not accept stale head-sidecar backups even when contents match the current git head" do
+    with_ci_switch_tool_versions_repo do |tmpdir, harness_path|
+      committed_versions = File.read(File.join(tmpdir, ".tool-versions"))
+
+      File.write(File.join(tmpdir, ".tool-versions"), File.read(File.join(tmpdir, ".minimum.tool-versions")))
+      File.write(File.join(tmpdir, ".maximum.tool-versions"), committed_versions)
+      File.write(File.join(tmpdir, ".maximum.tool-versions.head"), "stale-head\n")
+
+      _stdout, stderr, status = Open3.capture3(harness_path, "backup-matches-current-head", chdir: tmpdir)
+
+      expect(status).not_to be_success, stderr
+
+      run_ci_switch_tool_versions(harness_path, "latest-tool-versions", chdir: tmpdir)
+
+      expect(File.read(File.join(tmpdir, ".tool-versions"))).to eq(committed_versions)
+      expect(File).not_to exist(File.join(tmpdir, ".maximum.tool-versions"))
+      expect(File).not_to exist(File.join(tmpdir, ".maximum.tool-versions.head"))
+    end
+  end
+
   it "warns when a non-git checkout falls back from latest to the local minimum profile" do
     Dir.mktmpdir do |tmpdir|
       harness_path = File.join(tmpdir, "bin/ci-switch-tool-versions")
@@ -193,8 +213,12 @@ RSpec.describe "bin/ci-switch-config" do
       "  read-latest-ruby)",
       "    read_latest_tool_version ruby",
       "    ;;",
+      "  backup-matches-current-head)",
+      "    saved_tool_versions_match_current_head",
+      "    ;;",
       "  *)",
-      '    echo "Usage: $0 {minimum-tool-versions|latest-tool-versions|read-latest-ruby}" >&2',
+      '    echo "Usage: $0 {' \
+      'minimum-tool-versions|latest-tool-versions|read-latest-ruby|backup-matches-current-head}" >&2',
       "    exit 1",
       "    ;;",
       "esac",

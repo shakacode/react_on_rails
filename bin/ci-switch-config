@@ -51,6 +51,7 @@ saved_tool_versions_match_current_head() {
     if [ -n "$saved_head" ] && [ "$saved_head" = "$current_head" ]; then
       return 0
     fi
+    return 1
   fi
 
   # Legacy fallback: no matching HEAD sidecar means this may be an older backup.

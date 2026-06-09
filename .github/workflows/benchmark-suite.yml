@@ -161,7 +161,8 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          # Node tracks latest; Ruby stays on minimum to keep benchmark infrastructure stable.
+          # Ruby stays on minimum to exercise gem compatibility; Node tracks
+          # .tool-versions for the Shakapacker 10.1 floor and V8-bug pin.
           node-version-file: .tool-versions
 
       - name: Print system information
