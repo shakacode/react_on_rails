@@ -124,12 +124,14 @@ export const createRSCProvider = ({
           return fetchRSCPromisesRef.current[key];
         }
 
-        const promise = getServerComponent({ componentName, componentProps }).then((payload) => {
+        let promise!: Promise<ReactNode>;
+        const markPayloadIfSuccessful = (payload: ReactNode) => {
           if (!(payload instanceof Error)) {
             markSuccessfulPromise(key, promise);
           }
           return payload;
-        });
+        };
+        promise = getServerComponent({ componentName, componentProps }).then(markPayloadIfSuccessful);
         fetchRSCPromisesRef.current[key] = promise;
         return promise;
       },
@@ -152,10 +154,8 @@ export const createRSCProvider = ({
             return;
           }
 
-          const lastSuccessfulPromise = lastSuccessfulRSCPromisesRef.current[key];
-          // eslint-disable-next-line @typescript-eslint/no-misused-promises
-          if (lastSuccessfulPromise) {
-            fetchRSCPromisesRef.current[key] = lastSuccessfulPromise;
+          if (key in lastSuccessfulRSCPromisesRef.current) {
+            fetchRSCPromisesRef.current[key] = lastSuccessfulRSCPromisesRef.current[key];
           } else {
             // No prior success to restore; drop the key so the next getComponent
             // call retries the initial fetch path from scratch.
