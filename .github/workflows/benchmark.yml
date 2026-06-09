@@ -181,7 +181,7 @@ jobs:
       matrix_row: ${{ toJSON(matrix) }}
       mode: initial
     secrets:
-      REACT_ON_RAILS_PRO_LICENSE_V2: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+      REACT_ON_RAILS_PRO_LICENSE_V2: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}  # yamllint disable-line rule:line-length
       BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
 
   # The confirmation gate. Reads the first-run candidates, drops the ones whose only
@@ -243,7 +243,7 @@ jobs:
       matrix_row: ${{ toJSON(matrix) }}
       mode: confirm
     secrets:
-      REACT_ON_RAILS_PRO_LICENSE_V2: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+      REACT_ON_RAILS_PRO_LICENSE_V2: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}  # yamllint disable-line rule:line-length
       BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
 
   # Files a single GitHub issue for any CONFIRMED benchmark regressions, with the first
