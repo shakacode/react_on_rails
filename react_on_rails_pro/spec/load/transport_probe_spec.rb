@@ -112,6 +112,22 @@ RSpec.describe RendererHarness::TransportProbe do
       expect(summary.fetch(:latency_ms)).to include(p50: 2.0, max: 3.0)
     end
 
+    it "includes bounded response details in non-200 request errors" do
+      runner = described_class.new(config)
+      response = instance_double(
+        Async::HTTP::Protocol::Response,
+        status: 413,
+        body: StringIO.new('{"ok":false,"error":"request body exceeded --body-bytes limit (10)"}')
+      )
+      client = instance_double(Async::HTTP::Client)
+
+      allow(client).to receive(:post).and_return(response)
+
+      expect do
+        runner.send(:perform_request, client, "/probe/unary", "too large")
+      end.to raise_error(RuntimeError, /HTTP 413: .*request body exceeded --body-bytes limit/)
+    end
+
     it "computes latency deltas against the Fastify TCP baseline" do
       runner = described_class.new(config)
       results = {
@@ -133,6 +149,19 @@ RSpec.describe RendererHarness::TransportProbe do
           "stream_16kb" => { p50_ms_vs_baseline: -0.5, p95_ms_vs_baseline: -1.0, p99_ms_vs_baseline: -1.5 }
         }
       )
+    end
+
+    it "keeps machine-local output paths out of the JSON summary" do
+      runner = described_class.new(config)
+      server = instance_double(
+        RendererHarness::TransportProbe::NodeServer,
+        ready: { "nodeVersion" => "v22.0.0", "platform" => "darwin arm64" }
+      )
+      runner.instance_variable_set(:@server, server)
+
+      summary = runner.send(:build_summary, {})
+
+      expect(summary).not_to have_key(:output_dir)
     end
   end
 
@@ -212,17 +241,19 @@ RSpec.describe RendererHarness::TransportProbe do
       endpoint = Async::HTTP::Endpoint.parse(origin, protocol: Async::HTTP::Protocol::HTTP2)
       response = nil
       Sync do
-        Async::HTTP::Client.open(endpoint, protocol: Async::HTTP::Protocol::HTTP2, retries: 0) do |client|
-          response = client.post(
-            "/probe/unary",
-            headers: Protocol::HTTP::Headers[[["content-type", "application/octet-stream"]]],
-            body:
-          )
-          response_body = +""
-          response.body&.each { |chunk| response_body << chunk }
-          [response.status, JSON.parse(response_body)]
-        ensure
-          response&.body&.close
+        Async::Task.current.with_timeout(5) do
+          Async::HTTP::Client.open(endpoint, protocol: Async::HTTP::Protocol::HTTP2, retries: 0) do |client|
+            response = client.post(
+              "/probe/unary",
+              headers: Protocol::HTTP::Headers[[["content-type", "application/octet-stream"]]],
+              body:
+            )
+            response_body = +""
+            response.body&.each { |chunk| response_body << chunk }
+            [response.status, JSON.parse(response_body)]
+          ensure
+            response&.body&.close
+          end
         end
       end
     end

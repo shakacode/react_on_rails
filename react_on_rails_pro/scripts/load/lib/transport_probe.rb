@@ -4,6 +4,7 @@ require "async"
 require "async/http"
 require "async/http/protocol/http2"
 require "fileutils"
+require "io/wait"
 require "json"
 require "open3"
 require "optparse"
@@ -230,6 +231,7 @@ module RendererHarness
 
       def perform_request(client, path, body)
         response_body = nil
+        response_text = +""
         response = client.post(
           path,
           headers: Protocol::HTTP::Headers[[["content-type", "application/octet-stream"]]],
@@ -237,8 +239,11 @@ module RendererHarness
         )
         bytes = 0
         response_body = response.body
-        response_body&.each { |chunk| bytes += chunk.bytesize }
-        raise "HTTP #{response.status}" unless response.status == 200
+        response_body&.each do |chunk|
+          bytes += chunk.bytesize
+          response_text << chunk unless response.status == 200
+        end
+        raise "HTTP #{response.status}: #{response_text}" unless response.status == 200
 
         bytes
       ensure
@@ -285,8 +290,7 @@ module RendererHarness
             platform: @server.ready.fetch("platform")
           },
           results:,
-          deltas: deltas(results),
-          output_dir:
+          deltas: deltas(results)
         }
       end
 
@@ -338,7 +342,7 @@ module RendererHarness
 
       def print_summary(summary)
         puts "Renderer transport probe summary"
-        puts "Output: #{File.join(summary[:output_dir], 'transport_probe_summary.json')}"
+        puts "Output: #{summary_path}"
         PROBE_CASES.each_key do |case_name|
           puts "\n#{case_name}"
           puts "scenario\trequests\tfailures\trps\tp50(ms)\tp95(ms)\tp99(ms)"
@@ -434,15 +438,17 @@ module RendererHarness
       end
 
       def read_ready
-        line = Timeout.timeout(@config.startup_timeout) { @stdout.gets }
+        if @stdout.respond_to?(:wait_readable) && !@stdout.wait_readable(@config.startup_timeout)
+          @stderr_reader&.join(0.2)
+          raise UserError, "transport probe server did not start within #{@config.startup_timeout}s: #{stderr_preview}"
+        end
+        line = @stdout.gets
         unless line
           @stderr_reader&.join(0.2)
           raise UserError, "transport probe server did not print readiness JSON: #{stderr_preview}"
         end
 
         validate_ready_payload(JSON.parse(line))
-      rescue Timeout::Error
-        raise UserError, "transport probe server did not start within #{@config.startup_timeout}s: #{stderr_preview}"
       rescue JSON::ParserError => e
         raise UserError, "transport probe server printed invalid readiness JSON: #{e.message}"
       end

@@ -165,7 +165,9 @@ const handleNativeStream = (stream, headers, { bodyBytes, streamBytes }) => {
     readRequestBody(stream, bodyBytes)
       .then(() => {
         stream.respond({ ':status': 200, 'content-type': 'application/octet-stream' });
-        streamChunks(streamBytes).pipe(stream);
+        const readable = streamChunks(streamBytes);
+        stream.on('error', () => readable.destroy());
+        readable.pipe(stream);
       })
       .catch((error) => writeReadError(stream, error));
     return;
@@ -267,8 +269,8 @@ const main = async () => {
   }
 
   if (scenarios.includes('native_uds')) {
-    nativeUdsSocketCreated = true;
     const nativeUdsServer = await listenNative({ bodyBytes, socketPath, streamBytes });
+    nativeUdsSocketCreated = true;
     servers.push({ server: nativeUdsServer, type: 'native' });
     endpoints.push({
       name: 'native_uds',
