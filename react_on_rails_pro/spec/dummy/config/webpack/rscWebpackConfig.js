@@ -127,7 +127,7 @@ const configureRsc = () => {
   // under rspack: RspackLoader only reports client modules to RSCRspackPlugin and
   // passes source through, so it cannot replace `'use client'` modules in the RSC bundle.
   const rscLoader = 'react-on-rails-rsc/WebpackLoader';
-  const hasRscLoader = (item) => (typeof item === 'string' ? item : (item?.loader ?? '')).includes(rscLoader);
+  const hasRscLoader = (item) => (typeof item === 'string' ? item : (item?.loader ?? '')) === rscLoader;
   const { rules } = rscConfig.module;
   rules.forEach((rule) => {
     if (typeof rule.use === 'function') {
