@@ -19,6 +19,7 @@ Use `.agents/workflows/pr-processing.md` as the deeper operating model for each 
 If the target scope is not verified yet, use `.agents/skills/plan-pr-batch/SKILL.md` first.
 For release-mode coordination, auto-merge confidence, and shared release tracker updates, follow `AGENTS.md` and the release-mode sections of `.agents/workflows/pr-processing.md`; do not invent new labels or overwrite tracker issue bodies from stale reads.
 If any target's value, priority, or proposed fix scope is unclear, use `.agents/skills/evaluate-issue/SKILL.md` before assigning implementation workers.
+Skip issues labeled `needs-customer-feedback` unless the user explicitly provides customer evidence or maintainer approval for that issue; report each skipped target with `needs-customer-feedback` as the reason.
 
 ## Non-Negotiable Safety Rules
 
@@ -60,6 +61,7 @@ Before implementation or worker launch, produce:
 
 1. A concrete goal name.
 2. A disposition summary for speculative, AI/code-analysis-only, over-scoped, or unclear candidates, or `N/A - all targets pre-approved`.
+   - Include any `needs-customer-feedback` targets skipped from implementation, with that label as the reason.
 3. A repo preflight: fetch/prune `main`, confirm the expected repository root, and verify nested repo paths before assigning work.
 4. A short batch table:
    - target number and title
