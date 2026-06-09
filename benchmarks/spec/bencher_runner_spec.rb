@@ -204,6 +204,22 @@ RSpec.describe BencherRunner do
       expect(FileUtils).not_to have_received(:rm_f).with("report.json")
     end
 
+    it "preserves the original persistence failure when temporary cleanup also fails" do
+      status = instance_double(Process::Status, exitstatus: 0)
+
+      allow(Open3).to receive(:capture3).and_return([JSON.generate("results" => [], "alerts" => []), "", status])
+      allow(File).to receive(:write).with("report.json.tmp", anything).and_raise(RuntimeError, "disk layer failed")
+      allow(FileUtils).to receive(:rm_f).with("report.json.tmp").and_raise(Errno::EACCES, "report.json.tmp")
+
+      expect do
+        runner.run(branch: "branch", start_point_args: [])
+      end.to(
+        output(/::warning::Could not remove temporary Bencher report report\.json\.tmp/).to_stdout
+          .and(raise_error(BencherRunner::PersistenceError, "disk layer failed"))
+      )
+      expect(FileUtils).not_to have_received(:rm_f).with("report.json")
+    end
+
     it "removes the temporary report but keeps the previous report when moving is interrupted" do
       status = instance_double(Process::Status, exitstatus: 0)
 

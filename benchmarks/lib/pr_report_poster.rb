@@ -23,11 +23,18 @@ class PrReportPoster
   def self.from_env(suite_name:, marker:)
     new(
       repository: ENV.fetch("GITHUB_REPOSITORY"),
-      pr_number: ENV.fetch("PR_NUMBER"),
+      pr_number: required_pr_number,
       suite_name:,
       marker:
     )
   end
+
+  def self.required_pr_number
+    ENV.fetch("PR_NUMBER") do
+      raise KeyError, "PR_NUMBER env var is required (set it from the pull_request event in the workflow step)"
+    end
+  end
+  private_class_method :required_pr_number
 
   def replace(markdown)
     # Guard callers that use the poster without the script-level empty-report check.

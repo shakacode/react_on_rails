@@ -107,7 +107,11 @@ class BencherRunner
     ensure
       # Always runs. After a successful mv the tmp file is already renamed, so
       # rm_f is a no-op; if write or mv raised it performs the cleanup.
-      FileUtils.rm_f(tmp_report_json)
+      begin
+        FileUtils.rm_f(tmp_report_json)
+      rescue StandardError => e
+        Github.warning("Could not remove temporary Bencher report #{tmp_report_json}: #{e.message}")
+      end
     end
 
     begin
