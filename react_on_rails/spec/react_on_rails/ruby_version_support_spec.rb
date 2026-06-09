@@ -60,8 +60,8 @@ RSpec.describe "Ruby version support" do
   end
 
   def ci_switch_tool_version_outputs
-    latest_tool_versions = committed_tool_versions(".tool-versions")
-    minimum_tool_versions = committed_tool_versions(".minimum.tool-versions")
+    latest_versions_content = committed_tool_versions(".tool-versions")
+    minimum_versions_content = committed_tool_versions(".minimum.tool-versions")
     script = [
       "source #{Shellwords.escape(File.join(repo_root, 'bin/ci-switch-config'))}",
       "latest_tool_versions=$(mktemp)",
@@ -76,7 +76,7 @@ RSpec.describe "Ruby version support" do
     ].join("\n")
 
     stdout, stderr, status = Open3.capture3(
-      { "LATEST_TOOL_VERSIONS" => latest_tool_versions, "MINIMUM_TOOL_VERSIONS" => minimum_tool_versions },
+      { "LATEST_TOOL_VERSIONS" => latest_versions_content, "MINIMUM_TOOL_VERSIONS" => minimum_versions_content },
       "bash", "-c", script, chdir: repo_root
     )
 

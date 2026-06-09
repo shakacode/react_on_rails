@@ -343,6 +343,7 @@ restore_tool_versions_to_latest() {
   else
     local git_err
 
+    # `git restore` requires Git 2.23+; GitHub Actions runners satisfy this.
     git_err="$(git -C "$PROJECT_ROOT" restore -- .tool-versions 2>&1)" || {
       echo "Error: could not restore .tool-versions from git. Restore it manually to the latest profile." >&2
       [ -n "$git_err" ] && echo "  git: $git_err" >&2
