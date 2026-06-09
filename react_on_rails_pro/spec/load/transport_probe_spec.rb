@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "spec_helper"
+require "stringio"
 require "transport_probe"
 
 RSpec.describe RendererHarness::TransportProbe do
@@ -149,6 +150,18 @@ RSpec.describe RendererHarness::TransportProbe do
       expect do
         described_class.start(config(node_bin: "/path/to/missing-node"))
       end.to raise_error(Errno::ENOENT)
+    end
+
+    it "rejects readiness JSON that is not an object with endpoints" do
+      server = described_class.new(config)
+      server.instance_variable_set(:@stdout, StringIO.new("#{JSON.generate('warning line')}\n"))
+
+      expect do
+        server.send(:read_ready)
+      end.to raise_error(
+        RendererHarness::TransportProbe::UserError,
+        /readiness JSON must be an object with an endpoints array/
+      )
     end
   end
 

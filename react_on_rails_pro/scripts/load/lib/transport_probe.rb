@@ -298,7 +298,7 @@ module RendererHarness
 
       def write_summary(summary)
         FileUtils.mkdir_p(output_dir)
-        File.write(File.join(output_dir, "transport_probe_summary.json"), JSON.pretty_generate(summary))
+        File.write(summary_path, JSON.pretty_generate(summary))
       end
 
       def output_dir
@@ -311,9 +311,13 @@ module RendererHarness
         )
       end
 
+      def summary_path
+        File.join(output_dir, "transport_probe_summary.json")
+      end
+
       def print_summary(summary)
         puts "Renderer transport probe summary"
-        puts "Output: #{summary[:output_dir]}"
+        puts "Output: #{File.join(summary[:output_dir], 'transport_probe_summary.json')}"
         PROBE_CASES.each_key do |case_name|
           puts "\n#{case_name}"
           puts "scenario\trequests\tfailures\trps\tp50(ms)\tp95(ms)\tp99(ms)"
@@ -413,11 +417,17 @@ module RendererHarness
           raise UserError, "transport probe server did not print readiness JSON: #{stderr_preview}"
         end
 
-        JSON.parse(line)
+        validate_ready_payload(JSON.parse(line))
       rescue Timeout::Error
         raise UserError, "transport probe server did not start within #{@config.startup_timeout}s: #{stderr_preview}"
       rescue JSON::ParserError => e
         raise UserError, "transport probe server printed invalid readiness JSON: #{e.message}"
+      end
+
+      def validate_ready_payload(payload)
+        return payload if payload.is_a?(Hash) && payload["endpoints"].is_a?(Array)
+
+        raise UserError, "transport probe server readiness JSON must be an object with an endpoints array"
       end
 
       def read_stderr
