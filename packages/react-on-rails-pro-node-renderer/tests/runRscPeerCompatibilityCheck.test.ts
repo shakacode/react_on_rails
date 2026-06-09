@@ -6,6 +6,14 @@ describe('runRscPeerCompatibilityCheck', () => {
   let warnSpy: jest.SpyInstance;
   let runRscPeerCompatibilityCheck: typeof import('../src/shared/runRscPeerCompatibilityCheck').runRscPeerCompatibilityCheck;
 
+  const resolveVersions =
+    (rscVersion: string, reactVersion = '19.2.0') =>
+    (spec: string): string | null => {
+      if (spec === 'react-on-rails-rsc') return rscVersion;
+      if (spec === 'react') return reactVersion;
+      return null;
+    };
+
   beforeEach(() => {
     jest.resetModules();
 
@@ -53,10 +61,15 @@ describe('runRscPeerCompatibilityCheck', () => {
     }
   });
 
+  it('warns when package resolution cannot start from the supplied cwd', () => {
+    expect(() => runRscPeerCompatibilityCheck({ cwd: 'relative-app-root' })).not.toThrow();
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('createRequire failed'));
+  });
+
   it('throws on a hard incompatibility (rsc major mismatch)', () => {
     expect(() =>
       runRscPeerCompatibilityCheck({
-        resolveVersion: (spec) => (spec.startsWith('react-on-rails-rsc') ? '20.0.0' : '19.2.0'),
+        resolveVersion: resolveVersions('20.0.0'),
       }),
     ).toThrow(/Incompatible react-on-rails-rsc/);
   });
@@ -64,7 +77,7 @@ describe('runRscPeerCompatibilityCheck', () => {
   it('warns (does not throw) when below recommendedMin', () => {
     expect(() =>
       runRscPeerCompatibilityCheck({
-        resolveVersion: (spec) => (spec.startsWith('react-on-rails-rsc') ? '19.0.1' : '19.2.0'),
+        resolveVersion: resolveVersions('19.0.1'),
       }),
     ).not.toThrow();
     expect(warnSpy).toHaveBeenCalledTimes(1);
@@ -74,7 +87,7 @@ describe('runRscPeerCompatibilityCheck', () => {
     expect(() =>
       runRscPeerCompatibilityCheck({
         env: { REACT_ON_RAILS_PRO_DISABLE_VERSION_CHECK: '1' },
-        resolveVersion: (spec) => (spec.startsWith('react-on-rails-rsc') ? '19.0.1' : '19.2.0'),
+        resolveVersion: resolveVersions('19.0.1'),
       }),
     ).not.toThrow();
     expect(warnSpy).toHaveBeenCalledTimes(1);
@@ -85,7 +98,7 @@ describe('runRscPeerCompatibilityCheck', () => {
     expect(() =>
       runRscPeerCompatibilityCheck({
         env: { REACT_ON_RAILS_PRO_DISABLE_VERSION_CHECK: '1' },
-        resolveVersion: (spec) => (spec.startsWith('react-on-rails-rsc') ? '20.0.0' : '19.2.0'),
+        resolveVersion: resolveVersions('20.0.0'),
       }),
     ).not.toThrow();
     expect(warnSpy).toHaveBeenCalledTimes(1);
@@ -96,14 +109,14 @@ describe('runRscPeerCompatibilityCheck', () => {
     expect(() =>
       runRscPeerCompatibilityCheck({
         env: { REACT_ON_RAILS_PRO_DISABLE_VERSION_CHECK: envValue },
-        resolveVersion: (spec) => (spec.startsWith('react-on-rails-rsc') ? '20.0.0' : '19.2.0'),
+        resolveVersion: resolveVersions('20.0.0'),
       }),
     ).toThrow(/Incompatible react-on-rails-rsc/);
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
   it('runs once per process (memoized)', () => {
-    const resolveVersion = (spec: string) => (spec.startsWith('react-on-rails-rsc') ? '19.0.1' : '19.2.0');
+    const resolveVersion = resolveVersions('19.0.1');
     runRscPeerCompatibilityCheck({ resolveVersion });
     runRscPeerCompatibilityCheck({ resolveVersion });
     expect(warnSpy).toHaveBeenCalledTimes(1);

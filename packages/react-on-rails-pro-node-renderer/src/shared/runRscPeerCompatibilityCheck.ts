@@ -68,7 +68,11 @@ const defaultResolveVersion = (packageName: string, cwd: string): string | null 
         return null;
       }
     }
-  } catch {
+  } catch (error) {
+    log.warn(
+      `[ReactOnRails] Could not resolve ${packageName} version ` +
+        `(createRequire failed: ${error instanceof Error ? error.message : String(error)}). Version check skipped.`,
+    );
     return null;
   }
 };

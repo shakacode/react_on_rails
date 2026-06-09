@@ -91,6 +91,8 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
     };
   }
 
+  // If React is not resolvable (unusual, since RSC requires React), skip this check;
+  // an app with React truly absent will fail during normal module loading.
   if (reactVersion) {
     const [reactMajor] = parseTuple(reactVersion);
     if (reactMajor < react.minMajor) {
