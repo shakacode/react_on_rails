@@ -41,8 +41,10 @@ If there is a conflict, `AGENTS.md` wins.
 # 4.0.10 or newer before running root bundle commands.
 bundle && pnpm install
 
-# After changing react_on_rails/Gemfile or Gemfile.shared_dev_dependencies,
-# also run bundle install at the repo root to keep the root Gemfile.lock synced.
+# The root Gemfile is a lint/tooling-only bundle (RuboCop + the benchmarks/
+# script-spec runner); it does NOT pull in the package Rails/test/runtime stack.
+# After changing the root Gemfile (RuboCop/rspec pins), run bundle install at the
+# repo root to keep the root Gemfile.lock synced.
 
 # Build TypeScript → JavaScript
 pnpm run build
