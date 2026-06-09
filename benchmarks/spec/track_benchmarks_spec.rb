@@ -131,6 +131,16 @@ RSpec.describe "track_benchmarks" do
   end
 
   describe "#replace_pr_comments" do
+    it "does not require CI event env outside pull requests" do
+      snapshot = ENV.to_h
+      ENV.delete("GITHUB_EVENT_NAME")
+      expect(PrReportPoster).not_to receive(:from_env)
+
+      expect { replace_pr_comments("report") }.not_to raise_error
+    ensure
+      ENV.replace(snapshot)
+    end
+
     it "does not require PR comment env for an empty pull request report" do
       with_env("GITHUB_EVENT_NAME" => "pull_request") do
         expect(PrReportPoster).not_to receive(:from_env)

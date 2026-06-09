@@ -118,6 +118,7 @@ class BencherRunner
       begin
         FileUtils.rm_f(tmp_report_json)
       rescue StandardError => e
+        # Cleanup failures are non-fatal, so keep this broader than the persistence rescue.
         Github.warning("Could not remove temporary Bencher report #{tmp_report_json}: #{e.message}")
       end
     end
@@ -126,6 +127,7 @@ class BencherRunner
       parse_report(stdout)
     rescue ReportParseError
       Github.debug("Malformed Bencher output (first 300 chars): #{stdout.slice(0, 300).inspect}")
+      # Only ReportParseError is cleaned up here. Unexpected parser bugs should propagate unchanged.
       # Remove malformed output so a future retry starts clean; the raw debugging
       # artifact is lost, but a bad report file is worse than no report file.
       begin
