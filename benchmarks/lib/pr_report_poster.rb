@@ -91,6 +91,7 @@ class PrReportPoster
     stdout, status = GithubCli.capture(
       "gh", "api", "repos/#{repository}/issues/#{pr_number}/comments",
       "--paginate",
+      # gh api --paginate applies --jq to each page independently, then concatenates stdout.
       # GitHub timestamps are fixed-width ISO-8601 strings, so lexical ordering matches time ordering.
       "--jq", ".[] | select(.body | startswith(env.MARKER)) | select(.created_at < env.CUTOFF_TS) | .id",
       env: { "MARKER" => marker, "CUTOFF_TS" => before }

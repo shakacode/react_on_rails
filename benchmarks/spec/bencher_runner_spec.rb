@@ -59,6 +59,10 @@ RSpec.describe BencherRunner do
         ]
       )
     end
+
+    it "passes the tuned maximum sample size to Bencher thresholds" do
+      expect(capture_run_command.each_cons(2)).to include(["--threshold-max-sample-size", "64"])
+    end
   end
 
   describe "#run" do
