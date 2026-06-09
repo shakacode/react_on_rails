@@ -47,3 +47,26 @@ export const createNodeReadableStream = () => {
 };
 
 export const getNodeVersion = () => parseInt(process.version.slice(1), 10);
+
+const webStreamEncoder = new TextEncoder();
+
+export const createWebStreamFromText = (text: string) =>
+  new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(webStreamEncoder.encode(text));
+      controller.close();
+    },
+  });
+
+export const createWebResponseFromText = (
+  text: string,
+  responseOverrides: Pick<Response, 'ok' | 'status' | 'statusText'> = {
+    ok: true,
+    status: 200,
+    statusText: 'OK',
+  },
+) =>
+  ({
+    body: createWebStreamFromText(text),
+    ...responseOverrides,
+  }) as Response;

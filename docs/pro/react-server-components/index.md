@@ -116,6 +116,7 @@ The [migration guide](../../oss/migrating/migrating-to-rsc.md) covers how to inc
 - [RSC Rendering Flow](./rendering-flow.md) — detailed rendering lifecycle, bundle types, and architecture
 - [Flight Protocol Syntax](./flight-protocol-syntax.md) — the wire format for streaming RSC data
 - [RSC Inside Client Components](./inside-client-components.md) — composing server and client components
+- [RSC Payloads as Route Data](./rsc-payload-route-data.md) — browser helper for client router loaders
 - [Purpose and Benefits](./purpose-and-benefits.md) — waterfall loading patterns, bundle size, and selective hydration
 - [Migration Success Stories](./success-stories.md) — reported results from DoorDash, Mux, Frigade, BlogHunch, and Developerway's independent analysis
 

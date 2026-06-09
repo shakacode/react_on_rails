@@ -34,6 +34,7 @@ ReactOnRails.register({ MyComponent });
 
 ```javascript
 import RSCRoute from 'react-on-rails-pro/RSCRoute';
+import { createRscPayloadNode } from 'react-on-rails-pro/rscPayloadNode';
 import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';
 import wrapServerComponentRenderer from 'react-on-rails-pro/wrapServerComponentRenderer/client';
 
@@ -65,6 +66,7 @@ This package wraps and extends the base `react-on-rails` package. You only need 
 | `react-on-rails-pro/client`                             | Client-only build (no SSR utilities)                    |
 | `react-on-rails-pro/RSCRoute`                           | React Server Components route component                 |
 | `react-on-rails-pro/RSCProvider`                        | RSC provider component                                  |
+| `react-on-rails-pro/rscPayloadNode`                     | Browser helper for RSC payloads as route data           |
 | `react-on-rails-pro/registerServerComponent/client`     | Client-side server component registration               |
 | `react-on-rails-pro/registerServerComponent/server`     | Server-side server component registration               |
 | `react-on-rails-pro/wrapServerComponentRenderer/client` | Client-side renderer wrapping                           |
@@ -92,6 +94,7 @@ See the [full installation guide](https://reactonrails.com/docs/pro/installation
 - [Installation Guide](https://reactonrails.com/docs/pro/installation)
 - [Configuration Reference](https://reactonrails.com/docs/configuration/configuration-pro)
 - [React Server Components Tutorial](https://reactonrails.com/docs/pro/react-server-components/tutorial)
+- [RSC Payloads as Route Data](https://reactonrails.com/docs/pro/react-server-components/rsc-payload-route-data)
 - [Upgrade from OSS to Pro](https://reactonrails.com/docs/pro/upgrading-to-pro/)
 - [React on Rails Pro Overview](https://reactonrails.com/docs/pro/)
 
