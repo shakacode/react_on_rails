@@ -182,6 +182,17 @@ RSpec.describe "Ruby version support" do
     expect(lint_ruby_versions).not_to be_empty
     expect(precompile_ruby_versions).to all(eq(expected_latest_ruby))
     expect(precompile_ruby_versions).not_to be_empty
+
+    examples_workflow = read_repo_file(".github/workflows/examples.yml")
+    playwright_workflow = read_repo_file(".github/workflows/playwright.yml")
+    [examples_workflow, playwright_workflow].each do |workflow|
+      expect(workflow).to include("steps.tool-versions.outputs.minimum-node-version")
+      expect(workflow).not_to include("node-version-file: .minimum.tool-versions")
+    end
+
+    benchmark_suite = read_repo_file(".github/workflows/benchmark-suite.yml")
+    expect(benchmark_suite).to include("steps.tool-versions.outputs.node-version")
+    expect(benchmark_suite).to include("deliberate min-Ruby x latest-Node cross-profile")
   end
 
   it "documents and switches to Ruby 4.0 for the latest local CI configuration" do

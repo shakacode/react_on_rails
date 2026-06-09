@@ -144,6 +144,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
       - name: Setup Ruby
         uses: ./.github/actions/setup-ruby
         with:
@@ -151,7 +154,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version-file: .minimum.tool-versions
+          node-version: ${{ steps.tool-versions.outputs.minimum-node-version }}
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
       - name: Get pnpm store directory
