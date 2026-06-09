@@ -162,7 +162,8 @@ jobs:
         uses: actions/setup-node@v6
         with:
           # Ruby stays on minimum to exercise gem compatibility; Node tracks
-          # .tool-versions for the Shakapacker 10.1 floor and V8-bug pin.
+          # latest .tool-versions for the Shakapacker 10.1 floor and V8-bug pin.
+          # The minimum Node profile remains in .minimum.tool-versions for matrix jobs.
           node-version-file: .tool-versions
 
       - name: Print system information

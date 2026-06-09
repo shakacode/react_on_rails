@@ -154,7 +154,8 @@ RSpec.describe "bin/ci-switch-config" do
 
       expect(status).to be_success, "#{stdout}\n#{stderr}"
       expect(stdout).to include(File.read(File.join(repo_root, ".minimum.tool-versions")).match(/ruby (\S+)/)[1])
-      expect(stderr).to include("falling back to current .tool-versions, which matches the minimum profile")
+      expect(stderr).to include("falling back to current .tool-versions")
+      expect(stderr).to include("current .tool-versions matches the minimum profile")
     end
   end
 

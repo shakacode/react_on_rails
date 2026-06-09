@@ -91,6 +91,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 1
       - name: Read runtime versions
         id: tool-versions
         uses: ./.github/actions/read-tool-versions
