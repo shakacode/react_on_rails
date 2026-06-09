@@ -39,6 +39,9 @@ If there is a conflict, `AGENTS.md` wins.
 # Install dependencies
 bundle && pnpm install
 
+# After changing react_on_rails/Gemfile or Gemfile.shared_dev_dependencies,
+# also run bundle install at the repo root to keep the root Gemfile.lock synced.
+
 # Build TypeScript → JavaScript
 pnpm run build
 
