@@ -300,8 +300,17 @@ const main = async () => {
     process.exit(0);
   };
 
-  process.once('SIGTERM', shutdown);
-  process.once('SIGINT', shutdown);
+  let shuttingDown = false;
+  const guardedShutdown = () => {
+    if (shuttingDown) {
+      return;
+    }
+    shuttingDown = true;
+    void shutdown();
+  };
+
+  process.once('SIGTERM', guardedShutdown);
+  process.once('SIGINT', guardedShutdown);
 };
 
 main().catch((error) => {

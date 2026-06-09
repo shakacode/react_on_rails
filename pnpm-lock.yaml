@@ -142,9 +142,6 @@ importers:
       eslint-plugin-testing-library:
         specifier: ^7.1.1
         version: 7.13.5(eslint@9.39.1(jiti@2.6.1))(typescript@5.9.3)
-      fastify:
-        specifier: ^5.8.5
-        version: 5.8.5
       globals:
         specifier: ^16.2.0
         version: 16.5.0
@@ -577,6 +574,15 @@ importers:
         version: 5.2.4(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.105.2)
       webpack-merge:
         specifier: '5'
+        version: 5.10.0
+
+  react_on_rails_pro:
+    devDependencies:
+      fastify:
+        specifier: ^5.8.5
+        version: 5.8.5
+      nps:
+        specifier: ^5.9.3
         version: 5.10.0
 
   react_on_rails_pro/spec/dummy:
