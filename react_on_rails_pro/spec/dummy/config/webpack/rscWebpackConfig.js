@@ -18,6 +18,19 @@ const { basename, dirname, isAbsolute, relative, resolve } = require('path');
 const { config } = require('shakapacker');
 const { default: serverWebpackConfig, extractLoader } = require('./serverWebpackConfig');
 
+const reactPackageRoot = dirname(require.resolve('react/package.json'));
+// React 19+ ships these react-server entry files alongside the standard entries.
+const resolveReactServerEntry = (entryFilename) => {
+  const entryPath = resolve(reactPackageRoot, entryFilename);
+  if (!existsSync(entryPath)) {
+    throw new Error(
+      `Expected React server entry "${entryFilename}" at "${entryPath}". ` +
+        'React package layout changed; update the RSC webpack aliases.',
+    );
+  }
+  return entryPath;
+};
+
 const rscReferenceDiscoveryPlugin = () => {
   try {
     // eslint-disable-next-line global-require
@@ -124,40 +137,39 @@ const configureRsc = () => {
     }
   });
 
-  // Add the `react-server` condition to the resolve config
-  // This condition is used by React and React on Rails to know that this bundle is a React Server Component bundle
-  // The `...` tells webpack to retain the default Webpack conditions (In this case will keep the `node` condition because the bundle targets node)
-  //
-  // IMPORTANT: The alias.js file sets React aliases to directory paths for deduplication.
-  // Directory-path aliases bypass webpack's conditionNames/exports resolution.
-  // For the RSC bundle, we must override these aliases to point to the react-server
-  // entry files directly, so that React's server-specific code is bundled correctly.
-  const rootNodeModules = resolve(__dirname, '..', '..', '..', '..', '..', 'node_modules');
+  // Add the `react-server` condition to the resolve config.
+  // This condition is used by React and React on Rails to identify RSC bundles.
+  // The `...` tells webpack to retain the default conditions (e.g., `node` for server target).
   const rscAliases = { ...(rscConfig.resolve?.alias || {}) };
   delete rscAliases['react-on-rails-pro$'];
-  // Drop the client-only StrictMode shim so RSC imports of `react-on-rails-pro/client` don't pull
-  // in a browser entry point inside the React server bundle.
+  // Strip client-only StrictMode shim so RSC imports of `react-on-rails-pro/client`
+  // do not pull a browser entry point into the React server bundle.
   delete rscAliases['react-on-rails-pro/client$'];
-  // Remove the base `react` directory alias (from alias.js) so our exact-match `react$` below is
-  // the sole React alias. Without this, the prefix-match `react` from alias.js would still intercept
-  // subpath imports like `react/jsx-runtime` from within node_modules.
   delete rscAliases.react;
+  delete rscAliases.react$;
   delete rscAliases['react/jsx-runtime'];
+  delete rscAliases['react/jsx-runtime$'];
   delete rscAliases['react/jsx-dev-runtime'];
+  delete rscAliases['react/jsx-dev-runtime$'];
+  delete rscAliases['react-dom/server'];
+  delete rscAliases['react-dom/server$'];
+
   rscConfig.resolve = {
     ...rscConfig.resolve,
     conditionNames: ['react-server', '...'],
     alias: {
       ...rscAliases,
-      // Override React aliases to use react-server entry points.
-      // The trailing $ makes this an exact match so `react/jsx-runtime` is NOT
-      // intercepted — it falls through to its own alias below.
-      react$: resolve(rootNodeModules, 'react', 'react.react-server.js'),
-      'react/jsx-runtime': resolve(rootNodeModules, 'react', 'jsx-runtime.react-server.js'),
-      'react/jsx-dev-runtime': resolve(rootNodeModules, 'react', 'jsx-dev-runtime.react-server.js'),
-      // Ignore import of react-dom/server in rsc bundle
-      // This module is not needed to generate the rsc payload, it's rendered using `react-on-rails-rsc`
-      // Not removing it will cause a runtime error
+      // Canonicalize RSC-bundle React imports to one React server package instance.
+      // Without these aliases, symlinked/hoisted packages can bundle one React copy
+      // for react-on-rails-rsc and another for app Server Components. React.cache()
+      // then sees no active RSC dispatcher and silently skips request-local dedupe.
+      react$: resolveReactServerEntry('react.react-server.js'),
+      'react/jsx-runtime$': resolveReactServerEntry('jsx-runtime.react-server.js'),
+      'react/jsx-dev-runtime$': resolveReactServerEntry('jsx-dev-runtime.react-server.js'),
+      // Ignore react-dom/server in RSC bundle - it's not needed for RSC payload generation.
+      // Not removing it will cause a runtime error.
+      // Prefix-match false covers exact and subpath imports such as
+      // react-dom/server.browser.js; no $-variant is needed.
       'react-dom/server': false,
     },
   };

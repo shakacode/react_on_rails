@@ -37,6 +37,7 @@ generator still installs the tested React range and exact RSC package pin.
 | **RSC bundle config** (`rscWebpackConfig.js`)                    | Yes                | Does not use WebpackPlugin; only uses loader + resolve settings                 |
 | **WebpackLoader** (`react-on-rails-rsc/WebpackLoader`)           | Yes                | Standard loader interface (`this.resourcePath`, source transform)               |
 | **`conditionNames: ['react-server', '...']`**                    | Yes                | Rspack supports conditional exports resolution                                  |
+| **React server file aliases**                                    | Yes                | Rspack supports exact aliases that keep React's RSC dispatcher shared           |
 | **`resolve.alias`** (`react-dom/server: false`)                  | Yes                | Rspack supports alias to `false`                                                |
 | **`LimitChunkCountPlugin`**                                      | Yes                | Generated configs use bundler-agnostic `bundler.optimize.LimitChunkCountPlugin` |
 | **Loader chain (SWC + Babel)**                                   | Yes                | Generated config handles both `function` and `Array` `rule.use` styles          |
@@ -84,7 +85,8 @@ which skips adding the manifest plugin (`RSCRspackPlugin` under rspack,
 
 1. The **WebpackLoader** to transform `'use client'` files into client reference proxies
 2. **`conditionNames: ['react-server', '...']`** to resolve React's server entry points
-3. **Aliases** to exclude `react-dom/server` from the RSC bundle
+3. **React server file aliases** to keep the RSC renderer and app Server Components on one React server package instance
+4. **Aliases** to exclude `react-dom/server` from the RSC bundle
 
 The manifest plugin is only added to the **server** and **client** bundles.
 
