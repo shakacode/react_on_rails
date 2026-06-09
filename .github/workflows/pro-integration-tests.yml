@@ -688,7 +688,7 @@ jobs:
             path="$2"
             shift 2
             timeout=300
-            elapsed=0
+            start=$SECONDS
 
             while true; do
               for authority in "$@"; do
@@ -729,13 +729,14 @@ jobs:
           timeout = setTimeout(fail, 10000);
           NODE
                 then
+                  elapsed=$((SECONDS - start))
                   echo "${name} started at ${authority}${path} after ${elapsed}s"
                   return 0
                 fi
               done
 
               sleep 1
-              elapsed=$((elapsed + 1))
+              elapsed=$((SECONDS - start))
               if [ $elapsed -ge $timeout ]; then
                 echo "Timeout waiting for ${name} to start after ${timeout}s"
                 echo "::group::${name} h2c readiness diagnostics"
