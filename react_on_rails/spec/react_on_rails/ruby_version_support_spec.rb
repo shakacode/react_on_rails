@@ -68,14 +68,21 @@ RSpec.describe "Ruby version support" do
   it "stores latest and minimum CI runtime versions in committed tool-version files" do
     # Runtime bumps start in the committed tool-version files; this snapshot and
     # SWITCHING_CI_CONFIGS.md follow those source-of-truth versions.
-    expect(tool_versions(".tool-versions")).to include(
+    latest_versions = tool_versions(".tool-versions")
+    minimum_versions = tool_versions(".minimum.tool-versions")
+
+    expect(latest_versions).to include(
       "ruby" => "4.0.5",
       "nodejs" => "22.12.0"
     )
-    expect(tool_versions(".minimum.tool-versions")).to include(
+    expect(minimum_versions).to include(
       "ruby" => "3.3.7",
       "nodejs" => "20.19.0"
     )
+    expect(Gem::Version.new(latest_versions.fetch("ruby")))
+      .to be > Gem::Version.new(minimum_versions.fetch("ruby"))
+    expect(Gem::Version.new(latest_versions.fetch("nodejs")))
+      .to be > Gem::Version.new(minimum_versions.fetch("nodejs"))
   end
 
   it "tests Ruby 4.0 as the latest OSS CI runtime while keeping Ruby 3.3 as the minimum" do
