@@ -125,6 +125,8 @@ const configureServer = (rscBundle = false) => {
 
   // Don't hash the server bundle b/c would conflict with the client manifest
   // And no need for the MiniCssExtractPlugin
+  // These plugin class names are stable in this unbundled Node config; if a
+  // future tool bundles or renames config modules, update this filter first.
   serverWebpackConfig.plugins = serverWebpackConfig.plugins.filter(
     (plugin) =>
       plugin.constructor.name !== 'WebpackAssetsManifest' &&

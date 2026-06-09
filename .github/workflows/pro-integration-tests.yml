@@ -557,6 +557,7 @@ jobs:
     timeout-minutes: 30
     env:
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+      # Pin Rails and the renderer to the same IPv4 loopback endpoint.
       REACT_RENDERER_URL: http://127.0.0.1:3800
       RENDERER_HOST: 127.0.0.1
       SHAKAPACKER_ASSETS_BUNDLER: rspack
@@ -743,7 +744,7 @@ jobs:
           }
 
           wait_for_service "Rails server" "http://localhost:3000/empty"
-          wait_for_h2c_service "Node renderer" "/info" "http://127.0.0.1:3800" "http://[::1]:3800"
+          wait_for_h2c_service "Node renderer" "/info" "http://127.0.0.1:3800"
 
       - name: Install Playwright dependencies
         run: cd spec/dummy && npx playwright install --with-deps

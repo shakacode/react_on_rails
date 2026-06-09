@@ -109,11 +109,10 @@ const configureRsc = () => {
     };
   }
 
-  // Add the RSC loader before the JavaScript loader.
-  const rscLoader =
-    config.assets_bundler === 'rspack'
-      ? 'react-on-rails-rsc/RspackLoader'
-      : 'react-on-rails-rsc/WebpackLoader';
+  // Add the RSC transform loader before the JavaScript loader. Keep WebpackLoader
+  // under rspack: RspackLoader only reports client modules to RSCRspackPlugin and
+  // passes source through, so it cannot replace `'use client'` modules in the RSC bundle.
+  const rscLoader = 'react-on-rails-rsc/WebpackLoader';
   const hasRscLoader = (item) => (typeof item === 'string' ? item : (item?.loader ?? '')).includes(rscLoader);
   const { rules } = rscConfig.module;
   rules.forEach((rule) => {
@@ -136,6 +135,7 @@ const configureRsc = () => {
         const jsLoader =
           extractLoader(resolvedRule, 'babel-loader') || extractLoader(resolvedRule, 'swc-loader');
         if (jsLoader) return [...resultArray, { loader: rscLoader }];
+        // Preserve the original return shape when this function rule is not a JS loader rule.
         return result;
       };
     } else if (Array.isArray(rule.use)) {

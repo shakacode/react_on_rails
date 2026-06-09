@@ -75,6 +75,8 @@ describe('Pro dummy RSC rspack config', () => {
       resolve: { alias: {} },
     };
     const configureServer = jest.fn(() => serverConfig);
+    // Local copy for the mocked server config: this test only needs the array rule
+    // lookup that rscLoaderWrapper performs after resolving a function-shaped rule.
     const extractLoader = (rule, loaderName) =>
       Array.isArray(rule.use)
         ? rule.use.find((item) => {
@@ -101,7 +103,7 @@ describe('Pro dummy RSC rspack config', () => {
     expect(wrappedUse.name).toBe('rscLoaderWrapper');
     expect(firstUseResult).toEqual([
       { loader: 'babel-loader', options: { caller: { ssr: true } } },
-      { loader: 'react-on-rails-rsc/RspackLoader' },
+      { loader: 'react-on-rails-rsc/WebpackLoader' },
     ]);
     expect(secondUseResult).toEqual(firstUseResult);
   });
