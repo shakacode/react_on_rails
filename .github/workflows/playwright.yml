@@ -63,6 +63,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
+          # Pin the single E2E lane to the exact Shakapacker floor from .minimum.tool-versions.
           node-version: ${{ steps.tool-versions.outputs.minimum-node-version }}
 
       - name: Setup pnpm

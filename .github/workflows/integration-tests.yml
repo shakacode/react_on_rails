@@ -101,6 +101,8 @@ jobs:
         uses: ./.github/actions/read-tool-versions
       - id: set-matrix
         run: |
+          # Integration matrices float Node within each supported major; single-lane
+          # workflows use exact patch versions when exercising the minimum floor.
           latest_ruby_version="${{ steps.tool-versions.outputs.ruby-minor-version }}"
           latest_node_version="${{ steps.tool-versions.outputs.node-major-version }}"
           minimum_ruby_version="${{ steps.tool-versions.outputs.minimum-ruby-minor-version }}"

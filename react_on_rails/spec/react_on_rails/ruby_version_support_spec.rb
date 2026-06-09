@@ -228,6 +228,10 @@ RSpec.describe "Ruby version support" do
     expect(ci_switch_config).to include('MINIMUM_REACT_MAJOR_VERSION="${MINIMUM_REACT_VERSION%%.*}"')
     expect(ci_switch_config).to include('MAXIMUM_TOOL_VERSIONS_HEAD_FILE="$PROJECT_ROOT/.maximum.tool-versions.head"')
     expect(ci_switch_config).to include("saved_tool_versions_match_current_head()")
+    expect(ci_switch_config).to include("set_tool_versions_to_minimum()")
+    expect(ci_switch_config).to include("restore_tool_versions_to_latest()")
+    expect(ci_switch_config).to include("read_committed_tool_version()")
+    expect(ci_switch_config).to include("read_latest_tool_version()")
     expect(ci_switch_config).to include(
       'LATEST_RUBY_VERSION="$(read_latest_tool_version ruby false)"'
     )
@@ -238,11 +242,6 @@ RSpec.describe "Ruby version support" do
     expect(ci_switch_config).to include('LATEST_SHAKAPACKER_VERSION="10.1.0"')
     expect(ci_switch_config).to include('LATEST_REACT_VERSION="19.0.0"')
     expect(ci_switch_config).to include('LATEST_REACT_MAJOR_VERSION="${LATEST_REACT_VERSION%%.*}"')
-    expect(ci_switch_config).to include('cp "$PROJECT_ROOT/.minimum.tool-versions" "$PROJECT_ROOT/.tool-versions"')
-    expect(ci_switch_config).to include('cp "$MAXIMUM_TOOL_VERSIONS_FILE" "$PROJECT_ROOT/.tool-versions"')
-    expect(ci_switch_config).to include('echo "$current_head" > "$MAXIMUM_TOOL_VERSIONS_HEAD_FILE"')
-    expect(ci_switch_config).to include('git -C "$PROJECT_ROOT" show HEAD:.tool-versions')
-    expect(ci_switch_config).to include('rm -f "$MAXIMUM_TOOL_VERSIONS_FILE" "$MAXIMUM_TOOL_VERSIONS_HEAD_FILE"')
     expect(ci_switch_config).to match(/set_ruby_version "\$LATEST_RUBY_VERSION"/)
     expect(ci_switch_config).to match(/set_node_version "\$LATEST_NODE_VERSION"/)
     expect(ci_switch_config).to include('[[ "${REACT_ROOT}" =~ ^\^?${MINIMUM_REACT_MAJOR_VERSION}(\.|$) ]]')
