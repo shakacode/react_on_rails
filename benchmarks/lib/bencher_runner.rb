@@ -10,7 +10,7 @@ require_relative "github"
 # Builds and runs the Bencher CLI invocation for benchmark tracking.
 class BencherRunner
   class ReportParseError < StandardError; end
-  class PersistenceError < RuntimeError; end
+  class PersistenceError < StandardError; end
 
   Result = Struct.new(:stderr, :exit_code, :report, keyword_init: true)
   private_constant :Result
@@ -46,6 +46,7 @@ class BencherRunner
 
   # Returns a Result with :stderr, :exit_code, and :report accessors. The
   # private constant keeps callers from depending on the struct class name.
+  # Raises ReportParseError or PersistenceError when report persistence fails.
   def run(branch:, start_point_args:)
     # This Bencher CLI call is not wrapped in Timeout.timeout because that can leak
     # child processes. In CI it is bounded by the GitHub Actions job timeout for
