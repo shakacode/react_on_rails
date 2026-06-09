@@ -67,7 +67,14 @@ saved_tool_versions_match_current_head() {
   # Legacy fallback for backups created before the HEAD sidecar existed. With no
   # sidecar, content identity is the only safe proxy for "captured at this head".
   # Accept the backup only when it already matches the committed latest profile.
-  git -C "$PROJECT_ROOT" show HEAD:.tool-versions 2>/dev/null | cmp -s "$MAXIMUM_TOOL_VERSIONS_FILE" -
+  local committed_tool_versions
+
+  committed_tool_versions="$(git -C "$PROJECT_ROOT" show HEAD:.tool-versions 2>/dev/null || true)"
+  if [ -z "$committed_tool_versions" ]; then
+    return 1
+  fi
+
+  cmp -s "$MAXIMUM_TOOL_VERSIONS_FILE" <<<"$committed_tool_versions"
 }
 
 read_committed_tool_version() {

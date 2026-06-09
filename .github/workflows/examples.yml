@@ -154,7 +154,9 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          # Pin the minimum lane to the exact Shakapacker floor from .minimum.tool-versions.
+          # All example lanes test on the minimum Shakapacker Node floor from
+          # .minimum.tool-versions; example tests exercise Ruby/gem compatibility,
+          # not Node version compatibility.
           node-version: ${{ steps.tool-versions.outputs.minimum-node-version }}
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
