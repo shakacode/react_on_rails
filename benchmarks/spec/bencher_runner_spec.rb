@@ -161,6 +161,19 @@ RSpec.describe BencherRunner do
       expect(FileUtils).to have_received(:rm_f).with("report.json")
     end
 
+    it "raises a testable error when Bencher emits non-JSON stdout" do
+      status = instance_double(Process::Status, exitstatus: 0)
+
+      allow(Open3).to receive(:capture3).and_return(["not json", "", status])
+      allow(File).to receive(:write).with("report.json.tmp", "not json")
+      allow(FileUtils).to receive(:mv).with("report.json.tmp", "report.json")
+      allow(FileUtils).to receive(:rm_f)
+
+      expect { runner.run("branch", []) }
+        .to raise_error(BencherRunner::ReportParseError, /Bencher JSON report has an unexpected shape/)
+      expect(FileUtils).to have_received(:rm_f).with("report.json")
+    end
+
     it "removes the temporary report but keeps the previous report when writing fails" do
       status = instance_double(Process::Status, exitstatus: 0)
 

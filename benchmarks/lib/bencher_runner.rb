@@ -104,7 +104,7 @@ class BencherRunner
 
   def parse_report(stdout)
     BencherReport.parse(stdout, tracked_measures: THRESHOLDS.map(&:first))
-  rescue BencherReport::FormatError => e
+  rescue BencherReport::FormatError, JSON::ParserError => e
     raise ReportParseError,
           "Bencher JSON report has an unexpected shape — re-verify against " \
           "benchmarks/spec/bencher_report_spec.rb before bumping the CLI pin. #{e.message}"
