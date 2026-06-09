@@ -37,6 +37,14 @@ RSpec.describe PrReportPoster do
         error_message: "Failed to list stale Pro Bencher report comments"
       )
     end
+
+    it "rejects non-numeric pull request numbers before building GitHub paths" do
+      with_env("GITHUB_REPOSITORY" => "shakacode/react_on_rails", "PR_NUMBER" => "main/456") do
+        expect do
+          described_class.from_env(suite_name: "Pro", marker: "<!-- BENCHER PRO -->")
+        end.to raise_error(ArgumentError, 'PR_NUMBER must be numeric, got: "main/456"')
+      end
+    end
   end
 
   describe "#replace" do

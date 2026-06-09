@@ -119,7 +119,7 @@ def run_bencher!(branch, start_point_args)
 rescue BencherRunner::ReportParseError => e
   warn "::error::#{e.message}"
   exit 1
-rescue SystemCallError => e
+rescue SystemCallError, RuntimeError => e
   warn "::error::Benchmark report I/O failed: #{e.message}"
   exit 1
 end

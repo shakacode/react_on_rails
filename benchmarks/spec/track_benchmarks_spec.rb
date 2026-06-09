@@ -129,7 +129,7 @@ RSpec.describe "track_benchmarks" do
   end
 
   describe "#run_bencher!" do
-    it "formats benchmark report I/O failures as GitHub Actions errors" do
+    it "formats system benchmark report I/O failures as GitHub Actions errors" do
       runner = instance_double(BencherRunner)
       allow(self).to receive(:bencher_runner).and_return(runner)
       allow(runner).to receive(:run).and_raise(Errno::ENOSPC, "report.json")
@@ -139,6 +139,19 @@ RSpec.describe "track_benchmarks" do
       end.to output(%r{::error::Benchmark report I/O failed: No space}).to_stderr.and raise_error(SystemExit) { |e|
         expect(e.status).to eq(1)
       }
+    end
+
+    it "formats non-system benchmark report write failures as GitHub Actions errors" do
+      runner = instance_double(BencherRunner)
+      allow(self).to receive(:bencher_runner).and_return(runner)
+      allow(runner).to receive(:run).and_raise(RuntimeError, "disk layer failed")
+
+      expect do
+        run_bencher!("branch", [])
+      end.to(
+        output(%r{::error::Benchmark report I/O failed: disk layer failed}).to_stderr
+          .and(raise_error(SystemExit) { |e| expect(e.status).to eq(1) })
+      )
     end
   end
 
