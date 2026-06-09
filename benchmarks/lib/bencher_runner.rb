@@ -138,7 +138,7 @@ class BencherRunner
     # artifact is lost, but a bad report file is worse than no report file.
     begin
       FileUtils.rm_f(report_json)
-    rescue SystemCallError, IOError => e
+    rescue StandardError => e
       Github.warning("Could not remove malformed Bencher report #{report_json}: #{e.message}")
     end
     raise
