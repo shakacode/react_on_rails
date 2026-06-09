@@ -504,8 +504,8 @@ DEPENDENCIES
   rspec-retry
   rspec_junit_formatter
   rubocop (= 1.61.0)
-  rubocop-performance (~> 1.20.0)
-  rubocop-rspec (~> 2.26)
+  rubocop-performance (= 1.20.2)
+  rubocop-rspec (= 2.31.0)
   sass-rails (~> 6.0)
   sdoc
   selenium-webdriver (= 4.9.0)
