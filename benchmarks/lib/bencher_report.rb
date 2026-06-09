@@ -15,7 +15,7 @@ require_relative "bencher_perf_url"
 # loud rather than mis-report), while purely informational alert fields are read
 # leniently (see #parse_alerts). The job fails loudly rather than silently rendering
 # garbage or missing a regression.
-class BencherReport
+class BencherReport # rubocop:disable Metrics/ClassLength
   class FormatError < StandardError; end
 
   # One benchmark+measure's value and its prediction interval. baseline/limits are
@@ -74,17 +74,24 @@ class BencherReport
 
   Alert = Struct.new(:benchmark, :measure, :limit, keyword_init: true)
 
-  def self.parse(json_string)
-    new(JSON.parse(json_string))
+  def self.parse(json_string, tracked_measures: nil)
+    new(JSON.parse(json_string), tracked_measures:)
   rescue JSON::ParserError => e
     raise FormatError, "Bencher report is not valid JSON: #{e.message}"
   end
 
-  def initialize(raw)
+  # tracked_measures: the measures the caller actually tracks (e.g. track_benchmarks.rb's
+  # THRESHOLDS names). When given, an active alert on any *other* measure is treated as
+  # filtered rather than a regression — this drops alerts from orphaned server-side Bencher
+  # thresholds (e.g. a p90_latency threshold the code stopped passing but never deleted),
+  # which otherwise file an issue that the summary table can't even flag. nil = track every
+  # measure (backward-compatible default for callers that only need parsing/significance).
+  def initialize(raw, tracked_measures: nil)
     raise FormatError, "report is not a JSON object (got #{raw.class})" unless raw.is_a?(Hash)
 
+    @tracked_measures = tracked_measures&.map { |measure| normalize(measure) }
     @boundaries = index_boundaries(raw)
-    @alerts = parse_alerts(raw)
+    @alerts, @filtered_alerts = parse_alerts(raw).partition { |alert| current_regression_alert?(alert) }
     # Per-benchmark perf links are informational (they only decide whether a name links
     # out), so they live in a separate, fully-lenient builder — a missing field yields an
     # unlinked name, never a FormatError that would fail the job over a cosmetic link.
@@ -93,9 +100,9 @@ class BencherReport
 
   attr_reader :alerts
 
-  def regression?
-    !@alerts.empty?
-  end
+  def regression? = !@alerts.empty?
+
+  def filtered_alert? = !@filtered_alerts.empty?
 
   # Boundary for a benchmark+measure, or nil if absent from the report.
   def boundary(benchmark_name, measure_key)
@@ -118,9 +125,7 @@ class BencherReport
   # plain name. A single benchmark missing its own uuid stays silent (a per-row cosmetic
   # miss); losing the shared context instead is a likely report-contract drift, so the
   # caller surfaces it as a ::warning:: — never a FormatError (the links are cosmetic).
-  def perf_links_unavailable?
-    @perf_urls.any_benchmarks? && !@perf_urls.context_ready?
-  end
+  def perf_links_unavailable? = @perf_urls.any_benchmarks? && !@perf_urls.context_ready?
 
   private
 
@@ -187,6 +192,42 @@ class BencherReport
         limit: dig_optional_string(entry, "limit")
       )
     end
+  end
+
+  # rubocop:disable Metrics/CyclomaticComplexity
+  def current_regression_alert?(alert)
+    return true unless alert.benchmark
+    return false if untracked_measure_alert?(alert)
+
+    direction = { "lower" => :lower, "upper" => :upper }[normalize(alert.limit)]
+    return true unless direction
+
+    unless alert.measure
+      matching_boundaries = @boundaries.fetch(alert.benchmark, {}).values.select do |boundary|
+        threshold_side?(boundary, direction)
+      end
+      return true if matching_boundaries.empty?
+
+      return matching_boundaries.any? { |boundary| boundary.significance(direction) == :regression }
+    end
+
+    boundary = boundary(alert.benchmark, alert.measure)
+    return true unless boundary && threshold_side?(boundary, direction)
+
+    boundary.significance(direction) == :regression
+  end
+  # rubocop:enable Metrics/CyclomaticComplexity
+
+  def threshold_side?(boundary, direction) = direction == :lower ? boundary.lower_limit : boundary.upper_limit
+
+  # An active alert on a measure the caller does not track (an orphaned server-side
+  # threshold). Only applies when tracked_measures was given; a measure-less alert can't be
+  # classified here, so it falls through to the existing benchmark-level fail-safe.
+  def untracked_measure_alert?(alert)
+    return false unless @tracked_measures
+    return false unless alert.measure
+
+    !@tracked_measures.include?(normalize(alert.measure))
   end
 
   def normalize(key)

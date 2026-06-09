@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require "optparse"
+require "fileutils"
+require "tmpdir"
 require_relative "spec_helper"
 require_relative "../track_benchmarks"
 require_relative "../lib/bmf_helpers"
@@ -12,17 +14,41 @@ require_relative "../lib/bmf_helpers"
 # mutually exclusive by design: an alert must never trigger a start-point-hash retry,
 # or a real regression would be silently re-measured against the wrong baseline.
 RSpec.describe "track_benchmarks" do
+  def result(name, measures)
+    { "benchmark" => { "name" => name }, "measures" => measures }
+  end
+
+  def rps_measure(value: 80.0)
+    {
+      "measure" => { "slug" => "rps", "name" => "rps" },
+      "metric" => { "value" => value },
+      "boundary" => { "baseline" => 100.0, "lower_limit" => 90.0, "upper_limit" => nil }
+    }
+  end
+
+  def p50_measure(value: 7.0)
+    {
+      "measure" => { "slug" => "p50-latency", "name" => "p50_latency" },
+      "metric" => { "value" => value },
+      "boundary" => { "baseline" => 5.0, "lower_limit" => nil, "upper_limit" => 6.0 }
+    }
+  end
+
+  def active_alert(benchmark: "/x", measure: "rps", limit: "lower")
+    {
+      "benchmark" => { "name" => benchmark },
+      "threshold" => { "measure" => { "slug" => measure } },
+      "metric" => { "value" => 1.0 },
+      "limit" => limit,
+      "status" => "active"
+    }
+  end
+
   def report_with_alert
     BencherReport.parse(
       JSON.generate(
-        "results" => [],
-        "alerts" => [{
-          "benchmark" => { "name" => "/x" },
-          "threshold" => { "measure" => { "slug" => "rps" } },
-          "metric" => { "value" => 1.0 },
-          "limit" => "lower",
-          "status" => "active"
-        }]
+        "results" => [[result("/x", [rps_measure])]],
+        "alerts" => [active_alert]
       )
     )
   end
@@ -49,14 +75,14 @@ RSpec.describe "track_benchmarks" do
     it "returns the deduped benchmark names from active alerts" do
       report = BencherReport.parse(
         JSON.generate(
-          "results" => [],
+          "results" => [[
+            result("/posts_page: Pro", [rps_measure, p50_measure]),
+            result("/other: Pro", [rps_measure])
+          ]],
           "alerts" => [
-            { "benchmark" => { "name" => "/posts_page: Pro" },
-              "threshold" => { "measure" => { "slug" => "rps" } }, "status" => "active" },
-            { "benchmark" => { "name" => "/posts_page: Pro" },
-              "threshold" => { "measure" => { "slug" => "p50-latency" } }, "status" => "active" },
-            { "benchmark" => { "name" => "/other: Pro" },
-              "threshold" => { "measure" => { "slug" => "rps" } }, "status" => "active" }
+            active_alert(benchmark: "/posts_page: Pro"),
+            active_alert(benchmark: "/posts_page: Pro", measure: "p50-latency", limit: "upper"),
+            active_alert(benchmark: "/other: Pro")
           ]
         )
       )
@@ -103,6 +129,161 @@ RSpec.describe "track_benchmarks" do
     end
   end
 
+  # Confirmation mode (BENCHMARK_MODE=confirm): a fresh-runner rerun of a main-push
+  # candidate. These pin the synthetic-branch/reset-baseline targeting, the structured
+  # alert pairs handed off to the confirmation, and the confirmed/cleared/inconclusive
+  # classification that decides whether an issue is filed.
+  describe "confirmation mode" do
+    around do |example|
+      snapshot = ENV.to_h
+      example.run
+    ensure
+      ENV.replace(snapshot)
+    end
+
+    describe "#slugify / #confirmation_branch" do
+      it "builds a branch-safe, never-main name unique per run and suite/shard" do
+        expect(slugify("Pro (shard 1/2)")).to eq("pro-shard-1-2")
+        expect(confirmation_branch("12345", "Pro (shard 1/2)")).to eq("confirm-main-12345-pro-shard-1-2")
+      end
+    end
+
+    describe "#branch_and_start_point_args" do
+      it "targets a throwaway branch and re-tests against main without polluting its series" do
+        ENV["BENCHMARK_MODE"] = "confirm"
+        ENV["GITHUB_RUN_ID"] = "777"
+        ENV["BENCHMARK_SUITE_NAME"] = "Core"
+
+        branch, start_point_args = branch_and_start_point_args
+        expect(branch).to eq("confirm-main-777-core")
+        expect(branch).not_to eq("main")
+        expect(start_point_args).to eq(
+          %w[--start-point main --start-point-clone-thresholds --start-point-reset]
+        )
+      end
+    end
+
+    describe "#regressed_alert_pairs" do
+      it "returns deduped benchmark+measure pairs from active alerts, dropping nameless ones" do
+        report = BencherReport.parse(
+          JSON.generate(
+            "results" => [[result("/x: Pro", [rps_measure])]],
+            "alerts" => [
+              active_alert(benchmark: "/x: Pro"),
+              active_alert(benchmark: "/x: Pro"),
+              { "threshold" => { "measure" => { "slug" => "rps" } }, "status" => "active" }
+            ]
+          )
+        )
+        expect(regressed_alert_pairs(report)).to eq([{ "benchmark" => "/x: Pro", "measure" => "rps" }])
+      end
+
+      it "preserves benchmark-only fallback pairs when Bencher omits the alert measure slug" do
+        measureless_alert = active_alert(benchmark: "/x: Pro")
+        measureless_alert["threshold"] = {}
+        report = BencherReport.parse(
+          JSON.generate(
+            "results" => [[result("/x: Pro", [rps_measure])]],
+            "alerts" => [measureless_alert]
+          )
+        )
+
+        expect(regressed_alert_pairs(report)).to eq([{ "benchmark" => "/x: Pro", "measure" => nil }])
+      end
+    end
+
+    describe "#load_candidate" do
+      def write_candidate(dir, payload)
+        artifact_dir = File.join(dir, "candidate")
+        FileUtils.mkdir_p(artifact_dir)
+        File.write(
+          File.join(artifact_dir, RegressionReport::CANDIDATE_FILENAME),
+          JSON.generate(payload)
+        )
+      end
+
+      it "returns alerts and summary for a valid candidate" do
+        Dir.mktmpdir do |dir|
+          alerts = [{ "benchmark" => "/x: Pro", "measure" => "rps" }]
+          write_candidate(dir, RegressionReport::ALERTS => alerts, RegressionReport::SUMMARY => "first run")
+
+          expect(load_candidate(dir)).to eq([alerts, "first run"])
+        end
+      end
+
+      it "treats missing alerts as inconclusive" do
+        Dir.mktmpdir do |dir|
+          write_candidate(dir, RegressionReport::SUMMARY => "first run")
+
+          expect(load_candidate(dir)).to eq([nil, "first run"])
+        end
+      end
+
+      it "treats non-array alerts as inconclusive" do
+        Dir.mktmpdir do |dir|
+          write_candidate(dir, RegressionReport::ALERTS => "not an array", RegressionReport::SUMMARY => "first run")
+
+          expect(load_candidate(dir)).to eq([nil, "first run"])
+        end
+      end
+
+      it "treats empty alerts as inconclusive" do
+        Dir.mktmpdir do |dir|
+          write_candidate(dir, RegressionReport::ALERTS => [], RegressionReport::SUMMARY => "first run")
+
+          expect(load_candidate(dir)).to eq([nil, "first run"])
+        end
+      end
+    end
+
+    describe "#confirmation_outcome" do
+      def pair(benchmark, measure)
+        { "benchmark" => benchmark, "measure" => measure }
+      end
+
+      it "is inconclusive when there is no parseable report" do
+        expect(confirmation_outcome(nil, 1, [pair("/x: Pro", "rps")])).to eq([:inconclusive, []])
+      end
+
+      it "is inconclusive on a non-zero exit with no alert (operational failure)" do
+        expect(confirmation_outcome(report_without_alert, 1, [pair("/x: Pro", "rps")])).to eq([:inconclusive, []])
+      end
+
+      it "is confirmed when the same benchmark+measure re-alerts" do
+        report = BencherReport.parse(
+          JSON.generate(
+            "results" => [[result("/x: Pro", [rps_measure])]],
+            "alerts" => [active_alert(benchmark: "/x: Pro")]
+          )
+        )
+        status, confirmed = confirmation_outcome(report, 1, [pair("/x: Pro", "rps")])
+        expect(status).to eq(:confirmed)
+        expect(confirmed).to eq([pair("/x: Pro", "rps")])
+      end
+
+      it "is cleared when a different benchmark/measure alerts than the candidate's" do
+        report = BencherReport.parse(
+          JSON.generate(
+            "results" => [[result("/y: Pro", [rps_measure])]],
+            "alerts" => [active_alert(benchmark: "/y: Pro")]
+          )
+        )
+        expect(confirmation_outcome(report, 1, [pair("/x: Pro", "rps")])).to eq([:cleared, []])
+      end
+
+      it "ignores a candidate alert on a temporarily-ignored benchmark" do
+        ignored = RegressionReport::IGNORED_REGRESSION_BENCHMARKS.first
+        report = BencherReport.parse(
+          JSON.generate(
+            "results" => [[result(ignored, [rps_measure])]],
+            "alerts" => [active_alert(benchmark: ignored)]
+          )
+        )
+        expect(confirmation_outcome(report, 1, [pair(ignored, "rps")])).to eq([:cleared, []])
+      end
+    end
+  end
+
   describe "#run_bencher" do
     it "emits the perf-link context warning to stdout so GitHub Actions annotates it" do
       status = instance_double(Process::Status, exitstatus: 0)
@@ -122,6 +303,39 @@ RSpec.describe "track_benchmarks" do
 
       expect { run_bencher("branch", []) }
         .to output(/::warning::Bencher report listed benchmarks but no perf-link context/).to_stdout
+    end
+
+    it "preserves the original alert exit so retry handling can run first" do
+      status = instance_double(Process::Status, exitstatus: 1)
+      report_json = JSON.generate(
+        "results" => [[result("/x", [rps_measure(value: 95.0)])]],
+        "alerts" => [active_alert]
+      )
+
+      allow(Open3).to receive(:capture3).and_return([report_json, "", status])
+      allow(File).to receive(:write).with(REPORT_JSON, report_json)
+
+      _stderr, exit_code, report = run_bencher("branch", [])
+
+      expect(exit_code).to eq(1)
+      expect(report).not_to be_regression
+      expect(report.filtered_alert?).to be(true)
+      expect(retry_without_start_point_hash?("Head Version abc123 not found", exit_code, report)).to be(true)
+    end
+
+    it "normalizes an alert exit to success after retry handling when every active alert is stale" do
+      report = BencherReport.parse(
+        JSON.generate(
+          "results" => [[result("/x", [rps_measure(value: 95.0)])]],
+          "alerts" => [active_alert]
+        )
+      )
+
+      exit_code = nil
+      expect { exit_code = normalized_bencher_exit_code(1, report) }
+        .to output(/::notice::Bencher reported only stale active alert/).to_stdout
+
+      expect(exit_code).to eq(0)
     end
   end
 

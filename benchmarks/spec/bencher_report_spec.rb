@@ -39,6 +39,14 @@ RSpec.describe BencherReport do
     JSON.generate("results" => results, "alerts" => alerts)
   end
 
+  def rps_regression_result(name: "/foo: Core", value: 80.0)
+    benchmark_result(
+      name:,
+      measures: [measure_entry(slug: "rps", name: "rps", value:, baseline: 100.0,
+                               lower_limit: 90.0, upper_limit: nil)]
+    )
+  end
+
   describe ".parse / #regression?" do
     it "reports no regression when alerts is empty" do
       report = described_class.parse(report_json)
@@ -46,15 +54,146 @@ RSpec.describe BencherReport do
       expect(report.alerts).to be_empty
     end
 
-    it "reports a regression and exposes the active alert's benchmark/measure/side" do
+    it "reports a current regression and exposes the active alert's benchmark/measure/side" do
       report = described_class.parse(
-        report_json(alerts: [alert(benchmark: "/foo: Core", measure_slug: "rps", limit: "lower")])
+        report_json(
+          results: [[rps_regression_result]],
+          alerts: [alert(benchmark: "/foo: Core", measure_slug: "rps", limit: "lower")]
+        )
       )
       expect(report.regression?).to be(true)
       expect(report.alerts.size).to eq(1)
       expect(report.alerts.first.benchmark).to eq("/foo: Core")
       expect(report.alerts.first.measure).to eq("rps")
       expect(report.alerts.first.limit).to eq("lower")
+    end
+
+    it "ignores active alerts when the current metric is not a regression" do
+      report = described_class.parse(
+        report_json(
+          results: [[rps_regression_result(value: 95.0)]],
+          alerts: [alert(benchmark: "/foo: Core", measure_slug: "rps", limit: "lower")]
+        )
+      )
+
+      expect(report.regression?).to be(false)
+      expect(report.alerts).to be_empty
+      expect(report.filtered_alert?).to be(true)
+    end
+
+    it "keeps active alerts with no benchmark name fail-safe" do
+      malformed_alert = alert(benchmark: "/foo: Core", measure_slug: "rps", limit: "lower")
+      malformed_alert.delete("benchmark")
+
+      report = described_class.parse(report_json(alerts: [malformed_alert]))
+
+      expect(report.regression?).to be(true)
+      expect(report.alerts.first.benchmark).to be_nil
+      expect(report.filtered_alert?).to be(false)
+    end
+
+    it "keeps active alerts with no matching boundary fail-safe" do
+      report = described_class.parse(
+        report_json(
+          results: [[benchmark_result(
+            name: "/foo: Core",
+            measures: [measure_entry(slug: "rps", name: "rps", value: 95.0, boundary: nil)]
+          )]],
+          alerts: [alert(benchmark: "/foo: Core", measure_slug: "rps", limit: "lower")]
+        )
+      )
+
+      expect(report.regression?).to be(true)
+      expect(report.filtered_alert?).to be(false)
+    end
+
+    it "keeps measure-less active alerts fail-safe when no boundary exists on the alert side" do
+      measureless_alert = alert(benchmark: "/foo: Core", measure_slug: "rps", limit: "lower")
+      measureless_alert["threshold"] = {}
+
+      report = described_class.parse(
+        report_json(
+          results: [[benchmark_result(
+            name: "/foo: Core",
+            measures: [measure_entry(slug: "p50-latency", name: "p50_latency", value: 5.5,
+                                     baseline: 5.0, lower_limit: nil, upper_limit: 6.0)]
+          )]],
+          alerts: [measureless_alert]
+        )
+      )
+
+      expect(report.regression?).to be(true)
+      expect(report.filtered_alert?).to be(false)
+    end
+
+    it "keeps measure-less active alerts when the benchmark has a current regression on the alert side" do
+      measureless_alert = alert(benchmark: "/foo: Core", measure_slug: "rps", limit: "lower")
+      measureless_alert["threshold"] = {}
+
+      report = described_class.parse(
+        report_json(
+          results: [[rps_regression_result]],
+          alerts: [measureless_alert]
+        )
+      )
+
+      expect(report.regression?).to be(true)
+      expect(report.alerts.first.benchmark).to eq("/foo: Core")
+      expect(report.alerts.first.measure).to be_nil
+    end
+
+    it "ignores measure-less active alerts when the benchmark has no current regression on the alert side" do
+      measureless_alert = alert(benchmark: "/foo: Core", measure_slug: "rps", limit: "lower")
+      measureless_alert["threshold"] = {}
+
+      report = described_class.parse(
+        report_json(
+          results: [[rps_regression_result(value: 95.0)]],
+          alerts: [measureless_alert]
+        )
+      )
+
+      expect(report.regression?).to be(false)
+      expect(report.alerts).to be_empty
+    end
+
+    it "ignores opposite-side improvements when matching measure-less active alerts" do
+      measureless_alert = alert(benchmark: "/foo: Core", measure_slug: "rps", limit: "lower")
+      measureless_alert["threshold"] = {}
+
+      report = described_class.parse(
+        report_json(
+          results: [[benchmark_result(
+            name: "/foo: Core",
+            measures: [
+              measure_entry(slug: "rps", name: "rps", value: 100.0,
+                            baseline: 100.0, lower_limit: 90.0, upper_limit: nil),
+              measure_entry(slug: "p50-latency", name: "p50_latency", value: 3.0,
+                            baseline: 5.0, lower_limit: nil, upper_limit: 6.0)
+            ]
+          )]],
+          alerts: [measureless_alert]
+        )
+      )
+
+      expect(report.regression?).to be(false)
+      expect(report.alerts).to be_empty
+    end
+
+    it "still reports hidden failed_pct regressions when the current value crosses its upper boundary" do
+      report = described_class.parse(
+        report_json(
+          results: [[benchmark_result(
+            name: "/foo: Core",
+            measures: [measure_entry(slug: "failed-pct", name: "failed_pct", value: 2.0,
+                                     baseline: 0.0, lower_limit: nil, upper_limit: 1.0)]
+          )]],
+          alerts: [alert(benchmark: "/foo: Core", measure_slug: "failed-pct", limit: "upper")]
+        )
+      )
+
+      expect(report.regression?).to be(true)
+      expect(report.alerts.first.measure).to eq("failed-pct")
     end
 
     it "ignores dismissed/silenced alerts (only active counts as a regression)" do
@@ -65,6 +204,74 @@ RSpec.describe BencherReport do
                     ])
       )
       expect(report.regression?).to be(false)
+    end
+  end
+
+  # An orphaned server-side threshold (e.g. p90_latency, which the code dropped from
+  # THRESHOLDS but never deleted in Bencher) keeps firing alerts on a measure the code
+  # no longer tracks. Those alerts are invisible in the summary table (the p90 column has
+  # no :direction) yet would still file a regression issue. `tracked_measures` lets the
+  # caller pass the measures it actually tracks so an alert on any other measure is treated
+  # as filtered, not a regression. See the orphaned-p90-threshold investigation.
+  describe "tracked-measure filtering" do
+    def p90_report(tracked_measures: :unset)
+      json = report_json(
+        results: [[benchmark_result(
+          name: "/foo: Core",
+          measures: [measure_entry(slug: "p90-latency", name: "p90_latency", value: 24.2,
+                                   baseline: 17.9, lower_limit: nil, upper_limit: 23.6)]
+        )]],
+        alerts: [alert(benchmark: "/foo: Core", measure_slug: "p90-latency", limit: "upper")]
+      )
+      tracked_measures == :unset ? described_class.parse(json) : described_class.parse(json, tracked_measures:)
+    end
+
+    it "filters an active alert on an untracked measure (orphaned p90 threshold)" do
+      report = p90_report(tracked_measures: %w[rps p50_latency failed_pct])
+      expect(report.regression?).to be(false)
+      expect(report.alerts).to be_empty
+      expect(report.filtered_alert?).to be(true)
+    end
+
+    it "still reports a regression on a tracked measure when tracked_measures is given" do
+      report = described_class.parse(
+        report_json(
+          results: [[rps_regression_result]],
+          alerts: [alert(benchmark: "/foo: Core", measure_slug: "rps", limit: "lower")]
+        ),
+        tracked_measures: %w[rps p50_latency failed_pct]
+      )
+      expect(report.regression?).to be(true)
+      expect(report.alerts.first.measure).to eq("rps")
+    end
+
+    it "matches tracked measures regardless of - / _ / case (slug vs THRESHOLDS name)" do
+      report = described_class.parse(
+        report_json(
+          results: [[benchmark_result(
+            name: "/foo: Core",
+            measures: [measure_entry(slug: "p50-latency", name: "p50_latency", value: 7.0,
+                                     baseline: 5.0, lower_limit: nil, upper_limit: 6.0)]
+          )]],
+          alerts: [alert(benchmark: "/foo: Core", measure_slug: "p50-latency", limit: "upper")]
+        ),
+        tracked_measures: %w[rps p50_latency failed_pct]
+      )
+      expect(report.regression?).to be(true)
+    end
+
+    it "counts every measure when tracked_measures is not given (backward compatible)" do
+      expect(p90_report.regression?).to be(true)
+    end
+
+    it "keeps a measure-less alert fail-safe even with tracked_measures set" do
+      measureless_alert = alert(benchmark: "/foo: Core", measure_slug: "rps", limit: "lower")
+      measureless_alert["threshold"] = {}
+      report = described_class.parse(
+        report_json(results: [[rps_regression_result]], alerts: [measureless_alert]),
+        tracked_measures: %w[rps p50_latency failed_pct]
+      )
+      expect(report.regression?).to be(true)
     end
   end
 
@@ -283,7 +490,7 @@ RSpec.describe BencherReport do
     end
 
     it "is false when the report lists no benchmarks (nothing to link)" do
-      expect(described_class.new("results" => [], "alerts" => []).perf_links_unavailable?).to be(false)
+      expect(described_class.new({ "results" => [], "alerts" => [] }).perf_links_unavailable?).to be(false)
     end
   end
 

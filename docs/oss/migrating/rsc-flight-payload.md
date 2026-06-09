@@ -105,7 +105,7 @@ In this benchmark, the TTFB improvement came primarily from the server serializi
 
 **Step 2:** Add `'use client'` to those components. The directive must appear at the top of the file, before any `import` statements. It tells React to send a client reference instead of the expanded element tree.
 
-Before adding `'use client'`, confirm the component and its import tree are free of server-only dependencies (`server-only`, `next/headers`, direct DB queries, API-key-bearing helpers, etc.). If any exist, move that work into a parent Server Component and pass the results down as props first.
+Before adding `'use client'`, confirm the component and its import tree are free of server-only dependencies (`server-only`, direct DB queries, API-key-bearing helpers, async props, etc.). If any exist, move that work into a parent Server Component and pass the results down as props first.
 After the change, inspect the resulting client bundle or import tree as well. Any direct or transitive import under that file now becomes client code, so server-only helpers must be pulled out before you keep the directive.
 
 Note: Client Components cannot be `async` functions. If the component you want to convert is currently loading its own data with `async`/`await`, move that fetch into a parent Server Component first and pass the data down as props before adding `'use client'`.

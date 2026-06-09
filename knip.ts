@@ -147,6 +147,11 @@ const config: KnipConfig = {
         'src/cache/index.stub.ts!',
         'src/registerDefaultRSCProvider.client.tsx!',
       ],
+      ignoreDependencies: [
+        // Optional peer dependency: only apps using the Redis cache handler need it.
+        // Knip flags optional peers referenced in code via lazy require().
+        'ioredis',
+      ],
       project: ['src/**/*.[jt]s{x,}!', 'tests/**/*.[jt]s{x,}', '!lib/**'],
       ignore: [
         'tests/emptyForTesting.js',
