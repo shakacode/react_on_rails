@@ -19,6 +19,7 @@
 # This file is OSS tooling, so it carries no Pro header itself.
 
 require "open3"
+require "stringio"
 
 PRO_TREES = %w[
   react_on_rails_pro
@@ -65,13 +66,13 @@ EXCLUDE_PATTERNS = [
   # covering those would need shebang-based shell detection plus a binstub
   # heuristic, deferred as a low-value follow-up (they are test-harness glue).
   %r{(\A|/)bin/},
-  %r{/fixtures/},                  # test fixtures: loaded/byte-asserted by tests,
-                                   # sometimes VM-evaluated; not product source
-  %r{/db/schema\.rb\z},            # generated
-  %r{(\A|/)public/},               # built/vendored assets
+  %r{/fixtures/}, # test fixtures: loaded/byte-asserted by tests,
+  # sometimes VM-evaluated; not product source
+  %r{/db/schema\.rb\z}, # generated
+  %r{(\A|/)public/}, # built/vendored assets
   %r{(\A|/)vendor/},
   %r{/ssr-generated/},
-  /\.lock\z/                       # Bundler/Yarn lockfiles (generated, not source)
+  /\.lock\z/ # Bundler/Yarn lockfiles (generated, not source)
 ].freeze
 
 # Returns :block, :hash, :erb, :html, or nil (not headerable).
@@ -95,10 +96,11 @@ def in_scope?(path)
   !comment_style(path).nil? && !excluded?(path)
 end
 
+# rubocop:disable Metrics/CyclomaticComplexity
 def render_header(style)
   case style
   when :block
-    +"/*\n" + HEADER_LINES.map { |l| l.empty? ? " *\n" : " * #{l}\n" }.join + " */\n"
+    "/*\n#{HEADER_LINES.map { |l| l.empty? ? " *\n" : " * #{l}\n" }.join} */\n"
   when :hash
     HEADER_LINES.map { |l| l.empty? ? "#\n" : "# #{l}\n" }.join
   when :erb
@@ -107,11 +109,12 @@ def render_header(style)
     # body. A plain %> (or a trailing newline here) would leave leading bytes in
     # the rendered template, which corrupts text/streaming responses such as
     # .text.erb RSC payloads.
-    +"<%#\n" + HEADER_LINES.map { |l| "#{l}\n" }.join + "-%>"
+    "<%#\n#{HEADER_LINES.map { |l| "#{l}\n" }.join}-%>"
   when :html
-    +"<!--\n" + HEADER_LINES.map { |l| "#{l}\n" }.join + "-->\n"
+    "<!--\n#{HEADER_LINES.map { |l| "#{l}\n" }.join}-->\n"
   end
 end
+# rubocop:enable Metrics/CyclomaticComplexity
 
 # JS/TS pragmas that must stay in the FIRST comment block of a file: jest reads
 # @jest-environment from the first docblock, Flow reads @flow. A license block
@@ -130,6 +133,7 @@ DOCKER_DIRECTIVE = /\A#\s*(?:syntax|escape|check)\s*=/i
 # Leading content that must stay first: shebang, Ruby/YAML magic comments, JS/TS
 # pragma docblocks (@jest-environment, @flow, …), and Dockerfile parser
 # directives. The header is inserted immediately after this preamble.
+# rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 def split_preamble(style, content)
   case style
   when :hash
@@ -164,10 +168,12 @@ def split_preamble(style, content)
     ["", content]
   end
 end
+# rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
 # Remove an existing Pro header (identified by the sentinel) from the leading
 # comment region, wherever it sits — including after a pragma docblock — so
 # --fix upgrades/repositions instead of stacking a second header.
+# rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 def strip_legacy(style, content)
   case style
   when :block
@@ -210,6 +216,7 @@ def strip_legacy(style, content)
     preamble + (lines[k..]&.join || "")
   end
 end
+# rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
 # Pure transform: returns content with the canonical header applied, or the
 # input unchanged when the file is not in scope. Idempotent by construction —
@@ -239,7 +246,8 @@ end
 
 def index_file_content(path)
   out, err, status = Open3.capture3("git", "show", ":#{path}")
-  abort "git show :#{path} failed: #{err.strip}" unless status.success?
+  message = "git show :#{path} failed (exit #{status.exitstatus}): #{err.strip}"
+  abort message unless status.success?
 
   out
 end
@@ -308,6 +316,7 @@ def assert(cond, msg)
   raise "ASSERTION FAILED: #{msg}" unless cond
 end
 
+# rubocop:disable Metrics/AbcSize, Metrics/MethodLength
 def run_self_test
   # Ruby: header goes below frozen_string_literal (must stay line 1), with a
   # blank line after the magic comment.
@@ -370,7 +379,7 @@ def run_self_test
   legacy = "/*\n * Copyright (c) 2025 Shakacode LLC\n *\n * This file is " \
            "NOT licensed under the MIT (open source) license.\n */\n\nconst y = 2;\n"
   upgraded = apply_header("c.js", legacy)
-  assert upgraded.scan(/Copyright \(c\) 2025/).size == 1, "legacy header replaced, not stacked"
+  assert upgraded.scan("Copyright (c) 2025").size == 1, "legacy header replaced, not stacked"
   assert upgraded.include?("AI AGENTS:"), "upgraded header has agent warning"
   assert upgraded.end_with?("const y = 2;\n"), "body preserved after upgrade"
 
@@ -402,9 +411,26 @@ def run_self_test
   assert !in_scope?("react_on_rails_pro/Gemfile.lock"), "lockfiles not in scope"
   assert in_scope?("react_on_rails_pro/lib/react_on_rails_pro/foo.rb"), "pro rb in scope"
 
+  original_stderr = $stderr
+  error_output = StringIO.new
+  $stderr = error_output
+  exit_status = nil
+  returned = false
+  begin
+    index_file_content("__nonexistent_path_for_self_test__")
+    returned = true
+  rescue SystemExit => e
+    exit_status = e.status
+  end
+  $stderr = original_stderr
+  assert !returned, "index_file_content should abort on missing path"
+  assert exit_status == 1, "index_file_content exits non-zero on missing path"
+  assert error_output.string.include?("exit 128"), "index_file_content reports git exit status"
+
   puts "self-test: all assertions passed"
   0
 end
+# rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
 # --- entry point ----------------------------------------------------------
 
