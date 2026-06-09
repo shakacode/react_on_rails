@@ -59,7 +59,7 @@ Prefer exact numbers for high-concurrency work. Filters are acceptable for disco
 Before implementation or worker launch, produce:
 
 1. A concrete goal name.
-2. An issue-value check for speculative, AI/code-analysis-only, or over-scoped candidates.
+2. A disposition summary for speculative, AI/code-analysis-only, over-scoped, or unclear candidates, or `N/A - all targets pre-approved`.
 3. A repo preflight: fetch/prune `main`, confirm the expected repository root, and verify nested repo paths before assigning work.
 4. A short batch table:
    - target number and title

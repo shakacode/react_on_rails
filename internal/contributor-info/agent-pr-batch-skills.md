@@ -14,10 +14,10 @@ The `.agents/skills/plan-pr-batch/agents/openai.yaml` file under a skill is opti
 
 ## Default Flow
 
-1. Start with `$plan-pr-batch` when the target scope is a filter, label, milestone, pasted list, or ambiguous bare number.
-2. Start with `$evaluate-issue` only when exact candidate issues are already known and may be hypothetical, AI/code-analysis-only, over-scoped, or better handled with a no-PR evidence comment.
+1. If the target scope is a filter, label, milestone, pasted list, or ambiguous bare number, start with `$plan-pr-batch`.
+2. If exact candidate issues are already known and may be hypothetical, AI/code-analysis-only, over-scoped, or better handled with a no-PR evidence comment, start with `$evaluate-issue` directly.
 3. Verify every candidate through GitHub. Use `UNKNOWN` for facts that cannot be checked.
-4. After `$plan-pr-batch` resolves exact candidates, use `$evaluate-issue` for unclear value, priority, or fix scope before assigning implementation work.
+4. After `$plan-pr-batch` resolves exact candidates, use `$evaluate-issue` for speculative, AI/code-analysis-only, over-scoped, or unclear items before assigning implementation work.
 5. Shape the batch into independent worker lanes. Cap at 8 items when files or risk overlap, or 10 fully independent items; otherwise propose a smaller first batch.
 6. Give the user the Batch Plan and fenced `$pr-batch` goal prompt. Do not launch workers yet.
 7. When the user says to run it, use `$pr-batch` with the fenced goal prompt.
