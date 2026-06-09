@@ -26,10 +26,12 @@ gh pr checks <PR>
 
 Use required checks for required CI readiness, then fetch all checks or explicit
 review-agent checks for advisory reviewer completion so non-required reviewers
-are not hidden. Avoid long-lived `gh ... --watch` commands in agent sessions. If
-live CI or review-agent state cannot be refreshed, report the affected state as
-`UNKNOWN` instead of guessing. Do not rely on `statusCheckRollup` as the primary
-live check source when bounded `gh pr checks` commands can answer the readiness
+are not hidden. Avoid long-lived `gh ... --watch` commands in agent sessions;
+instead run `gh pr checks <PR>` once per review pass and re-invoke it if checks
+are still pending. If live CI or review-agent state cannot be verified (for
+example, tool unavailable or API error), report the affected state as `UNKNOWN`
+instead of guessing. Do not rely on `statusCheckRollup` as the primary live
+check source when bounded `gh pr checks` commands can answer the readiness
 question more directly.
 
 Fetch inline PR review comments separately; `gh pr view --json comments` is not
