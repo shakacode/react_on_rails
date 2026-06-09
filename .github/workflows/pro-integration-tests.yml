@@ -792,7 +792,7 @@ jobs:
 
           # Both processes are already running; sequential waits keep the logs easier
           # to read while the renderer can continue booting during the Rails poll.
-          wait_for_service "Rails server" "http://localhost:3000/empty"
+          wait_for_service "Rails server" "http://127.0.0.1:3000/empty"
           # Single IPv4 authority is intentional: RENDERER_HOST binds h2c to
           # 127.0.0.1. Add ::1 here only if the renderer binding changes.
           wait_for_h2c_service "Node renderer" "/info" "http://127.0.0.1:3800"

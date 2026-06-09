@@ -18,6 +18,8 @@ const { basename, dirname, isAbsolute, relative, resolve } = require('path');
 const { config } = require('shakapacker');
 const { default: serverWebpackConfig, extractLoader } = require('./serverWebpackConfig');
 
+const RSC_LOADER_WRAPPED = Symbol.for('reactOnRailsPro.rscLoaderWrapped');
+
 const rscReferenceDiscoveryPlugin = () => {
   try {
     // eslint-disable-next-line global-require
@@ -121,7 +123,7 @@ const configureRsc = () => {
       // originalUse is captured before injection, so it cannot return the RSC loader itself.
       // This is scoped to live rule objects within one unbundled Node config module instance;
       // Jest module-cache resets intentionally get fresh rule objects.
-      if (rule.use.rscLoaderInjected) return;
+      if (rule.use[RSC_LOADER_WRAPPED]) return;
       const originalUse = rule.use;
       const wrappedUse = function rscLoaderWrapper(data) {
         const result = originalUse(data);
@@ -140,7 +142,7 @@ const configureRsc = () => {
         // Preserve the original return shape when this function rule is not a JS loader rule.
         return result;
       };
-      wrappedUse.rscLoaderInjected = true;
+      wrappedUse[RSC_LOADER_WRAPPED] = true;
       // eslint-disable-next-line no-param-reassign
       rule.use = wrappedUse;
     } else if (Array.isArray(rule.use)) {
