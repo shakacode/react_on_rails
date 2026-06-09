@@ -19,7 +19,7 @@ module ReactOnRailsPro
   module TaskHelpers
     # Returns the root folder of the monorepo
     def monorepo_root
-      File.expand_path("..", gem_root)
+      File.expand_path("../..", __dir__)
     end
 
     # Returns the root folder of the react_on_rails gem
