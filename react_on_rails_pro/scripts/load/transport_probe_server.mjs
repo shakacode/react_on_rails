@@ -76,6 +76,8 @@ const parseArgs = () => {
 const readRequestBody = async (stream, maxBytes) => {
   let bytes = 0;
   const chunks = [];
+  // Keep the stream open when we throw on body-limit overflow so the caller can
+  // write the error response instead of fighting an auto-destroyed stream.
   for await (const chunk of stream.iterator({ destroyOnReturn: false })) {
     bytes += chunk.length;
     if (bytes > maxBytes) {

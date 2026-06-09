@@ -44,9 +44,9 @@ RSpec.describe RendererHarness::TransportProbe do
       end.to raise_error(ArgumentError, /--requests must be >= 1/)
     end
 
-    it "rejects non-float startup timeout values" do
+    it "rejects non-positive startup timeout values" do
       expect do
-        described_class.send(:validate_positive_float!, "--startup-timeout", "10abc")
+        described_class.parse(["--startup-timeout", "0"])
       end.to raise_error(ArgumentError, /--startup-timeout must be > 0/)
     end
   end

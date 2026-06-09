@@ -53,6 +53,7 @@ module RendererHarness
           parser.on("--body-bytes N", Integer) { |v| opts[:body_bytes] = v }
           parser.on("--stream-bytes N", Integer) { |v| opts[:stream_bytes] = v }
           parser.on("--scenarios LIST", String) { |v| opts[:scenarios] = parse_scenarios(v) }
+          # Transient parser flag; removed before opts reaches the Config struct.
           parser.on("--skip-uds") { opts[:skip_uds] = true }
           parser.on("--node-bin PATH", String) { |v| opts[:node_bin] = v }
           parser.on("--server-script PATH", String) { |v| opts[:server_script] = v }
