@@ -554,8 +554,11 @@ jobs:
         needs.detect-changes.outputs.run_pro_dummy_tests == 'true'
       )
     runs-on: ubuntu-22.04
+    timeout-minutes: 30
     env:
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+      REACT_RENDERER_URL: http://127.0.0.1:3800
+      RENDERER_HOST: 127.0.0.1
       SHAKAPACKER_ASSETS_BUNDLER: rspack
     services:
       redis:
@@ -689,13 +692,14 @@ jobs:
 
           wait_for_h2c_service() {
             name="$1"
-            authority="$2"
-            path="$3"
+            path="$2"
+            shift 2
             timeout=300
             elapsed=0
 
             while true; do
-              if node - "$authority" "$path" <<'NODE'
+              for authority in "$@"; do
+                if node - "$authority" "$path" <<'NODE'
           const http2 = require('node:http2');
 
           const [authority, path] = process.argv.slice(2);
@@ -721,10 +725,11 @@ jobs:
           request.end();
           setTimeout(fail, 2000);
           NODE
-              then
-                echo "${name} started at ${authority}${path} after ${elapsed}s"
-                return 0
-              fi
+                then
+                  echo "${name} started at ${authority}${path} after ${elapsed}s"
+                  return 0
+                fi
+              done
 
               sleep 1
               elapsed=$((elapsed + 1))
@@ -736,7 +741,7 @@ jobs:
           }
 
           wait_for_service "Rails server" true "http://localhost:3000/empty"
-          wait_for_h2c_service "Node renderer" "http://[::1]:3800" "/info"
+          wait_for_h2c_service "Node renderer" "/info" "http://127.0.0.1:3800" "http://[::1]:3800"
 
       - name: Install Playwright dependencies
         run: cd spec/dummy && npx playwright install --with-deps

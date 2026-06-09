@@ -103,6 +103,7 @@ const configureRsc = () => {
     if (typeof rule.use === 'function') {
       // Skip if already wrapped by a previous configureRsc() call.
       // originalUse is captured before injection, so it cannot return the RSC loader itself.
+      // rule.use.name is stable in Node.js build processes because these configs are not minified.
       if (rule.use.name === 'rscLoaderWrapper') return;
       const originalUse = rule.use;
       // eslint-disable-next-line no-param-reassign

@@ -1,5 +1,7 @@
 /* eslint-disable no-param-reassign */
 const { config } = require('shakapacker');
+// The bundler choice is read at module load; tests that switch bundlers must
+// set SHAKAPACKER_ASSETS_BUNDLER before requiring this file or reset the cache.
 const bundler = config.assets_bundler === 'rspack' ? require('@rspack/core') : require('webpack');
 const RSCManifestPlugin =
   config.assets_bundler === 'rspack'

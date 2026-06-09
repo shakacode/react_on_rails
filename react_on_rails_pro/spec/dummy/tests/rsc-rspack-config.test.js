@@ -75,7 +75,12 @@ describe('Pro dummy RSC rspack config', () => {
     };
     const configureServer = jest.fn(() => serverConfig);
     const extractLoader = (rule, loaderName) =>
-      Array.isArray(rule.use) ? rule.use.find((item) => item?.loader?.includes(loaderName)) : null;
+      Array.isArray(rule.use)
+        ? rule.use.find((item) => {
+            const testValue = typeof item === 'string' ? item : (item?.loader ?? '');
+            return testValue.includes(loaderName);
+          })
+        : null;
 
     jest.doMock(serverConfigPath, () => ({
       default: configureServer,
