@@ -140,6 +140,8 @@ LATEST_RUBY_VERSION="$(read_latest_tool_version ruby false)"
 LATEST_RUBY_MINOR_VERSION="${LATEST_RUBY_VERSION%.*}"
 LATEST_NODE_VERSION="$(read_latest_tool_version nodejs false)"
 LATEST_NODE_MAJOR_VERSION="${LATEST_NODE_VERSION%%.*}"
+# Shakapacker/React stay as literals here: asdf/mise do not manage npm packages,
+# so they cannot live in .tool-versions alongside Ruby/Node.
 LATEST_SHAKAPACKER_VERSION="10.1.0" # Update when latest CI moves to a newer Shakapacker.
 LATEST_REACT_VERSION="19.0.0" # Update when latest CI moves to a newer React version.
 LATEST_REACT_MAJOR_VERSION="${LATEST_REACT_VERSION%%.*}"

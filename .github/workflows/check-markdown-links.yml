@@ -39,7 +39,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          # Node pin lives in .tool-versions to avoid the V8 bug in 22.21.0.
+          # Latest Node comes from .tool-versions; pinned below the Node startup regression.
           node-version-file: .tool-versions
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml

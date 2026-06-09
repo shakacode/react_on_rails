@@ -53,6 +53,7 @@ jobs:
       - name: Checkout PR branch for runtime config
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Read runtime versions
@@ -110,6 +111,7 @@ jobs:
       - name: Checkout PR branch
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Install PR dependencies

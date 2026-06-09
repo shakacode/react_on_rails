@@ -162,7 +162,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           # Ruby stays on minimum to exercise gem compatibility; Node tracks the
-          # latest runtime for the Shakapacker 10.1 floor and V8-bug pin.
+          # latest runtime from .tool-versions, pinned below the Node startup regression.
           # This deliberate min-Ruby x latest-Node cross-profile does not match
           # a regular CI matrix leg.
           node-version: ${{ steps.tool-versions.outputs.node-version }}
