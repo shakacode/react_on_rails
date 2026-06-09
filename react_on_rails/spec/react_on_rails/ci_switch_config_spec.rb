@@ -128,6 +128,20 @@ RSpec.describe "bin/ci-switch-config" do
     end
   end
 
+  it "accepts a legacy saved latest profile without a head sidecar when contents match the current git head" do
+    with_ci_switch_tool_versions_repo do |tmpdir, harness_path|
+      committed_versions = File.read(File.join(tmpdir, ".tool-versions"))
+
+      File.write(File.join(tmpdir, ".tool-versions"), File.read(File.join(tmpdir, ".minimum.tool-versions")))
+      File.write(File.join(tmpdir, ".maximum.tool-versions"), committed_versions)
+      FileUtils.rm_f(File.join(tmpdir, ".maximum.tool-versions.head"))
+
+      _stdout, stderr, status = Open3.capture3(harness_path, "backup-matches-current-head", chdir: tmpdir)
+
+      expect(status).to be_success, stderr
+    end
+  end
+
   it "does not accept stale head-sidecar backups even when contents match the current git head" do
     with_ci_switch_tool_versions_repo do |tmpdir, harness_path|
       committed_versions = File.read(File.join(tmpdir, ".tool-versions"))

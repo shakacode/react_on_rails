@@ -62,6 +62,8 @@ RSpec.describe "Ruby version support" do
   def ci_switch_tool_version_outputs
     latest_versions_content = committed_tool_versions(".tool-versions")
     minimum_versions_content = committed_tool_versions(".minimum.tool-versions")
+    # Feed committed file contents through env vars so the sourced script's
+    # read_tool_version parser reads the same temp-file shape as the workflow action.
     script = [
       "source #{Shellwords.escape(File.join(repo_root, 'bin/ci-switch-config'))}",
       "latest_tool_versions=$(mktemp)",
