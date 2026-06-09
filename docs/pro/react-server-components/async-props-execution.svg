@@ -129,7 +129,7 @@
 
     <!-- Rails code -->
     <g transform="translate(16, 56)">
-      <text x="0" y="0" font-family="ui-monospace, monospace" font-size="10" fill="#94A3B8">stream_react_component(</text>
+      <text x="0" y="0" font-family="ui-monospace, monospace" font-size="10" fill="#94A3B8">stream_react_component_with_async_props(</text>
       <text x="10" y="14" font-family="ui-monospace, monospace" font-size="10" fill="#FCD34D">props:</text>
       <text x="50" y="14" font-family="ui-monospace, monospace" font-size="10" fill="#F8FAFC">{ </text>
       <text x="60" y="14" font-family="ui-monospace, monospace" font-size="10" fill="#7DD3FC">title:</text>
@@ -139,15 +139,15 @@
       <text x="0" y="28" font-family="ui-monospace, monospace" font-size="10" fill="#94A3B8">) { |emit|</text>
 
       <!-- emit reviews -->
-      <text x="10" y="50" font-family="ui-monospace, monospace" font-size="10" fill="#F8FAFC">emit(</text>
-      <text x="45" y="50" font-family="ui-monospace, monospace" font-size="10" fill="#86EFAC">"reviews"</text>
-      <text x="105" y="50" font-family="ui-monospace, monospace" font-size="10" fill="#F8FAFC">, data)</text>
+      <text x="10" y="50" font-family="ui-monospace, monospace" font-size="10" fill="#F8FAFC">emit.call(</text>
+      <text x="75" y="50" font-family="ui-monospace, monospace" font-size="10" fill="#86EFAC">"reviews"</text>
+      <text x="135" y="50" font-family="ui-monospace, monospace" font-size="10" fill="#F8FAFC">, data)</text>
       <text x="175" y="50" font-family="ui-monospace, monospace" font-size="9" fill="#64748B">// 1s</text>
 
       <!-- emit recs -->
-      <text x="10" y="66" font-family="ui-monospace, monospace" font-size="10" fill="#F8FAFC">emit(</text>
-      <text x="45" y="66" font-family="ui-monospace, monospace" font-size="10" fill="#86EFAC">"recs"</text>
-      <text x="80" y="66" font-family="ui-monospace, monospace" font-size="10" fill="#F8FAFC">, data)</text>
+      <text x="10" y="66" font-family="ui-monospace, monospace" font-size="10" fill="#F8FAFC">emit.call(</text>
+      <text x="75" y="66" font-family="ui-monospace, monospace" font-size="10" fill="#86EFAC">"recs"</text>
+      <text x="110" y="66" font-family="ui-monospace, monospace" font-size="10" fill="#F8FAFC">, data)</text>
       <text x="175" y="66" font-family="ui-monospace, monospace" font-size="9" fill="#64748B">// 3s</text>
 
       <text x="0" y="80" font-family="ui-monospace, monospace" font-size="10" fill="#94A3B8">}</text>

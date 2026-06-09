@@ -193,6 +193,9 @@ When a server component is async, Flight handles it with promise references usin
 
 In React on Rails, slow data is streamed using [async props](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently) — Rails emits each prop as it resolves, and the component awaits the promise via `getReactOnRailsAsyncProp`. React on Rails injects `getReactOnRailsAsyncProp` into the component props when you use `stream_react_component_with_async_props`. Here's an example:
 
+> [!WARNING]
+> `sleep` blocks a Puma thread and is for demo purposes only. Replace it with your actual slow query; do not use `sleep` in a real application.
+
 ```erb
 <%# Rails view: stream slow data as an async prop %>
 <%= stream_react_component_with_async_props("Page",

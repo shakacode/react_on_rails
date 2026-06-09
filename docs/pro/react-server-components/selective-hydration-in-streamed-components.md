@@ -19,6 +19,9 @@ Let's try selective hydration with the React Server Component Page we created in
 
 Let's add a component that loads slow data using [async props](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently). First, update the Rails view to emit a slow prop:
 
+> [!WARNING]
+> `sleep` blocks a Puma thread and is for demo purposes only. Replace it with your actual slow query; do not use `sleep` in a real application.
+
 ```erb
 <%# app/views/pages/react_server_component_ssr.html.erb %>
 <%= stream_react_component_with_async_props("ReactServerComponentPage",
