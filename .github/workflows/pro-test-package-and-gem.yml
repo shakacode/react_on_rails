@@ -108,6 +108,16 @@ jobs:
           ruby-version: ${{ env.RUBY_VERSION }}
           bundler-version: 2.5.4
 
+      # Dependency-free guard (just git + ruby): every proprietary Pro file must
+      # carry the non-MIT license header. See script/check-pro-license-headers.
+      # Keep this early so missing headers fail before Node, pnpm, gems, or build.
+      - name: Check Pro license headers
+        # Override this workflow's react_on_rails_pro default; the checker lives at the repo root.
+        working-directory: .
+        run: |
+          ruby script/check-pro-license-headers --self-test
+          ruby script/check-pro-license-headers --check
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
