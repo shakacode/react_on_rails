@@ -46,9 +46,21 @@ RSpec.describe PrReportPoster do
         "gh", "api", "repos/shakacode/react_on_rails/issues/456/comments",
         "--paginate",
         "--jq", ".[] | select(.body | startswith(env.MARKER)) | select(.created_at < env.CUTOFF_TS) | .id",
-        env: { "MARKER" => "<!-- BENCHER PRO -->", "CUTOFF_TS" => kind_of(String) },
-        error_message: "Failed to list stale Pro Bencher report comments"
+        env: { "MARKER" => "<!-- BENCHER PRO -->", "CUTOFF_TS" => kind_of(String) }
       )
+    end
+
+    it "raises a descriptive error when GITHUB_REPOSITORY is absent" do
+      with_env("PR_NUMBER" => "456") do
+        ENV.delete("GITHUB_REPOSITORY")
+
+        expect do
+          described_class.from_env(suite_name: "Pro", marker: "<!-- BENCHER PRO -->")
+        end.to raise_error(
+          KeyError,
+          "GITHUB_REPOSITORY env var is required (set by GitHub Actions)"
+        )
+      end
     end
 
     it "rejects non-numeric pull request numbers before building GitHub paths" do
@@ -92,8 +104,7 @@ RSpec.describe PrReportPoster do
         "gh", "api", "repos/shakacode/react_on_rails/issues/123/comments",
         "--paginate",
         "--jq", ".[] | select(.body | startswith(env.MARKER)) | select(.created_at < env.CUTOFF_TS) | .id",
-        env: { "MARKER" => "<!-- BENCHER CORE -->", "CUTOFF_TS" => now.utc.iso8601 },
-        error_message: "Failed to list stale Core Bencher report comments"
+        env: { "MARKER" => "<!-- BENCHER CORE -->", "CUTOFF_TS" => now.utc.iso8601 }
       )
     end
 

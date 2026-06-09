@@ -128,7 +128,11 @@ class BencherRunner
       warn "::debug::Malformed Bencher output (first 300 chars): #{stdout.slice(0, 300).inspect}"
       # Remove malformed output so a future retry starts clean; the raw debugging
       # artifact is lost, but a bad report file is worse than no report file.
-      FileUtils.rm_f(report_json)
+      begin
+        FileUtils.rm_f(report_json)
+      rescue SystemCallError, IOError => e
+        Github.warning("Could not remove malformed Bencher report #{report_json}: #{e.message}")
+      end
       raise
     end
   end

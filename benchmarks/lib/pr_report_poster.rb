@@ -21,15 +21,22 @@ class PrReportPoster
   end
 
   # GitHub Actions sets GITHUB_REPOSITORY natively. The workflow step must set
-  # PR_NUMBER from the pull request event; ENV.fetch raises KeyError if either is absent.
+  # PR_NUMBER from the pull request event.
   def self.from_env(suite_name:, marker:)
     new(
-      repository: ENV.fetch("GITHUB_REPOSITORY"),
+      repository: required_repository,
       pr_number: required_pr_number,
       suite_name:,
       marker:
     )
   end
+
+  def self.required_repository
+    ENV.fetch("GITHUB_REPOSITORY") do
+      raise KeyError, "GITHUB_REPOSITORY env var is required (set by GitHub Actions)"
+    end
+  end
+  private_class_method :required_repository
 
   def self.required_pr_number
     ENV.fetch("PR_NUMBER") do
@@ -81,8 +88,7 @@ class PrReportPoster
       "--paginate",
       # GitHub timestamps are fixed-width ISO-8601 strings, so lexical ordering matches time ordering.
       "--jq", ".[] | select(.body | startswith(env.MARKER)) | select(.created_at < env.CUTOFF_TS) | .id",
-      env: { "MARKER" => marker, "CUTOFF_TS" => before },
-      error_message: "Failed to list stale #{suite_name} Bencher report comments"
+      env: { "MARKER" => marker, "CUTOFF_TS" => before }
     )
     unless status.success?
       Github.warning("Failed to list stale #{suite_name} Bencher report comments; skipping cleanup.")

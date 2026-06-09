@@ -172,6 +172,23 @@ RSpec.describe BencherRunner do
       expect(FileUtils).to have_received(:rm_f).with("report.json")
     end
 
+    it "preserves the parse error when malformed report cleanup fails" do
+      status = instance_double(Process::Status, exitstatus: 0)
+
+      allow(Open3).to receive(:capture3).and_return(["{}", "", status])
+      allow(File).to receive(:write).with("report.json.tmp", "{}")
+      allow(FileUtils).to receive(:mv).with("report.json.tmp", "report.json")
+      allow(FileUtils).to receive(:rm_f).with("report.json.tmp")
+      allow(FileUtils).to receive(:rm_f).with("report.json").and_raise(Errno::EACCES, "report.json")
+
+      expect do
+        expect do
+          expect { runner.run(branch: "branch", start_point_args: []) }
+            .to raise_error(BencherRunner::ReportParseError, /Bencher JSON report has an unexpected shape/)
+        end.to output(/::debug::Malformed Bencher output/).to_stderr
+      end.to output(/::warning::Could not remove malformed Bencher report report.json/).to_stdout
+    end
+
     it "raises a testable error when Bencher emits non-JSON stdout" do
       status = instance_double(Process::Status, exitstatus: 0)
 
