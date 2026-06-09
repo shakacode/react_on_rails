@@ -73,7 +73,7 @@ First gather:
 - required CI status from `gh pr checks <PR> --required`
 - advisory review-agent status from `gh pr checks <PR>` or explicit review-agent checks
 - review/check timing relative to the current head SHA and merge time, if merged
-- any live CI or review-agent state that could not be verified, reported as UNKNOWN
+- any live CI or review-agent state that could not be verified (report as `UNKNOWN`)
 
 Then red-team:
 - correctness, regression, compatibility, security, performance, and release risks
