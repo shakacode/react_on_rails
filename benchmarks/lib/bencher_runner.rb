@@ -85,7 +85,15 @@ class BencherRunner
       return nil
     end
 
-    File.write(report_json, stdout)
+    tmp_report_json = "#{report_json}.tmp"
+    begin
+      File.write(tmp_report_json, stdout)
+      FileUtils.mv(tmp_report_json, report_json)
+    rescue SystemCallError
+      FileUtils.rm_f(tmp_report_json)
+      FileUtils.rm_f(report_json)
+      raise
+    end
     parse_report(stdout)
   rescue ReportParseError
     FileUtils.rm_f(report_json)
