@@ -284,7 +284,7 @@ fi
 
 if [ "$RUN_PRO_LINT" = true ]; then
   if ensure_pro_dependencies; then
-    run_job "React on Rails Pro RuboCop" "cd react_on_rails_pro && BUNDLE_GEMFILE=../Gemfile bundle exec rubocop --ignore-parent-exclusion"
+    run_job "React on Rails Pro RuboCop" "cd react_on_rails_pro && BUNDLE_GEMFILE=\"$(git rev-parse --show-toplevel)/Gemfile\" bundle exec rubocop --ignore-parent-exclusion"
     run_job "React on Rails Pro RBS Validate" "cd react_on_rails_pro && bundle exec rake rbs:validate"
     run_job "React on Rails Pro TypeScript Check" "pnpm run nps check-typescript"
   fi
