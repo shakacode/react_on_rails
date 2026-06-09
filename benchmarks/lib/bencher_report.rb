@@ -15,7 +15,7 @@ require_relative "bencher_perf_url"
 # loud rather than mis-report), while purely informational alert fields are read
 # leniently (see #parse_alerts). The job fails loudly rather than silently rendering
 # garbage or missing a regression.
-class BencherReport
+class BencherReport # rubocop:disable Metrics/ClassLength
   class FormatError < StandardError; end
 
   # One benchmark+measure's value and its prediction interval. baseline/limits are
@@ -74,15 +74,22 @@ class BencherReport
 
   Alert = Struct.new(:benchmark, :measure, :limit, keyword_init: true)
 
-  def self.parse(json_string)
-    new(JSON.parse(json_string))
+  def self.parse(json_string, tracked_measures: nil)
+    new(JSON.parse(json_string), tracked_measures:)
   rescue JSON::ParserError => e
     raise FormatError, "Bencher report is not valid JSON: #{e.message}"
   end
 
-  def initialize(raw)
+  # tracked_measures: the measures the caller actually tracks (e.g. track_benchmarks.rb's
+  # THRESHOLDS names). When given, an active alert on any *other* measure is treated as
+  # filtered rather than a regression — this drops alerts from orphaned server-side Bencher
+  # thresholds (e.g. a p90_latency threshold the code stopped passing but never deleted),
+  # which otherwise file an issue that the summary table can't even flag. nil = track every
+  # measure (backward-compatible default for callers that only need parsing/significance).
+  def initialize(raw, tracked_measures: nil)
     raise FormatError, "report is not a JSON object (got #{raw.class})" unless raw.is_a?(Hash)
 
+    @tracked_measures = tracked_measures&.map { |measure| normalize(measure) }
     @boundaries = index_boundaries(raw)
     @alerts, @filtered_alerts = parse_alerts(raw).partition { |alert| current_regression_alert?(alert) }
     # Per-benchmark perf links are informational (they only decide whether a name links
@@ -190,6 +197,7 @@ class BencherReport
   # rubocop:disable Metrics/CyclomaticComplexity
   def current_regression_alert?(alert)
     return true unless alert.benchmark
+    return false if untracked_measure_alert?(alert)
 
     direction = { "lower" => :lower, "upper" => :upper }[normalize(alert.limit)]
     return true unless direction
@@ -211,6 +219,16 @@ class BencherReport
   # rubocop:enable Metrics/CyclomaticComplexity
 
   def threshold_side?(boundary, direction) = direction == :lower ? boundary.lower_limit : boundary.upper_limit
+
+  # An active alert on a measure the caller does not track (an orphaned server-side
+  # threshold). Only applies when tracked_measures was given; a measure-less alert can't be
+  # classified here, so it falls through to the existing benchmark-level fail-safe.
+  def untracked_measure_alert?(alert)
+    return false unless @tracked_measures
+    return false unless alert.measure
+
+    !@tracked_measures.include?(normalize(alert.measure))
+  end
 
   def normalize(key)
     key.to_s.downcase.gsub(/[-\s]+/, "_")
