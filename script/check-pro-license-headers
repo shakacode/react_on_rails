@@ -238,8 +238,8 @@ def tracked_in_scope_files
 end
 
 def index_file_content(path)
-  out, status = Open3.capture2("git", "show", ":#{path}")
-  abort "git show :#{path} failed" unless status.success?
+  out, err, status = Open3.capture3("git", "show", ":#{path}")
+  abort "git show :#{path} failed: #{err.strip}" unless status.success?
 
   out
 end
@@ -263,11 +263,11 @@ def run_check_staged
   files = tracked_in_scope_files
   missing = files.reject { |p| index_file_content(p).include?(render_header(comment_style(p))) }
   if missing.empty?
-    puts "All #{files.size} staged/index in-scope Pro files have the current license header."
+    puts "All #{files.size} tracked Pro files have the current license header in the index."
     return 0
   end
 
-  warn "Missing or outdated Pro license header in #{missing.size} staged/index file(s):"
+  warn "Missing or outdated Pro license header in the index for #{missing.size} tracked Pro file(s):"
   missing.each { |p| warn "  #{p}" }
   warn ""
   warn "Run `script/check-pro-license-headers --fix`, then stage the updated files."
