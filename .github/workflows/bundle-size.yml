@@ -50,6 +50,8 @@ jobs:
       # 1. Get PR's size-limit config first (base branch may not have it)
       - name: Checkout PR branch for config
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@v4

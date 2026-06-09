@@ -62,10 +62,15 @@ saved_tool_versions_match_current_head() {
 
 read_committed_tool_version() {
   local tool="$1"
+  local committed_tool_versions
   local version
 
-  version="$(git -C "$PROJECT_ROOT" show HEAD:.tool-versions 2>/dev/null |
-    awk -v tool="$tool" '$1 == tool { print $2; exit }' || true)"
+  committed_tool_versions="$(git -C "$PROJECT_ROOT" show HEAD:.tool-versions 2>/dev/null || true)"
+  if [ -n "$committed_tool_versions" ]; then
+    version="$(awk -v tool="$tool" '$1 == tool { print $2; exit }' <<<"$committed_tool_versions")"
+  else
+    version=""
+  fi
   if [ -n "$version" ]; then
     echo "$version"
     return
