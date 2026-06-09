@@ -53,7 +53,7 @@ class BencherRunner
     # .github/workflows/benchmark-suite.yml; the benchmark execution step has its
     # own narrower timeout-minutes before this reporting step runs.
     stdout, stderr, status = Open3.capture3(*args(branch, start_point_args))
-    emit_stderr(stderr, status.exitstatus)
+    emit_stderr(stderr)
     report = persist_report(stdout)
     warn_on_missing_perf_link_context(report) if report
     Result.new(stderr:, exit_code: status.exitstatus, report:)
@@ -63,14 +63,10 @@ class BencherRunner
 
   attr_reader :benchmark_json, :report_json
 
-  def emit_stderr(stderr, exit_code)
+  def emit_stderr(stderr)
     return if stderr.empty?
 
-    if exit_code.zero?
-      Github.debug("Bencher stderr: #{stderr}")
-    else
-      warn stderr
-    end
+    warn stderr
   end
 
   def threshold_args(measure, direction, boundary)
@@ -111,7 +107,8 @@ class BencherRunner
       begin
         FileUtils.rm_f(report_json)
       rescue SystemCallError, IOError => e
-        raise PersistenceError, e.message
+        raise PersistenceError,
+              "#{e.message} (Bencher produced no output; see stderr above for the run failure)"
       end
       return nil
     end

@@ -97,6 +97,7 @@ class PrReportPoster
       env: { "MARKER" => marker, "CUTOFF_TS" => before }
     )
     unless status.success?
+      # Cleanup is best-effort: stale comments should not fail an otherwise valid benchmark job.
       Github.warning("Failed to list stale #{suite_name} Bencher report comments; skipping cleanup.")
       return []
     end

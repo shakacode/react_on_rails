@@ -98,7 +98,7 @@ RSpec.describe BencherRunner do
       expect(FileUtils).to have_received(:rm_f).with("report.json")
     end
 
-    it "emits successful Bencher stderr as a debug annotation" do
+    it "emits successful Bencher stderr so CI logs preserve Bencher warnings" do
       status = instance_double(Process::Status, exitstatus: 0)
       report_json = JSON.generate("results" => [], "alerts" => [])
 
@@ -109,8 +109,8 @@ RSpec.describe BencherRunner do
 
       result = nil
       expect { result = runner.run(branch: "branch", start_point_args: []) }
-        .to output("::debug::Bencher stderr: informational stderr\n").to_stdout
-        .and output("").to_stderr
+        .to output("informational stderr\n").to_stderr
+        .and output("").to_stdout
 
       expect(result.stderr).to eq("informational stderr")
       expect(result.exit_code).to eq(0)
@@ -123,7 +123,12 @@ RSpec.describe BencherRunner do
       allow(Open3).to receive(:capture3).and_return(["", "auth failed", status])
       allow(FileUtils).to receive(:rm_f).with("report.json").and_raise(Errno::EACCES, "report.json")
 
-      expect { runner.run(branch: "branch", start_point_args: []) }.to raise_error(BencherRunner::PersistenceError)
+      expect { runner.run(branch: "branch", start_point_args: []) }
+        .to output("auth failed\n").to_stderr
+        .and raise_error(
+          BencherRunner::PersistenceError,
+          /Bencher produced no output; see stderr above/
+        )
     end
 
     it "emits the perf-link context warning to stdout so GitHub Actions annotates it" do
