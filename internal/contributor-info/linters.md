@@ -16,7 +16,8 @@ If you haven't tried the autofix options for `eslint` and `rubocop`, you're seri
 (cd react_on_rails && bundle exec rubocop -A)
 
 # Pro Ruby or RuboCop config changes:
-# --ignore-parent-exclusion is required because the root .rubocop.yml excludes subdirectories.
+# --ignore-parent-exclusion prevents root AllCops Exclude patterns, written as root-relative paths,
+# from being applied while running inside react_on_rails_pro/.
 (cd react_on_rails_pro && bundle exec rubocop -A --ignore-parent-exclusion)
 ```
 
