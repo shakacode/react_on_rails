@@ -153,7 +153,8 @@ const configureRsc = () => {
       'react/jsx-dev-runtime$': resolveReactServerEntry('jsx-dev-runtime.react-server.js'),
       // Ignore react-dom/server in RSC bundle - it's not needed for RSC payload generation.
       // Not removing it will cause a runtime error.
-      // Prefix-match false covers both exact and subpath imports; no $-variant is needed.
+      // Prefix-match false covers exact and subpath imports such as
+      // react-dom/server.browser.js; no $-variant is needed.
       'react-dom/server': false,
     },
   };
