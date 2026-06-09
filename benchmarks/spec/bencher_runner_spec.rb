@@ -94,6 +94,15 @@ RSpec.describe BencherRunner do
       expect(FileUtils).to have_received(:rm_f).with("report.json")
     end
 
+    it "raises a persistence error when stale report cleanup fails" do
+      status = instance_double(Process::Status, exitstatus: 2)
+
+      allow(Open3).to receive(:capture3).and_return(["", "auth failed", status])
+      allow(FileUtils).to receive(:rm_f).with("report.json").and_raise(Errno::EACCES, "report.json")
+
+      expect { runner.run(branch: "branch", start_point_args: []) }.to raise_error(BencherRunner::PersistenceError)
+    end
+
     it "emits the perf-link context warning to stdout so GitHub Actions annotates it" do
       status = instance_double(Process::Status, exitstatus: 0)
       report_json = JSON.generate(
@@ -190,16 +199,14 @@ RSpec.describe BencherRunner do
       expect(FileUtils).not_to have_received(:rm_f).with("report.json")
     end
 
-    it "removes the temporary report but keeps the previous report on non-system write errors" do
+    it "propagates unexpected write errors while cleaning up the temporary report" do
       status = instance_double(Process::Status, exitstatus: 0)
 
       allow(Open3).to receive(:capture3).and_return([JSON.generate("results" => [], "alerts" => []), "", status])
       allow(File).to receive(:write).with("report.json.tmp", anything).and_raise(RuntimeError, "disk layer failed")
       allow(FileUtils).to receive(:rm_f)
 
-      expect { runner.run(branch: "branch", start_point_args: []) }.to raise_error(
-        BencherRunner::PersistenceError, "disk layer failed"
-      )
+      expect { runner.run(branch: "branch", start_point_args: []) }.to raise_error(RuntimeError, "disk layer failed")
       expect(FileUtils).to have_received(:rm_f).with("report.json.tmp")
       expect(FileUtils).not_to have_received(:rm_f).with("report.json")
     end
@@ -208,14 +215,14 @@ RSpec.describe BencherRunner do
       status = instance_double(Process::Status, exitstatus: 0)
 
       allow(Open3).to receive(:capture3).and_return([JSON.generate("results" => [], "alerts" => []), "", status])
-      allow(File).to receive(:write).with("report.json.tmp", anything).and_raise(RuntimeError, "disk layer failed")
+      allow(File).to receive(:write).with("report.json.tmp", anything).and_raise(Errno::ENOSPC, "report.json.tmp")
       allow(FileUtils).to receive(:rm_f).with("report.json.tmp").and_raise(Errno::EACCES, "report.json.tmp")
 
       expect do
         runner.run(branch: "branch", start_point_args: [])
       end.to(
         output(/::warning::Could not remove temporary Bencher report report\.json\.tmp/).to_stdout
-          .and(raise_error(BencherRunner::PersistenceError, "disk layer failed"))
+          .and(raise_error(BencherRunner::PersistenceError))
       )
       expect(FileUtils).not_to have_received(:rm_f).with("report.json")
     end

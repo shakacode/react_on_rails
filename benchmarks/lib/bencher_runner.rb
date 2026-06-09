@@ -98,7 +98,11 @@ class BencherRunner
   # retry starts clean rather than re-posting garbage.
   def persist_report(stdout)
     if stdout.empty?
-      FileUtils.rm_f(report_json)
+      begin
+        FileUtils.rm_f(report_json)
+      rescue SystemCallError, IOError => e
+        raise PersistenceError, e.message
+      end
       return nil
     end
 
@@ -106,9 +110,7 @@ class BencherRunner
     begin
       File.write(tmp_report_json, stdout)
       FileUtils.mv(tmp_report_json, report_json)
-    rescue SystemCallError, IOError, RuntimeError => e
-      # SystemCallError/IOError cover OS-level write failures; RuntimeError
-      # covers storage-layer wrappers that raise non-OS write failures.
+    rescue SystemCallError, IOError => e
       raise PersistenceError, e.message
     ensure
       # Always runs. After a successful mv the tmp file is already renamed, so
