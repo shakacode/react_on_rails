@@ -4169,9 +4169,11 @@ describe RscGenerator, type: :generator do
           expect(content).to include("delete rscAliases['react/jsx-dev-runtime$']")
           expect(content).to include("delete rscAliases['react-dom/server']")
           expect(content).to include("delete rscAliases['react-dom/server$']")
-          expect(content).to include("resolveReactServerEntry('react.react-server.js')")
-          expect(content).to include("resolveReactServerEntry('jsx-runtime.react-server.js')")
-          expect(content).to include("resolveReactServerEntry('jsx-dev-runtime.react-server.js')")
+          expect(content).to include("react$: resolveReactServerEntry('react.react-server.js')")
+          expect(content).to include("'react/jsx-runtime$': resolveReactServerEntry('jsx-runtime.react-server.js')")
+          expect(content).to include(
+            "'react/jsx-dev-runtime$': resolveReactServerEntry('jsx-dev-runtime.react-server.js')"
+          )
           expect(content).to include("'react-dom/server': false")
         end
       end
