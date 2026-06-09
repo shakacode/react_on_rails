@@ -98,7 +98,7 @@ When evaluating candidates for a batch:
 - Run this skill before assigning workers when value is unclear.
 - Exclude `park`, `close`, and `product decision` items from implementation batches unless the batch goal is an audit/comment-only pass.
 - Convert low-value assigned issues into no-PR evidence comments instead of speculative PRs.
-- Carry the disposition into `$plan-pr-batch` as the target outcome: implementation PR, no-PR evidence comment, documentation-only, or product-decision blocker.
+- Carry the disposition into `$pr-batch` as the target outcome: implementation PR, no-PR evidence comment, `document/work around`, or product-decision blocker.
 
 ## Common Mistakes
 

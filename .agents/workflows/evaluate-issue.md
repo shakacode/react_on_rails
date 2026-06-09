@@ -2,7 +2,7 @@
 
 Use this workflow before fixing, batching, or assigning a GitHub issue when value is uncertain, especially when the issue was found by AI/code analysis rather than by real users.
 
-The authoritative rubric lives in `.agents/skills/evaluate-issue/SKILL.md`. Read and follow that file first; this workflow exists as the fallback route for agents that do not auto-load skills.
+The authoritative rubric lives in `.agents/skills/evaluate-issue/SKILL.md`. Read and follow that file first; this workflow exists for agents that prefer workflow-file entry points over skill invocation syntax.
 
 ## Sequence
 
@@ -15,4 +15,4 @@ The authoritative rubric lives in `.agents/skills/evaluate-issue/SKILL.md`. Read
 3. Batch handoff:
    - Exclude `park / P3`, `close`, and `product decision` items from implementation batches unless the batch is explicitly audit/comment-only.
    - Convert low-value assigned issues into no-PR evidence comments rather than speculative PRs.
-   - Carry the disposition into `$plan-pr-batch` as the target outcome: implementation PR, no-PR evidence comment, documentation-only, or product-decision blocker.
+   - Carry the disposition into `$pr-batch` as the target outcome: implementation PR, no-PR evidence comment, `document/work around`, or product-decision blocker.

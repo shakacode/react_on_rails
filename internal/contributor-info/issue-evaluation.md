@@ -62,11 +62,11 @@ Do not label AI/code-analysis-only findings as high priority without verified us
 Before adding issues to a PR batch, classify each target as:
 
 - implementation PR;
-- documentation/workaround update;
+- `document/work around`;
 - no-PR evidence comment;
 - product-decision blocker;
 - parked/deferred item.
 
 Only implementation PRs and explicitly selected documentation updates should go to worker implementation batches. Parked, close-candidate, and product-decision items belong in audit/comment-only batches or should be excluded.
 
-Use `.agents/skills/evaluate-issue/SKILL.md` when skills are available. Use `.agents/workflows/evaluate-issue.md` as the fallback route for assistants without skill auto-loading.
+Use `.agents/skills/evaluate-issue/SKILL.md` when skills are available. Use `.agents/workflows/evaluate-issue.md` for assistants that prefer workflow-file entry points over skill invocation syntax.
