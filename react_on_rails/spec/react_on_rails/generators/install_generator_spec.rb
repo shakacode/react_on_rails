@@ -2147,6 +2147,22 @@ describe InstallGenerator, type: :generator do
         expect(content).to include("serverWebpackConfig(true)")
         expect(content).to include("rsc-bundle")
         expect(content).to include("react-server")
+        expect(content).to include("const reactPackageRoot = dirname(require.resolve('react/package.json'))")
+        expect(content).to include("const resolveReactServerEntry = (entryFilename) =>")
+        expect(content).to include("existsSync(entryPath)")
+        expect(content).to include("delete rscAliases.react")
+        expect(content).to include("delete rscAliases['react$']")
+        expect(content).to include("delete rscAliases['react/jsx-runtime']")
+        expect(content).to include("delete rscAliases['react/jsx-runtime$']")
+        expect(content).to include("delete rscAliases['react/jsx-dev-runtime']")
+        expect(content).to include("delete rscAliases['react/jsx-dev-runtime$']")
+        expect(content).to include("delete rscAliases['react-dom/server']")
+        expect(content).to include("delete rscAliases['react-dom/server$']")
+        expect(content).to include("react$: resolveReactServerEntry('react.react-server.js')")
+        expect(content).to include("'react/jsx-runtime$': resolveReactServerEntry('jsx-runtime.react-server.js')")
+        expect(content).to include(
+          "'react/jsx-dev-runtime$': resolveReactServerEntry('jsx-dev-runtime.react-server.js')"
+        )
         expect(content).to include("process.env.REACT_ON_RAILS_RSC_REGISTRATION_ENTRY_PATH")
         expect(content).to include("defaultServerComponentRegistrationEntry")
       end
