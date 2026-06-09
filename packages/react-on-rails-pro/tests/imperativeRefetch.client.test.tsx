@@ -513,6 +513,53 @@ class CapturingErrorBoundary extends React.Component<
     expect(onRefetchError).not.toHaveBeenCalled();
   });
 
+  it('1e2. production does not revive a dismissed error when props return to a prior key', async () => {
+    process.env.NODE_ENV = 'production';
+    setupSequencedFetcher([
+      <div data-testid="card">
+        Card v1
+        <RecoverableInlineControls />
+      </div>,
+      rejectWith(new Error('recoverable id 1 failure')),
+      <div data-testid="card">
+        Card v2
+        <RecoverableInlineControls />
+      </div>,
+    ]);
+    const onRefetchError = jest.fn();
+    const ref = React.createRef<RSCRouteHandle>();
+
+    const Root: React.FC<{ id: number }> = ({ id }) => (
+      <TestHarness>
+        <RSCRoute
+          ref={ref}
+          componentName="UserCard"
+          componentProps={{ id }}
+          onRefetchError={onRefetchError}
+        />
+      </TestHarness>
+    );
+
+    const result = await renderInAct(<Root id={1} />);
+    expect(screen.getByTestId('card')).toHaveTextContent('Card v1');
+
+    await act(async () => {
+      await expect(ref.current!.refetch()).rejects.toThrow('recoverable id 1 failure');
+    });
+    await waitFor(() => expect(ref.current!.refetchError?.message).toBe('recoverable id 1 failure'));
+    await waitFor(() => expect(onRefetchError).toHaveBeenCalledTimes(1));
+
+    await rerenderInAct(result, <Root id={2} />);
+    await waitFor(() => expect(screen.getByTestId('card')).toHaveTextContent('Card v2'));
+    expect(screen.queryByTestId('recoverable-error')).not.toBeInTheDocument();
+
+    await rerenderInAct(result, <Root id={1} />);
+    await waitFor(() => expect(screen.getByTestId('card')).toHaveTextContent('Card v1'));
+    expect(screen.queryByTestId('recoverable-error')).not.toBeInTheDocument();
+    expect(ref.current!.refetchError).toBeNull();
+    expect(onRefetchError).toHaveBeenCalledTimes(1);
+  });
+
   it('1f. production ignores stale same-key refetch errors after a newer refetch succeeds', async () => {
     process.env.NODE_ENV = 'production';
     const pending = setupDeferredFetcher();

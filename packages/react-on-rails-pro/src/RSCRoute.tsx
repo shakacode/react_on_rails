@@ -174,12 +174,12 @@ type RefetchErrorState = [string, ServerComponentFetchError];
 
 const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
   ({ componentName, componentProps, onRefetchError }, ref) => {
-    const { getComponent, refetchComponent, getRefetchVersion, getSuccessfulVersion } = useRSC();
+    const { getComponent, refetchComponent, getRefetchVersion, successfulVersions } = useRSC();
     const currentRouteKey = useMemo(
       () => createRSCPayloadKey(componentName, componentProps),
       [componentName, componentProps],
     );
-    const successfulVersion = getSuccessfulVersion(componentName, componentProps);
+    const successfulVersion = successfulVersions[currentRouteKey] ?? 0;
     const [refetchErrorState, setRefetchErrorState] = useState<RefetchErrorState | null>(null);
     const refetchError = refetchErrorState?.[0] === currentRouteKey ? refetchErrorState[1] : null;
 
@@ -210,50 +210,26 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
       const requestKey = createRSCPayloadKey(n, p);
       // eslint-disable-next-line no-multi-assign
       const requestId = (latestRefetchRequestRef.current += 1);
-      // Bundlers replace NODE_ENV with a string literal in production builds.
-      // Jest mutates it at runtime only because tests bypass that substitution.
       const recoverOnError = process.env.NODE_ENV === 'production';
       // refetchComponent swaps the cache promise and bumps the provider's
       // version inside startTransition. That re-renders every <RSCRoute>
       // (including this one) as a transition commit, so old content stays
       // visible while the new promise streams in.
-      const refetchPromise = refetchComponent(n, p, {
-        recoverOnError,
-      });
-      // Capture this call's post-bump refetch version. Any later same-key refetch
-      // increments past it, so stale failures cannot pass the equality check.
+      const refetchPromise = refetchComponent(n, p, recoverOnError);
       const sharedRefetchVersion = getRefetchVersion(n, p);
-      return rejectErrorPayload(refetchPromise).then(
-        (payload) => {
-          if (isMountedRef.current) {
-            // Success only needs this instance's requestId guard. Stale same-key
-            // successes are harmless because the provider's successfulVersion
-            // bump also clears recoverable errors for mounted matching routes.
-            setRefetchErrorState((state) =>
-              latestRefetchRequestRef.current === requestId && state?.[0] === requestKey ? null : state,
-            );
-          }
-          return payload;
-        },
-        (error: unknown) => {
-          const serverComponentFetchError = toServerComponentFetchError(error, n, p);
-          if (recoverOnError) {
-            const [latestName, latestProps] = latestPropsRef.current;
-            const latestRouteKey = createRSCPayloadKey(latestName, latestProps);
-            if (
-              // requestId handles overlapping refetches from this instance;
-              // sharedRefetchVersion handles same-key refetches from siblings.
-              isMountedRef.current &&
-              latestRefetchRequestRef.current === requestId &&
-              getRefetchVersion(n, p) === sharedRefetchVersion &&
-              latestRouteKey === requestKey
-            ) {
-              setRefetchErrorState([requestKey, serverComponentFetchError]);
-            }
-          }
-          throw serverComponentFetchError;
-        },
-      );
+      return rejectErrorPayload(refetchPromise).catch((error: unknown) => {
+        const serverComponentFetchError = toServerComponentFetchError(error, n, p);
+        if (
+          recoverOnError &&
+          isMountedRef.current &&
+          latestRefetchRequestRef.current === requestId &&
+          getRefetchVersion(n, p) === sharedRefetchVersion &&
+          createRSCPayloadKey(...latestPropsRef.current) === requestKey
+        ) {
+          setRefetchErrorState([requestKey, serverComponentFetchError]);
+        }
+        throw serverComponentFetchError;
+      });
     }, [getRefetchVersion, refetchComponent]);
 
     const clearRefetchError = useCallback(() => {
@@ -263,7 +239,6 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
     }, [currentRouteKey]);
 
     const handle = useMemo<RSCRouteHandle>(
-      // retry is the same implementation as refetch; the distinction is semantic for error UI.
       () => ({ refetch, retry: refetch, refetchError, clearRefetchError }),
       [clearRefetchError, refetch, refetchError],
     );

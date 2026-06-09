@@ -35,12 +35,12 @@ type RSCContextType = {
   refetchComponent: (
     componentName: string,
     componentProps: unknown,
-    options?: { recoverOnError?: boolean },
+    recoverOnError?: boolean,
   ) => Promise<ReactNode>;
 
   getRefetchVersion: (componentName: string, componentProps: unknown) => number;
 
-  getSuccessfulVersion: (componentName: string, componentProps: unknown) => number;
+  successfulVersions: Record<string, number>;
 };
 
 const RSCContext = createContext<RSCContextType | undefined>(undefined);
@@ -71,20 +71,14 @@ export const createRSCProvider = ({
 }) => {
   return ({ children }: { children: ReactNode }) => {
     const fetchRSCPromisesRef = useRef<Record<string, Promise<ReactNode>>>({});
-    // TODO(#3564): these provider-lifetime caches grow with each unique
-    // componentName+props key. Add LRU/TTL eviction when high-cardinality route
-    // props make retained ReactNode promises or refetch-version counters matter.
+    // TODO(#3564): add LRU/TTL eviction for high-cardinality provider caches.
     const lastSuccessfulRSCPromisesRef = useRef<Record<string, Promise<ReactNode>>>({});
-    // Mutable by design: refetch() reads this synchronously after bumping it,
-    // before React has committed a state update.
     const refetchVersionsRef = useRef<Record<string, number>>({});
     // `versions` is a per-cache-key counter held in React state. Bumping it on
     // refetch (inside startTransition) is what makes <RSCRoute> consumers re-
     // render with the new promise from the cache while React keeps the old
     // tree visible until the new payload resolves.
     const [versions, setVersions] = useState<Record<string, number>>({});
-    // React state by design: successful refetches need to trigger a render so
-    // mounted routes can clear recoverable errors for this cache key.
     const [successfulVersions, setSuccessfulVersions] = useState<Record<string, number>>({});
     const [, startTransition] = useTransition();
 
@@ -93,14 +87,6 @@ export const createRSCProvider = ({
       return refetchVersionsRef.current[key] ?? 0;
     }, []);
 
-    const getSuccessfulVersion = useCallback(
-      (componentName: string, componentProps: unknown) => {
-        const key = createRSCPayloadKey(componentName, componentProps);
-        return successfulVersions[key] ?? 0;
-      },
-      [successfulVersions],
-    );
-
     const markSuccessfulPromise = useCallback(
       (key: string, promise: Promise<ReactNode>, notifyRoutes = false) => {
         if (fetchRSCPromisesRef.current[key] !== promise) {
@@ -108,9 +94,6 @@ export const createRSCProvider = ({
         }
 
         lastSuccessfulRSCPromisesRef.current[key] = promise;
-        // Initial loads establish the fallback baseline without notifying every
-        // route. Only successful refetches need to clear mounted recoverable
-        // errors for the same cache key.
         if (!notifyRoutes) {
           return;
         }
@@ -129,15 +112,14 @@ export const createRSCProvider = ({
           return fetchRSCPromisesRef.current[key];
         }
 
-        const promiseRef: { current?: Promise<ReactNode> } = {};
+        let promise!: Promise<ReactNode>;
         const markPayloadIfSuccessful = (payload: ReactNode) => {
-          if (!(payload instanceof Error) && promiseRef.current) {
-            markSuccessfulPromise(key, promiseRef.current);
+          if (!(payload instanceof Error)) {
+            markSuccessfulPromise(key, promise);
           }
           return payload;
         };
-        const promise = getServerComponent({ componentName, componentProps }).then(markPayloadIfSuccessful);
-        promiseRef.current = promise;
+        promise = getServerComponent({ componentName, componentProps }).then(markPayloadIfSuccessful);
         fetchRSCPromisesRef.current[key] = promise;
         return promise;
       },
@@ -145,40 +127,28 @@ export const createRSCProvider = ({
     );
 
     const refetchComponent = useCallback(
-      (
-        componentName: string,
-        componentProps: unknown,
-        { recoverOnError = false }: { recoverOnError?: boolean } = {},
-      ) => {
+      (componentName: string, componentProps: unknown, recoverOnError?: boolean) => {
         const key = createRSCPayloadKey(componentName, componentProps);
         refetchVersionsRef.current[key] = (refetchVersionsRef.current[key] ?? 0) + 1;
-        const promiseRef: { current?: Promise<ReactNode> } = {};
+        let promise!: Promise<ReactNode>;
         const restoreLastSuccessfulPromise = () => {
-          const promise = promiseRef.current;
-          if (!promise || fetchRSCPromisesRef.current[key] !== promise) {
+          if (fetchRSCPromisesRef.current[key] !== promise) {
             return;
           }
 
           if (key in lastSuccessfulRSCPromisesRef.current) {
             fetchRSCPromisesRef.current[key] = lastSuccessfulRSCPromisesRef.current[key];
           } else {
-            // No prior success to restore; drop the key so the next getComponent
-            // call retries the initial fetch path from scratch.
             // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
             delete fetchRSCPromisesRef.current[key];
           }
 
-          // The failed refetch already bumped `versions` when it wrote the
-          // failed promise. Bump again after recovery so routes read the
-          // restored or deleted cache entry.
           startTransition(() => {
             setVersions((v) => ({ ...v, [key]: (v[key] ?? 0) + 1 }));
           });
         };
 
-        // Normalize synchronous getServerComponent throws into promise
-        // rejections so recovery always runs through the error path below.
-        const promise = Promise.resolve()
+        promise = Promise.resolve()
           .then(() =>
             getServerComponent({
               componentName,
@@ -193,10 +163,7 @@ export const createRSCProvider = ({
                   restoreLastSuccessfulPromise();
                 }
               } else {
-                const currentPromise = promiseRef.current;
-                if (currentPromise) {
-                  markSuccessfulPromise(key, currentPromise, true);
-                }
+                markSuccessfulPromise(key, promise, true);
               }
               return payload;
             },
@@ -207,7 +174,6 @@ export const createRSCProvider = ({
               throw error;
             },
           );
-        promiseRef.current = promise;
         fetchRSCPromisesRef.current[key] = promise;
         startTransition(() => {
           setVersions((v) => ({ ...v, [key]: (v[key] ?? 0) + 1 }));
@@ -217,16 +183,11 @@ export const createRSCProvider = ({
       [markSuccessfulPromise, startTransition],
     );
 
-    // `versions` and `successfulVersions` are intentionally load-bearing deps:
-    // refetch writes bump `versions` so routes read the new cache promise, and
-    // successful refetches bump `successfulVersions` so routes can clear
-    // recoverable error state. Trade-off: each bump re-renders every useRSC()
-    // consumer even when its cache key is unaffected. Each extra render is a
-    // cache hit, but use a per-key subscription if this becomes a bottleneck.
+    // `versions` and `successfulVersions` intentionally refresh this context.
     const contextValue = useMemo(
-      () => ({ getComponent, refetchComponent, getRefetchVersion, getSuccessfulVersion }),
+      () => ({ getComponent, refetchComponent, getRefetchVersion, successfulVersions }),
       // eslint-disable-next-line react-hooks/exhaustive-deps
-      [getComponent, refetchComponent, getRefetchVersion, getSuccessfulVersion, versions, successfulVersions],
+      [getComponent, refetchComponent, getRefetchVersion, versions, successfulVersions],
     );
 
     return <RSCContext.Provider value={contextValue}>{children}</RSCContext.Provider>;

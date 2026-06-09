@@ -470,7 +470,7 @@ function Dashboard() {
   return (
     <>
       <Toolbar>
-        <button onClick={() => void cardRef.current?.refetch().catch(console.error)}>Refresh</button>
+        <button onClick={() => void cardRef.current?.refetch().catch(() => undefined)}>Refresh</button>
       </Toolbar>
       <RSCRoute ref={cardRef} componentName="UserCard" componentProps={{ userId: 123 }} />
     </>
