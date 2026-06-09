@@ -68,11 +68,26 @@ AI-found gaps are leads, not priorities. Prioritize real customer reports, verif
 
 ## Output Format
 
-- Recommendation: `fix now / P0`, `fix now / P1`, `fix later / P2`, `park / P3`, `document/work around`, `close`, or `product decision`
-- Evidence: links and facts verified, plus `UNKNOWN` where needed
-- Impact: who is affected and how often, or why that is unknown
-- Complexity: likely files/surfaces, risk, and sequencing
-- Next action: exact issue comment, label change, follow-up issue, docs/workflow update, or no PR
+```md
+Recommendation: <fix now / P0 | fix now / P1 | fix later / P2 | park / P3 | document/work around | close | product decision>
+
+Evidence:
+
+- <verified facts and links>
+- UNKNOWN: <missing facts>
+
+Impact:
+
+- <affected users/workflows/frequency>
+
+Complexity:
+
+- <files/surfaces/risk/sequencing>
+
+Next action:
+
+- <issue comment, label update, docs/workflow update, follow-up issue, no-PR evidence comment, or implementation PR>
+```
 
 ## Batch Integration
 

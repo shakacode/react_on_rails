@@ -2,7 +2,7 @@
 
 Use this workflow before fixing, batching, or assigning a GitHub issue when value is uncertain, especially when the issue was found by AI/code analysis rather than by real users.
 
-This mirrors `.agents/skills/evaluate-issue/SKILL.md`; keep the two in sync.
+This mirrors `.agents/skills/evaluate-issue/SKILL.md`. The skill file is authoritative; update this workflow to match after any skill change.
 
 ## Principle
 
@@ -74,7 +74,7 @@ Complexity:
 
 Next action:
 
-- <issue comment, label update, docs update, no-PR evidence comment, or implementation PR>
+- <issue comment, label update, docs/workflow update, follow-up issue, no-PR evidence comment, or implementation PR>
 ```
 
 ## Batch Integration
