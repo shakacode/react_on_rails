@@ -411,7 +411,6 @@ show_status() {
   print_header "Current Configuration"
   echo ""
   warn_if_latest_profile_may_be_under_reported
-  echo ""
 
   echo "Runtime versions:"
   if command -v ruby &> /dev/null; then

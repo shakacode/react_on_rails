@@ -95,7 +95,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version-file: .tool-versions
+          node-version: ${{ steps.tool-versions.outputs.node-version }}
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
       - name: Get pnpm store directory
