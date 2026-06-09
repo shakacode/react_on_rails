@@ -129,6 +129,7 @@ const configureRsc = () => {
   delete rscAliases['react/jsx-runtime$'];
   delete rscAliases['react/jsx-dev-runtime'];
   delete rscAliases['react/jsx-dev-runtime$'];
+  delete rscAliases['react-dom/server'];
   delete rscAliases['react-dom/server$'];
 
   rscConfig.resolve = {
