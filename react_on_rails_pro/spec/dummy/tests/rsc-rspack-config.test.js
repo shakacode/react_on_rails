@@ -5,6 +5,12 @@ const rspackConfigPath = path.resolve(__dirname, '../config/rspack/rspack.config
 const shakapackerBinPath = path.resolve(__dirname, '../bin/shakapacker');
 const clientConfigPath = path.resolve(__dirname, '../config/webpack/clientWebpackConfig.js');
 const serverConfigPath = path.resolve(__dirname, '../config/webpack/serverWebpackConfig.js');
+const rscConfigPath = path.resolve(__dirname, '../config/webpack/rscWebpackConfig.js');
+
+afterEach(() => {
+  jest.resetModules();
+  jest.clearAllMocks();
+});
 
 describe('Pro dummy RSC rspack config', () => {
   it('provides a rspack entrypoint that delegates to the shared build config', () => {
@@ -45,5 +51,52 @@ describe('Pro dummy RSC rspack config', () => {
     expect(clientSource).toContain('module: false');
     expect(clientSource).toContain('path: false');
     expect(clientSource).toContain('stream: false');
+  });
+
+  it('wraps function-shaped JavaScript loader rules once for the RSC loader', () => {
+    jest.doMock('shakapacker', () => ({
+      config: {
+        source_entry_path: 'packs',
+        source_path: 'client/app',
+      },
+    }));
+
+    const functionRule = {
+      use() {
+        return [{ loader: 'babel-loader', options: { caller: { ssr: true } } }];
+      },
+    };
+    const serverConfig = {
+      entry: { 'server-bundle': './server-bundle.js' },
+      module: { rules: [functionRule] },
+      output: {},
+      plugins: [],
+      resolve: { alias: {} },
+    };
+    const configureServer = jest.fn(() => serverConfig);
+    const extractLoader = (rule, loaderName) =>
+      Array.isArray(rule.use) ? rule.use.find((item) => item?.loader?.includes(loaderName)) : null;
+
+    jest.doMock(serverConfigPath, () => ({
+      default: configureServer,
+      extractLoader,
+    }));
+
+    // eslint-disable-next-line global-require, import/no-dynamic-require
+    const configureRsc = require(rscConfigPath);
+    const firstConfig = configureRsc();
+    const wrappedUse = firstConfig.module.rules[0].use;
+    const firstUseResult = wrappedUse({});
+
+    configureRsc();
+    const secondUseResult = firstConfig.module.rules[0].use({});
+
+    expect(configureServer).toHaveBeenCalledWith(true);
+    expect(wrappedUse.name).toBe('rscLoaderWrapper');
+    expect(firstUseResult).toEqual([
+      { loader: 'babel-loader', options: { caller: { ssr: true } } },
+      { loader: 'react-on-rails-rsc/WebpackLoader' },
+    ]);
+    expect(secondUseResult).toEqual(firstUseResult);
   });
 });

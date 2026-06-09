@@ -687,8 +687,56 @@ jobs:
             done
           }
 
-          wait_for_service "Rails server" false "http://localhost:3000"
-          wait_for_service "Node renderer" true "http://[::1]:3800/info" "http://127.0.0.1:3800/info"
+          wait_for_h2c_service() {
+            name="$1"
+            authority="$2"
+            path="$3"
+            timeout=300
+            elapsed=0
+
+            while true; do
+              if node - "$authority" "$path" <<'NODE'
+          const http2 = require('node:http2');
+
+          const [authority, path] = process.argv.slice(2);
+          const client = http2.connect(authority);
+          const request = client.request({ ':method': 'GET', ':path': path });
+          let status;
+
+          const fail = () => {
+            client.destroy();
+            process.exit(1);
+          };
+
+          client.on('error', fail);
+          request.on('error', fail);
+          request.on('response', (headers) => {
+            status = headers[':status'];
+          });
+          request.on('data', () => {});
+          request.on('end', () => {
+            client.close();
+            process.exit(status >= 200 && status < 300 ? 0 : 1);
+          });
+          request.end();
+          setTimeout(fail, 2000);
+          NODE
+              then
+                echo "${name} started at ${authority}${path} after ${elapsed}s"
+                return 0
+              fi
+
+              sleep 1
+              elapsed=$((elapsed + 1))
+              if [ $elapsed -ge $timeout ]; then
+                echo "Timeout waiting for ${name} to start after ${timeout}s"
+                exit 1
+              fi
+            done
+          }
+
+          wait_for_service "Rails server" true "http://localhost:3000/empty"
+          wait_for_h2c_service "Node renderer" "http://[::1]:3800" "/info"
 
       - name: Install Playwright dependencies
         run: cd spec/dummy && npx playwright install --with-deps

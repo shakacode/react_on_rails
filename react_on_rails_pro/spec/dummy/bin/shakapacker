@@ -4,7 +4,7 @@
 require "pathname"
 
 ENV["RAILS_ENV"] ||= "development"
-ENV["NODE_ENV"] ||= ENV.fetch("RAILS_ENV")
+ENV["NODE_ENV"] ||= ENV.fetch("RAILS_ENV", "development")
 ENV["BUNDLE_GEMFILE"] ||= File.expand_path("../../Gemfile", Pathname.new(__FILE__).realpath)
 
 require "bundler/setup"
