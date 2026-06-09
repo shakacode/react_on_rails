@@ -71,6 +71,9 @@ read_committed_tool_version() {
 
   # Fallback for non-git contexts. If the checkout is currently in minimum mode
   # and no valid backup exists, this reports the local minimum version as latest.
+  if [ -f "$MINIMUM_TOOL_VERSIONS_FILE" ] && cmp -s "$PROJECT_ROOT/.tool-versions" "$MINIMUM_TOOL_VERSIONS_FILE"; then
+    echo "Warning: could not read committed latest $tool version from git; falling back to current .tool-versions, which matches the minimum profile" >&2
+  fi
   read_tool_version "$PROJECT_ROOT/.tool-versions" "$tool"
 }
 
@@ -667,30 +670,34 @@ restore_to_latest() {
   echo "  bundle exec rake run_rspec:all_dummy"
 }
 
-# Main script
-# Keep this marker stable: ci_switch_config_spec.rb splits the function library here.
-case "${1:-}" in
-  minimum)
-    switch_to_minimum
-    ;;
-  latest)
-    restore_to_latest
-    ;;
-  status)
-    show_status
-    ;;
-  *)
-    echo "Usage: $0 {minimum|latest|status}"
-    echo ""
-    echo "Commands:"
-    echo "  minimum  - Switch to Ruby $MINIMUM_RUBY_MINOR_VERSION, Node 20, minimum dependencies (Shakapacker 8.2.0, React $MINIMUM_REACT_VERSION)"
-    echo "  latest   - Switch to Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, latest dependencies (Shakapacker $LATEST_SHAKAPACKER_VERSION, React $LATEST_REACT_VERSION)"
-    echo "  status   - Show current configuration"
-    echo ""
-    echo "Examples:"
-    echo "  $0 status           # Check current config"
-    echo "  $0 minimum          # Switch to minimum deps for testing CI failures"
-    echo "  $0 latest           # Switch back to latest deps"
-    exit 1
-    ;;
-esac
+main() {
+  case "${1:-}" in
+    minimum)
+      switch_to_minimum
+      ;;
+    latest)
+      restore_to_latest
+      ;;
+    status)
+      show_status
+      ;;
+    *)
+      echo "Usage: $0 {minimum|latest|status}"
+      echo ""
+      echo "Commands:"
+      echo "  minimum  - Switch to Ruby $MINIMUM_RUBY_MINOR_VERSION, Node 20, minimum dependencies (Shakapacker 8.2.0, React $MINIMUM_REACT_VERSION)"
+      echo "  latest   - Switch to Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, latest dependencies (Shakapacker $LATEST_SHAKAPACKER_VERSION, React $LATEST_REACT_VERSION)"
+      echo "  status   - Show current configuration"
+      echo ""
+      echo "Examples:"
+      echo "  $0 status           # Check current config"
+      echo "  $0 minimum          # Switch to minimum deps for testing CI failures"
+      echo "  $0 latest           # Switch back to latest deps"
+      exit 1
+      ;;
+  esac
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi

@@ -3,6 +3,7 @@
 require "fileutils"
 require "json"
 require "open3"
+require "shellwords"
 require "tmpdir"
 require_relative "spec_helper"
 
@@ -117,6 +118,26 @@ RSpec.describe "bin/ci-switch-config" do
     end
   end
 
+  it "warns when a non-git checkout falls back from latest to the local minimum profile" do
+    Dir.mktmpdir do |tmpdir|
+      harness_path = File.join(tmpdir, "bin/ci-switch-tool-versions")
+      script_copy_path = File.join(tmpdir, "bin/ci-switch-config")
+
+      FileUtils.mkdir_p(File.dirname(harness_path))
+      FileUtils.cp(source_script_path, script_copy_path)
+      File.write(harness_path, ci_switch_tool_versions_harness(script_copy_path))
+      FileUtils.cp(File.join(repo_root, ".minimum.tool-versions"), File.join(tmpdir, ".tool-versions"))
+      FileUtils.cp(File.join(repo_root, ".minimum.tool-versions"), File.join(tmpdir, ".minimum.tool-versions"))
+      FileUtils.chmod("+x", harness_path)
+
+      stdout, stderr, status = Open3.capture3(harness_path, "read-latest-ruby", chdir: tmpdir)
+
+      expect(status).to be_success, "#{stdout}\n#{stderr}"
+      expect(stdout).to include(File.read(File.join(repo_root, ".minimum.tool-versions")).match(/ruby (\S+)/)[1])
+      expect(stderr).to include("falling back to current .tool-versions, which matches the minimum profile")
+    end
+  end
+
   def ci_switch_status(dependencies)
     Dir.mktmpdir do |tmpdir|
       fake_script_path = File.join(tmpdir, "bin/ci-switch-config")
@@ -138,9 +159,11 @@ RSpec.describe "bin/ci-switch-config" do
   def with_ci_switch_tool_versions_repo
     Dir.mktmpdir do |tmpdir|
       harness_path = File.join(tmpdir, "bin/ci-switch-tool-versions")
+      script_copy_path = File.join(tmpdir, "bin/ci-switch-config")
 
       FileUtils.mkdir_p(File.dirname(harness_path))
-      File.write(harness_path, ci_switch_tool_versions_harness)
+      FileUtils.cp(source_script_path, script_copy_path)
+      File.write(harness_path, ci_switch_tool_versions_harness(script_copy_path))
       FileUtils.cp(File.join(repo_root, ".tool-versions"), File.join(tmpdir, ".tool-versions"))
       FileUtils.cp(File.join(repo_root, ".minimum.tool-versions"), File.join(tmpdir, ".minimum.tool-versions"))
       FileUtils.chmod("+x", harness_path)
@@ -155,13 +178,11 @@ RSpec.describe "bin/ci-switch-config" do
     end
   end
 
-  def ci_switch_tool_versions_harness
-    full_source = File.read(source_script_path)
-    script_body = full_source.split("\n# Main script\n").first
-    raise "ci-switch-config is missing the '# Main script' boundary marker" if script_body == full_source
-
+  def ci_switch_tool_versions_harness(script_path)
     [
-      script_body,
+      "#!/usr/bin/env bash",
+      "set -euo pipefail",
+      "source #{Shellwords.escape(script_path)}",
       'case "${1:-}" in',
       "  minimum-tool-versions)",
       "    set_tool_versions_to_minimum",
@@ -169,8 +190,11 @@ RSpec.describe "bin/ci-switch-config" do
       "  latest-tool-versions)",
       "    restore_tool_versions_to_latest",
       "    ;;",
+      "  read-latest-ruby)",
+      "    read_latest_tool_version ruby",
+      "    ;;",
       "  *)",
-      '    echo "Usage: $0 {minimum-tool-versions|latest-tool-versions}" >&2',
+      '    echo "Usage: $0 {minimum-tool-versions|latest-tool-versions|read-latest-ruby}" >&2',
       "    exit 1",
       "    ;;",
       "esac",
