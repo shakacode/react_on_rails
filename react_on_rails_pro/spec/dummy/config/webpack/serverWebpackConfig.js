@@ -113,6 +113,7 @@ const configureServer = (rscBundle = false) => {
       plugin.constructor.name !== 'WebpackAssetsManifest' &&
       plugin.constructor.name !== 'RspackManifestPlugin' &&
       plugin.constructor.name !== 'MiniCssExtractPlugin' &&
+      plugin.constructor.name !== 'CssExtractRspackPlugin' &&
       plugin.constructor.name !== 'ForkTsCheckerWebpackPlugin',
   );
 

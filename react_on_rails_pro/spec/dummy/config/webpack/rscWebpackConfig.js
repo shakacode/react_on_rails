@@ -101,6 +101,8 @@ const configureRsc = () => {
   const { rules } = rscConfig.module;
   rules.forEach((rule) => {
     if (typeof rule.use === 'function') {
+      // Skip if already wrapped by a previous configureRsc() call.
+      // originalUse is captured before injection, so it cannot return the RSC loader itself.
       if (rule.use.name === 'rscLoaderWrapper') return;
       const originalUse = rule.use;
       // eslint-disable-next-line no-param-reassign
