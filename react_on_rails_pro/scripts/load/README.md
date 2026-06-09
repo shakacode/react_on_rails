@@ -82,6 +82,11 @@ request body and rejects requests larger than 1 MB. Normal benchmark requests
 send exactly the configured limit, so rejection testing requires a separate
 oversized request rather than a standard probe run.
 
+When comparing `stream_response` deltas, remember that Fastify enforces
+`bodyLimit` before the handler sees the request, while the native HTTP/2 stream
+handler reads the request body before writing the response. Treat that difference
+as part of the benchmark interpretation rather than production transport proof.
+
 For environments where Unix sockets are unavailable:
 
 ```bash

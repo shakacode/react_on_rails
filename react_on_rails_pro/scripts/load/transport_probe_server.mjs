@@ -179,13 +179,13 @@ const handleNativeStream = (stream, headers, { bodyBytes, streamBytes }) => {
 const assertSocketPathAvailable = async (socketPath) => {
   try {
     await fs.lstat(socketPath);
-    throw new Error(`socket path already exists: ${socketPath}`);
   } catch (error) {
     if (error.code === 'ENOENT') {
       return;
     }
     throw error;
   }
+  throw new Error(`socket path already exists: ${socketPath}`);
 };
 
 const listenNative = async ({ bodyBytes, host, port, socketPath, streamBytes }) => {

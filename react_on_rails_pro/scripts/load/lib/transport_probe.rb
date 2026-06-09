@@ -11,7 +11,6 @@ require "optparse"
 require "protocol/http/headers"
 require "securerandom"
 require "tmpdir"
-require "timeout"
 require_relative "metrics"
 
 begin
@@ -28,7 +27,7 @@ module RendererHarness
     DEFAULT_SCENARIOS = %w[fastify_tcp native_tcp native_uds].freeze
     PROBE_CASES = {
       "small_unary" => { path: "/probe/unary" },
-      "stream_16kb" => { path: "/probe/stream" }
+      "stream_response" => { path: "/probe/stream" }
     }.freeze
     DELTA_PERCENTILES = %i[p50 p95 p99].freeze
 

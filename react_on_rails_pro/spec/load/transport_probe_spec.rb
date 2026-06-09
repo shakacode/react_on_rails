@@ -149,11 +149,11 @@ RSpec.describe RendererHarness::TransportProbe do
       results = {
         "fastify_tcp" => {
           "small_unary" => { latency_ms: { p50: 1.0, p95: 2.0, p99: 3.0 } },
-          "stream_16kb" => { latency_ms: { p50: 2.0, p95: 4.0, p99: 6.0 } }
+          "stream_response" => { latency_ms: { p50: 2.0, p95: 4.0, p99: 6.0 } }
         },
         "native_tcp" => {
           "small_unary" => { latency_ms: { p50: 0.75, p95: 1.5, p99: 2.25 } },
-          "stream_16kb" => { latency_ms: { p50: 1.5, p95: 3.0, p99: 4.5 } }
+          "stream_response" => { latency_ms: { p50: 1.5, p95: 3.0, p99: 4.5 } }
         }
       }
 
@@ -162,7 +162,7 @@ RSpec.describe RendererHarness::TransportProbe do
       expect(deltas).to eq(
         "native_tcp" => {
           "small_unary" => { p50_ms_vs_baseline: -0.25, p95_ms_vs_baseline: -0.5, p99_ms_vs_baseline: -0.75 },
-          "stream_16kb" => { p50_ms_vs_baseline: -0.5, p95_ms_vs_baseline: -1.0, p99_ms_vs_baseline: -1.5 }
+          "stream_response" => { p50_ms_vs_baseline: -0.5, p95_ms_vs_baseline: -1.0, p99_ms_vs_baseline: -1.5 }
         }
       )
     end
