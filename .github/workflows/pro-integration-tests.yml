@@ -583,18 +583,20 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
+
       - name: Setup Ruby
         uses: ./.github/actions/setup-ruby
         with:
-          ruby-version: ${{ env.RUBY_VERSION }}
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
           bundler-version: 2.5.4
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          # Pin to 22.12.0 (Shakapacker 10.1 floor) to avoid V8 bug in 22.21.0
-          # https://github.com/nodejs/node/issues/56010
-          node-version: '22.12.0'
+          node-version-file: .tool-versions
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -625,7 +627,7 @@ jobs:
         uses: ./.github/actions/setup-bundle
         with:
           working-directory: react_on_rails_pro/spec/dummy
-          ruby-version: ${{ env.RUBY_VERSION }}
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
           install-libyaml: 'false'
 
       - name: Install Node modules with pnpm
