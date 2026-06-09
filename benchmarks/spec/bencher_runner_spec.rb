@@ -112,6 +112,36 @@ RSpec.describe BencherRunner do
         .to output(/::warning::Bencher report listed benchmarks but no perf-link context/).to_stdout
     end
 
+    it "preserves stale active alerts as filtered so retry handling can run first" do
+      status = instance_double(Process::Status, exitstatus: 1)
+      report_json = JSON.generate(
+        "results" => [[{
+          "benchmark" => { "name" => "/x" },
+          "measures" => [{
+            "measure" => { "slug" => "rps", "name" => "rps" },
+            "metric" => { "value" => 95.0 },
+            "boundary" => { "baseline" => 100.0, "lower_limit" => 90.0, "upper_limit" => nil }
+          }]
+        }]],
+        "alerts" => [{
+          "benchmark" => { "name" => "/x" },
+          "threshold" => { "measure" => { "slug" => "rps" } },
+          "metric" => { "value" => 1.0 },
+          "limit" => "lower",
+          "status" => "active"
+        }]
+      )
+
+      allow(Open3).to receive(:capture3).and_return([report_json, "", status])
+      allow(File).to receive(:write).with("report.json", report_json)
+
+      result = runner.run("branch", [])
+
+      expect(result.exit_code).to eq(1)
+      expect(result.report).not_to be_regression
+      expect(result.report.filtered_alert?).to be(true)
+    end
+
     it "raises a testable error when Bencher emits malformed JSON" do
       status = instance_double(Process::Status, exitstatus: 0)
 

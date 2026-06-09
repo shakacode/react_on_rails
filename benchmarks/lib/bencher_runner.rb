@@ -88,7 +88,7 @@ class BencherRunner
   end
 
   def parse_report(stdout)
-    BencherReport.parse(stdout)
+    BencherReport.parse(stdout, tracked_measures: THRESHOLDS.map(&:first))
   rescue BencherReport::FormatError => e
     raise ReportParseError,
           "Bencher JSON report has an unexpected shape — re-verify against " \

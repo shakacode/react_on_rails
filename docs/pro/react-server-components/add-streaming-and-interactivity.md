@@ -2,17 +2,11 @@
 
 Before reading this document, please read the [Create React Server Component without SSR](./create-without-ssr.md) document.
 
-## Make the React Server Component Page Progressively Load
+## Add a Posts Component
 
-React Server Components support progressive loading, which means they can be built as asynchronous functions that resolve and render after the initial HTML is sent to the client. This enables a better user experience by:
+Let's create a `Posts` React Server Component. It receives its `posts` from Rails as a prop and renders synchronously — the component doesn't fetch its own data (see the [React on Rails note](#where-the-data-comes-from) below).
 
-1. Showing initial content quickly while async data loads;
-2. Maintaining interactivity while loading;
-3. Streaming updates to the page as server components resolve.
-
-This progressive enhancement approach lets React Server Components render and stream their output to the client without blocking the initial page load.
-
-Let's create an `async` React Server Component that will be progressively loaded. It receives its `posts` from Rails as a prop — the component doesn't fetch its own data (see the [React on Rails note](#where-the-data-comes-from) below).
+For **progressive loading** — where slow data streams in while the rest of the page is already interactive — you need [async props](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently), which require SSR. That pattern is covered in [Server-Side Rendering](./server-side-rendering.md) and [Selective Hydration](./selective-hydration-in-streamed-components.md).
 
 ```js
 // app/javascript/components/Posts.jsx
@@ -20,10 +14,7 @@ import React from 'react';
 import _ from 'lodash';
 import moment from 'moment';
 
-const Posts = async ({ posts }) => {
-  // Artificial delay to simulate a slow render and demonstrate streaming
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-
+const Posts = ({ posts }) => {
   const postsByUser = _.groupBy(posts, 'user_id');
   const onePostPerUser = _.map(postsByUser, (group) => group[0]);
 
@@ -46,7 +37,7 @@ const Posts = async ({ posts }) => {
 export default Posts;
 ```
 
-The async `Posts` component displays a list of posts it receives as a prop, showing one post per user with title, body, timestamp and thumbnail image.
+The `Posts` component displays a list of posts it receives as a prop, showing one post per user with title, body, timestamp and thumbnail image.
 
 Let's add the Posts component to the React Server Component Page, forwarding the `posts` prop down to it.
 
@@ -86,7 +77,7 @@ Rails prepares the `posts` data and passes it into the page as a prop. Update th
                           .as_json(only: [:id, :title, :body, :user_id, :created_at]) }) %>
 ```
 
-> **React on Rails note:** In React on Rails, Rails is the backend. The component receives `posts` as a prop instead of calling `fetch('/api/posts')` itself — an in-component fetch bypasses Rails' authorization and caching, and the Node renderer has no `fetch` global by default. The artificial `setTimeout` above only simulates a slow render so you can watch streaming work. When the **data** itself is slow to load, stream each prop as it resolves with [async props](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently) (covered after you [add SSR](./server-side-rendering.md)). See [RSC Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md). In a larger app you'd typically prepare this query in the controller (`@posts = Post.order(created_at: :desc).limit(20)`) and pass `@posts`; it's inline here to keep the tutorial in one file.
+> **React on Rails note:** In React on Rails, Rails is the backend. The component receives `posts` as a prop instead of calling `fetch('/api/posts')` itself — an in-component fetch bypasses Rails' authorization and caching, and the Node renderer has no `fetch` global by default. When the **data** itself is slow to load, stream each prop as it resolves with [async props](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently) (covered after you [add SSR](./server-side-rendering.md)). See [RSC Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md). In a larger app you'd typically prepare this query in the controller (`@posts = Post.order(created_at: :desc).limit(20)`) and pass `@posts`; it's inline here to keep the tutorial in one file.
 
 ## Run the Development Server
 
@@ -102,23 +93,19 @@ Navigate to the React Server Component Page:
 http://localhost:3000/react_server_component_without_ssr
 ```
 
-When you open the page, you'll see the React Server Component render immediately, followed by the "Loading..." fallback state from the Suspense component. After a 1-second delay, the Posts component will render with the `posts` data passed from Rails. This artificial delay helps demonstrate how React Server Components handle asynchronous operations and streaming:
+When you open the page, you'll see both the React Server Component and the Posts component render with the data passed from Rails.
 
-1. The page loads instantly with the ReactServerComponent.
-2. The Suspense fallback shows "Loading..." where the Posts will appear.
-3. After the delay, the Posts component streams in and replaces "Loading...".
+## How the Page Loads
 
-## How The Streaming Works
+The page loads through the `rsc_payload/ReactServerComponentPage` fetch request that React on Rails Pro initiates. In this synchronous example, all data is available immediately so the entire page renders at once.
 
-The streaming happens through the `rsc_payload/ReactServerComponentPage` fetch request that React on Rails Pro initiates when loading the page. The server keeps this connection open and sends data in chunks:
+For **progressive data streaming** — where slow data sources resolve independently via `<Suspense>` boundaries — you need [async props](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently). With async props:
 
-1. The initial chunk contains the immediately available content (ReactServerComponent).
-2. When the Posts component's async operation completes, the server sends another chunk with its rendered content.
-3. The browser progressively receives and renders these chunks, updating the page seamlessly.
+1. Rails sends fast props immediately and streams each slow prop as it resolves
+2. The component awaits each prop via `getReactOnRailsAsyncProp()`
+3. React shows the `<Suspense>` fallback until the data arrives, then swaps in the real content
 
-This streaming approach means users see content as soon as it's ready, rather than waiting for everything to load before seeing anything. The `Suspense` boundary ensures a smooth transition between the loading state and the final content.
-
-You can observe this streaming behavior in your browser's network tab: the `rsc/ReactServerComponentPage` request will show multiple chunks arriving over time, each one adding more content to your page.
+Async props require SSR, which is covered in [Server-Side Rendering](./server-side-rendering.md). See [RSC Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md) for the full pattern.
 
 ## Add Interactivity
 
@@ -150,7 +137,7 @@ Now, let's use the `ToggleContainer` component to wrap the post image.
 // app/javascript/components/Posts.jsx
 import ToggleContainer from './ToggleContainer';
 
-const Posts = async ({ posts }) => {
+const Posts = ({ posts }) => {
   // existing code..
 
   return (

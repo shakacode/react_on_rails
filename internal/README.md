@@ -4,7 +4,7 @@ This directory holds internal-only documentation that should not be published on
 
 ## What lives here
 
-- `internal/contributor-info/`: contributor workflows, release process, CI optimization notes
+- `internal/contributor-info/`: contributor workflows, issue evaluation, release process, CI optimization notes
 - `internal/planning/`: planning notes, drafts, and historical analysis
 - `internal/react_on_rails_pro/contributors-info/`: Pro-internal contributor notes
 

@@ -13,7 +13,7 @@ command is designed to prevent.
 
 ## Instructions
 
-1. Read `AGENTS.md` first. It is the canonical source for required commands, formatting, boundaries, and ask-first areas.
+1. Read `AGENTS.md` first. It is the canonical source for required commands, formatting, boundaries, and repository safety rules.
 2. Inspect the current branch diff with `git status --short`, `git diff --name-only origin/main...HEAD`, and
    `git diff --stat origin/main...HEAD`.
 3. Decide the required verification set that covers the changed surface area using the **Scope Guide** below. Always
@@ -61,7 +61,6 @@ Use this order unless the changed files make a narrower or broader set clearly a
    - `bin/check-links` when Markdown URLs were added or edited; do not substitute an ad hoc link checker unless the
      branch changes `bin/check-links`, `.lychee.toml`, or the documented link-check workflow itself
 6. CI workflows and YAML:
-   - Confirm the workflow edit itself was approved because `AGENTS.md` marks changes to `.github/workflows/` as ask-first
    - `actionlint` when any `.github/workflows/` file changed
    - `yamllint .github/` when any `.github/workflows/` file changed
    - Do not run RuboCop on `.yml` files
@@ -80,7 +79,7 @@ Use this order unless the changed files make a narrower or broader set clearly a
 - Documentation-only changes: run `pnpm start format.listDifferent`, sidebar validation for `docs/oss/` or `docs/pro/`, and `bin/check-links` for new or changed URLs. If committing, still run `bundle exec rubocop`; see Instructions step 3 for why this applies even to docs-only commits. RuboCop does not validate Markdown.
 - `react_on_rails_pro/**/*.{js,ts,tsx,jsx,json,css,md}` changes: run `cd react_on_rails_pro && pnpm start format.listDifferent` (the Pro package's local Prettier check via its `nps` script) plus any focused tests for the changed surface.
 - `react_on_rails_pro/**/*.rb` changes: run `(cd react_on_rails_pro && bundle exec rubocop --ignore-parent-exclusion)` and any targeted RSpec.
-- GitHub Actions workflow changes: confirm the edit was approved per the `AGENTS.md` ask-first rule, then run `actionlint` and `yamllint .github/`. Do not run RuboCop on `.yml` files.
+- GitHub Actions workflow changes: run `actionlint` and `yamllint .github/`. Do not run RuboCop on `.yml` files.
 - Anything not listed above (for example, Rakefile edits, generator templates, RBS-only changes, or build scripts): apply the narrowest set of checks that covers the changed surface and explain the choice in the output.
 
 ## Output Format
