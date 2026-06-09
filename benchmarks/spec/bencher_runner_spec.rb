@@ -8,27 +8,25 @@ require_relative "../lib/bencher_runner"
 RSpec.describe BencherRunner do
   subject(:runner) { described_class.new(benchmark_json: "bench.json", report_json: "report.json") }
 
-  describe "#threshold_args" do
-    it "puts the boundary on the lower side for higher-is-better measures" do
-      expect(runner.send(:threshold_args, "rps", :lower, "0.9995")).to eq(
-        %w[--threshold-measure rps --threshold-test t_test
-           --threshold-max-sample-size 64
-           --threshold-lower-boundary 0.9995 --threshold-upper-boundary _]
-      )
-    end
+  def capture_run_command(branch: "my-branch", start_point_args: [])
+    status = instance_double(Process::Status, exitstatus: 0)
+    report_json = JSON.generate("results" => [], "alerts" => [])
+    captured_args = nil
 
-    it "puts the boundary on the upper side for lower-is-better measures" do
-      expect(runner.send(:threshold_args, "p50_latency", :upper, "0.9999")).to eq(
-        %w[--threshold-measure p50_latency --threshold-test t_test
-           --threshold-max-sample-size 64
-           --threshold-lower-boundary _ --threshold-upper-boundary 0.9999]
-      )
+    allow(Open3).to receive(:capture3) do |*args|
+      captured_args = args
+      [report_json, "", status]
     end
+    allow(File).to receive(:write).with("report.json.tmp", report_json)
+    allow(FileUtils).to receive(:mv).with("report.json.tmp", "report.json")
+
+    runner.run(branch, start_point_args)
+    captured_args
   end
 
-  describe "#args" do
+  describe "Bencher CLI arguments" do
     it "builds a JSON Bencher run command with the configured files and start point" do
-      args = runner.send(:args, "feature-branch", ["--start-point", "main"])
+      args = capture_run_command(branch: "feature-branch", start_point_args: ["--start-point", "main"])
 
       expect(args).to include("bencher", "run", "--branch", "feature-branch")
       expect(args.each_cons(2)).to include(["--file", "bench.json"])
@@ -52,7 +50,7 @@ RSpec.describe BencherRunner do
     end
 
     it "tracks exactly rps/p50_latency/failed_pct with their tuned boundaries and sides" do
-      expect(parse_thresholds(runner.send(:args, "my-branch", []))).to eq(
+      expect(parse_thresholds(capture_run_command)).to eq(
         [
           { measure: "rps", lower: "0.9995", upper: "_" },
           { measure: "p50_latency", lower: "_", upper: "0.9999" },
