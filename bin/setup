@@ -74,6 +74,7 @@ print_success() {
   echo -e "${GREEN}✓${NC} $1"
 }
 
+# Keep this helper in sync with bin/ci-local and bin/ci-rerun-failures.
 bundle_command() {
   local gemfile="$1"
   shift

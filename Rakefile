@@ -38,7 +38,7 @@ end
 def ensure_package_bundle
   bundle_ready = Dir.chdir(gem_root) do
     Bundler.with_unbundled_env do
-      system("bundle", "check")
+      system("bundle", "check", out: File::NULL, err: File::NULL)
     end
   end
 
@@ -61,7 +61,7 @@ def root_bundle_exec_in(directory, *command)
 end
 
 def root_rubocop_paths
-  %w[Gemfile Rakefile rakelib react_on_rails]
+  %w[Gemfile Rakefile rakelib]
 end
 
 def define_package_task(task_name, *arg_names)
@@ -72,12 +72,12 @@ def define_package_task(task_name, *arg_names)
 end
 
 namespace :lint do
-  desc "Run root-bundle RuboCop on root tooling and OSS package files"
+  desc "Run root-bundle RuboCop on root tooling files"
   task :rubocop do
     root_bundle_exec_in(__dir__, "rubocop", *root_rubocop_paths)
   end
 
-  desc "Auto-fix root-bundle RuboCop violations in root tooling and OSS package files"
+  desc "Auto-fix root-bundle RuboCop violations in root tooling files"
   task :rubocop_autofix do
     root_bundle_exec_in(__dir__, "rubocop", "-A", *root_rubocop_paths)
     puts "Completed root RuboCop auto-fix"

@@ -20,6 +20,7 @@ ROOT_GEMFILE="$ROOT_DIR/Gemfile"
 OSS_GEMFILE="$ROOT_DIR/react_on_rails/Gemfile"
 OSS_DEPS_READY=false
 
+# Keep this helper in sync with bin/ci-local and bin/setup.
 bundle_command() {
   local gemfile="$1"
   shift

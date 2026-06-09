@@ -42,6 +42,7 @@ ROOT_GEMFILE="$ROOT_DIR/Gemfile"
 OSS_GEMFILE="$ROOT_DIR/react_on_rails/Gemfile"
 PRO_GEMFILE="$ROOT_DIR/react_on_rails_pro/Gemfile"
 
+# Keep this helper in sync with bin/ci-rerun-failures and bin/setup.
 bundle_command() {
   local gemfile="$1"
   shift
