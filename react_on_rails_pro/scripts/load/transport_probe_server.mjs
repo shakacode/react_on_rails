@@ -53,15 +53,15 @@ const parseArgs = () => {
     }
   }
 
-  if (!options.socketPath) {
-    throw new Error('--socket-path is required');
-  }
   if (options.scenarios.length === 0) {
     throw new Error('--scenarios must not be empty');
   }
   const unknownScenarios = options.scenarios.filter((scenario) => !VALID_SCENARIOS.has(scenario));
   if (unknownScenarios.length > 0) {
     throw new Error(`Unknown scenario(s): ${unknownScenarios.join(', ')}`);
+  }
+  if (options.scenarios.includes('native_uds') && !options.socketPath) {
+    throw new Error('--socket-path is required when native_uds is in --scenarios');
   }
   if (!Number.isInteger(options.bodyBytes) || options.bodyBytes < 1) {
     throw new Error('--body-bytes must be a positive integer');
@@ -75,7 +75,6 @@ const parseArgs = () => {
 
 const readRequestBody = async (stream, maxBytes) => {
   let bytes = 0;
-  const chunks = [];
   // Keep the stream open when body-limit overflow throws so writeReadError can
   // still send the 413 JSON response and then close the stream intentionally.
   for await (const chunk of stream.iterator({ destroyOnReturn: false })) {
@@ -85,9 +84,8 @@ const readRequestBody = async (stream, maxBytes) => {
       error.statusCode = 413;
       throw error;
     }
-    chunks.push(chunk);
   }
-  return Buffer.concat(chunks, bytes);
+  return bytes;
 };
 
 const streamChunks = (bytesTotal) => {
@@ -156,7 +154,7 @@ const handleNativeStream = (stream, headers, { bodyBytes, streamBytes }) => {
 
   if (path === '/probe/unary') {
     readRequestBody(stream, bodyBytes)
-      .then((body) => writeJson(stream, 200, { ok: true, receivedBytes: body.length }))
+      .then((receivedBytes) => writeJson(stream, 200, { ok: true, receivedBytes }))
       .catch((error) => writeReadError(stream, error));
     return;
   }

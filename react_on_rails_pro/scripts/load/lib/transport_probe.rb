@@ -233,7 +233,6 @@ module RendererHarness
 
       def perform_request(client, path, body)
         response_body = nil
-        response_text = +""
         response = client.post(
           path,
           headers: Protocol::HTTP::Headers[[["content-type", "application/octet-stream"]]],
@@ -241,11 +240,13 @@ module RendererHarness
         )
         bytes = 0
         response_body = response.body
-        response_body&.each do |chunk|
-          bytes += chunk.bytesize
-          append_error_response(response_text, chunk) unless response.status == 200
+        if response.status == 200
+          response_body&.each { |chunk| bytes += chunk.bytesize }
+        else
+          response_text = +""
+          response_body&.each { |chunk| append_error_response(response_text, chunk) }
+          raise "HTTP #{response.status}: #{response_text}"
         end
-        raise "HTTP #{response.status}: #{response_text}" unless response.status == 200
 
         bytes
       ensure

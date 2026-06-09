@@ -379,8 +379,8 @@ RSpec.describe RendererHarness::TransportProbe do
           request.on("error", () => {});
           request.write(Buffer.alloc(5, "x"));
           request.close(http2.constants.NGHTTP2_CANCEL);
-          setTimeout(() => client.close(), 50);
-          setTimeout(() => process.exit(0), 100);
+          setTimeout(() => client.close(), 200);
+          setTimeout(() => process.exit(0), 400);
         JS
 
         _stdout, client_stderr, client_status = Open3.capture3(
