@@ -102,26 +102,62 @@ def render_header(style)
   end
 end
 
-# Leading lines that must stay first: shebang, then Ruby/YAML magic comments.
-def split_preamble(style, content)
-  return ["", content] unless %i[block hash].include?(style)
+# JS/TS pragmas that must stay in the FIRST comment block of a file: jest reads
+# @jest-environment from the first docblock, Flow reads @flow. A license block
+# placed above one of these silently breaks it (e.g. jest falls back to jsdom).
+JS_PRAGMA = /@(?:jest-environment(?:-options)?|flow|noflow)\b/
 
-  lines = content.lines
-  i = 0
-  i += 1 if lines[i]&.start_with?("#!")
-  if style == :hash
+# A single leading JS/TS block comment (`/* … */` or `/** … */`) plus any
+# surrounding whitespace and one trailing newline.
+LEADING_BLOCK_COMMENT = %r{\A(\s*)(/\*\*?.*?\*/)([ \t]*\r?\n?)}m
+
+# Leading content that must stay first: shebang, Ruby/YAML magic comments, and
+# JS/TS pragma docblocks (@jest-environment, @flow, …). The header is inserted
+# immediately after this preamble.
+def split_preamble(style, content)
+  case style
+  when :hash
+    lines = content.lines
+    i = 0
+    i += 1 if lines[i]&.start_with?("#!")
     i += 1 while lines[i]&.match?(/\A#.*\b(frozen_string_literal|coding|encoding|warn_indent)\b/)
+    [lines[0...i].join, lines[i..]&.join || ""]
+  when :block
+    rest = content.dup
+    preamble = +""
+    if (m = rest.match(/\A#![^\n]*\n/))
+      preamble << m[0]
+      rest = rest[m.end(0)..]
+    end
+    while (m = rest.match(LEADING_BLOCK_COMMENT)) && m[2].match?(JS_PRAGMA)
+      preamble << m[0]
+      rest = rest[m.end(0)..]
+    end
+    [preamble, rest]
+  else
+    ["", content]
   end
-  [lines[0...i].join, lines[i..].join || ""]
 end
 
-# Strip an existing Pro header block (only if it contains the sentinel) so --fix
-# upgrades legacy/variant headers instead of stacking a second one.
+# Remove an existing Pro header (identified by the sentinel) from the leading
+# comment region, wherever it sits — including after a pragma docblock — so
+# --fix upgrades/repositions instead of stacking a second header.
 def strip_legacy(style, content)
   case style
-  when :block, :html
-    open_re, close = style == :block ? [%r{/\*}, %r{\*/}] : [/<!--/, /-->/]
-    m = content.match(/\A(#![^\n]*\n)?\s*(#{open_re}.*?#{close})\n?/m)
+  when :block
+    rest = content.dup
+    out = +""
+    if (m = rest.match(/\A#![^\n]*\n/))
+      out << m[0]
+      rest = rest[m.end(0)..]
+    end
+    while (m = rest.match(LEADING_BLOCK_COMMENT))
+      rest = rest[m.end(0)..]
+      out << m[0] unless m[2].include?(SENTINEL) # keep non-license leading blocks
+    end
+    out + rest
+  when :html
+    m = content.match(/\A(#![^\n]*\n)?\s*(<!--.*?-->)\n?/m)
     return content unless m && m[2].include?(SENTINEL)
 
     (m[1] || "") + content[m.end(0)..]
@@ -137,36 +173,28 @@ def strip_legacy(style, content)
     j += 1 while lines[j] == "\n"
     k = j
     k += 1 while lines[k]&.start_with?("#")
-    block = lines[j...k].join
-    return content unless block.include?(SENTINEL)
+    return content unless lines[j...k].join.include?(SENTINEL)
 
     preamble + (lines[k..]&.join || "")
   end
 end
 
 # Pure transform: returns content with the canonical header applied, or the
-# input unchanged when the file is not in scope. Idempotent.
+# input unchanged when the file is not in scope. Idempotent by construction —
+# it always strips any existing header and re-emits it in canonical position.
 def apply_header(path, content)
   style = comment_style(path)
   return content if style.nil?
-
-  header = render_header(style)
-  return content if content.include?(header)
 
   content = strip_legacy(style, content)
   preamble, body = split_preamble(style, content)
   body = body.sub(/\A\n+/, "")
 
-  pieces = []
-  unless preamble.empty?
-    pieces << preamble
-    pieces << "\n"
-  end
-  pieces << header
-  pieces << "\n" unless body.empty?
-  pieces << body
-  result = pieces.join
-  result += "\n" unless result.end_with?("\n")
+  result = +""
+  result << "#{preamble.strip}\n\n" unless preamble.strip.empty?
+  result << render_header(style)
+  result << "\n#{body}" unless body.empty?
+  result << "\n" unless result.end_with?("\n")
   result
 end
 
@@ -254,6 +282,22 @@ def run_self_test
   assert upgraded.scan(/Copyright \(c\) 2025/).size == 1, "legacy header replaced, not stacked"
   assert upgraded.include?("AI AGENTS:"), "upgraded header has agent warning"
   assert upgraded.end_with?("const y = 2;\n"), "body preserved after upgrade"
+
+  # jest @jest-environment docblock must stay the first comment (jest reads it
+  # from the first docblock); the license header goes below it.
+  pragma = "/**\n * @jest-environment node\n */\n\nimport x from 'x';\n"
+  jp = apply_header("a.test.ts", pragma)
+  assert jp.start_with?("/**\n * @jest-environment node\n */\n\n/*\n"), "pragma docblock stays first"
+  assert jp.include?(SENTINEL), "pragma file gets header"
+  assert jp.end_with?("import x from 'x';\n"), "pragma file body preserved"
+  assert apply_header("a.test.ts", jp) == jp, "pragma file idempotent"
+
+  # A header mistakenly placed ABOVE the pragma is repositioned below it.
+  broken = "/*\n * x #{SENTINEL} x\n */\n\n/**\n * @jest-environment node\n */\n\nimport x;\n"
+  fixed = apply_header("b.test.ts", broken)
+  assert fixed.start_with?("/**\n * @jest-environment node\n */\n"), "misplaced header moved below pragma"
+  assert fixed.scan(/@jest-environment/).size == 1, "pragma not duplicated"
+  assert fixed.scan(SENTINEL).size == 1, "header not duplicated when repositioning"
 
   # Out-of-scope inputs untouched.
   assert apply_header("data.json", "{}\n") == "{}\n", "json untouched"

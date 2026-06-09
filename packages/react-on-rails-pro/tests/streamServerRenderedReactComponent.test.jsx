@@ -1,3 +1,7 @@
+/**
+ * @jest-environment node
+ */
+
 /*
  * Copyright (c) 2025 ShakaCode LLC - React on Rails Pro (commercial license)
  *
@@ -11,10 +15,6 @@
  *
  * For licensing terms:
  * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
- */
-
-/**
- * @jest-environment node
  */
 
 import * as React from 'react';

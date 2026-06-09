@@ -1,3 +1,7 @@
+/**
+ * @jest-environment node
+ */
+
 /*
  * Copyright (c) 2025 ShakaCode LLC - React on Rails Pro (commercial license)
  *
@@ -13,9 +17,6 @@
  * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-/**
- * @jest-environment node
- */
 import { PassThrough, Transform } from 'stream';
 import { RailsContextWithServerComponentMetadata } from 'react-on-rails/types';
 import RSCRequestTracker from '../src/RSCRequestTracker.ts';
