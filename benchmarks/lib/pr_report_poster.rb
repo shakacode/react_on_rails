@@ -13,7 +13,7 @@ class PrReportPoster
 
   def initialize(repository:, pr_number:, suite_name:, marker:)
     normalized_repository = repository.to_s
-    # The regex rejects leading ".." segments, but embedded ".." still needs this guard.
+    # The regex allows ".." within component names, so reject any embedded path traversal.
     unless normalized_repository.match?(REPOSITORY_SLUG_PATTERN) && !normalized_repository.include?("..")
       raise ArgumentError, "repository must be in owner/repo format, got: #{normalized_repository.inspect}"
     end

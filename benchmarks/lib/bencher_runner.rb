@@ -121,8 +121,8 @@ class BencherRunner
     rescue SystemCallError, IOError => e
       raise PersistenceError, e.message
     ensure
-      # Always runs. After a successful mv the tmp file is already renamed, so
-      # rm_f is a no-op; if write or mv raised it performs the cleanup.
+      # Always runs, including for exceptions that bypass the rescue block. After a successful mv the tmp
+      # file no longer exists, so rm_f is a no-op; if write or mv raised it performs the cleanup.
       safe_remove_tmp(tmp_report_json)
     end
 
