@@ -71,14 +71,11 @@ RSpec.describe "Ruby version support" do
     latest_versions = tool_versions(".tool-versions")
     minimum_versions = tool_versions(".minimum.tool-versions")
 
-    expect(latest_versions).to include(
-      "ruby" => "4.0.5",
-      "nodejs" => "22.12.0"
-    )
-    expect(minimum_versions).to include(
-      "ruby" => "3.3.7",
-      "nodejs" => "20.19.0"
-    )
+    # Verify major/minor contracts; exact patch versions live in the source files above.
+    expect(minor_version(latest_versions.fetch("ruby"))).to eq("4.0")
+    expect(major_version(latest_versions.fetch("nodejs"))).to eq("22")
+    expect(minor_version(minimum_versions.fetch("ruby"))).to eq("3.3")
+    expect(major_version(minimum_versions.fetch("nodejs"))).to eq("20")
     expect(Gem::Version.new(latest_versions.fetch("ruby")))
       .to be > Gem::Version.new(minimum_versions.fetch("ruby"))
     expect(Gem::Version.new(latest_versions.fetch("nodejs")))

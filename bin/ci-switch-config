@@ -297,7 +297,10 @@ restore_tool_versions_to_latest() {
   if saved_tool_versions_match_current_head; then
     cp "$MAXIMUM_TOOL_VERSIONS_FILE" "$PROJECT_ROOT/.tool-versions"
   else
-    git -C "$PROJECT_ROOT" restore -- .tool-versions
+    git -C "$PROJECT_ROOT" restore -- .tool-versions 2>/dev/null || {
+      echo "Error: could not restore .tool-versions from git. Restore it manually to the latest profile." >&2
+      exit 1
+    }
   fi
   rm -f "$MAXIMUM_TOOL_VERSIONS_FILE" "$MAXIMUM_TOOL_VERSIONS_HEAD_FILE"
 
