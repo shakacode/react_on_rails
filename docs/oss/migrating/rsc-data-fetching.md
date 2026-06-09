@@ -233,6 +233,8 @@ With async props, `stream_react_component_with_async_props` starts rendering wit
 
 The synchronous example above loads every prop in the controller before React starts rendering. When one data source is slow (a recommendations service, an expensive aggregate), it holds up the whole render. **Async props** let Rails send the fast props immediately and stream each slow prop to the browser as it resolves, so React shows the shell and fills in each `<Suspense>` boundary independently.
 
+![How async props work in React on Rails](../../pro/react-server-components/async-props-execution.svg)
+
 Use `stream_react_component_with_async_props` and emit each slow prop from the block. The fast props go in `props:`; each `emit.call(name, value)` streams one more prop as soon as Rails has it:
 
 > [!NOTE]

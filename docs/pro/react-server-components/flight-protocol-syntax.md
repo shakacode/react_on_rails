@@ -189,40 +189,57 @@ React.createElement(Counter);
 
 ## Promises and Streaming
 
-When a server component is async (for example it await a fetch call), flight handle it with promise references using `$@` prefix. This is what enable streaming at React Server Components.
+When a server component is async, Flight handles it with promise references using the `$@` prefix. This is what enables streaming in React Server Components.
 
-For example imagine a page with fast and slow parts:
+In React on Rails, slow data is streamed using [async props](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently) — Rails emits each prop as it resolves, and the component awaits the promise via `getReactOnRailsAsyncProp`. React on Rails injects `getReactOnRailsAsyncProp` into the component props when you use `stream_react_component_with_async_props`. Here's an example:
+
+> [!WARNING]
+> `sleep` blocks a Puma thread and is for demo purposes only. Replace it with your actual slow query; do not use `sleep` in a real application.
+
+```erb
+<%# Rails view: stream slow data as an async prop %>
+<%= stream_react_component_with_async_props("Page",
+      props: { title: "Fast Header" }) do |emit|
+  sleep 2  # Demo only: blocks the Puma thread; replace with your actual slow query
+  emit.call("slowData", { message: "Loaded after 2 seconds" })
+end %>
+```
 
 ```jsx
-async function SlowData() {
-  const data = await fetch('/api/slow');
-  return <p>{data}</p>;
-}
+// React component: await the async prop
+import { Suspense } from 'react';
 
-function Page() {
+function Page({ title, getReactOnRailsAsyncProp }) {
+  const slowDataPromise = getReactOnRailsAsyncProp('slowData');
+
   return (
     <div>
-      <h1>Fast Header</h1>
+      <h1>{title}</h1>
       <Suspense fallback={<p>Loading...</p>}>
-        <SlowData />
+        <SlowData dataPromise={slowDataPromise} />
       </Suspense>
     </div>
   );
 }
+
+async function SlowData({ dataPromise }) {
+  const data = await dataPromise; // Resolves when Rails emits it
+  return <p>{data.message}</p>;
+}
 ```
 
-> **React on Rails note:** The `await fetch('/api/slow')` above is shown only to illustrate how an async component serializes to the Flight wire format below. In a real React on Rails app, don't fetch inside the component — Rails prepares the data and passes it as a prop. For a slow source like this, stream it with [async props](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently), which produce the same `$@` / `$L` references you see here. See [RSC Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md).
+> **React on Rails note:** `getReactOnRailsAsyncProp('slowData')` returns a Promise that resolves when Rails calls `emit.call("slowData", ...)`. The component awaits this promise inside a `<Suspense>` boundary, so React streams the fallback immediately and swaps in the real content when the data arrives. See [RSC Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md) for the full pattern.
 
-The server starts streaming immediately, it doesn't wait for SlowData to finish:
+When Rails calls `emit.call("slowData", ...)`, the server sends a second Flight chunk. Until then the client already received and rendered the first chunk (the `div`, `h1`, and the Suspense fallback):
 
 ```rsc
 0:["$","div",null,{"children":[["$","h1",null,{"children":"Fast Header"}],["$","$Sreact.suspense",null,{"fallback":["$","p",null,{"children":"Loading..."}],"children":"$L1"}]]}]
 ```
 
-At this point chunk 1 is not resolved yet. The client render the div and h1 immediately and show the Suspense fallback. When the fetch finish, the server send:
+At this point chunk 1 is not resolved yet. The client renders the div and h1 immediately and shows the Suspense fallback. When Rails emits the async prop, the server sends:
 
 ```rsc
-1:["$","p",null,{"children":"fetched data here"}]
+1:["$","p",null,{"children":"Loaded after 2 seconds"}]
 ```
 
 Now chunk 1 is resolved and the `$L1` lazy reference is complete. React replace the fallback with the actual content. This is how streaming works, you don't need the whole tree to be ready before sending the first byte to the client.

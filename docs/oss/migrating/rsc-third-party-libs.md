@@ -332,6 +332,8 @@ export async function getUser(id) {
 }
 ```
 
+> **React on Rails note:** The example above illustrates `server-only` in a generic RSC context. In React on Rails, the Node renderer has no database connection — database access stays in Rails controllers, which pass the results to components as props or [async props](rsc-data-fetching.md#async-props-stream-each-slow-prop-independently). See [RSC Data Fetching Patterns](rsc-data-fetching.md).
+
 ```jsx
 // lib/analytics.js
 import 'client-only'; // Build error if imported in a Server Component
@@ -343,9 +345,9 @@ export function trackEvent(event) {
 
 Use `server-only` for:
 
-- Database access modules
 - Modules that use API keys or secrets
 - Server-side utility functions
+- Database access modules (in frameworks where the server runtime has DB access — **not** React on Rails, where Rails controllers handle data access)
 
 Use `client-only` for:
 

@@ -17,30 +17,48 @@ This approach significantly improves both perceived and actual performance by ma
 
 Let's try selective hydration with the React Server Component Page we created in the [SSR React Server Components](./server-side-rendering.md).
 
-Let's add a component that is very slow to load into the page.
+Let's add a component that loads slow data using [async props](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently). First, update the Rails view to use `stream_react_component_with_async_props`, replacing the `stream_react_component` call from the SSR tutorial, and add a `do |emit|` block to stream the slow prop:
 
-```jsx
-const LongWaitingComponent = async () => {
-  await new Promise((resolve) => setTimeout(resolve, 5000));
-  return <div>Long waiting component</div>;
-};
+> [!WARNING]
+> `sleep` blocks a Puma thread and is for demo purposes only. Replace it with your actual slow query; do not use `sleep` in a real application.
+
+```erb
+<%# app/views/pages/react_server_component_ssr.html.erb %>
+<%= stream_react_component_with_async_props("ReactServerComponentPage",
+      props: { posts: @posts }) do |emit|
+  # Simulate a slow query — the page streams immediately while this resolves
+  sleep 5  # Demo only: blocks the Puma thread; replace with your actual slow query
+  emit.call("slowData", { message: "Loaded after 5 seconds" })
+end %>
 ```
 
-> **React on Rails note:** The `setTimeout` here just simulates a slow component so you can see selective hydration in action. In a real app, slow data comes from Rails — load it in your controller and stream it in as an [async prop](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently) so the rest of the page stays interactive while it resolves. See [RSC Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md).
-
-Add the component to the page.
+Then create a component that awaits the async prop:
 
 ```jsx
 // app/javascript/packs/components/ReactServerComponentPage.jsx
-const ReactServerComponentPage = () => {
+// The async component awaits the slow data promise
+async function LongWaitingComponent({ dataPromise }) {
+  const data = await dataPromise; // Resolves when Rails emits it
+  return <div>Loaded: {data.message}</div>;
+}
+```
+
+Add the component to the page, passing the async prop promise.
+
+```jsx
+// app/javascript/packs/components/ReactServerComponentPage.jsx
+const ReactServerComponentPage = ({ posts, getReactOnRailsAsyncProp }) => {
+  // Get the promise for the slow data — it resolves when Rails emits it
+  const slowDataPromise = getReactOnRailsAsyncProp('slowData');
+
   return (
     <div>
       <ReactServerComponent />
       <Suspense fallback={<div>Loading The Long Waiting Component...</div>}>
-        <LongWaitingComponent />
+        <LongWaitingComponent dataPromise={slowDataPromise} />
       </Suspense>
       <Suspense fallback={<div>Loading...</div>}>
-        <Posts />
+        <Posts posts={posts} />
       </Suspense>
     </div>
   );
@@ -49,7 +67,7 @@ const ReactServerComponentPage = () => {
 
 ## Fixing Compatibility Issue that Blocks Hydration
 
-When you run the page, you should see "Loading The Long Waiting Component..." in the browser for 5 seconds. Then, the component is rendered and the page becomes interactive.
+When you run the page, you should see "Loading The Long Waiting Component..." in the browser while the slow data loads. Then, the component is rendered and the page becomes interactive.
 
 You can notice that the page doesn't become interactive until the Long Waiting Component is rendered, which contradicts what we discussed about selective hydration.
 
