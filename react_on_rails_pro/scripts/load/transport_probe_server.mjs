@@ -79,6 +79,8 @@ const readRequestBody = async (stream, maxBytes) => {
   // still send the 413 JSON response and then close the stream intentionally.
   for await (const chunk of stream.iterator({ destroyOnReturn: false })) {
     bytes += chunk.length;
+    // The configured limit is inclusive: exactly maxBytes is accepted, and the
+    // first byte beyond maxBytes returns 413.
     if (bytes > maxBytes) {
       const error = new Error(`request body exceeded --body-bytes limit (${maxBytes})`);
       error.statusCode = 413;
@@ -229,6 +231,14 @@ const listenFastify = async ({ bodyBytes, host, port, streamBytes }) => {
   return app;
 };
 
+const listeningPort = (address, serverName) => {
+  if (!address || typeof address === 'string' || typeof address.port !== 'number') {
+    throw new Error(`${serverName} did not report a numeric listening port`);
+  }
+
+  return address.port;
+};
+
 const closeServer = async ({ server, type }) => {
   if (typeof server?.close !== 'function') {
     return;
@@ -277,10 +287,11 @@ const main = async () => {
     if (scenarios.includes('fastify_tcp')) {
       const fastifyServer = await listenFastify({ bodyBytes, host, port: 0, streamBytes });
       servers.push({ server: fastifyServer, type: 'fastify' });
+      const port = listeningPort(fastifyServer.server.address(), 'fastify_tcp');
       endpoints.push({
         name: 'fastify_tcp',
         kind: 'tcp',
-        origin: `http://${host}:${fastifyServer.server.address().port}`,
+        origin: `http://${host}:${port}`,
       });
     }
 

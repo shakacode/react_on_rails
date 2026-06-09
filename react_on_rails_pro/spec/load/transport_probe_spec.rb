@@ -223,6 +223,57 @@ RSpec.describe RendererHarness::TransportProbe do
       )
     end
 
+    it "rejects readiness endpoints without string names" do
+      server = described_class.new(config)
+      ready = {
+        endpoints: [
+          { kind: "tcp", origin: "http://127.0.0.1:3000" }
+        ]
+      }
+      server.instance_variable_set(:@stdout, StringIO.new("#{JSON.generate(ready)}\n"))
+
+      expect do
+        server.send(:read_ready)
+      end.to raise_error(
+        RendererHarness::TransportProbe::UserError,
+        /endpoints\[0\]\.name must be a non-empty string/
+      )
+    end
+
+    it "rejects tcp readiness endpoints without origins" do
+      server = described_class.new(config)
+      ready = {
+        endpoints: [
+          { name: "native_tcp", kind: "tcp" }
+        ]
+      }
+      server.instance_variable_set(:@stdout, StringIO.new("#{JSON.generate(ready)}\n"))
+
+      expect do
+        server.send(:read_ready)
+      end.to raise_error(
+        RendererHarness::TransportProbe::UserError,
+        /endpoints\[0\]\.origin must be a non-empty string/
+      )
+    end
+
+    it "rejects uds readiness endpoints without socket fields" do
+      server = described_class.new(config)
+      ready = {
+        endpoints: [
+          { name: "native_uds", kind: "uds", socketPath: "/tmp/probe.sock", scheme: "http" }
+        ]
+      }
+      server.instance_variable_set(:@stdout, StringIO.new("#{JSON.generate(ready)}\n"))
+
+      expect do
+        server.send(:read_ready)
+      end.to raise_error(
+        RendererHarness::TransportProbe::UserError,
+        /endpoints\[0\]\.authority must be a non-empty string/
+      )
+    end
+
     it "ignores already-closed stdin errors while stopping" do
       server = described_class.new(config)
       stdin = instance_double(IO)

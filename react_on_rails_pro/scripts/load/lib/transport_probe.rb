@@ -335,7 +335,11 @@ module RendererHarness
       end
 
       def output_dir
-        @output_dir ||= @config.output_dir || File.join(
+        @output_dir ||= build_output_dir
+      end
+
+      def build_output_dir
+        @config.output_dir || File.join(
           Dir.pwd,
           "tmp",
           "load-tests",
@@ -462,9 +466,40 @@ module RendererHarness
       end
 
       def validate_ready_payload(payload)
-        return payload if payload.is_a?(Hash) && payload["endpoints"].is_a?(Array)
+        unless payload.is_a?(Hash) && payload["endpoints"].is_a?(Array)
+          raise UserError, "transport probe server readiness JSON must be an object with an endpoints array"
+        end
 
-        raise UserError, "transport probe server readiness JSON must be an object with an endpoints array"
+        payload["endpoints"].each_with_index do |endpoint, index|
+          validate_ready_endpoint!(endpoint, index)
+        end
+
+        payload
+      end
+
+      def validate_ready_endpoint!(endpoint, index)
+        path = "endpoints[#{index}]"
+        raise UserError, "transport probe server readiness JSON #{path} must be an object" unless endpoint.is_a?(Hash)
+
+        validate_ready_endpoint_string!(endpoint, path, "name")
+
+        case endpoint["kind"]
+        when "tcp"
+          validate_ready_endpoint_string!(endpoint, path, "origin")
+        when "uds"
+          %w[socketPath scheme authority].each do |field|
+            validate_ready_endpoint_string!(endpoint, path, field)
+          end
+        else
+          raise UserError, "transport probe server readiness JSON #{path}.kind must be \"tcp\" or \"uds\""
+        end
+      end
+
+      def validate_ready_endpoint_string!(endpoint, path, field)
+        value = endpoint[field]
+        return if value.is_a?(String) && !value.empty?
+
+        raise UserError, "transport probe server readiness JSON #{path}.#{field} must be a non-empty string"
       end
 
       def read_stderr
