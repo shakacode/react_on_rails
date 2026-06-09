@@ -154,6 +154,19 @@ RSpec.describe "track_benchmarks" do
       )
     end
 
+    it "formats Bencher report parse failures as GitHub Actions errors" do
+      runner = instance_double(BencherRunner)
+      allow(self).to receive(:bencher_runner).and_return(runner)
+      allow(runner).to receive(:run).and_raise(BencherRunner::ReportParseError, "unexpected shape")
+
+      expect do
+        run_bencher!("branch", [])
+      end.to(
+        output(/::error::unexpected shape/).to_stderr
+          .and(raise_error(SystemExit) { |e| expect(e.status).to eq(1) })
+      )
+    end
+
     it "does not relabel unexpected runtime failures as report persistence errors" do
       runner = instance_double(BencherRunner)
       allow(self).to receive(:bencher_runner).and_return(runner)

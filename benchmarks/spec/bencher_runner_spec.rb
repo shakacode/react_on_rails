@@ -168,7 +168,7 @@ RSpec.describe BencherRunner do
       expect do
         expect { runner.run(branch: "branch", start_point_args: []) }
           .to raise_error(BencherRunner::ReportParseError, /Bencher JSON report has an unexpected shape/)
-      end.to output(/::debug::Malformed Bencher output/).to_stderr
+      end.to output(/::debug::Malformed Bencher output/).to_stdout
       expect(FileUtils).to have_received(:rm_f).with("report.json")
     end
 
@@ -182,11 +182,11 @@ RSpec.describe BencherRunner do
       allow(FileUtils).to receive(:rm_f).with("report.json").and_raise(Errno::EACCES, "report.json")
 
       expect do
-        expect do
-          expect { runner.run(branch: "branch", start_point_args: []) }
-            .to raise_error(BencherRunner::ReportParseError, /Bencher JSON report has an unexpected shape/)
-        end.to output(/::debug::Malformed Bencher output/).to_stderr
-      end.to output(/::warning::Could not remove malformed Bencher report report.json/).to_stdout
+        expect { runner.run(branch: "branch", start_point_args: []) }
+          .to raise_error(BencherRunner::ReportParseError, /Bencher JSON report has an unexpected shape/)
+      end.to(
+        output(/::debug::Malformed Bencher output.*::warning::Could not remove malformed Bencher report/m).to_stdout
+      )
     end
 
     it "raises a testable error when Bencher emits non-JSON stdout" do
@@ -200,7 +200,7 @@ RSpec.describe BencherRunner do
       expect do
         expect { runner.run(branch: "branch", start_point_args: []) }
           .to raise_error(BencherRunner::ReportParseError, /Bencher JSON report has an unexpected shape/)
-      end.to output(/::debug::Malformed Bencher output/).to_stderr
+      end.to output(/::debug::Malformed Bencher output/).to_stdout
       expect(FileUtils).to have_received(:rm_f).with("report.json")
     end
 
