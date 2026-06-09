@@ -459,7 +459,7 @@ switch_to_minimum() {
     fi
   fi
 
-  # Set Ruby and Node versions
+  # Always write .tool-versions: CI reads it directly regardless of version manager.
   set_tool_versions_to_minimum
 
   case "$VERSION_MANAGER" in

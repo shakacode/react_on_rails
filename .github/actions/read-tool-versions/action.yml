@@ -14,9 +14,6 @@ outputs:
   node-version:
     description: Latest Node patch version from .tool-versions.
     value: ${{ steps.versions.outputs.node-version }}
-  node-minor-version:
-    description: Latest Node minor version from .tool-versions.
-    value: ${{ steps.versions.outputs.node-minor-version }}
   node-major-version:
     description: Latest Node major version from .tool-versions.
     value: ${{ steps.versions.outputs.node-major-version }}
@@ -29,9 +26,6 @@ outputs:
   minimum-node-version:
     description: Minimum Node patch version from .minimum.tool-versions.
     value: ${{ steps.versions.outputs.minimum-node-version }}
-  minimum-node-minor-version:
-    description: Minimum Node minor version from .minimum.tool-versions.
-    value: ${{ steps.versions.outputs.minimum-node-minor-version }}
   minimum-node-major-version:
     description: Minimum Node major version from .minimum.tool-versions.
     value: ${{ steps.versions.outputs.minimum-node-major-version }}
@@ -82,11 +76,9 @@ runs:
           echo "ruby-version=$latest_ruby_version"
           echo "ruby-minor-version=${latest_ruby_version%.*}"
           echo "node-version=$latest_node_version"
-          echo "node-minor-version=${latest_node_version%.*}"
           echo "node-major-version=${latest_node_version%%.*}"
           echo "minimum-ruby-version=$minimum_ruby_version"
           echo "minimum-ruby-minor-version=${minimum_ruby_version%.*}"
           echo "minimum-node-version=$minimum_node_version"
-          echo "minimum-node-minor-version=${minimum_node_version%.*}"
           echo "minimum-node-major-version=${minimum_node_version%%.*}"
         } >> "$GITHUB_OUTPUT"

@@ -65,7 +65,8 @@ jobs:
       - name: Save size-limit config
         run: cp .size-limit.json /tmp/size-limit-config.json
 
-      # 2. Get base branch sizes
+      # 2. Get base branch sizes. Checkout overwrites .tool-versions, so keep
+      #    node setup above this point.
       - name: Checkout base branch
         uses: actions/checkout@v4
         with:
