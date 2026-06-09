@@ -72,15 +72,13 @@ RSpec.describe "bin/ci-switch-config" do
     expect(stdout).to include("latest Ruby/Node may be under-reported")
   end
 
-  it "restores the latest tool-version profile saved from the current git head" do
+  it "restores the committed latest tool-version profile saved from the current git head" do
     with_ci_switch_tool_versions_repo do |tmpdir, harness_path|
-      local_versions = "ruby 4.1.0\nnodejs 23.0.0\n"
-
-      File.write(File.join(tmpdir, ".tool-versions"), local_versions)
+      committed_versions = File.read(File.join(tmpdir, ".tool-versions"))
 
       run_ci_switch_tool_versions(harness_path, "minimum-tool-versions", chdir: tmpdir)
 
-      expect(File.read(File.join(tmpdir, ".maximum.tool-versions"))).to eq(local_versions)
+      expect(File.read(File.join(tmpdir, ".maximum.tool-versions"))).to eq(committed_versions)
       expect(File.read(File.join(tmpdir, ".maximum.tool-versions.head")).strip).to eq(git_head(tmpdir))
       expect(File.read(File.join(tmpdir, ".tool-versions"))).to eq(
         File.read(File.join(tmpdir, ".minimum.tool-versions"))
@@ -88,7 +86,7 @@ RSpec.describe "bin/ci-switch-config" do
 
       run_ci_switch_tool_versions(harness_path, "latest-tool-versions", chdir: tmpdir)
 
-      expect(File.read(File.join(tmpdir, ".tool-versions"))).to eq(local_versions)
+      expect(File.read(File.join(tmpdir, ".tool-versions"))).to eq(committed_versions)
       expect(File).not_to exist(File.join(tmpdir, ".maximum.tool-versions"))
       expect(File).not_to exist(File.join(tmpdir, ".maximum.tool-versions.head"))
     end
@@ -149,6 +147,26 @@ RSpec.describe "bin/ci-switch-config" do
       File.write(File.join(tmpdir, ".tool-versions"), File.read(File.join(tmpdir, ".minimum.tool-versions")))
       File.write(File.join(tmpdir, ".maximum.tool-versions"), committed_versions)
       File.write(File.join(tmpdir, ".maximum.tool-versions.head"), "stale-head\n")
+
+      _stdout, stderr, status = Open3.capture3(harness_path, "backup-matches-current-head", chdir: tmpdir)
+
+      expect(status).not_to be_success, stderr
+
+      run_ci_switch_tool_versions(harness_path, "latest-tool-versions", chdir: tmpdir)
+
+      expect(File.read(File.join(tmpdir, ".tool-versions"))).to eq(committed_versions)
+      expect(File).not_to exist(File.join(tmpdir, ".maximum.tool-versions"))
+      expect(File).not_to exist(File.join(tmpdir, ".maximum.tool-versions.head"))
+    end
+  end
+
+  it "does not accept same-head backups when contents differ from the committed current git head" do
+    with_ci_switch_tool_versions_repo do |tmpdir, harness_path|
+      committed_versions = File.read(File.join(tmpdir, ".tool-versions"))
+
+      File.write(File.join(tmpdir, ".tool-versions"), File.read(File.join(tmpdir, ".minimum.tool-versions")))
+      File.write(File.join(tmpdir, ".maximum.tool-versions"), "ruby 4.0.4\nnodejs 22.11.0\n")
+      File.write(File.join(tmpdir, ".maximum.tool-versions.head"), "#{git_head(tmpdir)}\n")
 
       _stdout, stderr, status = Open3.capture3(harness_path, "backup-matches-current-head", chdir: tmpdir)
 

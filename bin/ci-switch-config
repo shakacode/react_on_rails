@@ -57,7 +57,8 @@ saved_tool_versions_match_current_head() {
     current_head="$(current_git_head)"
     saved_head="$(cat "$MAXIMUM_TOOL_VERSIONS_HEAD_FILE")"
     if [ -n "$saved_head" ] && [ "$saved_head" = "$current_head" ]; then
-      return 0
+      saved_tool_versions_match_committed_profile
+      return
     fi
     # A stale sidecar is intentionally authoritative: do not fall through to
     # legacy content comparison when a backup advertises a different HEAD.
@@ -67,6 +68,10 @@ saved_tool_versions_match_current_head() {
   # Legacy fallback for backups created before the HEAD sidecar existed. With no
   # sidecar, content identity is the only safe proxy for "captured at this head".
   # Accept the backup only when it already matches the committed latest profile.
+  saved_tool_versions_match_committed_profile
+}
+
+saved_tool_versions_match_committed_profile() {
   local committed_tool_versions
 
   committed_tool_versions="$(git -C "$PROJECT_ROOT" show HEAD:.tool-versions 2>/dev/null || true)"
