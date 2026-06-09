@@ -53,6 +53,8 @@ saved_tool_versions_match_current_head() {
     fi
   fi
 
+  # Legacy fallback: no matching HEAD sidecar means this may be an older backup.
+  # Accept it only when its content still matches the committed .tool-versions.
   git -C "$PROJECT_ROOT" show HEAD:.tool-versions 2>/dev/null | cmp -s "$MAXIMUM_TOOL_VERSIONS_FILE" -
 }
 
@@ -67,6 +69,8 @@ read_committed_tool_version() {
     return
   fi
 
+  # Fallback for non-git contexts. If the checkout is currently in minimum mode
+  # and no valid backup exists, this reports the local minimum version as latest.
   read_tool_version "$PROJECT_ROOT/.tool-versions" "$tool"
 }
 
@@ -260,14 +264,18 @@ set_tool_versions_to_minimum() {
 
   if [ -f "$PROJECT_ROOT/.tool-versions" ] &&
     ! cmp -s "$PROJECT_ROOT/.tool-versions" "$PROJECT_ROOT/.minimum.tool-versions"; then
-    local current_head
-
-    cp "$PROJECT_ROOT/.tool-versions" "$MAXIMUM_TOOL_VERSIONS_FILE"
-    current_head="$(current_git_head)"
-    if [ -n "$current_head" ]; then
-      echo "$current_head" > "$MAXIMUM_TOOL_VERSIONS_HEAD_FILE"
+    if saved_tool_versions_match_current_head; then
+      print_success "Preserved existing latest runtime-version backup"
     else
-      rm -f "$MAXIMUM_TOOL_VERSIONS_HEAD_FILE"
+      local current_head
+
+      cp "$PROJECT_ROOT/.tool-versions" "$MAXIMUM_TOOL_VERSIONS_FILE"
+      current_head="$(current_git_head)"
+      if [ -n "$current_head" ]; then
+        echo "$current_head" > "$MAXIMUM_TOOL_VERSIONS_HEAD_FILE"
+      else
+        rm -f "$MAXIMUM_TOOL_VERSIONS_HEAD_FILE"
+      fi
     fi
   fi
 
@@ -660,6 +668,7 @@ restore_to_latest() {
 }
 
 # Main script
+# Keep this marker stable: ci_switch_config_spec.rb splits the function library here.
 case "${1:-}" in
   minimum)
     switch_to_minimum

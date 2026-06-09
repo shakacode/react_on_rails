@@ -277,6 +277,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
+          # Node tracks latest; Ruby stays on minimum to keep benchmark infrastructure stable.
           node-version-file: .tool-versions
 
       - name: Print system information

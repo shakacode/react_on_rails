@@ -83,6 +83,24 @@ RSpec.describe "bin/ci-switch-config" do
     end
   end
 
+  it "preserves an existing latest profile when minimum mode is rerun after local edits" do
+    with_ci_switch_tool_versions_repo do |tmpdir, harness_path|
+      latest_versions = File.read(File.join(tmpdir, ".tool-versions"))
+      local_minimum_edit = "ruby 3.3.8\nnodejs 20.0.0\n"
+
+      run_ci_switch_tool_versions(harness_path, "minimum-tool-versions", chdir: tmpdir)
+      File.write(File.join(tmpdir, ".tool-versions"), local_minimum_edit)
+
+      run_ci_switch_tool_versions(harness_path, "minimum-tool-versions", chdir: tmpdir)
+
+      expect(File.read(File.join(tmpdir, ".maximum.tool-versions"))).to eq(latest_versions)
+      expect(File.read(File.join(tmpdir, ".maximum.tool-versions.head")).strip).to eq(git_head(tmpdir))
+      expect(File.read(File.join(tmpdir, ".tool-versions"))).to eq(
+        File.read(File.join(tmpdir, ".minimum.tool-versions"))
+      )
+    end
+  end
+
   it "ignores a stale saved latest tool-version profile from another git head" do
     with_ci_switch_tool_versions_repo do |tmpdir, harness_path|
       committed_versions = File.read(File.join(tmpdir, ".tool-versions"))
@@ -138,7 +156,9 @@ RSpec.describe "bin/ci-switch-config" do
   end
 
   def ci_switch_tool_versions_harness
-    script_body = File.read(source_script_path).split("\n# Main script\n").first
+    full_source = File.read(source_script_path)
+    script_body = full_source.split("\n# Main script\n").first
+    raise "ci-switch-config is missing the '# Main script' boundary marker" if script_body == full_source
 
     [
       script_body,

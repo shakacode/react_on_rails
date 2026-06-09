@@ -1,2 +1,3 @@
 ruby 4.0.5
+# Keep Node below 22.21.0 until nodejs/node#56010 is avoided.
 nodejs 22.12.0
