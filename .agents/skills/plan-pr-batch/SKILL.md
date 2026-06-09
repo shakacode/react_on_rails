@@ -28,6 +28,7 @@ Plan a PR batch
    - Record title, URL, state, branch/author for PRs, labels, linked PR/issue refs, and blockers. If a fact cannot be verified, write `UNKNOWN`.
 
 3. Shape
+   - For any issue that is speculative, AI/code-analysis-only, over-scoped, or unclear in value, priority, or fix scope, route through `.agents/skills/evaluate-issue/SKILL.md` before assigning it to implementation work.
    - Exclude closed or merged items unless the user explicitly asked to audit them.
    - Separate independent work from dependency-ordered work.
    - Cap at 8 with shared/risky files, else 10 independent items; propose a smaller first batch.

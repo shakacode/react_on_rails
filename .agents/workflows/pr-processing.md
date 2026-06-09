@@ -25,6 +25,7 @@ For adversarial pre-merge or post-merge PR review, use `.agents/skills/adversari
    - Confirm the issue or PR describes a real project benefit, not just speculative polish or churn.
    - Push back on poorly defined, low-value, or harmful requests before creating a PR.
    - For assigned issues, an acceptable outcome may be an issue comment explaining why no PR should be created.
+   - When the value, priority, or proposed fix scope is unclear, use `.agents/skills/evaluate-issue/SKILL.md` before implementation (or `.agents/workflows/evaluate-issue.md` for agents without skill support).
 3. Isolate the work:
    - Fetch/prune `main`, confirm the expected repository root, and verify nested repo paths before assigning work.
    - Use the current checkout for one focused task.
