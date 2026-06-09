@@ -174,7 +174,12 @@ module ReactOnRails
     def check_for_component_store_name_conflicts
       component_names = common_component_to_path.keys + client_component_to_path.keys
       store_names = store_to_path.keys
-      conflicts = component_names & store_names
+      conflicts = component_names.filter_map do |component_name|
+        store_name = store_names.find { |name| component_name.casecmp?(name) }
+        next unless store_name
+
+        component_name == store_name ? component_name : "#{component_name} (component) / #{store_name} (store)"
+      end
 
       return if conflicts.empty?
 
@@ -715,8 +720,19 @@ module ReactOnRails
 
     def component_name(file_path)
       basename = File.basename(file_path, File.extname(file_path))
+      derived_name = basename.sub(CONTAINS_CLIENT_OR_SERVER_REGEX, "")
 
-      basename.sub(CONTAINS_CLIENT_OR_SERVER_REGEX, "")
+      return derived_name unless auto_bundled_component_file?(file_path)
+
+      derived_name.camelize
+    end
+
+    def auto_bundled_component_file?(file_path)
+      components_subdirectory = ReactOnRails.configuration.components_subdirectory
+      return false if components_subdirectory.blank?
+      return false unless file_path.match?(COMPONENT_EXTENSIONS)
+
+      Pathname(file_path).each_filename.include?(components_subdirectory)
     end
 
     def component_name_to_path(paths)
