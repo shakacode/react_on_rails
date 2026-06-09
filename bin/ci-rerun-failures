@@ -52,6 +52,8 @@ ensure_oss_dependencies() {
   OSS_DEPS_READY=true
 }
 
+# Keep this list in sync with run_command() below. Every branch that uses
+# bundle_command "$OSS_GEMFILE" needs an entry here so OSS dependencies install first.
 requires_oss_bundle() {
   case "$1" in
     "rspec-package-tests"|"dummy-app-integration-tests"|"examples")

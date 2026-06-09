@@ -23,6 +23,7 @@ NC='\033[0m' # No Color
 # Script directory (for running from anywhere)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+OSS_GEMFILE="$ROOT_DIR/react_on_rails/Gemfile"
 
 # Optional directories that should be skipped (not hard-fail) when Ruby doesn't match Gemfile.
 OPTIONAL_SETUP_DIRS=(
@@ -254,7 +255,7 @@ build_node_package() {
   # Builds TypeScript packages. This compiles src/ to lib/.
   # The dummy apps use workspace:* protocol so pnpm install links them automatically.
   print_step "Building node package..."
-  if ! (cd "$ROOT_DIR/react_on_rails" && bundle_command "$ROOT_DIR/react_on_rails/Gemfile" bundle exec rake node_package); then
+  if ! (cd "$ROOT_DIR/react_on_rails" && bundle_command "$OSS_GEMFILE" bundle exec rake node_package); then
     print_error "Failed to build node package"
     exit 1
   fi

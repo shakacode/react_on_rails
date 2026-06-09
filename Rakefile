@@ -19,6 +19,8 @@ def gem_root
   File.expand_path("react_on_rails", __dir__)
 end
 
+@package_bundle_ready = false
+
 def package_rake_task(task_name, *task_args)
   task_invocation = if task_args.empty?
                       task_name.to_s
@@ -36,13 +38,18 @@ def package_rake_task(task_name, *task_args)
 end
 
 def ensure_package_bundle
+  return if @package_bundle_ready
+
   bundle_ready = Dir.chdir(gem_root) do
     Bundler.with_unbundled_env do
       system("bundle", "check", out: File::NULL, err: File::NULL)
     end
   end
 
-  return if bundle_ready
+  if bundle_ready
+    @package_bundle_ready = true
+    return
+  end
 
   puts "Installing react_on_rails bundle before delegated rake task..."
   Dir.chdir(gem_root) do
@@ -50,6 +57,7 @@ def ensure_package_bundle
       sh "bundle", "install"
     end
   end
+  @package_bundle_ready = true
 end
 
 def root_bundle_exec_in(directory, *command)
@@ -159,7 +167,7 @@ end
 desc "Run root-bundle RuboCop only; full lint: cd react_on_rails && bundle exec rake lint"
 task lint: ["lint:rubocop"]
 
-desc "Auto-fix all linting violations via the package task"
+desc "Auto-fix full package lint; broader than root rake lint (ESLint, Prettier, Stylelint, RuboCop)"
 task autofix: ["lint:autofix"]
 
 define_package_task("run_rspec:run_rspec", :packer)
