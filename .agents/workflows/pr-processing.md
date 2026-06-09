@@ -274,11 +274,11 @@ For high-risk cases above, run Claude's `/simplify` after all required review pa
 
 Before merge, wait for requested or configured review agents such as Claude, CodeRabbit, Greptile, Cursor Bugbot, and Codex review to finish for the current head SHA. Poll CI with bounded commands and timeouts; use narrow required-check commands such as `gh pr checks <PR> --required` for required CI readiness, then also fetch all checks or explicit review-agent checks so non-required reviewers are not hidden. Avoid long-lived `gh ... --watch`. Ignore superseded cancelled workflow rows unless they are current required checks or current configured review-agent checks. If live state cannot be verified, report it as `UNKNOWN` instead of guessing. AI review systems are advisory unless they identify a confirmed blocker: correctness regression, failing test, security issue, API contract break, data-loss risk, or missing required maintainer approval. Their approvals, positive issue comments, and "no actionable comments" summaries are useful evidence, but they do not count as required GitHub approval objects. For high-risk or concurrent-batch PRs, run or request the adversarial PR review workflow in `.agents/workflows/adversarial-pr-review.md`. A completed check is not enough when review comments exist: classify and resolve or explicitly waive actionable findings before merging. Treat untriaged `BLOCKING`, `Must Fix`, `MUST-FIX`, `Changes Requested`, correctness, security, regression, compatibility, and missing-changelog findings as merge blockers unless a maintainer explicitly waives them.
 
-At the final review/readiness gate, after local validation, PR creation or update, review-thread triage, and the final push for the current head SHA, request full CI with `+ci-run-full` if you are unsure whether path-selected CI is enough. Record that decision as FYI, not as an immediate maintainer question.
+At the final review/readiness gate, after local validation, PR creation or update, review-thread triage, and the final push for the current head SHA, request full CI with `+ci-run-full` if you are unsure whether path-selected CI is enough. Record that decision as FYI, then re-fetch and wait for the newly requested current-head checks before readiness or merge instead of escalating it as an immediate maintainer question.
 
-<!-- Keep this closeout summary in sync with `$pr-batch` and the Coordinator Closeout Lane below. -->
+<!-- Keep this closeout summary in sync with `.agents/skills/pr-batch/SKILL.md` and the Coordinator Closeout Lane below. -->
 
-After workers finish, the coordinator must keep working through the live finalize/merge lane instead of stopping at PR creation: re-fetch live PR status, wait for current-head checks and reviews, triage/resolve or explicitly waive current unresolved review threads, update stale release-mode classification or accelerated-RC confidence block, request full CI when uncertainty remains, and merge eligible ready PRs when authorized under the current release mode.
+After workers finish, the coordinator must keep working through the live finalize/merge lane instead of stopping at PR creation: re-fetch live PR status, wait for current-head checks and reviews, triage/resolve or explicitly waive current unresolved review threads, update stale release-mode classification or accelerated-RC confidence block, request full CI when uncertainty remains, re-fetch and wait for the newly requested current-head checks, and merge eligible ready PRs when authorized under the current release mode.
 
 For blocking questions, stop work on that target, surface a structured question to the coordinator or maintainer, and mark the issue/PR with the agreed pending-question state. Report the question/comment URL as `blocked needing user input`; do not open a speculative PR. For non-blocking questions where you make a decision and continue, record the decision in the PR description before review or merge.
 
@@ -312,6 +312,8 @@ Suggested PR description section:
 Before merge or final readiness, scan the PR description for the decision log and make sure each non-blocking decision is still accurate after review changes.
 
 ### Batch Handoff Format
+
+<!-- Canonical batch handoff copy. `.agents/skills/pr-batch/SKILL.md` should point here instead of duplicating this section. -->
 
 Split batch handoffs into two sections:
 
@@ -376,7 +378,9 @@ The closeout lane is:
 3. Fetch current unresolved review threads and triage them as fixed, waived, or
    still blocking.
 4. Refresh stale release-mode classification or accelerated-RC confidence block
-   before readiness or merge.
+   (the `Agent Confidence:` block in the release tracker required by
+   accelerated-RC mode; canonical definition in `AGENTS.md`) before readiness or
+   merge.
 5. After the final push, if local validation passed and the only uncertainty is
    whether full CI is needed, request full CI with `+ci-run-full` and record the
    reason as FYI, then loop back to re-fetch and wait for the newly requested
@@ -501,7 +505,7 @@ Use the `+ci-*` PR comment commands from the CI command workflow for full-CI dec
 - During active implementation or review-fix churn, do not request full CI.
 - If a PR is still being iterated and already has `full-ci`, ask whether to comment `+ci-stop-full` before pushing more batches.
 - Use `+ci-status` before deciding whether full CI is already enabled or waived for the current SHA.
-- Use `+ci-run-full` only after local validation, self-review, review-thread triage, and the final push for the current batch. If the agent or coordinator is still unsure at review/readiness time whether path-selected CI is enough, default to `+ci-run-full`; record the reason in FYI rather than pausing for maintainer opinion, then re-fetch and wait for the newly requested current-head checks before readiness or merge.
+- Use `+ci-run-full` only after local validation, self-review, review-thread triage, and the final push for the current batch. At that point, if you are unsure whether path-selected CI is enough, request full CI and record the reason in FYI; then re-fetch and wait for the newly requested current-head checks before readiness or merge. Do not request full CI speculatively during active churn.
 - Use `+ci-skip-full [reason]` only with explicit maintainer approval and only for low-risk/current-SHA cases where the reason is auditable.
 - Use `+ci-help` when the command syntax or current behavior is unclear.
 - Put one `+ci-*` command per PR comment; the workflow handles only the first command in a comment.
@@ -678,7 +682,7 @@ For a manual multi-PR landing plan:
 4. For each candidate PR, verify it is the right thing to work on now: approved or worth fixing, non-duplicative, scoped, and clear enough to complete.
 5. For blocked PRs, fix only the blocking cause, rerun targeted local checks, and batch one push.
 6. Do not create follow-up issues for ordinary review nits. Use one deferred bundle per PR only after explicit user approval.
-7. Use full CI sparingly, but default to requesting it after local validation when uncertainty remains at final readiness: final readiness gate, high-risk changes, maintainer request, or unclear CI sufficiency.
+7. After local validation, if path-selected CI may be insufficient at final readiness, request full CI; otherwise use it sparingly.
 
 ## Post-Merge Batch Audit
 
