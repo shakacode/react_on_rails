@@ -155,6 +155,8 @@ def plan_confirmation(artifacts_dir)
   plan = build_plan(payloads, benchmark_matrix_rows)
   announce_suppressed(plan[:suppressed])
 
+  # Confirmation is all-or-nothing: if any candidate cannot be mapped back to a
+  # suite/shard, filing a partial issue could hide a real regression elsewhere.
   unless plan[:unmatched].empty?
     warn_unmatched(plan[:unmatched])
     emit_no_confirmations
