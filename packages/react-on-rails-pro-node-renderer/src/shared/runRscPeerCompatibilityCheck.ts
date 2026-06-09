@@ -55,26 +55,29 @@ const findPackageVersionFromEntrypoint = (packageName: string, entrypointPath: s
 // `react-on-rails-rsc` and `react` are the consuming app's dependencies, not the node
 // renderer's, so resolve them from the app root rather than this module's location.
 const defaultResolveVersion = (packageName: string, cwd: string): string | null => {
-  try {
-    const appRequire = createRequire(path.join(cwd, 'noop.js'));
+  let appRequire: NodeJS.Require;
 
-    try {
-      return (appRequire(`${packageName}/${PACKAGE_JSON}`) as { version?: string }).version ?? null;
-    } catch {
-      // Some packages do not export ./package.json; fall back to the package root
-      // found from the public entrypoint so the check does not silently no-op.
-      try {
-        const entrypointPath = appRequire.resolve(packageName);
-        return findPackageVersionFromEntrypoint(packageName, entrypointPath);
-      } catch {
-        return null;
-      }
-    }
+  try {
+    appRequire = createRequire(path.join(cwd, 'noop.js'));
   } catch (error) {
     log.warn(
       `[ReactOnRails] Could not resolve ${packageName} version ` +
         `(createRequire failed: ${error instanceof Error ? error.message : String(error)}). Version check skipped.`,
     );
+    return null;
+  }
+
+  try {
+    return (appRequire(`${packageName}/${PACKAGE_JSON}`) as { version?: string }).version ?? null;
+  } catch {
+    // Some packages do not export ./package.json; fall back to the package root
+    // found from the public entrypoint so the check does not silently no-op.
+  }
+
+  try {
+    const entrypointPath = appRequire.resolve(packageName);
+    return findPackageVersionFromEntrypoint(packageName, entrypointPath);
+  } catch {
     return null;
   }
 };
