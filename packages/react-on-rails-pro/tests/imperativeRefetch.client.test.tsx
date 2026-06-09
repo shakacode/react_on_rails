@@ -389,6 +389,59 @@ class CapturingErrorBoundary extends React.Component<
     await waitFor(() => expect(onRefetchError).toHaveBeenCalledTimes(1));
   });
 
+  it('1d3. production refetch failures from resolved Error payloads preserve the last rendered route', async () => {
+    process.env.NODE_ENV = 'production';
+    const refetchError = new Error('resolved production refetch failed');
+    setupSequencedFetcher([
+      <div data-testid="card">
+        Card v1
+        <RecoverableInlineControls />
+      </div>,
+      refetchError,
+      <div data-testid="card">
+        Card v2
+        <RecoverableInlineControls />
+      </div>,
+    ]);
+    const onRefetchError = jest.fn();
+    const ref = React.createRef<RSCRouteHandle>();
+
+    await renderInAct(
+      <TestHarness>
+        <CapturingErrorBoundary fallback={(error) => <div data-testid="route-error">{error.message}</div>}>
+          <RSCRoute
+            ref={ref}
+            componentName="UserCard"
+            componentProps={{ id: 1 }}
+            onRefetchError={onRefetchError}
+          />
+        </CapturingErrorBoundary>
+      </TestHarness>,
+    );
+
+    expect(screen.getByTestId('card')).toHaveTextContent('Card v1');
+
+    await act(async () => {
+      await expect(ref.current!.refetch()).rejects.toThrow('resolved production refetch failed');
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('recoverable-error')).toHaveTextContent('resolved production refetch failed'),
+    );
+    expect(screen.getByTestId('card')).toHaveTextContent('Card v1');
+    expect(screen.queryByTestId('route-error')).not.toBeInTheDocument();
+    expect(ref.current!.refetchError?.originalError).toBe(refetchError);
+    await waitFor(() => expect(onRefetchError).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      await expect(ref.current!.retry()).resolves.toEqual(expect.anything());
+    });
+
+    await waitFor(() => expect(screen.getByTestId('card')).toHaveTextContent('Card v2'));
+    expect(screen.queryByTestId('recoverable-error')).not.toBeInTheDocument();
+    expect(ref.current!.refetchError).toBeNull();
+  });
+
   it('1e. production ignores recoverable refetch errors from stale route props', async () => {
     process.env.NODE_ENV = 'production';
     const pending = setupDeferredFetcher();

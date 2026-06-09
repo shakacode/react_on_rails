@@ -209,6 +209,8 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
       const requestKey = createRSCPayloadKey(n, p);
       // eslint-disable-next-line no-multi-assign
       const requestId = (latestRefetchRequestRef.current += 1);
+      // Bundlers replace NODE_ENV with a string literal in production builds.
+      // Jest mutates it at runtime only because tests bypass that substitution.
       const recoverOnError = process.env.NODE_ENV === 'production';
       // refetchComponent swaps the cache promise and bumps the provider's
       // version inside startTransition. That re-renders every <RSCRoute>
@@ -223,6 +225,9 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
       return rejectErrorPayload(refetchPromise).then(
         (payload) => {
           if (isMountedRef.current) {
+            // Success only needs this instance's requestId guard. Stale same-key
+            // successes are harmless because the provider's successfulVersion
+            // bump also clears recoverable errors for mounted matching routes.
             setRefetchErrorState((state) =>
               latestRefetchRequestRef.current === requestId && state?.[0] === requestKey ? null : state,
             );
@@ -249,6 +254,7 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
         },
       );
     }, [getRefetchVersion, refetchComponent]);
+    const retry = useCallback((): Promise<ReactNode> => refetch(), [refetch]);
 
     const clearRefetchError = useCallback(() => {
       if (isMountedRef.current) {
@@ -258,8 +264,8 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
 
     const handle = useMemo<RSCRouteHandle>(
       // retry is the same implementation as refetch; the distinction is semantic for error UI.
-      () => ({ refetch, retry: refetch, refetchError, clearRefetchError }),
-      [clearRefetchError, refetch, refetchError],
+      () => ({ refetch, retry, refetchError, clearRefetchError }),
+      [clearRefetchError, refetch, refetchError, retry],
     );
     useImperativeHandle(ref, () => handle, [handle]);
     useEffect(() => {
