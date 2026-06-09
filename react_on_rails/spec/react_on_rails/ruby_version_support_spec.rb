@@ -255,11 +255,13 @@ RSpec.describe "Ruby version support" do
     expect(ci_switch_config).to include("restore_tool_versions_to_latest()")
     expect(ci_switch_config).to include("read_committed_tool_version()")
     expect(ci_switch_config).to include("read_latest_tool_version()")
+    expect(ci_switch_config).to include("reload_latest_tool_version_globals()")
+    expect(ci_switch_config).to include("reload_latest_tool_version_globals false")
     expect(ci_switch_config).to include(
-      'LATEST_RUBY_VERSION="$(read_latest_tool_version ruby false)"'
+      'LATEST_RUBY_VERSION="$(read_latest_tool_version ruby "$emit_warnings")"'
     )
     expect(ci_switch_config).to include(
-      'LATEST_NODE_VERSION="$(read_latest_tool_version nodejs false)"'
+      'LATEST_NODE_VERSION="$(read_latest_tool_version nodejs "$emit_warnings")"'
     )
     expect(ci_switch_config).to include('LATEST_NODE_MAJOR_VERSION="${LATEST_NODE_VERSION%%.*}"')
     expect(ci_switch_config).to include('LATEST_SHAKAPACKER_VERSION="10.1.0"')

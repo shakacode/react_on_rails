@@ -132,7 +132,7 @@ jobs:
           name: dummy-app-bundle-${{ steps.get-sha.outputs.sha }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}-${{ matrix.bundler }}
           path: react_on_rails/spec/dummy/public/webpack
           if-no-files-found: error
-          retention-days: 3
+          retention-days: 7
 
   dummy-app-integration-tests:
     # Decoupled per chain (#3593 / #3622): this job needs only THIS call's build job, so a build

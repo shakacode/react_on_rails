@@ -1,8 +1,10 @@
 ---
 name: Read tool versions
 description: >-
-  Read committed latest and minimum runtime versions. Requires actions/checkout
-  to have run first.
+  Read committed latest and minimum Ruby/Node runtime versions for jobs that
+  need both runtimes. For Node-only jobs, prefer actions/setup-node with
+  node-version-file: .tool-versions. Requires actions/checkout to have run
+  first.
 
 outputs:
   ruby-version:

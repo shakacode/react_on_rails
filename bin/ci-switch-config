@@ -126,6 +126,15 @@ read_latest_tool_version() {
   fi
 }
 
+reload_latest_tool_version_globals() {
+  local emit_warnings="${1:-false}"
+
+  LATEST_RUBY_VERSION="$(read_latest_tool_version ruby "$emit_warnings")"
+  LATEST_RUBY_MINOR_VERSION="${LATEST_RUBY_VERSION%.*}"
+  LATEST_NODE_VERSION="$(read_latest_tool_version nodejs "$emit_warnings")"
+  LATEST_NODE_MAJOR_VERSION="${LATEST_NODE_VERSION%%.*}"
+}
+
 # Run at load time (outside main) so sourced test harnesses get populated globals.
 # Requires .minimum.tool-versions to be present before sourcing.
 require_minimum_tool_versions_file
@@ -136,10 +145,7 @@ MINIMUM_NODE_VERSION="$(read_tool_version "$MINIMUM_TOOL_VERSIONS_FILE" nodejs)"
 MINIMUM_NODE_MAJOR_VERSION="${MINIMUM_NODE_VERSION%%.*}"
 MINIMUM_REACT_VERSION="18.0.0" # Update when minimum CI moves to a newer React version.
 MINIMUM_REACT_MAJOR_VERSION="${MINIMUM_REACT_VERSION%%.*}"
-LATEST_RUBY_VERSION="$(read_latest_tool_version ruby false)"
-LATEST_RUBY_MINOR_VERSION="${LATEST_RUBY_VERSION%.*}"
-LATEST_NODE_VERSION="$(read_latest_tool_version nodejs false)"
-LATEST_NODE_MAJOR_VERSION="${LATEST_NODE_VERSION%%.*}"
+reload_latest_tool_version_globals false
 # Shakapacker/React stay as literals here: asdf/mise do not manage npm packages,
 # so they cannot live in .tool-versions alongside Ruby/Node.
 LATEST_SHAKAPACKER_VERSION="10.1.0" # Update when latest CI moves to a newer Shakapacker.
@@ -368,11 +374,7 @@ restore_tool_versions_to_latest() {
   rm -f "$MAXIMUM_TOOL_VERSIONS_FILE" "$MAXIMUM_TOOL_VERSIONS_HEAD_FILE"
 
   # Refresh script globals so downstream set_* calls use the restored latest profile.
-  # Keep this list in sync with the load-time globals block near the top of the script.
-  LATEST_RUBY_VERSION="$(read_tool_version "$PROJECT_ROOT/.tool-versions" ruby)"
-  LATEST_RUBY_MINOR_VERSION="${LATEST_RUBY_VERSION%.*}"
-  LATEST_NODE_VERSION="$(read_tool_version "$PROJECT_ROOT/.tool-versions" nodejs)"
-  LATEST_NODE_MAJOR_VERSION="${LATEST_NODE_VERSION%%.*}"
+  reload_latest_tool_version_globals false
 
   print_success "Restored .tool-versions with Ruby $LATEST_RUBY_VERSION and Node $LATEST_NODE_VERSION"
 }
