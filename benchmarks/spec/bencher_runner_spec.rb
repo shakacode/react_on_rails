@@ -19,7 +19,7 @@ RSpec.describe BencherRunner do
     end
     allow(File).to receive(:write).with("report.json.tmp", report_json)
     allow(FileUtils).to receive(:mv).with("report.json.tmp", "report.json")
-    allow(FileUtils).to receive(:rm_f)
+    allow(FileUtils).to receive(:rm_f).with("report.json.tmp")
 
     runner.run(branch, start_point_args)
     captured_args
@@ -161,7 +161,7 @@ RSpec.describe BencherRunner do
       expect(FileUtils).to have_received(:rm_f).with("report.json")
     end
 
-    it "removes stale and temporary reports when writing the report fails" do
+    it "removes the temporary report but keeps the previous report when writing fails" do
       status = instance_double(Process::Status, exitstatus: 0)
 
       allow(Open3).to receive(:capture3).and_return([JSON.generate("results" => [], "alerts" => []), "", status])
@@ -170,10 +170,10 @@ RSpec.describe BencherRunner do
 
       expect { runner.run("branch", []) }.to raise_error(Errno::ENOSPC)
       expect(FileUtils).to have_received(:rm_f).with("report.json.tmp")
-      expect(FileUtils).to have_received(:rm_f).with("report.json")
+      expect(FileUtils).not_to have_received(:rm_f).with("report.json")
     end
 
-    it "removes stale and temporary reports when writing raises a non-system error" do
+    it "removes the temporary report but keeps the previous report on non-system write errors" do
       status = instance_double(Process::Status, exitstatus: 0)
 
       allow(Open3).to receive(:capture3).and_return([JSON.generate("results" => [], "alerts" => []), "", status])
@@ -182,10 +182,10 @@ RSpec.describe BencherRunner do
 
       expect { runner.run("branch", []) }.to raise_error(RuntimeError, "disk layer failed")
       expect(FileUtils).to have_received(:rm_f).with("report.json.tmp")
-      expect(FileUtils).to have_received(:rm_f).with("report.json")
+      expect(FileUtils).not_to have_received(:rm_f).with("report.json")
     end
 
-    it "removes the temporary and final reports when moving the report is interrupted" do
+    it "removes the temporary report but keeps the previous report when moving is interrupted" do
       status = instance_double(Process::Status, exitstatus: 0)
 
       allow(Open3).to receive(:capture3).and_return([JSON.generate("results" => [], "alerts" => []), "", status])
@@ -195,7 +195,7 @@ RSpec.describe BencherRunner do
 
       expect { runner.run("branch", []) }.to raise_error(Interrupt)
       expect(FileUtils).to have_received(:rm_f).with("report.json.tmp")
-      expect(FileUtils).to have_received(:rm_f).with("report.json")
+      expect(FileUtils).not_to have_received(:rm_f).with("report.json")
     end
   end
 end

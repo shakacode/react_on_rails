@@ -27,6 +27,7 @@ class PrReportPoster
   end
 
   def replace(markdown)
+    # Guard callers that use the poster without the script-level empty-report check.
     return if markdown.empty?
 
     cutoff_ts = Time.now.utc.iso8601

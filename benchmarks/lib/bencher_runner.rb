@@ -80,8 +80,8 @@ class BencherRunner
   end
 
   # Writes Bencher stdout to disk, parses it, and returns the parsed report.
-  # Any write, move, or parse failure removes report files so stale JSON cannot
-  # masquerade as the current run.
+  # Parse failures remove only a report this run placed on disk, so stale JSON
+  # from a prior successful run is not deleted by a write or move failure.
   def persist_report(stdout)
     if stdout.empty?
       FileUtils.rm_f(report_json)
@@ -89,14 +89,16 @@ class BencherRunner
     end
 
     tmp_report_json = "#{report_json}.tmp"
+    moved = false
     report_verified = false
     begin
       File.write(tmp_report_json, stdout)
       FileUtils.mv(tmp_report_json, report_json)
+      moved = true
       parse_report(stdout).tap { report_verified = true }
     ensure
       FileUtils.rm_f(tmp_report_json)
-      FileUtils.rm_f(report_json) unless report_verified
+      FileUtils.rm_f(report_json) if moved && !report_verified
     end
   end
 

@@ -112,7 +112,7 @@ def branch_and_start_point_args
   end
 end
 
-def run_bencher_or_exit(branch, start_point_args)
+def run_bencher!(branch, start_point_args)
   bencher_runner.run(branch, start_point_args)
 rescue BencherRunner::ReportParseError => e
   warn "::error::#{e.message}"
@@ -445,7 +445,7 @@ if __FILE__ == $PROGRAM_NAME
   env!("BENCHER_API_TOKEN")
 
   branch, start_point_args = branch_and_start_point_args
-  bencher_result = run_bencher_or_exit(branch, start_point_args)
+  bencher_result = run_bencher!(branch, start_point_args)
   stderr = bencher_result.stderr
   bencher_exit_code = bencher_result.exit_code
   report = bencher_result.report
@@ -459,7 +459,7 @@ if __FILE__ == $PROGRAM_NAME
     Github.warning("Start-point hash not found in Bencher; falling back to latest baseline for comparison")
     # The retry's stderr is unused: regression classification reads the JSON report,
     # and this path only triggers when the first run had no regression.
-    retry_result = run_bencher_or_exit(branch, retry_args)
+    retry_result = run_bencher!(branch, retry_args)
     bencher_exit_code = retry_result.exit_code
     report = retry_result.report
   end
