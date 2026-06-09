@@ -59,8 +59,9 @@ Prefer exact numbers for high-concurrency work. Filters are acceptable for disco
 Before implementation or worker launch, produce:
 
 1. A concrete goal name.
-2. A repo preflight: fetch/prune `main`, confirm the expected repository root, and verify nested repo paths before assigning work.
-3. A short batch table:
+2. An issue-value check for speculative, AI/code-analysis-only, or over-scoped candidates.
+3. A repo preflight: fetch/prune `main`, confirm the expected repository root, and verify nested repo paths before assigning work.
+4. A short batch table:
    - target number and title
    - branch name
    - expected file area
@@ -68,9 +69,8 @@ Before implementation or worker launch, produce:
    - risk
    - likely outcome: implementation PR, combined investigation PR, no-PR evidence comment, or product-decision blocker
    - assigned machine or worker
-4. A permission and trust preflight result.
-5. A conflict check for overlapping files or dependent PRs.
-6. An issue-value check for speculative, AI/code-analysis-only, or over-scoped candidates.
+5. A permission and trust preflight result.
+6. A conflict check for overlapping files or dependent PRs.
 7. A final `/goal` prompt when the user asked for Goal mode.
 
 If the user is in `/plan` or asks for a plan-to-goal handoff, stop after the `/goal` prompt. Do not begin implementation from plan approval unless the user explicitly says to launch now.

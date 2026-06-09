@@ -2,6 +2,7 @@
 name: evaluate-issue
 description: >-
   Use before fixing, batching, or assigning GitHub issues or proposed fixes when the value is uncertain, the report came from AI/code analysis, the fix is complex, or the user asks whether an issue is worth doing. Produces an evidence-backed recommendation: fix now, document/work around, park, close, or ask for product input.
+argument-hint: '[issue URL or number]'
 ---
 
 # Evaluate Issue
@@ -55,7 +56,7 @@ AI-found gaps are leads, not priorities. Prioritize real customer reports, verif
    - `close / not planned`: low-value, speculative, harmful, duplicate, or superseded.
    - `product decision`: maintainer input required before implementation would be safe.
 
-6. If GitHub labels are requested
+6. Apply labels only when authorized
    - Use `P0` for merge-this-week blockers, `P1` for target-this-sprint work, `P2` for backlog, and `P3` for parked priority.
    - Keep `discussion` for RFCs and unresolved product decisions.
    - Use `needs-customer-feedback` when the issue is a nice-to-have, AI/code-analysis-only, or otherwise should not be implemented until customer evidence or maintainer approval exists.

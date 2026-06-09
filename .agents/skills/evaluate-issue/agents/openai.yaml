@@ -1,3 +1,4 @@
+# Codex UI metadata for skill picker display text and default prompt.
 interface:
   display_name: "Evaluate Issue"
   short_description: "Prioritize issues before fixes"
