@@ -13,6 +13,8 @@
 # For licensing terms:
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
+require "bundler"
+
 module ReactOnRailsPro
   module TaskHelpers
     # Returns the root folder of the react_on_rails gem

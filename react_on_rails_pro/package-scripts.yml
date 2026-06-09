@@ -24,7 +24,7 @@ scripts:
       script: rm -rf /tmp/react-on-rails-pro-node-renderer-bundles && nps build && RENDERER_LOG_LEVEL=info NODE_DEBUG=ROR node --enable-source-maps ../packages/react-on-rails-pro-node-renderer/lib/default-node-renderer.js
   lint:
     description: Run all linters
-    script: npx concurrently --prefix "[{name}]" --names "ESLINT, RUBOCOP, PRETTIER" -c "blue,yellow,magenta,orange" "nps eslint" "bundle exec rubocop" "nps format.listDifferent"
+    script: npx concurrently --prefix "[{name}]" --names "ESLINT, RUBOCOP, PRETTIER" -c "blue,yellow,magenta,orange" "nps eslint" "BUNDLE_GEMFILE=../Gemfile bundle exec rubocop --ignore-parent-exclusion" "nps format.listDifferent"
 
   build:
     default:
