@@ -18,6 +18,7 @@ const { basename, dirname, isAbsolute, relative, resolve } = require('path');
 const { config } = require('shakapacker');
 const { default: serverWebpackConfig, extractLoader } = require('./serverWebpackConfig');
 
+const RSC_LOADER_WRAPPED = Symbol.for('reactOnRailsPro.rscLoaderWrapped');
 const reactPackageRoot = dirname(require.resolve('react/package.json'));
 // React 19+ ships these react-server entry files alongside the standard entries.
 const resolveReactServerEntry = (entryFilename) => {
@@ -122,16 +123,46 @@ const configureRsc = () => {
     };
   }
 
-  // Add the RSC loader before the babel loader
+  // Add the RSC transform loader before the JavaScript loader. Keep WebpackLoader
+  // under rspack: RspackLoader only reports client modules to RSCRspackPlugin and
+  // passes source through, so it cannot replace `'use client'` modules in the RSC bundle.
+  const rscLoader = 'react-on-rails-rsc/WebpackLoader';
+  const hasRscLoader = (item) => (typeof item === 'string' ? item : (item?.loader ?? '')) === rscLoader;
   const { rules } = rscConfig.module;
   rules.forEach((rule) => {
-    if (Array.isArray(rule.use)) {
-      // Ensure this loader runs before the JS loader (Babel loader in this case) to properly exclude client components from the RSC bundle.
-      // If your project uses a different JS loader, insert it before that loader instead.
-      const babelLoader = extractLoader(rule, 'babel-loader');
-      if (babelLoader) {
+    if (typeof rule.use === 'function') {
+      // Skip if already wrapped by a previous configureRsc() call.
+      // originalUse is captured before injection, so it cannot return the RSC loader itself.
+      // This is scoped to live rule objects within one unbundled Node config module instance;
+      // Jest module-cache resets intentionally get fresh rule objects.
+      if (rule.use[RSC_LOADER_WRAPPED]) return;
+      const originalUse = rule.use;
+      const wrappedUse = function rscLoaderWrapper(data) {
+        const result = originalUse.call(this, data);
+        let resultArray = [];
+        if (Array.isArray(result)) {
+          resultArray = result;
+        } else if (result) {
+          resultArray = [result];
+        }
+        const resolvedRule = { use: resultArray };
+        const jsLoader =
+          extractLoader(resolvedRule, 'babel-loader') || extractLoader(resolvedRule, 'swc-loader');
+        // If originalUse returned a single object and we inject the RSC loader,
+        // we promote the return type from object to array. Webpack normalizes both.
+        if (jsLoader) return [...resultArray, { loader: rscLoader }];
+        // Preserve the original return shape when this function rule is not a JS loader rule.
+        return result;
+      };
+      wrappedUse[RSC_LOADER_WRAPPED] = true;
+      // eslint-disable-next-line no-param-reassign
+      rule.use = wrappedUse;
+    } else if (Array.isArray(rule.use)) {
+      if (rule.use.some(hasRscLoader)) return;
+      const jsLoader = extractLoader(rule, 'babel-loader') || extractLoader(rule, 'swc-loader');
+      if (jsLoader) {
         rule.use.push({
-          loader: 'react-on-rails-rsc/WebpackLoader',
+          loader: rscLoader,
         });
       }
     }
