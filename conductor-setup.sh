@@ -95,6 +95,7 @@ install_matching_bundler() {
 
 LOCKFILE_DIRS=(
     "."
+    "react_on_rails"
     "react_on_rails/spec/dummy"
     "react_on_rails_pro"
     "react_on_rails_pro/spec/dummy"
