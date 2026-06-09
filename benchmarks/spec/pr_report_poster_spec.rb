@@ -67,7 +67,7 @@ RSpec.describe PrReportPoster do
 
       allow(GithubCli).to receive_messages(capture: ["111\n222\n", status], run: true)
 
-      expect { poster.delete_stale_comments(before: "cutoff") }
+      expect { poster.send(:delete_stale_comments, before: "cutoff") }
         .to output(/Deleting stale Core Bencher report comment 111/).to_stdout
       expect(GithubCli).to have_received(:run).with(
         "gh", "api", "-X", "DELETE", "repos/shakacode/react_on_rails/issues/comments/111",
@@ -84,7 +84,7 @@ RSpec.describe PrReportPoster do
 
       allow(GithubCli).to receive_messages(capture: ["111\n", status], run: true)
 
-      poster.delete_stale_comments(before: "cutoff")
+      poster.send(:delete_stale_comments, before: "cutoff")
 
       expect(GithubCli).not_to have_received(:run)
     end
@@ -94,8 +94,22 @@ RSpec.describe PrReportPoster do
 
       allow(GithubCli).to receive_messages(capture: ["111\n", status], run: false)
 
-      expect { poster.delete_stale_comments(before: "cutoff") }
+      expect { poster.send(:delete_stale_comments, before: "cutoff") }
         .to output(/::warning::Failed to delete 1 stale Core Bencher report comment/).to_stdout
+    end
+
+    it "ignores non-numeric stale comment ids" do
+      status = instance_double(Process::Status, success?: true)
+
+      allow(GithubCli).to receive_messages(capture: ["111\nnot-an-id\n222\n", status], run: true)
+
+      poster.send(:delete_stale_comments, before: "cutoff")
+
+      expect(GithubCli).to have_received(:run).twice
+      expect(GithubCli).not_to have_received(:run).with(
+        "gh", "api", "-X", "DELETE", "repos/shakacode/react_on_rails/issues/comments/not-an-id",
+        any_args
+      )
     end
   end
 end

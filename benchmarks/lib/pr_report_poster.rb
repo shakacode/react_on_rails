@@ -35,6 +35,10 @@ class PrReportPoster
     end
   end
 
+  private
+
+  attr_reader :repository, :pr_number, :suite_name, :marker
+
   def delete_stale_comments(before:)
     failed = 0
     stale_comment_ids(before:).each do |comment_id|
@@ -54,10 +58,6 @@ class PrReportPoster
     )
   end
 
-  private
-
-  attr_reader :repository, :pr_number, :suite_name, :marker
-
   def stale_comment_ids(before:)
     # Marker + cutoff are passed via env so the jq filter reads them through `env.X`,
     # avoiding Ruby/JQ escaping mismatches from interpolated strings.
@@ -70,7 +70,7 @@ class PrReportPoster
     )
     return [] unless status.success?
 
-    stdout.lines.map(&:strip).reject(&:empty?)
+    stdout.lines.map(&:strip).reject(&:empty?).grep(/\A\d+\z/)
   end
 
   def post_comment(markdown)

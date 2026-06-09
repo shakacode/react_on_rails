@@ -12,6 +12,8 @@ class BencherRunner
 
   Result = Struct.new(:stderr, :exit_code, :report, keyword_init: true)
 
+  # Bencher dashboard project for React on Rails benchmark runs.
+  PROJECT_SLUG = "react-on-rails-t8a9ncxo"
   MAX_SAMPLE = "64"
   # Per-measure t-test boundaries (the confidence level Bencher uses for its
   # prediction interval). Tuned from a sweep of recent main-branch reports so fewer
@@ -54,7 +56,7 @@ class BencherRunner
   def args(branch, start_point_args)
     [
       "bencher", "run",
-      "--project", "react-on-rails-t8a9ncxo",
+      "--project", PROJECT_SLUG,
       "--branch", branch,
       *start_point_args,
       "--testbed", "github-actions",
