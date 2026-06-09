@@ -49,6 +49,20 @@ RSpec.describe RendererHarness::TransportProbe do
         described_class.parse(["--startup-timeout", "0"])
       end.to raise_error(ArgumentError, /--startup-timeout must be > 0/)
     end
+
+    {
+      "--scenarios" => "--skip-uds",
+      "--node-bin" => "--requests",
+      "--server-script" => "--requests",
+      "--socket-path" => "--requests",
+      "--output-dir" => "--skip-uds"
+    }.each do |flag, next_token|
+      it "rejects #{flag} without a value before another flag" do
+        expect do
+          described_class.parse([flag, next_token])
+        end.to raise_error(ArgumentError, /#{Regexp.escape(flag)} requires a value/)
+      end
+    end
   end
 
   describe RendererHarness::TransportProbe::Runner do
@@ -162,6 +176,15 @@ RSpec.describe RendererHarness::TransportProbe do
         RendererHarness::TransportProbe::UserError,
         /readiness JSON must be an object with an endpoints array/
       )
+    end
+
+    it "ignores already-closed stdin errors while stopping" do
+      server = described_class.new(config)
+      stdin = instance_double(IO)
+      allow(stdin).to receive(:close).and_raise(IOError, "closed stream")
+      server.instance_variable_set(:@stdin, stdin)
+
+      expect { server.stop }.not_to raise_error
     end
   end
 

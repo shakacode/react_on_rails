@@ -76,8 +76,8 @@ const parseArgs = () => {
 const readRequestBody = async (stream, maxBytes) => {
   let bytes = 0;
   const chunks = [];
-  // Keep the stream open when we throw on body-limit overflow so the caller can
-  // write the error response instead of fighting an auto-destroyed stream.
+  // Keep the stream open when body-limit overflow throws so writeReadError can
+  // still send the 413 JSON response and then close the stream intentionally.
   for await (const chunk of stream.iterator({ destroyOnReturn: false })) {
     bytes += chunk.length;
     if (bytes > maxBytes) {

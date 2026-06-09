@@ -52,14 +52,16 @@ module RendererHarness
           parser.on("--warmup N", Integer) { |v| opts[:warmup] = v }
           parser.on("--body-bytes N", Integer) { |v| opts[:body_bytes] = v }
           parser.on("--stream-bytes N", Integer) { |v| opts[:stream_bytes] = v }
-          parser.on("--scenarios LIST", String) { |v| opts[:scenarios] = parse_scenarios(v) }
+          parser.on("--scenarios LIST", String) do |v|
+            opts[:scenarios] = parse_scenarios(required_value!("--scenarios", v))
+          end
           # Transient parser flag; removed before opts reaches the Config struct.
           parser.on("--skip-uds") { opts[:skip_uds] = true }
-          parser.on("--node-bin PATH", String) { |v| opts[:node_bin] = v }
-          parser.on("--server-script PATH", String) { |v| opts[:server_script] = v }
-          parser.on("--socket-path PATH", String) { |v| opts[:socket_path] = v }
+          parser.on("--node-bin PATH", String) { |v| opts[:node_bin] = required_value!("--node-bin", v) }
+          parser.on("--server-script PATH", String) { |v| opts[:server_script] = required_value!("--server-script", v) }
+          parser.on("--socket-path PATH", String) { |v| opts[:socket_path] = required_value!("--socket-path", v) }
           parser.on("--startup-timeout SECONDS", Float) { |v| opts[:startup_timeout] = v }
-          parser.on("--output-dir PATH", String) { |v| opts[:output_dir] = v }
+          parser.on("--output-dir PATH", String) { |v| opts[:output_dir] = required_value!("--output-dir", v) }
           parser.on("-h", "--help") do
             puts parser
             exit 0
@@ -88,6 +90,12 @@ module RendererHarness
 
       def self.parse_scenarios(value)
         value.split(",").map(&:strip).reject(&:empty?)
+      end
+
+      def self.required_value!(flag, value)
+        return value unless value.nil? || value.empty? || value.start_with?("--")
+
+        raise ArgumentError, "#{flag} requires a value"
       end
 
       def self.validate!(opts)
@@ -128,7 +136,7 @@ module RendererHarness
         File.join(Dir.tmpdir, "ror-transport-probe-#{Process.pid}-#{SecureRandom.hex(4)}.sock")
       end
 
-      private_class_method :defaults, :parse_scenarios, :validate!,
+      private_class_method :defaults, :parse_scenarios, :required_value!, :validate!,
                            :validate_positive_integer!, :validate_non_negative_integer!,
                            :validate_positive_float!, :default_server_script,
                            :default_socket_path
@@ -390,7 +398,9 @@ module RendererHarness
       private
 
       def close_stdin
-        @stdin&.close unless @stdin&.closed?
+        @stdin&.close
+      rescue IOError
+        nil
       end
 
       def terminate_process
