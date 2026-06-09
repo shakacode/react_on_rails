@@ -802,7 +802,7 @@ async function Navbar({ userId }) {
 
 > **Note:** `React.cache()` is only available in React Server Component environments. It is not available in Client Components or non-RSC server rendering (e.g., `renderToString`).
 
-For most React on Rails applications, you won't need `React.cache()` because data flows through Rails controller props.
+For most React on Rails applications, you won't need `React.cache()` for data fetching because data flows through Rails controller props. However, `React.cache()` is valuable for sharing **computed per-request state** (like intl instances, feature flag lookups, or auth context) across Server Components without prop drilling. See [Sharing Per-Request Data in Server Components](../../pro/react-server-components/per-request-data.md) for these patterns.
 
 ## Mutations: Rails Controllers, Not Server Actions
 

@@ -20,6 +20,8 @@ type StateProps = Record<string, unknown> & {
 };
 
 type ReduxAppState = StateProps & {
+  // Redux's Reducer<S> requires S to be indexable; RailsContext is a discriminated union with no index
+  // signature, so intersect with Record<string, unknown> to satisfy that constraint while keeping known fields.
   railsContext: RailsContext & Record<string, unknown>;
 };
 
