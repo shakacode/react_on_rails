@@ -113,6 +113,8 @@ def branch_and_start_point_args
 end
 
 def run_bencher!(branch, start_point_args)
+  # The bang means this script helper exits the process on an untriageable
+  # Bencher report shape, matching the surrounding top-level script helpers.
   bencher_runner.run(branch, start_point_args)
 rescue BencherRunner::ReportParseError => e
   warn "::error::#{e.message}"

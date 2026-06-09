@@ -11,6 +11,7 @@ class BencherRunner
   class ReportParseError < StandardError; end
 
   Result = Struct.new(:stderr, :exit_code, :report, keyword_init: true)
+  private_constant :Result
 
   # Bencher dashboard project for React on Rails benchmark runs.
   PROJECT_SLUG = "react-on-rails-t8a9ncxo"
@@ -104,6 +105,8 @@ class BencherRunner
       result
     ensure
       FileUtils.rm_f(tmp_report_json)
+      # Remove malformed output so a future retry starts clean; the raw debugging
+      # artifact is lost, but a bad report file is worse than no report file.
       FileUtils.rm_f(report_json) if moved && !report_verified
     end
   end
