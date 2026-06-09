@@ -25,15 +25,19 @@ describe('rscWebpackConfig discovery build contract', () => {
     expect(source).toContain('excludedRegistrationEntryPathComponents');
     expect(source).toContain('return configuredEntry;');
   });
+
+  it('keeps generated React server alias cleanup guards in the RSC config source', () => {
+    expect(source).toContain("delete rscAliases['react-dom/server'];");
+    expect(source).toContain("delete rscAliases['react-dom/server$'];");
+    expect(source).toContain('const resolveReactServerEntry = (entryFilename) =>');
+    expect(source).toContain('existsSync(entryPath)');
+  });
+
   it('pins React server imports to one package instance for React.cache dispatcher sharing', () => {
     const config = rscWebpackConfig();
     const aliases = config.resolve.alias;
 
     expect(config.resolve.conditionNames).toContain('react-server');
-    expect(source).toContain("delete rscAliases['react-dom/server'];");
-    expect(source).toContain("delete rscAliases['react-dom/server$'];");
-    expect(source).toContain('const resolveReactServerEntry = (entryFilename) =>');
-    expect(source).toContain('existsSync(entryPath)');
     expect(aliases.react).toBeUndefined();
     expect(aliases.react$).toMatch(/react[\\/]react\.react-server\.js$/);
     expect(aliases['react/jsx-runtime$']).toMatch(/react[\\/]jsx-runtime\.react-server\.js$/);
