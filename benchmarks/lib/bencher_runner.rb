@@ -84,9 +84,10 @@ class BencherRunner
     ]
   end
 
-  # Writes Bencher stdout to disk, parses it, and returns the parsed report.
-  # Parse failures remove only a report this run placed on disk, so stale JSON
-  # from a prior successful run is not deleted by a write or move failure.
+  # Writes Bencher stdout to disk atomically (tmp -> mv), then parses it.
+  # On I/O failure the prior report at report_json is left untouched.
+  # On parse failure the newly-written malformed report is removed so a future
+  # retry starts clean rather than re-posting garbage.
   def persist_report(stdout)
     if stdout.empty?
       FileUtils.rm_f(report_json)
@@ -103,7 +104,7 @@ class BencherRunner
 
     begin
       parse_report(stdout)
-    rescue StandardError
+    rescue ReportParseError
       # Remove malformed output so a future retry starts clean; the raw debugging
       # artifact is lost, but a bad report file is worse than no report file.
       FileUtils.rm_f(report_json)

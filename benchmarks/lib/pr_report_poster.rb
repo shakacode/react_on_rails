@@ -79,7 +79,7 @@ class PrReportPoster
       Github.warning(
         "Stale #{suite_name} Bencher report comment listing returned no numeric IDs " \
         "(#{non_numeric_comment_ids.size} non-numeric token(s), " \
-        "e.g. #{non_numeric_comment_ids.first.slice(0, 40).inspect}); skipping cleanup."
+        "e.g. #{non_numeric_comment_ids.first.slice(0, 120).inspect}); skipping cleanup."
       )
       return []
     elsif non_numeric_comment_ids.any?
