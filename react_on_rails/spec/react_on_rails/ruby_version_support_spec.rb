@@ -133,9 +133,13 @@ RSpec.describe "Ruby version support" do
       "minimum-node-version" => ci_switch_outputs.fetch("minimum-node-version")
     )
     expect(action_outputs.fetch("ruby-minor-version")).to eq(minor_version(ci_switch_outputs.fetch("ruby-version")))
+    expect(action_outputs.fetch("node-minor-version")).to eq(minor_version(ci_switch_outputs.fetch("node-version")))
     expect(action_outputs.fetch("node-major-version")).to eq(major_version(ci_switch_outputs.fetch("node-version")))
     expect(action_outputs.fetch("minimum-ruby-minor-version")).to eq(
       minor_version(ci_switch_outputs.fetch("minimum-ruby-version"))
+    )
+    expect(action_outputs.fetch("minimum-node-minor-version")).to eq(
+      minor_version(ci_switch_outputs.fetch("minimum-node-version"))
     )
     expect(action_outputs.fetch("minimum-node-major-version")).to eq(
       major_version(ci_switch_outputs.fetch("minimum-node-version"))

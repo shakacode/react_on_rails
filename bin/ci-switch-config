@@ -52,6 +52,8 @@ saved_tool_versions_match_current_head() {
     if [ -n "$saved_head" ] && [ "$saved_head" = "$current_head" ]; then
       return 0
     fi
+    # A stale sidecar is intentionally authoritative: do not fall through to
+    # legacy content comparison when a backup advertises a different HEAD.
     return 1
   fi
 
