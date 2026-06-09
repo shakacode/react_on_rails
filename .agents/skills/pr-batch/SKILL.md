@@ -112,18 +112,11 @@ For high-risk cases above, run Claude's `/simplify` after all required review pa
 
 Before merge, wait for requested or configured review agents such as Claude, CodeRabbit, Greptile, Cursor Bugbot, and Codex review to finish for the current head SHA. Poll CI with bounded commands and timeouts; use narrow required-check commands such as `gh pr checks <PR> --required` for required CI readiness, then also fetch all checks or explicit review-agent checks so non-required reviewers are not hidden. Avoid long-lived `gh ... --watch`. Ignore superseded cancelled workflow rows unless they are current required checks or current configured review-agent checks. If live state cannot be verified, report it as `UNKNOWN` instead of guessing. AI review systems are advisory unless they identify a confirmed blocker: correctness regression, failing test, security issue, API contract break, data-loss risk, or missing required maintainer approval. Their approvals, positive issue comments, and "no actionable comments" summaries are useful evidence, but they do not count as required GitHub approval objects. For high-risk or concurrent-batch PRs, run or request the adversarial PR review workflow in `.agents/workflows/adversarial-pr-review.md`. A completed check is not enough when review comments exist: classify and resolve or explicitly waive actionable findings before merging. Treat untriaged `BLOCKING`, `Must Fix`, `MUST-FIX`, `Changes Requested`, correctness, security, regression, compatibility, and missing-changelog findings as merge blockers unless a maintainer explicitly waives them.
 
-Apply the full-CI uncertainty rule below at the final review/readiness gate:
-request full CI when path-selected CI coverage is uncertain, classify that as
-FYI rather than Immediate maintainer attention, then wait for the current-head
-checks before readiness or merge.
-
-See the coordinator closeout summary in
-`.agents/workflows/pr-processing.md` under **Plan To Goal Handoff** and the
-canonical Coordinator Closeout Lane.
+At the final review/readiness gate, apply the canonical full-CI uncertainty rule and Coordinator Closeout Lane from `.agents/workflows/pr-processing.md` under **Plan To Goal Handoff**.
 
 For blocking questions, stop work on that target, surface a structured question to the coordinator or maintainer, and mark the issue/PR with the agreed pending-question state. Report the question/comment URL as `blocked needing user input`; do not open a speculative PR. For non-blocking questions where you make a decision and continue, record the decision in the PR description before review or merge.
 
-Before final handoff, kill or confirm no stray GitHub polling processes are still running. Final state for every target must be one of: merged PR; open PR waiting on checks/review; blocked needing user input with the surfaced question/comment URL; or no-PR with an evidence-backed issue/PR comment URL. Split the handoff into `Immediate maintainer attention` and `FYI / decisions made`. Put only true blockers or questions in Immediate. Put non-blocking decisions, no-PR rationales, and full-CI uncertainty that was already handled by requesting full CI in FYI. Final handoff must list branches, PR URLs, issue outcomes, validations, last-known CI state, blockers, no-PR comments, and next actions.
+Before final handoff, follow the canonical final-state and `Immediate maintainer attention` / `FYI / decisions made` split in `.agents/workflows/pr-processing.md`.
 ```
 
 ## Question And Decision Handling
