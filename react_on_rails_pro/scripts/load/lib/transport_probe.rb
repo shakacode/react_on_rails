@@ -50,7 +50,11 @@ module RendererHarness
           parser.banner = "Usage: transport_probe [options]"
           parser.on("--requests N", Integer) { |v| opts[:requests] = v }
           parser.on("--warmup N", Integer) { |v| opts[:warmup] = v }
-          parser.on("--body-bytes N", Integer) { |v| opts[:body_bytes] = v }
+          parser.on(
+            "--body-bytes N",
+            Integer,
+            "Request payload size and server body limit"
+          ) { |v| opts[:body_bytes] = v }
           parser.on("--stream-bytes N", Integer) { |v| opts[:stream_bytes] = v }
           parser.on("--scenarios LIST", String) do |v|
             opts[:scenarios] = parse_scenarios(required_value!("--scenarios", v))
@@ -296,24 +300,32 @@ module RendererHarness
             node_version: @server.ready.fetch("nodeVersion"),
             platform: @server.ready.fetch("platform")
           },
+          baseline: baseline_name(results),
           results:,
           deltas: deltas(results)
         }
       end
 
       def deltas(results)
-        baseline_name = results.key?("fastify_tcp") ? "fastify_tcp" : "native_tcp"
-        baseline = results[baseline_name]
+        selected_baseline = baseline_name(results)
+        baseline = results[selected_baseline]
         return {} unless baseline
 
         results.each_with_object({}) do |(scenario, scenario_results), memo|
-          next if scenario == baseline_name
+          next if scenario == selected_baseline
 
           memo[scenario] = PROBE_CASES.keys.each_with_object({}) do |case_name, case_memo|
             deltas = latency_deltas(baseline[case_name], scenario_results[case_name])
             case_memo[case_name] = deltas unless deltas.empty?
           end
         end
+      end
+
+      def baseline_name(results)
+        return "fastify_tcp" if results.key?("fastify_tcp")
+        return "native_tcp" if results.key?("native_tcp")
+
+        nil
       end
 
       def latency_deltas(baseline_case, scenario_case)

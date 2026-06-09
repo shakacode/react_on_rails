@@ -44,6 +44,12 @@ RSpec.describe RendererHarness::TransportProbe do
       end.to raise_error(ArgumentError, /--requests must be >= 1/)
     end
 
+    it "describes the body byte option as payload size and server limit" do
+      expect do
+        described_class.parse(["--help"])
+      end.to output(/Request payload size and server body limit/).to_stdout.and raise_error(SystemExit)
+    end
+
     it "rejects non-positive startup timeout values" do
       expect do
         described_class.parse(["--startup-timeout", "0"])
@@ -159,10 +165,41 @@ RSpec.describe RendererHarness::TransportProbe do
 
       deltas = runner.send(:deltas, results)
 
+      expect(runner.send(:baseline_name, results)).to eq("fastify_tcp")
       expect(deltas).to eq(
         "native_tcp" => {
           "small_unary" => { p50_ms_vs_baseline: -0.25, p95_ms_vs_baseline: -0.5, p99_ms_vs_baseline: -0.75 },
           "stream_response" => { p50_ms_vs_baseline: -0.5, p95_ms_vs_baseline: -1.0, p99_ms_vs_baseline: -1.5 }
+        }
+      )
+    end
+
+    it "records native_tcp as the fallback baseline when Fastify is omitted" do
+      runner = described_class.new(config)
+      server = instance_double(
+        RendererHarness::TransportProbe::NodeServer,
+        ready: { "nodeVersion" => "v22.0.0", "platform" => "darwin arm64" }
+      )
+      results = {
+        "native_tcp" => {
+          "small_unary" => { latency_ms: { p50: 1.0, p95: 2.0, p99: 3.0 } }
+        },
+        "native_uds" => {
+          "small_unary" => { latency_ms: { p50: 0.75, p95: 1.5, p99: 2.25 } }
+        }
+      }
+      runner.instance_variable_set(:@server, server)
+
+      summary = runner.send(:build_summary, results)
+
+      expect(summary[:baseline]).to eq("native_tcp")
+      expect(summary[:deltas]).to eq(
+        "native_uds" => {
+          "small_unary" => {
+            p50_ms_vs_baseline: -0.25,
+            p95_ms_vs_baseline: -0.5,
+            p99_ms_vs_baseline: -0.75
+          }
         }
       )
     end
@@ -430,6 +467,8 @@ RSpec.describe RendererHarness::TransportProbe do
           request.on("error", () => {});
           request.write(Buffer.alloc(5, "x"));
           request.close(http2.constants.NGHTTP2_CANCEL);
+          // Bounded grace period for this dev-tool regression test: let the
+          // server observe the cancelled stream before closing the session.
           setTimeout(() => client.close(), 200);
           setTimeout(() => process.exit(0), 400);
         JS

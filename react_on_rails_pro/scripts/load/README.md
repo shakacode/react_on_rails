@@ -99,6 +99,10 @@ only: a production UDS transport still needs Linux/topology validation against
 the real renderer harness (`bin/renderer-harness`) before adding socket-path
 configuration or runtime transport plumbing.
 
+Summary JSON records the latency-delta baseline in the top-level `baseline`
+field. `fastify_tcp` is preferred when selected; if it is omitted, the probe
+falls back to `native_tcp` as the baseline.
+
 ### Tracking the node-renderer process
 
 To include the node-renderer RSS in `memory.csv`, pass its PID:

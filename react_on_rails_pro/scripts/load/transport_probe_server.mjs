@@ -190,6 +190,8 @@ const assertSocketPathAvailable = async (socketPath) => {
 
 const listenNative = async ({ bodyBytes, host, port, socketPath, streamBytes }) => {
   if (socketPath) {
+    // The default path includes a PID and random suffix; fixed caller-provided
+    // paths still get this best-effort collision guard before listen().
     await assertSocketPathAvailable(socketPath);
   }
 

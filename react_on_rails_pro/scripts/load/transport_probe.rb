@@ -11,7 +11,7 @@ begin
   failures = summary.fetch(:results).values.sum do |case_results|
     case_results.values.sum { |result| result.fetch(:failures) }
   end
-  exit(failures.zero? ? 0 : 1)
+  exit(failures.zero? ? 0 : 3)
 rescue RendererHarness::TransportProbe::UserError,
        ArgumentError,
        OptionParser::ParseError => e
