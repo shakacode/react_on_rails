@@ -76,7 +76,21 @@ Create a new file `config/webpack/rscWebpackConfig.js`:
 
 ```js
 // use the same config as serverWebpackConfig.js but add the RSC loader
+const { existsSync } = require('fs');
+const { dirname, resolve } = require('path');
 const serverWebpackConfig = require('./serverWebpackConfig');
+const reactPackageRoot = dirname(require.resolve('react/package.json'));
+// React 19+ ships these react-server entry files alongside the standard entries.
+const resolveReactServerEntry = (entryFilename) => {
+  const entryPath = resolve(reactPackageRoot, entryFilename);
+  if (!existsSync(entryPath)) {
+    throw new Error(
+      `Expected React server entry "${entryFilename}" at "${entryPath}". ` +
+        'React package layout changed; update the RSC webpack aliases.',
+    );
+  }
+  return entryPath;
+};
 
 // Function that extracts a specific loader from a webpack rule
 function extractLoader(rule, loaderName) {
@@ -117,12 +131,33 @@ const configureRsc = () => {
     }
   });
 
-  // Add the `react-server` condition to the resolve config
-  // This condition is used by React and React on Rails to know that this bundle is a React Server Component bundle
-  // The `...` tells webpack to retain the default Webpack conditions (In this case will keep the `node` condition because the bundle targets node)
+  // Add the `react-server` condition to the resolve config.
+  // This condition is used by React and React on Rails to identify RSC bundles.
+  // The `...` tells webpack to retain default conditions such as `node`.
+  const rscAliases = { ...(rscConfig.resolve?.alias || {}) };
+  delete rscAliases.react;
+  delete rscAliases['react$'];
+  delete rscAliases['react/jsx-runtime'];
+  delete rscAliases['react/jsx-runtime$'];
+  delete rscAliases['react/jsx-dev-runtime'];
+  delete rscAliases['react/jsx-dev-runtime$'];
+  delete rscAliases['react-dom/server'];
+  delete rscAliases['react-dom/server$'];
+
   rscConfig.resolve = {
     ...rscConfig.resolve,
     conditionNames: ['react-server', '...'],
+    alias: {
+      ...rscAliases,
+      // Keep the RSC renderer and app Server Components on the same React
+      // server package instance so React.cache() sees the active dispatcher.
+      react$: resolveReactServerEntry('react.react-server.js'),
+      'react/jsx-runtime$': resolveReactServerEntry('jsx-runtime.react-server.js'),
+      'react/jsx-dev-runtime$': resolveReactServerEntry('jsx-dev-runtime.react-server.js'),
+      // RSC payload generation does not use react-dom/server.
+      // Prefix-match false covers both exact and subpath imports; no $-variant is needed.
+      'react-dom/server': false,
+    },
   };
 
   // Update the output bundle name to be `rsc-bundle.js` instead of `server-bundle.js`
@@ -232,8 +267,8 @@ import lodash from 'lodash';
 // your Rails controller, which passes the results to the component as props (see note below).
 import os from 'os';
 
-// This async component demonstrates server-side functionality
-async function ReactServerComponent() {
+// This component demonstrates server-side functionality
+function ReactServerComponent() {
   console.log('Hello from ReactServerComponent');
 
   // Using moment.js for complex date calculations

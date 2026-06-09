@@ -47,9 +47,51 @@ REPORT_JSON = ENV.fetch("BENCHER_REPORT_JSON", "bench_results/bencher_report.jso
 # NOTE: benchmark_config.rb independently defines DISPLAY_JSON with the same default
 # path; the bench scripts and this tracker run as separate programs, so keep them in sync.
 DISPLAY_JSON = ENV.fetch("BENCHMARK_DISPLAY_JSON", "bench_results/benchmark_display.json")
-REGRESSION_REPORT_JSON = File.join("bench_results", RegressionReport::FILENAME)
+# Initial-run hand-off: a non-fatal candidate written when Bencher alerts on main.
+CANDIDATE_REPORT_JSON = File.join("bench_results", RegressionReport::CANDIDATE_FILENAME)
+# Confirmation-run hand-off: written only when the candidate's alert(s) re-alert.
+CONFIRMED_REPORT_JSON = File.join("bench_results", RegressionReport::CONFIRMED_FILENAME)
+# Directory the first-run candidate artifact was downloaded into (confirmation mode).
+# Read via a recursive glob, not a fixed path, so it works regardless of how
+# upload/download-artifact nests the single file under the download path.
+CANDIDATE_INPUT_DIR = ENV.fetch("BENCHMARK_CANDIDATE_DIR", "candidate")
+
+# A confirmation rerun (BENCHMARK_MODE=confirm) re-tests a main-push regression candidate
+# on a fresh runner before the issue is filed. It must NOT pollute main's Bencher series,
+# so it submits to a throwaway per-run branch and re-tests against main's cloned baseline.
+def confirmation_mode?
+  ENV.fetch("BENCHMARK_MODE", "initial") == "confirm"
+end
+
+# Bencher branch-safe slug: lowercase, runs of non-alphanumerics collapsed to a single
+# dash, no leading/trailing dash. "Pro (shard 1/2)" -> "pro-shard-1-2".
+def slugify(value)
+  value.to_s.downcase.gsub(/[^a-z0-9]+/, "-").gsub(/\A-+|-+\z/, "")
+end
+
+# A unique synthetic Bencher branch for the confirmation rerun, e.g.
+# "confirm-main-123456-pro-shard-1-2". Unique per run AND suite/shard so concurrent
+# confirmation reruns never share a series, and never "main" so the confirmation sample
+# is not appended to main's history.
+def confirmation_branch(run_id, suite_name)
+  "confirm-main-#{run_id}-#{slugify(suite_name)}"
+end
+
+# Re-test against main's baseline without writing into main's series: clone main's
+# thresholds onto the throwaway branch and reset it to a fresh copy of main's head each
+# run. This is the same anchoring the PR path uses (branch_and_start_point_args).
+def confirmation_start_point_args
+  ["--start-point", "main", "--start-point-clone-thresholds", "--start-point-reset"]
+end
 
 def branch_and_start_point_args
+  if confirmation_mode?
+    return [
+      confirmation_branch(ENV.fetch("GITHUB_RUN_ID"), ENV.fetch("BENCHMARK_SUITE_NAME")),
+      confirmation_start_point_args
+    ]
+  end
+
   case ENV.fetch("GITHUB_EVENT_NAME")
   when "push"
     ["main", []]
@@ -136,7 +178,11 @@ def run_bencher(branch, start_point_args)
     # backtrace so the failure is triageable in CI logs. This covers both the initial
     # run and the start-point-hash retry, since both go through run_bencher.
     begin
-      report = BencherReport.parse(stdout)
+      # Pass the measures we actually track so an alert from an orphaned server-side Bencher
+      # threshold (a measure dropped from THRESHOLDS but never deleted in Bencher, e.g.
+      # p90_latency) is treated as filtered rather than a regression — it would otherwise file
+      # an issue the summary table can't even flag (p90 has no :direction column).
+      report = BencherReport.parse(stdout, tracked_measures: THRESHOLDS.map(&:first))
     rescue BencherReport::FormatError => e
       warn "::error::Bencher JSON report has an unexpected shape — re-verify against " \
            "benchmarks/spec/bencher_report_spec.rb before bumping the CLI pin. #{e.message}"
@@ -153,7 +199,15 @@ def run_bencher(branch, start_point_args)
       )
     end
   end
+
   [stderr, status.exitstatus, report]
+end
+
+def normalized_bencher_exit_code(exit_code, report)
+  return exit_code unless exit_code != 0 && report&.filtered_alert? && !regression?(report)
+
+  Github.notice("Bencher reported only stale active alert(s); no current boundary-backed regression remains.")
+  0
 end
 
 def append_step_summary(markdown)
@@ -290,6 +344,81 @@ def regressed_benchmark_names(report)
   report.alerts.filter_map(&:benchmark).uniq
 end
 
+# The structured benchmark+measure pairs Bencher raised an active alert for, deduped.
+# Read from the same alerts[] as #regression?/#regressed_benchmark_names. Handed off in
+# the candidate so a confirmation rerun can require the SAME pair to re-alert (not just
+# any alert in the suite). An alert with no benchmark name is dropped — it can't be
+# matched. measure may be nil; the matcher falls back to name-only for those.
+def regressed_alert_pairs(report)
+  return [] unless report
+
+  report.alerts
+        .select(&:benchmark)
+        .map { |alert| RegressionReport.alert(alert.benchmark, alert.measure) }
+        .uniq
+end
+
+# Read the downloaded first-run candidate (found by recursive glob under dir): its
+# structured alerts and rendered summary. Returns [nil, ""] when the payload is
+# missing/corrupt so the caller can treat the confirmation as inconclusive (an
+# operational failure) rather than silently clearing it.
+def load_candidate(dir)
+  path = Dir.glob(File.join(dir, "**", RegressionReport::CANDIDATE_FILENAME)).first
+  unless path
+    warn "::error::No confirmation candidate (#{RegressionReport::CANDIDATE_FILENAME}) found under " \
+         "#{dir}; treating the confirmation as inconclusive."
+    return [nil, ""]
+  end
+
+  parsed = JSON.parse(File.read(path))
+  unless parsed.is_a?(Hash)
+    warn "::error::Confirmation candidate #{path} is not a JSON object (got #{parsed.class}); " \
+         "treating the confirmation as inconclusive."
+    return [nil, ""]
+  end
+
+  alerts = parsed[RegressionReport::ALERTS]
+  unless alerts.is_a?(Array) && !alerts.empty?
+    warn "::error::Confirmation candidate #{path} has empty or missing " \
+         "#{RegressionReport::ALERTS}; treating the confirmation as inconclusive."
+    return [nil, parsed[RegressionReport::SUMMARY].to_s]
+  end
+
+  [alerts, parsed[RegressionReport::SUMMARY].to_s]
+rescue StandardError => e
+  warn "::error::Could not read confirmation candidate #{path} (#{e.class}: #{e.message}); " \
+       "treating the confirmation as inconclusive."
+  [nil, ""]
+end
+
+# Classify a confirmation rerun. Pure so it is unit-testable.
+#   :inconclusive — no parseable report, or a non-zero exit with no alert (operational
+#                   failure: auth/API/network/CLI). Must fail the workflow, file nothing.
+#   :cleared      — the report parsed but none of the candidate's (non-ignored) alerts
+#                   re-alerted. The first run was noise.
+#   :confirmed    — the same benchmark+measure pair(s) re-alerted; returns just those.
+# Ignored benchmarks are dropped from the candidate side first so a confirmation can
+# never be carried by a benchmark we would suppress anyway.
+def confirmation_outcome(report, bencher_exit_code, candidate_alerts)
+  return [:inconclusive, []] if report.nil?
+  return [:inconclusive, []] if bencher_exit_code != 0 && !regression?(report)
+
+  confirmed = RegressionReport.confirmed_alerts(
+    RegressionReport.actionable_alerts(candidate_alerts),
+    regressed_alert_pairs(report)
+  )
+  return [:cleared, []] if confirmed.empty?
+
+  [:confirmed, confirmed]
+end
+
+# Human-readable "benchmark (measure)" for the workflow summary / logs.
+def describe_alert(alert)
+  benchmark = alert[RegressionReport::ALERT_BENCHMARK]
+  measure = alert[RegressionReport::ALERT_MEASURE]
+  measure ? "#{benchmark} (#{measure})" : benchmark
+end
+
 # A missing start-point baseline (operational, not a regression): retrying without
 # the start-point hash falls back to the latest baseline. The no-regression guard is
 # load-bearing — a real regression must not be silently re-run against a different
@@ -302,6 +431,130 @@ end
 
 def main_push?
   ENV.fetch("GITHUB_EVENT_NAME") == "push" && ENV.fetch("GITHUB_REF") == "refs/heads/main"
+end
+
+# A main-push Bencher alert is now a NON-FATAL candidate: the gate/confirmation jobs
+# rerun the alerting suite/shard on a fresh runner and only file the issue if the SAME
+# benchmark+measure re-alerts, so write the candidate hand-off and exit 0 — the
+# report-regressions job owns the final pass/fail. (A lost hand-off is the one case we
+# still fail the suite, rather than silently drop the regression.) A non-zero exit with
+# NO alert is an operational failure, not a regression, and still fails the suite.
+def report_main_push_candidate(report, report_markdown, bencher_exit_code, suite_name)
+  if regression?(report)
+    exit 1 unless write_candidate(report, report_markdown, suite_name)
+  else
+    warn "::error::Bencher exited #{bencher_exit_code} on main with no regression alert for " \
+         "#{suite_name}; this indicates an operational failure (auth/API/network/CLI), not a " \
+         "performance regression. Check the logs above."
+    exit bencher_exit_code
+  end
+end
+
+# Write the non-fatal first-run candidate for the gate/confirmation jobs. Records the
+# structured alert pairs so the confirmation rerun can require the SAME pair(s) to
+# re-alert, plus the un-sharded suite name (so a suite's shards combine downstream) and
+# the rendered summary. Returns true on success; false means the hand-off was lost, so
+# the caller fails the suite rather than silently dropping the regression.
+def write_candidate(report, report_markdown, suite_name)
+  File.write(
+    CANDIDATE_REPORT_JSON,
+    JSON.generate(
+      RegressionReport::SUITE_NAME => ENV.fetch("BENCHMARK_SUITE_GROUP", suite_name),
+      RegressionReport::SHARD_LABEL => ENV.fetch("BENCHMARK_SHARD_LABEL", ""),
+      RegressionReport::SUMMARY => regression_handoff_summary(report_markdown),
+      RegressionReport::REGRESSED_BENCHMARKS => regressed_benchmark_names(report),
+      RegressionReport::ALERTS => regressed_alert_pairs(report)
+    )
+  )
+  Github.notice(
+    "Bencher flagged a #{suite_name} regression CANDIDATE on main. It is non-fatal until a " \
+    "fresh-runner confirmation rerun re-alerts on the same benchmark+measure. " \
+    "See the Bencher dashboard and the workflow run: #{Github.run_url}"
+  )
+  true
+rescue StandardError => e
+  warn "::error::Bencher flagged a #{suite_name} regression candidate on main but its payload " \
+       "could not be written (#{e.class}: #{e.message}); confirmation cannot run and the issue will " \
+       "NOT be auto-filed — investigate using GitHub run logs: #{Github.run_url}"
+  false
+end
+
+# Write the confirmed hand-off for report-regressions: the first run and confirmation
+# summaries side by side (the comparison is the evidence) and the confirmed alert pairs.
+def write_confirmed(confirmed_alerts, first_run_summary, confirmation_markdown, suite_name)
+  File.write(
+    CONFIRMED_REPORT_JSON,
+    JSON.generate(
+      RegressionReport::SUITE_NAME => ENV.fetch("BENCHMARK_SUITE_GROUP", suite_name),
+      RegressionReport::SHARD_LABEL => ENV.fetch("BENCHMARK_SHARD_LABEL", ""),
+      RegressionReport::FIRST_RUN_SUMMARY => first_run_summary,
+      RegressionReport::CONFIRMATION_SUMMARY => regression_handoff_summary(confirmation_markdown),
+      RegressionReport::ALERTS => confirmed_alerts,
+      RegressionReport::REGRESSED_BENCHMARKS =>
+        confirmed_alerts.filter_map { |alert| alert[RegressionReport::ALERT_BENCHMARK] }.uniq
+    )
+  )
+  true
+rescue StandardError => e
+  warn "::error::A #{suite_name} regression was confirmed on a fresh runner but its payload " \
+       "could not be written (#{e.class}: #{e.message}); the issue will NOT be auto-filed — " \
+       "investigate using GitHub run logs: #{Github.run_url}"
+  false
+end
+
+# State the confirmation outcome in the workflow run summary (acceptance criterion:
+# every first-run alert is visibly confirmed, cleared as noise, or inconclusive).
+def append_confirmation_summary(status, confirmed_alerts, suite_name)
+  body =
+    case status
+    when :confirmed
+      lines = confirmed_alerts.map { |alert| "- #{describe_alert(alert)}" }.join("\n")
+      "## #{suite_name} confirmation: ✅ CONFIRMED\n\n" \
+        "These first-run alerts re-alerted on a fresh runner (re-tested against main's " \
+        "baseline) and will be reported:\n\n#{lines}\n\n"
+    when :cleared
+      "## #{suite_name} confirmation: 🟢 CLEARED (noise)\n\n" \
+      "The first-run alert(s) did not re-alert on a fresh runner. No issue will be filed.\n\n"
+    else
+      "## #{suite_name} confirmation: ⚠️ INCONCLUSIVE\n\n" \
+      "The confirmation rerun could not be evaluated (benchmark execution or Bencher " \
+      "reporting failed). Treated as an operational failure; no issue will be filed.\n\n"
+    end
+  append_step_summary(body)
+end
+
+# The confirmation rerun (BENCHMARK_MODE=confirm). Owns its own exit code:
+#   confirmed   -> write the confirmed hand-off, exit 0 (report-regressions fails the run)
+#   cleared     -> exit 0 (the first-run alert was noise)
+#   inconclusive-> exit 1 (operational failure: fail the workflow, file nothing)
+def run_confirmation(report, bencher_exit_code, confirmation_markdown, suite_name)
+  candidate_alerts, first_run_summary = load_candidate(CANDIDATE_INPUT_DIR)
+  # A missing/corrupt candidate is an operational failure, not a cleared alert.
+  return finish_confirmation(:inconclusive, [], suite_name) if candidate_alerts.nil?
+
+  status, confirmed_alerts = confirmation_outcome(report, bencher_exit_code, candidate_alerts)
+  if status == :confirmed && !write_confirmed(confirmed_alerts, first_run_summary, confirmation_markdown, suite_name)
+    # The regression confirmed but its hand-off was lost: fail rather than drop it.
+    return finish_confirmation(:inconclusive, [], suite_name)
+  end
+
+  finish_confirmation(status, confirmed_alerts, suite_name)
+end
+
+def finish_confirmation(status, confirmed_alerts, suite_name)
+  append_confirmation_summary(status, confirmed_alerts, suite_name)
+  case status
+  when :confirmed
+    Github.notice("Confirmed #{confirmed_alerts.size} #{suite_name} regression alert(s) on a fresh runner.")
+    exit 0
+  when :cleared
+    Github.notice("Cleared #{suite_name} first-run alert(s) as noise; no re-alert on the fresh runner.")
+    exit 0
+  else
+    warn "::error::#{suite_name} confirmation rerun was inconclusive (operational failure); " \
+         "failing the workflow without filing an issue. Investigate: #{Github.run_url}"
+    exit 1
+  end
 end
 
 # Only run the benchmark tracking when invoked as a script; `require`-ing the file
@@ -332,68 +585,42 @@ if __FILE__ == $PROGRAM_NAME
     # and this path only triggers when the first run had no regression.
     _retry_stderr, bencher_exit_code, report = run_bencher(branch, retry_args)
   end
+  bencher_exit_code = normalized_bencher_exit_code(bencher_exit_code, report)
 
   # Build the Markdown summary table once; the same body feeds the job summary, the
-  # PR comment, and (on a main regression) the report-regressions hand-off.
+  # PR comment, and the candidate/confirmation hand-offs.
   report_markdown = rendered_report(report, SUITE_NAME)
   post_report_to_summary(report_markdown)
-  pr_event = ENV.fetch("GITHUB_EVENT_NAME") == "pull_request"
-  if report.nil? && pr_event
-    # A nil report means Bencher produced no parseable output (operational failure). On
-    # a PR, replacing the comment now would delete the previous run's real report and
-    # make an auth/API/network failure look like a normal un-highlighted summary, while
-    # the job still exits 0. Keep the prior comment intact and surface the failure
-    # instead. (post_report_to_summary above is per-run and clobbers nothing.)
-    Github.warning(
-      "Bencher produced no report for #{SUITE_NAME} (operational failure); " \
-      "keeping the previous PR comment intact instead of overwriting it with an un-highlighted table."
-    )
-  elsif pr_event && regression?(report) && report_markdown.empty?
-    # A real regression but no table to render (display sidecar missing/empty). Don't
-    # leave the stale PR comment looking unchanged — post the run-URL fallback (which
-    # also emits ::error::) so the regression is visible in the PR thread, mirroring the
-    # main-push report-regressions hand-off.
-    replace_pr_comments(regression_handoff_summary(report_markdown))
-  else
-    replace_pr_comments(report_markdown)
-  end
 
-  if main_push? && bencher_exit_code != 0
-    if regression?(report)
-      # Record the regression for the post-matrix report-regressions job rather than
-      # filing the issue here: parallel matrix suites would otherwise race to create
-      # duplicate issues and clobber each other's sections in the shared comment.
-      # Use the un-sharded suite name so that job can combine a suite's shards into a
-      # single section (shard_label keeps their ordering deterministic).
-      handoff_summary = regression_handoff_summary(report_markdown)
-      begin
-        File.write(
-          REGRESSION_REPORT_JSON,
-          JSON.generate(
-            RegressionReport::SUITE_NAME => ENV.fetch("BENCHMARK_SUITE_GROUP", SUITE_NAME),
-            RegressionReport::SHARD_LABEL => ENV.fetch("BENCHMARK_SHARD_LABEL", ""),
-            RegressionReport::SUMMARY => handoff_summary,
-            RegressionReport::REGRESSED_BENCHMARKS => regressed_benchmark_names(report)
-          )
-        )
-        Github.warning(
-          "Bencher flagged a #{SUITE_NAME} regression on main (exit #{bencher_exit_code}). " \
-          "The report-regressions job will file the issue. " \
-          "See the Bencher dashboard and the workflow run: #{Github.run_url}"
-        )
-      rescue StandardError => e # rubocop:disable Metrics/BlockNesting
-        # The suite still fails (exit 1 below), so the regression is surfaced; but the
-        # hand-off payload is gone, so report-regressions can't auto-file the issue.
-        warn "::error::Bencher flagged a #{SUITE_NAME} regression on main but its report payload " \
-             "could not be written (#{e.class}: #{e.message}); the issue will NOT be auto-filed — " \
-             "investigate using GitHub run logs: #{Github.run_url}"
-      end
-      exit 1
+  if confirmation_mode?
+    # Fresh-runner rerun of a main-push candidate. Owns its own exit code (confirmed /
+    # cleared / inconclusive) and never posts PR comments.
+    run_confirmation(report, bencher_exit_code, report_markdown, SUITE_NAME)
+  else
+    pr_event = ENV.fetch("GITHUB_EVENT_NAME") == "pull_request"
+    if report.nil? && pr_event
+      # A nil report means Bencher produced no parseable output (operational failure). On
+      # a PR, replacing the comment now would delete the previous run's real report and
+      # make an auth/API/network failure look like a normal un-highlighted summary, while
+      # the job still exits 0. Keep the prior comment intact and surface the failure
+      # instead. (post_report_to_summary above is per-run and clobbers nothing.)
+      Github.warning(
+        "Bencher produced no report for #{SUITE_NAME} (operational failure); " \
+        "keeping the previous PR comment intact instead of overwriting it with an un-highlighted table."
+      )
+    elsif pr_event && regression?(report) && report_markdown.empty?
+      # A real regression but no table to render (display sidecar missing/empty). Don't
+      # leave the stale PR comment looking unchanged — post the run-URL fallback (which
+      # also emits ::error::) so the regression is visible in the PR thread, mirroring the
+      # main-push candidate hand-off.
+      replace_pr_comments(regression_handoff_summary(report_markdown))
     else
-      warn "::error::Bencher exited #{bencher_exit_code} on main with no regression alert for #{SUITE_NAME}; " \
-           "this indicates an operational failure (auth/API/network/CLI), not a performance regression. " \
-           "Check the logs above."
-      exit bencher_exit_code
+      replace_pr_comments(report_markdown)
+    end
+
+    if main_push? && bencher_exit_code != 0
+      report_main_push_candidate(report, report_markdown, bencher_exit_code,
+                                 SUITE_NAME)
     end
   end
 end

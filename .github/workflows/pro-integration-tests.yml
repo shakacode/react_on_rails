@@ -543,3 +543,283 @@ jobs:
         with:
           name: pro-playwright-report
           path: react_on_rails_pro/spec/dummy/playwright-report
+
+  # Layer 2 Rspack + RSC runtime gate: build client/server/RSC bundles, boot Rails
+  # and the Pro Node renderer, then prove RSC client-boundary routes hydrate.
+  dummy-app-rspack-rsc-runtime-gate:
+    needs:
+      - detect-changes
+    if: |
+      !(
+        github.event_name == 'push' &&
+        github.ref == 'refs/heads/main' &&
+        needs.detect-changes.outputs.non_runtime_only == 'true'
+      ) && (
+        github.ref == 'refs/heads/main' ||
+        github.event_name == 'workflow_dispatch' ||
+        needs.detect-changes.outputs.run_pro_tests == 'true' ||
+        needs.detect-changes.outputs.run_pro_dummy_tests == 'true'
+      )
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    env:
+      REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+      # Pin Rails and the renderer to the same IPv4 loopback endpoint.
+      REACT_RENDERER_URL: http://127.0.0.1:3800
+      RENDERER_HOST: 127.0.0.1
+      SHAKAPACKER_ASSETS_BUNDLER: rspack
+    services:
+      redis:
+        image: cimg/redis:6.2.6
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Ruby
+        uses: ./.github/actions/setup-ruby
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
+          bundler-version: 2.5.4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          # Pin to 22.12.0 (Shakapacker 10.1 floor) to avoid V8 bug in 22.21.0
+          # https://github.com/nodejs/node/issues/56010
+          node-version: '22.12.0'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Print system information
+        run: |
+          echo "Linux release: "; cat /etc/issue
+          echo "Current user: "; whoami
+          echo "Current directory: "; pwd
+          echo "Ruby version: "; ruby -v
+          echo "Node version: "; node -v
+          echo "pnpm version: "; pnpm --version
+          echo "Bundler version: "; bundle --version
+
+      - name: Install Ruby Gems for Pro dummy app
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: react_on_rails_pro/spec/dummy
+          ruby-version: ${{ env.RUBY_VERSION }}
+          install-libyaml: 'false'
+
+      - name: Install Node modules with pnpm
+        working-directory: .
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace packages
+        working-directory: .
+        run: pnpm run build
+
+      - name: Ensure minimum required Chrome version
+        run: |
+          echo -e "Installed $(google-chrome --version)\n"
+          MINIMUM_REQUIRED_CHROME_VERSION=75
+          INSTALLED_CHROME_MAJOR_VERSION="$(google-chrome --version | tr ' .' '\t' | cut -f3)"
+          if [[ $INSTALLED_CHROME_MAJOR_VERSION -lt $MINIMUM_REQUIRED_CHROME_VERSION ]]; then
+            wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+            sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
+            sudo apt-get update
+            sudo apt-get install google-chrome-stable
+            echo -e "\nInstalled $(google-chrome --version)"
+          fi
+
+      - name: Generate file-system based entrypoints
+        run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
+
+      - name: Build Rspack RSC test bundles for Pro dummy app
+        run: cd spec/dummy && pnpm run build:test:rspack
+
+      - name: Run Pro Node renderer in background
+        run: |
+          cd spec/dummy
+          pnpm run node-renderer &
+
+      - name: Run Rails server in background
+        run: |
+          cd spec/dummy
+          RAILS_ENV="test" bundle exec rails server &
+
+      - name: Wait for Rails server and Node renderer to start
+        run: |
+          wait_for_service() {
+            name="$1"
+            shift 1
+            timeout=300
+            start=$SECONDS
+
+            while true; do
+              for url in "$@"; do
+                curl --fail --silent --max-time 5 "$url" > /dev/null && {
+                  elapsed=$((SECONDS - start))
+                  echo "${name} started at ${url} after ${elapsed}s"
+                  return 0
+                }
+              done
+
+              sleep 1
+              elapsed=$((SECONDS - start))
+              if [ $elapsed -ge $timeout ]; then
+                echo "Timeout waiting for ${name} to start after ${timeout}s"
+                exit 1
+              fi
+            done
+          }
+
+          wait_for_h2c_service() {
+            name="$1"
+            path="$2"
+            shift 2
+            timeout=300
+            start=$SECONDS
+
+            while true; do
+              for authority in "$@"; do
+                if node - "$authority" "$path" <<'NODE'
+          const http2 = require('node:http2');
+
+          const [authority, path] = process.argv.slice(2);
+          const client = http2.connect(authority);
+          const request = client.request({ ':method': 'GET', ':path': path });
+          let status;
+          let timeout;
+          let completed = false;
+
+          const finish = (exitCode, destroyClient = false) => {
+            if (completed) return;
+            completed = true;
+            clearTimeout(timeout);
+            if (destroyClient) {
+              client.destroy();
+            } else {
+              client.close();
+            }
+            process.exit(exitCode);
+          };
+
+          const fail = () => finish(1, true);
+
+          client.on('error', fail);
+          request.on('error', fail);
+          request.on('response', (headers) => {
+            status = headers[':status'];
+          });
+          request.on('data', () => {});
+          request.on('end', () => {
+            finish(status >= 200 && status < 300 ? 0 : 1);
+          });
+          request.end();
+          timeout = setTimeout(fail, 10000);
+          NODE
+                then
+                  elapsed=$((SECONDS - start))
+                  echo "${name} started at ${authority}${path} after ${elapsed}s"
+                  return 0
+                fi
+              done
+
+              sleep 1
+              elapsed=$((SECONDS - start))
+              if [ $elapsed -ge $timeout ]; then
+                echo "Timeout waiting for ${name} to start after ${timeout}s"
+                echo "::group::${name} h2c readiness diagnostics"
+                for authority in "$@"; do
+                  echo "GET ${authority}${path}"
+                  node - "$authority" "$path" <<'NODE' || true
+          const http2 = require('node:http2');
+
+          const [authority, path] = process.argv.slice(2);
+          const client = http2.connect(authority);
+          let body = '';
+          const timeout = setTimeout(() => {
+            console.error('diagnostic timeout without response');
+            client.destroy();
+            process.exit(1);
+          }, 5000);
+
+          const finish = (exitCode) => {
+            clearTimeout(timeout);
+            client.close();
+            process.exit(exitCode);
+          };
+
+          client.on('error', (error) => {
+            console.error(`connect error: ${error.message}`);
+            finish(1);
+          });
+          const request = client.request({ ':method': 'GET', ':path': path });
+          request.on('response', (headers) => {
+            console.log(`response headers: ${JSON.stringify(headers)}`);
+          });
+          request.on('data', (chunk) => {
+            body += chunk.toString();
+            body = body.slice(0, 500);
+          });
+          request.on('end', () => {
+            if (body) console.log(`response body: ${body}`);
+            finish(0);
+          });
+          request.on('error', (error) => {
+            console.error(`request error: ${error.message}`);
+            finish(1);
+          });
+          request.end();
+          NODE
+                done
+                echo "::endgroup::"
+                exit 1
+              fi
+            done
+          }
+
+          # Both processes are already running; sequential waits keep the logs easier
+          # to read while the renderer can continue booting during the Rails poll.
+          wait_for_service "Rails server" "http://127.0.0.1:3000/empty"
+          # Single IPv4 authority is intentional: RENDERER_HOST binds h2c to
+          # 127.0.0.1. Add ::1 here only if the renderer binding changes.
+          wait_for_h2c_service "Node renderer" "/info" "http://127.0.0.1:3800"
+
+      - name: Install Playwright dependencies
+        run: cd spec/dummy && npx playwright install --with-deps
+
+      - name: Run RSC Playwright E2E tests for Pro dummy app
+        run: cd spec/dummy && pnpm e2e-test:rsc
+
+      - name: Store test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pro-rspack-rsc-playwright-test-results
+          path: react_on_rails_pro/spec/dummy/test-results/results.xml
+
+      - name: Store Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pro-rspack-rsc-playwright-report
+          path: react_on_rails_pro/spec/dummy/playwright-report
