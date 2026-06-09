@@ -96,15 +96,20 @@ jobs:
         id: tool-versions
         uses: ./.github/actions/read-tool-versions
       - id: set-matrix
+        env:
+          FORCE_RUN: ${{ inputs.force_run }}
+          HAS_FULL_CI_LABEL: ${{ needs.detect-changes.outputs.has_full_ci_label }}
+          LATEST_RUBY_VERSION: ${{ steps.tool-versions.outputs.ruby-minor-version }}
+          MINIMUM_RUBY_VERSION: ${{ steps.tool-versions.outputs.minimum-ruby-minor-version }}
         run: |
-          latest_ruby_version="${{ steps.tool-versions.outputs.ruby-minor-version }}"
-          minimum_ruby_version="${{ steps.tool-versions.outputs.minimum-ruby-minor-version }}"
+          latest_ruby_version="$LATEST_RUBY_VERSION"
+          minimum_ruby_version="$MINIMUM_RUBY_VERSION"
 
           # Determine if we should run full matrix (main, workflow_dispatch, force_run, or full-ci label)
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]] || \
-             [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
-             [[ "${{ inputs.force_run }}" == "true" ]] || \
-             [[ "${{ needs.detect-changes.outputs.has_full_ci_label }}" == "true" ]]; then
+          if [[ "$GITHUB_REF" == "refs/heads/main" ]] || \
+             [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]] || \
+             [[ "$FORCE_RUN" == "true" ]] || \
+             [[ "$HAS_FULL_CI_LABEL" == "true" ]]; then
             # Full matrix: test both latest and minimum supported versions
             matrix="$(jq -nc \
               --arg latest_ruby_version "$latest_ruby_version" \
