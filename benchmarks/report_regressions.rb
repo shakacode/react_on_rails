@@ -40,10 +40,12 @@ class RegressionIssueReporter
     new(**attributes).report(summary)
   end
 
-  def initialize(suite_name:, github_run_url:, bencher_url:, issue_number_cache: nil, report_comment_id_cache: nil)
+  def initialize(suite_name:, github_run_url:, bencher_url:, regressed_overview: "",
+                 issue_number_cache: nil, report_comment_id_cache: nil)
     @suite_name = suite_name
     @github_run_url = github_run_url
     @bencher_url = bencher_url
+    @regressed_overview = regressed_overview
     @issue_number_cache = issue_number_cache
     @report_comment_id_cache = report_comment_id_cache
     @commit_short = ENV.fetch("GITHUB_SHA")[0, 7]
@@ -63,7 +65,8 @@ class RegressionIssueReporter
 
   private
 
-  attr_reader :suite_name, :github_run_url, :bencher_url, :issue_number_cache, :report_comment_id_cache, :commit_short
+  attr_reader :suite_name, :github_run_url, :bencher_url, :regressed_overview, :issue_number_cache,
+              :report_comment_id_cache, :commit_short
 
   def ensure_regression_label
     GithubCli.run(
@@ -321,7 +324,7 @@ class RegressionIssueReporter
       | **Pushed by** | @#{github_actor} |
       | **Workflow run** | [Run ##{github_run_number}](#{github_run_url}) |
       | **Bencher dashboard** | [View history](#{bencher_url}) |
-
+      #{regressed_section}
       ### What to do
 
       1. Check the workflow run for the full Bencher HTML report
@@ -332,6 +335,24 @@ class RegressionIssueReporter
 
       ---
       *This issue was created automatically by the benchmark CI workflow.*
+    MARKDOWN
+  end
+
+  # A "What regressed" section naming the confirmed benchmark+measure pairs, so the issue
+  # body itself says what regressed (the per-suite tables flag only rps/p50, never the
+  # column-less failed_pct). Empty when no structured pairs were handed off, leaving the
+  # body unchanged.
+  def regressed_section
+    return "" if regressed_overview.to_s.strip.empty?
+
+    <<~MARKDOWN
+
+      ### What regressed
+
+      The fresh-runner confirmation re-alerted on these benchmark + measure pairs:
+
+      #{regressed_overview}
+
     MARKDOWN
   end
 
@@ -400,6 +421,23 @@ def shard_summary(payload)
   MARKDOWN
 end
 
+# A flat, deduped list of the confirmed benchmark+measure pairs across all suites, for the
+# issue body — so a reader sees what regressed without opening the per-suite tables. Built
+# from each payload's structured ALERTS ({benchmark, measure}); "" when no payload carried
+# them (older writer, or alerts with no benchmark name), which leaves the body unchanged.
+def regressed_overview_markdown(payloads)
+  payloads
+    .flat_map { |payload| payload[RegressionReport::ALERTS] || [] }
+    .select { |pair| pair.is_a?(Hash) && pair[RegressionReport::ALERT_BENCHMARK] }
+    .uniq
+    .map do |pair|
+      benchmark = pair[RegressionReport::ALERT_BENCHMARK]
+      measure = pair[RegressionReport::ALERT_MEASURE]
+      measure ? "- `#{benchmark}` — **#{measure}**" : "- `#{benchmark}`"
+    end
+    .join("\n")
+end
+
 # Reports the confirmed regressions. Returns:
 #   :clean  — no confirmed payloads (every first-run alert cleared as noise / ignored)
 #   :filed  — at least one confirmed regression filed/updated successfully
@@ -418,12 +456,17 @@ def report_regressions(artifacts_dir)
   # One section per suite: a sharded suite emits one payload per shard, so combine
   # them rather than filing a section per shard. Suites sorted for stable output.
   by_suite = readable.group_by { |payload| payload.fetch(RegressionReport::SUITE_NAME) }
+  # Name every confirmed benchmark+measure pair across all suites in the issue body so it is
+  # actionable on its own. Computed once and passed to each suite's reporter; only the
+  # reporter that creates the issue renders the body.
+  regressed_overview = regressed_overview_markdown(readable)
   issue_number_cache = {}
   report_comment_id_cache = {}
   reported_ok = by_suite.keys.sort.map do |suite_name|
     report_suite(
       suite_name,
       by_suite.fetch(suite_name),
+      regressed_overview:,
       issue_number_cache:,
       report_comment_id_cache:
     )
@@ -435,7 +478,7 @@ def report_regressions(artifacts_dir)
   :filed
 end
 
-def report_suite(suite_name, payloads, issue_number_cache: nil, report_comment_id_cache: nil)
+def report_suite(suite_name, payloads, regressed_overview: "", issue_number_cache: nil, report_comment_id_cache: nil)
   # Order shard summaries by shard number ("2/5" before "10/5"); each already
   # self-labels with its shard in its headers, so concatenation reads cleanly.
   summary = payloads
@@ -449,6 +492,7 @@ def report_suite(suite_name, payloads, issue_number_cache: nil, report_comment_i
     github_run_url: Github.run_url,
     bencher_url: BENCHER_URL,
     summary:,
+    regressed_overview:,
     issue_number_cache:,
     report_comment_id_cache:
   )
