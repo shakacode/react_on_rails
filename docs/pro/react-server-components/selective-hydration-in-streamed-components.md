@@ -32,6 +32,7 @@ end %>
 Then create a component that awaits the async prop:
 
 ```jsx
+// app/javascript/packs/components/ReactServerComponentPage.jsx
 // The async component awaits the slow data promise
 async function LongWaitingComponent({ dataPromise }) {
   const data = await dataPromise; // Resolves when Rails emits it

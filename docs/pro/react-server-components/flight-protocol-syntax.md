@@ -191,7 +191,7 @@ React.createElement(Counter);
 
 When a server component is async, Flight handles it with promise references using the `$@` prefix. This is what enables streaming in React Server Components.
 
-In React on Rails, slow data is streamed using [async props](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently) — Rails emits each prop as it resolves, and the component awaits the promise via `getReactOnRailsAsyncProp`. Here's an example:
+In React on Rails, slow data is streamed using [async props](../../oss/migrating/rsc-data-fetching.md#async-props-stream-each-slow-prop-independently) — Rails emits each prop as it resolves, and the component awaits the promise via `getReactOnRailsAsyncProp`. React on Rails injects `getReactOnRailsAsyncProp` into the component props when you use `stream_react_component_with_async_props`. Here's an example:
 
 ```erb
 <%# Rails view: stream slow data as an async prop %>
@@ -225,7 +225,7 @@ async function SlowData({ dataPromise }) {
 }
 ```
 
-> **How it works:** `getReactOnRailsAsyncProp('slowData')` returns a Promise that resolves when Rails calls `emit.call("slowData", ...)`. The component awaits this promise inside a `<Suspense>` boundary, so React streams the fallback immediately and swaps in the real content when the data arrives. See [RSC Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md) for the full pattern.
+> **React on Rails note:** `getReactOnRailsAsyncProp('slowData')` returns a Promise that resolves when Rails calls `emit.call("slowData", ...)`. The component awaits this promise inside a `<Suspense>` boundary, so React streams the fallback immediately and swaps in the real content when the data arrives. See [RSC Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md) for the full pattern.
 
 The server starts streaming immediately, it doesn't wait for SlowData to finish:
 
