@@ -94,20 +94,20 @@ class BencherRunner
     end
 
     tmp_report_json = "#{report_json}.tmp"
-    moved = false
-    report_verified = false
     begin
       File.write(tmp_report_json, stdout)
       FileUtils.mv(tmp_report_json, report_json)
-      moved = true
-      result = parse_report(stdout)
-      report_verified = true
-      result
     ensure
       FileUtils.rm_f(tmp_report_json)
+    end
+
+    begin
+      parse_report(stdout)
+    rescue StandardError
       # Remove malformed output so a future retry starts clean; the raw debugging
       # artifact is lost, but a bad report file is worse than no report file.
-      FileUtils.rm_f(report_json) if moved && !report_verified
+      FileUtils.rm_f(report_json)
+      raise
     end
   end
 

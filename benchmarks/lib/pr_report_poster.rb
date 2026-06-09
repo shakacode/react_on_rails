@@ -81,6 +81,7 @@ class PrReportPoster
         "(#{non_numeric_comment_ids.size} non-numeric token(s), " \
         "e.g. #{non_numeric_comment_ids.first.slice(0, 40).inspect}); skipping cleanup."
       )
+      return []
     elsif non_numeric_comment_ids.any?
       Github.warning(
         "Stale #{suite_name} Bencher report comment listing returned " \
