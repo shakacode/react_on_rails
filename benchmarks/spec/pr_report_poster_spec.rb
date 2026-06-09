@@ -111,12 +111,13 @@ RSpec.describe PrReportPoster do
       )
     end
 
-    it "does not delete anything when the stale comment listing command fails" do
+    it "warns and does not delete anything when the stale comment listing command fails" do
       status = instance_double(Process::Status, success?: false)
 
       allow(GithubCli).to receive_messages(capture: ["111\n", status], run: true)
 
-      poster.replace("### report")
+      expect { poster.replace("### report") }
+        .to output(/::warning::Failed to list stale Core Bencher report comments; skipping cleanup/).to_stdout
 
       expect(GithubCli).not_to have_received(:run).with(
         "gh", "api", "-X", "DELETE", "repos/shakacode/react_on_rails/issues/comments/111",

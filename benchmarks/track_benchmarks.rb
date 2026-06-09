@@ -120,7 +120,7 @@ rescue BencherRunner::ReportParseError => e
   warn "::error::#{e.message}"
   exit 1
 rescue SystemCallError, RuntimeError => e
-  warn "::error::Benchmark report I/O failed: #{e.message}"
+  warn "::error::Benchmark report persistence failed: #{e.message}"
   exit 1
 end
 

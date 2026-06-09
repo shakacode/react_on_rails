@@ -136,9 +136,10 @@ RSpec.describe "track_benchmarks" do
 
       expect do
         run_bencher!("branch", [])
-      end.to output(%r{::error::Benchmark report I/O failed: No space}).to_stderr.and raise_error(SystemExit) { |e|
-        expect(e.status).to eq(1)
-      }
+      end.to(
+        output(/::error::Benchmark report persistence failed: No space/).to_stderr
+          .and(raise_error(SystemExit) { |e| expect(e.status).to eq(1) })
+      )
     end
 
     it "formats non-system benchmark report write failures as GitHub Actions errors" do
@@ -149,7 +150,7 @@ RSpec.describe "track_benchmarks" do
       expect do
         run_bencher!("branch", [])
       end.to(
-        output(%r{::error::Benchmark report I/O failed: disk layer failed}).to_stderr
+        output(/::error::Benchmark report persistence failed: disk layer failed/).to_stderr
           .and(raise_error(SystemExit) { |e| expect(e.status).to eq(1) })
       )
     end

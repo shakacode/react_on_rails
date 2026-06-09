@@ -75,7 +75,10 @@ class PrReportPoster
       env: { "MARKER" => marker, "CUTOFF_TS" => before },
       error_message: "Failed to list stale #{suite_name} Bencher report comments"
     )
-    return [] unless status.success?
+    unless status.success?
+      Github.warning("Failed to list stale #{suite_name} Bencher report comments; skipping cleanup.")
+      return []
+    end
 
     comment_ids = stdout.lines.map(&:strip).reject(&:empty?)
     numeric_comment_ids = comment_ids.grep(/\A\d+\z/)

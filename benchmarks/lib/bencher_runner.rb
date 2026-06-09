@@ -87,7 +87,8 @@ class BencherRunner
   end
 
   # Writes Bencher stdout to disk atomically (tmp -> mv), then parses it.
-  # On I/O failure the prior report at report_json is left untouched.
+  # On write/move failure the prior report at report_json is left untouched.
+  # Empty Bencher stdout removes any stale prior report because there is no new output to preserve.
   # On parse failure the newly-written malformed report is removed so a future
   # retry starts clean rather than re-posting garbage.
   def persist_report(stdout)
