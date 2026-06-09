@@ -47,7 +47,8 @@ jobs:
     env:
       CI_JOB_NUMBER: 1
     steps:
-      # 1. Get PR's size-limit config first (base branch may not have it)
+      # 1. Checkout before setup-node so .tool-versions exists, and keep the PR's
+      #    size-limit config because the base branch may not have it.
       - name: Checkout PR branch for config
         uses: actions/checkout@v4
         with:
