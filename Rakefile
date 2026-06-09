@@ -94,8 +94,10 @@ end
 
 # MAINTAINER NOTE: When adding a package Rake task that should work from the
 # monorepo root, add it here so `rake <task>` delegates into the react_on_rails
-# bundle. To audit drift, compare root `bundle exec rake -T` with
-# `(cd react_on_rails && bundle exec rake -T)`.
+# bundle.
+# Audit drift:
+#   diff <(bundle exec rake -T | awk '{print $2}' | sort) \
+#        <(cd react_on_rails && bundle exec rake -T | awk '{print $2}' | sort)
 %w[
   all_but_examples
   ci

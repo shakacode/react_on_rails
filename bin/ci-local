@@ -41,6 +41,7 @@ ROOT_DIR="$(git rev-parse --show-toplevel)"
 ROOT_GEMFILE="$ROOT_DIR/Gemfile"
 OSS_GEMFILE="$ROOT_DIR/react_on_rails/Gemfile"
 PRO_GEMFILE="$ROOT_DIR/react_on_rails_pro/Gemfile"
+cd "$ROOT_DIR"
 
 # Keep this helper in sync with bin/ci-rerun-failures and bin/setup.
 bundle_command() {
@@ -226,9 +227,9 @@ ensure_oss_dependencies() {
     return 0
   fi
 
-  if ! (cd react_on_rails && bundle_command "$OSS_GEMFILE" bundle check >/dev/null 2>&1); then
+  if ! (cd "$ROOT_DIR/react_on_rails" && bundle_command "$OSS_GEMFILE" bundle check >/dev/null 2>&1); then
     echo -e "${YELLOW}Installing react_on_rails Ruby dependencies...${NC}"
-    if ! (cd react_on_rails && bundle_command "$OSS_GEMFILE" bundle install); then
+    if ! (cd "$ROOT_DIR/react_on_rails" && bundle_command "$OSS_GEMFILE" bundle install); then
       echo -e "${RED}✗ react_on_rails dependency installation failed${NC}"
       echo -e "${RED}Cannot proceed without dependencies. Please fix the errors above.${NC}"
       exit 1
