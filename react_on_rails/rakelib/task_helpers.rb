@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "bundler" # Provides Bundler.with_unbundled_env for child bundle commands.
 require "English"
 
 module ReactOnRails
