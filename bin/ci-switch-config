@@ -55,8 +55,9 @@ saved_tool_versions_match_current_head() {
     return 1
   fi
 
-  # Legacy fallback: no matching HEAD sidecar means this may be an older backup.
-  # Accept it only when its content still matches the committed .tool-versions.
+  # Legacy fallback for backups created before the HEAD sidecar existed. With no
+  # sidecar, content identity is the only safe proxy for "captured at this head".
+  # Accept the backup only when it already matches the committed latest profile.
   git -C "$PROJECT_ROOT" show HEAD:.tool-versions 2>/dev/null | cmp -s "$MAXIMUM_TOOL_VERSIONS_FILE" -
 }
 

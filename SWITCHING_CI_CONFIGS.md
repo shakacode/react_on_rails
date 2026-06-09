@@ -203,6 +203,10 @@ When switching to **latest**, `.tool-versions` is restored from `.maximum.tool-v
 matches the current git head (or from git if no current saved profile exists), and dependency files are restored
 from git.
 
+Keep `.tool-versions` and `.minimum.tool-versions` to plain `tool version` lines with no comments so both mise and
+asdf can parse them. The latest Node profile intentionally stays at `22.12.0` until the Node `22.21.0` startup
+regression tracked in nodejs/node#56010 is avoided.
+
 ## Common Workflows
 
 ### Debugging a Minimum Config CI Failure
