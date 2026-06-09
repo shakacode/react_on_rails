@@ -152,6 +152,7 @@ def replace_pr_comments(markdown)
 end
 
 def pr_report_poster
+  # Only called from replace_pr_comments, which guards against non-PR runs first.
   @pr_report_poster ||= PrReportPoster.from_env(suite_name: SUITE_NAME, marker: REPORT_MARKER)
 end
 
@@ -462,8 +463,8 @@ if __FILE__ == $PROGRAM_NAME
     # The retry's stderr is unused: regression classification reads the JSON report,
     # and this path only triggers when the first run had no regression.
     retry_result = run_bencher!(branch, retry_args)
-    # Intentionally leave retry_result.stderr unused, preserving the old _retry_stderr
-    # clarity: only the retry's exit code and parsed report affect the final outcome.
+    # Intentionally leave retry_result.stderr unused here. BencherRunner#run has
+    # already emitted it; only the exit code and parsed report affect the outcome.
     bencher_exit_code = retry_result.exit_code
     report = retry_result.report
   end

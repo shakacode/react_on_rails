@@ -40,6 +40,8 @@ class BencherRunner
     @report_json = report_json
   end
 
+  # Returns a Result with :stderr, :exit_code, and :report accessors. The
+  # private constant keeps callers from depending on the struct class name.
   def run(branch:, start_point_args:)
     # This Bencher CLI call is not wrapped in Timeout.timeout because that can leak
     # child processes. In CI it is bounded by the GitHub Actions job timeout for
