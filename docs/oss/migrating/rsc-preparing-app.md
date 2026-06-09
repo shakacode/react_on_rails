@@ -251,6 +251,7 @@ module.exports = configureRsc;
 > **Mutation safety note:** This example assumes `serverWebpackConfig(true)` returns a fresh config object per call. If your setup reuses shared config objects, clone `module.rules` / `rule.use` before mutating them in `configureRsc`.
 >
 > **React aliases note:** Do not alias `react` to a package directory in the RSC bundle. Directory aliases can bypass the `react-server` condition or create duplicate React server modules. The exact file aliases in the example above keep `React.cache()` request-local memoization connected to the RSC renderer dispatcher.
+> Before applying those aliases, remove any inherited `react`, `react$`, `react/jsx-runtime`, `react/jsx-runtime$`, `react/jsx-dev-runtime`, `react/jsx-dev-runtime$`, `react-dom/server`, and `react-dom/server$` aliases from the server config, matching the cleanup block shown above.
 
 ### 4b. Add RSCWebpackPlugin to the server webpack config
 
