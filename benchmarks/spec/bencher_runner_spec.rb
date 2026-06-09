@@ -116,7 +116,7 @@ RSpec.describe BencherRunner do
         .to output(/::warning::Bencher report listed benchmarks but no perf-link context/).to_stdout
     end
 
-    it "preserves stale active alerts as filtered so retry handling can run first" do
+    it "returns exit_code=1 and a non-regression filtered_alert? report as a retry precondition" do
       status = instance_double(Process::Status, exitstatus: 1)
       report_json = JSON.generate(
         "results" => [[{

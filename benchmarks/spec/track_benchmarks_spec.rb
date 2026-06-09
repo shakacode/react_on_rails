@@ -128,6 +128,20 @@ RSpec.describe "track_benchmarks" do
     end
   end
 
+  describe "#run_bencher!" do
+    it "formats benchmark report I/O failures as GitHub Actions errors" do
+      runner = instance_double(BencherRunner)
+      allow(self).to receive(:bencher_runner).and_return(runner)
+      allow(runner).to receive(:run).and_raise(Errno::ENOSPC, "report.json")
+
+      expect do
+        run_bencher!("branch", [])
+      end.to output(%r{::error::Benchmark report I/O failed: No space}).to_stderr.and raise_error(SystemExit) { |e|
+        expect(e.status).to eq(1)
+      }
+    end
+  end
+
   # Confirmation mode (BENCHMARK_MODE=confirm): a fresh-runner rerun of a main-push
   # candidate. These pin the synthetic-branch/reset-baseline targeting, the structured
   # alert pairs handed off to the confirmation, and the confirmed/cleared/inconclusive
