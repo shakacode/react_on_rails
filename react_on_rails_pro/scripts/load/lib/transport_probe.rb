@@ -223,7 +223,7 @@ module RendererHarness
         else
           [
             Async::HTTP::Endpoint.parse(endpoint.fetch("origin"), protocol: Async::HTTP::Protocol::HTTP2),
-            { protocol: Async::HTTP::Protocol::HTTP2, retries: 0 }
+            { retries: 0 }
           ]
         end
       end

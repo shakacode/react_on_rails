@@ -99,9 +99,9 @@ const streamChunks = (bytesTotal) => {
   return Readable.from(chunks);
 };
 
-const writeJson = (stream, status, payload) => {
+const writeJson = (stream, status, payload, onFinish) => {
   if (stream.closed || stream.destroyed || stream.session?.closed || stream.session?.destroyed) {
-    return;
+    return false;
   }
 
   const body = Buffer.from(JSON.stringify(payload));
@@ -111,11 +111,13 @@ const writeJson = (stream, status, payload) => {
       'content-type': 'application/json',
       'content-length': body.length,
     });
-    stream.end(body);
+    stream.end(body, onFinish);
+    return true;
   } catch (error) {
     if (error.code !== 'ERR_HTTP2_INVALID_STREAM') {
       throw error;
     }
+    return false;
   }
 };
 
@@ -134,10 +136,8 @@ const closeStream = (stream) => {
 };
 
 const writeReadError = (stream, error) => {
-  writeJson(stream, error.statusCode || 500, { ok: false, error: error.message });
-  if (error.statusCode === 413) {
-    closeStream(stream);
-  }
+  const onFinish = error.statusCode === 413 ? () => closeStream(stream) : undefined;
+  writeJson(stream, error.statusCode || 500, { ok: false, error: error.message }, onFinish);
 };
 
 const handleNativeStream = (stream, headers, { bodyBytes, streamBytes }) => {
@@ -214,6 +214,7 @@ const listenFastify = async ({ bodyBytes, host, port, streamBytes }) => {
     ok: true,
     receivedBytes: Buffer.isBuffer(request.body) ? request.body.length : 0,
   }));
+  // Fastify applies bodyLimit before this handler; the stream probe discards the request body.
   app.post('/probe/stream', async (_request, reply) => {
     reply.type('application/octet-stream');
     return reply.send(streamChunks(streamBytes));
@@ -266,8 +267,8 @@ const main = async () => {
   }
 
   if (scenarios.includes('native_uds')) {
-    const nativeUdsServer = await listenNative({ bodyBytes, socketPath, streamBytes });
     nativeUdsSocketCreated = true;
+    const nativeUdsServer = await listenNative({ bodyBytes, socketPath, streamBytes });
     servers.push({ server: nativeUdsServer, type: 'native' });
     endpoints.push({
       name: 'native_uds',
