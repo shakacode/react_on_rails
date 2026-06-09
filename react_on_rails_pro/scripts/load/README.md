@@ -54,6 +54,55 @@ requests before measured requests begin. All workers must finish warmup before m
 `--start-gate-timeout` controls how long to wait for them (default: 30 seconds). If bundle upload is
 slow on a cold renderer, adjust `--upload-timeout` (default: 10 seconds).
 
+### Transport Probe For Fastify/Native HTTP/2/UDS
+
+Issues #3582 and #3583 need benchmark evidence before any production renderer
+transport change. The benchmark-only transport probe starts a tiny local Node
+server with equivalent probe endpoints over:
+
+- Fastify h2c over TCP loopback.
+- Native `node:http2` h2c over TCP loopback.
+- Native `node:http2` over a Unix domain socket.
+
+It does not change the production renderer, the Rails HTTP client, or the
+default h2c-over-TCP transport.
+
+Run from `react_on_rails_pro/` after workspace Node dependencies are installed:
+
+```bash
+bundle exec ruby scripts/load/transport_probe.rb --requests 3000 --warmup 300
+```
+
+Use Node >= 18, matching the Pro package requirement. The native stream probe
+uses Node's `Readable#iterator` API.
+
+`--body-bytes` is both the request payload size sent by each probe request and
+the server-side body limit. For example, `--body-bytes 1048576` sends a 1 MB
+request body and rejects requests larger than 1 MB. Normal benchmark requests
+send exactly the configured limit, so rejection testing requires a separate
+oversized request rather than a standard probe run.
+
+When comparing `stream_response` deltas, remember that Fastify enforces
+`bodyLimit` before the handler sees the request, while the native HTTP/2 stream
+handler reads the request body before writing the response. Treat that difference
+as part of the benchmark interpretation rather than production transport proof.
+
+For environments where Unix sockets are unavailable:
+
+```bash
+bundle exec ruby scripts/load/transport_probe.rb --skip-uds
+```
+
+The probe writes `transport_probe_summary.json` under
+`tmp/load-tests/transport-probe/<timestamp>/`. Treat this as Phase 0 evidence
+only: a production UDS transport still needs Linux/topology validation against
+the real renderer harness (`bin/renderer-harness`) before adding socket-path
+configuration or runtime transport plumbing.
+
+Summary JSON records the latency-delta baseline in the top-level `baseline`
+field. `fastify_tcp` is preferred when selected; if it is omitted, the probe
+falls back to `native_tcp` as the baseline.
+
 ### Tracking the node-renderer process
 
 To include the node-renderer RSS in `memory.csv`, pass its PID:
