@@ -133,6 +133,20 @@ print_warning() {
   echo -e "${YELLOW}⚠${NC} $1"
 }
 
+warn_if_latest_profile_may_be_under_reported() {
+  if saved_tool_versions_match_current_head; then
+    return
+  fi
+
+  if git -C "$PROJECT_ROOT" show HEAD:.tool-versions >/dev/null 2>&1; then
+    return
+  fi
+
+  if [ -f "$MINIMUM_TOOL_VERSIONS_FILE" ] && cmp -s "$PROJECT_ROOT/.tool-versions" "$MINIMUM_TOOL_VERSIONS_FILE"; then
+    print_warning "Could not read the committed latest runtime profile; latest Ruby/Node may be under-reported."
+  fi
+}
+
 print_error() {
   echo -e "${RED}✗${NC} $1"
 }
@@ -362,6 +376,8 @@ install_bundle_to_vendor() {
 
 show_status() {
   print_header "Current Configuration"
+  echo ""
+  warn_if_latest_profile_may_be_under_reported
   echo ""
 
   echo "Runtime versions:"

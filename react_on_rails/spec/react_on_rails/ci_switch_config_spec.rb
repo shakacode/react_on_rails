@@ -12,54 +12,64 @@ RSpec.describe "bin/ci-switch-config" do
   let(:source_script_path) { File.join(repo_root, "bin/ci-switch-config") }
 
   it "reports shakapacker-webpack before core shakapacker in status output" do
-    stdout, stderr, status = ci_switch_status(
-      "shakapacker" => "10.1.0",
-      "shakapacker-webpack" => "~10.1.0"
-    )
+    stdout, stderr, status = ci_switch_status({
+                                                "shakapacker" => "10.1.0",
+                                                "shakapacker-webpack" => "~10.1.0"
+                                              })
 
     expect(status).to be_success, stderr
     expect(stdout).to include("Shakapacker (npm, shakapacker-webpack): 10.1.0")
   end
 
   it "reports shakapacker-rspack before core shakapacker when webpack is absent" do
-    stdout, stderr, status = ci_switch_status(
-      "shakapacker" => "10.1.0",
-      "shakapacker-rspack" => "^10.1.0"
-    )
+    stdout, stderr, status = ci_switch_status({
+                                                "shakapacker" => "10.1.0",
+                                                "shakapacker-rspack" => "^10.1.0"
+                                              })
 
     expect(status).to be_success, stderr
     expect(stdout).to include("Shakapacker (npm, shakapacker-rspack): 10.1.0")
   end
 
   it "prefers shakapacker-webpack when both adapter packages are present" do
-    stdout, stderr, status = ci_switch_status(
-      "shakapacker" => "10.1.0",
-      "shakapacker-webpack" => "~10.1.0",
-      "shakapacker-rspack" => "^10.1.0"
-    )
+    stdout, stderr, status = ci_switch_status({
+                                                "shakapacker" => "10.1.0",
+                                                "shakapacker-webpack" => "~10.1.0",
+                                                "shakapacker-rspack" => "^10.1.0"
+                                              })
 
     expect(status).to be_success, stderr
     expect(stdout).to include("Shakapacker (npm, shakapacker-webpack): 10.1.0")
   end
 
   it "reports core shakapacker when adapter packages are absent" do
-    stdout, stderr, status = ci_switch_status(
-      "shakapacker" => "^10.1.0"
-    )
+    stdout, stderr, status = ci_switch_status({
+                                                "shakapacker" => "^10.1.0"
+                                              })
 
     expect(status).to be_success, stderr
     expect(stdout).to include("Shakapacker (npm, shakapacker): 10.1.0")
   end
 
   it "ignores non-semver adapter specs instead of reporting the raw package line" do
-    stdout, stderr, status = ci_switch_status(
-      "shakapacker" => "10.1.0",
-      "shakapacker-webpack" => "workspace:~10.1.0"
-    )
+    stdout, stderr, status = ci_switch_status({
+                                                "shakapacker" => "10.1.0",
+                                                "shakapacker-webpack" => "workspace:~10.1.0"
+                                              })
 
     expect(status).to be_success, stderr
     expect(stdout).to include("Shakapacker (npm, shakapacker): 10.1.0")
     expect(stdout).not_to include("workspace:~10.1.0")
+  end
+
+  it "warns in status when a non-git checkout may under-report latest runtimes" do
+    stdout, stderr, status = ci_switch_status(
+      { "shakapacker" => "10.1.0" },
+      tool_versions_source: ".minimum.tool-versions"
+    )
+
+    expect(status).to be_success, stderr
+    expect(stdout).to include("latest Ruby/Node may be under-reported")
   end
 
   it "restores the latest tool-version profile saved from the current git head" do
@@ -159,7 +169,7 @@ RSpec.describe "bin/ci-switch-config" do
     end
   end
 
-  def ci_switch_status(dependencies)
+  def ci_switch_status(dependencies, tool_versions_source: ".tool-versions")
     Dir.mktmpdir do |tmpdir|
       fake_script_path = File.join(tmpdir, "bin/ci-switch-config")
       package_json_path = File.join(tmpdir, "react_on_rails/spec/dummy/package.json")
@@ -167,7 +177,7 @@ RSpec.describe "bin/ci-switch-config" do
       FileUtils.mkdir_p(File.dirname(fake_script_path))
       FileUtils.mkdir_p(File.dirname(package_json_path))
       FileUtils.cp(source_script_path, fake_script_path)
-      FileUtils.cp(File.join(repo_root, ".tool-versions"), File.join(tmpdir, ".tool-versions"))
+      FileUtils.cp(File.join(repo_root, tool_versions_source), File.join(tmpdir, ".tool-versions"))
       FileUtils.cp(File.join(repo_root, ".minimum.tool-versions"), File.join(tmpdir, ".minimum.tool-versions"))
       FileUtils.chmod("+x", fake_script_path)
 

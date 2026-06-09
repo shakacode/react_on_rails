@@ -40,6 +40,8 @@ runs:
         set -euo pipefail
 
         # Mirrors read_tool_version() in bin/ci-switch-config; keep parsing in sync.
+        # react_on_rails/spec/react_on_rails/ruby_version_support_spec.rb
+        # fails if the workflow action and local switch tool parsers drift.
         read_tool_version() {
           local file="$1"
           local tool="$2"
