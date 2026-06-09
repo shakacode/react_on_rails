@@ -74,6 +74,7 @@ saved_tool_versions_match_current_head() {
     return 1
   fi
 
+  # printf adds back the trailing newline that command substitution stripped.
   cmp -s "$MAXIMUM_TOOL_VERSIONS_FILE" <(printf "%s\n" "$committed_tool_versions")
 }
 

@@ -12,7 +12,6 @@ on:
       - '.lychee.toml'
       - '.prettierignore'
       - '.prettierrc'
-      - '.tool-versions'
       - 'pnpm-lock.yaml'
   pull_request:
     paths:
@@ -21,7 +20,6 @@ on:
       - '.lychee.toml'
       - '.prettierignore'
       - '.prettierrc'
-      - '.tool-versions'
       - 'pnpm-lock.yaml'
   schedule:
     # Run daily at 3am UTC to catch stale cached links
