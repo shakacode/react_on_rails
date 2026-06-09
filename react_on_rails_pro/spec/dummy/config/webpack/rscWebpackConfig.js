@@ -138,7 +138,7 @@ const configureRsc = () => {
       if (rule.use[RSC_LOADER_WRAPPED]) return;
       const originalUse = rule.use;
       const wrappedUse = function rscLoaderWrapper(data) {
-        const result = originalUse(data);
+        const result = originalUse.call(this, data);
         let resultArray = [];
         if (Array.isArray(result)) {
           resultArray = result;

@@ -133,8 +133,14 @@ describe('Pro dummy RSC rspack config', () => {
       },
     }));
 
+    const loaderContext = { issuer: 'server-bundle' };
+    const loaderData = { resource: 'Component.jsx' };
     const functionRule = {
-      use() {
+      receivedThis: undefined,
+      receivedData: undefined,
+      use(data) {
+        this.receivedThis = this;
+        this.receivedData = data;
         return [{ loader: 'babel-loader', options: { caller: { ssr: true } } }];
       },
     };
@@ -157,14 +163,16 @@ describe('Pro dummy RSC rspack config', () => {
     const configureRsc = require(rscConfigPath);
     const firstConfig = configureRsc();
     const wrappedUse = firstConfig.module.rules[0].use;
-    const firstUseResult = wrappedUse({});
+    const firstUseResult = wrappedUse.call(loaderContext, loaderData);
 
     configureRsc();
-    const secondUseResult = firstConfig.module.rules[0].use({});
+    const secondUseResult = firstConfig.module.rules[0].use.call(loaderContext, loaderData);
 
     expect(configureServer).toHaveBeenCalledWith(true);
     expect(wrappedUse[Symbol.for('reactOnRailsPro.rscLoaderWrapped')]).toBe(true);
     expect(firstConfig.module.rules[0].use).toBe(wrappedUse);
+    expect(loaderContext.receivedThis).toBe(loaderContext);
+    expect(loaderContext.receivedData).toBe(loaderData);
     expect(firstUseResult).toEqual([
       { loader: 'babel-loader', options: { caller: { ssr: true } } },
       { loader: 'react-on-rails-rsc/WebpackLoader' },
