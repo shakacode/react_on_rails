@@ -8,10 +8,10 @@ If you haven't tried the autofix options for `eslint` and `rubocop`, you're seri
 
 1. Be **SURE** you have a clean git status, as you'll want to review what the autofix does to your code!
 2. **RuboCop:** In this monorepo, use the package-scoped bundle that owns the Ruby files. For routine
-   formatting, prefer `rake autofix`; for targeted Ruby autofix on a specific package:
+   OSS Ruby and JS/TS formatting, prefer `rake autofix`; for targeted Ruby autofix on a specific package:
 
 ```bash
-# OSS Ruby (react_on_rails package only; skip if you already ran rake autofix):
+# OSS Ruby (react_on_rails package only; equivalent to rake autofix's Ruby step):
 # -A includes unsafe cops, matching the set rake autofix applies.
 (cd react_on_rails && bundle exec rubocop -A)
 
