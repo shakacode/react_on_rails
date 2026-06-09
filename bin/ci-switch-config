@@ -74,7 +74,7 @@ saved_tool_versions_match_current_head() {
     return 1
   fi
 
-  cmp -s "$MAXIMUM_TOOL_VERSIONS_FILE" <<<"$committed_tool_versions"
+  cmp -s "$MAXIMUM_TOOL_VERSIONS_FILE" <(printf "%s\n" "$committed_tool_versions")
 }
 
 read_committed_tool_version() {
@@ -116,6 +116,8 @@ read_latest_tool_version() {
   fi
 }
 
+# Run at load time (outside main) so sourced test harnesses get populated globals.
+# Requires .minimum.tool-versions to be present before sourcing.
 require_minimum_tool_versions_file
 
 MINIMUM_RUBY_VERSION="$(read_tool_version "$MINIMUM_TOOL_VERSIONS_FILE" ruby)"

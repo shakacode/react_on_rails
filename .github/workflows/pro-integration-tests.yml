@@ -116,8 +116,9 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          # Pro CI stays on minimum Ruby for gem compatibility, but uses latest Node from
-          # .tool-versions; this matches benchmark-suite's deliberate cross-profile.
+          # Pro CI stays on minimum Ruby for gem compatibility but uses latest Node from
+          # .tool-versions (Shakapacker 10.1 floor + V8-bug avoidance). This is the
+          # same deliberate min-Ruby x latest-Node cross-profile used by benchmark-suite.
           # The latest Node pin also avoids the V8 bug in 22.21.0:
           # https://github.com/nodejs/node/issues/56010
           node-version-file: .tool-versions

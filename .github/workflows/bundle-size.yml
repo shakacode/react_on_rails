@@ -71,7 +71,7 @@ jobs:
       - name: Checkout base branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.base_ref }}
+          ref: ${{ github.event.pull_request.base.sha }}
 
       - name: Copy size-limit config to base branch
         run: cp /tmp/size-limit-config.json .size-limit.json

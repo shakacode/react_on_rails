@@ -220,7 +220,7 @@ RSpec.describe "bin/ci-switch-config" do
       run_git(tmpdir, "config", "user.email", "codex@example.com")
       run_git(tmpdir, "config", "user.name", "Codex")
       run_git(tmpdir, "add", "-f", ".tool-versions", ".minimum.tool-versions", "bin/ci-switch-tool-versions")
-      run_git(tmpdir, "commit", "-m", "Initial tool versions")
+      run_git(tmpdir, "commit", "--no-gpg-sign", "-m", "Initial tool versions")
 
       yield tmpdir, harness_path
     end
