@@ -76,9 +76,20 @@ Create a new file `config/webpack/rscWebpackConfig.js`:
 
 ```js
 // use the same config as serverWebpackConfig.js but add the RSC loader
+const { existsSync } = require('fs');
 const { dirname, resolve } = require('path');
 const serverWebpackConfig = require('./serverWebpackConfig');
 const reactPackageRoot = dirname(require.resolve('react/package.json'));
+const resolveReactServerEntry = (entryFilename) => {
+  const entryPath = resolve(reactPackageRoot, entryFilename);
+  if (!existsSync(entryPath)) {
+    throw new Error(
+      `Expected React server entry "${entryFilename}" at "${entryPath}". ` +
+        'React package layout changed; update the RSC webpack aliases.',
+    );
+  }
+  return entryPath;
+};
 
 // Function that extracts a specific loader from a webpack rule
 function extractLoader(rule, loaderName) {
@@ -139,9 +150,9 @@ const configureRsc = () => {
       ...rscAliases,
       // Keep the RSC renderer and app Server Components on the same React
       // server package instance so React.cache() sees the active dispatcher.
-      react$: resolve(reactPackageRoot, 'react.react-server.js'),
-      'react/jsx-runtime$': resolve(reactPackageRoot, 'jsx-runtime.react-server.js'),
-      'react/jsx-dev-runtime$': resolve(reactPackageRoot, 'jsx-dev-runtime.react-server.js'),
+      react$: resolveReactServerEntry('react.react-server.js'),
+      'react/jsx-runtime$': resolveReactServerEntry('jsx-runtime.react-server.js'),
+      'react/jsx-dev-runtime$': resolveReactServerEntry('jsx-dev-runtime.react-server.js'),
       // RSC payload generation does not use react-dom/server.
       'react-dom/server': false,
     },

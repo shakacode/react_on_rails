@@ -31,6 +31,9 @@ describe('rscWebpackConfig discovery build contract', () => {
 
     expect(config.resolve.conditionNames).toContain('react-server');
     expect(source).toContain("delete rscAliases['react-dom/server'];");
+    expect(source).toContain("delete rscAliases['react-dom/server$'];");
+    expect(source).toContain('const resolveReactServerEntry = (entryFilename) =>');
+    expect(source).toContain('existsSync(entryPath)');
     expect(aliases.react).toBeUndefined();
     expect(aliases.react$).toMatch(/react[\\/]react\.react-server\.js$/);
     expect(aliases['react/jsx-runtime$']).toMatch(/react[\\/]jsx-runtime\.react-server\.js$/);
