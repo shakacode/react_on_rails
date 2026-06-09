@@ -89,19 +89,15 @@ class BencherRunner
     end
 
     tmp_report_json = "#{report_json}.tmp"
-    report_persisted = false
+    report_verified = false
     begin
       File.write(tmp_report_json, stdout)
       FileUtils.mv(tmp_report_json, report_json)
-      report_persisted = true
+      parse_report(stdout).tap { report_verified = true }
     ensure
       FileUtils.rm_f(tmp_report_json)
-      FileUtils.rm_f(report_json) unless report_persisted
+      FileUtils.rm_f(report_json) unless report_verified
     end
-    parse_report(stdout)
-  rescue ReportParseError
-    FileUtils.rm_f(report_json)
-    raise
   end
 
   def parse_report(stdout)
@@ -113,7 +109,7 @@ class BencherRunner
   end
 
   def warn_on_missing_perf_link_context(report)
-    return unless report&.perf_links_unavailable?
+    return unless report.perf_links_unavailable?
 
     Github.warning(
       "Bencher report listed benchmarks but no perf-link context " \

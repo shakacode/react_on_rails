@@ -68,6 +68,7 @@ RSpec.describe BencherRunner do
       allow(Open3).to receive(:capture3).and_return([report_json, "", status])
       allow(File).to receive(:write).with("report.json.tmp", report_json)
       allow(FileUtils).to receive(:mv).with("report.json.tmp", "report.json")
+      allow(FileUtils).to receive(:rm_f)
 
       result = runner.run("branch", [])
 
@@ -108,6 +109,7 @@ RSpec.describe BencherRunner do
       allow(Open3).to receive(:capture3).and_return([report_json, "", status])
       allow(File).to receive(:write).with("report.json.tmp", report_json)
       allow(FileUtils).to receive(:mv).with("report.json.tmp", "report.json")
+      allow(FileUtils).to receive(:rm_f)
 
       expect { runner.run("branch", []) }
         .to output(/::warning::Bencher report listed benchmarks but no perf-link context/).to_stdout
@@ -136,6 +138,7 @@ RSpec.describe BencherRunner do
       allow(Open3).to receive(:capture3).and_return([report_json, "", status])
       allow(File).to receive(:write).with("report.json.tmp", report_json)
       allow(FileUtils).to receive(:mv).with("report.json.tmp", "report.json")
+      allow(FileUtils).to receive(:rm_f)
 
       result = runner.run("branch", [])
 

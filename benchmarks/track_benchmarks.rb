@@ -142,6 +142,7 @@ def bencher_runner
 end
 
 def replace_pr_comments(markdown)
+  # Keep empty reports as no-ops before reading PR-only env such as PR_NUMBER.
   return if markdown.empty?
   return unless ENV.fetch("GITHUB_EVENT_NAME") == "pull_request"
 
