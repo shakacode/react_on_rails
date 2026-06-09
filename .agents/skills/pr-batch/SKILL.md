@@ -115,7 +115,7 @@ Before merge, wait for requested or configured review agents such as Claude, Cod
 At the final review/readiness gate, after local validation, PR creation or update, review-thread triage, and the final push for the current head SHA, request full CI with `+ci-run-full` if you are unsure whether path-selected CI is enough. Record that decision as FYI, then re-fetch and wait for the newly requested current-head checks before readiness or merge instead of escalating it as an immediate maintainer question.
 
 See the coordinator closeout summary in
-`.agents/workflows/pr-processing.md` under the goal-prompt section and the
+`.agents/workflows/pr-processing.md` under **Plan To Goal Handoff** and the
 canonical Coordinator Closeout Lane.
 
 For blocking questions, stop work on that target, surface a structured question to the coordinator or maintainer, and mark the issue/PR with the agreed pending-question state. Report the question/comment URL as `blocked needing user input`; do not open a speculative PR. For non-blocking questions where you make a decision and continue, record the decision in the PR description before review or merge.
@@ -198,9 +198,8 @@ When worker subagents are explicitly authorized:
 
 ## Coordinator Closeout Lane
 
-The goal-prompt pointer above names the closeout source. For the complete
-numbered sequence, follow the canonical closeout lane in
+For the complete numbered sequence, follow the canonical closeout lane in
 `.agents/workflows/pr-processing.md` instead of stopping at PR creation. The
-coordinator owns the live re-fetch, current-head checks and review-thread
-triage, release-mode or accelerated-RC confidence refresh, full-CI request and
-waitback when uncertainty remains, and any authorized ready/merge action.
+coordinator owns the live re-fetch, current-head checks and review-thread triage,
+release-mode or accelerated-RC confidence refresh, full-CI request and waitback
+when uncertainty remains, and any authorized ready/merge action.
