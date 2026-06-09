@@ -13,6 +13,8 @@ require_relative "../lib/bmf_helpers"
 # mutually exclusive by design: an alert must never trigger a start-point-hash retry,
 # or a real regression would be silently re-measured against the wrong baseline.
 RSpec.describe "track_benchmarks" do
+  include BenchmarkEnvHelper
+
   def result(name, measures)
     { "benchmark" => { "name" => name }, "measures" => measures }
   end
@@ -125,6 +127,16 @@ RSpec.describe "track_benchmarks" do
     it "is false on success and for unrelated non-zero failures" do
       expect(retry_without_start_point_hash?("Head Version abc123 not found", 0, report_without_alert)).to be(false)
       expect(retry_without_start_point_hash?("some other error", 1, report_without_alert)).to be(false)
+    end
+  end
+
+  describe "#replace_pr_comments" do
+    it "does not require PR comment env for an empty pull request report" do
+      with_env("GITHUB_EVENT_NAME" => "pull_request") do
+        expect(PrReportPoster).not_to receive(:from_env)
+
+        expect { replace_pr_comments("") }.not_to raise_error
+      end
     end
   end
 
