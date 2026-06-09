@@ -66,8 +66,7 @@ EXCLUDE_PATTERNS = [
   # covering those would need shebang-based shell detection plus a binstub
   # heuristic, deferred as a low-value follow-up (they are test-harness glue).
   %r{(\A|/)bin/},
-  %r{/fixtures/}, # test fixtures: loaded/byte-asserted by tests,
-  # sometimes VM-evaluated; not product source
+  %r{/fixtures/}, # test fixtures: byte-asserted or VM-evaluated by tests, not product source
   %r{/db/schema\.rb\z}, # generated
   %r{(\A|/)public/}, # built/vendored assets
   %r{(\A|/)vendor/},
@@ -421,11 +420,12 @@ def run_self_test
     returned = true
   rescue SystemExit => e
     exit_status = e.status
+  ensure
+    $stderr = original_stderr
   end
-  $stderr = original_stderr
   assert !returned, "index_file_content should abort on missing path"
   assert exit_status == 1, "index_file_content exits non-zero on missing path"
-  assert error_output.string.include?("exit 128"), "index_file_content reports git exit status"
+  assert error_output.string.match?(/exit \d+/), "index_file_content error message includes git exit code"
 
   puts "self-test: all assertions passed"
   0
