@@ -45,6 +45,8 @@ const normalizePayloadPath = (payloadPath: string): string => {
   }
   const pathSegments = trimmedPayloadPath.split('/').filter(Boolean);
   if (
+    // Only "/" reaches this branch after trim/filter; protocol-relative paths
+    // are caught by startsWith("//") below.
     pathSegments.length === 0 ||
     trimmedPayloadPath.startsWith('//') ||
     INVALID_PAYLOAD_PATH_CHARS.test(trimmedPayloadPath) ||

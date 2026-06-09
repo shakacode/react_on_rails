@@ -323,6 +323,18 @@ describe('createRscPayloadNode', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it.each(['', ' '])('rejects empty payload paths: %s', async (payloadPath) => {
+    const { createRscPayloadNode } = loadHelper();
+
+    await expect(
+      createRscPayloadNode({
+        componentName: 'DashboardPanel',
+        payloadPath,
+      }),
+    ).rejects.toThrow('createRscPayloadNode requires a payloadPath.');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('allows colon characters in ordinary Rails payload path segments', async () => {
     const { createRscPayloadNode } = loadHelper();
     fetchMock.mockResolvedValue(responseFromText(frame('route data')));
