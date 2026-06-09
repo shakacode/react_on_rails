@@ -654,19 +654,28 @@ jobs:
           cd spec/dummy
           RAILS_ENV="test" bundle exec rails server &
 
-      - name: Wait for Rails server to start
+      - name: Wait for Rails server and Node renderer to start
         run: |
-          timeout=300
-          elapsed=0
-          while ! curl -s http://localhost:3000 > /dev/null; do
-            sleep 1
-            elapsed=$((elapsed + 1))
-            if [ $elapsed -ge $timeout ]; then
-              echo "Timeout waiting for Rails server to start after ${timeout}s"
-              exit 1
-            fi
-          done
-          echo "Rails server started after ${elapsed}s"
+          wait_for_service() {
+            name="$1"
+            url="$2"
+            timeout=300
+            elapsed=0
+
+            while ! curl --fail --silent "$url" > /dev/null; do
+              sleep 1
+              elapsed=$((elapsed + 1))
+              if [ $elapsed -ge $timeout ]; then
+                echo "Timeout waiting for ${name} to start after ${timeout}s"
+                exit 1
+              fi
+            done
+
+            echo "${name} started after ${elapsed}s"
+          }
+
+          wait_for_service "Rails server" "http://localhost:3000"
+          wait_for_service "Node renderer" "http://localhost:3800/info"
 
       - name: Install Playwright dependencies
         run: cd spec/dummy && npx playwright install --with-deps
