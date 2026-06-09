@@ -3,7 +3,7 @@
  */
 
 /*
- * Copyright (c) 2025 ShakaCode LLC - React on Rails Pro (commercial license)
+ * Copyright (c) 2025-2026 ShakaCode LLC - React on Rails Pro (commercial license)
  *
  * This file is NOT licensed under the MIT (open source) license. It is part of
  * the React on Rails Pro offering and is licensed separately.

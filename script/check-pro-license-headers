@@ -32,7 +32,7 @@ SENTINEL = "NOT licensed under the MIT"
 # Canonical header content as plain lines (no comment markers). Kept ASCII to
 # satisfy RuboCop Style/AsciiComments, and under 120 cols for Layout/LineLength.
 HEADER_LINES = [
-  "Copyright (c) 2025 ShakaCode LLC - React on Rails Pro (commercial license)",
+  "Copyright (c) 2025-2026 ShakaCode LLC - React on Rails Pro (commercial license)",
   "",
   "This file is NOT licensed under the MIT (open source) license. It is part of",
   "the React on Rails Pro offering and is licensed separately.",
@@ -59,7 +59,11 @@ end
 
 # Tracked files matching the allowlist but not authored Pro IP / not source.
 EXCLUDE_PATTERNS = [
-  %r{(\A|/)bin/},                  # gem-generated binstubs
+  # Almost all bin/ entries are gem-generated binstubs. This also skips the few
+  # authored shell scripts there (e.g. spec dummies' bin/prod, bin/docker-entrypoint);
+  # covering those would need shebang-based shell detection plus a binstub
+  # heuristic, deferred as a low-value follow-up (they are test-harness glue).
+  %r{(\A|/)bin/},
   %r{/fixtures/},                  # test fixtures: loaded/byte-asserted by tests,
                                    # sometimes VM-evaluated; not product source
   %r{/db/schema\.rb\z},            # generated
