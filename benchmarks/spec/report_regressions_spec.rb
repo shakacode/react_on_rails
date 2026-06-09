@@ -117,6 +117,24 @@ RSpec.describe "benchmark regression reporting" do
         expect(calls).to eq(["label create", "issue list", "issue create", "comment list", "comment create"])
       end
 
+      it "names the confirmed benchmark+measure pairs in the created issue body" do
+        described_class.report(
+          summary: "core regressed",
+          suite_name: "core",
+          github_run_url: "https://github.com/run/1",
+          bencher_url: "https://bencher.dev/dash",
+          regressed_overview: "- `/x: Core` — **rps**"
+        )
+        body = posted_bodies.fetch("issue create")
+        expect(body).to include("### What regressed")
+        expect(body).to include("- `/x: Core` — **rps**")
+      end
+
+      it "omits the what-regressed section when no pairs were handed off" do
+        report
+        expect(posted_bodies.fetch("issue create")).not_to include("What regressed")
+      end
+
       it "reuses a just-created issue number for later suites in the same reporter run" do
         issue_number_cache = {}
 
@@ -274,6 +292,25 @@ RSpec.describe "benchmark regression reporting" do
   # first-run/confirmation evidence rendering, and the exit status. A confirmed
   # regression fails the workflow (exit 1) even though the issue was filed successfully —
   # this job owns the final pass/fail.
+  describe "regressed_overview_markdown" do
+    it "renders deduped benchmark+measure bullets from each payload's ALERTS" do
+      payloads = [
+        { RegressionReport::ALERTS => [
+          { RegressionReport::ALERT_BENCHMARK => "/a: Core", RegressionReport::ALERT_MEASURE => "rps" },
+          { RegressionReport::ALERT_BENCHMARK => "/a: Core", RegressionReport::ALERT_MEASURE => "rps" }
+        ] },
+        { RegressionReport::ALERTS => [
+          { RegressionReport::ALERT_BENCHMARK => "/b: Pro", RegressionReport::ALERT_MEASURE => nil }
+        ] }
+      ]
+      expect(regressed_overview_markdown(payloads)).to eq("- `/a: Core` — **rps**\n- `/b: Pro`")
+    end
+
+    it "is empty when no payload carries structured alert pairs" do
+      expect(regressed_overview_markdown([{ RegressionReport::SUITE_NAME => "Core" }])).to eq("")
+    end
+  end
+
   describe "report_regressions.rb (script)" do
     script = File.expand_path("../report_regressions.rb", __dir__)
 
