@@ -8,10 +8,10 @@ This guide explains how to switch between different CI test configurations local
 # Check your current configuration
 bin/ci-switch-config status
 
-# Switch to minimum dependencies (Ruby 3.3, Node 20)
+# Switch to the minimum runtime/dependency profile
 bin/ci-switch-config minimum
 
-# Switch back to latest dependencies (Ruby 4.0, Node 22)
+# Switch back to the latest runtime/dependency profile
 bin/ci-switch-config latest
 ```
 

@@ -131,13 +131,21 @@ RSpec.describe "Ruby version support" do
     ci_switch_config = read_repo_file("bin/ci-switch-config")
     # These are shell variable names, not Ruby interpolation.
     expect(ci_switch_config).to include(
-      "Target: Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, Shakapacker $LATEST_SHAKAPACKER_VERSION"
+      "Target: Ruby $LATEST_RUBY_MINOR_VERSION, Node $LATEST_NODE_MAJOR_VERSION, " \
+      "Shakapacker $LATEST_SHAKAPACKER_VERSION"
     )
-    expect(ci_switch_config).to include("matches CI: Ruby $MINIMUM_RUBY_MINOR_VERSION, Node 20, minimum deps")
-    expect(ci_switch_config).to include("matches CI: Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, latest deps")
-    expect(ci_switch_config).to include("Switch to Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, latest dependencies")
     expect(ci_switch_config).to include(
-      "latest   - Switch to Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, latest dependencies " \
+      "matches CI: Ruby $MINIMUM_RUBY_MINOR_VERSION, Node $MINIMUM_NODE_MAJOR_VERSION, minimum deps"
+    )
+    expect(ci_switch_config).to include(
+      "matches CI: Ruby $LATEST_RUBY_MINOR_VERSION, Node $LATEST_NODE_MAJOR_VERSION, latest deps"
+    )
+    expect(ci_switch_config).to include(
+      "Switch to Ruby $LATEST_RUBY_MINOR_VERSION, Node $LATEST_NODE_MAJOR_VERSION, latest dependencies"
+    )
+    expect(ci_switch_config).to include(
+      "latest   - Switch to Ruby $LATEST_RUBY_MINOR_VERSION, Node $LATEST_NODE_MAJOR_VERSION, " \
+      "latest dependencies " \
       "(Shakapacker $LATEST_SHAKAPACKER_VERSION, React $LATEST_REACT_VERSION)"
     )
     expect(ci_switch_config).to include('MINIMUM_RUBY_MINOR_VERSION="${MINIMUM_RUBY_VERSION%.*}"')
@@ -147,6 +155,7 @@ RSpec.describe "Ruby version support" do
     expect(ci_switch_config).to include(
       'MINIMUM_NODE_VERSION="$(read_tool_version "$MINIMUM_TOOL_VERSIONS_FILE" nodejs)"'
     )
+    expect(ci_switch_config).to include('MINIMUM_NODE_MAJOR_VERSION="${MINIMUM_NODE_VERSION%%.*}"')
     expect(ci_switch_config).to include('MINIMUM_REACT_VERSION="18.0.0"')
     expect(ci_switch_config).to include('MINIMUM_REACT_MAJOR_VERSION="${MINIMUM_REACT_VERSION%%.*}"')
     expect(ci_switch_config).to include('MAXIMUM_TOOL_VERSIONS_HEAD_FILE="$PROJECT_ROOT/.maximum.tool-versions.head"')
@@ -157,6 +166,7 @@ RSpec.describe "Ruby version support" do
     expect(ci_switch_config).to include(
       'LATEST_NODE_VERSION="$(read_latest_tool_version nodejs)"'
     )
+    expect(ci_switch_config).to include('LATEST_NODE_MAJOR_VERSION="${LATEST_NODE_VERSION%%.*}"')
     expect(ci_switch_config).to include('LATEST_SHAKAPACKER_VERSION="10.1.0"')
     expect(ci_switch_config).to include('LATEST_REACT_VERSION="19.0.0"')
     expect(ci_switch_config).to include('LATEST_REACT_MAJOR_VERSION="${LATEST_REACT_VERSION%%.*}"')
@@ -185,7 +195,7 @@ RSpec.describe "Ruby version support" do
     expect(ci_rerun_failures).to include(latest_job_description)
 
     switching_guide = read_repo_file("SWITCHING_CI_CONFIGS.md")
-    expect(switching_guide).to include("Switch back to latest dependencies (Ruby 4.0, Node 22)")
+    expect(switching_guide).to include("Switch back to the latest runtime/dependency profile")
     expect(switching_guide).to include("Restore `.tool-versions` from `.maximum.tool-versions`")
 
     expect(read_repo_file(".claude/docs/replicating-ci-failures.md")).to include(

@@ -1,6 +1,8 @@
 ---
 name: Read tool versions
-description: Read committed latest and minimum runtime versions.
+description: >-
+  Read committed latest and minimum runtime versions. Requires actions/checkout
+  to have run first.
 
 outputs:
   ruby-version:
@@ -37,8 +39,8 @@ runs:
       run: |
         set -euo pipefail
 
-          # Mirrors read_tool_version() in bin/ci-switch-config; keep parsing in sync.
-          read_tool_version() {
+        # Mirrors read_tool_version() in bin/ci-switch-config; keep parsing in sync.
+        read_tool_version() {
           local file="$1"
           local tool="$2"
           local version
