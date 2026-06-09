@@ -73,6 +73,13 @@ Run from `react_on_rails_pro/` after workspace Node dependencies are installed:
 bundle exec ruby scripts/load/transport_probe.rb --requests 3000 --warmup 300
 ```
 
+Use Node >= 18, matching the Pro package requirement. The native stream probe
+uses Node's `Readable#iterator` API.
+
+`--body-bytes` is both the request payload size sent by each probe request and
+the server-side body limit. For example, `--body-bytes 1048576` sends a 1 MB
+request body and rejects requests larger than 1 MB.
+
 For environments where Unix sockets are unavailable:
 
 ```bash

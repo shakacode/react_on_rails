@@ -128,6 +128,22 @@ RSpec.describe RendererHarness::TransportProbe do
       end.to raise_error(RuntimeError, /HTTP 413: .*request body exceeded --body-bytes limit/)
     end
 
+    it "caps non-200 response details" do
+      runner = described_class.new(config)
+      response = instance_double(
+        Async::HTTP::Protocol::Response,
+        status: 500,
+        body: StringIO.new("#{'x' * 5000}tail")
+      )
+      client = instance_double(Async::HTTP::Client)
+
+      allow(client).to receive(:post).and_return(response)
+
+      expect do
+        runner.send(:perform_request, client, "/probe/unary", "body")
+      end.to raise_error(RuntimeError) { |error| expect(error.message).not_to include("tail") }
+    end
+
     it "computes latency deltas against the Fastify TCP baseline" do
       runner = described_class.new(config)
       results = {

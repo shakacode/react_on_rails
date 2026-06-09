@@ -144,6 +144,8 @@ module RendererHarness
     end
 
     class Runner # rubocop:disable Metrics/ClassLength
+      ERROR_RESPONSE_BYTES = 4096
+
       def initialize(config)
         @config = config
         @server = nil
@@ -241,13 +243,18 @@ module RendererHarness
         response_body = response.body
         response_body&.each do |chunk|
           bytes += chunk.bytesize
-          response_text << chunk unless response.status == 200
+          append_error_response(response_text, chunk) unless response.status == 200
         end
         raise "HTTP #{response.status}: #{response_text}" unless response.status == 200
 
         bytes
       ensure
         response_body&.close
+      end
+
+      def append_error_response(response_text, chunk)
+        remaining_bytes = ERROR_RESPONSE_BYTES - response_text.bytesize
+        response_text << chunk.byteslice(0, remaining_bytes).to_s if remaining_bytes.positive?
       end
 
       def measure_ms

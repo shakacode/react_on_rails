@@ -248,47 +248,6 @@ const main = async () => {
   const endpoints = [];
   let nativeUdsSocketCreated = false;
 
-  if (scenarios.includes('fastify_tcp')) {
-    const fastifyServer = await listenFastify({ bodyBytes, host, port: 0, streamBytes });
-    servers.push({ server: fastifyServer, type: 'fastify' });
-    endpoints.push({
-      name: 'fastify_tcp',
-      kind: 'tcp',
-      origin: `http://${host}:${fastifyServer.server.address().port}`,
-    });
-  }
-
-  if (scenarios.includes('native_tcp')) {
-    const nativeTcpServer = await listenNative({ bodyBytes, host, port: 0, streamBytes });
-    servers.push({ server: nativeTcpServer, type: 'native' });
-    endpoints.push({
-      name: 'native_tcp',
-      kind: 'tcp',
-      origin: `http://${host}:${nativeTcpServer.address().port}`,
-    });
-  }
-
-  if (scenarios.includes('native_uds')) {
-    const nativeUdsServer = await listenNative({ bodyBytes, socketPath, streamBytes });
-    nativeUdsSocketCreated = true;
-    servers.push({ server: nativeUdsServer, type: 'native' });
-    endpoints.push({
-      name: 'native_uds',
-      kind: 'uds',
-      socketPath,
-      scheme: 'http',
-      authority: 'localhost',
-    });
-  }
-
-  const ready = {
-    nodeVersion: process.version,
-    platform: `${os.platform()} ${os.release()} ${os.arch()}`,
-    endpoints,
-  };
-
-  process.stdout.write(`${JSON.stringify(ready)}\n`);
-
   const cleanupSocket = async () => {
     if (!nativeUdsSocketCreated) {
       return;
@@ -306,9 +265,59 @@ const main = async () => {
     }
   };
 
-  const shutdown = async () => {
+  const cleanupStartedServers = async () => {
     await Promise.allSettled(servers.map(closeServer));
     await cleanupSocket();
+  };
+
+  try {
+    if (scenarios.includes('fastify_tcp')) {
+      const fastifyServer = await listenFastify({ bodyBytes, host, port: 0, streamBytes });
+      servers.push({ server: fastifyServer, type: 'fastify' });
+      endpoints.push({
+        name: 'fastify_tcp',
+        kind: 'tcp',
+        origin: `http://${host}:${fastifyServer.server.address().port}`,
+      });
+    }
+
+    if (scenarios.includes('native_tcp')) {
+      const nativeTcpServer = await listenNative({ bodyBytes, host, port: 0, streamBytes });
+      servers.push({ server: nativeTcpServer, type: 'native' });
+      endpoints.push({
+        name: 'native_tcp',
+        kind: 'tcp',
+        origin: `http://${host}:${nativeTcpServer.address().port}`,
+      });
+    }
+
+    if (scenarios.includes('native_uds')) {
+      const nativeUdsServer = await listenNative({ bodyBytes, socketPath, streamBytes });
+      nativeUdsSocketCreated = true;
+      servers.push({ server: nativeUdsServer, type: 'native' });
+      endpoints.push({
+        name: 'native_uds',
+        kind: 'uds',
+        socketPath,
+        scheme: 'http',
+        authority: 'localhost',
+      });
+    }
+  } catch (error) {
+    await cleanupStartedServers();
+    throw error;
+  }
+
+  const ready = {
+    nodeVersion: process.version,
+    platform: `${os.platform()} ${os.release()} ${os.arch()}`,
+    endpoints,
+  };
+
+  process.stdout.write(`${JSON.stringify(ready)}\n`);
+
+  const shutdown = async () => {
+    await cleanupStartedServers();
     process.exit(0);
   };
 
