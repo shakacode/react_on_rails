@@ -82,15 +82,25 @@
       @keyframes spin { to { transform: rotate(360deg); } }
 
       @media (prefers-reduced-motion: reduce) {
-        .phase-1, .phase-2, .phase-3, .phase-4,
+        .phase-1, .phase-2, .phase-3,
         .rails-hl-1, .rails-hl-2,
         .react-hl-1, .react-hl-2,
         .spinner, .pointer {
           animation: none;
+          opacity: 0;
+        }
+
+        .phase-4 {
+          animation: none;
           opacity: 1;
         }
 
-        .step-1, .step-2, .step-3, .step-4 {
+        .step-1, .step-2, .step-3 {
+          animation: none;
+          fill: #E2E8F0;
+        }
+
+        .step-4 {
           animation: none;
           fill: #3B82F6;
         }
