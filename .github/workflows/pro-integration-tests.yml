@@ -675,7 +675,7 @@ jobs:
           }
 
           wait_for_service "Rails server" "http://localhost:3000"
-          wait_for_service "Node renderer" "http://localhost:3800/info"
+          wait_for_service "Node renderer" "http://[::1]:3800/info"
 
       - name: Install Playwright dependencies
         run: cd spec/dummy && npx playwright install --with-deps
