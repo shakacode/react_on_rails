@@ -578,12 +578,15 @@ importers:
 
   react_on_rails_pro:
     devDependencies:
-      fastify:
-        specifier: ^5.8.5
-        version: 5.8.5
       nps:
         specifier: ^5.9.3
         version: 5.10.0
+
+  react_on_rails_pro/scripts/load:
+    devDependencies:
+      fastify:
+        specifier: ^5.8.5
+        version: 5.8.5
 
   react_on_rails_pro/spec/dummy:
     dependencies:

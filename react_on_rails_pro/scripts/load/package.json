@@ -1,0 +1,10 @@
+{
+  "name": "react-on-rails-pro-transport-probe",
+  "version": "0.0.0-private",
+  "private": true,
+  "description": "Development-only transport probe dependencies for React on Rails Pro.",
+  "type": "module",
+  "devDependencies": {
+    "fastify": "^5.8.5"
+  }
+}

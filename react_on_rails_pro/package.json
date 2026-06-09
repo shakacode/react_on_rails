@@ -9,7 +9,6 @@
     "prettier": "npx prettier"
   },
   "devDependencies": {
-    "fastify": "^5.8.5",
     "nps": "^5.9.3"
   }
 }

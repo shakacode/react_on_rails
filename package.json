@@ -11,6 +11,7 @@
     "packages/create-react-on-rails-app",
     "react_on_rails/spec/dummy",
     "react_on_rails_pro",
+    "react_on_rails_pro/scripts/load",
     "react_on_rails_pro/spec/dummy",
     "react_on_rails_pro/spec/execjs-compatible-dummy"
   ],

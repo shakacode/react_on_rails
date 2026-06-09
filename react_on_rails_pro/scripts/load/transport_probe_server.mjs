@@ -207,7 +207,7 @@ const listenNative = async ({ bodyBytes, host, port, socketPath, streamBytes }) 
 const listenFastify = async ({ bodyBytes, host, port, streamBytes }) => {
   const { default: fastify } = await import('fastify').catch((error) => {
     if (error.code === 'ERR_MODULE_NOT_FOUND') {
-      throw new Error('fastify package not found -- run: pnpm install (in react_on_rails_pro/)');
+      throw new Error('fastify package not found -- run: pnpm install (from the repository root)');
     }
     throw error;
   });
@@ -287,7 +287,7 @@ const main = async () => {
     if (scenarios.includes('fastify_tcp')) {
       const fastifyServer = await listenFastify({ bodyBytes, host, port: 0, streamBytes });
       servers.push({ server: fastifyServer, type: 'fastify' });
-      const port = listeningPort(fastifyServer.server.address(), 'fastify_tcp');
+      const port = listeningPort(fastifyServer.addresses()[0], 'fastify_tcp');
       endpoints.push({
         name: 'fastify_tcp',
         kind: 'tcp',

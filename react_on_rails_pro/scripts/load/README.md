@@ -78,7 +78,9 @@ uses Node's `Readable#iterator` API.
 
 `--body-bytes` is both the request payload size sent by each probe request and
 the server-side body limit. For example, `--body-bytes 1048576` sends a 1 MB
-request body and rejects requests larger than 1 MB.
+request body and rejects requests larger than 1 MB. Normal benchmark requests
+send exactly the configured limit, so rejection testing requires a separate
+oversized request rather than a standard probe run.
 
 For environments where Unix sockets are unavailable:
 
