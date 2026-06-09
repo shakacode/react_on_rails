@@ -12,9 +12,11 @@ If you haven't tried the autofix options for `eslint` and `rubocop`, you're seri
 
 ```bash
 # OSS Ruby (react_on_rails package only; skip if you already ran rake autofix):
+# -A includes unsafe cops, matching the set rake autofix applies.
 (cd react_on_rails && bundle exec rubocop -A)
 
 # Pro Ruby or RuboCop config changes:
+# --ignore-parent-exclusion is required because the root .rubocop.yml excludes subdirectories.
 (cd react_on_rails_pro && bundle exec rubocop -A --ignore-parent-exclusion)
 ```
 
