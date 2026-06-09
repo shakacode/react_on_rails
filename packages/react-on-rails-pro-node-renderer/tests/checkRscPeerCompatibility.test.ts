@@ -1,4 +1,16 @@
 import { checkRscPeerCompatibility } from '../src/shared/checkRscPeerCompatibility';
+import { RSC_PEER_SUPPORT } from '../src/shared/rscPeerSupport';
+
+const { recommendedMin } = RSC_PEER_SUPPORT.reactOnRailsRsc;
+
+const versionBelowRecommendedMin = (version: string) => {
+  const [major, minor, patch] = version.split('.').map(Number);
+  if (patch > 0) return `${major}.${minor}.${patch - 1}`;
+  if (minor > 0) return `${major}.${minor - 1}.999`;
+  throw new Error('recommendedMin must allow a lower supported-major version for the warn-tier test');
+};
+
+const belowRecommendedMin = versionBelowRecommendedMin(recommendedMin);
 
 describe('checkRscPeerCompatibility', () => {
   it('returns ok when react-on-rails-rsc is absent (optional peer not installed)', () => {
@@ -37,12 +49,15 @@ describe('checkRscPeerCompatibility', () => {
   });
 
   it('warns when rsc is on the supported major but below recommendedMin', () => {
-    // recommendedMin is 19.0.2; 19.0.1 is below it.
-    expect(checkRscPeerCompatibility({ rscVersion: '19.0.1', reactVersion: '19.2.0' }).level).toBe('warn');
+    expect(checkRscPeerCompatibility({ rscVersion: belowRecommendedMin, reactVersion: '19.2.0' }).level).toBe(
+      'warn',
+    );
   });
 
   it('does not warn at exactly recommendedMin', () => {
-    expect(checkRscPeerCompatibility({ rscVersion: '19.0.2', reactVersion: '19.2.0' }).level).toBe('ok');
+    expect(checkRscPeerCompatibility({ rscVersion: recommendedMin, reactVersion: '19.2.0' }).level).toBe(
+      'ok',
+    );
   });
 
   it('skips the React check when React is not resolvable', () => {

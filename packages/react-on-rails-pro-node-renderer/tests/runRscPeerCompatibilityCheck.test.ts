@@ -1,3 +1,7 @@
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+
 describe('runRscPeerCompatibilityCheck', () => {
   let warnSpy: jest.SpyInstance;
   let runRscPeerCompatibilityCheck: typeof import('../src/shared/runRscPeerCompatibilityCheck').runRscPeerCompatibilityCheck;
@@ -20,6 +24,33 @@ describe('runRscPeerCompatibilityCheck', () => {
   it('no-ops when react-on-rails-rsc cannot be resolved', () => {
     expect(() => runRscPeerCompatibilityCheck({ resolveVersion: () => null })).not.toThrow();
     expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the package root when package.json is not exported', () => {
+    const appRoot = mkdtempSync(path.join(tmpdir(), 'ror-rsc-peer-'));
+    const packageRoot = path.join(appRoot, 'node_modules', 'react-on-rails-rsc');
+    mkdirSync(path.join(packageRoot, 'dist'), { recursive: true });
+    writeFileSync(path.join(packageRoot, 'dist', 'index.js'), 'export {};\n');
+    writeFileSync(
+      path.join(packageRoot, 'dist', 'package.json'),
+      `${JSON.stringify({ name: 'react-server-dom-webpack', version: '18.0.0' })}\n`,
+    );
+    writeFileSync(
+      path.join(packageRoot, 'package.json'),
+      `${JSON.stringify({
+        name: 'react-on-rails-rsc',
+        version: '20.0.0',
+        exports: { '.': './dist/index.js' },
+        type: 'module',
+      })}\n`,
+    );
+
+    try {
+      expect(() => runRscPeerCompatibilityCheck({ cwd: appRoot })).toThrow(/Incompatible react-on-rails-rsc/);
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      rmSync(appRoot, { recursive: true, force: true });
+    }
   });
 
   it('throws on a hard incompatibility (rsc major mismatch)', () => {

@@ -13,18 +13,61 @@
  */
 
 import { createRequire } from 'node:module';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import log from './log.js';
 import { checkRscPeerCompatibility } from './checkRscPeerCompatibility.js';
 
 const DISABLE_ENV = 'REACT_ON_RAILS_PRO_DISABLE_VERSION_CHECK';
+const PACKAGE_JSON = 'package.json';
+
+interface PackageJsonManifest {
+  name?: unknown;
+  version?: unknown;
+}
+
+const readPackageJsonManifest = (packageJsonPath: string): PackageJsonManifest | null => {
+  try {
+    return JSON.parse(readFileSync(packageJsonPath, 'utf8')) as PackageJsonManifest;
+  } catch {
+    return null;
+  }
+};
+
+const findPackageVersionFromEntrypoint = (packageName: string, entrypointPath: string): string | null => {
+  let currentDir = path.dirname(entrypointPath);
+
+  while (true) {
+    const packageJsonPath = path.join(currentDir, PACKAGE_JSON);
+    if (existsSync(packageJsonPath)) {
+      const manifest = readPackageJsonManifest(packageJsonPath);
+      if (manifest?.name === packageName && typeof manifest.version === 'string') return manifest.version;
+    }
+
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir) return null;
+    currentDir = parentDir;
+  }
+};
 
 // `react-on-rails-rsc` and `react` are the consuming app's dependencies, not the node
 // renderer's, so resolve them from the app root rather than this module's location.
-const defaultResolveVersion = (specifier: string, cwd: string): string | null => {
+const defaultResolveVersion = (packageName: string, cwd: string): string | null => {
   try {
     const appRequire = createRequire(path.join(cwd, 'noop.js'));
-    return (appRequire(specifier) as { version?: string }).version ?? null;
+
+    try {
+      return (appRequire(`${packageName}/${PACKAGE_JSON}`) as { version?: string }).version ?? null;
+    } catch {
+      // Some packages do not export ./package.json; fall back to the package root
+      // found from the public entrypoint so the check does not silently no-op.
+      try {
+        const entrypointPath = appRequire.resolve(packageName);
+        return findPackageVersionFromEntrypoint(packageName, entrypointPath);
+      } catch {
+        return null;
+      }
+    }
   } catch {
     return null;
   }
@@ -37,7 +80,7 @@ export interface RunRscPeerCompatibilityCheckOptions {
   proVersion?: string;
   env?: NodeJS.ProcessEnv;
   // Injectable for tests; defaults to resolving from the app root.
-  resolveVersion?: (specifier: string) => string | null;
+  resolveVersion?: (packageName: string) => string | null;
 }
 
 export function runRscPeerCompatibilityCheck(options: RunRscPeerCompatibilityCheckOptions = {}): void {
@@ -50,8 +93,8 @@ export function runRscPeerCompatibilityCheck(options: RunRscPeerCompatibilityChe
   const resolveVersion =
     options.resolveVersion ?? ((specifier: string) => defaultResolveVersion(specifier, cwd));
 
-  const rscVersion = resolveVersion('react-on-rails-rsc/package.json');
-  const reactVersion = resolveVersion('react/package.json');
+  const rscVersion = resolveVersion('react-on-rails-rsc');
+  const reactVersion = resolveVersion('react');
 
   const result = checkRscPeerCompatibility({ rscVersion, reactVersion, proVersion: options.proVersion });
   if (result.level === 'ok') return;

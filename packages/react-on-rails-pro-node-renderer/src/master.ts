@@ -23,6 +23,7 @@ const ORPHAN_CLEANUP_INTERVAL_MS = 5 * MILLISECONDS_IN_MINUTE;
 const ORPHAN_AGE_THRESHOLD_MS = 30 * MILLISECONDS_IN_MINUTE;
 
 export default function masterRun(runningConfig?: Partial<Config>) {
+  // This is memoized after the wrapper path runs, but still protects direct `./master` entrypoint users.
   runRscPeerCompatibilityCheck({ proVersion: packageJson.version });
 
   // Check license status on startup and log appropriately
