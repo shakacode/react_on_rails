@@ -47,18 +47,22 @@ jobs:
     env:
       CI_JOB_NUMBER: 1
     steps:
-      # 1. Checkout before setup-node so .tool-versions exists, and keep the PR's
-      #    runtime for both base and PR builds to avoid cross-version size skew.
+      # 1. Read the PR's runtime before switching branches, then keep that Node
+      #    version for both base and PR builds to avoid cross-version size skew.
       #    Also keep the PR's size-limit config because the base branch may not have it.
-      - name: Checkout PR branch for config
+      - name: Checkout PR branch for runtime config
         uses: actions/checkout@v4
         with:
           persist-credentials: false
 
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
+
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version-file: .tool-versions
+          node-version: ${{ steps.tool-versions.outputs.node-version }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -66,8 +70,7 @@ jobs:
       - name: Save size-limit config
         run: cp .size-limit.json /tmp/size-limit-config.json
 
-      # 2. Get base branch sizes. Checkout overwrites .tool-versions, so keep
-      #    node setup above this point.
+      # 2. Get base branch sizes.
       - name: Checkout base branch
         uses: actions/checkout@v4
         with:

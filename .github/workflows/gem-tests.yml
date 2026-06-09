@@ -80,17 +80,23 @@ jobs:
         uses: ./.github/actions/read-tool-versions
       - name: Set gem tests matrix
         id: set-matrix
+        env:
+          LATEST_RUBY_VERSION: ${{ steps.tool-versions.outputs.ruby-minor-version }}
+          MINIMUM_RUBY_VERSION: ${{ steps.tool-versions.outputs.minimum-ruby-minor-version }}
+          WORKFLOW_REF: ${{ github.ref }}
+          HAS_FULL_CI_LABEL: ${{ steps.check-label.outputs.result }}
+          FORCE_RUN: ${{ inputs.force_run }}
         run: |
-          latest_ruby_version="${{ steps.tool-versions.outputs.ruby-minor-version }}"
-          minimum_ruby_version="${{ steps.tool-versions.outputs.minimum-ruby-minor-version }}"
+          latest_ruby_version="$LATEST_RUBY_VERSION"
+          minimum_ruby_version="$MINIMUM_RUBY_VERSION"
 
           # Determine if we should run full matrix (main or full-ci label)
           # Each Ruby version / dependency level is split into two shards:
           #   generators – spec/react_on_rails/generators (heavy filesystem I/O)
           #   unit       – everything else under spec/react_on_rails
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]] || \
-             [[ "${{ steps.check-label.outputs.result }}" == "true" ]] || \
-             [[ "${{ inputs.force_run }}" == "true" ]]; then
+          if [[ "$WORKFLOW_REF" == "refs/heads/main" ]] || \
+             [[ "$HAS_FULL_CI_LABEL" == "true" ]] || \
+             [[ "$FORCE_RUN" == "true" ]]; then
             # Full matrix: test both latest and minimum supported versions × 2 shards
             matrix="$(jq -nc \
               --arg latest_ruby_version "$latest_ruby_version" \

@@ -100,19 +100,28 @@ jobs:
         id: tool-versions
         uses: ./.github/actions/read-tool-versions
       - id: set-matrix
+        env:
+          LATEST_RUBY_VERSION: ${{ steps.tool-versions.outputs.ruby-minor-version }}
+          LATEST_NODE_VERSION: ${{ steps.tool-versions.outputs.node-major-version }}
+          MINIMUM_RUBY_VERSION: ${{ steps.tool-versions.outputs.minimum-ruby-minor-version }}
+          MINIMUM_NODE_VERSION: ${{ steps.tool-versions.outputs.minimum-node-major-version }}
+          WORKFLOW_REF: ${{ github.ref }}
+          WORKFLOW_EVENT: ${{ github.event_name }}
+          FORCE_RUN: ${{ inputs.force_run }}
+          HAS_FULL_CI_LABEL: ${{ needs.detect-changes.outputs.has_full_ci_label }}
         run: |
           # Integration matrices float Node within each supported major; single-lane
           # workflows use exact patch versions when exercising the minimum floor.
-          latest_ruby_version="${{ steps.tool-versions.outputs.ruby-minor-version }}"
-          latest_node_version="${{ steps.tool-versions.outputs.node-major-version }}"
-          minimum_ruby_version="${{ steps.tool-versions.outputs.minimum-ruby-minor-version }}"
-          minimum_node_version="${{ steps.tool-versions.outputs.minimum-node-major-version }}"
+          latest_ruby_version="$LATEST_RUBY_VERSION"
+          latest_node_version="$LATEST_NODE_VERSION"
+          minimum_ruby_version="$MINIMUM_RUBY_VERSION"
+          minimum_node_version="$MINIMUM_NODE_VERSION"
 
           # Determine if we should run full matrix (main, workflow_dispatch, force_run, or full-ci label).
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]] || \
-             [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
-             [[ "${{ inputs.force_run }}" == "true" ]] || \
-             [[ "${{ needs.detect-changes.outputs.has_full_ci_label }}" == "true" ]]; then
+          if [[ "$WORKFLOW_REF" == "refs/heads/main" ]] || \
+             [[ "$WORKFLOW_EVENT" == "workflow_dispatch" ]] || \
+             [[ "$FORCE_RUN" == "true" ]] || \
+             [[ "$HAS_FULL_CI_LABEL" == "true" ]]; then
             run_full_matrix=true
           else
             run_full_matrix=false

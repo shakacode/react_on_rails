@@ -25,6 +25,13 @@ RSpec.describe "Ruby version support" do
     end
   end
 
+  def committed_tool_versions(path)
+    stdout, stderr, status = Open3.capture3("git", "-C", repo_root, "show", "HEAD:#{path}")
+
+    expect(status).to be_success, "#{stdout}\n#{stderr}"
+    stdout
+  end
+
   def minor_version(version)
     version.split(".").take(2).join(".")
   end
@@ -53,15 +60,25 @@ RSpec.describe "Ruby version support" do
   end
 
   def ci_switch_tool_version_outputs
+    latest_tool_versions = committed_tool_versions(".tool-versions")
+    minimum_tool_versions = committed_tool_versions(".minimum.tool-versions")
     script = [
       "source #{Shellwords.escape(File.join(repo_root, 'bin/ci-switch-config'))}",
-      'echo "ruby-version=$(read_tool_version "$PROJECT_ROOT/.tool-versions" ruby)"',
-      'echo "node-version=$(read_tool_version "$PROJECT_ROOT/.tool-versions" nodejs)"',
-      'echo "minimum-ruby-version=$(read_tool_version "$MINIMUM_TOOL_VERSIONS_FILE" ruby)"',
-      'echo "minimum-node-version=$(read_tool_version "$MINIMUM_TOOL_VERSIONS_FILE" nodejs)"'
+      "latest_tool_versions=$(mktemp)",
+      "minimum_tool_versions=$(mktemp)",
+      'trap \'rm -f "$latest_tool_versions" "$minimum_tool_versions"\' EXIT',
+      'printf "%s\n" "$LATEST_TOOL_VERSIONS" > "$latest_tool_versions"',
+      'printf "%s\n" "$MINIMUM_TOOL_VERSIONS" > "$minimum_tool_versions"',
+      'echo "ruby-version=$(read_tool_version "$latest_tool_versions" ruby)"',
+      'echo "node-version=$(read_tool_version "$latest_tool_versions" nodejs)"',
+      'echo "minimum-ruby-version=$(read_tool_version "$minimum_tool_versions" ruby)"',
+      'echo "minimum-node-version=$(read_tool_version "$minimum_tool_versions" nodejs)"'
     ].join("\n")
 
-    stdout, stderr, status = Open3.capture3("bash", "-c", script, chdir: repo_root)
+    stdout, stderr, status = Open3.capture3(
+      { "LATEST_TOOL_VERSIONS" => latest_tool_versions, "MINIMUM_TOOL_VERSIONS" => minimum_tool_versions },
+      "bash", "-c", script, chdir: repo_root
+    )
 
     expect(status).to be_success, "#{stdout}\n#{stderr}"
     expect(stderr).to be_empty
