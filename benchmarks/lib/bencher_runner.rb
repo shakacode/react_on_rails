@@ -89,7 +89,7 @@ class BencherRunner
     begin
       File.write(tmp_report_json, stdout)
       FileUtils.mv(tmp_report_json, report_json)
-    rescue SystemCallError
+    rescue StandardError
       FileUtils.rm_f(tmp_report_json)
       FileUtils.rm_f(report_json)
       raise

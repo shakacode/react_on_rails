@@ -111,5 +111,15 @@ RSpec.describe PrReportPoster do
         any_args
       )
     end
+
+    it "warns when stale comment listing returns no numeric ids" do
+      status = instance_double(Process::Status, success?: true)
+
+      allow(GithubCli).to receive_messages(capture: ["not-an-id\n", status], run: true)
+
+      expect { poster.send(:delete_stale_comments, before: "cutoff") }
+        .to output(/::warning::Stale Core Bencher report comment listing returned no numeric IDs/).to_stdout
+      expect(GithubCli).not_to have_received(:run)
+    end
   end
 end

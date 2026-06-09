@@ -168,5 +168,17 @@ RSpec.describe BencherRunner do
       expect(FileUtils).to have_received(:rm_f).with("report.json.tmp")
       expect(FileUtils).to have_received(:rm_f).with("report.json")
     end
+
+    it "removes stale and temporary reports when writing raises a non-system error" do
+      status = instance_double(Process::Status, exitstatus: 0)
+
+      allow(Open3).to receive(:capture3).and_return([JSON.generate("results" => [], "alerts" => []), "", status])
+      allow(File).to receive(:write).with("report.json.tmp", anything).and_raise(RuntimeError, "disk layer failed")
+      allow(FileUtils).to receive(:rm_f)
+
+      expect { runner.run("branch", []) }.to raise_error(RuntimeError, "disk layer failed")
+      expect(FileUtils).to have_received(:rm_f).with("report.json.tmp")
+      expect(FileUtils).to have_received(:rm_f).with("report.json")
+    end
   end
 end

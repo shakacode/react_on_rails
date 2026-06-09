@@ -72,7 +72,16 @@ class PrReportPoster
     )
     return [] unless status.success?
 
-    stdout.lines.map(&:strip).reject(&:empty?).grep(/\A\d+\z/)
+    comment_ids = stdout.lines.map(&:strip).reject(&:empty?)
+    numeric_comment_ids = comment_ids.grep(/\A\d+\z/)
+    if comment_ids.any? && numeric_comment_ids.empty?
+      Github.warning(
+        "Stale #{suite_name} Bencher report comment listing returned no numeric IDs; " \
+        "skipping cleanup so current comments are preserved."
+      )
+    end
+
+    numeric_comment_ids
   end
 
   def post_comment(markdown)
