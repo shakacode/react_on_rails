@@ -209,8 +209,9 @@ RSpec.describe "Ruby version support" do
     end
 
     benchmark_suite = read_repo_file(".github/workflows/benchmark-suite.yml")
+    expect(benchmark_suite).to include("steps.tool-versions.outputs.minimum-ruby-version")
     expect(benchmark_suite).to include("steps.tool-versions.outputs.node-version")
-    expect(benchmark_suite).to include("deliberate min-Ruby x latest-Node cross-profile")
+    expect(benchmark_suite).not_to include("steps.tool-versions.outputs.minimum-node-version")
   end
 
   it "documents and switches to Ruby 4.0 for the latest local CI configuration" do
