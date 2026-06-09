@@ -254,7 +254,6 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
         },
       );
     }, [getRefetchVersion, refetchComponent]);
-    const retry = useCallback((): Promise<ReactNode> => refetch(), [refetch]);
 
     const clearRefetchError = useCallback(() => {
       if (isMountedRef.current) {
@@ -264,8 +263,8 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
 
     const handle = useMemo<RSCRouteHandle>(
       // retry is the same implementation as refetch; the distinction is semantic for error UI.
-      () => ({ refetch, retry, refetchError, clearRefetchError }),
-      [clearRefetchError, refetch, refetchError, retry],
+      () => ({ refetch, retry: refetch, refetchError, clearRefetchError }),
+      [clearRefetchError, refetch, refetchError],
     );
     useImperativeHandle(ref, () => handle, [handle]);
     useEffect(() => {
