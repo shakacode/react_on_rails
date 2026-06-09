@@ -66,6 +66,7 @@ class PrReportPoster
     stdout, status = GithubCli.capture(
       "gh", "api", "repos/#{repository}/issues/#{pr_number}/comments",
       "--paginate",
+      # GitHub timestamps are fixed-width ISO-8601 strings, so lexical ordering matches time ordering.
       "--jq", ".[] | select(.body | startswith(env.MARKER)) | select(.created_at < env.CUTOFF_TS) | .id",
       env: { "MARKER" => marker, "CUTOFF_TS" => before },
       error_message: "Failed to list stale #{suite_name} Bencher report comments"
@@ -74,7 +75,7 @@ class PrReportPoster
 
     comment_ids = stdout.lines.map(&:strip).reject(&:empty?)
     numeric_comment_ids = comment_ids.grep(/\A\d+\z/)
-    non_numeric_comment_ids = comment_ids - numeric_comment_ids
+    non_numeric_comment_ids = comment_ids.grep_v(/\A\d+\z/)
     if non_numeric_comment_ids.any? && numeric_comment_ids.empty?
       Github.warning(
         "Stale #{suite_name} Bencher report comment listing returned no numeric IDs; " \

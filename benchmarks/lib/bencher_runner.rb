@@ -80,7 +80,7 @@ class BencherRunner
   end
 
   # Writes Bencher stdout to disk, parses it, and returns the parsed report.
-  # If parsing fails after the file move, remove the report so stale JSON cannot
+  # Any write, move, or parse failure removes report files so stale JSON cannot
   # masquerade as the current run.
   def persist_report(stdout)
     if stdout.empty?

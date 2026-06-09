@@ -4,6 +4,8 @@ require_relative "spec_helper"
 require_relative "../lib/pr_report_poster"
 
 RSpec.describe PrReportPoster do
+  include BenchmarkEnvHelper
+
   subject(:poster) do
     described_class.new(
       repository: "shakacode/react_on_rails",
@@ -11,6 +13,30 @@ RSpec.describe PrReportPoster do
       suite_name: "Core",
       marker: "<!-- BENCHER CORE -->"
     )
+  end
+
+  describe ".from_env" do
+    it "wires the repository and pull request number from GitHub Actions env" do
+      status = instance_double(Process::Status, success?: true)
+      allow(GithubCli).to receive_messages(run: true, capture: ["", status])
+
+      with_env("GITHUB_REPOSITORY" => "shakacode/react_on_rails", "PR_NUMBER" => "456") do
+        described_class.from_env(suite_name: "Pro", marker: "<!-- BENCHER PRO -->").replace("### report")
+      end
+
+      expect(GithubCli).to have_received(:run).with(
+        "gh", "pr", "comment", "456", "--body-file", "-",
+        error_message: "Failed to post Pro benchmark report comment",
+        stdin_data: "<!-- BENCHER PRO -->\n### report"
+      )
+      expect(GithubCli).to have_received(:capture).with(
+        "gh", "api", "repos/shakacode/react_on_rails/issues/456/comments",
+        "--paginate",
+        "--jq", ".[] | select(.body | startswith(env.MARKER)) | select(.created_at < env.CUTOFF_TS) | .id",
+        env: { "MARKER" => "<!-- BENCHER PRO -->", "CUTOFF_TS" => kind_of(String) },
+        error_message: "Failed to list stale Pro Bencher report comments"
+      )
+    end
   end
 
   describe "#replace" do
