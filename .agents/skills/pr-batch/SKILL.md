@@ -112,17 +112,27 @@ For high-risk cases above, run Claude's `/simplify` after all required review pa
 
 Before merge, wait for requested or configured review agents such as Claude, CodeRabbit, Greptile, Cursor Bugbot, and Codex review to finish for the current head SHA. Poll CI with bounded commands and timeouts; use narrow required-check commands such as `gh pr checks <PR> --required` for required CI readiness, then also fetch all checks or explicit review-agent checks so non-required reviewers are not hidden. Avoid long-lived `gh ... --watch`. Ignore superseded cancelled workflow rows unless they are current required checks or current configured review-agent checks. If live state cannot be verified, report it as `UNKNOWN` instead of guessing. AI review systems are advisory unless they identify a confirmed blocker: correctness regression, failing test, security issue, API contract break, data-loss risk, or missing required maintainer approval. Their approvals, positive issue comments, and "no actionable comments" summaries are useful evidence, but they do not count as required GitHub approval objects. For high-risk or concurrent-batch PRs, run or request the adversarial PR review workflow in `.agents/workflows/adversarial-pr-review.md`. A completed check is not enough when review comments exist: classify and resolve or explicitly waive actionable findings before merging. Treat untriaged `BLOCKING`, `Must Fix`, `MUST-FIX`, `Changes Requested`, correctness, security, regression, compatibility, and missing-changelog findings as merge blockers unless a maintainer explicitly waives them.
 
-For blocking questions, stop work on that target, surface the question to the coordinator or maintainer, and mark the issue/PR with the agreed pending-question state. For non-blocking questions where you make a decision and continue, record the decision in the PR description before review or merge.
+At the final review/readiness gate, apply the canonical full-CI uncertainty rule and Coordinator Closeout Lane from `.agents/workflows/pr-processing.md` under **Plan To Goal Handoff**.
 
-Before final handoff, kill or confirm no stray GitHub polling processes are still running. Final state for every target must be one of: merged PR; open PR waiting on checks/review; blocked needing user input; or no-PR with an evidence-backed issue/PR comment. Final handoff must list branches, PR URLs, issue outcomes, validations, last-known CI state, blockers, no-PR comments, and next actions.
+For blocking questions, stop work on that target, surface a structured question to the coordinator or maintainer, and mark the issue/PR with the agreed pending-question state. Report the question/comment URL as `blocked needing user input`; do not open a speculative PR. For non-blocking questions where you make a decision and continue, record the decision in the PR description before review or merge.
+
+Before final handoff, follow the canonical final-state and `Immediate maintainer attention` / `FYI / decisions made` split in `.agents/workflows/pr-processing.md`.
 ```
 
 ## Question And Decision Handling
 
 Classify every unresolved question before continuing:
 
-- **Blocking question**: the implementation, validation, or merge decision would be unsafe without maintainer input. Stop work on that target until answered. Subagents should return the blocking question to the coordinator instead of guessing. For multi-machine batches, post a structured issue or PR comment and, if the repo uses labels for this workflow, apply `codex-pending-question`.
+- **Blocking question**: the implementation, validation, or merge decision would be unsafe without maintainer input. Stop work on that target until answered. Subagents should return the blocking question to the coordinator instead of guessing. For multi-machine batches, post a structured issue or PR comment and, if the repo uses labels for this workflow, apply `codex-pending-question`. A worker handoff should include the question/comment URL as that target's blocked final state.
 - **Non-blocking decision**: a reasonable local decision can be made without increasing merge risk. Continue work, but add a clearly formatted decision note to the PR description so later review across merged PRs can surface these items quickly.
+
+<!-- Keep this full-CI uncertainty rule in sync with `.agents/workflows/pr-processing.md`. -->
+
+Full-CI uncertainty at the final readiness gate after local validation and the
+final push is a non-blocking decision. Request full CI with `+ci-run-full`,
+record the reason, re-fetch and wait for the newly requested current-head checks,
+and continue the readiness flow instead of escalating it as an immediate
+maintainer question.
 
 Suggested PR description section:
 
@@ -136,6 +146,14 @@ Suggested PR description section:
 ```
 
 Before merge or final readiness, scan the PR description for the decision log and make sure each non-blocking decision is still accurate after review changes.
+
+## Batch Handoff Format
+
+Use the canonical Batch Handoff Format in
+`.agents/workflows/pr-processing.md`. In short, split final batch handoffs into
+**Immediate maintainer attention** for true blockers and questions only, and
+**FYI / decisions made** for decisions, validations, review state, full-CI
+requests already handled, and no-PR rationales.
 
 ## Coordination State
 
@@ -173,3 +191,11 @@ When worker subagents are explicitly authorized:
 - Tell workers they are not alone in the codebase and must not revert others' edits.
 - Keep write scopes disjoint unless the main agent serializes integration.
 - The main agent owns final PR creation, status reporting, full-CI decisions, and merge sequencing.
+
+## Coordinator Closeout Lane
+
+For the complete numbered sequence, follow the canonical closeout lane in
+`.agents/workflows/pr-processing.md` instead of stopping at PR creation. The
+coordinator owns the live re-fetch, current-head checks and review-thread triage,
+release-mode or accelerated-RC confidence refresh, full-CI request and waitback
+when uncertainty remains, and any authorized ready/merge action.
