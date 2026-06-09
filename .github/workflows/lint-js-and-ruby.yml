@@ -87,7 +87,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          # Pin lives in .tool-versions (Shakapacker 10.1 floor) to avoid V8 bug in 22.21.0
+          # Node pin lives in .tool-versions to avoid the V8 bug in 22.21.0.
           # https://github.com/nodejs/node/issues/56010
           node-version-file: .tool-versions
       - name: Setup pnpm
@@ -128,7 +128,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          # Pin lives in .tool-versions (Shakapacker 10.1 floor) to avoid V8 bug in 22.21.0
+          # Node pin lives in .tool-versions to avoid the V8 bug in 22.21.0.
           # https://github.com/nodejs/node/issues/56010
           node-version-file: .tool-versions
       - name: Setup pnpm
@@ -158,7 +158,7 @@ jobs:
         uses: ./.github/actions/setup-bundle
         with:
           working-directory: .
-          ruby-version: '4.0'
+          ruby-version: ${{ steps.tool-versions.outputs.ruby-minor-version }}
           install-libyaml: 'false'
       - name: Install Ruby Gems for package
         uses: ./.github/actions/setup-bundle
