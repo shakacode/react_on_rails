@@ -113,7 +113,7 @@ module RendererHarness
       end
 
       def self.validate_positive_float!(flag, value)
-        return if value.to_f.positive?
+        return if value.is_a?(Float) && value.positive?
 
         raise ArgumentError, "#{flag} must be > 0"
       end
@@ -352,6 +352,7 @@ module RendererHarness
       def initialize(config)
         @config = config
         @stderr_lines = []
+        @stderr_mutex = Mutex.new
       end
 
       def start
@@ -425,15 +426,17 @@ module RendererHarness
 
       def read_stderr
         @stderr.each_line do |line|
-          @stderr_lines << line
-          @stderr_lines.shift while @stderr_lines.length > 40
+          @stderr_mutex.synchronize do
+            @stderr_lines << line
+            @stderr_lines.shift while @stderr_lines.length > 40
+          end
         end
       rescue IOError
         nil
       end
 
       def stderr_preview
-        @stderr_lines.join.strip
+        @stderr_mutex.synchronize { @stderr_lines.join.strip }
       end
     end
   end
