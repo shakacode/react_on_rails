@@ -5,8 +5,6 @@ import { createWebResponseFromText } from './testUtils.ts';
 
 enableFetchMocks();
 
-const responseFromText = createWebResponseFromText;
-
 const loadClientModule = async (createFromReadableStream = jest.fn()) => {
   jest.resetModules();
   jest.doMock('react-on-rails-rsc/client.browser', () => ({
@@ -41,7 +39,7 @@ describe('fetchRSC HTTP responses', () => {
       props: JSON.stringify(componentProps),
     })}`;
     fetchMock.mockResolvedValue(
-      responseFromText('<html>Not found</html>', {
+      createWebResponseFromText('<html>Not found</html>', {
         ok: false,
         status: 404,
         statusText: 'Not Found',
@@ -63,7 +61,7 @@ describe('fetchRSC HTTP responses', () => {
   it('propagates non-ok HTTP responses through the getReactServerComponent fetch path', async () => {
     const { createFromReadableStream, default: getReactServerComponent } = await loadClientModule();
     fetchMock.mockResolvedValue(
-      responseFromText('unauthorized', {
+      createWebResponseFromText('unauthorized', {
         ok: false,
         status: 401,
         statusText: 'Unauthorized',
@@ -84,6 +82,38 @@ describe('fetchRSC HTTP responses', () => {
       'Failed to fetch RSC payload for component "AccountPanel" from "/rsc_payload/AccountPanel?props=%7B%7D": RSC payload request for component "AccountPanel" from "/rsc_payload/AccountPanel" failed with HTTP 401 Unauthorized.',
     );
     expect(createFromReadableStream).not.toHaveBeenCalled();
+  });
+
+  it('encodes component names when constructing the payload request URL', async () => {
+    const { fetchRSC } = await loadClientModule();
+    const componentName = 'Account Panel+Details';
+    const componentProps = { id: 1 };
+    fetchMock.mockResolvedValue(
+      createWebResponseFromText('unauthorized', {
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+      }),
+    );
+
+    await expect(
+      fetchRSC({
+        componentName,
+        componentProps,
+        rscPayloadGenerationUrlPath: '/rsc_payload',
+      }),
+    ).rejects.toThrow(
+      `Failed to fetch RSC payload for component "${componentName}" from "/rsc_payload/${encodeURIComponent(
+        componentName,
+      )}?props=%7B%22id%22%3A1%7D": RSC payload request for component "${componentName}" from "/rsc_payload/${encodeURIComponent(
+        componentName,
+      )}" failed with HTTP 401 Unauthorized.`,
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/rsc_payload/${encodeURIComponent(componentName)}?${new URLSearchParams({
+        props: JSON.stringify(componentProps),
+      })}`,
+    );
   });
 });
 

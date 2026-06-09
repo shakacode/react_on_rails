@@ -70,6 +70,7 @@ describe('createRscPayloadNode', () => {
   afterEach(() => {
     fetchMock.mockReset();
     jest.dontMock('react-on-rails-rsc/client.browser');
+    jest.dontMock('../src/getReactServerComponent.client.ts');
     jest.resetModules();
     document.body.innerHTML = '';
   });
@@ -92,6 +93,27 @@ describe('createRscPayloadNode', () => {
       { credentials: 'same-origin' },
     );
     expect(createFromReadableStream).toHaveBeenCalledTimes(1);
+  });
+
+  it('encodes component names as one payload URL path segment', async () => {
+    const { createRscPayloadNode } = loadHelper();
+    const props = { requestedBy: 'loader' };
+    fetchMock.mockResolvedValue(responseFromText(frame('route data')));
+
+    await expect(
+      createRscPayloadNode({
+        componentName: 'Dashboard Panel+Beta',
+        payloadPath: '/rsc_payload',
+        props,
+      }),
+    ).resolves.toBe('route data');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/rsc_payload/${encodeURIComponent('Dashboard Panel+Beta')}?${new URLSearchParams({
+        props: JSON.stringify(props),
+      })}`,
+      { credentials: 'same-origin' },
+    );
   });
 
   it('forwards only documented fetch controls to the payload request', async () => {
@@ -153,13 +175,13 @@ describe('createRscPayloadNode', () => {
     ).rejects.toBe(payloadError);
   });
 
-  it('rejects cross-realm-style Error payloads for route error boundaries', async () => {
+  it('rejects cross-realm Error payloads for route error boundaries', async () => {
     const { createFromReadableStream, createRscPayloadNode } = loadHelper();
-    const payloadError = {
-      name: 'Error',
-      message: 'server component failed in another realm',
-      stack: 'Error: server component failed in another realm',
-    } as Error;
+    const iframe = document.createElement('iframe');
+    document.body.appendChild(iframe);
+    const ErrorFromOtherRealm = (iframe.contentWindow as { Error?: ErrorConstructor } | null)?.Error;
+    if (!ErrorFromOtherRealm) throw new Error('Expected iframe.contentWindow.Error to be available.');
+    const payloadError = new ErrorFromOtherRealm('server component failed in another realm');
     fetchMock.mockResolvedValue(responseFromText(frame('serialized error payload')));
     (createFromReadableStream as jest.Mock).mockResolvedValueOnce(payloadError);
 
@@ -171,9 +193,14 @@ describe('createRscPayloadNode', () => {
     ).rejects.toBe(payloadError);
   });
 
-  it('returns plain object payloads that only resemble validation errors', async () => {
+  it('returns plain object payloads that only resemble errors', async () => {
     const { createFromReadableStream, createRscPayloadNode } = loadHelper();
-    const validationPayload = { name: 'ValidationError', message: 'Input too short', code: 422 };
+    const validationPayload = {
+      name: 'Error',
+      message: 'Display this validation result.',
+      stack: 'Error: Display this validation result.\n    at serialized route data',
+      code: 422,
+    };
     fetchMock.mockResolvedValue(responseFromText(frame('plain object payload')));
     (createFromReadableStream as jest.Mock).mockResolvedValueOnce(validationPayload);
 
@@ -215,21 +242,46 @@ describe('createRscPayloadNode', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('preserves non-Error synchronous failures as rejection causes', async () => {
+    jest.resetModules();
+    jest.doMock('../src/getReactServerComponent.client.ts', () => ({
+      fetchRSC: () => {
+        // eslint-disable-next-line no-throw-literal
+        throw 'route data failed';
+      },
+    }));
+
+    // eslint-disable-next-line global-require, @typescript-eslint/no-var-requires
+    const { createRscPayloadNode } = require('../src/createRscPayloadNode.client.ts') as {
+      createRscPayloadNode: CreateRscPayloadNode;
+    };
+
+    await expect(
+      createRscPayloadNode({
+        componentName: 'DashboardPanel',
+        payloadPath: '/rsc_payload',
+      }),
+    ).rejects.toMatchObject({
+      cause: 'route data failed',
+      message: 'route data failed',
+    });
+  });
+
   it.each([
     '../AdminPanel',
     'Admin\\Panel',
     'AdminPanel?draft=true',
     'AdminPanel#section',
     'AdminPanel%2FEdit',
-  ])('rejects component names that would change the payload URL path: %s', (componentName) => {
+  ])('rejects component names that would change the payload URL path: %s', async (componentName) => {
     const { createRscPayloadNode } = loadHelper();
 
-    expect(() =>
+    await expect(
       createRscPayloadNode({
         componentName,
         payloadPath: '/rsc_payload',
       }),
-    ).toThrow('createRscPayloadNode componentName cannot include path or query-string characters.');
+    ).rejects.toThrow('createRscPayloadNode componentName cannot include path or query-string characters.');
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -240,18 +292,52 @@ describe('createRscPayloadNode', () => {
     '/rsc_payload#fragment',
     'https://example.test/rsc_payload',
     'rsc\\payload',
-  ])('rejects payload paths that would escape the configured Rails path: %s', (payloadPath) => {
+  ])('rejects payload paths that would escape the configured Rails path: %s', async (payloadPath) => {
     const { createRscPayloadNode } = loadHelper();
 
-    expect(() =>
+    await expect(
       createRscPayloadNode({
         componentName: 'DashboardPanel',
         payloadPath,
       }),
-    ).toThrow(
+    ).rejects.toThrow(
       'createRscPayloadNode payloadPath must be a Rails path without traversal, URL, query, hash, or encoded path characters.',
     );
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('allows colon characters in ordinary Rails payload path segments', async () => {
+    const { createRscPayloadNode } = loadHelper();
+    fetchMock.mockResolvedValue(responseFromText(frame('route data')));
+
+    await expect(
+      createRscPayloadNode({
+        componentName: 'DashboardPanel',
+        payloadPath: '/rsc_payload/v1:tenant',
+      }),
+    ).resolves.toBe('route data');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/rsc_payload/v1:tenant/DashboardPanel?${new URLSearchParams({ props: JSON.stringify({}) })}`,
+      { credentials: 'same-origin' },
+    );
+  });
+
+  it('normalizes protocol-relative payload paths as relative Rails paths', async () => {
+    const { createRscPayloadNode } = loadHelper();
+    fetchMock.mockResolvedValue(responseFromText(frame('route data')));
+
+    await expect(
+      createRscPayloadNode({
+        componentName: 'DashboardPanel',
+        payloadPath: '//tenant.example/rsc_payload',
+      }),
+    ).resolves.toBe('route data');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/tenant.example/rsc_payload/DashboardPanel?${new URLSearchParams({ props: JSON.stringify({}) })}`,
+      { credentials: 'same-origin' },
+    );
   });
 
   it('does not materialize console replay metadata as inline script', async () => {

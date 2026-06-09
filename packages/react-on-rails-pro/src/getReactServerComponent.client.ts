@@ -46,6 +46,12 @@ export type FetchRSCOptions = {
   replayConsoleScripts?: boolean;
 };
 
+const createMissingRSCPayloadPathError = (componentName: string) =>
+  new Error(
+    `Cannot fetch RSC payload for component "${componentName}": rscPayloadGenerationUrlPath is not configured. ` +
+      'Please ensure React Server Components support is properly enabled and configured.',
+  );
+
 /**
  * Replays a consoleReplayScript by injecting it as a <script> element.
  */
@@ -187,17 +193,14 @@ export const fetchRSC = ({
   replayConsoleScripts,
 }: FetchRSCOptions) => {
   if (!rscPayloadGenerationUrlPath) {
-    throw new Error(
-      `Cannot fetch RSC payload for component "${componentName}": rscPayloadGenerationUrlPath is not configured. ` +
-        'Please ensure React Server Components support is properly enabled and configured.',
-    );
+    throw createMissingRSCPayloadPathError(componentName);
   }
 
   try {
     const propsString = JSON.stringify(componentProps);
     const strippedUrlPath = rscPayloadGenerationUrlPath.replace(/^\/|\/$/g, '');
     const encodedParams = new URLSearchParams({ props: propsString }).toString();
-    const sourcePath = `/${strippedUrlPath}/${componentName}`;
+    const sourcePath = `/${strippedUrlPath}/${encodeURIComponent(componentName)}`;
     const fetchUrl = `${sourcePath}?${encodedParams}`;
     const fetchPromise = fetchOptions ? fetch(fetchUrl, fetchOptions) : fetch(fetchUrl);
 
@@ -221,9 +224,11 @@ export const fetchRSC = ({
     });
   } catch (error: unknown) {
     // Handle JSON.stringify errors or other synchronous errors
-    throw new Error(
+    const wrapper: Error & { cause?: unknown } = new Error(
       `Failed to prepare RSC request for component "${componentName}": ${extractErrorMessage(error)}`,
     );
+    wrapper.cause = error;
+    throw wrapper;
   }
 };
 
@@ -349,12 +354,8 @@ const getReactServerComponent =
       }
     }
     if (!railsContext.rscPayloadGenerationUrlPath) {
-      return Promise.reject(
-        new Error(
-          `Cannot fetch RSC payload for component "${componentName}": rscPayloadGenerationUrlPath is not configured. ` +
-            'Please ensure React Server Components support is properly enabled and configured.',
-        ),
-      );
+      // fetchRSC throws synchronously for a missing path; keep this API on the Promise rejection path.
+      return Promise.reject(createMissingRSCPayloadPathError(componentName));
     }
 
     return fetchRSC({

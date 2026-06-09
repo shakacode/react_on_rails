@@ -20,13 +20,18 @@ describe('refetch stress dummy app conventions', () => {
       default: './lib/RSCRoute.js',
     });
     expect(proPackageJson.exports['./rscPayloadNode']).toEqual({
-      types: './lib/createRscPayloadNode.client.d.ts',
-      'react-server': './lib/createRscPayloadNode.server.js',
+      'react-server': {
+        types: './lib/createRscPayloadNode.server.d.ts',
+        default: './lib/createRscPayloadNode.server.js',
+      },
       node: {
         types: './lib/createRscPayloadNode.server.d.ts',
         default: './lib/createRscPayloadNode.server.js',
       },
-      default: './lib/createRscPayloadNode.client.js',
+      default: {
+        types: './lib/createRscPayloadNode.client.d.ts',
+        default: './lib/createRscPayloadNode.client.js',
+      },
     });
   });
 
