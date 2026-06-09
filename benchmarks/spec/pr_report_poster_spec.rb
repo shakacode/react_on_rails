@@ -60,18 +60,16 @@ RSpec.describe PrReportPoster do
     end
 
     it "raises a descriptive error when PR_NUMBER is absent" do
-      snapshot = ENV.to_h
-      ENV["GITHUB_REPOSITORY"] = "shakacode/react_on_rails"
-      ENV.delete("PR_NUMBER")
+      with_env("GITHUB_REPOSITORY" => "shakacode/react_on_rails") do
+        ENV.delete("PR_NUMBER")
 
-      expect do
-        described_class.from_env(suite_name: "Pro", marker: "<!-- BENCHER PRO -->")
-      end.to raise_error(
-        KeyError,
-        "PR_NUMBER env var is required (set it from the pull_request event in the workflow step)"
-      )
-    ensure
-      ENV.replace(snapshot)
+        expect do
+          described_class.from_env(suite_name: "Pro", marker: "<!-- BENCHER PRO -->")
+        end.to raise_error(
+          KeyError,
+          "PR_NUMBER env var is required (set it from the pull_request event in the workflow step)"
+        )
+      end
     end
   end
 

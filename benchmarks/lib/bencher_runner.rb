@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "fileutils"
+require "json"
 require "open3"
 
 require_relative "bencher_report"
@@ -17,6 +18,8 @@ class BencherRunner
   # Bencher dashboard project for React on Rails benchmark runs.
   PROJECT_SLUG = "react-on-rails-t8a9ncxo"
   MAX_SAMPLE = "64"
+  private_constant :MAX_SAMPLE
+
   # Per-measure t-test boundaries (the confidence level Bencher uses for its
   # prediction interval). Tuned from a sweep of recent main-branch reports so fewer
   # than 1/20 commits raise a false regression across all benchmarks: rps and p50
@@ -103,6 +106,8 @@ class BencherRunner
       File.write(tmp_report_json, stdout)
       FileUtils.mv(tmp_report_json, report_json)
     rescue SystemCallError, IOError, RuntimeError => e
+      # SystemCallError/IOError cover OS-level write failures; RuntimeError
+      # covers storage-layer wrappers that raise non-OS write failures.
       raise PersistenceError, e.message
     ensure
       # Always runs. After a successful mv the tmp file is already renamed, so
