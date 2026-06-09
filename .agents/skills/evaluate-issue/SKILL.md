@@ -60,7 +60,7 @@ AI-found gaps are leads, not priorities. Prioritize real customer reports, verif
    - `product decision`: maintainer input required before implementation would be safe.
 
 6. Apply labels only when authorized
-   - "Authorized" means the user explicitly asked for label changes in this session or granted issue-triage/write permission for the current task. If unsure, report the label recommendation without changing GitHub.
+   - "Authorized" means the current user prompt, worker goal, or task instructions explicitly allow label changes, or the user granted issue-triage/write permission for the current task. If unsure, report the label recommendation without changing GitHub.
    - Use `P0` for merge-this-week blockers, `P1` for target-this-sprint work, `P2` for backlog, and `P3` for parked priority.
    - Keep `discussion` for RFCs and unresolved product decisions.
    - Use `needs-customer-feedback` when the issue is a nice-to-have, AI/code-analysis-only, or otherwise should not be implemented until customer evidence or maintainer approval exists.

@@ -50,10 +50,10 @@ Be skeptical of broad changes to identity models, runtime behavior, CI/workflow 
 - `P3`: parked priority.
 - `discussion`: RFCs, unclear product direction, or design conversations.
 - `needs-customer-feedback`: do not implement until customer evidence or maintainer approval exists.
-  Create it with description `Do not implement until customer evidence or maintainer approval exists.` and color `bfd4f2` when label creation is authorized; otherwise report it as a missing label.
+  See `.agents/skills/evaluate-issue/SKILL.md` for the canonical creation description, color, and authorization rule.
 - `runtime-fix`: user-facing behavior fix that should actually be implemented.
 
-Label changes are authorized only when the user explicitly asked for labels in the current session or granted issue-triage/write permission for the current task. If unsure, report the label recommendation without changing GitHub.
+Label changes are authorized only when the current user prompt, worker goal, or task instructions explicitly allow label changes, or the user granted issue-triage/write permission for the current task. If unsure, report the label recommendation without changing GitHub.
 
 Do not label AI/code-analysis-only findings as high priority without verified user impact.
 
