@@ -13,6 +13,7 @@ class PrReportPoster
 
   def initialize(repository:, pr_number:, suite_name:, marker:)
     normalized_repository = repository.to_s
+    # The regex rejects leading ".." segments, but embedded ".." still needs this guard.
     unless normalized_repository.match?(REPOSITORY_SLUG_PATTERN) && !normalized_repository.include?("..")
       raise ArgumentError, "repository must be in owner/repo format, got: #{normalized_repository.inspect}"
     end
@@ -74,7 +75,7 @@ class PrReportPoster
   def delete_stale_comments(before:)
     failed = 0
     stale_comment_ids(before:).each do |comment_id|
-      Github.notice("Deleting stale #{suite_name} Bencher report comment #{comment_id}")
+      puts "Deleting stale #{suite_name} Bencher report comment #{comment_id}"
       failed += 1 unless GithubCli.run(
         "gh", "api", "-X", "DELETE", "repos/#{repository}/issues/comments/#{comment_id}",
         error_message: "Failed to delete stale #{suite_name} Bencher report comment #{comment_id}"

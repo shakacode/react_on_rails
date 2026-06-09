@@ -17,6 +17,7 @@ class BencherRunner
 
   # Bencher dashboard project for React on Rails benchmark runs.
   PROJECT_SLUG = "react-on-rails-t8a9ncxo"
+  private_constant :PROJECT_SLUG
   MAX_SAMPLE = "64" # String because it is passed verbatim as a CLI argument.
   private_constant :MAX_SAMPLE
 

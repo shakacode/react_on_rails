@@ -154,7 +154,7 @@ def replace_pr_comments(markdown)
 end
 
 def pr_report_poster
-  # Only called from replace_pr_comments, which guards against non-PR runs first.
+  # Keep this behind replace_pr_comments so non-PR runs never require PR env vars.
   @pr_report_poster ||= PrReportPoster.from_env(suite_name: SUITE_NAME, marker: REPORT_MARKER)
 end
 
