@@ -80,6 +80,7 @@ const { existsSync } = require('fs');
 const { dirname, resolve } = require('path');
 const serverWebpackConfig = require('./serverWebpackConfig');
 const reactPackageRoot = dirname(require.resolve('react/package.json'));
+// React 19+ ships these react-server entry files alongside the standard entries.
 const resolveReactServerEntry = (entryFilename) => {
   const entryPath = resolve(reactPackageRoot, entryFilename);
   if (!existsSync(entryPath)) {
@@ -154,6 +155,7 @@ const configureRsc = () => {
       'react/jsx-runtime$': resolveReactServerEntry('jsx-runtime.react-server.js'),
       'react/jsx-dev-runtime$': resolveReactServerEntry('jsx-dev-runtime.react-server.js'),
       // RSC payload generation does not use react-dom/server.
+      // Prefix-match false covers both exact and subpath imports; no $-variant is needed.
       'react-dom/server': false,
     },
   };

@@ -4,6 +4,7 @@ const { config } = require('shakapacker');
 const { default: serverWebpackConfig, extractLoader } = require('./serverWebpackConfig');
 
 const reactPackageRoot = dirname(require.resolve('react/package.json'));
+// React 19+ ships these react-server entry files alongside the standard entries.
 const resolveReactServerEntry = (entryFilename) => {
   const entryPath = resolve(reactPackageRoot, entryFilename);
   if (!existsSync(entryPath)) {
@@ -152,6 +153,7 @@ const configureRsc = () => {
       'react/jsx-dev-runtime$': resolveReactServerEntry('jsx-dev-runtime.react-server.js'),
       // Ignore react-dom/server in RSC bundle - it's not needed for RSC payload generation.
       // Not removing it will cause a runtime error.
+      // Prefix-match false covers both exact and subpath imports; no $-variant is needed.
       'react-dom/server': false,
     },
   };
