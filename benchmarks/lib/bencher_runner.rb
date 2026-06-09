@@ -99,13 +99,15 @@ class BencherRunner
       File.write(tmp_report_json, stdout)
       FileUtils.mv(tmp_report_json, report_json)
     ensure
-      # No-op after a successful mv; cleans up the tmp file only if write/mv raised.
+      # Always runs. After a successful mv the tmp file is already renamed, so
+      # rm_f is a no-op; if write or mv raised it performs the cleanup.
       FileUtils.rm_f(tmp_report_json)
     end
 
     begin
       parse_report(stdout)
     rescue ReportParseError
+      warn "::debug::Malformed Bencher output (first 300 chars): #{stdout.slice(0, 300).inspect}"
       # Remove malformed output so a future retry starts clean; the raw debugging
       # artifact is lost, but a bad report file is worse than no report file.
       FileUtils.rm_f(report_json)

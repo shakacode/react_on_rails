@@ -119,10 +119,13 @@ RSpec.describe PrReportPoster do
     it "warns when stale comment deletion fails" do
       status = instance_double(Process::Status, success?: true)
 
-      allow(GithubCli).to receive_messages(capture: ["111\n", status], run: false)
+      allow(GithubCli).to receive(:capture).and_return(["111\n", status])
       allow(GithubCli).to receive(:run)
         .with("gh", "pr", "comment", anything, any_args)
         .and_return(true)
+      allow(GithubCli).to receive(:run)
+        .with("gh", "api", "-X", "DELETE", anything, any_args)
+        .and_return(false)
 
       expect { poster.replace("### report") }
         .to output(/::warning::Failed to delete 1 stale Core Bencher report comment/).to_stdout

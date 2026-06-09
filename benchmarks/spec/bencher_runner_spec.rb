@@ -156,8 +156,10 @@ RSpec.describe BencherRunner do
       allow(FileUtils).to receive(:mv).with("report.json.tmp", "report.json")
       allow(FileUtils).to receive(:rm_f)
 
-      expect { runner.run(branch: "branch", start_point_args: []) }
-        .to raise_error(BencherRunner::ReportParseError, /Bencher JSON report has an unexpected shape/)
+      expect do
+        expect { runner.run(branch: "branch", start_point_args: []) }
+          .to raise_error(BencherRunner::ReportParseError, /Bencher JSON report has an unexpected shape/)
+      end.to output(/::debug::Malformed Bencher output/).to_stderr
       expect(FileUtils).to have_received(:rm_f).with("report.json")
     end
 
@@ -169,8 +171,10 @@ RSpec.describe BencherRunner do
       allow(FileUtils).to receive(:mv).with("report.json.tmp", "report.json")
       allow(FileUtils).to receive(:rm_f)
 
-      expect { runner.run(branch: "branch", start_point_args: []) }
-        .to raise_error(BencherRunner::ReportParseError, /Bencher JSON report has an unexpected shape/)
+      expect do
+        expect { runner.run(branch: "branch", start_point_args: []) }
+          .to raise_error(BencherRunner::ReportParseError, /Bencher JSON report has an unexpected shape/)
+      end.to output(/::debug::Malformed Bencher output/).to_stderr
       expect(FileUtils).to have_received(:rm_f).with("report.json")
     end
 
