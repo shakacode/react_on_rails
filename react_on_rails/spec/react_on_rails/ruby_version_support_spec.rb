@@ -173,11 +173,14 @@ RSpec.describe "Ruby version support" do
     lint_ruby_versions = workflow_ruby_versions(".github/workflows/lint-js-and-ruby.yml")
     precompile_ruby_versions = workflow_ruby_versions(".github/workflows/precompile-check.yml")
     expected_latest_ruby = "${{ steps.tool-versions.outputs.ruby-minor-version }}"
+    expected_minimum_ruby = "${{ steps.tool-versions.outputs.minimum-ruby-version }}"
 
     expect(lint_ruby_versions).to all(eq(expected_latest_ruby))
     expect(lint_ruby_versions).not_to be_empty
     expect(precompile_ruby_versions).to all(eq(expected_latest_ruby))
     expect(precompile_ruby_versions).not_to be_empty
+    expect(workflow_ruby_versions(".github/workflows/pro-test-package-and-gem.yml")).to all(eq(expected_minimum_ruby))
+    expect(read_repo_file(".github/workflows/pro-test-package-and-gem.yml")).not_to include("env.RUBY_VERSION")
 
     examples_workflow = read_repo_file(".github/workflows/examples.yml")
     playwright_workflow = read_repo_file(".github/workflows/playwright.yml")

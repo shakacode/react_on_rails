@@ -14,6 +14,13 @@ MINIMUM_TOOL_VERSIONS_FILE="$PROJECT_ROOT/.minimum.tool-versions"
 MAXIMUM_TOOL_VERSIONS_FILE="$PROJECT_ROOT/.maximum.tool-versions"
 MAXIMUM_TOOL_VERSIONS_HEAD_FILE="$PROJECT_ROOT/.maximum.tool-versions.head"
 
+require_minimum_tool_versions_file() {
+  if [ ! -f "$MINIMUM_TOOL_VERSIONS_FILE" ]; then
+    echo "Error: $MINIMUM_TOOL_VERSIONS_FILE not found. This file is required and should be committed." >&2
+    exit 1
+  fi
+}
+
 read_tool_version() {
   local file="$1"
   local tool="$2"
@@ -101,6 +108,8 @@ read_latest_tool_version() {
     read_committed_tool_version "$tool" "$emit_warnings"
   fi
 }
+
+require_minimum_tool_versions_file
 
 MINIMUM_RUBY_VERSION="$(read_tool_version "$MINIMUM_TOOL_VERSIONS_FILE" ruby)"
 MINIMUM_RUBY_MINOR_VERSION="${MINIMUM_RUBY_VERSION%.*}"

@@ -169,6 +169,23 @@ RSpec.describe "bin/ci-switch-config" do
     end
   end
 
+  it "reports a friendly error when the minimum tool-version file is missing" do
+    Dir.mktmpdir do |tmpdir|
+      fake_script_path = File.join(tmpdir, "bin/ci-switch-config")
+
+      FileUtils.mkdir_p(File.dirname(fake_script_path))
+      FileUtils.cp(source_script_path, fake_script_path)
+      FileUtils.cp(File.join(repo_root, ".tool-versions"), File.join(tmpdir, ".tool-versions"))
+      FileUtils.chmod("+x", fake_script_path)
+
+      _stdout, stderr, status = Open3.capture3(fake_script_path, "status", chdir: tmpdir)
+
+      expect(status).not_to be_success
+      expect(stderr).to include("Error: #{File.join(tmpdir, '.minimum.tool-versions')} not found.")
+      expect(stderr).to include("This file is required and should be committed.")
+    end
+  end
+
   def ci_switch_status(dependencies, tool_versions_source: ".tool-versions")
     Dir.mktmpdir do |tmpdir|
       fake_script_path = File.join(tmpdir, "bin/ci-switch-config")

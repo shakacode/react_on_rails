@@ -182,7 +182,7 @@ jobs:
         uses: ./.github/actions/setup-bundle
         with:
           working-directory: .
-          ruby-version: ${{ env.RUBY_VERSION }}
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
           install-libyaml: 'false'
 
       # RuboCop is owned by the root Gemfile/Gemfile.lock so OSS and Pro use one
