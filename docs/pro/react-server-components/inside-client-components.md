@@ -482,6 +482,8 @@ function Dashboard() {
 
 In production, failed client-control refetches are recoverable: the last successful route content remains visible, `ref.current.refetchError` is set, and `ref.current.retry()` fetches the route's current `componentName` and `componentProps`. If props changed after the failure, `retry()` attempts the new request; call `clearRefetchError()` to dismiss the old error without fetching. Pass `onRefetchError` to `<RSCRoute>` when a parent or sibling needs to report the failure or update its own error UI. The callback receives the error after the handle's `refetchError` state has committed. In development, the failed refetch still throws through the route so the real `ServerComponentFetchError` and component context are visible.
 
+Recoverable refetches keep the last successful rendered `ReactNode` promise in the provider cache for each unique `componentName` and `componentProps` pair until the provider unmounts. Use this pattern for stable, low-cardinality route props; high-churn props such as per-user IDs in a long-lived single-page session can retain more rendered subtrees. Bounded eviction is tracked in [issue 3564](https://github.com/shakacode/react_on_rails/issues/3564).
+
 ### `useCurrentRSCRoute()` from inside the RSC subtree
 
 When the trigger lives inside the server component's own subtree — for example, an inline "Refresh" button that the server component itself renders — that descendant client component can call `useCurrentRSCRoute()` and refetch without being passed any props.

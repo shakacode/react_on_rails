@@ -74,12 +74,16 @@ export const createRSCProvider = ({
     // componentName+props key. Add LRU/TTL eviction when high-cardinality route
     // props make retained ReactNode promises or refetch-version counters matter.
     const lastSuccessfulRSCPromisesRef = useRef<Record<string, Promise<ReactNode>>>({});
+    // Mutable by design: refetch() reads this synchronously after bumping it,
+    // before React has committed a state update.
     const refetchVersionsRef = useRef<Record<string, number>>({});
     // `versions` is a per-cache-key counter held in React state. Bumping it on
     // refetch (inside startTransition) is what makes <RSCRoute> consumers re-
     // render with the new promise from the cache while React keeps the old
     // tree visible until the new payload resolves.
     const [versions, setVersions] = useState<Record<string, number>>({});
+    // React state by design: successful refetches need to trigger a render so
+    // mounted routes can clear recoverable errors for this cache key.
     const [successfulVersions, setSuccessfulVersions] = useState<Record<string, number>>({});
     const [, startTransition] = useTransition();
 
@@ -171,6 +175,8 @@ export const createRSCProvider = ({
           });
         };
 
+        // Normalize synchronous getServerComponent throws into promise
+        // rejections so recovery always runs through the error path below.
         const promise = Promise.resolve()
           .then(() =>
             getServerComponent({

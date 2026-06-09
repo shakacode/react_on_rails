@@ -92,6 +92,12 @@ class RSCRouteErrorBoundary extends Component<
  */
 export type RSCRouteHandle = {
   refetch: () => Promise<ReactNode>;
+  /**
+   * Alias for `refetch()` for error-recovery UI. Re-fetches using the route's
+   * current `componentName` and `componentProps`; if props changed after the
+   * failure, `retry()` issues the new request rather than replaying the failed
+   * one.
+   */
   retry: () => Promise<ReactNode>;
   refetchError: ServerComponentFetchError | null;
   clearRefetchError: () => void;
