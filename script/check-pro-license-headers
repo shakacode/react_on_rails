@@ -260,14 +260,16 @@ def run_check
 end
 
 def run_check_staged
+  # Lefthook calls this before commit. Validate every in-scope tracked file as
+  # represented in the index so untouched Pro files cannot carry stale headers.
   files = tracked_in_scope_files
   missing = files.reject { |p| index_file_content(p).include?(render_header(comment_style(p))) }
   if missing.empty?
-    puts "All #{files.size} tracked Pro files have the current license header in the index."
+    puts "All #{files.size} in-scope Pro files have the current license header in the index."
     return 0
   end
 
-  warn "Missing or outdated Pro license header in the index for #{missing.size} tracked Pro file(s):"
+  warn "Missing or outdated Pro license header in the index for #{missing.size} in-scope Pro file(s):"
   missing.each { |p| warn "  #{p}" }
   warn ""
   warn "Run `script/check-pro-license-headers --fix`, then stage the updated files."
