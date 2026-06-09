@@ -34,6 +34,7 @@ read_tool_version() {
 }
 
 current_git_head() {
+  # Non-git contexts return an empty string; callers must guard empty output.
   git -C "$PROJECT_ROOT" rev-parse HEAD 2>/dev/null || true
 }
 

@@ -37,7 +37,8 @@ runs:
       run: |
         set -euo pipefail
 
-        read_tool_version() {
+          # Mirrors read_tool_version() in bin/ci-switch-config; keep parsing in sync.
+          read_tool_version() {
           local file="$1"
           local tool="$2"
           local version
