@@ -664,18 +664,19 @@ jobs:
             name="$1"
             shift 1
             timeout=300
-            elapsed=0
+            start=$SECONDS
 
             while true; do
               for url in "$@"; do
-                curl --fail --silent "$url" > /dev/null && {
+                curl --fail --silent --max-time 5 "$url" > /dev/null && {
+                  elapsed=$((SECONDS - start))
                   echo "${name} started at ${url} after ${elapsed}s"
                   return 0
                 }
               done
 
               sleep 1
-              elapsed=$((elapsed + 1))
+              elapsed=$((SECONDS - start))
               if [ $elapsed -ge $timeout ]; then
                 echo "Timeout waiting for ${name} to start after ${timeout}s"
                 exit 1
@@ -778,8 +779,7 @@ jobs:
           });
           request.on('error', (error) => {
             console.error(`request error: ${error.message}`);
-            client.destroy();
-            process.exit(1);
+            finish(1);
           });
           request.end();
           NODE
