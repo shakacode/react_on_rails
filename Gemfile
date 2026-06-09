@@ -20,6 +20,10 @@
 
 source "https://rubygems.org"
 
+# benchmark is no longer a default gem on Ruby >= 3.5; rubocop's executable
+# requires it, so the lint-only bundle must declare it explicitly.
+gem "benchmark", require: false
+
 gem "rubocop", "1.61.0", require: false
 gem "rubocop-performance", "1.20.2", require: false
 gem "rubocop-rspec", "2.31.0", require: false
