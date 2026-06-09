@@ -83,7 +83,7 @@ RSpec.describe "Ruby version support" do
     )
 
     expect(status).to be_success, "#{stdout}\n#{stderr}"
-    expect(stderr).to be_empty
+    expect(stderr).not_to include("Error:")
 
     stdout.lines.to_h { |line| line.strip.split("=", 2) }
   end

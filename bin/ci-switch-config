@@ -61,11 +61,11 @@ saved_tool_versions_valid_for_restore() {
       # content equality with the committed profile so stale or locally-bumped
       # runtime versions cannot persist across branch updates or pulls.
       saved_tool_versions_match_committed_profile
-      return
+    else
+      # A stale sidecar is intentionally authoritative: do not fall through to
+      # legacy content comparison when a backup advertises a different HEAD.
+      return 1
     fi
-    # A stale sidecar is intentionally authoritative: do not fall through to
-    # legacy content comparison when a backup advertises a different HEAD.
-    return 1
   fi
 
   # Legacy fallback for backups created before the HEAD sidecar existed. With no
@@ -365,6 +365,7 @@ restore_tool_versions_to_latest() {
   rm -f "$MAXIMUM_TOOL_VERSIONS_FILE" "$MAXIMUM_TOOL_VERSIONS_HEAD_FILE"
 
   # Refresh script globals so downstream set_* calls use the restored latest profile.
+  # Keep this list in sync with the load-time globals block near the top of the script.
   LATEST_RUBY_VERSION="$(read_tool_version "$PROJECT_ROOT/.tool-versions" ruby)"
   LATEST_RUBY_MINOR_VERSION="${LATEST_RUBY_VERSION%.*}"
   LATEST_NODE_VERSION="$(read_tool_version "$PROJECT_ROOT/.tool-versions" nodejs)"
