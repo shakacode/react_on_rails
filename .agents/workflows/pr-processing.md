@@ -276,7 +276,7 @@ Before merge, wait for requested or configured review agents such as Claude, Cod
 
 At the final review/readiness gate, after local validation, PR creation or update, review-thread triage, and the final push for the current head SHA, request full CI with `+ci-run-full` if you are unsure whether path-selected CI is enough. Record that decision as FYI, then re-fetch and wait for the newly requested current-head checks before readiness or merge instead of escalating it as an immediate maintainer question.
 
-After workers finish, the coordinator must keep working through the Coordinator Closeout Lane instead of stopping at PR creation: re-fetch live PR status, wait for current-head checks and reviews, triage/resolve or explicitly waive current unresolved review threads, update stale release-mode classification or accelerated-RC confidence block, request full CI when uncertainty remains, re-fetch and wait for the newly requested current-head checks, and merge eligible ready PRs when authorized under the current release mode.
+After workers finish, the coordinator must keep working through the Coordinator Closeout Lane instead of stopping at PR creation: re-fetch live PR status, wait for current-head checks and reviews, triage/resolve or explicitly waive current unresolved review threads, update stale release-mode classification, refresh the finalized PR-body `Agent Merge Confidence` block when accelerated-RC readiness requires it, request full CI when uncertainty remains, re-fetch and wait for the newly requested current-head checks, and merge eligible ready PRs when authorized under the current release mode.
 
 For blocking questions, stop work on that target, surface a structured question to the coordinator or maintainer, and mark the issue/PR with the agreed pending-question state. Report the question/comment URL as `blocked needing user input`; do not open a speculative PR. For non-blocking questions where you make a decision and continue, record the decision in the PR description before review or merge.
 
@@ -377,10 +377,10 @@ The closeout lane is:
    polling.
 3. Fetch current unresolved review threads and triage them as fixed, waived, or
    still blocking.
-4. Refresh stale release-mode classification or accelerated-RC confidence block
-   (the `Agent Confidence:` block in the release tracker required by
-   accelerated-RC mode; canonical definition in `AGENTS.md`) before readiness or
-   merge.
+4. Refresh stale release-mode classification from the release tracker when
+   needed. For accelerated-RC merge readiness, refresh the latest finalized
+   PR-body `Agent Merge Confidence` block required by `AGENTS.md`; keep this
+   distinct from tracker mode/classification updates.
 5. After the final push, if local validation passed and the only uncertainty is
    whether full CI is needed, request full CI with `+ci-run-full` and record the
    reason as FYI, then loop back to re-fetch and wait for the newly requested
