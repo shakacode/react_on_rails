@@ -7,8 +7,11 @@ namespace :lint do # rubocop:disable Metrics/BlockLength
 
   desc "Run Rubocop as shell"
   task :rubocop do
-    sh_in_dir(gem_root, "BUNDLE_GEMFILE=../Gemfile bundle exec rubocop --version")
-    sh_in_dir(gem_root, "BUNDLE_GEMFILE=../Gemfile bundle exec rubocop .")
+    sh_in_dir(
+      gem_root,
+      "BUNDLE_GEMFILE=../Gemfile bundle exec rubocop --version",
+      "BUNDLE_GEMFILE=../Gemfile bundle exec rubocop ."
+    )
   end
 
   desc "Run stylelint as shell"

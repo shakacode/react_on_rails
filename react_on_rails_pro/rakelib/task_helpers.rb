@@ -13,7 +13,7 @@
 # For licensing terms:
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
-require "bundler"
+require "bundler" # Provides Bundler.with_unbundled_env for child bundle commands.
 
 module ReactOnRailsPro
   module TaskHelpers
