@@ -49,7 +49,8 @@ AI-found gaps are leads, not priorities. Prioritize real customer reports, verif
    - Split complex fixes into prerequisites and decision points; do not let a polished RFC imply immediate priority.
 
 5. Recommend disposition
-   - `fix now`: verified high impact and manageable scope.
+   - `fix now / P0`: release blocker, merge-this-week severity, security/data-loss risk, or active severe regression.
+   - `fix now / P1`: verified urgency with a manageable scope, but not an immediate release blocker.
    - `fix later / P2`: real impact but not urgent, or needs sequencing.
    - `park / P3`: plausible but hypothetical, complex, or waiting for customer evidence.
    - `document/work around`: current behavior is acceptable if users get clear guidance.
@@ -57,6 +58,7 @@ AI-found gaps are leads, not priorities. Prioritize real customer reports, verif
    - `product decision`: maintainer input required before implementation would be safe.
 
 6. Apply labels only when authorized
+   - "Authorized" means the user explicitly asked for label changes in this session or granted issue-triage/write permission for the current task. If unsure, report the label recommendation without changing GitHub.
    - Use `P0` for merge-this-week blockers, `P1` for target-this-sprint work, `P2` for backlog, and `P3` for parked priority.
    - Keep `discussion` for RFCs and unresolved product decisions.
    - Use `needs-customer-feedback` when the issue is a nice-to-have, AI/code-analysis-only, or otherwise should not be implemented until customer evidence or maintainer approval exists.
@@ -66,7 +68,7 @@ AI-found gaps are leads, not priorities. Prioritize real customer reports, verif
 
 ## Output Format
 
-- Recommendation: `fix now`, `fix later`, `park`, `document/work around`, `close`, or `product decision`
+- Recommendation: `fix now / P0`, `fix now / P1`, `fix later / P2`, `park / P3`, `document/work around`, `close`, or `product decision`
 - Evidence: links and facts verified, plus `UNKNOWN` where needed
 - Impact: who is affected and how often, or why that is unknown
 - Complexity: likely files/surfaces, risk, and sequencing

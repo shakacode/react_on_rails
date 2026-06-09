@@ -34,7 +34,8 @@ Be skeptical of broad changes to identity models, runtime behavior, CI/workflow 
 
 ## Disposition Guide
 
-- **Fix now:** verified high impact and a manageable, well-tested implementation path.
+- **Fix now / P0:** release blocker, merge-this-week severity, security/data-loss risk, or active severe regression.
+- **Fix now / P1:** verified urgency with a manageable, well-tested implementation path, but not an immediate release blocker.
 - **Fix later / P2:** real impact, but not urgent or dependent on sequencing.
 - **Park / P3:** plausible but hypothetical, complex, waiting for customer evidence, or better as an RFC.
 - **Document/work around:** current behavior is acceptable when users get clear guidance.
@@ -51,6 +52,8 @@ Be skeptical of broad changes to identity models, runtime behavior, CI/workflow 
 - `needs-customer-feedback`: do not implement until customer evidence or maintainer approval exists.
   Create it with description `Do not implement until customer evidence or maintainer approval exists.` and color `bfd4f2` when label creation is authorized; otherwise report it as a missing label.
 - `runtime-fix`: user-facing behavior fix that should actually be implemented.
+
+Label changes are authorized only when the user explicitly asked for labels in the current session or granted issue-triage/write permission for the current task. If unsure, report the label recommendation without changing GitHub.
 
 Do not label AI/code-analysis-only findings as high priority without verified user impact.
 
