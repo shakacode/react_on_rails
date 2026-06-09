@@ -34,6 +34,8 @@ type VersionTuple = [number, number, number];
 // avoids semver's prerelease rules (and a `semver` dependency) entirely.
 const parseTuple = (version: string): VersionTuple => {
   // `resolveVersion` is a public injection point, so tolerate a leading `v`/`=` (e.g. `v19.0.4`).
+  // Malformed versions intentionally coerce to 0 segments so the major mismatch
+  // branch reports the original string instead of hiding it behind a parse error.
   const normalized = version.replace(/^[v=]+/, '');
   const [withoutBuild = ''] = normalized.split('+', 1);
   const [core = ''] = withoutBuild.split('-', 1);

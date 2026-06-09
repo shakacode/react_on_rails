@@ -45,6 +45,7 @@ const findPackageVersionFromEntrypoint = (packageName: string, entrypointPath: s
     }
 
     const parentDir = path.dirname(currentDir);
+    // `path.dirname(root) === root`, so this sentinel stops the upward walk at the filesystem root.
     if (parentDir === currentDir) return null;
     currentDir = parentDir;
   }
@@ -104,6 +105,7 @@ export function runRscPeerCompatibilityCheck(options: RunRscPeerCompatibilityChe
   if (result.level === 'ok') return;
 
   if (result.level === 'warn') {
+    // DISABLE_ENV only downgrades hard errors; warnings still fire so operators see the degraded-version signal.
     log.warn(result.message);
     return;
   }
