@@ -15,7 +15,7 @@ const toLengthPrefixedWithMetadata = (content: string, metadata: Record<string, 
   return `${JSON.stringify(metadata)}\t${contentBuf.length.toString(16).padStart(8, '0')}\n${content}`;
 };
 
-const rscPayloadKey = 'test-{}-test-node';
+const rscPayloadKey = 'test-fun4a7ngv9-test-node';
 const rscPayloadKeyReference = `[${JSON.stringify(rscPayloadKey)}]`;
 const expectedInitializationScript = `<script>delete (self.REACT_ON_RAILS_RSC_ERRORS||={})${rscPayloadKeyReference};(self.REACT_ON_RAILS_RSC_PAYLOADS||={})${rscPayloadKeyReference}||=[]</script>`;
 const expectedPayloadPushScript = (chunk: string) =>
@@ -146,7 +146,7 @@ describe('injectRSCPayload', () => {
     const resultStr = await collectStreamData(result);
 
     expect(resultStr).toContain('REACT_ON_RAILS_RSC_ERRORS');
-    expect(resultStr).toContain('["test-{}-test-node"]||=');
+    expect(resultStr).toContain('["test-fun4a7ngv9-test-node"]||=');
     expect(resultStr).toContain('useState is not a function');
     expect(resultStr).toContain('/app/components/Broken.server.tsx');
     expect(resultStr).toContain('REACT_ON_RAILS_RSC_PAYLOADS');

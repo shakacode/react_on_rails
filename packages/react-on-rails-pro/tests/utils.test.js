@@ -1,9 +1,33 @@
 import { enableFetchMocks } from 'jest-fetch-mock';
 
-import { fetch } from '../src/utils.ts';
+import { fetch, createEmbeddedPayloadKey } from '../src/utils.ts';
 import { createNodeReadableStream, getNodeVersion } from './testUtils.ts';
 
 enableFetchMocks();
+
+describe('createEmbeddedPayloadKey', () => {
+  it('hashes empty props into a stable key', () => {
+    expect(createEmbeddedPayloadKey('Comp', {}, 'node-1')).toBe('Comp-fun4a7ngv9-node-1');
+  });
+
+  it('produces different hashes for different props', () => {
+    const key1 = createEmbeddedPayloadKey('Comp', { a: 1 }, 'node-1');
+    const key2 = createEmbeddedPayloadKey('Comp', { a: 2 }, 'node-1');
+    expect(key1).not.toBe(key2);
+  });
+
+  it('handles undefined props', () => {
+    expect(createEmbeddedPayloadKey('Comp', undefined, 'node-1')).toBe('Comp-4naxctcn8d-node-1');
+  });
+
+  it('handles null props', () => {
+    expect(createEmbeddedPayloadKey('Comp', null, 'node-1')).toBe('Comp-k7whjxr9t4-node-1');
+  });
+
+  it('omits domNodeId when not provided', () => {
+    expect(createEmbeddedPayloadKey('Comp', {})).toBe('Comp-fun4a7ngv9');
+  });
+});
 
 // The fetch mock functionality that returns a ReadableStream is not supported in Node.js v16.
 // Additionally, fetch function is used in RSCClientRoot only that is compatible with Node.js v18+,

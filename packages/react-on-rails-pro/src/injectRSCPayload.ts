@@ -15,7 +15,7 @@
 import { PassThrough } from 'stream';
 import { PipeableOrReadableStream } from 'react-on-rails/types';
 import sanitizeNonce from 'react-on-rails/@internal/sanitizeNonce';
-import { createRSCPayloadKey } from './utils.ts';
+import { createEmbeddedPayloadKey } from './utils.ts';
 import RSCRequestTracker from './RSCRequestTracker.ts';
 import safePipe from './safePipe.ts';
 import LengthPrefixedStreamParser from './parseLengthPrefixedStream.ts';
@@ -333,7 +333,7 @@ export default function injectRSCPayload(
 
       rscRequestTracker.onRSCPayloadGenerated((streamInfo) => {
         const { stream, props, componentName } = streamInfo;
-        const rscPayloadKey = createRSCPayloadKey(componentName, props, domNodeId);
+        const rscPayloadKey = createEmbeddedPayloadKey(componentName, props, domNodeId);
 
         // CRITICAL TIMING: Initialize global array IMMEDIATELY when component requests RSC
         // This ensures the array exists before the component's HTML is rendered and sent.
