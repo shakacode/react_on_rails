@@ -75,14 +75,16 @@ class PrReportPoster
     comment_ids = stdout.lines.map(&:strip).reject(&:empty?)
     numeric_comment_ids = comment_ids.grep(/\A\d+\z/)
     non_numeric_comment_ids = comment_ids.grep_v(/\A\d+\z/)
-    if non_numeric_comment_ids.any? && numeric_comment_ids.empty?
-      Github.warning(
-        "Stale #{suite_name} Bencher report comment listing returned no numeric IDs " \
-        "(#{non_numeric_comment_ids.size} non-numeric token(s), " \
-        "e.g. #{non_numeric_comment_ids.first.slice(0, 120).inspect}); skipping cleanup."
-      )
-      return []
-    elsif non_numeric_comment_ids.any?
+    if non_numeric_comment_ids.any?
+      if numeric_comment_ids.empty?
+        Github.warning(
+          "Stale #{suite_name} Bencher report comment listing returned no numeric IDs " \
+          "(#{non_numeric_comment_ids.size} non-numeric token(s), " \
+          "e.g. #{non_numeric_comment_ids.first.slice(0, 120).inspect}); skipping cleanup."
+        )
+        return []
+      end
+
       Github.warning(
         "Stale #{suite_name} Bencher report comment listing returned " \
         "#{non_numeric_comment_ids.size} non-numeric ID(s); ignoring those entries."
