@@ -19,6 +19,7 @@ RSpec.describe BencherRunner do
     end
     allow(File).to receive(:write).with("report.json.tmp", report_json)
     allow(FileUtils).to receive(:mv).with("report.json.tmp", "report.json")
+    allow(FileUtils).to receive(:rm_f)
 
     runner.run(branch, start_point_args)
     captured_args

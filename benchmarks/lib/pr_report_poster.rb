@@ -45,12 +45,10 @@ class PrReportPoster
     failed = 0
     stale_comment_ids(before:).each do |comment_id|
       puts "Deleting stale #{suite_name} Bencher report comment #{comment_id}"
-      next if GithubCli.run(
+      failed += 1 unless GithubCli.run(
         "gh", "api", "-X", "DELETE", "repos/#{repository}/issues/comments/#{comment_id}",
         error_message: "Failed to delete stale #{suite_name} Bencher report comment #{comment_id}"
       )
-
-      failed += 1
     end
     return if failed.zero?
 
@@ -78,8 +76,8 @@ class PrReportPoster
     non_numeric_comment_ids = comment_ids.grep_v(/\A\d+\z/)
     if non_numeric_comment_ids.any? && numeric_comment_ids.empty?
       Github.warning(
-        "Stale #{suite_name} Bencher report comment listing returned no numeric IDs; " \
-        "skipping cleanup so current comments are preserved."
+        "Stale #{suite_name} Bencher report comment listing returned no numeric IDs " \
+        "(#{non_numeric_comment_ids.size} non-numeric token(s) received); skipping cleanup."
       )
     elsif non_numeric_comment_ids.any?
       Github.warning(
