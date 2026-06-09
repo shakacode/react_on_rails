@@ -8,10 +8,11 @@ describe('runRscPeerCompatibilityCheck', () => {
   let belowRecommendedMin: string;
 
   const resolveVersions =
-    (rscVersion: string, reactVersion = '19.2.0') =>
+    (rscVersion: string, reactVersion = '19.2.0', reactDomVersion = reactVersion) =>
     (spec: string): string | null => {
       if (spec === 'react-on-rails-rsc') return rscVersion;
       if (spec === 'react') return reactVersion;
+      if (spec === 'react-dom') return reactDomVersion;
       return null;
     };
 
@@ -72,6 +73,7 @@ describe('runRscPeerCompatibilityCheck', () => {
   it('warns when package resolution cannot start from the supplied cwd', () => {
     expect(() => runRscPeerCompatibilityCheck({ cwd: 'relative-app-root' })).not.toThrow();
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('createRequire failed'));
+    expect(warnSpy).toHaveBeenCalledTimes(1);
   });
 
   it('throws on a hard incompatibility (rsc major mismatch)', () => {
@@ -120,6 +122,15 @@ describe('runRscPeerCompatibilityCheck', () => {
         resolveVersion: resolveVersions('20.0.0'),
       }),
     ).toThrow(/Incompatible react-on-rails-rsc/);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('throws on a react-dom mismatch', () => {
+    expect(() =>
+      runRscPeerCompatibilityCheck({
+        resolveVersion: resolveVersions('19.0.4', '19.2.0', '19.2.1'),
+      }),
+    ).toThrow(/Incompatible react-dom/);
     expect(warnSpy).not.toHaveBeenCalled();
   });
 

@@ -52,21 +52,21 @@ const findPackageVersionFromEntrypoint = (packageName: string, entrypointPath: s
   }
 };
 
-// `react-on-rails-rsc` and `react` are the consuming app's dependencies, not the node
-// renderer's, so resolve them from the app root rather than this module's location.
-const defaultResolveVersion = (packageName: string, cwd: string): string | null => {
-  let appRequire: NodeJS.Require;
-
+const createAppRequire = (cwd: string): NodeJS.Require | null => {
   try {
-    appRequire = createRequire(path.join(cwd, 'noop.js'));
+    return createRequire(path.join(cwd, 'noop.js'));
   } catch (error) {
     log.warn(
-      `[ReactOnRails] Could not resolve ${packageName} version ` +
+      `[ReactOnRails] Could not resolve peer package versions ` +
         `(createRequire failed: ${error instanceof Error ? error.message : String(error)}). Version check skipped.`,
     );
     return null;
   }
+};
 
+// `react-on-rails-rsc` and `react` are the consuming app's dependencies, not the node
+// renderer's, so resolve them from the app root rather than this module's location.
+const defaultResolveVersion = (packageName: string, appRequire: NodeJS.Require): string | null => {
   try {
     return (appRequire(`${packageName}/${PACKAGE_JSON}`) as { version?: string }).version ?? null;
   } catch {
@@ -94,18 +94,31 @@ export interface RunRscPeerCompatibilityCheckOptions {
 
 export function runRscPeerCompatibilityCheck(options: RunRscPeerCompatibilityCheckOptions = {}): void {
   if (alreadyRan) return;
-  // Set before evaluating so a caught startup error does not rerun the same process-wide check.
+  // Memoized once per process. Set before evaluating so a re-entrant direct
+  // wrapper/master/worker call will not rerun, and a caught startup error will
+  // not throw again unless the process restarts.
   alreadyRan = true;
 
   const env = options.env ?? process.env;
   const cwd = options.cwd ?? process.cwd();
-  const resolveVersion =
-    options.resolveVersion ?? ((specifier: string) => defaultResolveVersion(specifier, cwd));
+  let { resolveVersion } = options;
+  if (!resolveVersion) {
+    const appRequire = createAppRequire(cwd);
+    resolveVersion = appRequire
+      ? (specifier: string) => defaultResolveVersion(specifier, appRequire)
+      : () => null;
+  }
 
   const rscVersion = resolveVersion('react-on-rails-rsc');
   const reactVersion = resolveVersion('react');
+  const reactDomVersion = resolveVersion('react-dom');
 
-  const result = checkRscPeerCompatibility({ rscVersion, reactVersion, proVersion: options.proVersion });
+  const result = checkRscPeerCompatibility({
+    rscVersion,
+    reactVersion,
+    reactDomVersion,
+    proVersion: options.proVersion,
+  });
   if (result.level === 'ok') return;
 
   if (result.level === 'warn') {

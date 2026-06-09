@@ -48,6 +48,28 @@ describe('checkRscPeerCompatibility', () => {
     expect(r.message).toContain('>= 19');
   });
 
+  it('errors when react-dom major is below the RSC minimum', () => {
+    const r = checkRscPeerCompatibility({
+      rscVersion: '19.0.4',
+      reactVersion: '19.2.0',
+      reactDomVersion: '18.3.1',
+    });
+    expect(r.level).toBe('error');
+    expect(r.message).toContain('react-dom');
+    expect(r.message).toContain('>= 19');
+  });
+
+  it('errors when react-dom does not match react', () => {
+    const r = checkRscPeerCompatibility({
+      rscVersion: '19.0.4',
+      reactVersion: '19.2.0',
+      reactDomVersion: '19.2.1',
+    });
+    expect(r.level).toBe('error');
+    expect(r.message).toContain('react-dom');
+    expect(r.message).toContain('match react 19.2.0');
+  });
+
   it('warns when rsc is on the supported major but below recommendedMin', () => {
     expect(checkRscPeerCompatibility({ rscVersion: belowRecommendedMin, reactVersion: '19.2.0' }).level).toBe(
       'warn',

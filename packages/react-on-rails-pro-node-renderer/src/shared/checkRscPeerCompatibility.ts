@@ -23,6 +23,7 @@ export type RscPeerCheckResult =
 export interface RscPeerCheckInput {
   rscVersion: string | null;
   reactVersion: string | null;
+  reactDomVersion?: string | null;
   // Optional, only used to enrich the message (e.g. the node-renderer version).
   proVersion?: string;
 }
@@ -53,6 +54,9 @@ const isAtLeast = (actual: VersionTuple, floor: VersionTuple): boolean => {
   return true;
 };
 
+const sameTuple = (left: VersionTuple, right: VersionTuple): boolean =>
+  left.every((value, index) => value === right[index]);
+
 const proLabel = (proVersion?: string) =>
   proVersion ? `React on Rails Pro (${proVersion})` : 'React on Rails Pro';
 
@@ -72,7 +76,7 @@ const warnMessage = (found: string, recommendedMin: string, proVersion?: string)
   ].join('\n');
 
 export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerCheckResult {
-  const { rscVersion, reactVersion, proVersion } = input;
+  const { rscVersion, reactVersion, reactDomVersion, proVersion } = input;
 
   // react-on-rails-rsc is an optional peer. Absent => the consumer is not on the RSC
   // path (or not using RSC at all) => nothing to validate.
@@ -96,12 +100,32 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
 
   // If React is not resolvable (unusual, since RSC requires React), skip this check;
   // an app with React truly absent will fail during normal module loading.
+  let reactTuple: VersionTuple | null = null;
   if (reactVersion) {
-    const [reactMajor] = parseTuple(reactVersion);
+    reactTuple = parseTuple(reactVersion);
+    const [reactMajor] = reactTuple;
     if (reactMajor < react.minMajor) {
       return {
         level: 'error',
         message: errorMessage('react', reactVersion, `>= ${react.minMajor}`, proVersion),
+      };
+    }
+  }
+
+  if (reactDomVersion) {
+    const reactDomTuple = parseTuple(reactDomVersion);
+    const [reactDomMajor] = reactDomTuple;
+    if (reactDomMajor < react.minMajor) {
+      return {
+        level: 'error',
+        message: errorMessage('react-dom', reactDomVersion, `>= ${react.minMajor}`, proVersion),
+      };
+    }
+
+    if (reactTuple && !sameTuple(reactTuple, reactDomTuple)) {
+      return {
+        level: 'error',
+        message: errorMessage('react-dom', reactDomVersion, `match react ${reactVersion}`, proVersion),
       };
     }
   }
