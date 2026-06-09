@@ -42,6 +42,7 @@ export interface RunRscPeerCompatibilityCheckOptions {
 
 export function runRscPeerCompatibilityCheck(options: RunRscPeerCompatibilityCheckOptions = {}): void {
   if (alreadyRan) return;
+  // Set before evaluating so a caught startup error does not rerun the same process-wide check.
   alreadyRan = true;
 
   const env = options.env ?? process.env;
@@ -56,8 +57,7 @@ export function runRscPeerCompatibilityCheck(options: RunRscPeerCompatibilityChe
   if (result.level === 'ok') return;
 
   if (result.level === 'warn') {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-ok results always carry a message
-    log.warn(result.message!);
+    log.warn(result.message);
     return;
   }
 

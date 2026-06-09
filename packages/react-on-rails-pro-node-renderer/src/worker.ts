@@ -14,6 +14,7 @@ import log, { sharedLoggerOptions } from './shared/log.js';
 import packageJson from './shared/packageJson.js';
 import { buildConfig, Config, getConfig } from './shared/configBuilder.js';
 import fileExistsAsync from './shared/fileExistsAsync.js';
+import { runRscPeerCompatibilityCheck } from './shared/runRscPeerCompatibilityCheck.js';
 import type { FastifyReply } from './worker/types.js';
 import { performRequestPrechecks } from './worker/requestPrechecks.js';
 import { type AuthBody, authenticate } from './worker/authHandler.js';
@@ -189,6 +190,8 @@ const extractBodyArrayField = <Key extends string>(
 };
 
 export default function run(config: Partial<Config>) {
+  runRscPeerCompatibilityCheck({ proVersion: packageJson.version });
+
   // Store config in app state. From now it can be loaded by any module using
   // getConfig():
   buildConfig(config);

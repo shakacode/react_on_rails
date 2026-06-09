@@ -70,6 +70,7 @@ function setupMasterRunHarness() {
   }));
   const mockLogSanitizedConfig = jest.fn();
   const mockGetLicenseStatus = jest.fn(() => 'valid');
+  const mockRunRscPeerCompatibilityCheck = jest.fn();
   const setIntervalSpy = jest.spyOn(global, 'setInterval').mockReturnValue(0 as unknown as NodeJS.Timeout);
   const setTimeoutSpy = jest
     .spyOn(global, 'setTimeout')
@@ -103,6 +104,10 @@ function setupMasterRunHarness() {
     __esModule: true,
     getLicenseStatus: mockGetLicenseStatus,
   }));
+  jest.doMock('../src/shared/runRscPeerCompatibilityCheck.js', () => ({
+    __esModule: true,
+    runRscPeerCompatibilityCheck: mockRunRscPeerCompatibilityCheck,
+  }));
   jest.doMock('../src/master/restartWorkers', () => ({
     __esModule: true,
     default: jest.fn(),
@@ -130,6 +135,7 @@ function setupMasterRunHarness() {
     mockFork,
     mockCluster,
     mockErrorReporterMessage,
+    mockRunRscPeerCompatibilityCheck,
     setIntervalSpy,
     setTimeoutSpy,
     processExitSpy,
@@ -146,6 +152,14 @@ describe('master startup failure handling via masterRun wiring', () => {
   afterEach(() => {
     jest.restoreAllMocks();
     jest.resetModules();
+  });
+
+  it('runs the RSC peer compatibility check on direct master startup', () => {
+    const harness = setupMasterRunHarness();
+
+    expect(harness.mockRunRscPeerCompatibilityCheck).toHaveBeenCalledWith({
+      proVersion: expect.any(String),
+    });
   });
 
   it.each([

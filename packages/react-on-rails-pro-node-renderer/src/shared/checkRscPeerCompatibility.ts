@@ -16,10 +16,9 @@ import { RSC_PEER_SUPPORT } from './rscPeerSupport.js';
 
 export type RscPeerCheckLevel = 'ok' | 'warn' | 'error';
 
-export interface RscPeerCheckResult {
-  level: RscPeerCheckLevel;
-  message?: string;
-}
+export type RscPeerCheckResult =
+  | { level: 'ok'; message?: undefined }
+  | { level: Exclude<RscPeerCheckLevel, 'ok'>; message: string };
 
 export interface RscPeerCheckInput {
   rscVersion: string | null;
