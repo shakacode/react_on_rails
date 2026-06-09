@@ -60,7 +60,8 @@ end
 # Tracked files matching the allowlist but not authored Pro IP / not source.
 EXCLUDE_PATTERNS = [
   %r{(\A|/)bin/},                  # gem-generated binstubs
-  %r{/tests/fixtures/projects/},   # captured bundles from other apps
+  %r{/fixtures/},                  # test fixtures: loaded/byte-asserted by tests,
+                                   # sometimes VM-evaluated; not product source
   %r{/db/schema\.rb\z},            # generated
   %r{(\A|/)public/},               # built/vendored assets
   %r{(\A|/)vendor/},
@@ -305,6 +306,8 @@ def run_self_test
   assert excluded?(
     "packages/react-on-rails-pro-node-renderer/tests/fixtures/projects/x/server-bundle.js"
   ), "third-party fixtures excluded"
+  assert excluded?("packages/react-on-rails-pro-node-renderer/tests/fixtures/bundle.js"),
+         "byte-asserted bundle fixtures excluded"
   assert !in_scope?("react_on_rails_pro/lib/react_on_rails_pro/foo.json"), "json not in scope"
   assert !in_scope?("react_on_rails_pro/Gemfile.lock"), "lockfiles not in scope"
   assert in_scope?("react_on_rails_pro/lib/react_on_rails_pro/foo.rb"), "pro rb in scope"
