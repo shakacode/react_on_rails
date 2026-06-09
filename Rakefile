@@ -74,7 +74,6 @@ end
 namespace :lint do
   desc "Run root-bundle RuboCop on root tooling and OSS package files"
   task :rubocop do
-    root_bundle_exec_in(__dir__, "rubocop", "--version")
     root_bundle_exec_in(__dir__, "rubocop", *root_rubocop_paths)
   end
 
@@ -85,8 +84,10 @@ namespace :lint do
   end
 end
 
-# NOTE: When adding a new package task that should work from the monorepo root,
-# add it here so `rake <task>` delegates into the react_on_rails bundle.
+# MAINTAINER NOTE: When adding a package Rake task that should work from the
+# monorepo root, add it here so `rake <task>` delegates into the react_on_rails
+# bundle. To audit drift, compare root `bundle exec rake -T` with
+# `(cd react_on_rails && bundle exec rake -T)`.
 %w[
   all_but_examples
   ci
@@ -155,7 +156,7 @@ end
   shakapacker_examples:gen_redux-server-rendering
 ].each { |task_name| define_package_task(task_name) }
 
-desc "Run root-bundle RuboCop on root tooling and OSS package files"
+desc "Run root-bundle RuboCop only; full lint: cd react_on_rails && bundle exec rake lint"
 task lint: ["lint:rubocop"]
 
 desc "Auto-fix all linting violations via the package task"
