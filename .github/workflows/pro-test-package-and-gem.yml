@@ -168,6 +168,14 @@ jobs:
         working-directory: .
         run: pnpm --filter react-on-rails-pro build
 
+      # Dependency-free guard (just git + ruby): every proprietary Pro file must
+      # carry the non-MIT license header. See script/check-pro-license-headers.
+      - name: Check Pro license headers
+        working-directory: .
+        run: |
+          ruby script/check-pro-license-headers --self-test
+          ruby script/check-pro-license-headers --check
+
       # These steps need the Pro package Gemfile (which carries rubocop/rbs),
       # so pin it via absolute path — robust to changes in defaults.run.
       - name: Lint Ruby

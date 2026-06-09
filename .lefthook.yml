@@ -33,6 +33,12 @@ pre-commit:
       run: bin/lefthook/check-trailing-newlines all-changed
       stage_fixed: true
 
+    # When any Pro file is staged, verify every proprietary Pro file carries the
+    # non-MIT license header. Check-only (run `--fix` to insert/upgrade).
+    pro-license-headers:
+      glob: "{react_on_rails_pro/**/*,packages/react-on-rails-pro/**/*,packages/react-on-rails-pro-node-renderer/**/*}"
+      run: script/check-pro-license-headers
+
 pre-push:
   commands:
     branch-lint:
