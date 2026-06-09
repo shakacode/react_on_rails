@@ -63,6 +63,7 @@ saved_tool_versions_match_current_head() {
 
 read_committed_tool_version() {
   local tool="$1"
+  local emit_warnings="${2:-true}"
   local committed_tool_versions
   local version
 
@@ -79,20 +80,23 @@ read_committed_tool_version() {
 
   # Fallback for non-git contexts. Always warn because the local file may already
   # be switched to the minimum profile when no valid latest backup exists.
-  echo "Warning: could not read committed latest $tool version from git; falling back to current .tool-versions" >&2
-  if [ -f "$MINIMUM_TOOL_VERSIONS_FILE" ] && cmp -s "$PROJECT_ROOT/.tool-versions" "$MINIMUM_TOOL_VERSIONS_FILE"; then
-    echo "Warning: current .tool-versions matches the minimum profile; latest $tool may be under-reported" >&2
+  if [ "$emit_warnings" = true ]; then
+    echo "Warning: could not read committed latest $tool version from git; falling back to current .tool-versions" >&2
+    if [ -f "$MINIMUM_TOOL_VERSIONS_FILE" ] && cmp -s "$PROJECT_ROOT/.tool-versions" "$MINIMUM_TOOL_VERSIONS_FILE"; then
+      echo "Warning: current .tool-versions matches the minimum profile; latest $tool may be under-reported" >&2
+    fi
   fi
   read_tool_version "$PROJECT_ROOT/.tool-versions" "$tool"
 }
 
 read_latest_tool_version() {
   local tool="$1"
+  local emit_warnings="${2:-true}"
 
   if saved_tool_versions_match_current_head; then
     read_tool_version "$MAXIMUM_TOOL_VERSIONS_FILE" "$tool"
   else
-    read_committed_tool_version "$tool"
+    read_committed_tool_version "$tool" "$emit_warnings"
   fi
 }
 
@@ -102,9 +106,9 @@ MINIMUM_NODE_VERSION="$(read_tool_version "$MINIMUM_TOOL_VERSIONS_FILE" nodejs)"
 MINIMUM_NODE_MAJOR_VERSION="${MINIMUM_NODE_VERSION%%.*}"
 MINIMUM_REACT_VERSION="18.0.0" # Update when minimum CI moves to a newer React version.
 MINIMUM_REACT_MAJOR_VERSION="${MINIMUM_REACT_VERSION%%.*}"
-LATEST_RUBY_VERSION="$(read_latest_tool_version ruby)"
+LATEST_RUBY_VERSION="$(read_latest_tool_version ruby false)"
 LATEST_RUBY_MINOR_VERSION="${LATEST_RUBY_VERSION%.*}"
-LATEST_NODE_VERSION="$(read_latest_tool_version nodejs)"
+LATEST_NODE_VERSION="$(read_latest_tool_version nodejs false)"
 LATEST_NODE_MAJOR_VERSION="${LATEST_NODE_VERSION%%.*}"
 LATEST_SHAKAPACKER_VERSION="10.1.0" # Update when latest CI moves to a newer Shakapacker.
 LATEST_REACT_VERSION="19.0.0" # Update when latest CI moves to a newer React version.
@@ -303,8 +307,11 @@ restore_tool_versions_to_latest() {
   if saved_tool_versions_match_current_head; then
     cp "$MAXIMUM_TOOL_VERSIONS_FILE" "$PROJECT_ROOT/.tool-versions"
   else
-    git -C "$PROJECT_ROOT" restore -- .tool-versions 2>/dev/null || {
+    local git_err
+
+    git_err="$(git -C "$PROJECT_ROOT" restore -- .tool-versions 2>&1)" || {
       echo "Error: could not restore .tool-versions from git. Restore it manually to the latest profile." >&2
+      [ -n "$git_err" ] && echo "  git: $git_err" >&2
       exit 1
     }
   fi

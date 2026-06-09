@@ -1,6 +1,10 @@
 # frozen_string_literal: true
 
 require "yaml"
+require "fileutils"
+require "open3"
+require "shellwords"
+require "tmpdir"
 require_relative "spec_helper"
 
 RSpec.describe "Ruby version support" do
@@ -27,6 +31,42 @@ RSpec.describe "Ruby version support" do
 
   def major_version(version)
     version.split(".").first
+  end
+
+  def read_tool_versions_action_outputs
+    action = YAML.safe_load(read_repo_file(".github/actions/read-tool-versions/action.yml"))
+    run_script = action.fetch("runs").fetch("steps").find { |step| step["id"] == "versions" }.fetch("run")
+
+    Dir.mktmpdir do |tmpdir|
+      github_output = File.join(tmpdir, "github-output")
+
+      FileUtils.cp(File.join(repo_root, ".tool-versions"), File.join(tmpdir, ".tool-versions"))
+      FileUtils.cp(File.join(repo_root, ".minimum.tool-versions"), File.join(tmpdir, ".minimum.tool-versions"))
+
+      stdout, stderr, status = Open3.capture3(
+        { "GITHUB_OUTPUT" => github_output }, "bash", "-c", run_script, chdir: tmpdir
+      )
+
+      expect(status).to be_success, "#{stdout}\n#{stderr}"
+      File.read(github_output).lines.to_h { |line| line.strip.split("=", 2) }
+    end
+  end
+
+  def ci_switch_tool_version_outputs
+    script = [
+      "source #{Shellwords.escape(File.join(repo_root, 'bin/ci-switch-config'))}",
+      'echo "ruby-version=$(read_tool_version "$PROJECT_ROOT/.tool-versions" ruby)"',
+      'echo "node-version=$(read_tool_version "$PROJECT_ROOT/.tool-versions" nodejs)"',
+      'echo "minimum-ruby-version=$(read_tool_version "$MINIMUM_TOOL_VERSIONS_FILE" ruby)"',
+      'echo "minimum-node-version=$(read_tool_version "$MINIMUM_TOOL_VERSIONS_FILE" nodejs)"'
+    ].join("\n")
+
+    stdout, stderr, status = Open3.capture3("bash", "-c", script, chdir: repo_root)
+
+    expect(status).to be_success, "#{stdout}\n#{stderr}"
+    expect(stderr).to be_empty
+
+    stdout.lines.to_h { |line| line.strip.split("=", 2) }
   end
 
   # Only use this helper on workflows that hardcode `ruby-version` in steps. Matrix-driven
@@ -80,6 +120,26 @@ RSpec.describe "Ruby version support" do
       .to be > Gem::Version.new(minimum_versions.fetch("ruby"))
     expect(Gem::Version.new(latest_versions.fetch("nodejs")))
       .to be > Gem::Version.new(minimum_versions.fetch("nodejs"))
+  end
+
+  it "keeps the workflow action and local CI switch tool-version parsers in sync" do
+    action_outputs = read_tool_versions_action_outputs
+    ci_switch_outputs = ci_switch_tool_version_outputs
+
+    expect(action_outputs).to include(
+      "ruby-version" => ci_switch_outputs.fetch("ruby-version"),
+      "node-version" => ci_switch_outputs.fetch("node-version"),
+      "minimum-ruby-version" => ci_switch_outputs.fetch("minimum-ruby-version"),
+      "minimum-node-version" => ci_switch_outputs.fetch("minimum-node-version")
+    )
+    expect(action_outputs.fetch("ruby-minor-version")).to eq(minor_version(ci_switch_outputs.fetch("ruby-version")))
+    expect(action_outputs.fetch("node-major-version")).to eq(major_version(ci_switch_outputs.fetch("node-version")))
+    expect(action_outputs.fetch("minimum-ruby-minor-version")).to eq(
+      minor_version(ci_switch_outputs.fetch("minimum-ruby-version"))
+    )
+    expect(action_outputs.fetch("minimum-node-major-version")).to eq(
+      major_version(ci_switch_outputs.fetch("minimum-node-version"))
+    )
   end
 
   it "tests Ruby 4.0 as the latest OSS CI runtime while keeping Ruby 3.3 as the minimum" do
@@ -158,10 +218,10 @@ RSpec.describe "Ruby version support" do
     expect(ci_switch_config).to include('MAXIMUM_TOOL_VERSIONS_HEAD_FILE="$PROJECT_ROOT/.maximum.tool-versions.head"')
     expect(ci_switch_config).to include("saved_tool_versions_match_current_head()")
     expect(ci_switch_config).to include(
-      'LATEST_RUBY_VERSION="$(read_latest_tool_version ruby)"'
+      'LATEST_RUBY_VERSION="$(read_latest_tool_version ruby false)"'
     )
     expect(ci_switch_config).to include(
-      'LATEST_NODE_VERSION="$(read_latest_tool_version nodejs)"'
+      'LATEST_NODE_VERSION="$(read_latest_tool_version nodejs false)"'
     )
     expect(ci_switch_config).to include('LATEST_NODE_MAJOR_VERSION="${LATEST_NODE_VERSION%%.*}"')
     expect(ci_switch_config).to include('LATEST_SHAKAPACKER_VERSION="10.1.0"')
