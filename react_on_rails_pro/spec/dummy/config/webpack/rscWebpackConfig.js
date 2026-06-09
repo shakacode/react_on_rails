@@ -134,6 +134,8 @@ const configureRsc = () => {
         const resolvedRule = { use: resultArray };
         const jsLoader =
           extractLoader(resolvedRule, 'babel-loader') || extractLoader(resolvedRule, 'swc-loader');
+        // If originalUse returned a single object and we inject the RSC loader,
+        // we promote the return type from object to array. Webpack normalizes both.
         if (jsLoader) return [...resultArray, { loader: rscLoader }];
         // Preserve the original return shape when this function rule is not a JS loader rule.
         return result;

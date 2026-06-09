@@ -4,6 +4,11 @@ const path = require('path');
 const rspackConfigPath = path.resolve(__dirname, '../config/rspack/rspack.config.js');
 const shakapackerBinPath = path.resolve(__dirname, '../bin/shakapacker');
 const clientConfigPath = path.resolve(__dirname, '../config/webpack/clientWebpackConfig.js');
+const commonConfigPath = path.resolve(__dirname, '../config/webpack/commonWebpackConfig.js');
+const rscManifestClientReferencesPath = path.resolve(
+  __dirname,
+  '../config/webpack/rscManifestClientReferences.js',
+);
 const serverConfigPath = path.resolve(__dirname, '../config/webpack/serverWebpackConfig.js');
 const rscConfigPath = path.resolve(__dirname, '../config/webpack/rscWebpackConfig.js');
 
@@ -34,6 +39,9 @@ describe('Pro dummy RSC rspack config', () => {
     const clientSource = fs.readFileSync(clientConfigPath, 'utf8');
     const serverSource = fs.readFileSync(serverConfigPath, 'utf8');
 
+    // Contract/snapshot guard: this intentionally scans config source so a
+    // future refactor that changes the runtime plugin selection path gets a
+    // deliberate review. Behavior-specific loader wrapping is covered below.
     [clientSource, serverSource].forEach((source) => {
       expect(source).toContain("config.assets_bundler === 'rspack'");
       expect(source).toContain("require('react-on-rails-rsc/RspackPlugin').RSCRspackPlugin");
@@ -42,6 +50,54 @@ describe('Pro dummy RSC rspack config', () => {
     });
     expect(serverSource).toContain("require('@rspack/core')");
     expect(serverSource).toContain("require('webpack')");
+  });
+
+  it('filters client manifest and style plugins from the rspack server bundle', () => {
+    function WebpackAssetsManifest() {}
+    function RspackManifestPlugin() {}
+    function MiniCssExtractPlugin() {}
+    function CssExtractRspackPlugin() {}
+    function ForkTsCheckerWebpackPlugin() {}
+    function KeepServerPlugin() {}
+
+    const commonConfig = {
+      entry: { 'server-bundle': './server-bundle.js' },
+      module: { rules: [] },
+      output: {},
+      plugins: [
+        new WebpackAssetsManifest(),
+        new RspackManifestPlugin(),
+        new MiniCssExtractPlugin(),
+        new CssExtractRspackPlugin(),
+        new ForkTsCheckerWebpackPlugin(),
+        new KeepServerPlugin(),
+      ],
+      resolve: { alias: { 'react-on-rails-pro/client$': 'client-shim' } },
+    };
+
+    jest.doMock('shakapacker', () => ({
+      config: { assets_bundler: 'rspack' },
+    }));
+    jest.doMock('@rspack/core', () => ({
+      optimize: {
+        LimitChunkCountPlugin: function LimitChunkCountPlugin() {},
+      },
+    }));
+    jest.doMock('react-on-rails-rsc/RspackPlugin', () => ({
+      RSCRspackPlugin: function RSCManifestPlugin() {},
+    }));
+    jest.doMock(commonConfigPath, () => () => commonConfig);
+    jest.doMock(rscManifestClientReferencesPath, () => () => []);
+
+    // eslint-disable-next-line global-require, import/no-dynamic-require
+    const configureServer = require(serverConfigPath).default;
+    const serverConfig = configureServer();
+
+    expect(serverConfig.plugins.map((plugin) => plugin.constructor.name)).toEqual([
+      'LimitChunkCountPlugin',
+      'KeepServerPlugin',
+      'RSCManifestPlugin',
+    ]);
   });
 
   it('keeps Node-only modules out of the browser bundle fallback set', () => {

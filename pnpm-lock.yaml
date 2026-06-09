@@ -621,10 +621,10 @@ importers:
         specifier: ^5.15.2
         version: 5.15.2(webpack@5.104.1)
       '@rspack/cli':
-        specifier: ^2.0.0
+        specifier: ~2.0.0
         version: 2.0.5(@rspack/core@2.0.5)
       '@rspack/core':
-        specifier: ^2.0.0
+        specifier: ~2.0.0
         version: 2.0.5
       '@sentry/node':
         specifier: ^7.120.0
