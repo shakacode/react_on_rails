@@ -197,7 +197,7 @@ In React on Rails, slow data is streamed using [async props](../../oss/migrating
 <%# Rails view: stream slow data as an async prop %>
 <%= stream_react_component_with_async_props("Page",
       props: { title: "Fast Header" }) do |emit|
-  sleep 2  # Simulate slow database query (demo only)
+  sleep 2  # Demo only: blocks the Puma thread; replace with your actual slow query
   emit.call("slowData", { message: "Loaded after 2 seconds" })
 end %>
 ```
@@ -227,7 +227,7 @@ async function SlowData({ dataPromise }) {
 
 > **React on Rails note:** `getReactOnRailsAsyncProp('slowData')` returns a Promise that resolves when Rails calls `emit.call("slowData", ...)`. The component awaits this promise inside a `<Suspense>` boundary, so React streams the fallback immediately and swaps in the real content when the data arrives. See [RSC Data Fetching Patterns](../../oss/migrating/rsc-data-fetching.md) for the full pattern.
 
-The server starts streaming immediately, it doesn't wait for SlowData to finish:
+When Rails calls `emit.call("slowData", ...)`, the server sends a second Flight chunk. Until then the client already received and rendered the first chunk (the `div`, `h1`, and the Suspense fallback):
 
 ```rsc
 0:["$","div",null,{"children":[["$","h1",null,{"children":"Fast Header"}],["$","$Sreact.suspense",null,{"fallback":["$","p",null,{"children":"Loading..."}],"children":"$L1"}]]}]

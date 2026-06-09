@@ -24,7 +24,7 @@ Let's add a component that loads slow data using [async props](../../oss/migrati
 <%= stream_react_component_with_async_props("ReactServerComponentPage",
       props: { posts: @posts }) do |emit|
   # Simulate a slow query — the page streams immediately while this resolves
-  sleep 5  # Demo only: replace with your actual slow query
+  sleep 5  # Demo only: blocks the Puma thread; replace with your actual slow query
   emit.call("slowData", { message: "Loaded after 5 seconds" })
 end %>
 ```
