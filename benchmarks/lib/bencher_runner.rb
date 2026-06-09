@@ -39,8 +39,6 @@ class BencherRunner
     @report_json = report_json
   end
 
-  attr_reader :benchmark_json, :report_json
-
   def threshold_args(measure, direction, boundary)
     # "_" is Bencher's sentinel for "no boundary on this side".
     lower, upper = direction == :lower ? [boundary, "_"] : ["_", boundary]
@@ -78,6 +76,8 @@ class BencherRunner
   end
 
   private
+
+  attr_reader :benchmark_json, :report_json
 
   def persist_report(stdout)
     if stdout.empty?

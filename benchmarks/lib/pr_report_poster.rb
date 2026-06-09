@@ -15,6 +15,8 @@ class PrReportPoster
     @marker = marker
   end
 
+  # Requires GITHUB_REPOSITORY and PR_NUMBER in ENV. GitHub Actions sets both
+  # during pull_request events; ENV.fetch raises KeyError if either is absent.
   def self.from_env(suite_name:, marker:)
     new(
       repository: ENV.fetch("GITHUB_REPOSITORY"),

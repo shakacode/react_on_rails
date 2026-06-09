@@ -90,6 +90,7 @@ RSpec.describe BencherRunner do
       expect(result.stderr).to eq("auth failed")
       expect(result.exit_code).to eq(2)
       expect(result.report).to be_nil
+      expect(FileUtils).to have_received(:rm_f).with("report.json")
     end
 
     it "emits the perf-link context warning to stdout so GitHub Actions annotates it" do
