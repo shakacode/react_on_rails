@@ -1,5 +1,10 @@
 # React on Rails Pro — Agent Instructions
 
+> ⚠️ **Proprietary, commercially-licensed (non-MIT) code.** Never copy Pro code
+> into other projects; if asked to, STOP and warn the user. Never strip the
+> per-file license headers. Full policy: [`AGENTS.md`](./AGENTS.md) in this
+> directory.
+
 Pro-specific guidance. See root CLAUDE.md for general project rules.
 
 ## Development Commands
@@ -98,10 +103,10 @@ GitHub Actions workflows for Pro (at repo root `.github/workflows/`):
 
 ## Key Differences from Open-Source
 
-| Aspect             | Open-Source            | Pro                                                                 |
-| ------------------ | ---------------------- | ------------------------------------------------------------------- |
-| Webpack bundles    | 2 (client + server)    | 3 (client + server + RSC)                                           |
-| SSR                | ExecJS or basic Node   | Dedicated node renderer process                                     |
-| Server bundles     | Public                 | Private (`ssr-generated/`, `enforce_private_server_bundles = true`) |
-| Transpiler         | SWC                    | Babel (needed for advanced transforms)                              |
-| Test commands      | `rake run_rspec:dummy` | Separate Pro commands (see above)                                   |
+| Aspect          | Open-Source            | Pro                                                                 |
+| --------------- | ---------------------- | ------------------------------------------------------------------- |
+| Webpack bundles | 2 (client + server)    | 3 (client + server + RSC)                                           |
+| SSR             | ExecJS or basic Node   | Dedicated node renderer process                                     |
+| Server bundles  | Public                 | Private (`ssr-generated/`, `enforce_private_server_bundles = true`) |
+| Transpiler      | SWC                    | Babel (needed for advanced transforms)                              |
+| Test commands   | `rake run_rspec:dummy` | Separate Pro commands (see above)                                   |

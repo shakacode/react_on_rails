@@ -178,7 +178,11 @@ def run_bencher(branch, start_point_args)
     # backtrace so the failure is triageable in CI logs. This covers both the initial
     # run and the start-point-hash retry, since both go through run_bencher.
     begin
-      report = BencherReport.parse(stdout)
+      # Pass the measures we actually track so an alert from an orphaned server-side Bencher
+      # threshold (a measure dropped from THRESHOLDS but never deleted in Bencher, e.g.
+      # p90_latency) is treated as filtered rather than a regression — it would otherwise file
+      # an issue the summary table can't even flag (p90 has no :direction column).
+      report = BencherReport.parse(stdout, tracked_measures: THRESHOLDS.map(&:first))
     rescue BencherReport::FormatError => e
       warn "::error::Bencher JSON report has an unexpected shape — re-verify against " \
            "benchmarks/spec/bencher_report_spec.rb before bumping the CLI pin. #{e.message}"
@@ -195,7 +199,15 @@ def run_bencher(branch, start_point_args)
       )
     end
   end
+
   [stderr, status.exitstatus, report]
+end
+
+def normalized_bencher_exit_code(exit_code, report)
+  return exit_code unless exit_code != 0 && report&.filtered_alert? && !regression?(report)
+
+  Github.notice("Bencher reported only stale active alert(s); no current boundary-backed regression remains.")
+  0
 end
 
 def append_step_summary(markdown)
@@ -573,6 +585,7 @@ if __FILE__ == $PROGRAM_NAME
     # and this path only triggers when the first run had no regression.
     _retry_stderr, bencher_exit_code, report = run_bencher(branch, retry_args)
   end
+  bencher_exit_code = normalized_bencher_exit_code(bencher_exit_code, report)
 
   # Build the Markdown summary table once; the same body feeds the job summary, the
   # PR comment, and the candidate/confirmation hand-offs.
