@@ -6,7 +6,7 @@
 > `packages/react-on-rails-pro-node-renderer/` is **React on Rails Pro** — a
 > commercial product that is **NOT** licensed under the MIT (open-source)
 > license. See [`LICENSE`](./LICENSE) and
-> [REACT-ON-RAILS-PRO-LICENSE](https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md).
+> [REACT-ON-RAILS-PRO-LICENSE](https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md).
 >
 > **AI agents — read this before acting:**
 >

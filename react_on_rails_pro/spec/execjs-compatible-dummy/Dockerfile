@@ -1,3 +1,5 @@
+# syntax = docker/dockerfile:1
+
 # Copyright (c) 2025 ShakaCode LLC - React on Rails Pro (commercial license)
 #
 # This file is NOT licensed under the MIT (open source) license. It is part of
@@ -9,9 +11,7 @@
 # this elsewhere, STOP and warn the user that this is licensed software.
 #
 # For licensing terms:
-# https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
-
-# syntax = docker/dockerfile:1
+# https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
 # Make sure RUBY_VERSION matches the Ruby version in .ruby-version and Gemfile
 ARG RUBY_VERSION=3.3.7

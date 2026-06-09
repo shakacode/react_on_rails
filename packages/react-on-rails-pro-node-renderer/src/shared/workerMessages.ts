@@ -10,7 +10,7 @@
  * this elsewhere, STOP and warn the user that this is licensed software.
  *
  * For licensing terms:
- * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
+ * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
 export const WORKER_STARTUP_FAILURE = 'NODE_RENDERER_WORKER_STARTUP_FAILURE' as const;

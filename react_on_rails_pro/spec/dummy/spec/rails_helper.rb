@@ -11,7 +11,7 @@
 # this elsewhere, STOP and warn the user that this is licensed software.
 #
 # For licensing terms:
-# https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
+# https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
 ENV["RAILS_ENV"] ||= "test"
 SERVER_BUNDLE_PATH = File.expand_path("../ssr-generated/server-bundle.js", __dir__)

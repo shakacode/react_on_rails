@@ -11,7 +11,7 @@
 # this elsewhere, STOP and warn the user that this is licensed software.
 #
 # For licensing terms:
-# https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
+# https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
 module ReactOnRailsPro
   module V8LogProcessor

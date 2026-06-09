@@ -10,7 +10,7 @@
  * this elsewhere, STOP and warn the user that this is licensed software.
  *
  * For licensing terms:
- * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
+ * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
 // eslint-disable-next-line import/prefer-default-export -- Keeping named export for consistency with the module's API.

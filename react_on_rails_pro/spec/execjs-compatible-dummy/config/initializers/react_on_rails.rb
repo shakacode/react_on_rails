@@ -11,7 +11,7 @@
 # this elsewhere, STOP and warn the user that this is licensed software.
 #
 # For licensing terms:
-# https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
+# https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
 # ⚠️ TEST CONFIGURATION - Do not copy directly for production apps
 # This is the ExecJS-compatible dummy app for testing legacy webpacker compatibility.
