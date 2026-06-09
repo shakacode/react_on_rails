@@ -16,23 +16,30 @@ const parseArgs = () => {
     streamBytes: 16_384,
   };
 
+  const readValue = (index, flag) => {
+    const value = args.at(index + 1);
+    if (value === undefined || value.startsWith('--')) {
+      throw new Error(`${flag} requires a value`);
+    }
+    return value;
+  };
+
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     if (arg === '--scenarios') {
-      options.scenarios = args
-        .at(index + 1)
+      options.scenarios = readValue(index, arg)
         .split(',')
         .map((scenario) => scenario.trim())
         .filter(Boolean);
       index += 1;
     } else if (arg === '--socket-path') {
-      options.socketPath = args.at(index + 1);
+      options.socketPath = readValue(index, arg);
       index += 1;
     } else if (arg === '--body-bytes') {
-      options.bodyBytes = Number(args.at(index + 1));
+      options.bodyBytes = Number(readValue(index, arg));
       index += 1;
     } else if (arg === '--stream-bytes') {
-      options.streamBytes = Number(args.at(index + 1));
+      options.streamBytes = Number(readValue(index, arg));
       index += 1;
     } else {
       throw new Error(`Unknown argument: ${arg}`);
@@ -207,12 +214,12 @@ const listenFastify = async ({ bodyBytes, host, port, streamBytes }) => {
   return app;
 };
 
-const closeServer = async (server) => {
-  if (typeof server.close !== 'function') {
+const closeServer = async ({ server, type }) => {
+  if (typeof server?.close !== 'function') {
     return;
   }
 
-  if (typeof server.address === 'function') {
+  if (type === 'native') {
     await new Promise((resolve, reject) => {
       server.close((error) => (error ? reject(error) : resolve()));
     });
@@ -231,7 +238,7 @@ const main = async () => {
 
   if (scenarios.includes('fastify_tcp')) {
     const fastifyServer = await listenFastify({ bodyBytes, host, port: 0, streamBytes });
-    servers.push(fastifyServer);
+    servers.push({ server: fastifyServer, type: 'fastify' });
     endpoints.push({
       name: 'fastify_tcp',
       kind: 'tcp',
@@ -241,7 +248,7 @@ const main = async () => {
 
   if (scenarios.includes('native_tcp')) {
     const nativeTcpServer = await listenNative({ bodyBytes, host, port: 0, streamBytes });
-    servers.push(nativeTcpServer);
+    servers.push({ server: nativeTcpServer, type: 'native' });
     endpoints.push({
       name: 'native_tcp',
       kind: 'tcp',
@@ -252,7 +259,7 @@ const main = async () => {
   if (scenarios.includes('native_uds')) {
     const nativeUdsServer = await listenNative({ bodyBytes, socketPath, streamBytes });
     nativeUdsSocketCreated = true;
-    servers.push(nativeUdsServer);
+    servers.push({ server: nativeUdsServer, type: 'native' });
     endpoints.push({
       name: 'native_uds',
       kind: 'uds',

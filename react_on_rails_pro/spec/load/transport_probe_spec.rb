@@ -141,6 +141,25 @@ RSpec.describe RendererHarness::TransportProbe do
   end
 
   describe "transport_probe_server.mjs" do
+    def close_probe_io(stdin, stdout, stderr)
+      [stdin, stdout, stderr].each { |io| io&.close unless io&.closed? }
+    end
+
+    def terminate_probe_process(wait_thread, signal)
+      return unless wait_thread&.alive?
+
+      Process.kill(signal, wait_thread.pid)
+      wait_thread.join(5) if signal == "TERM"
+      Process.kill("KILL", wait_thread.pid) if wait_thread.alive?
+    rescue Errno::ESRCH
+      nil
+    end
+
+    def close_probe_server(stdin, stdout, stderr, wait_thread, signal: "KILL")
+      close_probe_io(stdin, stdout, stderr)
+      terminate_probe_process(wait_thread, signal)
+    end
+
     def post_native_probe(origin, body)
       endpoint = Async::HTTP::Endpoint.parse(origin, protocol: Async::HTTP::Protocol::HTTP2)
       response = nil
@@ -183,10 +202,7 @@ RSpec.describe RendererHarness::TransportProbe do
 
         expect(File.read(socket_path)).to eq("keep me")
       ensure
-        stdin&.close unless stdin&.closed?
-        stdout&.close unless stdout&.closed?
-        stderr&.close unless stderr&.closed?
-        Process.kill("KILL", wait_thread.pid) if wait_thread&.alive?
+        close_probe_server(stdin, stdout, stderr, wait_thread)
       end
     end
 
@@ -216,12 +232,7 @@ RSpec.describe RendererHarness::TransportProbe do
           "error" => include("request body exceeded --body-bytes limit (4)")
         )
       ensure
-        stdin&.close unless stdin&.closed?
-        stdout&.close unless stdout&.closed?
-        stderr&.close unless stderr&.closed?
-        Process.kill("TERM", wait_thread.pid) if wait_thread&.alive?
-        wait_thread&.join(5)
-        Process.kill("KILL", wait_thread.pid) if wait_thread&.alive?
+        close_probe_server(stdin, stdout, stderr, wait_thread, signal: "TERM")
       end
     end
 
@@ -264,21 +275,12 @@ RSpec.describe RendererHarness::TransportProbe do
           native_endpoint.fetch("origin")
         )
         expect(client_status).to be_success, client_stderr
-        sleep 0.2
 
-        expect(wait_thread).to be_alive
         status, payload = post_native_probe(native_endpoint.fetch("origin"), "1234")
         expect(status).to eq(200)
         expect(payload).to include("ok" => true, "receivedBytes" => 4)
       ensure
-        stdin&.close unless stdin&.closed?
-        stdout&.close unless stdout&.closed?
-        stderr&.close unless stderr&.closed?
-        term_pid = wait_thread&.pid if wait_thread&.alive?
-        Process.kill("TERM", term_pid) if term_pid
-        wait_thread&.join(5)
-        kill_pid = wait_thread&.pid if wait_thread&.alive?
-        Process.kill("KILL", kill_pid) if kill_pid
+        close_probe_server(stdin, stdout, stderr, wait_thread, signal: "TERM")
       end
     end
 
@@ -304,10 +306,7 @@ RSpec.describe RendererHarness::TransportProbe do
         expect(stderr.read).to include("socket path already exists")
         expect(File.read(socket_path)).to eq("keep me")
       ensure
-        stdin&.close unless stdin&.closed?
-        stdout&.close unless stdout&.closed?
-        stderr&.close unless stderr&.closed?
-        Process.kill("KILL", wait_thread.pid) if wait_thread&.alive?
+        close_probe_server(stdin, stdout, stderr, wait_thread)
       end
     end
   end

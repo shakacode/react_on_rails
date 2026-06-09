@@ -106,7 +106,7 @@ module RendererHarness
       end
 
       def self.validate_non_negative_integer!(flag, value)
-        return if value.is_a?(Integer) && !value.negative?
+        return if value.is_a?(Integer) && value >= 0
 
         raise ArgumentError, "#{flag} must be >= 0"
       end
@@ -280,11 +280,12 @@ module RendererHarness
       end
 
       def deltas(results)
-        baseline = results["fastify_tcp"] || results["native_tcp"]
+        baseline_name = results.key?("fastify_tcp") ? "fastify_tcp" : "native_tcp"
+        baseline = results[baseline_name]
         return {} unless baseline
 
         results.each_with_object({}) do |(scenario, scenario_results), memo|
-          next if scenario_results.equal?(baseline)
+          next if scenario == baseline_name
 
           memo[scenario] = PROBE_CASES.keys.each_with_object({}) do |case_name, case_memo|
             baseline_p95 = baseline.dig(case_name, :latency_ms, :p95)
@@ -381,6 +382,8 @@ module RendererHarness
         Process.kill("TERM", @wait_thread.pid) if @wait_thread.alive?
         @wait_thread.join(5)
         Process.kill("KILL", @wait_thread.pid) if @wait_thread.alive?
+      rescue Errno::ESRCH
+        nil
       end
 
       def close_pipes
