@@ -195,7 +195,15 @@ def run_bencher(branch, start_point_args)
       )
     end
   end
+
   [stderr, status.exitstatus, report]
+end
+
+def normalized_bencher_exit_code(exit_code, report)
+  return exit_code unless exit_code != 0 && report&.filtered_alert? && !regression?(report)
+
+  Github.notice("Bencher reported only stale active alert(s); no current boundary-backed regression remains.")
+  0
 end
 
 def append_step_summary(markdown)
@@ -573,6 +581,7 @@ if __FILE__ == $PROGRAM_NAME
     # and this path only triggers when the first run had no regression.
     _retry_stderr, bencher_exit_code, report = run_bencher(branch, retry_args)
   end
+  bencher_exit_code = normalized_bencher_exit_code(bencher_exit_code, report)
 
   # Build the Markdown summary table once; the same body feeds the job summary, the
   # PR comment, and the candidate/confirmation hand-offs.
