@@ -18,6 +18,7 @@ import path from 'node:path';
 import log from './log.js';
 import { checkRscPeerCompatibility } from './checkRscPeerCompatibility.js';
 
+// Only '1' disables; keep this strict so truthy shell values do not silently change startup policy.
 const DISABLE_ENV = 'REACT_ON_RAILS_PRO_DISABLE_VERSION_CHECK';
 const PACKAGE_JSON = 'package.json';
 
