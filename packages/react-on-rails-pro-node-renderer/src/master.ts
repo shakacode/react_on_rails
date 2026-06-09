@@ -21,10 +21,12 @@ import path from 'path';
 import cluster from 'cluster';
 import { readdir, stat, rm } from 'fs/promises';
 import log from './shared/log.js';
+import packageJson from './shared/packageJson.js';
 import { buildConfig, Config, logSanitizedConfig } from './shared/configBuilder.js';
 import restartWorkers from './master/restartWorkers.js';
 import * as errorReporter from './shared/errorReporter.js';
 import { getLicenseStatus } from './shared/licenseValidator.js';
+import { runRscPeerCompatibilityCheck } from './shared/runRscPeerCompatibilityCheck.js';
 import { isWorkerStartupFailureMessage, type WorkerStartupFailureMessage } from './shared/workerMessages.js';
 
 const MILLISECONDS_IN_MINUTE = 60000;
@@ -36,6 +38,9 @@ const ORPHAN_CLEANUP_INTERVAL_MS = 5 * MILLISECONDS_IN_MINUTE;
 const ORPHAN_AGE_THRESHOLD_MS = 30 * MILLISECONDS_IN_MINUTE;
 
 export default function masterRun(runningConfig?: Partial<Config>) {
+  // This is memoized after the wrapper path runs, but still protects direct `./master` entrypoint users.
+  runRscPeerCompatibilityCheck({ proVersion: packageJson.version });
+
   // Check license status on startup and log appropriately
   // Use warn in production, info in non-production (matches Ruby behavior)
   // Check both NODE_ENV and RAILS_ENV for production detection to stay consistent
