@@ -13,6 +13,10 @@ describe('checkRscPeerCompatibility', () => {
     expect(checkRscPeerCompatibility({ rscVersion: '19.0.5-rc.6', reactVersion: '19.2.0' }).level).toBe('ok');
   });
 
+  it('returns ok for a version with a leading v (prefix stripped for comparison)', () => {
+    expect(checkRscPeerCompatibility({ rscVersion: 'v19.0.4', reactVersion: '19.2.0' }).level).toBe('ok');
+  });
+
   it('errors when rsc major is above the supported major', () => {
     const r = checkRscPeerCompatibility({ rscVersion: '20.0.0', reactVersion: '19.2.0' });
     expect(r.level).toBe('error');
@@ -28,6 +32,8 @@ describe('checkRscPeerCompatibility', () => {
     const r = checkRscPeerCompatibility({ rscVersion: '19.0.4', reactVersion: '18.3.1' });
     expect(r.level).toBe('error');
     expect(r.message).toContain('react');
+    expect(r.message).toContain('18.3.1');
+    expect(r.message).toContain('>= 19');
   });
 
   it('warns when rsc is on the supported major but below recommendedMin', () => {

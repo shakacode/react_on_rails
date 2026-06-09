@@ -34,7 +34,9 @@ type VersionTuple = [number, number, number];
 // `19.0.5-rc.6` compares as `19.0.5`. We only need major/minor/patch ordering, so this
 // avoids semver's prerelease rules (and a `semver` dependency) entirely.
 const parseTuple = (version: string): VersionTuple => {
-  const [core = ''] = version.split('+', 1)[0]?.split('-', 1) ?? [];
+  // `resolveVersion` is a public injection point, so tolerate a leading `v`/`=` (e.g. `v19.0.4`).
+  const normalized = version.replace(/^[v=]+/, '');
+  const [core = ''] = normalized.split('+', 1)[0]?.split('-', 1) ?? [];
   const parts = core.split('.');
   return [Number(parts[0]) || 0, Number(parts[1]) || 0, Number(parts[2]) || 0];
 };

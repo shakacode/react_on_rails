@@ -1,11 +1,8 @@
-import path from 'node:path';
 import log from '../src/shared/log';
 import {
   runRscPeerCompatibilityCheck,
   __resetRscPeerCompatibilityCheckForTests,
 } from '../src/shared/runRscPeerCompatibilityCheck';
-
-const FIXTURE = path.join(__dirname, 'fixtures');
 
 describe('runRscPeerCompatibilityCheck', () => {
   let warnSpy: jest.SpyInstance;
@@ -20,9 +17,7 @@ describe('runRscPeerCompatibilityCheck', () => {
   });
 
   it('no-ops when react-on-rails-rsc cannot be resolved', () => {
-    expect(() =>
-      runRscPeerCompatibilityCheck({ cwd: path.join(FIXTURE, 'no-rsc'), resolveVersion: () => null }),
-    ).not.toThrow();
+    expect(() => runRscPeerCompatibilityCheck({ resolveVersion: () => null })).not.toThrow();
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
