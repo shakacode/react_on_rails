@@ -8,7 +8,7 @@ describe('runRscPeerCompatibilityCheck', () => {
   let belowRecommendedMin: string;
 
   const resolveVersions =
-    (rscVersion: string, reactVersion = '19.2.0', reactDomVersion = reactVersion) =>
+    (rscVersion: string, reactVersion = '19.0.4', reactDomVersion = reactVersion) =>
     (spec: string): string | null => {
       if (spec === 'react-on-rails-rsc') return rscVersion;
       if (spec === 'react') return reactVersion;
@@ -128,7 +128,7 @@ describe('runRscPeerCompatibilityCheck', () => {
   it('throws on a react-dom mismatch', () => {
     expect(() =>
       runRscPeerCompatibilityCheck({
-        resolveVersion: resolveVersions('19.0.4', '19.2.0', '19.2.1'),
+        resolveVersion: resolveVersions('19.0.4', '19.0.4', '19.0.5'),
       }),
     ).toThrow(/Incompatible react-dom/);
     expect(warnSpy).not.toHaveBeenCalled();

@@ -57,6 +57,18 @@ const isAtLeast = (actual: VersionTuple, floor: VersionTuple): boolean => {
 const sameTuple = (left: VersionTuple, right: VersionTuple): boolean =>
   left.every((value, index) => value === right[index]);
 
+const supportedReactRange = ({
+  supportedMajor,
+  supportedMinor,
+  minPatch,
+}: typeof RSC_PEER_SUPPORT.react): string =>
+  `${supportedMajor}.${supportedMinor}.x with patch >= ${supportedMajor}.${supportedMinor}.${minPatch}`;
+
+const isSupportedReactTuple = (
+  [major, minor, patch]: VersionTuple,
+  { supportedMajor, supportedMinor, minPatch }: typeof RSC_PEER_SUPPORT.react,
+): boolean => major === supportedMajor && minor === supportedMinor && patch >= minPatch;
+
 const proLabel = (proVersion?: string) =>
   proVersion ? `React on Rails Pro (${proVersion})` : 'React on Rails Pro';
 
@@ -103,22 +115,20 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
   let reactTuple: VersionTuple | null = null;
   if (reactVersion) {
     reactTuple = parseTuple(reactVersion);
-    const [reactMajor] = reactTuple;
-    if (reactMajor < react.minMajor) {
+    if (!isSupportedReactTuple(reactTuple, react)) {
       return {
         level: 'error',
-        message: errorMessage('react', reactVersion, `>= ${react.minMajor}`, proVersion),
+        message: errorMessage('react', reactVersion, supportedReactRange(react), proVersion),
       };
     }
   }
 
   if (reactDomVersion) {
     const reactDomTuple = parseTuple(reactDomVersion);
-    const [reactDomMajor] = reactDomTuple;
-    if (reactDomMajor < react.minMajor) {
+    if (!isSupportedReactTuple(reactDomTuple, react)) {
       return {
         level: 'error',
-        message: errorMessage('react-dom', reactDomVersion, `>= ${react.minMajor}`, proVersion),
+        message: errorMessage('react-dom', reactDomVersion, supportedReactRange(react), proVersion),
       };
     }
 

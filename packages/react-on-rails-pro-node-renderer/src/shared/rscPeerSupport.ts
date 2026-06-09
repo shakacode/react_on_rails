@@ -23,5 +23,5 @@
 // (the stable 19.0.5 ship/pin is tracked by issue #3634).
 export const RSC_PEER_SUPPORT = {
   reactOnRailsRsc: { recommendedMin: '19.0.2', supportedMajor: 19 },
-  react: { minMajor: 19 },
+  react: { supportedMajor: 19, supportedMinor: 0, minPatch: 4 },
 } as const;
