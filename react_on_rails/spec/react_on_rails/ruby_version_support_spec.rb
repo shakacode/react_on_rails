@@ -47,7 +47,7 @@ RSpec.describe "Ruby version support" do
     Dir.mktmpdir do |tmpdir|
       github_output = File.join(tmpdir, "github-output")
 
-      FileUtils.cp(File.join(repo_root, ".tool-versions"), File.join(tmpdir, ".tool-versions"))
+      File.write(File.join(tmpdir, ".tool-versions"), committed_tool_versions(".tool-versions"))
       FileUtils.cp(File.join(repo_root, ".minimum.tool-versions"), File.join(tmpdir, ".minimum.tool-versions"))
 
       stdout, stderr, status = Open3.capture3(
@@ -250,7 +250,7 @@ RSpec.describe "Ruby version support" do
     expect(ci_switch_config).to include('MINIMUM_REACT_VERSION="18.0.0"')
     expect(ci_switch_config).to include('MINIMUM_REACT_MAJOR_VERSION="${MINIMUM_REACT_VERSION%%.*}"')
     expect(ci_switch_config).to include('MAXIMUM_TOOL_VERSIONS_HEAD_FILE="$PROJECT_ROOT/.maximum.tool-versions.head"')
-    expect(ci_switch_config).to include("saved_tool_versions_match_current_head()")
+    expect(ci_switch_config).to include("saved_tool_versions_valid_for_restore()")
     expect(ci_switch_config).to include("set_tool_versions_to_minimum()")
     expect(ci_switch_config).to include("restore_tool_versions_to_latest()")
     expect(ci_switch_config).to include("read_committed_tool_version()")

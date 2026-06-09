@@ -134,7 +134,7 @@ RSpec.describe "bin/ci-switch-config" do
       File.write(File.join(tmpdir, ".maximum.tool-versions"), committed_versions)
       FileUtils.rm_f(File.join(tmpdir, ".maximum.tool-versions.head"))
 
-      _stdout, stderr, status = Open3.capture3(harness_path, "backup-matches-current-head", chdir: tmpdir)
+      _stdout, stderr, status = Open3.capture3(harness_path, "backup-valid-for-restore", chdir: tmpdir)
 
       expect(status).to be_success, stderr
     end
@@ -148,7 +148,7 @@ RSpec.describe "bin/ci-switch-config" do
       File.write(File.join(tmpdir, ".maximum.tool-versions"), committed_versions)
       File.write(File.join(tmpdir, ".maximum.tool-versions.head"), "stale-head\n")
 
-      _stdout, stderr, status = Open3.capture3(harness_path, "backup-matches-current-head", chdir: tmpdir)
+      _stdout, stderr, status = Open3.capture3(harness_path, "backup-valid-for-restore", chdir: tmpdir)
 
       expect(status).not_to be_success, stderr
 
@@ -168,7 +168,7 @@ RSpec.describe "bin/ci-switch-config" do
       File.write(File.join(tmpdir, ".maximum.tool-versions"), "ruby 4.0.4\nnodejs 22.11.0\n")
       File.write(File.join(tmpdir, ".maximum.tool-versions.head"), "#{git_head(tmpdir)}\n")
 
-      _stdout, stderr, status = Open3.capture3(harness_path, "backup-matches-current-head", chdir: tmpdir)
+      _stdout, stderr, status = Open3.capture3(harness_path, "backup-valid-for-restore", chdir: tmpdir)
 
       expect(status).not_to be_success, stderr
 
@@ -273,12 +273,12 @@ RSpec.describe "bin/ci-switch-config" do
       "  read-latest-ruby)",
       "    read_latest_tool_version ruby",
       "    ;;",
-      "  backup-matches-current-head)",
-      "    saved_tool_versions_match_current_head",
+      "  backup-valid-for-restore)",
+      "    saved_tool_versions_valid_for_restore",
       "    ;;",
       "  *)",
       '    echo "Usage: $0 {' \
-      'minimum-tool-versions|latest-tool-versions|read-latest-ruby|backup-matches-current-head}" >&2',
+      'minimum-tool-versions|latest-tool-versions|read-latest-ruby|backup-valid-for-restore}" >&2',
       "    exit 1",
       "    ;;",
       "esac",
