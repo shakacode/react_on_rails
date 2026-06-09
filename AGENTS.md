@@ -37,6 +37,8 @@ If there is a conflict, `AGENTS.md` wins.
 
 ```bash
 # Install dependencies
+# The committed root Gemfile.lock is generated with Bundler 4.0.10; use Bundler
+# 4.0.10 or newer before running root bundle commands.
 bundle && pnpm install
 
 # After changing react_on_rails/Gemfile or Gemfile.shared_dev_dependencies,

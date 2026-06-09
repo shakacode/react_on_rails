@@ -22,7 +22,11 @@ include ReactOnRailsPro::TaskHelpers
 namespace :lint do
   desc "Run Rubocop as shell"
   task :rubocop do
-    sh_in_dir(gem_root, "BUNDLE_GEMFILE=../Gemfile bundle exec rubocop --ignore-parent-exclusion .")
+    root_gemfile = File.join(monorepo_root, "Gemfile")
+    sh_in_dir(
+      gem_root,
+      "BUNDLE_GEMFILE=#{root_gemfile} bundle exec rubocop --ignore-parent-exclusion ."
+    )
   end
 
   desc "Run eslint as shell"

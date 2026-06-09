@@ -17,6 +17,11 @@ require "bundler" # Provides Bundler.with_unbundled_env for child bundle command
 
 module ReactOnRailsPro
   module TaskHelpers
+    # Returns the root folder of the monorepo
+    def monorepo_root
+      File.expand_path("..", gem_root)
+    end
+
     # Returns the root folder of the react_on_rails gem
     def gem_root
       File.expand_path("..", __dir__)
