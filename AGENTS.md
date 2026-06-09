@@ -39,10 +39,12 @@ If there is a conflict, `AGENTS.md` wins.
 # Install dependencies
 # The committed root Gemfile.lock is generated with Bundler 4.0.10; use Bundler
 # 4.0.10 or newer before running root bundle commands.
-bundle && pnpm install
+bundle && (cd react_on_rails && bundle) && pnpm install
 
-# After changing react_on_rails/Gemfile or Gemfile.shared_dev_dependencies,
-# also run bundle install at the repo root to keep the root Gemfile.lock synced.
+# The root Gemfile is intentionally limited to repo-wide lint, hook, release,
+# and benchmark script spec tooling. After changing package Gemfiles, run bundle
+# install in that package directory; after changing the root Gemfile, run bundle
+# install at the repo root to sync the tooling lock.
 
 # Build TypeScript → JavaScript
 pnpm run build
@@ -53,35 +55,36 @@ pnpm run build
 (cd react_on_rails_pro && BUNDLE_GEMFILE=../Gemfile bundle exec rubocop --ignore-parent-exclusion)
 pnpm run lint                                                    # JS/TS via ESLint
 pnpm start format.listDifferent                                  # Check Prettier formatting
-rake lint                                                        # All linting (Ruby + JS + formatting)
+(cd react_on_rails && bundle exec rake lint)                     # Package lint task (Ruby + JS + formatting)
 
 # Optional Ruby diagnostic from the repo root (not the CI contract)
 BUNDLE_GEMFILE=Gemfile bundle exec rubocop
 
 # Auto-fix formatting
-rake autofix                         # Preferred for all formatting
+(cd react_on_rails && bundle exec rake autofix) # Preferred for all formatting
 
 # Run tests
-rake run_rspec:gem                   # Ruby unit tests (gem code)
-rake run_rspec:dummy                 # Ruby integration tests (dummy Rails app)
+(cd react_on_rails && bundle exec rake run_rspec:gem)   # Ruby unit tests (gem code)
+(cd react_on_rails && bundle exec rake run_rspec:dummy) # Ruby integration tests (dummy Rails app)
 pnpm run test                        # JavaScript/TypeScript tests
-rake                                 # Full suite (lint + all tests except examples)
+(cd react_on_rails && bundle exec rake)                 # Full package suite (lint + tests except examples)
 
 # Type checking
 pnpm run type-check                  # TypeScript
-bundle exec rake rbs:validate        # RBS signatures
+(cd react_on_rails && bundle exec rake rbs:validate) # RBS signatures
 
 # Additional test subsets
-rake run_rspec                       # All Ruby tests
-rake all_but_examples                # All tests except generated examples
-rake run_rspec:shakapacker_examples_basic  # Single example test
+(cd react_on_rails && bundle exec rake run_rspec) # All Ruby tests
+(cd react_on_rails && bundle exec rake all_but_examples) # All tests except generated examples
+(cd react_on_rails && bundle exec rake run_rspec:shakapacker_examples_basic) # Single example test
 
 # Documentation checks
 script/check-docs-sidebar            # Validate docs sidebar coverage
 bin/check-links                      # Markdown link checks (requires lychee)
 
 # Full initial setup
-bundle && pnpm install && rake shakapacker_examples:gen_all && rake node_package && rake
+bundle && (cd react_on_rails && bundle) && pnpm install && \
+  (cd react_on_rails && bundle exec rake shakapacker_examples:gen_all node_package && bundle exec rake)
 
 # CI/workflow linting
 actionlint                           # GitHub Actions lint

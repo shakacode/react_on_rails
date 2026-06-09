@@ -62,10 +62,10 @@ updates:
           - "shakapacker"
     multi-ecosystem-group: "execjs-dummy-shakapacker"
 
-  # Ruby gems - Open source and Pro gems (including dummy apps)
-  # Root directory is not included because it reuses the Gemfile from react_on_rails
+  # Ruby gems - root tooling plus Open source and Pro gems (including dummy apps)
   - package-ecosystem: "bundler"
     directories:
+      - "/"
       - "/react_on_rails"
       - "/react_on_rails/spec/dummy"
       - "/react_on_rails_pro"

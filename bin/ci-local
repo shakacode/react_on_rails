@@ -37,8 +37,30 @@ NC='\033[0m' # No Color
 echo -e "${BLUE}=== React on Rails Local CI ===${NC}"
 echo ""
 
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+ROOT_GEMFILE="$ROOT_DIR/Gemfile"
+OSS_GEMFILE="$ROOT_DIR/react_on_rails/Gemfile"
+PRO_GEMFILE="$ROOT_DIR/react_on_rails_pro/Gemfile"
+cd "$ROOT_DIR"
+
+# Keep this helper in sync with bin/ci-rerun-failures and bin/setup.
+bundle_command() {
+  local gemfile="$1"
+  shift
+
+  env \
+    -u BUNDLE_APP_CONFIG \
+    -u BUNDLE_BIN_PATH \
+    -u BUNDLE_GEMFILE \
+    -u BUNDLER_VERSION \
+    -u RUBYOPT \
+    BUNDLE_GEMFILE="$gemfile" \
+    "$@"
+}
+
 # Track failures
 FAILED_JOBS=()
+OSS_DEPS_READY=false
 PRO_DEPS_READY=false
 
 # Internal implementation: runs a shell command string via the shell, so
@@ -48,7 +70,8 @@ _run_job_shell() {
   local job_name="$1"
   local command="$2"
   echo -e "${BLUE}▶ Running: $job_name${NC}"
-  if eval "$command"; then
+  # Keep legacy shell-command side effects, especially `cd`, scoped to the job.
+  if (eval "$command"); then
     echo -e "${GREEN}✓ $job_name passed${NC}"
     echo ""
     return 0
@@ -188,7 +211,7 @@ ensure_pro_dependencies() {
 
   if [ ! -d "react_on_rails_pro/node_modules" ] || [ ! -d "react_on_rails_pro/vendor/bundle" ]; then
     echo -e "${YELLOW}Installing React on Rails Pro dependencies...${NC}"
-    if ! (cd react_on_rails_pro && bundle install && pnpm install); then
+    if ! (cd react_on_rails_pro && bundle_command "$PRO_GEMFILE" bundle install && pnpm install); then
       echo -e "${YELLOW}⚠ Pro dependencies installation failed, skipping Pro tests${NC}"
       RUN_PRO_LINT=false
       RUN_PRO_TESTS=false
@@ -199,10 +222,27 @@ ensure_pro_dependencies() {
   PRO_DEPS_READY=true
 }
 
+ensure_oss_dependencies() {
+  if [ "$OSS_DEPS_READY" = true ]; then
+    return 0
+  fi
+
+  if ! (cd "$ROOT_DIR/react_on_rails" && bundle_command "$OSS_GEMFILE" bundle check >/dev/null 2>&1); then
+    echo -e "${YELLOW}Installing react_on_rails Ruby dependencies...${NC}"
+    if ! (cd "$ROOT_DIR/react_on_rails" && bundle_command "$OSS_GEMFILE" bundle install); then
+      echo -e "${RED}✗ react_on_rails dependency installation failed${NC}"
+      echo -e "${RED}Cannot proceed without dependencies. Please fix the errors above.${NC}"
+      exit 1
+    fi
+  fi
+
+  OSS_DEPS_READY=true
+}
+
 # Ensure dependencies are installed
 if [ ! -d "node_modules" ] || [ ! -d "vendor/bundle" ]; then
   echo -e "${YELLOW}Installing dependencies...${NC}"
-  if ! (bundle install && pnpm install); then
+  if ! (bundle_command "$ROOT_GEMFILE" bundle install && pnpm install); then
     echo -e "${RED}✗ Dependency installation failed${NC}"
     echo -e "${RED}Cannot proceed without dependencies. Please fix the errors above.${NC}"
     exit 1
@@ -220,9 +260,13 @@ fi
 # gives contributors a complete failure report from a single local run.
 run_job_argv "Docs Sidebar Check" script/check-docs-sidebar "$BASE_REF" || true
 
+if [ "$RUN_RUBY" = true ] || [ "$RUN_DUMMY" = true ] || [ "$RUN_GENERATORS" = true ]; then
+  ensure_oss_dependencies
+fi
+
 # Run linting
 if [ "$RUN_LINT" = true ]; then
-  run_job "RuboCop" "BUNDLE_GEMFILE=\"$(git rev-parse --show-toplevel)/Gemfile\" bundle exec rubocop"
+  run_job "RuboCop" "bundle_command \"$ROOT_GEMFILE\" bundle exec rubocop"
   run_job "ESLint" "pnpm run eslint --report-unused-disable-directives"
   run_job "Prettier Check" "pnpm start format.listDifferent"
   run_job "TypeScript Type Check" "pnpm run type-check"
@@ -236,9 +280,9 @@ fi
 # Run Ruby gem tests
 if [ "$RUN_RUBY" = true ]; then
   if [ "$FAST_MODE" = true ]; then
-    run_job "RSpec (Gem Only - Fast)" "bundle exec rspec spec/react_on_rails"
+    run_job "RSpec (Gem Only - Fast)" "cd react_on_rails && bundle_command \"$OSS_GEMFILE\" bundle exec rspec spec/react_on_rails"
   else
-    run_job "RSpec (Gem Only)" "bundle exec rake run_rspec:gem"
+    run_job "RSpec (Gem Only)" "cd react_on_rails && bundle_command \"$OSS_GEMFILE\" bundle exec rake run_rspec:gem"
   fi
 fi
 
@@ -255,10 +299,10 @@ if [ "$RUN_DUMMY" = true ]; then
         echo -e "${YELLOW}⚠ Dummy app setup failed, skipping dummy app tests${NC}"
         echo ""
       else
-        run_job "Dummy App Integration Tests" "bundle exec rake run_rspec:dummy"
+        run_job "Dummy App Integration Tests" "cd react_on_rails && bundle_command \"$OSS_GEMFILE\" bundle exec rake run_rspec:dummy"
       fi
     else
-      run_job "Dummy App Integration Tests" "bundle exec rake run_rspec:dummy"
+      run_job "Dummy App Integration Tests" "cd react_on_rails && bundle_command \"$OSS_GEMFILE\" bundle exec rake run_rspec:dummy"
     fi
   fi
 fi
@@ -269,7 +313,7 @@ if [ "$RUN_GENERATORS" = true ]; then
     echo -e "${YELLOW}Skipping generator tests in --fast mode (they are slow)${NC}"
     echo ""
   else
-    run_job "Generator Tests" "bundle exec rake run_rspec:shakapacker_examples"
+    run_job "Generator Tests" "cd react_on_rails && bundle_command \"$OSS_GEMFILE\" bundle exec rake run_rspec:shakapacker_examples"
   fi
 fi
 
@@ -284,8 +328,8 @@ fi
 
 if [ "$RUN_PRO_LINT" = true ]; then
   if ensure_pro_dependencies; then
-    run_job "React on Rails Pro RuboCop" "cd react_on_rails_pro && BUNDLE_GEMFILE=\"$(git rev-parse --show-toplevel)/Gemfile\" bundle exec rubocop --ignore-parent-exclusion"
-    run_job "React on Rails Pro RBS Validate" "cd react_on_rails_pro && bundle exec rake rbs:validate"
+    run_job "React on Rails Pro RuboCop" "cd react_on_rails_pro && bundle_command \"$ROOT_GEMFILE\" bundle exec rubocop --ignore-parent-exclusion"
+    run_job "React on Rails Pro RBS Validate" "cd react_on_rails_pro && bundle_command \"$PRO_GEMFILE\" bundle exec rake rbs:validate"
     run_job "React on Rails Pro TypeScript Check" "pnpm run nps check-typescript"
   fi
 fi
@@ -297,7 +341,7 @@ if [ "$RUN_PRO_TESTS" = true ]; then
     echo ""
   elif ensure_pro_dependencies; then
     run_job "React on Rails Pro JS Tests" "cd react_on_rails_pro && pnpm run nps test"
-    run_job "React on Rails Pro RSpec" "cd react_on_rails_pro && bundle exec rspec"
+    run_job "React on Rails Pro RSpec" "cd react_on_rails_pro && bundle_command \"$PRO_GEMFILE\" bundle exec rspec"
   fi
 fi
 

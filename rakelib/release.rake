@@ -12,7 +12,6 @@ require "tmpdir"
 require_relative "task_helpers"
 require_relative "../react_on_rails/lib/react_on_rails/version_syntax_converter"
 require_relative "../react_on_rails/lib/react_on_rails/git_utils"
-require_relative "../react_on_rails/lib/react_on_rails/utils"
 
 class RaisingMessageHandler
   def add_error(error)
@@ -35,6 +34,11 @@ SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS = 50 * 60
 
 def current_monorepo_root
   File.expand_path("..", __dir__)
+end
+
+def release_truthy?(value)
+  # Includes "t" to preserve the former ReactOnRails::Utils.object_to_boolean contract.
+  [true, "true", "yes", 1, "1", "t"].include?(value.instance_of?(String) ? value.downcase : value)
 end
 
 def release_paths(monorepo_root)
@@ -536,13 +540,11 @@ def expected_bump_type_from_changelog_section(changelog_section)
 end
 
 def version_policy_override_enabled?(override_flag)
-  ReactOnRails::Utils.object_to_boolean(override_flag) ||
-    ReactOnRails::Utils.object_to_boolean(ENV.fetch("RELEASE_VERSION_POLICY_OVERRIDE", nil))
+  release_truthy?(override_flag) || release_truthy?(ENV.fetch("RELEASE_VERSION_POLICY_OVERRIDE", nil))
 end
 
 def ci_status_override_enabled?(override_flag)
-  ReactOnRails::Utils.object_to_boolean(override_flag) ||
-    ReactOnRails::Utils.object_to_boolean(ENV.fetch("RELEASE_CI_STATUS_OVERRIDE", nil))
+  release_truthy?(override_flag) || release_truthy?(ENV.fetch("RELEASE_CI_STATUS_OVERRIDE", nil))
 end
 
 # Statuses considered "incomplete" — anything not yet a finalized conclusion.
@@ -1716,7 +1718,7 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
 
   args_hash = args.to_hash
 
-  is_dry_run = ReactOnRails::Utils.object_to_boolean(args_hash[:dry_run])
+  is_dry_run = release_truthy?(args_hash[:dry_run])
   is_verbose = ENV["VERBOSE"] == "1"
   allow_version_policy_override = version_policy_override_enabled?(args_hash[:override_version_policy])
   allow_ci_status_override = ci_status_override_enabled?(args_hash[:override_ci_status])
@@ -2027,7 +2029,7 @@ Examples:
 task :sync_github_release, %i[gem_version dry_run] do |_t, args|
   monorepo_root = current_monorepo_root
   args_hash = args.to_hash
-  is_dry_run = ReactOnRails::Utils.object_to_boolean(args_hash[:dry_run])
+  is_dry_run = release_truthy?(args_hash[:dry_run])
 
   requested_gem_version = args_hash[:gem_version].to_s.strip
   if requested_gem_version.empty?
