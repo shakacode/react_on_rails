@@ -68,7 +68,8 @@ _run_job_shell() {
   local job_name="$1"
   local command="$2"
   echo -e "${BLUE}▶ Running: $job_name${NC}"
-  if eval "$command"; then
+  # Keep legacy shell-command side effects, especially `cd`, scoped to the job.
+  if (eval "$command"); then
     echo -e "${GREEN}✓ $job_name passed${NC}"
     echo ""
     return 0
@@ -239,7 +240,7 @@ ensure_oss_dependencies() {
 # Ensure dependencies are installed
 if [ ! -d "node_modules" ] || [ ! -d "vendor/bundle" ]; then
   echo -e "${YELLOW}Installing dependencies...${NC}"
-  if ! (bundle install && pnpm install); then
+  if ! (bundle_command "$ROOT_GEMFILE" bundle install && pnpm install); then
     echo -e "${RED}✗ Dependency installation failed${NC}"
     echo -e "${RED}Cannot proceed without dependencies. Please fix the errors above.${NC}"
     exit 1

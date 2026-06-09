@@ -60,6 +60,10 @@ def root_bundle_exec_in(directory, *command)
   end
 end
 
+def root_rubocop_paths
+  %w[Gemfile Rakefile rakelib react_on_rails]
+end
+
 def define_package_task(task_name, *arg_names)
   desc "Delegates to react_on_rails #{task_name}"
   task task_name, arg_names do |_task, args|
@@ -68,15 +72,15 @@ def define_package_task(task_name, *arg_names)
 end
 
 namespace :lint do
-  desc "Run root-bundle RuboCop on the OSS package directory"
+  desc "Run root-bundle RuboCop on root tooling and OSS package files"
   task :rubocop do
-    root_bundle_exec_in(gem_root, "rubocop", "--version")
-    root_bundle_exec_in(gem_root, "rubocop", ".")
+    root_bundle_exec_in(__dir__, "rubocop", "--version")
+    root_bundle_exec_in(__dir__, "rubocop", *root_rubocop_paths)
   end
 
-  desc "Auto-fix root-bundle RuboCop violations in the OSS package directory"
+  desc "Auto-fix root-bundle RuboCop violations in root tooling and OSS package files"
   task :rubocop_autofix do
-    root_bundle_exec_in(gem_root, "rubocop", "-A")
+    root_bundle_exec_in(__dir__, "rubocop", "-A", *root_rubocop_paths)
     puts "Completed root RuboCop auto-fix"
   end
 end
@@ -151,7 +155,7 @@ end
   shakapacker_examples:gen_redux-server-rendering
 ].each { |task_name| define_package_task(task_name) }
 
-desc "Run root-bundle RuboCop on the OSS package directory"
+desc "Run root-bundle RuboCop on root tooling and OSS package files"
 task lint: ["lint:rubocop"]
 
 desc "Auto-fix all linting violations via the package task"
