@@ -121,12 +121,10 @@ const configureRsc = () => {
       // originalUse is captured before injection, so it cannot return the RSC loader itself.
       // This is scoped to live rule objects within one unbundled Node config module instance;
       // Jest module-cache resets intentionally get fresh rule objects.
-      // Keep this function declaration named if config preprocessing is introduced.
-      if (rule.use.name === 'rscLoaderWrapper') return;
+      if (rule.use.rscLoaderInjected) return;
       const originalUse = rule.use;
-      // eslint-disable-next-line no-param-reassign
-      rule.use = function rscLoaderWrapper(data) {
-        const result = originalUse.call(this, data);
+      const wrappedUse = function rscLoaderWrapper(data) {
+        const result = originalUse(data);
         let resultArray = [];
         if (Array.isArray(result)) {
           resultArray = result;
@@ -142,6 +140,9 @@ const configureRsc = () => {
         // Preserve the original return shape when this function rule is not a JS loader rule.
         return result;
       };
+      wrappedUse.rscLoaderInjected = true;
+      // eslint-disable-next-line no-param-reassign
+      rule.use = wrappedUse;
     } else if (Array.isArray(rule.use)) {
       if (rule.use.some(hasRscLoader)) return;
       const jsLoader = extractLoader(rule, 'babel-loader') || extractLoader(rule, 'swc-loader');

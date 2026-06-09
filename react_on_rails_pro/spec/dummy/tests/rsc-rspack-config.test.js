@@ -163,7 +163,8 @@ describe('Pro dummy RSC rspack config', () => {
     const secondUseResult = firstConfig.module.rules[0].use({});
 
     expect(configureServer).toHaveBeenCalledWith(true);
-    expect(wrappedUse.name).toBe('rscLoaderWrapper');
+    expect(wrappedUse.rscLoaderInjected).toBe(true);
+    expect(firstConfig.module.rules[0].use).toBe(wrappedUse);
     expect(firstUseResult).toEqual([
       { loader: 'babel-loader', options: { caller: { ssr: true } } },
       { loader: 'react-on-rails-rsc/WebpackLoader' },
