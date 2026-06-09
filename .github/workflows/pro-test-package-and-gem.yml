@@ -178,11 +178,18 @@ jobs:
         working-directory: .
         run: pnpm --filter react-on-rails-pro build
 
-      # These steps need the Pro package Gemfile (which carries rubocop/rbs),
-      # so pin it via absolute path — robust to changes in defaults.run.
+      - name: Install Ruby Gems for root lint tools
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: .
+          ruby-version: ${{ env.RUBY_VERSION }}
+          install-libyaml: 'false'
+
+      # RuboCop is owned by the root Gemfile/Gemfile.lock so OSS and Pro use one
+      # locked lint version. Keep the Pro package Gemfile for RBS.
       - name: Lint Ruby
         env:
-          BUNDLE_GEMFILE: ${{ github.workspace }}/react_on_rails_pro/Gemfile
+          BUNDLE_GEMFILE: ${{ github.workspace }}/Gemfile
         run: bundle exec rubocop --ignore-parent-exclusion
 
       - name: Validate RBS type signatures

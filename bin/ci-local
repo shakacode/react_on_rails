@@ -222,7 +222,7 @@ run_job_argv "Docs Sidebar Check" script/check-docs-sidebar "$BASE_REF" || true
 
 # Run linting
 if [ "$RUN_LINT" = true ]; then
-  run_job "RuboCop" "bundle exec rubocop"
+  run_job "RuboCop" "BUNDLE_GEMFILE=\"$(git rev-parse --show-toplevel)/Gemfile\" bundle exec rubocop"
   run_job "ESLint" "pnpm run eslint --report-unused-disable-directives"
   run_job "Prettier Check" "pnpm start format.listDifferent"
   run_job "TypeScript Type Check" "pnpm run type-check"
@@ -284,7 +284,7 @@ fi
 
 if [ "$RUN_PRO_LINT" = true ]; then
   if ensure_pro_dependencies; then
-    run_job "React on Rails Pro RuboCop" "cd react_on_rails_pro && bundle exec rubocop --ignore-parent-exclusion"
+    run_job "React on Rails Pro RuboCop" "cd react_on_rails_pro && BUNDLE_GEMFILE=\"$(git rev-parse --show-toplevel)/Gemfile\" bundle exec rubocop --ignore-parent-exclusion"
     run_job "React on Rails Pro RBS Validate" "cd react_on_rails_pro && bundle exec rake rbs:validate"
     run_job "React on Rails Pro TypeScript Check" "pnpm run nps check-typescript"
   fi

@@ -7,7 +7,12 @@ namespace :lint do # rubocop:disable Metrics/BlockLength
 
   desc "Run Rubocop as shell"
   task :rubocop do
-    sh_in_dir(gem_root, "bundle exec rubocop --version", "bundle exec rubocop .")
+    root_gemfile = File.join(monorepo_root, "Gemfile")
+    sh_in_dir(
+      gem_root,
+      "BUNDLE_GEMFILE=\"#{root_gemfile}\" bundle exec rubocop --version",
+      "BUNDLE_GEMFILE=\"#{root_gemfile}\" bundle exec rubocop ."
+    )
   end
 
   desc "Run stylelint as shell"
@@ -27,10 +32,11 @@ namespace :lint do # rubocop:disable Metrics/BlockLength
 
   desc "Auto-fix all linting violations"
   task :autofix do
+    root_gemfile = File.join(monorepo_root, "Gemfile")
     sh_in_dir(gem_root, "pnpm run eslint . --fix")
     sh_in_dir(gem_root, "pnpm run prettier --write .")
     sh_in_dir(gem_root, stylelint_fix_command)
-    sh_in_dir(gem_root, "bundle exec rubocop -A")
+    sh_in_dir(gem_root, "BUNDLE_GEMFILE=\"#{root_gemfile}\" bundle exec rubocop -A")
     puts "Completed auto-fixing all linting violations"
   end
 
