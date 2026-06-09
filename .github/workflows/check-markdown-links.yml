@@ -39,8 +39,8 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          # Pin to 22.12.0 (Shakapacker 10.1 floor) to avoid V8 bug in 22.21.0
-          node-version: '22.12.0'
+          # Latest Node comes from .tool-versions; pinned below the Node startup regression.
+          node-version-file: .tool-versions
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 

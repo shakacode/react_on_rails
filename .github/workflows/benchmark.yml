@@ -67,12 +67,6 @@ concurrency:
   group: ${{ github.event.pull_request.number && format('benchmark-pr-{0}', github.event.pull_request.number) || format('benchmark-{0}', github.sha) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-env:
-  # Only RUBY_VERSION is used in this file (detect-changes). The benchmark parameters
-  # (routes/rate/...) and tool versions live in benchmark-suite.yml, where the suite
-  # actually runs — a reusable workflow does not inherit the caller's env.
-  RUBY_VERSION: '3.3.7'
-
 jobs:
   detect-changes:
     permissions:
@@ -88,6 +82,9 @@ jobs:
         with:
           fetch-depth: 50
           persist-credentials: false
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
       - name: Detect relevant changes
         id: detect
         run: |
@@ -140,7 +137,7 @@ jobs:
         uses: ./.github/actions/setup-bundle
         with:
           working-directory: .
-          ruby-version: ${{ env.RUBY_VERSION }}
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
       # Validate the benchmark scripts (matrix generation, route discovery) before
       # any benchmark runs: if this logic is wrong, the matrix and routes feeding
       # the run are wrong, so the results would be invalid. Running it here (rather

@@ -88,19 +88,45 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
       - id: set-matrix
+        env:
+          FORCE_RUN: ${{ inputs.force_run }}
+          HAS_FULL_CI_LABEL: ${{ needs.detect-changes.outputs.has_full_ci_label }}
+          LATEST_RUBY_VERSION: ${{ steps.tool-versions.outputs.ruby-minor-version }}
+          MINIMUM_RUBY_VERSION: ${{ steps.tool-versions.outputs.minimum-ruby-minor-version }}
         run: |
+          latest_ruby_version="$LATEST_RUBY_VERSION"
+          minimum_ruby_version="$MINIMUM_RUBY_VERSION"
+
           # Determine if we should run full matrix (main, workflow_dispatch, force_run, or full-ci label)
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]] || \
-             [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
-             [[ "${{ inputs.force_run }}" == "true" ]] || \
-             [[ "${{ needs.detect-changes.outputs.has_full_ci_label }}" == "true" ]]; then
+          if [[ "$GITHUB_REF" == "refs/heads/main" ]] || \
+             [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]] || \
+             [[ "$FORCE_RUN" == "true" ]] || \
+             [[ "$HAS_FULL_CI_LABEL" == "true" ]]; then
             # Full matrix: test both latest and minimum supported versions
-            echo 'matrix={"include":[{"ruby-version":"4.0","dependency-level":"latest"},{"ruby-version":"3.3","dependency-level":"minimum"}]}' >> "$GITHUB_OUTPUT"
+            matrix="$(jq -nc \
+              --arg latest_ruby_version "$latest_ruby_version" \
+              --arg minimum_ruby_version "$minimum_ruby_version" \
+              '{
+                "include": [
+                  {"ruby-version": $latest_ruby_version, "dependency-level": "latest"},
+                  {"ruby-version": $minimum_ruby_version, "dependency-level": "minimum"}
+                ]
+              }')"
           else
             # PR matrix: test only latest versions for fast feedback
-            echo 'matrix={"include":[{"ruby-version":"4.0","dependency-level":"latest"}]}' >> "$GITHUB_OUTPUT"
+            matrix="$(jq -nc \
+              --arg latest_ruby_version "$latest_ruby_version" \
+              '{"include": [{"ruby-version": $latest_ruby_version, "dependency-level": "latest"}]}')"
           fi
+          echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
 
   examples:
     needs: [detect-changes, setup-matrix]
@@ -123,6 +149,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
       - name: Setup Ruby
         uses: ./.github/actions/setup-ruby
         with:
@@ -130,7 +159,10 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # All example lanes test on the minimum Shakapacker Node floor from
+          # .minimum.tool-versions; example tests exercise Ruby/gem compatibility,
+          # not Node version compatibility.
+          node-version: ${{ steps.tool-versions.outputs.minimum-node-version }}
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
       - name: Get pnpm store directory

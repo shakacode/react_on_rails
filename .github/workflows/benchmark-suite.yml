@@ -30,11 +30,11 @@ on:
       BENCHER_API_TOKEN:
         required: true
 
-# Same benchmark parameters as benchmark.yml's top-level env: a reusable workflow does
-# NOT inherit the caller's env, but it DOES see the caller's github context, so the
-# workflow_dispatch inputs resolve identically (empty on push/pull_request).
+# Same benchmark parameters as benchmark.yml's old top-level env: a reusable workflow
+# does NOT inherit the caller's env, but it DOES see the caller's github context, so the
+# workflow_dispatch inputs resolve identically (empty on push/pull_request). Ruby and
+# Node versions come from the committed tool-version files after checkout.
 env:
-  RUBY_VERSION: '3.3.7'
   K6_VERSION: '2.0.0'
   VEGETA_VERSION: '12.13.0'
   ROUTES: ${{ github.event.inputs.routes }}
@@ -86,6 +86,10 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
+
       - name: Install Bencher CLI
         # Pinned: reporting parses Bencher's `--format json` report — results +
         # boundaries drive the summary-table significance highlighting, and the
@@ -130,7 +134,7 @@ jobs:
       - name: Setup Ruby
         uses: ./.github/actions/setup-ruby
         with:
-          ruby-version: ${{ env.RUBY_VERSION }}
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
 
       - name: Get gem home directory
         id: gem-home
@@ -141,7 +145,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ steps.gem-home.outputs.path }}
-          key: foreman-gem-${{ runner.os }}-${{ runner.arch }}-ruby-${{ env.RUBY_VERSION }}
+          key: foreman-gem-${{ runner.os }}-${{ runner.arch }}-ruby-${{ steps.tool-versions.outputs.minimum-ruby-version }}
 
       - name: Install foreman
         if: steps.cache-foreman.outputs.cache-hit != 'true'
@@ -157,7 +161,11 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          # Ruby stays on minimum to exercise gem compatibility; Node tracks the
+          # latest runtime from .tool-versions, pinned below the Node startup regression.
+          # This deliberate min-Ruby x latest-Node cross-profile does not match
+          # a regular CI matrix leg.
+          node-version: ${{ steps.tool-versions.outputs.node-version }}
 
       - name: Print system information
         run: |
@@ -215,7 +223,7 @@ jobs:
         uses: ./.github/actions/setup-bundle
         with:
           working-directory: ${{ env.APP_DIRECTORY }}
-          ruby-version: ${{ env.RUBY_VERSION }}
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
           install-libyaml: 'false'
 
       - name: Generate file-system based entrypoints for Pro

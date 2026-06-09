@@ -8,10 +8,10 @@ This guide explains how to switch between different CI test configurations local
 # Check your current configuration
 bin/ci-switch-config status
 
-# Switch to minimum dependencies (Ruby 3.3, Node 20)
+# Switch to the minimum runtime/dependency profile
 bin/ci-switch-config minimum
 
-# Switch back to latest dependencies (Ruby 4.0, Node 22)
+# Switch back to the latest runtime/dependency profile
 bin/ci-switch-config latest
 ```
 
@@ -123,7 +123,9 @@ bin/ci-switch-config minimum
 
 This will:
 
-1. Create `.tool-versions` with the Ruby patch from `MINIMUM_RUBY_VERSION` in `bin/ci-switch-config` and Node 20.18.1
+1. Copy `.minimum.tool-versions` to `.tool-versions`, saving the latest profile as `.maximum.tool-versions`
+   with `.maximum.tool-versions.head`
+   - This `.tool-versions` update happens for every supported version manager because CI reads the file directly.
 2. Run `script/convert` to downgrade dependencies:
    - Shakapacker 10.1.0 → 8.2.0
    - React 19.0.0 → 18.0.0
@@ -158,7 +160,8 @@ bin/ci-switch-config latest
 
 This will:
 
-1. Create `.tool-versions` with Ruby 4.0.5 and Node 22.12.0
+1. Restore `.tool-versions` from `.maximum.tool-versions` when it was saved on the current git head
+   (or from git if no current saved profile exists)
 2. Restore files from git (reverting changes made by `script/convert`)
 3. Clean `node_modules` and `pnpm-lock.yaml`
 4. Reinstall dependencies with `--frozen-lockfile`
@@ -187,6 +190,8 @@ bundle exec rake run_rspec:all_dummy
 When switching to **minimum**, these files are modified:
 
 - `.tool-versions` - Ruby/Node versions
+- `.maximum.tool-versions` - saved latest Ruby/Node versions
+- `.maximum.tool-versions.head` - git commit where the saved runtime versions were captured
 - `Gemfile.development_dependencies` - Shakapacker gem version
 - `package.json` - React versions, dev dependencies removed
 - `react_on_rails/spec/dummy/package.json` - React and Shakapacker versions
@@ -194,7 +199,13 @@ When switching to **minimum**, these files are modified:
 - `node_modules/`, `pnpm-lock.yaml` - Cleaned and regenerated
 - `react_on_rails/spec/dummy/node_modules/`, `react_on_rails/spec/dummy/pnpm-lock.yaml` - Cleaned and regenerated
 
-When switching to **latest**, these files are restored from git.
+When switching to **latest**, `.tool-versions` is restored from `.maximum.tool-versions` when that saved profile
+matches the current git head (or from git if no current saved profile exists), and dependency files are restored
+from git.
+
+Keep `.tool-versions` and `.minimum.tool-versions` to plain `tool version` lines with no comments so both mise and
+asdf can parse them. The latest Node profile should stay pinned below the Node startup regression tracked in
+nodejs/node#56010 until that fix reaches an LTS patch.
 
 ## Common Workflows
 
@@ -285,8 +296,8 @@ rvm install 3.3.7   # or 4.0.5
 rvm use 3.3.7
 
 # Install and use specific Node version
-nvm install 20.18.1  # or 22.12.0
-nvm use 20.18.1
+nvm install 20.19.0  # or 22.12.0
+nvm use 20.19.0
 
 # Verify versions
 ruby --version

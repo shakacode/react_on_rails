@@ -51,16 +51,20 @@ jobs:
       )
     steps:
       - uses: actions/checkout@v4
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
 
       - name: Setup Ruby
         uses: ./.github/actions/setup-ruby
         with:
           # Keep the single E2E lane on the minimum runtime; matrix workflows cover latest.
-          ruby-version: '3.3'
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-minor-version }}
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # Pin the single E2E lane to the exact Shakapacker floor from .minimum.tool-versions.
+          node-version: ${{ steps.tool-versions.outputs.minimum-node-version }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -87,7 +91,7 @@ jobs:
         uses: ./.github/actions/setup-bundle
         with:
           working-directory: react_on_rails/spec/dummy
-          ruby-version: '3.3'
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-minor-version }}
           install-libyaml: 'false'
 
       - name: Install Playwright browsers

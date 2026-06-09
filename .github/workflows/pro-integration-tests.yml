@@ -31,9 +31,6 @@ defaults:
   run:
     working-directory: react_on_rails_pro
 
-env:
-  RUBY_VERSION: 3.3.7
-
 jobs:
   detect-changes:
     # Skip Dependabot PRs — they can't access the Pro license secret.
@@ -105,19 +102,26 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
 
       - name: Setup Ruby
         uses: ./.github/actions/setup-ruby
         with:
-          ruby-version: ${{ env.RUBY_VERSION }}
+          # Pro CI pins the exact minimum patch for reproducible licensed dummy-app runs.
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
           bundler-version: 2.5.4
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          # Pin to 22.12.0 (Shakapacker 10.1 floor) to avoid V8 bug in 22.21.0
+          # Pro CI stays on minimum Ruby for gem compatibility but uses latest Node from
+          # .tool-versions. This is the same deliberate min-Ruby x latest-Node
+          # cross-profile used by benchmark-suite.
+          # The Node pin stays below the startup regression until the LTS fix lands:
           # https://github.com/nodejs/node/issues/56010
-          node-version: '22.12.0'
+          node-version-file: .tool-versions
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -162,7 +166,7 @@ jobs:
         uses: ./.github/actions/setup-bundle
         with:
           working-directory: react_on_rails_pro/spec/dummy
-          ruby-version: ${{ env.RUBY_VERSION }}
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
           install-libyaml: 'false'
 
       - name: Generate file-system based entrypoints
@@ -218,19 +222,22 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
 
       - name: Setup Ruby
         uses: ./.github/actions/setup-ruby
         with:
-          ruby-version: ${{ env.RUBY_VERSION }}
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
           bundler-version: 2.5.4
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          # Pin to 22.12.0 (Shakapacker 10.1 floor) to avoid V8 bug in 22.21.0
+          # Latest Node comes from .tool-versions; pinned below the Node startup regression.
           # https://github.com/nodejs/node/issues/56010
-          node-version: '22.12.0'
+          node-version-file: .tool-versions
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -277,7 +284,7 @@ jobs:
         uses: ./.github/actions/setup-bundle
         with:
           working-directory: react_on_rails_pro/spec/dummy
-          ruby-version: ${{ env.RUBY_VERSION }}
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
           install-libyaml: 'false'
 
       - name: Install Node modules with pnpm
@@ -407,19 +414,22 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
 
       - name: Setup Ruby
         uses: ./.github/actions/setup-ruby
         with:
-          ruby-version: ${{ env.RUBY_VERSION }}
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
           bundler-version: 2.5.4
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          # Pin to 22.12.0 (Shakapacker 10.1 floor) to avoid V8 bug in 22.21.0
+          # Latest Node comes from .tool-versions; pinned below the Node startup regression.
           # https://github.com/nodejs/node/issues/56010
-          node-version: '22.12.0'
+          node-version-file: .tool-versions
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -466,7 +476,7 @@ jobs:
         uses: ./.github/actions/setup-bundle
         with:
           working-directory: react_on_rails_pro/spec/dummy
-          ruby-version: ${{ env.RUBY_VERSION }}
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
           install-libyaml: 'false'
 
       - name: Install Node modules with pnpm
@@ -576,18 +586,22 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
+
       - name: Setup Ruby
         uses: ./.github/actions/setup-ruby
         with:
-          ruby-version: ${{ env.RUBY_VERSION }}
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
           bundler-version: 2.5.4
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          # Pin to 22.12.0 (Shakapacker 10.1 floor) to avoid V8 bug in 22.21.0
+          # Latest Node comes from .tool-versions; pinned below the Node startup regression.
           # https://github.com/nodejs/node/issues/56010
-          node-version: '22.12.0'
+          node-version-file: .tool-versions
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -618,7 +632,7 @@ jobs:
         uses: ./.github/actions/setup-bundle
         with:
           working-directory: react_on_rails_pro/spec/dummy
-          ruby-version: ${{ env.RUBY_VERSION }}
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
           install-libyaml: 'false'
 
       - name: Install Node modules with pnpm

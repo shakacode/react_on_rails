@@ -2,23 +2,152 @@
 # Switch between CI test configurations locally
 #
 # Usage:
-#   bin/ci-switch-config minimum   # Ruby 3.3, Node 20, minimum deps
-#   bin/ci-switch-config latest    # Ruby 4.0, Node 22, latest deps
+#   bin/ci-switch-config minimum   # minimum Ruby/Node profile and dependencies
+#   bin/ci-switch-config latest    # latest Ruby/Node profile and dependencies
 #   bin/ci-switch-config status    # Show current configuration
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+MINIMUM_TOOL_VERSIONS_FILE="$PROJECT_ROOT/.minimum.tool-versions"
+MAXIMUM_TOOL_VERSIONS_FILE="$PROJECT_ROOT/.maximum.tool-versions"
+MAXIMUM_TOOL_VERSIONS_HEAD_FILE="$PROJECT_ROOT/.maximum.tool-versions.head"
 
-MINIMUM_RUBY_VERSION="3.3.7" # Update when a newer 3.3.x patch is released.
+require_minimum_tool_versions_file() {
+  if [ ! -f "$MINIMUM_TOOL_VERSIONS_FILE" ]; then
+    echo "Error: $MINIMUM_TOOL_VERSIONS_FILE not found. This file is required at script load time and should be committed." >&2
+    exit 1
+  fi
+}
+
+read_tool_version() {
+  local file="$1"
+  local tool="$2"
+  local version
+
+  if [ ! -f "$file" ]; then
+    echo "Missing $file" >&2
+    exit 1
+  fi
+
+  version="$(awk -v tool="$tool" '$1 == tool { print $2; exit }' "$file")"
+  if [ -z "$version" ]; then
+    echo "Missing $tool version in $file" >&2
+    exit 1
+  fi
+
+  echo "$version"
+}
+
+current_git_head() {
+  # Non-git contexts return an empty string; callers must guard empty output.
+  git -C "$PROJECT_ROOT" rev-parse HEAD 2>/dev/null || true
+}
+
+saved_tool_versions_valid_for_restore() {
+  if [ ! -f "$MAXIMUM_TOOL_VERSIONS_FILE" ]; then
+    return 1
+  fi
+
+  if [ -f "$MAXIMUM_TOOL_VERSIONS_HEAD_FILE" ]; then
+    local current_head
+    local saved_head
+
+    current_head="$(current_git_head)"
+    saved_head="$(cat "$MAXIMUM_TOOL_VERSIONS_HEAD_FILE")"
+    if [ -n "$saved_head" ] && [ "$saved_head" = "$current_head" ]; then
+      # The sidecar HEAD match is necessary but not sufficient: also require
+      # content equality with the committed profile so stale or locally-bumped
+      # runtime versions cannot persist across branch updates or pulls.
+      saved_tool_versions_match_committed_profile
+      return
+    else
+      # A stale sidecar is intentionally authoritative: do not fall through to
+      # legacy content comparison when a backup advertises a different HEAD.
+      return 1
+    fi
+  fi
+
+  # Legacy fallback for backups created before the HEAD sidecar existed. With no
+  # sidecar, content identity is the only safe proxy for "captured at this head".
+  # Accept the backup only when it already matches the committed latest profile.
+  saved_tool_versions_match_committed_profile
+}
+
+saved_tool_versions_match_committed_profile() {
+  local committed_tool_versions
+
+  committed_tool_versions="$(git -C "$PROJECT_ROOT" show HEAD:.tool-versions 2>/dev/null || true)"
+  if [ -z "$committed_tool_versions" ]; then
+    return 1
+  fi
+
+  # printf adds back the trailing newline that command substitution stripped.
+  cmp -s "$MAXIMUM_TOOL_VERSIONS_FILE" <(printf "%s\n" "$committed_tool_versions")
+}
+
+read_committed_tool_version() {
+  local tool="$1"
+  local emit_warnings="${2:-true}"
+  local committed_tool_versions
+  local version
+
+  committed_tool_versions="$(git -C "$PROJECT_ROOT" show HEAD:.tool-versions 2>/dev/null || true)"
+  if [ -n "$committed_tool_versions" ]; then
+    version="$(awk -v tool="$tool" '$1 == tool { print $2; exit }' <<<"$committed_tool_versions")"
+  else
+    version=""
+  fi
+  if [ -n "$version" ]; then
+    echo "$version"
+    return
+  fi
+
+  # Fallback for non-git contexts. Always warn because the local file may already
+  # be switched to the minimum profile when no valid latest backup exists.
+  if [ "$emit_warnings" = true ]; then
+    echo "Warning: could not read committed latest $tool version from git; falling back to current .tool-versions" >&2
+    if [ -f "$MINIMUM_TOOL_VERSIONS_FILE" ] && cmp -s "$PROJECT_ROOT/.tool-versions" "$MINIMUM_TOOL_VERSIONS_FILE"; then
+      echo "Warning: current .tool-versions matches the minimum profile; latest $tool may be under-reported" >&2
+    fi
+  fi
+  read_tool_version "$PROJECT_ROOT/.tool-versions" "$tool"
+}
+
+read_latest_tool_version() {
+  local tool="$1"
+  local emit_warnings="${2:-true}"
+
+  if saved_tool_versions_valid_for_restore; then
+    read_tool_version "$MAXIMUM_TOOL_VERSIONS_FILE" "$tool"
+  else
+    read_committed_tool_version "$tool" "$emit_warnings"
+  fi
+}
+
+reload_latest_tool_version_globals() {
+  local emit_warnings="${1:-false}"
+
+  LATEST_RUBY_VERSION="$(read_latest_tool_version ruby "$emit_warnings")"
+  LATEST_RUBY_MINOR_VERSION="${LATEST_RUBY_VERSION%.*}"
+  LATEST_NODE_VERSION="$(read_latest_tool_version nodejs "$emit_warnings")"
+  LATEST_NODE_MAJOR_VERSION="${LATEST_NODE_VERSION%%.*}"
+}
+
+# Run at load time (outside main) so sourced test harnesses get populated globals.
+# Requires .minimum.tool-versions to be present before sourcing.
+require_minimum_tool_versions_file
+
+MINIMUM_RUBY_VERSION="$(read_tool_version "$MINIMUM_TOOL_VERSIONS_FILE" ruby)"
 MINIMUM_RUBY_MINOR_VERSION="${MINIMUM_RUBY_VERSION%.*}"
-MINIMUM_NODE_VERSION="20.18.1" # Update when minimum CI moves to a newer Node patch.
+MINIMUM_NODE_VERSION="$(read_tool_version "$MINIMUM_TOOL_VERSIONS_FILE" nodejs)"
+MINIMUM_NODE_MAJOR_VERSION="${MINIMUM_NODE_VERSION%%.*}"
 MINIMUM_REACT_VERSION="18.0.0" # Update when minimum CI moves to a newer React version.
 MINIMUM_REACT_MAJOR_VERSION="${MINIMUM_REACT_VERSION%%.*}"
-LATEST_RUBY_VERSION="4.0.5" # Update when a newer 4.0.x patch is released.
-LATEST_RUBY_MINOR_VERSION="${LATEST_RUBY_VERSION%.*}"
-LATEST_NODE_VERSION="22.12.0" # Update when latest CI moves to a newer Node patch.
+reload_latest_tool_version_globals false
+# Shakapacker/React stay as literals here: asdf/mise do not manage npm packages,
+# so they cannot live in .tool-versions alongside Ruby/Node.
 LATEST_SHAKAPACKER_VERSION="10.1.0" # Update when latest CI moves to a newer Shakapacker.
 LATEST_REACT_VERSION="19.0.0" # Update when latest CI moves to a newer React version.
 LATEST_REACT_MAJOR_VERSION="${LATEST_REACT_VERSION%%.*}"
@@ -40,6 +169,20 @@ print_success() {
 
 print_warning() {
   echo -e "${YELLOW}⚠${NC} $1"
+}
+
+warn_if_latest_profile_may_be_under_reported() {
+  if saved_tool_versions_valid_for_restore; then
+    return
+  fi
+
+  if git -C "$PROJECT_ROOT" show HEAD:.tool-versions >/dev/null 2>&1; then
+    return
+  fi
+
+  if [ -f "$MINIMUM_TOOL_VERSIONS_FILE" ] && cmp -s "$PROJECT_ROOT/.tool-versions" "$MINIMUM_TOOL_VERSIONS_FILE"; then
+    print_warning "Could not read the committed latest runtime profile; latest Ruby/Node may be under-reported."
+  fi
 }
 
 print_error() {
@@ -186,6 +329,58 @@ set_node_version() {
   esac
 }
 
+set_tool_versions_to_minimum() {
+  print_header "Setting runtime versions in .tool-versions"
+
+  if [ -f "$PROJECT_ROOT/.tool-versions" ] &&
+    ! cmp -s "$PROJECT_ROOT/.tool-versions" "$PROJECT_ROOT/.minimum.tool-versions"; then
+    if saved_tool_versions_valid_for_restore; then
+      print_success "Preserved existing latest runtime-version backup"
+    else
+      local current_head
+
+      cp "$PROJECT_ROOT/.tool-versions" "$MAXIMUM_TOOL_VERSIONS_FILE"
+      current_head="$(current_git_head)"
+      if [ -n "$current_head" ]; then
+        echo "$current_head" > "$MAXIMUM_TOOL_VERSIONS_HEAD_FILE"
+      else
+        rm -f "$MAXIMUM_TOOL_VERSIONS_HEAD_FILE"
+      fi
+    fi
+  elif [ -f "$MAXIMUM_TOOL_VERSIONS_FILE" ] && ! saved_tool_versions_valid_for_restore; then
+    print_warning "Stale runtime-version backup exists from a different branch; it will be discarded on restore."
+  fi
+
+  cp "$PROJECT_ROOT/.minimum.tool-versions" "$PROJECT_ROOT/.tool-versions"
+  print_success "Copied .minimum.tool-versions to .tool-versions"
+}
+
+restore_tool_versions_to_latest() {
+  print_header "Setting runtime versions in .tool-versions"
+
+  if saved_tool_versions_valid_for_restore; then
+    cp "$MAXIMUM_TOOL_VERSIONS_FILE" "$PROJECT_ROOT/.tool-versions"
+  else
+    local git_err
+
+    # `git restore` requires Git 2.23+; GitHub Actions runners satisfy this.
+    git_err="$(git -C "$PROJECT_ROOT" restore -- .tool-versions 2>&1)" || {
+      echo "Error: could not restore .tool-versions from git. Restore it manually to the latest profile." >&2
+      [ -n "$git_err" ] && echo "  git: $git_err" >&2
+      exit 1
+    }
+    if [ -f "$MAXIMUM_TOOL_VERSIONS_FILE" ]; then
+      print_warning "Local runtime-version backup was stale or mismatched; restored .tool-versions from git."
+    fi
+  fi
+  rm -f "$MAXIMUM_TOOL_VERSIONS_FILE" "$MAXIMUM_TOOL_VERSIONS_HEAD_FILE"
+
+  # Refresh script globals so downstream set_* calls use the restored latest profile.
+  reload_latest_tool_version_globals false
+
+  print_success "Restored .tool-versions with Ruby $LATEST_RUBY_VERSION and Node $LATEST_NODE_VERSION"
+}
+
 install_bundle_to_vendor() {
   local bundle_dir="${1:-$PWD}"
   local lockfile="$bundle_dir/Gemfile.lock"
@@ -223,6 +418,7 @@ install_bundle_to_vendor() {
 show_status() {
   print_header "Current Configuration"
   echo ""
+  warn_if_latest_profile_may_be_under_reported
 
   echo "Runtime versions:"
   if command -v ruby &> /dev/null; then
@@ -274,9 +470,9 @@ show_status() {
 
   echo ""
   if [[ "${SHAKAPACKER_GEM}" == "8.2.0" ]] && [[ "${REACT_ROOT}" =~ ^\^?${MINIMUM_REACT_MAJOR_VERSION}(\.|$) ]]; then
-    echo -e "Current config: ${GREEN}minimum${NC} (matches CI: Ruby $MINIMUM_RUBY_MINOR_VERSION, Node 20, minimum deps)"
+    echo -e "Current config: ${GREEN}minimum${NC} (matches CI: Ruby $MINIMUM_RUBY_MINOR_VERSION, Node $MINIMUM_NODE_MAJOR_VERSION, minimum deps)"
   elif [[ "${SHAKAPACKER_GEM}" == "$LATEST_SHAKAPACKER_VERSION" ]] && [[ "${REACT_ROOT}" =~ ^\^?${LATEST_REACT_MAJOR_VERSION}(\.|$) ]]; then
-    echo -e "Current config: ${GREEN}latest${NC} (matches CI: Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, latest deps)"
+    echo -e "Current config: ${GREEN}latest${NC} (matches CI: Ruby $LATEST_RUBY_MINOR_VERSION, Node $LATEST_NODE_MAJOR_VERSION, latest deps)"
   else
     echo -e "Current config: ${YELLOW}unknown/mixed${NC} (run 'bin/ci-switch-config latest' or 'minimum' to align with CI)"
   fi
@@ -286,7 +482,7 @@ switch_to_minimum() {
   local VERSION_MANAGER=$(check_version_manager)
 
   print_header "Switching to MINIMUM configuration"
-  echo "  Target: Ruby $MINIMUM_RUBY_MINOR_VERSION, Node 20, Shakapacker 8.2.0, React $MINIMUM_REACT_VERSION"
+  echo "  Target: Ruby $MINIMUM_RUBY_MINOR_VERSION, Node $MINIMUM_NODE_MAJOR_VERSION, Shakapacker 8.2.0, React $MINIMUM_REACT_VERSION"
   echo "  Using version manager: $VERSION_MANAGER"
   echo ""
 
@@ -301,16 +497,10 @@ switch_to_minimum() {
     fi
   fi
 
-  # Set Ruby and Node versions
+  # Always write .tool-versions: CI reads it directly regardless of version manager.
+  set_tool_versions_to_minimum
+
   case "$VERSION_MANAGER" in
-    mise|asdf)
-      print_header "Setting runtime versions in .tool-versions"
-      cat > "$PROJECT_ROOT/.tool-versions" <<EOF
-ruby ${MINIMUM_RUBY_VERSION}
-nodejs ${MINIMUM_NODE_VERSION}
-EOF
-      print_success "Created .tool-versions with Ruby $MINIMUM_RUBY_VERSION and Node $MINIMUM_NODE_VERSION"
-      ;;
     rvm|rvm+nvm)
       print_header "Creating .ruby-version for rvm"
       echo "$MINIMUM_RUBY_VERSION" > "$PROJECT_ROOT/.ruby-version"
@@ -428,7 +618,7 @@ restore_to_latest() {
   local VERSION_MANAGER=$(check_version_manager)
 
   print_header "Restoring to LATEST configuration"
-  echo "  Target: Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, Shakapacker $LATEST_SHAKAPACKER_VERSION, React $LATEST_REACT_VERSION"
+  echo "  Target: Ruby $LATEST_RUBY_MINOR_VERSION, Node $LATEST_NODE_MAJOR_VERSION, Shakapacker $LATEST_SHAKAPACKER_VERSION, React $LATEST_REACT_VERSION"
   echo "  Using version manager: $VERSION_MANAGER"
   echo ""
 
@@ -444,15 +634,9 @@ restore_to_latest() {
   fi
 
   # Set Ruby and Node versions
+  restore_tool_versions_to_latest
+
   case "$VERSION_MANAGER" in
-    mise|asdf)
-      print_header "Setting runtime versions in .tool-versions"
-      cat > "$PROJECT_ROOT/.tool-versions" <<EOF
-ruby ${LATEST_RUBY_VERSION}
-nodejs ${LATEST_NODE_VERSION}
-EOF
-      print_success "Created .tool-versions with Ruby $LATEST_RUBY_VERSION and Node $LATEST_NODE_VERSION"
-      ;;
     rvm|rvm+nvm)
       print_header "Creating .ruby-version for rvm"
       echo "$LATEST_RUBY_VERSION" > "$PROJECT_ROOT/.ruby-version"
@@ -565,29 +749,34 @@ EOF
   echo "  bundle exec rake run_rspec:all_dummy"
 }
 
-# Main script
-case "${1:-}" in
-  minimum)
-    switch_to_minimum
-    ;;
-  latest)
-    restore_to_latest
-    ;;
-  status)
-    show_status
-    ;;
-  *)
-    echo "Usage: $0 {minimum|latest|status}"
-    echo ""
-    echo "Commands:"
-    echo "  minimum  - Switch to Ruby $MINIMUM_RUBY_MINOR_VERSION, Node 20, minimum dependencies (Shakapacker 8.2.0, React $MINIMUM_REACT_VERSION)"
-    echo "  latest   - Switch to Ruby $LATEST_RUBY_MINOR_VERSION, Node 22, latest dependencies (Shakapacker $LATEST_SHAKAPACKER_VERSION, React $LATEST_REACT_VERSION)"
-    echo "  status   - Show current configuration"
-    echo ""
-    echo "Examples:"
-    echo "  $0 status           # Check current config"
-    echo "  $0 minimum          # Switch to minimum deps for testing CI failures"
-    echo "  $0 latest           # Switch back to latest deps"
-    exit 1
-    ;;
-esac
+main() {
+  case "${1:-}" in
+    minimum)
+      switch_to_minimum
+      ;;
+    latest)
+      restore_to_latest
+      ;;
+    status)
+      show_status
+      ;;
+    *)
+      echo "Usage: $0 {minimum|latest|status}"
+      echo ""
+      echo "Commands:"
+      echo "  minimum  - Switch to Ruby $MINIMUM_RUBY_MINOR_VERSION, Node $MINIMUM_NODE_MAJOR_VERSION, minimum dependencies (Shakapacker 8.2.0, React $MINIMUM_REACT_VERSION)"
+      echo "  latest   - Switch to Ruby $LATEST_RUBY_MINOR_VERSION, Node $LATEST_NODE_MAJOR_VERSION, latest dependencies (Shakapacker $LATEST_SHAKAPACKER_VERSION, React $LATEST_REACT_VERSION)"
+      echo "  status   - Show current configuration"
+      echo ""
+      echo "Examples:"
+      echo "  $0 status           # Check current config"
+      echo "  $0 minimum          # Switch to minimum deps for testing CI failures"
+      echo "  $0 latest           # Switch back to latest deps"
+      exit 1
+      ;;
+  esac
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi
