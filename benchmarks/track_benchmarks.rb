@@ -115,7 +115,7 @@ end
 def run_bencher!(branch, start_point_args)
   # The bang means this script helper exits the process on an untriageable
   # Bencher report shape, matching the surrounding top-level script helpers.
-  bencher_runner.run(branch, start_point_args)
+  bencher_runner.run(branch:, start_point_args:)
 rescue BencherRunner::ReportParseError => e
   warn "::error::#{e.message}"
   exit 1
@@ -144,8 +144,7 @@ def bencher_runner
 end
 
 def replace_pr_comments(markdown)
-  # Short-circuit first: avoids constructing pr_report_poster (which reads
-  # PR_NUMBER) on push events where there is nothing to post.
+  # Short-circuit on empty markdown before the env-var lookup; most main-branch pushes take this path.
   return if markdown.empty?
   return unless ENV.fetch("GITHUB_EVENT_NAME") == "pull_request"
 

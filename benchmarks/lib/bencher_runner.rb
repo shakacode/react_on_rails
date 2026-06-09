@@ -40,7 +40,7 @@ class BencherRunner
     @report_json = report_json
   end
 
-  def run(branch, start_point_args)
+  def run(branch:, start_point_args:)
     # This Bencher CLI call is not wrapped in Timeout.timeout because that can leak
     # child processes. In CI it is bounded by the GitHub Actions job timeout for
     # .github/workflows/benchmark-suite.yml; the benchmark execution step has its

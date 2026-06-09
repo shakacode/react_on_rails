@@ -21,7 +21,7 @@ RSpec.describe BencherRunner do
     allow(FileUtils).to receive(:mv).with("report.json.tmp", "report.json")
     allow(FileUtils).to receive(:rm_f).with("report.json.tmp")
 
-    runner.run(branch, start_point_args)
+    runner.run(branch:, start_point_args:)
     captured_args
   end
 
@@ -71,7 +71,7 @@ RSpec.describe BencherRunner do
       allow(FileUtils).to receive(:mv).with("report.json.tmp", "report.json")
       allow(FileUtils).to receive(:rm_f)
 
-      result = runner.run("branch", [])
+      result = runner.run(branch: "branch", start_point_args: [])
 
       expect(result.stderr).to eq("")
       expect(result.exit_code).to eq(0)
@@ -85,7 +85,7 @@ RSpec.describe BencherRunner do
       allow(FileUtils).to receive(:rm_f).with("report.json")
 
       result = nil
-      expect { result = runner.run("branch", []) }
+      expect { result = runner.run(branch: "branch", start_point_args: []) }
         .to output("auth failed\n").to_stderr
 
       expect(result.stderr).to eq("auth failed")
@@ -112,7 +112,7 @@ RSpec.describe BencherRunner do
       allow(FileUtils).to receive(:mv).with("report.json.tmp", "report.json")
       allow(FileUtils).to receive(:rm_f)
 
-      expect { runner.run("branch", []) }
+      expect { runner.run(branch: "branch", start_point_args: []) }
         .to output(/::warning::Bencher report listed benchmarks but no perf-link context/).to_stdout
     end
 
@@ -141,7 +141,7 @@ RSpec.describe BencherRunner do
       allow(FileUtils).to receive(:mv).with("report.json.tmp", "report.json")
       allow(FileUtils).to receive(:rm_f)
 
-      result = runner.run("branch", [])
+      result = runner.run(branch: "branch", start_point_args: [])
 
       expect(result.exit_code).to eq(1)
       expect(result.report).not_to be_regression
@@ -156,7 +156,7 @@ RSpec.describe BencherRunner do
       allow(FileUtils).to receive(:mv).with("report.json.tmp", "report.json")
       allow(FileUtils).to receive(:rm_f)
 
-      expect { runner.run("branch", []) }
+      expect { runner.run(branch: "branch", start_point_args: []) }
         .to raise_error(BencherRunner::ReportParseError, /Bencher JSON report has an unexpected shape/)
       expect(FileUtils).to have_received(:rm_f).with("report.json")
     end
@@ -169,7 +169,7 @@ RSpec.describe BencherRunner do
       allow(FileUtils).to receive(:mv).with("report.json.tmp", "report.json")
       allow(FileUtils).to receive(:rm_f)
 
-      expect { runner.run("branch", []) }
+      expect { runner.run(branch: "branch", start_point_args: []) }
         .to raise_error(BencherRunner::ReportParseError, /Bencher JSON report has an unexpected shape/)
       expect(FileUtils).to have_received(:rm_f).with("report.json")
     end
@@ -181,7 +181,7 @@ RSpec.describe BencherRunner do
       allow(File).to receive(:write).with("report.json.tmp", anything).and_raise(Errno::ENOSPC)
       allow(FileUtils).to receive(:rm_f)
 
-      expect { runner.run("branch", []) }.to raise_error(Errno::ENOSPC)
+      expect { runner.run(branch: "branch", start_point_args: []) }.to raise_error(Errno::ENOSPC)
       expect(FileUtils).to have_received(:rm_f).with("report.json.tmp")
       expect(FileUtils).not_to have_received(:rm_f).with("report.json")
     end
@@ -193,7 +193,7 @@ RSpec.describe BencherRunner do
       allow(File).to receive(:write).with("report.json.tmp", anything).and_raise(RuntimeError, "disk layer failed")
       allow(FileUtils).to receive(:rm_f)
 
-      expect { runner.run("branch", []) }.to raise_error(RuntimeError, "disk layer failed")
+      expect { runner.run(branch: "branch", start_point_args: []) }.to raise_error(RuntimeError, "disk layer failed")
       expect(FileUtils).to have_received(:rm_f).with("report.json.tmp")
       expect(FileUtils).not_to have_received(:rm_f).with("report.json")
     end
@@ -206,7 +206,7 @@ RSpec.describe BencherRunner do
       allow(FileUtils).to receive(:mv).with("report.json.tmp", "report.json").and_raise(Interrupt)
       allow(FileUtils).to receive(:rm_f)
 
-      expect { runner.run("branch", []) }.to raise_error(Interrupt)
+      expect { runner.run(branch: "branch", start_point_args: []) }.to raise_error(Interrupt)
       expect(FileUtils).to have_received(:rm_f).with("report.json.tmp")
       expect(FileUtils).not_to have_received(:rm_f).with("report.json")
     end

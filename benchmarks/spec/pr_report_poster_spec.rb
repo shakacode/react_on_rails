@@ -136,7 +136,7 @@ RSpec.describe PrReportPoster do
       expect { poster.replace("### report") }
         .to output(/::warning::Stale Core Bencher report comment listing returned 1 non-numeric ID/).to_stdout
 
-      expect(GithubCli).to have_received(:run).exactly(3).times
+      expect(GithubCli).to have_received(:run).with("gh", "api", "-X", "DELETE", anything, any_args).twice
       expect(GithubCli).not_to have_received(:run).with(
         "gh", "api", "-X", "DELETE", "repos/shakacode/react_on_rails/issues/comments/not-an-id",
         any_args
