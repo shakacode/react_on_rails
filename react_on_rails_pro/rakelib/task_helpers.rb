@@ -13,8 +13,15 @@
 # For licensing terms:
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
+require "bundler" # Provides Bundler.with_unbundled_env for child bundle commands.
+
 module ReactOnRailsPro
   module TaskHelpers
+    # Returns the root folder of the monorepo
+    def monorepo_root
+      File.expand_path("../..", __dir__)
+    end
+
     # Returns the root folder of the react_on_rails gem
     def gem_root
       File.expand_path("..", __dir__)

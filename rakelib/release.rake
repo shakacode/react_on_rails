@@ -1834,6 +1834,7 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
 
     puts "\nUpdating Gemfile.lock files..."
     bundle_quiet_flag = is_verbose ? "" : " --quiet"
+    unbundled_sh_in_dir_for_release(release_paths_hash[:monorepo_root], "bundle install#{bundle_quiet_flag}")
     unbundled_sh_in_dir_for_release(release_paths_hash[:gem_root], "bundle install#{bundle_quiet_flag}")
     unbundled_sh_in_dir_for_release(release_paths_hash[:dummy_app_dir], "bundle install#{bundle_quiet_flag}")
 

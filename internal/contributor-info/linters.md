@@ -7,18 +7,18 @@ These linters support the [ShakaCode Style Guidelines](../../docs/oss/misc/style
 If you haven't tried the autofix options for `eslint` and `rubocop`, you're seriously missing out!
 
 1. Be **SURE** you have a clean git status, as you'll want to review what the autofix does to your code!
-2. **RuboCop:** In this monorepo, use the package-scoped bundle that owns the Ruby files. For routine
+2. **RuboCop:** In this monorepo, use the root bundle that owns the RuboCop version. For routine
    OSS Ruby and JS/TS formatting, prefer `rake autofix`; for targeted Ruby autofix on a specific package:
 
 ```bash
 # OSS Ruby (react_on_rails package only; equivalent to rake autofix's Ruby step):
 # -A includes unsafe cops, matching the set rake autofix applies.
-(cd react_on_rails && bundle exec rubocop -A)
+(cd react_on_rails && BUNDLE_GEMFILE=../Gemfile bundle exec rubocop -A)
 
 # Pro Ruby or RuboCop config changes:
 # --ignore-parent-exclusion prevents root AllCops Exclude patterns, written as root-relative paths,
 # from being applied while running inside react_on_rails_pro/.
-(cd react_on_rails_pro && bundle exec rubocop -A --ignore-parent-exclusion)
+(cd react_on_rails_pro && BUNDLE_GEMFILE=../Gemfile bundle exec rubocop -A --ignore-parent-exclusion)
 ```
 
 3. **ESLint:** Be sure to be in the correct directory where you have JS files.

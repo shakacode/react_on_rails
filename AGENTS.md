@@ -37,21 +37,26 @@ If there is a conflict, `AGENTS.md` wins.
 
 ```bash
 # Install dependencies
+# The committed root Gemfile.lock is generated with Bundler 4.0.10; use Bundler
+# 4.0.10 or newer before running root bundle commands.
 bundle && pnpm install
+
+# After changing react_on_rails/Gemfile or Gemfile.shared_dev_dependencies,
+# also run bundle install at the repo root to keep the root Gemfile.lock synced.
 
 # Build TypeScript → JavaScript
 pnpm run build
 
 # Lint (MANDATORY before every commit)
-(cd react_on_rails && bundle exec rubocop)                       # OSS Ruby lint — CI-equivalent
+(cd react_on_rails && BUNDLE_GEMFILE=../Gemfile bundle exec rubocop) # OSS Ruby lint — CI-equivalent
 # Pro Ruby lint — CI-equivalent when Pro files or RuboCop config change
-(cd react_on_rails_pro && bundle exec rubocop --ignore-parent-exclusion)
+(cd react_on_rails_pro && BUNDLE_GEMFILE=../Gemfile bundle exec rubocop --ignore-parent-exclusion)
 pnpm run lint                                                    # JS/TS via ESLint
 pnpm start format.listDifferent                                  # Check Prettier formatting
 rake lint                                                        # All linting (Ruby + JS + formatting)
 
 # Optional Ruby diagnostic from the repo root (not the CI contract)
-bundle exec rubocop
+BUNDLE_GEMFILE=Gemfile bundle exec rubocop
 
 # Auto-fix formatting
 rake autofix                         # Preferred for all formatting
@@ -277,13 +282,13 @@ For small, focused PRs (roughly 5 files changed or fewer and one clear purpose):
 
 ### Always
 
-- Run the CI-equivalent Ruby lint before committing, not the root `bundle exec rubocop`:
+- Run the CI-equivalent Ruby lint before committing:
   ```bash
-  (cd react_on_rails && bundle exec rubocop)
+  (cd react_on_rails && BUNDLE_GEMFILE=../Gemfile bundle exec rubocop)
   # Also run when touching Pro Ruby or RuboCop config:
-  (cd react_on_rails_pro && bundle exec rubocop --ignore-parent-exclusion)
+  (cd react_on_rails_pro && BUNDLE_GEMFILE=../Gemfile bundle exec rubocop --ignore-parent-exclusion)
   ```
-  Root `bundle exec rubocop` is a broad local sweep, not the CI contract.
+  The root `Gemfile` owns the RuboCop version; package directories own their test and RBS bundles.
 - Use `pnpm` for all JS operations — never `npm` or `yarn`
 - Use `bundle exec` for Ruby commands
 - Ensure all files end with a newline

@@ -154,6 +154,12 @@ jobs:
           echo "Bundler version: "; bundle --version
       - name: Check Gemfile.lock platforms
         run: ruby script/check-gemfile-lock-platforms
+      - name: Install Ruby Gems for root lint tools
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: .
+          ruby-version: '4.0'
+          install-libyaml: 'false'
       - name: Install Ruby Gems for package
         uses: ./.github/actions/setup-bundle
         with:
@@ -163,17 +169,17 @@ jobs:
       - name: Install Node modules with pnpm
         run: pnpm install --frozen-lockfile
 
-      # Pin the package Gemfile explicitly for parity with pro-lint.yml and to
-      # stay robust if the package and dummy Gemfiles ever diverge.
+      # RuboCop is owned by the root Gemfile/Gemfile.lock so OSS and Pro use one
+      # locked lint version. Keep package bundles for package-specific tasks.
       - name: Lint Ruby
         env:
-          BUNDLE_GEMFILE: ${{ github.workspace }}/react_on_rails/Gemfile
+          BUNDLE_GEMFILE: ${{ github.workspace }}/Gemfile
         run: cd react_on_rails && bundle exec rubocop
       # The benchmarks/ scripts live outside the gem, so the package rubocop run
       # above doesn't see them. Lint them from the repo root (root .rubocop.yml).
       - name: Lint benchmark scripts
         env:
-          BUNDLE_GEMFILE: ${{ github.workspace }}/react_on_rails/Gemfile
+          BUNDLE_GEMFILE: ${{ github.workspace }}/Gemfile
         run: bundle exec rubocop benchmarks
       - name: Validate RBS type signatures
         env:

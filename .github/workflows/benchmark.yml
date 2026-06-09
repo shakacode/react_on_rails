@@ -132,20 +132,12 @@ jobs:
         shell: bash
       # Only pay the Bundler setup when benchmarks will run or the scripts
       # themselves changed; unrelated PRs keep this job stdlib-only and fast.
-      # TODO: when fixing #2214 this should switch to the new root Gemfile.
-      - name: Setup Ruby
-        if: steps.benchmark-matrices.outputs.run_benchmark_suites == 'true' || steps.detect.outputs.benchmarks_changed == 'true'
-        uses: ./.github/actions/setup-ruby
-        with:
-          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
-      # The benchmark specs only need rspec, which the root Gemfile provides (it
-      # delegates to react_on_rails/Gemfile). The setup-bundle action can't manage
-      # it because there is no committed root Gemfile.lock yet, so install manually.
-      # TODO(#2214): once a root Gemfile.lock is committed, replace this step with
-      # the setup-bundle action (working-directory: ".") and delete it.
       - name: Install gems for benchmark specs
         if: steps.benchmark-matrices.outputs.run_benchmark_suites == 'true' || steps.detect.outputs.benchmarks_changed == 'true'
-        run: bundle install --jobs 4 --retry 3
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: .
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
       # Validate the benchmark scripts (matrix generation, route discovery) before
       # any benchmark runs: if this logic is wrong, the matrix and routes feeding
       # the run are wrong, so the results would be invalid. Running it here (rather
