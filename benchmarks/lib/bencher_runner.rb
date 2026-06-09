@@ -99,6 +99,7 @@ class BencherRunner
       File.write(tmp_report_json, stdout)
       FileUtils.mv(tmp_report_json, report_json)
     ensure
+      # No-op after a successful mv; cleans up the tmp file only if write/mv raised.
       FileUtils.rm_f(tmp_report_json)
     end
 

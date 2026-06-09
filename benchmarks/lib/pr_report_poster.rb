@@ -30,6 +30,8 @@ class PrReportPoster
     # Guard callers that use the poster without the script-level empty-report check.
     return if markdown.empty?
 
+    # Capture cutoff before posting so the stale-comment sweep only hits pre-existing
+    # comments with the same marker, not the one this run is about to create.
     cutoff_ts = Time.now.utc.iso8601
     if post_comment(markdown)
       delete_stale_comments(before: cutoff_ts)

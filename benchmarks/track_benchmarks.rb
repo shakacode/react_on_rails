@@ -144,7 +144,8 @@ def bencher_runner
 end
 
 def replace_pr_comments(markdown)
-  # Short-circuit before any event-type branching for the common empty-report case.
+  # Short-circuit first: avoids constructing pr_report_poster (which reads
+  # PR_NUMBER) on push events where there is nothing to post.
   return if markdown.empty?
   return unless ENV.fetch("GITHUB_EVENT_NAME") == "pull_request"
 
