@@ -126,6 +126,23 @@ RSpec.describe "bin/ci-switch-config" do
     end
   end
 
+  it "warns about stale saved latest profile when minimum mode is already active" do
+    with_ci_switch_tool_versions_repo do |tmpdir, harness_path|
+      minimum_versions = File.read(File.join(tmpdir, ".minimum.tool-versions"))
+
+      File.write(File.join(tmpdir, ".tool-versions"), minimum_versions)
+      File.write(File.join(tmpdir, ".maximum.tool-versions"), "ruby 4.0.4\nnodejs 22.11.0\n")
+      File.write(File.join(tmpdir, ".maximum.tool-versions.head"), "stale-head\n")
+
+      stdout, stderr, status = Open3.capture3(harness_path, "minimum-tool-versions", chdir: tmpdir)
+
+      expect(status).to be_success, "#{stdout}\n#{stderr}"
+      expect(stdout).to include(
+        "Stale runtime-version backup exists from a different branch; it will be discarded on restore."
+      )
+    end
+  end
+
   it "accepts a legacy saved latest profile without a head sidecar when contents match the current git head" do
     with_ci_switch_tool_versions_repo do |tmpdir, harness_path|
       committed_versions = File.read(File.join(tmpdir, ".tool-versions"))

@@ -55,6 +55,7 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
+          fetch-depth: 1
 
       - name: Read runtime versions
         id: tool-versions

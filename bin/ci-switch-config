@@ -347,6 +347,8 @@ set_tool_versions_to_minimum() {
         rm -f "$MAXIMUM_TOOL_VERSIONS_HEAD_FILE"
       fi
     fi
+  elif [ -f "$MAXIMUM_TOOL_VERSIONS_FILE" ] && ! saved_tool_versions_valid_for_restore; then
+    print_warning "Stale runtime-version backup exists from a different branch; it will be discarded on restore."
   fi
 
   cp "$PROJECT_ROOT/.minimum.tool-versions" "$PROJECT_ROOT/.tool-versions"
