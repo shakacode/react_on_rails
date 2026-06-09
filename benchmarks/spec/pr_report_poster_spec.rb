@@ -65,9 +65,7 @@ RSpec.describe PrReportPoster do
     end
 
     it "raises a descriptive error when GITHUB_REPOSITORY is absent" do
-      with_env("PR_NUMBER" => "456") do
-        ENV.delete("GITHUB_REPOSITORY")
-
+      with_env("GITHUB_REPOSITORY" => nil, "PR_NUMBER" => "456") do
         expect do
           described_class.from_env(suite_name: "Pro", marker: "<!-- BENCHER PRO -->")
         end.to raise_error(
@@ -86,9 +84,7 @@ RSpec.describe PrReportPoster do
     end
 
     it "raises a descriptive error when PR_NUMBER is absent" do
-      with_env("GITHUB_REPOSITORY" => "shakacode/react_on_rails") do
-        ENV.delete("PR_NUMBER")
-
+      with_env("GITHUB_REPOSITORY" => "shakacode/react_on_rails", "PR_NUMBER" => nil) do
         expect do
           described_class.from_env(suite_name: "Pro", marker: "<!-- BENCHER PRO -->")
         end.to raise_error(
