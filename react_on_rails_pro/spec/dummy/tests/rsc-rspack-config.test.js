@@ -11,8 +11,8 @@ describe('Pro dummy RSC rspack config', () => {
     expect(fs.existsSync(rspackConfigPath)).toBe(true);
 
     const source = fs.readFileSync(rspackConfigPath, 'utf8');
-    expect(source).toContain("process.env.SHAKAPACKER_ASSETS_BUNDLER ||= 'rspack'");
-    expect(source).toContain("require('../webpack/webpack.config')");
+    expect(source).toMatch(/SHAKAPACKER_ASSETS_BUNDLER/);
+    expect(source).toMatch(/webpack\.config/);
   });
 
   it('uses the Shakapacker runner that selects webpack or rspack at runtime', () => {

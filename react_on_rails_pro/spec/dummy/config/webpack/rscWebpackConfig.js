@@ -98,6 +98,7 @@ const configureRsc = () => {
   const { rules } = rscConfig.module;
   rules.forEach((rule) => {
     if (typeof rule.use === 'function') {
+      if (rule.use.name === 'rscLoaderWrapper') return;
       const originalUse = rule.use;
       // eslint-disable-next-line no-param-reassign
       rule.use = function rscLoaderWrapper(data) {
