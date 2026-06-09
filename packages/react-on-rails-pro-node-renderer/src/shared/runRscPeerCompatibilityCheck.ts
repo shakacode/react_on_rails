@@ -61,6 +61,7 @@ export function runRscPeerCompatibilityCheck(options: RunRscPeerCompatibilityChe
   }
 
   if (result.level === 'warn') {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-ok results always carry a message
     log.warn(result.message!);
     return;
   }
@@ -69,6 +70,7 @@ export function runRscPeerCompatibilityCheck(options: RunRscPeerCompatibilityChe
 }
 
 // Test-only: reset the once-per-process memoization.
+// eslint-disable-next-line no-underscore-dangle
 export function __resetRscPeerCompatibilityCheckForTests(): void {
   alreadyRan = false;
 }
