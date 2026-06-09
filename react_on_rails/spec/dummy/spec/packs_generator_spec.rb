@@ -1162,9 +1162,12 @@ module ReactOnRails
             .and_return("#{stores_fixture_path}/StoreWithNameConflict")
         end
 
-        it "raises an error for name conflict" do
+        it "raises an error for case-only name conflict" do
           expect { described_class.instance.generate_packs_if_stale }
-            .to raise_error(ReactOnRails::Error, /names are used for both components and stores/)
+            .to raise_error(
+              ReactOnRails::Error,
+              %r{Conflicting \(component\) / conflicting \(store\)}
+            )
         end
       end
     end
@@ -1424,6 +1427,12 @@ module ReactOnRails
         let(:file_path) { "/path/to/ror_components/my_component.jsx" }
 
         it { is_expected.to eq "MyComponent" }
+      end
+
+      context "with snake_case component file outside components_subdirectory" do
+        let(:file_path) { "/path/to/other_dir/my_component.jsx" }
+
+        it { is_expected.to eq "my_component" }
       end
 
       context "with client component file" do
