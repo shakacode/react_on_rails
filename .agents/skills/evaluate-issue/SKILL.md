@@ -16,7 +16,7 @@ $evaluate-issue
 Is this issue worth fixing?
 ```
 
-Use this before `$plan-pr-batch` or `$pr-batch` when candidate issues may be low-value, speculative, over-scoped, or better handled with a no-PR evidence comment.
+Use this before assigning implementation work when candidate issues may be low-value, speculative, over-scoped, or better handled with a no-PR evidence comment. If the user named exact issues or PRs, evaluate them directly; if the user gave filters or an unverified batch scope, let `$plan-pr-batch` resolve exact targets first, then evaluate unclear candidates before `$pr-batch` worker launch.
 
 ## Core Principle
 
