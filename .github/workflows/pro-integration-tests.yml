@@ -661,24 +661,16 @@ jobs:
         run: |
           wait_for_service() {
             name="$1"
-            require_success="$2"
-            shift 2
+            shift 1
             timeout=300
             elapsed=0
 
             while true; do
               for url in "$@"; do
-                if [ "$require_success" = "true" ]; then
-                  curl --fail --silent "$url" > /dev/null && {
-                    echo "${name} started at ${url} after ${elapsed}s"
-                    return 0
-                  }
-                else
-                  curl --silent "$url" > /dev/null && {
-                    echo "${name} started at ${url} after ${elapsed}s"
-                    return 0
-                  }
-                fi
+                curl --fail --silent "$url" > /dev/null && {
+                  echo "${name} started at ${url} after ${elapsed}s"
+                  return 0
+                }
               done
 
               sleep 1
@@ -750,7 +742,7 @@ jobs:
             done
           }
 
-          wait_for_service "Rails server" true "http://localhost:3000/empty"
+          wait_for_service "Rails server" "http://localhost:3000/empty"
           wait_for_h2c_service "Node renderer" "/info" "http://127.0.0.1:3800" "http://[::1]:3800"
 
       - name: Install Playwright dependencies

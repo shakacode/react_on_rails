@@ -56,6 +56,7 @@ describe('Pro dummy RSC rspack config', () => {
   it('wraps function-shaped JavaScript loader rules once for the RSC loader', () => {
     jest.doMock('shakapacker', () => ({
       config: {
+        assets_bundler: 'rspack',
         source_entry_path: 'packs',
         source_path: 'client/app',
       },
@@ -100,7 +101,7 @@ describe('Pro dummy RSC rspack config', () => {
     expect(wrappedUse.name).toBe('rscLoaderWrapper');
     expect(firstUseResult).toEqual([
       { loader: 'babel-loader', options: { caller: { ssr: true } } },
-      { loader: 'react-on-rails-rsc/WebpackLoader' },
+      { loader: 'react-on-rails-rsc/RspackLoader' },
     ]);
     expect(secondUseResult).toEqual(firstUseResult);
   });

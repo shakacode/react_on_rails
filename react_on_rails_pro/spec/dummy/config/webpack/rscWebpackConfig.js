@@ -110,9 +110,11 @@ const configureRsc = () => {
   }
 
   // Add the RSC loader before the JavaScript loader.
-  const rscWebpackLoader = 'react-on-rails-rsc/WebpackLoader';
-  const hasRscWebpackLoader = (item) =>
-    (typeof item === 'string' ? item : (item?.loader ?? '')).includes(rscWebpackLoader);
+  const rscLoader =
+    config.assets_bundler === 'rspack'
+      ? 'react-on-rails-rsc/RspackLoader'
+      : 'react-on-rails-rsc/WebpackLoader';
+  const hasRscLoader = (item) => (typeof item === 'string' ? item : (item?.loader ?? '')).includes(rscLoader);
   const { rules } = rscConfig.module;
   rules.forEach((rule) => {
     if (typeof rule.use === 'function') {
@@ -133,15 +135,15 @@ const configureRsc = () => {
         const resolvedRule = { use: resultArray };
         const jsLoader =
           extractLoader(resolvedRule, 'babel-loader') || extractLoader(resolvedRule, 'swc-loader');
-        if (jsLoader) return [...resultArray, { loader: rscWebpackLoader }];
+        if (jsLoader) return [...resultArray, { loader: rscLoader }];
         return result;
       };
     } else if (Array.isArray(rule.use)) {
-      if (rule.use.some(hasRscWebpackLoader)) return;
+      if (rule.use.some(hasRscLoader)) return;
       const jsLoader = extractLoader(rule, 'babel-loader') || extractLoader(rule, 'swc-loader');
       if (jsLoader) {
         rule.use.push({
-          loader: rscWebpackLoader,
+          loader: rscLoader,
         });
       }
     }
