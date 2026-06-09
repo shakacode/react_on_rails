@@ -17,7 +17,7 @@ class BencherRunner
 
   # Bencher dashboard project for React on Rails benchmark runs.
   PROJECT_SLUG = "react-on-rails-t8a9ncxo"
-  MAX_SAMPLE = "64"
+  MAX_SAMPLE = "64" # String because it is passed verbatim as a CLI argument.
   private_constant :MAX_SAMPLE
 
   # Per-measure t-test boundaries (the confidence level Bencher uses for its
@@ -125,12 +125,7 @@ class BencherRunner
     ensure
       # Always runs. After a successful mv the tmp file is already renamed, so
       # rm_f is a no-op; if write or mv raised it performs the cleanup.
-      begin
-        FileUtils.rm_f(tmp_report_json)
-      rescue StandardError => e
-        # Cleanup failures are non-fatal, so keep this broader than the persistence rescue.
-        Github.warning("Could not remove temporary Bencher report #{tmp_report_json}: #{e.message}")
-      end
+      safe_remove_tmp(tmp_report_json)
     end
 
     begin
@@ -155,6 +150,13 @@ class BencherRunner
     raise ReportParseError,
           "Bencher JSON report has an unexpected shape — re-verify against " \
           "benchmarks/spec/bencher_report_spec.rb before bumping the CLI pin. #{e.message}"
+  end
+
+  def safe_remove_tmp(path)
+    FileUtils.rm_f(path)
+  rescue StandardError => e
+    # Cleanup failures are non-fatal, so keep this broader than the persistence rescue.
+    Github.warning("Could not remove temporary Bencher report #{path}: #{e.message}")
   end
 
   def warn_on_missing_perf_link_context(report)

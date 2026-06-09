@@ -126,7 +126,7 @@ class PrReportPoster
     # Send the body over stdin (--body-file -) rather than as a CLI argument so a
     # large report can't hit the OS argument-length limit.
     GithubCli.run(
-      "gh", "pr", "comment", pr_number, "--body-file", "-",
+      "gh", "pr", "comment", pr_number, "--repo", repository, "--body-file", "-",
       error_message: "Failed to post #{suite_name} benchmark report comment",
       stdin_data: "#{marker}\n#{markdown}"
     )

@@ -52,7 +52,7 @@ RSpec.describe PrReportPoster do
       end
 
       expect(GithubCli).to have_received(:run).with(
-        "gh", "pr", "comment", "456", "--body-file", "-",
+        "gh", "pr", "comment", "456", "--repo", "shakacode/react_on_rails", "--body-file", "-",
         error_message: "Failed to post Pro benchmark report comment",
         stdin_data: "<!-- BENCHER PRO -->\n### report"
       )
@@ -106,7 +106,7 @@ RSpec.describe PrReportPoster do
       poster.replace("### report")
 
       expect(GithubCli).to have_received(:run).with(
-        "gh", "pr", "comment", "123", "--body-file", "-",
+        "gh", "pr", "comment", "123", "--repo", "shakacode/react_on_rails", "--body-file", "-",
         error_message: "Failed to post Core benchmark report comment",
         stdin_data: "<!-- BENCHER CORE -->\n### report"
       )
@@ -126,7 +126,7 @@ RSpec.describe PrReportPoster do
         .to output(/::warning::Failed to post Core benchmark report comment/).to_stdout
 
       expect(GithubCli).to have_received(:run).with(
-        "gh", "pr", "comment", "123", "--body-file", "-",
+        "gh", "pr", "comment", "123", "--repo", "shakacode/react_on_rails", "--body-file", "-",
         error_message: "Failed to post Core benchmark report comment",
         stdin_data: "<!-- BENCHER CORE -->\n### report"
       )
