@@ -8,9 +8,12 @@ require_relative "github_cli"
 # Posts the per-suite Bencher Markdown report to a pull request and cleans up
 # older comments with the same marker.
 class PrReportPoster
+  REPOSITORY_SLUG_PATTERN = %r{\A[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*\z}
+  private_constant :REPOSITORY_SLUG_PATTERN
+
   def initialize(repository:, pr_number:, suite_name:, marker:)
     normalized_repository = repository.to_s
-    unless normalized_repository.match?(%r{\A[\w.-]+/[\w.-]+\z})
+    unless normalized_repository.match?(REPOSITORY_SLUG_PATTERN) && !normalized_repository.include?("..")
       raise ArgumentError, "repository must be in owner/repo format, got: #{normalized_repository.inspect}"
     end
 

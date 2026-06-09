@@ -46,7 +46,7 @@ class BencherRunner
 
   # Returns a Result with :stderr, :exit_code, and :report accessors. The
   # private constant keeps callers from depending on the struct class name.
-  # Raises ReportParseError or PersistenceError when report persistence fails.
+  # Raises PersistenceError on I/O failure, ReportParseError on malformed JSON output.
   def run(branch:, start_point_args:)
     # This Bencher CLI call is not wrapped in Timeout.timeout because that can leak
     # child processes. In CI it is bounded by the GitHub Actions job timeout for
@@ -125,20 +125,22 @@ class BencherRunner
       safe_remove_tmp(tmp_report_json)
     end
 
+    parse_and_cleanup_report(stdout)
+  end
+
+  def parse_and_cleanup_report(stdout)
+    parse_report(stdout)
+  rescue ReportParseError
+    Github.debug("Malformed Bencher output (first 300 chars): #{stdout.slice(0, 300).inspect}")
+    # Only ReportParseError is cleaned up here. Unexpected parser bugs should propagate unchanged.
+    # Remove malformed output so a future retry starts clean; the raw debugging
+    # artifact is lost, but a bad report file is worse than no report file.
     begin
-      parse_report(stdout)
-    rescue ReportParseError
-      Github.debug("Malformed Bencher output (first 300 chars): #{stdout.slice(0, 300).inspect}")
-      # Only ReportParseError is cleaned up here. Unexpected parser bugs should propagate unchanged.
-      # Remove malformed output so a future retry starts clean; the raw debugging
-      # artifact is lost, but a bad report file is worse than no report file.
-      begin
-        FileUtils.rm_f(report_json)
-      rescue SystemCallError, IOError => e
-        Github.warning("Could not remove malformed Bencher report #{report_json}: #{e.message}")
-      end
-      raise
+      FileUtils.rm_f(report_json)
+    rescue SystemCallError, IOError => e
+      Github.warning("Could not remove malformed Bencher report #{report_json}: #{e.message}")
     end
+    raise
   end
 
   def parse_report(stdout)
