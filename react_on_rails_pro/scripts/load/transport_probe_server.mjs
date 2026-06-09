@@ -205,7 +205,12 @@ const listenNative = async ({ bodyBytes, host, port, socketPath, streamBytes }) 
 };
 
 const listenFastify = async ({ bodyBytes, host, port, streamBytes }) => {
-  const { default: fastify } = await import('fastify');
+  const { default: fastify } = await import('fastify').catch((error) => {
+    if (error.code === 'ERR_MODULE_NOT_FOUND') {
+      throw new Error('fastify package not found -- run: pnpm install (in react_on_rails_pro/)');
+    }
+    throw error;
+  });
   const app = fastify({ http2: true, logger: false, bodyLimit: bodyBytes });
   app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer' }, (_request, body, done) => {
     done(null, body);

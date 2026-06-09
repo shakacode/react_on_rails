@@ -339,7 +339,7 @@ module RendererHarness
           "tmp",
           "load-tests",
           "transport-probe",
-          Time.now.utc.strftime("%Y-%m-%dT%H-%M-%SZ")
+          "#{Time.now.utc.strftime('%Y-%m-%dT%H-%M-%SZ')}-#{SecureRandom.hex(4)}"
         )
       end
 
