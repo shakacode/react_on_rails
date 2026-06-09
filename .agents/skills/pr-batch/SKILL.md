@@ -114,7 +114,7 @@ Before merge, wait for requested or configured review agents such as Claude, Cod
 
 At the final review/readiness gate, after local validation, PR creation or update, review-thread triage, and the final push for the current head SHA, request full CI with `+ci-run-full` if you are unsure whether path-selected CI is enough. Record that decision as FYI, not as an immediate maintainer question.
 
-After workers finish, the coordinator must keep working through the live finalize/merge lane instead of stopping at PR creation: re-fetch live PR status, wait for current-head checks and reviews, triage/resolve or explicitly waive current unresolved review threads, update stale confidence or release-mode text, request full CI when uncertainty remains, and merge eligible ready PRs when authorized under the current release mode.
+After workers finish, the coordinator must keep working through the live finalize/merge lane instead of stopping at PR creation: re-fetch live PR status, wait for current-head checks and reviews, triage/resolve or explicitly waive current unresolved review threads, update stale release-mode classification or accelerated-RC confidence block, request full CI when uncertainty remains, and merge eligible ready PRs when authorized under the current release mode.
 
 For blocking questions, stop work on that target, surface a structured question to the coordinator or maintainer, and mark the issue/PR with the agreed pending-question state. Report the question/comment URL as `blocked needing user input`; do not open a speculative PR. For non-blocking questions where you make a decision and continue, record the decision in the PR description before review or merge.
 
@@ -200,22 +200,8 @@ When worker subagents are explicitly authorized:
 
 ## Coordinator Closeout Lane
 
-After workers finish, the coordinator keeps working until each target has a live
-final state. Do not stop at PR creation unless the user explicitly requested
-PR-only output.
-
-The closeout lane is:
-
-1. Re-fetch every worker PR and issue state from GitHub.
-2. Wait for current-head checks and configured review agents, using bounded
-   polling.
-3. Fetch current unresolved review threads and triage them as fixed, waived, or
-   still blocking.
-4. Refresh stale release-mode or confidence text before readiness or merge.
-5. After the final push, if local validation passed and the only uncertainty is
-   whether full CI is needed, request full CI with `+ci-run-full` and record the
-   reason as FYI, then loop back to re-fetch and wait for the newly requested
-   current-head checks before readiness or merge.
-6. Under the current release mode, mark ready or merge PRs that satisfy the
-   merge qualification rules; report only remaining blockers, questions, or
-   `UNKNOWN` live state.
+After workers finish, follow the canonical closeout lane in
+`.agents/workflows/pr-processing.md` instead of stopping at PR creation. The
+coordinator owns the live re-fetch, current-head checks and review-thread
+triage, release-mode or accelerated-RC confidence refresh, full-CI request when
+uncertainty remains, and any authorized ready/merge action.
