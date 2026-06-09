@@ -94,7 +94,7 @@ See the [full installation guide](https://reactonrails.com/docs/pro/installation
 - [Installation Guide](https://reactonrails.com/docs/pro/installation)
 - [Configuration Reference](https://reactonrails.com/docs/configuration/configuration-pro)
 - [React Server Components Tutorial](https://reactonrails.com/docs/pro/react-server-components/tutorial)
-- [RSC Payloads as Route Data](https://reactonrails.com/docs/pro/react-server-components/rsc-payload-route-data)
+- [RSC Payloads as Route Data](../../docs/pro/react-server-components/rsc-payload-route-data.md)
 - [Upgrade from OSS to Pro](https://reactonrails.com/docs/pro/upgrading-to-pro/)
 - [React on Rails Pro Overview](https://reactonrails.com/docs/pro/)
 
