@@ -39,6 +39,18 @@ class BencherRunner
     @report_json = report_json
   end
 
+  def run(branch, start_point_args)
+    stdout, stderr, status = Open3.capture3(*args(branch, start_point_args))
+    warn stderr unless stderr.empty?
+    report = persist_report(stdout)
+    warn_on_missing_perf_link_context(report)
+    Result.new(stderr:, exit_code: status.exitstatus, report:)
+  end
+
+  private
+
+  attr_reader :benchmark_json, :report_json
+
   def threshold_args(measure, direction, boundary)
     # "_" is Bencher's sentinel for "no boundary on this side".
     lower, upper = direction == :lower ? [boundary, "_"] : ["_", boundary]
@@ -67,18 +79,6 @@ class BencherRunner
     ]
   end
 
-  def run(branch, start_point_args)
-    stdout, stderr, status = Open3.capture3(*args(branch, start_point_args))
-    warn stderr unless stderr.empty?
-    report = persist_report(stdout)
-    warn_on_missing_perf_link_context(report)
-    Result.new(stderr:, exit_code: status.exitstatus, report:)
-  end
-
-  private
-
-  attr_reader :benchmark_json, :report_json
-
   def persist_report(stdout)
     if stdout.empty?
       FileUtils.rm_f(report_json)
@@ -87,6 +87,9 @@ class BencherRunner
 
     File.write(report_json, stdout)
     parse_report(stdout)
+  rescue ReportParseError
+    FileUtils.rm_f(report_json)
+    raise
   end
 
   def parse_report(stdout)

@@ -10,7 +10,7 @@ RSpec.describe BencherRunner do
 
   describe "#threshold_args" do
     it "puts the boundary on the lower side for higher-is-better measures" do
-      expect(runner.threshold_args("rps", :lower, "0.9995")).to eq(
+      expect(runner.send(:threshold_args, "rps", :lower, "0.9995")).to eq(
         %w[--threshold-measure rps --threshold-test t_test
            --threshold-max-sample-size 64
            --threshold-lower-boundary 0.9995 --threshold-upper-boundary _]
@@ -18,7 +18,7 @@ RSpec.describe BencherRunner do
     end
 
     it "puts the boundary on the upper side for lower-is-better measures" do
-      expect(runner.threshold_args("p50_latency", :upper, "0.9999")).to eq(
+      expect(runner.send(:threshold_args, "p50_latency", :upper, "0.9999")).to eq(
         %w[--threshold-measure p50_latency --threshold-test t_test
            --threshold-max-sample-size 64
            --threshold-lower-boundary _ --threshold-upper-boundary 0.9999]
@@ -28,7 +28,7 @@ RSpec.describe BencherRunner do
 
   describe "#args" do
     it "builds a JSON Bencher run command with the configured files and start point" do
-      args = runner.args("feature-branch", ["--start-point", "main"])
+      args = runner.send(:args, "feature-branch", ["--start-point", "main"])
 
       expect(args).to include("bencher", "run", "--branch", "feature-branch")
       expect(args.each_cons(2)).to include(["--file", "bench.json"])
@@ -52,7 +52,7 @@ RSpec.describe BencherRunner do
     end
 
     it "tracks exactly rps/p50_latency/failed_pct with their tuned boundaries and sides" do
-      expect(parse_thresholds(runner.args("my-branch", []))).to eq(
+      expect(parse_thresholds(runner.send(:args, "my-branch", []))).to eq(
         [
           { measure: "rps", lower: "0.9995", upper: "_" },
           { measure: "p50_latency", lower: "_", upper: "0.9999" },
@@ -148,9 +148,11 @@ RSpec.describe BencherRunner do
 
       allow(Open3).to receive(:capture3).and_return(["{}", "", status])
       allow(File).to receive(:write).with("report.json", "{}")
+      allow(FileUtils).to receive(:rm_f).with("report.json")
 
       expect { runner.run("branch", []) }
         .to raise_error(BencherRunner::ReportParseError, /Bencher JSON report has an unexpected shape/)
+      expect(FileUtils).to have_received(:rm_f).with("report.json")
     end
   end
 end
