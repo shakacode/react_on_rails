@@ -10,6 +10,7 @@ require_relative "spec_helper"
 RSpec.describe "bin/ci-switch-config" do
   let(:repo_root) { File.expand_path("../../..", __dir__) }
   let(:source_script_path) { File.join(repo_root, "bin/ci-switch-config") }
+  let(:read_tool_version_path) { File.join(repo_root, "bin/read-tool-version") }
 
   it "reports shakapacker-webpack before core shakapacker in status output" do
     stdout, stderr, status = ci_switch_status({
@@ -200,10 +201,8 @@ RSpec.describe "bin/ci-switch-config" do
   it "warns when a non-git checkout falls back from latest to the local minimum profile" do
     Dir.mktmpdir do |tmpdir|
       harness_path = File.join(tmpdir, "bin/ci-switch-tool-versions")
-      script_copy_path = File.join(tmpdir, "bin/ci-switch-config")
+      script_copy_path = install_ci_switch_scripts(tmpdir)
 
-      FileUtils.mkdir_p(File.dirname(harness_path))
-      FileUtils.cp(source_script_path, script_copy_path)
       File.write(harness_path, ci_switch_tool_versions_harness(script_copy_path))
       FileUtils.cp(File.join(repo_root, ".minimum.tool-versions"), File.join(tmpdir, ".tool-versions"))
       FileUtils.cp(File.join(repo_root, ".minimum.tool-versions"), File.join(tmpdir, ".minimum.tool-versions"))
@@ -218,14 +217,46 @@ RSpec.describe "bin/ci-switch-config" do
     end
   end
 
+  it "parses plain mise/asdf tool version lines via the shared bin/read-tool-version helper" do
+    Dir.mktmpdir do |tmpdir|
+      tool_versions_path = File.join(tmpdir, ".tool-versions")
+      File.write(tool_versions_path, "ruby 3.3.7\nnodejs 22.12.0\n")
+
+      stdout, stderr, status = Open3.capture3(read_tool_version_path, tool_versions_path, "nodejs")
+
+      expect(status).to be_success, stderr
+      expect(stdout.strip).to eq("22.12.0")
+    end
+  end
+
+  it "fails via the shared bin/read-tool-version helper when the tool-versions file is missing" do
+    Dir.mktmpdir do |tmpdir|
+      missing_path = File.join(tmpdir, ".tool-versions")
+
+      _stdout, stderr, status = Open3.capture3(read_tool_version_path, missing_path, "ruby")
+
+      expect(status).not_to be_success
+      expect(stderr).to include("Missing #{missing_path}")
+    end
+  end
+
+  it "fails via the shared bin/read-tool-version helper when the tool is not listed" do
+    Dir.mktmpdir do |tmpdir|
+      tool_versions_path = File.join(tmpdir, ".tool-versions")
+      File.write(tool_versions_path, "ruby 3.3.7\n")
+
+      _stdout, stderr, status = Open3.capture3(read_tool_version_path, tool_versions_path, "nodejs")
+
+      expect(status).not_to be_success
+      expect(stderr).to include("Missing nodejs version in #{tool_versions_path}")
+    end
+  end
+
   it "reports a friendly error when the minimum tool-version file is missing" do
     Dir.mktmpdir do |tmpdir|
-      fake_script_path = File.join(tmpdir, "bin/ci-switch-config")
+      fake_script_path = install_ci_switch_scripts(tmpdir)
 
-      FileUtils.mkdir_p(File.dirname(fake_script_path))
-      FileUtils.cp(source_script_path, fake_script_path)
       FileUtils.cp(File.join(repo_root, ".tool-versions"), File.join(tmpdir, ".tool-versions"))
-      FileUtils.chmod("+x", fake_script_path)
 
       _stdout, stderr, status = Open3.capture3(fake_script_path, "status", chdir: tmpdir)
 
@@ -235,17 +266,26 @@ RSpec.describe "bin/ci-switch-config" do
     end
   end
 
+  def install_ci_switch_scripts(tmpdir)
+    script_copy_path = File.join(tmpdir, "bin/ci-switch-config")
+
+    FileUtils.mkdir_p(File.dirname(script_copy_path))
+    FileUtils.cp(source_script_path, script_copy_path)
+    # bin/ci-switch-config sources this shared parser from its own directory.
+    FileUtils.cp(read_tool_version_path, File.join(tmpdir, "bin/read-tool-version"))
+    FileUtils.chmod("+x", script_copy_path)
+
+    script_copy_path
+  end
+
   def ci_switch_status(dependencies, tool_versions_source: ".tool-versions")
     Dir.mktmpdir do |tmpdir|
-      fake_script_path = File.join(tmpdir, "bin/ci-switch-config")
+      fake_script_path = install_ci_switch_scripts(tmpdir)
       package_json_path = File.join(tmpdir, "react_on_rails/spec/dummy/package.json")
 
-      FileUtils.mkdir_p(File.dirname(fake_script_path))
       FileUtils.mkdir_p(File.dirname(package_json_path))
-      FileUtils.cp(source_script_path, fake_script_path)
       FileUtils.cp(File.join(repo_root, tool_versions_source), File.join(tmpdir, ".tool-versions"))
       FileUtils.cp(File.join(repo_root, ".minimum.tool-versions"), File.join(tmpdir, ".minimum.tool-versions"))
-      FileUtils.chmod("+x", fake_script_path)
 
       File.write(package_json_path, JSON.pretty_generate("dependencies" => dependencies))
 
@@ -256,10 +296,8 @@ RSpec.describe "bin/ci-switch-config" do
   def with_ci_switch_tool_versions_repo
     Dir.mktmpdir do |tmpdir|
       harness_path = File.join(tmpdir, "bin/ci-switch-tool-versions")
-      script_copy_path = File.join(tmpdir, "bin/ci-switch-config")
+      script_copy_path = install_ci_switch_scripts(tmpdir)
 
-      FileUtils.mkdir_p(File.dirname(harness_path))
-      FileUtils.cp(source_script_path, script_copy_path)
       File.write(harness_path, ci_switch_tool_versions_harness(script_copy_path))
       FileUtils.cp(File.join(repo_root, ".tool-versions"), File.join(tmpdir, ".tool-versions"))
       FileUtils.cp(File.join(repo_root, ".minimum.tool-versions"), File.join(tmpdir, ".minimum.tool-versions"))

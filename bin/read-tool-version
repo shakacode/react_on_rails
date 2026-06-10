@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Shared parser for asdf/mise ".tool-versions"-style files (plain "tool version"
+# lines). Single source of truth for bin/ci-switch-config (which sources this
+# file) and .github/actions/read-tool-versions/action.yml (which executes it),
+# so the local switch tool and the workflow action cannot drift.
+#
+# Usage:
+#   bin/read-tool-version <tool-versions-file> <tool>   # prints the version
+#   source bin/read-tool-version                        # defines read_tool_version()
+
+read_tool_version() {
+  local file="$1"
+  local tool="$2"
+  local version
+
+  if [ ! -f "$file" ]; then
+    echo "Missing $file" >&2
+    exit 1
+  fi
+
+  version="$(awk -v tool="$tool" '$1 == tool { print $2; exit }' "$file")"
+  if [ -z "$version" ]; then
+    echo "Missing $tool version in $file" >&2
+    exit 1
+  fi
+
+  echo "$version"
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  set -euo pipefail
+
+  if [ "$#" -ne 2 ]; then
+    echo "Usage: $0 <tool-versions-file> <tool>" >&2
+    exit 1
+  fi
+
+  read_tool_version "$@"
+fi

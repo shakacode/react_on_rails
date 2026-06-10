@@ -40,6 +40,15 @@ RSpec.describe "Ruby version support" do
     version.split(".").first
   end
 
+  # The action executes the shared bin/read-tool-version helper from the workspace root.
+  def install_shared_tool_version_helper(tmpdir)
+    helper_copy_path = File.join(tmpdir, "bin/read-tool-version")
+
+    FileUtils.mkdir_p(File.dirname(helper_copy_path))
+    FileUtils.cp(File.join(repo_root, "bin/read-tool-version"), helper_copy_path)
+    FileUtils.chmod("+x", helper_copy_path)
+  end
+
   def read_tool_versions_action_outputs
     action = YAML.safe_load(read_repo_file(".github/actions/read-tool-versions/action.yml"))
     run_script = action.fetch("runs").fetch("steps").find { |step| step["id"] == "versions" }.fetch("run")
@@ -49,6 +58,7 @@ RSpec.describe "Ruby version support" do
 
       File.write(File.join(tmpdir, ".tool-versions"), committed_tool_versions(".tool-versions"))
       FileUtils.cp(File.join(repo_root, ".minimum.tool-versions"), File.join(tmpdir, ".minimum.tool-versions"))
+      install_shared_tool_version_helper(tmpdir)
 
       stdout, stderr, status = Open3.capture3(
         { "GITHUB_OUTPUT" => github_output }, "bash", "-c", run_script, chdir: tmpdir

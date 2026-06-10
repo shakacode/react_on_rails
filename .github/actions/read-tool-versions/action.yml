@@ -41,37 +41,17 @@ runs:
       run: |
         set -euo pipefail
 
-        # Mirrors read_tool_version() in bin/ci-switch-config; keep parsing in sync.
-        # react_on_rails/spec/react_on_rails/ruby_version_support_spec.rb
-        # fails if the workflow action and local switch tool parsers drift.
-        read_tool_version() {
-          local file="$1"
-          local tool="$2"
-          local version
-
-          if [ ! -f "$file" ]; then
-            echo "::error file=$file::Missing $file"
-            exit 1
-          fi
-
-          version="$(
-            awk -v tool="$tool" '$1 == tool { print $2; exit }' "$file"
-          )"
-          if [ -z "$version" ]; then
-            echo "::error file=$file::Missing $tool version in $file"
-            exit 1
-          fi
-
-          echo "$version"
-        }
-
-        latest_ruby_version="$(read_tool_version ".tool-versions" ruby)"
-        latest_node_version="$(read_tool_version ".tool-versions" nodejs)"
+        # bin/read-tool-version is the shared parser also sourced by
+        # bin/ci-switch-config, so the workflow action and the local switch
+        # tool cannot drift. The parity is verified by
+        # react_on_rails/spec/react_on_rails/ruby_version_support_spec.rb.
+        latest_ruby_version="$(bin/read-tool-version .tool-versions ruby)"
+        latest_node_version="$(bin/read-tool-version .tool-versions nodejs)"
         minimum_ruby_version="$(
-          read_tool_version ".minimum.tool-versions" ruby
+          bin/read-tool-version .minimum.tool-versions ruby
         )"
         minimum_node_version="$(
-          read_tool_version ".minimum.tool-versions" nodejs
+          bin/read-tool-version .minimum.tool-versions nodejs
         )"
 
         {
