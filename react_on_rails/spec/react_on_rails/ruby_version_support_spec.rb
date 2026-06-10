@@ -257,7 +257,12 @@ RSpec.describe "Ruby version support" do
       'MINIMUM_NODE_VERSION="$(read_tool_version "$MINIMUM_TOOL_VERSIONS_FILE" nodejs)"'
     )
     expect(ci_switch_config).to include('MINIMUM_NODE_MAJOR_VERSION="${MINIMUM_NODE_VERSION%%.*}"')
-    expect(ci_switch_config).to include('MINIMUM_REACT_VERSION="18.0.0"')
+    expect(ci_switch_config).to include(
+      'MINIMUM_SHAKAPACKER_VERSION="$(read_tool_version "$CI_DEPENDENCY_VERSIONS_FILE" minimum-shakapacker)"'
+    )
+    expect(ci_switch_config).to include(
+      'MINIMUM_REACT_VERSION="$(read_tool_version "$CI_DEPENDENCY_VERSIONS_FILE" minimum-react)"'
+    )
     expect(ci_switch_config).to include('MINIMUM_REACT_MAJOR_VERSION="${MINIMUM_REACT_VERSION%%.*}"')
     expect(ci_switch_config).to include('MAXIMUM_TOOL_VERSIONS_HEAD_FILE="$PROJECT_ROOT/.maximum.tool-versions.head"')
     expect(ci_switch_config).to include("saved_tool_versions_valid_for_restore()")
@@ -274,9 +279,20 @@ RSpec.describe "Ruby version support" do
       'LATEST_NODE_VERSION="$(read_latest_tool_version nodejs "$emit_warnings")"'
     )
     expect(ci_switch_config).to include('LATEST_NODE_MAJOR_VERSION="${LATEST_NODE_VERSION%%.*}"')
-    expect(ci_switch_config).to include('LATEST_SHAKAPACKER_VERSION="10.1.0"')
-    expect(ci_switch_config).to include('LATEST_REACT_VERSION="19.0.0"')
+    expect(ci_switch_config).to include(
+      'LATEST_SHAKAPACKER_VERSION="$(read_tool_version "$CI_DEPENDENCY_VERSIONS_FILE" latest-shakapacker)"'
+    )
+    expect(ci_switch_config).to include(
+      'LATEST_REACT_VERSION="$(read_tool_version "$CI_DEPENDENCY_VERSIONS_FILE" latest-react)"'
+    )
     expect(ci_switch_config).to include('LATEST_REACT_MAJOR_VERSION="${LATEST_REACT_VERSION%%.*}"')
+
+    # The dependency profile matrix itself lives in the committed data file.
+    dependency_versions = tool_versions(".ci-dependency-versions")
+    expect(dependency_versions.fetch("minimum-shakapacker")).to eq("8.2.0")
+    expect(dependency_versions.fetch("minimum-react")).to eq("18.0.0")
+    expect(dependency_versions.fetch("latest-shakapacker")).to eq("10.1.0")
+    expect(dependency_versions.fetch("latest-react")).to eq("19.0.0")
     expect(ci_switch_config).to match(/set_ruby_version "\$LATEST_RUBY_VERSION"/)
     expect(ci_switch_config).to match(/set_node_version "\$LATEST_NODE_VERSION"/)
     expect(ci_switch_config).to include('[[ "${REACT_ROOT}" =~ ^\^?${MINIMUM_REACT_MAJOR_VERSION}(\.|$) ]]')
