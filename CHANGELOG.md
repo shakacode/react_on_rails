@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Changed
+
+- **[Pro]** **Updated the RSC rollout pin to `react-on-rails-rsc@19.0.5-rc.7`**: The generator default, package manifests, lockfile, and Pro RSC install docs now point at `19.0.5-rc.7`, which fixes the Webpack client manifest CSS collection to exclude runtime-chunk CSS (so shared runtime CSS no longer leaks into every client component's Flight stylesheet hints, while the server manifest still retains runtime-chunk CSS for SSR coverage) and to skip `.hot-update.css` HMR files. The temporary exact prerelease pin policy is unchanged until stable `19.0.5` ships. [PR 3857](https://github.com/shakacode/react_on_rails/pull/3857) by [justin808](https://github.com/justin808).
+
 ### [17.0.0.rc.2] - 2026-06-09
 
 #### Added
