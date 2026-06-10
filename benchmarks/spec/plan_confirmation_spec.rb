@@ -29,7 +29,11 @@ RSpec.describe "plan_confirmation" do
     }
   end
 
-  let(:ignored) { RegressionReport::IGNORED_REGRESSION_BENCHMARKS.first }
+  # The production list is empty (no active suppressions); stub a sample entry so these
+  # examples keep pinning the ignore-list short-circuit machinery.
+  let(:ignored) { "/ignored: Pro" }
+
+  before { stub_const("RegressionReport::IGNORED_REGRESSION_BENCHMARKS", [ignored]) }
 
   describe ".fully_ignored?" do
     it "is true only when every named benchmark is ignored" do

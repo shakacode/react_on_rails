@@ -60,7 +60,11 @@ RSpec.describe RegressionReport do
   end
 
   describe "the ignore-list helpers" do
-    let(:ignored) { described_class::IGNORED_REGRESSION_BENCHMARKS.first }
+    # The production list is empty (no active suppressions); stub a sample entry so
+    # these examples keep pinning the general filtering machinery.
+    let(:ignored) { "/ignored: Pro" }
+
+    before { stub_const("RegressionReport::IGNORED_REGRESSION_BENCHMARKS", [ignored]) }
 
     it "drops ignored benchmarks from alert pairs" do
       alerts = [alert(ignored, "rps"), alert("/real: Pro", "rps")]

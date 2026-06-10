@@ -329,7 +329,10 @@ RSpec.describe "track_benchmarks" do
       end
 
       it "ignores a candidate alert on a temporarily-ignored benchmark" do
-        ignored = RegressionReport::IGNORED_REGRESSION_BENCHMARKS.first
+        # The production list is empty (no active suppressions); stub a sample entry so
+        # this example keeps pinning the ignore handling in the confirmation outcome.
+        ignored = "/ignored: Pro"
+        stub_const("RegressionReport::IGNORED_REGRESSION_BENCHMARKS", [ignored])
         report = BencherReport.parse(
           JSON.generate(
             "results" => [[result(ignored, [rps_measure])]],
