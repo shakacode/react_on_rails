@@ -210,7 +210,7 @@ jobs:
     # Redis backs streamed RSC fixtures covered by the request specs.
     services:
       redis:
-        image: cimg/redis:6.2.6
+        image: public.ecr.aws/docker/library/redis:6.2.6
         ports:
           - 6379:6379
         options: >-
@@ -402,7 +402,7 @@ jobs:
     # Redis service container
     services:
       redis:
-        image: cimg/redis:6.2.6
+        image: public.ecr.aws/docker/library/redis:6.2.6
         ports:
           - 6379:6379
         options: >-
@@ -573,7 +573,7 @@ jobs:
       SHAKAPACKER_ASSETS_BUNDLER: rspack
     services:
       redis:
-        image: cimg/redis:6.2.6
+        image: public.ecr.aws/docker/library/redis:6.2.6
         ports:
           - 6379:6379
         options: >-

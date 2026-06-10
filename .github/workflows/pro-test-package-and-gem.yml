@@ -322,7 +322,7 @@ jobs:
     # Redis service container
     services:
       redis:
-        image: cimg/redis:6.2.6
+        image: public.ecr.aws/docker/library/redis:6.2.6
         ports:
           - 6379:6379
         options: >-
