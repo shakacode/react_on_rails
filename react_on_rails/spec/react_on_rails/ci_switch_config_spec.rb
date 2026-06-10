@@ -266,6 +266,22 @@ RSpec.describe "bin/ci-switch-config" do
     end
   end
 
+  it "reports a friendly error when the CI dependency versions file is missing" do
+    Dir.mktmpdir do |tmpdir|
+      fake_script_path = install_ci_switch_scripts(tmpdir)
+
+      FileUtils.cp(File.join(repo_root, ".tool-versions"), File.join(tmpdir, ".tool-versions"))
+      FileUtils.cp(File.join(repo_root, ".minimum.tool-versions"), File.join(tmpdir, ".minimum.tool-versions"))
+      FileUtils.rm(File.join(tmpdir, ".ci-dependency-versions"))
+
+      _stdout, stderr, status = Open3.capture3(fake_script_path, "status", chdir: tmpdir)
+
+      expect(status).not_to be_success
+      expect(stderr).to include("Error: #{File.join(tmpdir, '.ci-dependency-versions')} not found.")
+      expect(stderr).to include("This file is required at script load time and should be committed.")
+    end
+  end
+
   def install_ci_switch_scripts(tmpdir)
     script_copy_path = File.join(tmpdir, "bin/ci-switch-config")
 
@@ -273,6 +289,8 @@ RSpec.describe "bin/ci-switch-config" do
     FileUtils.cp(source_script_path, script_copy_path)
     # bin/ci-switch-config sources this shared parser from its own directory.
     FileUtils.cp(read_tool_version_path, File.join(tmpdir, "bin/read-tool-version"))
+    # Dependency profile versions are read from this committed file at load time.
+    FileUtils.cp(File.join(repo_root, ".ci-dependency-versions"), File.join(tmpdir, ".ci-dependency-versions"))
     FileUtils.chmod("+x", script_copy_path)
 
     script_copy_path

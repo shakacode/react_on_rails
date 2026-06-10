@@ -1,0 +1,8 @@
+# CI dependency profile versions for bin/ci-switch-config (latest/minimum profiles).
+# Same "<name> <version>" line format as .tool-versions, parsed by bin/read-tool-version.
+# These are npm/gem dependency targets, not runtimes: asdf/mise do not manage them,
+# so they cannot live in .tool-versions alongside Ruby/Node.
+minimum-shakapacker 8.2.0
+minimum-react 18.0.0
+latest-shakapacker 10.1.0
+latest-react 19.0.0

@@ -13,10 +13,13 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 MINIMUM_TOOL_VERSIONS_FILE="$PROJECT_ROOT/.minimum.tool-versions"
 MAXIMUM_TOOL_VERSIONS_FILE="$PROJECT_ROOT/.maximum.tool-versions"
 MAXIMUM_TOOL_VERSIONS_HEAD_FILE="$PROJECT_ROOT/.maximum.tool-versions.head"
+CI_DEPENDENCY_VERSIONS_FILE="$PROJECT_ROOT/.ci-dependency-versions"
 
-require_minimum_tool_versions_file() {
-  if [ ! -f "$MINIMUM_TOOL_VERSIONS_FILE" ]; then
-    echo "Error: $MINIMUM_TOOL_VERSIONS_FILE not found. This file is required at script load time and should be committed." >&2
+require_committed_file() {
+  local file="$1"
+
+  if [ ! -f "$file" ]; then
+    echo "Error: $file not found. This file is required at script load time and should be committed." >&2
     exit 1
   fi
 }
@@ -122,20 +125,22 @@ reload_latest_tool_version_globals() {
 }
 
 # Run at load time (outside main) so sourced test harnesses get populated globals.
-# Requires .minimum.tool-versions to be present before sourcing.
-require_minimum_tool_versions_file
+# Requires .minimum.tool-versions and .ci-dependency-versions to be present before sourcing.
+require_committed_file "$MINIMUM_TOOL_VERSIONS_FILE"
+require_committed_file "$CI_DEPENDENCY_VERSIONS_FILE"
 
 MINIMUM_RUBY_VERSION="$(read_tool_version "$MINIMUM_TOOL_VERSIONS_FILE" ruby)"
 MINIMUM_RUBY_MINOR_VERSION="${MINIMUM_RUBY_VERSION%.*}"
 MINIMUM_NODE_VERSION="$(read_tool_version "$MINIMUM_TOOL_VERSIONS_FILE" nodejs)"
 MINIMUM_NODE_MAJOR_VERSION="${MINIMUM_NODE_VERSION%%.*}"
-MINIMUM_REACT_VERSION="18.0.0" # Update when minimum CI moves to a newer React version.
+# Shakapacker/React profile versions live in .ci-dependency-versions: asdf/mise
+# do not manage npm packages, so they cannot live in .tool-versions alongside Ruby/Node.
+MINIMUM_SHAKAPACKER_VERSION="$(read_tool_version "$CI_DEPENDENCY_VERSIONS_FILE" minimum-shakapacker)"
+MINIMUM_REACT_VERSION="$(read_tool_version "$CI_DEPENDENCY_VERSIONS_FILE" minimum-react)"
 MINIMUM_REACT_MAJOR_VERSION="${MINIMUM_REACT_VERSION%%.*}"
 reload_latest_tool_version_globals false
-# Shakapacker/React stay as literals here: asdf/mise do not manage npm packages,
-# so they cannot live in .tool-versions alongside Ruby/Node.
-LATEST_SHAKAPACKER_VERSION="10.1.0" # Update when latest CI moves to a newer Shakapacker.
-LATEST_REACT_VERSION="19.0.0" # Update when latest CI moves to a newer React version.
+LATEST_SHAKAPACKER_VERSION="$(read_tool_version "$CI_DEPENDENCY_VERSIONS_FILE" latest-shakapacker)"
+LATEST_REACT_VERSION="$(read_tool_version "$CI_DEPENDENCY_VERSIONS_FILE" latest-react)"
 LATEST_REACT_MAJOR_VERSION="${LATEST_REACT_VERSION%%.*}"
 
 # Color codes for output
@@ -455,7 +460,7 @@ show_status() {
   fi
 
   echo ""
-  if [[ "${SHAKAPACKER_GEM}" == "8.2.0" ]] && [[ "${REACT_ROOT}" =~ ^\^?${MINIMUM_REACT_MAJOR_VERSION}(\.|$) ]]; then
+  if [[ "${SHAKAPACKER_GEM}" == "$MINIMUM_SHAKAPACKER_VERSION" ]] && [[ "${REACT_ROOT}" =~ ^\^?${MINIMUM_REACT_MAJOR_VERSION}(\.|$) ]]; then
     echo -e "Current config: ${GREEN}minimum${NC} (matches CI: Ruby $MINIMUM_RUBY_MINOR_VERSION, Node $MINIMUM_NODE_MAJOR_VERSION, minimum deps)"
   elif [[ "${SHAKAPACKER_GEM}" == "$LATEST_SHAKAPACKER_VERSION" ]] && [[ "${REACT_ROOT}" =~ ^\^?${LATEST_REACT_MAJOR_VERSION}(\.|$) ]]; then
     echo -e "Current config: ${GREEN}latest${NC} (matches CI: Ruby $LATEST_RUBY_MINOR_VERSION, Node $LATEST_NODE_MAJOR_VERSION, latest deps)"
@@ -468,7 +473,7 @@ switch_to_minimum() {
   local VERSION_MANAGER=$(check_version_manager)
 
   print_header "Switching to MINIMUM configuration"
-  echo "  Target: Ruby $MINIMUM_RUBY_MINOR_VERSION, Node $MINIMUM_NODE_MAJOR_VERSION, Shakapacker 8.2.0, React $MINIMUM_REACT_VERSION"
+  echo "  Target: Ruby $MINIMUM_RUBY_MINOR_VERSION, Node $MINIMUM_NODE_MAJOR_VERSION, Shakapacker $MINIMUM_SHAKAPACKER_VERSION, React $MINIMUM_REACT_VERSION"
   echo "  Using version manager: $VERSION_MANAGER"
   echo ""
 
@@ -750,7 +755,7 @@ main() {
       echo "Usage: $0 {minimum|latest|status}"
       echo ""
       echo "Commands:"
-      echo "  minimum  - Switch to Ruby $MINIMUM_RUBY_MINOR_VERSION, Node $MINIMUM_NODE_MAJOR_VERSION, minimum dependencies (Shakapacker 8.2.0, React $MINIMUM_REACT_VERSION)"
+      echo "  minimum  - Switch to Ruby $MINIMUM_RUBY_MINOR_VERSION, Node $MINIMUM_NODE_MAJOR_VERSION, minimum dependencies (Shakapacker $MINIMUM_SHAKAPACKER_VERSION, React $MINIMUM_REACT_VERSION)"
       echo "  latest   - Switch to Ruby $LATEST_RUBY_MINOR_VERSION, Node $LATEST_NODE_MAJOR_VERSION, latest dependencies (Shakapacker $LATEST_SHAKAPACKER_VERSION, React $LATEST_REACT_VERSION)"
       echo "  status   - Show current configuration"
       echo ""
