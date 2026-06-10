@@ -47,26 +47,14 @@ module RegressionReport
   FIRST_RUN_SUMMARY = "first_run_summary"
   CONFIRMATION_SUMMARY = "confirmation_summary"
 
-  # TEMPORARY — benchmarks whose regressions must NOT open an issue, by the exact
-  # benchmark name Bencher reports (the leading-slash name shown in the summary table,
-  # matched against REGRESSED_BENCHMARKS in each suite's payload).
-  #
-  # /posts_page: Pro spent weeks hard-500ing on every request (failed_pct = 100), so the
-  # route was effectively an instant error and Bencher built its rps/latency baseline
-  # from those bogus-fast failure responses. Now that the route is fixed, its real
-  # (slower) timings read as large regressions against that fast baseline and would file
-  # a spurious regression issue on every main push. We can't surgically delete just this
-  # benchmark's history in Bencher (the delete is blocked by a FOREIGN KEY constraint
-  # from its reports/alerts), so we suppress it here instead — and short-circuit it
-  # BEFORE a confirmation rerun (plan_confirmation.rb), so we don't burn a fresh runner
-  # confirming a benchmark we would suppress anyway.
-  #
-  # REMOVE this entry (restoring unconditional filing) once the failure-era samples have
-  # rolled out of Bencher's 64-run t-test window for /posts_page: Pro on main — i.e. once
-  # the dashboard baseline reflects real timings again. After that a regression for it is
-  # genuine and must be reported. Tracking issue + full revert steps:
-  # https://github.com/shakacode/react_on_rails/issues/3669
-  IGNORED_REGRESSION_BENCHMARKS = ["/posts_page: Pro"].freeze
+  # Benchmarks whose regressions must NOT open an issue, by the exact benchmark name
+  # Bencher reports (the leading-slash name shown in the summary table, matched against
+  # REGRESSED_BENCHMARKS in each suite's payload). Entries here are TEMPORARY
+  # suppressions: plan_confirmation.rb short-circuits a candidate whose only regressed
+  # benchmarks are listed here BEFORE a confirmation rerun (no fresh runner, no issue).
+  # Empty means every confirmed regression is reported. Any entry added here must have a
+  # tracking issue stating the revert criteria.
+  IGNORED_REGRESSION_BENCHMARKS = [].freeze
 
   # Build a structured alert hash for the ALERTS payload key.
   def alert(benchmark, measure)
