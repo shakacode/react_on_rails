@@ -21,24 +21,10 @@ require_minimum_tool_versions_file() {
   fi
 }
 
-read_tool_version() {
-  local file="$1"
-  local tool="$2"
-  local version
-
-  if [ ! -f "$file" ]; then
-    echo "Missing $file" >&2
-    exit 1
-  fi
-
-  version="$(awk -v tool="$tool" '$1 == tool { print $2; exit }' "$file")"
-  if [ -z "$version" ]; then
-    echo "Missing $tool version in $file" >&2
-    exit 1
-  fi
-
-  echo "$version"
-}
+# Shared .tool-versions parser (defines read_tool_version); the
+# .github/actions/read-tool-versions workflow action executes the same helper.
+# shellcheck source=bin/read-tool-version
+source "$SCRIPT_DIR/read-tool-version"
 
 current_git_head() {
   # Non-git contexts return an empty string; callers must guard empty output.
