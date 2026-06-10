@@ -32,7 +32,7 @@ export interface RscPeerCheckInput {
 type VersionTuple = [number, number, number];
 
 // Strip build metadata (`+...`) and prerelease (`-...`) so a coordinated RC such as
-// `19.0.5-rc.6` compares as `19.0.5`. We only need major/minor/patch ordering, so this
+// `19.0.5-rc.7` compares as `19.0.5`. We only need major/minor/patch ordering, so this
 // avoids semver's prerelease rules (and a `semver` dependency) entirely.
 const parseTuple = (version: string): VersionTuple => {
   // `resolveVersion` is a public injection point, so tolerate a leading `v`/`=` (e.g. `v19.0.4`).

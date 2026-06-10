@@ -18,7 +18,7 @@
 //
 // `recommendedMin` deliberately starts at the stable floor we currently recommend.
 // Raise it to the stable `react-on-rails-rsc` release (expected 19.0.5) once
-// 19.0.5-rc.6 is promoted, which activates the warn tier for anyone still on an older
+// 19.0.5-rc.7 is promoted, which activates the warn tier for anyone still on an older
 // 19.x build.
 // Bump tracked by https://github.com/shakacode/react_on_rails/issues/3632
 // (the stable 19.0.5 ship/pin is tracked by issue #3634).
