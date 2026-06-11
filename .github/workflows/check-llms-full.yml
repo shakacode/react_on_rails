@@ -1,0 +1,50 @@
+name: Check llms-full.txt
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/oss/**'
+      - 'docs/pro/**'
+      - 'docs/sidebars.ts'
+      - 'docs/llms-full-preamble.md'
+      - 'docs/.llms-exclusions'
+      - 'llms.txt'
+      - 'llms-full.txt'
+      - 'script/generate-llms-full.mjs'
+      - '.github/workflows/check-llms-full.yml'
+  pull_request:
+    paths:
+      - 'docs/oss/**'
+      - 'docs/pro/**'
+      - 'docs/sidebars.ts'
+      - 'docs/llms-full-preamble.md'
+      - 'docs/.llms-exclusions'
+      - 'llms.txt'
+      - 'llms-full.txt'
+      - 'script/generate-llms-full.mjs'
+      - '.github/workflows/check-llms-full.yml'
+  workflow_dispatch:
+
+jobs:
+  check-llms-full:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.tool-versions.outputs.node-version }}
+
+      - name: Check llms-full.txt is current and docs URLs resolve
+        run: node script/generate-llms-full.mjs --check

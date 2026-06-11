@@ -1,0 +1,13 @@
+# Docs intentionally excluded from the generated llms-full.txt
+# (redirect stubs with no real content). One doc ID per line.
+# Inline comments (after #) are allowed.
+# Used by script/generate-llms-full.mjs.
+
+# Legacy stubs that redirect to the Docusaurus archive plugin
+building-features/hmr-and-hot-reloading-with-the-webpack-dev-server
+building-features/rails-webpacker-react-integration-options
+deployment/troubleshooting-when-using-webpacker
+misc/asset-pipeline
+
+# URL-compatibility stub that redirects to pro/react-on-rails-pro
+pro/home-pro
