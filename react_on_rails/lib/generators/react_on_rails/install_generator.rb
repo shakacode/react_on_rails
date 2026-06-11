@@ -647,6 +647,15 @@ module ReactOnRails
       def add_agent_files
         return unless options.agent_files?
 
+        # AGENTS.md is the canonical file the editor pointers (CLAUDE.md, Cursor, Copilot) all
+        # reference. If the app already has its own AGENTS.md, it may document unrelated
+        # conventions, so leave it untouched AND skip the pointer files rather than emit editor
+        # guidance pointing at an AGENTS.md we did not write.
+        if File.exist?(File.join(destination_root, "AGENTS.md"))
+          say_status :skip, "AGENTS.md already exists; leaving it and the editor pointer files untouched", :yellow
+          return
+        end
+
         AGENT_FILES.each do |relative_path|
           if File.exist?(File.join(destination_root, relative_path))
             say_status :skip, "#{relative_path} already exists; leaving it untouched", :yellow
@@ -756,6 +765,10 @@ module ReactOnRails
         elsif options.pro?
           flags << "--pro"
         end
+
+        # Preserve an explicit agent-files opt-out so the suggested re-run doesn't emit
+        # AGENTS.md/editor files a user deliberately skipped (--agent-files defaults to on).
+        flags << "--no-agent-files" unless options.agent_files?
 
         ["rails generate react_on_rails:install", *flags].join(" ")
       end

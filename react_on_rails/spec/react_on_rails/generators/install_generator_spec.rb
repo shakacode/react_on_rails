@@ -147,6 +147,19 @@ describe InstallGenerator, type: :generator do
 
       agent_file_paths.each { |relative_path| assert_no_file(relative_path) }
     end
+
+    it "skips the editor pointer files when the app already has its own AGENTS.md" do
+      simulate_existing_file("AGENTS.md", "# App's own AGENTS.md — keep me\n")
+
+      run_add_agent_files
+
+      # The existing AGENTS.md is left untouched and no pointer files are written, so we never
+      # emit editor guidance referencing an AGENTS.md we did not author.
+      assert_file("AGENTS.md") { |content| expect(content).to include("keep me") }
+      %w[CLAUDE.md .cursor/rules/react-on-rails.mdc .github/copilot-instructions.md].each do |pointer|
+        assert_no_file(pointer)
+      end
+    end
   end
 
   context "without args" do
