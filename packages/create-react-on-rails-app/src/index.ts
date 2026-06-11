@@ -87,6 +87,7 @@ async function run(appName: string, rawOpts: Record<string, unknown>, command?: 
     rspack: webpackRequested ? false : (rawOpts.rspack ?? true) === true,
     pro,
     rsc,
+    cliVersion: packageJson.version,
   };
 
   if (options.rsc && options.pro) {
