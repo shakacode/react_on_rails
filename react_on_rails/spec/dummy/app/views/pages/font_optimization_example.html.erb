@@ -1,0 +1,41 @@
+<%#
+  Demonstrates ReactOnRails::FontHelper#react_on_rails_font_face.
+
+  The helper returns markup for the document <head>: a font preload <link>, an
+  @font-face with font-display: swap, and a metric-matched fallback @font-face
+  (size-adjust + ascent/descent/line-gap overrides) so swapping in Inter causes
+  no layout shift (CLS).
+
+  The vendored font is self-hosted at /fonts/inter-latin-400-normal.woff2
+  (Inter, OFL-1.1 — see public/fonts/LICENSE-Inter.txt). In a real app you would
+  fingerprint it through the asset pipeline and pass `asset_path(...)` as `src:`.
+  The fallback metrics are documented in docs/oss/building-features/fonts.md.
+%>
+<% content_for :head do %>
+  <%= react_on_rails_font_face(
+        family: "Inter",
+        src: "/fonts/inter-latin-400-normal.woff2",
+        weight: 400,
+        fallback: {
+          family: "Arial",
+          size_adjust: "107.12%",
+          ascent_override: "90.44%",
+          descent_override: "22.52%",
+          line_gap_override: "0.0%"
+        }
+      ) %>
+  <style>
+    .font-optimization-example {
+      font-family: "Inter", "Inter Fallback", Arial, sans-serif;
+    }
+  </style>
+<% end %>
+
+<div class="font-optimization-example">
+  <h1>Font optimization example</h1>
+  <p>
+    This page self-hosts the Inter web font, preloads it, applies
+    <code>font-display: swap</code>, and uses a <code>size-adjust</code> fallback
+    face so there is no layout shift when Inter swaps in.
+  </p>
+</div>

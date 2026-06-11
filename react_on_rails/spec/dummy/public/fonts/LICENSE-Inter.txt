@@ -1,0 +1,21 @@
+Inter font — vendored example for the React on Rails font-optimization helper.
+
+File: inter-latin-400-normal.woff2
+Family: Inter
+Weight: 400 (normal)
+Subset: latin
+Source font version: v20 (per @fontsource/inter metadata)
+woff2 fetched from: https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-400-normal.woff2
+
+License: SIL Open Font License, Version 1.1 (OFL-1.1)
+  https://openfontlicense.org
+Copyright: Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter)
+
+This font is redistributed here under the OFL-1.1 solely to provide a small,
+permissively-licensed, self-hosted example for the documentation and tests.
+The OFL permits bundling and redistribution; it does not permit selling the
+font by itself. See the full license text at the URL above.
+
+Fallback metric values used by the example (Inter over an Arial fallback) are
+derived from @capsizecss/metrics@4.0.0 and documented in
+docs/oss/building-features/fonts.md.

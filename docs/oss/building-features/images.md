@@ -45,3 +45,9 @@ to `app/javascript/images/foobar.jpg` with a custom alias like this:
     },
   },
 ```
+
+## See also
+
+For self-hosting and optimizing web fonts (preload, `font-display`, and a
+`size-adjust` metric-matched fallback to eliminate layout shift), see
+[Font Optimization](./fonts.md).
