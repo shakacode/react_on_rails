@@ -564,6 +564,7 @@ module ReactOnRails
     end
 
     def modulepreload_source?(source)
+      # Priority order: explicit module metadata, rel/type metadata, then the .mjs extension heuristic.
       module_value = preload_manifest_value(source, "module")
       return true if module_value == true
       return false if module_value == false
