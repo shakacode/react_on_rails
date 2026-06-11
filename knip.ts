@@ -223,6 +223,9 @@ const config: KnipConfig = {
         '@rescript/react',
         // The Babel plugin fails to detect it
         'babel-plugin-transform-react-remove-prop-types',
+        // Loaded only when REACT_COMPILER=1 in babel.config.js (which Knip ignores above), so
+        // it is never seen as used by static analysis. See docs/oss/building-features/react-compiler.md.
+        'babel-plugin-react-compiler',
         // Required by @babel/plugin-transform-runtime for polyfills (used by webpack)
         '@babel/runtime',
         // Used in webpack server config for CSS extraction
