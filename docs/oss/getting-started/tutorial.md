@@ -160,7 +160,12 @@ If your app sets `config.auto_load_bundle = true` in `config/initializers/react_
 <%= react_component("Counter", props: @counter_props) %>
 ```
 
-The generated `react_on_rails_default` layout includes the Shakapacker tags that auto-bundling needs. If you render from your application's default layout instead, add the same `stylesheet_pack_tag` and `javascript_pack_tag` placeholders there.
+The generated `react_on_rails_default` layout includes the Shakapacker tags that auto-bundling needs. If you render from your application's default layout instead, add the same argless pack-tag calls there:
+
+```erb
+<%= stylesheet_pack_tag %>
+<%= javascript_pack_tag %>
+```
 
 If `app/views/layouts/react_on_rails_default.html.erb` is not present (for example, you added React on Rails manually to an existing app without running the installer), remove the `layout` line from the controller and add the pack-tag placeholders to the layout that renders this view.
 
@@ -281,7 +286,11 @@ Run `./bin/dev`, not only `bin/rails server`. The dev command starts both Rails 
 
 ### Server Rendering Fails
 
-Temporarily set `prerender: false` to confirm the browser render works, then remove browser-only APIs from the server render path. You can also enable `trace: true` on `react_component` while debugging.
+Temporarily set `prerender: false` to confirm the browser render works, then remove browser-only APIs from the server render path. You can also enable `trace: true` on `react_component` while debugging:
+
+```erb
+<%= react_component("Counter", props: @counter_props, prerender: true, auto_load_bundle: true, trace: true) %>
+```
 
 ## Appendix: Redux Integration
 
@@ -300,6 +309,8 @@ When rendering a Redux-backed component, the Rails side still uses the same view
 ```erb
 <%= react_component("HelloWorldApp", props: @hello_world_props, auto_load_bundle: true) %>
 ```
+
+The component is named `HelloWorldApp` because that is what the Redux installer generates. Adjust the component name and props key to match your app's controller setup.
 
 For manually wired stores or advanced store sharing, use the [`redux_store` helper](../api-reference/redux-store-api.md) and the [Redux integration guide](../building-features/react-and-redux.md).
 

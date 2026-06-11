@@ -12,7 +12,7 @@ This guide will have you rendering React components in your Rails app as quickly
 Before starting, make sure you have:
 
 - **🚨 React on Rails 17.0.0+** (this guide)
-- **🚨 Shakapacker 6+** (7+ recommended for React on Rails 17)
+- **Shakapacker 6+** — installed automatically by the React on Rails generator (7+ recommended for React on Rails 17)
 - **Rails 7+** application
 - **Ruby 3.3+** (required)
 - **Node.js 18+** and a package manager (**npm**, **pnpm**, **Yarn**, or **bun**)
@@ -60,9 +60,9 @@ Take a look at the files created by the generator.
 - Shakapacker install
 - React component files in `client/`
 - A sample controller and view
-- Webpack configuration
+- Bundler configuration
 
-> 💡 **Performance Tip:** Add the `--rspack` flag for significantly faster builds (~20x improvement). You can also switch bundlers later with `bin/switch-bundler rspack`.
+> 💡 **Performance Tip:** Fresh installs use Rspack by default when supported for significantly faster builds. To compare or temporarily force Webpack, run the installer with `--no-rspack`; you can also switch bundlers later with `bin/switch-bundler`.
 >
 > **Note on `bin/switch-bundler`:** This utility safely switches between webpack and rspack by updating `shakapacker.yml` and managing dependencies. However, it does not modify custom webpack configuration code. If you have custom webpack plugins or loaders, you may need to update those manually to work with rspack. See [Rspack documentation](../api-reference/generator-details.md#rspack-support) for details on unified configuration patterns.
 
@@ -73,7 +73,7 @@ Take a look at the files created by the generator.
 > - **overmind**: `brew install overmind` (macOS) or see [installation guide](https://github.com/DarthSim/overmind#installation)
 > - **foreman**: `gem install foreman` (install globally, not in your project bundle - [details](https://github.com/ddollar/foreman/wiki/Don't-Bundle-Foreman))
 
-Start both Rails and the Webpack dev server:
+Start both Rails and the bundler dev server:
 
 ```bash
 ./bin/dev
@@ -82,7 +82,7 @@ Start both Rails and the Webpack dev server:
 This starts both:
 
 - Rails server on `http://localhost:3000`
-- Webpack dev server for hot reloading
+- Bundler dev server for hot reloading
 
 ## 🎨 Step 3: See Your Component (2 minutes)
 
