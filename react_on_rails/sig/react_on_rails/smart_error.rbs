@@ -1,5 +1,20 @@
 module ReactOnRails
   class SmartError < Error
+    type error_definition = {
+      code: String,
+      title: String,
+      summary: String,
+      sample_context: Hash[Symbol, untyped]
+    }
+
+    DOCS_BASE_URL: String
+    UNKNOWN_ERROR_DEFINITION: error_definition
+    ERROR_DEFINITIONS: Hash[Symbol, error_definition]
+
+    def self.error_definitions: () -> Hash[Symbol, error_definition]
+    def self.error_definition_for: (Symbol | String error_type) -> error_definition
+    def self.docs_url_for: (Symbol | String error_type) -> String
+
     attr_reader error_type: Symbol
     attr_reader component_name: String?
     attr_reader props: String?
@@ -7,11 +22,16 @@ module ReactOnRails
     attr_reader additional_context: Hash[Symbol, untyped]
 
     def initialize: (error_type: Symbol, ?component_name: String?, ?props: String?, ?js_code: String?, **untyped additional_context) -> void
+    def code: () -> String
+    def docs_url: () -> String?
     def solution: () -> String
 
     private
 
     def build_error_message: () -> String
+    def normalized_error_type: () -> Symbol
+    def error_definition: () -> error_definition
+    def error_reference_section: () -> String
     def error_type_title: () -> String
     def error_description: () -> String
     def component_not_registered_solution: () -> String
