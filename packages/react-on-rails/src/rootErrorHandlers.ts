@@ -132,7 +132,7 @@ function inDevelopmentEnv(): boolean {
  * dev-mode logger must re-emit it itself — otherwise window-'error'-based tooling (dev overlays,
  * error trackers) goes silent in development.
  */
-function defaultReportRecoverableError(error: unknown): void {
+export function defaultReportRecoverableError(error: unknown): void {
   if (typeof globalThis.reportError === 'function') {
     globalThis.reportError(error);
   } else {

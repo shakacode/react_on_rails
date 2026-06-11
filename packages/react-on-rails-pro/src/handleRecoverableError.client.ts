@@ -14,6 +14,7 @@
  */
 
 import type { ReactHydrateOptions } from 'react-on-rails/reactApis';
+import { defaultReportRecoverableError } from 'react-on-rails/@internal/rootErrorHandlers';
 import { isRSCRouteSSRFalseBailoutError } from './RSCRouteSSRFalseBailoutError.ts';
 
 const getRecoverableErrorCause = (error: unknown): unknown =>
@@ -21,14 +22,6 @@ const getRecoverableErrorCause = (error: unknown): unknown =>
 
 const isRSCRouteSSRFalseBailout = (error: unknown): boolean =>
   isRSCRouteSSRFalseBailoutError(error) || isRSCRouteSSRFalseBailoutError(getRecoverableErrorCause(error));
-
-const reportRecoverableError = (error: unknown) => {
-  if (typeof globalThis.reportError === 'function') {
-    globalThis.reportError(error);
-  } else {
-    console.error(error);
-  }
-};
 
 /**
  * Builds an `onRecoverableError` root option that chains Pro's internal recoverable-error
@@ -49,7 +42,7 @@ export const chainRecoverableErrorHandlers =
     if (isRSCRouteSSRFalseBailout(error)) {
       return;
     }
-    reportRecoverableError(error);
+    defaultReportRecoverableError(error);
     next?.(error, errorInfo);
   };
 
