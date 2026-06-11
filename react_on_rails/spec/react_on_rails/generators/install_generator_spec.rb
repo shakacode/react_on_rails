@@ -65,7 +65,9 @@ describe InstallGenerator, type: :generator do
     assert_file "app/javascript/src/HelloWorldApp/components/HelloWorld.#{extension}" do |content|
       expect(content).to include("React on Rails + Redux + Tailwind CSS")
       expect(content).to include("rounded-lg")
+      expect(content).to include("focus:outline-hidden")
       expect(content).not_to include("HelloWorld.module.css")
+      expect(content).not_to include("<form")
     end
 
     assert_tailwind_bundler_config(config_dir)
