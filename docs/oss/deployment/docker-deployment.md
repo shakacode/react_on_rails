@@ -420,9 +420,13 @@ containers:
       - name: RENDERER_PORT
         value: '3800'
     readinessProbe:
-      httpGet:
-        path: /health
+      tcpSocket:
         port: 3800
+      periodSeconds: 10
+    livenessProbe:
+      tcpSocket:
+        port: 3800
+      periodSeconds: 30
 ```
 
 > **Note:** `REACT_RENDERER_URL` must be read in your initializer for it to take effect:
@@ -441,7 +445,8 @@ When running the Node Renderer in containers:
 - Set `host` to `0.0.0.0` so health checks and the Rails container can reach it. See [Node Renderer configuration](../building-features/node-renderer/js-configuration.md).
 - On Control Plane, use `process.env.PORT` for the port — Control Plane assigns the port dynamically. See the [Control Plane port docs](https://docs.controlplane.com/reference/workload/containers#port-variable).
 - Set `workersCount` explicitly rather than relying on CPU auto-detection, which can over-allocate workers in constrained containers.
-- Add a `/health` endpoint for container orchestrator probes. See [Adding a Health Check Endpoint](../building-features/node-renderer/js-configuration.md#adding-a-health-check-endpoint).
+- Use `tcpSocket` probes for shallow Kubernetes readiness and liveness checks. Kubernetes `httpGet` probes use HTTP/1.1 and cannot check the h2c-only Node Renderer listener directly.
+- For endpoint-style renderer checks, use an `exec` probe with an h2c-capable client packaged in the renderer image, or expose a separate HTTP/1.1 health endpoint in your own application code.
 
 ## Static assets and CDN
 
