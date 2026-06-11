@@ -1,7 +1,7 @@
 ---
 name: update-changelog
 description: Analyze merged PRs and update CHANGELOG.md, optionally stamping release, rc, beta, or explicit version headers. Use before releases or when changelog entries are missing.
-argument-hint: '[classification-sweep|release|rc|beta|version]'
+argument-hint: '[classification-sweep BASE_REF..TARGET_REF|release|rc|beta|version]'
 ---
 
 # Update Changelog
@@ -16,7 +16,7 @@ This skill accepts an optional mode argument from the invocation text:
 - **`release`** (`/update-changelog release`): Add entries and stamp a version header. Auto-compute the next version based on changes (breaking -> major, added features -> minor, fixes -> patch). Then `rake release` (with no args) will pick up this version automatically.
 - **`rc`** (`/update-changelog rc`): Same as `release`, but stamps an RC prerelease version (e.g., `16.5.0.rc.0`). Auto-increments the RC index if prior RCs exist for the same base version.
 - **`beta`** (`/update-changelog beta`): Same as `rc`, but stamps a beta prerelease version (e.g., `16.5.0.beta.0`).
-- **`classification-sweep`** (`/update-changelog classification-sweep BASE_REF..TARGET_REF`): Print a mechanical review table for every merged PR in the selected range before deciding which changelog entries to add. This mode does not edit `CHANGELOG.md`.
+- **`classification-sweep`** (`/update-changelog classification-sweep BASE_REF..TARGET_REF`): Print a mechanical review table for every merged PR in the selected range before deciding which changelog entries to add. This read-only agent workflow runs git and GitHub API commands directly; it does not edit `CHANGELOG.md` and does not invoke `bundle exec rake` or any header-stamping task.
 - **Explicit version** (`/update-changelog 16.5.0.rc.10`): Add entries and stamp the exact version provided. Skips auto-computation — use this when you already know the target version. The version string must look like a semver version (with optional `.rc.N` or `.beta.N` suffix).
 
 ## When to Use This
@@ -117,7 +117,8 @@ while IFS=$'\t' read -r sha subject; do
   else
     mapped_rows=$(gh api -H "Accept: application/vnd.github+json" \
       "repos/shakacode/react_on_rails/commits/${sha}/pulls" \
-      --jq ".[] | select(.merged_at != null and .base.ref == \"main\") | [.number, \"${sha}\", .title] | @tsv" || true)
+      --arg sha "$sha" \
+      --jq '.[] | select(.merged_at != null and .base.ref == "main") | [.number, $sha, .title] | @tsv' || true)
     if [ -n "$mapped_rows" ]; then
       printf '%s\n' "$mapped_rows"
     else
@@ -128,6 +129,8 @@ done | awk -F '\t' '{ key = ($1 == "UNKNOWN" ? $1 FS $2 : $1); if (!seen[key]++)
 ```
 
 If any commit in the range cannot be mapped to a PR, the command prints an explicit `UNKNOWN` row for that commit. Carry that row into the full table with `Result` set to `UNKNOWN`, investigate it, and do not finish the sweep until the row is resolved to a merged PR classification or explicitly reported as a blocker. Do not silently drop it.
+
+A sudden spike of `UNKNOWN` rows can indicate stale GitHub authentication, API rate limits, or a temporary API failure rather than genuinely unmapped commits. Run `gh auth status` and retry the PR-listing command when the UNKNOWN count looks suspicious.
 
 ### Required Sweep Output
 
@@ -162,10 +165,10 @@ Each row needs a one-line reason specific enough for review. Avoid generic reaso
 - Use `entry-needed` for user-visible product behavior: public API/config/generator changes, runtime bug fixes, compatibility changes, breaking changes, security fixes, and performance or reliability changes users would care about.
 - Use `entry-needed` for Pro runtime changes that affect React Server Components, the Node renderer, caching, routing, package compatibility, generated Pro configs, or observable logging/error behavior. Pro-only is still user-visible for Pro users.
 - Use `entry-needed` for `perf-reliability` when the PR changes runtime performance, removes blocking work, improves production recovery, or makes user-visible failures diagnosable. For example, a PR that moves Pro RSC manifest signature checks from synchronous filesystem calls to async checks is `entry-needed`.
-- Use `no-entry` for docs-only, tests-only, formatting, lint, internal refactors, CI, benchmark harnesses, release automation, agent/process docs, and other contributor-only changes. Keep docs-only PRs as `entry-needed` when they correct incorrect public behavior documentation.
+- Use `no-entry` for docs-only, tests-only, formatting, lint, internal refactors, CI, benchmark harnesses, release automation, agent/process docs, and other contributor-only changes. Keep docs-only PRs as `entry-needed` when they correct incorrect public behavior documentation; use Category `product code` for docs-only PRs that correct public OSS behavior docs, or `Pro runtime` when they correct public Pro behavior docs.
 - Categorize by the primary surface changed, not by the changelog section it might eventually use:
   - `product code`: OSS gem/npm package runtime, generators, public types, public config, or user-facing examples.
-  - `Pro runtime`: proprietary Pro package/runtime behavior, RSC integration, Node renderer behavior, Pro generated config, Pro package compatibility.
+  - `Pro runtime`: proprietary Pro package/runtime behavior, RSC integration, Node renderer behavior, Pro-generated config, Pro package compatibility.
   - `perf-reliability`: runtime performance/reliability fixes, benchmark/regression systems, crash recovery, and failure classification. Use `entry-needed` only when users benefit directly; benchmark machinery itself is usually `no-entry`.
   - `release-process`: release tasks, CI selection, dependency pins used only for releasing/testing, changelog mechanics, PR batch mechanics, agent skills, GitHub Actions, and maintainer workflow.
   - `internal`: docs/planning, tests, fixtures, refactors, cleanup, diagnostics for contributors, and non-user-facing maintenance.
