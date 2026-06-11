@@ -37,12 +37,12 @@ Verified in this repository:
 - The current RSC rendering-flow docs state that the client bundle extracts CSS, the server bundle uses
   CSS Modules locals only, and the RSC bundle does not extract CSS.
 - The Pro dummy app request spec
-  `react_on_rails_pro/spec/dummy/spec/requests/rsc_use_client_css_manifest_spec.rb` checks
+  `react_on_rails_pro/spec/dummy/spec/requests/rsc_use_client_css_manifest_spec.rb` (in the Pro repository) checks
   `react-client-manifest.json` records CSS for a `'use client'` component rendered by an RSC page.
 - The Pro dummy app Playwright regression test
-  `react_on_rails_pro/spec/dummy/e2e-tests/rsc_use_client_css.spec.ts` checks that same path: a CSS
-  Module imported by a `'use client'` component in an RSC tree is preloaded or linked before the styled
-  probe paints.
+  `react_on_rails_pro/spec/dummy/e2e-tests/rsc_use_client_css.spec.ts` (in the Pro repository) checks that
+  same path: a CSS Module imported by a `'use client'` component in an RSC tree is preloaded or linked before
+  the styled probe paints.
 - The React on Rails helper still loads generated component packs by appending both
   `generated/<ComponentName>` JavaScript and stylesheet pack tags when `auto_load_bundle` is enabled.
 
@@ -320,6 +320,9 @@ const excludeVanillaExtractCss = (rule) => {
     rule.oneOf.forEach(excludeVanillaExtractCss);
   }
 
+  // Target the generated broad CSS rule so vanillaExtractCssRule handles
+  // .vanilla.css exactly once. Inspect clientConfig.module.rules in your app
+  // to confirm which rules this mutation actually hits.
   if (rule.test instanceof RegExp && rule.test.test('app.css')) {
     rule.exclude = [rule.exclude, /\.vanilla\.css$/i].flat().filter(Boolean);
   }
@@ -328,10 +331,10 @@ const excludeVanillaExtractCss = (rule) => {
 const configureClient = () => {
   const clientConfig = commonWebpackConfig();
 
-  // Keep the generated Pro client setup before this point, including:
-  // - deleting the server-bundle entry
-  // - installing the RSC client-manifest plugin
-  // - preserving LoadablePlugin and browser resolve fallbacks
+  // --- Start of generated Pro client setup from this clientWebpackConfig.js ---
+  // Delete the server-bundle entry, install the RSC client-manifest plugin,
+  // and preserve LoadablePlugin plus browser resolve fallbacks.
+  // --- End of generated Pro client setup ---
 
   clientConfig.plugins.push(new VanillaExtractPlugin());
 
@@ -429,8 +432,8 @@ Status key:
   three bundles after upgrading `react-on-rails-rsc`.
 - If a component's first styled usage is in the browser after an `RSCRoute` client-side navigation, the RSC
   payload still needs the stylesheet links. Verify that path separately for route-heavy apps.
-- Rspack support exists, but check the Rspack compatibility page and verify CSS extraction for any package that
-  relies on webpack-only plugins.
+- Rspack support exists, but check the [Rspack compatibility page](./rspack-compatibility.md) and verify CSS
+  extraction for any package that relies on webpack-only plugins.
 - This page intentionally does not include package fixtures or regression tests for Tailwind, Vanilla Extract,
   Linaria, Panda, Compiled, styled-components, Emotion, or component-library styling systems.
 
