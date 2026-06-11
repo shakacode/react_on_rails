@@ -32,7 +32,7 @@ type Props = {
   };
 };
 
-export default async (props: Props, _railsContext: RailsContext) => {
+export default async (props: Props, railsContext: RailsContext) => {
   const { csrf, sessionCookie } = props.ssrOnlyProps;
   const client = new ApolloClient({
     ssrMode: true,
@@ -60,6 +60,9 @@ export default async (props: Props, _railsContext: RailsContext) => {
   // you need to return additional property `apolloStateTag`, to fulfill the state for hydration
   const apolloStateTag = renderToString(
     <script
+      // Carry the per-request CSP nonce so the strict policy
+      // (config/initializers/content_security_policy.rb) allows this inline script.
+      nonce={railsContext.cspNonce}
       // eslint-disable-next-line react/no-danger
       dangerouslySetInnerHTML={{
         __html: `
