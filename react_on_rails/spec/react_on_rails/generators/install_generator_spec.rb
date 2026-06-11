@@ -84,6 +84,17 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  def assert_tailwind_rsc_setup(config_dir:, extension:)
+    assert_tailwind_dependencies
+    assert_file "app/javascript/stylesheets/application.css", /@import "tailwindcss";/
+
+    assert_file "app/javascript/src/HelloServer/ror_components/HelloServer.#{extension}" do |content|
+      expect(content).to include("../../../stylesheets/application.css")
+    end
+
+    assert_tailwind_bundler_config(config_dir)
+  end
+
   def simulate_managed_stock_webpack_files(options = {})
     # MANAGED_WEBPACK_FILE_TEMPLATES is private_constant; this fixture helper
     # intentionally introspects it so tests track managed-file coverage.
@@ -2582,6 +2593,17 @@ describe InstallGenerator, type: :generator do
     end
 
     include_examples "rsc_hello_server_files"
+  end
+
+  context "with --rsc --tailwind --typescript" do
+    before(:all) { run_generator_test_with_args(%w[--rsc --tailwind --typescript], package_json: true) }
+
+    include_examples "rsc_common_files"
+
+    it "wires Tailwind into the generated HelloServer entry" do
+      assert_no_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx"
+      assert_tailwind_rsc_setup(config_dir: "config/rspack", extension: "tsx")
+    end
   end
 
   context "with --rsc --rspack" do

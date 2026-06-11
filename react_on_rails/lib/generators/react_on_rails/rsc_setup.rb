@@ -206,6 +206,7 @@ module ReactOnRails
         # Check if HelloServer already exists (check both jsx and tsx)
         if File.exist?(File.join(destination_root, "#{ror_components_dir}/HelloServer.jsx")) ||
            File.exist?(File.join(destination_root, "#{ror_components_dir}/HelloServer.tsx"))
+          add_tailwind_import_to_hello_server_entry(ror_components_dir)
           say "ℹ️  HelloServer component already exists, skipping", :yellow
           return
         end
@@ -219,12 +220,31 @@ module ReactOnRails
         # Copy component files (uses jsx or tsx based on --typescript flag)
         copy_file("templates/rsc/base/app/javascript/src/HelloServer/ror_components/HelloServer.#{ext}",
                   "#{ror_components_dir}/HelloServer.#{ext}")
+        add_tailwind_import_to_hello_server_entry(ror_components_dir)
         copy_file("templates/rsc/base/app/javascript/src/HelloServer/components/HelloServer.#{ext}",
                   "#{components_dir}/HelloServer.#{ext}")
         copy_file("templates/rsc/base/app/javascript/src/HelloServer/components/LikeButton.#{ext}",
                   "#{components_dir}/LikeButton.#{ext}")
 
         say "✅ Created HelloServer component", :green
+      end
+
+      def add_tailwind_import_to_hello_server_entry(ror_components_dir)
+        return unless use_tailwind?
+
+        candidate_entry_paths = %w[jsx tsx].map do |extension|
+          "#{ror_components_dir}/HelloServer.#{extension}"
+        end
+
+        relative_entry_path = candidate_entry_paths.find do |entry_path|
+          File.exist?(File.join(destination_root, entry_path))
+        end
+        return unless relative_entry_path
+
+        stylesheet_import = "import '../../../stylesheets/application.css';"
+        return if File.read(File.join(destination_root, relative_entry_path)).include?(stylesheet_import)
+
+        prepend_to_file(relative_entry_path, "#{stylesheet_import}\n\n")
       end
 
       def create_hello_server_controller

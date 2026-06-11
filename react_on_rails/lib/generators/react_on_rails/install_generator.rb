@@ -282,6 +282,7 @@ module ReactOnRails
 
         invoke "react_on_rails:rsc", [], { typescript: options.typescript?, invoked_by_install: true,
                                            new_app: options.new_app?, redux: options.redux?,
+                                           tailwind: use_tailwind?,
                                            force: options[:force], skip: options[:skip],
                                            pretend: options[:pretend] }
       end
