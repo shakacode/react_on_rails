@@ -119,6 +119,19 @@ describe('useRailsForm', () => {
 
       expect(fetchMock.mock.calls[0][1].body).toBe(JSON.stringify({ name: 'Ada', email: 'ada@example.com' }));
     });
+
+    it('submits values set by setData in the same tick as the submit', async () => {
+      // React batches the state update, so without eager ref bookkeeping the
+      // fetch body would serialize the pre-setData values.
+      const { result } = renderHook(() => useRailsForm({ name: '', captchaToken: '' }));
+
+      await act(async () => {
+        result.current.setData('captchaToken', 'tok-123');
+        await result.current.post('/contact_messages');
+      });
+
+      expect(fetchMock.mock.calls[0][1].body).toBe(JSON.stringify({ name: '', captchaToken: 'tok-123' }));
+    });
   });
 
   describe('processing lifecycle', () => {
@@ -289,6 +302,38 @@ describe('useRailsForm', () => {
 
       expect(result.current.processing).toBe(false);
       expect(result.current.wasSuccessful).toBe(false);
+    });
+
+    it('does not fire onSuccess for a submission superseded by a newer one', async () => {
+      // A slow first request must not run its callbacks (e.g. navigate on
+      // redirectTo) after a newer submission has already completed.
+      let resolveFirst: (response: Response) => void = () => {};
+      fetchMock
+        .mockImplementationOnce(
+          () =>
+            new Promise<Response>((resolve) => {
+              resolveFirst = resolve;
+            }),
+        )
+        .mockResolvedValueOnce(mockResponse({ status: 200, body: { redirect_to: '/second' } }));
+
+      const { result } = renderHook(() => useRailsForm({ a: 1 }));
+      const firstOnSuccess = jest.fn();
+      const secondOnSuccess = jest.fn();
+
+      let firstSubmit: Promise<unknown> = Promise.resolve();
+      await act(async () => {
+        firstSubmit = result.current.post('/things', { onSuccess: firstOnSuccess });
+        await result.current.post('/things', { onSuccess: secondOnSuccess });
+      });
+
+      await act(async () => {
+        resolveFirst(mockResponse({ status: 200, body: { redirect_to: '/first' } }));
+        await firstSubmit;
+      });
+
+      expect(secondOnSuccess).toHaveBeenCalledTimes(1);
+      expect(firstOnSuccess).not.toHaveBeenCalled();
     });
   });
 

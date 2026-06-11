@@ -185,9 +185,15 @@ export function useRailsForm<TData extends Record<string, unknown>>(initialData:
   const [processing, setProcessing] = useState(false);
   const [wasSuccessful, setWasSuccessful] = useState(false);
 
-  // Latest data for submit() so callbacks never read stale state.
+  // Latest data for submit(). Updated eagerly by commitData (not on render) so
+  // `setData(...); submit(...)` in the same tick posts the just-set values —
+  // React batches the state update, so `data` itself is stale until re-render.
   const dataRef = useRef(data);
-  dataRef.current = data;
+
+  const commitData = useCallback((updater: (previousData: TData) => TData) => {
+    dataRef.current = updater(dataRef.current);
+    setDataState(dataRef.current);
+  }, []);
 
   // Guards against state updates from stale (superseded) or unmounted submissions.
   const submissionIdRef = useRef(0);
@@ -202,14 +208,14 @@ export function useRailsForm<TData extends Record<string, unknown>>(initialData:
   const setData = useCallback(
     (keyOrValues: keyof TData | Partial<TData> | ((previousData: TData) => TData), value?: unknown) => {
       if (typeof keyOrValues === 'function') {
-        setDataState(keyOrValues);
+        commitData(keyOrValues);
       } else if (typeof keyOrValues === 'object') {
-        setDataState((previousData) => ({ ...previousData, ...keyOrValues }));
+        commitData((previousData) => ({ ...previousData, ...keyOrValues }));
       } else {
-        setDataState((previousData) => ({ ...previousData, [keyOrValues]: value }));
+        commitData((previousData) => ({ ...previousData, [keyOrValues]: value }));
       }
     },
-    [],
+    [commitData],
   ) as UseRailsForm<TData>['setData'];
 
   const clearErrors = useCallback((...fields: string[]) => {
@@ -229,11 +235,11 @@ export function useRailsForm<TData extends Record<string, unknown>>(initialData:
   const reset = useCallback(
     (...fields: Extract<keyof TData, string>[]) => {
       if (fields.length === 0) {
-        setDataState(initialDataRef.current);
+        commitData(() => initialDataRef.current);
         clearErrors();
         return;
       }
-      setDataState((previousData) => {
+      commitData((previousData) => {
         const nextData = { ...previousData };
         fields.forEach((field) => {
           nextData[field] = initialDataRef.current[field];
@@ -242,7 +248,7 @@ export function useRailsForm<TData extends Record<string, unknown>>(initialData:
       });
       clearErrors(...fields);
     },
-    [clearErrors],
+    [clearErrors, commitData],
   );
 
   const submit = useCallback(
@@ -279,8 +285,8 @@ export function useRailsForm<TData extends Record<string, unknown>>(initialData:
           if (isCurrent()) {
             setErrors(validationErrors);
             setProcessing(false);
+            options.onError?.(validationErrors);
           }
-          options.onError?.(validationErrors);
           return { ok: false as const, errors: validationErrors, response };
         }
       }
@@ -303,8 +309,10 @@ export function useRailsForm<TData extends Record<string, unknown>>(initialData:
         setErrors({});
         setWasSuccessful(true);
         setProcessing(false);
+        // Guarded like the state updates: a superseded submission must not
+        // fire callbacks (e.g. navigate on redirectTo) after a newer one.
+        options.onSuccess?.(result);
       }
-      options.onSuccess?.(result);
       return result;
     },
     [],
