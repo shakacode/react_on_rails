@@ -1,0 +1,63 @@
+{
+  "env": {
+    "node": "v22.12.0",
+    "v8": "12.4.254.21-node.21",
+    "os": "Darwin 25.5.0 (darwin/arm64)",
+    "cpu": "Apple M5 Max",
+    "cores": 18,
+    "memGB": 128,
+    "exposedGc": true,
+    "date": "2026-06-11T22:11:32.685Z"
+  },
+  "results": [
+    {
+      "name": "tutorial_app_scaled_1_16mb",
+      "description": "tutorial App request, comments scaled to ~1.16 MB (4398 comments)",
+      "bundle": "react-webpack-rails-tutorial/ec974491/server-bundle.js",
+      "requestBytes": 1164241,
+      "resultBytes": 1652797,
+      "resultWasSync": true,
+      "iters": 300,
+      "warmup": 25,
+      "coldBundleBuildMs": 48.36170799999999,
+      "compile": {
+        "n": 300,
+        "mean": 6.241747100000257,
+        "min": 4.326791999999841,
+        "p50": 5.869291999995767,
+        "p90": 6.838625000003958,
+        "p99": 15.327832999999373,
+        "max": 37.7982090000005
+      },
+      "hotline": {
+        "n": 300,
+        "mean": 203.4328928933334,
+        "min": 160.0122080000001,
+        "p50": 197.5952499999994,
+        "p90": 235.8527080000058,
+        "p99": 305.41737499999726,
+        "max": 311.8980840000004
+      },
+      "compileSameSrc": {
+        "n": 100,
+        "mean": 0.07631042000022717,
+        "min": 0.020250000001396984,
+        "p50": 0.02074999999604188,
+        "p90": 0.021374999996623956,
+        "p99": 0.05383299999812152,
+        "max": 5.505000000004657
+      },
+      "hotlineSameSrc": {
+        "n": 300,
+        "mean": 184.04305403,
+        "min": 147.2586250000022,
+        "p50": 180.23091700000805,
+        "p90": 212.30783299999894,
+        "p99": 280.2890000000043,
+        "max": 305.2360000000044
+      },
+      "gcMsPerIterUniquePhase": 14.772553929891437,
+      "gcMsPerIterSamePhase": 12.713506313245743
+    }
+  ]
+}

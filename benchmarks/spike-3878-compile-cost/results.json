@@ -1,0 +1,259 @@
+{
+  "env": {
+    "node": "v22.12.0",
+    "v8": "12.4.254.21-node.21",
+    "os": "Darwin 25.5.0 (darwin/arm64)",
+    "cpu": "Apple M5 Max",
+    "cores": 18,
+    "memGB": 128,
+    "exposedGc": true,
+    "date": "2026-06-11T22:09:42.919Z"
+  },
+  "results": [
+    {
+      "name": "spec_dummy_redux_actual",
+      "description": "spec/dummy ReduxApp — actual gem-generated request, unmodified",
+      "bundle": "spec-dummy/9fa89f7/server-bundle-web-target.js",
+      "requestBytes": 989,
+      "resultBytes": 1797,
+      "resultWasSync": true,
+      "iters": 500,
+      "warmup": 25,
+      "coldBundleBuildMs": 61.945209000000006,
+      "compile": {
+        "n": 500,
+        "mean": 0.021277947999999127,
+        "min": 0.009832999999957792,
+        "p50": 0.014541000000008353,
+        "p90": 0.03941599999996015,
+        "p99": 0.07145900000000438,
+        "max": 0.12458300000000122
+      },
+      "hotline": {
+        "n": 500,
+        "mean": 0.323525168,
+        "min": 0.22154199999999946,
+        "p50": 0.281708999999978,
+        "p90": 0.45420799999999417,
+        "p99": 0.8822089999999889,
+        "max": 1.0812500000000114
+      },
+      "compileSameSrc": {
+        "n": 100,
+        "mean": 0.0018108500000022332,
+        "min": 0.0004999999999881766,
+        "p50": 0.0005419999999958236,
+        "p90": 0.0009580000000255495,
+        "p99": 0.014791999999999916,
+        "max": 0.09162499999996498
+      },
+      "hotlineSameSrc": {
+        "n": 500,
+        "mean": 0.31894501000000103,
+        "min": 0.21462499999995543,
+        "p50": 0.2785000000000082,
+        "p90": 0.42620800000008785,
+        "p99": 0.7735410000000229,
+        "max": 5.238416999999913
+      },
+      "gcMsPerIterUniquePhase": 0.005164085995405913,
+      "gcMsPerIterSamePhase": 0.013423833999782801
+    },
+    {
+      "name": "tutorial_app_actual",
+      "description": "react-webpack-rails-tutorial App — actual gem-generated request, unmodified",
+      "bundle": "react-webpack-rails-tutorial/ec974491/server-bundle.js",
+      "requestBytes": 1101,
+      "resultBytes": 3821,
+      "resultWasSync": true,
+      "iters": 500,
+      "warmup": 25,
+      "coldBundleBuildMs": 42.21174999999994,
+      "compile": {
+        "n": 500,
+        "mean": 0.05184374799999841,
+        "min": 0.01612499999987449,
+        "p50": 0.04545800000005329,
+        "p90": 0.08062499999994088,
+        "p99": 0.13670799999999872,
+        "max": 0.8430000000000746
+      },
+      "hotline": {
+        "n": 500,
+        "mean": 1.2901969040000036,
+        "min": 0.6416659999999865,
+        "p50": 1.1030829999999696,
+        "p90": 1.7159999999998945,
+        "p99": 3.5233749999999873,
+        "max": 40.721000000000004
+      },
+      "compileSameSrc": {
+        "n": 100,
+        "mean": 0.000828329999988,
+        "min": 0.00041699999997035775,
+        "p50": 0.0005000000001018634,
+        "p90": 0.0006670000000212895,
+        "p99": 0.002416999999923064,
+        "max": 0.027207999999973254
+      },
+      "hotlineSameSrc": {
+        "n": 500,
+        "mean": 0.9574828399999965,
+        "min": 0.6040000000000418,
+        "p50": 0.8548330000000988,
+        "p90": 1.3767089999998916,
+        "p99": 2.422375000000102,
+        "max": 2.9987079999998514
+      },
+      "gcMsPerIterUniquePhase": 0.05306433400511742,
+      "gcMsPerIterSamePhase": 0.04176757800579071
+    },
+    {
+      "name": "friendsandguests_listing_index_actual",
+      "description": "friendsandguests ListingIndex — actual gem-generated request (14 KB), unmodified",
+      "bundle": "friendsandguests/1a7fe417/server-bundle.js",
+      "requestBytes": 14379,
+      "resultBytes": 61871,
+      "resultWasSync": true,
+      "iters": 500,
+      "warmup": 25,
+      "coldBundleBuildMs": 120.47741700000006,
+      "compile": {
+        "n": 500,
+        "mean": 0.19965081600000395,
+        "min": 0.13066600000001927,
+        "p50": 0.18933300000026065,
+        "p90": 0.24666699999943376,
+        "p99": 0.305833999999777,
+        "max": 0.6864999999997963
+      },
+      "hotline": {
+        "n": 500,
+        "mean": 6.1612554299999855,
+        "min": 4.099207999999635,
+        "p50": 5.901291000000128,
+        "p90": 7.8117919999999685,
+        "p99": 9.315541999999823,
+        "max": 11.272750000000087
+      },
+      "compileSameSrc": {
+        "n": 100,
+        "mean": 0.002511629999971774,
+        "min": 0.0005409999994299142,
+        "p50": 0.0005840000003445311,
+        "p90": 0.0007919999998193816,
+        "p99": 0.002666000000317581,
+        "max": 0.1861669999998412
+      },
+      "hotlineSameSrc": {
+        "n": 500,
+        "mean": 5.988234559999993,
+        "min": 3.9344580000006317,
+        "p50": 5.699125000000095,
+        "p90": 7.438791999999921,
+        "p99": 11.22545799999989,
+        "max": 13.59337499999856
+      },
+      "gcMsPerIterUniquePhase": 0.2986749139837921,
+      "gcMsPerIterSamePhase": 0.3085840020030737
+    },
+    {
+      "name": "tutorial_app_scaled_64kb",
+      "description": "tutorial App request, comments scaled to ~64 KB (245 comments)",
+      "bundle": "react-webpack-rails-tutorial/ec974491/server-bundle.js",
+      "requestBytes": 65658,
+      "resultBytes": 94348,
+      "resultWasSync": true,
+      "iters": 300,
+      "warmup": 25,
+      "coldBundleBuildMs": 11.874292000000423,
+      "compile": {
+        "n": 300,
+        "mean": 0.6281835833332601,
+        "min": 0.351833999999144,
+        "p50": 0.5541250000005675,
+        "p90": 0.8102500000004511,
+        "p99": 2.690875000000233,
+        "max": 3.2137500000008004
+      },
+      "hotline": {
+        "n": 300,
+        "mean": 12.372421100000034,
+        "min": 9.64312499999869,
+        "p50": 12.136500000000524,
+        "p90": 14.236542000000554,
+        "p99": 18.344375000000582,
+        "max": 20.39758400000028
+      },
+      "compileSameSrc": {
+        "n": 100,
+        "mean": 0.03057918000005884,
+        "min": 0.021875000000363798,
+        "p50": 0.022708000000420725,
+        "p90": 0.0235419999989972,
+        "p99": 0.03395799999998417,
+        "max": 0.7930840000008175
+      },
+      "hotlineSameSrc": {
+        "n": 300,
+        "mean": 12.249367653333369,
+        "min": 9.58783399999993,
+        "p50": 12.0938750000023,
+        "p90": 14.108541999999943,
+        "p99": 18.9820409999993,
+        "max": 38.59541700000045
+      },
+      "gcMsPerIterUniquePhase": 0.9340320633475979,
+      "gcMsPerIterSamePhase": 0.9047959633730351
+    },
+    {
+      "name": "tutorial_app_scaled_1_16mb",
+      "description": "tutorial App request, comments scaled to ~1.16 MB (4398 comments)",
+      "bundle": "react-webpack-rails-tutorial/ec974491/server-bundle.js",
+      "requestBytes": 1164241,
+      "resultBytes": 1652797,
+      "resultWasSync": true,
+      "iters": 150,
+      "warmup": 25,
+      "coldBundleBuildMs": 14.698583000001236,
+      "compile": {
+        "n": 150,
+        "mean": 5.841672206666723,
+        "min": 4.230250000000524,
+        "p50": 5.632000000001426,
+        "p90": 6.304791000002297,
+        "p99": 11.331167000000278,
+        "max": 15.413541999998415
+      },
+      "hotline": {
+        "n": 150,
+        "mean": 201.45742993333337,
+        "min": 173.41891699999906,
+        "p50": 194.2825410000005,
+        "p90": 217.07862499999828,
+        "p99": 384.5129159999997,
+        "max": 391.4595420000005
+      },
+      "compileSameSrc": {
+        "n": 100,
+        "mean": 0.10007968000005349,
+        "min": 0.029624999995576218,
+        "p50": 0.030582999999751337,
+        "p90": 0.03516700000182027,
+        "p99": 0.13091700000222772,
+        "max": 6.633207999999286
+      },
+      "hotlineSameSrc": {
+        "n": 150,
+        "mean": 177.55870023333418,
+        "min": 155.49079199999687,
+        "p50": 166.70583299999998,
+        "p90": 201.06316599999263,
+        "p99": 309.93387500000244,
+        "max": 322.5720830000064
+      },
+      "gcMsPerIterUniquePhase": 14.580592773593962,
+      "gcMsPerIterSamePhase": 12.523282873580854
+    }
+  ]
+}

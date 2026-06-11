@@ -1,0 +1,52 @@
+{
+  "env": {
+    "node": "v22.12.0",
+    "v8": "12.4.254.21-node.21",
+    "os": "Darwin 25.5.0 (darwin/arm64)",
+    "cpu": "Apple M5 Max",
+    "cores": 18,
+    "memGB": 128,
+    "exposedGc": false,
+    "date": "2026-06-11T22:03:27.445Z"
+  },
+  "results": [
+    {
+      "name": "tutorial_app_scaled_1_16mb",
+      "description": "tutorial App request, comments scaled to ~1.16 MB (4398 comments)",
+      "bundle": "react-webpack-rails-tutorial/ec974491/server-bundle.js",
+      "requestBytes": 1164241,
+      "resultBytes": 1652797,
+      "resultWasSync": true,
+      "iters": 100,
+      "warmup": 25,
+      "coldBundleBuildMs": 51.876042,
+      "compile": {
+        "n": 100,
+        "mean": 6.223164189999871,
+        "min": 5.229916999996931,
+        "p50": 5.820749999998952,
+        "p90": 6.84624999999869,
+        "p99": 13.285374999999476,
+        "max": 16.460666999999376
+      },
+      "hotline": {
+        "n": 100,
+        "mean": 176.94026504000016,
+        "min": 157.37024999999994,
+        "p50": 170.3065000000006,
+        "p90": 200.78104200000234,
+        "p99": 238.28675000000294,
+        "max": 249.69858400000157
+      },
+      "compileSameSrc": {
+        "n": 100,
+        "mean": 0.11668999000004987,
+        "min": 0.02254199999879347,
+        "p50": 0.02824999999938882,
+        "p90": 0.03195899999991525,
+        "p99": 0.07433400000081747,
+        "max": 8.689291999999114
+      }
+    }
+  ]
+}
