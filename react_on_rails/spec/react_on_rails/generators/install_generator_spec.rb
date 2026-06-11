@@ -2623,8 +2623,8 @@ describe InstallGenerator, type: :generator do
     include_examples "rsc_hello_server_files"
   end
 
-  context "with --rsc --tailwind --typescript" do
-    before(:all) { run_generator_test_with_args(%w[--rsc --tailwind --typescript], package_json: true) }
+  context "with --rsc --rspack --tailwind --typescript" do
+    before(:all) { run_generator_test_with_args(%w[--rsc --rspack --tailwind --typescript], package_json: true) }
 
     include_examples "rsc_common_files"
 

@@ -31,6 +31,8 @@ The generator installs these published packages:
 
 ```bash
 pnpm add tailwindcss@^4.3.0 @tailwindcss/postcss@^4.3.0 postcss@^8.5.15 postcss-loader@^8.2.1
+npm install tailwindcss@^4.3.0 @tailwindcss/postcss@^4.3.0 postcss@^8.5.15 postcss-loader@^8.2.1
+yarn add tailwindcss@^4.3.0 @tailwindcss/postcss@^4.3.0 postcss@^8.5.15 postcss-loader@^8.2.1
 ```
 
 It also creates `app/javascript/stylesheets/application.css`:
@@ -70,6 +72,8 @@ If you are not rerunning the generator, add the packages yourself:
 
 ```bash
 pnpm add tailwindcss@^4.3.0 @tailwindcss/postcss@^4.3.0 postcss@^8.5.15 postcss-loader@^8.2.1
+npm install tailwindcss@^4.3.0 @tailwindcss/postcss@^4.3.0 postcss@^8.5.15 postcss-loader@^8.2.1
+yarn add tailwindcss@^4.3.0 @tailwindcss/postcss@^4.3.0 postcss@^8.5.15 postcss-loader@^8.2.1
 ```
 
 Then create a CSS entry, import it from your client component or client pack,
