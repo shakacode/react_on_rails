@@ -81,17 +81,26 @@ module ReactOnRails
     # Returns a plain (not html_safe) String.
     def self.font_face_markup(family:, src:, weight: 400, style: "normal", display: "swap",
                               unicode_range: nil, preload: true, fallback: nil)
+      # Validate every value interpolated into the trusted <style>/<link> markup so no
+      # argument can break out of the CSS/HTML context (see the contract in the docstring).
       ensure_safe!("family", family)
       ensure_safe!("src", src)
+      ensure_safe!("weight", weight)
+      ensure_safe!("style", style)
+      ensure_safe!("display", display)
+      ensure_safe!("unicode_range", unicode_range) if unicode_range
       if fallback
         ensure_safe!("fallback[:family]", fallback.fetch(:family))
         ensure_safe!("fallback[:name]", fallback[:name]) if fallback[:name]
+        %i[size_adjust ascent_override descent_override line_gap_override].each do |key|
+          ensure_safe!("fallback[:#{key}]", fallback[key]) if fallback[key]
+        end
       end
       rule = font_face_rule(family:, src:, weight:, style:, display:, unicode_range:)
       parts = []
       parts << preload_link(src) if preload
       parts << +"<style>\n#{rule}"
-      parts[-1] << "\n#{fallback_font_face_rule(family, fallback)}" if fallback
+      parts[-1] << "\n#{fallback_font_face_rule(family, fallback, weight:, style:)}" if fallback
       parts[-1] << "\n</style>"
       parts.join("\n")
     end
@@ -127,11 +136,21 @@ module ReactOnRails
 
     # Generates the metric-matched fallback face. Hardcode `size-adjust` and the
     # override percentages from the font's published metrics (see the fonts docs
-    # for how the Inter-over-Arial numbers are derived).
-    def self.fallback_font_face_rule(family, fallback)
+    # for how the Inter-over-Arial numbers are derived). The `font-weight` and
+    # `font-style` mirror the primary face so the browser matches this fallback to
+    # the same elements (otherwise the size-adjust CLS protection silently fails for
+    # non-400 weights / non-normal styles), the way `next/font` generates its
+    # weight-matched fallback.
+    def self.fallback_font_face_rule(family, fallback, weight:, style:)
       name = fallback[:name] || "#{family} Fallback"
       local = fallback.fetch(:family)
-      lines = ["@font-face {", %(  font-family: "#{name}";), %(  src: local("#{local}");)]
+      lines = [
+        "@font-face {",
+        %(  font-family: "#{name}";),
+        %(  src: local("#{local}");),
+        "  font-weight: #{weight};",
+        "  font-style: #{style};"
+      ]
       lines << "  size-adjust: #{fallback[:size_adjust]};" if fallback[:size_adjust]
       lines << "  ascent-override: #{fallback[:ascent_override]};" if fallback[:ascent_override]
       lines << "  descent-override: #{fallback[:descent_override]};" if fallback[:descent_override]

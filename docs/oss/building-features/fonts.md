@@ -111,7 +111,11 @@ the fallback and the web font have different metrics, text **reflows** on the
 swap — that reflow is CLS. The fix (the same one `next/font` uses) is a second
 `@font-face` that takes a **local** system font and adjusts its metrics with
 `size-adjust`, `ascent-override`, `descent-override`, and `line-gap-override` so
-it occupies exactly the space the real web font will. See
+it occupies exactly the space the real web font will. The helper also emits
+`font-weight` and `font-style` on this fallback face matching the primary face,
+so the browser applies it to the same elements (without this, the size-adjust
+protection silently fails for non-`400` weights or non-`normal` styles — just as
+`next/font` generates a weight-matched fallback). See
 [web.dev: font best practices](https://web.dev/articles/font-best-practices) and
 [Chrome: improved font fallbacks](https://developer.chrome.com/blog/font-fallbacks/).
 

@@ -56,6 +56,13 @@ module ReactOnRails
         expect(markup).to include("descent-override: 22.52%;")
         expect(markup).to include("line-gap-override: 0.0%;")
       end
+
+      it "emits font-weight and font-style on the fallback face so it matches the same elements" do
+        # The fallback @font-face must mirror the primary face's weight/style, otherwise the
+        # browser won't apply the size-adjust fallback to non-400/non-normal elements (CLS).
+        expect(markup).to include("@font-face {\n  font-family: \"Inter Fallback\";\n  " \
+                                  "src: local(\"Arial\");\n  font-weight: 400;\n  font-style: normal;")
+      end
     end
 
     describe ".font_face_markup" do
@@ -91,6 +98,16 @@ module ReactOnRails
         expect(markup).to include('font-family: "Inter Variable Fallback";')
       end
 
+      it "mirrors a non-default weight and style onto the fallback face" do
+        markup = described_class.font_face_markup(
+          family: "Inter", src: "/assets/inter.woff2", weight: 700, style: "italic",
+          fallback: { family: "Arial", size_adjust: "107.12%" }
+        )
+        # Both the primary and fallback faces carry the same weight/style.
+        expect(markup.scan("font-weight: 700;").size).to eq(2)
+        expect(markup.scan("font-style: italic;").size).to eq(2)
+      end
+
       it "defaults font-style to normal and font-display to swap" do
         markup = described_class.font_face_markup(family: "Inter", src: "/assets/inter.woff2")
         expect(markup).to include("font-style: normal;")
@@ -109,6 +126,24 @@ module ReactOnRails
         expect do
           described_class.font_face_markup(
             family: 'Inter"></style><script>alert(1)</script>', src: "/assets/inter.woff2"
+          )
+        end.to raise_error(ArgumentError, /unsafe character/)
+      end
+
+      it "raises if display: tries to break out of the <style> context" do
+        expect do
+          described_class.font_face_markup(
+            family: "Inter", src: "/assets/inter.woff2",
+            display: "swap;</style><script>alert(1)</script>"
+          )
+        end.to raise_error(ArgumentError, /unsafe character/)
+      end
+
+      it "raises if a fallback metric value contains markup-breaking characters" do
+        expect do
+          described_class.font_face_markup(
+            family: "Inter", src: "/assets/inter.woff2",
+            fallback: { family: "Arial", size_adjust: "107%;</style><script>" }
           )
         end.to raise_error(ArgumentError, /unsafe character/)
       end
